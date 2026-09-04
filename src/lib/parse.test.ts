@@ -28,11 +28,11 @@ describe('parseDelimited', () => {
 
 describe('sniffDelimiter', () => {
 	it('prefers tabs for spreadsheet paste', () => {
-		expect(sniffDelimiter('title\tbody\nKitchen\tTidy up')).toBe('\t');
+		expect(sniffDelimiter('title\tbody\nFerns\tWater them')).toBe('\t');
 	});
 
 	it('falls back to commas', () => {
-		expect(sniffDelimiter('title,body\nKitchen,Tidy up')).toBe(',');
+		expect(sniffDelimiter('title,body\nFerns,Water them')).toBe(',');
 	});
 });
 
@@ -43,14 +43,14 @@ describe('normaliseHeaders', () => {
 });
 
 describe('parseTable', () => {
-	const csv = 'title,subtitle,body\nKitchen,,"## Fire\n\n- Turn it off."\n';
+	const csv = 'title,subtitle,body\nFerns,,"## Too dry\n\n- Water them."\n';
 
 	it('maps rows onto headers', () => {
 		const { columns, rows } = parseTable(csv);
 		expect(columns).toEqual(['title', 'subtitle', 'body']);
 		expect(rows).toHaveLength(1);
 		expect(rows[0].subtitle).toBe('');
-		expect(rows[0].body).toContain('- Turn it off.');
+		expect(rows[0].body).toContain('- Water them.');
 	});
 
 	it('pads short records so every row has every column', () => {

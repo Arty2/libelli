@@ -47,8 +47,8 @@ blocks the main thread. *Reset* in the toolbar wipes both.
 ## Using it
 
 1. **Data in.** *Paste from Excel* (tabs, commas, quoted multi-line cells all
-   parse), *Import CSV*, or *Load sample* for the four reference ONX cards.
-   Clicking a row previews it.
+   parse), *Import CSV*, or *Load sample* for the four mock cards in
+   `static/sample-cards.csv`. Clicking a row previews it.
 2. **Map columns.** Select a box; the options bar binds its slot to a column.
    The mapping lives outside the template, so a template can be shared between
    spreadsheets — on import you are asked to confirm it rather than it being
@@ -66,9 +66,9 @@ blocks the main thread. *Reset* in the toolbar wipes both.
 
 ## Template format
 
-`src/lib/templates/onx-card.json` is the built-in template and the reference for
-the format. `schema` is mandatory: a file claiming a newer schema is refused
-rather than half-read.
+`src/lib/templates/default-card.json` is the built-in template and the worked
+example of the format. `schema` is mandatory: a file claiming a newer schema is
+refused rather than half-read.
 
 - `mode`: `plain` | `markdown` | `image`
 - `overflow`: `clip` (fixed height, hidden) | `grow` (fixed top, height auto,

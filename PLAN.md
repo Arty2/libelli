@@ -2,7 +2,7 @@
 
 A front-end-only SvelteKit app that turns tabular data (pasted from Excel/Coda, or a CSV) into print-ready A5 cards using a WYSIWYG box-based template editor.
 
-Reference output: see the four ONX studio instruction cards (Kitchen Etiquette, How to Use the Monitors, Studio Etiquette, How to Use the Printer). Title, optional subtitle, a long Markdown body, and a footer with record ID left and date right.
+Target output: an instruction card with a title, an optional subtitle, a long Markdown body, and a footer line. Two of the four sample cards carry a subtitle and two do not.
 
 ---
 
@@ -30,12 +30,12 @@ These were settled during planning. Do not re-litigate them while building; if o
 ```json
 {
   "schema": 1,
-  "name": "ONX Instruction Card",
+  "name": "A5 Instruction Card",
   "page": { "w": 148, "h": 210, "unit": "mm" },
   "bleed": 0,
   "fonts": [
     { "family": "Patrick Hand", "source": "google" },
-    { "family": "Studio Sans", "source": "local", "ref": "font:studio-sans" }
+    { "family": "House Sans", "source": "local", "ref": "font:house-sans" }
   ],
   "defaults": { "font": "Patrick Hand", "size": 11, "lineHeight": 1.35, "color": "#000" },
   "boxes": [
@@ -84,7 +84,7 @@ Box fields:
 ```json
 {
   "columns": ["Name", "Subtitle", "Content", "Record ID", "Date"],
-  "rows": [ { "Name": "Kitchen Etiquette", "…": "…" } ],
+  "rows": [ { "Name": "Watering the Ferns", "…": "…" } ],
   "mapping": { "title": "Name", "body": "Content", "footer_left": "Record ID" },
   "activeRow": 0,
   "ui": { "showOutlines": true, "zoom": "fit" }
@@ -135,7 +135,7 @@ Ship each one working before starting the next.
 
 **M1 — Data in.** Paste TSV from Excel and import CSV. Parse into `columns` + `rows` with correct quoted-field and embedded-newline handling. Render an editable table. Add/delete rows and columns.
 
-**M2 — Render and print.** Commit `onx-card.json` to `src/lib/templates/` and `sample-cards.csv` to `static/`. Both are supplied — do not author a template by hand. Render the active row into an A5 page, then print all rows, one card per page. *This proves the riskiest part on day one — do it before any editor UI exists.*
+**M2 — Render and print.** Commit the card template to `src/lib/templates/` and a sample dataset to `static/`. Render the active row into an A5 page, then print all rows, one card per page. *This proves the riskiest part on day one — do it before any editor UI exists.*
 
 **M3 — Mapping.** Per-box dropdown binding a slot to a column. Persist mapping to localStorage keyed by template name.
 
@@ -166,7 +166,7 @@ Support: `#`/`##`/`###` headings, `-` and `*` bullets (one nesting level), `1.` 
 
 Everything else renders as literal text. **Escape HTML in every leaf text node** — pasted spreadsheet content will contain `<`, `&`, and stray angle brackets.
 
-Ordered-list note: the reference printer card has a numbering bug where the last step restarts at 1. Renumber sequentially from the source rather than reproducing it.
+Ordered-list note: renumber sequentially from the source order, so a dataset whose numbering restarts part-way through still prints as one continuous list.
 
 ---
 
@@ -216,13 +216,13 @@ static/
 
 ## 9. Acceptance checks
 
-- Pasting the four ONX cards produces four A5 pages that closely match the reference PDF.
+- Pasting the four sample cards produces four A5 pages laid out as specified.
 - A `grow` box lengthens downward as body text grows; a `clip` box hard-cuts.
 - Exported template imports cleanly in a fresh browser profile with mapping re-prompted, not assumed.
 - A cell containing `<b>x</b> & "y"` renders literally, not as markup.
 - Print produces exactly one page per row with no blank trailing page.
 - Changing `page.w`/`page.h` moves nothing, because all coordinates are already in mm.
-- Kitchen Etiquette (no subtitle) and Studio Etiquette (subtitle present) both start their body immediately below whatever precedes it, with no dead band on the former.
+- A card without a subtitle and a card with one both start their body immediately below whatever precedes it, with no dead band on the former.
 - Toggling `bleed.enabled` changes only the page size and margins — every box stays visually where it was.
 - The category footer stays pinned at 199mm regardless of how long the body runs.
 

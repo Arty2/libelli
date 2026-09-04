@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "name": "ONX Instruction Card",
+  "name": "A5 Instruction Card",
   "page": { "w": 148, "h": 210, "unit": "mm" },
   "bleed": { "enabled": false, "amount": 3, "cropMarks": false },
   "fonts": [

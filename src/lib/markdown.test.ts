@@ -22,7 +22,7 @@ describe('escaping', () => {
 
 describe('blocks', () => {
 	it('renders headings at multiples of the box size', () => {
-		const html = renderMarkdown('## Fire hazard', { size: 10, md: { h2: { size: 1.5 } } });
+		const html = renderMarkdown('## Too dry', { size: 10, md: { h2: { size: 1.5 } } });
 		expect(html).toContain('<h2');
 		expect(html).toContain('font-size:15pt');
 	});
@@ -75,7 +75,7 @@ describe('inline', () => {
 	it('linkifies safe URLs only', () => {
 		expect(renderInline('[docs](https://example.com)')).toContain('href="https://example.com"');
 		expect(renderInline('[x](javascript:alert(1))')).not.toContain('href');
-		expect(renderInline('[mail](print@printbyxerox.com)')).toContain('href="mailto:print@printbyxerox.com"');
+		expect(renderInline('[mail](bookings@meadowlark.example)')).toContain('href="mailto:bookings@meadowlark.example"');
 	});
 
 	it('leaves unsupported syntax as literal text', () => {

@@ -1,4 +1,4 @@
-import onxCard from './templates/onx-card.json';
+import defaultCard from './templates/default-card.json';
 import type { Box, Defaults, FontRef, Mapping, Template } from './types';
 import { SCHEMA_VERSION } from './types';
 
@@ -9,7 +9,7 @@ import { SCHEMA_VERSION } from './types';
  * the difference between a ten-line migration and silently corrupting saved work.
  */
 
-export const BUILTIN_TEMPLATE_JSON = onxCard as unknown;
+export const BUILTIN_TEMPLATE_JSON = defaultCard as unknown;
 
 export const DEFAULT_DEFAULTS: Defaults = {
 	font: 'Patrick Hand',
