@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "name": "ONX Instruction Card",
+  "page": { "w": 148, "h": 210, "unit": "mm" },
+  "bleed": { "enabled": false, "amount": 3, "cropMarks": false },
+  "fonts": [
+    { "family": "Patrick Hand", "source": "google" },
+    { "family": "Space Mono", "source": "google" }
+  ],
+  "defaults": {
+    "font": "Patrick Hand",
+    "size": 12.5,
+    "lineHeight": 1.5,
+    "weight": 400,
+    "color": "#000000",
+    "align": "left"
+  },
+  "slots": ["title", "subtitle", "body", "category"],
+  "boxes": [
+    {
+      "id": "b_title",
+      "slot": "title",
+      "x": 14, "y": 13, "w": 120, "h": 16,
+      "size": 30,
+      "lineHeight": 1.05,
+      "mode": "plain",
+      "overflow": "grow",
+      "hideWhenEmpty": true
+    },
+    {
+      "id": "b_subtitle",
+      "slot": "subtitle",
+      "x": 14, "y": 31, "w": 120, "h": 8,
+      "size": 15,
+      "lineHeight": 1.2,
+      "mode": "plain",
+      "overflow": "grow",
+      "anchor": { "to": "b_title", "gap": 2 },
+      "hideWhenEmpty": true
+    },
+    {
+      "id": "b_body",
+      "slot": "body",
+      "x": 12, "y": 44, "w": 124, "h": 150,
+      "size": 12.5,
+      "lineHeight": 1.5,
+      "mode": "markdown",
+      "overflow": "grow",
+      "anchor": { "to": "b_subtitle", "gap": 8 },
+      "md": {
+        "h1": { "size": 1.5, "spaceBefore": 6, "spaceAfter": 1.5 },
+        "h2": { "size": 1.35, "spaceBefore": 6, "spaceAfter": 1.5 },
+        "h3": { "size": 1.15, "spaceBefore": 4, "spaceAfter": 1 },
+        "paragraph": { "spaceAfter": 3 },
+        "list": { "indent": 7, "markerGap": 4, "itemSpacing": 1.5 }
+      }
+    },
+    {
+      "id": "b_category",
+      "slot": "category",
+      "x": 12, "y": 199, "w": 60, "h": 6,
+      "font": "Space Mono",
+      "size": 8,
+      "lineHeight": 1.2,
+      "color": "#555555",
+      "mode": "plain",
+      "overflow": "clip",
+      "anchor": null
+    }
+  ]
+}
