@@ -6,4 +6,4 @@
  * vibe-coded app and it is always in flux, so it never claims to be 1.0.
  * Keep this in step with `version` in package.json.
  */
-export const VERSION = '0.9.0';
+export const VERSION = '0.9.1';

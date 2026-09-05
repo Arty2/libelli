@@ -1,27 +1,57 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import type { AlignEdge } from '$lib/layout';
 	import type { Arrange } from '$lib/template';
 	import type { Box, Template } from '$lib/types';
 
 	interface Props {
+		/** the box the menu was opened on */
 		box: Box;
-		/** how many boxes the actions will apply to */
-		count: number;
+		/** everything the actions will apply to; `box` is one of them */
+		selectedBoxes: Box[];
 		template: Template;
 		/** viewport coordinates of the click that opened this */
 		x: number;
 		y: number;
 		onarrange: (where: Arrange) => void;
+		onalign: (edge: AlignEdge) => void;
+		ongroup: () => void;
 		onlock: (locked: boolean) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
 		onclose: () => void;
 	}
 
-	let { box, template, count, x, y, onarrange, onlock, onduplicate, ondelete, onclose }: Props = $props();
+	let {
+		box,
+		template,
+		selectedBoxes,
+		x,
+		y,
+		onarrange,
+		onalign,
+		ongroup,
+		onlock,
+		onduplicate,
+		ondelete,
+		onclose
+	}: Props = $props();
 
-	const many = $derived(count > 1);
-	const plural = $derived(many ? ` ${count} Boxes` : '');
+	const many = $derived(selectedBoxes.length > 1);
+	const plural = $derived(many ? ` ${selectedBoxes.length} Boxes` : '');
+	const grouped = $derived(
+		many && selectedBoxes.every((b) => b.group) && new Set(selectedBoxes.map((b) => b.group)).size === 1
+	);
+
+	/** The same six the selection bar offers, as one row rather than six lines. */
+	const ALIGN_EDGES: Array<{ value: AlignEdge; icon: string; label: string }> = [
+		{ value: 'left', icon: 'obj-left', label: 'Align Left' },
+		{ value: 'centre-x', icon: 'obj-centre-x', label: 'Centre Horizontally' },
+		{ value: 'right', icon: 'obj-right', label: 'Align Right' },
+		{ value: 'top', icon: 'obj-top', label: 'Align Top' },
+		{ value: 'centre-y', icon: 'obj-centre-y', label: 'Centre Vertically' },
+		{ value: 'bottom', icon: 'obj-bottom', label: 'Align Bottom' }
+	];
 
 	const frozen = $derived(!!template.locked);
 	const index = $derived(template.boxes.findIndex((b) => b.id === box.id));
@@ -63,6 +93,31 @@
 	tabindex="-1"
 	style="left:{position.left}px;top:{position.top}px"
 >
+	<!-- With several chosen the menu carries what the selection bar carries: the
+	     alignments as an icon row, because six of them as six lines would bury
+	     everything else. -->
+	{#if many}
+		<div class="align-row" role="group" aria-label="Align">
+			{#each ALIGN_EDGES as option (option.value)}
+				<button
+					title={option.label}
+					aria-label={option.label}
+					disabled={frozen}
+					onclick={() => run(() => onalign(option.value))}
+				>
+					<Icon name={option.icon} size={15} />
+				</button>
+			{/each}
+		</div>
+
+		<hr />
+
+		<button role="menuitem" disabled={frozen} onclick={() => run(ongroup)}>
+			<Icon name="layers" size={15} />
+			{grouped ? 'Ungroup' : 'Group'}
+		</button>
+	{/if}
+
 	<!-- Stacking is about one box's place in the list, so it is offered for one. -->
 	{#if !many}
 		<button role="menuitem" disabled={frozen || atFront} onclick={() => run(() => onarrange('front'))}>
@@ -147,5 +202,18 @@
 		margin: 4px 6px;
 		border: none;
 		border-top: 1px solid #eee;
+	}
+
+	.align-row {
+		display: grid;
+		grid-template-columns: repeat(6, 1fr);
+		gap: 1px;
+		padding: 2px;
+	}
+
+	.align-row button {
+		width: auto;
+		justify-content: center;
+		padding: 6px 0;
 	}
 </style>

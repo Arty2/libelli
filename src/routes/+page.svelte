@@ -859,10 +859,12 @@
 	<BoxMenu
 		box={menuBox}
 		{template}
-		count={selectedIds.length}
+		{selectedBoxes}
 		x={boxMenu.x}
 		y={boxMenu.y}
 		onarrange={arrange}
+		onalign={alignSelection}
+		ongroup={groupSelection}
 		onlock={lockSelection}
 		onduplicate={duplicateBox}
 		ondelete={deleteBox}

@@ -78,7 +78,9 @@ resize boxes directly, or type exact millimetres.
   top, middle, bottom — and to lock, duplicate or delete the lot. **Group** makes
   a selection stick, so clicking any member picks up all of them; it is a shared
   name on each box rather than a container, which keeps the box list flat and
-  leaves anchoring and stacking alone.
+  leaves anchoring and stacking alone. Right-clicking inside a selection offers
+  the same things the bar does — the six alignments as one icon row, then group,
+  lock, duplicate and delete — and keeps the selection rather than collapsing it.
 
   One consequence worth stating: an anchored box takes its top from another box,
   so lining it up vertically would be undone on the next render. Aligning that
