@@ -28,6 +28,7 @@ src/lib/
   table.ts        column reorder, row sorting
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
+  assets.ts       background images: bytes in IndexedDB, object-URL lifetime, url() safety
   history.ts      undo/redo snapshots
   storage.ts      localStorage + IndexedDB, plus the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
@@ -68,6 +69,14 @@ Load-bearing choices, in case they look arbitrary:
   margins no longer collapse out of the box, which the existing
   `:first-child { margin-top: 0 }` rules already absorb. Measurement is
   unaffected — `measure()` reads the box's own `offsetHeight`.
+- **Big things are referenced, never embedded.** A template names a font family
+  and a background image; the bytes live in IndexedDB, keyed by that name, and a
+  file the browser has never been given is asked for rather than substituted.
+  That is what keeps a template small enough to paste into a message, and it is
+  why `Card` takes a *resolved* background as a prop — reading bytes back is
+  asynchronous, and the component has to stay a pure function of its props.
+  `assets.ts` also owns object-URL lifetime: an object URL outlives the value
+  that made it, so each is revoked when replaced.
 - **Snapping has a fixed precedence.** Alt beats the grid, the grid beats sibling
   edges, and sibling edges beat plain 0.5mm rounding. Sibling edges come from
   `resolveLayout`, so a box snaps to where a grown box actually ends. An anchored
@@ -97,7 +106,7 @@ Load-bearing choices, in case they look arbitrary:
   page, dialogs opened and dismissed. Say what was actually checked, and say it
   plainly; if something was not checked, say that too.
 - **Tests cover the pure logic.** `parse`, `markdown`, `layout`, `template`,
-  `history`, `colour`, `css`, `qr`, `table` have unit tests. Components are verified by driving them.
+  `history`, `colour`, `css`, `assets`, `qr`, `table` have unit tests. Components are verified by driving them.
 - **Small commits with real messages.** What changed, why that shape, and what
   was verified. No model names in anything that lands in the repo.
 - **Comments explain the why.** Not what the line does — why it is that way, and

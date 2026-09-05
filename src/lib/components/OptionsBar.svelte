@@ -1,12 +1,15 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { safeImageUrl } from '$lib/assets';
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
 	import { DEFAULT_QR, PAGE_NUMBER_POSITIONS } from '$lib/template';
 	import type {
 		Align,
+		BackgroundFit,
 		Box,
 		Dataset,
 		Mapping,
+		PageBackgroundImage,
 		PageNumberPosition,
 		QrSettings,
 		Template,
@@ -27,6 +30,9 @@
 		ondelete: () => void;
 		onaddbox: () => void;
 		onuploadfont: (file: File) => void;
+		onuploadbackground: (file: File) => void;
+		/** say something in the status bar; the bar has nowhere of its own to say it */
+		onnotice: (message: string) => void;
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
@@ -45,12 +51,15 @@
 		ondelete,
 		onaddbox,
 		onuploadfont,
+		onuploadbackground,
+		onnotice,
 		onimporttemplate,
 		onexporttemplate,
 		oneditcss
 	}: Props = $props();
 
 	let fontInput = $state<HTMLInputElement | null>(null);
+	let imageInput = $state<HTMLInputElement | null>(null);
 
 	const familyOptions = $derived(
 		Array.from(new Set([...template.fonts.map((f) => f.family), ...CURATED_GOOGLE_FONTS])).sort((a, b) =>
@@ -166,6 +175,31 @@
 			const { background: _dropped, ...rest } = qr;
 			patch({ qr: rest });
 		}
+	}
+
+	function setBackground(image: PageBackgroundImage | undefined) {
+		patchTemplate({ page: { ...template.page, ...(image ? { image } : { image: undefined }) } });
+	}
+
+	function linkBackground() {
+		const url = window.prompt('Address of the background image', template.page.image?.src ?? 'https://');
+		if (url === null) return;
+		// Checked here as well as on load: normalisation only runs when a template
+		// is read, so without this an unusable address would sit in the editor
+		// looking accepted until the next reload quietly dropped it.
+		const safe = safeImageUrl(url);
+		if (!safe) {
+			onnotice('A background image has to be an http or https address.');
+			return;
+		}
+		setBackground({ src: safe, source: 'url', fit: template.page.image?.fit ?? 'cover' });
+	}
+
+	function uploadBackground(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (file) onuploadbackground(file);
+		input.value = '';
 	}
 
 	function uploadFont(event: Event) {
@@ -302,6 +336,43 @@
 				onchange={(e) => patchTemplate({ page: { ...template.page, background: e.currentTarget.value } })}
 			/>
 		</label>
+
+		<span class="group" role="group" aria-label="Background image">
+			<span class="label">Image</span>
+			{#if template.page.image}
+				<span class="asset" title={template.page.image.src}>
+					<Icon name={template.page.image.source === 'url' ? 'link' : 'image'} size={12} />
+					{template.page.image.src.replace(/^.*\//, '').slice(0, 24)}
+				</span>
+				<select
+					value={template.page.image.fit}
+					title="How the image fills the sheet, bleed included"
+					disabled={pageFrozen}
+					onchange={(e) =>
+						setBackground({ ...template.page.image!, fit: e.currentTarget.value as BackgroundFit })}
+				>
+					<option value="cover">Cover</option>
+					<option value="contain">Contain</option>
+					<option value="repeat">Tile</option>
+				</select>
+				<button
+					class="square"
+					title="Remove the background image"
+					aria-label="Remove the background image"
+					disabled={pageFrozen}
+					onclick={() => setBackground(undefined)}
+				>
+					<Icon name="close" size={14} />
+				</button>
+			{:else}
+				<button
+					disabled={pageFrozen}
+					title="A file from this machine; the picture stays in this browser, the template only names it"
+					onclick={() => imageInput?.click()}>Upload…</button
+				>
+				<button disabled={pageFrozen} title="An http(s) address the template will carry as written" onclick={linkBackground}>Link…</button>
+			{/if}
+		</span>
 
 		<label class="check">
 			<input
@@ -731,7 +802,13 @@
 	</div>
 {/if}
 
-<input bind:this={fontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={uploadFont} />
+<!-- One picker each, in the section that opens it: both bars are mounted at
+     once, so an unscoped input would exist two or three times over. -->
+{#if section === 'page'}
+	<input bind:this={imageInput} type="file" accept="image/*" hidden onchange={uploadBackground} />
+{:else}
+	<input bind:this={fontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={uploadFont} />
+{/if}
 
 <style>
 	.options {
@@ -772,6 +849,25 @@
 	.unit {
 		color: #999;
 		font-size: 10px;
+	}
+
+	.label {
+		font-size: 11px;
+		color: #555;
+	}
+
+	/* The image is named, not shown: a thumbnail in a toolbar this dense reads as
+	   clutter, and the name is what the template actually carries. */
+	.asset {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		max-width: 12rem;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		font-size: 11px;
+		color: #555;
 	}
 
 	.note {

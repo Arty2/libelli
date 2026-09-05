@@ -1,10 +1,13 @@
+import { safeImageUrl } from './assets';
 import { parseColour } from './colour';
 import defaultCard from './templates/default-card.json';
 import type {
+	BackgroundFit,
 	Box,
 	Defaults,
 	FontRef,
 	Mapping,
+	PageBackgroundImage,
 	PageNumberPosition,
 	PageNumberSpec,
 	QrSettings,
@@ -149,7 +152,8 @@ export function normaliseTemplate(raw: unknown): Template {
 			w: num(t.page?.w, 148),
 			h: num(t.page?.h, 210),
 			unit: 'mm',
-			background: parseColour(t.page?.background) ?? '#ffffff'
+			background: parseColour(t.page?.background) ?? '#ffffff',
+			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image) })
 		},
 		bleed: normaliseBleed(t.bleed),
 		pageNumber: normalisePageNumber(t.pageNumber),
@@ -179,6 +183,24 @@ function normaliseBleed(raw: any): Template['bleed'] {
 		amount: num(raw?.amount, 3),
 		cropMarks: Boolean(raw?.cropMarks)
 	};
+}
+
+const BACKGROUND_FITS: BackgroundFit[] = ['cover', 'contain', 'repeat'];
+
+/**
+ * A background reference, or nothing. A `url` image has to survive
+ * `safeImageUrl` — a template is a file someone can hand you, and the only
+ * schemes it may point a browser at are http and https.
+ */
+function normaliseBackgroundImage(raw: any): PageBackgroundImage | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const fit: BackgroundFit = BACKGROUND_FITS.includes(raw.fit) ? raw.fit : 'cover';
+	if (raw.source === 'url') {
+		const src = safeImageUrl(raw.src);
+		return src ? { src, source: 'url', fit } : undefined;
+	}
+	const src = typeof raw.src === 'string' ? raw.src.trim() : '';
+	return src ? { src, source: 'local', fit } : undefined;
 }
 
 function normalisePageNumber(raw: any): PageNumberSpec {

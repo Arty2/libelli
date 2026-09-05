@@ -8,11 +8,12 @@
 		dataset: Dataset;
 		mapping: Mapping;
 		activeRow: number;
+		background: string | null;
 		onactivate: (index: number) => void;
 		onclose: () => void;
 	}
 
-	let { template, dataset, mapping, activeRow, onactivate, onclose }: Props = $props();
+	let { template, dataset, mapping, activeRow, background, onactivate, onclose }: Props = $props();
 
 	let fullscreen = $state<number | null>(null);
 	let viewport = $state({ w: 1200, h: 800 });
@@ -75,7 +76,7 @@
 					aria-label="Open card {i + 1} full screen"
 				>
 					<span class="scaler" style="transform:scale({thumbScale})">
-						<Card {template} {row} {mapping} pageNumber={i + 1} />
+						<Card {template} {row} {mapping} pageNumber={i + 1} {background} />
 					</span>
 				</button>
 				<figcaption>{i + 1}</figcaption>
@@ -89,7 +90,7 @@
 			<button class="nav prev" onclick={(e) => { e.stopPropagation(); fullscreen = Math.max(0, index - 1); }} aria-label="Previous card">←</button>
 			<div class="full-card" role="presentation" onclick={(e) => e.stopPropagation()} style="width:{mmToPx(outerW) * fullScale}px;height:{mmToPx(outerH) * fullScale}px">
 				<span class="scaler" style="transform:scale({fullScale})">
-					<Card {template} row={dataset.rows[index]} {mapping} pageNumber={index + 1} />
+					<Card {template} row={dataset.rows[index]} {mapping} pageNumber={index + 1} {background} />
 				</span>
 			</div>
 			<button class="nav next" onclick={(e) => { e.stopPropagation(); fullscreen = Math.min(dataset.rows.length - 1, index + 1); }} aria-label="Next card">→</button>

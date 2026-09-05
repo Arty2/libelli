@@ -6,6 +6,7 @@
 	import OptionsBar from '$lib/components/OptionsBar.svelte';
 	import PagePreview from '$lib/components/PagePreview.svelte';
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
+	import { resolveBackground, uploadBackgroundImage } from '$lib/assets';
 	import { ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
 	import { GRID_MINOR } from '$lib/layout';
@@ -53,6 +54,11 @@
 	let printing = $state(false);
 	let mappingPrompt = $state(false);
 	let missingFonts = $state<FontRef[]>([]);
+	/** the page background, resolved out of storage; null when there is none to draw */
+	let background = $state<string | null>(null);
+	/** a local background image this browser has never been given the file for */
+	let missingImage = $state<string | null>(null);
+	let backgroundInput = $state<HTMLInputElement | null>(null);
 	let status = $state('');
 	let templateInput = $state<HTMLInputElement | null>(null);
 	let missingFontInput = $state<HTMLInputElement | null>(null);
@@ -123,6 +129,26 @@
 		if (firstRun) status = 'Sample cards loaded to play with. Edit the table, drag the boxes, then Print — or press ? for the tour.';
 		missingFonts = await ensureTemplateFonts(template);
 	}
+
+	/**
+	 * Resolving a background reads bytes back out of IndexedDB, so it is an
+	 * effect keyed on the reference rather than something the render can do. A
+	 * `local` image the browser has never been given resolves to null and is
+	 * asked for by name — the same bargain as a missing font.
+	 */
+	$effect(() => {
+		const image = template.page.image ? $state.snapshot(template.page.image) : undefined;
+		let stale = false;
+		void (async () => {
+			const resolved = await resolveBackground(image);
+			if (stale) return;
+			background = resolved;
+			missingImage = image && image.source === 'local' && !resolved ? image.src : null;
+		})();
+		return () => {
+			stale = true;
+		};
+	});
 
 	// ---- undo/redo ----------------------------------------------------------
 
@@ -338,6 +364,25 @@
 		}
 	}
 
+	async function handleBackgroundUpload(file: File, nameOverride?: string) {
+		try {
+			const image = await uploadBackgroundImage(file, template.page.image?.fit ?? 'cover', nameOverride);
+			template = { ...template, page: { ...template.page, image } };
+			status = `${image.src} set as the page background — the picture stays in this browser, the template only names it.`;
+		} catch {
+			status = 'That image could not be read.';
+		}
+	}
+
+	async function onMissingBackgroundChosen(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		// Stored under the name the template already carries, whatever the file
+		// you picked happens to be called, or the reference would still dangle.
+		if (file && missingImage) await handleBackgroundUpload(file, missingImage);
+	}
+
 	function pickMissingFont(font: FontRef) {
 		missingFontTarget = font;
 		missingFontInput?.click();
@@ -451,6 +496,7 @@
 		</button>
 		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
+		<input bind:this={backgroundInput} type="file" accept="image/*" hidden onchange={onMissingBackgroundChosen} />
 	</header>
 
 	{#if pageSetupOpen}
@@ -467,6 +513,8 @@
 			ondelete={deleteBox}
 			onaddbox={addBox}
 			onuploadfont={(file) => handleFontUpload(file)}
+			onuploadbackground={(file) => void handleBackgroundUpload(file)}
+			onnotice={(message) => (status = message)}
 			onimporttemplate={() => templateInput?.click()}
 			onexporttemplate={doExportTemplate}
 			oneditcss={() => (cssOpen = true)}
@@ -487,6 +535,8 @@
 			ondelete={deleteBox}
 			onaddbox={addBox}
 			onuploadfont={(file) => handleFontUpload(file)}
+			onuploadbackground={(file) => void handleBackgroundUpload(file)}
+			onnotice={(message) => (status = message)}
 			onimporttemplate={() => templateInput?.click()}
 			onexporttemplate={doExportTemplate}
 			oneditcss={() => (cssOpen = true)}
@@ -503,6 +553,19 @@
 			{#each missingFonts as font (font.ref ?? font.family)}
 				<button onclick={() => pickMissingFont(font)}>Choose {font.family} File…</button>
 			{/each}
+		</div>
+	{/if}
+
+	{#if missingImage}
+		<div class="banner" role="alert">
+			<span>
+				This template's background image, <strong>{missingImage}</strong>, is not in this browser. The template
+				carries its name, never the picture.
+			</span>
+			<button onclick={() => backgroundInput?.click()}>Choose {missingImage}…</button>
+			<button
+				onclick={() => (template = { ...template, page: { ...template.page, image: undefined } })}
+			>Remove It</button>
 		</div>
 	{/if}
 
@@ -534,6 +597,7 @@
 			{selectedId}
 			zoom={ui.zoom}
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
+			{background}
 			onselect={(id) => (selectedId = id)}
 			onchange={updateBox}
 			onoutlines={(show) => (ui = { ...ui, showOutlines: show })}
@@ -701,13 +765,14 @@
 		{dataset}
 		{mapping}
 		{activeRow}
+		{background}
 		onactivate={(i) => (activeRow = i)}
 		onclose={() => (contactOpen = false)}
 	/>
 {/if}
 
 {#if printing}
-	<PrintRoot {template} {dataset} {mapping} />
+	<PrintRoot {template} {dataset} {mapping} {background} />
 {/if}
 
 <style>

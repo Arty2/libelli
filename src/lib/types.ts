@@ -23,12 +23,31 @@ export type PageNumberPosition =
 	| 'bottom-center'
 	| 'bottom-right';
 
+/** how a background image fills the sheet */
+export type BackgroundFit = 'cover' | 'contain' | 'repeat';
+
+/**
+ * A background image for the page.
+ *
+ * The bytes are never part of the template: a `local` image is a file whose
+ * bytes live in this browser's storage under `src`, and a `url` image is
+ * fetched from wherever it says. Either way the template file carries a name,
+ * not a picture, so it stays small, diffable and quick to hand around.
+ */
+export interface PageBackgroundImage {
+	/** an http(s) URL, or the file name whose bytes are stored in this browser */
+	src: string;
+	source: 'url' | 'local';
+	fit: BackgroundFit;
+}
+
 export interface PageSpec {
 	w: number;
 	h: number;
 	unit: 'mm';
 	/** paper colour; printed only when the browser's background graphics are on */
 	background?: string;
+	image?: PageBackgroundImage;
 }
 
 export interface BleedSpec {

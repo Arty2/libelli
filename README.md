@@ -77,6 +77,14 @@ resize boxes directly, or type exact millimetres.
   changes the sheet size, optionally with crop marks, and every box stays
   visually where it was. On screen the trim edge is marked in purple, on the
   same toggle as the box outlines.
+- **Background image** — *Upload…* takes a file from this machine, *Link…* takes
+  an http(s) address, and either can **cover**, be **contained**, or **tile**.
+  The image reaches the cut edge, bleed included, and sits on top of the paper
+  colour — so like the paper colour, it prints only with background graphics on.
+  **The picture is never part of the template.** An uploaded file's bytes stay in
+  this browser and the template carries only its name; a linked one carries the
+  address. Open a template on another machine and it asks for the file by name
+  rather than rendering a blank page — the same bargain as an uploaded font.
 - **Page numbers** — off by default; six corners to choose from, an adjustable
   margin, and the template's default type. The number is the row's position, so
   the preview, the contact sheet and the print all agree.
@@ -227,9 +235,9 @@ passes them, and a guide shows what it caught.
 ## Settings
 
 - **Page** — template name, width, height, default font, size, leading and
-  tracking, default text colour, paper colour, bleed on/off, bleed amount, crop
-  marks, page number position and margin, custom CSS, lock, and the template
-  import/export buttons
+  tracking, default text colour, paper colour, background image and how it fills
+  the sheet, bleed on/off, bleed amount, crop marks, page number position and
+  margin, custom CSS, lock, and the template import/export buttons
 - **Box** — slot, bound column, font, size, weight, leading, tracking, case (as
   typed / small caps / uppercase), horizontal and vertical alignment, colour,
   mode (plain / markdown / image / QR), fit (image and QR), QR correction, quiet
@@ -247,11 +255,15 @@ type size, modules for a QR quiet zone.
 A template travels as JSON and carries no data with it — that is the point of
 keeping the column mapping outside it.
 
-- **Export Template** — fonts referenced by family name. Small, diffable,
-  git-friendly. Custom CSS, page numbers and locks travel with it.
+- **Export Template** — fonts referenced by family name, and a background image
+  by file name or address. Small, diffable, git-friendly — no picture and no font
+  bytes are ever folded into it. Custom CSS, page numbers and locks travel with
+  it.
 - **Import Template** — in page setup, next to the export, so it cannot be
-  mistaken for *Import CSV* under the table. Any font the template names but this
-  browser does not have is asked for by name rather than substituted.
+  mistaken for *Import CSV* under the table. Any font or background image the
+  template names but this browser does not have is asked for by name rather than
+  substituted. A linked background is only ever an http(s) address; a template
+  cannot smuggle one in as `data:` or point the browser at anything else.
 
 The column mapping is put to you for confirmation rather than assumed, since the
 template may have been built against a different spreadsheet.

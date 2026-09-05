@@ -66,6 +66,19 @@ describe('normaliseTemplate', () => {
 		expect(t.boxes[0].locked).toBe(true);
 	});
 
+	it('keeps a background image by name, and only the two safe schemes by URL', () => {
+		const local = normaliseTemplate({ schema: 2, page: { image: { src: 'paper.jpg', source: 'local', fit: 'repeat' } }, boxes: [] });
+		expect(local.page.image).toEqual({ src: 'paper.jpg', source: 'local', fit: 'repeat' });
+
+		const remote = normaliseTemplate({ schema: 2, page: { image: { src: 'https://example.com/p.jpg', source: 'url' } }, boxes: [] });
+		expect(remote.page.image).toEqual({ src: 'https://example.com/p.jpg', source: 'url', fit: 'cover' });
+
+		for (const src of ['javascript:alert(1)', 'data:image/png;base64,AAA', '']) {
+			expect(normaliseTemplate({ schema: 2, page: { image: { src, source: 'url' } }, boxes: [] }).page.image).toBeUndefined();
+		}
+		expect(normaliseTemplate({ schema: 2, page: { image: { src: 'x.jpg', source: 'local', fit: 'wonky' } }, boxes: [] }).page.image?.fit).toBe('cover');
+	});
+
 	it('falls back to white for a page colour it cannot parse', () => {
 		expect(normaliseTemplate({ schema: 1, page: { background: 'url(x)' }, boxes: [] }).page.background).toBe('#ffffff');
 		expect(normaliseTemplate({ schema: 1, page: { background: '#eee8d5' }, boxes: [] }).page.background).toBe('#eee8d5');

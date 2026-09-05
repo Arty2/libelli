@@ -14,6 +14,8 @@
 		zoom: 'fit' | number;
 		/** 1-based position of the previewed row, for the page number */
 		pageNumber: number | null;
+		/** the template's background image, resolved by the app */
+		background: string | null;
 		onselect: (id: string | null) => void;
 		onchange: (box: Box) => void;
 		onoutlines: (show: boolean) => void;
@@ -32,6 +34,7 @@
 		selectedId,
 		zoom,
 		pageNumber,
+		background,
 		onselect,
 		onchange,
 		onoutlines,
@@ -93,6 +96,7 @@
 				{grid}
 				{scale}
 				{pageNumber}
+				{background}
 				interactive={true}
 				{selectedId}
 				{onselect}

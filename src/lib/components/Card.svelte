@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { backgroundStyle } from '$lib/assets';
 	import { scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { FREE_STEP, GRID_MINOR, boxEdges, pxToMm, resolveLayout, snapTo, snapToEdges } from '$lib/layout';
@@ -21,6 +22,13 @@
 		selectedId?: string | null;
 		/** 1-based position of this card in the run; drawn when the template asks for it */
 		pageNumber?: number | null;
+		/**
+		 * The template's background image, already resolved to something a
+		 * `background-image` can use. Resolved by the app rather than here,
+		 * because reading it back out of storage is asynchronous and this
+		 * component has to stay a pure function of its props.
+		 */
+		background?: string | null;
 		onselect?: (id: string | null) => void;
 		onchange?: (box: Box) => void;
 	}
@@ -35,6 +43,7 @@
 		interactive = false,
 		selectedId = null,
 		pageNumber = null,
+		background = null,
 		onselect,
 		onchange
 	}: Props = $props();
@@ -98,6 +107,21 @@
 	const customCss = $derived(scopeCss(template.css ?? '', '.trim'));
 
 	const VALIGN_TO_FLEX = { top: 'flex-start', middle: 'center', bottom: 'flex-end' } as const;
+
+	/**
+	 * Paper colour is the ground and the image sits on it, both covering the
+	 * bleed as well as the trim — a background that stopped at the trim edge
+	 * would show a white rim on everything printed with bleed.
+	 */
+	function cardStyle(): string {
+		return [
+			`width:${template.page.w + bleed * 2}mm`,
+			`height:${template.page.h + bleed * 2}mm`,
+			`padding:${bleed}mm`,
+			`background-color:${template.page.background ?? '#ffffff'}`,
+			...backgroundStyle(template.page.image, background)
+		].join(';');
+	}
 
 	function measure(node: HTMLElement, id: string) {
 		const read = () => {
@@ -285,12 +309,7 @@
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 </script>
 
-<div
-	class="card"
-	class:bleeding={bleed > 0}
-	style="width:{template.page.w + bleed * 2}mm;height:{template.page.h + bleed * 2}mm;padding:{bleed}mm;background:{template
-		.page.background ?? '#ffffff'}"
->
+<div class="card" class:bleeding={bleed > 0} style={cardStyle()}>
 	<div class="trim" class:bleed-marked={outlines && bleed > 0} style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->

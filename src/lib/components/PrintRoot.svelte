@@ -6,9 +6,10 @@
 		template: Template;
 		dataset: Dataset;
 		mapping: Mapping;
+		background: string | null;
 	}
 
-	let { template, dataset, mapping }: Props = $props();
+	let { template, dataset, mapping, background }: Props = $props();
 
 	const bleed = $derived(template.bleed.enabled ? template.bleed.amount : 0);
 	const pageW = $derived(template.page.w + bleed * 2);
@@ -25,7 +26,7 @@
 	{#each dataset.rows as row, i (i)}
 		<!-- Sized to the sheet so nothing can spill sideways into an extra page. -->
 		<div class="print-page" style="width:{pageW}mm;height:{pageH}mm">
-			<Card {template} {row} {mapping} pageNumber={i + 1} />
+			<Card {template} {row} {mapping} pageNumber={i + 1} {background} />
 		</div>
 	{/each}
 </div>
