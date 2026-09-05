@@ -203,9 +203,16 @@ pick the **paper size** matching the card's millimetres, set **Margins** to
 which Chrome drops along with the paper colour. Checking the cards and reading
 the checklist are the same act, so they are the same screen.
 
-**Print Preview** always opens it. **Print** opens it too, until you tick *Skip
-this when I press Print* — after that Print goes straight to the browser and the
-preview is still there when you want it.
+**Print…** is the only way in, so there is no route to the printer that skips
+the look at what you are about to spend paper on.
+
+Every page has a checkbox under it, and only the ticked ones print — untick the
+three proofs that came out wrong and reprint just those. **Select All** /
+**Select None** does the whole run, and the Print button says how many pages it
+is about to send. A page keeps the number it has in the table however few of
+them go, so page 4 prints as page 4 even when it is the only one selected. The
+selection is for one print: reopening the preview starts from every page again,
+because sorting or deleting a row moves the positions it was pinned to.
 
 Click a thumbnail to open that card full screen, <kbd>←</kbd> / <kbd>→</kbd> to
 move between cards, <kbd>Esc</kbd> to come back out.

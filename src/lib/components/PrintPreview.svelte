@@ -10,10 +10,10 @@
 		mapping: Mapping;
 		activeRow: number;
 		background: string | null;
-		/** whether pressing Print goes straight to the browser, skipping this */
-		skipOnPrint: boolean;
+		/** row indices left out of the print; empty means every page goes */
+		excluded: Set<number>;
 		onactivate: (index: number) => void;
-		onskipchange: (skip: boolean) => void;
+		onexcludedchange: (excluded: Set<number>) => void;
 		onprint: () => void;
 		onclose: () => void;
 	}
@@ -24,12 +24,26 @@
 		mapping,
 		activeRow,
 		background,
-		skipOnPrint,
+		excluded,
 		onactivate,
-		onskipchange,
+		onexcludedchange,
 		onprint,
 		onclose
 	}: Props = $props();
+
+	const chosen = $derived(dataset.rows.filter((_, i) => !excluded.has(i)).length);
+	const allChosen = $derived(chosen === dataset.rows.length);
+
+	/** Reassigned rather than mutated: a plain Set in state is not deeply tracked. */
+	function toggle(index: number, include: boolean) {
+		const next = new Set(excluded);
+		if (include) next.delete(index);
+		else next.add(index);
+		onexcludedchange(next);
+	}
+
+	const setAll = (include: boolean) =>
+		onexcludedchange(include ? new Set() : new Set(dataset.rows.map((_, i) => i)));
 
 	const sheetW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 	const sheetH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
@@ -80,14 +94,21 @@
 
 <div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Print preview">
 	<header>
-		<h2>Print preview — {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}, one per row</h2>
+		<h2>
+			Print preview —
+			{#if allChosen}
+				{dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}, one per row
+			{:else}
+				{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}
+			{/if}
+		</h2>
 		<div class="header-actions">
-			<label class="skip">
-				<input type="checkbox" checked={skipOnPrint} onchange={(e) => onskipchange(e.currentTarget.checked)} />
-				Skip this when I press Print
-			</label>
+			<button onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
 			<button onclick={onclose}>Close</button>
-			<button class="primary" onclick={onprint}><Icon name="print" size={15} /> Print</button>
+			<button class="primary" onclick={onprint} disabled={chosen === 0}>
+				<Icon name="print" size={15} />
+				Print {chosen} Page{chosen === 1 ? '' : 's'}
+			</button>
 		</div>
 	</header>
 
@@ -106,7 +127,8 @@
 
 	<div class="grid">
 		{#each dataset.rows as row, i (i)}
-			<figure>
+			{@const included = !excluded.has(i)}
+			<figure class:dropped={!included}>
 				<button
 					class="thumb"
 					style="width:{mmToPx(outerW) * thumbScale}px;height:{mmToPx(outerH) * thumbScale}px"
@@ -118,7 +140,16 @@
 						<Card {template} {row} {mapping} pageNumber={i + 1} {background} />
 					</span>
 				</button>
-				<figcaption>{i + 1}</figcaption>
+				<figcaption>
+					<label>
+						<input
+							type="checkbox"
+							checked={included}
+							onchange={(e) => toggle(i, e.currentTarget.checked)}
+						/>
+						{i + 1}
+					</label>
+				</figcaption>
 			</figure>
 		{/each}
 	</div>
@@ -171,14 +202,6 @@
 		gap: 10px;
 	}
 
-	.skip {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
-		color: #555;
-	}
-
 	header button,
 	.nav {
 		display: inline-flex;
@@ -201,6 +224,11 @@
 		background: #111;
 		border-color: #111;
 		color: #fff;
+	}
+
+	header button:disabled {
+		opacity: 0.5;
+		cursor: default;
 	}
 
 	.checklist {
@@ -270,6 +298,23 @@
 		font: 11px ui-sans-serif, system-ui, sans-serif;
 		color: #767676;
 		margin-top: 6px;
+	}
+
+	figcaption label {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		cursor: pointer;
+	}
+
+	/* A dropped page stays legible — you are deciding about it, not deleting it. */
+	.dropped .thumb {
+		opacity: 0.32;
+		box-shadow: none;
+	}
+
+	.dropped figcaption {
+		color: #aaa;
 	}
 
 	.full {

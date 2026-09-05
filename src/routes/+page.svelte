@@ -38,11 +38,16 @@
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
 	let mapping = $state<Mapping>({});
-	let ui = $state<UiState>({ showOutlines: true, showGrid: false, zoom: 'fit', printHintSeen: false });
+	let ui = $state<UiState>({ showOutlines: true, showGrid: false, zoom: 'fit' });
 	let activeRow = $state(0);
 	let selectedId = $state<string | null>(null);
 	let ready = $state(false);
 	let previewOpen = $state(false);
+	/**
+	 * Rows left out of the next print, by index. Excluded rather than included so
+	 * that adding a row prints it: a new card should not have to be opted in.
+	 */
+	let excludedRows = $state<Set<number>>(new Set());
 	let helpOpen = $state(false);
 	let cssOpen = $state(false);
 	// Page setup is a panel, not a mode: it opens on wide screens and stays out of
@@ -413,19 +418,19 @@
 	const raf = () => new Promise((resolve) => requestAnimationFrame(resolve));
 
 	/**
-	 * The preview first — every card as it will come out, next to the four print
-	 * settings the browser gets wrong by default. Skippable once you know them,
-	 * and always reachable from the Print Preview button.
+	 * Printing always goes through the preview: it is where you see what will come
+	 * out, choose which pages go, and read the four dialog settings the browser
+	 * gets wrong by default. One door, not two.
 	 */
 	function requestPrint() {
 		if (!dataset.rows.length) {
 			status = 'Nothing to print yet.';
 			return;
 		}
-		if (ui.printHintSeen) {
-			void print();
-			return;
-		}
+		// Every page, every time. The selection is by row index, and sorting or
+		// deleting a row moves those indices under it — a stale exclusion would
+		// quietly drop a different card than the one you unticked.
+		excludedRows = new Set();
 		previewOpen = true;
 	}
 
@@ -502,8 +507,9 @@
 			<Icon name="settings" size={15} /> <span class="label">Page Setup</span>
 		</button>
 		<button class="danger-outline" onclick={() => (resetStage = 1)} title="Clear everything stored in this browser">Reset</button>
-		<button onclick={() => (previewOpen = true)} disabled={!dataset.rows.length}>Print Preview</button>
-		<button class="primary" onclick={requestPrint}><Icon name="print" size={15} /> Print</button>
+		<button class="primary" onclick={requestPrint} disabled={!dataset.rows.length}>
+			<Icon name="print" size={15} /> Print…
+		</button>
 		<button class="square" onclick={() => (helpOpen = true)} aria-label="Help and credits" title="Help and credits">
 			<Icon name="help" size={16} />
 		</button>
@@ -703,7 +709,7 @@
 		<p>Rows of a spreadsheet in, print-ready cards out. Data, templates and fonts stay in this browser — nothing is uploaded, and there is no server to upload to.</p>
 
 		<h3>Printing</h3>
-		<p><strong>Print Preview</strong> shows every card as a small page next to the four dialog settings that decide whether it comes out right — paper size, margins, headers and footers, background graphics. Print goes through the same screen until you tell it not to. One page comes out per row.</p>
+		<p>Print opens the preview: every card as a small page, next to the four dialog settings that decide whether it comes out right — paper size, margins, headers and footers, background graphics. Untick any page you do not want and only the rest are sent; each keeps the number it has in the table.</p>
 
 		<h3>Keys</h3>
 		<dl class="keys">
@@ -750,16 +756,16 @@
 		{mapping}
 		{activeRow}
 		{background}
-		skipOnPrint={ui.printHintSeen}
+		excluded={excludedRows}
 		onactivate={(i) => (activeRow = i)}
-		onskipchange={(skip) => (ui = { ...ui, printHintSeen: skip })}
+		onexcludedchange={(next) => (excludedRows = next)}
 		onprint={printFromPreview}
 		onclose={() => (previewOpen = false)}
 	/>
 {/if}
 
 {#if printing}
-	<PrintRoot {template} {dataset} {mapping} {background} />
+	<PrintRoot {template} {dataset} {mapping} {background} excluded={excludedRows} />
 {/if}
 
 <style>

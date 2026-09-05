@@ -7,9 +7,18 @@
 		dataset: Dataset;
 		mapping: Mapping;
 		background: string | null;
+		/** row indices the preview left out */
+		excluded: Set<number>;
 	}
 
-	let { template, dataset, mapping, background }: Props = $props();
+	let { template, dataset, mapping, background, excluded }: Props = $props();
+
+	// Filtered into a list up front, carrying each row's original index: a page
+	// keeps the number it has in the table however few of them are printed, and
+	// `:last-child` still finds the real last page for the break rule.
+	const pages = $derived(
+		dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index))
+	);
 
 	const bleed = $derived(template.bleed.enabled ? template.bleed.amount : 0);
 	const pageW = $derived(template.page.w + bleed * 2);
@@ -23,10 +32,10 @@
 </svelte:head>
 
 <div class="print-root" aria-hidden="true" style="width:{pageW}mm">
-	{#each dataset.rows as row, i (i)}
+	{#each pages as page (page.index)}
 		<!-- Sized to the sheet so nothing can spill sideways into an extra page. -->
 		<div class="print-page" style="width:{pageW}mm;height:{pageH}mm">
-			<Card {template} {row} {mapping} pageNumber={i + 1} {background} />
+			<Card {template} row={page.row} {mapping} pageNumber={page.index + 1} {background} />
 		</div>
 	{/each}
 </div>

@@ -68,6 +68,10 @@ Load-bearing choices, in case they look arbitrary:
 - **Both option bars read in groups**, outward from the subject: what the thing
   is, then its type, then how it looks, then where it sits, then what you can do
   to it. A new control goes in the group it belongs to rather than on the end.
+- **One door to the printer.** Print opens the preview; the preview prints. The
+  page selection lives there, keyed by row index and reset every time it opens —
+  sorting or deleting a row moves those indices, and a stale exclusion would drop
+  a different card than the one that was unticked.
 - **A lock is a button in the bar and an indicator on the canvas.** The padlock
   on a box or a page says *locked*; it is never the control, because the control
   belongs with the rest of that subject's settings. The button that sets a lock

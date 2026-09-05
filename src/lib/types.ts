@@ -198,6 +198,4 @@ export interface UiState {
 	showOutlines: boolean;
 	showGrid: boolean;
 	zoom: 'fit' | number;
-	/** the print checklist is a reminder, not a gate: it can be dismissed for good */
-	printHintSeen: boolean;
 }
