@@ -124,7 +124,8 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			borderColor: colour(partial.borderColor),
 			borderRadius: partial.borderRadius,
 			fit: partial.fit,
-			locked: partial.locked
+			locked: partial.locked,
+			group: typeof partial.group === 'string' && partial.group.trim() ? partial.group : undefined
 		})
 	};
 }

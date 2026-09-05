@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { FREE_STEP, GRID_MAJOR, GRID_MINOR, boxEdges, resolveLayout, snapTo, snapToEdges } from './layout';
+import {
+	FREE_STEP,
+	GRID_MAJOR,
+	GRID_MINOR,
+	alignBoxes,
+	boxEdges,
+	resolveLayout,
+	snapTo,
+	snapToEdges
+} from './layout';
 import { newBox } from './template';
 import type { Box } from './types';
 
@@ -76,5 +85,62 @@ describe('snapping', () => {
 		expect(edges.y).toContain(13 + 24);
 		// 136 is the dragged box's own right edge: a box never snaps to itself.
 		expect(edges.x).not.toContain(136);
+	});
+});
+
+describe('alignBoxes', () => {
+	const boxes = () => [
+		newBox({ id: 'a', x: 10, y: 10, w: 20, h: 10 }),
+		newBox({ id: 'b', x: 40, y: 30, w: 40, h: 20 }),
+		newBox({ id: 'c', x: 100, y: 5, w: 10, h: 30 })
+	];
+	const xs = (list: Box[]) => list.map((b) => b.x);
+	const ys = (list: Box[]) => list.map((b) => b.y);
+
+	it('lines boxes up on the left and right of what encloses them all', () => {
+		expect(xs(alignBoxes(boxes(), ['a', 'b', 'c'], 'left'))).toEqual([10, 10, 10]);
+		// The enclosing box ends at 110, so each one's right edge lands there.
+		expect(xs(alignBoxes(boxes(), ['a', 'b', 'c'], 'right'))).toEqual([90, 70, 100]);
+	});
+
+	it('centres on the middle of the enclosing box, not on any one of them', () => {
+		// 10 to 110, so the centre is 60.
+		expect(xs(alignBoxes(boxes(), ['a', 'b', 'c'], 'centre-x'))).toEqual([50, 40, 55]);
+		// 5 to 50, so the centre is 27.5.
+		expect(ys(alignBoxes(boxes(), ['a', 'b', 'c'], 'centre-y'))).toEqual([22.5, 17.5, 12.5]);
+	});
+
+	it('lines boxes up on the top and bottom', () => {
+		expect(ys(alignBoxes(boxes(), ['a', 'b', 'c'], 'top'))).toEqual([5, 5, 5]);
+		expect(ys(alignBoxes(boxes(), ['a', 'b', 'c'], 'bottom'))).toEqual([40, 30, 20]);
+	});
+
+	it('leaves boxes outside the selection exactly where they are', () => {
+		const aligned = alignBoxes(boxes(), ['a', 'b'], 'left');
+		expect(xs(aligned)).toEqual([10, 10, 100]);
+	});
+
+	it('will not move a locked box, and needs two to align at all', () => {
+		const list = [newBox({ id: 'a', x: 10, y: 10, w: 20, h: 10, locked: true }), ...boxes().slice(1)];
+		expect(alignBoxes(list, ['a', 'b'], 'left').map((b) => b.x)).toEqual([10, 40, 100]);
+		expect(alignBoxes(boxes(), ['a'], 'left')).toEqual(boxes());
+	});
+
+	it('gives up an anchor when aligning vertically, since it would undo the move', () => {
+		const anchored = [
+			newBox({ id: 'a', x: 0, y: 10, w: 10, h: 10 }),
+			newBox({ id: 'b', x: 0, y: 40, w: 10, h: 10, anchor: { to: 'a', gap: 4 } })
+		];
+		const aligned = alignBoxes(anchored, ['a', 'b'], 'top');
+		expect(aligned[1].anchor).toBeNull();
+		expect(aligned.map((b) => b.y)).toEqual([10, 10]);
+	});
+
+	it('keeps an anchor when aligning horizontally, which cannot fight it', () => {
+		const anchored = [
+			newBox({ id: 'a', x: 0, y: 10, w: 10, h: 10 }),
+			newBox({ id: 'b', x: 30, y: 40, w: 10, h: 10, anchor: { to: 'a', gap: 4 } })
+		];
+		expect(alignBoxes(anchored, ['a', 'b'], 'left')[1].anchor).toEqual({ to: 'a', gap: 4 });
 	});
 });

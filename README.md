@@ -72,6 +72,17 @@ resize boxes directly, or type exact millimetres.
 - **Stacking** — boxes paint in the order they are listed, so *Bring to Front*
   is a move to the end of that list rather than a z-index to keep in step. In
   the box bar and on right-click.
+- **Several at once** — shift-click (or Ctrl/Cmd-click) to build a selection,
+  Ctrl/Cmd+A for all of them. Dragging any one moves the set; a bar appears to
+  line them up against the box that encloses them all — left, centre, right,
+  top, middle, bottom — and to lock, duplicate or delete the lot. **Group** makes
+  a selection stick, so clicking any member picks up all of them; it is a shared
+  name on each box rather than a container, which keeps the box list flat and
+  leaves anchoring and stacking alone.
+
+  One consequence worth stating: an anchored box takes its top from another box,
+  so lining it up vertically would be undone on the next render. Aligning that
+  way releases the anchor, and says so. Horizontal alignment never touches one.
 - **Decorative boxes** — leave a box's **Field** blank and it is bound to
   nothing: the same text or picture on every card, typed straight into the box.
 - **Overflow** — a red corner appears on a box whose content is taller than the
@@ -285,6 +296,8 @@ Both bars run in groups, outward from the thing itself:
   horizontal and vertical, and stacking order · surface (fill, padding, border
   width, style and colour, radius) · position · size and overflow · flow
   (anchor, gap, hide when empty) · then the actions: lock, duplicate, delete
+- **Selection** — with more than one box chosen the box bar gives way to this
+  one: the six alignments, then group, lock, duplicate, delete
 
 Undo, redo and *+ Box* sit at the corners of the page rather than in the window's
 toolbar, next to the thing they act on. The top toolbar holds only what is about

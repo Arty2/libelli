@@ -72,7 +72,14 @@ Load-bearing choices, in case they look arbitrary:
 - **Controls sit next to what they act on.** Undo, redo and *+ Box* are at the
   page's corners, the view toggles along its bottom edge; the window toolbar
   holds only what is about the whole app. A right-click menu on a box carries
-  the same actions its bar does — neither is the only way to reach them.
+  the same actions its bar does — neither is the only way to reach them. Only
+  the primary pointer button drags: a right-click that started one would collapse
+  a multi-selection before the menu it opened could act on the rest.
+- **A group is a shared name, not a container.** `Box.group` keeps the box list
+  flat, so grouping cannot disturb anchoring, stacking or measurement; selecting
+  one member expands to the whole group in `selectBox`. `alignBoxes` works on
+  declared geometry and releases the anchor of a box it moves vertically —
+  an anchor would otherwise undo the alignment on the next render.
 - **Stacking is array order**, not a z-index: `arrangeBoxes` moves a box within
   the list, and returns the same array when there is nowhere to go so no undo
   entry is recorded for a no-op.

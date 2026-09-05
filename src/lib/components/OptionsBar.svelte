@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import { safeImageUrl } from '$lib/assets';
+	import type { AlignEdge } from '$lib/layout';
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
 	import {
 		BORDER_STYLES,
@@ -26,18 +27,23 @@
 	} from '$lib/types';
 
 	interface Props {
-		/** which half of the editor this instance is: the two never share a row */
-		section: 'page' | 'box';
+		/** which part of the editor this instance is: they never share a row */
+		section: 'page' | 'box' | 'selection';
 		template: Template;
 		dataset: Dataset;
 		mapping: Mapping;
 		selected: Box | null;
+		/** every chosen box; one of them is `selected`, more of them is a selection */
+		selectedBoxes: Box[];
 		onboxchange: (box: Box) => void;
 		ontemplatechange: (template: Template) => void;
 		onmappingchange: (mapping: Mapping) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
 		onarrange: (where: Arrange) => void;
+		onalign: (edge: AlignEdge) => void;
+		onlockselection: () => void;
+		ongroup: () => void;
 		onresettemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
@@ -54,12 +60,16 @@
 		dataset,
 		mapping,
 		selected,
+		selectedBoxes,
 		onboxchange,
 		ontemplatechange,
 		onmappingchange,
 		onduplicate,
 		ondelete,
 		onarrange,
+		onalign,
+		onlockselection,
+		ongroup,
 		onresettemplate,
 		onuploadfont,
 		onuploadbackground,
@@ -136,6 +146,23 @@
 		{ value: 'middle', icon: 'valign-middle', label: 'Middle' },
 		{ value: 'bottom', icon: 'valign-bottom', label: 'Bottom' }
 	];
+
+	/** Lining boxes up against the box that encloses them all. */
+	const ALIGN_EDGES: Array<{ value: AlignEdge; icon: string; label: string }> = [
+		{ value: 'left', icon: 'obj-left', label: 'Align Left' },
+		{ value: 'centre-x', icon: 'obj-centre-x', label: 'Centre Horizontally' },
+		{ value: 'right', icon: 'obj-right', label: 'Align Right' },
+		{ value: 'top', icon: 'obj-top', label: 'Align Top' },
+		{ value: 'centre-y', icon: 'obj-centre-y', label: 'Centre Vertically' },
+		{ value: 'bottom', icon: 'obj-bottom', label: 'Align Bottom' }
+	];
+
+	const allLocked = $derived(selectedBoxes.length > 0 && selectedBoxes.every((b) => b.locked));
+	const oneGroup = $derived(
+		selectedBoxes.length > 1 &&
+			selectedBoxes.every((b) => b.group) &&
+			new Set(selectedBoxes.map((b) => b.group)).size === 1
+	);
 
 	const EDGES: Array<{ key: keyof Sides; label: string }> = [
 		{ key: 'top', label: 'T' },
@@ -534,7 +561,47 @@
 			</button>
 		</span>
 	</div>
-{:else if selected}
+{:else if section === 'selection' && selectedBoxes.length > 1}
+	<!-- Several boxes at once: nothing here is about what one of them says, only
+	     about where they sit relative to each other and what happens to the lot. -->
+	<div class="options box-options" aria-label="Selection">
+		<span class="context">{selectedBoxes.length} Boxes</span>
+
+		<span class="group" role="group" aria-label="Align">
+			<span class="label">Align</span>
+			<span class="segmented">
+				{#each ALIGN_EDGES.slice(0, 3) as option (option.value)}
+					<button title={option.label} aria-label={option.label} disabled={pageFrozen} onclick={() => onalign(option.value)}>
+						<Icon name={option.icon} size={15} />
+					</button>
+				{/each}
+			</span>
+			<span class="segmented">
+				{#each ALIGN_EDGES.slice(3) as option (option.value)}
+					<button title={option.label} aria-label={option.label} disabled={pageFrozen} onclick={() => onalign(option.value)}>
+						<Icon name={option.icon} size={15} />
+					</button>
+				{/each}
+			</span>
+		</span>
+
+		<span class="spacer"></span>
+
+		<span class="actions">
+			<button aria-pressed={oneGroup} disabled={pageFrozen} title={oneGroup ? 'Split them up again' : 'Move, lock and delete these as one'} onclick={ongroup}>
+				<Icon name="layers" size={14} />
+				{oneGroup ? 'Ungroup' : 'Group'}
+			</button>
+			<button aria-pressed={allLocked} disabled={pageFrozen} title={allLocked ? 'Unlock all of them' : 'Lock all of them'} onclick={onlockselection}>
+				<Icon name="locked" size={14} /> Lock
+			</button>
+			<button onclick={onduplicate} disabled={pageFrozen}><Icon name="copy" size={14} /> Duplicate</button>
+			<button class="danger-outline" onclick={ondelete} disabled={pageFrozen || allLocked}>
+				<Icon name="trash" size={14} /> Delete
+			</button>
+		</span>
+	</div>
+{:else if section === 'box' && selected}
 	<!-- Same idea: what the box holds, how its type is set, where that type sits,
 	     what the box looks like, where it is, and only then what you can do to it. -->
 	<div class="options box-options" aria-label="Box settings">

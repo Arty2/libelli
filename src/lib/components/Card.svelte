@@ -20,7 +20,7 @@
 		/** preview scale, used only to convert pointer deltas back to mm */
 		scale?: number;
 		interactive?: boolean;
-		selectedId?: string | null;
+		selectedIds?: string[];
 		/** 1-based position of this card in the run; drawn when the template asks for it */
 		pageNumber?: number | null;
 		/**
@@ -30,7 +30,8 @@
 		 * component has to stay a pure function of its props.
 		 */
 		background?: string | null;
-		onselect?: (id: string | null) => void;
+		/** `additive` is a modifier-click: add to or drop from the selection */
+		onselect?: (id: string | null, additive?: boolean) => void;
 		onchange?: (box: Box) => void;
 		/** right-click on a box, in viewport coordinates */
 		onmenu?: (id: string, x: number, y: number) => void;
@@ -44,7 +45,7 @@
 		grid = false,
 		scale = 1,
 		interactive = false,
-		selectedId = null,
+		selectedIds = [],
 		pageNumber = null,
 		background = null,
 		onselect,
@@ -229,16 +230,42 @@
 	// ---- direct manipulation -------------------------------------------------
 
 	type DragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
-	let drag: { id: string; mode: DragMode; startX: number; startY: number; origin: Box } | null = null;
+	let drag: {
+		id: string;
+		mode: DragMode;
+		startX: number;
+		startY: number;
+		origin: Box;
+		others: Box[];
+	} | null = null;
 
 	const editable = (box: Box) => interactive && !box.locked && !template.locked;
+	const isSelected = (box: Box) => selectedIds.includes(box.id);
+	/** Handles belong to a single box: with several chosen, the bar does the work. */
+	const soleSelection = $derived(selectedIds.length === 1);
 
 	function startDrag(event: PointerEvent, box: Box, mode: DragMode) {
+		// Only the primary button drags. Without this a right-click starts one,
+		// and its non-additive select collapses a multi-selection to one box
+		// before the context menu it opened has a chance to act on the rest.
+		if (event.button !== 0) return;
 		if (!editable(box)) return;
 		event.preventDefault();
 		event.stopPropagation();
-		onselect?.(box.id);
-		drag = { id: box.id, mode, startX: event.clientX, startY: event.clientY, origin: { ...box } };
+		onselect?.(box.id, event.shiftKey || event.metaKey || event.ctrlKey);
+		drag = {
+			id: box.id,
+			mode,
+			startX: event.clientX,
+			startY: event.clientY,
+			origin: { ...box },
+			// Snapshotted at the start: moving several boxes applies one delta to
+			// each of these, so a box cannot drift by accumulating rounding.
+			others:
+				mode === 'move' && selectedIds.length > 1
+					? template.boxes.filter((b) => b.id !== box.id && selectedIds.includes(b.id) && !b.locked).map((b) => ({ ...b }))
+					: []
+		};
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 	}
 
@@ -321,7 +348,26 @@
 		}
 		guide = latched;
 		onchange?.(next);
+
+		// Whatever snapping did to the box under the pointer is what the others
+		// move by, so the selection keeps its shape.
+		if (drag.mode === 'move' && drag.others.length) {
+			const movedX = next.x - origin.x;
+			const movedY = origin.anchor
+				? (next.anchor?.gap ?? 0) - origin.anchor.gap
+				: next.y - origin.y;
+			for (const other of drag.others) {
+				const moved: Box = { ...other, x: round2(other.x + movedX) };
+				if (movedY) {
+					if (other.anchor) moved.anchor = { ...other.anchor, gap: Math.max(0, round2(other.anchor.gap + movedY)) };
+					else moved.y = round2(other.y + movedY);
+				}
+				onchange?.(moved);
+			}
+		}
 	}
+
+	const round2 = (v: number) => Math.round(v * 100) / 100;
 
 	function endDrag(event: PointerEvent) {
 		if (!drag) return;
@@ -349,7 +395,7 @@
 			<div
 				class="box"
 				class:outlined={outlines && !empty}
-				class:selected={interactive && selectedId === box.id}
+				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
 				style={boxStyle(box)}
 				data-box-id={box.id}
@@ -358,7 +404,9 @@
 				oncontextmenu={(e) => {
 					if (!interactive) return;
 					e.preventDefault();
-					onselect?.(box.id);
+					// Right-clicking inside an existing selection acts on all of it;
+					// right-clicking outside one selects the box first.
+					if (!isSelected(box)) onselect?.(box.id, false);
 					onmenu?.(box.id, e.clientX, e.clientY);
 				}}
 				onpointermove={moveDrag}
@@ -396,7 +444,7 @@
 					</span>
 				{/if}
 
-				{#if interactive && selectedId === box.id}
+				{#if interactive && isSelected(box) && soleSelection}
 					{#if editable(box)}
 						{#each HANDLES as handle (handle)}
 							<span

@@ -10,13 +10,13 @@
 		mapping: Mapping;
 		outlines: boolean;
 		grid: boolean;
-		selectedId: string | null;
+		selectedIds: string[];
 		zoom: 'fit' | number;
 		/** 1-based position of the previewed row, for the page number */
 		pageNumber: number | null;
 		/** the template's background image, resolved by the app */
 		background: string | null;
-		onselect: (id: string | null) => void;
+		onselect: (id: string | null, additive?: boolean) => void;
 		onchange: (box: Box) => void;
 		onoutlines: (show: boolean) => void;
 		ongrid: (show: boolean) => void;
@@ -36,7 +36,7 @@
 		mapping,
 		outlines,
 		grid,
-		selectedId,
+		selectedIds,
 		zoom,
 		pageNumber,
 		background,
@@ -108,7 +108,7 @@
 				{pageNumber}
 				{background}
 				interactive={true}
-				{selectedId}
+				{selectedIds}
 				{onselect}
 				{onchange}
 				{onmenu}
@@ -180,7 +180,7 @@
 		</select>
 	</label>
 
-	{#if selectedId}
+	{#if selectedIds.length}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
 		     hopeless. Shown only where there is no keyboard to fall back on. -->
 		<div class="pad" role="group" aria-label="Nudge the selected box">

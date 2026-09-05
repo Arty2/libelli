@@ -5,6 +5,8 @@
 
 	interface Props {
 		box: Box;
+		/** how many boxes the actions will apply to */
+		count: number;
 		template: Template;
 		/** viewport coordinates of the click that opened this */
 		x: number;
@@ -16,7 +18,10 @@
 		onclose: () => void;
 	}
 
-	let { box, template, x, y, onarrange, onlock, onduplicate, ondelete, onclose }: Props = $props();
+	let { box, template, count, x, y, onarrange, onlock, onduplicate, ondelete, onclose }: Props = $props();
+
+	const many = $derived(count > 1);
+	const plural = $derived(many ? ` ${count} Boxes` : '');
 
 	const frozen = $derived(!!template.locked);
 	const index = $derived(template.boxes.findIndex((b) => b.id === box.id));
@@ -58,30 +63,33 @@
 	tabindex="-1"
 	style="left:{position.left}px;top:{position.top}px"
 >
-	<button role="menuitem" disabled={frozen || atFront} onclick={() => run(() => onarrange('front'))}>
-		<Icon name="bring-to-front" size={15} /> Bring to Front
-	</button>
-	<button role="menuitem" disabled={frozen || atFront} onclick={() => run(() => onarrange('forward'))}>
-		<Icon name="bring-forward" size={15} /> Bring Forward
-	</button>
-	<button role="menuitem" disabled={frozen || atBack} onclick={() => run(() => onarrange('backward'))}>
-		<Icon name="send-backward" size={15} /> Send Backward
-	</button>
-	<button role="menuitem" disabled={frozen || atBack} onclick={() => run(() => onarrange('back'))}>
-		<Icon name="send-to-back" size={15} /> Send to Back
-	</button>
+	<!-- Stacking is about one box's place in the list, so it is offered for one. -->
+	{#if !many}
+		<button role="menuitem" disabled={frozen || atFront} onclick={() => run(() => onarrange('front'))}>
+			<Icon name="bring-to-front" size={15} /> Bring to Front
+		</button>
+		<button role="menuitem" disabled={frozen || atFront} onclick={() => run(() => onarrange('forward'))}>
+			<Icon name="bring-forward" size={15} /> Bring Forward
+		</button>
+		<button role="menuitem" disabled={frozen || atBack} onclick={() => run(() => onarrange('backward'))}>
+			<Icon name="send-backward" size={15} /> Send Backward
+		</button>
+		<button role="menuitem" disabled={frozen || atBack} onclick={() => run(() => onarrange('back'))}>
+			<Icon name="send-to-back" size={15} /> Send to Back
+		</button>
 
-	<hr />
+		<hr />
+	{/if}
 
 	<button role="menuitem" disabled={frozen} onclick={() => run(() => onlock(!box.locked))}>
 		<Icon name="locked" size={15} />
-		{box.locked ? 'Unlock' : 'Lock'}
+		{box.locked ? 'Unlock' : 'Lock'}{plural}
 	</button>
 	<button role="menuitem" disabled={frozen} onclick={() => run(onduplicate)}>
-		<Icon name="copy" size={15} /> Duplicate
+		<Icon name="copy" size={15} /> Duplicate{plural}
 	</button>
-	<button class="danger" role="menuitem" disabled={frozen || !!box.locked} onclick={() => run(ondelete)}>
-		<Icon name="trash" size={15} /> Delete
+	<button class="danger" role="menuitem" disabled={frozen || (!many && !!box.locked)} onclick={() => run(ondelete)}>
+		<Icon name="trash" size={15} /> Delete{plural}
 	</button>
 </div>
 

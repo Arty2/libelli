@@ -165,6 +165,12 @@ export interface Box extends TextStyle {
 	/** how an image or QR fills its box: contain fits it, cover crops it */
 	fit?: 'contain' | 'cover' | 'fill';
 	locked?: boolean;
+	/**
+	 * Boxes sharing a group id are selected, moved, locked and deleted together.
+	 * A plain string rather than a container: the boxes stay a flat list, so
+	 * grouping cannot break anchoring, stacking or anything else that reads it.
+	 */
+	group?: string;
 }
 
 export interface Template {

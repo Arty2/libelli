@@ -10,7 +10,7 @@
 	import { resolveBackground, uploadBackgroundImage } from '$lib/assets';
 	import { ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
-	import { GRID_MINOR } from '$lib/layout';
+	import { GRID_MINOR, alignBoxes, type AlignEdge } from '$lib/layout';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { VERSION } from '$lib/version';
 	import {
@@ -42,7 +42,7 @@
 	let mapping = $state<Mapping>({});
 	let ui = $state<UiState>({ showOutlines: true, showGrid: false, zoom: 'fit' });
 	let activeRow = $state(0);
-	let selectedId = $state<string | null>(null);
+	let selectedIds = $state<string[]>([]);
 	let ready = $state(false);
 	let previewOpen = $state(false);
 	/**
@@ -94,7 +94,13 @@
 	const undoable = $derived(canUndo(history));
 	const redoable = $derived(canRedo(history));
 
-	const selected = $derived(template.boxes.find((b) => b.id === selectedId) ?? null);
+	/** The single-box bar only makes sense for one box; several get their own. */
+	const selected = $derived(
+		selectedIds.length === 1 ? (template.boxes.find((b) => b.id === selectedIds[0]) ?? null) : null
+	);
+	const selectedBoxes = $derived(template.boxes.filter((b) => selectedIds.includes(b.id)));
+	/** The box the menu was opened on, whether or not it is the only one chosen. */
+	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
 	const row = $derived(dataset.rows[activeRow] ?? null);
 	const slots = $derived(usedSlots(template));
 
@@ -173,7 +179,8 @@
 		dataset = structuredClone(next.dataset);
 		mapping = structuredClone(next.mapping);
 		if (activeRow >= dataset.rows.length) activeRow = Math.max(0, dataset.rows.length - 1);
-		if (selectedId && !template.boxes.some((b) => b.id === selectedId)) selectedId = null;
+		// A snapshot can be from before a box existed, or after it was deleted.
+		selectedIds = selectedIds.filter((id) => template.boxes.some((b) => b.id === id));
 	}
 
 	function undo() {
@@ -248,7 +255,7 @@
 			static: { text: 'New box' }
 		});
 		template = { ...template, boxes: [...template.boxes, box] };
-		selectedId = box.id;
+		selectedIds = [box.id];
 	}
 
 	function arrange(where: Arrange) {
@@ -264,28 +271,103 @@
 	 */
 	function resetTemplate() {
 		template = starterTemplate();
-		selectedId = null;
+		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
 		status = 'Template reset to the starter card. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.';
 	}
 
+	/**
+	 * Selecting one box selects the whole group it belongs to: that is what a
+	 * group is for. A modifier-click adds or drops that whole set.
+	 */
+	function selectBox(id: string | null, additive = false) {
+		if (!id) {
+			selectedIds = [];
+			return;
+		}
+		const box = template.boxes.find((b) => b.id === id);
+		const ids = box?.group
+			? template.boxes.filter((b) => b.group === box.group).map((b) => b.id)
+			: [id];
+		if (!additive) {
+			selectedIds = ids;
+			return;
+		}
+		const already = ids.every((one) => selectedIds.includes(one));
+		selectedIds = already
+			? selectedIds.filter((one) => !ids.includes(one))
+			: Array.from(new Set([...selectedIds, ...ids]));
+	}
+
 	function duplicateBox() {
-		if (!selected) return;
-		const copy: Box = { ...structuredClone($state.snapshot(selected)), id: nextBoxId(template.boxes), anchor: null, y: selected.y + 6, x: selected.x + 4 };
-		template = { ...template, boxes: [...template.boxes, copy] };
-		selectedId = copy.id;
+		if (!selectedBoxes.length || template.locked) return;
+		const copies: Box[] = [];
+		// One fresh group id for the copies, or duplicating a group would splice
+		// the copies into the original.
+		const regroup = new Map<string, string>();
+		for (const box of selectedBoxes) {
+			const source = structuredClone($state.snapshot(box));
+			if (source.group && !regroup.has(source.group)) regroup.set(source.group, `g_${Math.random().toString(36).slice(2, 8)}`);
+			copies.push({
+				...source,
+				id: nextBoxId([...template.boxes, ...copies]),
+				anchor: null,
+				x: box.x + 4,
+				y: box.y + 6,
+				...(source.group ? { group: regroup.get(source.group) } : {})
+			});
+		}
+		template = { ...template, boxes: [...template.boxes, ...copies] };
+		selectedIds = copies.map((b) => b.id);
 	}
 
 	function deleteBox() {
-		if (!selected || selected.locked || template.locked) return;
-		const gone = selected.id;
+		if (template.locked) return;
+		const gone = new Set(selectedBoxes.filter((b) => !b.locked).map((b) => b.id));
+		if (!gone.size) return;
 		template = {
 			...template,
-			// Anything anchored to the deleted box falls back to its own Y.
-			boxes: template.boxes.filter((b) => b.id !== gone).map((b) => (b.anchor?.to === gone ? { ...b, anchor: null } : b))
+			// Anything anchored to a deleted box falls back to its own Y.
+			boxes: template.boxes
+				.filter((b) => !gone.has(b.id))
+				.map((b) => (b.anchor && gone.has(b.anchor.to) ? { ...b, anchor: null } : b))
 		};
-		selectedId = null;
-		status = 'Box deleted. Ctrl/Cmd+Z brings it back.';
+		selectedIds = [];
+		status = `${gone.size} box${gone.size === 1 ? '' : 'es'} deleted. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`;
+	}
+
+	function alignSelection(edge: AlignEdge) {
+		if (template.locked) return;
+		const boxes = alignBoxes(template.boxes, selectedIds, edge);
+		if (boxes === template.boxes) return;
+		const brokeAnchors = boxes.some((b, i) => template.boxes[i].anchor && !b.anchor);
+		template = { ...template, boxes };
+		status = brokeAnchors
+			? 'Aligned. An anchored box cannot also be lined up vertically, so those anchors were released.'
+			: 'Aligned.';
+	}
+
+	/** All of them locked already means the button unlocks; otherwise it locks. */
+	function lockSelection() {
+		if (template.locked || !selectedBoxes.length) return;
+		const unlock = selectedBoxes.every((b) => b.locked);
+		const ids = new Set(selectedIds);
+		template = {
+			...template,
+			boxes: template.boxes.map((b) => (ids.has(b.id) ? stripUndefined({ ...b, locked: unlock ? undefined : true }) as Box : b))
+		};
+	}
+
+	function groupSelection() {
+		if (template.locked || selectedBoxes.length < 2) return;
+		const grouped = selectedBoxes.every((b) => b.group) && new Set(selectedBoxes.map((b) => b.group)).size === 1;
+		const group = grouped ? undefined : `g_${Math.random().toString(36).slice(2, 8)}`;
+		const ids = new Set(selectedIds);
+		template = {
+			...template,
+			boxes: template.boxes.map((b) => (ids.has(b.id) ? (stripUndefined({ ...b, group }) as Box) : b))
+		};
+		status = grouped ? 'Ungrouped.' : `${selectedBoxes.length} boxes grouped — clicking any one now takes all of them.`;
 	}
 
 	/**
@@ -334,7 +416,12 @@
 			return;
 		}
 		if (typing || previewOpen) return;
-		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId) {
+		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
+			event.preventDefault();
+			selectedIds = template.boxes.map((b) => b.id);
+			return;
+		}
+		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIds.length) {
 			event.preventDefault();
 			deleteBox();
 		}
@@ -342,13 +429,13 @@
 		// focus if you clicked it, and arrow keys that work sometimes are worse
 		// than arrow keys that never do.
 		const move = NUDGES[event.key];
-		if (move && selectedId) {
+		if (move && selectedIds.length) {
 			event.preventDefault();
 			const step = event.shiftKey ? GRID_MINOR : event.altKey ? 0.25 : 1;
 			nudgeBox(move[0] * step, move[1] * step);
 			return;
 		}
-		if (event.key === 'Escape') selectedId = null;
+		if (event.key === 'Escape') selectedIds = [];
 	}
 
 	// ---- import / export ----------------------------------------------------
@@ -377,7 +464,7 @@
 		try {
 			const raw = JSON.parse(await file.text());
 			template = normaliseTemplate(raw);
-			selectedId = null;
+			selectedIds = [];
 			// Never assume the mapping: a template is shared between spreadsheets.
 			const stored = loadMapping(template.name);
 			mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(template), dataset.columns);
@@ -513,12 +600,43 @@
 			{dataset}
 			{mapping}
 			{selected}
+			{selectedBoxes}
 			onboxchange={updateBox}
 			ontemplatechange={applyTemplate}
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
 			onarrange={arrange}
+			onalign={alignSelection}
+			onlockselection={lockSelection}
+			ongroup={groupSelection}
+			onresettemplate={resetTemplate}
+			onuploadfont={(file) => handleFontUpload(file)}
+			onuploadbackground={(file) => void handleBackgroundUpload(file)}
+			onnotice={(message) => (status = message)}
+			onimporttemplate={() => templateInput?.click()}
+			onexporttemplate={doExportTemplate}
+			oneditcss={() => (cssOpen = true)}
+		/>
+	{/if}
+
+	{#if selectedIds.length > 1}
+		<OptionsBar
+			section="selection"
+			{template}
+			{dataset}
+			{mapping}
+			{selected}
+			{selectedBoxes}
+			onboxchange={updateBox}
+			ontemplatechange={applyTemplate}
+			onmappingchange={(m) => (mapping = m)}
+			onduplicate={duplicateBox}
+			ondelete={deleteBox}
+			onarrange={arrange}
+			onalign={alignSelection}
+			onlockselection={lockSelection}
+			ongroup={groupSelection}
 			onresettemplate={resetTemplate}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
@@ -536,12 +654,16 @@
 			{dataset}
 			{mapping}
 			{selected}
+			{selectedBoxes}
 			onboxchange={updateBox}
 			ontemplatechange={applyTemplate}
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
 			onarrange={arrange}
+			onalign={alignSelection}
+			onlockselection={lockSelection}
+			ongroup={groupSelection}
 			onresettemplate={resetTemplate}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
@@ -603,11 +725,11 @@
 			{mapping}
 			outlines={ui.showOutlines}
 			grid={ui.showGrid}
-			{selectedId}
+			{selectedIds}
 			zoom={ui.zoom}
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
 			{background}
-			onselect={(id) => (selectedId = id)}
+			onselect={selectBox}
 			onchange={updateBox}
 			onoutlines={(show) => (ui = { ...ui, showOutlines: show })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
@@ -693,7 +815,9 @@
 			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
 			<dt>Ctrl/Cmd + Shift + Z</dt><dd>Redo</dd>
 			<dt>Arrows</dt><dd>Nudge the selected box by 1mm (Shift 5mm, Alt 0.25mm)</dd>
-			<dt>Delete</dt><dd>Remove the selected box</dd>
+			<dt>Shift / Ctrl / ⌘ + click</dt><dd>Add a box to the selection, or drop it</dd>
+			<dt>Ctrl/Cmd + A</dt><dd>Select every box</dd>
+			<dt>Delete</dt><dd>Remove the selected boxes</dd>
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
 			<dt>← →</dt><dd>Previous / next card, in the print preview</dd>
 			<dt>Alt + drag</dt><dd>Ignore the grid and every snap</dd>
@@ -702,6 +826,10 @@
 		<h3>Placing boxes</h3>
 		<p>Drag boxes on the page or type exact millimetres. A box latches onto the edges and centres of its neighbours as it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid of a 10mm grid instead. A box anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link.</p>
 		<p>Right-click a box for its stacking order, lock, duplicate and delete — the same actions are in its bar. Boxes paint in the order they are listed, so <em>Bring to Front</em> is a move to the end of that list rather than a z-index to keep track of. A red corner on a box means its content does not fit and the print will clip it.</p>
+
+		<h3>Several at once</h3>
+		<p>Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them. Dragging any one moves the whole set, and the bar that appears lines them up against the box that encloses them all — left, centre, right, top, middle, bottom. Lock, duplicate and delete apply to the lot.</p>
+		<p><strong>Group</strong> makes that selection stick: clicking any member picks up all of them, until you ungroup. An anchored box cannot also be lined up vertically — an anchor would move it straight back — so aligning that way releases the anchor and says so.</p>
 
 		<h3>Type</h3>
 		<p>Page setup holds the defaults — family, size, leading, tracking and colour. A box that leaves those fields blank inherits them, so changing the page changes every box that never overrode it.</p>
@@ -727,14 +855,15 @@
 	</div>
 {/if}
 
-{#if boxMenu && selected && selected.id === boxMenu.id}
+{#if boxMenu && menuBox}
 	<BoxMenu
-		box={selected}
+		box={menuBox}
 		{template}
+		count={selectedIds.length}
 		x={boxMenu.x}
 		y={boxMenu.y}
 		onarrange={arrange}
-		onlock={(locked) => updateBox({ ...selected!, locked: locked || undefined })}
+		onlock={lockSelection}
 		onduplicate={duplicateBox}
 		ondelete={deleteBox}
 		onclose={() => (boxMenu = null)}

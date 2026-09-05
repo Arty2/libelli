@@ -148,3 +148,53 @@ export function boxEdges(
 	}
 	return { x, y };
 }
+
+// ---- aligning a selection --------------------------------------------------
+
+export type AlignEdge = 'left' | 'centre-x' | 'right' | 'top' | 'centre-y' | 'bottom';
+
+const HORIZONTAL: AlignEdge[] = ['left', 'centre-x', 'right'];
+
+/**
+ * Line several boxes up on the edges of the box that encloses them all — the
+ * convention every drawing program uses, and the only one that does not need a
+ * "which box wins?" rule.
+ *
+ * Declared geometry, not resolved: this runs where measured heights are not
+ * known, and a box's own `y`/`h` are what the template stores. That has one
+ * consequence worth stating — an anchored box takes its top from another box,
+ * so aligning it vertically would be undone on the next render. Those boxes
+ * give up their anchor, which is the only reading of "line these up" that
+ * survives. Horizontal alignment never touches an anchor.
+ */
+export function alignBoxes(boxes: Box[], ids: string[], edge: AlignEdge): Box[] {
+	const chosen = boxes.filter((b) => ids.includes(b.id) && !b.locked);
+	if (chosen.length < 2) return boxes;
+
+	const horizontal = HORIZONTAL.includes(edge);
+	const start = (b: Box) => (horizontal ? b.x : b.y);
+	const size = (b: Box) => (horizontal ? b.w : b.h);
+	const min = Math.min(...chosen.map(start));
+	const max = Math.max(...chosen.map((b) => start(b) + size(b)));
+	const middle = (min + max) / 2;
+
+	const place = (b: Box): number => {
+		switch (edge) {
+			case 'left':
+			case 'top':
+				return min;
+			case 'right':
+			case 'bottom':
+				return max - size(b);
+			default:
+				return middle - size(b) / 2;
+		}
+	};
+
+	const moving = new Set(chosen.map((b) => b.id));
+	return boxes.map((box) => {
+		if (!moving.has(box.id)) return box;
+		const value = Math.round(place(box) * 100) / 100;
+		return horizontal ? { ...box, x: value } : { ...box, y: value, anchor: null };
+	});
+}
