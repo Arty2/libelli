@@ -69,6 +69,11 @@ resize boxes directly, or type exact millimetres.
   own Y however long the body above it runs.
 - **Alignment** — horizontal (left, centre, right) and vertical (top, middle,
   bottom) within the box's own frame.
+- **Surface** — a fill colour, padding, a border with its own thickness and
+  colour, and a corner radius, all in millimetres. The border sits *inside* the
+  box's millimetres rather than outside them, so framing a box does not move it
+  or anything anchored below it — though padding and a border do make the box
+  taller, which an anchored box below will follow, as it should.
 - **Type defaults** — page setup holds the family, size, leading, tracking and
   colour. A box that leaves those fields blank inherits them, so changing the
   page moves every box that never overrode it; a new box starts out inheriting
@@ -239,10 +244,11 @@ passes them, and a guide shows what it caught.
   the sheet, bleed on/off, bleed amount, crop marks, page number position and
   margin, custom CSS, lock, and the template import/export buttons
 - **Box** — slot, bound column, font, size, weight, leading, tracking, case (as
-  typed / small caps / uppercase), horizontal and vertical alignment, colour,
-  mode (plain / markdown / image / QR), fit (image and QR), QR correction, quiet
-  zone and backing (transparent or solid), overflow (grow / clip), X and Y, W and
-  H, anchor, anchor gap, hide when empty, lock
+  typed / small caps / uppercase), horizontal and vertical alignment, text
+  colour, fill, padding, border width and colour, corner radius, mode (plain /
+  markdown / image / QR), fit (image and QR), QR correction, quiet zone and
+  backing (transparent or solid), overflow (grow / clip), X and Y, W and H,
+  anchor, anchor gap, hide when empty, lock
 - **View** — in the bottom corners of the page itself, not the toolbar: grid and
   box outlines at the left (screen only, never printed), zoom (fit, or 50% to
   200%) at the right

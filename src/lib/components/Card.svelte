@@ -163,6 +163,12 @@
 		if (box.textCase === 'smallcaps') parts.push('font-variant-caps:small-caps');
 		if (box.padding) parts.push(`padding:${box.padding}mm`);
 		if (box.background) parts.push(`background:${box.background}`);
+		// `.box` is border-box, so a border eats into the width rather than adding
+		// to it: the box still occupies exactly the millimetres it was given.
+		if (box.borderWidth) {
+			parts.push(`border:${box.borderWidth}mm solid ${box.borderColor ?? box.color ?? template.defaults.color}`);
+		}
+		if (box.borderRadius) parts.push(`border-radius:${box.borderRadius}mm`);
 		if (hidden.has(box.id)) {
 			parts.push('height:0', 'overflow:hidden', 'visibility:hidden');
 		} else if (box.overflow === 'clip') {

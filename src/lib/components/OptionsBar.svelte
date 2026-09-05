@@ -166,6 +166,11 @@
 		patch({ qr: { ...DEFAULT_QR, ...selected?.qr, ...change } });
 	}
 
+	/** As with a QR's backing, transparent is the absence of a fill, not a white one. */
+	function setFill(opaque: boolean) {
+		patch({ background: opaque ? (selected?.background ?? '#ffffff') : undefined });
+	}
+
 	/** Transparent is the absence of a background, not a white one. */
 	function setQrBackground(opaque: boolean) {
 		if (!selected) return;
@@ -615,6 +620,89 @@
 				onchange={(e) => patch({ color: e.currentTarget.value })}
 			/>
 		</label>
+
+		<span class="group" role="group" aria-label="Box surface">
+			<label class="field">
+				<span>Fill</span>
+				<select
+					value={selected.background ? 'solid' : 'none'}
+					title="A fill behind this box; transparent lets the paper through"
+					disabled={boxFrozen}
+					onchange={(e) => setFill(e.currentTarget.value === 'solid')}
+				>
+					<option value="none">None</option>
+					<option value="solid">Solid</option>
+				</select>
+			</label>
+			{#if selected.background}
+				<label class="field">
+					<span class="sr-only">Fill Colour</span>
+					<input
+						class="colour"
+						type="color"
+						value={selected.background}
+						disabled={boxFrozen}
+						onchange={(e) => patch({ background: e.currentTarget.value })}
+					/>
+				</label>
+			{/if}
+
+			<label class="field">
+				<span>Padding</span>
+				<input
+					class="w-4"
+					type="number"
+					step="0.5"
+					min="0"
+					value={selected.padding ?? 0}
+					disabled={boxFrozen}
+					onchange={(e) => patch({ padding: numeric(e, 0) || undefined })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+
+			<label class="field">
+				<span>Border</span>
+				<input
+					class="w-4"
+					type="number"
+					step="0.1"
+					min="0"
+					title="Border thickness; the border sits inside the box's millimetres, not outside them"
+					value={selected.borderWidth ?? 0}
+					disabled={boxFrozen}
+					onchange={(e) => patch({ borderWidth: numeric(e, 0) || undefined })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+			{#if selected.borderWidth}
+				<label class="field">
+					<span class="sr-only">Border Colour</span>
+					<input
+						class="colour"
+						type="color"
+						title="Border colour; blank follows the text colour"
+						value={selected.borderColor ?? selected.color ?? template.defaults.color}
+						disabled={boxFrozen}
+						onchange={(e) => patch({ borderColor: e.currentTarget.value })}
+					/>
+				</label>
+			{/if}
+
+			<label class="field">
+				<span>Radius</span>
+				<input
+					class="w-4"
+					type="number"
+					step="0.5"
+					min="0"
+					value={selected.borderRadius ?? 0}
+					disabled={boxFrozen}
+					onchange={(e) => patch({ borderRadius: numeric(e, 0) || undefined })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+		</span>
 
 		<label class="field">
 			<span>Mode</span>

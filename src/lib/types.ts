@@ -139,8 +139,16 @@ export interface Box extends TextStyle {
 	anchor?: Anchor | null;
 	hideWhenEmpty?: boolean;
 	static?: StaticContent;
+	/** fill behind the box's content; absent means the paper shows through */
 	background?: string;
+	/** mm of space between the border and the content */
 	padding?: number;
+	/** mm; 0 or absent is no border */
+	borderWidth?: number;
+	/** absent falls back to the box's own text colour */
+	borderColor?: string;
+	/** mm */
+	borderRadius?: number;
 	/** how an image or QR fills its box: contain fits it, cover crops it */
 	fit?: 'contain' | 'cover' | 'fill';
 	locked?: boolean;

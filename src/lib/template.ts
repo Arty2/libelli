@@ -100,7 +100,10 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			size: partial.size,
 			weight: partial.weight,
 			lineHeight: partial.lineHeight,
-			color: partial.color,
+			// Every colour on a box goes through the parser before it can reach a
+			// style attribute; one that is not recognised is dropped rather than
+			// guessed at, the same rule the markdown renderer follows.
+			color: colour(partial.color),
 			align: partial.align,
 			valign: partial.valign,
 			italic: partial.italic,
@@ -111,8 +114,11 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			anchor: partial.anchor,
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
-			background: partial.background,
+			background: colour(partial.background),
 			padding: partial.padding,
+			borderWidth: partial.borderWidth,
+			borderColor: colour(partial.borderColor),
+			borderRadius: partial.borderRadius,
 			fit: partial.fit,
 			locked: partial.locked
 		})
@@ -158,7 +164,11 @@ export function normaliseTemplate(raw: unknown): Template {
 		bleed: normaliseBleed(t.bleed),
 		pageNumber: normalisePageNumber(t.pageNumber),
 		fonts: normaliseFonts(t.fonts),
-		defaults: { ...DEFAULT_DEFAULTS, ...stripUndefined(t.defaults ?? {}) },
+		defaults: {
+			...DEFAULT_DEFAULTS,
+			...stripUndefined(t.defaults ?? {}),
+			color: colour(t.defaults?.color) ?? DEFAULT_DEFAULTS.color
+		},
 		slots,
 		boxes,
 		...stripUndefined({
@@ -227,12 +237,22 @@ function normaliseFonts(raw: any): FontRef[] {
 	return out;
 }
 
+/** A recognised colour, or nothing at all — never the string it was handed. */
+const colour = (raw: unknown): string | undefined =>
+	parseColour(typeof raw === 'string' ? raw : undefined) ?? undefined;
+
 function num(value: unknown, fallback: number): number {
 	const n = Number(value);
 	return Number.isFinite(n) ? n : fallback;
 }
 
-function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+/**
+ * Drop keys whose value is undefined. Exported because "back to the default" is
+ * expressed by removing a field, and structured clone — unlike JSON — keeps an
+ * undefined-valued key, so a box would otherwise accumulate dead fields.
+ * `null` survives: an anchor explicitly set to none is not the same as no anchor.
+ */
+export function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
 	const out: Record<string, any> = {};
 	for (const [k, v] of Object.entries(obj)) if (v !== undefined) out[k] = v;
 	return out as Partial<T>;

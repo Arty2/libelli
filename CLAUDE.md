@@ -56,13 +56,19 @@ Load-bearing choices, in case they look arbitrary:
   exactly like one that does.
 - **Escaping, colour parsing and CSS scoping are chokepoints.** Cell content is
   untrusted: every leaf text node is HTML-escaped in `markdown.ts`, and every
-  colour goes through `colour.ts` before it can reach a `style` attribute. A
+  colour goes through `colour.ts` before it can reach a `style` attribute —
+  `template.ts` runs each of a box's colours through it on load, and one it does
+  not recognise is dropped rather than guessed at. A
   template is a file someone can hand you, so its custom CSS goes through
   `css.ts`, which prefixes every selector with the card's scope and strips
   `@import` and any non-`data:` `url()` — the app fetches nothing, and a template
   must not be able to change that. Note that `css.ts` also builds the `<style>`
   tag: a literal `<style>…</style>` pair written in a `.svelte` file gets picked
   up by the Svelte toolchain as that component's own stylesheet.
+- **A box is `border-box`.** Padding and a border are drawn inside the
+  millimetres the box was given, so framing one never moves it sideways. It does
+  make the box taller, which `measure()` picks up and anchored boxes below
+  follow — that is the intended behaviour, not a leak.
 - **Vertical alignment makes a box a flex column.** That is why `.box` is
   `display: flex`: `justify-content` is the only thing that places content
   vertically in a box whose height may be a `min-height`. The cost is that child
@@ -81,6 +87,10 @@ Load-bearing choices, in case they look arbitrary:
   edges, and sibling edges beat plain 0.5mm rounding. Sibling edges come from
   `resolveLayout`, so a box snaps to where a grown box actually ends. An anchored
   box always snaps its `gap`, never its `y`.
+- **Clearing a field means removing it.** "Inherit the page default", "no fill",
+  "no border" are all expressed as an absent key, so `updateBox` strips undefined
+  values: structured clone, unlike JSON, keeps an undefined-valued key, and a box
+  would otherwise silt up with dead fields.
 - **Undo is snapshots, not a command log.** One entry is the whole editable
   state (template + data + mapping), recorded on a debounce. An inverse
   operation cannot drift out of step with the operation it undoes.

@@ -18,6 +18,7 @@
 		newBox,
 		nextBoxId,
 		normaliseTemplate,
+		stripUndefined,
 		usedSlots
 	} from '$lib/template';
 	import {
@@ -213,7 +214,11 @@
 	// ---- template editing ---------------------------------------------------
 
 	function updateBox(next: Box) {
-		template = { ...template, boxes: template.boxes.map((b) => (b.id === next.id ? next : b)) };
+		// Cleared fields arrive as undefined — that is how a box says "inherit" or
+		// "none". Stripped here so the saved template and the undo snapshots stay
+		// free of keys that carry no value.
+		const box = stripUndefined(next) as Box;
+		template = { ...template, boxes: template.boxes.map((b) => (b.id === box.id ? box : b)) };
 	}
 
 	function addBox() {
