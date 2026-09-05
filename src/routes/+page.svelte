@@ -2,16 +2,17 @@
 	import { tick } from 'svelte';
 	import ContactSheet from '$lib/components/ContactSheet.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 	import OptionsBar from '$lib/components/OptionsBar.svelte';
 	import PagePreview from '$lib/components/PagePreview.svelte';
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
-	import { collectBundleFonts, ensureTemplateFonts, installBundleFonts, uploadLocalFont } from '$lib/fonts';
+	import { ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
+	import { GRID_MINOR } from '$lib/layout';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
-		exportBundle,
 		exportTemplate,
 		newBox,
 		nextBoxId,
@@ -35,12 +36,18 @@
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
 	let mapping = $state<Mapping>({});
-	let ui = $state<UiState>({ showOutlines: true, zoom: 'fit' });
+	let ui = $state<UiState>({ showOutlines: true, showGrid: false, zoom: 'fit', printHintSeen: false });
 	let activeRow = $state(0);
 	let selectedId = $state<string | null>(null);
 	let ready = $state(false);
 	let contactOpen = $state(false);
 	let helpOpen = $state(false);
+	let cssOpen = $state(false);
+	let printPrompt = $state(false);
+	let dontShowPrintHint = $state(false);
+	// Page setup is a panel, not a mode: it opens on wide screens and stays out of
+	// the way on a phone, where it would eat the preview it is there to serve.
+	let pageSetupOpen = $state(true);
 	let firstRun = $state(false);
 	let resetStage = $state<0 | 1 | 2>(0);
 	let printing = $state(false);
@@ -110,6 +117,7 @@
 		const storedMapping = loadMapping(template.name);
 		mapping = Object.keys(storedMapping).length ? storedMapping : autoMap(usedSlots(template), dataset.columns);
 		ui = loadUi();
+		if (typeof window !== 'undefined' && window.innerWidth <= 900) pageSetupOpen = false;
 		history = createHistory(snapshot());
 		ready = true;
 		if (firstRun) status = 'Sample cards loaded to play with. Edit the table, drag the boxes, then Print — or press ? for the tour.';
@@ -205,7 +213,7 @@
 	}
 
 	function deleteBox() {
-		if (!selected) return;
+		if (!selected || selected.locked || template.locked) return;
 		const gone = selected.id;
 		template = {
 			...template,
@@ -213,7 +221,32 @@
 			boxes: template.boxes.filter((b) => b.id !== gone).map((b) => (b.anchor?.to === gone ? { ...b, anchor: null } : b))
 		};
 		selectedId = null;
+		status = 'Box deleted. Ctrl/Cmd+Z brings it back.';
 	}
+
+	/**
+	 * Move the selected box by whole millimetres. Anchored boxes move their gap
+	 * rather than their y, the same rule dragging follows, so a nudge cannot
+	 * quietly break an anchor chain.
+	 */
+	function nudgeBox(dx: number, dy: number) {
+		const box = selected;
+		if (!box || box.locked || template.locked) return;
+		const round = (v: number) => Math.round(v * 100) / 100;
+		const next: Box = { ...box, x: round(box.x + dx) };
+		if (dy) {
+			if (box.anchor) next.anchor = { ...box.anchor, gap: Math.max(0, round(box.anchor.gap + dy)) };
+			else next.y = round(box.y + dy);
+		}
+		updateBox(next);
+	}
+
+	const NUDGES: Record<string, [number, number]> = {
+		ArrowLeft: [-1, 0],
+		ArrowRight: [1, 0],
+		ArrowUp: [0, -1],
+		ArrowDown: [0, 1]
+	};
 
 	function onWindowKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
@@ -230,8 +263,10 @@
 			redo();
 			return;
 		}
-		if (event.key === 'Escape' && (helpOpen || resetStage)) {
+		if (event.key === 'Escape' && (helpOpen || resetStage || cssOpen || printPrompt)) {
 			helpOpen = false;
+			cssOpen = false;
+			printPrompt = false;
 			resetStage = 0;
 			return;
 		}
@@ -239,6 +274,16 @@
 		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId) {
 			event.preventDefault();
 			deleteBox();
+		}
+		// Nudging lives on the window, not on the preview: the preview only has
+		// focus if you clicked it, and arrow keys that work sometimes are worse
+		// than arrow keys that never do.
+		const move = NUDGES[event.key];
+		if (move && selectedId) {
+			event.preventDefault();
+			const step = event.shiftKey ? GRID_MINOR : event.altKey ? 0.25 : 1;
+			nudgeBox(move[0] * step, move[1] * step);
+			return;
 		}
 		if (event.key === 'Escape') selectedId = null;
 	}
@@ -261,12 +306,6 @@
 		status = 'Template exported — fonts referenced by name.';
 	}
 
-	async function doExportBundle() {
-		const fonts = await collectBundleFonts($state.snapshot(template));
-		download(`${slugify(template.name)}-bundle.json`, exportBundle($state.snapshot(template), fonts));
-		status = 'Bundle exported — font bytes embedded.';
-	}
-
 	async function importTemplate(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
@@ -274,7 +313,6 @@
 		if (!file) return;
 		try {
 			const raw = JSON.parse(await file.text());
-			await installBundleFonts(raw);
 			template = normaliseTemplate(raw);
 			selectedId = null;
 			// Never assume the mapping: a template is shared between spreadsheets.
@@ -317,11 +355,28 @@
 
 	const raf = () => new Promise((resolve) => requestAnimationFrame(resolve));
 
-	async function print() {
+	/** The checklist first: every one of these settings is one the browser gets
+	    wrong by default, and each one silently ruins the sheet. */
+	function requestPrint() {
 		if (!dataset.rows.length) {
 			status = 'Nothing to print yet.';
 			return;
 		}
+		if (ui.printHintSeen) {
+			void print();
+			return;
+		}
+		dontShowPrintHint = false;
+		printPrompt = true;
+	}
+
+	function confirmPrint() {
+		printPrompt = false;
+		if (dontShowPrintHint) ui = { ...ui, printHintSeen: true };
+		void print();
+	}
+
+	async function print() {
 		printing = true;
 		await tick();
 		try {
@@ -343,7 +398,8 @@
 	 * Reset asks twice: the second press is a different button in a different
 	 * place, so it cannot be reached by double-clicking the first. What is in the
 	 * editor afterwards is undoable — the browser storage is not, which is why
-	 * uploaded fonts get called out by name in the dialog.
+	 * uploaded fonts get called out by name in the dialog. (Deleting a row or a
+	 * column no longer asks at all; undo covers those, but not this.)
 	 */
 	async function confirmReset() {
 		if (resetStage === 1) {
@@ -372,34 +428,70 @@
 <div class="app">
 	<header class="toolbar">
 		<strong class="brand">libelli</strong>
-		<span class="name">{template.name}</span>
 		<span class="spacer"></span>
-		<button onclick={undo} disabled={!undoable} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">↶</button>
-		<button onclick={redo} disabled={!redoable} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">↷</button>
-		<button onclick={() => templateInput?.click()}>Import</button>
-		<button onclick={doExportTemplate}>Export template</button>
-		<button onclick={doExportBundle}>Export bundle</button>
+		<button class="square" onclick={undo} disabled={!undoable} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
+			<Icon name="undo" size={16} />
+		</button>
+		<button class="square" onclick={redo} disabled={!redoable} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
+			<Icon name="redo" size={16} />
+		</button>
+		<button
+			onclick={() => (pageSetupOpen = !pageSetupOpen)}
+			aria-pressed={pageSetupOpen}
+			aria-expanded={pageSetupOpen}
+			title="Show or hide the page setup"
+		>
+			<Icon name="settings" size={15} /> <span class="label">Page Setup</span>
+		</button>
 		<button class="danger-outline" onclick={() => (resetStage = 1)} title="Clear everything stored in this browser">Reset</button>
-		<button onclick={() => (contactOpen = true)} disabled={!dataset.rows.length}>Contact sheet</button>
-		<button class="primary" onclick={print}>Print</button>
-		<button onclick={() => (helpOpen = true)} aria-label="Help and credits" title="Help and credits">?</button>
+		<button onclick={() => (contactOpen = true)} disabled={!dataset.rows.length}>Contact Sheet</button>
+		<button class="primary" onclick={requestPrint}><Icon name="print" size={15} /> Print</button>
+		<button class="square" onclick={() => (helpOpen = true)} aria-label="Help and credits" title="Help and credits">
+			<Icon name="help" size={16} />
+		</button>
 		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
 	</header>
 
-	<OptionsBar
-		{template}
-		{dataset}
-		{mapping}
-		{selected}
-		onboxchange={updateBox}
-		ontemplatechange={(t) => (template = t)}
-		onmappingchange={(m) => (mapping = m)}
-		onduplicate={duplicateBox}
-		ondelete={deleteBox}
-		onaddbox={addBox}
-		onuploadfont={(file) => handleFontUpload(file)}
-	/>
+	{#if pageSetupOpen}
+		<OptionsBar
+			section="page"
+			{template}
+			{dataset}
+			{mapping}
+			{selected}
+			onboxchange={updateBox}
+			ontemplatechange={(t) => (template = t)}
+			onmappingchange={(m) => (mapping = m)}
+			onduplicate={duplicateBox}
+			ondelete={deleteBox}
+			onaddbox={addBox}
+			onuploadfont={(file) => handleFontUpload(file)}
+			onimporttemplate={() => templateInput?.click()}
+			onexporttemplate={doExportTemplate}
+			oneditcss={() => (cssOpen = true)}
+		/>
+	{/if}
+
+	{#if selected}
+		<OptionsBar
+			section="box"
+			{template}
+			{dataset}
+			{mapping}
+			{selected}
+			onboxchange={updateBox}
+			ontemplatechange={(t) => (template = t)}
+			onmappingchange={(m) => (mapping = m)}
+			onduplicate={duplicateBox}
+			ondelete={deleteBox}
+			onaddbox={addBox}
+			onuploadfont={(file) => handleFontUpload(file)}
+			onimporttemplate={() => templateInput?.click()}
+			onexporttemplate={doExportTemplate}
+			oneditcss={() => (cssOpen = true)}
+		/>
+	{/if}
 
 	{#if missingFonts.length}
 		<div class="banner" role="alert">
@@ -409,7 +501,7 @@
 				{missingFonts.length === 1 ? 'it' : 'them'}.
 			</span>
 			{#each missingFonts as font (font.ref ?? font.family)}
-				<button onclick={() => pickMissingFont(font)}>Choose {font.family} file…</button>
+				<button onclick={() => pickMissingFont(font)}>Choose {font.family} File…</button>
 			{/each}
 		</div>
 	{/if}
@@ -421,7 +513,7 @@
 				<label class="check">
 					{slot}
 					<select value={mapping[slot] ?? ''} onchange={(e) => (mapping = { ...mapping, [slot]: e.currentTarget.value })}>
-						<option value="">— none —</option>
+						<option value="">— None —</option>
 						{#each dataset.columns as column (column)}
 							<option value={column}>{column}</option>
 						{/each}
@@ -438,12 +530,17 @@
 			{row}
 			{mapping}
 			outlines={ui.showOutlines}
+			grid={ui.showGrid}
 			{selectedId}
 			zoom={ui.zoom}
+			pageNumber={dataset.rows.length ? activeRow + 1 : null}
 			onselect={(id) => (selectedId = id)}
 			onchange={updateBox}
 			onoutlines={(show) => (ui = { ...ui, showOutlines: show })}
+			ongrid={(show) => (ui = { ...ui, showGrid: show })}
 			onzoom={(zoom) => (ui = { ...ui, zoom })}
+			onnudge={nudgeBox}
+			onlock={(locked) => (template = { ...template, locked: locked || undefined })}
 		/>
 
 		<aside>
@@ -463,18 +560,74 @@
 					if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), next.columns);
 				}}
 			/>
-			<section class="print-help">
-				<h2>Before you print</h2>
-				<p>In the print dialog set <strong>Margins</strong> to <em>None</em>, uncheck <strong>Headers and footers</strong>, and switch on <strong>Background graphics</strong> — Chrome drops background colours by default.</p>
-				<p class="muted">One page per row. Everything stays in this browser; nothing is uploaded.</p>
-			</section>
 		</aside>
 	</main>
 
-	{#if status}
-		<p class="status" role="status">{status}</p>
-	{/if}
+	<footer class="status-bar">
+		<span class="status" role="status">{status}</span>
+		<span class="version">v{VERSION}</span>
+	</footer>
 </div>
+
+{#if printPrompt}
+	<div class="modal-backdrop" role="presentation" onclick={() => (printPrompt = false)}></div>
+	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="print-title">
+		<h2 id="print-title">Before you print</h2>
+		<p>Four settings in the browser's print dialog, each of which the browser gets wrong by default:</p>
+		<ul class="checklist">
+			<li>
+				<strong>Paper size</strong> — pick the one matching
+				<strong>{template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0)} ×
+				{template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0)} mm</strong>. If your printer has no
+				such size, print on a larger sheet and trim.
+			</li>
+			<li><strong>Margins</strong> — set to <em>None</em>.</li>
+			<li><strong>Headers and footers</strong> — switch off.</li>
+			<li><strong>Background graphics</strong> — switch on, or Chrome drops the paper colour.</li>
+		</ul>
+		<p class="muted">
+			{dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}, one per row. Everything stays in this browser;
+			nothing is uploaded.
+		</p>
+		<div class="modal-actions">
+			<label class="check">
+				<input type="checkbox" bind:checked={dontShowPrintHint} />
+				Don't show this again
+			</label>
+			<span class="spacer"></span>
+			<button onclick={() => (printPrompt = false)}>Cancel</button>
+			<button class="primary" use:focusOnOpen onclick={confirmPrint}>Print</button>
+		</div>
+	</div>
+{/if}
+
+{#if cssOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (cssOpen = false)}></div>
+	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title">
+		<h2 id="css-title">Custom CSS</h2>
+		<p>
+			Styles for this card, saved inside the template and exported with it. Selectors are scoped to the card, so
+			nothing here can reach the editor around it.
+		</p>
+		<textarea
+			class="code"
+			rows="12"
+			spellcheck="false"
+			use:focusOnOpen
+			placeholder={'h1 { letter-spacing: 0.4mm }\nem { color: #b42318 }'}
+			value={template.css ?? ''}
+			onchange={(e) => (template = { ...template, css: e.currentTarget.value.trim() || undefined })}
+		></textarea>
+		<p class="muted">
+			<code>@import</code> and any <code>url()</code> pointing off this machine are stripped: the app fetches nothing,
+			and a template you were handed should not be able to change that.
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button class="primary" onclick={() => (cssOpen = false)}>Done</button>
+		</div>
+	</div>
+{/if}
 
 {#if resetStage}
 	<div class="modal-backdrop" role="presentation" onclick={() => (resetStage = 0)}></div>
@@ -506,22 +659,29 @@
 		<p>Rows of a spreadsheet in, print-ready cards out. Data, templates and fonts stay in this browser — nothing is uploaded, and there is no server to upload to.</p>
 
 		<h3>Printing</h3>
-		<p>In the print dialog set <strong>Margins</strong> to <em>None</em>, uncheck <strong>Headers and footers</strong>, and switch on <strong>Background graphics</strong>. One page comes out per row.</p>
+		<p>Press Print and the checklist comes up first: paper size, margins, headers and footers, background graphics. One page comes out per row.</p>
 
 		<h3>Keys</h3>
 		<dl class="keys">
 			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
 			<dt>Ctrl/Cmd + Shift + Z</dt><dd>Redo</dd>
-			<dt>Arrows</dt><dd>Nudge the selected box (Shift 5mm, Alt 0.25mm)</dd>
+			<dt>Arrows</dt><dd>Nudge the selected box by 1mm (Shift 5mm, Alt 0.25mm)</dd>
 			<dt>Delete</dt><dd>Remove the selected box</dd>
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
+			<dt>Alt + drag</dt><dd>Ignore the grid and every snap</dd>
 		</dl>
 
-		<h3>Colour</h3>
-		<p>The options bar sets the default text colour and the paper colour for the whole card, and a colour for any single box. Inside a Markdown body, <code>[a few words]&#123;red&#125;</code> or <code>[…]&#123;#b42318&#125;</code> colours just those words. Paper colour prints only with background graphics switched on.</p>
+		<h3>Placing boxes</h3>
+		<p>Drag boxes on the page or type exact millimetres. A box latches onto the edges and centres of its neighbours as it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid of a 10mm grid instead. A box anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link. The lock at the top right of a box, or of the page, freezes what you have.</p>
 
-		<h3>Editing</h3>
-		<p>Drag boxes on the page or type exact millimetres. A box anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link. Column headers are editable in place; deleting a row or a column asks first, and can be undone.</p>
+		<h3>Type</h3>
+		<p>Page setup holds the defaults — family, size, leading, tracking and colour. A box that leaves those fields blank inherits them, so changing the page changes every box that never overrode it.</p>
+
+		<h3>Colour</h3>
+		<p>Page setup sets the default text colour and the paper colour, and a box can set its own. Inside a Markdown body, <code>[a few words]&#123;red&#125;</code> or <code>[…]&#123;#b42318&#125;</code> colours just those words. Paper colour prints only with background graphics switched on.</p>
+
+		<h3>Data</h3>
+		<p>Column headers are editable in place. The pale row and column at the end of the table are placeholders: type into one and it becomes real. Deleting a row or a column happens straight away — Ctrl/Cmd+Z brings it back.</p>
 
 		<p class="credit">
 			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>
@@ -567,7 +727,9 @@
 	.app {
 		display: flex;
 		flex-direction: column;
-		height: 100vh;
+		/* dvh, not vh: a phone's address bar otherwise hides the status bar and
+		   pushes the preview off the bottom of the screen. */
+		height: 100dvh;
 		min-height: 0;
 	}
 
@@ -586,10 +748,6 @@
 		font-size: 13px;
 	}
 
-	.name {
-		color: #767676;
-	}
-
 	.spacer {
 		flex: 1;
 	}
@@ -605,38 +763,28 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
+		min-width: 0;
 		background: #fff;
 	}
 
 	aside :global(.data) {
 		flex: 1;
 		min-height: 0;
-	}
-
-	.print-help {
-		border-top: 1px solid #eee;
-		border-left: 1px solid #ddd;
-		padding: 10px 12px;
-		font-size: 12px;
-		line-height: 1.5;
-		color: #333;
-		background: #fcfcfc;
-	}
-
-	.print-help h2 {
-		margin: 0 0 4px;
-		font-size: 12px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: #767676;
-	}
-
-	.print-help p {
-		margin: 0 0 6px;
+		min-width: 0;
 	}
 
 	.muted {
 		color: #767676;
+	}
+
+	.checklist {
+		margin: 0 0 10px;
+		padding-left: 20px;
+		color: #333;
+	}
+
+	.checklist li {
+		margin-bottom: 4px;
 	}
 
 	.banner {
@@ -650,13 +798,28 @@
 		font-size: 12px;
 	}
 
-	.status {
-		margin: 0;
-		padding: 6px 12px;
-		font-size: 12px;
+	.status-bar {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 5px 12px;
+		font-size: 11px;
 		color: #555;
 		background: #fff;
 		border-top: 1px solid #eee;
+	}
+
+	.status {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.status-bar .version {
+		font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+		color: #999;
 	}
 
 	.check {
@@ -666,11 +829,15 @@
 	}
 
 	button {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
 		border: 1px solid #ccc;
 		border-radius: 6px;
 		background: #fff;
+		color: #111;
 		cursor: pointer;
 	}
 
@@ -683,10 +850,25 @@
 		cursor: default;
 	}
 
+	/* Square, equal-sized icon buttons: undo, redo and help are the same kind of
+	   thing and used to be three different widths. */
+	button.square {
+		width: 30px;
+		height: 30px;
+		padding: 0;
+		justify-content: center;
+	}
+
 	button.primary {
 		background: #111;
 		border-color: #111;
 		color: #fff;
+	}
+
+	button[aria-pressed='true']:not(.primary):not(.danger-outline) {
+		border-color: #2563eb;
+		color: #2563eb;
+		background: #eaf1fe;
 	}
 
 	/* Outline, not filled: dangerous enough to notice in the toolbar, quiet
@@ -753,6 +935,16 @@
 		color: #333;
 	}
 
+	.modal textarea.code {
+		width: 100%;
+		box-sizing: border-box;
+		font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+		padding: 8px;
+		border: 1px solid #ccc;
+		border-radius: 6px;
+		resize: vertical;
+	}
+
 	.keys {
 		display: grid;
 		grid-template-columns: max-content 1fr;
@@ -817,10 +1009,23 @@
 	}
 
 	@media (max-width: 900px) {
+		/* The preview is centred on the device, not on the table: `overflow:
+		   hidden` here and `min-width: 0` on the aside stop the table's natural
+		   width from stretching the grid and dragging the page off-centre. The
+		   table keeps its own horizontal scrollbar. */
 		main {
 			grid-template-columns: 1fr;
-			grid-template-rows: minmax(320px, 1fr) minmax(240px, 1fr);
-			overflow: auto;
+			grid-template-rows: minmax(0, 1.15fr) minmax(0, 1fr);
+			overflow: hidden;
+		}
+
+		.toolbar {
+			gap: 6px;
+			padding: 6px 8px;
+		}
+
+		.toolbar .label {
+			display: none;
 		}
 	}
 

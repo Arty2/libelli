@@ -1,17 +1,27 @@
 /**
- * Template + runtime types.
+ * Shared shapes.
  *
- * Units: every coordinate and every spacing value is in millimetres, because
- * pixels are meaningless on paper. The one exception is `size` / `weight`,
- * which are typographic: `size` is in points (1pt = 1/72in), the unit a
- * designer expects to type into a font-size field.
+ * Every coordinate and every spacing in here is millimetres, measured from the
+ * trim edge. `size` is points and `weight` is typographic — the two places a
+ * print convention beats consistency.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export type BoxMode = 'plain' | 'markdown' | 'image' | 'qr';
 export type Overflow = 'clip' | 'grow';
 export type Align = 'left' | 'center' | 'right';
+/** vertical placement of a box's content within its own frame */
+export type VAlign = 'top' | 'middle' | 'bottom';
+export type TextCase = 'none' | 'smallcaps' | 'uppercase';
+
+export type PageNumberPosition =
+	| 'top-left'
+	| 'top-center'
+	| 'top-right'
+	| 'bottom-left'
+	| 'bottom-center'
+	| 'bottom-right';
 
 export interface PageSpec {
 	w: number;
@@ -26,6 +36,14 @@ export interface BleedSpec {
 	/** mm of bleed on every side */
 	amount: number;
 	cropMarks: boolean;
+}
+
+/** A page number printed on every card. Off unless asked for. */
+export interface PageNumberSpec {
+	enabled: boolean;
+	position: PageNumberPosition;
+	/** mm inset from the trim edge */
+	margin: number;
 }
 
 export interface FontRef {
@@ -43,11 +61,15 @@ export interface TextStyle {
 	lineHeight?: number;
 	color?: string;
 	align?: Align;
+	valign?: VAlign;
 	italic?: boolean;
+	/** mm */
 	letterSpacing?: number;
 }
 
-export type Defaults = Required<Pick<TextStyle, 'font' | 'size' | 'lineHeight' | 'weight' | 'color' | 'align'>>;
+export type Defaults = Required<
+	Pick<TextStyle, 'font' | 'size' | 'lineHeight' | 'weight' | 'color' | 'align' | 'letterSpacing'>
+>;
 
 /** Markdown block metrics. `size` values are multipliers of the box size; every spacing is mm. */
 export interface MarkdownStyle {
@@ -65,6 +87,7 @@ export interface QrSettings {
 	level: 'L' | 'M' | 'Q' | 'H';
 	/** quiet zone in modules — the white border a scanner needs */
 	margin: number;
+	/** absent means transparent: the paper (or the box background) shows through */
 	background?: string;
 }
 
@@ -91,6 +114,7 @@ export interface Box extends TextStyle {
 	h: number;
 	mode: BoxMode;
 	overflow: Overflow;
+	textCase?: TextCase;
 	md?: MarkdownStyle;
 	qr?: QrSettings;
 	anchor?: Anchor | null;
@@ -108,10 +132,15 @@ export interface Template {
 	name: string;
 	page: PageSpec;
 	bleed: BleedSpec;
+	pageNumber: PageNumberSpec;
 	fonts: FontRef[];
 	defaults: Defaults;
 	slots: string[];
 	boxes: Box[];
+	/** author's own CSS, scoped to the card at render time */
+	css?: string;
+	/** freezes the whole design: no dragging, no resizing, no option changes */
+	locked?: boolean;
 }
 
 /** Runtime state — never written into a template file. */
@@ -127,5 +156,8 @@ export type Mapping = Record<string, string>;
 
 export interface UiState {
 	showOutlines: boolean;
+	showGrid: boolean;
 	zoom: 'fit' | number;
+	/** the print checklist is a reminder, not a gate: it can be dismissed for good */
+	printHintSeen: boolean;
 }

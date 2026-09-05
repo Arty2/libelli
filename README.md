@@ -49,9 +49,10 @@ localStorage's ~5MB. [Undo](#undo-and-redo) keeps its snapshots in memory.
 
 ## Cards and boxes
 
-A template is a list of boxes on a page. Select one on the page and the options
-bar above it becomes that box's inspector; click the background and it becomes
-the page's. Drag and resize boxes directly, or type exact millimetres.
+A template is a list of boxes on a page. Page setup and box settings are two
+separate bars: **Page Setup** in the toolbar shows or hides the template's own
+settings, and a box's bar appears under it whenever a box is selected. Drag and
+resize boxes directly, or type exact millimetres.
 
 - **Millimetres, from the trim edge** — changing the page size or switching bleed
   on moves nothing, because no coordinate was ever expressed in pixels.
@@ -66,9 +67,26 @@ the page's. Drag and resize boxes directly, or type exact millimetres.
   drops out of the anchor chain, so a card with no subtitle has no dead band
   where the subtitle would have been. A box with no anchor stays pinned to its
   own Y however long the body above it runs.
+- **Alignment** — horizontal (left, centre, right) and vertical (top, middle,
+  bottom) within the box's own frame.
+- **Type defaults** — page setup holds the family, size, leading, tracking and
+  colour. A box that leaves those fields blank inherits them, so changing the
+  page moves every box that never overrode it; a new box starts out inheriting
+  everything.
 - **Bleed** — an outset on the page, never an offset on content: turning it on
   changes the sheet size, optionally with crop marks, and every box stays
-  visually where it was.
+  visually where it was. On screen the trim edge is marked in purple, on the
+  same toggle as the box outlines.
+- **Page numbers** — off by default; six corners to choose from, an adjustable
+  margin, and the template's default type. The number is the row's position, so
+  the preview, the contact sheet and the print all agree.
+- **Lock** — the padlock at the top right of a box, or of the page, freezes what
+  you have: no dragging, no resizing, no option changes. A page lock covers every
+  box and the page settings too.
+- **Custom CSS** — page setup has a CSS button; what you write there is saved
+  inside the template and travels with it. Selectors are scoped to the card, so
+  nothing in a template can restyle the editor around it, and `@import` and any
+  `url()` pointing off this machine are stripped — the app fetches nothing.
 
 ## The data table
 
@@ -87,9 +105,11 @@ Clicking a row previews it.
   reverse it. Numbers sort by value rather than by digit, case is ignored, and
   blanks stay at the bottom either way. This reorders the data, not just the
   view, because row order *is* print order — and it is undoable.
-- **Add** — *+ Row* and *+ Column*, or the `+` at the end of the header row.
-- **Delete** — asks first, naming what goes: the number of filled cells for a
-  column, the opening text for a row. Undoable either way.
+- **Add** — the pale row and column at the end of the table are placeholders:
+  type into one and it becomes real. There is no separate button, because the
+  place you would click is the place you were already typing.
+- **Delete** — immediate, with a line saying what went. Undo covers it; a
+  confirmation you dismiss without reading protects nobody.
 
 ## Markdown and colour
 
@@ -156,10 +176,11 @@ Pick a curated Google family, type any other family name, or upload a file.
 Print renders every row into a dedicated container and hands it to the browser:
 `@page { size: <w>mm <h>mm; margin: 0 }`, one page per row, no trailing blank.
 
-The app keeps a short panel of dialog settings next to the button, because two
-of them catch everyone out: set **Margins** to *None*, uncheck **Headers and
-footers**, and switch on **Background graphics** — Chrome drops background
-colours by default, paper colour included.
+Pressing Print brings up the checklist first, because every one of these is a
+setting the browser gets wrong by default: pick the **paper size** matching the
+card's millimetres, set **Margins** to *None*, uncheck **Headers and footers**,
+and switch on **Background graphics** — Chrome drops background colours, paper
+colour included. Tick *Don't show this again* once you know it by heart.
 
 ## Contact sheet
 
@@ -193,37 +214,47 @@ and sample data, with your work one undo away. Uploaded fonts are the exception
 | <kbd>←</kbd> <kbd>→</kbd> | Previous / next card, in the contact sheet |
 
 While a text field has focus, undo is left to the browser's own text history and
-<kbd>Delete</kbd> deletes characters — the app keeps its hands off both. Nudging
-needs the page area focused, which clicking a box does. Dragging snaps to 0.5mm;
-hold <kbd>Alt</kbd> for 0.01mm.
+<kbd>Delete</kbd> deletes characters — the app keeps its hands off both.
+Otherwise the arrow keys move the selected box wherever you are on the page. On
+a touch screen the same job is done by the four-way pad that appears beside the
+card, with a chip to switch between 1mm and 5mm.
+
+Dragging snaps in this order: hold <kbd>Alt</kbd> and nothing snaps at all;
+switch **Grid** on and everything snaps to the 5mm subgrid of a 10mm grid;
+otherwise a box latches onto the edges and centres of its neighbours as it
+passes them, and a guide shows what it caught.
 
 ## Settings
 
-- **Page** — template name, width, height, default font, default text colour,
-  paper colour, default size, bleed on/off, bleed amount, crop marks
-- **Box** — slot, bound column, font, size, weight, leading, alignment, colour,
-  mode (plain / markdown / image / QR), fit (image and QR), QR correction and
-  quiet zone, overflow (grow / clip), X, Y, W, H, anchor, anchor gap, hide when
-  empty
-- **View** — in the bottom corners of the page itself, not the toolbar: box
-  outlines on/off (screen only, never printed) at the left, zoom (fit, or 50% to
+- **Page** — template name, width, height, default font, size, leading and
+  tracking, default text colour, paper colour, bleed on/off, bleed amount, crop
+  marks, page number position and margin, custom CSS, lock, and the template
+  import/export buttons
+- **Box** — slot, bound column, font, size, weight, leading, tracking, case (as
+  typed / small caps / uppercase), horizontal and vertical alignment, colour,
+  mode (plain / markdown / image / QR), fit (image and QR), QR correction, quiet
+  zone and backing (transparent or solid), overflow (grow / clip), X and Y, W and
+  H, anchor, anchor gap, hide when empty, lock
+- **View** — in the bottom corners of the page itself, not the toolbar: grid and
+  box outlines at the left (screen only, never printed), zoom (fit, or 50% to
   200%) at the right
+
+Every number says its unit: mm for geometry, bleed, tracking and gaps, pt for
+type size, modules for a QR quiet zone.
 
 ## Import and export
 
 A template travels as JSON and carries no data with it — that is the point of
 keeping the column mapping outside it.
 
-- **Export template** — fonts referenced by family name. Small, diffable,
-  git-friendly. The default.
-- **Export bundle** — the same file with font bytes embedded as base64.
-  Self-contained, larger, for handing to someone who does not have the fonts.
-- **Import** — one button takes either. A bundle is recognised by the font bytes
-  it carries, and those are installed into this browser before the template
-  renders.
+- **Export Template** — fonts referenced by family name. Small, diffable,
+  git-friendly. Custom CSS, page numbers and locks travel with it.
+- **Import Template** — in page setup, next to the export, so it cannot be
+  mistaken for *Import CSV* under the table. Any font the template names but this
+  browser does not have is asked for by name rather than substituted.
 
-Whichever arrives, the column mapping is put to you for confirmation rather than
-assumed, since the template may have been built against a different spreadsheet.
+The column mapping is put to you for confirmation rather than assumed, since the
+template may have been built against a different spreadsheet.
 A template claiming a schema newer than the app understands is refused outright
 rather than half-read.
 

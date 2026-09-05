@@ -25,7 +25,7 @@
 	{#each dataset.rows as row, i (i)}
 		<!-- Sized to the sheet so nothing can spill sideways into an extra page. -->
 		<div class="print-page" style="width:{pageW}mm;height:{pageH}mm">
-			<Card {template} {row} {mapping} />
+			<Card {template} {row} {mapping} pageNumber={i + 1} />
 		</div>
 	{/each}
 </div>

@@ -75,7 +75,7 @@
 					aria-label="Open card {i + 1} full screen"
 				>
 					<span class="scaler" style="transform:scale({thumbScale})">
-						<Card {template} {row} {mapping} />
+						<Card {template} {row} {mapping} pageNumber={i + 1} />
 					</span>
 				</button>
 				<figcaption>{i + 1}</figcaption>
@@ -89,7 +89,7 @@
 			<button class="nav prev" onclick={(e) => { e.stopPropagation(); fullscreen = Math.max(0, index - 1); }} aria-label="Previous card">←</button>
 			<div class="full-card" role="presentation" onclick={(e) => e.stopPropagation()} style="width:{mmToPx(outerW) * fullScale}px;height:{mmToPx(outerH) * fullScale}px">
 				<span class="scaler" style="transform:scale({fullScale})">
-					<Card {template} row={dataset.rows[index]} {mapping} />
+					<Card {template} row={dataset.rows[index]} {mapping} pageNumber={index + 1} />
 				</span>
 			</div>
 			<button class="nav next" onclick={(e) => { e.stopPropagation(); fullscreen = Math.min(dataset.rows.length - 1, index + 1); }} aria-label="Next card">→</button>

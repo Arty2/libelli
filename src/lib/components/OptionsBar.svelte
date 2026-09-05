@@ -1,9 +1,21 @@
 <script lang="ts">
+	import Icon from './Icon.svelte';
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
-	import { DEFAULT_QR } from '$lib/template';
-	import type { Box, Dataset, Mapping, QrSettings, Template } from '$lib/types';
+	import { DEFAULT_QR, PAGE_NUMBER_POSITIONS } from '$lib/template';
+	import type {
+		Align,
+		Box,
+		Dataset,
+		Mapping,
+		PageNumberPosition,
+		QrSettings,
+		Template,
+		VAlign
+	} from '$lib/types';
 
 	interface Props {
+		/** which half of the editor this instance is: the two never share a row */
+		section: 'page' | 'box';
 		template: Template;
 		dataset: Dataset;
 		mapping: Mapping;
@@ -15,9 +27,13 @@
 		ondelete: () => void;
 		onaddbox: () => void;
 		onuploadfont: (file: File) => void;
+		onimporttemplate: () => void;
+		onexporttemplate: () => void;
+		oneditcss: () => void;
 	}
 
 	let {
+		section,
 		template,
 		dataset,
 		mapping,
@@ -28,7 +44,10 @@
 		onduplicate,
 		ondelete,
 		onaddbox,
-		onuploadfont
+		onuploadfont,
+		onimporttemplate,
+		onexporttemplate,
+		oneditcss
 	}: Props = $props();
 
 	let fontInput = $state<HTMLInputElement | null>(null);
@@ -41,16 +60,59 @@
 
 	const anchorOptions = $derived(template.boxes.filter((b) => b.id !== selected?.id));
 
+	/** A locked design is read-only everywhere; a locked box only locks itself. */
+	const pageFrozen = $derived(!!template.locked);
+	const boxFrozen = $derived(!!template.locked || !!selected?.locked);
+
+	const POSITION_LABELS: Record<PageNumberPosition, string> = {
+		'top-left': 'Top Left',
+		'top-center': 'Top Centre',
+		'top-right': 'Top Right',
+		'bottom-left': 'Bottom Left',
+		'bottom-center': 'Bottom Centre',
+		'bottom-right': 'Bottom Right'
+	};
+
+	const ALIGNMENTS: Array<{ value: Align; icon: string; label: string }> = [
+		{ value: 'left', icon: 'align-left', label: 'Left' },
+		{ value: 'center', icon: 'align-center', label: 'Centre' },
+		{ value: 'right', icon: 'align-right', label: 'Right' }
+	];
+
+	const VERTICALS: Array<{ value: VAlign; icon: string; label: string }> = [
+		{ value: 'top', icon: 'valign-top', label: 'Top' },
+		{ value: 'middle', icon: 'valign-middle', label: 'Middle' },
+		{ value: 'bottom', icon: 'valign-bottom', label: 'Bottom' }
+	];
+
 	const patch = (change: Partial<Box>) => {
 		if (selected) onboxchange({ ...selected, ...change });
 	};
+
+	const patchTemplate = (change: Partial<Template>) => ontemplatechange({ ...template, ...change });
 
 	const numeric = (event: Event, fallback: number) => {
 		const value = Number((event.currentTarget as HTMLInputElement).value);
 		return Number.isFinite(value) ? value : fallback;
 	};
 
+	/**
+	 * An empty field means "inherit". That is the whole mechanism behind the
+	 * global type settings: a box that names no size takes the template's, so
+	 * changing the template moves every box that never overrode it.
+	 */
+	const inherited = (event: Event): number | undefined => {
+		const raw = (event.currentTarget as HTMLInputElement).value.trim();
+		if (!raw) return undefined;
+		const value = Number(raw);
+		return Number.isFinite(value) ? value : undefined;
+	};
+
 	function setFont(value: string) {
+		if (value === '') {
+			patch({ font: undefined });
+			return;
+		}
 		if (value === '__upload') {
 			fontInput?.click();
 			return;
@@ -74,14 +136,14 @@
 
 	function registerFamily(family: string) {
 		if (template.fonts.some((f) => f.family.toLowerCase() === family.toLowerCase())) return;
-		ontemplatechange({ ...template, fonts: [...template.fonts, { family, source: 'google' }] });
+		patchTemplate({ fonts: [...template.fonts, { family, source: 'google' }] });
 	}
 
 	function setSlot(slot: string) {
 		const value = slot.trim();
 		patch({ slot: value || null });
 		if (value && !template.slots.includes(value)) {
-			ontemplatechange({ ...template, slots: [...template.slots, value] });
+			patchTemplate({ slots: [...template.slots, value] });
 		}
 	}
 
@@ -89,6 +151,21 @@
 		if (!selected) return;
 		if (!value) patch({ anchor: null });
 		else patch({ anchor: { to: value, gap: selected.anchor?.gap ?? 4 } });
+	}
+
+	function setQr(change: Partial<QrSettings>) {
+		patch({ qr: { ...DEFAULT_QR, ...selected?.qr, ...change } });
+	}
+
+	/** Transparent is the absence of a background, not a white one. */
+	function setQrBackground(opaque: boolean) {
+		if (!selected) return;
+		const qr = { ...DEFAULT_QR, ...selected.qr };
+		if (opaque) patch({ qr: { ...qr, background: qr.background ?? '#ffffff' } });
+		else {
+			const { background: _dropped, ...rest } = qr;
+			patch({ qr: rest });
+		}
 	}
 
 	function uploadFont(event: Event) {
@@ -99,8 +176,223 @@
 	}
 </script>
 
-<div class="options" aria-label="Options">
-	{#if selected}
+{#if section === 'page'}
+	<div class="options" aria-label="Page setup">
+		<span class="context">Page</span>
+
+		<label class="field">
+			<span>Template</span>
+			<input
+				class="w-10"
+				value={template.name}
+				disabled={pageFrozen}
+				onchange={(e) => patchTemplate({ name: e.currentTarget.value })}
+			/>
+		</label>
+
+		<span class="group" role="group" aria-label="Page size">
+			<label class="field">
+				<span>Width</span>
+				<input
+					class="w-4"
+					type="number"
+					step="1"
+					value={template.page.w}
+					disabled={pageFrozen}
+					onchange={(e) => patchTemplate({ page: { ...template.page, w: numeric(e, template.page.w) } })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+			<label class="field">
+				<span>Height</span>
+				<input
+					class="w-4"
+					type="number"
+					step="1"
+					value={template.page.h}
+					disabled={pageFrozen}
+					onchange={(e) => patchTemplate({ page: { ...template.page, h: numeric(e, template.page.h) } })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+			<span class="note" title="Text and QR codes print at the printer's own resolution; artwork you place should be prepared at 300 dpi">
+				300 dpi
+			</span>
+		</span>
+
+		<span class="group" role="group" aria-label="Type defaults">
+			<label class="field">
+				<span>Font</span>
+				<select
+					value={template.defaults.font}
+					disabled={pageFrozen}
+					onchange={(e) => patchTemplate({ defaults: { ...template.defaults, font: e.currentTarget.value } })}
+				>
+					{#each familyOptions as family (family)}
+						<option value={family}>{family}</option>
+					{/each}
+				</select>
+			</label>
+			<label class="field">
+				<span>Size</span>
+				<input
+					class="w-4"
+					type="number"
+					step="0.5"
+					min="1"
+					value={template.defaults.size}
+					disabled={pageFrozen}
+					onchange={(e) =>
+						patchTemplate({ defaults: { ...template.defaults, size: numeric(e, template.defaults.size) } })}
+				/>
+				<span class="unit">pt</span>
+			</label>
+			<label class="field">
+				<span>Leading</span>
+				<input
+					class="w-4"
+					type="number"
+					step="0.05"
+					min="0.8"
+					value={template.defaults.lineHeight}
+					disabled={pageFrozen}
+					onchange={(e) =>
+						patchTemplate({
+							defaults: { ...template.defaults, lineHeight: numeric(e, template.defaults.lineHeight) }
+						})}
+				/>
+			</label>
+			<label class="field">
+				<span>Tracking</span>
+				<input
+					class="w-4"
+					type="number"
+					step="0.05"
+					value={template.defaults.letterSpacing}
+					disabled={pageFrozen}
+					onchange={(e) =>
+						patchTemplate({
+							defaults: { ...template.defaults, letterSpacing: numeric(e, template.defaults.letterSpacing) }
+						})}
+				/>
+				<span class="unit">mm</span>
+			</label>
+		</span>
+
+		<label class="field">
+			<span>Text</span>
+			<input
+				class="colour"
+				type="color"
+				title="Default text colour for every box that does not set its own"
+				value={template.defaults.color}
+				disabled={pageFrozen}
+				onchange={(e) => patchTemplate({ defaults: { ...template.defaults, color: e.currentTarget.value } })}
+			/>
+		</label>
+
+		<label class="field">
+			<span>Paper</span>
+			<input
+				class="colour"
+				type="color"
+				title="Page colour — prints only with background graphics enabled"
+				value={template.page.background ?? '#ffffff'}
+				disabled={pageFrozen}
+				onchange={(e) => patchTemplate({ page: { ...template.page, background: e.currentTarget.value } })}
+			/>
+		</label>
+
+		<label class="check">
+			<input
+				type="checkbox"
+				checked={template.bleed.enabled}
+				disabled={pageFrozen}
+				onchange={(e) => patchTemplate({ bleed: { ...template.bleed, enabled: e.currentTarget.checked } })}
+			/>
+			Bleed
+		</label>
+
+		{#if template.bleed.enabled}
+			<label class="field">
+				<span>Amount</span>
+				<input
+					class="w-4"
+					type="number"
+					step="0.5"
+					min="0"
+					value={template.bleed.amount}
+					disabled={pageFrozen}
+					onchange={(e) => patchTemplate({ bleed: { ...template.bleed, amount: numeric(e, template.bleed.amount) } })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+			<label class="check">
+				<input
+					type="checkbox"
+					checked={template.bleed.cropMarks}
+					disabled={pageFrozen}
+					onchange={(e) => patchTemplate({ bleed: { ...template.bleed, cropMarks: e.currentTarget.checked } })}
+				/>
+				Crop Marks
+			</label>
+		{/if}
+
+		<label class="field">
+			<span>Page Number</span>
+			<select
+				value={template.pageNumber.enabled ? template.pageNumber.position : ''}
+				disabled={pageFrozen}
+				onchange={(e) => {
+					const value = e.currentTarget.value;
+					patchTemplate({
+						pageNumber: {
+							...template.pageNumber,
+							enabled: value !== '',
+							position: (value || template.pageNumber.position) as PageNumberPosition
+						}
+					});
+				}}
+			>
+				<option value="">Off</option>
+				{#each PAGE_NUMBER_POSITIONS as position (position)}
+					<option value={position}>{POSITION_LABELS[position]}</option>
+				{/each}
+			</select>
+		</label>
+
+		{#if template.pageNumber.enabled}
+			<label class="field">
+				<span>Margin</span>
+				<input
+					class="w-4"
+					type="number"
+					step="0.5"
+					min="0"
+					value={template.pageNumber.margin}
+					disabled={pageFrozen}
+					onchange={(e) =>
+						patchTemplate({
+							pageNumber: { ...template.pageNumber, margin: numeric(e, template.pageNumber.margin) }
+						})}
+				/>
+				<span class="unit">mm</span>
+			</label>
+		{/if}
+
+		<span class="spacer"></span>
+
+		<span class="actions">
+		<button onclick={oneditcss} disabled={pageFrozen} title="Custom CSS, saved inside the template">
+			<Icon name="code" size={14} /> CSS{template.css ? ' •' : ''}
+		</button>
+		<button onclick={onimporttemplate} disabled={pageFrozen}>Import Template…</button>
+		<button onclick={onexporttemplate}>Export Template</button>
+		<button onclick={onaddbox} disabled={pageFrozen}><Icon name="add" size={14} /> Box</button>
+		</span>
+	</div>
+{:else if selected}
+	<div class="options box-options" aria-label="Box settings">
 		<span class="context">Box</span>
 
 		<label class="field">
@@ -109,6 +401,7 @@
 				class="w-6"
 				value={selected.slot ?? ''}
 				placeholder="static"
+				disabled={boxFrozen}
 				onchange={(e) => setSlot(e.currentTarget.value)}
 			/>
 		</label>
@@ -120,7 +413,7 @@
 					value={mapping[selected.slot] ?? ''}
 					onchange={(e) => onmappingchange({ ...mapping, [selected.slot as string]: e.currentTarget.value })}
 				>
-					<option value="">— none —</option>
+					<option value="">— None —</option>
 					{#each dataset.columns as column (column)}
 						<option value={column}>{column}</option>
 					{/each}
@@ -130,12 +423,13 @@
 
 		<label class="field">
 			<span>Font</span>
-			<select value={selected.font ?? template.defaults.font} onchange={(e) => setFont(e.currentTarget.value)}>
+			<select value={selected.font ?? ''} disabled={boxFrozen} onchange={(e) => setFont(e.currentTarget.value)}>
+				<option value="">Default — {template.defaults.font}</option>
 				{#each familyOptions as family (family)}
 					<option value={family}>{family}</option>
 				{/each}
-				<option value="__custom">Other family…</option>
-				<option value="__upload">Upload a font file…</option>
+				<option value="__custom">Other Family…</option>
+				<option value="__upload">Upload a Font File…</option>
 			</select>
 		</label>
 
@@ -146,17 +440,23 @@
 				type="number"
 				step="0.5"
 				min="1"
-				value={selected.size ?? template.defaults.size}
-				onchange={(e) => patch({ size: numeric(e, template.defaults.size) })}
+				placeholder={String(template.defaults.size)}
+				title="Blank inherits the page's {template.defaults.size}pt"
+				value={selected.size ?? ''}
+				disabled={boxFrozen}
+				onchange={(e) => patch({ size: inherited(e) })}
 			/>
+			<span class="unit">pt</span>
 		</label>
 
 		<label class="field">
 			<span>Weight</span>
 			<select
-				value={String(selected.weight ?? template.defaults.weight)}
-				onchange={(e) => patch({ weight: Number(e.currentTarget.value) })}
+				value={selected.weight === undefined ? '' : String(selected.weight)}
+				disabled={boxFrozen}
+				onchange={(e) => patch({ weight: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
 			>
+				<option value="">Default — {template.defaults.weight}</option>
 				{#each [300, 400, 500, 600, 700, 800] as weight (weight)}
 					<option value={String(weight)}>{weight}</option>
 				{/each}
@@ -170,17 +470,67 @@
 				type="number"
 				step="0.05"
 				min="0.8"
-				value={selected.lineHeight ?? template.defaults.lineHeight}
-				onchange={(e) => patch({ lineHeight: numeric(e, template.defaults.lineHeight) })}
+				placeholder={String(template.defaults.lineHeight)}
+				title="Blank inherits the page's {template.defaults.lineHeight}"
+				value={selected.lineHeight ?? ''}
+				disabled={boxFrozen}
+				onchange={(e) => patch({ lineHeight: inherited(e) })}
 			/>
 		</label>
 
 		<label class="field">
-			<span>Align</span>
-			<select value={selected.align ?? template.defaults.align} onchange={(e) => patch({ align: e.currentTarget.value as Box['align'] })}>
-				<option value="left">left</option>
-				<option value="center">center</option>
-				<option value="right">right</option>
+			<span>Tracking</span>
+			<input
+				class="w-4"
+				type="number"
+				step="0.05"
+				placeholder={String(template.defaults.letterSpacing)}
+				title="Letter spacing; blank inherits the page's"
+				value={selected.letterSpacing ?? ''}
+				disabled={boxFrozen}
+				onchange={(e) => patch({ letterSpacing: inherited(e) })}
+			/>
+			<span class="unit">mm</span>
+		</label>
+
+		<span class="segmented" role="group" aria-label="Horizontal alignment">
+			{#each ALIGNMENTS as option (option.value)}
+				<button
+					aria-pressed={(selected.align ?? template.defaults.align) === option.value}
+					title="Align {option.label}"
+					aria-label="Align {option.label}"
+					disabled={boxFrozen}
+					onclick={() => patch({ align: option.value })}
+				>
+					<Icon name={option.icon} size={15} />
+				</button>
+			{/each}
+		</span>
+
+		<span class="segmented" role="group" aria-label="Vertical alignment">
+			{#each VERTICALS as option (option.value)}
+				<button
+					aria-pressed={(selected.valign ?? 'top') === option.value}
+					title="Align {option.label}"
+					aria-label="Align {option.label}"
+					disabled={boxFrozen}
+					onclick={() => patch({ valign: option.value })}
+				>
+					<Icon name={option.icon} size={15} />
+				</button>
+			{/each}
+		</span>
+
+		<label class="field">
+			<span>Case</span>
+			<select
+				value={selected.textCase ?? 'none'}
+				disabled={boxFrozen}
+				onchange={(e) => patch({ textCase: e.currentTarget.value as Box['textCase'] })}
+			>
+				<option value="none">As Typed</option>
+				<option value="smallcaps">Small Caps</option>
+				<option value="uppercase">Uppercase</option>
 			</select>
 		</label>
 
@@ -190,27 +540,36 @@
 				class="colour"
 				type="color"
 				value={selected.color ?? template.defaults.color}
+				disabled={boxFrozen}
 				onchange={(e) => patch({ color: e.currentTarget.value })}
 			/>
 		</label>
 
 		<label class="field">
 			<span>Mode</span>
-			<select value={selected.mode} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
-				<option value="plain">plain</option>
-				<option value="markdown">markdown</option>
-				<option value="image">image</option>
-				<option value="qr">QR code</option>
+			<select
+				value={selected.mode}
+				disabled={boxFrozen}
+				onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}
+			>
+				<option value="plain">Plain</option>
+				<option value="markdown">Markdown</option>
+				<option value="image">Image</option>
+				<option value="qr">QR Code</option>
 			</select>
 		</label>
 
 		{#if selected.mode === 'image' || selected.mode === 'qr'}
 			<label class="field">
 				<span>Fit</span>
-				<select value={selected.fit ?? 'contain'} onchange={(e) => patch({ fit: e.currentTarget.value as Box['fit'] })}>
-					<option value="contain">fit</option>
-					<option value="cover">cover</option>
-					<option value="fill">stretch</option>
+				<select
+					value={selected.fit ?? 'contain'}
+					disabled={boxFrozen}
+					onchange={(e) => patch({ fit: e.currentTarget.value as Box['fit'] })}
+				>
+					<option value="contain">Fit</option>
+					<option value="cover">Cover</option>
+					<option value="fill">Stretch</option>
 				</select>
 			</label>
 		{/if}
@@ -221,7 +580,8 @@
 				<select
 					value={selected.qr?.level ?? DEFAULT_QR.level}
 					title="How much of the code can be damaged and still scan"
-					onchange={(e) => patch({ qr: { ...DEFAULT_QR, ...selected.qr, level: e.currentTarget.value as QrSettings['level'] } })}
+					disabled={boxFrozen}
+					onchange={(e) => setQr({ level: e.currentTarget.value as QrSettings['level'] })}
 				>
 					<option value="L">L — 7%</option>
 					<option value="M">M — 15%</option>
@@ -230,7 +590,7 @@
 				</select>
 			</label>
 			<label class="field">
-				<span>Quiet zone</span>
+				<span>Quiet Zone</span>
 				<input
 					class="w-4"
 					type="number"
@@ -239,22 +599,55 @@
 					step="1"
 					title="Blank border in modules; scanners need at least two"
 					value={selected.qr?.margin ?? DEFAULT_QR.margin}
-					onchange={(e) => patch({ qr: { ...DEFAULT_QR, ...selected.qr, margin: numeric(e, DEFAULT_QR.margin) } })}
+					disabled={boxFrozen}
+					onchange={(e) => setQr({ margin: numeric(e, DEFAULT_QR.margin) })}
 				/>
+				<span class="unit">modules</span>
 			</label>
+			<label class="field">
+				<span>Backing</span>
+				<select
+					value={selected.qr?.background ? 'opaque' : 'transparent'}
+					title="Transparent lets the paper show through; a scanner needs contrast either way"
+					disabled={boxFrozen}
+					onchange={(e) => setQrBackground(e.currentTarget.value === 'opaque')}
+				>
+					<option value="transparent">Transparent</option>
+					<option value="opaque">Solid</option>
+				</select>
+			</label>
+			{#if selected.qr?.background}
+				<label class="field">
+					<span class="sr-only">QR Background Colour</span>
+					<input
+						class="colour"
+						type="color"
+						value={selected.qr.background}
+						disabled={boxFrozen}
+						onchange={(e) => setQr({ background: e.currentTarget.value })}
+					/>
+				</label>
+			{/if}
 		{/if}
 
 		<label class="field">
 			<span>Overflow</span>
-			<select value={selected.overflow} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
-				<option value="grow">grow</option>
-				<option value="clip">clip</option>
+			<select
+				value={selected.overflow}
+				disabled={boxFrozen}
+				onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}
+			>
+				<option value="grow">Grow</option>
+				<option value="clip">Clip</option>
 			</select>
 		</label>
 
-		<span class="group" role="group" aria-label="Geometry in millimetres">
+		<!-- Position and size are separate groups, and wrap as a pair: four number
+		     fields in one run is what makes this bar unusable on a phone. -->
+		<span class="group" role="group" aria-label="Position">
 			<label class="field"><span>X</span>
-				<input class="w-4" type="number" step="0.5" value={selected.x} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
+				<input class="w-4" type="number" step="0.5" value={selected.x} disabled={boxFrozen} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
+				<span class="unit">mm</span>
 			</label>
 			<label class="field"><span>Y</span>
 				<input
@@ -262,23 +655,29 @@
 					type="number"
 					step="0.5"
 					value={selected.y}
-					disabled={!!selected.anchor}
+					disabled={boxFrozen || !!selected.anchor}
 					title={selected.anchor ? 'Anchored: the gap sets the top edge' : ''}
 					onchange={(e) => patch({ y: numeric(e, selected.y) })}
 				/>
+				<span class="unit">mm</span>
 			</label>
+		</span>
+
+		<span class="group" role="group" aria-label="Size">
 			<label class="field"><span>W</span>
-				<input class="w-4" type="number" step="0.5" value={selected.w} onchange={(e) => patch({ w: numeric(e, selected.w) })} />
+				<input class="w-4" type="number" step="0.5" value={selected.w} disabled={boxFrozen} onchange={(e) => patch({ w: numeric(e, selected.w) })} />
+				<span class="unit">mm</span>
 			</label>
 			<label class="field"><span>H</span>
-				<input class="w-4" type="number" step="0.5" value={selected.h} onchange={(e) => patch({ h: numeric(e, selected.h) })} />
+				<input class="w-4" type="number" step="0.5" value={selected.h} disabled={boxFrozen} onchange={(e) => patch({ h: numeric(e, selected.h) })} />
+				<span class="unit">mm</span>
 			</label>
 		</span>
 
 		<label class="field">
 			<span>Anchor</span>
-			<select value={selected.anchor?.to ?? ''} onchange={(e) => setAnchor(e.currentTarget.value)}>
-				<option value="">— fixed Y —</option>
+			<select value={selected.anchor?.to ?? ''} disabled={boxFrozen} onchange={(e) => setAnchor(e.currentTarget.value)}>
+				<option value="">— Fixed Y —</option>
 				{#each anchorOptions as box (box.id)}
 					<option value={box.id}>{box.slot ?? box.id}</option>
 				{/each}
@@ -294,8 +693,10 @@
 					step="0.5"
 					min="0"
 					value={selected.anchor.gap}
+					disabled={boxFrozen}
 					onchange={(e) => patch({ anchor: { to: selected.anchor!.to, gap: numeric(e, selected.anchor!.gap) } })}
 				/>
+				<span class="unit">mm</span>
 			</label>
 		{/if}
 
@@ -303,127 +704,34 @@
 			<input
 				type="checkbox"
 				checked={!!selected.hideWhenEmpty}
+				disabled={boxFrozen}
 				onchange={(e) => patch({ hideWhenEmpty: e.currentTarget.checked })}
 			/>
-			Hide when empty
+			Hide When Empty
 		</label>
 
 		<span class="spacer"></span>
-		<button onclick={onduplicate}>Duplicate</button>
-		<button onclick={ondelete}>Delete</button>
-	{:else}
-		<span class="context">Page</span>
 
-		<label class="field">
-			<span>Template</span>
-			<input class="w-10" value={template.name} onchange={(e) => ontemplatechange({ ...template, name: e.currentTarget.value })} />
-		</label>
+		<span class="actions">
+		<button
+			class="square"
+			aria-pressed={!!selected.locked}
+			title={selected.locked ? 'Unlock this box' : 'Lock this box'}
+			aria-label={selected.locked ? 'Unlock this box' : 'Lock this box'}
+			disabled={pageFrozen}
+			onclick={() => patch({ locked: selected.locked ? undefined : true })}
+		>
+			<Icon name={selected.locked ? 'locked' : 'unlocked'} size={15} />
+		</button>
+		<button onclick={onduplicate} disabled={pageFrozen}><Icon name="copy" size={14} /> Duplicate</button>
+		<button class="danger-outline" onclick={ondelete} disabled={boxFrozen}>
+			<Icon name="trash" size={14} /> Delete
+		</button>
+		</span>
+	</div>
+{/if}
 
-		<label class="field">
-			<span>Width</span>
-			<input
-				class="w-4"
-				type="number"
-				step="1"
-				value={template.page.w}
-				onchange={(e) => ontemplatechange({ ...template, page: { ...template.page, w: numeric(e, template.page.w) } })}
-			/>
-		</label>
-		<label class="field">
-			<span>Height</span>
-			<input
-				class="w-4"
-				type="number"
-				step="1"
-				value={template.page.h}
-				onchange={(e) => ontemplatechange({ ...template, page: { ...template.page, h: numeric(e, template.page.h) } })}
-			/>
-		</label>
-
-		<label class="field">
-			<span>Body font</span>
-			<select
-				value={template.defaults.font}
-				onchange={(e) => ontemplatechange({ ...template, defaults: { ...template.defaults, font: e.currentTarget.value } })}
-			>
-				{#each familyOptions as family (family)}
-					<option value={family}>{family}</option>
-				{/each}
-			</select>
-		</label>
-
-		<label class="field">
-			<span>Text</span>
-			<input
-				class="colour"
-				type="color"
-				title="Default text colour for every box that does not set its own"
-				value={template.defaults.color}
-				onchange={(e) => ontemplatechange({ ...template, defaults: { ...template.defaults, color: e.currentTarget.value } })}
-			/>
-		</label>
-
-		<label class="field">
-			<span>Paper</span>
-			<input
-				class="colour"
-				type="color"
-				title="Page colour — prints only with background graphics enabled"
-				value={template.page.background ?? '#ffffff'}
-				onchange={(e) => ontemplatechange({ ...template, page: { ...template.page, background: e.currentTarget.value } })}
-			/>
-		</label>
-
-		<label class="field">
-			<span>Body size</span>
-			<input
-				class="w-4"
-				type="number"
-				step="0.5"
-				value={template.defaults.size}
-				onchange={(e) =>
-					ontemplatechange({ ...template, defaults: { ...template.defaults, size: numeric(e, template.defaults.size) } })}
-			/>
-		</label>
-
-		<label class="check">
-			<input
-				type="checkbox"
-				checked={template.bleed.enabled}
-				onchange={(e) => ontemplatechange({ ...template, bleed: { ...template.bleed, enabled: e.currentTarget.checked } })}
-			/>
-			Bleed
-		</label>
-
-		{#if template.bleed.enabled}
-			<label class="field">
-				<span>Amount</span>
-				<input
-					class="w-4"
-					type="number"
-					step="0.5"
-					min="0"
-					value={template.bleed.amount}
-					onchange={(e) =>
-						ontemplatechange({ ...template, bleed: { ...template.bleed, amount: numeric(e, template.bleed.amount) } })}
-				/>
-			</label>
-			<label class="check">
-				<input
-					type="checkbox"
-					checked={template.bleed.cropMarks}
-					onchange={(e) => ontemplatechange({ ...template, bleed: { ...template.bleed, cropMarks: e.currentTarget.checked } })}
-				/>
-				Crop marks
-			</label>
-		{/if}
-
-		<span class="spacer"></span>
-		<button onclick={onaddbox}>+ Box</button>
-	{/if}
-
-	<input bind:this={fontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={uploadFont} />
-</div>
+<input bind:this={fontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={uploadFont} />
 
 <style>
 	.options {
@@ -435,6 +743,11 @@
 		border-bottom: 1px solid #ddd;
 		background: #f7f7f7;
 		font: 12px ui-sans-serif, system-ui, sans-serif;
+	}
+
+	.box-options {
+		background: #eef3fb;
+		border-bottom-color: #cfdcf3;
 	}
 
 	.context {
@@ -456,8 +769,20 @@
 		font-size: 11px;
 	}
 
+	.unit {
+		color: #999;
+		font-size: 10px;
+	}
+
+	.note {
+		color: #999;
+		font-size: 10px;
+		align-self: center;
+	}
+
 	.group {
 		display: inline-flex;
+		align-items: center;
 		gap: 8px;
 		padding: 2px 8px;
 		border-left: 1px solid #ddd;
@@ -481,7 +806,8 @@
 		color: #111;
 	}
 
-	input:disabled {
+	input:disabled,
+	select:disabled {
 		background: #f0f0f0;
 		color: #999;
 	}
@@ -495,16 +821,101 @@
 		flex: 1;
 	}
 
+	/* Kept together so a wrap moves the whole set to the next line rather than
+	   stranding Delete on its own at the far left. */
+	.actions {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		margin-left: auto;
+	}
+
 	button {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 5px 10px;
 		border: 1px solid #ccc;
 		border-radius: 6px;
 		background: #fff;
+		color: #111;
 		cursor: pointer;
 	}
 
-	button:hover {
+	button:hover:not(:disabled) {
 		border-color: #999;
+	}
+
+	button:disabled {
+		opacity: 0.5;
+		cursor: default;
+	}
+
+	button.square {
+		padding: 5px;
+		width: 27px;
+		justify-content: center;
+	}
+
+	button[aria-pressed='true'] {
+		border-color: #2563eb;
+		color: #2563eb;
+		background: #eaf1fe;
+	}
+
+	button.danger-outline {
+		border-color: #b42318;
+		color: #b42318;
+	}
+
+	button.danger-outline:hover:not(:disabled) {
+		border-color: #8f1c13;
+		background: #fdf3f2;
+	}
+
+	.segmented {
+		display: inline-flex;
+	}
+
+	.segmented button {
+		padding: 5px 7px;
+		border-radius: 0;
+		margin-left: -1px;
+	}
+
+	.segmented button:first-child {
+		border-radius: 6px 0 0 6px;
+		margin-left: 0;
+	}
+
+	.segmented button:last-child {
+		border-radius: 0 6px 6px 0;
+	}
+
+	.segmented button[aria-pressed='true'] {
+		position: relative;
+		z-index: 1;
+	}
+
+	/* On a phone these bars wrap to a dozen rows and swallow the page they are
+	   meant to be editing. Capped and scrolled instead, so the preview keeps the
+	   larger share of the screen. */
+	@media (max-width: 900px) {
+		.options {
+			max-height: 26dvh;
+			overflow-y: auto;
+			gap: 6px 8px;
+			padding: 6px 8px;
+		}
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 </style>

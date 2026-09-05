@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from './Icon.svelte';
 	import { SAMPLE_CSV } from '$lib/onboarding';
 	import { parseTable } from '$lib/parse';
 	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
@@ -16,7 +17,6 @@
 	let { dataset, activeRow, onactivate, onchange, onrenamecolumn }: Props = $props();
 
 	let pasteOpen = $state(false);
-	let pendingDelete = $state<{ kind: 'row' | 'column'; index: number } | null>(null);
 	// Which column the rows were last sorted by, so the header can show it and
 	// a second click can turn it round.
 	let sortedBy = $state<{ column: string; direction: SortDirection } | null>(null);
@@ -25,18 +25,10 @@
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let notice = $state('');
 
-	/** Give a dialog its first focus so Esc/Tab work without a mouse trip. */
-	const focusOnOpen = (node: HTMLElement) => node.focus();
-
 	function onKeydown(event: KeyboardEvent) {
-		if (event.key !== 'Escape') return;
-		if (pendingDelete) {
-			event.stopPropagation();
-			pendingDelete = null;
-		} else if (pasteOpen) {
-			event.stopPropagation();
-			pasteOpen = false;
-		}
+		if (event.key !== 'Escape' || !pasteOpen) return;
+		event.stopPropagation();
+		pasteOpen = false;
 	}
 
 	const emptyRow = (columns: string[]): Row => Object.fromEntries(columns.map((c) => [c, '']));
@@ -81,29 +73,35 @@
 		onactivate(previewed);
 	}
 
-	function addColumn() {
-		let name = 'Column';
-		let n = dataset.columns.length + 1;
-		while (dataset.columns.includes(`${name} ${n}`)) n++;
-		const column = `${name} ${n}`;
+	/**
+	 * There is no "add column" button any more: the trailing placeholder column
+	 * *is* the button, and typing a name into it is what creates it. Called with
+	 * no name it still generates one, which is what an import path wants.
+	 */
+	function addColumn(name?: string) {
+		const wanted = name?.trim();
+		if (wanted && dataset.columns.includes(wanted)) {
+			notice = `There is already a column called \u201c${wanted}\u201d.`;
+			return;
+		}
+		let column = wanted ?? '';
+		if (!column) {
+			let n = dataset.columns.length + 1;
+			while (dataset.columns.includes(`Column ${n}`)) n++;
+			column = `Column ${n}`;
+		}
+		notice = '';
 		onchange({
 			columns: [...dataset.columns, column],
 			rows: dataset.rows.map((r) => ({ ...r, [column]: '' }))
 		});
 	}
 
-	/** Deleting data is the one action here that cannot be re-typed in a second,
-	    so it always goes through a confirmation naming what is about to go. */
-	const askDelete = (kind: 'row' | 'column', index: number) => (pendingDelete = { kind, index });
-
-	function confirmDelete() {
-		const pending = pendingDelete;
-		pendingDelete = null;
-		if (!pending) return;
-		if (pending.kind === 'column') deleteColumn(pending.index);
-		else deleteRow(pending.index);
-	}
-
+	/**
+	 * Deleting is immediate. It used to ask twice; undo now covers it, and a
+	 * confirmation you dismiss without reading protects nobody. The notice says
+	 * what went and how to get it back.
+	 */
 	function deleteColumn(index: number) {
 		const column = dataset.columns[index];
 		onchange({
@@ -114,10 +112,14 @@
 				return next;
 			})
 		});
+		notice = `Deleted the column \u201c${column}\u201d. Ctrl/Cmd+Z brings it back.`;
 	}
 
-	function addRow() {
-		onchange({ ...dataset, rows: [...dataset.rows, emptyRow(dataset.columns)] });
+	/** The trailing placeholder row calls this with whatever was typed into it. */
+	function addRow(column?: string, value = '') {
+		const row = emptyRow(dataset.columns);
+		if (column) row[column] = value;
+		onchange({ ...dataset, rows: [...dataset.rows, row] });
 		onactivate(dataset.rows.length);
 	}
 
@@ -125,6 +127,7 @@
 		const rows = dataset.rows.filter((_, i) => i !== index);
 		onchange({ ...dataset, rows });
 		if (activeRow >= rows.length) onactivate(Math.max(0, rows.length - 1));
+		notice = `Deleted row ${index + 1}. Ctrl/Cmd+Z brings it back.`;
 	}
 
 	function duplicateRow(index: number) {
@@ -175,30 +178,6 @@
 		input.value = '';
 	}
 
-	/** What exactly is about to be lost, spelled out in the confirmation. */
-	const pendingSummary = $derived.by(() => {
-		if (!pendingDelete) return null;
-		if (pendingDelete.kind === 'column') {
-			const column = dataset.columns[pendingDelete.index];
-			const filled = dataset.rows.filter((r) => (r[column] ?? '').trim() !== '').length;
-			return {
-				title: `Delete the column “${column}”?`,
-				detail:
-					filled === 0
-						? 'It is empty, and any box bound to it will fall back to no content.'
-						: `${filled} filled cell${filled === 1 ? '' : 's'} go with it, and any box bound to it will fall back to no content.`,
-				action: 'Delete column'
-			};
-		}
-		const row = dataset.rows[pendingDelete.index];
-		const label = dataset.columns.map((c) => (row?.[c] ?? '').trim()).find(Boolean) ?? '';
-		return {
-			title: `Delete row ${pendingDelete.index + 1}?`,
-			detail: label ? `It starts “${label.slice(0, 60)}${label.length > 60 ? '…' : ''}”.` : 'The row is empty.',
-			action: 'Delete row'
-		};
-	});
-
 	function loadSample() {
 		// Bundled, not fetched: the sample must be there even offline.
 		commitImport(parseTable(SAMPLE_CSV));
@@ -228,14 +207,36 @@
 									title="Sort rows by {column}"
 									aria-label="Sort rows by {column}"
 									onclick={() => sortBy(column)}
-								>{sortedBy?.column === column ? (sortedBy.direction === 'asc' ? '▲' : '▼') : '↕'}</button>
-								<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}>‹</button>
-								<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}>›</button>
-								<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => askDelete('column', i)}>✕</button>
+								>
+									<Icon
+										name={sortedBy?.column === column
+											? sortedBy.direction === 'asc'
+												? 'sort-asc'
+												: 'sort-desc'
+											: 'sort'}
+										size={14}
+									/>
+								</button>
+								<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
+								<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
+								<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => deleteColumn(i)}><Icon name="trash" size={14} /></button>
 							</span>
 						</th>
 					{/each}
-					<th class="add"><button class="icon" title="Add column" onclick={addColumn}>+</button></th>
+						<th class="ghost" scope="col">
+							<input
+								class="column-name placeholder"
+								value=""
+								placeholder="New column"
+								aria-label="Add a column by naming it"
+								title="Type a name to add a column"
+								onchange={(e) => {
+									const name = e.currentTarget.value;
+									e.currentTarget.value = '';
+									if (name.trim()) addColumn(name);
+								}}
+							/>
+						</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -252,8 +253,8 @@
 								{i + 1}
 							</button>
 							<span class="row-actions">
-								<button class="icon" title="Duplicate row" onclick={() => duplicateRow(i)}>⧉</button>
-								<button class="icon" title="Delete row" onclick={() => askDelete('row', i)}>✕</button>
+								<button class="icon" title="Duplicate row" aria-label="Duplicate row {i + 1}" onclick={() => duplicateRow(i)}><Icon name="copy" size={14} /></button>
+								<button class="icon" title="Delete row" aria-label="Delete row {i + 1}" onclick={() => deleteRow(i)}><Icon name="trash" size={14} /></button>
 							</span>
 						</td>
 						{#each dataset.columns as column (column)}
@@ -277,16 +278,36 @@
 						</td>
 					</tr>
 				{/if}
+				{#if dataset.columns.length}
+					<!-- The placeholder row: typing into it is what adds a row. -->
+					<tr class="ghost-row">
+						<td class="gutter"><span class="sr-only">New row</span><Icon name="add" size={13} /></td>
+						{#each dataset.columns as column (column)}
+							<td>
+								<textarea
+									rows="1"
+									aria-label="New row, {column}"
+									placeholder={column === dataset.columns[0] ? 'New row' : ''}
+									value=""
+									oninput={(e) => {
+										const value = e.currentTarget.value;
+										e.currentTarget.value = '';
+										addRow(column, value);
+									}}
+								></textarea>
+							</td>
+						{/each}
+						<td></td>
+					</tr>
+				{/if}
 			</tbody>
 		</table>
 	</div>
 
 	<div class="actions">
 		<button onclick={() => (pasteOpen = true)}>Paste from Excel</button>
-		<button onclick={() => fileInput?.click()}>Import CSV</button>
-		<button onclick={addRow}>+ Row</button>
-		<button onclick={addColumn}>+ Column</button>
-		<button class="quiet" onclick={loadSample}>Load sample</button>
+		<button onclick={() => fileInput?.click()}>Import CSV…</button>
+		<button class="quiet" onclick={loadSample}>Load Sample</button>
 		<input
 			bind:this={fileInput}
 			type="file"
@@ -298,19 +319,6 @@
 	{#if notice}<p class="notice" role="status">{notice}</p>{/if}
 </section>
 
-{#if pendingDelete && pendingSummary}
-	<div class="modal-backdrop" role="presentation" onclick={() => (pendingDelete = null)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label={pendingSummary.title}>
-		<h2>{pendingSummary.title}</h2>
-		<p>{pendingSummary.detail} You can undo this afterwards.</p>
-		<div class="modal-actions">
-			<span class="spacer"></span>
-			<button use:focusOnOpen onclick={() => (pendingDelete = null)}>Cancel</button>
-			<button class="danger" onclick={confirmDelete}>{pendingSummary.action}</button>
-		</div>
-	</div>
-{/if}
-
 {#if pasteOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (pasteOpen = false)}></div>
 	<div class="modal" role="dialog" aria-modal="true" aria-label="Paste spreadsheet data">
@@ -318,8 +326,8 @@
 		<p>Copy the cells including the header row, then paste them here. Tabs, commas and quoted multi-line cells all work.</p>
 		<textarea bind:value={pasteText} rows="10" placeholder="title&#9;subtitle&#9;body…"></textarea>
 		<div class="modal-actions">
-			<label><input type="radio" bind:group={pasteMode} value="replace" /> Replace rows</label>
-			<label><input type="radio" bind:group={pasteMode} value="append" /> Append rows</label>
+			<label><input type="radio" bind:group={pasteMode} value="replace" /> Replace Rows</label>
+			<label><input type="radio" bind:group={pasteMode} value="append" /> Append Rows</label>
 			<span class="spacer"></span>
 			<button onclick={() => (pasteOpen = false)}>Cancel</button>
 			<button class="primary" onclick={applyPaste}>Load</button>
@@ -332,6 +340,10 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
+		/* The table is the only thing here allowed to be wider than its column:
+		   without this it stretches the app grid and shoves the preview
+		   off-centre on a phone. It scrolls sideways on its own instead. */
+		min-width: 0;
 		background: #fff;
 		border-left: 1px solid #ddd;
 	}
@@ -460,20 +472,42 @@
 		opacity: 1;
 	}
 
+	/* One square, one size, one colour for every tool in the table — the row and
+	   column controls used to be typed glyphs with wildly different metrics. */
 	.icon {
+		display: inline-grid;
+		place-items: center;
+		width: 22px;
+		height: 22px;
 		border: none;
 		background: transparent;
 		cursor: pointer;
 		color: #767676;
-		font-size: 12px;
-		line-height: 1;
-		padding: 3px;
-		border-radius: 3px;
+		padding: 0;
+		border-radius: 4px;
 	}
 
-	.icon:hover {
+	.icon:hover:not(:disabled) {
 		background: #eee;
 		color: #111;
+	}
+
+	.column-tools,
+	.row-actions {
+		align-items: center;
+	}
+
+	.ghost .column-name::placeholder,
+	.ghost-row textarea::placeholder {
+		color: #aaa;
+	}
+
+	.ghost-row .gutter {
+		color: #bbb;
+	}
+
+	.ghost-row textarea {
+		color: #767676;
 	}
 
 	.empty {
@@ -540,16 +574,6 @@
 		padding: 18px;
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
 		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
-	}
-
-	.modal.narrow {
-		width: min(420px, 92vw);
-	}
-
-	button.danger {
-		background: #b42318;
-		border-color: #b42318;
-		color: #fff;
 	}
 
 	.modal h2 {

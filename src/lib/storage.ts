@@ -69,7 +69,11 @@ const mappingKey = (templateName: string) => `mapping:${templateName}`;
 export const loadMapping = (templateName: string): Mapping => local.get<Mapping>(mappingKey(templateName), {});
 export const saveMapping = (templateName: string, mapping: Mapping) => local.set(mappingKey(templateName), mapping);
 
-export const loadUi = (): UiState => local.get<UiState>('ui', { showOutlines: true, zoom: 'fit' });
+const UI_DEFAULTS: UiState = { showOutlines: true, showGrid: false, zoom: 'fit', printHintSeen: false };
+
+// Merged, not returned raw: a settings blob written by an older build is missing
+// whatever was added since, and an undefined toggle renders as neither on nor off.
+export const loadUi = (): UiState => ({ ...UI_DEFAULTS, ...local.get<Partial<UiState>>('ui', {}) });
 export const saveUi = (ui: UiState) => local.set('ui', ui);
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;

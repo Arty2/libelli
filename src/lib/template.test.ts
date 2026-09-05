@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { autoMap, builtinTemplate, normaliseTemplate, usedSlots } from './template';
+import { DEFAULT_DEFAULTS, autoMap, builtinTemplate, normaliseTemplate, usedSlots } from './template';
 
 describe('the built-in template', () => {
 	const template = builtinTemplate();
@@ -27,9 +27,43 @@ describe('normaliseTemplate', () => {
 		expect(() => normaliseTemplate({ schema: 99, boxes: [] })).toThrow(/newer version/);
 	});
 
-	it('reads the early `bleed: 0` shorthand', () => {
-		expect(normaliseTemplate({ schema: 1, bleed: 0, boxes: [] }).bleed.enabled).toBe(false);
-		expect(normaliseTemplate({ schema: 1, bleed: 5, boxes: [] }).bleed).toEqual({ enabled: true, amount: 5, cropMarks: false });
+	it('gives a file that predates page numbers the default, switched off', () => {
+		expect(normaliseTemplate({ schema: 1, boxes: [] }).pageNumber).toEqual({
+			enabled: false,
+			position: 'bottom-right',
+			margin: 8
+		});
+	});
+
+	it('falls back to a corner it knows rather than trusting a position it does not', () => {
+		const t = normaliseTemplate({ schema: 2, pageNumber: { enabled: true, position: 'middle-of-nowhere' }, boxes: [] });
+		expect(t.pageNumber).toEqual({ enabled: true, position: 'bottom-right', margin: 8 });
+	});
+
+	it('fills in type defaults a file never named, so nothing renders undefined', () => {
+		const t = normaliseTemplate({ schema: 1, defaults: { font: 'Space Mono' }, boxes: [] });
+		expect(t.defaults.letterSpacing).toBe(DEFAULT_DEFAULTS.letterSpacing);
+		expect(t.defaults.font).toBe('Space Mono');
+	});
+
+	it('keeps a box at the default by not writing the field at all', () => {
+		const t = normaliseTemplate({ schema: 2, boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10 }] });
+		expect('size' in t.boxes[0]).toBe(false);
+		expect('font' in t.boxes[0]).toBe(false);
+	});
+
+	it('carries alignment, case and lock through a round trip', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			locked: true,
+			css: 'p { color: red }',
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, valign: 'middle', textCase: 'smallcaps', locked: true }]
+		});
+		expect(t.locked).toBe(true);
+		expect(t.css).toBe('p { color: red }');
+		expect(t.boxes[0].valign).toBe('middle');
+		expect(t.boxes[0].textCase).toBe('smallcaps');
+		expect(t.boxes[0].locked).toBe(true);
 	});
 
 	it('falls back to white for a page colour it cannot parse', () => {
@@ -40,6 +74,14 @@ describe('normaliseTemplate', () => {
 	it('drops anchors that point nowhere', () => {
 		const t = normaliseTemplate({ schema: 1, boxes: [{ id: 'a', slot: null, x: 0, y: 0, w: 10, h: 10, anchor: { to: 'ghost', gap: 2 } }] });
 		expect(t.boxes[0].anchor).toBeNull();
+	});
+
+	it('treats an unreadable QR background as no background at all', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 20, h: 20, mode: 'qr', qr: { level: 'M', margin: 2, background: 'javascript:x' } }]
+		});
+		expect(t.boxes[0].qr?.background).toBeUndefined();
 	});
 
 	it('fills in QR settings for a qr box and clamps a silly quiet zone', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveLayout } from './layout';
+import { FREE_STEP, GRID_MAJOR, GRID_MINOR, boxEdges, resolveLayout, snapTo, snapToEdges } from './layout';
 import { newBox } from './template';
 import type { Box } from './types';
 
@@ -48,5 +48,33 @@ describe('resolveLayout', () => {
 		const { tops } = resolveLayout({ boxes: cyclic, measured: {}, hidden: new Set() });
 		expect(Number.isFinite(tops.a)).toBe(true);
 		expect(Number.isFinite(tops.b)).toBe(true);
+	});
+});
+
+describe('snapping', () => {
+	it('rounds to the step, not to the nearest whole millimetre', () => {
+		expect(snapTo(12.4, GRID_MINOR)).toBe(10);
+		expect(snapTo(12.6, GRID_MINOR)).toBe(15);
+		expect(snapTo(12.4, GRID_MAJOR)).toBe(10);
+		expect(snapTo(0.3841, FREE_STEP)).toBe(0.38);
+	});
+
+	it('latches onto the nearest edge, and onto nothing when none is near', () => {
+		expect(snapToEdges(14.6, [12, 15, 60], 1.5)).toBe(15);
+		expect(snapToEdges(30, [12, 15, 60], 1.5)).toBe(null);
+	});
+
+	it('offers a sibling its left, centre and right, and its rendered top, middle and bottom', () => {
+		const all = boxes();
+		const layout = resolveLayout({ boxes: all, measured: { title: 24 }, hidden: new Set() });
+		const edges = boxEdges(all, layout, 'body');
+
+		expect(edges.x).toContain(14); // title's left
+		expect(edges.x).toContain(134); // title's right
+		expect(edges.x).toContain(74); // title's centre
+		// The title measured 24mm tall, so its bottom is where it renders, not 13+16.
+		expect(edges.y).toContain(13 + 24);
+		// 136 is the dragged box's own right edge: a box never snaps to itself.
+		expect(edges.x).not.toContain(136);
 	});
 });

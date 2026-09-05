@@ -19,9 +19,11 @@ This file is about working on it.
 src/lib/
   types.ts        template + runtime types; every coordinate is mm, font sizes are pt
   colour.ts       the only place a colour string is allowed to become CSS
+  css.ts          scopes the template's own CSS to the card; strips @import and remote url()
   parse.ts        CSV / TSV parsing (quoted fields, embedded newlines, delimiter sniffing)
   markdown.ts     hand-written Markdown subset -> HTML, escaping at the leaves
-  layout.ts       mm geometry + anchor resolution
+  layout.ts       mm geometry, anchor resolution, grid and sibling-edge snapping
+  icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
   table.ts        column reorder, row sorting
   template.ts     defaults, validation, migration, import/export
@@ -30,7 +32,7 @@ src/lib/
   storage.ts      localStorage + IndexedDB, plus the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
   version.ts      VERSION, and the bumping rule
-  components/     Card, PagePreview, DataTable, OptionsBar, ContactSheet, PrintRoot
+  components/     Card, PagePreview, DataTable, OptionsBar, ContactSheet, PrintRoot, Icon
 src/routes/+page.svelte   all app state and wiring
 static/sample-cards.csv   sample data, bundled with ?raw and also served as a file
 ```
@@ -51,9 +53,25 @@ Load-bearing choices, in case they look arbitrary:
   underneath it. `jsqr` is a dev dependency only: the tests decode generated
   codes with an independent decoder, because a QR that does not scan looks
   exactly like one that does.
-- **Escaping and colour parsing are chokepoints.** Cell content is untrusted:
-  every leaf text node is HTML-escaped in `markdown.ts`, and every colour goes
-  through `colour.ts` before it can reach a `style` attribute.
+- **Escaping, colour parsing and CSS scoping are chokepoints.** Cell content is
+  untrusted: every leaf text node is HTML-escaped in `markdown.ts`, and every
+  colour goes through `colour.ts` before it can reach a `style` attribute. A
+  template is a file someone can hand you, so its custom CSS goes through
+  `css.ts`, which prefixes every selector with the card's scope and strips
+  `@import` and any non-`data:` `url()` — the app fetches nothing, and a template
+  must not be able to change that. Note that `css.ts` also builds the `<style>`
+  tag: a literal `<style>…</style>` pair written in a `.svelte` file gets picked
+  up by the Svelte toolchain as that component's own stylesheet.
+- **Vertical alignment makes a box a flex column.** That is why `.box` is
+  `display: flex`: `justify-content` is the only thing that places content
+  vertically in a box whose height may be a `min-height`. The cost is that child
+  margins no longer collapse out of the box, which the existing
+  `:first-child { margin-top: 0 }` rules already absorb. Measurement is
+  unaffected — `measure()` reads the box's own `offsetHeight`.
+- **Snapping has a fixed precedence.** Alt beats the grid, the grid beats sibling
+  edges, and sibling edges beat plain 0.5mm rounding. Sibling edges come from
+  `resolveLayout`, so a box snaps to where a grown box actually ends. An anchored
+  box always snaps its `gap`, never its `y`.
 - **Undo is snapshots, not a command log.** One entry is the whole editable
   state (template + data + mapping), recorded on a debounce. An inverse
   operation cannot drift out of step with the operation it undoes.
@@ -79,7 +97,7 @@ Load-bearing choices, in case they look arbitrary:
   page, dialogs opened and dismissed. Say what was actually checked, and say it
   plainly; if something was not checked, say that too.
 - **Tests cover the pure logic.** `parse`, `markdown`, `layout`, `template`,
-  `history`, `colour`, `qr`, `table` have unit tests. Components are verified by driving them.
+  `history`, `colour`, `css`, `qr`, `table` have unit tests. Components are verified by driving them.
 - **Small commits with real messages.** What changed, why that shape, and what
   was verified. No model names in anything that lands in the repo.
 - **Comments explain the why.** Not what the line does — why it is that way, and
@@ -90,8 +108,10 @@ Load-bearing choices, in case they look arbitrary:
   or in a comment rather than leaving the next reader to rediscover it.
 - **Never ship anything traceable to reference material.** Sample data and
   template names are invented; contact addresses use reserved `.example` domains.
-- **Destructive things ask first,** name what will be lost, and are undoable
-  where the browser allows it.
+- **Destructive things are undoable, and only ask when undo cannot reach them.**
+  Deleting a row, a column or a box happens straight away and says so; Reset asks
+  twice, because it clears browser storage and uploaded fonts that no undo can
+  bring back.
 
 ## Working commands
 
