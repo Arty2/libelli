@@ -1,7 +1,7 @@
 {
 	"name": "libelli",
 	"private": true,
-	"version": "0.2.1",
+	"version": "0.3.0",
 	"description": "Turn spreadsheet rows into print-ready cards, entirely in the browser.",
 	"license": "MIT",
 	"type": "module",

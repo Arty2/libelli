@@ -1,5 +1,4 @@
 <script lang="ts">
-	import jsQR from 'jsqr';
 	import { rowFromUrl, sharedRowKey, type SharedRow } from '$lib/share';
 
 	interface Props {
@@ -25,6 +24,25 @@
 
 	const canvas = typeof document === 'undefined' ? null : document.createElement('canvas');
 
+	/**
+	 * The decoder is the app's one runtime dependency and nothing else needs it,
+	 * so it is fetched when scanning starts rather than shipped to everyone who
+	 * only ever prints cards.
+	 */
+	let decode: typeof import('jsqr').default | null = null;
+	let loading = $state(false);
+
+	async function loadDecoder() {
+		if (decode) return decode;
+		loading = true;
+		try {
+			decode = (await import('jsqr')).default;
+			return decode;
+		} finally {
+			loading = false;
+		}
+	}
+
 	function take(text: string, source: string): boolean {
 		const shared = rowFromUrl(text);
 		if (!shared) {
@@ -44,7 +62,7 @@
 	}
 
 	function readImage(source: CanvasImageSource, width: number, height: number): string | null {
-		if (!canvas || !width || !height) return null;
+		if (!canvas || !decode || !width || !height) return null;
 		// Decode at a bounded size: a 4K frame costs far more to scan than it
 		// gains, and phones hand over exactly that.
 		const scale = Math.min(1, 800 / Math.max(width, height));
@@ -54,11 +72,12 @@
 		if (!context) return null;
 		context.drawImage(source, 0, 0, canvas.width, canvas.height);
 		const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-		return jsQR(pixels.data, pixels.width, pixels.height)?.data ?? null;
+		return decode(pixels.data, pixels.width, pixels.height)?.data ?? null;
 	}
 
 	async function startCamera() {
 		cameraError = '';
+		await loadDecoder();
 		if (!navigator.mediaDevices?.getUserMedia) {
 			cameraError = 'This browser has no camera access here. Paste a link or choose an image instead.';
 			return;
@@ -101,6 +120,7 @@
 		input.value = '';
 		if (!file) return;
 		try {
+			await loadDecoder();
 			const bitmap = await createImageBitmap(file);
 			const text = readImage(bitmap, bitmap.width, bitmap.height);
 			bitmap.close();
@@ -136,7 +156,9 @@
 	<h2 id="scan-title">Scan rows in</h2>
 
 	<div class="viewer">
-		{#if cameraError}
+		{#if loading && !cameraError}
+			<p class="camera-error">Loading the decoder…</p>
+		{:else if cameraError}
 			<p class="camera-error">{cameraError}</p>
 		{:else}
 			<!-- svelte-ignore a11y_media_has_caption -->

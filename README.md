@@ -90,6 +90,8 @@ Clicking a row previews it.
 - **Add** — *+ Row* and *+ Column*, or the `+` at the end of the header row.
 - **Delete** — asks first, naming what goes: the number of filled cells for a
   column, the opening text for a row. Undoable either way.
+- **Row menu** — the link and QR for that row, to copy, preview or download.
+- **Scan rows in** — collect rows from printed codes; see [Rows in links](#rows-in-links).
 
 ## Markdown and colour
 
@@ -126,18 +128,63 @@ box exactly.
 
 - **Image** — a data URL, an external URL, or inline SVG held in the template.
   A bound column can supply the URL per row.
-- **QR code** — the bound cell is encoded as a QR and drawn as SVG, so it stays
-  sharp at any print size; a raster QR at print resolution is the classic way to
-  end up with a code no phone will read. Byte mode, versions 1–10, which holds
-  213 characters at correction level M — enough for any URL worth putting on a
-  card. **Correction** trades capacity for damage tolerance (L 7% to H 30%), and
-  **Quiet zone** sets the blank border scanners need; two modules is the
-  practical minimum. Text the encoder cannot hold renders as nothing rather than
-  as a square that will not scan.
+- **QR code** — encoded here and drawn as SVG, so it stays sharp at any print
+  size; a raster QR at print resolution is the classic way to end up with a code
+  no phone will read. Byte mode, all 40 versions, up to 2953 bytes at correction
+  level L. **Encodes** chooses between the bound cell and [the whole row](#rows-in-links);
+  **Correction** trades capacity for damage tolerance (L 7% to H 30%); **Quiet
+  zone** sets the blank border scanners need, two modules being the practical
+  minimum. Text the encoder cannot hold renders as nothing rather than as a
+  square that will not scan.
+
+Capacity is never the limit that bites — physical size is. A code carrying a
+whole row can need 50mm across, and the options bar says so in red when the box
+is smaller than that, because an unreadable code looks exactly like a readable
+one until someone tries it.
 
 The encoder is written here rather than pulled in, like the Markdown renderer
 and the CSV parser. Its tests decode what it produces with an independent
 decoder, since a QR that does not scan looks exactly like one that does.
+
+## Rows in links
+
+A row can travel in a URL, which makes a card scannable back into a table: print
+it, hand it over, scan it, and the row arrives in someone else's libelli.
+
+- **A card that carries its own row** — set a QR box to encode *whole row*, and
+  pick which columns travel. Fewer columns, smaller code, and a smaller code
+  scans from further away.
+- **A link per row** — the table's row menu gives a preview, a copy button and an
+  SVG download, along with the version and the print width the code needs.
+- **Two shapes** — readable (`?title=Ferns&body=…`, plain GET variables anyone
+  can write by hand) and compact (`?r=0…`) for when the readable form would make
+  a code too dense to print. Links are generated readable while they stay short
+  and compact when they must; both are understood on the way in.
+- **Opening a link** offers the row rather than adding it, and clears the query
+  afterwards so a refresh cannot add it twice. This is the path a phone camera
+  takes: it opens the link, and libelli asks.
+- **Scan rows in** decodes from the camera, a pasted link, or an image file, all
+  through one path, de-duplicating by content so a card held in frame arrives
+  once. Nothing is uploaded; decoding happens in the browser.
+
+The row travels *inside* the link — there is no server holding it, and no
+shortener in the middle. That also means a link is as long as the row it carries.
+
+## Projects
+
+Several working sets in one browser, so an import lands in its own place instead
+of on top of the last job. The toolbar switches between them, and each keeps its
+own template, rows and column mapping.
+
+- **Imports ask** — CSV, paste and the sample offer *a new project*, *add to
+  these rows* or *replace these rows*, unless the table is empty and there is
+  nothing to lose.
+- **Undo is per project**, so Ctrl+Z can never pull one project's rows into
+  another.
+- **Fonts stay browser-wide** — they are assets of the machine, not of a job, and
+  a template naming a missing one still prompts for the file.
+- **Reset has a scope** — this project back to the starter card, or everything in
+  this browser. The first is one undo away; the second is not, and says so.
 
 ## Fonts
 
@@ -202,9 +249,9 @@ hold <kbd>Alt</kbd> for 0.01mm.
 - **Page** — template name, width, height, default font, default text colour,
   paper colour, default size, bleed on/off, bleed amount, crop marks
 - **Box** — slot, bound column, font, size, weight, leading, alignment, colour,
-  mode (plain / markdown / image / QR), fit (image and QR), QR correction and
-  quiet zone, overflow (grow / clip), X, Y, W, H, anchor, anchor gap, hide when
-  empty
+  mode (plain / markdown / image / QR), fit (image and QR), what a QR encodes
+  (cell or whole row) and which columns travel, QR correction and quiet zone,
+  overflow (grow / clip), X, Y, W, H, anchor, anchor gap, hide when empty
 - **View** — in the bottom corners of the page itself, not the toolbar: box
   outlines on/off (screen only, never printed) at the left, zoom (fit, or 50% to
   200%) at the right
@@ -249,6 +296,9 @@ npm run build    # static output in ./build, deployable anywhere
 - **Components are verified by driving them** — the pure logic has unit tests;
   layout, printing and the dialogs are checked in a real browser, where the
   geometry can be read back in millimetres and the PDF counted page by page.
+- **One runtime dependency** — `jsqr`, for decoding scanned codes, dynamically
+  imported so it downloads when scanning starts rather than on first load.
+  Encoding, Markdown and CSV parsing are all hand-written.
 - **Version** — `src/lib/version.ts` is the source of truth, kept in step with
   `package.json`. A fix is a patch (0.1.0 → 0.1.1), a feature is a minor
   (0.1.1 → 0.2.0), and the leading zero never moves.

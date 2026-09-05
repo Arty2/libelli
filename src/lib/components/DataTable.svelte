@@ -14,9 +14,11 @@
 		/** so bindings can follow a renamed column instead of pointing at a ghost */
 		onrenamecolumn: (from: string, to: string) => void;
 		onscan: () => void;
+		/** an import that should not touch this project's rows at all */
+		onnewproject: (dataset: Dataset) => void;
 	}
 
-	let { dataset, activeRow, onactivate, onchange, onrenamecolumn, onscan }: Props = $props();
+	let { dataset, activeRow, onactivate, onchange, onrenamecolumn, onscan, onnewproject }: Props = $props();
 
 	let pasteOpen = $state(false);
 	let pendingDelete = $state<{ kind: 'row' | 'column'; index: number } | null>(null);
@@ -25,7 +27,7 @@
 	let sortedBy = $state<{ column: string; direction: SortDirection } | null>(null);
 	let linkFor = $state<number | null>(null);
 	let pasteText = $state('');
-	let pasteMode = $state<'replace' | 'append'>('replace');
+	let pendingImport = $state<{ dataset: Dataset; source: string } | null>(null);
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let notice = $state('');
 
@@ -180,13 +182,34 @@
 			notice = 'Nothing recognisable in there.';
 			return;
 		}
-		commitImport(parsed);
 		pasteOpen = false;
 		pasteText = '';
+		offerImport(parsed, 'the pasted table');
 	}
 
-	function commitImport(parsed: Dataset) {
-		if (pasteMode === 'append' && dataset.columns.length) {
+	/**
+	 * Never land on top of existing rows without being told to. An empty table
+	 * has nothing to lose, so that one case skips the question.
+	 */
+	function offerImport(parsed: Dataset, source: string) {
+		if (!parsed.columns.length) {
+			notice = 'Nothing recognisable in there.';
+			return;
+		}
+		if (!dataset.columns.length && !dataset.rows.length) {
+			commitImport(parsed, 'replace');
+			return;
+		}
+		pendingImport = { dataset: parsed, source };
+	}
+
+	function commitImport(parsed: Dataset, mode: 'replace' | 'append' | 'project') {
+		pendingImport = null;
+		if (mode === 'project') {
+			onnewproject(parsed);
+			return;
+		}
+		if (mode === 'append' && dataset.columns.length) {
 			const rows = parsed.rows.map((row) => {
 				const next = emptyRow(dataset.columns);
 				for (const column of dataset.columns) {
@@ -211,7 +234,7 @@
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
-		commitImport(parseTable(await file.text()));
+		offerImport(parseTable(await file.text()), file.name);
 		input.value = '';
 	}
 
@@ -241,7 +264,7 @@
 
 	function loadSample() {
 		// Bundled, not fetched: the sample must be there even offline.
-		commitImport(parseTable(SAMPLE_CSV));
+		offerImport(parseTable(SAMPLE_CSV), 'the sample');
 	}
 </script>
 
@@ -345,6 +368,35 @@
 	{#if notice}<p class="notice" role="status">{notice}</p>{/if}
 </section>
 
+{#if pendingImport}
+	<div class="modal-backdrop" role="presentation" onclick={() => (pendingImport = null)}></div>
+	<div class="modal narrow" role="dialog" aria-modal="true" aria-label="Where should the import go?">
+		<h2>
+			{pendingImport.dataset.rows.length} row{pendingImport.dataset.rows.length === 1 ? '' : 's'} from
+			{pendingImport.source}
+		</h2>
+		<p>This project already holds {dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'}. Where should they go?</p>
+		<div class="choices">
+			<button use:focusOnOpen onclick={() => commitImport(pendingImport!.dataset, 'project')}>
+				<strong>A new project</strong>
+				<span>Keeps everything here exactly as it is.</span>
+			</button>
+			<button onclick={() => commitImport(pendingImport!.dataset, 'append')}>
+				<strong>Add to these rows</strong>
+				<span>Matched on column name, then by position.</span>
+			</button>
+			<button onclick={() => commitImport(pendingImport!.dataset, 'replace')}>
+				<strong>Replace these rows</strong>
+				<span>The current rows go. Undo brings them back.</span>
+			</button>
+		</div>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (pendingImport = null)}>Cancel</button>
+		</div>
+	</div>
+{/if}
+
 {#if linkFor !== null && linkPlan}
 	<div class="modal-backdrop" role="presentation" onclick={() => (linkFor = null)}></div>
 	<div class="modal narrow" role="dialog" aria-modal="true" aria-label="Row link">
@@ -390,8 +442,6 @@
 		<p>Copy the cells including the header row, then paste them here. Tabs, commas and quoted multi-line cells all work.</p>
 		<textarea bind:value={pasteText} rows="10" placeholder="title&#9;subtitle&#9;body…"></textarea>
 		<div class="modal-actions">
-			<label><input type="radio" bind:group={pasteMode} value="replace" /> Replace rows</label>
-			<label><input type="radio" bind:group={pasteMode} value="append" /> Append rows</label>
 			<span class="spacer"></span>
 			<button onclick={() => (pasteOpen = false)}>Cancel</button>
 			<button class="primary" onclick={applyPaste}>Load</button>
@@ -643,6 +693,27 @@
 		color: #b42318;
 	}
 
+	.choices {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin-top: 4px;
+	}
+
+	.choices button {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 2px;
+		text-align: left;
+		padding: 9px 11px;
+	}
+
+	.choices span {
+		color: #767676;
+		font-size: 11.5px;
+	}
+
 	.muted {
 		color: #767676;
 		font-size: 11.5px;
@@ -679,12 +750,6 @@
 		align-items: center;
 		gap: 10px;
 		margin-top: 12px;
-	}
-
-	.modal-actions label {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
 	}
 
 	.spacer {
