@@ -305,6 +305,28 @@
 		</label>
 
 		<label class="field">
+			<span>Text</span>
+			<input
+				class="colour"
+				type="color"
+				title="Default text colour for every box that does not set its own"
+				value={template.defaults.color}
+				onchange={(e) => ontemplatechange({ ...template, defaults: { ...template.defaults, color: e.currentTarget.value } })}
+			/>
+		</label>
+
+		<label class="field">
+			<span>Paper</span>
+			<input
+				class="colour"
+				type="color"
+				title="Page colour — prints only with background graphics enabled"
+				value={template.page.background ?? '#ffffff'}
+				onchange={(e) => ontemplatechange({ ...template, page: { ...template.page, background: e.currentTarget.value } })}
+			/>
+		</label>
+
+		<label class="field">
 			<span>Body size</span>
 			<input
 				class="w-4"

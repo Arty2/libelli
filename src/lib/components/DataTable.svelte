@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SAMPLE_CSV } from '$lib/onboarding';
 	import { parseTable } from '$lib/parse';
 	import type { Dataset, Row } from '$lib/types';
 
@@ -174,13 +175,9 @@
 		};
 	});
 
-	async function loadSample() {
-		try {
-			const response = await fetch(`${import.meta.env.BASE_URL}sample-cards.csv`);
-			commitImport(parseTable(await response.text()));
-		} catch {
-			notice = 'Could not load the sample file.';
-		}
+	function loadSample() {
+		// Bundled, not fetched: the sample must be there even offline.
+		commitImport(parseTable(SAMPLE_CSV));
 	}
 </script>
 

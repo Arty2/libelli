@@ -1,3 +1,4 @@
+import { parseColour } from './colour';
 import type { MarkdownStyle } from './types';
 
 /**
@@ -6,7 +7,8 @@ import type { MarkdownStyle } from './types';
  *
  * Supported: `#`/`##`/`###` headings, `-`/`*` bullets (one nesting level),
  * `1.` ordered lists, `**bold**`, `*italic*`, `` `code` ``, `[text](url)`,
- * blank-line paragraphs and `---` rules. Everything else is literal text.
+ * `[text]{colour}` for a coloured run of words, blank-line paragraphs and `---`
+ * rules. Everything else is literal text.
  *
  * Every leaf text node is HTML-escaped before any markup is emitted, because
  * pasted spreadsheet content is full of `<`, `&` and stray angle brackets.
@@ -164,6 +166,12 @@ export function renderInline(text: string): string {
 		const url = safeUrl(unescapeEntities(href));
 		if (!url) return whole;
 		return `<a href="${escapeHtml(url)}" style="color:inherit">${label}</a>`;
+	});
+	// [words]{red} / [words]{#b42318} — per-word colour, the reason a colour
+	// parser sits between the text and the style attribute.
+	out = out.replace(/\[([^\]]*)\]\{([^}\s]{1,32})\}/g, (whole, label: string, name: string) => {
+		const colour = parseColour(unescapeEntities(name));
+		return colour ? `<span style="color:${colour}">${label}</span>` : whole;
 	});
 	out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 	out = out.replace(/__([^_]+)__/g, '<strong>$1</strong>');

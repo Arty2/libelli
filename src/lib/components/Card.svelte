@@ -188,7 +188,8 @@
 <div
 	class="card"
 	class:bleeding={bleed > 0}
-	style="width:{template.page.w + bleed * 2}mm;height:{template.page.h + bleed * 2}mm;padding:{bleed}mm"
+	style="width:{template.page.w + bleed * 2}mm;height:{template.page.h + bleed * 2}mm;padding:{bleed}mm;background:{template
+		.page.background ?? '#ffffff'}"
 >
 	<div class="trim" style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#each template.boxes as box (box.id)}
@@ -252,6 +253,10 @@
 		box-sizing: border-box;
 		overflow: hidden;
 		color: #000;
+		/* Paper colour is part of the artwork, not decoration the printer may
+		   drop — though the browser still asks for "background graphics". */
+		print-color-adjust: exact;
+		-webkit-print-color-adjust: exact;
 	}
 
 	.trim {

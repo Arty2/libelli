@@ -78,6 +78,18 @@ describe('inline', () => {
 		expect(renderInline('[mail](bookings@meadowlark.example)')).toContain('href="mailto:bookings@meadowlark.example"');
 	});
 
+	it('colours a run of words by name or hex', () => {
+		expect(renderInline('[danger]{red} ahead')).toContain('<span style="color:#b42318">danger</span>');
+		expect(renderInline('[x]{#0af}')).toContain('color:#0af');
+		expect(renderInline('[bold and red]{red}')).toContain('>bold and red</span>');
+	});
+
+	it('refuses a colour it does not recognise, leaving the text alone', () => {
+		expect(renderInline('[x]{url(javascript:1)}')).toBe('[x]{url(javascript:1)}');
+		expect(renderInline('[x]{nonsense}')).toBe('[x]{nonsense}');
+		expect(renderInline('[x]{red;background:url(a)}')).not.toContain('<span');
+	});
+
 	it('leaves unsupported syntax as literal text', () => {
 		expect(render('> quote')).toContain('&gt; quote');
 	});

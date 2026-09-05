@@ -45,6 +45,14 @@ UI state. IndexedDB holds the dataset, the template and uploaded font bytes,
 because base64 fonts blow through localStorage's ~5MB and its synchronous API
 blocks the main thread. *Reset* in the toolbar wipes both.
 
+**Colour.** The options bar sets a default text colour and a paper colour for
+the whole card, and a colour for any single box. Inside a Markdown body,
+`[a few words]{red}` or `[…]{#b42318}` colours just those words. Every colour —
+from a template file or from a spreadsheet cell — goes through one parser that
+accepts hex and a named set and refuses everything else, so nothing else can
+ride into a `style` attribute. Paper colour prints only with the browser's
+background graphics switched on.
+
 **Undo/redo.** One entry is a snapshot of the whole editable state — template,
 data and mapping — recorded on a debounce, so a drag or a burst of typing is one
 step. Snapshots cannot drift out of step with the actions they reverse the way a
@@ -54,9 +62,12 @@ has focus the browser's own text undo is left alone.
 
 ## Using it
 
+0. **First run.** You land on the starter template with a few sample rows —
+   bundled with the app, so it works offline. *Reset* in the toolbar returns to
+   exactly that, and asks twice before it does.
 1. **Data in.** *Paste from Excel* (tabs, commas, quoted multi-line cells all
-   parse), *Import CSV*, or *Load sample* for the four mock cards in
-   `static/sample-cards.csv`. Clicking a row previews it.
+   parse), *Import CSV*, or *Load sample* to get the sample rows back. Clicking
+   a row previews it.
 2. **Edit the table.** Rename a column by typing in its header, add one with
    *+ Column*, add rows with *+ Row*. Deleting a row or a column asks first,
    naming what goes with it — and is undoable either way.
@@ -102,7 +113,10 @@ src/lib/
   layout.ts       mm geometry + anchor resolution
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google + local font loading
+  colour.ts       the one place a colour string becomes CSS
   history.ts      undo/redo snapshots
+  onboarding.ts   starter template + sample rows
+  version.ts      VERSION and the bumping rule
   storage.ts      localStorage + IndexedDB
   components/     Card, PagePreview, DataTable, OptionsBar, ContactSheet, PrintRoot
 src/routes/+page.svelte
@@ -115,6 +129,12 @@ static/sample-cards.csv
 
 `npm run build` writes a static site to `build/`. Any static host works; on
 Vercel the SvelteKit preset picks it up with no configuration and no functions.
+
+## Versioning
+
+`src/lib/version.ts` is the source of truth, kept in step with `package.json`.
+A fix is a patch (0.1.0 → 0.1.1), a feature is a minor (0.1.1 → 0.2.0), and the
+leading zero never moves — this app is always in flux and does not claim 1.0.
 
 ## Credits
 

@@ -1,3 +1,4 @@
+import { parseColour } from './colour';
 import defaultCard from './templates/default-card.json';
 import type { Box, Defaults, FontRef, Mapping, Template } from './types';
 import { SCHEMA_VERSION } from './types';
@@ -28,7 +29,7 @@ export function blankTemplate(): Template {
 	return {
 		schema: SCHEMA_VERSION,
 		name: 'Untitled card',
-		page: { w: 148, h: 210, unit: 'mm' },
+		page: { w: 148, h: 210, unit: 'mm', background: '#ffffff' },
 		bleed: { enabled: false, amount: 3, cropMarks: false },
 		fonts: [{ family: 'Patrick Hand', source: 'google' }],
 		defaults: { ...DEFAULT_DEFAULTS },
@@ -114,7 +115,8 @@ export function normaliseTemplate(raw: unknown): Template {
 		page: {
 			w: num(t.page?.w, 148),
 			h: num(t.page?.h, 210),
-			unit: 'mm'
+			unit: 'mm',
+			background: parseColour(t.page?.background) ?? '#ffffff'
 		},
 		bleed,
 		fonts: normaliseFonts(t.fonts),

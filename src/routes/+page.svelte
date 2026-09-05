@@ -7,10 +7,10 @@
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
 	import { collectBundleFonts, ensureTemplateFonts, installBundleFonts, uploadLocalFont } from '$lib/fonts';
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
-	import { parseTable } from '$lib/parse';
+	import { sampleDataset, starterTemplate } from '$lib/onboarding';
+	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
-		builtinTemplate,
 		exportBundle,
 		exportTemplate,
 		newBox,
@@ -32,7 +32,7 @@
 	} from '$lib/storage';
 	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
-	let template = $state<Template>(builtinTemplate());
+	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
 	let mapping = $state<Mapping>({});
 	let ui = $state<UiState>({ showOutlines: true, zoom: 'fit' });
@@ -41,6 +41,8 @@
 	let ready = $state(false);
 	let contactOpen = $state(false);
 	let helpOpen = $state(false);
+	let firstRun = $state(false);
+	let resetStage = $state<0 | 1 | 2>(0);
 	let printing = $state(false);
 	let mappingPrompt = $state(false);
 	let missingFonts = $state<FontRef[]>([]);
@@ -68,7 +70,7 @@
 	// cannot be cloned back out. Seeded from constants; boot() replaces it with
 	// the first real snapshot once the stored template and data have loaded.
 	let history = $state.raw(
-		createHistory<Snapshot>({ template: builtinTemplate(), dataset: { columns: [], rows: [] }, mapping: {} })
+		createHistory<Snapshot>({ template: starterTemplate(), dataset: { columns: [], rows: [] }, mapping: {} })
 	);
 	const undoable = $derived(canUndo(history));
 	const redoable = $derived(canRedo(history));
@@ -91,7 +93,7 @@
 			try {
 				template = normaliseTemplate(storedTemplate);
 			} catch {
-				template = builtinTemplate();
+				template = starterTemplate();
 			}
 		}
 
@@ -99,13 +101,10 @@
 		if (storedDataset?.columns?.length) {
 			dataset = storedDataset;
 		} else {
-			// First run: the sample cards, so there is something to look at.
-			try {
-				const response = await fetch(`${import.meta.env.BASE_URL}sample-cards.csv`);
-				if (response.ok) dataset = parseTable(await response.text());
-			} catch {
-				/* offline first run: an empty table is fine */
-			}
+			// Onboarding: a first-time visitor lands on the starter card and a few
+			// rows of sample data rather than on an empty page.
+			dataset = sampleDataset();
+			firstRun = true;
 		}
 
 		const storedMapping = loadMapping(template.name);
@@ -113,6 +112,7 @@
 		ui = loadUi();
 		history = createHistory(snapshot());
 		ready = true;
+		if (firstRun) status = 'Sample cards loaded to play with. Edit the table, drag the boxes, then Print — or press ? for the tour.';
 		missingFonts = await ensureTemplateFonts(template);
 	}
 
@@ -230,8 +230,9 @@
 			redo();
 			return;
 		}
-		if (event.key === 'Escape' && helpOpen) {
+		if (event.key === 'Escape' && (helpOpen || resetStage)) {
 			helpOpen = false;
+			resetStage = 0;
 			return;
 		}
 		if (typing || contactOpen) return;
@@ -338,16 +339,28 @@
 		printing = false;
 	}
 
-	async function reset() {
-		if (!window.confirm('Delete the saved template, data, mapping and fonts from this browser?')) return;
+	/**
+	 * Reset asks twice: the second press is a different button in a different
+	 * place, so it cannot be reached by double-clicking the first. What is in the
+	 * editor afterwards is undoable — the browser storage is not, which is why
+	 * uploaded fonts get called out by name in the dialog.
+	 */
+	async function confirmReset() {
+		if (resetStage === 1) {
+			resetStage = 2;
+			return;
+		}
+		resetStage = 0;
+		const before = snapshot();
 		await resetAll();
-		template = builtinTemplate();
-		dataset = { columns: [], rows: [] };
-		mapping = {};
+		template = starterTemplate();
+		dataset = sampleDataset();
+		mapping = autoMap(usedSlots(template), dataset.columns);
 		selectedId = null;
 		activeRow = 0;
-		history = resetHistory(history, snapshot());
-		status = 'Everything reset.';
+		// Keep the pre-reset state one Ctrl+Z away.
+		history = record(resetHistory(history, before), snapshot());
+		status = 'Reset to the starter card and sample data. Ctrl/Cmd+Z brings your work back.';
 	}
 </script>
 
@@ -385,7 +398,7 @@
 		</label>
 		<button class="primary" onclick={print}>Print</button>
 		<button onclick={() => (helpOpen = true)} aria-label="Help and credits" title="Help and credits">?</button>
-		<button class="quiet" onclick={reset} title="Clear everything stored in this browser">Reset</button>
+		<button class="quiet" onclick={() => (resetStage = 1)} title="Clear everything stored in this browser">Reset</button>
 		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
 	</header>
@@ -470,10 +483,33 @@
 	{/if}
 </div>
 
+{#if resetStage}
+	<div class="modal-backdrop" role="presentation" onclick={() => (resetStage = 0)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="reset-title">
+		<h2 id="reset-title">{resetStage === 1 ? 'Delete everything in this browser?' : 'Really delete everything?'}</h2>
+		{#if resetStage === 1}
+			<p>
+				This removes the saved template, all rows, the column mapping and any fonts you uploaded, then returns to
+				the starter card and sample data.
+			</p>
+			<p class="muted">Your work stays one undo away. Uploaded fonts do not — those you would have to add again.</p>
+		{:else}
+			<p>Last chance. Press again to delete, or cancel.</p>
+		{/if}
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button use:focusOnOpen onclick={() => (resetStage = 0)}>Cancel</button>
+			<button class="danger" onclick={confirmReset}>
+				{resetStage === 1 ? 'Delete everything' : 'Yes, delete everything'}
+			</button>
+		</div>
+	</div>
+{/if}
+
 {#if helpOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (helpOpen = false)}></div>
 	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
-		<h2 id="help-title">libelli</h2>
+		<h2 id="help-title">libelli <span class="version">v{VERSION}</span></h2>
 		<p>Rows of a spreadsheet in, print-ready cards out. Data, templates and fonts stay in this browser — nothing is uploaded, and there is no server to upload to.</p>
 
 		<h3>Printing</h3>
@@ -487,6 +523,9 @@
 			<dt>Delete</dt><dd>Remove the selected box</dd>
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
 		</dl>
+
+		<h3>Colour</h3>
+		<p>The options bar sets the default text colour and the paper colour for the whole card, and a colour for any single box. Inside a Markdown body, <code>[a few words]&#123;red&#125;</code> or <code>[…]&#123;#b42318&#125;</code> colours just those words. Paper colour prints only with background graphics switched on.</p>
 
 		<h3>Editing</h3>
 		<p>Drag boxes on the page or type exact millimetres. A box anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link. Column headers are editable in place; deleting a row or a column asks first, and can be undone.</p>
@@ -735,6 +774,30 @@
 	.keys dd {
 		margin: 0;
 		color: #333;
+	}
+
+	.modal.narrow {
+		width: min(440px, 92vw);
+	}
+
+	.version {
+		font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+		color: #767676;
+		vertical-align: 2px;
+	}
+
+	.modal code {
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 11.5px;
+		background: #f3f3f3;
+		padding: 1px 4px;
+		border-radius: 3px;
+	}
+
+	button.danger {
+		background: #b42318;
+		border-color: #b42318;
+		color: #fff;
 	}
 
 	.credit {

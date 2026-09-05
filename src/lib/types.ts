@@ -17,6 +17,8 @@ export interface PageSpec {
 	w: number;
 	h: number;
 	unit: 'mm';
+	/** paper colour; printed only when the browser's background graphics are on */
+	background?: string;
 }
 
 export interface BleedSpec {
