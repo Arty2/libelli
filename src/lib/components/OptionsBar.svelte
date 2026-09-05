@@ -2,7 +2,14 @@
 	import Icon from './Icon.svelte';
 	import { safeImageUrl } from '$lib/assets';
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
-	import { BORDER_STYLES, DEFAULT_QR, PAGE_NUMBER_POSITIONS, borderSides, normaliseBorderWidth } from '$lib/template';
+	import {
+		BORDER_STYLES,
+		DEFAULT_QR,
+		PAGE_NUMBER_POSITIONS,
+		borderSides,
+		normaliseBorderWidth,
+		type Arrange
+	} from '$lib/template';
 	import type {
 		Align,
 		BackgroundFit,
@@ -30,7 +37,8 @@
 		onmappingchange: (mapping: Mapping) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
-		onaddbox: () => void;
+		onarrange: (where: Arrange) => void;
+		onresettemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
@@ -51,7 +59,8 @@
 		onmappingchange,
 		onduplicate,
 		ondelete,
-		onaddbox,
+		onarrange,
+		onresettemplate,
 		onuploadfont,
 		onuploadbackground,
 		onnotice,
@@ -100,8 +109,27 @@
 	const ALIGNMENTS: Array<{ value: Align; icon: string; label: string }> = [
 		{ value: 'left', icon: 'align-left', label: 'Left' },
 		{ value: 'center', icon: 'align-center', label: 'Centre' },
-		{ value: 'right', icon: 'align-right', label: 'Right' }
+		{ value: 'right', icon: 'align-right', label: 'Right' },
+		{ value: 'justify', icon: 'align-justify', label: 'Justified' }
 	];
+
+	/** Paint order is array order, so "front" is last in the list, not a z-index. */
+	const ARRANGEMENTS: Array<{ value: Arrange; icon: string; label: string }> = [
+		{ value: 'front', icon: 'bring-to-front', label: 'Bring to Front' },
+		{ value: 'forward', icon: 'bring-forward', label: 'Bring Forward' },
+		{ value: 'backward', icon: 'send-backward', label: 'Send Backward' },
+		{ value: 'back', icon: 'send-to-back', label: 'Send to Back' }
+	];
+
+	const stackIndex = $derived(template.boxes.findIndex((b) => b.id === selected?.id));
+	const atFront = $derived(stackIndex === template.boxes.length - 1);
+	const atBack = $derived(stackIndex === 0);
+	const cannotArrange = (where: Arrange) =>
+		boxFrozen || ((where === 'front' || where === 'forward') ? atFront : atBack);
+
+	/** Static content for a box bound to no column — the decorative case. */
+	const setStatic = (change: Partial<NonNullable<Box['static']>>) =>
+		patch({ static: { ...selected?.static, ...change } });
 
 	const VERTICALS: Array<{ value: VAlign; icon: string; label: string }> = [
 		{ value: 'top', icon: 'valign-top', label: 'Top' },
@@ -250,8 +278,9 @@
 		<label class="field">
 			<span>Template</span>
 			<input
-				class="w-10"
+				class="w-8"
 				value={template.name}
+				placeholder="Untitled card"
 				disabled={pageFrozen}
 				onchange={(e) => patchTemplate({ name: e.currentTarget.value })}
 			/>
@@ -264,6 +293,7 @@
 					class="w-4"
 					type="number"
 					step="1"
+					placeholder="148"
 					value={template.page.w}
 					disabled={pageFrozen}
 					onchange={(e) => patchTemplate({ page: { ...template.page, w: numeric(e, template.page.w) } })}
@@ -276,6 +306,7 @@
 					class="w-4"
 					type="number"
 					step="1"
+					placeholder="210"
 					value={template.page.h}
 					disabled={pageFrozen}
 					onchange={(e) => patchTemplate({ page: { ...template.page, h: numeric(e, template.page.h) } })}
@@ -340,6 +371,7 @@
 					type="number"
 					step="0.5"
 					min="1"
+					placeholder="12.5"
 					value={template.defaults.size}
 					disabled={pageFrozen}
 					onchange={(e) =>
@@ -354,6 +386,7 @@
 					type="number"
 					step="0.05"
 					min="0.8"
+					placeholder="1.5"
 					value={template.defaults.lineHeight}
 					disabled={pageFrozen}
 					onchange={(e) =>
@@ -368,6 +401,7 @@
 					class="w-4"
 					type="number"
 					step="0.05"
+					placeholder="0"
 					value={template.defaults.letterSpacing}
 					disabled={pageFrozen}
 					onchange={(e) =>
@@ -468,7 +502,8 @@
 						type="number"
 						step="0.5"
 						min="0"
-						value={template.pageNumber.margin}
+						placeholder="8"
+					value={template.pageNumber.margin}
 						disabled={pageFrozen}
 						onchange={(e) =>
 							patchTemplate({ pageNumber: { ...template.pageNumber, margin: numeric(e, template.pageNumber.margin) } })}
@@ -486,6 +521,9 @@
 			</button>
 			<button onclick={onimporttemplate} disabled={pageFrozen}>Import Template…</button>
 			<button onclick={onexporttemplate}>Export Template</button>
+			<button onclick={onresettemplate} disabled={pageFrozen} title="Back to the starter card. Your rows are not touched.">
+				<Icon name="reset" size={14} /> Reset Template
+			</button>
 			<!-- Never disabled by the lock it sets, or there would be no way out of it. -->
 			<button
 				aria-pressed={pageFrozen}
@@ -494,7 +532,6 @@
 			>
 				<Icon name="locked" size={14} /> Lock
 			</button>
-			<button onclick={onaddbox} disabled={pageFrozen}><Icon name="add" size={14} /> Box</button>
 		</span>
 	</div>
 {:else if selected}
@@ -505,11 +542,12 @@
 
 		<span class="group" role="group" aria-label="Content">
 			<label class="field">
-				<span>Slot</span>
+				<span>Field</span>
 				<input
-					class="w-6"
+					class="w-5"
 					value={selected.slot ?? ''}
-					placeholder="static"
+					placeholder="decorative"
+					title="The template's own name for what this box holds — bind it to a spreadsheet column beside it. Leave it blank and the box is decorative: it shows the same thing on every card."
 					disabled={boxFrozen}
 					onchange={(e) => setSlot(e.currentTarget.value)}
 				/>
@@ -519,6 +557,7 @@
 					<span>Column</span>
 					<select
 						value={mapping[selected.slot] ?? ''}
+						title="Which spreadsheet column fills this field"
 						onchange={(e) => onmappingchange({ ...mapping, [selected.slot as string]: e.currentTarget.value })}
 					>
 						<option value="">— None —</option>
@@ -526,6 +565,30 @@
 							<option value={column}>{column}</option>
 						{/each}
 					</select>
+				</label>
+			{:else if selected.mode === 'image'}
+				<label class="field">
+					<span>Source</span>
+					<input
+						class="w-8"
+						value={selected.static?.url ?? ''}
+						placeholder="https://…"
+						title="The picture this decorative box shows on every card"
+						disabled={boxFrozen}
+						onchange={(e) => setStatic({ url: e.currentTarget.value.trim() || undefined })}
+					/>
+				</label>
+			{:else}
+				<label class="field">
+					<span>Text</span>
+					<input
+						class="w-8"
+						value={selected.static?.text ?? ''}
+						placeholder="same on every card"
+						title="What this decorative box says; it is bound to no column, so it never changes between cards"
+						disabled={boxFrozen}
+						onchange={(e) => setStatic({ text: e.currentTarget.value })}
+					/>
 				</label>
 			{/if}
 			<label class="field">
@@ -701,6 +764,18 @@
 						aria-label="Align {option.label}"
 						disabled={boxFrozen}
 						onclick={() => patch({ align: option.value })}
+					>
+						<Icon name={option.icon} size={15} />
+					</button>
+				{/each}
+			</span>
+			<span class="segmented" role="group" aria-label="Stacking order">
+				{#each ARRANGEMENTS as option (option.value)}
+					<button
+						title={option.label}
+						aria-label={option.label}
+						disabled={cannotArrange(option.value)}
+						onclick={() => onarrange(option.value)}
 					>
 						<Icon name={option.icon} size={15} />
 					</button>
@@ -1059,7 +1134,7 @@
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 4px 5px;
 		border: 1px solid #ccc;
-		border-radius: 5px;
+		border-radius: var(--radius-input);
 		background: #fff;
 		color: #111;
 	}
@@ -1070,11 +1145,18 @@
 		color: #999;
 	}
 
-	.w-3 { width: 3.2rem; }
-	.w-4 { width: 4.5rem; }
-	.w-6 { width: 6.5rem; }
-	.w-10 { width: 11rem; }
-	.colour { width: 2.2rem; padding: 2px; }
+	/* Sized to what goes in them, not to a grid: a millimetre value is four
+	   characters and a template name is not, and every rem saved here is a
+	   control that stays on the same row instead of wrapping to the next. */
+	.w-3 { width: 2.9rem; }
+	.w-4 { width: 3.5rem; }
+	.w-5 { width: 4.6rem; }
+	.w-8 { width: 8.5rem; }
+	.colour { width: 2rem; padding: 2px; }
+
+	select {
+		max-width: 9.5rem;
+	}
 
 	.spacer {
 		flex: 1;
@@ -1087,7 +1169,7 @@
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 5px 10px;
 		border: 1px solid #ccc;
-		border-radius: 6px;
+		border-radius: var(--radius-button);
 		background: #fff;
 		color: #111;
 		cursor: pointer;
@@ -1135,12 +1217,12 @@
 	}
 
 	.segmented button:first-child {
-		border-radius: 6px 0 0 6px;
+		border-radius: var(--radius-button) 0 0 var(--radius-button);
 		margin-left: 0;
 	}
 
 	.segmented button:last-child {
-		border-radius: 0 6px 6px 0;
+		border-radius: 0 var(--radius-button) var(--radius-button) 0;
 	}
 
 	.segmented button[aria-pressed='true'] {

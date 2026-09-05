@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import BoxMenu from '$lib/components/BoxMenu.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -17,9 +18,11 @@
 		exportTemplate,
 		newBox,
 		nextBoxId,
+		arrangeBoxes,
 		normaliseTemplate,
 		stripUndefined,
-		usedSlots
+		usedSlots,
+		type Arrange
 	} from '$lib/template';
 	import {
 		loadDataset,
@@ -27,7 +30,6 @@
 		loadTemplate,
 		loadUi,
 		migrateLegacyStorage,
-		resetAll,
 		saveDataset,
 		saveMapping,
 		saveTemplate,
@@ -54,7 +56,7 @@
 	// the way on a phone, where it would eat the preview it is there to serve.
 	let pageSetupOpen = $state(true);
 	let firstRun = $state(false);
-	let resetStage = $state<0 | 1 | 2>(0);
+	let boxMenu = $state<{ id: string; x: number; y: number } | null>(null);
 	let printing = $state(false);
 	let mappingPrompt = $state(false);
 	let missingFonts = $state<FontRef[]>([]);
@@ -249,6 +251,24 @@
 		selectedId = box.id;
 	}
 
+	function arrange(where: Arrange) {
+		if (!selected || template.locked) return;
+		const boxes = arrangeBoxes(template.boxes, selected.id, where);
+		if (boxes === template.boxes) return;
+		template = { ...template, boxes };
+	}
+
+	/**
+	 * The template only. Rows, columns and the mapping are left exactly where
+	 * they are — this is for starting the design again, not for clearing out.
+	 */
+	function resetTemplate() {
+		template = starterTemplate();
+		selectedId = null;
+		mapping = autoMap(usedSlots(template), dataset.columns);
+		status = 'Template reset to the starter card. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.';
+	}
+
 	function duplicateBox() {
 		if (!selected) return;
 		const copy: Box = { ...structuredClone($state.snapshot(selected)), id: nextBoxId(template.boxes), anchor: null, y: selected.y + 6, x: selected.x + 4 };
@@ -307,10 +327,10 @@
 			redo();
 			return;
 		}
-		if (event.key === 'Escape' && (helpOpen || resetStage || cssOpen)) {
+		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu)) {
 			helpOpen = false;
 			cssOpen = false;
-			resetStage = 0;
+			boxMenu = null;
 			return;
 		}
 		if (typing || previewOpen) return;
@@ -418,9 +438,8 @@
 	const raf = () => new Promise((resolve) => requestAnimationFrame(resolve));
 
 	/**
-	 * Printing always goes through the preview: it is where you see what will come
-	 * out, choose which pages go, and read the four dialog settings the browser
-	 * gets wrong by default. One door, not two.
+	 * Everything that leaves the app goes through one screen: the pages as they
+	 * will come out, which of them to send, and then print or PNG. One door.
 	 */
 	function requestPrint() {
 		if (!dataset.rows.length) {
@@ -457,30 +476,6 @@
 		printing = false;
 	}
 
-	/**
-	 * Reset asks twice: the second press is a different button in a different
-	 * place, so it cannot be reached by double-clicking the first. What is in the
-	 * editor afterwards is undoable — the browser storage is not, which is why
-	 * uploaded fonts get called out by name in the dialog. (Deleting a row or a
-	 * column no longer asks at all; undo covers those, but not this.)
-	 */
-	async function confirmReset() {
-		if (resetStage === 1) {
-			resetStage = 2;
-			return;
-		}
-		resetStage = 0;
-		const before = snapshot();
-		await resetAll();
-		template = starterTemplate();
-		dataset = sampleDataset();
-		mapping = autoMap(usedSlots(template), dataset.columns);
-		selectedId = null;
-		activeRow = 0;
-		// Keep the pre-reset state one Ctrl+Z away.
-		history = record(resetHistory(history, before), snapshot());
-		status = 'Reset to the starter card and sample data. Ctrl/Cmd+Z brings your work back.';
-	}
 </script>
 
 <svelte:window onkeydown={onWindowKeydown} onafterprint={onAfterPrint} />
@@ -492,11 +487,8 @@
 	<header class="toolbar">
 		<strong class="brand">libelli</strong>
 		<span class="spacer"></span>
-		<button class="square" onclick={undo} disabled={!undoable} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
-			<Icon name="undo" size={16} />
-		</button>
-		<button class="square" onclick={redo} disabled={!redoable} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
-			<Icon name="redo" size={16} />
+		<button onclick={() => (helpOpen = true)} title="How this works, and the keys">
+			<Icon name="help" size={15} /> Help
 		</button>
 		<button
 			onclick={() => (pageSetupOpen = !pageSetupOpen)}
@@ -506,12 +498,8 @@
 		>
 			<Icon name="settings" size={15} /> <span class="label">Page Setup</span>
 		</button>
-		<button class="danger-outline" onclick={() => (resetStage = 1)} title="Clear everything stored in this browser">Reset</button>
 		<button class="primary" onclick={requestPrint} disabled={!dataset.rows.length}>
-			<Icon name="print" size={15} /> Print…
-		</button>
-		<button class="square" onclick={() => (helpOpen = true)} aria-label="Help and credits" title="Help and credits">
-			<Icon name="help" size={16} />
+			<Icon name="download" size={15} /> Export…
 		</button>
 		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
@@ -530,7 +518,8 @@
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
-			onaddbox={addBox}
+			onarrange={arrange}
+			onresettemplate={resetTemplate}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
 			onnotice={(message) => (status = message)}
@@ -552,7 +541,8 @@
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
-			onaddbox={addBox}
+			onarrange={arrange}
+			onresettemplate={resetTemplate}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
 			onnotice={(message) => (status = message)}
@@ -623,6 +613,12 @@
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
 			onzoom={(zoom) => (ui = { ...ui, zoom })}
 			onnudge={nudgeBox}
+			{undoable}
+			{redoable}
+			onundo={undo}
+			onredo={redo}
+			onaddbox={addBox}
+			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
 		/>
 
 		<aside>
@@ -679,37 +675,18 @@
 	</div>
 {/if}
 
-{#if resetStage}
-	<div class="modal-backdrop" role="presentation" onclick={() => (resetStage = 0)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="reset-title">
-		<h2 id="reset-title">{resetStage === 1 ? 'Delete everything in this browser?' : 'Really delete everything?'}</h2>
-		{#if resetStage === 1}
-			<p>
-				This removes the saved template, all rows, the column mapping and any fonts you uploaded, then returns to
-				the starter card and sample data.
-			</p>
-			<p class="muted">Your work stays one undo away. Uploaded fonts do not — those you would have to add again.</p>
-		{:else}
-			<p>Last chance. Press again to delete, or cancel.</p>
-		{/if}
-		<div class="modal-actions">
-			<span class="spacer"></span>
-			<button use:focusOnOpen onclick={() => (resetStage = 0)}>Cancel</button>
-			<button class="danger" onclick={confirmReset}>
-				{resetStage === 1 ? 'Delete everything' : 'Yes, delete everything'}
-			</button>
-		</div>
-	</div>
-{/if}
-
 {#if helpOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (helpOpen = false)}></div>
 	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
 		<h2 id="help-title">libelli <span class="version">v{VERSION}</span></h2>
 		<p>Rows of a spreadsheet in, print-ready cards out. Data, templates and fonts stay in this browser — nothing is uploaded, and there is no server to upload to.</p>
 
-		<h3>Printing</h3>
-		<p>Print opens the preview: every card as a small page, next to the four dialog settings that decide whether it comes out right — paper size, margins, headers and footers, background graphics. Untick any page you do not want and only the rest are sent; each keeps the number it has in the table.</p>
+		<h3>Getting cards out</h3>
+		<p><strong>Export</strong> opens one screen showing every card as a small page. Untick any you do not want, then <strong>Print</strong>, or <strong>Export PNG</strong> for one 300 dpi file per page. The print checklist sits under the pages, because those four settings decide whether what you saw is what comes out.</p>
+
+		<h3>Fields and decorative boxes</h3>
+		<p>A box's <strong>Field</strong> is the template's own name for what the box holds — <em>title</em>, <em>body</em>, and so on. The template names fields; the <strong>Column</strong> beside it says which spreadsheet column fills this one. That indirection is the point: the same template works against another spreadsheet by rebinding the columns, and no data is carried inside the template file.</p>
+		<p>Leave the Field blank and the box is <strong>decorative</strong>: bound to nothing, showing the same text or picture on every card. Type it straight into the box's own Text field.</p>
 
 		<h3>Keys</h3>
 		<dl class="keys">
@@ -723,19 +700,20 @@
 		</dl>
 
 		<h3>Placing boxes</h3>
-		<p>Drag boxes on the page or type exact millimetres. A box latches onto the edges and centres of its neighbours as it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid of a 10mm grid instead. A box anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link. The lock at the top right of a box, or of the page, freezes what you have.</p>
+		<p>Drag boxes on the page or type exact millimetres. A box latches onto the edges and centres of its neighbours as it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid of a 10mm grid instead. A box anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link.</p>
+		<p>Right-click a box for its stacking order, lock, duplicate and delete — the same actions are in its bar. Boxes paint in the order they are listed, so <em>Bring to Front</em> is a move to the end of that list rather than a z-index to keep track of. A red corner on a box means its content does not fit and the print will clip it.</p>
 
 		<h3>Type</h3>
 		<p>Page setup holds the defaults — family, size, leading, tracking and colour. A box that leaves those fields blank inherits them, so changing the page changes every box that never overrode it.</p>
 
 		<h3>Locking</h3>
-		<p><strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page lock covers every box and the page settings too. The padlock that appears on the box, or at the corner of the page, is telling you it is locked; the button that undoes it is in the bar.</p>
+		<p><strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page lock covers every box and the page settings too. The padlock that appears on the box, or at the corner of the page, is telling you it is locked; the button that undoes it is in the bar. Outlines off takes the padlocks away with the rest of the screen furniture.</p>
 
 		<h3>Colour</h3>
 		<p>Page setup sets the default text colour and the paper colour, and a box can set its own. Inside a Markdown body, <code>[a few words]&#123;red&#125;</code> or <code>[…]&#123;#b42318&#125;</code> colours just those words. Paper colour prints only with background graphics switched on.</p>
 
 		<h3>Data</h3>
-		<p>Column headers are editable in place. The pale row and column at the end of the table are placeholders: type into one and it becomes real. Deleting a row or a column happens straight away — Ctrl/Cmd+Z brings it back.</p>
+		<p>Column headers are editable in place. The pale row and column at the end of the table are placeholders: type into one and it becomes real. Deleting a row or a column happens straight away — Ctrl/Cmd+Z brings it back. The red bin under the table empties the whole dataset and asks twice; it leaves the template alone, as <strong>Reset Template</strong> in page setup leaves the data alone.</p>
 
 		<p class="credit">
 			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>
@@ -749,6 +727,20 @@
 	</div>
 {/if}
 
+{#if boxMenu && selected && selected.id === boxMenu.id}
+	<BoxMenu
+		box={selected}
+		{template}
+		x={boxMenu.x}
+		y={boxMenu.y}
+		onarrange={arrange}
+		onlock={(locked) => updateBox({ ...selected!, locked: locked || undefined })}
+		onduplicate={duplicateBox}
+		ondelete={deleteBox}
+		onclose={() => (boxMenu = null)}
+	/>
+{/if}
+
 {#if previewOpen}
 	<PrintPreview
 		{template}
@@ -760,6 +752,7 @@
 		onactivate={(i) => (activeRow = i)}
 		onexcludedchange={(next) => (excludedRows = next)}
 		onprint={printFromPreview}
+		onnotice={(message) => (status = message)}
 		onclose={() => (previewOpen = false)}
 	/>
 {/if}
@@ -769,6 +762,13 @@
 {/if}
 
 <style>
+	/* Control radii live here rather than in each component: a button is 3px and
+	   a field is 1px everywhere in the app, and there is one place to change it. */
+	:global(:root) {
+		--radius-button: 3px;
+		--radius-input: 1px;
+	}
+
 	:global(html, body) {
 		margin: 0;
 		height: 100%;
@@ -883,7 +883,7 @@
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
 		border: 1px solid #ccc;
-		border-radius: 6px;
+		border-radius: var(--radius-button);
 		background: #fff;
 		color: #111;
 		cursor: pointer;
@@ -898,15 +898,6 @@
 		cursor: default;
 	}
 
-	/* Square, equal-sized icon buttons: undo, redo and help are the same kind of
-	   thing and used to be three different widths. */
-	button.square {
-		width: 30px;
-		height: 30px;
-		padding: 0;
-		justify-content: center;
-	}
-
 	button.primary {
 		background: #111;
 		border-color: #111;
@@ -919,25 +910,11 @@
 		background: #eaf1fe;
 	}
 
-	/* Outline, not filled: dangerous enough to notice in the toolbar, quiet
-	   enough not to compete with Print. The filled `.danger` below is for the
-	   confirm button inside the dialog, where shouting is the point. */
-	button.danger-outline {
-		border-color: #b42318;
-		color: #b42318;
-		background: transparent;
-	}
-
-	button.danger-outline:hover:not(:disabled) {
-		border-color: #8f1c13;
-		background: #fdf3f2;
-	}
-
 	select {
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 4px 5px;
 		border: 1px solid #ccc;
-		border-radius: 5px;
+		border-radius: var(--radius-input);
 		background: #fff;
 	}
 
@@ -989,7 +966,7 @@
 		font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
 		padding: 8px;
 		border: 1px solid #ccc;
-		border-radius: 6px;
+		border-radius: var(--radius-input);
 		resize: vertical;
 	}
 
@@ -1012,10 +989,6 @@
 		color: #333;
 	}
 
-	.modal.narrow {
-		width: min(440px, 92vw);
-	}
-
 	.version {
 		font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
 		color: #767676;
@@ -1028,12 +1001,6 @@
 		background: #f3f3f3;
 		padding: 1px 4px;
 		border-radius: 3px;
-	}
-
-	button.danger {
-		background: #b42318;
-		border-color: #b42318;
-		color: #fff;
 	}
 
 	.credit a {

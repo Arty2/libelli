@@ -24,6 +24,7 @@ src/lib/
   markdown.ts     hand-written Markdown subset -> HTML, escaping at the leaves
   layout.ts       mm geometry, anchor resolution, grid and sibling-edge snapping
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
+  png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
   table.ts        column reorder, row sorting
   template.ts     defaults, validation, migration, import/export
@@ -33,7 +34,7 @@ src/lib/
   storage.ts      localStorage + IndexedDB, plus the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
   version.ts      VERSION, and the bumping rule
-  components/     Card, PagePreview, DataTable, OptionsBar, PrintPreview, PrintRoot, Icon
+  components/     Card, PagePreview, DataTable, OptionsBar, PrintPreview, PrintRoot, BoxMenu, Icon
 src/routes/+page.svelte   all app state and wiring
 static/sample-cards.csv   sample data, bundled with ?raw and also served as a file
 ```
@@ -68,6 +69,19 @@ Load-bearing choices, in case they look arbitrary:
 - **Both option bars read in groups**, outward from the subject: what the thing
   is, then its type, then how it looks, then where it sits, then what you can do
   to it. A new control goes in the group it belongs to rather than on the end.
+- **Controls sit next to what they act on.** Undo, redo and *+ Box* are at the
+  page's corners, the view toggles along its bottom edge; the window toolbar
+  holds only what is about the whole app. A right-click menu on a box carries
+  the same actions its bar does — neither is the only way to reach them.
+- **Stacking is array order**, not a z-index: `arrangeBoxes` moves a box within
+  the list, and returns the same array when there is nowhere to go so no undo
+  entry is recorded for a no-op.
+- **Radii are tokens.** `--radius-button` (3px) and `--radius-input` (1px) on
+  `:root`; a surface (modal, menu, chip) keeps its own larger radius.
+- **A box's content lives in `.content`.** Handles and badges are absolutely
+  positioned children of `.box` that hang past its edges, so measuring the box's
+  own `scrollHeight` reports overflow on every selected box. The wrapper is what
+  gets measured, and it is also the single flex item `justify-content` places.
 - **One door to the printer.** Print opens the preview; the preview prints. The
   page selection lives there, keyed by row index and reset every time it opens —
   sorting or deleting a row moves those indices, and a stale exclusion would drop

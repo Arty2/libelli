@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEFAULTS, autoMap, borderSides, builtinTemplate, normaliseTemplate, usedSlots } from './template';
+import {
+	DEFAULT_DEFAULTS,
+	arrangeBoxes,
+	autoMap,
+	borderSides,
+	builtinTemplate,
+	newBox,
+	normaliseTemplate,
+	usedSlots
+} from './template';
 
 describe('the built-in template', () => {
 	const template = builtinTemplate();
@@ -204,5 +213,29 @@ describe('mapping', () => {
 
 	it('leaves a slot unmapped rather than binding the wrong column', () => {
 		expect(autoMap(['title', 'body'], ['Widget'])).toEqual({});
+	});
+});
+
+describe('arrangeBoxes', () => {
+	const ids = (boxes: ReturnType<typeof newBox>[]) => boxes.map((b) => b.id).join('');
+	const boxes = () => ['a', 'b', 'c', 'd'].map((id) => newBox({ id }));
+
+	it('moves a box one step at a time, since paint order is array order', () => {
+		expect(ids(arrangeBoxes(boxes(), 'b', 'forward'))).toBe('acbd');
+		expect(ids(arrangeBoxes(boxes(), 'c', 'backward'))).toBe('acbd');
+	});
+
+	it('sends a box the whole way', () => {
+		expect(ids(arrangeBoxes(boxes(), 'b', 'front'))).toBe('acdb');
+		expect(ids(arrangeBoxes(boxes(), 'c', 'back'))).toBe('cabd');
+	});
+
+	it('returns the same array when there is nowhere to go, so no undo entry is made', () => {
+		const list = boxes();
+		expect(arrangeBoxes(list, 'd', 'front')).toBe(list);
+		expect(arrangeBoxes(list, 'd', 'forward')).toBe(list);
+		expect(arrangeBoxes(list, 'a', 'back')).toBe(list);
+		expect(arrangeBoxes(list, 'a', 'backward')).toBe(list);
+		expect(arrangeBoxes(list, 'ghost', 'front')).toBe(list);
 	});
 });

@@ -243,6 +243,32 @@ function normaliseFonts(raw: any): FontRef[] {
 
 export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'double'];
 
+/** Where a box is being moved to in the stack. */
+export type Arrange = 'front' | 'forward' | 'backward' | 'back';
+
+/**
+ * Reorder one box in the paint order.
+ *
+ * Stacking is array order — a later box paints over an earlier one — so
+ * arranging is a move within the list rather than a z-index anyone has to keep
+ * in step. Returns the array unchanged when the box is already where it is
+ * being sent, so an undo entry is never recorded for a no-op.
+ */
+export function arrangeBoxes(boxes: Box[], id: string, where: Arrange): Box[] {
+	const from = boxes.findIndex((b) => b.id === id);
+	if (from === -1) return boxes;
+	const last = boxes.length - 1;
+	const to =
+		where === 'front' ? last
+		: where === 'back' ? 0
+		: where === 'forward' ? Math.min(last, from + 1)
+		: Math.max(0, from - 1);
+	if (to === from) return boxes;
+	const next = [...boxes];
+	next.splice(to, 0, next.splice(from, 1)[0]);
+	return next;
+}
+
 /**
  * A border thickness, in whichever of the two shapes it was written.
  *

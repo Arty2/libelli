@@ -10,7 +10,7 @@ export const SCHEMA_VERSION = 2;
 
 export type BoxMode = 'plain' | 'markdown' | 'image' | 'qr';
 export type Overflow = 'clip' | 'grow';
-export type Align = 'left' | 'center' | 'right';
+export type Align = 'left' | 'center' | 'right' | 'justify';
 /** vertical placement of a box's content within its own frame */
 export type VAlign = 'top' | 'middle' | 'bottom';
 export type TextCase = 'none' | 'smallcaps' | 'uppercase';

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
+	import { elementToPng, ratioForDpi } from '$lib/png';
 	import { mmToPx } from '$lib/layout';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
@@ -15,6 +16,7 @@
 		onactivate: (index: number) => void;
 		onexcludedchange: (excluded: Set<number>) => void;
 		onprint: () => void;
+		onnotice: (message: string) => void;
 		onclose: () => void;
 	}
 
@@ -28,8 +30,52 @@
 		onactivate,
 		onexcludedchange,
 		onprint,
+		onnotice,
 		onclose
 	}: Props = $props();
+
+	let grid = $state<HTMLDivElement | null>(null);
+	let exporting = $state(false);
+
+	const slug = (name: string) =>
+		name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'card';
+
+	/**
+	 * One file per selected page, at 300 dpi. A card is already rendered here at
+	 * full size behind the thumbnail's transform, so the export reads the same
+	 * DOM the preview is showing rather than building a second one.
+	 */
+	async function exportPng() {
+		if (!grid || exporting) return;
+		exporting = true;
+		const families = Array.from(
+			new Set([template.defaults.font, ...template.boxes.map((b) => b.font).filter(Boolean)])
+		) as string[];
+		let missing: string[] = [];
+		let written = 0;
+		try {
+			const cards = Array.from(grid.querySelectorAll<HTMLElement>('figure:not(.dropped) .card'));
+			for (const [i, card] of cards.entries()) {
+				const { blob, missingFonts } = await elementToPng(card, families, ratioForDpi(300));
+				missing = missingFonts;
+				const url = URL.createObjectURL(blob);
+				const link = document.createElement('a');
+				link.href = url;
+				link.download = `${slug(template.name)}-${i + 1}.png`;
+				link.click();
+				URL.revokeObjectURL(url);
+				written += 1;
+			}
+			onnotice(
+				`${written} PNG${written === 1 ? '' : 's'} exported at 300 dpi.` +
+					(missing.length ? ` ${missing.join(', ')} could not be embedded — upload the font file to export it as itself.` : '')
+			);
+		} catch (error) {
+			onnotice(error instanceof Error ? error.message : 'That could not be exported.');
+		} finally {
+			exporting = false;
+		}
+	}
 
 	const chosen = $derived(dataset.rows.filter((_, i) => !excluded.has(i)).length);
 	const allChosen = $derived(chosen === dataset.rows.length);
@@ -92,10 +138,10 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Print preview">
+<div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Export">
 	<header>
 		<h2>
-			Print preview —
+			Export —
 			{#if allChosen}
 				{dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}, one per row
 			{:else}
@@ -105,6 +151,10 @@
 		<div class="header-actions">
 			<button onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
 			<button onclick={onclose}>Close</button>
+			<button onclick={exportPng} disabled={chosen === 0 || exporting}>
+				<Icon name="download" size={15} />
+				{exporting ? 'Exporting…' : `Export PNG${chosen === 1 ? '' : ` ×${chosen}`}`}
+			</button>
 			<button class="primary" onclick={onprint} disabled={chosen === 0}>
 				<Icon name="print" size={15} />
 				Print {chosen} Page{chosen === 1 ? '' : 's'}
@@ -112,20 +162,8 @@
 		</div>
 	</header>
 
-	<!-- The checklist rides with the preview rather than in a dialog of its own:
-	     these are the settings that decide whether what you see below is what
-	     comes out, so they belong beside it. -->
-	<section class="checklist" aria-label="Before you print">
-		<ol>
-			<li><strong>Paper size</strong> — the one matching <strong>{sheetW} × {sheetH} mm</strong>, or a larger sheet you trim.</li>
-			<li><strong>Margins</strong> — <em>None</em>.</li>
-			<li><strong>Headers and footers</strong> — off.</li>
-			<li><strong>Background graphics</strong> — on, or Chrome drops the paper colour.</li>
-		</ol>
-		<p class="muted">Everything stays in this browser; nothing is uploaded.</p>
-	</section>
 
-	<div class="grid">
+	<div class="grid" bind:this={grid}>
 		{#each dataset.rows as row, i (i)}
 			{@const included = !excluded.has(i)}
 			<figure class:dropped={!included}>
@@ -153,6 +191,24 @@
 			</figure>
 		{/each}
 	</div>
+
+	<hr />
+
+	<!-- Under the pages, not above them: the cards are what you came to look at,
+	     and these four settings are what to do once you have. -->
+	<section class="checklist" aria-label="Before you print">
+		<h3>Before you print</h3>
+		<ol>
+			<li><strong>Paper size</strong> — the one matching <strong>{sheetW} × {sheetH} mm</strong>, or a larger sheet you trim.</li>
+			<li><strong>Margins</strong> — <em>None</em>.</li>
+			<li><strong>Headers and footers</strong> — off.</li>
+			<li><strong>Background graphics</strong> — on, or Chrome drops the paper colour.</li>
+		</ol>
+		<p class="muted">
+			A PNG export needs none of this — it comes out at 300 dpi whatever the print dialog says. Everything stays in
+			this browser; nothing is uploaded.
+		</p>
+	</section>
 
 	{#if fullscreen !== null}
 		{@const index = fullscreen}
@@ -210,7 +266,7 @@
 		border: 1px solid #ccc;
 		background: #fff;
 		color: #111;
-		border-radius: 6px;
+		border-radius: var(--radius-button);
 		cursor: pointer;
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
@@ -231,10 +287,24 @@
 		cursor: default;
 	}
 
+	hr {
+		margin: 8px 18px 0;
+		border: none;
+		border-top: 1px solid #ddd;
+	}
+
 	.checklist {
-		padding: 12px 18px 0;
+		padding: 12px 18px 24px;
 		font: 12px/1.55 ui-sans-serif, system-ui, sans-serif;
 		color: #333;
+	}
+
+	.checklist h3 {
+		margin: 0 0 6px;
+		font-size: 11px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: #767676;
 	}
 
 	.checklist ol {

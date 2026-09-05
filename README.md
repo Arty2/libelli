@@ -67,8 +67,16 @@ resize boxes directly, or type exact millimetres.
   drops out of the anchor chain, so a card with no subtitle has no dead band
   where the subtitle would have been. A box with no anchor stays pinned to its
   own Y however long the body above it runs.
-- **Alignment** — horizontal (left, centre, right) and vertical (top, middle,
-  bottom) within the box's own frame.
+- **Alignment** — horizontal (left, centre, right, justified — justified text
+  hyphenates) and vertical (top, middle, bottom) within the box's own frame.
+- **Stacking** — boxes paint in the order they are listed, so *Bring to Front*
+  is a move to the end of that list rather than a z-index to keep in step. In
+  the box bar and on right-click.
+- **Decorative boxes** — leave a box's **Field** blank and it is bound to
+  nothing: the same text or picture on every card, typed straight into the box.
+- **Overflow** — a red corner appears on a box whose content is taller than the
+  box will let it be, because a clipped card looks fine on screen right up until
+  it is printed.
 - **Surface** — a fill colour, padding, a border and a corner radius, all in
   millimetres. A border takes one thickness all round, or one per edge behind
   the expander next to it; its style and its radius are always for the whole
@@ -100,7 +108,7 @@ resize boxes directly, or type exact millimetres.
   resizing, no option changes. A page lock covers every box and the page settings
   as well. A padlock appears on the locked box, or at the corner of a locked
   page, as an indicator — the button that sets it is in the bar, with the rest of
-  that subject's settings.
+  that subject's settings. Turning outlines off takes the padlocks with it.
 - **Custom CSS** — page setup has a CSS button; what you write there is saved
   inside the template and travels with it. Selectors are scoped to the card, so
   nothing in a template can restyle the editor around it, and `@import` and any
@@ -127,7 +135,9 @@ Clicking a row previews it.
   type into one and it becomes real. There is no separate button, because the
   place you would click is the place you were already typing.
 - **Delete** — immediate, with a line saying what went. Undo covers it; a
-  confirmation you dismiss without reading protects nobody.
+  confirmation you dismiss without reading protects nobody. The red bin at the
+  end of the toolbar is the exception: it empties the whole dataset and asks
+  twice, because that is not one row you can retype.
 
 ## Markdown and colour
 
@@ -203,8 +213,17 @@ pick the **paper size** matching the card's millimetres, set **Margins** to
 which Chrome drops along with the paper colour. Checking the cards and reading
 the checklist are the same act, so they are the same screen.
 
-**Print…** is the only way in, so there is no route to the printer that skips
-the look at what you are about to spend paper on.
+**Export…** is the only way in, so there is no route to the printer that skips
+the look at what you are about to spend paper on. From it: **Print**, or
+**Export PNG** for one 300 dpi file per selected page — rendered here, with no
+library, by carrying the card into an SVG `foreignObject` and drawing that to a
+canvas. Uploaded fonts are embedded in the PNG; a Google family cannot be,
+because embedding it would mean fetching it, so the export says which families
+fell back.
+
+The print checklist sits at the bottom of that screen, under the pages: the
+cards are what you came to look at, and the four settings are what to do once
+you have.
 
 Every page has a checkbox under it, and only the ticked ones print — untick the
 three proofs that came out wrong and reprint just those. **Select All** /
@@ -261,11 +280,15 @@ Both bars run in groups, outward from the thing itself:
   leading, tracking, colour) · surface (paper colour, background image and fit) ·
   page number and its margin · then the actions: CSS, import, export, lock, add
   a box
-- **Box** — content (slot, column, mode, fit, QR settings) · type (font, size,
-  weight, leading, tracking, case, colour) · alignment, horizontal and vertical ·
-  surface (fill, padding, border width, style and colour, radius) · position ·
-  size and overflow · flow (anchor, gap, hide when empty) · then the actions:
-  lock, duplicate, delete
+- **Box** — content (field, column or static text, mode, fit, QR settings) ·
+  type (font, size, weight, leading, tracking, case, colour) · alignment,
+  horizontal and vertical, and stacking order · surface (fill, padding, border
+  width, style and colour, radius) · position · size and overflow · flow
+  (anchor, gap, hide when empty) · then the actions: lock, duplicate, delete
+
+Undo, redo and *+ Box* sit at the corners of the page rather than in the window's
+toolbar, next to the thing they act on. The top toolbar holds only what is about
+the whole app: Help, Page Setup, Export.
 - **View** — in the bottom corners of the page itself, not the toolbar: grid and
   box outlines at the left (screen only, never printed), zoom (fit, or 50% to
   200%) at the right

@@ -17,6 +17,9 @@
 	let { dataset, activeRow, onactivate, onchange, onrenamecolumn }: Props = $props();
 
 	let pasteOpen = $state(false);
+	/** Two presses, because emptying the table is the one thing here undo cannot
+	    be relied on for: it is the whole dataset, not a row. */
+	let clearStage = $state<0 | 1 | 2>(0);
 	// Which column the rows were last sorted by, so the header can show it and
 	// a second click can turn it round.
 	let sortedBy = $state<{ column: string; direction: SortDirection } | null>(null);
@@ -26,9 +29,27 @@
 	let notice = $state('');
 
 	function onKeydown(event: KeyboardEvent) {
-		if (event.key !== 'Escape' || !pasteOpen) return;
-		event.stopPropagation();
-		pasteOpen = false;
+		if (event.key !== 'Escape') return;
+		if (clearStage) {
+			event.stopPropagation();
+			clearStage = 0;
+		} else if (pasteOpen) {
+			event.stopPropagation();
+			pasteOpen = false;
+		}
+	}
+
+	function clearData() {
+		if (clearStage === 1) {
+			clearStage = 2;
+			return;
+		}
+		clearStage = 0;
+		const rows = dataset.rows.length;
+		onchange({ columns: [], rows: [] });
+		onactivate(0);
+		sortedBy = null;
+		notice = `Deleted every row and column — ${rows} row${rows === 1 ? '' : 's'} gone. Ctrl/Cmd+Z brings them back.`;
 	}
 
 	const emptyRow = (columns: string[]): Row => Object.fromEntries(columns.map((c) => [c, '']));
@@ -308,6 +329,16 @@
 		<button onclick={() => (pasteOpen = true)}>Paste from Excel</button>
 		<button onclick={() => fileInput?.click()}>Import CSV…</button>
 		<button class="quiet" onclick={loadSample}>Load Sample</button>
+		<span class="spacer"></span>
+		<button
+			class="icon danger"
+			title="Delete all data"
+			aria-label="Delete all data"
+			disabled={!dataset.columns.length && !dataset.rows.length}
+			onclick={() => (clearStage = 1)}
+		>
+			<Icon name="trash" size={15} />
+		</button>
 		<input
 			bind:this={fileInput}
 			type="file"
@@ -318,6 +349,29 @@
 	</div>
 	{#if notice}<p class="notice" role="status">{notice}</p>{/if}
 </section>
+
+{#if clearStage}
+	<div class="modal-backdrop" role="presentation" onclick={() => (clearStage = 0)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete all data?">
+		<h2>{clearStage === 1 ? 'Delete all data?' : 'Really delete all data?'}</h2>
+		{#if clearStage === 1}
+			<p>
+				Every row and every column goes — {dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'} across
+				{dataset.columns.length} column{dataset.columns.length === 1 ? '' : 's'}. The template is not touched.
+			</p>
+			<p class="muted">Ctrl/Cmd+Z brings it back, as long as you do not reload first.</p>
+		{:else}
+			<p>Last chance. Press again to delete, or cancel.</p>
+		{/if}
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (clearStage = 0)}>Cancel</button>
+			<button class="danger-solid" onclick={clearData}>
+				{clearStage === 1 ? 'Delete all data' : 'Yes, delete all data'}
+			</button>
+		</div>
+	</div>
+{/if}
 
 {#if pasteOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (pasteOpen = false)}></div>
@@ -379,7 +433,7 @@
 
 	.column-name {
 		border: 1px solid transparent;
-		border-radius: 4px;
+		border-radius: var(--radius-input);
 		background: transparent;
 		font: 600 12px ui-sans-serif, system-ui, sans-serif;
 		width: 8.5rem;
@@ -484,7 +538,7 @@
 		cursor: pointer;
 		color: #767676;
 		padding: 0;
-		border-radius: 4px;
+		border-radius: var(--radius-button);
 	}
 
 	.icon:hover:not(:disabled) {
@@ -535,7 +589,7 @@
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
 		border: 1px solid #ccc;
-		border-radius: 6px;
+		border-radius: var(--radius-button);
 		background: #fff;
 		cursor: pointer;
 	}
@@ -547,6 +601,40 @@
 	button.quiet {
 		border-color: transparent;
 		color: #555;
+	}
+
+	.actions .icon.danger {
+		width: 28px;
+		height: 28px;
+		color: #b42318;
+	}
+
+	.actions .icon.danger:hover:not(:disabled) {
+		background: #fdf3f2;
+		color: #8f1c13;
+	}
+
+	.actions .icon.danger:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+
+	button.danger-solid {
+		background: #b42318;
+		border-color: #b42318;
+		color: #fff;
+	}
+
+	.modal .muted {
+		color: #767676;
+	}
+
+	.modal.narrow {
+		width: min(420px, 92vw);
+	}
+
+	.actions .spacer {
+		flex: 1;
 	}
 
 	button.primary {
@@ -592,7 +680,7 @@
 		font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
 		padding: 8px;
 		border: 1px solid #ccc;
-		border-radius: 6px;
+		border-radius: var(--radius-input);
 		resize: vertical;
 	}
 

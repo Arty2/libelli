@@ -32,6 +32,8 @@
 		background?: string | null;
 		onselect?: (id: string | null) => void;
 		onchange?: (box: Box) => void;
+		/** right-click on a box, in viewport coordinates */
+		onmenu?: (id: string, x: number, y: number) => void;
 	}
 
 	let {
@@ -46,10 +48,13 @@
 		pageNumber = null,
 		background = null,
 		onselect,
-		onchange
+		onchange,
+		onmenu
 	}: Props = $props();
 
 	let measured = $state<Record<string, number>>({});
+	/** boxes whose content is taller than the box will let it be */
+	let overflowing = $state<Record<string, boolean>>({});
 	/** the edge a live drag has latched onto, drawn as a guide until it lets go */
 	let guide = $state<{ x: number | null; y: number | null }>({ x: null, y: null });
 
@@ -128,6 +133,14 @@
 		const read = () => {
 			const mm = pxToMm(node.offsetHeight);
 			if (Math.abs((measured[id] ?? 0) - mm) > 0.01) measured = { ...measured, [id]: mm };
+			// What the box was *given* against what its content actually needs. The
+			// content is measured through its own wrapper, not through the box:
+			// handles and badges are absolutely positioned children that stick out
+			// past the edge, and they would otherwise read as overflow on every box
+			// the moment it was selected.
+			const content = node.querySelector<HTMLElement>('.content');
+			const spills = !!content && content.scrollHeight > node.clientHeight + 1;
+			if ((overflowing[id] ?? false) !== spills) overflowing = { ...overflowing, [id]: spills };
 		};
 		read();
 		const observer = new ResizeObserver(read);
@@ -157,6 +170,9 @@
 			// box's own offsetHeight is unchanged, so anchoring still measures right.
 			`justify-content:${VALIGN_TO_FLEX[box.valign ?? 'top']}`
 		];
+		// Justified text without hyphenation opens rivers; the card is `lang="en"`
+		// so the browser has a dictionary to break with.
+		if ((box.align ?? template.defaults.align) === 'justify') parts.push('hyphens:auto');
 		const letterSpacing = box.letterSpacing ?? template.defaults.letterSpacing;
 		if (letterSpacing) parts.push(`letter-spacing:${letterSpacing}mm`);
 		if (box.italic) parts.push('font-style:italic');
@@ -321,7 +337,7 @@
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 </script>
 
-<div class="card" class:bleeding={bleed > 0} style={cardStyle()}>
+<div class="card" class:bleeding={bleed > 0} style={cardStyle()} lang="en">
 	<div class="trim" class:bleed-marked={outlines && bleed > 0} style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
@@ -339,29 +355,45 @@
 				data-box-id={box.id}
 				use:measure={box.id}
 				onpointerdown={(e) => startDrag(e, box, 'move')}
+				oncontextmenu={(e) => {
+					if (!interactive) return;
+					e.preventDefault();
+					onselect?.(box.id);
+					onmenu?.(box.id, e.clientX, e.clientY);
+				}}
 				onpointermove={moveDrag}
 				onpointerup={endDrag}
 				onpointercancel={endDrag}
 				role="presentation"
 			>
-				{#if box.mode === 'markdown'}
-					<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf -->
-					{@html renderMarkdown(contentOf(box), { size: box.size ?? template.defaults.size, md: box.md })}
-				{:else if box.mode === 'qr'}
-					<span class="media" style="height:{box.h}mm">
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
-						{@html qrFor(box)}
+				<div class="content">
+					{#if box.mode === 'markdown'}
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf -->
+						{@html renderMarkdown(contentOf(box), { size: box.size ?? template.defaults.size, md: box.md })}
+					{:else if box.mode === 'qr'}
+						<span class="media" style="height:{box.h}mm">
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
+							{@html qrFor(box)}
+						</span>
+					{:else if box.mode === 'image'}
+						<span class="media" style="height:{box.h}mm">
+							{#if box.static?.svg}
+								{@html fitSvg(safeSvg(box.static.svg), box.fit)}
+							{:else if imageSource(box)}
+								<img src={imageSource(box)} alt="" style="object-fit:{box.fit ?? 'contain'}" />
+							{/if}
+						</span>
+					{:else}
+						<span class="plain">{contentOf(box)}</span>
+					{/if}
+				</div>
+
+				{#if outlines && !empty && overflowing[box.id]}
+					<!-- Always on screen, never gated behind outlines: this is not
+					     furniture, it is a warning that the print will be wrong. -->
+					<span class="overflow-mark" title="The content does not fit — this box is clipping what will print">
+						<Icon name="warning" size={11} />
 					</span>
-				{:else if box.mode === 'image'}
-					<span class="media" style="height:{box.h}mm">
-						{#if box.static?.svg}
-							{@html fitSvg(safeSvg(box.static.svg), box.fit)}
-						{:else if imageSource(box)}
-							<img src={imageSource(box)} alt="" style="object-fit:{box.fit ?? 'contain'}" />
-						{/if}
-					</span>
-				{:else}
-					<span class="plain">{contentOf(box)}</span>
 				{/if}
 
 				{#if interactive && selectedId === box.id}
@@ -376,8 +408,9 @@
 								role="presentation"
 							></span>
 						{/each}
-					{:else}
-						<!-- A locked box shows why it will not move instead of handles that do nothing. -->
+					{:else if outlines}
+						<!-- A locked box shows why it will not move instead of handles that do
+						     nothing. Screen furniture, so the outlines toggle hides it too. -->
 						<span class="lock-badge" title="Locked">
 							<Icon name="locked" size={11} />
 						</span>
@@ -433,6 +466,14 @@
 		flex-direction: column;
 	}
 
+	/* The one flex item in the box, so `justify-content` still places the content
+	   vertically, and so the content can be measured without the handles and
+	   badges that hang off the box's edges. */
+	.content {
+		width: 100%;
+		min-width: 0;
+	}
+
 	.plain {
 		display: block;
 		white-space: pre-wrap;
@@ -457,10 +498,10 @@
 		height: 100%;
 	}
 
-	.box :global(p:first-child),
-	.box :global(h1:first-child),
-	.box :global(h2:first-child),
-	.box :global(h3:first-child) {
+	.content :global(p:first-child),
+	.content :global(h1:first-child),
+	.content :global(h2:first-child),
+	.content :global(h3:first-child) {
 		margin-top: 0;
 	}
 
@@ -475,7 +516,7 @@
 		height: 14px;
 		background: #fff;
 		border: 1px solid #2563eb;
-		border-radius: 3px;
+		border-radius: var(--radius-button);
 		z-index: 3;
 		/* A bigger invisible target than the visible square: fingers are not mice. */
 		box-shadow: 0 0 0 5px rgba(0, 0, 0, 0);
@@ -527,6 +568,21 @@
 			z-index: 2;
 		}
 
+		.overflow-mark {
+			position: absolute;
+			right: -1px;
+			bottom: -1px;
+			display: grid;
+			place-items: center;
+			width: 15px;
+			height: 15px;
+			border-radius: var(--radius-button) 0 0 0;
+			background: #b42318;
+			color: #fff;
+			pointer-events: none;
+			z-index: 3;
+		}
+
 		.lock-badge {
 			position: absolute;
 			top: -9px;
@@ -535,7 +591,7 @@
 			place-items: center;
 			width: 18px;
 			height: 18px;
-			border-radius: 4px;
+			border-radius: var(--radius-button);
 			background: #fff;
 			border: 1px solid #2563eb;
 			color: #2563eb;

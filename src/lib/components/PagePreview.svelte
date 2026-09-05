@@ -22,6 +22,12 @@
 		ongrid: (show: boolean) => void;
 		onzoom: (zoom: 'fit' | number) => void;
 		onnudge: (dx: number, dy: number) => void;
+		undoable: boolean;
+		redoable: boolean;
+		onundo: () => void;
+		onredo: () => void;
+		onaddbox: () => void;
+		onmenu: (id: string, x: number, y: number) => void;
 	}
 
 	let {
@@ -39,7 +45,13 @@
 		onoutlines,
 		ongrid,
 		onzoom,
-		onnudge
+		onnudge,
+		undoable,
+		redoable,
+		onundo,
+		onredo,
+		onaddbox,
+		onmenu
 	}: Props = $props();
 
 	const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2];
@@ -99,6 +111,7 @@
 				{selectedId}
 				{onselect}
 				{onchange}
+				{onmenu}
 			/>
 		</div>
 
@@ -112,14 +125,33 @@
 			></div>
 		{/if}
 
-		{#if template.locked}
+		{#if template.locked && outlines}
 			<!-- An indicator, not a control: the button that sets this lives in page
-			     setup, where the rest of the page's settings are. -->
+			     setup, where the rest of the page's settings are. Screen furniture,
+			     so the outlines toggle takes it away with the rest. -->
 			<span class="page-lock" title="The design is locked">
 				<Icon name="locked" size={14} />
 				<span class="sr-only">The design is locked</span>
 			</span>
 		{/if}
+	</div>
+
+	<!-- Editing the page happens at the page, not in a bar at the top of the
+	     window: undoing is on one side, adding a box on the other, and the view
+	     toggles are along the bottom. -->
+	<div class="corner top left">
+		<button class="square" onclick={onundo} disabled={!undoable} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
+			<Icon name="undo" size={16} />
+		</button>
+		<button class="square" onclick={onredo} disabled={!redoable} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
+			<Icon name="redo" size={16} />
+		</button>
+	</div>
+
+	<div class="corner top right">
+		<button onclick={onaddbox} disabled={!!template.locked} title="Add a box to the page">
+			<Icon name="add" size={14} /> Box
+		</button>
 	</div>
 
 	<!-- View state sits on the page it affects, one control per bottom corner,
@@ -212,7 +244,7 @@
 		width: 26px;
 		height: 26px;
 		border: 1px solid #2563eb;
-		border-radius: 6px;
+		border-radius: var(--radius-button);
 		background: #fff;
 		color: #2563eb;
 	}
@@ -246,6 +278,46 @@
 		padding: 2px 3px;
 	}
 
+	.corner.top {
+		top: 12px;
+		bottom: auto;
+		padding: 4px;
+		gap: 4px;
+	}
+
+	.corner.top.right {
+		padding: 4px;
+	}
+
+	.corner button {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		font: 12px ui-sans-serif, system-ui, sans-serif;
+		padding: 5px 9px;
+		border: 1px solid #ccc;
+		border-radius: var(--radius-button);
+		background: #fff;
+		color: #111;
+		cursor: pointer;
+	}
+
+	.corner button:hover:not(:disabled) {
+		border-color: #999;
+	}
+
+	.corner button:disabled {
+		opacity: 0.45;
+		cursor: default;
+	}
+
+	.corner button.square {
+		width: 28px;
+		height: 28px;
+		padding: 0;
+		justify-content: center;
+	}
+
 	.corner select {
 		font: 500 11px ui-sans-serif, system-ui, sans-serif;
 		color: #555;
@@ -276,7 +348,7 @@
 		display: grid;
 		place-items: center;
 		border: 1px solid #ddd;
-		border-radius: 6px;
+		border-radius: var(--radius-button);
 		background: #fff;
 		color: #333;
 		font: 600 11px ui-sans-serif, system-ui, sans-serif;
