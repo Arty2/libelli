@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { SAMPLE_CSV } from '$lib/onboarding';
 	import { parseTable } from '$lib/parse';
+	import { qrPlan, qrSvg } from '$lib/qr';
+	import { rowUrl, toSharedRow } from '$lib/share';
 	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
 	import type { Dataset, Row } from '$lib/types';
 
@@ -11,15 +13,17 @@
 		onchange: (dataset: Dataset) => void;
 		/** so bindings can follow a renamed column instead of pointing at a ghost */
 		onrenamecolumn: (from: string, to: string) => void;
+		onscan: () => void;
 	}
 
-	let { dataset, activeRow, onactivate, onchange, onrenamecolumn }: Props = $props();
+	let { dataset, activeRow, onactivate, onchange, onrenamecolumn, onscan }: Props = $props();
 
 	let pasteOpen = $state(false);
 	let pendingDelete = $state<{ kind: 'row' | 'column'; index: number } | null>(null);
 	// Which column the rows were last sorted by, so the header can show it and
 	// a second click can turn it round.
 	let sortedBy = $state<{ column: string; direction: SortDirection } | null>(null);
+	let linkFor = $state<number | null>(null);
 	let pasteText = $state('');
 	let pasteMode = $state<'replace' | 'append'>('replace');
 	let fileInput = $state<HTMLInputElement | null>(null);
@@ -63,6 +67,42 @@
 		notice = '';
 		onchange({ columns, rows });
 		onrenamecolumn(from, to);
+	}
+
+	// ---- row links -----------------------------------------------------------
+
+	const shareBase = () => `${location.origin}${location.pathname}`;
+	const linkOf = (index: number) =>
+		rowUrl(shareBase(), toSharedRow(dataset.rows[index] ?? {}, dataset.columns));
+
+	const linkPlan = $derived.by(() => {
+		if (linkFor === null || !dataset.rows[linkFor]) return null;
+		const url = linkOf(linkFor);
+		try {
+			return { url, ...qrPlan(url), svg: qrSvg(url, { margin: 2 }) };
+		} catch (error) {
+			return { url, error: error instanceof Error ? error.message : 'This row is too long for a QR code.' };
+		}
+	});
+
+	async function copyLink(index: number) {
+		try {
+			await navigator.clipboard.writeText(linkOf(index));
+			notice = 'Link copied. Anyone opening it is offered the row.';
+		} catch {
+			notice = 'The browser would not let us copy — the link is in the panel below.';
+			linkFor = index;
+		}
+	}
+
+	function downloadQr(index: number) {
+		const svg = qrSvg(linkOf(index), { margin: 2 });
+		const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = `row-${index + 1}.svg`;
+		link.click();
+		URL.revokeObjectURL(url);
 	}
 
 	function shiftColumn(index: number, by: number) {
@@ -252,6 +292,12 @@
 								{i + 1}
 							</button>
 							<span class="row-actions">
+								<button
+									class="icon"
+									title="Link and QR for this row"
+									aria-label="Link and QR for row {i + 1}"
+									onclick={() => (linkFor = linkFor === i ? null : i)}
+								>⧉⃞</button>
 								<button class="icon" title="Duplicate row" onclick={() => duplicateRow(i)}>⧉</button>
 								<button class="icon" title="Delete row" onclick={() => askDelete('row', i)}>✕</button>
 							</span>
@@ -286,6 +332,7 @@
 		<button onclick={() => fileInput?.click()}>Import CSV</button>
 		<button onclick={addRow}>+ Row</button>
 		<button onclick={addColumn}>+ Column</button>
+		<button onclick={onscan}>Scan rows in</button>
 		<button class="quiet" onclick={loadSample}>Load sample</button>
 		<input
 			bind:this={fileInput}
@@ -297,6 +344,31 @@
 	</div>
 	{#if notice}<p class="notice" role="status">{notice}</p>{/if}
 </section>
+
+{#if linkFor !== null && linkPlan}
+	<div class="modal-backdrop" role="presentation" onclick={() => (linkFor = null)}></div>
+	<div class="modal narrow" role="dialog" aria-modal="true" aria-label="Row link">
+		<h2>Row {linkFor + 1} as a link</h2>
+		{#if 'error' in linkPlan}
+			<p class="warn">{linkPlan.error}</p>
+			<p>Bind fewer columns to the code, or shorten the row.</p>
+		{:else}
+			<div class="qr-preview">{@html linkPlan.svg}</div>
+			<p class="muted">
+				Version {linkPlan.version}, {linkPlan.modules} modules — print it at least
+				<strong>{linkPlan.minimumWidthMm}mm</strong> wide, or nothing will scan it.
+			</p>
+		{/if}
+		<p class="link-text">{linkPlan.url}</p>
+		<p class="muted">The row travels inside the link itself. Nothing is uploaded, and the link works offline once the app is loaded.</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => copyLink(linkFor as number)}>Copy link</button>
+			{#if !('error' in linkPlan)}<button onclick={() => downloadQr(linkFor as number)}>Download SVG</button>{/if}
+			<button class="primary" onclick={() => (linkFor = null)}>Close</button>
+		</div>
+	</div>
+{/if}
 
 {#if pendingDelete && pendingSummary}
 	<div class="modal-backdrop" role="presentation" onclick={() => (pendingDelete = null)}></div>
@@ -544,6 +616,36 @@
 
 	.modal.narrow {
 		width: min(420px, 92vw);
+	}
+
+	.qr-preview {
+		width: 160px;
+		height: 160px;
+		margin: 6px auto 10px;
+	}
+
+	.qr-preview :global(svg) {
+		width: 100%;
+		height: 100%;
+	}
+
+	.link-text {
+		font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+		word-break: break-all;
+		background: #f6f6f6;
+		border-radius: 5px;
+		padding: 7px 8px;
+		max-height: 7rem;
+		overflow: auto;
+	}
+
+	.warn {
+		color: #b42318;
+	}
+
+	.muted {
+		color: #767676;
+		font-size: 11.5px;
 	}
 
 	button.danger {

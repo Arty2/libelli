@@ -5,9 +5,11 @@
 	import OptionsBar from '$lib/components/OptionsBar.svelte';
 	import PagePreview from '$lib/components/PagePreview.svelte';
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
+	import ScanModal from '$lib/components/ScanModal.svelte';
 	import { collectBundleFonts, ensureTemplateFonts, installBundleFonts, uploadLocalFont } from '$lib/fonts';
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
+	import { appendSharedRow, rowFromUrl, type SharedRow } from '$lib/share';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
@@ -45,6 +47,8 @@
 	let resetStage = $state<0 | 1 | 2>(0);
 	let printing = $state(false);
 	let mappingPrompt = $state(false);
+	let incoming = $state<SharedRow | null>(null);
+	let scanOpen = $state(false);
 	let missingFonts = $state<FontRef[]>([]);
 	let status = $state('');
 	let templateInput = $state<HTMLInputElement | null>(null);
@@ -106,6 +110,10 @@
 			dataset = sampleDataset();
 			firstRun = true;
 		}
+
+		// A link carrying a row — the path a phone camera takes when it scans a
+		// card. Offered, never added behind the user's back.
+		incoming = rowFromUrl(location.search);
 
 		const storedMapping = loadMapping(template.name);
 		mapping = Object.keys(storedMapping).length ? storedMapping : autoMap(usedSlots(template), dataset.columns);
@@ -235,12 +243,36 @@
 			resetStage = 0;
 			return;
 		}
-		if (typing || contactOpen) return;
+		if (typing || contactOpen || scanOpen) return;
 		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId) {
 			event.preventDefault();
 			deleteBox();
 		}
 		if (event.key === 'Escape') selectedId = null;
+	}
+
+	// ---- rows arriving by link ----------------------------------------------
+
+	function acceptIncoming() {
+		if (!incoming) return;
+		dataset = appendSharedRow($state.snapshot(dataset), incoming);
+		activeRow = dataset.rows.length - 1;
+		if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), dataset.columns);
+		status = 'Row added from the link.';
+		dismissIncoming();
+	}
+
+	function collectScanned(shared: SharedRow) {
+		dataset = appendSharedRow($state.snapshot(dataset), shared);
+		activeRow = dataset.rows.length - 1;
+		if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), dataset.columns);
+	}
+
+	function dismissIncoming() {
+		incoming = null;
+		// Clear the query so a refresh cannot add the same row twice. `window` is
+		// explicit here because `history` is the undo stack in this file.
+		window.history.replaceState(null, '', location.pathname);
 	}
 
 	// ---- import / export ----------------------------------------------------
@@ -390,6 +422,7 @@
 	<OptionsBar
 		{template}
 		{dataset}
+		{row}
 		{mapping}
 		{selected}
 		onboxchange={updateBox}
@@ -411,6 +444,17 @@
 			{#each missingFonts as font (font.ref ?? font.family)}
 				<button onclick={() => pickMissingFont(font)}>Choose {font.family} file…</button>
 			{/each}
+		</div>
+	{/if}
+
+	{#if incoming}
+		<div class="banner" role="alert">
+			<span>
+				This link carries a row: <strong>{incoming.values.find((v) => v.trim()) ?? '(empty)'}</strong>
+				{#if incoming.columns.length > 1}<span class="muted">and {incoming.columns.length - 1} more field{incoming.columns.length === 2 ? '' : 's'}</span>{/if}
+			</span>
+			<button class="primary" onclick={acceptIncoming}>Add to the table</button>
+			<button onclick={dismissIncoming}>Discard</button>
 		</div>
 	{/if}
 
@@ -451,6 +495,7 @@
 				{dataset}
 				{activeRow}
 				onactivate={(i) => (activeRow = i)}
+				onscan={() => (scanOpen = true)}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
 					// follows it, so the card keeps rendering what it rendered before.
@@ -533,6 +578,10 @@
 			<button class="primary" use:focusOnOpen onclick={() => (helpOpen = false)}>Close</button>
 		</div>
 	</div>
+{/if}
+
+{#if scanOpen}
+	<ScanModal onrow={collectScanned} onclose={() => (scanOpen = false)} />
 {/if}
 
 {#if contactOpen}

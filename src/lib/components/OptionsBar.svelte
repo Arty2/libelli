@@ -1,11 +1,15 @@
 <script lang="ts">
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
+	import { qrPlan } from '$lib/qr';
+	import { rowUrl, toSharedRow } from '$lib/share';
 	import { DEFAULT_QR } from '$lib/template';
-	import type { Box, Dataset, Mapping, QrSettings, Template } from '$lib/types';
+	import type { Box, Dataset, Mapping, QrSettings, Row, Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
 		dataset: Dataset;
+		/** the previewed row, so a row QR can be measured against the real thing */
+		row: Row | null;
 		mapping: Mapping;
 		selected: Box | null;
 		onboxchange: (box: Box) => void;
@@ -20,6 +24,7 @@
 	let {
 		template,
 		dataset,
+		row,
 		mapping,
 		selected,
 		onboxchange,
@@ -40,6 +45,23 @@
 	);
 
 	const anchorOptions = $derived(template.boxes.filter((b) => b.id !== selected?.id));
+
+	/**
+	 * Capacity is not the limit that bites — print size is. A whole-row code can
+	 * easily need 50mm, and dropping that into an 18mm box produces a square
+	 * nothing will read, so the numbers are shown where the choice is made.
+	 */
+	const rowQrPlan = $derived.by(() => {
+		if (!selected || selected.mode !== 'qr' || selected.qr?.source !== 'row' || !row) return null;
+		const base = typeof location === 'undefined' ? '' : `${location.origin}${location.pathname}`;
+		try {
+			return qrPlan(rowUrl(base, toSharedRow(row, dataset.columns, selected.qr?.columns)), {
+				level: selected.qr?.level ?? 'M'
+			});
+		} catch {
+			return null;
+		}
+	});
 
 	const patch = (change: Partial<Box>) => {
 		if (selected) onboxchange({ ...selected, ...change });
@@ -70,6 +92,18 @@
 		// A QR box needs its settings the moment it becomes one, so the options
 		// bar never shows an empty control.
 		patch(mode === 'qr' ? { mode, qr: { ...DEFAULT_QR, ...selected?.qr } } : { mode });
+	}
+
+	/**
+	 * An empty list means "all columns", so unticking from that state has to
+	 * start from the full set rather than from nothing.
+	 */
+	function toggleQrColumn(column: string, include: boolean) {
+		if (!selected) return;
+		const current = selected.qr?.columns?.length ? selected.qr.columns : dataset.columns;
+		const next = include ? [...current, column] : current.filter((c) => c !== column);
+		const ordered = dataset.columns.filter((c) => next.includes(c));
+		patch({ qr: { ...DEFAULT_QR, ...selected.qr, columns: ordered.length === dataset.columns.length ? [] : ordered } });
 	}
 
 	function registerFamily(family: string) {
@@ -216,6 +250,48 @@
 		{/if}
 
 		{#if selected.mode === 'qr'}
+			<label class="field">
+				<span>Encodes</span>
+				<select
+					value={selected.qr?.source ?? 'cell'}
+					title="The bound cell, or a link carrying the whole row"
+					onchange={(e) =>
+						patch({ qr: { ...DEFAULT_QR, ...selected.qr, source: e.currentTarget.value as QrSettings['source'] } })}
+				>
+					<option value="cell">this cell</option>
+					<option value="row">whole row</option>
+				</select>
+			</label>
+
+			{#if selected.qr?.source === 'row' && dataset.columns.length}
+				<details class="picker">
+					<summary title="Which columns travel in the link">
+						Columns ({selected.qr?.columns?.length || dataset.columns.length})
+					</summary>
+					<div class="picker-list">
+						{#each dataset.columns as column (column)}
+							<label class="check">
+								<input
+									type="checkbox"
+									checked={!selected.qr?.columns?.length || selected.qr.columns.includes(column)}
+									onchange={(e) => toggleQrColumn(column, e.currentTarget.checked)}
+								/>
+								{column}
+							</label>
+						{/each}
+						<p class="hint">Fewer columns, smaller code — and a smaller code scans from further away.</p>
+					</div>
+				</details>
+			{/if}
+
+			{#if rowQrPlan}
+				<span class="plan" class:tight={selected.w < rowQrPlan.minimumWidthMm}>
+					v{rowQrPlan.version} · needs {rowQrPlan.minimumWidthMm}mm{selected.w < rowQrPlan.minimumWidthMm
+						? ` · box is ${selected.w}mm`
+						: ''}
+				</span>
+			{/if}
+
 			<label class="field">
 				<span>Correction</span>
 				<select
@@ -493,6 +569,57 @@
 
 	.spacer {
 		flex: 1;
+	}
+
+	.picker {
+		position: relative;
+	}
+
+	.picker summary {
+		cursor: pointer;
+		color: #555;
+		list-style: none;
+		padding: 4px 6px;
+		border: 1px solid #ccc;
+		border-radius: 5px;
+		background: #fff;
+	}
+
+	.picker-list {
+		position: absolute;
+		z-index: 5;
+		top: calc(100% + 4px);
+		left: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 8px 10px;
+		background: #fff;
+		border: 1px solid #ccc;
+		border-radius: 6px;
+		box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+		max-height: 40vh;
+		overflow: auto;
+		white-space: nowrap;
+	}
+
+	.plan {
+		font-size: 11px;
+		color: #767676;
+		white-space: nowrap;
+	}
+
+	.plan.tight {
+		color: #b42318;
+		font-weight: 600;
+	}
+
+	.hint {
+		margin: 4px 0 0;
+		color: #767676;
+		font-size: 11px;
+		max-width: 15rem;
+		white-space: normal;
 	}
 
 	button {

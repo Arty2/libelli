@@ -127,12 +127,20 @@ export function normaliseTemplate(raw: unknown): Template {
 	};
 }
 
-export const DEFAULT_QR: QrSettings = { level: 'M', margin: 2 };
+export const DEFAULT_QR: QrSettings = { level: 'M', margin: 2, source: 'cell' };
 
 function normaliseQr(raw: any): QrSettings {
 	const level = ['L', 'M', 'Q', 'H'].includes(raw?.level) ? raw.level : DEFAULT_QR.level;
 	const margin = Math.max(0, Math.min(8, num(raw?.margin, DEFAULT_QR.margin)));
-	return { level, margin, ...(raw?.background ? { background: String(raw.background) } : {}) };
+	const source: QrSettings['source'] = raw?.source === 'row' ? 'row' : 'cell';
+	const columns = Array.isArray(raw?.columns) ? raw.columns.map(String).slice(0, 64) : undefined;
+	return {
+		level,
+		margin,
+		source,
+		...(columns?.length ? { columns } : {}),
+		...(raw?.background ? { background: String(raw.background) } : {})
+	};
 }
 
 function normaliseBleed(raw: any): Template['bleed'] {
