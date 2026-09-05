@@ -8,9 +8,11 @@
 		activeRow: number;
 		onactivate: (index: number) => void;
 		onchange: (dataset: Dataset) => void;
+		/** so bindings can follow a renamed column instead of pointing at a ghost */
+		onrenamecolumn: (from: string, to: string) => void;
 	}
 
-	let { dataset, activeRow, onactivate, onchange }: Props = $props();
+	let { dataset, activeRow, onactivate, onchange, onrenamecolumn }: Props = $props();
 
 	let pasteOpen = $state(false);
 	let pendingDelete = $state<{ kind: 'row' | 'column'; index: number } | null>(null);
@@ -56,6 +58,7 @@
 		});
 		notice = '';
 		onchange({ columns, rows });
+		onrenamecolumn(from, to);
 	}
 
 	function addColumn() {

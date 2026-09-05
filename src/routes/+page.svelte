@@ -465,6 +465,13 @@
 				{dataset}
 				{activeRow}
 				onactivate={(i) => (activeRow = i)}
+				onrenamecolumn={(from, to) => {
+					// A rename is not a rebinding: every slot pointing at the old name
+					// follows it, so the card keeps rendering what it rendered before.
+					mapping = Object.fromEntries(
+						Object.entries(mapping).map(([slot, column]) => [slot, column === from ? to : column])
+					);
+				}}
 				onchange={(next) => {
 					dataset = next;
 					if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), next.columns);
