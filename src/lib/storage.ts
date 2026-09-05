@@ -9,9 +9,14 @@ import type { Dataset, Mapping, Template, UiState } from './types';
  * string-only, and synchronous on the main thread.
  */
 
-const PREFIX = 'a5cs';
-const DB_NAME = 'a5-card-studio';
+const PREFIX = 'libelli';
+const DB_NAME = 'libelli';
 const DB_VERSION = 1;
+
+// Pre-release builds stored under the app's old name. Both are migrated once,
+// on boot, so nobody loses a template to a rename.
+const LEGACY_PREFIX = 'a5cs';
+const LEGACY_DB_NAME = 'a5-card-studio';
 export const STORE_KV = 'kv';
 export const STORE_FONTS = 'fonts';
 
@@ -117,6 +122,68 @@ export const saveTemplate = (t: Template) => idbSet(STORE_KV, KEY_TEMPLATE, t);
 export const loadTemplate = () => idbGet<Template>(STORE_KV, KEY_TEMPLATE);
 export const saveDataset = (d: Dataset) => idbSet(STORE_KV, KEY_DATASET, d);
 export const loadDataset = () => idbGet<Dataset>(STORE_KV, KEY_DATASET);
+
+/**
+ * Carry work saved by pre-release builds over to the current keys. Runs once
+ * per browser: the old localStorage keys and the old database are removed after
+ * copying, so a second run finds nothing to do.
+ */
+export async function migrateLegacyStorage(): Promise<void> {
+	if (!hasWindow()) return;
+
+	try {
+		for (const key of Object.keys(window.localStorage)) {
+			if (!key.startsWith(`${LEGACY_PREFIX}:`)) continue;
+			const moved = `${PREFIX}:${key.slice(LEGACY_PREFIX.length + 1)}`;
+			// Never overwrite something the current build already wrote.
+			if (window.localStorage.getItem(moved) === null) {
+				window.localStorage.setItem(moved, window.localStorage.getItem(key) ?? '');
+			}
+			window.localStorage.removeItem(key);
+		}
+	} catch {
+		/* private mode: nothing to carry over anyway */
+	}
+
+	if (!('indexedDB' in window)) return;
+	try {
+		// Only touch the legacy database if it is actually there — opening a
+		// missing one would create an empty database as a side effect.
+		const databases = (await indexedDB.databases?.()) ?? [];
+		if (!databases.some((d) => d.name === LEGACY_DB_NAME)) return;
+
+		const legacy = await new Promise<IDBDatabase | null>((resolve) => {
+			const request = indexedDB.open(LEGACY_DB_NAME);
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => resolve(null);
+			request.onblocked = () => resolve(null);
+		});
+		if (!legacy) return;
+
+		for (const store of [STORE_KV, STORE_FONTS]) {
+			if (!legacy.objectStoreNames.contains(store)) continue;
+			const entries = await new Promise<Array<[string, unknown]>>((resolve) => {
+				try {
+					const objectStore = legacy.transaction(store, 'readonly').objectStore(store);
+					const keys = objectStore.getAllKeys();
+					const values = objectStore.getAll();
+					values.onsuccess = () => resolve((keys.result ?? []).map((k, i) => [String(k), values.result[i]]));
+					values.onerror = () => resolve([]);
+				} catch {
+					resolve([]);
+				}
+			});
+			for (const [key, value] of entries) {
+				if ((await idbGet(store, key)) === undefined) await idbSet(store, key, value);
+			}
+		}
+
+		legacy.close();
+		indexedDB.deleteDatabase(LEGACY_DB_NAME);
+	} catch {
+		// A failed migration must never stop the app from starting.
+	}
+}
 
 /** "Reset everything": drop every trace of this app from the browser. */
 export async function resetAll(): Promise<void> {

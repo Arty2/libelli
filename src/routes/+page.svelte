@@ -6,6 +6,7 @@
 	import PagePreview from '$lib/components/PagePreview.svelte';
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
 	import { collectBundleFonts, ensureTemplateFonts, installBundleFonts, uploadLocalFont } from '$lib/fonts';
+	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
 	import { parseTable } from '$lib/parse';
 	import {
 		autoMap,
@@ -22,6 +23,7 @@
 		loadMapping,
 		loadTemplate,
 		loadUi,
+		migrateLegacyStorage,
 		resetAll,
 		saveDataset,
 		saveMapping,
@@ -38,6 +40,7 @@
 	let selectedId = $state<string | null>(null);
 	let ready = $state(false);
 	let contactOpen = $state(false);
+	let helpOpen = $state(false);
 	let printing = $state(false);
 	let mappingPrompt = $state(false);
 	let missingFonts = $state<FontRef[]>([]);
@@ -45,6 +48,30 @@
 	let templateInput = $state<HTMLInputElement | null>(null);
 	let missingFontInput = $state<HTMLInputElement | null>(null);
 	let missingFontTarget = $state<FontRef | null>(null);
+
+	/** One undo entry is the whole editable state: template, data and mapping. */
+	interface Snapshot {
+		template: Template;
+		dataset: Dataset;
+		mapping: Mapping;
+	}
+	/** Give a dialog its first focus so Esc/Tab work without a mouse trip. */
+	const focusOnOpen = (node: HTMLElement) => node.focus();
+
+	const snapshot = (): Snapshot => ({
+		template: $state.snapshot(template),
+		dataset: $state.snapshot(dataset),
+		mapping: $state.snapshot(mapping)
+	});
+	// Raw state: the history is replaced wholesale on every step, and its entries
+	// are plain snapshots that must stay plain — a deep state proxy over them
+	// cannot be cloned back out. Seeded from constants; boot() replaces it with
+	// the first real snapshot once the stored template and data have loaded.
+	let history = $state.raw(
+		createHistory<Snapshot>({ template: builtinTemplate(), dataset: { columns: [], rows: [] }, mapping: {} })
+	);
+	const undoable = $derived(canUndo(history));
+	const redoable = $derived(canRedo(history));
 
 	const selected = $derived(template.boxes.find((b) => b.id === selectedId) ?? null);
 	const row = $derived(dataset.rows[activeRow] ?? null);
@@ -58,6 +85,7 @@
 	});
 
 	async function boot() {
+		await migrateLegacyStorage();
 		const storedTemplate = await loadTemplate();
 		if (storedTemplate) {
 			try {
@@ -71,7 +99,7 @@
 		if (storedDataset?.columns?.length) {
 			dataset = storedDataset;
 		} else {
-			// First run: the four reference cards, so there is something to look at.
+			// First run: the sample cards, so there is something to look at.
 			try {
 				const response = await fetch(`${import.meta.env.BASE_URL}sample-cards.csv`);
 				if (response.ok) dataset = parseTable(await response.text());
@@ -83,23 +111,58 @@
 		const storedMapping = loadMapping(template.name);
 		mapping = Object.keys(storedMapping).length ? storedMapping : autoMap(usedSlots(template), dataset.columns);
 		ui = loadUi();
+		history = createHistory(snapshot());
 		ready = true;
 		missingFonts = await ensureTemplateFonts(template);
+	}
+
+	// ---- undo/redo ----------------------------------------------------------
+
+	// Debounced, so a drag or a burst of typing becomes one entry. `record`
+	// ignores a state equal to the present, which is what stops an applied undo
+	// from recording itself straight back.
+	$effect(() => {
+		if (!ready) return;
+		const snap = snapshot();
+		const timer = setTimeout(() => (history = record(history, snap)), 350);
+		return () => clearTimeout(timer);
+	});
+
+	function applySnapshot(next: Snapshot) {
+		template = structuredClone(next.template);
+		dataset = structuredClone(next.dataset);
+		mapping = structuredClone(next.mapping);
+		if (activeRow >= dataset.rows.length) activeRow = Math.max(0, dataset.rows.length - 1);
+		if (selectedId && !template.boxes.some((b) => b.id === selectedId)) selectedId = null;
+	}
+
+	function undo() {
+		if (!undoable) return;
+		history = undoStep(history);
+		applySnapshot(history.present);
+		status = 'Undone.';
+	}
+
+	function redo() {
+		if (!redoable) return;
+		history = redoStep(history);
+		applySnapshot(history.present);
+		status = 'Redone.';
 	}
 
 	// ---- autosave -----------------------------------------------------------
 
 	$effect(() => {
 		if (!ready) return;
-		const snapshot = $state.snapshot(template);
-		const timer = setTimeout(() => void saveTemplate(snapshot), 300);
+		const saved = $state.snapshot(template);
+		const timer = setTimeout(() => void saveTemplate(saved), 300);
 		return () => clearTimeout(timer);
 	});
 
 	$effect(() => {
 		if (!ready) return;
-		const snapshot = $state.snapshot(dataset);
-		const timer = setTimeout(() => void saveDataset(snapshot), 300);
+		const saved = $state.snapshot(dataset);
+		const timer = setTimeout(() => void saveDataset(saved), 300);
 		return () => clearTimeout(timer);
 	});
 
@@ -155,6 +218,22 @@
 	function onWindowKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
 		const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
+		// While a field has focus, leave undo to the browser's own text history.
+		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+			event.preventDefault();
+			if (event.shiftKey) redo();
+			else undo();
+			return;
+		}
+		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
+			event.preventDefault();
+			redo();
+			return;
+		}
+		if (event.key === 'Escape' && helpOpen) {
+			helpOpen = false;
+			return;
+		}
 		if (typing || contactOpen) return;
 		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId) {
 			event.preventDefault();
@@ -267,20 +346,23 @@
 		mapping = {};
 		selectedId = null;
 		activeRow = 0;
+		history = resetHistory(history, snapshot());
 		status = 'Everything reset.';
 	}
 </script>
 
 <svelte:window onkeydown={onWindowKeydown} onafterprint={onAfterPrint} />
 <svelte:head>
-	<title>A5 Card Studio</title>
+	<title>libelli</title>
 </svelte:head>
 
 <div class="app">
 	<header class="toolbar">
-		<strong class="brand">A5 Card Studio</strong>
+		<strong class="brand">libelli</strong>
 		<span class="name">{template.name}</span>
 		<span class="spacer"></span>
+		<button onclick={undo} disabled={!undoable} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">↶</button>
+		<button onclick={redo} disabled={!redoable} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">↷</button>
 		<button onclick={() => templateInput?.click()}>Import</button>
 		<button onclick={doExportTemplate}>Export template</button>
 		<button onclick={doExportBundle}>Export bundle</button>
@@ -302,6 +384,7 @@
 			</select>
 		</label>
 		<button class="primary" onclick={print}>Print</button>
+		<button onclick={() => (helpOpen = true)} aria-label="Help and credits" title="Help and credits">?</button>
 		<button class="quiet" onclick={reset} title="Clear everything stored in this browser">Reset</button>
 		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
@@ -386,6 +469,36 @@
 		<p class="status" role="status">{status}</p>
 	{/if}
 </div>
+
+{#if helpOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (helpOpen = false)}></div>
+	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
+		<h2 id="help-title">libelli</h2>
+		<p>Rows of a spreadsheet in, print-ready cards out. Data, templates and fonts stay in this browser — nothing is uploaded, and there is no server to upload to.</p>
+
+		<h3>Printing</h3>
+		<p>In the print dialog set <strong>Margins</strong> to <em>None</em>, uncheck <strong>Headers and footers</strong>, and switch on <strong>Background graphics</strong>. One page comes out per row.</p>
+
+		<h3>Keys</h3>
+		<dl class="keys">
+			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
+			<dt>Ctrl/Cmd + Shift + Z</dt><dd>Redo</dd>
+			<dt>Arrows</dt><dd>Nudge the selected box (Shift 5mm, Alt 0.25mm)</dd>
+			<dt>Delete</dt><dd>Remove the selected box</dd>
+			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
+		</dl>
+
+		<h3>Editing</h3>
+		<p>Drag boxes on the page or type exact millimetres. A box anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link. Column headers are editable in place; deleting a row or a column asks first, and can be undone.</p>
+
+		<p class="credit">Dialectic Acheiropoieton of Heracles Papatheodorou and&nbsp;Claude</p>
+
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button class="primary" use:focusOnOpen onclick={() => (helpOpen = false)}>Close</button>
+		</div>
+	</div>
+{/if}
 
 {#if contactOpen}
 	<ContactSheet
@@ -561,6 +674,83 @@
 		border: 1px solid #ccc;
 		border-radius: 5px;
 		background: #fff;
+	}
+
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.35);
+		z-index: 40;
+	}
+
+	.modal {
+		position: fixed;
+		z-index: 41;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		width: min(560px, 92vw);
+		max-height: 86vh;
+		overflow: auto;
+		background: #fff;
+		border-radius: 10px;
+		padding: 20px 22px;
+		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+		font-size: 13px;
+		line-height: 1.55;
+	}
+
+	.modal h2 {
+		margin: 0 0 6px;
+		font-size: 16px;
+	}
+
+	.modal h3 {
+		margin: 16px 0 4px;
+		font-size: 11px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: #767676;
+	}
+
+	.modal p {
+		margin: 0 0 8px;
+		color: #333;
+	}
+
+	.keys {
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		gap: 3px 14px;
+		margin: 0;
+	}
+
+	.keys dt {
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 11px;
+		color: #111;
+		white-space: nowrap;
+	}
+
+	.keys dd {
+		margin: 0;
+		color: #333;
+	}
+
+	.credit {
+		margin-top: 18px;
+		padding-top: 12px;
+		border-top: 1px solid #eee;
+		font-style: italic;
+		color: #767676;
+		text-align: center;
+	}
+
+	.modal-actions {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-top: 14px;
 	}
 
 	@media (max-width: 900px) {

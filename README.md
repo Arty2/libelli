@@ -1,7 +1,8 @@
-# A5 Card Studio
+# libelli
 
-Turn a spreadsheet into print-ready A5 cards. Paste rows out of Excel, Coda or
+Turn a spreadsheet into print-ready cards. Paste rows out of Excel, Coda or
 Sheets, bind columns to boxes on a WYSIWYG page, and print one card per row.
+A5 out of the box, any page size you like.
 
 Front-end only: SvelteKit with `adapter-static`, no backend, no serverless
 functions, no uploads. Everything — data, templates, fonts — stays in the
@@ -44,23 +45,33 @@ UI state. IndexedDB holds the dataset, the template and uploaded font bytes,
 because base64 fonts blow through localStorage's ~5MB and its synchronous API
 blocks the main thread. *Reset* in the toolbar wipes both.
 
+**Undo/redo.** One entry is a snapshot of the whole editable state — template,
+data and mapping — recorded on a debounce, so a drag or a burst of typing is one
+step. Snapshots cannot drift out of step with the actions they reverse the way a
+command log can, and the state is small enough that the cost does not matter.
+Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z, or the arrows in the toolbar; while a text field
+has focus the browser's own text undo is left alone.
+
 ## Using it
 
 1. **Data in.** *Paste from Excel* (tabs, commas, quoted multi-line cells all
    parse), *Import CSV*, or *Load sample* for the four mock cards in
    `static/sample-cards.csv`. Clicking a row previews it.
-2. **Map columns.** Select a box; the options bar binds its slot to a column.
+2. **Edit the table.** Rename a column by typing in its header, add one with
+   *+ Column*, add rows with *+ Row*. Deleting a row or a column asks first,
+   naming what goes with it — and is undoable either way.
+3. **Map columns.** Select a box; the options bar binds its slot to a column.
    The mapping lives outside the template, so a template can be shared between
    spreadsheets — on import you are asked to confirm it rather than it being
    assumed.
-3. **Edit boxes.** Drag and resize on the page, or type exact mm values. Arrow
+4. **Edit boxes.** Drag and resize on the page, or type exact mm values. Arrow
    keys nudge (Shift = 5mm, Alt = 0.25mm). Dragging an anchored box vertically
    adjusts its gap, not its `y`, so the relationship survives.
-4. **Fonts.** Pick a Google family, type any other family name, or upload a
+5. **Fonts.** Pick a Google family, type any other family name, or upload a
    `.woff2`/`.woff`/`.otf`/`.ttf`. If an imported template references a local
    font this browser has never seen, you are prompted for the file — nothing is
    silently substituted.
-5. **Print.** In the print dialog set **Margins** to *None*, uncheck **Headers
+6. **Print.** In the print dialog set **Margins** to *None*, uncheck **Headers
    and footers**, and switch on **Background graphics** (Chrome drops background
    colours by default).
 
@@ -91,6 +102,7 @@ src/lib/
   layout.ts       mm geometry + anchor resolution
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google + local font loading
+  history.ts      undo/redo snapshots
   storage.ts      localStorage + IndexedDB
   components/     Card, PagePreview, DataTable, OptionsBar, ContactSheet, PrintRoot
 src/routes/+page.svelte
@@ -103,3 +115,7 @@ static/sample-cards.csv
 
 `npm run build` writes a static site to `build/`. Any static host works; on
 Vercel the SvelteKit preset picks it up with no configuration and no functions.
+
+## Credits
+
+Dialectic Acheiropoieton of Heracles Papatheodorou and&nbsp;Claude

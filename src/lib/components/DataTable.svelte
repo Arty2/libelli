@@ -12,10 +12,25 @@
 	let { dataset, activeRow, onactivate, onchange }: Props = $props();
 
 	let pasteOpen = $state(false);
+	let pendingDelete = $state<{ kind: 'row' | 'column'; index: number } | null>(null);
 	let pasteText = $state('');
 	let pasteMode = $state<'replace' | 'append'>('replace');
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let notice = $state('');
+
+	/** Give a dialog its first focus so Esc/Tab work without a mouse trip. */
+	const focusOnOpen = (node: HTMLElement) => node.focus();
+
+	function onKeydown(event: KeyboardEvent) {
+		if (event.key !== 'Escape') return;
+		if (pendingDelete) {
+			event.stopPropagation();
+			pendingDelete = null;
+		} else if (pasteOpen) {
+			event.stopPropagation();
+			pasteOpen = false;
+		}
+	}
 
 	const emptyRow = (columns: string[]): Row => Object.fromEntries(columns.map((c) => [c, '']));
 
@@ -51,6 +66,18 @@
 			columns: [...dataset.columns, column],
 			rows: dataset.rows.map((r) => ({ ...r, [column]: '' }))
 		});
+	}
+
+	/** Deleting data is the one action here that cannot be re-typed in a second,
+	    so it always goes through a confirmation naming what is about to go. */
+	const askDelete = (kind: 'row' | 'column', index: number) => (pendingDelete = { kind, index });
+
+	function confirmDelete() {
+		const pending = pendingDelete;
+		pendingDelete = null;
+		if (!pending) return;
+		if (pending.kind === 'column') deleteColumn(pending.index);
+		else deleteRow(pending.index);
 	}
 
 	function deleteColumn(index: number) {
@@ -123,6 +150,30 @@
 		input.value = '';
 	}
 
+	/** What exactly is about to be lost, spelled out in the confirmation. */
+	const pendingSummary = $derived.by(() => {
+		if (!pendingDelete) return null;
+		if (pendingDelete.kind === 'column') {
+			const column = dataset.columns[pendingDelete.index];
+			const filled = dataset.rows.filter((r) => (r[column] ?? '').trim() !== '').length;
+			return {
+				title: `Delete the column “${column}”?`,
+				detail:
+					filled === 0
+						? 'It is empty, and any box bound to it will fall back to no content.'
+						: `${filled} filled cell${filled === 1 ? '' : 's'} go with it, and any box bound to it will fall back to no content.`,
+				action: 'Delete column'
+			};
+		}
+		const row = dataset.rows[pendingDelete.index];
+		const label = dataset.columns.map((c) => (row?.[c] ?? '').trim()).find(Boolean) ?? '';
+		return {
+			title: `Delete row ${pendingDelete.index + 1}?`,
+			detail: label ? `It starts “${label.slice(0, 60)}${label.length > 60 ? '…' : ''}”.` : 'The row is empty.',
+			action: 'Delete row'
+		};
+	});
+
 	async function loadSample() {
 		try {
 			const response = await fetch(`${import.meta.env.BASE_URL}sample-cards.csv`);
@@ -132,6 +183,8 @@
 		}
 	}
 </script>
+
+<svelte:window onkeydown={onKeydown} />
 
 <section class="data" aria-label="Card data">
 	<div class="scroll">
@@ -144,10 +197,11 @@
 							<input
 								class="column-name"
 								value={column}
-								aria-label="Column name"
+								aria-label="Rename column {column}"
+								title="Rename this column"
 								onchange={(e) => renameColumn(i, e.currentTarget.value)}
 							/>
-							<button class="icon" title="Delete column" onclick={() => deleteColumn(i)}>✕</button>
+							<button class="icon" title="Delete column" onclick={() => askDelete('column', i)}>✕</button>
 						</th>
 					{/each}
 					<th class="add"><button class="icon" title="Add column" onclick={addColumn}>+</button></th>
@@ -168,7 +222,7 @@
 							</button>
 							<span class="row-actions">
 								<button class="icon" title="Duplicate row" onclick={() => duplicateRow(i)}>⧉</button>
-								<button class="icon" title="Delete row" onclick={() => deleteRow(i)}>✕</button>
+								<button class="icon" title="Delete row" onclick={() => askDelete('row', i)}>✕</button>
 							</span>
 						</td>
 						{#each dataset.columns as column (column)}
@@ -200,6 +254,7 @@
 		<button onclick={() => (pasteOpen = true)}>Paste from Excel</button>
 		<button onclick={() => fileInput?.click()}>Import CSV</button>
 		<button onclick={addRow}>+ Row</button>
+		<button onclick={addColumn}>+ Column</button>
 		<button class="quiet" onclick={loadSample}>Load sample</button>
 		<input
 			bind:this={fileInput}
@@ -211,6 +266,19 @@
 	</div>
 	{#if notice}<p class="notice" role="status">{notice}</p>{/if}
 </section>
+
+{#if pendingDelete && pendingSummary}
+	<div class="modal-backdrop" role="presentation" onclick={() => (pendingDelete = null)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label={pendingSummary.title}>
+		<h2>{pendingSummary.title}</h2>
+		<p>{pendingSummary.detail} You can undo this afterwards.</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button use:focusOnOpen onclick={() => (pendingDelete = null)}>Cancel</button>
+			<button class="danger" onclick={confirmDelete}>{pendingSummary.action}</button>
+		</div>
+	</div>
+{/if}
 
 {#if pasteOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (pasteOpen = false)}></div>
@@ -267,11 +335,22 @@
 	}
 
 	.column-name {
-		border: none;
+		border: 1px solid transparent;
+		border-radius: 4px;
 		background: transparent;
 		font: 600 12px ui-sans-serif, system-ui, sans-serif;
 		width: 8.5rem;
 		padding: 3px;
+	}
+
+	.column-name:hover {
+		border-color: #ddd;
+		background: #fff;
+	}
+
+	.column-name:focus {
+		border-color: #2563eb;
+		background: #fff;
 	}
 
 	td textarea {
@@ -409,6 +488,16 @@
 		padding: 18px;
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
 		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+	}
+
+	.modal.narrow {
+		width: min(420px, 92vw);
+	}
+
+	button.danger {
+		background: #b42318;
+		border-color: #b42318;
+		color: #fff;
 	}
 
 	.modal h2 {

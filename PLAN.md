@@ -1,4 +1,4 @@
-# A5 Card Studio — implementation plan
+# libelli — implementation plan
 
 A front-end-only SvelteKit app that turns tabular data (pasted from Excel/Coda, or a CSV) into print-ready A5 cards using a WYSIWYG box-based template editor.
 
