@@ -205,8 +205,9 @@ hold <kbd>Alt</kbd> for 0.01mm.
   mode (plain / markdown / image / QR), fit (image and QR), QR correction and
   quiet zone, overflow (grow / clip), X, Y, W, H, anchor, anchor gap, hide when
   empty
-- **View** — box outlines on/off (screen only, never printed), zoom (fit, or 50%
-  to 200%)
+- **View** — in the bottom corners of the page itself, not the toolbar: box
+  outlines on/off (screen only, never printed) at the left, zoom (fit, or 50% to
+  200%) at the right
 
 ## Import and export
 

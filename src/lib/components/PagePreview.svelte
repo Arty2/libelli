@@ -12,9 +12,14 @@
 		zoom: 'fit' | number;
 		onselect: (id: string | null) => void;
 		onchange: (box: Box) => void;
+		onoutlines: (show: boolean) => void;
+		onzoom: (zoom: 'fit' | number) => void;
 	}
 
-	let { template, row, mapping, outlines, selectedId, zoom, onselect, onchange }: Props = $props();
+	let { template, row, mapping, outlines, selectedId, zoom, onselect, onchange, onoutlines, onzoom }: Props =
+		$props();
+
+	const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2];
 
 	let host = $state<HTMLDivElement | null>(null);
 	let hostSize = $state({ w: 0, h: 0 });
@@ -92,7 +97,25 @@
 			/>
 		</div>
 	</div>
-	<div class="zoom-readout">{Math.round(scale * 100)}%</div>
+	<!-- View state sits on the page it affects, one control per bottom corner,
+	     rather than in the toolbar among the actions. -->
+	<label class="corner left" title="Dashed box outlines — screen only, never printed">
+		<input type="checkbox" checked={outlines} onchange={(e) => onoutlines(e.currentTarget.checked)} />
+		Outlines
+	</label>
+
+	<label class="corner right">
+		<span class="sr-only">Zoom</span>
+		<select
+			value={zoom === 'fit' ? 'fit' : String(zoom)}
+			onchange={(e) => onzoom(e.currentTarget.value === 'fit' ? 'fit' : Number(e.currentTarget.value))}
+		>
+			<option value="fit">Fit — {Math.round(scale * 100)}%</option>
+			{#each ZOOM_STEPS as step (step)}
+				<option value={String(step)}>{step * 100}%</option>
+			{/each}
+		</select>
+	</label>
 </div>
 
 <style>
@@ -122,14 +145,47 @@
 		transform-origin: top left;
 	}
 
-	.zoom-readout {
+	.corner {
 		position: absolute;
-		right: 12px;
 		bottom: 10px;
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
 		font: 500 11px/1 ui-sans-serif, system-ui, sans-serif;
-		color: #767676;
-		background: rgba(255, 255, 255, 0.8);
-		padding: 4px 6px;
-		border-radius: 4px;
+		color: #555;
+		background: rgba(255, 255, 255, 0.85);
+		padding: 5px 7px;
+		border-radius: 5px;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+	}
+
+	.corner.left {
+		left: 12px;
+	}
+
+	.corner.right {
+		right: 12px;
+		padding: 2px 3px;
+	}
+
+	.corner select {
+		font: 500 11px ui-sans-serif, system-ui, sans-serif;
+		color: #555;
+		border: none;
+		background: transparent;
+		padding: 3px 4px;
+	}
+
+	.corner input {
+		margin: 0;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 </style>

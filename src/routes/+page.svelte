@@ -379,26 +379,10 @@
 		<button onclick={() => templateInput?.click()}>Import</button>
 		<button onclick={doExportTemplate}>Export template</button>
 		<button onclick={doExportBundle}>Export bundle</button>
+		<button class="danger-outline" onclick={() => (resetStage = 1)} title="Clear everything stored in this browser">Reset</button>
 		<button onclick={() => (contactOpen = true)} disabled={!dataset.rows.length}>Contact sheet</button>
-		<label class="check">
-			<input type="checkbox" bind:checked={ui.showOutlines} />
-			Outlines
-		</label>
-		<label class="check">
-			<span class="sr-only">Zoom</span>
-			<select
-				value={ui.zoom === 'fit' ? 'fit' : String(ui.zoom)}
-				onchange={(e) => (ui = { ...ui, zoom: e.currentTarget.value === 'fit' ? 'fit' : Number(e.currentTarget.value) })}
-			>
-				<option value="fit">Fit</option>
-				{#each [0.5, 0.75, 1, 1.5, 2] as level (level)}
-					<option value={String(level)}>{level * 100}%</option>
-				{/each}
-			</select>
-		</label>
 		<button class="primary" onclick={print}>Print</button>
 		<button onclick={() => (helpOpen = true)} aria-label="Help and credits" title="Help and credits">?</button>
-		<button class="quiet" onclick={() => (resetStage = 1)} title="Clear everything stored in this browser">Reset</button>
 		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
 	</header>
@@ -458,6 +442,8 @@
 			zoom={ui.zoom}
 			onselect={(id) => (selectedId = id)}
 			onchange={updateBox}
+			onoutlines={(show) => (ui = { ...ui, showOutlines: show })}
+			onzoom={(zoom) => (ui = { ...ui, zoom })}
 		/>
 
 		<aside>
@@ -679,15 +665,6 @@
 		gap: 4px;
 	}
 
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip: rect(0 0 0 0);
-		white-space: nowrap;
-	}
-
 	button {
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
@@ -712,9 +689,18 @@
 		color: #fff;
 	}
 
-	button.quiet {
-		border-color: transparent;
-		color: #555;
+	/* Outline, not filled: dangerous enough to notice in the toolbar, quiet
+	   enough not to compete with Print. The filled `.danger` below is for the
+	   confirm button inside the dialog, where shouting is the point. */
+	button.danger-outline {
+		border-color: #b42318;
+		color: #b42318;
+		background: transparent;
+	}
+
+	button.danger-outline:hover:not(:disabled) {
+		border-color: #8f1c13;
+		background: #fdf3f2;
 	}
 
 	select {
