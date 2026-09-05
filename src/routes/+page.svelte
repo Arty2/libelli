@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
-	import ContactSheet from '$lib/components/ContactSheet.svelte';
+	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import OptionsBar from '$lib/components/OptionsBar.svelte';
@@ -42,11 +42,9 @@
 	let activeRow = $state(0);
 	let selectedId = $state<string | null>(null);
 	let ready = $state(false);
-	let contactOpen = $state(false);
+	let previewOpen = $state(false);
 	let helpOpen = $state(false);
 	let cssOpen = $state(false);
-	let printPrompt = $state(false);
-	let dontShowPrintHint = $state(false);
 	// Page setup is a panel, not a mode: it opens on wide screens and stays out of
 	// the way on a phone, where it would eat the preview it is there to serve.
 	let pageSetupOpen = $state(true);
@@ -213,6 +211,16 @@
 
 	// ---- template editing ---------------------------------------------------
 
+	/**
+	 * Same reason as updateBox: unlocking, or clearing the background image, is
+	 * expressed by removing the field, and structured clone keeps a key whose
+	 * value is undefined. The page object gets the same treatment because that is
+	 * where the image lives.
+	 */
+	function applyTemplate(next: Template) {
+		template = { ...stripUndefined(next), page: stripUndefined(next.page) } as Template;
+	}
+
 	function updateBox(next: Box) {
 		// Cleared fields arrive as undefined — that is how a box says "inherit" or
 		// "none". Stripped here so the saved template and the undo snapshots stay
@@ -294,14 +302,13 @@
 			redo();
 			return;
 		}
-		if (event.key === 'Escape' && (helpOpen || resetStage || cssOpen || printPrompt)) {
+		if (event.key === 'Escape' && (helpOpen || resetStage || cssOpen)) {
 			helpOpen = false;
 			cssOpen = false;
-			printPrompt = false;
 			resetStage = 0;
 			return;
 		}
-		if (typing || contactOpen) return;
+		if (typing || previewOpen) return;
 		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId) {
 			event.preventDefault();
 			deleteBox();
@@ -405,8 +412,11 @@
 
 	const raf = () => new Promise((resolve) => requestAnimationFrame(resolve));
 
-	/** The checklist first: every one of these settings is one the browser gets
-	    wrong by default, and each one silently ruins the sheet. */
+	/**
+	 * The preview first — every card as it will come out, next to the four print
+	 * settings the browser gets wrong by default. Skippable once you know them,
+	 * and always reachable from the Print Preview button.
+	 */
 	function requestPrint() {
 		if (!dataset.rows.length) {
 			status = 'Nothing to print yet.';
@@ -416,13 +426,11 @@
 			void print();
 			return;
 		}
-		dontShowPrintHint = false;
-		printPrompt = true;
+		previewOpen = true;
 	}
 
-	function confirmPrint() {
-		printPrompt = false;
-		if (dontShowPrintHint) ui = { ...ui, printHintSeen: true };
+	function printFromPreview() {
+		previewOpen = false;
 		void print();
 	}
 
@@ -494,7 +502,7 @@
 			<Icon name="settings" size={15} /> <span class="label">Page Setup</span>
 		</button>
 		<button class="danger-outline" onclick={() => (resetStage = 1)} title="Clear everything stored in this browser">Reset</button>
-		<button onclick={() => (contactOpen = true)} disabled={!dataset.rows.length}>Contact Sheet</button>
+		<button onclick={() => (previewOpen = true)} disabled={!dataset.rows.length}>Print Preview</button>
 		<button class="primary" onclick={requestPrint}><Icon name="print" size={15} /> Print</button>
 		<button class="square" onclick={() => (helpOpen = true)} aria-label="Help and credits" title="Help and credits">
 			<Icon name="help" size={16} />
@@ -512,7 +520,7 @@
 			{mapping}
 			{selected}
 			onboxchange={updateBox}
-			ontemplatechange={(t) => (template = t)}
+			ontemplatechange={applyTemplate}
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
@@ -534,7 +542,7 @@
 			{mapping}
 			{selected}
 			onboxchange={updateBox}
-			ontemplatechange={(t) => (template = t)}
+			ontemplatechange={applyTemplate}
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
@@ -609,7 +617,6 @@
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
 			onzoom={(zoom) => (ui = { ...ui, zoom })}
 			onnudge={nudgeBox}
-			onlock={(locked) => (template = { ...template, locked: locked || undefined })}
 		/>
 
 		<aside>
@@ -637,38 +644,6 @@
 		<span class="version">v{VERSION}</span>
 	</footer>
 </div>
-
-{#if printPrompt}
-	<div class="modal-backdrop" role="presentation" onclick={() => (printPrompt = false)}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="print-title">
-		<h2 id="print-title">Before you print</h2>
-		<p>Four settings in the browser's print dialog, each of which the browser gets wrong by default:</p>
-		<ul class="checklist">
-			<li>
-				<strong>Paper size</strong> — pick the one matching
-				<strong>{template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0)} ×
-				{template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0)} mm</strong>. If your printer has no
-				such size, print on a larger sheet and trim.
-			</li>
-			<li><strong>Margins</strong> — set to <em>None</em>.</li>
-			<li><strong>Headers and footers</strong> — switch off.</li>
-			<li><strong>Background graphics</strong> — switch on, or Chrome drops the paper colour.</li>
-		</ul>
-		<p class="muted">
-			{dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}, one per row. Everything stays in this browser;
-			nothing is uploaded.
-		</p>
-		<div class="modal-actions">
-			<label class="check">
-				<input type="checkbox" bind:checked={dontShowPrintHint} />
-				Don't show this again
-			</label>
-			<span class="spacer"></span>
-			<button onclick={() => (printPrompt = false)}>Cancel</button>
-			<button class="primary" use:focusOnOpen onclick={confirmPrint}>Print</button>
-		</div>
-	</div>
-{/if}
 
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (cssOpen = false)}></div>
@@ -728,7 +703,7 @@
 		<p>Rows of a spreadsheet in, print-ready cards out. Data, templates and fonts stay in this browser — nothing is uploaded, and there is no server to upload to.</p>
 
 		<h3>Printing</h3>
-		<p>Press Print and the checklist comes up first: paper size, margins, headers and footers, background graphics. One page comes out per row.</p>
+		<p><strong>Print Preview</strong> shows every card as a small page next to the four dialog settings that decide whether it comes out right — paper size, margins, headers and footers, background graphics. Print goes through the same screen until you tell it not to. One page comes out per row.</p>
 
 		<h3>Keys</h3>
 		<dl class="keys">
@@ -737,6 +712,7 @@
 			<dt>Arrows</dt><dd>Nudge the selected box by 1mm (Shift 5mm, Alt 0.25mm)</dd>
 			<dt>Delete</dt><dd>Remove the selected box</dd>
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
+			<dt>← →</dt><dd>Previous / next card, in the print preview</dd>
 			<dt>Alt + drag</dt><dd>Ignore the grid and every snap</dd>
 		</dl>
 
@@ -745,6 +721,9 @@
 
 		<h3>Type</h3>
 		<p>Page setup holds the defaults — family, size, leading, tracking and colour. A box that leaves those fields blank inherits them, so changing the page changes every box that never overrode it.</p>
+
+		<h3>Locking</h3>
+		<p><strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page lock covers every box and the page settings too. The padlock that appears on the box, or at the corner of the page, is telling you it is locked; the button that undoes it is in the bar.</p>
 
 		<h3>Colour</h3>
 		<p>Page setup sets the default text colour and the paper colour, and a box can set its own. Inside a Markdown body, <code>[a few words]&#123;red&#125;</code> or <code>[…]&#123;#b42318&#125;</code> colours just those words. Paper colour prints only with background graphics switched on.</p>
@@ -764,15 +743,18 @@
 	</div>
 {/if}
 
-{#if contactOpen}
-	<ContactSheet
+{#if previewOpen}
+	<PrintPreview
 		{template}
 		{dataset}
 		{mapping}
 		{activeRow}
 		{background}
+		skipOnPrint={ui.printHintSeen}
 		onactivate={(i) => (activeRow = i)}
-		onclose={() => (contactOpen = false)}
+		onskipchange={(skip) => (ui = { ...ui, printHintSeen: skip })}
+		onprint={printFromPreview}
+		onclose={() => (previewOpen = false)}
 	/>
 {/if}
 
@@ -845,16 +827,6 @@
 
 	.muted {
 		color: #767676;
-	}
-
-	.checklist {
-		margin: 0 0 10px;
-		padding-left: 20px;
-		color: #333;
-	}
-
-	.checklist li {
-		margin-bottom: 4px;
 	}
 
 	.banner {

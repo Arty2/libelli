@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEFAULTS, autoMap, builtinTemplate, normaliseTemplate, usedSlots } from './template';
+import { DEFAULT_DEFAULTS, autoMap, borderSides, builtinTemplate, normaliseTemplate, usedSlots } from './template';
 
 describe('the built-in template', () => {
 	const template = builtinTemplate();
@@ -100,6 +100,44 @@ describe('normaliseTemplate', () => {
 		expect('borderColor' in t.boxes[1]).toBe(false);
 	});
 
+	it('collapses four equal border edges back to one number, and keeps four when they differ', () => {
+		const uniform = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, borderWidth: { top: 0.5, right: 0.5, bottom: 0.5, left: 0.5 } }]
+		});
+		expect(uniform.boxes[0].borderWidth).toBe(0.5);
+
+		const varied = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, borderWidth: { top: 1, right: 0, bottom: 0.5, left: 0 } }]
+		});
+		expect(varied.boxes[0].borderWidth).toEqual({ top: 1, right: 0, bottom: 0.5, left: 0 });
+	});
+
+	it('treats a border of nothing as no border rather than a zero-width one', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			boxes: [
+				{ id: 'a', x: 0, y: 0, w: 10, h: 10, borderWidth: 0 },
+				{ id: 'b', x: 0, y: 0, w: 10, h: 10, borderWidth: { top: 0, right: 0, bottom: 0, left: 0 } }
+			]
+		});
+		expect('borderWidth' in t.boxes[0]).toBe(false);
+		expect('borderWidth' in t.boxes[1]).toBe(false);
+	});
+
+	it('keeps only a border style it can draw', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			boxes: [
+				{ id: 'a', x: 0, y: 0, w: 10, h: 10, borderWidth: 1, borderStyle: 'dashed' },
+				{ id: 'b', x: 0, y: 0, w: 10, h: 10, borderWidth: 1, borderStyle: 'groovy' }
+			]
+		});
+		expect(t.boxes[0].borderStyle).toBe('dashed');
+		expect('borderStyle' in t.boxes[1]).toBe(false);
+	});
+
 	it('falls back to the default text colour when a template names an unusable one', () => {
 		expect(normaliseTemplate({ schema: 2, defaults: { color: 'chartreuse' }, boxes: [] }).defaults.color).toBe('#000000');
 		expect(normaliseTemplate({ schema: 2, defaults: { color: 'navy' }, boxes: [] }).defaults.color).toBe('#14306b');
@@ -137,6 +175,18 @@ describe('normaliseTemplate', () => {
 
 	it('rejects anything that is not a template', () => {
 		expect(() => normaliseTemplate({ schema: 1 })).toThrow(/no boxes/);
+	});
+});
+
+describe('borderSides', () => {
+	it('reads one number as four equal edges', () => {
+		expect(borderSides(0.4)).toEqual({ top: 0.4, right: 0.4, bottom: 0.4, left: 0.4 });
+	});
+
+	it('passes four edges through, and reads no border as four zeroes', () => {
+		const sides = { top: 1, right: 0, bottom: 0.5, left: 0 };
+		expect(borderSides(sides)).toEqual(sides);
+		expect(borderSides(undefined)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
 	});
 });
 

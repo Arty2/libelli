@@ -22,7 +22,6 @@
 		ongrid: (show: boolean) => void;
 		onzoom: (zoom: 'fit' | number) => void;
 		onnudge: (dx: number, dy: number) => void;
-		onlock: (locked: boolean) => void;
 	}
 
 	let {
@@ -40,8 +39,7 @@
 		onoutlines,
 		ongrid,
 		onzoom,
-		onnudge,
-		onlock
+		onnudge
 	}: Props = $props();
 
 	const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2];
@@ -114,14 +112,14 @@
 			></div>
 		{/if}
 
-		<button
-			class="page-lock"
-			aria-pressed={!!template.locked}
-			title={template.locked ? 'Unlock the design' : 'Lock the design — no dragging, no option changes'}
-			onclick={() => onlock(!template.locked)}
-		>
-			<Icon name={template.locked ? 'locked' : 'unlocked'} size={14} />
-		</button>
+		{#if template.locked}
+			<!-- An indicator, not a control: the button that sets this lives in page
+			     setup, where the rest of the page's settings are. -->
+			<span class="page-lock" title="The design is locked">
+				<Icon name="locked" size={14} />
+				<span class="sr-only">The design is locked</span>
+			</span>
+		{/if}
 	</div>
 
 	<!-- View state sits on the page it affects, one control per bottom corner,
@@ -213,16 +211,9 @@
 		place-items: center;
 		width: 26px;
 		height: 26px;
-		padding: 0;
-		border: 1px solid #ccc;
+		border: 1px solid #2563eb;
 		border-radius: 6px;
 		background: #fff;
-		color: #555;
-		cursor: pointer;
-	}
-
-	.page-lock[aria-pressed='true'] {
-		border-color: #2563eb;
 		color: #2563eb;
 	}
 

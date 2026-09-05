@@ -33,7 +33,7 @@ src/lib/
   storage.ts      localStorage + IndexedDB, plus the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
   version.ts      VERSION, and the bumping rule
-  components/     Card, PagePreview, DataTable, OptionsBar, ContactSheet, PrintRoot, Icon
+  components/     Card, PagePreview, DataTable, OptionsBar, PrintPreview, PrintRoot, Icon
 src/routes/+page.svelte   all app state and wiring
 static/sample-cards.csv   sample data, bundled with ?raw and also served as a file
 ```
@@ -65,10 +65,19 @@ Load-bearing choices, in case they look arbitrary:
   must not be able to change that. Note that `css.ts` also builds the `<style>`
   tag: a literal `<style>…</style>` pair written in a `.svelte` file gets picked
   up by the Svelte toolchain as that component's own stylesheet.
+- **Both option bars read in groups**, outward from the subject: what the thing
+  is, then its type, then how it looks, then where it sits, then what you can do
+  to it. A new control goes in the group it belongs to rather than on the end.
+- **A lock is a button in the bar and an indicator on the canvas.** The padlock
+  on a box or a page says *locked*; it is never the control, because the control
+  belongs with the rest of that subject's settings. The button that sets a lock
+  is never disabled by the lock it sets.
 - **A box is `border-box`.** Padding and a border are drawn inside the
   millimetres the box was given, so framing one never moves it sideways. It does
   make the box taller, which `measure()` picks up and anchored boxes below
-  follow — that is the intended behaviour, not a leak.
+  follow — that is the intended behaviour, not a leak. A border width is one
+  number or four; `normaliseBorderWidth` collapses four equal edges back to one,
+  so a template never grows structure it did not ask for.
 - **Vertical alignment makes a box a flex column.** That is why `.box` is
   `display: flex`: `justify-content` is the only thing that places content
   vertically in a box whose height may be a `min-height`. The cost is that child

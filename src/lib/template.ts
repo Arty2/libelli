@@ -3,6 +3,8 @@ import { parseColour } from './colour';
 import defaultCard from './templates/default-card.json';
 import type {
 	BackgroundFit,
+	BorderStyle,
+	BorderWidth,
 	Box,
 	Defaults,
 	FontRef,
@@ -11,6 +13,7 @@ import type {
 	PageNumberPosition,
 	PageNumberSpec,
 	QrSettings,
+	Sides,
 	Template
 } from './types';
 import { SCHEMA_VERSION } from './types';
@@ -116,7 +119,8 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			static: partial.static,
 			background: colour(partial.background),
 			padding: partial.padding,
-			borderWidth: partial.borderWidth,
+			borderWidth: normaliseBorderWidth(partial.borderWidth),
+			borderStyle: BORDER_STYLES.includes(partial.borderStyle as BorderStyle) ? partial.borderStyle : undefined,
 			borderColor: colour(partial.borderColor),
 			borderRadius: partial.borderRadius,
 			fit: partial.fit,
@@ -235,6 +239,37 @@ function normaliseFonts(raw: any): FontRef[] {
 		out.push({ family, source, ...(f?.ref ? { ref: String(f.ref) } : {}) });
 	}
 	return out;
+}
+
+export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'double'];
+
+/**
+ * A border thickness, in whichever of the two shapes it was written.
+ *
+ * Four equal edges collapse back to a single number, so a template that never
+ * used per-edge widths never grows an object it did not ask for, and a box that
+ * is nudged back to uniform tidies itself up again. A border of nothing is
+ * `undefined` rather than zero: absent is how this format says "no border".
+ */
+export function normaliseBorderWidth(raw: unknown): BorderWidth | undefined {
+	if (typeof raw === 'number') return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+	if (!raw || typeof raw !== 'object') return undefined;
+	const side = (value: unknown) => Math.max(0, num(value, 0));
+	const sides: Sides = {
+		top: side((raw as any).top),
+		right: side((raw as any).right),
+		bottom: side((raw as any).bottom),
+		left: side((raw as any).left)
+	};
+	const { top, right, bottom, left } = sides;
+	if (top === right && right === bottom && bottom === left) return top > 0 ? top : undefined;
+	return sides;
+}
+
+/** The four edges of a border, whichever shape it is stored in. */
+export function borderSides(width: BorderWidth | undefined): Sides {
+	if (typeof width === 'number') return { top: width, right: width, bottom: width, left: width };
+	return width ?? { top: 0, right: 0, bottom: 0, left: 0 };
 }
 
 /** A recognised colour, or nothing at all — never the string it was handed. */

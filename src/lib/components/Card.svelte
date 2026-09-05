@@ -5,6 +5,7 @@
 	import { fontStack } from '$lib/fonts';
 	import { FREE_STEP, GRID_MINOR, boxEdges, pxToMm, resolveLayout, snapTo, snapToEdges } from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
+	import { borderSides } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -166,7 +167,12 @@
 		// `.box` is border-box, so a border eats into the width rather than adding
 		// to it: the box still occupies exactly the millimetres it was given.
 		if (box.borderWidth) {
-			parts.push(`border:${box.borderWidth}mm solid ${box.borderColor ?? box.color ?? template.defaults.color}`);
+			const { top, right, bottom, left } = borderSides(box.borderWidth);
+			parts.push(
+				`border-width:${top}mm ${right}mm ${bottom}mm ${left}mm`,
+				`border-style:${box.borderStyle ?? 'solid'}`,
+				`border-color:${box.borderColor ?? box.color ?? template.defaults.color}`
+			);
 		}
 		if (box.borderRadius) parts.push(`border-radius:${box.borderRadius}mm`);
 		if (hidden.has(box.id)) {

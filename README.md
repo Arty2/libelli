@@ -69,10 +69,13 @@ resize boxes directly, or type exact millimetres.
   own Y however long the body above it runs.
 - **Alignment** — horizontal (left, centre, right) and vertical (top, middle,
   bottom) within the box's own frame.
-- **Surface** — a fill colour, padding, a border with its own thickness and
-  colour, and a corner radius, all in millimetres. The border sits *inside* the
-  box's millimetres rather than outside them, so framing a box does not move it
-  or anything anchored below it — though padding and a border do make the box
+- **Surface** — a fill colour, padding, a border and a corner radius, all in
+  millimetres. A border takes one thickness all round, or one per edge behind
+  the expander next to it; its style and its radius are always for the whole
+  box. Four equal edges collapse back to a single number, so a template never
+  grows structure it did not ask for. The border sits *inside* the box's
+  millimetres rather than outside them, so framing a box does not move it or
+  anything anchored below it — though padding and a border do make the box
   taller, which an anchored box below will follow, as it should.
 - **Type defaults** — page setup holds the family, size, leading, tracking and
   colour. A box that leaves those fields blank inherits them, so changing the
@@ -92,10 +95,12 @@ resize boxes directly, or type exact millimetres.
   rather than rendering a blank page — the same bargain as an uploaded font.
 - **Page numbers** — off by default; six corners to choose from, an adjustable
   margin, and the template's default type. The number is the row's position, so
-  the preview, the contact sheet and the print all agree.
-- **Lock** — the padlock at the top right of a box, or of the page, freezes what
-  you have: no dragging, no resizing, no option changes. A page lock covers every
-  box and the page settings too.
+  the editor, the print preview and the print all agree.
+- **Lock** — **Lock** in either bar freezes what you have: no dragging, no
+  resizing, no option changes. A page lock covers every box and the page settings
+  as well. A padlock appears on the locked box, or at the corner of a locked
+  page, as an indicator — the button that sets it is in the bar, with the rest of
+  that subject's settings.
 - **Custom CSS** — page setup has a CSS button; what you write there is saved
   inside the template and travels with it. Selectors are scoped to the card, so
   nothing in a template can restyle the editor around it, and `@import` and any
@@ -189,17 +194,21 @@ Pick a curated Google family, type any other family name, or upload a file.
 Print renders every row into a dedicated container and hands it to the browser:
 `@page { size: <w>mm <h>mm; margin: 0 }`, one page per row, no trailing blank.
 
-Pressing Print brings up the checklist first, because every one of these is a
-setting the browser gets wrong by default: pick the **paper size** matching the
-card's millimetres, set **Margins** to *None*, uncheck **Headers and footers**,
-and switch on **Background graphics** — Chrome drops background colours, paper
-colour included. Tick *Don't show this again* once you know it by heart.
+## Print preview
 
-## Contact sheet
+One screen holds both halves of getting a print right: every row rendered as a
+small page, and the four dialog settings the browser gets wrong by default —
+pick the **paper size** matching the card's millimetres, set **Margins** to
+*None*, uncheck **Headers and footers**, and switch on **Background graphics**,
+which Chrome drops along with the paper colour. Checking the cards and reading
+the checklist are the same act, so they are the same screen.
 
-Every row rendered as a small page in a grid, for checking a whole set at once.
-Click a thumbnail to open it full screen, <kbd>←</kbd> / <kbd>→</kbd> to move
-between cards, <kbd>Esc</kbd> to come back out.
+**Print Preview** always opens it. **Print** opens it too, until you tick *Skip
+this when I press Print* — after that Print goes straight to the browser and the
+preview is still there when you want it.
+
+Click a thumbnail to open that card full screen, <kbd>←</kbd> / <kbd>→</kbd> to
+move between cards, <kbd>Esc</kbd> to come back out.
 
 ## Undo and redo
 
@@ -224,7 +233,7 @@ and sample data, with your work one undo away. Uploaded fonts are the exception
 | <kbd>Alt</kbd> + arrows | Nudge by 0.25mm |
 | <kbd>Delete</kbd> | Remove the selected box |
 | <kbd>Esc</kbd> | Deselect, or close what is open |
-| <kbd>←</kbd> <kbd>→</kbd> | Previous / next card, in the contact sheet |
+| <kbd>←</kbd> <kbd>→</kbd> | Previous / next card, in the print preview |
 
 While a text field has focus, undo is left to the browser's own text history and
 <kbd>Delete</kbd> deletes characters — the app keeps its hands off both.
@@ -239,16 +248,17 @@ passes them, and a guide shows what it caught.
 
 ## Settings
 
-- **Page** — template name, width, height, default font, size, leading and
-  tracking, default text colour, paper colour, background image and how it fills
-  the sheet, bleed on/off, bleed amount, crop marks, page number position and
-  margin, custom CSS, lock, and the template import/export buttons
-- **Box** — slot, bound column, font, size, weight, leading, tracking, case (as
-  typed / small caps / uppercase), horizontal and vertical alignment, text
-  colour, fill, padding, border width and colour, corner radius, mode (plain /
-  markdown / image / QR), fit (image and QR), QR correction, quiet zone and
-  backing (transparent or solid), overflow (grow / clip), X and Y, W and H,
-  anchor, anchor gap, hide when empty, lock
+Both bars run in groups, outward from the thing itself:
+
+- **Page** — name · sheet size, bleed, crop marks · type defaults (font, size,
+  leading, tracking, colour) · surface (paper colour, background image and fit) ·
+  page number and its margin · then the actions: CSS, import, export, lock, add
+  a box
+- **Box** — content (slot, column, mode, fit, QR settings) · type (font, size,
+  weight, leading, tracking, case, colour) · alignment, horizontal and vertical ·
+  surface (fill, padding, border width, style and colour, radius) · position ·
+  size and overflow · flow (anchor, gap, hide when empty) · then the actions:
+  lock, duplicate, delete
 - **View** — in the bottom corners of the page itself, not the toolbar: grid and
   box outlines at the left (screen only, never printed), zoom (fit, or 50% to
   200%) at the right

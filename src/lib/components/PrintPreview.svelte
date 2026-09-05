@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Card from './Card.svelte';
+	import Icon from './Icon.svelte';
 	import { mmToPx } from '$lib/layout';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
@@ -9,11 +10,29 @@
 		mapping: Mapping;
 		activeRow: number;
 		background: string | null;
+		/** whether pressing Print goes straight to the browser, skipping this */
+		skipOnPrint: boolean;
 		onactivate: (index: number) => void;
+		onskipchange: (skip: boolean) => void;
+		onprint: () => void;
 		onclose: () => void;
 	}
 
-	let { template, dataset, mapping, activeRow, background, onactivate, onclose }: Props = $props();
+	let {
+		template,
+		dataset,
+		mapping,
+		activeRow,
+		background,
+		skipOnPrint,
+		onactivate,
+		onskipchange,
+		onprint,
+		onclose
+	}: Props = $props();
+
+	const sheetW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
+	const sheetH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 
 	let fullscreen = $state<number | null>(null);
 	let viewport = $state({ w: 1200, h: 800 });
@@ -59,11 +78,31 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Contact sheet">
+<div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Print preview">
 	<header>
-		<h2>Contact sheet — {dataset.rows.length} card{dataset.rows.length === 1 ? '' : 's'}</h2>
-		<button class="close" onclick={onclose} aria-label="Close contact sheet">✕</button>
+		<h2>Print preview — {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}, one per row</h2>
+		<div class="header-actions">
+			<label class="skip">
+				<input type="checkbox" checked={skipOnPrint} onchange={(e) => onskipchange(e.currentTarget.checked)} />
+				Skip this when I press Print
+			</label>
+			<button onclick={onclose}>Close</button>
+			<button class="primary" onclick={onprint}><Icon name="print" size={15} /> Print</button>
+		</div>
 	</header>
+
+	<!-- The checklist rides with the preview rather than in a dialog of its own:
+	     these are the settings that decide whether what you see below is what
+	     comes out, so they belong beside it. -->
+	<section class="checklist" aria-label="Before you print">
+		<ol>
+			<li><strong>Paper size</strong> — the one matching <strong>{sheetW} × {sheetH} mm</strong>, or a larger sheet you trim.</li>
+			<li><strong>Margins</strong> — <em>None</em>.</li>
+			<li><strong>Headers and footers</strong> — off.</li>
+			<li><strong>Background graphics</strong> — on, or Chrome drops the paper colour.</li>
+		</ol>
+		<p class="muted">Everything stays in this browser; nothing is uploaded.</p>
+	</section>
 
 	<div class="grid">
 		{#each dataset.rows as row, i (i)}
@@ -126,14 +165,71 @@
 		font: 600 14px ui-sans-serif, system-ui, sans-serif;
 	}
 
-	.close,
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.skip {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		font: 12px ui-sans-serif, system-ui, sans-serif;
+		color: #555;
+	}
+
+	header button,
 	.nav {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
 		border: 1px solid #ccc;
 		background: #fff;
+		color: #111;
 		border-radius: 6px;
 		cursor: pointer;
+		font: 12px ui-sans-serif, system-ui, sans-serif;
+		padding: 6px 10px;
+	}
+
+	.nav {
 		font-size: 14px;
-		padding: 5px 10px;
+	}
+
+	header button.primary {
+		background: #111;
+		border-color: #111;
+		color: #fff;
+	}
+
+	.checklist {
+		padding: 12px 18px 0;
+		font: 12px/1.55 ui-sans-serif, system-ui, sans-serif;
+		color: #333;
+	}
+
+	.checklist ol {
+		margin: 0;
+		padding-left: 20px;
+		columns: 2;
+		column-gap: 28px;
+	}
+
+	.checklist .muted {
+		color: #767676;
+		margin: 6px 0 0;
+	}
+
+	@media (max-width: 700px) {
+		.checklist ol {
+			columns: 1;
+		}
+
+		header {
+			flex-wrap: wrap;
+			gap: 8px;
+		}
 	}
 
 	.grid {
