@@ -2,6 +2,7 @@
 	import { fontStack } from '$lib/fonts';
 	import { pxToMm, resolveLayout } from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
+	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
@@ -45,6 +46,40 @@
 		if (box.mode === 'image') return !(box.static?.svg || box.static?.url || box.static?.dataUrl || contentOf(box).trim());
 		return contentOf(box).trim() === '';
 	};
+
+	/**
+	 * A QR is only worth printing if it scans, so anything the encoder refuses —
+	 * empty text, or more than a version-10 code can hold — renders as nothing
+	 * rather than as a square that no phone will read.
+	 */
+	function qrFor(box: Box): string {
+		const value = contentOf(box).trim() || box.static?.text?.trim() || '';
+		if (!value) return '';
+		try {
+			return fitSvg(
+				qrSvg(value, {
+					level: box.qr?.level ?? 'M',
+					margin: box.qr?.margin ?? 2,
+					colour: box.color ?? template.defaults.color,
+					background: box.qr?.background
+				}),
+				box.fit
+			);
+		} catch {
+			return '';
+		}
+	}
+
+	/**
+	 * `object-fit` does nothing to an inline SVG, so the equivalent goes on the
+	 * root element instead: meet fits the whole thing in, slice crops it.
+	 */
+	function fitSvg(svg: string, fit: Box['fit']): string {
+		const ratio = fit === 'cover' ? 'xMidYMid slice' : fit === 'fill' ? 'none' : 'xMidYMid meet';
+		return svg.replace(/^(\s*<svg\b)([^>]*)>/i, (_whole, open: string, attrs: string) => {
+			return `${open}${attrs.replace(/\spreserveAspectRatio="[^"]*"/i, '')} preserveAspectRatio="${ratio}">`;
+		});
+	}
 
 	const hidden = $derived(new Set(template.boxes.filter((b) => b.hideWhenEmpty && isEmpty(b)).map((b) => b.id)));
 	const layout = $derived(resolveLayout({ boxes: template.boxes, measured, hidden }));
@@ -211,12 +246,19 @@
 				{#if box.mode === 'markdown'}
 					<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf -->
 					{@html renderMarkdown(contentOf(box), { size: box.size ?? template.defaults.size, md: box.md })}
+				{:else if box.mode === 'qr'}
+					<span class="media" style="height:{box.h}mm">
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
+						{@html qrFor(box)}
+					</span>
 				{:else if box.mode === 'image'}
-					{#if box.static?.svg}
-						{@html safeSvg(box.static.svg)}
-					{:else if imageSource(box)}
-						<img src={imageSource(box)} alt="" style="width:100%;height:100%;object-fit:{box.fit ?? 'contain'}" />
-					{/if}
+					<span class="media" style="height:{box.h}mm">
+						{#if box.static?.svg}
+							{@html fitSvg(safeSvg(box.static.svg), box.fit)}
+						{:else if imageSource(box)}
+							<img src={imageSource(box)} alt="" style="object-fit:{box.fit ?? 'contain'}" />
+						{/if}
+					</span>
 				{:else}
 					<span class="plain">{contentOf(box)}</span>
 				{/if}
@@ -273,6 +315,21 @@
 	.plain {
 		display: block;
 		white-space: pre-wrap;
+	}
+
+	/* Media has no flow height of its own, so the box's declared height is the
+	   frame, and `cover` crops inside it rather than spilling onto the card. */
+	.media {
+		display: block;
+		width: 100%;
+		overflow: hidden;
+	}
+
+	.media :global(svg),
+	.media img {
+		display: block;
+		width: 100%;
+		height: 100%;
 	}
 
 	.box :global(p:first-child),

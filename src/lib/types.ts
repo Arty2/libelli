@@ -9,7 +9,7 @@
 
 export const SCHEMA_VERSION = 1;
 
-export type BoxMode = 'plain' | 'markdown' | 'image';
+export type BoxMode = 'plain' | 'markdown' | 'image' | 'qr';
 export type Overflow = 'clip' | 'grow';
 export type Align = 'left' | 'center' | 'right';
 
@@ -59,6 +59,15 @@ export interface MarkdownStyle {
 	rule?: { spaceBefore?: number; spaceAfter?: number; color?: string };
 }
 
+/** QR rendering options for a `qr` box; the value encoded is the bound cell. */
+export interface QrSettings {
+	/** error correction: L 7%, M 15%, Q 25%, H 30% of the code recoverable */
+	level: 'L' | 'M' | 'Q' | 'H';
+	/** quiet zone in modules — the white border a scanner needs */
+	margin: number;
+	background?: string;
+}
+
 export interface Anchor {
 	to: string;
 	/** mm between the target's rendered bottom and this box's top */
@@ -83,11 +92,13 @@ export interface Box extends TextStyle {
 	mode: BoxMode;
 	overflow: Overflow;
 	md?: MarkdownStyle;
+	qr?: QrSettings;
 	anchor?: Anchor | null;
 	hideWhenEmpty?: boolean;
 	static?: StaticContent;
 	background?: string;
 	padding?: number;
+	/** how an image or QR fills its box: contain fits it, cover crops it */
 	fit?: 'contain' | 'cover' | 'fill';
 	locked?: boolean;
 }

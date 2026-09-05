@@ -1,7 +1,7 @@
 {
 	"name": "libelli",
 	"private": true,
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -14,6 +14,7 @@
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.70.3",
 		"@sveltejs/vite-plugin-svelte": "^5.0.3",
+		"jsqr": "^1.4.0",
 		"svelte": "^5.57.0",
 		"svelte-check": "^4.7.6",
 		"typescript": "~5.9.3",

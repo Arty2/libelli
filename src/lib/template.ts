@@ -1,6 +1,6 @@
 import { parseColour } from './colour';
 import defaultCard from './templates/default-card.json';
-import type { Box, Defaults, FontRef, Mapping, Template } from './types';
+import type { Box, Defaults, FontRef, Mapping, QrSettings, Template } from './types';
 import { SCHEMA_VERSION } from './types';
 
 /**
@@ -71,6 +71,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			italic: partial.italic,
 			letterSpacing: partial.letterSpacing,
 			md: partial.md,
+			qr: partial.mode === 'qr' ? normaliseQr(partial.qr) : partial.qr,
 			anchor: partial.anchor,
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
@@ -124,6 +125,14 @@ export function normaliseTemplate(raw: unknown): Template {
 		slots,
 		boxes
 	};
+}
+
+export const DEFAULT_QR: QrSettings = { level: 'M', margin: 2 };
+
+function normaliseQr(raw: any): QrSettings {
+	const level = ['L', 'M', 'Q', 'H'].includes(raw?.level) ? raw.level : DEFAULT_QR.level;
+	const margin = Math.max(0, Math.min(8, num(raw?.margin, DEFAULT_QR.margin)));
+	return { level, margin, ...(raw?.background ? { background: String(raw.background) } : {}) };
 }
 
 function normaliseBleed(raw: any): Template['bleed'] {

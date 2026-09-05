@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { SAMPLE_CSV } from '$lib/onboarding';
 	import { parseTable } from '$lib/parse';
+	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
 	import type { Dataset, Row } from '$lib/types';
 
 	interface Props {
@@ -16,6 +17,9 @@
 
 	let pasteOpen = $state(false);
 	let pendingDelete = $state<{ kind: 'row' | 'column'; index: number } | null>(null);
+	// Which column the rows were last sorted by, so the header can show it and
+	// a second click can turn it round.
+	let sortedBy = $state<{ column: string; direction: SortDirection } | null>(null);
 	let pasteText = $state('');
 	let pasteMode = $state<'replace' | 'append'>('replace');
 	let fileInput = $state<HTMLInputElement | null>(null);
@@ -59,6 +63,22 @@
 		notice = '';
 		onchange({ columns, rows });
 		onrenamecolumn(from, to);
+	}
+
+	function shiftColumn(index: number, by: number) {
+		const target = index + by;
+		if (target < 0 || target >= dataset.columns.length) return;
+		onchange(moveColumn(dataset, index, target));
+	}
+
+	function sortBy(column: string) {
+		const direction: SortDirection = sortedBy?.column === column && sortedBy.direction === 'asc' ? 'desc' : 'asc';
+		const sorted = sortRows(dataset, column, direction);
+		// The previewed card follows its row rather than staying on a position.
+		const previewed = indexAfterSort(dataset, sorted, activeRow);
+		sortedBy = { column, direction };
+		onchange(sorted);
+		onactivate(previewed);
 	}
 
 	function addColumn() {
@@ -143,6 +163,7 @@
 			onchange(parsed);
 			onactivate(0);
 		}
+		sortedBy = null;
 		notice = `${parsed.rows.length} row${parsed.rows.length === 1 ? '' : 's'} loaded.`;
 	}
 
@@ -193,7 +214,7 @@
 				<tr>
 					<th class="gutter" scope="col"><span class="sr-only">Row</span></th>
 					{#each dataset.columns as column, i (column)}
-						<th scope="col">
+						<th scope="col" aria-sort={sortedBy?.column === column ? (sortedBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
 							<input
 								class="column-name"
 								value={column}
@@ -201,7 +222,17 @@
 								title="Rename this column"
 								onchange={(e) => renameColumn(i, e.currentTarget.value)}
 							/>
-							<button class="icon" title="Delete column" onclick={() => askDelete('column', i)}>✕</button>
+							<span class="column-tools">
+								<button
+									class="icon"
+									title="Sort rows by {column}"
+									aria-label="Sort rows by {column}"
+									onclick={() => sortBy(column)}
+								>{sortedBy?.column === column ? (sortedBy.direction === 'asc' ? '▲' : '▼') : '↕'}</button>
+								<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}>‹</button>
+								<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}>›</button>
+								<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => askDelete('column', i)}>✕</button>
+							</span>
 						</th>
 					{/each}
 					<th class="add"><button class="icon" title="Add column" onclick={addColumn}>+</button></th>
@@ -351,6 +382,27 @@
 	.column-name:focus {
 		border-color: #2563eb;
 		background: #fff;
+	}
+
+	.column-tools {
+		display: inline-flex;
+		gap: 1px;
+		opacity: 0.35;
+	}
+
+	th:hover .column-tools,
+	th:focus-within .column-tools {
+		opacity: 1;
+	}
+
+	.icon:disabled {
+		opacity: 0.3;
+		cursor: default;
+	}
+
+	.icon:disabled:hover {
+		background: transparent;
+		color: #767676;
 	}
 
 	td textarea {

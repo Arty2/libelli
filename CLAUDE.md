@@ -22,6 +22,8 @@ src/lib/
   parse.ts        CSV / TSV parsing (quoted fields, embedded newlines, delimiter sniffing)
   markdown.ts     hand-written Markdown subset -> HTML, escaping at the leaves
   layout.ts       mm geometry + anchor resolution
+  qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
+  table.ts        column reorder, row sorting
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
   history.ts      undo/redo snapshots
@@ -44,8 +46,11 @@ Load-bearing choices, in case they look arbitrary:
   `y` — that is how the footer stays put however long the body runs.
 - **DOM rendering, browser printing.** The editor and the printed page share one
   layout engine, so they cannot drift. `@page { size: <w>mm <h>mm; margin: 0 }`.
-- **No runtime dependencies.** The Markdown renderer and the CSV parser are
-  hand-written so the app works offline and nothing can rot underneath it.
+- **No runtime dependencies.** The Markdown renderer, the CSV parser and the QR
+  encoder are hand-written, so the app works offline and nothing can rot
+  underneath it. `jsqr` is a dev dependency only: the tests decode generated
+  codes with an independent decoder, because a QR that does not scan looks
+  exactly like one that does.
 - **Escaping and colour parsing are chokepoints.** Cell content is untrusted:
   every leaf text node is HTML-escaped in `markdown.ts`, and every colour goes
   through `colour.ts` before it can reach a `style` attribute.
@@ -74,7 +79,7 @@ Load-bearing choices, in case they look arbitrary:
   page, dialogs opened and dismissed. Say what was actually checked, and say it
   plainly; if something was not checked, say that too.
 - **Tests cover the pure logic.** `parse`, `markdown`, `layout`, `template`,
-  `history`, `colour` have unit tests. Components are verified by driving them.
+  `history`, `colour`, `qr`, `table` have unit tests. Components are verified by driving them.
 - **Small commits with real messages.** What changed, why that shape, and what
   was verified. No model names in anything that lands in the repo.
 - **Comments explain the why.** Not what the line does — why it is that way, and
@@ -99,4 +104,5 @@ npm run build    # static output in ./build
 
 ## Credits
 
-Dialectic Acheiropoieton of Heracles Papatheodorou and&nbsp;Claude
+[Dialectic Acheiropoieton](https://heracl.es/libelli) of Heracles Papatheodorou
+and&nbsp;Claude

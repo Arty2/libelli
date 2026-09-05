@@ -537,7 +537,10 @@
 		<h3>Editing</h3>
 		<p>Drag boxes on the page or type exact millimetres. A box anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link. Column headers are editable in place; deleting a row or a column asks first, and can be undone.</p>
 
-		<p class="credit">Dialectic Acheiropoieton of Heracles Papatheodorou and&nbsp;Claude</p>
+		<p class="credit">
+			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>
+			of Heracles Papatheodorou and&nbsp;Claude
+		</p>
 
 		<div class="modal-actions">
 			<span class="spacer"></span>
@@ -805,6 +808,10 @@
 		background: #b42318;
 		border-color: #b42318;
 		color: #fff;
+	}
+
+	.credit a {
+		color: inherit;
 	}
 
 	.credit {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
-	import type { Box, Dataset, Mapping, Template } from '$lib/types';
+	import { DEFAULT_QR } from '$lib/template';
+	import type { Box, Dataset, Mapping, QrSettings, Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
@@ -63,6 +64,12 @@
 		}
 		registerFamily(value);
 		patch({ font: value });
+	}
+
+	function setMode(mode: Box['mode']) {
+		// A QR box needs its settings the moment it becomes one, so the options
+		// bar never shows an empty control.
+		patch(mode === 'qr' ? { mode, qr: { ...DEFAULT_QR, ...selected?.qr } } : { mode });
 	}
 
 	function registerFamily(family: string) {
@@ -189,12 +196,53 @@
 
 		<label class="field">
 			<span>Mode</span>
-			<select value={selected.mode} onchange={(e) => patch({ mode: e.currentTarget.value as Box['mode'] })}>
+			<select value={selected.mode} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
 				<option value="plain">plain</option>
 				<option value="markdown">markdown</option>
 				<option value="image">image</option>
+				<option value="qr">QR code</option>
 			</select>
 		</label>
+
+		{#if selected.mode === 'image' || selected.mode === 'qr'}
+			<label class="field">
+				<span>Fit</span>
+				<select value={selected.fit ?? 'contain'} onchange={(e) => patch({ fit: e.currentTarget.value as Box['fit'] })}>
+					<option value="contain">fit</option>
+					<option value="cover">cover</option>
+					<option value="fill">stretch</option>
+				</select>
+			</label>
+		{/if}
+
+		{#if selected.mode === 'qr'}
+			<label class="field">
+				<span>Correction</span>
+				<select
+					value={selected.qr?.level ?? DEFAULT_QR.level}
+					title="How much of the code can be damaged and still scan"
+					onchange={(e) => patch({ qr: { ...DEFAULT_QR, ...selected.qr, level: e.currentTarget.value as QrSettings['level'] } })}
+				>
+					<option value="L">L — 7%</option>
+					<option value="M">M — 15%</option>
+					<option value="Q">Q — 25%</option>
+					<option value="H">H — 30%</option>
+				</select>
+			</label>
+			<label class="field">
+				<span>Quiet zone</span>
+				<input
+					class="w-4"
+					type="number"
+					min="0"
+					max="8"
+					step="1"
+					title="Blank border in modules; scanners need at least two"
+					value={selected.qr?.margin ?? DEFAULT_QR.margin}
+					onchange={(e) => patch({ qr: { ...DEFAULT_QR, ...selected.qr, margin: numeric(e, DEFAULT_QR.margin) } })}
+				/>
+			</label>
+		{/if}
 
 		<label class="field">
 			<span>Overflow</span>

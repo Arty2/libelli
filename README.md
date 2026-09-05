@@ -2,7 +2,9 @@
 
 Turn spreadsheet rows into print-ready cards, entirely in the browser.
 
-- **Project page** — https://github.com/Arty2/libelli
+- **Project page** — https://heracl.es/libelli
+- **Live instance** — https://libelli.vercel.app
+- **Source** — https://github.com/Arty2/libelli
 
 *Libelli* is the plural of *libellus*, a little book — about the size of the
 thing coming out of your printer.
@@ -77,7 +79,14 @@ Clicking a row previews it.
   commas and semicolons are told apart by sniffing, quoted fields and embedded
   newlines survive, and rows can replace or append.
 - **Import CSV** — the same parser against a file.
-- **Rename in place** — type in a column header; the cells follow the rename.
+- **Rename in place** — type in a column header; the cells and any slot bound to
+  that column follow the rename.
+- **Reorder** — ‹ › in a header move a column left or right. Row objects are
+  keyed by name, so this changes the view and nothing else.
+- **Sort** — the arrow in a header sorts the rows by that column; click again to
+  reverse it. Numbers sort by value rather than by digit, case is ignored, and
+  blanks stay at the bottom either way. This reorders the data, not just the
+  view, because row order *is* print order — and it is undoable.
 - **Add** — *+ Row* and *+ Column*, or the `+` at the end of the header row.
 - **Delete** — asks first, naming what goes: the number of filled cells for a
   column, the opening text for a row. Undoable either way.
@@ -107,6 +116,28 @@ nesting, `1.` ordered lists, `**bold**`, `*italic*`, `` `code` ``,
 Colours from a template file, a settings field or a spreadsheet cell all go
 through one parser that accepts hex and a named set and refuses everything else,
 so nothing can ride into a style attribute behind a colour.
+
+## Images and QR codes
+
+Two box modes carry something other than text. Both are framed by the box's
+declared height, and both take a **Fit**: *fit* puts the whole thing inside the
+box, *cover* fills the box and crops the overflow, *stretch* distorts it to the
+box exactly.
+
+- **Image** — a data URL, an external URL, or inline SVG held in the template.
+  A bound column can supply the URL per row.
+- **QR code** — the bound cell is encoded as a QR and drawn as SVG, so it stays
+  sharp at any print size; a raster QR at print resolution is the classic way to
+  end up with a code no phone will read. Byte mode, versions 1–10, which holds
+  213 characters at correction level M — enough for any URL worth putting on a
+  card. **Correction** trades capacity for damage tolerance (L 7% to H 30%), and
+  **Quiet zone** sets the blank border scanners need; two modules is the
+  practical minimum. Text the encoder cannot hold renders as nothing rather than
+  as a square that will not scan.
+
+The encoder is written here rather than pulled in, like the Markdown renderer
+and the CSV parser. Its tests decode what it produces with an independent
+decoder, since a QR that does not scan looks exactly like one that does.
 
 ## Fonts
 
@@ -171,8 +202,9 @@ hold <kbd>Alt</kbd> for 0.01mm.
 - **Page** — template name, width, height, default font, default text colour,
   paper colour, default size, bleed on/off, bleed amount, crop marks
 - **Box** — slot, bound column, font, size, weight, leading, alignment, colour,
-  mode (plain / markdown / image), overflow (grow / clip), X, Y, W, H, anchor,
-  anchor gap, hide when empty
+  mode (plain / markdown / image / QR), fit (image and QR), QR correction and
+  quiet zone, overflow (grow / clip), X, Y, W, H, anchor, anchor gap, hide when
+  empty
 - **View** — box outlines on/off (screen only, never printed), zoom (fit, or 50%
   to 200%)
 
@@ -225,6 +257,7 @@ worked on; `PLAN.md` is the plan it was built from.
 
 ## Credit
 
-Dialectic Acheiropoieton of Heracles Papatheodorou and&nbsp;Claude
+[Dialectic Acheiropoieton](https://heracl.es/libelli) of Heracles Papatheodorou
+and&nbsp;Claude
 
 MIT License.

@@ -7,7 +7,7 @@ describe('the built-in template', () => {
 	it('loads with its boxes, anchors and bleed intact', () => {
 		expect(template.name).toBe('A5 Instruction Card');
 		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff' });
-		expect(template.boxes.map((b) => b.id)).toEqual(['b_title', 'b_subtitle', 'b_body', 'b_category']);
+		expect(template.boxes.map((b) => b.id)).toEqual(['b_title', 'b_subtitle', 'b_body', 'b_category', 'b_qr']);
 		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 8 });
 		expect(template.boxes.find((b) => b.id === 'b_category')?.anchor).toBeNull();
 		expect(template.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });
@@ -40,6 +40,18 @@ describe('normaliseTemplate', () => {
 	it('drops anchors that point nowhere', () => {
 		const t = normaliseTemplate({ schema: 1, boxes: [{ id: 'a', slot: null, x: 0, y: 0, w: 10, h: 10, anchor: { to: 'ghost', gap: 2 } }] });
 		expect(t.boxes[0].anchor).toBeNull();
+	});
+
+	it('fills in QR settings for a qr box and clamps a silly quiet zone', () => {
+		const t = normaliseTemplate({
+			schema: 1,
+			boxes: [
+				{ id: 'a', slot: 'link', x: 0, y: 0, w: 20, h: 20, mode: 'qr' },
+				{ id: 'b', slot: 'link', x: 0, y: 0, w: 20, h: 20, mode: 'qr', qr: { level: 'X', margin: 99 } }
+			]
+		});
+		expect(t.boxes[0].qr).toEqual({ level: 'M', margin: 2 });
+		expect(t.boxes[1].qr).toEqual({ level: 'M', margin: 8 });
 	});
 
 	it('rejects anything that is not a template', () => {
