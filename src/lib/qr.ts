@@ -1,14 +1,19 @@
 /**
- * QR code generation, byte mode, versions 1–10.
+ * QR code generation, byte mode, versions 1–40.
  *
- * Hand-written like the rest of the pipeline: a QR library would be the app's
- * only runtime dependency, and this is a closed, specified problem that will
- * never need updating. Versions 1–10 hold 213 bytes at level M, which covers
- * any URL anyone will sensibly put on a card; longer input is refused rather
- * than silently truncated into an unscannable square.
+ * Hand-written like the Markdown renderer and the CSV parser: this is a closed,
+ * specified problem that will never need updating. The full version range holds
+ * 2953 bytes at level L, enough for a whole spreadsheet row; input past that is
+ * refused rather than silently truncated into an unscannable square.
  *
- * The output is SVG, so it stays sharp at any print size — a raster QR at
- * 300dpi is the classic way to end up with a code no phone will read.
+ * Capacity is not the real limit, though — physical size is. A version-40 code
+ * is 177 modules across, so at 20mm each module is 0.11mm and no phone will
+ * read it. `qrPlan` reports the module count and the print width that follows
+ * from it, so the UI can say so before someone prints a sheet of unreadable
+ * squares.
+ *
+ * The output is SVG, so it stays sharp at any size — a raster QR resampled by a
+ * printer driver is the classic way to end up with a code that will not scan.
  */
 
 import { parseColour } from './colour';
@@ -16,7 +21,7 @@ import { parseColour } from './colour';
 export type EccLevel = 'L' | 'M' | 'Q' | 'H';
 
 /**
- * Per version (1–10) and level: EC codewords per block, then the block groups
+ * Per version (1–40) and level: EC codewords per block, then the block groups
  * as [count, data codewords]. Straight from the spec's error-correction
  * characteristics table; the tests decode real codes to prove it is right.
  */
@@ -24,52 +29,44 @@ type Spec = [ec: number, g1: number, d1: number, g2: number, d2: number];
 
 const ECC: Record<EccLevel, Spec[]> = {
 	L: [
-		[7, 1, 19, 0, 0],
-		[10, 1, 34, 0, 0],
-		[15, 1, 55, 0, 0],
-		[20, 1, 80, 0, 0],
-		[26, 1, 108, 0, 0],
-		[18, 2, 68, 0, 0],
-		[20, 2, 78, 0, 0],
-		[24, 2, 97, 0, 0],
-		[30, 2, 116, 0, 0],
-		[18, 2, 68, 2, 69]
+		[7, 1, 19, 0, 0], [10, 1, 34, 0, 0], [15, 1, 55, 0, 0], [20, 1, 80, 0, 0], [26, 1, 108, 0, 0],
+		[18, 2, 68, 0, 0], [20, 2, 78, 0, 0], [24, 2, 97, 0, 0], [30, 2, 116, 0, 0], [18, 2, 68, 2, 69],
+		[20, 4, 81, 0, 0], [24, 2, 92, 2, 93], [26, 4, 107, 0, 0], [30, 3, 115, 1, 116], [22, 5, 87, 1, 88],
+		[24, 5, 98, 1, 99], [28, 1, 107, 5, 108], [30, 5, 120, 1, 121], [28, 3, 113, 4, 114], [28, 3, 107, 5, 108],
+		[28, 4, 116, 4, 117], [28, 2, 111, 7, 112], [30, 4, 121, 5, 122], [30, 6, 117, 4, 118], [26, 8, 106, 4, 107],
+		[28, 10, 114, 2, 115], [30, 8, 122, 4, 123], [30, 3, 117, 10, 118], [30, 7, 116, 7, 117], [30, 5, 115, 10, 116],
+		[30, 13, 115, 3, 116], [30, 17, 115, 0, 0], [30, 17, 115, 1, 116], [30, 13, 115, 6, 116], [30, 12, 121, 7, 122],
+		[30, 6, 121, 14, 122], [30, 17, 122, 4, 123], [30, 4, 122, 18, 123], [30, 20, 117, 4, 118], [30, 19, 118, 6, 119]
 	],
 	M: [
-		[10, 1, 16, 0, 0],
-		[16, 1, 28, 0, 0],
-		[26, 1, 44, 0, 0],
-		[18, 2, 32, 0, 0],
-		[24, 2, 43, 0, 0],
-		[16, 4, 27, 0, 0],
-		[18, 4, 31, 0, 0],
-		[22, 2, 38, 2, 39],
-		[22, 3, 36, 2, 37],
-		[26, 4, 43, 1, 44]
+		[10, 1, 16, 0, 0], [16, 1, 28, 0, 0], [26, 1, 44, 0, 0], [18, 2, 32, 0, 0], [24, 2, 43, 0, 0],
+		[16, 4, 27, 0, 0], [18, 4, 31, 0, 0], [22, 2, 38, 2, 39], [22, 3, 36, 2, 37], [26, 4, 43, 1, 44],
+		[30, 1, 50, 4, 51], [22, 6, 36, 2, 37], [22, 8, 37, 1, 38], [24, 4, 40, 5, 41], [24, 5, 41, 5, 42],
+		[28, 7, 45, 3, 46], [28, 10, 46, 1, 47], [26, 9, 43, 4, 44], [26, 3, 44, 11, 45], [26, 3, 41, 13, 42],
+		[26, 17, 42, 0, 0], [28, 17, 46, 0, 0], [28, 4, 47, 14, 48], [28, 6, 45, 14, 46], [28, 8, 47, 13, 48],
+		[28, 19, 46, 4, 47], [28, 22, 45, 3, 46], [28, 3, 45, 23, 46], [28, 21, 45, 7, 46], [28, 19, 47, 10, 48],
+		[28, 2, 46, 29, 47], [28, 10, 46, 23, 47], [28, 14, 46, 21, 47], [28, 14, 46, 23, 47], [28, 12, 47, 26, 48],
+		[28, 6, 47, 34, 48], [28, 29, 46, 14, 47], [28, 13, 46, 32, 47], [28, 40, 47, 7, 48], [28, 18, 47, 31, 48]
 	],
 	Q: [
-		[13, 1, 13, 0, 0],
-		[22, 1, 22, 0, 0],
-		[18, 2, 17, 0, 0],
-		[26, 2, 24, 0, 0],
-		[18, 2, 15, 2, 16],
-		[24, 4, 19, 0, 0],
-		[18, 2, 14, 4, 15],
-		[22, 4, 18, 2, 19],
-		[20, 4, 16, 4, 17],
-		[24, 6, 19, 2, 20]
+		[13, 1, 13, 0, 0], [22, 1, 22, 0, 0], [18, 2, 17, 0, 0], [26, 2, 24, 0, 0], [18, 2, 15, 2, 16],
+		[24, 4, 19, 0, 0], [18, 2, 14, 4, 15], [22, 4, 18, 2, 19], [20, 4, 16, 4, 17], [24, 6, 19, 2, 20],
+		[28, 4, 22, 4, 23], [26, 4, 20, 6, 21], [24, 8, 20, 4, 21], [20, 11, 16, 5, 17], [30, 5, 24, 7, 25],
+		[24, 15, 19, 2, 20], [28, 1, 22, 15, 23], [28, 17, 22, 1, 23], [26, 17, 21, 4, 22], [30, 15, 24, 5, 25],
+		[28, 17, 22, 6, 23], [30, 7, 24, 16, 25], [30, 11, 24, 14, 25], [30, 11, 24, 16, 25], [30, 7, 24, 22, 25],
+		[28, 28, 22, 6, 23], [30, 8, 23, 26, 24], [30, 4, 24, 31, 25], [30, 1, 23, 37, 24], [30, 15, 24, 25, 25],
+		[30, 42, 24, 1, 25], [30, 10, 24, 35, 25], [30, 29, 24, 19, 25], [30, 44, 24, 7, 25], [30, 39, 24, 14, 25],
+		[30, 46, 24, 10, 25], [30, 49, 24, 10, 25], [30, 48, 24, 14, 25], [30, 43, 24, 22, 25], [30, 34, 24, 34, 25]
 	],
 	H: [
-		[17, 1, 9, 0, 0],
-		[28, 1, 16, 0, 0],
-		[22, 2, 13, 0, 0],
-		[16, 4, 9, 0, 0],
-		[22, 2, 11, 2, 12],
-		[28, 4, 15, 0, 0],
-		[26, 4, 13, 1, 14],
-		[26, 4, 14, 2, 15],
-		[24, 4, 12, 4, 13],
-		[28, 6, 15, 2, 16]
+		[17, 1, 9, 0, 0], [28, 1, 16, 0, 0], [22, 2, 13, 0, 0], [16, 4, 9, 0, 0], [22, 2, 11, 2, 12],
+		[28, 4, 15, 0, 0], [26, 4, 13, 1, 14], [26, 4, 14, 2, 15], [24, 4, 12, 4, 13], [28, 6, 15, 2, 16],
+		[24, 3, 12, 8, 13], [28, 7, 14, 4, 15], [22, 12, 11, 4, 12], [24, 11, 12, 5, 13], [24, 11, 12, 7, 13],
+		[30, 3, 15, 13, 16], [28, 2, 14, 17, 15], [28, 2, 14, 19, 15], [26, 9, 13, 16, 14], [28, 15, 15, 10, 16],
+		[30, 19, 16, 6, 17], [24, 34, 13, 0, 0], [30, 16, 15, 14, 16], [30, 30, 16, 2, 17], [30, 22, 15, 13, 16],
+		[30, 33, 16, 4, 17], [30, 12, 15, 28, 16], [30, 11, 15, 31, 16], [30, 19, 15, 26, 16], [30, 23, 15, 25, 16],
+		[30, 23, 15, 28, 16], [30, 19, 15, 35, 16], [30, 11, 15, 46, 16], [30, 59, 16, 1, 17], [30, 22, 15, 41, 16],
+		[30, 2, 15, 64, 16], [30, 24, 15, 46, 16], [30, 42, 15, 32, 16], [30, 10, 15, 67, 16], [30, 20, 15, 61, 16]
 	]
 };
 
@@ -84,8 +81,41 @@ const ALIGNMENT: number[][] = [
 	[6, 22, 38],
 	[6, 24, 42],
 	[6, 26, 46],
-	[6, 28, 50]
+	[6, 28, 50],
+	[6, 30, 54],
+	[6, 32, 58],
+	[6, 34, 62],
+	[6, 26, 46, 66],
+	[6, 26, 48, 70],
+	[6, 26, 50, 74],
+	[6, 30, 54, 78],
+	[6, 30, 56, 82],
+	[6, 30, 58, 86],
+	[6, 34, 62, 90],
+	[6, 28, 50, 72, 94],
+	[6, 26, 50, 74, 98],
+	[6, 30, 54, 78, 102],
+	[6, 28, 54, 80, 106],
+	[6, 32, 58, 84, 110],
+	[6, 30, 58, 86, 114],
+	[6, 34, 62, 90, 118],
+	[6, 26, 50, 74, 98, 122],
+	[6, 30, 54, 78, 102, 126],
+	[6, 26, 52, 78, 104, 130],
+	[6, 30, 56, 82, 108, 134],
+	[6, 34, 60, 86, 112, 138],
+	[6, 30, 58, 86, 114, 142],
+	[6, 34, 62, 90, 118, 146],
+	[6, 30, 54, 78, 102, 126, 150],
+	[6, 24, 50, 76, 102, 128, 154],
+	[6, 28, 54, 80, 106, 132, 158],
+	[6, 32, 58, 84, 110, 136, 162],
+	[6, 26, 54, 82, 110, 138, 166],
+	[6, 30, 58, 86, 114, 142, 170]
 ];
+
+/** Exposed so the tests can check the table against the spec's construction rule. */
+export const ALIGNMENT_CENTRES: readonly (readonly number[])[] = ALIGNMENT;
 
 const LEVEL_BITS: Record<EccLevel, number> = { L: 0b01, M: 0b00, Q: 0b11, H: 0b10 };
 
@@ -156,12 +186,12 @@ const dataCodewords = (spec: Spec) => spec[1] * spec[2] + spec[3] * spec[4];
 const lengthBits = (version: number) => (version < 10 ? 8 : 16);
 
 function chooseVersion(byteLength: number, level: EccLevel): number {
-	for (let version = 1; version <= 10; version++) {
+	for (let version = 1; version <= 40; version++) {
 		const capacity = dataCodewords(ECC[level][version - 1]);
 		const needed = Math.ceil((4 + lengthBits(version) + byteLength * 8) / 8);
 		if (needed <= capacity) return version;
 	}
-	throw new Error('Too much text for a QR code of this size.');
+	throw new Error(`Too much text for a QR code: ${byteLength} bytes, and level ${level} holds ${qrCapacity(level)}.`);
 }
 
 function codewords(bytes: number[], version: number, level: EccLevel): number[] {
@@ -414,6 +444,51 @@ function penalty(grid: Grid): number {
 
 export interface QrOptions {
 	level?: EccLevel;
+}
+
+export interface QrPlan {
+	version: number;
+	/** modules across, excluding the quiet zone */
+	modules: number;
+	/** bytes this version and level can still hold */
+	capacity: number;
+	/**
+	 * Smallest sensible print width in mm. Half a millimetre per module is the
+	 * rule of thumb for a phone camera at arm's length; below it, scanning goes
+	 * unreliable long before it goes impossible.
+	 */
+	minimumWidthMm: number;
+}
+
+/** What encoding this text would produce, without producing it. Throws if it will not fit. */
+export function qrPlan(text: string, options: QrOptions = {}): QrPlan {
+	const level = options.level ?? 'M';
+	const bytes = new TextEncoder().encode(text).length;
+	const version = chooseVersion(bytes, level);
+	const modules = 17 + version * 4;
+	return {
+		version,
+		modules,
+		capacity: qrVersionCapacity(version, level),
+		minimumWidthMm: Math.ceil(modules * 0.5)
+	};
+}
+
+/** Bytes a given version and level can hold. */
+export const qrVersionCapacity = (version: number, level: EccLevel = 'M'): number =>
+	dataCodewords(ECC[level][version - 1]) - Math.ceil((4 + lengthBits(version)) / 8);
+
+/** The most any level can carry, so "too long" can say how long. */
+export const qrCapacity = (level: EccLevel = 'M'): number => qrVersionCapacity(40, level);
+
+/**
+ * Codewords a version and level use in total, data plus error correction.
+ * Exported for the test that checks the 160 transcribed table rows add up to
+ * the capacity the module geometry allows — a wrong row is otherwise invisible.
+ */
+export function qrBlockTotals(version: number, level: EccLevel = 'M') {
+	const [ec, g1, d1, g2, d2] = ECC[level][version - 1];
+	return { blocks: g1 + g2, data: g1 * d1 + g2 * d2, total: ec * (g1 + g2) + g1 * d1 + g2 * d2 };
 }
 
 /** The module grid: `true` is a dark module. */
