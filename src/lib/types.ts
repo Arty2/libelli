@@ -66,6 +66,13 @@ export interface QrSettings {
 	/** quiet zone in modules — the white border a scanner needs */
 	margin: number;
 	background?: string;
+	/**
+	 * `cell` encodes the bound column's value; `row` encodes a link that carries
+	 * the whole row, so a printed card can be scanned back into a table.
+	 */
+	source?: 'cell' | 'row';
+	/** for `row`: which columns travel. Empty or absent means all of them. */
+	columns?: string[];
 }
 
 export interface Anchor {

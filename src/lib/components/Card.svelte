@@ -3,6 +3,7 @@
 	import { pxToMm, resolveLayout } from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
 	import { qrSvg } from '$lib/qr';
+	import { rowUrl, toSharedRow } from '$lib/share';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
@@ -44,6 +45,7 @@
 
 	const isEmpty = (box: Box) => {
 		if (box.mode === 'image') return !(box.static?.svg || box.static?.url || box.static?.dataUrl || contentOf(box).trim());
+		if (box.mode === 'qr' && box.qr?.source === 'row') return !row || Object.values(row).every((v) => !String(v ?? '').trim());
 		return contentOf(box).trim() === '';
 	};
 
@@ -52,8 +54,17 @@
 	 * empty text, or more than a version-10 code can hold — renders as nothing
 	 * rather than as a square that no phone will read.
 	 */
+	/** Where a row link points: this page, without whatever query brought us here. */
+	const shareBase = () => (typeof location === 'undefined' ? '' : `${location.origin}${location.pathname}`);
+
 	function qrFor(box: Box): string {
-		const value = contentOf(box).trim() || box.static?.text?.trim() || '';
+		const value =
+			box.qr?.source === 'row'
+				? // The whole row, so a printed card can be scanned back into a table.
+					row
+					? rowUrl(shareBase(), toSharedRow(row, Object.keys(row), box.qr.columns))
+					: ''
+				: contentOf(box).trim() || box.static?.text?.trim() || '';
 		if (!value) return '';
 		try {
 			return fitSvg(

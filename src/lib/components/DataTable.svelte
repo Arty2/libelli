@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { SAMPLE_CSV } from '$lib/onboarding';
 	import { parseTable } from '$lib/parse';
+	import { qrPlan, qrSvg } from '$lib/qr';
+	import { rowUrl, toSharedRow } from '$lib/share';
 	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
 	import type { Dataset, Row } from '$lib/types';
 
@@ -11,17 +13,21 @@
 		onchange: (dataset: Dataset) => void;
 		/** so bindings can follow a renamed column instead of pointing at a ghost */
 		onrenamecolumn: (from: string, to: string) => void;
+		onscan: () => void;
+		/** an import that should not touch this project's rows at all */
+		onnewproject: (dataset: Dataset) => void;
 	}
 
-	let { dataset, activeRow, onactivate, onchange, onrenamecolumn }: Props = $props();
+	let { dataset, activeRow, onactivate, onchange, onrenamecolumn, onscan, onnewproject }: Props = $props();
 
 	let pasteOpen = $state(false);
 	let pendingDelete = $state<{ kind: 'row' | 'column'; index: number } | null>(null);
 	// Which column the rows were last sorted by, so the header can show it and
 	// a second click can turn it round.
 	let sortedBy = $state<{ column: string; direction: SortDirection } | null>(null);
+	let linkFor = $state<number | null>(null);
 	let pasteText = $state('');
-	let pasteMode = $state<'replace' | 'append'>('replace');
+	let pendingImport = $state<{ dataset: Dataset; source: string } | null>(null);
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let notice = $state('');
 
@@ -63,6 +69,42 @@
 		notice = '';
 		onchange({ columns, rows });
 		onrenamecolumn(from, to);
+	}
+
+	// ---- row links -----------------------------------------------------------
+
+	const shareBase = () => `${location.origin}${location.pathname}`;
+	const linkOf = (index: number) =>
+		rowUrl(shareBase(), toSharedRow(dataset.rows[index] ?? {}, dataset.columns));
+
+	const linkPlan = $derived.by(() => {
+		if (linkFor === null || !dataset.rows[linkFor]) return null;
+		const url = linkOf(linkFor);
+		try {
+			return { url, ...qrPlan(url), svg: qrSvg(url, { margin: 2 }) };
+		} catch (error) {
+			return { url, error: error instanceof Error ? error.message : 'This row is too long for a QR code.' };
+		}
+	});
+
+	async function copyLink(index: number) {
+		try {
+			await navigator.clipboard.writeText(linkOf(index));
+			notice = 'Link copied. Anyone opening it is offered the row.';
+		} catch {
+			notice = 'The browser would not let us copy — the link is in the panel below.';
+			linkFor = index;
+		}
+	}
+
+	function downloadQr(index: number) {
+		const svg = qrSvg(linkOf(index), { margin: 2 });
+		const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = `row-${index + 1}.svg`;
+		link.click();
+		URL.revokeObjectURL(url);
 	}
 
 	function shiftColumn(index: number, by: number) {
@@ -140,13 +182,34 @@
 			notice = 'Nothing recognisable in there.';
 			return;
 		}
-		commitImport(parsed);
 		pasteOpen = false;
 		pasteText = '';
+		offerImport(parsed, 'the pasted table');
 	}
 
-	function commitImport(parsed: Dataset) {
-		if (pasteMode === 'append' && dataset.columns.length) {
+	/**
+	 * Never land on top of existing rows without being told to. An empty table
+	 * has nothing to lose, so that one case skips the question.
+	 */
+	function offerImport(parsed: Dataset, source: string) {
+		if (!parsed.columns.length) {
+			notice = 'Nothing recognisable in there.';
+			return;
+		}
+		if (!dataset.columns.length && !dataset.rows.length) {
+			commitImport(parsed, 'replace');
+			return;
+		}
+		pendingImport = { dataset: parsed, source };
+	}
+
+	function commitImport(parsed: Dataset, mode: 'replace' | 'append' | 'project') {
+		pendingImport = null;
+		if (mode === 'project') {
+			onnewproject(parsed);
+			return;
+		}
+		if (mode === 'append' && dataset.columns.length) {
 			const rows = parsed.rows.map((row) => {
 				const next = emptyRow(dataset.columns);
 				for (const column of dataset.columns) {
@@ -171,7 +234,7 @@
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
-		commitImport(parseTable(await file.text()));
+		offerImport(parseTable(await file.text()), file.name);
 		input.value = '';
 	}
 
@@ -201,7 +264,7 @@
 
 	function loadSample() {
 		// Bundled, not fetched: the sample must be there even offline.
-		commitImport(parseTable(SAMPLE_CSV));
+		offerImport(parseTable(SAMPLE_CSV), 'the sample');
 	}
 </script>
 
@@ -252,6 +315,12 @@
 								{i + 1}
 							</button>
 							<span class="row-actions">
+								<button
+									class="icon"
+									title="Link and QR for this row"
+									aria-label="Link and QR for row {i + 1}"
+									onclick={() => (linkFor = linkFor === i ? null : i)}
+								>⧉⃞</button>
 								<button class="icon" title="Duplicate row" onclick={() => duplicateRow(i)}>⧉</button>
 								<button class="icon" title="Delete row" onclick={() => askDelete('row', i)}>✕</button>
 							</span>
@@ -286,6 +355,7 @@
 		<button onclick={() => fileInput?.click()}>Import CSV</button>
 		<button onclick={addRow}>+ Row</button>
 		<button onclick={addColumn}>+ Column</button>
+		<button onclick={onscan}>Scan rows in</button>
 		<button class="quiet" onclick={loadSample}>Load sample</button>
 		<input
 			bind:this={fileInput}
@@ -297,6 +367,60 @@
 	</div>
 	{#if notice}<p class="notice" role="status">{notice}</p>{/if}
 </section>
+
+{#if pendingImport}
+	<div class="modal-backdrop" role="presentation" onclick={() => (pendingImport = null)}></div>
+	<div class="modal narrow" role="dialog" aria-modal="true" aria-label="Where should the import go?">
+		<h2>
+			{pendingImport.dataset.rows.length} row{pendingImport.dataset.rows.length === 1 ? '' : 's'} from
+			{pendingImport.source}
+		</h2>
+		<p>This project already holds {dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'}. Where should they go?</p>
+		<div class="choices">
+			<button use:focusOnOpen onclick={() => commitImport(pendingImport!.dataset, 'project')}>
+				<strong>A new project</strong>
+				<span>Keeps everything here exactly as it is.</span>
+			</button>
+			<button onclick={() => commitImport(pendingImport!.dataset, 'append')}>
+				<strong>Add to these rows</strong>
+				<span>Matched on column name, then by position.</span>
+			</button>
+			<button onclick={() => commitImport(pendingImport!.dataset, 'replace')}>
+				<strong>Replace these rows</strong>
+				<span>The current rows go. Undo brings them back.</span>
+			</button>
+		</div>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (pendingImport = null)}>Cancel</button>
+		</div>
+	</div>
+{/if}
+
+{#if linkFor !== null && linkPlan}
+	<div class="modal-backdrop" role="presentation" onclick={() => (linkFor = null)}></div>
+	<div class="modal narrow" role="dialog" aria-modal="true" aria-label="Row link">
+		<h2>Row {linkFor + 1} as a link</h2>
+		{#if 'error' in linkPlan}
+			<p class="warn">{linkPlan.error}</p>
+			<p>Bind fewer columns to the code, or shorten the row.</p>
+		{:else}
+			<div class="qr-preview">{@html linkPlan.svg}</div>
+			<p class="muted">
+				Version {linkPlan.version}, {linkPlan.modules} modules — print it at least
+				<strong>{linkPlan.minimumWidthMm}mm</strong> wide, or nothing will scan it.
+			</p>
+		{/if}
+		<p class="link-text">{linkPlan.url}</p>
+		<p class="muted">The row travels inside the link itself. Nothing is uploaded, and the link works offline once the app is loaded.</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => copyLink(linkFor as number)}>Copy link</button>
+			{#if !('error' in linkPlan)}<button onclick={() => downloadQr(linkFor as number)}>Download SVG</button>{/if}
+			<button class="primary" onclick={() => (linkFor = null)}>Close</button>
+		</div>
+	</div>
+{/if}
 
 {#if pendingDelete && pendingSummary}
 	<div class="modal-backdrop" role="presentation" onclick={() => (pendingDelete = null)}></div>
@@ -318,8 +442,6 @@
 		<p>Copy the cells including the header row, then paste them here. Tabs, commas and quoted multi-line cells all work.</p>
 		<textarea bind:value={pasteText} rows="10" placeholder="title&#9;subtitle&#9;body…"></textarea>
 		<div class="modal-actions">
-			<label><input type="radio" bind:group={pasteMode} value="replace" /> Replace rows</label>
-			<label><input type="radio" bind:group={pasteMode} value="append" /> Append rows</label>
 			<span class="spacer"></span>
 			<button onclick={() => (pasteOpen = false)}>Cancel</button>
 			<button class="primary" onclick={applyPaste}>Load</button>
@@ -546,6 +668,57 @@
 		width: min(420px, 92vw);
 	}
 
+	.qr-preview {
+		width: 160px;
+		height: 160px;
+		margin: 6px auto 10px;
+	}
+
+	.qr-preview :global(svg) {
+		width: 100%;
+		height: 100%;
+	}
+
+	.link-text {
+		font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+		word-break: break-all;
+		background: #f6f6f6;
+		border-radius: 5px;
+		padding: 7px 8px;
+		max-height: 7rem;
+		overflow: auto;
+	}
+
+	.warn {
+		color: #b42318;
+	}
+
+	.choices {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin-top: 4px;
+	}
+
+	.choices button {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 2px;
+		text-align: left;
+		padding: 9px 11px;
+	}
+
+	.choices span {
+		color: #767676;
+		font-size: 11.5px;
+	}
+
+	.muted {
+		color: #767676;
+		font-size: 11.5px;
+	}
+
 	button.danger {
 		background: #b42318;
 		border-color: #b42318;
@@ -577,12 +750,6 @@
 		align-items: center;
 		gap: 10px;
 		margin-top: 12px;
-	}
-
-	.modal-actions label {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
 	}
 
 	.spacer {

@@ -1,7 +1,9 @@
 import jsQR from 'jsqr';
 import { describe, expect, it } from 'vitest';
-import { qrMatrix, qrSvg } from './qr';
+import { ALIGNMENT_CENTRES, qrBlockTotals, qrCapacity, qrMatrix, qrPlan, qrSvg, qrVersionCapacity } from './qr';
 import type { EccLevel } from './qr';
+
+const LEVELS: EccLevel[] = ['L', 'M', 'Q', 'H'];
 
 /** Blow the module grid up into RGBA pixels so a real decoder can read it. */
 function decode(text: string, level?: EccLevel): string | null {
@@ -27,6 +29,70 @@ function decode(text: string, level?: EccLevel): string | null {
 }
 
 describe('qrMatrix', () => {
+	/**
+	 * The version tables are 160 rows of transcribed spec, and a wrong row looks
+	 * exactly like a right one until something tries to read the code. Two nets:
+	 * the block structure has to add up to the version's total capacity, and a
+	 * real decoder has to get the text back at every version and every level.
+	 */
+	it('has block tables that add up to each version total', () => {
+		const mismatches: string[] = [];
+		for (let version = 1; version <= 40; version++) {
+			const size = 17 + version * 4;
+			const centres = version === 1 ? 0 : Math.floor(version / 7) + 2;
+			const alignment = version === 1 ? 0 : 25 * (centres * centres - 3) - 10 * (centres - 2);
+			const functionModules =
+				192 + // three finders with their separators
+				2 * (size - 16) + // timing
+				31 + // format information, dark module included
+				(version >= 7 ? 36 : 0) +
+				alignment;
+			const total = Math.floor((size * size - functionModules) / 8);
+			for (const level of LEVELS) {
+				const sum = qrBlockTotals(version, level).total;
+				if (sum !== total) mismatches.push(`v${version}${level}: table ${sum}, geometry ${total}`);
+			}
+		}
+		expect(mismatches).toEqual([]);
+	});
+
+	/**
+	 * The centres are transcribed too, so derive them from the spec's own rule —
+	 * evenly spaced, first fixed at 6 — and require the table to agree.
+	 */
+	it('has alignment centres matching the construction rule', () => {
+		const derived = (version: number): number[] => {
+			if (version === 1) return [];
+			const count = Math.floor(version / 7) + 2;
+			const step = version === 32 ? 26 : Math.floor((version * 4 + count * 2 + 1) / (count * 2 - 2)) * 2;
+			const out: number[] = [];
+			for (let i = 0, pos = version * 4 + 10; i < count - 1; i++, pos -= step) out.unshift(pos);
+			out.unshift(6);
+			return out;
+		};
+		for (let version = 1; version <= 40; version++) {
+			expect(ALIGNMENT_CENTRES[version - 1], `version ${version}`).toEqual(derived(version));
+		}
+	});
+
+	it('decodes at every version and every level', () => {
+		for (let version = 1; version <= 40; version++) {
+			for (const level of LEVELS) {
+				// Fill the version exactly: one byte more would roll over to the next.
+				const text = 'A'.repeat(qrVersionCapacity(version, level));
+				expect(qrPlan(text, { level }).version, `version ${version} level ${level}`).toBe(version);
+				// jsQR's own table has version 23's fourth alignment centre at 74
+				// where the spec's rule puts it at 78, so it samples our (correct)
+				// code slightly off. At M and above its error correction absorbs
+				// that; at L, 7%, it cannot. The encoder is right — see the
+				// construction-rule test above — so this one case is skipped
+				// rather than the table being bent to match a decoder bug.
+				if (version === 23 && level === 'L') continue;
+				expect(decode(text, level), `version ${version} level ${level}`).toBe(text);
+			}
+		}
+	}, 120_000);
+
 	it('produces a square grid of the right version size', () => {
 		expect(qrMatrix('hi').length).toBe(21); // version 1, 21 modules
 		expect(qrMatrix('x'.repeat(200), { level: 'L' }).length).toBe(53); // version 9
@@ -55,8 +121,22 @@ describe('qrMatrix', () => {
 	});
 
 	it('refuses input it cannot hold rather than truncating it', () => {
-		expect(() => qrMatrix('x'.repeat(400), { level: 'H' })).toThrow(/Too much text/);
+		expect(() => qrMatrix('x'.repeat(qrCapacity('H') + 1), { level: 'H' })).toThrow(/Too much text/);
 		expect(() => qrMatrix('')).toThrow(/Nothing to encode/);
+	});
+});
+
+describe('qrPlan', () => {
+	it('reports the version, module count and a print size that can be scanned', () => {
+		expect(qrPlan('https://example.com')).toMatchObject({ version: 2, modules: 25, minimumWidthMm: 13 });
+		const row = qrPlan('x'.repeat(900), { level: 'M' });
+		expect(row.version).toBeGreaterThan(20);
+		expect(row.minimumWidthMm).toBeGreaterThan(45);
+	});
+
+	it('knows what each level can hold at all', () => {
+		expect(qrCapacity('L')).toBe(2953);
+		expect(qrCapacity('H')).toBeLessThan(qrCapacity('Q'));
 	});
 });
 

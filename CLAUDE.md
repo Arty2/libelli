@@ -22,7 +22,9 @@ src/lib/
   parse.ts        CSV / TSV parsing (quoted fields, embedded newlines, delimiter sniffing)
   markdown.ts     hand-written Markdown subset -> HTML, escaping at the leaves
   layout.ts       mm geometry + anchor resolution
-  qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
+  qr.ts           QR encoding (byte mode, all 40 versions) -> SVG
+  share.ts        a row in a URL, both directions
+  projects.ts     several working sets in one browser
   table.ts        column reorder, row sorting
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
@@ -46,11 +48,18 @@ Load-bearing choices, in case they look arbitrary:
   `y` — that is how the footer stays put however long the body runs.
 - **DOM rendering, browser printing.** The editor and the printed page share one
   layout engine, so they cannot drift. `@page { size: <w>mm <h>mm; margin: 0 }`.
-- **No runtime dependencies.** The Markdown renderer, the CSV parser and the QR
-  encoder are hand-written, so the app works offline and nothing can rot
-  underneath it. `jsqr` is a dev dependency only: the tests decode generated
-  codes with an independent decoder, because a QR that does not scan looks
-  exactly like one that does.
+- **One runtime dependency, deliberately.** The Markdown renderer, the CSV
+  parser and the QR *encoder* are hand-written, so the app works offline and
+  nothing can rot underneath it. Decoding a photographed code is a different
+  problem — binarisation, perspective, error correction on damaged input — so
+  `jsqr` is a real dependency, loaded on demand when scanning starts rather than
+  shipped to everyone who only prints. It doubles as the tests' independent
+  decoder, because a QR that does not scan looks exactly like one that does.
+- **Snapshot at the boundary.** A Svelte state proxy cannot be structured-cloned
+  into IndexedDB, and the write fails inside the storage layer, not where it was
+  called. `$state.snapshot` before anything crosses into storage or history —
+  this has now cost two debugging rounds, and the storage layer warns instead of
+  swallowing the failure.
 - **Escaping and colour parsing are chokepoints.** Cell content is untrusted:
   every leaf text node is HTML-escaped in `markdown.ts`, and every colour goes
   through `colour.ts` before it can reach a `style` attribute.

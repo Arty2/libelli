@@ -96,6 +96,10 @@ function openDb(): Promise<IDBDatabase | null> {
 	return dbPromise;
 }
 
+function warn(store: string, error: unknown) {
+	if (typeof console !== 'undefined') console.warn(`libelli: ${store} store write failed`, error);
+}
+
 function tx<T>(store: string, mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest): Promise<T | undefined> {
 	return openDb().then(
 		(db) =>
@@ -105,8 +109,14 @@ function tx<T>(store: string, mode: IDBTransactionMode, run: (s: IDBObjectStore)
 					const transaction = db.transaction(store, mode);
 					const request = run(transaction.objectStore(store));
 					request.onsuccess = () => resolve(request.result as T);
-					request.onerror = () => resolve(undefined);
-				} catch {
+					request.onerror = () => {
+						warn(store, request.error);
+						resolve(undefined);
+					};
+				} catch (error) {
+					// A write that cannot be cloned — a framework proxy, say — fails
+					// here. Silence made that a ten-minute hunt once already.
+					warn(store, error);
 					resolve(undefined);
 				}
 			})

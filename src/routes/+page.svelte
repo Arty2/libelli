@@ -5,9 +5,28 @@
 	import OptionsBar from '$lib/components/OptionsBar.svelte';
 	import PagePreview from '$lib/components/PagePreview.svelte';
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
+	import ScanModal from '$lib/components/ScanModal.svelte';
 	import { collectBundleFonts, ensureTemplateFonts, installBundleFonts, uploadLocalFont } from '$lib/fonts';
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
+	import { appendSharedRow, rowFromUrl, type SharedRow } from '$lib/share';
+	import {
+		blankProjectData,
+		chooseActive,
+		createProject,
+		deleteProject,
+		listProjects,
+		loadProjectData,
+		migrateToProjects,
+		rememberProject,
+		rememberedProject,
+		renameInIndex,
+		saveIndex,
+		saveProjectData,
+		touchInIndex,
+		type ProjectData,
+		type ProjectMeta
+	} from '$lib/projects';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
@@ -18,18 +37,7 @@
 		normaliseTemplate,
 		usedSlots
 	} from '$lib/template';
-	import {
-		loadDataset,
-		loadMapping,
-		loadTemplate,
-		loadUi,
-		migrateLegacyStorage,
-		resetAll,
-		saveDataset,
-		saveMapping,
-		saveTemplate,
-		saveUi
-	} from '$lib/storage';
+	import { loadMapping, loadUi, migrateLegacyStorage, resetAll, saveMapping, saveUi } from '$lib/storage';
 	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
@@ -43,8 +51,14 @@
 	let helpOpen = $state(false);
 	let firstRun = $state(false);
 	let resetStage = $state<0 | 1 | 2>(0);
+	let resetScope = $state<'project' | 'everything'>('project');
 	let printing = $state(false);
 	let mappingPrompt = $state(false);
+	let incoming = $state<SharedRow | null>(null);
+	let scanOpen = $state(false);
+	let projects = $state<ProjectMeta[]>([]);
+	let projectId = $state<string | null>(null);
+	const project = $derived(projects.find((p) => p.id === projectId) ?? null);
 	let missingFonts = $state<FontRef[]>([]);
 	let status = $state('');
 	let templateInput = $state<HTMLInputElement | null>(null);
@@ -88,32 +102,62 @@
 
 	async function boot() {
 		await migrateLegacyStorage();
-		const storedTemplate = await loadTemplate();
-		if (storedTemplate) {
-			try {
-				template = normaliseTemplate(storedTemplate);
-			} catch {
-				template = starterTemplate();
-			}
-		}
+		projects = await migrateToProjects();
 
-		const storedDataset = await loadDataset();
-		if (storedDataset?.columns?.length) {
-			dataset = storedDataset;
-		} else {
+		if (!projects.length) {
 			// Onboarding: a first-time visitor lands on the starter card and a few
 			// rows of sample data rather than on an empty page.
-			dataset = sampleDataset();
+			const meta = await createProject('My cards', blankProjectData());
+			projects = [meta];
 			firstRun = true;
 		}
 
-		const storedMapping = loadMapping(template.name);
-		mapping = Object.keys(storedMapping).length ? storedMapping : autoMap(usedSlots(template), dataset.columns);
+		projectId = chooseActive(projects, rememberedProject());
+		await openProject(projectId as string, { seed: true });
+
+		// A link carrying a row — the path a phone camera takes when it scans a
+		// card. Offered, never added behind the user's back.
+		incoming = rowFromUrl(location.search);
+
 		ui = loadUi();
-		history = createHistory(snapshot());
 		ready = true;
 		if (firstRun) status = 'Sample cards loaded to play with. Edit the table, drag the boxes, then Print — or press ? for the tour.';
 		missingFonts = await ensureTemplateFonts(template);
+	}
+
+	/** Put a project's contents into the editor. `seed` skips saving what was there. */
+	async function openProject(id: string, { seed = false } = {}) {
+		if (!seed && projectId && projectId !== id) await persist(projectId);
+		const data = (await loadProjectData(id)) ?? blankProjectData();
+		try {
+			template = normaliseTemplate(data.template);
+		} catch {
+			template = starterTemplate();
+		}
+		dataset = data.dataset?.columns?.length ? data.dataset : { columns: [], rows: [] };
+		const stored = data.mapping && Object.keys(data.mapping).length ? data.mapping : loadMapping(template.name);
+		mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(template), dataset.columns);
+		activeRow = Math.min(data.activeRow ?? 0, Math.max(0, dataset.rows.length - 1));
+		selectedId = null;
+		projectId = id;
+		rememberProject(id);
+		// Undo is per project: one shared stack would let Ctrl+Z pull the previous
+		// project's rows into this one.
+		history = createHistory(snapshot());
+		missingFonts = await ensureTemplateFonts(template);
+	}
+
+	const currentData = (): ProjectData => ({
+		template: $state.snapshot(template),
+		dataset: $state.snapshot(dataset),
+		mapping: $state.snapshot(mapping),
+		activeRow
+	});
+
+	async function persist(id: string) {
+		await saveProjectData(id, currentData());
+		projects = touchInIndex($state.snapshot(projects), id);
+		await saveIndex($state.snapshot(projects));
 	}
 
 	// ---- undo/redo ----------------------------------------------------------
@@ -153,19 +197,15 @@
 	// ---- autosave -----------------------------------------------------------
 
 	$effect(() => {
-		if (!ready) return;
-		const saved = $state.snapshot(template);
-		const timer = setTimeout(() => void saveTemplate(saved), 300);
+		if (!ready || !projectId) return;
+		const id = projectId;
+		const data = currentData();
+		const timer = setTimeout(() => void saveProjectData(id, data), 300);
 		return () => clearTimeout(timer);
 	});
 
-	$effect(() => {
-		if (!ready) return;
-		const saved = $state.snapshot(dataset);
-		const timer = setTimeout(() => void saveDataset(saved), 300);
-		return () => clearTimeout(timer);
-	});
-
+	// The mapping is also kept by template name, so importing the same template
+	// into another project still remembers how its slots were bound.
 	$effect(() => {
 		if (!ready) return;
 		saveMapping(template.name, $state.snapshot(mapping));
@@ -235,12 +275,84 @@
 			resetStage = 0;
 			return;
 		}
-		if (typing || contactOpen) return;
+		if (typing || contactOpen || scanOpen) return;
 		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedId) {
 			event.preventDefault();
 			deleteBox();
 		}
 		if (event.key === 'Escape') selectedId = null;
+	}
+
+	// ---- projects -------------------------------------------------------------
+
+	async function newProject(data?: ProjectData) {
+		const name = window.prompt('Name for the new project', 'Untitled project');
+		if (name === null) return;
+		if (projectId) await persist(projectId);
+		const meta = await createProject(name, data ?? { ...blankProjectData(), dataset: { columns: [], rows: [] } });
+		projects = await listProjects();
+		await openProject(meta.id, { seed: true });
+		status = `Started “${meta.name}”. Nothing else was touched.`;
+	}
+
+	async function duplicateProject() {
+		if (!project) return;
+		await persist(project.id);
+		const meta = await createProject(`${project.name} copy`, currentData());
+		projects = await listProjects();
+		await openProject(meta.id, { seed: true });
+		status = `Copied to “${meta.name}”.`;
+	}
+
+	async function renameProject() {
+		if (!project) return;
+		const name = window.prompt('Rename this project', project.name);
+		if (name === null) return;
+		projects = renameInIndex($state.snapshot(projects), project.id, name);
+		await saveIndex($state.snapshot(projects));
+	}
+
+	async function removeProject() {
+		if (!project) return;
+		const rows = dataset.rows.length;
+		const ok = window.confirm(
+			`Delete “${project.name}” with its ${rows} row${rows === 1 ? '' : 's'} and its template? This one cannot be undone.`
+		);
+		if (!ok) return;
+		const gone = project.id;
+		projects = await deleteProject(gone);
+		if (!projects.length) {
+			const meta = await createProject('My cards', blankProjectData());
+			projects = [meta];
+			await openProject(meta.id, { seed: true });
+		} else {
+			await openProject(chooseActive(projects, null) as string, { seed: true });
+		}
+		status = 'Project deleted.';
+	}
+
+	// ---- rows arriving by link ----------------------------------------------
+
+	function acceptIncoming() {
+		if (!incoming) return;
+		dataset = appendSharedRow($state.snapshot(dataset), incoming);
+		activeRow = dataset.rows.length - 1;
+		if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), dataset.columns);
+		status = 'Row added from the link.';
+		dismissIncoming();
+	}
+
+	function collectScanned(shared: SharedRow) {
+		dataset = appendSharedRow($state.snapshot(dataset), shared);
+		activeRow = dataset.rows.length - 1;
+		if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), dataset.columns);
+	}
+
+	function dismissIncoming() {
+		incoming = null;
+		// Clear the query so a refresh cannot add the same row twice. `window` is
+		// explicit here because `history` is the undo stack in this file.
+		window.history.replaceState(null, '', location.pathname);
 	}
 
 	// ---- import / export ----------------------------------------------------
@@ -352,7 +464,17 @@
 		}
 		resetStage = 0;
 		const before = snapshot();
-		await resetAll();
+
+		if (resetScope === 'everything') {
+			await resetAll();
+			projects = [];
+			const meta = await createProject('My cards', blankProjectData());
+			projects = [meta];
+			await openProject(meta.id, { seed: true });
+			status = 'Everything deleted. Back to the starter card and sample data.';
+			return;
+		}
+
 		template = starterTemplate();
 		dataset = sampleDataset();
 		mapping = autoMap(usedSlots(template), dataset.columns);
@@ -360,7 +482,7 @@
 		activeRow = 0;
 		// Keep the pre-reset state one Ctrl+Z away.
 		history = record(resetHistory(history, before), snapshot());
-		status = 'Reset to the starter card and sample data. Ctrl/Cmd+Z brings your work back.';
+		status = 'This project is back to the starter card and sample data. Ctrl/Cmd+Z brings your work back.';
 	}
 </script>
 
@@ -372,6 +494,22 @@
 <div class="app">
 	<header class="toolbar">
 		<strong class="brand">libelli</strong>
+		<label class="projects">
+			<span class="sr-only">Project</span>
+			<select
+				value={projectId ?? ''}
+				title="Each project keeps its own template, rows and mapping"
+				onchange={(e) => void openProject(e.currentTarget.value)}
+			>
+				{#each projects as p (p.id)}
+					<option value={p.id}>{p.name}</option>
+				{/each}
+			</select>
+		</label>
+		<button class="quiet" onclick={() => void newProject()} title="Start an empty project">+ New</button>
+		<button class="quiet" onclick={() => void duplicateProject()} title="Copy this project">Duplicate</button>
+		<button class="quiet" onclick={() => void renameProject()}>Rename</button>
+		<button class="quiet" onclick={() => void removeProject()} title="Delete this project">Delete</button>
 		<span class="name">{template.name}</span>
 		<span class="spacer"></span>
 		<button onclick={undo} disabled={!undoable} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">↶</button>
@@ -390,6 +528,7 @@
 	<OptionsBar
 		{template}
 		{dataset}
+		{row}
 		{mapping}
 		{selected}
 		onboxchange={updateBox}
@@ -411,6 +550,17 @@
 			{#each missingFonts as font (font.ref ?? font.family)}
 				<button onclick={() => pickMissingFont(font)}>Choose {font.family} file…</button>
 			{/each}
+		</div>
+	{/if}
+
+	{#if incoming}
+		<div class="banner" role="alert">
+			<span>
+				This link carries a row: <strong>{incoming.values.find((v) => v.trim()) ?? '(empty)'}</strong>
+				{#if incoming.columns.length > 1}<span class="muted">and {incoming.columns.length - 1} more field{incoming.columns.length === 2 ? '' : 's'}</span>{/if}
+			</span>
+			<button class="primary" onclick={acceptIncoming}>Add to the table</button>
+			<button onclick={dismissIncoming}>Discard</button>
 		</div>
 	{/if}
 
@@ -451,6 +601,16 @@
 				{dataset}
 				{activeRow}
 				onactivate={(i) => (activeRow = i)}
+				onscan={() => (scanOpen = true)}
+				onnewproject={(imported) =>
+					void newProject({
+						template: $state.snapshot(template),
+						// Snapshot: a state proxy cannot be structured-cloned into IndexedDB,
+						// and the write fails at the storage layer rather than here.
+						dataset: $state.snapshot(imported),
+						mapping: {},
+						activeRow: 0
+					})}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
 					// follows it, so the card keeps rendering what it rendered before.
@@ -479,21 +639,32 @@
 {#if resetStage}
 	<div class="modal-backdrop" role="presentation" onclick={() => (resetStage = 0)}></div>
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="reset-title">
-		<h2 id="reset-title">{resetStage === 1 ? 'Delete everything in this browser?' : 'Really delete everything?'}</h2>
+		<h2 id="reset-title">
+			{resetStage === 1 ? 'What should be reset?' : `Really reset ${resetScope === 'everything' ? 'everything' : 'this project'}?`}
+		</h2>
 		{#if resetStage === 1}
-			<p>
-				This removes the saved template, all rows, the column mapping and any fonts you uploaded, then returns to
-				the starter card and sample data.
-			</p>
-			<p class="muted">Your work stays one undo away. Uploaded fonts do not — those you would have to add again.</p>
+			<label class="scope">
+				<input type="radio" bind:group={resetScope} value="project" />
+				<span>
+					<strong>This project</strong> — “{project?.name ?? 'current'}” goes back to the starter card and sample
+					data. Other projects are untouched, and one undo brings this one back.
+				</span>
+			</label>
+			<label class="scope">
+				<input type="radio" bind:group={resetScope} value="everything" />
+				<span>
+					<strong>Everything in this browser</strong> — every project, its rows and template, and the fonts you
+					uploaded. Undo cannot reach any of it.
+				</span>
+			</label>
 		{:else}
-			<p>Last chance. Press again to delete, or cancel.</p>
+			<p>Last chance. Press again to reset, or cancel.</p>
 		{/if}
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button use:focusOnOpen onclick={() => (resetStage = 0)}>Cancel</button>
 			<button class="danger" onclick={confirmReset}>
-				{resetStage === 1 ? 'Delete everything' : 'Yes, delete everything'}
+				{resetStage === 1 ? 'Reset' : `Yes, reset ${resetScope === 'everything' ? 'everything' : 'this project'}`}
 			</button>
 		</div>
 	</div>
@@ -533,6 +704,10 @@
 			<button class="primary" use:focusOnOpen onclick={() => (helpOpen = false)}>Close</button>
 		</div>
 	</div>
+{/if}
+
+{#if scanOpen}
+	<ScanModal onrow={collectScanned} onclose={() => (scanOpen = false)} />
 {/if}
 
 {#if contactOpen}
@@ -588,6 +763,26 @@
 
 	.name {
 		color: #767676;
+	}
+
+	.projects select {
+		font: 600 12px ui-sans-serif, system-ui, sans-serif;
+		max-width: 12rem;
+	}
+
+	button.quiet {
+		border-color: transparent;
+		color: #555;
+		padding: 5px 7px;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 
 	.spacer {
@@ -794,6 +989,18 @@
 		background: #b42318;
 		border-color: #b42318;
 		color: #fff;
+	}
+
+	.scope {
+		display: flex;
+		gap: 8px;
+		align-items: flex-start;
+		margin-bottom: 10px;
+		line-height: 1.45;
+	}
+
+	.scope input {
+		margin-top: 3px;
 	}
 
 	.credit a {
