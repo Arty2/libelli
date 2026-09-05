@@ -1,6 +1,8 @@
 <script lang="ts">
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
+	import SelectionTools from './SelectionTools.svelte';
+	import type { AlignEdge } from '$lib/layout';
 	import { GRID_MAJOR, GRID_MINOR, mmToPx } from '$lib/layout';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -28,6 +30,13 @@
 		onredo: () => void;
 		onaddbox: () => void;
 		onmenu: (id: string, x: number, y: number) => void;
+		/** everything currently chosen; the selection tools appear for two or more */
+		selectedBoxes: Box[];
+		onalign: (edge: AlignEdge) => void;
+		ongroup: () => void;
+		onlockselection: () => void;
+		onduplicate: () => void;
+		ondelete: () => void;
 	}
 
 	let {
@@ -51,7 +60,13 @@
 		onundo,
 		onredo,
 		onaddbox,
-		onmenu
+		onmenu,
+		selectedBoxes,
+		onalign,
+		ongroup,
+		onlockselection,
+		onduplicate,
+		ondelete
 	}: Props = $props();
 
 	const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2];
@@ -139,18 +154,32 @@
 	<!-- Editing the page happens at the page, not in a bar at the top of the
 	     window: undoing is on one side, adding a box on the other, and the view
 	     toggles are along the bottom. -->
-	<div class="corner top left">
-		<button class="square" onclick={onundo} disabled={!undoable} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
-			<Icon name="undo" size={16} />
-		</button>
-		<button class="square" onclick={onredo} disabled={!redoable} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
-			<Icon name="redo" size={16} />
-		</button>
+	<div class="rail">
+		<div class="corner">
+			<button class="square" onclick={onundo} disabled={!undoable} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
+				<Icon name="undo" size={16} />
+			</button>
+			<button class="square" onclick={onredo} disabled={!redoable} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
+				<Icon name="redo" size={16} />
+			</button>
+		</div>
+
+		{#if selectedBoxes.length > 1}
+			<SelectionTools
+				boxes={selectedBoxes}
+				frozen={!!template.locked}
+				{onalign}
+				{ongroup}
+				onlock={onlockselection}
+				{onduplicate}
+				{ondelete}
+			/>
+		{/if}
 	</div>
 
 	<div class="corner top right">
-		<button onclick={onaddbox} disabled={!!template.locked} title="Add a box to the page">
-			<Icon name="add" size={14} /> Box
+		<button onclick={onaddbox} disabled={!!template.locked} title="Add a text box to the page">
+			<Icon name="text" size={14} /> Text
 		</button>
 	</div>
 
@@ -276,6 +305,25 @@
 	.corner.right {
 		right: 12px;
 		padding: 2px 3px;
+	}
+
+	/* One column down the left edge: undo and redo always, the selection tools
+	   under them when there is a selection to act on. */
+	.rail {
+		position: absolute;
+		top: 12px;
+		left: 12px;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 8px;
+	}
+
+	.rail .corner {
+		position: static;
+		flex-direction: column;
+		padding: 4px;
+		gap: 4px;
 	}
 
 	.corner.top {

@@ -243,7 +243,8 @@
 		template = { ...template, boxes: template.boxes.map((b) => (b.id === box.id ? box : b)) };
 	}
 
-	function addBox() {
+	/** Static text: it lives in the template, so it says the same on every card. */
+	function addTextBox() {
 		const box = newBox({
 			id: nextBoxId(template.boxes),
 			slot: null,
@@ -252,7 +253,7 @@
 			w: 80,
 			h: 12,
 			mode: 'plain',
-			static: { text: 'New box' }
+			static: { text: 'Text' }
 		});
 		template = { ...template, boxes: [...template.boxes, box] };
 		selectedIds = [box.id];
@@ -600,43 +601,12 @@
 			{dataset}
 			{mapping}
 			{selected}
-			{selectedBoxes}
 			onboxchange={updateBox}
 			ontemplatechange={applyTemplate}
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
 			onarrange={arrange}
-			onalign={alignSelection}
-			onlockselection={lockSelection}
-			ongroup={groupSelection}
-			onresettemplate={resetTemplate}
-			onuploadfont={(file) => handleFontUpload(file)}
-			onuploadbackground={(file) => void handleBackgroundUpload(file)}
-			onnotice={(message) => (status = message)}
-			onimporttemplate={() => templateInput?.click()}
-			onexporttemplate={doExportTemplate}
-			oneditcss={() => (cssOpen = true)}
-		/>
-	{/if}
-
-	{#if selectedIds.length > 1}
-		<OptionsBar
-			section="selection"
-			{template}
-			{dataset}
-			{mapping}
-			{selected}
-			{selectedBoxes}
-			onboxchange={updateBox}
-			ontemplatechange={applyTemplate}
-			onmappingchange={(m) => (mapping = m)}
-			onduplicate={duplicateBox}
-			ondelete={deleteBox}
-			onarrange={arrange}
-			onalign={alignSelection}
-			onlockselection={lockSelection}
-			ongroup={groupSelection}
 			onresettemplate={resetTemplate}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
@@ -654,16 +624,12 @@
 			{dataset}
 			{mapping}
 			{selected}
-			{selectedBoxes}
 			onboxchange={updateBox}
 			ontemplatechange={applyTemplate}
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
 			onarrange={arrange}
-			onalign={alignSelection}
-			onlockselection={lockSelection}
-			ongroup={groupSelection}
 			onresettemplate={resetTemplate}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
@@ -739,8 +705,14 @@
 			{redoable}
 			onundo={undo}
 			onredo={redo}
-			onaddbox={addBox}
+			onaddbox={addTextBox}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
+			{selectedBoxes}
+			onalign={alignSelection}
+			ongroup={groupSelection}
+			onlockselection={lockSelection}
+			onduplicate={duplicateBox}
+			ondelete={deleteBox}
 		/>
 
 		<aside>
@@ -806,9 +778,9 @@
 		<h3>Getting cards out</h3>
 		<p><strong>Export</strong> opens one screen showing every card as a small page. Untick any you do not want, then <strong>Print</strong>, or <strong>Export PNG</strong> for one 300 dpi file per page. The print checklist sits under the pages, because those four settings decide whether what you saw is what comes out.</p>
 
-		<h3>Fields and decorative boxes</h3>
-		<p>A box's <strong>Field</strong> is the template's own name for what the box holds — <em>title</em>, <em>body</em>, and so on. The template names fields; the <strong>Column</strong> beside it says which spreadsheet column fills this one. That indirection is the point: the same template works against another spreadsheet by rebinding the columns, and no data is carried inside the template file.</p>
-		<p>Leave the Field blank and the box is <strong>decorative</strong>: bound to nothing, showing the same text or picture on every card. Type it straight into the box's own Text field.</p>
+		<h3>What a box holds</h3>
+		<p>A box's <strong>Field</strong> is the template's own name for what it holds — <em>title</em>, <em>body</em>, and so on. The template names fields; the <strong>Column</strong> beside it says which spreadsheet column fills this one. That indirection is the point: the same template works against another spreadsheet by rebinding the columns, and no data is carried inside the template file.</p>
+		<p><strong>Content</strong> says where a box gets what it shows. A <strong>Data Field</strong> binds it to a column, so it changes card to card. <strong>Static Text</strong> is typed into the box and saved in the template, not in the data — the same on every card, travelling with the design. <strong>Decorative</strong> is neither: a box kept for its fill, its border or its size. <em>+ Text</em> beside the page adds a static text box.</p>
 
 		<h3>Keys</h3>
 		<dl class="keys">
@@ -828,7 +800,7 @@
 		<p>Right-click a box for its stacking order, lock, duplicate and delete — the same actions are in its bar. Boxes paint in the order they are listed, so <em>Bring to Front</em> is a move to the end of that list rather than a z-index to keep track of. A red corner on a box means its content does not fit and the print will clip it.</p>
 
 		<h3>Several at once</h3>
-		<p>Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them. Dragging any one moves the whole set, and the bar that appears lines them up against the box that encloses them all — left, centre, right, top, middle, bottom. Lock, duplicate and delete apply to the lot.</p>
+		<p>Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them. Dragging any one moves the whole set, and a column of icons appears beside the page, under undo and redo, to line them up against the box that encloses them all — left, centre, right, top, middle, bottom — and to group, lock, duplicate or delete the lot. Right-click carries the same set with its wording.</p>
 		<p><strong>Group</strong> makes that selection stick: clicking any member picks up all of them, until you ungroup. An anchored box cannot also be lined up vertically — an anchor would move it straight back — so aligning that way releases the anchor and says so.</p>
 
 		<h3>Type</h3>

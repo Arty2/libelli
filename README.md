@@ -73,9 +73,10 @@ resize boxes directly, or type exact millimetres.
   is a move to the end of that list rather than a z-index to keep in step. In
   the box bar and on right-click.
 - **Several at once** — shift-click (or Ctrl/Cmd-click) to build a selection,
-  Ctrl/Cmd+A for all of them. Dragging any one moves the set; a bar appears to
-  line them up against the box that encloses them all — left, centre, right,
-  top, middle, bottom — and to lock, duplicate or delete the lot. **Group** makes
+  Ctrl/Cmd+A for all of them. Dragging any one moves the set; a column of icons
+  appears beside the page, under undo and redo, to line them up against the box
+  that encloses them all — left, centre, right, top, middle, bottom — and to
+  lock, duplicate or delete the lot. **Group** makes
   a selection stick, so clicking any member picks up all of them; it is a shared
   name on each box rather than a container, which keeps the box list flat and
   leaves anchoring and stacking alone. Right-clicking inside a selection offers
@@ -85,8 +86,12 @@ resize boxes directly, or type exact millimetres.
   One consequence worth stating: an anchored box takes its top from another box,
   so lining it up vertically would be undone on the next render. Aligning that
   way releases the anchor, and says so. Horizontal alignment never touches one.
-- **Decorative boxes** — leave a box's **Field** blank and it is bound to
-  nothing: the same text or picture on every card, typed straight into the box.
+- **Where a box gets its content** — one choice with three answers. A **Data
+  Field** binds it to a spreadsheet column, so it changes card to card. **Static
+  Text** is typed into the box and saved in the template, so it says the same on
+  every card and travels with the design rather than with the data.
+  **Decorative** is neither: a box kept for its fill, its border or its size.
+  *+ Text* on the page adds a static text box.
 - **Overflow** — a red corner appears on a box whose content is taller than the
   box will let it be, because a clipped card looks fine on screen right up until
   it is printed.
@@ -298,11 +303,13 @@ Both bars run in groups, outward from the thing itself:
   horizontal and vertical, and stacking order · surface (fill, padding, border
   width, style and colour, radius) · position · size and overflow · flow
   (anchor, gap, hide when empty) · then the actions: lock, duplicate, delete
-- **Selection** — with more than one box chosen the box bar gives way to this
-  one: the six alignments, then group, lock, duplicate, delete
+- **Selection** — not a bar at all: with more than one box chosen, a column of
+  icons appears beside the page under undo and redo — the six alignments, then
+  group, lock, duplicate, delete. The right-click menu carries the same set with
+  its wording.
 
-Undo, redo and *+ Box* sit at the corners of the page rather than in the window's
-toolbar, next to the thing they act on. The top toolbar holds only what is about
+Undo and redo sit in a column at the page's top-left corner and *+ Text* at its
+top-right, rather than in the window's toolbar, next to the thing they act on. The top toolbar holds only what is about
 the whole app: Help, Page Setup, Export.
 - **View** — in the bottom corners of the page itself, not the toolbar: grid and
   box outlines at the left (screen only, never printed), zoom (fit, or 50% to

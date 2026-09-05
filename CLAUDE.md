@@ -34,7 +34,8 @@ src/lib/
   storage.ts      localStorage + IndexedDB, plus the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
   version.ts      VERSION, and the bumping rule
-  components/     Card, PagePreview, DataTable, OptionsBar, PrintPreview, PrintRoot, BoxMenu, Icon
+  components/     Card, PagePreview, DataTable, OptionsBar, PrintPreview, PrintRoot, BoxMenu,
+                  SelectionTools, Icon
 src/routes/+page.svelte   all app state and wiring
 static/sample-cards.csv   sample data, bundled with ?raw and also served as a file
 ```
@@ -69,12 +70,19 @@ Load-bearing choices, in case they look arbitrary:
 - **Both option bars read in groups**, outward from the subject: what the thing
   is, then its type, then how it looks, then where it sits, then what you can do
   to it. A new control goes in the group it belongs to rather than on the end.
-- **Controls sit next to what they act on.** Undo, redo and *+ Box* are at the
-  page's corners, the view toggles along its bottom edge; the window toolbar
-  holds only what is about the whole app. A right-click menu on a box carries
+- **Controls sit next to what they act on.** Undo and redo are a column at the
+  page's top-left corner with the selection tools under them, *+ Text* is at the
+  top-right, and the view toggles are along the bottom edge; the window toolbar
+  holds only what is about the whole app. Tools that come and go with a
+  selection belong on that rail rather than in the options bar, where they would
+  shove every other control sideways each time a second box was picked up. A right-click menu on a box carries
   the same actions its bar does — neither is the only way to reach them. Only
   the primary pointer button drags: a right-click that started one would collapse
   a multi-selection before the menu it opened could act on the rest.
+- **A box's content source is read, not stored.** A bound box has a `slot`, a
+  static one carries its own `static` content, and a box with neither is
+  decorative. Storing that as a fourth field would only give it something to
+  disagree with.
 - **A group is a shared name, not a container.** `Box.group` keeps the box list
   flat, so grouping cannot disturb anchoring, stacking or measurement; selecting
   one member expands to the whole group in `selectBox`. `alignBoxes` works on
