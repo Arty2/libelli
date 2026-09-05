@@ -302,6 +302,12 @@ npm run build    # static output in ./build, deployable anywhere
 - **Version** — `src/lib/version.ts` is the source of truth, kept in step with
   `package.json`. A fix is a patch (0.1.0 → 0.1.1), a feature is a minor
   (0.1.1 → 0.2.0), and the leading zero never moves.
+- **Deploying** — `npm run build` writes a static site to `build/`; any static
+  host serves it. `vercel.json` states the build command and output directory
+  outright and turns the framework preset off, because Vercel reads this as a
+  plain Vite app and goes looking for `dist/`. Not the SvelteKit preset: that
+  expects the Vercel adapter's `.vercel/output`, which would mean serverless
+  functions this app has no use for.
 
 `CLAUDE.md` covers the load-bearing decisions and how the code is meant to be
 worked on; `PLAN.md` is the plan it was built from.
