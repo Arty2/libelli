@@ -1,0 +1,26 @@
+{
+	"name": "libelli",
+	"private": true,
+	"version": "0.2.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"test": "vitest run --config vitest.config.ts"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-static": "^3.0.10",
+		"@sveltejs/kit": "^2.70.3",
+		"@sveltejs/vite-plugin-svelte": "^5.0.3",
+		"jsqr": "^1.4.0",
+		"svelte": "^5.57.0",
+		"svelte-check": "^4.7.6",
+		"typescript": "~5.9.3",
+		"vite": "^6.3.5",
+		"vitest": "^3.2.4"
+	},
+	"license": "MIT",
+	"description": "Turn spreadsheet rows into print-ready cards, entirely in the browser."
+}
