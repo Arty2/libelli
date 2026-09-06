@@ -7,12 +7,13 @@
 	import OptionsBar from '$lib/components/OptionsBar.svelte';
 	import PagePreview from '$lib/components/PagePreview.svelte';
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
-	import { resolveBackground, uploadBackgroundImage } from '$lib/assets';
+	import { isDroppableImage, readImageAsDataUrl, resolveBackground, uploadBackgroundImage } from '$lib/assets';
 	import { download, slugify } from '$lib/download';
 	import { ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
 	import { GRID_MINOR, alignBoxes, type AlignEdge } from '$lib/layout';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
+	import { parseTable } from '$lib/parse';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { VERSION } from '$lib/version';
 	import {
@@ -87,6 +88,14 @@
 	let updateReady = $state(false);
 	/** The browser is offering an install, so the toolbar can offer one too. */
 	let installable = $state(false);
+
+	/**
+	 * Pictures dropped onto a box, box id -> data URL, for this session only.
+	 * Not in the template and not in storage: see the note on Card's prop.
+	 */
+	let transient = $state<Record<string, string>>({});
+	/** A file is over the window; the overlay says where it will land. */
+	let dragging = $state(false);
 	let templateInput = $state<HTMLInputElement | null>(null);
 	let missingFontInput = $state<HTMLInputElement | null>(null);
 	let missingFontTarget = $state<FontRef | null>(null);
@@ -353,6 +362,10 @@
 	function resetTemplate() {
 		template = starterTemplate();
 		selectedIds = [];
+		// The pictures belonged to the design that just went. A template file
+		// carries its own box ids, so keeping them risks a dropped picture
+		// reappearing on an unrelated area that happens to share an id.
+		transient = {};
 		mapping = autoMap(usedSlots(template), dataset.columns);
 		notify('Template reset to the starter card. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
 	}
@@ -626,15 +639,20 @@
 		notify('Template exported — fonts referenced by name.');
 	}
 
-	async function importTemplate(event: Event) {
+	function importTemplate(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
 		input.value = '';
-		if (!file) return;
+		if (file) void loadTemplateFile(file);
+	}
+
+	/** Split from the input handler so a dropped file lands in the same place. */
+	async function loadTemplateFile(file: File) {
 		try {
 			const raw = JSON.parse(await file.text());
 			template = normaliseTemplate(raw);
 			selectedIds = [];
+			transient = {};
 			// Never assume the mapping: a template is shared between spreadsheets.
 			const stored = loadMapping(template.name);
 			mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(template), dataset.columns);
@@ -644,6 +662,119 @@
 		} catch (error) {
 			notify(error instanceof Error ? error.message : 'That file is not a template.', 'warning');
 		}
+	}
+
+	// ---- dropped files ------------------------------------------------------
+
+	/**
+	 * One drop handler for the whole app rather than one per component. Every
+	 * handler it calls already took a `File`, and `Card` already puts
+	 * `data-box-id` on every box, so the box under the pointer can be found
+	 * without giving the render path anything new to do.
+	 */
+	function onDragOver(event: DragEvent) {
+		if (!event.dataTransfer?.types.includes('Files')) return;
+		event.preventDefault();
+		event.dataTransfer.dropEffect = 'copy';
+		dragging = true;
+	}
+
+	function onDragLeave(event: DragEvent) {
+		// Only when the pointer has actually left the window: dragging across a
+		// child element fires leave on the one being left.
+		if (event.relatedTarget === null) dragging = false;
+	}
+
+	async function onDrop(event: DragEvent) {
+		dragging = false;
+		const file = event.dataTransfer?.files?.[0];
+		if (!file) return;
+		event.preventDefault();
+
+		const name = file.name.toLowerCase();
+		if (isDroppableImage(file)) {
+			// A picture dropped on a box is that box's; anywhere else it is the
+			// page's. The target answers the question, so nothing has to be asked.
+			const boxId = (event.target as HTMLElement | null)?.closest('[data-box-id]')?.getAttribute('data-box-id');
+			if (boxId) await dropImageOnBox(boxId, file);
+			else await handleBackgroundUpload(file);
+			return;
+		}
+		if (name.endsWith('.json')) {
+			await loadTemplateFile(file);
+			return;
+		}
+		if (/\.(woff2?|otf|ttf)$/.test(name)) {
+			await handleFontUpload(file);
+			return;
+		}
+		if (/\.(csv|tsv|txt)$/.test(name)) {
+			try {
+				const parsed = parseTable(await file.text());
+				if (!parsed.columns.length) throw new Error('empty');
+				applyDataset(parsed);
+				notify(`${parsed.rows.length} row${parsed.rows.length === 1 ? '' : 's'} loaded from ${file.name}.`);
+			} catch {
+				notify(`${file.name} could not be read as a table.`, 'warning');
+			}
+			return;
+		}
+		notify(`libelli does not know what to do with ${file.name}.`, 'warning');
+	}
+
+	/**
+	 * A dropped picture is held for this session and never written down — not
+	 * into the template, not into storage. A photo baked into a box would put
+	 * megabytes into a file that is meant to be small enough to paste into a
+	 * message, which is the same reason a font and a background are named rather
+	 * than carried.
+	 *
+	 * The box itself is not touched either. Marking it `mode: 'image'` would be
+	 * saved, and on a box bound to a column it would go on reading that column
+	 * as an image address after the picture was gone — a broken image where
+	 * there used to be text. Nothing about the design changed, so nothing is
+	 * recorded and there is no undo entry to make. The badge on the box and this
+	 * notice are what stop the picture vanishing being a surprise.
+	 */
+	async function dropImageOnBox(boxId: string, file: File) {
+		const box = template.boxes.find((b) => b.id === boxId);
+		if (!box) return;
+		if (box.locked || template.locked) {
+			notify('That area is locked. Unlock it to drop a picture on it.', 'warning');
+			return;
+		}
+		try {
+			transient = { ...transient, [boxId]: await readImageAsDataUrl(file) };
+			selectBox(boxId);
+			notify(
+				`${file.name} is showing in this area for now. It is not saved with the template and a reload will clear it — the badge on the area takes it off again.`
+			);
+		} catch {
+			notify('That image could not be read.', 'warning');
+		}
+	}
+
+	function clearTransient(boxId: string) {
+		const { [boxId]: gone, ...rest } = transient;
+		if (!gone) return;
+		transient = rest;
+		notify('Picture removed. The area is showing what the template says again.');
+	}
+
+	/**
+	 * Named, so both the table and a dropped file can hand a dataset over.
+	 *
+	 * A binding pointing at a column the new table does not have renders as
+	 * nothing, so a spreadsheet with different headers used to blank every box
+	 * on the card at once. Bindings that still resolve are kept — a rebinding
+	 * nobody asked for is worse than a blank — and only the dead ones are filled
+	 * in again by name.
+	 */
+	function applyDataset(next: Dataset) {
+		dataset = next;
+		const columns = new Set(next.columns);
+		const kept = Object.fromEntries(Object.entries(mapping).filter(([, column]) => columns.has(column)));
+		mapping = { ...autoMap(usedSlots(template), next.columns), ...kept };
 	}
 
 	async function handleFontUpload(file: File, family?: string) {
@@ -740,7 +871,27 @@
 	<title>libelli</title>
 </svelte:head>
 
-<div class="app">
+<!-- svelte-ignore a11y_no_static_element_interactions -- a drop target, not a control -->
+<div
+	class="app"
+	ondragover={onDragOver}
+	ondragleave={onDragLeave}
+	ondrop={(event) => void onDrop(event)}
+>
+	{#if dragging}
+		<!-- Says what will happen before it happens: a file dropped on nothing in
+		     particular is not the same as one dropped on a box. -->
+		<div class="drop-veil">
+			<div class="drop-note">
+				<Icon name="image" size={18} />
+				<strong>Drop it anywhere</strong>
+				<span>
+					A picture on an area fills that area, elsewhere it becomes the page background. A spreadsheet replaces the
+					table, a <code>.json</code> loads as a template, a font file installs here.
+				</span>
+			</div>
+		</div>
+	{/if}
 	<header class="toolbar">
 		<strong class="brand">libelli</strong>
 		<span class="spacer"></span>
@@ -878,6 +1029,8 @@
 			rowCount={dataset.rows.length}
 			onactivate={(i) => (activeRow = i)}
 			{background}
+			{transient}
+			ontransientclear={clearTransient}
 			onselect={selectBox}
 			onchange={updateBox}
 			onbounds={(show) => (ui = { ...ui, showBounds: show })}
@@ -913,10 +1066,7 @@
 						Object.entries(mapping).map(([slot, column]) => [slot, column === from ? to : column])
 					);
 				}}
-				onchange={(next) => {
-					dataset = next;
-					if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), next.columns);
-				}}
+				onchange={applyDataset}
 			/>
 		</aside>
 		{/if}
@@ -992,6 +1142,20 @@
 		<h3>Getting cards out</h3>
 		<p><strong>Export</strong> — the button, or <strong>Ctrl/Cmd + P</strong> — opens one screen showing every card as a small page. The browser's own print dialog is taken over rather than left to fire: it would print the editor rather than the cards. Pressing it again from that screen sends the run.</p>
 		<p>Untick any card you do not want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The print checklist sits under the pages, because those four settings decide whether what you saw is what comes out.</p>
+
+		<h3>Dropping files in</h3>
+		<p>
+			Drag a file onto the window and libelli works out what it is: a spreadsheet replaces the table, a
+			<code>.json</code> loads as a template, a font file installs here, and a picture becomes the page background —
+			or, dropped straight onto an area, fills that area.
+		</p>
+		<p>
+			A picture on an area is <strong>not saved</strong>. It shows, it prints and it comes out in a PNG, but it is
+			never written into the template: a photo inside a template file would spoil the one thing that makes a template
+			worth having, that it is small enough to hand to somebody. The area wears an amber mark while the picture is
+			there — click it to take the picture off — and a reload clears it. To keep one, give the area a
+			<strong>Source</strong> address, or make it the page background.
+		</p>
 
 		<h3>What an area holds</h3>
 		<p>An area's <strong>Field</strong> is the template's own name for what it holds — <em>title</em>, <em>body</em>, and so on. The template names fields; the <strong>Column</strong> beside it says which spreadsheet column fills this one. That indirection is the point: the same template works against another spreadsheet by rebinding the columns, and no data is carried inside the template file.</p>
@@ -1077,6 +1241,7 @@
 		{mapping}
 		{activeRow}
 		{background}
+		{transient}
 		excluded={excludedRows}
 		onactivate={(i) => (activeRow = i)}
 		onexcludedchange={(next) => (excludedRows = next)}
@@ -1087,7 +1252,7 @@
 {/if}
 
 {#if printing}
-	<PrintRoot {template} {dataset} {mapping} {background} excluded={excludedRows} />
+	<PrintRoot {template} {dataset} {mapping} {background} {transient} excluded={excludedRows} />
 {/if}
 
 <style>
@@ -1186,6 +1351,34 @@
 
 	.muted {
 		color: #767676;
+	}
+
+	/* Above everything, and click-through: the drop lands on whatever is really
+	   under the pointer, which is how a box gets to claim it. */
+	.drop-veil {
+		position: fixed;
+		inset: 0;
+		z-index: 50;
+		display: grid;
+		place-items: center;
+		background: rgba(17, 17, 17, 0.35);
+		pointer-events: none;
+	}
+
+	.drop-note {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+		max-width: 380px;
+		padding: 18px 22px;
+		text-align: center;
+		font-size: 12px;
+		line-height: 1.5;
+		color: #111;
+		background: #fff;
+		border: 2px dashed #2563eb;
+		border-radius: 6px;
 	}
 
 	.banner {

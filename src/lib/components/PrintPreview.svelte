@@ -12,6 +12,8 @@
 		mapping: Mapping;
 		activeRow: number;
 		background: string | null;
+		/** pictures dropped onto a box this session; they print and export */
+		transient: Record<string, string>;
 		/** row indices left out of the print; empty means every page goes */
 		excluded: Set<number>;
 		onactivate: (index: number) => void;
@@ -27,6 +29,7 @@
 		mapping,
 		activeRow,
 		background,
+		transient,
 		excluded,
 		onactivate,
 		onexcludedchange,
@@ -198,7 +201,7 @@
 					aria-label="Open card {i + 1} full screen"
 				>
 					<span class="scaler" style="transform:scale({thumbScale})">
-						<Card {template} {row} {mapping} pageNumber={i + 1} {background} />
+						<Card {template} {row} {mapping} pageNumber={i + 1} {background} {transient} />
 					</span>
 				</button>
 				<figcaption>
@@ -241,7 +244,7 @@
 			</button>
 			<div class="full-card" role="presentation" onclick={(e) => e.stopPropagation()} style="width:{mmToPx(outerW) * fullScale}px;height:{mmToPx(outerH) * fullScale}px">
 				<span class="scaler" style="transform:scale({fullScale})">
-					<Card {template} row={dataset.rows[index]} {mapping} pageNumber={index + 1} {background} />
+					<Card {template} row={dataset.rows[index]} {mapping} pageNumber={index + 1} {background} {transient} />
 				</span>
 			</div>
 			<!-- Under the card with the count between them: the two arrows and the

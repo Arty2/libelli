@@ -338,6 +338,27 @@ its neighbours as it passes them, and a guide shows what it caught. There is no
 key to hold for free movement — switch **Grid** and **Bounds** both off and
 nothing latches, because a box should never snap to a guide you cannot see.
 
+## Dropping files in
+
+Drag a file anywhere onto the window and libelli works out what it is:
+
+| Dropped | What happens |
+| --- | --- |
+| `.csv` `.tsv` `.txt` | Replaces the table. Bindings that still resolve are kept; the rest are matched to the new columns by name |
+| `.json` | Loads as a template |
+| `.woff2` `.woff` `.otf` `.ttf` | Installs the font in this browser |
+| A picture, **on an area** | Shows in that area for this session |
+| A picture, anywhere else | Becomes the page background |
+
+A picture dropped on an area is deliberately **not saved**. It shows on screen,
+it prints, and it comes out in a PNG export — but it is not written into the
+template and not kept in the browser, because a photo inside a template file
+would ruin the one thing that makes a template worth having: that it is small
+enough to paste into a message. The area carries an amber mark while the picture
+is there, saying so; clicking that mark takes the picture off again, and a reload
+does the same. To keep a picture, give the area a **Source** address or use it as
+the page background, both of which are saved.
+
 ## Installing it, and working offline
 
 libelli keeps a copy of itself in the browser, so it opens with the network off

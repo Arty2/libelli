@@ -144,6 +144,17 @@ Load-bearing choices, in case they look arbitrary:
   margins no longer collapse out of the box, which the existing
   `:first-child { margin-top: 0 }` rules already absorb. Measurement is
   unaffected — `measure()` reads the box's own `offsetHeight`.
+- **A dropped picture is a session, not a change.** An image dropped on a box is
+  held in `transient` — box id to data URL, in memory, passed to `Card` as a
+  resolved prop the way `background` is. Nothing is written: not the template,
+  not IndexedDB. It is a data URL rather than an object URL because `png.ts`
+  rasterises through an SVG `foreignObject`, which resolves no external
+  reference at all — a `blob:` or `https:` `<img src>` exports blank, and a
+  `data:` one comes out. And the box itself is left alone: setting `mode:
+  'image'` would be saved, and on a box bound to a column it would go on
+  reading that column as an image address after the picture was gone. The badge
+  is a button that takes the picture off, and shows whatever Bounds says,
+  because it warns of loss rather than explaining geometry.
 - **Big things are referenced, never embedded.** A template names a font family
   and a background image; the bytes live in IndexedDB, keyed by that name, and a
   file the browser has never been given is asked for rather than substituted.
