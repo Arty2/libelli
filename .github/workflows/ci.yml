@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A force-push supersedes the run it interrupts, and finishing that run buys
+# nothing. This is where the minutes actually go on a branch under review.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Fastest signal first, so a broken unit fails in seconds rather than
+      # after a build. One job rather than a matrix: this app targets browsers,
+      # not several Node versions, so a matrix would triple the minutes for
+      # nothing.
+      - run: npm test
+
+      - run: npm run check
+
+      - run: npm run build
