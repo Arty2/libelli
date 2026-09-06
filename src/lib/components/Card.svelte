@@ -5,7 +5,7 @@
 	import { fontStack } from '$lib/fonts';
 	import { FREE_STEP, GRID_MINOR, boxEdges, pxToMm, resolveLayout, snapTo, snapToEdges } from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
-	import { borderSides } from '$lib/template';
+	import { sidesOf } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -13,8 +13,8 @@
 		template: Template;
 		row?: Row | null;
 		mapping?: Mapping;
-		/** dashed box outlines and the bleed marker; screen only, never printed */
-		outlines?: boolean;
+		/** dashed box bounds and the bleed marker; screen only, never printed */
+		bounds?: boolean;
 		/** snap drags to the 5mm subgrid rather than to sibling edges */
 		grid?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
@@ -41,7 +41,7 @@
 		template,
 		row = null,
 		mapping = {},
-		outlines = false,
+		bounds = false,
 		grid = false,
 		scale = 1,
 		interactive = false,
@@ -179,12 +179,15 @@
 		if (box.italic) parts.push('font-style:italic');
 		if (box.textCase === 'uppercase') parts.push('text-transform:uppercase');
 		if (box.textCase === 'smallcaps') parts.push('font-variant-caps:small-caps');
-		if (box.padding) parts.push(`padding:${box.padding}mm`);
+		if (box.padding) {
+			const p = sidesOf(box.padding);
+			parts.push(`padding:${p.top}mm ${p.right}mm ${p.bottom}mm ${p.left}mm`);
+		}
 		if (box.background) parts.push(`background:${box.background}`);
 		// `.box` is border-box, so a border eats into the width rather than adding
 		// to it: the box still occupies exactly the millimetres it was given.
 		if (box.borderWidth) {
-			const { top, right, bottom, left } = borderSides(box.borderWidth);
+			const { top, right, bottom, left } = sidesOf(box.borderWidth);
 			parts.push(
 				`border-width:${top}mm ${right}mm ${bottom}mm ${left}mm`,
 				`border-style:${box.borderStyle ?? 'solid'}`,
@@ -273,29 +276,33 @@
 	}
 
 	/**
-	 * Snapping, strongest first: Alt is an escape hatch to free movement, an
-	 * enabled grid wins over everything else, and otherwise a box latches onto a
-	 * sibling's edge when it comes within `SNAP_TOLERANCE`. Sibling edges come
-	 * from the resolved layout, so a box snaps to where a grown box really ends.
+	 * Snapping, strongest first: an enabled grid wins over everything else, and
+	 * otherwise a box latches onto a sibling's edge when it comes within
+	 * `SNAP_TOLERANCE`. Sibling edges come from the resolved layout, so a box
+	 * snaps to where a grown box really ends.
+	 *
+	 * There is no modifier to hold: the two toggles under the page are the whole
+	 * control. Grid off and Bounds off is free movement, because a box cannot
+	 * latch onto a guide that is not being drawn — a snap to an invisible edge is
+	 * indistinguishable from a bug.
 	 */
 	const SNAP_TOLERANCE = 1.5;
 
 	function moveDrag(event: PointerEvent) {
 		if (!drag) return;
-		const free = event.altKey;
-		const edges = free || grid ? { x: [], y: [] } : boxEdges(template.boxes, layout, drag.id);
+		const latch = !grid && bounds;
+		const edges = latch ? boxEdges(template.boxes, layout, drag.id) : { x: [], y: [] };
 		const latched = { x: null as number | null, y: null as number | null };
 
 		const place = (value: number, axis: 'x' | 'y'): number => {
-			if (free) return snapTo(value, FREE_STEP);
 			if (grid) return snapTo(value, GRID_MINOR);
-			const hit = snapToEdges(value, edges[axis], SNAP_TOLERANCE);
-			if (hit === null) return snapTo(value, 0.5);
+			const hit = latch ? snapToEdges(value, edges[axis], SNAP_TOLERANCE) : null;
+			if (hit === null) return snapTo(value, FREE_STEP);
 			latched[axis] = hit;
 			return hit;
 		};
 		// A size is not a position: it rounds, but it never latches onto an edge.
-		const size = (value: number) => (free ? snapTo(value, FREE_STEP) : grid ? snapTo(value, GRID_MINOR) : snapTo(value, 0.5));
+		const size = (value: number) => snapTo(value, grid ? GRID_MINOR : FREE_STEP);
 
 		const dx = pxToMm((event.clientX - drag.startX) / scale);
 		const dy = pxToMm((event.clientY - drag.startY) / scale);
@@ -387,7 +394,7 @@
 </script>
 
 <div class="card" class:bleeding={bleed > 0} style={cardStyle()} lang="en">
-	<div class="trim" class:bleed-marked={outlines && bleed > 0} style="width:{template.page.w}mm;height:{template.page.h}mm">
+	<div class="trim" class:bleed-marked={bounds && bleed > 0} style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
 			{@html styleTag(customCss)}
@@ -397,7 +404,7 @@
 			{@const empty = hidden.has(box.id)}
 			<div
 				class="box"
-				class:outlined={outlines && !empty}
+				class:outlined={bounds && !empty}
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
 				style={boxStyle(box)}
@@ -439,15 +446,15 @@
 					{/if}
 				</div>
 
-				{#if outlines && !empty && overflowing[box.id]}
-					<!-- Always on screen, never gated behind outlines: this is not
+				{#if bounds && !empty && overflowing[box.id]}
+					<!-- Always on screen, never gated behind bounds: this is not
 					     furniture, it is a warning that the print will be wrong. -->
 					<span class="overflow-mark" title="The content does not fit — this box is clipping what will print">
 						<Icon name="warning" size={11} />
 					</span>
 				{/if}
 
-				{#if outlines && (box.anchor || box.locked)}
+				{#if bounds && (box.anchor || box.locked)}
 					<!-- Why the box will not do what you might ask of it, stacked at its
 					     corner: the anchor above the lock when it carries both. -->
 					<span class="badges">

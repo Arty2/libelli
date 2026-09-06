@@ -106,7 +106,14 @@ export const GRID_MINOR = 5;
 /** Free movement still rounds, or a drag leaves 0.3841mm coordinates behind. */
 export const FREE_STEP = 0.01;
 
-export const snapTo = (value: number, step: number) => Math.round(value / step) * step;
+/**
+ * Rounded after the multiply, not just by it: `1529 * 0.01` is
+ * 15.290000000000001 in binary floating point, and that number would go into
+ * the box, into the field beside it and into the exported template. Three
+ * decimals is finer than any step here and finer than a printer can resolve.
+ */
+export const snapTo = (value: number, step: number) =>
+	Math.round((Math.round(value / step) * step) * 1000) / 1000;
 
 /**
  * Nearest candidate within `tolerance` mm, or null when nothing is close.

@@ -24,8 +24,11 @@ export interface Sides {
 	left: number;
 }
 
-/** One thickness for the whole box, or one per edge. Style and radius are never per-edge. */
-export type BorderWidth = number | Sides;
+/**
+ * One measurement for the whole box, or one per edge. Border style and radius
+ * are never per-edge, so this is only ever a width or a padding.
+ */
+export type SideValue = number | Sides;
 
 export type PageNumberPosition =
 	| 'top-left'
@@ -153,10 +156,10 @@ export interface Box extends TextStyle {
 	static?: StaticContent;
 	/** fill behind the box's content; absent means the paper shows through */
 	background?: string;
-	/** mm of space between the border and the content */
-	padding?: number;
+	/** mm between the border and the content. A number is every edge, an object is per edge. */
+	padding?: SideValue;
 	/** mm; 0 or absent is no border. A number is every edge, an object is per edge. */
-	borderWidth?: BorderWidth;
+	borderWidth?: SideValue;
 	borderStyle?: BorderStyle;
 	/** absent falls back to the box's own text colour */
 	borderColor?: string;
@@ -201,7 +204,8 @@ export type Row = Record<string, string>;
 export type Mapping = Record<string, string>;
 
 export interface UiState {
-	showOutlines: boolean;
+	/** dashed box bounds and the trim edge; screen furniture, never printed */
+	showBounds: boolean;
 	showGrid: boolean;
 	zoom: 'fit' | number;
 }

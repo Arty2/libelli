@@ -89,31 +89,34 @@ resize boxes directly, or type exact millimetres.
   the vertical alignments out and keep their anchor — the anchor badge at the
   corner says why, and the status line says how many stayed put. Horizontal
   alignment cannot fight an anchor, so they take part in that as usual.
-- **Where a box gets its content** — one choice with three answers. A **Data
+- **Where a box gets its content** — one choice with two answers. A **Data
   Field** binds it to a spreadsheet column, so it changes card to card. **Static
   Text** is typed into the box and saved in the template, so it says the same on
-  every card and travels with the design rather than with the data.
-  **Decorative** is neither: an area kept for its fill, its border or its size.
-  *+ Area* beside the page adds one, starting as static text.
+  every card and travels with the design rather than with the data. An area with
+  nothing typed into it is still an area — it keeps its fill, its border and its
+  size, and **Hide When Empty** is what takes it away again. *+ Area* beside the
+  page adds one, starting as static text.
 - **Overflow** — a red corner appears on a box whose content is taller than the
   box will let it be, because a clipped card looks fine on screen right up until
   it is printed.
 - **Surface** — a fill colour, padding, a border and a corner radius, all in
-  millimetres. A border takes one thickness all round, or one per edge behind
-  the expander next to it; its style and its radius are always for the whole
-  box. Four equal edges collapse back to a single number, so a template never
-  grows structure it did not ask for. The border sits *inside* the box's
+  millimetres. A padding and a border each take one measurement all round, or
+  one per edge behind the expander next to it; a border's style and the corner
+  radius are always for the whole box. Four equal edges collapse back to a
+  single number, so a template never grows structure it did not ask for. The border sits *inside* the box's
   millimetres rather than outside them, so framing a box does not move it or
   anything anchored below it — though padding and a border do make the box
   taller, which an anchored box below will follow, as it should.
-- **Type defaults** — page setup holds the family, size, leading, tracking and
+- **Type defaults** — page setup holds the family, size, leading, spacing and
   colour. A box that leaves those fields blank inherits them, so changing the
   page moves every box that never overrode it; a new box starts out inheriting
   everything.
 - **Bleed** — an outset on the page, never an offset on content: turning it on
   changes the sheet size, optionally with crop marks, and every box stays
   visually where it was. On screen the trim edge is marked in purple, on the
-  same toggle as the box outlines.
+  same toggle as the area bounds. The grid keeps its corner at the trim, not at
+  the sheet, so turning bleed on does not slide the gridlines under the boxes
+  they are there to measure.
 - **Background image** — *Upload…* takes a file from this machine, *Link…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
@@ -130,7 +133,7 @@ resize boxes directly, or type exact millimetres.
   button that unlocks it could never be reached. A page lock covers every box and the page settings
   as well. A padlock appears on the locked box, or at the corner of a locked
   page, as an indicator — the button that sets it is in the bar, with the rest of
-  that subject's settings. Turning outlines off takes the padlocks with it.
+  that subject's settings. Turning bounds off takes the padlocks with it.
 - **Custom CSS** — page setup has a CSS button; what you write there is saved
   inside the template and travels with it. Selectors are scoped to the card, so
   nothing in a template can restyle the editor around it, and `@import` and any
@@ -237,7 +240,7 @@ the checklist are the same act, so they are the same screen.
 
 **Export…** is the only way in, so there is no route to the printer that skips
 the look at what you are about to spend paper on. From it: **Print**, or
-**Export PNG** for one 300 dpi file per selected page — rendered here, with no
+**PNG** for one 300 dpi file per selected page — rendered here, with no
 library, by carrying the card into an SVG `foreignObject` and drawing that to a
 canvas. Every face is embedded: uploaded ones from this browser, and a Google
 family by fetching the stylesheet the page already loaded and the font files it
@@ -252,8 +255,8 @@ you have.
 
 Every page has a checkbox under it, and only the ticked ones print — untick the
 three proofs that came out wrong and reprint just those. **Select All** /
-**Select None** does the whole run, and the Print button says how many pages it
-is about to send. A page keeps the number it has in the table however few of
+**Select None** does the whole run, and the title says how many pages are going.
+A page keeps the number it has in the table however few of
 them go, so page 4 prints as page 4 even when it is the only one selected. The
 selection is for one print: reopening the preview starts from every page again,
 because sorting or deleting a row moves the positions it was pinned to.
@@ -279,63 +282,70 @@ and sample data, with your work one undo away. Uploaded fonts are the exception
 | --- | --- |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>z</kbd> | Undo |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>z</kbd> | Redo |
-| <kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd> | Nudge the selected box by 1mm |
+| <kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd> | Nudge the selection by 1mm |
 | <kbd>⇧</kbd> + arrows | Nudge by 5mm |
-| <kbd>Alt</kbd> + arrows | Nudge by 0.25mm |
-| <kbd>Delete</kbd> | Remove the selected box |
+| <kbd>Alt</kbd> <kbd>⇧</kbd> + arrows | Nudge by 10mm |
+| <kbd>Delete</kbd> | Remove the selected areas |
 | <kbd>Esc</kbd> | Deselect, or close what is open |
-| <kbd>←</kbd> <kbd>→</kbd> | Previous / next card, in the print preview |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>h</kbd> | Bounds on or off |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> | Grid on or off |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> | Zoom the page in or out |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>0</kbd> | Fit the page (<kbd>⇧</kbd> for 100%) |
 
 While a text field has focus, undo is left to the browser's own text history and
 <kbd>Delete</kbd> deletes characters — the app keeps its hands off both.
 Otherwise the arrow keys move the selected box wherever you are on the page. On
 a touch screen the same job is done by the four-way pad that appears beside the
-card, with a chip to switch between 1mm and 5mm.
+card, with a chip cycling between 1mm, 5mm and 10mm; holding an arrow keeps it
+moving. Pinching zooms the page, as do the zoom keys above.
 
-Dragging snaps in this order: hold <kbd>Alt</kbd> and nothing snaps at all;
-switch **Grid** on and everything snaps to the 5mm subgrid of a 10mm grid;
-otherwise a box latches onto the edges and centres of its neighbours as it
-passes them, and a guide shows what it caught.
+Dragging snaps in this order: switch **Grid** on and everything snaps to the 5mm
+subgrid of a 10mm grid; otherwise a box latches onto the edges and centres of
+its neighbours as it passes them, and a guide shows what it caught. There is no
+key to hold for free movement — switch **Grid** and **Bounds** both off and
+nothing latches, because a box should never snap to a guide you cannot see.
 
 ## Settings
 
 Both bars run in groups, outward from the thing itself:
 
 - **Page** — name · sheet size, bleed, crop marks · type defaults (font, size,
-  leading, tracking, colour) · surface (paper colour, background image and fit) ·
+  leading, spacing, colour) · surface (paper colour, background image and fit) ·
   page number and its margin · then the actions: CSS, import, export, lock, add
   a box
-- **Box** — content (field, column or static text, mode, fit, QR settings) ·
-  type (font, size, weight, leading, tracking, case, colour) · alignment,
-  horizontal and vertical, and stacking order · surface (fill, padding, border
-  width, style and colour, radius) · position · size and overflow · flow
-  (anchor, gap, hide when empty) · then the actions: lock, duplicate, delete
-- **Selection** — not a bar at all: with more than one box chosen, a column of
-  icons appears beside the page under undo and redo — the six alignments, then
-  group, lock, duplicate, delete. The right-click menu carries the same set with
-  its wording.
+- **Area** — content (field, column or static text, mode, fit, QR settings) ·
+  type (font, size, weight, leading, spacing, case, colour) · alignment,
+  horizontal and vertical · surface (fill, padding, border width, style and
+  colour, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
+  when empty) · then the actions: lock, duplicate, delete
+- **Stacking order** — not in the bar: a column beside the page, under undo and
+  redo, whenever anything is selected. Bring to front, forward, backward, send
+  to back.
+- **Selection** — with more than one area chosen, another column appears under
+  that one — the six alignments, then group, lock, duplicate, delete. The
+  right-click menu carries the same set with its wording.
 
-Undo and redo sit in a column at the page's top-left corner and *+ Text* at its
+Undo and redo sit in a column at the page's top-left corner and *+ Area* at its
 top-right, rather than in the window's toolbar, next to the thing they act on. The top toolbar holds only what is about
-the whole app: Help, Page Setup, Export.
+the whole app: Help, Data, Page Setup, Export.
 - **View** — in the bottom corners of the page itself, not the toolbar: grid and
-  box outlines at the left (screen only, never printed), zoom (fit, or 50% to
-  200%) at the right
+  area bounds at the left (screen only, never printed), zoom at the right;
+  between them, under the sheet, which card of how many you are looking at
 
-Every number says its unit: mm for geometry, bleed, tracking and gaps, pt for
-type size, modules for a QR quiet zone.
+Every number says its unit: mm for geometry, bleed, spacing and gaps, pt for
+type size, modules for a QR padding.
 
 ## Import and export
 
 A template travels as JSON and carries no data with it — that is the point of
 keeping the column mapping outside it.
 
-- **Export Template** — fonts referenced by family name, and a background image
+- **Export** — in page setup: fonts referenced by family name, and a background image
   by file name or address. Small, diffable, git-friendly — no picture and no font
   bytes are ever folded into it. Custom CSS, page numbers and locks travel with
   it.
-- **Import Template** — in page setup, next to the export, so it cannot be
-  mistaken for *Import CSV* under the table. Any font or background image the
+- **Import** — next to that export, so it cannot be mistaken for *Import CSV*
+  under the table. Any font or background image the
   template names but this browser does not have is asked for by name rather than
   substituted. A linked background is only ever an http(s) address; a template
   cannot smuggle one in as `data:` or point the browser at anything else.

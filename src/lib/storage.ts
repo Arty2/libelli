@@ -73,11 +73,17 @@ const mappingKey = (templateName: string) => `mapping:${templateName}`;
 export const loadMapping = (templateName: string): Mapping => local.get<Mapping>(mappingKey(templateName), {});
 export const saveMapping = (templateName: string, mapping: Mapping) => local.set(mappingKey(templateName), mapping);
 
-const UI_DEFAULTS: UiState = { showOutlines: true, showGrid: false, zoom: 'fit' };
+const UI_DEFAULTS: UiState = { showBounds: true, showGrid: false, zoom: 'fit' };
 
 // Merged, not returned raw: a settings blob written by an older build is missing
 // whatever was added since, and an undefined toggle renders as neither on nor off.
-export const loadUi = (): UiState => ({ ...UI_DEFAULTS, ...local.get<Partial<UiState>>('ui', {}) });
+// `showOutlines` is what this toggle was called before it was renamed to Bounds;
+// read it once so nobody's preference is silently flipped back on by a rename.
+export const loadUi = (): UiState => {
+	const stored = local.get<Partial<UiState> & { showOutlines?: boolean }>('ui', {});
+	const { showOutlines, ...rest } = stored;
+	return { ...UI_DEFAULTS, ...(showOutlines === undefined ? {} : { showBounds: showOutlines }), ...rest };
+};
 export const saveUi = (ui: UiState) => local.set('ui', ui);
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;

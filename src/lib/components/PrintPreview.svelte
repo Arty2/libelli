@@ -150,14 +150,16 @@
 		</h2>
 		<div class="header-actions">
 			<button onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
-			<button onclick={onclose}>Close</button>
 			<button onclick={exportPng} disabled={chosen === 0 || exporting}>
 				<Icon name="download" size={15} />
-				{exporting ? 'Exporting…' : `Export PNG${chosen === 1 ? '' : ` ×${chosen}`}`}
+				{exporting ? 'Exporting…' : 'PNG'}
 			</button>
 			<button class="primary" onclick={onprint} disabled={chosen === 0}>
 				<Icon name="print" size={15} />
-				Print {chosen} Page{chosen === 1 ? '' : 's'}
+				Print
+			</button>
+			<button class="icon" onclick={onclose} title="Close" aria-label="Close">
+				<Icon name="close" size={16} />
 			</button>
 		</div>
 	</header>
@@ -213,14 +215,31 @@
 	{#if fullscreen !== null}
 		{@const index = fullscreen}
 		<div class="full" role="presentation" onclick={() => (fullscreen = null)}>
-			<button class="nav prev" onclick={(e) => { e.stopPropagation(); fullscreen = Math.max(0, index - 1); }} aria-label="Previous card">←</button>
+			<button class="plain close" onclick={() => (fullscreen = null)} title="Close" aria-label="Close">
+				<Icon name="close" size={22} />
+			</button>
 			<div class="full-card" role="presentation" onclick={(e) => e.stopPropagation()} style="width:{mmToPx(outerW) * fullScale}px;height:{mmToPx(outerH) * fullScale}px">
 				<span class="scaler" style="transform:scale({fullScale})">
 					<Card {template} row={dataset.rows[index]} {mapping} pageNumber={index + 1} {background} />
 				</span>
 			</div>
-			<button class="nav next" onclick={(e) => { e.stopPropagation(); fullscreen = Math.min(dataset.rows.length - 1, index + 1); }} aria-label="Next card">→</button>
-			<p class="counter">{index + 1} / {dataset.rows.length} · Esc to close</p>
+			<!-- Under the card with the count between them: the two arrows and the
+			     number are one control, and either side of the page they were a
+			     screen-width apart from what they act on. -->
+			<div class="nav-bar" role="presentation" onclick={(e) => e.stopPropagation()}>
+				<button class="plain" disabled={index === 0} onclick={() => (fullscreen = Math.max(0, index - 1))} aria-label="Previous card">
+					<Icon name="caret-left" size={26} />
+				</button>
+				<span class="counter">{index + 1} / {dataset.rows.length}</span>
+				<button
+					class="plain"
+					disabled={index === dataset.rows.length - 1}
+					onclick={() => (fullscreen = Math.min(dataset.rows.length - 1, index + 1))}
+					aria-label="Next card"
+				>
+					<Icon name="caret-right" size={26} />
+				</button>
+			</div>
 		</div>
 	{/if}
 </div>
@@ -258,12 +277,11 @@
 		gap: 10px;
 	}
 
-	header button,
-	.nav {
+	header button {
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
-		border: 1px solid #ccc;
+		border: 1px solid var(--border-control);
 		background: #fff;
 		color: #111;
 		border-radius: var(--radius-button);
@@ -272,8 +290,16 @@
 		padding: 6px 10px;
 	}
 
-	.nav {
-		font-size: 14px;
+	header button:hover:not(:disabled) {
+		border-color: var(--border-control-hover);
+	}
+
+	header button.icon {
+		display: grid;
+		place-items: center;
+		width: 30px;
+		height: 30px;
+		padding: 0;
 	}
 
 	header button.primary {
@@ -393,9 +419,39 @@
 		z-index: 60;
 		background: rgba(20, 20, 20, 0.82);
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		gap: 18px;
+	}
+
+	/* No button around them: over a dark ground these are white marks on the
+	   image, and a bordered chip would be one more thing to look past. */
+	.plain {
+		border: none;
+		background: none;
+		padding: 4px;
+		color: #fff;
+		cursor: pointer;
+		display: grid;
+		place-items: center;
+	}
+
+	.plain:disabled {
+		opacity: 0.3;
+		cursor: default;
+	}
+
+	.plain.close {
+		position: absolute;
+		top: 14px;
+		right: 18px;
+	}
+
+	.nav-bar {
+		display: flex;
+		align-items: center;
+		gap: 22px;
 	}
 
 	.full-card {
@@ -405,14 +461,10 @@
 	}
 
 	.counter {
-		position: absolute;
-		bottom: 18px;
-		left: 0;
-		right: 0;
+		color: #fff;
+		font: 24px ui-sans-serif, system-ui, sans-serif;
+		min-width: 6rem;
 		text-align: center;
-		color: #eee;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
-		margin: 0;
 	}
 
 	@media (prefers-reduced-motion: no-preference) {

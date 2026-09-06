@@ -4,7 +4,7 @@ import defaultCard from './templates/default-card.json';
 import type {
 	BackgroundFit,
 	BorderStyle,
-	BorderWidth,
+	SideValue,
 	Box,
 	Defaults,
 	FontRef,
@@ -95,7 +95,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		w: num(partial.w, 60),
 		h: num(partial.h, 12),
 		mode: partial.mode ?? 'plain',
-		overflow: partial.overflow ?? 'grow',
+		overflow: partial.overflow ?? 'clip',
 		// Anything optional that is not named here is dropped on load: this list
 		// is the box format, so a new field has to be added in both places.
 		...stripUndefined({
@@ -118,8 +118,8 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
 			background: colour(partial.background),
-			padding: partial.padding,
-			borderWidth: normaliseBorderWidth(partial.borderWidth),
+			padding: normaliseSides(partial.padding),
+			borderWidth: normaliseSides(partial.borderWidth),
 			borderStyle: BORDER_STYLES.includes(partial.borderStyle as BorderStyle) ? partial.borderStyle : undefined,
 			borderColor: colour(partial.borderColor),
 			borderRadius: partial.borderRadius,
@@ -296,14 +296,15 @@ export function arrangeBoxes(boxes: Box[], ids: string[], where: Arrange): Box[]
 }
 
 /**
- * A border thickness, in whichever of the two shapes it was written.
+ * A per-edge measurement — a border width or a padding — in whichever of the
+ * two shapes it was written.
  *
  * Four equal edges collapse back to a single number, so a template that never
- * used per-edge widths never grows an object it did not ask for, and a box that
- * is nudged back to uniform tidies itself up again. A border of nothing is
- * `undefined` rather than zero: absent is how this format says "no border".
+ * used per-edge values never grows an object it did not ask for, and a box that
+ * is nudged back to uniform tidies itself up again. Nothing at all is
+ * `undefined` rather than zero: absent is how this format says "none".
  */
-export function normaliseBorderWidth(raw: unknown): BorderWidth | undefined {
+export function normaliseSides(raw: unknown): SideValue | undefined {
 	if (typeof raw === 'number') return Number.isFinite(raw) && raw > 0 ? raw : undefined;
 	if (!raw || typeof raw !== 'object') return undefined;
 	const side = (value: unknown) => Math.max(0, num(value, 0));
@@ -318,8 +319,8 @@ export function normaliseBorderWidth(raw: unknown): BorderWidth | undefined {
 	return sides;
 }
 
-/** The four edges of a border, whichever shape it is stored in. */
-export function borderSides(width: BorderWidth | undefined): Sides {
+/** The four edges of such a measurement, whichever shape it is stored in. */
+export function sidesOf(width: SideValue | undefined): Sides {
 	if (typeof width === 'number') return { top: width, right: width, bottom: width, left: width };
 	return width ?? { top: 0, right: 0, bottom: 0, left: 0 };
 }

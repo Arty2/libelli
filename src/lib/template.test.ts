@@ -3,7 +3,7 @@ import {
 	DEFAULT_DEFAULTS,
 	arrangeBoxes,
 	autoMap,
-	borderSides,
+	sidesOf,
 	builtinTemplate,
 	newBox,
 	normaliseTemplate,
@@ -123,6 +123,38 @@ describe('normaliseTemplate', () => {
 		expect(varied.boxes[0].borderWidth).toEqual({ top: 1, right: 0, bottom: 0.5, left: 0 });
 	});
 
+	it('gives padding the same one-or-four treatment as a border width', () => {
+		const uniform = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, padding: { top: 2, right: 2, bottom: 2, left: 2 } }]
+		});
+		expect(uniform.boxes[0].padding).toBe(2);
+
+		const varied = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, padding: { top: 3, right: 1, bottom: 0, left: 1 } }]
+		});
+		expect(varied.boxes[0].padding).toEqual({ top: 3, right: 1, bottom: 0, left: 1 });
+
+		const none = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, padding: 0 }]
+		});
+		expect('padding' in none.boxes[0]).toBe(false);
+	});
+
+	it('starts a box that does not say otherwise on clip, so it keeps the size it was given', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			boxes: [
+				{ id: 'a', x: 0, y: 0, w: 10, h: 10 },
+				{ id: 'b', x: 0, y: 0, w: 10, h: 10, overflow: 'grow' }
+			]
+		});
+		expect(t.boxes[0].overflow).toBe('clip');
+		expect(t.boxes[1].overflow).toBe('grow');
+	});
+
 	it('treats a border of nothing as no border rather than a zero-width one', () => {
 		const t = normaliseTemplate({
 			schema: 2,
@@ -187,15 +219,15 @@ describe('normaliseTemplate', () => {
 	});
 });
 
-describe('borderSides', () => {
+describe('sidesOf', () => {
 	it('reads one number as four equal edges', () => {
-		expect(borderSides(0.4)).toEqual({ top: 0.4, right: 0.4, bottom: 0.4, left: 0.4 });
+		expect(sidesOf(0.4)).toEqual({ top: 0.4, right: 0.4, bottom: 0.4, left: 0.4 });
 	});
 
 	it('passes four edges through, and reads no border as four zeroes', () => {
 		const sides = { top: 1, right: 0, bottom: 0.5, left: 0 };
-		expect(borderSides(sides)).toEqual(sides);
-		expect(borderSides(undefined)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+		expect(sidesOf(sides)).toEqual(sides);
+		expect(sidesOf(undefined)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
 	});
 });
 

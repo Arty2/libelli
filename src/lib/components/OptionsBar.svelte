@@ -6,9 +6,8 @@
 		BORDER_STYLES,
 		DEFAULT_QR,
 		PAGE_NUMBER_POSITIONS,
-		borderSides,
-		normaliseBorderWidth,
-		type Arrange
+		normaliseSides,
+		sidesOf
 	} from '$lib/template';
 	import type {
 		Align,
@@ -37,7 +36,6 @@
 		onmappingchange: (mapping: Mapping) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
-		onarrange: (where: Arrange) => void;
 		onresettemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
@@ -59,7 +57,6 @@
 		onmappingchange,
 		onduplicate,
 		ondelete,
-		onarrange,
 		onresettemplate,
 		onuploadfont,
 		onuploadbackground,
@@ -73,6 +70,8 @@
 	let imageInput = $state<HTMLInputElement | null>(null);
 	/** whether the border is being edited edge by edge rather than all round */
 	let perSide = $state(false);
+	/** the same question for padding; the two expand independently */
+	let perSidePadding = $state(false);
 
 	const familyOptions = $derived(
 		Array.from(new Set([...template.fonts.map((f) => f.family), ...CURATED_GOOGLE_FONTS])).sort((a, b) =>
@@ -87,8 +86,11 @@
 	const boxFrozen = $derived(!!template.locked || !!selected?.locked);
 
 	// A border already written edge by edge stays that way whatever the toggle says.
-	const sides = $derived(borderSides(selected?.borderWidth));
+	const sides = $derived(sidesOf(selected?.borderWidth));
 	const showSides = $derived(perSide || typeof selected?.borderWidth === 'object');
+
+	const padSides = $derived(sidesOf(selected?.padding));
+	const showPadSides = $derived(perSidePadding || typeof selected?.padding === 'object');
 
 	const POSITION_LABELS: Record<PageNumberPosition, string> = {
 		'top-left': 'Top Left',
@@ -113,36 +115,21 @@
 		{ value: 'justify', icon: 'align-justify', label: 'Justified' }
 	];
 
-	/** Paint order is array order, so "front" is last in the list, not a z-index. */
-	const ARRANGEMENTS: Array<{ value: Arrange; icon: string; label: string }> = [
-		{ value: 'front', icon: 'bring-to-front', label: 'Bring to Front' },
-		{ value: 'forward', icon: 'bring-forward', label: 'Bring Forward' },
-		{ value: 'backward', icon: 'send-backward', label: 'Send Backward' },
-		{ value: 'back', icon: 'send-to-back', label: 'Send to Back' }
-	];
-
-	const stackIndex = $derived(template.boxes.findIndex((b) => b.id === selected?.id));
-	const atFront = $derived(stackIndex === template.boxes.length - 1);
-	const atBack = $derived(stackIndex === 0);
-	const cannotArrange = (where: Arrange) =>
-		boxFrozen || ((where === 'front' || where === 'forward') ? atFront : atBack);
-
 	const setStatic = (change: Partial<NonNullable<Box['static']>>) =>
 		patch({ static: { ...selected?.static, ...change } });
 
 	/**
 	 * What a box gets its content from. Read off the box rather than stored
-	 * beside it: a bound box has a field, a static one carries its own content in
-	 * the template, and a box with neither is there for its fill, border or size
-	 * alone. Storing this as well would only give it something to disagree with.
+	 * beside it: a bound box has a field, and anything else carries its own
+	 * content in the template. Storing this as well would only give it something
+	 * to disagree with.
+	 *
+	 * There is no third "decorative" source any more: a static box with nothing
+	 * typed in it is that box, and it still draws its fill, its border and its
+	 * size. Hide When Empty is what turns it back off again.
 	 */
-	type Source = 'field' | 'static' | 'decorative';
-	const source = $derived.by<Source>(() => {
-		if (!selected) return 'decorative';
-		if (selected.slot) return 'field';
-		const own = selected.static ?? {};
-		return 'text' in own || 'url' in own || 'svg' in own || 'dataUrl' in own ? 'static' : 'decorative';
-	});
+	type Source = 'field' | 'static';
+	const source = $derived.by<Source>(() => (selected?.slot ? 'field' : 'static'));
 
 	function setSource(next: Source) {
 		if (!selected) return;
@@ -150,8 +137,8 @@
 			patch({ slot: selected.slot ?? 'field', static: undefined });
 			return;
 		}
-		// Static keeps whatever was typed before; decorative is the empty box.
-		patch({ slot: null, static: next === 'static' ? { text: selected.static?.text ?? '' } : undefined });
+		// Static keeps whatever was typed before.
+		patch({ slot: null, static: { text: selected.static?.text ?? '' } });
 	}
 
 	const VERTICALS: Array<{ value: VAlign; icon: string; label: string }> = [
@@ -256,8 +243,12 @@
 	}
 
 	/** Normalised on the way in, so four equal edges never linger as an object. */
-	const setBorder = (width: unknown) => patch({ borderWidth: normaliseBorderWidth(width) });
+	const setBorder = (width: unknown) => patch({ borderWidth: normaliseSides(width) });
 	const setEdge = (edge: keyof Sides, value: number) => setBorder({ ...sides, [edge]: Math.max(0, value) });
+
+	const setPadding = (value: unknown) => patch({ padding: normaliseSides(value) });
+	const setPadEdge = (edge: keyof Sides, value: number) =>
+		setPadding({ ...padSides, [edge]: Math.max(0, value) });
 
 	function setBackground(image: PageBackgroundImage | undefined) {
 		patchTemplate({ page: { ...template.page, ...(image ? { image } : { image: undefined }) } });
@@ -313,7 +304,7 @@
 			<label class="field">
 				<span>Width</span>
 				<input
-					class="w-4"
+					class="n-3"
 					type="number"
 					step="1"
 					placeholder="148"
@@ -326,7 +317,7 @@
 			<label class="field">
 				<span>Height</span>
 				<input
-					class="w-4"
+					class="n-3"
 					type="number"
 					step="1"
 					placeholder="210"
@@ -336,9 +327,6 @@
 				/>
 				<span class="unit">mm</span>
 			</label>
-			<span class="note" title="Text and QR codes print at the printer's own resolution; artwork you place should be prepared at 300 dpi">
-				300 dpi
-			</span>
 			<label class="check">
 				<input
 					type="checkbox"
@@ -351,7 +339,7 @@
 			{#if template.bleed.enabled}
 				<label class="field">
 					<input
-						class="w-4"
+						class="n-2"
 						type="number"
 						step="0.5"
 						min="0"
@@ -390,7 +378,7 @@
 			<label class="field">
 				<span>Size</span>
 				<input
-					class="w-4"
+					class="n-3"
 					type="number"
 					step="0.5"
 					min="1"
@@ -405,7 +393,7 @@
 			<label class="field">
 				<span>Leading</span>
 				<input
-					class="w-4"
+					class="n-3"
 					type="number"
 					step="0.05"
 					min="0.8"
@@ -419,9 +407,9 @@
 				/>
 			</label>
 			<label class="field">
-				<span>Tracking</span>
+				<span>Spacing</span>
 				<input
-					class="w-4"
+					class="n-3"
 					type="number"
 					step="0.05"
 					placeholder="0"
@@ -521,7 +509,7 @@
 				<label class="field">
 					<span>Margin</span>
 					<input
-						class="w-4"
+						class="n-2"
 						type="number"
 						step="0.5"
 						min="0"
@@ -539,14 +527,17 @@
 		<span class="spacer"></span>
 
 		<span class="actions">
-			<button onclick={oneditcss} disabled={pageFrozen} title="Custom CSS, saved inside the template">
-				<Icon name="code" size={14} /> CSS{template.css ? ' •' : ''}
+			<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
+				Custom CSS{template.css ? ' •' : ''}
 			</button>
-			<button onclick={onimporttemplate} disabled={pageFrozen}>Import Template…</button>
-			<button onclick={onexporttemplate}>Export Template</button>
-			<button onclick={onresettemplate} disabled={pageFrozen} title="Back to the starter card. Your rows are not touched.">
-				<Icon name="reset" size={14} /> Reset Template
-			</button>
+			<button onclick={onimporttemplate} disabled={pageFrozen}>Import…</button>
+			<button onclick={onexporttemplate}>Export</button>
+			<button
+				class="danger-outline"
+				onclick={onresettemplate}
+				disabled={pageFrozen}
+				title="Back to the starter card. Your rows are not touched."
+			>Reset</button>
 			<!-- Never disabled by the lock it sets, or there would be no way out of it. -->
 			<button
 				aria-pressed={pageFrozen}
@@ -574,7 +565,6 @@
 				>
 					<option value="field">Data Field</option>
 					<option value="static">Static Text</option>
-					<option value="decorative">Decorative</option>
 				</select>
 			</label>
 			{#if source === 'field'}
@@ -603,8 +593,6 @@
 						{/each}
 					</select>
 				</label>
-			{:else if source === 'decorative'}
-				<span class="note">no content — a fill, a border or a rule</span>
 			{:else if selected.mode === 'image'}
 				<label class="field">
 					<span>Source</span>
@@ -633,7 +621,7 @@
 			<label class="field">
 				<span>Mode</span>
 				<select value={selected.mode} disabled={boxFrozen} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
-					<option value="plain">Plain</option>
+					<option value="plain">Plain Text</option>
 					<option value="markdown">Markdown</option>
 					<option value="image">Image</option>
 					<option value="qr">QR Code</option>
@@ -665,9 +653,9 @@
 					</select>
 				</label>
 				<label class="field">
-					<span>Quiet Zone</span>
+					<span>Padding</span>
 					<input
-						class="w-4"
+						class="n-2"
 						type="number"
 						min="0"
 						max="8"
@@ -680,7 +668,7 @@
 					<span class="unit">modules</span>
 				</label>
 				<label class="field">
-					<span>Backing</span>
+					<span>Background</span>
 					<select
 						value={selected.qr?.background ? 'opaque' : 'transparent'}
 						title="Transparent lets the paper show through; a scanner needs contrast either way"
@@ -721,7 +709,7 @@
 			<label class="field">
 				<span>Size</span>
 				<input
-					class="w-4"
+					class="n-3"
 					type="number"
 					step="0.5"
 					min="1"
@@ -749,7 +737,7 @@
 			<label class="field">
 				<span>Leading</span>
 				<input
-					class="w-4"
+					class="n-3"
 					type="number"
 					step="0.05"
 					min="0.8"
@@ -761,9 +749,9 @@
 				/>
 			</label>
 			<label class="field">
-				<span>Tracking</span>
+				<span>Spacing</span>
 				<input
-					class="w-4"
+					class="n-3"
 					type="number"
 					step="0.05"
 					placeholder={String(template.defaults.letterSpacing)}
@@ -803,18 +791,6 @@
 						aria-label="Align {option.label}"
 						disabled={boxFrozen}
 						onclick={() => patch({ align: option.value })}
-					>
-						<Icon name={option.icon} size={15} />
-					</button>
-				{/each}
-			</span>
-			<span class="segmented" role="group" aria-label="Stacking order">
-				{#each ARRANGEMENTS as option (option.value)}
-					<button
-						title={option.label}
-						aria-label={option.label}
-						disabled={cannotArrange(option.value)}
-						onclick={() => onarrange(option.value)}
 					>
 						<Icon name={option.icon} size={15} />
 					</button>
@@ -861,19 +837,54 @@
 				</label>
 			{/if}
 
-			<label class="field">
+			<span class="field">
 				<span>Padding</span>
-				<input
-					class="w-4"
-					type="number"
-					step="0.5"
-					min="0"
-					value={selected.padding ?? 0}
-					disabled={boxFrozen}
-					onchange={(e) => patch({ padding: numeric(e, 0) || undefined })}
-				/>
+				{#if showPadSides}
+					{#each EDGES as edge (edge.key)}
+						<label class="field tight">
+							<span class="edge">{edge.label}</span>
+							<input
+								class="n-2"
+								type="number"
+								step="0.5"
+								min="0"
+								aria-label="{edge.label} padding"
+								value={padSides[edge.key]}
+								disabled={boxFrozen}
+								onchange={(e) => setPadEdge(edge.key, numeric(e, 0))}
+							/>
+						</label>
+					{/each}
+				{:else}
+					<input
+						class="n-3"
+						type="number"
+						step="0.5"
+						min="0"
+						aria-label="Padding"
+						title="Space between the border and the content, inside the box's millimetres"
+						value={typeof selected.padding === 'number' ? selected.padding : 0}
+						disabled={boxFrozen}
+						onchange={(e) => setPadding(numeric(e, 0))}
+					/>
+				{/if}
 				<span class="unit">mm</span>
-			</label>
+				<button
+					class="square"
+					aria-pressed={showPadSides}
+					title={showPadSides ? 'One padding all round' : 'A padding per edge'}
+					aria-label="Per-edge padding"
+					disabled={boxFrozen}
+					onclick={() => {
+						// Same bargain as the border: collapse to the top edge rather
+						// than silently discarding three uneven values.
+						if (showPadSides && typeof selected?.padding === 'object') setPadding(padSides.top);
+						perSidePadding = !showPadSides;
+					}}
+				>
+					<Icon name={showPadSides ? 'caret-up' : 'caret-down'} size={14} />
+				</button>
+			</span>
 
 			<span class="field">
 				<span>Border</span>
@@ -882,7 +893,7 @@
 						<label class="field tight">
 							<span class="edge">{edge.label}</span>
 							<input
-								class="w-3"
+								class="n-2"
 								type="number"
 								step="0.1"
 								min="0"
@@ -895,7 +906,7 @@
 					{/each}
 				{:else}
 					<input
-						class="w-4"
+						class="n-3"
 						type="number"
 						step="0.1"
 						min="0"
@@ -954,7 +965,7 @@
 			<label class="field">
 				<span>Radius</span>
 				<input
-					class="w-4"
+					class="n-3"
 					type="number"
 					step="0.5"
 					min="0"
@@ -967,16 +978,17 @@
 			</label>
 		</span>
 
-		<!-- Position and size stay separate groups, and wrap as a pair: four number
-		     fields in one run is what makes this bar unusable on a phone. -->
+		<!-- Where the box starts and where it takes that start from: an anchored
+		     box reads its top off another box's rendered bottom, so Y and Anchor
+		     are two answers to one question and belong on one line. -->
 		<span class="group" role="group" aria-label="Position">
 			<label class="field"><span>X</span>
-				<input class="w-4" type="number" step="0.5" value={selected.x} disabled={boxFrozen} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
+				<input class="n-3" type="number" step="0.5" value={selected.x} disabled={boxFrozen} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
 				<span class="unit">mm</span>
 			</label>
 			<label class="field"><span>Y</span>
 				<input
-					class="w-4"
+					class="n-3"
 					type="number"
 					step="0.5"
 					value={selected.y}
@@ -986,27 +998,6 @@
 				/>
 				<span class="unit">mm</span>
 			</label>
-		</span>
-
-		<span class="group" role="group" aria-label="Size">
-			<label class="field"><span>W</span>
-				<input class="w-4" type="number" step="0.5" value={selected.w} disabled={boxFrozen} onchange={(e) => patch({ w: numeric(e, selected.w) })} />
-				<span class="unit">mm</span>
-			</label>
-			<label class="field"><span>H</span>
-				<input class="w-4" type="number" step="0.5" value={selected.h} disabled={boxFrozen} onchange={(e) => patch({ h: numeric(e, selected.h) })} />
-				<span class="unit">mm</span>
-			</label>
-			<label class="field">
-				<span>Overflow</span>
-				<select value={selected.overflow} disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
-					<option value="grow">Grow</option>
-					<option value="clip">Clip</option>
-				</select>
-			</label>
-		</span>
-
-		<span class="group" role="group" aria-label="Flow">
 			<label class="field">
 				<span>Anchor</span>
 				<select value={selected.anchor?.to ?? ''} disabled={boxFrozen} onchange={(e) => setAnchor(e.currentTarget.value)}>
@@ -1020,7 +1011,7 @@
 				<label class="field">
 					<span>Gap</span>
 					<input
-						class="w-4"
+						class="n-3"
 						type="number"
 						step="0.5"
 						min="0"
@@ -1031,6 +1022,26 @@
 					<span class="unit">mm</span>
 				</label>
 			{/if}
+		</span>
+
+		<!-- And how big it ends up: the declared millimetres, whether content may
+		     push past them, and whether an empty one shows at all. -->
+		<span class="group" role="group" aria-label="Size">
+			<label class="field"><span>W</span>
+				<input class="n-3" type="number" step="0.5" value={selected.w} disabled={boxFrozen} onchange={(e) => patch({ w: numeric(e, selected.w) })} />
+				<span class="unit">mm</span>
+			</label>
+			<label class="field"><span>H</span>
+				<input class="n-3" type="number" step="0.5" value={selected.h} disabled={boxFrozen} onchange={(e) => patch({ h: numeric(e, selected.h) })} />
+				<span class="unit">mm</span>
+			</label>
+			<label class="field">
+				<span>Overflow</span>
+				<select value={selected.overflow} disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
+					<option value="clip">Clip</option>
+					<option value="grow">Grow</option>
+				</select>
+			</label>
 			<label class="check">
 				<input
 					type="checkbox"
@@ -1044,7 +1055,13 @@
 
 		<span class="spacer"></span>
 
+		<!-- The two things you do to an area, then the switch that stops you doing
+		     either: Lock is a state, not an action, so it sits after them. -->
 		<span class="actions">
+			<button onclick={onduplicate} disabled={pageFrozen}><Icon name="copy" size={14} /> Duplicate</button>
+			<button class="danger-outline" onclick={ondelete} disabled={boxFrozen}>
+				<Icon name="trash" size={14} /> Delete
+			</button>
 			<button
 				aria-pressed={!!selected.locked}
 				title={selected.locked ? 'Unlock this box' : 'Lock this box'}
@@ -1052,10 +1069,6 @@
 				onclick={() => patch({ locked: selected.locked ? undefined : true })}
 			>
 				<Icon name="locked" size={14} /> Lock
-			</button>
-			<button onclick={onduplicate} disabled={pageFrozen}><Icon name="copy" size={14} /> Duplicate</button>
-			<button class="danger-outline" onclick={ondelete} disabled={boxFrozen}>
-				<Icon name="trash" size={14} /> Delete
 			</button>
 		</span>
 	</div>
@@ -1103,6 +1116,7 @@
 
 	.field > span {
 		font-size: 11px;
+		white-space: nowrap;
 	}
 
 	.field.tight {
@@ -1124,12 +1138,6 @@
 	.label {
 		font-size: 11px;
 		color: #555;
-	}
-
-	.note {
-		color: #999;
-		font-size: 10px;
-		align-self: center;
 	}
 
 	/* Related controls are one group with a rule either side, so the bar reads as
@@ -1166,16 +1174,21 @@
 		align-items: center;
 		gap: 4px;
 		color: #555;
+		white-space: nowrap;
 	}
 
 	input,
 	select {
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 4px 5px;
-		border: 1px solid #ccc;
+		border: 1px solid var(--border-control);
 		border-radius: var(--radius-input);
 		background: #fff;
 		color: #111;
+		/* So a width below means the whole control, not the room inside it: an
+		   input is content-box by default, which made every field 12px wider
+		   than it was asked to be. */
+		box-sizing: border-box;
 	}
 
 	input:disabled,
@@ -1184,14 +1197,27 @@
 		color: #999;
 	}
 
-	/* Sized to what goes in them, not to a grid: a millimetre value is four
-	   characters and a template name is not, and every rem saved here is a
-	   control that stays on the same row instead of wrapping to the next. */
-	.w-3 { width: 2.9rem; }
-	.w-4 { width: 3.5rem; }
+	/* Sized to what goes in them, not to a grid: every rem saved here is a
+	   control that stays on the same row instead of wrapping to the next. Two
+	   characters covers a bleed, a margin or a quiet zone; three covers a
+	   coordinate and anything with a decimal point in it. */
+	.n-2 { width: 2.6rem; }
+	.n-3 { width: 3.3rem; }
 	.w-5 { width: 4.6rem; }
 	.w-8 { width: 8.5rem; }
 	.colour { width: 2rem; padding: 2px; }
+
+	/* The spin buttons are what made a two-character field four wide. Arrow keys
+	   still step the value, which is the only thing they were reachable for. */
+	input[type='number'] {
+		appearance: textfield;
+	}
+
+	input[type='number']::-webkit-outer-spin-button,
+	input[type='number']::-webkit-inner-spin-button {
+		appearance: none;
+		margin: 0;
+	}
 
 	select {
 		max-width: 9.5rem;
@@ -1207,7 +1233,7 @@
 		gap: 5px;
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 5px 10px;
-		border: 1px solid #ccc;
+		border: 1px solid var(--border-control);
 		border-radius: var(--radius-button);
 		background: #fff;
 		color: #111;
@@ -1215,7 +1241,7 @@
 	}
 
 	button:hover:not(:disabled) {
-		border-color: #999;
+		border-color: var(--border-control-hover);
 	}
 
 	button:disabled {

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
-	import { SAMPLE_CSV } from '$lib/onboarding';
-	import { parseTable } from '$lib/parse';
+	import { download } from '$lib/download';
+	import { parseTable, toCsv } from '$lib/parse';
 	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
 	import type { Dataset, Row } from '$lib/types';
 
@@ -23,6 +23,13 @@
 	// Which column the rows were last sorted by, so the header can show it and
 	// a second click can turn it round.
 	let sortedBy = $state<{ column: string; direction: SortDirection } | null>(null);
+	/**
+	 * The order the rows were in before any of that. Sorting rewrites the array,
+	 * so "unsort" has nowhere to go unless the order is kept: this is taken once,
+	 * when an unsorted table is sorted, and handed back by the button in the
+	 * row-number header.
+	 */
+	let unsorted = $state<Row[] | null>(null);
 	let pasteText = $state('');
 	let pasteMode = $state<'replace' | 'append'>('replace');
 	let fileInput = $state<HTMLInputElement | null>(null);
@@ -49,6 +56,7 @@
 		onchange({ columns: [], rows: [] });
 		onactivate(0);
 		sortedBy = null;
+		unsorted = null;
 		notice = `Deleted every row and column — ${rows} row${rows === 1 ? '' : 's'} gone. Ctrl/Cmd+Z brings them back.`;
 	}
 
@@ -89,9 +97,22 @@
 		const sorted = sortRows(dataset, column, direction);
 		// The previewed card follows its row rather than staying on a position.
 		const previewed = indexAfterSort(dataset, sorted, activeRow);
+		if (!sortedBy) unsorted = dataset.rows;
 		sortedBy = { column, direction };
 		onchange(sorted);
 		onactivate(previewed);
+	}
+
+	/** Back to the order the rows arrived in, wherever the sorting took them. */
+	function clearSort() {
+		if (!unsorted) return;
+		const restored = { ...dataset, rows: unsorted };
+		const previewed = indexAfterSort(dataset, restored, activeRow);
+		sortedBy = null;
+		unsorted = null;
+		onchange(restored);
+		onactivate(previewed);
+		notice = 'Back to the order the rows came in.';
 	}
 
 	/**
@@ -188,6 +209,7 @@
 			onactivate(0);
 		}
 		sortedBy = null;
+		unsorted = null;
 		notice = `${parsed.rows.length} row${parsed.rows.length === 1 ? '' : 's'} loaded.`;
 	}
 
@@ -199,9 +221,10 @@
 		input.value = '';
 	}
 
-	function loadSample() {
-		// Bundled, not fetched: the sample must be there even offline.
-		commitImport(parseTable(SAMPLE_CSV));
+	/** The table as it stands, back out as a file. Nothing leaves the browser. */
+	function exportCsv() {
+		download('card-data.csv', toCsv(dataset), 'text/csv');
+		notice = `${dataset.rows.length} row${dataset.rows.length === 1 ? '' : 's'} exported as CSV.`;
 	}
 </script>
 
@@ -212,7 +235,21 @@
 		<table>
 			<thead>
 				<tr>
-					<th class="gutter" scope="col"><span class="sr-only">Row</span></th>
+					<th class="gutter" scope="col">
+						<span class="sr-only">Row</span>
+						<span class="gutter-head">
+							<Icon name="activity" size={14} />
+							<button
+								class="icon"
+								title="Back to the order the rows came in"
+								aria-label="Remove sorting"
+								disabled={!sortedBy}
+								onclick={clearSort}
+							>
+								<Icon name="close" size={13} />
+							</button>
+						</span>
+					</th>
 					{#each dataset.columns as column, i (column)}
 						<th scope="col" aria-sort={sortedBy?.column === column ? (sortedBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
 							<input
@@ -234,7 +271,7 @@
 											? sortedBy.direction === 'asc'
 												? 'sort-asc'
 												: 'sort-desc'
-											: 'sort'}
+											: 'activity'}
 										size={14}
 									/>
 								</button>
@@ -244,19 +281,13 @@
 							</span>
 						</th>
 					{/each}
+						<!-- A button rather than a field to type a name into: adding a
+						     column and naming it are two things, and the header is
+						     already editable in place. -->
 						<th class="ghost" scope="col">
-							<input
-								class="column-name placeholder"
-								value=""
-								placeholder="New column"
-								aria-label="Add a column by naming it"
-								title="Type a name to add a column"
-								onchange={(e) => {
-									const name = e.currentTarget.value;
-									e.currentTarget.value = '';
-									if (name.trim()) addColumn(name);
-								}}
-							/>
+							<button class="icon add" title="Add a column" aria-label="Add a column" onclick={() => addColumn()}>
+								<Icon name="add" size={16} />
+							</button>
 						</th>
 				</tr>
 			</thead>
@@ -270,8 +301,8 @@
 								title="Preview this row"
 								onclick={() => onactivate(i)}
 							>
-								<span class="dot" aria-hidden="true">{i === activeRow ? '●' : '○'}</span>
-								{i + 1}
+								<span class="tick" aria-hidden="true"></span>
+								<span class="number">{i + 1}</span>
 							</button>
 							<span class="row-actions">
 								<button class="icon" title="Duplicate row" aria-label="Duplicate row {i + 1}" onclick={() => duplicateRow(i)}><Icon name="copy" size={14} /></button>
@@ -295,49 +326,39 @@
 				{#if !dataset.rows.length}
 					<tr>
 						<td class="empty" colspan={dataset.columns.length + 2}>
-							No rows yet. Paste from a spreadsheet, import a CSV, or load the sample.
+							No rows yet. Paste from a spreadsheet, import a CSV, or add a row with the + below.
 						</td>
 					</tr>
 				{/if}
 				{#if dataset.columns.length}
-					<!-- The placeholder row: typing into it is what adds a row. -->
+					<!-- One button under the last row, centred on the gutter it sits in. -->
 					<tr class="ghost-row">
-						<td class="gutter"><span class="sr-only">New row</span><Icon name="add" size={13} /></td>
-						{#each dataset.columns as column (column)}
-							<td>
-								<textarea
-									rows="1"
-									aria-label="New row, {column}"
-									placeholder={column === dataset.columns[0] ? 'New row' : ''}
-									value=""
-									oninput={(e) => {
-										const value = e.currentTarget.value;
-										e.currentTarget.value = '';
-										addRow(column, value);
-									}}
-								></textarea>
-							</td>
-						{/each}
-						<td></td>
+						<td class="gutter">
+							<button class="icon add" title="Add a row" aria-label="Add a row" onclick={() => addRow()}>
+								<Icon name="add" size={16} />
+							</button>
+						</td>
+						<td colspan={dataset.columns.length + 1}></td>
 					</tr>
 				{/if}
 			</tbody>
 		</table>
 	</div>
 
+	<!-- One line, always: this bar wrapping was costing the table a row of its
+	     own height every time the tray narrowed. -->
 	<div class="actions">
 		<button onclick={() => (pasteOpen = true)}>Paste from Excel</button>
 		<button onclick={() => fileInput?.click()}>Import CSV…</button>
-		<button class="quiet" onclick={loadSample}>Load Sample</button>
+		<button onclick={exportCsv} disabled={!dataset.columns.length}>Export CSV</button>
 		<span class="spacer"></span>
 		<button
-			class="icon danger"
-			title="Delete all data"
-			aria-label="Delete all data"
+			class="danger"
+			title="Delete every row and column"
 			disabled={!dataset.columns.length && !dataset.rows.length}
 			onclick={() => (clearStage = 1)}
 		>
-			<Icon name="trash" size={15} />
+			<Icon name="trash" size={15} /> Delete
 		</button>
 		<input
 			bind:this={fileInput}
@@ -495,35 +516,92 @@
 		background: #eff5ff;
 	}
 
+	/* As narrow as a two-digit number and its tick: every millimetre here is a
+	   millimetre the actual data does not get. */
 	.gutter {
+		position: relative;
 		width: 1%;
 		white-space: nowrap;
-		padding: 3px 5px;
+		padding: 3px 4px;
+		color: #767676;
+		text-align: center;
+	}
+
+	.gutter-head {
+		display: inline-flex;
+		align-items: center;
+		gap: 1px;
 		color: #767676;
 	}
 
 	.row-pick {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
 		border: none;
 		background: transparent;
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		cursor: pointer;
 		color: inherit;
-		padding: 2px 3px;
+		padding: 2px;
 	}
 
-	.dot {
-		color: #2563eb;
+	.row-pick .number {
+		min-width: 1.2em;
+		text-align: right;
 	}
 
+	/* A square, not a radio: this marks the row on the page, and the checkboxes
+	   in the export screen are square too. Sized and aligned to the number. */
+	.tick {
+		width: 11px;
+		height: 11px;
+		border: 1px solid #bbb;
+		border-radius: var(--radius-input);
+		background: #fff;
+	}
+
+	.row-pick[aria-pressed='true'] .tick {
+		border-color: #2563eb;
+		background: #2563eb;
+		box-shadow: inset 0 0 0 2px #fff;
+	}
+
+	.icon.add {
+		width: 100%;
+		color: #999;
+	}
+
+	.ghost .icon.add {
+		width: 22px;
+	}
+
+	th.ghost {
+		text-align: center;
+	}
+
+	/* Out of the flow entirely: laid out inside the gutter they doubled its
+	   width for two buttons that are invisible until the row is under the
+	   pointer. They sit just past it instead, on their own ground. */
 	.row-actions {
+		position: absolute;
+		top: 1px;
+		left: 100%;
+		z-index: 2;
 		display: inline-flex;
 		gap: 2px;
+		padding: 1px;
+		background: #fff;
+		border: 1px solid #eee;
+		border-radius: var(--radius-button);
 		opacity: 0;
+		pointer-events: none;
 	}
 
 	tr:hover .row-actions,
 	tr:focus-within .row-actions {
 		opacity: 1;
+		pointer-events: auto;
 	}
 
 	/* One square, one size, one colour for every tool in the table — the row and
@@ -551,17 +629,8 @@
 		align-items: center;
 	}
 
-	.ghost .column-name::placeholder,
-	.ghost-row textarea::placeholder {
-		color: #aaa;
-	}
-
 	.ghost-row .gutter {
 		color: #bbb;
-	}
-
-	.ghost-row textarea {
-		color: #767676;
 	}
 
 	.empty {
@@ -572,10 +641,16 @@
 
 	.actions {
 		display: flex;
-		flex-wrap: wrap;
+		align-items: center;
+		flex-wrap: nowrap;
 		gap: 6px;
 		padding: 8px;
 		border-top: 1px solid #eee;
+		overflow-x: auto;
+	}
+
+	.actions button {
+		flex: none;
 	}
 
 	.notice {
@@ -586,37 +661,34 @@
 	}
 
 	button {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
-		border: 1px solid #ccc;
+		border: 1px solid var(--border-control);
 		border-radius: var(--radius-button);
 		background: #fff;
 		cursor: pointer;
 	}
 
-	button:hover {
-		border-color: #999;
+	button:hover:not(:disabled) {
+		border-color: var(--border-control-hover);
 	}
 
-	button.quiet {
-		border-color: transparent;
-		color: #555;
+	button:disabled {
+		opacity: 0.4;
+		cursor: default;
 	}
 
-	.actions .icon.danger {
-		width: 28px;
-		height: 28px;
+	.actions button.danger {
+		border-color: #b42318;
 		color: #b42318;
 	}
 
-	.actions .icon.danger:hover:not(:disabled) {
+	.actions button.danger:hover:not(:disabled) {
+		border-color: #8f1c13;
 		background: #fdf3f2;
-		color: #8f1c13;
-	}
-
-	.actions .icon.danger:disabled {
-		opacity: 0.35;
-		cursor: default;
 	}
 
 	button.danger-solid {
