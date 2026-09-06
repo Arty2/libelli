@@ -1,0 +1,45 @@
+/* App-wide rules and the design tokens every component reads.
+
+   A plain stylesheet imported by +layout.svelte rather than a :global block
+   inside a component's <style>, so that changing a control radius does not mean
+   opening the largest file in the app. */
+
+/* Control radii and borders live here rather than in each component: a button
+   is 3px and a field is 1px everywhere in the app, both are drawn in the same
+   grey, and there is one place to change any of it. A button that did not
+   match the field beside it was the loudest thing in these bars. */
+:root {
+	--radius-button: 3px;
+	--radius-input: 1px;
+	--border-control: #ccc;
+	--border-control-hover: #999;
+}
+
+/* Chrome is not prose: dragging across a toolbar should not leave half the
+   app highlighted. Fields opt back in, because their contents are yours. */
+button,
+label,
+th,
+dt,
+.unit,
+.context {
+	user-select: none;
+}
+
+input,
+textarea {
+	user-select: text;
+}
+
+html, body {
+	margin: 0;
+	height: 100%;
+	background: #eee;
+	color: #111;
+	font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+*:focus-visible {
+	outline: 2px solid #2563eb;
+	outline-offset: 1px;
+}

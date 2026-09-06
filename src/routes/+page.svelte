@@ -12,7 +12,19 @@
 	import { download, slugify } from '$lib/download';
 	import { ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
-	import { GRID_MINOR, alignBoxes, type AlignEdge } from '$lib/layout';
+	import { alignBoxes, type AlignEdge } from '$lib/layout';
+	import {
+		ALIGN_LABELS,
+		deleteBoxes,
+		duplicateBoxes,
+		groupMembers,
+		nudgeBox as nudge,
+		stepAlignment,
+		toggleGroup,
+		toggleLock,
+		toggleSelection
+	} from '$lib/boxops';
+	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport } from '$lib/keys';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { VERSION } from '$lib/version';
@@ -39,7 +51,7 @@
 		storageAvailable,
 		saveUi
 	} from '$lib/storage';
-	import type { Align, Box, Dataset, FontRef, Mapping, Template, UiState, VAlign } from '$lib/types';
+	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
@@ -373,55 +385,26 @@
 			selectedIds = [];
 			return;
 		}
-		const box = template.boxes.find((b) => b.id === id);
-		const ids = box?.group
-			? template.boxes.filter((b) => b.group === box.group).map((b) => b.id)
-			: [id];
-		if (!additive) {
-			selectedIds = ids;
-			return;
-		}
-		const already = ids.every((one) => selectedIds.includes(one));
-		selectedIds = already
-			? selectedIds.filter((one) => !ids.includes(one))
-			: Array.from(new Set([...selectedIds, ...ids]));
+		const ids = groupMembers(template.boxes, id);
+		selectedIds = additive ? toggleSelection(selectedIds, ids) : ids;
 	}
 
 	function duplicateBox() {
 		if (!selectedBoxes.length || template.locked) return;
-		const copies: Box[] = [];
-		// One fresh group id for the copies, or duplicating a group would splice
-		// the copies into the original.
-		const regroup = new Map<string, string>();
-		for (const box of selectedBoxes) {
-			const source = structuredClone($state.snapshot(box));
-			if (source.group && !regroup.has(source.group)) regroup.set(source.group, `g_${Math.random().toString(36).slice(2, 8)}`);
-			copies.push({
-				...source,
-				id: nextBoxId([...template.boxes, ...copies]),
-				anchor: null,
-				x: box.x + 4,
-				y: box.y + 6,
-				...(source.group ? { group: regroup.get(source.group) } : {})
-			});
-		}
-		template = { ...template, boxes: [...template.boxes, ...copies] };
-		selectedIds = copies.map((b) => b.id);
+		// Snapshotted: duplicateBoxes deep-clones its sources, which a state
+		// proxy cannot be.
+		const { boxes, created } = duplicateBoxes($state.snapshot(template.boxes) as Box[], selectedIds);
+		template = { ...template, boxes };
+		selectedIds = created;
 	}
 
 	function deleteBox() {
 		if (template.locked) return;
-		const gone = new Set(selectedBoxes.filter((b) => !b.locked).map((b) => b.id));
-		if (!gone.size) return;
-		template = {
-			...template,
-			// Anything anchored to a deleted box falls back to its own Y.
-			boxes: template.boxes
-				.filter((b) => !gone.has(b.id))
-				.map((b) => (b.anchor && gone.has(b.anchor.to) ? { ...b, anchor: null } : b))
-		};
+		const { boxes, removed } = deleteBoxes(template.boxes, selectedIds);
+		if (!removed) return;
+		template = { ...template, boxes };
 		selectedIds = [];
-		notify(`${gone.size} area${gone.size === 1 ? '' : 's'} deleted. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`);
+		notify(`${removed} area${removed === 1 ? '' : 's'} deleted. Ctrl/Cmd+Z brings ${removed === 1 ? 'it' : 'them'} back.`);
 	}
 
 	function alignSelection(edge: AlignEdge) {
@@ -436,27 +419,16 @@
 			: 'Aligned.');
 	}
 
-	/** All of them locked already means the button unlocks; otherwise it locks. */
 	function lockSelection() {
 		if (template.locked || !selectedBoxes.length) return;
-		const unlock = selectedBoxes.every((b) => b.locked);
-		const ids = new Set(selectedIds);
-		template = {
-			...template,
-			boxes: template.boxes.map((b) => (ids.has(b.id) ? stripUndefined({ ...b, locked: unlock ? undefined : true }) as Box : b))
-		};
+		template = { ...template, boxes: toggleLock(template.boxes, selectedIds).boxes };
 	}
 
 	function groupSelection() {
 		if (template.locked || selectedBoxes.length < 2) return;
-		const grouped = selectedBoxes.every((b) => b.group) && new Set(selectedBoxes.map((b) => b.group)).size === 1;
-		const group = grouped ? undefined : `g_${Math.random().toString(36).slice(2, 8)}`;
-		const ids = new Set(selectedIds);
-		template = {
-			...template,
-			boxes: template.boxes.map((b) => (ids.has(b.id) ? (stripUndefined({ ...b, group }) as Box) : b))
-		};
-		notify(grouped ? 'Ungrouped.' : `${selectedBoxes.length} areas grouped — clicking any one now takes all of them.`);
+		const { boxes, grouped } = toggleGroup(template.boxes, selectedIds);
+		template = { ...template, boxes };
+		notify(grouped ? `${selectedBoxes.length} areas grouped — clicking any one now takes all of them.` : 'Ungrouped.');
 	}
 
 	/**
@@ -466,32 +438,10 @@
 	 */
 	function nudgeBox(dx: number, dy: number) {
 		const box = selected;
-		if (!box || box.locked || template.locked) return;
-		const round = (v: number) => Math.round(v * 100) / 100;
-		const next: Box = { ...box, x: round(box.x + dx) };
-		if (dy) {
-			if (box.anchor) next.anchor = { ...box.anchor, gap: Math.max(0, round(box.anchor.gap + dy)) };
-			else next.y = round(box.y + dy);
-		}
-		updateBox(next);
+		if (!box || template.locked) return;
+		const next = nudge(box, dx, dy);
+		if (next) updateBox(next);
 	}
-
-	/**
-	 * Alignment, in the order the segmented control in the bar reads: stepping is
-	 * clamped at the ends rather than wrapping, so holding the key settles on
-	 * left or on justify instead of cycling past it forever.
-	 */
-	const H_ALIGN: Align[] = ['left', 'center', 'right', 'justify'];
-	const V_ALIGN: VAlign[] = ['top', 'middle', 'bottom'];
-	const ALIGN_LABELS: Record<string, string> = {
-		left: 'left',
-		center: 'centred',
-		right: 'right',
-		justify: 'justified',
-		top: 'top',
-		middle: 'middle',
-		bottom: 'bottom'
-	};
 
 	/** Move every chosen box one step along an axis of alignment. */
 	function stepAlign(axis: 'h' | 'v', direction: -1 | 1) {
@@ -502,53 +452,12 @@
 		if (!targets.length) return;
 		const landed = new Set<string>();
 		for (const box of targets) {
-			if (axis === 'h') {
-				const current = box.align ?? template.defaults.align;
-				const at = H_ALIGN.indexOf(current);
-				const next = H_ALIGN[Math.min(H_ALIGN.length - 1, Math.max(0, at + direction))];
-				landed.add(next);
-				if (next !== current) updateBox({ ...box, align: next });
-			} else {
-				const current = box.valign ?? 'top';
-				const at = V_ALIGN.indexOf(current);
-				const next = V_ALIGN[Math.min(V_ALIGN.length - 1, Math.max(0, at + direction))];
-				landed.add(next);
-				if (next !== current) updateBox({ ...box, valign: next });
-			}
+			const step = stepAlignment(box, axis, direction, template.defaults.align);
+			landed.add(step.landed);
+			if (step.changed) updateBox({ ...box, ...(axis === 'h' ? { align: step.align } : { valign: step.valign }) });
 		}
 		notify(landed.size === 1 ? `Aligned ${ALIGN_LABELS[[...landed][0]]}.` : 'Alignment stepped.');
 	}
-
-	const ALIGN_KEYS: Record<string, ['h' | 'v', -1 | 1]> = {
-		ArrowLeft: ['h', -1],
-		ArrowRight: ['h', 1],
-		ArrowUp: ['v', -1],
-		ArrowDown: ['v', 1]
-	};
-
-	const NUDGES: Record<string, [number, number]> = {
-		ArrowLeft: [-1, 0],
-		ArrowRight: [1, 0],
-		ArrowUp: [0, -1],
-		ArrowDown: [0, 1]
-	};
-
-	/**
-	 * The keys that mean "I want this on paper". All three land on the same
-	 * screen, because there is one door to the printer and it is the preview.
-	 *
-	 * Ctrl/Cmd+P is the point of the exercise: the browser's own print dialog
-	 * would take the editor's DOM rather than the print run, so it is
-	 * intercepted rather than left to fire. This works even while a field has
-	 * focus — the alternative is a print dialog opening because you were in a
-	 * text box at the time. Ctrl/Cmd+Shift+P is Firefox's private window and
-	 * cannot be taken from it there; the other two work everywhere.
-	 */
-	const wantsExport = (event: KeyboardEvent) => {
-		if (!event.metaKey && !event.ctrlKey) return false;
-		const key = event.key.toLowerCase();
-		return key === 'p' || (event.shiftKey && key === 's');
-	};
 
 	function onWindowKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
@@ -608,7 +517,7 @@
 		// the same keys, moving the content inside the box rather than the box
 		// itself. Checked before the nudge, which only looks at Shift and Alt.
 		const align = ALIGN_KEYS[event.key];
-		if (align && (event.metaKey || event.ctrlKey) && event.shiftKey && selectedIds.length) {
+		if (align && isAlignChord(event) && selectedIds.length) {
 			event.preventDefault();
 			stepAlign(align[0], align[1]);
 			return;
@@ -622,7 +531,7 @@
 			// 1mm, 5mm with Shift, 10mm with Alt as well. The old 0.25mm step is
 			// gone: anything finer than a millimetre is typed into the bar, where
 			// you can see the number you are aiming at.
-			const step = event.shiftKey ? (event.altKey ? 10 : GRID_MINOR) : 1;
+			const step = nudgeStep(event);
 			nudgeBox(move[0] * step, move[1] * step);
 			return;
 		}
@@ -1118,46 +1027,6 @@
 {/if}
 
 <style>
-	/* Control radii and borders live here rather than in each component: a button
-	   is 3px and a field is 1px everywhere in the app, both are drawn in the same
-	   grey, and there is one place to change any of it. A button that did not
-	   match the field beside it was the loudest thing in these bars. */
-	:global(:root) {
-		--radius-button: 3px;
-		--radius-input: 1px;
-		--border-control: #ccc;
-		--border-control-hover: #999;
-	}
-
-	/* Chrome is not prose: dragging across a toolbar should not leave half the
-	   app highlighted. Fields opt back in, because their contents are yours. */
-	:global(button),
-	:global(label),
-	:global(th),
-	:global(dt),
-	:global(.unit),
-	:global(.context) {
-		user-select: none;
-	}
-
-	:global(input),
-	:global(textarea) {
-		user-select: text;
-	}
-
-	:global(html, body) {
-		margin: 0;
-		height: 100%;
-		background: #eee;
-		color: #111;
-		font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	}
-
-	:global(*:focus-visible) {
-		outline: 2px solid #2563eb;
-		outline-offset: 1px;
-	}
-
 	.app {
 		display: flex;
 		flex-direction: column;
