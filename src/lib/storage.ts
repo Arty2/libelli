@@ -129,9 +129,19 @@ function tx<T>(store: string, mode: IDBTransactionMode, run: (s: IDBObjectStore)
 }
 
 export const idbGet = <T>(store: string, key: string) => tx<T>(store, 'readonly', (s) => s.get(key));
-export const idbSet = (store: string, key: string, value: unknown) => tx<void>(store, 'readwrite', (s) => s.put(value, key));
+/** True if the write landed. A put resolves its key, so `undefined` is a failure. */
+export const idbSet = (store: string, key: string, value: unknown) =>
+	tx<IDBValidKey>(store, 'readwrite', (s) => s.put(value, key)).then((k) => k !== undefined);
 export const idbDelete = (store: string, key: string) => tx<void>(store, 'readwrite', (s) => s.delete(key));
 export const idbKeys = (store: string) => tx<IDBValidKey[]>(store, 'readonly', (s) => s.getAllKeys()).then((k) => (k ?? []).map(String));
+
+/**
+ * Whether IndexedDB opened at all. Every read here resolves rather than
+ * rejecting, so a blocked or private-mode browser is indistinguishable from an
+ * empty one — and "no stored template" means something very different in the
+ * two cases. The caller needs to be able to tell which it is looking at.
+ */
+export const storageAvailable = () => openDb().then((db) => db !== null);
 
 export const saveTemplate = (t: Template) => idbSet(STORE_KV, KEY_TEMPLATE, t);
 export const loadTemplate = () => idbGet<Template>(STORE_KV, KEY_TEMPLATE);

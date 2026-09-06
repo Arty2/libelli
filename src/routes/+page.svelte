@@ -14,6 +14,7 @@
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
 	import { GRID_MINOR, alignBoxes, type AlignEdge } from '$lib/layout';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
+	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
@@ -35,6 +36,7 @@
 		saveDataset,
 		saveMapping,
 		saveTemplate,
+		storageAvailable,
 		saveUi
 	} from '$lib/storage';
 	import type { Align, Box, Dataset, FontRef, Mapping, Template, UiState, VAlign } from '$lib/types';
@@ -77,6 +79,21 @@
 	let missingImage = $state<string | null>(null);
 	let backgroundInput = $state<HTMLInputElement | null>(null);
 	let status = $state('');
+	/**
+	 * A notice is either something that happened or something that went wrong,
+	 * and the two used to render identically in an 11px grey line. A warning
+	 * gets the warning mark and a colour; everything else reads as before.
+	 */
+	let statusTone = $state<'info' | 'warning'>('info');
+
+	function notify(text: string, tone: 'info' | 'warning' = 'info') {
+		status = text;
+		statusTone = tone;
+	}
+	/** A replacement worker is installed and waiting for someone to be ready. */
+	let updateReady = $state(false);
+	/** The browser is offering an install, so the toolbar can offer one too. */
+	let installable = $state(false);
 	let templateInput = $state<HTMLInputElement | null>(null);
 	let missingFontInput = $state<HTMLInputElement | null>(null);
 	let missingFontTarget = $state<FontRef | null>(null);
@@ -124,12 +141,22 @@
 
 	async function boot() {
 		await migrateLegacyStorage();
+		// Asked before anything is read, because every read below resolves rather
+		// than rejecting: without this, a browser that is refusing to store
+		// anything looks exactly like a browser visiting for the first time, and
+		// a returning user would be told their month of work was sample data.
+		const storable = await storageAvailable();
+		let unreadable = false;
+
 		const storedTemplate = await loadTemplate();
 		if (storedTemplate) {
 			try {
 				template = normaliseTemplate(storedTemplate);
 			} catch {
+				// Silently starting over is how someone finds out their design is
+				// gone by noticing, rather than by being told.
 				template = starterTemplate();
+				unreadable = true;
 			}
 		}
 
@@ -152,8 +179,37 @@
 		}
 		history = createHistory(snapshot());
 		ready = true;
-		if (firstRun) status = 'Sample cards loaded to play with. Edit the table, drag the boxes, then Print — or press ? for the tour.';
+		if (!storable) {
+			// The autosave warning would otherwise land on top of this one a
+			// moment later, and "no longer being saved" is a worse thing to read
+			// than the truth: it was never going to be saved in this browser.
+			saveFailed = true;
+			notify(
+				'This browser will not let libelli store anything — private mode, or storage turned off for this site. Everything here works, but none of it will be here next time. Export your template before you close the tab.',
+				'warning'
+			);
+		} else if (unreadable)
+			notify('The saved template could not be read, so this is the starter card. Your data is untouched.', 'warning');
+		else if (firstRun)
+			notify('Sample cards loaded to play with. Edit the table, drag the boxes, then Print — or press ? for the tour.');
 		missingFonts = await ensureTemplateFonts(template);
+
+		// Last, so the precache download is not competing with the first paint.
+		registerServiceWorker(() => {
+			updateReady = true;
+			notify('A new version of libelli is ready — reload when you are at a good stopping point.');
+		});
+	}
+
+	// No reactive reads, so this runs once and its return value is the cleanup.
+	$effect(() => watchInstall((available) => (installable = available)));
+
+	async function install() {
+		const outcome = await promptInstall();
+		// The offer is spent either way, so the button goes whatever they chose.
+		installable = false;
+		if (outcome === 'accepted') notify('Installed. libelli opens in its own window from now on.');
+		else if (outcome === 'dismissed') notify('Left in the browser — the offer comes back on a later visit.');
 	}
 
 	/**
@@ -201,29 +257,42 @@
 		if (!undoable) return;
 		history = undoStep(history);
 		applySnapshot(history.present);
-		status = 'Undone.';
+		notify('Undone.');
 	}
 
 	function redo() {
 		if (!redoable) return;
 		history = redoStep(history);
 		applySnapshot(history.present);
-		status = 'Redone.';
+		notify('Redone.');
 	}
 
 	// ---- autosave -----------------------------------------------------------
 
+	/**
+	 * Said once per session, not once per keystroke: a save that is failing is
+	 * failing every 300ms, and a status line that rewrites itself forever is
+	 * worse than one that says the thing plainly and stops.
+	 */
+	let saveFailed = false;
+
+	function reportSave(landed: boolean) {
+		if (landed || saveFailed) return;
+		saveFailed = true;
+		notify('Your work is no longer being saved — this browser is out of room, or has stopped allowing it. Export what you have.', 'warning');
+	}
+
 	$effect(() => {
 		if (!ready) return;
 		const saved = $state.snapshot(template);
-		const timer = setTimeout(() => void saveTemplate(saved), 300);
+		const timer = setTimeout(() => void saveTemplate(saved).then(reportSave), 300);
 		return () => clearTimeout(timer);
 	});
 
 	$effect(() => {
 		if (!ready) return;
 		const saved = $state.snapshot(dataset);
-		const timer = setTimeout(() => void saveDataset(saved), 300);
+		const timer = setTimeout(() => void saveDataset(saved).then(reportSave), 300);
 		return () => clearTimeout(timer);
 	});
 
@@ -292,7 +361,7 @@
 		template = starterTemplate();
 		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
-		status = 'Template reset to the starter card. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.';
+		notify('Template reset to the starter card. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
 	}
 
 	/**
@@ -352,7 +421,7 @@
 				.map((b) => (b.anchor && gone.has(b.anchor.to) ? { ...b, anchor: null } : b))
 		};
 		selectedIds = [];
-		status = `${gone.size} area${gone.size === 1 ? '' : 's'} deleted. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`;
+		notify(`${gone.size} area${gone.size === 1 ? '' : 's'} deleted. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`);
 	}
 
 	function alignSelection(edge: AlignEdge) {
@@ -362,9 +431,9 @@
 		const vertical = edge === 'top' || edge === 'centre-y' || edge === 'bottom';
 		const skipped = vertical ? selectedBoxes.filter((b) => b.anchor && !b.locked).length : 0;
 		template = { ...template, boxes };
-		status = skipped
+		notify(skipped
 			? `Aligned. ${skipped} anchored ${skipped === 1 ? 'area takes its top' : 'areas take their tops'} from another, so vertical alignment left ${skipped === 1 ? 'it' : 'them'} alone.`
-			: 'Aligned.';
+			: 'Aligned.');
 	}
 
 	/** All of them locked already means the button unlocks; otherwise it locks. */
@@ -387,7 +456,7 @@
 			...template,
 			boxes: template.boxes.map((b) => (ids.has(b.id) ? (stripUndefined({ ...b, group }) as Box) : b))
 		};
-		status = grouped ? 'Ungrouped.' : `${selectedBoxes.length} areas grouped — clicking any one now takes all of them.`;
+		notify(grouped ? 'Ungrouped.' : `${selectedBoxes.length} areas grouped — clicking any one now takes all of them.`);
 	}
 
 	/**
@@ -447,7 +516,7 @@
 				if (next !== current) updateBox({ ...box, valign: next });
 			}
 		}
-		status = landed.size === 1 ? `Aligned ${ALIGN_LABELS[[...landed][0]]}.` : 'Alignment stepped.';
+		notify(landed.size === 1 ? `Aligned ${ALIGN_LABELS[[...landed][0]]}.` : 'Alignment stepped.');
 	}
 
 	const ALIGN_KEYS: Record<string, ['h' | 'v', -1 | 1]> = {
@@ -512,6 +581,19 @@
 			return;
 		}
 		if (typing || previewOpen) return;
+		// The first-run notice tells people to press ? for the tour, and for a
+		// long time nothing listened. `/` too, so it works without the shift on
+		// a keyboard that puts ? somewhere else.
+		if (event.key === '?' || event.key === '/') {
+			event.preventDefault();
+			helpOpen = true;
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd' && selectedIds.length) {
+			event.preventDefault();
+			duplicateBox();
+			return;
+		}
 		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
 			event.preventDefault();
 			selectedIds = template.boxes.map((b) => b.id);
@@ -520,6 +602,7 @@
 		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIds.length) {
 			event.preventDefault();
 			deleteBox();
+			return;
 		}
 		// Ctrl/Cmd+Shift turns the arrows into alignment, in the direction pressed:
 		// the same keys, moving the content inside the box rather than the box
@@ -550,7 +633,7 @@
 
 	function doExportTemplate() {
 		download(`${slugify(template.name)}.json`, exportTemplate($state.snapshot(template)));
-		status = 'Template exported — fonts referenced by name.';
+		notify('Template exported — fonts referenced by name.');
 	}
 
 	async function importTemplate(event: Event) {
@@ -567,9 +650,9 @@
 			mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(template), dataset.columns);
 			mappingPrompt = true;
 			missingFonts = await ensureTemplateFonts(template);
-			status = `Loaded “${template.name}”.`;
+			notify(`Loaded “${template.name}”.`);
 		} catch (error) {
-			status = error instanceof Error ? error.message : 'That file is not a template.';
+			notify(error instanceof Error ? error.message : 'That file is not a template.', 'warning');
 		}
 	}
 
@@ -579,9 +662,9 @@
 			const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== ref.family.toLowerCase());
 			template = { ...template, fonts: [...fonts, ref] };
 			missingFonts = missingFonts.filter((f) => (f.ref ?? f.family) !== (ref.ref ?? ref.family));
-			status = `${ref.family} installed in this browser.`;
+			notify(`${ref.family} installed in this browser.`);
 		} catch {
-			status = 'That font file could not be read.';
+			notify('That font file could not be read.', 'warning');
 		}
 	}
 
@@ -589,9 +672,9 @@
 		try {
 			const image = await uploadBackgroundImage(file, template.page.image?.fit ?? 'cover', nameOverride);
 			template = { ...template, page: { ...template.page, image } };
-			status = `${image.src} set as the page background — the picture stays in this browser, the template only names it.`;
+			notify(`${image.src} set as the page background — the picture stays in this browser, the template only names it.`);
 		} catch {
-			status = 'That image could not be read.';
+			notify('That image could not be read.', 'warning');
 		}
 	}
 
@@ -627,7 +710,7 @@
 	 */
 	function requestPrint() {
 		if (!dataset.rows.length) {
-			status = 'Nothing to print yet.';
+			notify('Nothing to print yet.', 'warning');
 			return;
 		}
 		// Every page, every time. The selection is by row index, and sorting or
@@ -671,6 +754,11 @@
 	<header class="toolbar">
 		<strong class="brand">libelli</strong>
 		<span class="spacer"></span>
+		{#if installable}
+			<button onclick={() => void install()} title="Install libelli on this device">
+				<Icon name="add" size={15} /> Install
+			</button>
+		{/if}
 		<button onclick={() => (helpOpen = true)} title="How this works, and the keys">
 			<Icon name="help" size={15} /> Help
 		</button>
@@ -713,7 +801,7 @@
 			onresettemplate={resetTemplate}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
-			onnotice={(message) => (status = message)}
+			onnotice={notify}
 			onimporttemplate={() => templateInput?.click()}
 			onexporttemplate={doExportTemplate}
 			oneditcss={() => (cssOpen = true)}
@@ -735,7 +823,7 @@
 			onresettemplate={resetTemplate}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
-			onnotice={(message) => (status = message)}
+			onnotice={notify}
 			onimporttemplate={() => templateInput?.click()}
 			onexporttemplate={doExportTemplate}
 			oneditcss={() => (cssOpen = true)}
@@ -813,6 +901,7 @@
 			onredo={redo}
 			onaddbox={addTextBox}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
+			modalOpen={helpOpen || cssOpen || previewOpen || lightboxOpen || boxMenu !== null}
 			{selectedBoxes}
 			onalign={alignSelection}
 			onarrange={arrange}
@@ -845,7 +934,14 @@
 	</main>
 
 	<footer class="status-bar">
-		<span class="status" role="status">{status}</span>
+		<!-- `title` because the line is one ellipsised row: a long notice was
+		     otherwise cut off with no way to read the rest of it. -->
+		<span class="status" class:warning={statusTone === 'warning'} role="status" title={status}>
+			{#if statusTone === 'warning'}<Icon name="warning" size={12} />{/if}{status}
+		</span>
+		{#if updateReady}
+			<button class="reload" onclick={applyUpdate}>Reload</button>
+		{/if}
 		<span class="version">v{VERSION}</span>
 	</footer>
 </div>
@@ -897,6 +993,12 @@
 			keeps working with the network off, a template is a small file you can hand to somebody, and closing the tab is
 			the only thing that ever deletes anything.
 		</p>
+		<p>
+			It keeps a copy of itself here too, so it opens with no network at all. Where your browser offers it, an
+			<strong>Install</strong> button appears in the toolbar and gives libelli its own window and its own icon. When a
+			new version has downloaded the status bar says so and offers a reload, rather than swapping it in while you are
+			working — undo lives in memory, and a reload nobody asked for would take it.
+		</p>
 
 		<h3>Getting cards out</h3>
 		<p><strong>Export</strong> — the button, or <strong>Ctrl/Cmd + P</strong> — opens one screen showing every card as a small page. The browser's own print dialog is taken over rather than left to fire: it would print the editor rather than the cards. Pressing it again from that screen sends the run.</p>
@@ -918,9 +1020,11 @@
 			<dt>Alt + Shift + Arrows</dt><dd>Nudge by 10mm</dd>
 			<dt>Shift / Ctrl / ⌘ + click</dt><dd>Add an area to the selection, or drop it</dd>
 			<dt>Ctrl/Cmd + A</dt><dd>Select every area</dd>
+			<dt>Ctrl/Cmd + D</dt><dd>Duplicate the selected areas</dd>
 			<dt>Delete</dt><dd>Remove the selected areas</dd>
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
 			<dt>← / →</dt><dd>Step through the cards, with one open full screen</dd>
+			<dt>? or /</dt><dd>This panel</dd>
 			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
 			<dt>Ctrl/Cmd + '</dt><dd>Grid on or off</dd>
 			<dt>Ctrl/Cmd + P</dt><dd>Export — again from that screen to print</dd>
@@ -992,7 +1096,7 @@
 		onactivate={(i) => (activeRow = i)}
 		onexcludedchange={(next) => (excludedRows = next)}
 		onprint={printFromPreview}
-		onnotice={(message) => (status = message)}
+		onnotice={notify}
 		onclose={() => (previewOpen = false)}
 	/>
 {/if}
@@ -1134,11 +1238,25 @@
 	}
 
 	.status {
+		display: flex;
+		align-items: center;
+		gap: 4px;
 		flex: 1;
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	/* Something went wrong reads differently from something happened. The same
+	   mark the canvas uses for a box that is clipping what will print. */
+	.status.warning {
+		color: #b42318;
+	}
+
+	.status-bar .reload {
+		padding: 2px 8px;
+		font-size: 11px;
 	}
 
 	.status-bar .version {

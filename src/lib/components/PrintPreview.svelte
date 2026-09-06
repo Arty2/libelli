@@ -2,6 +2,7 @@
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
 	import Lightbox from './Lightbox.svelte';
+	import { downloadBlob, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
 	import { mmToPx } from '$lib/layout';
 	import type { Dataset, Mapping, Template } from '$lib/types';
@@ -17,7 +18,7 @@
 		onactivate: (index: number) => void;
 		onexcludedchange: (excluded: Set<number>) => void;
 		onprint: () => void;
-		onnotice: (message: string) => void;
+		onnotice: (message: string, tone?: 'info' | 'warning') => void;
 		onclose: () => void;
 	}
 
@@ -37,9 +38,8 @@
 
 	let grid = $state<HTMLDivElement | null>(null);
 	let exporting = $state(false);
-
-	const slug = (name: string) =>
-		name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'card';
+	/** How far through a run, so a long export is not a frozen button. */
+	let progress = $state<{ done: number; total: number } | null>(null);
 
 	/**
 	 * One file per selected page, at 300 dpi. A card is already rendered here at
@@ -52,29 +52,37 @@
 		const families = Array.from(
 			new Set([template.defaults.font, ...template.boxes.map((b) => b.font).filter(Boolean)])
 		) as string[];
-		let missing: string[] = [];
+		// A set, not the last card's list: this was being overwritten every
+		// iteration, so a run of fifty reported only what card fifty was missing.
+		const missing = new Set<string>();
 		let written = 0;
 		try {
 			const cards = Array.from(grid.querySelectorAll<HTMLElement>('figure:not(.dropped) .card'));
+			progress = { done: 0, total: cards.length };
 			for (const [i, card] of cards.entries()) {
 				const { blob, missingFonts } = await elementToPng(card, families, ratioForDpi(300));
-				missing = missingFonts;
-				const url = URL.createObjectURL(blob);
-				const link = document.createElement('a');
-				link.href = url;
-				link.download = `${slug(template.name)}-${i + 1}.png`;
-				link.click();
-				URL.revokeObjectURL(url);
+				for (const family of missingFonts) missing.add(family);
+				downloadBlob(`${slugify(template.name)}-${i + 1}.png`, blob);
 				written += 1;
+				progress = { done: written, total: cards.length };
 			}
 			onnotice(
 				`${written} PNG${written === 1 ? '' : 's'} exported at 300 dpi.` +
-					(missing.length ? ` ${missing.join(', ')} could not be embedded — upload the font file to export it as itself.` : '')
+					(missing.size
+						? ` ${[...missing].join(', ')} could not be embedded — upload the font file to export it as itself.`
+						: '')
 			);
 		} catch (error) {
-			onnotice(error instanceof Error ? error.message : 'That could not be exported.');
+			const reason = error instanceof Error ? error.message : 'That could not be exported.';
+			// Which card it died on matters: the files already saved are real, and
+			// saying nothing about them reads as though the whole run was lost.
+			onnotice(
+				written ? `${reason} ${written} PNG${written === 1 ? '' : 's'} had already been saved.` : reason,
+				'warning'
+			);
 		} finally {
 			exporting = false;
+			progress = null;
 		}
 	}
 
@@ -141,7 +149,13 @@
 			<button onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
 			<button onclick={exportPng} disabled={chosen === 0 || exporting}>
 				<Icon name="download" size={15} />
-				{exporting ? 'Exporting…' : 'PNG'}
+				{#if exporting}
+					{progress && progress.total > 1
+						? `Exporting ${Math.min(progress.done + 1, progress.total)}/${progress.total}…`
+						: 'Exporting…'}
+				{:else}
+					PNG
+				{/if}
 			</button>
 			<button class="primary" onclick={onprint} disabled={chosen === 0}>
 				<Icon name="print" size={15} />

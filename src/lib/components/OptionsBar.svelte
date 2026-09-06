@@ -46,7 +46,7 @@
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
-		onnotice: (message: string) => void;
+		onnotice: (message: string, tone?: 'info' | 'warning') => void;
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
@@ -293,7 +293,7 @@
 		// looking accepted until the next reload quietly dropped it.
 		const safe = safeImageUrl(url);
 		if (!safe) {
-			onnotice('A background image has to be an http or https address.');
+			onnotice('A background image has to be an http or https address.', 'warning');
 			return;
 		}
 		setBackground({ src: safe, source: 'url', fit: template.page.image?.fit ?? 'cover' });

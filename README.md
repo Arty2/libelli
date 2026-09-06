@@ -312,8 +312,10 @@ and sample data, with your work one undo away. Uploaded fonts are the exception
 | <kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd> | Nudge the selection by 1mm |
 | <kbd>⇧</kbd> + arrows | Nudge by 5mm |
 | <kbd>Alt</kbd> <kbd>⇧</kbd> + arrows | Nudge by 10mm |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>d</kbd> | Duplicate the selected areas |
 | <kbd>Delete</kbd> | Remove the selected areas |
 | <kbd>Esc</kbd> | Deselect, or close what is open |
+| <kbd>?</kbd> or <kbd>/</kbd> | The help panel |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>h</kbd> | Bounds on or off |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> | Grid on or off |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>p</kbd> | Export — again from that screen to print |
@@ -335,6 +337,33 @@ subgrid of a 10mm grid; otherwise a box latches onto the edges and centres of
 its neighbours as it passes them, and a guide shows what it caught. There is no
 key to hold for free movement — switch **Grid** and **Bounds** both off and
 nothing latches, because a box should never snap to a guide you cannot see.
+
+## Installing it, and working offline
+
+libelli keeps a copy of itself in the browser, so it opens with the network off
+and stays usable on a train or in a room with bad wifi. The first visit fetches
+the app; every visit after that is served from that copy.
+
+Where the browser offers it — Chrome, Edge and most Chromium browsers, on
+desktop and Android — an **Install** button appears in the toolbar and puts
+libelli in its own window, with its own icon, off the taskbar or app drawer.
+The button is only there when the browser is actually offering an install, and
+goes once you have taken it.
+
+The copy is replaced a whole build at a time. When a new version has downloaded,
+the status bar says so and offers **Reload** rather than swapping it in
+underneath you: undo history lives in memory, and a reload you did not ask for
+would throw it away.
+
+None of this changes what leaves the browser, because nothing does. The cache
+holds this app's own files and nothing else — a font from Google or a background
+image you pointed at a URL goes to the network exactly as it did before, and is
+never stored.
+
+**On iPhone and iPad**, Add to Home Screen deliberately keeps Safari's chrome.
+A chromeless iOS web app has no Share → Print and no working print command, and
+printing is the entire point of this app, so it keeps the browser's printer
+instead of the full-screen look.
 
 ## Settings
 
