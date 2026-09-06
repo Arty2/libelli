@@ -184,6 +184,12 @@ Load-bearing choices, in case they look arbitrary:
 - Feature: minor — `0.1.1` → `0.2.0`
 - **The leading zero never moves.** This is a vibe-coded app, always in flux; it
   does not claim to be 1.0.
+- **Bump once per session, not once per change.** A session is one release
+  however many commits it takes: set the number when the work starts landing and
+  leave it alone, so the follow-ups and corrections that always follow do not
+  each claim a version of their own. Size the single bump by the largest change
+  in the session — one feature among five fixes still makes it a minor. Bump
+  again within a session only when asked to.
 
 ## How we work
 
