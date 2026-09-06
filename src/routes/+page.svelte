@@ -36,7 +36,7 @@
 		saveTemplate,
 		saveUi
 	} from '$lib/storage';
-	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
+	import type { Align, Box, Dataset, FontRef, Mapping, Template, UiState, VAlign } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
@@ -400,6 +400,56 @@
 		updateBox(next);
 	}
 
+	/**
+	 * Alignment, in the order the segmented control in the bar reads: stepping is
+	 * clamped at the ends rather than wrapping, so holding the key settles on
+	 * left or on justify instead of cycling past it forever.
+	 */
+	const H_ALIGN: Align[] = ['left', 'center', 'right', 'justify'];
+	const V_ALIGN: VAlign[] = ['top', 'middle', 'bottom'];
+	const ALIGN_LABELS: Record<string, string> = {
+		left: 'left',
+		center: 'centred',
+		right: 'right',
+		justify: 'justified',
+		top: 'top',
+		middle: 'middle',
+		bottom: 'bottom'
+	};
+
+	/** Move every chosen box one step along an axis of alignment. */
+	function stepAlign(axis: 'h' | 'v', direction: -1 | 1) {
+		if (template.locked) return;
+		// Snapshotted first: `updateBox` replaces the template on every call, and
+		// `selectedBoxes` is derived from it.
+		const targets = selectedBoxes.filter((b) => !b.locked).map((b) => $state.snapshot(b) as Box);
+		if (!targets.length) return;
+		const landed = new Set<string>();
+		for (const box of targets) {
+			if (axis === 'h') {
+				const current = box.align ?? template.defaults.align;
+				const at = H_ALIGN.indexOf(current);
+				const next = H_ALIGN[Math.min(H_ALIGN.length - 1, Math.max(0, at + direction))];
+				landed.add(next);
+				if (next !== current) updateBox({ ...box, align: next });
+			} else {
+				const current = box.valign ?? 'top';
+				const at = V_ALIGN.indexOf(current);
+				const next = V_ALIGN[Math.min(V_ALIGN.length - 1, Math.max(0, at + direction))];
+				landed.add(next);
+				if (next !== current) updateBox({ ...box, valign: next });
+			}
+		}
+		status = landed.size === 1 ? `Aligned ${ALIGN_LABELS[[...landed][0]]}.` : 'Alignment stepped.';
+	}
+
+	const ALIGN_KEYS: Record<string, ['h' | 'v', -1 | 1]> = {
+		ArrowLeft: ['h', -1],
+		ArrowRight: ['h', 1],
+		ArrowUp: ['v', -1],
+		ArrowDown: ['v', 1]
+	};
+
 	const NUDGES: Record<string, [number, number]> = {
 		ArrowLeft: [-1, 0],
 		ArrowRight: [1, 0],
@@ -437,6 +487,15 @@
 		if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIds.length) {
 			event.preventDefault();
 			deleteBox();
+		}
+		// Ctrl/Cmd+Shift turns the arrows into alignment, in the direction pressed:
+		// the same keys, moving the content inside the box rather than the box
+		// itself. Checked before the nudge, which only looks at Shift and Alt.
+		const align = ALIGN_KEYS[event.key];
+		if (align && (event.metaKey || event.ctrlKey) && event.shiftKey && selectedIds.length) {
+			event.preventDefault();
+			stepAlign(align[0], align[1]);
+			return;
 		}
 		// Nudging lives on the window, not on the preview: the preview only has
 		// focus if you clicked it, and arrow keys that work sometimes are worse
@@ -825,6 +884,8 @@
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
 			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
 			<dt>Ctrl/Cmd + '</dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
+			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
 			<dt>Ctrl/Cmd + + / −</dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
 		</dl>
@@ -840,6 +901,7 @@
 
 		<h3>Type</h3>
 		<p>Page setup holds the defaults — family, size, leading, spacing and colour. An area that leaves those fields blank inherits them, so changing the page changes every area that never overrode it.</p>
+		<p>Two shortcuts work on the type without going to the bar. <strong>Ctrl/Cmd + Shift</strong> and the scroll wheel sizes whatever the pointer is over, in points — the whole selection if that area is part of one, and it gives an inheriting area a size of its own on the first turn. <strong>Ctrl/Cmd + Shift</strong> and the arrows step the alignment of everything selected in the direction pressed: left and right along <em>left, centred, right, justified</em>, up and down along <em>top, middle, bottom</em>.</p>
 
 		<h3>Locking</h3>
 		<p><strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page lock covers every area and the page settings too. The padlock that appears on the area, or at the corner of the page, is telling you it is locked; the button that undoes it is in the bar. Bounds off takes the padlocks away with the rest of the screen furniture.</p>

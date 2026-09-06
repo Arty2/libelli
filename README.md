@@ -117,6 +117,11 @@ resize boxes directly, or type exact millimetres.
   millimetres rather than outside them, so framing a box does not move it or
   anything anchored below it — though padding and a border do make the box
   taller, which an anchored box below will follow, as it should.
+- **Type without the bar** — <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> and the
+  scroll wheel sizes whatever the pointer is over, in points, and the same
+  modifiers with the arrows step the alignment of the selection in the direction
+  pressed. Both give an area a value of its own on the first go, so an area that
+  was inheriting stops.
 - **Type defaults** — page setup holds the family, size, leading, spacing and
   colour. A box that leaves those fields blank inherits them, so changing the
   page moves every box that never overrode it; a new box starts out inheriting
@@ -299,6 +304,8 @@ and sample data, with your work one undo away. Uploaded fonts are the exception
 | <kbd>Esc</kbd> | Deselect, or close what is open |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>h</kbd> | Bounds on or off |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> | Grid on or off |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + arrows | Step the alignment — left, right, top, bottom |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + scroll | Size the type in the area under the pointer |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> | Zoom the page in or out |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>0</kbd> | Fit the page (<kbd>⇧</kbd> for 100%) |
 

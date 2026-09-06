@@ -140,6 +140,13 @@ Load-bearing choices, in case they look arbitrary:
   asynchronous, and the component has to stay a pure function of its props.
   `assets.ts` also owns object-URL lifetime: an object URL outlives the value
   that made it, so each is revoked when replaced.
+- **One wheel listener, two gestures.** `Ctrl`/`Cmd` and the wheel zooms the
+  page; add `Shift` and it sizes the type under the pointer instead. Both are
+  `preventDefault`ed by the same non-passive listener on the stage, because the
+  browser would otherwise zoom itself underneath either of them. Wheel deltas
+  are accumulated and spent a point at a time: a mouse notch is one fat event
+  and a trackpad is a stream of small ones, so reading them one-for-one would
+  make the same flick one step on one machine and forty on another.
 - **The editor does not clip, the output does.** `.card` is `overflow: hidden`
   so a print or a PNG never spills onto its neighbour; `.card.editing` — the
   interactive preview only — turns that off, so a box dragged past the edge

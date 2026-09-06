@@ -144,10 +144,52 @@
 	const zoomBy = (factor: number) => zoomTo(scale * factor);
 
 	/**
+	 * Type size under the pointer, in points.
+	 *
+	 * A mouse notch is a single fat event and a trackpad is a stream of small
+	 * ones, so the deltas are accumulated and spent a point at a time rather than
+	 * read one-for-one — otherwise the same flick is one step on one machine and
+	 * forty on another. One notch of a mouse wheel is a point; the tally resets
+	 * when the pointer moves to another box.
+	 */
+	const SIZE_NOTCH = 100;
+	let sizeTally = 0;
+	let sizeTarget: string | null = null;
+
+	function resizeType(event: WheelEvent) {
+		if (template.locked) return;
+		const under = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-box-id]');
+		const id = under?.dataset.boxId;
+		if (!id) return;
+
+		if (id !== sizeTarget) {
+			sizeTarget = id;
+			sizeTally = 0;
+		}
+		sizeTally -= event.deltaY;
+		const steps = Math.trunc(sizeTally / SIZE_NOTCH);
+		if (!steps) return;
+		sizeTally -= steps * SIZE_NOTCH;
+
+		// The box under the pointer, or the whole selection when it is part of one
+		// — the same bargain dragging one of several makes.
+		const chosen = selectedIds.includes(id) ? selectedIds : [id];
+		for (const box of template.boxes.filter((b) => chosen.includes(b.id) && !b.locked)) {
+			// A box with no size of its own inherits the page's; the first step is
+			// what gives it one to change.
+			const from = box.size ?? template.defaults.size;
+			const size = Math.round(Math.max(1, from + steps) * 10) / 10;
+			if (size !== box.size) onchange({ ...box, size });
+		}
+	}
+
+	/**
 	 * Pinch. A trackpad pinch and a Ctrl+wheel arrive as the same event, which is
 	 * why this is one handler; `preventDefault` is what stops the browser zooming
 	 * the whole app around it, and it only works on a non-passive listener, so
-	 * this is added by hand rather than as an `onwheel` attribute.
+	 * this is added by hand rather than as an `onwheel` attribute. Shift held as
+	 * well sizes the type under the pointer instead of the page — still
+	 * prevented, or the browser would zoom itself underneath it.
 	 */
 	$effect(() => {
 		if (!host) return;
@@ -155,7 +197,8 @@
 		const onWheel = (event: WheelEvent) => {
 			if (!event.ctrlKey && !event.metaKey) return;
 			event.preventDefault();
-			zoomBy(Math.exp(-event.deltaY / 220));
+			if (event.shiftKey) resizeType(event);
+			else zoomBy(Math.exp(-event.deltaY / 220));
 		};
 		node.addEventListener('wheel', onWheel, { passive: false });
 		return () => node.removeEventListener('wheel', onWheel);
