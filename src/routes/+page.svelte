@@ -13,6 +13,7 @@
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
 	import { GRID_MINOR, alignBoxes, type AlignEdge } from '$lib/layout';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
+	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
@@ -70,6 +71,10 @@
 	let missingImage = $state<string | null>(null);
 	let backgroundInput = $state<HTMLInputElement | null>(null);
 	let status = $state('');
+	/** A replacement worker is installed and waiting for someone to be ready. */
+	let updateReady = $state(false);
+	/** The browser is offering an install, so the toolbar can offer one too. */
+	let installable = $state(false);
 	let templateInput = $state<HTMLInputElement | null>(null);
 	let missingFontInput = $state<HTMLInputElement | null>(null);
 	let missingFontTarget = $state<FontRef | null>(null);
@@ -147,6 +152,23 @@
 		ready = true;
 		if (firstRun) status = 'Sample cards loaded to play with. Edit the table, drag the boxes, then Print — or press ? for the tour.';
 		missingFonts = await ensureTemplateFonts(template);
+
+		// Last, so the precache download is not competing with the first paint.
+		registerServiceWorker(() => {
+			updateReady = true;
+			status = 'A new version of libelli is ready — reload when you are at a good stopping point.';
+		});
+	}
+
+	// No reactive reads, so this runs once and its return value is the cleanup.
+	$effect(() => watchInstall((available) => (installable = available)));
+
+	async function install() {
+		const outcome = await promptInstall();
+		// The offer is spent either way, so the button goes whatever they chose.
+		installable = false;
+		if (outcome === 'accepted') status = 'Installed. libelli opens in its own window from now on.';
+		else if (outcome === 'dismissed') status = 'Left in the browser — the offer comes back on a later visit.';
 	}
 
 	/**
@@ -661,6 +683,11 @@
 	<header class="toolbar">
 		<strong class="brand">libelli</strong>
 		<span class="spacer"></span>
+		{#if installable}
+			<button onclick={() => void install()} title="Install libelli on this device">
+				<Icon name="add" size={15} /> Install
+			</button>
+		{/if}
 		<button onclick={() => (helpOpen = true)} title="How this works, and the keys">
 			<Icon name="help" size={15} /> Help
 		</button>
@@ -834,7 +861,10 @@
 	</main>
 
 	<footer class="status-bar">
-		<span class="status" role="status">{status}</span>
+		<span class="status" role="status" title={status}>{status}</span>
+		{#if updateReady}
+			<button class="reload" onclick={applyUpdate}>Reload</button>
+		{/if}
 		<span class="version">v{VERSION}</span>
 	</footer>
 </div>
@@ -885,6 +915,12 @@
 			uploaded, because there is no server to upload it to, no account to make and nothing watching what you do. It
 			keeps working with the network off, a template is a small file you can hand to somebody, and closing the tab is
 			the only thing that ever deletes anything.
+		</p>
+		<p>
+			It keeps a copy of itself here too, so it opens with no network at all. Where your browser offers it, an
+			<strong>Install</strong> button appears in the toolbar and gives libelli its own window and its own icon. When a
+			new version has downloaded the status bar says so and offers a reload, rather than swapping it in while you are
+			working — undo lives in memory, and a reload nobody asked for would take it.
 		</p>
 
 		<h3>Getting cards out</h3>
@@ -1112,6 +1148,11 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.status-bar .reload {
+		padding: 2px 8px;
+		font-size: 11px;
 	}
 
 	.status-bar .version {

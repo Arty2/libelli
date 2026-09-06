@@ -4,7 +4,21 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="description" content="libelli — turn spreadsheet rows into print-ready cards, entirely in your browser." />
+		<meta name="theme-color" content="#ffffff" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+		<!--
+			There is deliberately no `apple-mobile-web-app-capable` here. It is what
+			makes an iOS home-screen launch chromeless, and a chromeless iOS web app
+			has no Share → Print and no working window.print(). Printing is the whole
+			point of this app, so iOS keeps Safari's chrome and keeps its printer.
+			The manifest still says standalone, so desktop and Android install as
+			proper apps, where printing works either way. Please do not "fix" this.
+		-->
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+		<meta name="apple-mobile-web-app-title" content="libelli" />
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

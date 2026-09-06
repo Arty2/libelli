@@ -34,9 +34,12 @@ src/lib/
   history.ts      undo/redo snapshots
   storage.ts      localStorage + IndexedDB, plus the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
+  sw-policy.ts    what the service worker does with a request, kept testable
+  pwa.ts          worker registration, the update handshake, the install offer
   version.ts      VERSION, and the bumping rule
   components/     Card, PagePreview, DataTable, OptionsBar, PrintPreview, PrintRoot, BoxMenu,
                   SelectionTools, Icon
+src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   all app state and wiring
 static/sample-cards.csv   sample data, bundled with ?raw and also served as a file
 ```
@@ -111,6 +114,15 @@ Load-bearing choices, in case they look arbitrary:
 - **A lock stops a box moving, not being picked.** `startDrag` selects before it
   checks whether the box is editable, or the only control that could unlock a
   box would be unreachable.
+- **The worker only ever touches same-origin GETs.** `sw-policy.ts` decides, and
+  it passes everything cross-origin straight through: the app promises to fetch
+  nothing, and a cache full of somebody else's bytes would quietly break that
+  promise in a place nobody thinks to look. It also never skips waiting on its
+  own — the undo stack is in memory, so a worker that swapped itself in would
+  force a reload that threw the stack away. The page offers a Reload instead.
+  Precaching fetches with `cache: 'reload'`: the shell is the one URL that never
+  changes between builds, so a cached copy of it names the *previous* build's
+  hashed assets, and activate has just binned the cache those lived in.
 - **The PNG export is the one thing that fetches.** `png.ts` inlines a Google
   face by fetching the stylesheet the page already loaded and the files it names.
   Deliberate, confined to that file, and best effort — a blocked request falls
