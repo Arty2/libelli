@@ -35,6 +35,8 @@
 		onredo: () => void;
 		onaddbox: () => void;
 		onmenu: (id: string, x: number, y: number) => void;
+		/** a dialog has the screen: the view keys are not the page's right now */
+		modalOpen: boolean;
 		/** everything currently chosen; the selection tools appear for two or more */
 		selectedBoxes: Box[];
 		onalign: (edge: AlignEdge) => void;
@@ -70,6 +72,7 @@
 		onredo,
 		onaddbox,
 		onmenu,
+		modalOpen,
 		selectedBoxes,
 		onalign,
 		onarrange,
@@ -241,6 +244,10 @@
 	function onKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
 		if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+		// This listener is on the window, so it fires while a dialog is up too —
+		// and zooming the page you cannot see behind Help is not what Ctrl+0 was
+		// asked for.
+		if (modalOpen) return;
 		if (!event.ctrlKey && !event.metaKey) return;
 
 		switch (event.key) {
