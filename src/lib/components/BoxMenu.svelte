@@ -92,7 +92,7 @@
 	class="menu"
 	bind:this={menu}
 	role="menu"
-	aria-label="Box actions"
+	aria-label="Area actions"
 	tabindex="-1"
 	style="left:{position.left}px;top:{position.top}px"
 >

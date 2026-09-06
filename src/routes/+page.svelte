@@ -8,6 +8,7 @@
 	import PagePreview from '$lib/components/PagePreview.svelte';
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
 	import { resolveBackground, uploadBackgroundImage } from '$lib/assets';
+	import { download, slugify } from '$lib/download';
 	import { ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
 	import { GRID_MINOR, alignBoxes, type AlignEdge } from '$lib/layout';
@@ -35,12 +36,12 @@
 		saveTemplate,
 		saveUi
 	} from '$lib/storage';
-	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
+	import type { Align, Box, Dataset, FontRef, Mapping, Template, UiState, VAlign } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
 	let mapping = $state<Mapping>({});
-	let ui = $state<UiState>({ showOutlines: true, showGrid: false, zoom: 'fit' });
+	let ui = $state<UiState>({ showBounds: true, showGrid: false, zoom: 'fit' });
 	let activeRow = $state(0);
 	let selectedIds = $state<string[]>([]);
 	let ready = $state(false);
@@ -55,6 +56,9 @@
 	// Page setup is a panel, not a mode: it opens on wide screens and stays out of
 	// the way on a phone, where it would eat the preview it is there to serve.
 	let pageSetupOpen = $state(true);
+	// Same bargain for the table: on a phone the preview and the spreadsheet
+	// cannot both have the screen, so the data tray starts folded away.
+	let dataOpen = $state(true);
 	let firstRun = $state(false);
 	let boxMenu = $state<{ id: string; x: number; y: number } | null>(null);
 	let printing = $state(false);
@@ -135,7 +139,10 @@
 		const storedMapping = loadMapping(template.name);
 		mapping = Object.keys(storedMapping).length ? storedMapping : autoMap(usedSlots(template), dataset.columns);
 		ui = loadUi();
-		if (typeof window !== 'undefined' && window.innerWidth <= 900) pageSetupOpen = false;
+		if (typeof window !== 'undefined' && window.innerWidth <= 900) {
+			pageSetupOpen = false;
+			dataOpen = false;
+		}
 		history = createHistory(snapshot());
 		ready = true;
 		if (firstRun) status = 'Sample cards loaded to play with. Edit the table, drag the boxes, then Print — or press ? for the tour.';
@@ -338,7 +345,7 @@
 				.map((b) => (b.anchor && gone.has(b.anchor.to) ? { ...b, anchor: null } : b))
 		};
 		selectedIds = [];
-		status = `${gone.size} box${gone.size === 1 ? '' : 'es'} deleted. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`;
+		status = `${gone.size} area${gone.size === 1 ? '' : 's'} deleted. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`;
 	}
 
 	function alignSelection(edge: AlignEdge) {
@@ -373,7 +380,7 @@
 			...template,
 			boxes: template.boxes.map((b) => (ids.has(b.id) ? (stripUndefined({ ...b, group }) as Box) : b))
 		};
-		status = grouped ? 'Ungrouped.' : `${selectedBoxes.length} boxes grouped — clicking any one now takes all of them.`;
+		status = grouped ? 'Ungrouped.' : `${selectedBoxes.length} areas grouped — clicking any one now takes all of them.`;
 	}
 
 	/**
@@ -393,6 +400,56 @@
 		updateBox(next);
 	}
 
+	/**
+	 * Alignment, in the order the segmented control in the bar reads: stepping is
+	 * clamped at the ends rather than wrapping, so holding the key settles on
+	 * left or on justify instead of cycling past it forever.
+	 */
+	const H_ALIGN: Align[] = ['left', 'center', 'right', 'justify'];
+	const V_ALIGN: VAlign[] = ['top', 'middle', 'bottom'];
+	const ALIGN_LABELS: Record<string, string> = {
+		left: 'left',
+		center: 'centred',
+		right: 'right',
+		justify: 'justified',
+		top: 'top',
+		middle: 'middle',
+		bottom: 'bottom'
+	};
+
+	/** Move every chosen box one step along an axis of alignment. */
+	function stepAlign(axis: 'h' | 'v', direction: -1 | 1) {
+		if (template.locked) return;
+		// Snapshotted first: `updateBox` replaces the template on every call, and
+		// `selectedBoxes` is derived from it.
+		const targets = selectedBoxes.filter((b) => !b.locked).map((b) => $state.snapshot(b) as Box);
+		if (!targets.length) return;
+		const landed = new Set<string>();
+		for (const box of targets) {
+			if (axis === 'h') {
+				const current = box.align ?? template.defaults.align;
+				const at = H_ALIGN.indexOf(current);
+				const next = H_ALIGN[Math.min(H_ALIGN.length - 1, Math.max(0, at + direction))];
+				landed.add(next);
+				if (next !== current) updateBox({ ...box, align: next });
+			} else {
+				const current = box.valign ?? 'top';
+				const at = V_ALIGN.indexOf(current);
+				const next = V_ALIGN[Math.min(V_ALIGN.length - 1, Math.max(0, at + direction))];
+				landed.add(next);
+				if (next !== current) updateBox({ ...box, valign: next });
+			}
+		}
+		status = landed.size === 1 ? `Aligned ${ALIGN_LABELS[[...landed][0]]}.` : 'Alignment stepped.';
+	}
+
+	const ALIGN_KEYS: Record<string, ['h' | 'v', -1 | 1]> = {
+		ArrowLeft: ['h', -1],
+		ArrowRight: ['h', 1],
+		ArrowUp: ['v', -1],
+		ArrowDown: ['v', 1]
+	};
+
 	const NUDGES: Record<string, [number, number]> = {
 		ArrowLeft: [-1, 0],
 		ArrowRight: [1, 0],
@@ -400,9 +457,32 @@
 		ArrowDown: [0, 1]
 	};
 
+	/**
+	 * The keys that mean "I want this on paper". All three land on the same
+	 * screen, because there is one door to the printer and it is the preview.
+	 *
+	 * Ctrl/Cmd+P is the point of the exercise: the browser's own print dialog
+	 * would take the editor's DOM rather than the print run, so it is
+	 * intercepted rather than left to fire. This works even while a field has
+	 * focus — the alternative is a print dialog opening because you were in a
+	 * text box at the time. Ctrl/Cmd+Shift+P is Firefox's private window and
+	 * cannot be taken from it there; the other two work everywhere.
+	 */
+	const wantsExport = (event: KeyboardEvent) => {
+		if (!event.metaKey && !event.ctrlKey) return false;
+		const key = event.key.toLowerCase();
+		return key === 'p' || (event.shiftKey && key === 's');
+	};
+
 	function onWindowKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
 		const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
+		if (wantsExport(event)) {
+			event.preventDefault();
+			// The preview has the key while it is open: a second press prints.
+			if (!previewOpen && !printing) requestPrint();
+			return;
+		}
 		// While a field has focus, leave undo to the browser's own text history.
 		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
 			event.preventDefault();
@@ -431,13 +511,25 @@
 			event.preventDefault();
 			deleteBox();
 		}
+		// Ctrl/Cmd+Shift turns the arrows into alignment, in the direction pressed:
+		// the same keys, moving the content inside the box rather than the box
+		// itself. Checked before the nudge, which only looks at Shift and Alt.
+		const align = ALIGN_KEYS[event.key];
+		if (align && (event.metaKey || event.ctrlKey) && event.shiftKey && selectedIds.length) {
+			event.preventDefault();
+			stepAlign(align[0], align[1]);
+			return;
+		}
 		// Nudging lives on the window, not on the preview: the preview only has
 		// focus if you clicked it, and arrow keys that work sometimes are worse
 		// than arrow keys that never do.
 		const move = NUDGES[event.key];
 		if (move && selectedIds.length) {
 			event.preventDefault();
-			const step = event.shiftKey ? GRID_MINOR : event.altKey ? 0.25 : 1;
+			// 1mm, 5mm with Shift, 10mm with Alt as well. The old 0.25mm step is
+			// gone: anything finer than a millimetre is typed into the bar, where
+			// you can see the number you are aiming at.
+			const step = event.shiftKey ? (event.altKey ? 10 : GRID_MINOR) : 1;
 			nudgeBox(move[0] * step, move[1] * step);
 			return;
 		}
@@ -445,17 +537,6 @@
 	}
 
 	// ---- import / export ----------------------------------------------------
-
-	function download(filename: string, contents: string, type = 'application/json') {
-		const url = URL.createObjectURL(new Blob([contents], { type }));
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = filename;
-		link.click();
-		URL.revokeObjectURL(url);
-	}
-
-	const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'template';
 
 	function doExportTemplate() {
 		download(`${slugify(template.name)}.json`, exportTemplate($state.snapshot(template)));
@@ -584,6 +665,14 @@
 			<Icon name="help" size={15} /> Help
 		</button>
 		<button
+			onclick={() => (dataOpen = !dataOpen)}
+			aria-pressed={dataOpen}
+			aria-expanded={dataOpen}
+			title="Show or hide the table"
+		>
+			<Icon name="layers" size={15} /> <span class="label">Data</span>
+		</button>
+		<button
 			onclick={() => (pageSetupOpen = !pageSetupOpen)}
 			aria-pressed={pageSetupOpen}
 			aria-expanded={pageSetupOpen}
@@ -611,7 +700,6 @@
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
-			onarrange={arrange}
 			onresettemplate={resetTemplate}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
@@ -634,7 +722,6 @@
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
-			onarrange={arrange}
 			onresettemplate={resetTemplate}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
@@ -689,20 +776,23 @@
 		</div>
 	{/if}
 
-	<main>
+	<main class:no-data={!dataOpen}>
 		<PagePreview
 			{template}
 			{row}
 			{mapping}
-			outlines={ui.showOutlines}
+			bounds={ui.showBounds}
 			grid={ui.showGrid}
 			{selectedIds}
 			zoom={ui.zoom}
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
+			{activeRow}
+			rowCount={dataset.rows.length}
+			onactivate={(i) => (activeRow = i)}
 			{background}
 			onselect={selectBox}
 			onchange={updateBox}
-			onoutlines={(show) => (ui = { ...ui, showOutlines: show })}
+			onbounds={(show) => (ui = { ...ui, showBounds: show })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
 			onzoom={(zoom) => (ui = { ...ui, zoom })}
 			onnudge={nudgeBox}
@@ -721,6 +811,7 @@
 			ondelete={deleteBox}
 		/>
 
+		{#if dataOpen}
 		<aside>
 			<DataTable
 				{dataset}
@@ -739,6 +830,7 @@
 				}}
 			/>
 		</aside>
+		{/if}
 	</main>
 
 	<footer class="status-bar">
@@ -777,59 +869,83 @@
 
 {#if helpOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (helpOpen = false)}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
-		<h2 id="help-title">libelli <span class="version">v{VERSION}</span></h2>
-		<p>Rows of a spreadsheet in, print-ready cards out. Data, templates and fonts stay in this browser — nothing is uploaded, and there is no server to upload to.</p>
+	<div class="modal help" role="dialog" aria-modal="true" aria-labelledby="help-title">
+		<!-- The header stays put while the rest scrolls: the way out of a long
+		     dialog should not be at the bottom of it. -->
+		<header class="modal-header">
+			<h2 id="help-title">libelli <span class="version">v{VERSION}</span></h2>
+			<button class="icon" use:focusOnOpen onclick={() => (helpOpen = false)} title="Close" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
+
+		<p>Rows of a spreadsheet in, print-ready cards out.</p>
+		<p>
+			All of it happens here, in this browser. Your rows, your template, the fonts and images you add — none of it is
+			uploaded, because there is no server to upload it to, no account to make and nothing watching what you do. It
+			keeps working with the network off, a template is a small file you can hand to somebody, and closing the tab is
+			the only thing that ever deletes anything.
+		</p>
 
 		<h3>Getting cards out</h3>
-		<p><strong>Export</strong> opens one screen showing every card as a small page. Untick any you do not want, then <strong>Print</strong>, or <strong>Export PNG</strong> for one 300 dpi file per page. The print checklist sits under the pages, because those four settings decide whether what you saw is what comes out.</p>
+		<p><strong>Export</strong> — the button, or <strong>Ctrl/Cmd + P</strong> — opens one screen showing every card as a small page. The browser's own print dialog is taken over rather than left to fire: it would print the editor rather than the cards. Pressing it again from that screen sends the run.</p>
+		<p>Untick any card you do not want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The print checklist sits under the pages, because those four settings decide whether what you saw is what comes out.</p>
 
-		<h3>What a box holds</h3>
-		<p>A box's <strong>Field</strong> is the template's own name for what it holds — <em>title</em>, <em>body</em>, and so on. The template names fields; the <strong>Column</strong> beside it says which spreadsheet column fills this one. That indirection is the point: the same template works against another spreadsheet by rebinding the columns, and no data is carried inside the template file.</p>
-		<p><strong>Content</strong> says where a box gets what it shows. A <strong>Data Field</strong> binds it to a column, so it changes card to card. <strong>Static Text</strong> is typed into the box and saved in the template, not in the data — the same on every card, travelling with the design. <strong>Decorative</strong> is neither: a box kept for its fill, its border or its size. <em>+ Area</em> beside the page adds one, starting as static text.</p>
+		<h3>What an area holds</h3>
+		<p>An area's <strong>Field</strong> is the template's own name for what it holds — <em>title</em>, <em>body</em>, and so on. The template names fields; the <strong>Column</strong> beside it says which spreadsheet column fills this one. That indirection is the point: the same template works against another spreadsheet by rebinding the columns, and no data is carried inside the template file.</p>
+		<p><strong>Content</strong> says where an area gets what it shows. A <strong>Data Field</strong> binds it to a column, so it changes card to card. <strong>Static Text</strong> is typed into the area and saved in the template, not in the data — the same on every card, travelling with the design. An area with nothing typed into it is still an area: it keeps its fill, its border and its size, and <strong>Hide When Empty</strong> is what takes it away again. <em>+ Area</em> beside the page adds one.</p>
 
 		<h3>Keys</h3>
 		<dl class="keys">
 			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
 			<dt>Ctrl/Cmd + Shift + Z</dt><dd>Redo</dd>
-			<dt>Arrows</dt><dd>Nudge the selected box by 1mm (Shift 5mm, Alt 0.25mm)</dd>
+			<dt>Arrows</dt><dd>Nudge the selection by 1mm</dd>
+			<dt>Shift + Arrows</dt><dd>Nudge by 5mm</dd>
+			<dt>Alt + Shift + Arrows</dt><dd>Nudge by 10mm</dd>
 			<dt>Shift / Ctrl / ⌘ + click</dt><dd>Add an area to the selection, or drop it</dd>
 			<dt>Ctrl/Cmd + A</dt><dd>Select every area</dd>
 			<dt>Delete</dt><dd>Remove the selected areas</dd>
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
-			<dt>← →</dt><dd>Previous / next card, in the print preview</dd>
-			<dt>Alt + drag</dt><dd>Ignore the grid and every snap</dd>
+			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
+			<dt>Ctrl/Cmd + '</dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + P</dt><dd>Export — again from that screen to print</dd>
+			<dt>Ctrl/Cmd + Shift + P / S</dt><dd>The same door, for the fingers that reach for those</dd>
+			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
+			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
+			<dt>Ctrl/Cmd + + / −</dt><dd>Zoom the page in or out</dd>
+			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
 		</dl>
 
-		<h3>Placing boxes</h3>
-		<p>Drag boxes on the page or type exact millimetres. A box latches onto the edges and centres of its neighbours as it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid of a 10mm grid instead. A box anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link.</p>
-		<p>Right-click an area for its stacking order, lock, duplicate and delete — the same actions are in its bar. Areas paint in the order they are listed, so <em>Bring to Front</em> is a move to the end of that list rather than a z-index to keep track of. A red corner means the content does not fit and the print will clip it; a padlock or an anchor at the corner says why an area will not move.</p>
+		<h3>Placing areas</h3>
+		<p>Drag areas on the page or type exact millimetres. An area latches onto the edges and centres of its neighbours as it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid of a 10mm grid instead. There is no key to hold for free movement: the two toggles under the page are the control. Grid off and <strong>Bounds</strong> off and nothing latches, because an area should never snap to a guide that is not being drawn. An area anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link.</p>
+		<p><strong>Rotation</strong> turns an area by degrees about a point you can drag — the small ring that appears on it once it is turned, or the <strong>X</strong> and <strong>Y</strong> beside the rotation, as a percentage of the area's own width and height. A turned area still takes up the space it would have upright, so anything anchored below it stays where it is; that is deliberate, and it is what stops one rotation shuffling the whole card.</p>
+		<p>Stacking order is the column beside the page, under undo and redo, and it is in the right-click menu too. Areas paint in the order they are listed, so <em>Bring to Front</em> is a move to the end of that list rather than a z-index to keep track of. A red corner means the content does not fit and the print will clip it; a padlock or an anchor at the corner says why an area will not move.</p>
 
 		<h3>Several at once</h3>
-		<p>Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them. Dragging any one moves the whole set, and a column of icons appears beside the page, under undo and redo, to line them up against the box that encloses them all — left, centre, right, top, middle, bottom — and to group, lock, duplicate or delete the lot. Right-click carries the same set with its wording.</p>
+		<p>Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them. Dragging any one moves the whole set, and a column of icons appears beside the page to line them up against the box that encloses them all — left, centre, right, top, middle, bottom — and to group, lock, duplicate or delete the lot. Right-click carries the same set with its wording.</p>
 		<p><strong>Group</strong> makes that selection stick: clicking any member picks up all of them, until you ungroup. An anchored area sits out of a vertical align — an anchor would move it straight back — and the anchor badge at its corner says why.</p>
 
+		<h3>The sheet</h3>
+		<p><strong>Size</strong> in page setup has the sizes worth having to hand — A5, A4, A3, and business, playing and trading cards at their real dimensions rather than round numbers. Picking one keeps the orientation you are already in, and the <strong>⇄</strong> beside the height turns the page over. Neither moves anything on the card: coordinates are measured from the trim edge, so trying a design the other way round costs nothing. Anything you type yourself reads as <em>Custom</em>.</p>
+
 		<h3>Type</h3>
-		<p>Page setup holds the defaults — family, size, leading, tracking and colour. A box that leaves those fields blank inherits them, so changing the page changes every box that never overrode it.</p>
+		<p>Page setup holds the defaults — family, size, leading, spacing and colour. An area that leaves those fields blank inherits them, so changing the page changes every area that never overrode it.</p>
+		<p>Two shortcuts work on the type without going to the bar. <strong>Ctrl/Cmd + Shift</strong> and the scroll wheel sizes whatever the pointer is over, in points — the whole selection if that area is part of one, and it gives an inheriting area a size of its own on the first turn. <strong>Ctrl/Cmd + Shift</strong> and the arrows step the alignment of everything selected in the direction pressed: left and right along <em>left, centred, right, justified</em>, up and down along <em>top, middle, bottom</em>.</p>
 
 		<h3>Locking</h3>
-		<p><strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page lock covers every box and the page settings too. The padlock that appears on the box, or at the corner of the page, is telling you it is locked; the button that undoes it is in the bar. Outlines off takes the padlocks away with the rest of the screen furniture.</p>
+		<p><strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page lock covers every area and the page settings too. The padlock that appears on the area, or at the corner of the page, is telling you it is locked; the button that undoes it is in the bar. Bounds off takes the padlocks away with the rest of the screen furniture.</p>
 
 		<h3>Colour</h3>
-		<p>Page setup sets the default text colour and the paper colour, and a box can set its own. Inside a Markdown body, <code>[a few words]&#123;red&#125;</code> or <code>[…]&#123;#b42318&#125;</code> colours just those words. Paper colour prints only with background graphics switched on.</p>
+		<p>Page setup sets the default text colour and the paper colour, and an area can set its own. Inside a Markdown body, <code>[a few words]&#123;red&#125;</code> or <code>[…]&#123;#b42318&#125;</code> colours just those words. Paper colour prints only with background graphics switched on.</p>
 
 		<h3>Data</h3>
-		<p>Column headers are editable in place. The pale row and column at the end of the table are placeholders: type into one and it becomes real. Deleting a row or a column happens straight away — Ctrl/Cmd+Z brings it back. The red bin under the table empties the whole dataset and asks twice; it leaves the template alone, as <strong>Reset Template</strong> in page setup leaves the data alone.</p>
+		<p>Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column. Deleting a row or a column happens straight away — Ctrl/Cmd+Z brings it back. <strong>Export CSV</strong> hands the table back as a file; the red <strong>Delete</strong> under it empties the whole dataset and asks twice. That leaves the template alone, as <strong>Reset</strong> in page setup leaves the data alone. <strong>Data</strong> in the toolbar folds the table away when the page needs the room.</p>
 
 		<p class="credit">
 			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>
 			of Heracles Papatheodorou and&nbsp;Claude
 		</p>
 
-		<div class="modal-actions">
-			<span class="spacer"></span>
-			<button class="primary" use:focusOnOpen onclick={() => (helpOpen = false)}>Close</button>
-		</div>
 	</div>
 {/if}
 
@@ -871,11 +987,31 @@
 {/if}
 
 <style>
-	/* Control radii live here rather than in each component: a button is 3px and
-	   a field is 1px everywhere in the app, and there is one place to change it. */
+	/* Control radii and borders live here rather than in each component: a button
+	   is 3px and a field is 1px everywhere in the app, both are drawn in the same
+	   grey, and there is one place to change any of it. A button that did not
+	   match the field beside it was the loudest thing in these bars. */
 	:global(:root) {
 		--radius-button: 3px;
 		--radius-input: 1px;
+		--border-control: #ccc;
+		--border-control-hover: #999;
+	}
+
+	/* Chrome is not prose: dragging across a toolbar should not leave half the
+	   app highlighted. Fields opt back in, because their contents are yours. */
+	:global(button),
+	:global(label),
+	:global(th),
+	:global(dt),
+	:global(.unit),
+	:global(.context) {
+		user-select: none;
+	}
+
+	:global(input),
+	:global(textarea) {
+		user-select: text;
 	}
 
 	:global(html, body) {
@@ -924,6 +1060,10 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(360px, 40%);
 		min-height: 0;
+	}
+
+	main.no-data {
+		grid-template-columns: minmax(0, 1fr);
 	}
 
 	aside {
@@ -991,7 +1131,7 @@
 		gap: 5px;
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
-		border: 1px solid #ccc;
+		border: 1px solid var(--border-control);
 		border-radius: var(--radius-button);
 		background: #fff;
 		color: #111;
@@ -999,7 +1139,7 @@
 	}
 
 	button:hover:not(:disabled) {
-		border-color: #999;
+		border-color: var(--border-control-hover);
 	}
 
 	button:disabled {
@@ -1022,7 +1162,7 @@
 	select {
 		font: 12px ui-sans-serif, system-ui, sans-serif;
 		padding: 4px 5px;
-		border: 1px solid #ccc;
+		border: 1px solid var(--border-control);
 		border-radius: var(--radius-input);
 		background: #fff;
 	}
@@ -1054,6 +1194,40 @@
 	.modal h2 {
 		margin: 0 0 6px;
 		font-size: 16px;
+	}
+
+	/* Sticky against the modal's own padding, so the rule under it spans the
+	   full width rather than stopping short either side. */
+	.modal-header {
+		position: sticky;
+		top: -20px;
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 12px;
+		margin: -20px -22px 8px;
+		padding: 20px 22px 8px;
+		background: #fff;
+		border-bottom: 1px solid #eee;
+		z-index: 1;
+	}
+
+	.modal-header h2 {
+		margin: 0;
+	}
+
+	.modal-header .icon {
+		display: grid;
+		place-items: center;
+		width: 26px;
+		height: 26px;
+		padding: 0;
+		border-color: transparent;
+		color: #555;
+	}
+
+	.modal-header .icon:hover {
+		background: #f3f3f3;
 	}
 
 	.modal h3 {
@@ -1141,6 +1315,10 @@
 			grid-template-columns: 1fr;
 			grid-template-rows: minmax(0, 1.15fr) minmax(0, 1fr);
 			overflow: hidden;
+		}
+
+		main.no-data {
+			grid-template-rows: minmax(0, 1fr);
 		}
 
 		.toolbar {

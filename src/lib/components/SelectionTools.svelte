@@ -1,29 +1,19 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import type { AlignEdge } from '$lib/layout';
-	import type { Arrange } from '$lib/template';
 	import type { Box } from '$lib/types';
 
 	interface Props {
 		boxes: Box[];
 		frozen: boolean;
 		onalign: (edge: AlignEdge) => void;
-		onarrange: (where: Arrange) => void;
 		ongroup: () => void;
 		onlock: () => void;
 		onduplicate: () => void;
 		ondelete: () => void;
 	}
 
-	let { boxes, frozen, onalign, onarrange, ongroup, onlock, onduplicate, ondelete }: Props = $props();
-
-	/** Several move as a block, keeping their order relative to each other. */
-	const ARRANGEMENTS: Array<{ value: Arrange; icon: string; label: string }> = [
-		{ value: 'front', icon: 'bring-to-front', label: 'Bring to Front' },
-		{ value: 'forward', icon: 'bring-forward', label: 'Bring Forward' },
-		{ value: 'backward', icon: 'send-backward', label: 'Send Backward' },
-		{ value: 'back', icon: 'send-to-back', label: 'Send to Back' }
-	];
+	let { boxes, frozen, onalign, ongroup, onlock, onduplicate, ondelete }: Props = $props();
 
 	const allLocked = $derived(boxes.length > 0 && boxes.every((b) => b.locked));
 	const grouped = $derived(
@@ -40,23 +30,15 @@
 	];
 </script>
 
-<!-- Under undo and redo, in the same column: these appear and disappear with the
-     selection, so they belong beside the page rather than pushing the options
-     bar around every time a second box is picked up. Icons only — the count and
-     the wording live in the right-click menu, which has room for them. -->
+<!-- Under undo, redo and the stacking column: these appear only when there is
+     more than one box chosen, so they belong beside the page rather than
+     pushing the options bar around every time a second box is picked up. Icons
+     only — the count and the wording live in the right-click menu. -->
 <div class="tools" role="toolbar" aria-label="Selection" aria-orientation="vertical">
 	<span class="count" aria-hidden="true">{boxes.length}</span>
 
 	{#each ALIGN_EDGES as option (option.value)}
 		<button title={option.label} aria-label={option.label} disabled={frozen} onclick={() => onalign(option.value)}>
-			<Icon name={option.icon} size={16} />
-		</button>
-	{/each}
-
-	<hr />
-
-	{#each ARRANGEMENTS as option (option.value)}
-		<button title={option.label} aria-label={option.label} disabled={frozen} onclick={() => onarrange(option.value)}>
 			<Icon name={option.icon} size={16} />
 		</button>
 	{/each}
@@ -94,13 +76,13 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 2px;
+		gap: 3px;
 		padding: 4px;
 		border-radius: 6px;
 		background: rgba(255, 255, 255, 0.92);
 		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-		/* Fourteen tools is taller than a short viewport; the rail scrolls rather
-		   than running off the bottom of the page it sits beside. */
+		/* Ten tools is taller than a short viewport; the rail scrolls rather than
+		   running off the bottom of the page it sits beside. */
 		max-height: calc(100dvh - 220px);
 		overflow-y: auto;
 	}
@@ -117,16 +99,16 @@
 		width: 28px;
 		height: 28px;
 		padding: 0;
-		border: 1px solid transparent;
+		border: 1px solid var(--border-control);
 		border-radius: var(--radius-button);
-		background: transparent;
+		background: #fff;
 		color: #333;
 		cursor: pointer;
 	}
 
 	button:hover:not(:disabled) {
 		background: #eef3fb;
-		border-color: #cfdcf3;
+		border-color: var(--border-control-hover);
 	}
 
 	button:disabled {

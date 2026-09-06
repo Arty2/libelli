@@ -27,6 +27,7 @@ src/lib/
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
   table.ts        column reorder, row sorting
+  download.ts     hand the browser a file; the one copy both exports use
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
   assets.ts       background images: bytes in IndexedDB, object-URL lifetime, url() safety
@@ -71,18 +72,22 @@ Load-bearing choices, in case they look arbitrary:
   is, then its type, then how it looks, then where it sits, then what you can do
   to it. A new control goes in the group it belongs to rather than on the end.
 - **Controls sit next to what they act on.** Undo and redo are a column at the
-  page's top-left corner with the selection tools under them, *+ Text* is at the
-  top-right, and the view toggles are along the bottom edge; the window toolbar
-  holds only what is about the whole app. Tools that come and go with a
+  page's top-left corner, with stacking order under them whenever anything is
+  selected and the multi-selection tools under that; *+ Area* is at the
+  top-right, the view toggles are along the bottom edge and the card pager sits
+  under the sheet. The window toolbar holds only what is about the whole app.
+  Tools that come and go with a
   selection belong on that rail rather than in the options bar, where they would
   shove every other control sideways each time a second box was picked up. A right-click menu on a box carries
   the same actions its bar does — neither is the only way to reach them. Only
   the primary pointer button drags: a right-click that started one would collapse
   a multi-selection before the menu it opened could act on the rest.
-- **A box's content source is read, not stored.** A bound box has a `slot`, a
-  static one carries its own `static` content, and a box with neither is
-  decorative. Storing that as a fourth field would only give it something to
-  disagree with.
+- **A box's content source is read, not stored.** A bound box has a `slot` and
+  anything else carries its own `static` content. Storing that as a third field
+  would only give it something to disagree with. There is no separate
+  "decorative" source: a static box with nothing typed into it still draws its
+  fill, its border and its size, and `hideWhenEmpty` is what takes it away —
+  two settings that already existed, rather than a third state to keep in step.
 - **A group is a shared name, not a container.** `Box.group` keeps the box list
   flat, so grouping cannot disturb anchoring, stacking or measurement; selecting
   one member expands to the whole group in `selectBox`. `alignBoxes` works on
@@ -118,8 +123,9 @@ Load-bearing choices, in case they look arbitrary:
   millimetres the box was given, so framing one never moves it sideways. It does
   make the box taller, which `measure()` picks up and anchored boxes below
   follow — that is the intended behaviour, not a leak. A border width is one
-  number or four; `normaliseBorderWidth` collapses four equal edges back to one,
-  so a template never grows structure it did not ask for.
+  number or four, and so is a padding; `normaliseSides` collapses four equal
+  edges back to one, so a template never grows structure it did not ask for.
+  `sidesOf` reads either shape back out as four edges.
 - **Vertical alignment makes a box a flex column.** That is why `.box` is
   `display: flex`: `justify-content` is the only thing that places content
   vertically in a box whose height may be a `min-height`. The cost is that child
@@ -134,10 +140,31 @@ Load-bearing choices, in case they look arbitrary:
   asynchronous, and the component has to stay a pure function of its props.
   `assets.ts` also owns object-URL lifetime: an object URL outlives the value
   that made it, so each is revoked when replaced.
-- **Snapping has a fixed precedence.** Alt beats the grid, the grid beats sibling
-  edges, and sibling edges beat plain 0.5mm rounding. Sibling edges come from
-  `resolveLayout`, so a box snaps to where a grown box actually ends. An anchored
-  box always snaps its `gap`, never its `y`.
+- **One wheel listener, two gestures.** `Ctrl`/`Cmd` and the wheel zooms the
+  page; add `Shift` and it sizes the type under the pointer instead. Both are
+  `preventDefault`ed by the same non-passive listener on the stage, because the
+  browser would otherwise zoom itself underneath either of them. Wheel deltas
+  are accumulated and spent a point at a time: a mouse notch is one fat event
+  and a trackpad is a stream of small ones, so reading them one-for-one would
+  make the same flick one step on one machine and forty on another.
+- **The editor does not clip, the output does.** `.card` is `overflow: hidden`
+  so a print or a PNG never spills onto its neighbour; `.card.editing` — the
+  interactive preview only — turns that off, so a box dragged past the edge
+  stays visible and stays grabbable. Losing the handles of something you can no
+  longer see is worse than being shown what will not print, and the trim edge
+  already says where the paper stops.
+- **Screen furniture is sized in screen pixels.** Handles and the pivot live
+  inside the scaled card, so a 14px handle is nine pixels under the finger at
+  62%. `--ui-scale` on `.card` is `1 / scale`, and every screen-only measure is
+  multiplied by it, so a target is the size it was drawn at whatever the zoom.
+- **Snapping is the two view toggles, not a modifier.** The grid beats sibling
+  edges, sibling edges beat plain `FREE_STEP` rounding, and there is no key to
+  hold: Grid off and Bounds off is free movement, because a box must never latch
+  onto a guide that is not being drawn — a snap to an invisible edge reads as a
+  bug. Sibling edges come from `resolveLayout`, so a box snaps to where a grown
+  box actually ends. An anchored box always snaps its `gap`, never its `y`.
+  `snapTo` rounds after the multiply: `1529 * 0.01` is 15.290000000000001, and
+  that number would otherwise reach the field and the exported template.
 - **Clearing a field means removing it.** "Inherit the page default", "no fill",
   "no border" are all expressed as an absent key, so `updateBox` strips undefined
   values: structured clone, unlike JSON, keeps an undefined-valued key, and a box
@@ -157,6 +184,12 @@ Load-bearing choices, in case they look arbitrary:
 - Feature: minor — `0.1.1` → `0.2.0`
 - **The leading zero never moves.** This is a vibe-coded app, always in flux; it
   does not claim to be 1.0.
+- **Bump once per session, not once per change.** A session is one release
+  however many commits it takes: set the number when the work starts landing and
+  leave it alone, so the follow-ups and corrections that always follow do not
+  each claim a version of their own. Size the single bump by the largest change
+  in the session — one feature among five fixes still makes it a minor. Bump
+  again within a session only when asked to.
 
 ## How we work
 
@@ -178,6 +211,21 @@ Load-bearing choices, in case they look arbitrary:
   or in a comment rather than leaving the next reader to rediscover it.
 - **Never ship anything traceable to reference material.** Sample data and
   template names are invented; contact addresses use reserved `.example` domains.
+- **Rotation is a transform, so it costs no layout.** `rotation` is degrees and
+  `centre` is the pivot in *percent* of the box — the one thing in the format
+  that is not mm, because a pivot in mm drifts towards a corner as the box
+  grows. A CSS transform leaves `offsetHeight` alone, so `measure()`, anchoring
+  and snapping all see the upright rectangle: turning one area never shuffles
+  the rest of the card. The cost is that a resize handle on a turned box hands
+  back a screen-space delta, which `moveDrag` rotates by −θ before reading it as
+  a width; `move` is exempt, because a translation in the parent's space is the
+  same whichever way the box faces.
+- **A handle's target is a pseudo-element, not a box-shadow.** A transparent
+  `box-shadow` looks like a bigger hit area and is never hit-tested. `::before`
+  with a negative inset is, and it grows again under `pointer: coarse`.
+- **A new box starts clipped.** `newBox` defaults `overflow` to `clip`, so an
+  area keeps the millimetres it was given until someone asks it to reflow. The
+  starter template's title and body say `grow` for themselves.
 - **Destructive things are undoable, and only ask when undo cannot reach them.**
   Deleting a row, a column or a box happens straight away and says so; Reset asks
   twice, because it clears browser storage and uploaded fonts that no undo can

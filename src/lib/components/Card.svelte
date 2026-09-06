@@ -5,7 +5,7 @@
 	import { fontStack } from '$lib/fonts';
 	import { FREE_STEP, GRID_MINOR, boxEdges, pxToMm, resolveLayout, snapTo, snapToEdges } from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
-	import { borderSides } from '$lib/template';
+	import { sidesOf } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -13,8 +13,8 @@
 		template: Template;
 		row?: Row | null;
 		mapping?: Mapping;
-		/** dashed box outlines and the bleed marker; screen only, never printed */
-		outlines?: boolean;
+		/** dashed box bounds and the bleed marker; screen only, never printed */
+		bounds?: boolean;
 		/** snap drags to the 5mm subgrid rather than to sibling edges */
 		grid?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
@@ -41,7 +41,7 @@
 		template,
 		row = null,
 		mapping = {},
-		outlines = false,
+		bounds = false,
 		grid = false,
 		scale = 1,
 		interactive = false,
@@ -125,6 +125,10 @@
 			`width:${template.page.w + bleed * 2}mm`,
 			`height:${template.page.h + bleed * 2}mm`,
 			`padding:${bleed}mm`,
+			// Handles live inside the scaled card, so a 14px handle is nine pixels
+			// under the finger at 62%. Everything screen-only is sized against this
+			// so a target stays the size it was drawn at, whatever the zoom.
+			`--ui-scale:${1 / (scale || 1)}`,
 			`background-color:${template.page.background ?? '#ffffff'}`,
 			...backgroundStyle(template.page.image, background)
 		].join(';');
@@ -179,12 +183,15 @@
 		if (box.italic) parts.push('font-style:italic');
 		if (box.textCase === 'uppercase') parts.push('text-transform:uppercase');
 		if (box.textCase === 'smallcaps') parts.push('font-variant-caps:small-caps');
-		if (box.padding) parts.push(`padding:${box.padding}mm`);
+		if (box.padding) {
+			const p = sidesOf(box.padding);
+			parts.push(`padding:${p.top}mm ${p.right}mm ${p.bottom}mm ${p.left}mm`);
+		}
 		if (box.background) parts.push(`background:${box.background}`);
 		// `.box` is border-box, so a border eats into the width rather than adding
 		// to it: the box still occupies exactly the millimetres it was given.
 		if (box.borderWidth) {
-			const { top, right, bottom, left } = borderSides(box.borderWidth);
+			const { top, right, bottom, left } = sidesOf(box.borderWidth);
 			parts.push(
 				`border-width:${top}mm ${right}mm ${bottom}mm ${left}mm`,
 				`border-style:${box.borderStyle ?? 'solid'}`,
@@ -192,6 +199,15 @@
 			);
 		}
 		if (box.borderRadius) parts.push(`border-radius:${box.borderRadius}mm`);
+		// A CSS transform does not touch layout, so a rotated box still reports the
+		// height it would have had upright — which is what `measure()` reads and
+		// what anchored boxes below follow. That is the intended bargain: turning a
+		// box does not shove the rest of the card around. Snapping sees the upright
+		// rectangle too.
+		if (box.rotation) {
+			const centre = box.centre ?? { x: 50, y: 50 };
+			parts.push(`transform:rotate(${box.rotation}deg)`, `transform-origin:${centre.x}% ${centre.y}%`);
+		}
 		if (hidden.has(box.id)) {
 			parts.push('height:0', 'overflow:hidden', 'visibility:hidden');
 		} else if (box.overflow === 'clip') {
@@ -229,7 +245,7 @@
 
 	// ---- direct manipulation -------------------------------------------------
 
-	type DragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+	type DragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | 'centre';
 	let drag: {
 		id: string;
 		mode: DragMode;
@@ -273,33 +289,47 @@
 	}
 
 	/**
-	 * Snapping, strongest first: Alt is an escape hatch to free movement, an
-	 * enabled grid wins over everything else, and otherwise a box latches onto a
-	 * sibling's edge when it comes within `SNAP_TOLERANCE`. Sibling edges come
-	 * from the resolved layout, so a box snaps to where a grown box really ends.
+	 * Snapping, strongest first: an enabled grid wins over everything else, and
+	 * otherwise a box latches onto a sibling's edge when it comes within
+	 * `SNAP_TOLERANCE`. Sibling edges come from the resolved layout, so a box
+	 * snaps to where a grown box really ends.
+	 *
+	 * There is no modifier to hold: the two toggles under the page are the whole
+	 * control. Grid off and Bounds off is free movement, because a box cannot
+	 * latch onto a guide that is not being drawn — a snap to an invisible edge is
+	 * indistinguishable from a bug.
 	 */
 	const SNAP_TOLERANCE = 1.5;
 
 	function moveDrag(event: PointerEvent) {
 		if (!drag) return;
-		const free = event.altKey;
-		const edges = free || grid ? { x: [], y: [] } : boxEdges(template.boxes, layout, drag.id);
+		const latch = !grid && bounds;
+		const edges = latch ? boxEdges(template.boxes, layout, drag.id) : { x: [], y: [] };
 		const latched = { x: null as number | null, y: null as number | null };
 
 		const place = (value: number, axis: 'x' | 'y'): number => {
-			if (free) return snapTo(value, FREE_STEP);
 			if (grid) return snapTo(value, GRID_MINOR);
-			const hit = snapToEdges(value, edges[axis], SNAP_TOLERANCE);
-			if (hit === null) return snapTo(value, 0.5);
+			const hit = latch ? snapToEdges(value, edges[axis], SNAP_TOLERANCE) : null;
+			if (hit === null) return snapTo(value, FREE_STEP);
 			latched[axis] = hit;
 			return hit;
 		};
 		// A size is not a position: it rounds, but it never latches onto an edge.
-		const size = (value: number) => (free ? snapTo(value, FREE_STEP) : grid ? snapTo(value, GRID_MINOR) : snapTo(value, 0.5));
+		const size = (value: number) => snapTo(value, grid ? GRID_MINOR : FREE_STEP);
 
-		const dx = pxToMm((event.clientX - drag.startX) / scale);
-		const dy = pxToMm((event.clientY - drag.startY) / scale);
 		const origin = drag.origin;
+		// The handles turn with the box, so a pointer delta arrives in screen space
+		// and has to come back through the rotation before it can be read as a
+		// width or a height. Moving is exempt: a translation in the parent's space
+		// is the same however the box is turned, and un-rotating it would send the
+		// box off at an angle to the pointer.
+		const screenX = pxToMm((event.clientX - drag.startX) / scale);
+		const screenY = pxToMm((event.clientY - drag.startY) / scale);
+		const turn = drag.mode === 'move' ? 0 : ((origin.rotation ?? 0) * Math.PI) / 180;
+		const cos = Math.cos(turn);
+		const sin = Math.sin(turn);
+		const dx = screenX * cos + screenY * sin;
+		const dy = -screenX * sin + screenY * cos;
 		const next: Box = { ...origin };
 
 		const setTop = (deltaY: number) => {
@@ -310,6 +340,18 @@
 		};
 
 		switch (drag.mode) {
+			case 'centre': {
+				// Percent of the box, not millimetres, because that is how the pivot
+				// is stored — and clamped to the box, so it can never be dragged
+				// somewhere the marker cannot be picked up again.
+				const was = origin.centre ?? { x: 50, y: 50 };
+				const pct = (value: number) => Math.round(Math.max(0, Math.min(100, value)) * 10) / 10;
+				next.centre = {
+					x: pct(was.x + (dx / origin.w) * 100),
+					y: pct(was.y + (dy / Math.max(1, layout.heights[origin.id] ?? origin.h)) * 100)
+				};
+				break;
+			}
 			case 'move':
 				next.x = place(origin.x + dx, 'x');
 				setTop(dy);
@@ -386,8 +428,8 @@
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 </script>
 
-<div class="card" class:bleeding={bleed > 0} style={cardStyle()} lang="en">
-	<div class="trim" class:bleed-marked={outlines && bleed > 0} style="width:{template.page.w}mm;height:{template.page.h}mm">
+<div class="card" class:bleeding={bleed > 0} class:editing={interactive} style={cardStyle()} lang="en">
+	<div class="trim" class:bleed-marked={bounds && bleed > 0} style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
 			{@html styleTag(customCss)}
@@ -397,7 +439,7 @@
 			{@const empty = hidden.has(box.id)}
 			<div
 				class="box"
-				class:outlined={outlines && !empty}
+				class:outlined={bounds && !empty}
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
 				style={boxStyle(box)}
@@ -439,15 +481,15 @@
 					{/if}
 				</div>
 
-				{#if outlines && !empty && overflowing[box.id]}
-					<!-- Always on screen, never gated behind outlines: this is not
+				{#if bounds && !empty && overflowing[box.id]}
+					<!-- Always on screen, never gated behind bounds: this is not
 					     furniture, it is a warning that the print will be wrong. -->
 					<span class="overflow-mark" title="The content does not fit — this box is clipping what will print">
 						<Icon name="warning" size={11} />
 					</span>
 				{/if}
 
-				{#if outlines && (box.anchor || box.locked)}
+				{#if bounds && (box.anchor || box.locked)}
 					<!-- Why the box will not do what you might ask of it, stacked at its
 					     corner: the anchor above the lock when it carries both. -->
 					<span class="badges">
@@ -465,6 +507,21 @@
 				{/if}
 
 				{#if interactive && isSelected(box) && soleSelection}
+					{#if editable(box) && box.rotation}
+						<!-- The point the box turns about, draggable where it acts. Only
+						     drawn on a rotated box: on an upright one it would be a
+						     control with nothing to show for itself. -->
+						<span
+							class="pivot"
+							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
+							title="The point this box turns about — drag it, or type it in the bar"
+							onpointerdown={(e) => startDrag(e, box, 'centre')}
+							onpointermove={moveDrag}
+							onpointerup={endDrag}
+							onpointercancel={endDrag}
+							role="presentation"
+						></span>
+					{/if}
 					{#if editable(box)}
 						{#each HANDLES as handle (handle)}
 							<span
@@ -513,6 +570,15 @@
 		   drop — though the browser still asks for "background graphics". */
 		print-color-adjust: exact;
 		-webkit-print-color-adjust: exact;
+	}
+
+	/* The editor does not clip. A box dragged past the edge stays visible and
+	   stays grabbable — losing the handles of something you can no longer see is
+	   worse than showing you what will not print. Everywhere the card is *output*
+	   — the print run, the PNG export, the contact sheet — keeps the clip above,
+	   so nothing spills onto a neighbouring page. */
+	.card.editing {
+		overflow: visible;
 	}
 
 	.trim {
@@ -572,26 +638,65 @@
 		touch-action: none;
 	}
 
-	.handle {
+	/* `--mark` is what you see, `--reach` is how far past it the pointer counts.
+	   Both are in screen pixels: multiplying by `--ui-scale` undoes the card's
+	   own zoom, so a handle is the same size to the hand at 40% as at 200%. */
+	.handle,
+	.pivot {
+		--mark: calc(14px * var(--ui-scale, 1));
+		--reach: calc(8px * var(--ui-scale, 1));
 		position: absolute;
-		width: 14px;
-		height: 14px;
+		width: var(--mark);
+		height: var(--mark);
 		background: #fff;
-		border: 1px solid #2563eb;
+		border: calc(1px * var(--ui-scale, 1)) solid #2563eb;
 		border-radius: var(--radius-button);
+		box-sizing: border-box;
 		z-index: 3;
-		/* A bigger invisible target than the visible square: fingers are not mice. */
-		box-shadow: 0 0 0 5px rgba(0, 0, 0, 0);
 		touch-action: none;
 	}
-	.h-nw { top: -7px; left: -7px; cursor: nwse-resize; }
-	.h-n { top: -7px; left: calc(50% - 7px); cursor: ns-resize; }
-	.h-ne { top: -7px; right: -7px; cursor: nesw-resize; }
-	.h-e { top: calc(50% - 7px); right: -7px; cursor: ew-resize; }
-	.h-se { bottom: -7px; right: -7px; cursor: nwse-resize; }
-	.h-s { bottom: -7px; left: calc(50% - 7px); cursor: ns-resize; }
-	.h-sw { bottom: -7px; left: -7px; cursor: nesw-resize; }
-	.h-w { top: calc(50% - 7px); left: -7px; cursor: ew-resize; }
+
+	/* The target, as opposed to the mark. A transparent box-shadow looks like it
+	   grows a handle but is never hit-tested, so the target used to be the square
+	   and nothing more. A pseudo-element is hit-tested, and it costs no layout. */
+	.handle::before,
+	.pivot::before {
+		content: '';
+		position: absolute;
+		inset: calc(-1 * var(--reach));
+	}
+
+	.pivot {
+		--mark: calc(11px * var(--ui-scale, 1));
+		margin: calc(var(--mark) / -2) 0 0 calc(var(--mark) / -2);
+		border: none;
+		border-radius: 50%;
+		box-shadow: inset 0 0 0 calc(2px * var(--ui-scale, 1)) #2563eb;
+		cursor: move;
+	}
+
+	/* Fingers are not mice: the marks stay small enough to see past, and the
+	   targets grow to something you can actually land on. */
+	@media (pointer: coarse) {
+		.handle {
+			--mark: calc(20px * var(--ui-scale, 1));
+			--reach: calc(14px * var(--ui-scale, 1));
+		}
+
+		.pivot {
+			--mark: calc(16px * var(--ui-scale, 1));
+			--reach: calc(14px * var(--ui-scale, 1));
+		}
+	}
+
+	.h-nw { top: calc(var(--mark) / -2); left: calc(var(--mark) / -2); cursor: nwse-resize; }
+	.h-n { top: calc(var(--mark) / -2); left: calc(50% - var(--mark) / 2); cursor: ns-resize; }
+	.h-ne { top: calc(var(--mark) / -2); right: calc(var(--mark) / -2); cursor: nesw-resize; }
+	.h-e { top: calc(50% - var(--mark) / 2); right: calc(var(--mark) / -2); cursor: ew-resize; }
+	.h-se { bottom: calc(var(--mark) / -2); right: calc(var(--mark) / -2); cursor: nwse-resize; }
+	.h-s { bottom: calc(var(--mark) / -2); left: calc(50% - var(--mark) / 2); cursor: ns-resize; }
+	.h-sw { bottom: calc(var(--mark) / -2); left: calc(var(--mark) / -2); cursor: nesw-resize; }
+	.h-w { top: calc(50% - var(--mark) / 2); left: calc(var(--mark) / -2); cursor: ew-resize; }
 
 	.crop-marks .mark {
 		position: absolute;

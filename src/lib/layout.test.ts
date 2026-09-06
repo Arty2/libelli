@@ -66,6 +66,8 @@ describe('snapping', () => {
 		expect(snapTo(12.6, GRID_MINOR)).toBe(15);
 		expect(snapTo(12.4, GRID_MAJOR)).toBe(10);
 		expect(snapTo(0.3841, FREE_STEP)).toBe(0.38);
+		// Rounded after the multiply: 1529 * 0.01 is 15.290000000000001 otherwise.
+		expect(snapTo(15.2937, FREE_STEP)).toBe(15.29);
 	});
 
 	it('latches onto the nearest edge, and onto nothing when none is near', () => {

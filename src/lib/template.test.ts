@@ -3,7 +3,11 @@ import {
 	DEFAULT_DEFAULTS,
 	arrangeBoxes,
 	autoMap,
-	borderSides,
+	normaliseCentre,
+	presetFor,
+	presetSize,
+	normaliseRotation,
+	sidesOf,
 	builtinTemplate,
 	newBox,
 	normaliseTemplate,
@@ -123,6 +127,38 @@ describe('normaliseTemplate', () => {
 		expect(varied.boxes[0].borderWidth).toEqual({ top: 1, right: 0, bottom: 0.5, left: 0 });
 	});
 
+	it('gives padding the same one-or-four treatment as a border width', () => {
+		const uniform = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, padding: { top: 2, right: 2, bottom: 2, left: 2 } }]
+		});
+		expect(uniform.boxes[0].padding).toBe(2);
+
+		const varied = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, padding: { top: 3, right: 1, bottom: 0, left: 1 } }]
+		});
+		expect(varied.boxes[0].padding).toEqual({ top: 3, right: 1, bottom: 0, left: 1 });
+
+		const none = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, padding: 0 }]
+		});
+		expect('padding' in none.boxes[0]).toBe(false);
+	});
+
+	it('starts a box that does not say otherwise on clip, so it keeps the size it was given', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			boxes: [
+				{ id: 'a', x: 0, y: 0, w: 10, h: 10 },
+				{ id: 'b', x: 0, y: 0, w: 10, h: 10, overflow: 'grow' }
+			]
+		});
+		expect(t.boxes[0].overflow).toBe('clip');
+		expect(t.boxes[1].overflow).toBe('grow');
+	});
+
 	it('treats a border of nothing as no border rather than a zero-width one', () => {
 		const t = normaliseTemplate({
 			schema: 2,
@@ -187,15 +223,73 @@ describe('normaliseTemplate', () => {
 	});
 });
 
-describe('borderSides', () => {
+describe('page presets', () => {
+	it('names a sheet whichever way round it is turned', () => {
+		expect(presetFor(148, 210)).toBe('A5');
+		expect(presetFor(210, 148)).toBe('A5');
+		expect(presetFor(297, 420)).toBe('A3');
+		expect(presetFor(63.5, 88.9)).toBe('Playing Card');
+	});
+
+	it('tells a trading card from a playing card', () => {
+		expect(presetFor(63, 88)).toBe('Trading Card');
+		expect(presetFor(63.5, 88.9)).toBe('Playing Card');
+	});
+
+	it('leaves a size of its own unnamed', () => {
+		expect(presetFor(100, 150)).toBeUndefined();
+		expect(presetFor(148, 211)).toBeUndefined();
+	});
+
+	it('keeps the orientation the page is already in', () => {
+		expect(presetSize('A4', false)).toEqual({ w: 210, h: 297 });
+		expect(presetSize('A4', true)).toEqual({ w: 297, h: 210 });
+		expect(presetSize('Nothing', false)).toBeUndefined();
+	});
+});
+
+describe('rotation and its centre', () => {
+	it('wraps degrees into a half turn either way and drops an upright box', () => {
+		expect(normaliseRotation(90)).toBe(90);
+		expect(normaliseRotation(-90)).toBe(-90);
+		expect(normaliseRotation(270)).toBe(-90);
+		expect(normaliseRotation(360)).toBeUndefined();
+		expect(normaliseRotation(720)).toBeUndefined();
+		expect(normaliseRotation(0)).toBeUndefined();
+		expect(normaliseRotation('nonsense')).toBeUndefined();
+	});
+
+	it('clamps the pivot to the box and drops the middle', () => {
+		expect(normaliseCentre({ x: 0, y: 100 })).toEqual({ x: 0, y: 100 });
+		expect(normaliseCentre({ x: -40, y: 180 })).toEqual({ x: 0, y: 100 });
+		expect(normaliseCentre({ x: 50, y: 50 })).toBeUndefined();
+		expect(normaliseCentre(undefined)).toBeUndefined();
+	});
+
+	it('carries both through a template, and leaves an upright box carrying neither', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			boxes: [
+				{ id: 'a', x: 0, y: 0, w: 10, h: 10, rotation: 400, centre: { x: 0, y: 0 } },
+				{ id: 'b', x: 0, y: 0, w: 10, h: 10 }
+			]
+		});
+		expect(t.boxes[0].rotation).toBe(40);
+		expect(t.boxes[0].centre).toEqual({ x: 0, y: 0 });
+		expect('rotation' in t.boxes[1]).toBe(false);
+		expect('centre' in t.boxes[1]).toBe(false);
+	});
+});
+
+describe('sidesOf', () => {
 	it('reads one number as four equal edges', () => {
-		expect(borderSides(0.4)).toEqual({ top: 0.4, right: 0.4, bottom: 0.4, left: 0.4 });
+		expect(sidesOf(0.4)).toEqual({ top: 0.4, right: 0.4, bottom: 0.4, left: 0.4 });
 	});
 
 	it('passes four edges through, and reads no border as four zeroes', () => {
 		const sides = { top: 1, right: 0, bottom: 0.5, left: 0 };
-		expect(borderSides(sides)).toEqual(sides);
-		expect(borderSides(undefined)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+		expect(sidesOf(sides)).toEqual(sides);
+		expect(sidesOf(undefined)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
 	});
 });
 

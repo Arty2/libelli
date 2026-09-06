@@ -4,8 +4,8 @@ import defaultCard from './templates/default-card.json';
 import type {
 	BackgroundFit,
 	BorderStyle,
-	BorderWidth,
 	Box,
+	Centre,
 	Defaults,
 	FontRef,
 	Mapping,
@@ -13,6 +13,7 @@ import type {
 	PageNumberPosition,
 	PageNumberSpec,
 	QrSettings,
+	SideValue,
 	Sides,
 	Template
 } from './types';
@@ -95,7 +96,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		w: num(partial.w, 60),
 		h: num(partial.h, 12),
 		mode: partial.mode ?? 'plain',
-		overflow: partial.overflow ?? 'grow',
+		overflow: partial.overflow ?? 'clip',
 		// Anything optional that is not named here is dropped on load: this list
 		// is the box format, so a new field has to be added in both places.
 		...stripUndefined({
@@ -115,11 +116,13 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			md: partial.md,
 			qr: partial.mode === 'qr' ? normaliseQr(partial.qr) : partial.qr,
 			anchor: partial.anchor,
+			rotation: normaliseRotation(partial.rotation),
+			centre: normaliseCentre(partial.centre),
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
 			background: colour(partial.background),
-			padding: partial.padding,
-			borderWidth: normaliseBorderWidth(partial.borderWidth),
+			padding: normaliseSides(partial.padding),
+			borderWidth: normaliseSides(partial.borderWidth),
 			borderStyle: BORDER_STYLES.includes(partial.borderStyle as BorderStyle) ? partial.borderStyle : undefined,
 			borderColor: colour(partial.borderColor),
 			borderRadius: partial.borderRadius,
@@ -296,14 +299,56 @@ export function arrangeBoxes(boxes: Box[], ids: string[], where: Arrange): Box[]
 }
 
 /**
- * A border thickness, in whichever of the two shapes it was written.
+ * Sheet sizes worth having to hand, in millimetres and in portrait.
+ *
+ * The card sizes are the real standards rather than round numbers: a poker
+ * playing card is 2.5 x 3.5 inches and a trading card is a hair smaller, and
+ * printing one at the other's size is exactly the sort of thing this list is
+ * meant to stop.
+ */
+export const PAGE_PRESETS: Array<{ name: string; w: number; h: number }> = [
+	{ name: 'A5', w: 148, h: 210 },
+	{ name: 'A4', w: 210, h: 297 },
+	{ name: 'A3', w: 297, h: 420 },
+	{ name: 'Business Card', w: 85, h: 55 },
+	{ name: 'Playing Card', w: 63.5, h: 88.9 },
+	{ name: 'Trading Card', w: 63, h: 88 }
+];
+
+const close = (a: number, b: number) => Math.abs(a - b) < 0.05;
+
+/**
+ * The preset a sheet matches, whichever way round it is turned, or nothing when
+ * it is a size of its own. Turning a page keeps its name — an A4 on its side is
+ * still an A4, and a dropdown that said "Custom" the moment you rotated would
+ * be lying about what is loaded.
+ */
+export function presetFor(w: number, h: number): string | undefined {
+	return PAGE_PRESETS.find(
+		(p) => (close(p.w, w) && close(p.h, h)) || (close(p.h, w) && close(p.w, h))
+	)?.name;
+}
+
+/**
+ * A preset's dimensions, kept in the orientation the page is already in: asking
+ * for A4 while working landscape should not turn the sheet under you.
+ */
+export function presetSize(name: string, landscape: boolean): { w: number; h: number } | undefined {
+	const preset = PAGE_PRESETS.find((p) => p.name === name);
+	if (!preset) return undefined;
+	return landscape ? { w: preset.h, h: preset.w } : { w: preset.w, h: preset.h };
+}
+
+/**
+ * A per-edge measurement — a border width or a padding — in whichever of the
+ * two shapes it was written.
  *
  * Four equal edges collapse back to a single number, so a template that never
- * used per-edge widths never grows an object it did not ask for, and a box that
- * is nudged back to uniform tidies itself up again. A border of nothing is
- * `undefined` rather than zero: absent is how this format says "no border".
+ * used per-edge values never grows an object it did not ask for, and a box that
+ * is nudged back to uniform tidies itself up again. Nothing at all is
+ * `undefined` rather than zero: absent is how this format says "none".
  */
-export function normaliseBorderWidth(raw: unknown): BorderWidth | undefined {
+export function normaliseSides(raw: unknown): SideValue | undefined {
 	if (typeof raw === 'number') return Number.isFinite(raw) && raw > 0 ? raw : undefined;
 	if (!raw || typeof raw !== 'object') return undefined;
 	const side = (value: unknown) => Math.max(0, num(value, 0));
@@ -318,8 +363,30 @@ export function normaliseBorderWidth(raw: unknown): BorderWidth | undefined {
 	return sides;
 }
 
-/** The four edges of a border, whichever shape it is stored in. */
-export function borderSides(width: BorderWidth | undefined): Sides {
+/**
+ * Degrees, wrapped into (-180, 180]. Upright is the absence of the field rather
+ * than a zero, the same rule the rest of this format follows, so a template full
+ * of unrotated boxes carries nothing about rotation at all.
+ */
+export function normaliseRotation(raw: unknown): number | undefined {
+	const value = Number(raw);
+	if (!Number.isFinite(value)) return undefined;
+	// The modulo first, so 360 and 720 both come back as upright and drop out.
+	const wrapped = Math.round((((value % 360) + 540) % 360 - 180) * 10) / 10;
+	const degrees = wrapped === -180 ? 180 : wrapped;
+	return degrees === 0 ? undefined : degrees;
+}
+
+/** The pivot, in percent of the box. The middle is the default, so it is dropped. */
+export function normaliseCentre(raw: unknown): Centre | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const axis = (value: unknown) => Math.round(Math.max(0, Math.min(100, num(value, 50))) * 10) / 10;
+	const centre: Centre = { x: axis((raw as any).x), y: axis((raw as any).y) };
+	return centre.x === 50 && centre.y === 50 ? undefined : centre;
+}
+
+/** The four edges of such a measurement, whichever shape it is stored in. */
+export function sidesOf(width: SideValue | undefined): Sides {
 	if (typeof width === 'number') return { top: width, right: width, bottom: width, left: width };
 	return width ?? { top: 0, right: 0, bottom: 0, left: 0 };
 }
