@@ -140,6 +140,10 @@ Load-bearing choices, in case they look arbitrary:
   asynchronous, and the component has to stay a pure function of its props.
   `assets.ts` also owns object-URL lifetime: an object URL outlives the value
   that made it, so each is revoked when replaced.
+- **Screen furniture is sized in screen pixels.** Handles and the pivot live
+  inside the scaled card, so a 14px handle is nine pixels under the finger at
+  62%. `--ui-scale` on `.card` is `1 / scale`, and every screen-only measure is
+  multiplied by it, so a target is the size it was drawn at whatever the zoom.
 - **Snapping is the two view toggles, not a modifier.** The grid beats sibling
   edges, sibling edges beat plain `FREE_STEP` rounding, and there is no key to
   hold: Grid off and Bounds off is free movement, because a box must never latch
@@ -188,6 +192,18 @@ Load-bearing choices, in case they look arbitrary:
   or in a comment rather than leaving the next reader to rediscover it.
 - **Never ship anything traceable to reference material.** Sample data and
   template names are invented; contact addresses use reserved `.example` domains.
+- **Rotation is a transform, so it costs no layout.** `rotation` is degrees and
+  `centre` is the pivot in *percent* of the box — the one thing in the format
+  that is not mm, because a pivot in mm drifts towards a corner as the box
+  grows. A CSS transform leaves `offsetHeight` alone, so `measure()`, anchoring
+  and snapping all see the upright rectangle: turning one area never shuffles
+  the rest of the card. The cost is that a resize handle on a turned box hands
+  back a screen-space delta, which `moveDrag` rotates by −θ before reading it as
+  a width; `move` is exempt, because a translation in the parent's space is the
+  same whichever way the box faces.
+- **A handle's target is a pseudo-element, not a box-shadow.** A transparent
+  `box-shadow` looks like a bigger hit area and is never hit-tested. `::before`
+  with a negative inset is, and it grows again under `pointer: coarse`.
 - **A new box starts clipped.** `newBox` defaults `overflow` to `clip`, so an
   area keeps the millimetres it was given until someone asks it to reflow. The
   starter template's title and body say `grow` for themselves.

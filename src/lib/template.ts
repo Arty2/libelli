@@ -4,8 +4,8 @@ import defaultCard from './templates/default-card.json';
 import type {
 	BackgroundFit,
 	BorderStyle,
-	SideValue,
 	Box,
+	Centre,
 	Defaults,
 	FontRef,
 	Mapping,
@@ -13,6 +13,7 @@ import type {
 	PageNumberPosition,
 	PageNumberSpec,
 	QrSettings,
+	SideValue,
 	Sides,
 	Template
 } from './types';
@@ -115,6 +116,8 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			md: partial.md,
 			qr: partial.mode === 'qr' ? normaliseQr(partial.qr) : partial.qr,
 			anchor: partial.anchor,
+			rotation: normaliseRotation(partial.rotation),
+			centre: normaliseCentre(partial.centre),
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
 			background: colour(partial.background),
@@ -317,6 +320,28 @@ export function normaliseSides(raw: unknown): SideValue | undefined {
 	const { top, right, bottom, left } = sides;
 	if (top === right && right === bottom && bottom === left) return top > 0 ? top : undefined;
 	return sides;
+}
+
+/**
+ * Degrees, wrapped into (-180, 180]. Upright is the absence of the field rather
+ * than a zero, the same rule the rest of this format follows, so a template full
+ * of unrotated boxes carries nothing about rotation at all.
+ */
+export function normaliseRotation(raw: unknown): number | undefined {
+	const value = Number(raw);
+	if (!Number.isFinite(value)) return undefined;
+	// The modulo first, so 360 and 720 both come back as upright and drop out.
+	const wrapped = Math.round((((value % 360) + 540) % 360 - 180) * 10) / 10;
+	const degrees = wrapped === -180 ? 180 : wrapped;
+	return degrees === 0 ? undefined : degrees;
+}
+
+/** The pivot, in percent of the box. The middle is the default, so it is dropped. */
+export function normaliseCentre(raw: unknown): Centre | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const axis = (value: unknown) => Math.round(Math.max(0, Math.min(100, num(value, 50))) * 10) / 10;
+	const centre: Centre = { x: axis((raw as any).x), y: axis((raw as any).y) };
+	return centre.x === 50 && centre.y === 50 ? undefined : centre;
 }
 
 /** The four edges of such a measurement, whichever shape it is stored in. */

@@ -96,6 +96,11 @@ resize boxes directly, or type exact millimetres.
   nothing typed into it is still an area — it keeps its fill, its border and its
   size, and **Hide When Empty** is what takes it away again. *+ Area* beside the
   page adds one, starting as static text.
+- **Rotation** — degrees clockwise, turning about a pivot you can drag on the
+  area itself or type as a percentage of its width and height. The pivot only
+  appears once there is a rotation to see it against. A turned area still
+  occupies the space it would have upright, so anchored areas below it do not
+  move — turning one thing never shuffles the card.
 - **Overflow** — a red corner appears on a box whose content is taller than the
   box will let it be, because a clipped card looks fine on screen right up until
   it is printed.
@@ -317,7 +322,8 @@ Both bars run in groups, outward from the thing itself:
   type (font, size, weight, leading, spacing, case, colour) · alignment,
   horizontal and vertical · surface (fill, padding, border width, style and
   colour, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
-  when empty) · then the actions: lock, duplicate, delete
+  when empty) · rotation and its pivot · then the actions: duplicate, delete,
+  lock
 - **Stacking order** — not in the bar: a column beside the page, under undo and
   redo, whenever anything is selected. Bring to front, forward, backward, send
   to back.

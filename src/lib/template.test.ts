@@ -3,6 +3,8 @@ import {
 	DEFAULT_DEFAULTS,
 	arrangeBoxes,
 	autoMap,
+	normaliseCentre,
+	normaliseRotation,
 	sidesOf,
 	builtinTemplate,
 	newBox,
@@ -216,6 +218,39 @@ describe('normaliseTemplate', () => {
 
 	it('rejects anything that is not a template', () => {
 		expect(() => normaliseTemplate({ schema: 1 })).toThrow(/no boxes/);
+	});
+});
+
+describe('rotation and its centre', () => {
+	it('wraps degrees into a half turn either way and drops an upright box', () => {
+		expect(normaliseRotation(90)).toBe(90);
+		expect(normaliseRotation(-90)).toBe(-90);
+		expect(normaliseRotation(270)).toBe(-90);
+		expect(normaliseRotation(360)).toBeUndefined();
+		expect(normaliseRotation(720)).toBeUndefined();
+		expect(normaliseRotation(0)).toBeUndefined();
+		expect(normaliseRotation('nonsense')).toBeUndefined();
+	});
+
+	it('clamps the pivot to the box and drops the middle', () => {
+		expect(normaliseCentre({ x: 0, y: 100 })).toEqual({ x: 0, y: 100 });
+		expect(normaliseCentre({ x: -40, y: 180 })).toEqual({ x: 0, y: 100 });
+		expect(normaliseCentre({ x: 50, y: 50 })).toBeUndefined();
+		expect(normaliseCentre(undefined)).toBeUndefined();
+	});
+
+	it('carries both through a template, and leaves an upright box carrying neither', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			boxes: [
+				{ id: 'a', x: 0, y: 0, w: 10, h: 10, rotation: 400, centre: { x: 0, y: 0 } },
+				{ id: 'b', x: 0, y: 0, w: 10, h: 10 }
+			]
+		});
+		expect(t.boxes[0].rotation).toBe(40);
+		expect(t.boxes[0].centre).toEqual({ x: 0, y: 0 });
+		expect('rotation' in t.boxes[1]).toBe(false);
+		expect('centre' in t.boxes[1]).toBe(false);
 	});
 });
 

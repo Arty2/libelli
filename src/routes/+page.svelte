@@ -831,6 +831,7 @@
 
 		<h3>Placing areas</h3>
 		<p>Drag areas on the page or type exact millimetres. An area latches onto the edges and centres of its neighbours as it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid of a 10mm grid instead. There is no key to hold for free movement: the two toggles under the page are the control. Grid off and <strong>Bounds</strong> off and nothing latches, because an area should never snap to a guide that is not being drawn. An area anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link.</p>
+		<p><strong>Rotation</strong> turns an area by degrees about a point you can drag — the small ring that appears on it once it is turned, or the <strong>X</strong> and <strong>Y</strong> beside the rotation, as a percentage of the area's own width and height. A turned area still takes up the space it would have upright, so anything anchored below it stays where it is; that is deliberate, and it is what stops one rotation shuffling the whole card.</p>
 		<p>Stacking order is the column beside the page, under undo and redo, and it is in the right-click menu too. Areas paint in the order they are listed, so <em>Bring to Front</em> is a move to the end of that list rather than a z-index to keep track of. A red corner means the content does not fit and the print will clip it; a padlock or an anchor at the corner says why an area will not move.</p>
 
 		<h3>Several at once</h3>

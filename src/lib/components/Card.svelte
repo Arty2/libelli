@@ -125,6 +125,10 @@
 			`width:${template.page.w + bleed * 2}mm`,
 			`height:${template.page.h + bleed * 2}mm`,
 			`padding:${bleed}mm`,
+			// Handles live inside the scaled card, so a 14px handle is nine pixels
+			// under the finger at 62%. Everything screen-only is sized against this
+			// so a target stays the size it was drawn at, whatever the zoom.
+			`--ui-scale:${1 / (scale || 1)}`,
 			`background-color:${template.page.background ?? '#ffffff'}`,
 			...backgroundStyle(template.page.image, background)
 		].join(';');
@@ -195,6 +199,15 @@
 			);
 		}
 		if (box.borderRadius) parts.push(`border-radius:${box.borderRadius}mm`);
+		// A CSS transform does not touch layout, so a rotated box still reports the
+		// height it would have had upright — which is what `measure()` reads and
+		// what anchored boxes below follow. That is the intended bargain: turning a
+		// box does not shove the rest of the card around. Snapping sees the upright
+		// rectangle too.
+		if (box.rotation) {
+			const centre = box.centre ?? { x: 50, y: 50 };
+			parts.push(`transform:rotate(${box.rotation}deg)`, `transform-origin:${centre.x}% ${centre.y}%`);
+		}
 		if (hidden.has(box.id)) {
 			parts.push('height:0', 'overflow:hidden', 'visibility:hidden');
 		} else if (box.overflow === 'clip') {
@@ -232,7 +245,7 @@
 
 	// ---- direct manipulation -------------------------------------------------
 
-	type DragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+	type DragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | 'centre';
 	let drag: {
 		id: string;
 		mode: DragMode;
@@ -304,9 +317,19 @@
 		// A size is not a position: it rounds, but it never latches onto an edge.
 		const size = (value: number) => snapTo(value, grid ? GRID_MINOR : FREE_STEP);
 
-		const dx = pxToMm((event.clientX - drag.startX) / scale);
-		const dy = pxToMm((event.clientY - drag.startY) / scale);
 		const origin = drag.origin;
+		// The handles turn with the box, so a pointer delta arrives in screen space
+		// and has to come back through the rotation before it can be read as a
+		// width or a height. Moving is exempt: a translation in the parent's space
+		// is the same however the box is turned, and un-rotating it would send the
+		// box off at an angle to the pointer.
+		const screenX = pxToMm((event.clientX - drag.startX) / scale);
+		const screenY = pxToMm((event.clientY - drag.startY) / scale);
+		const turn = drag.mode === 'move' ? 0 : ((origin.rotation ?? 0) * Math.PI) / 180;
+		const cos = Math.cos(turn);
+		const sin = Math.sin(turn);
+		const dx = screenX * cos + screenY * sin;
+		const dy = -screenX * sin + screenY * cos;
 		const next: Box = { ...origin };
 
 		const setTop = (deltaY: number) => {
@@ -317,6 +340,18 @@
 		};
 
 		switch (drag.mode) {
+			case 'centre': {
+				// Percent of the box, not millimetres, because that is how the pivot
+				// is stored — and clamped to the box, so it can never be dragged
+				// somewhere the marker cannot be picked up again.
+				const was = origin.centre ?? { x: 50, y: 50 };
+				const pct = (value: number) => Math.round(Math.max(0, Math.min(100, value)) * 10) / 10;
+				next.centre = {
+					x: pct(was.x + (dx / origin.w) * 100),
+					y: pct(was.y + (dy / Math.max(1, layout.heights[origin.id] ?? origin.h)) * 100)
+				};
+				break;
+			}
 			case 'move':
 				next.x = place(origin.x + dx, 'x');
 				setTop(dy);
@@ -472,6 +507,21 @@
 				{/if}
 
 				{#if interactive && isSelected(box) && soleSelection}
+					{#if editable(box) && box.rotation}
+						<!-- The point the box turns about, draggable where it acts. Only
+						     drawn on a rotated box: on an upright one it would be a
+						     control with nothing to show for itself. -->
+						<span
+							class="pivot"
+							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
+							title="The point this box turns about — drag it, or type it in the bar"
+							onpointerdown={(e) => startDrag(e, box, 'centre')}
+							onpointermove={moveDrag}
+							onpointerup={endDrag}
+							onpointercancel={endDrag}
+							role="presentation"
+						></span>
+					{/if}
 					{#if editable(box)}
 						{#each HANDLES as handle (handle)}
 							<span
@@ -579,26 +629,65 @@
 		touch-action: none;
 	}
 
-	.handle {
+	/* `--mark` is what you see, `--reach` is how far past it the pointer counts.
+	   Both are in screen pixels: multiplying by `--ui-scale` undoes the card's
+	   own zoom, so a handle is the same size to the hand at 40% as at 200%. */
+	.handle,
+	.pivot {
+		--mark: calc(14px * var(--ui-scale, 1));
+		--reach: calc(8px * var(--ui-scale, 1));
 		position: absolute;
-		width: 14px;
-		height: 14px;
+		width: var(--mark);
+		height: var(--mark);
 		background: #fff;
-		border: 1px solid #2563eb;
+		border: calc(1px * var(--ui-scale, 1)) solid #2563eb;
 		border-radius: var(--radius-button);
+		box-sizing: border-box;
 		z-index: 3;
-		/* A bigger invisible target than the visible square: fingers are not mice. */
-		box-shadow: 0 0 0 5px rgba(0, 0, 0, 0);
 		touch-action: none;
 	}
-	.h-nw { top: -7px; left: -7px; cursor: nwse-resize; }
-	.h-n { top: -7px; left: calc(50% - 7px); cursor: ns-resize; }
-	.h-ne { top: -7px; right: -7px; cursor: nesw-resize; }
-	.h-e { top: calc(50% - 7px); right: -7px; cursor: ew-resize; }
-	.h-se { bottom: -7px; right: -7px; cursor: nwse-resize; }
-	.h-s { bottom: -7px; left: calc(50% - 7px); cursor: ns-resize; }
-	.h-sw { bottom: -7px; left: -7px; cursor: nesw-resize; }
-	.h-w { top: calc(50% - 7px); left: -7px; cursor: ew-resize; }
+
+	/* The target, as opposed to the mark. A transparent box-shadow looks like it
+	   grows a handle but is never hit-tested, so the target used to be the square
+	   and nothing more. A pseudo-element is hit-tested, and it costs no layout. */
+	.handle::before,
+	.pivot::before {
+		content: '';
+		position: absolute;
+		inset: calc(-1 * var(--reach));
+	}
+
+	.pivot {
+		--mark: calc(11px * var(--ui-scale, 1));
+		margin: calc(var(--mark) / -2) 0 0 calc(var(--mark) / -2);
+		border: none;
+		border-radius: 50%;
+		box-shadow: inset 0 0 0 calc(2px * var(--ui-scale, 1)) #2563eb;
+		cursor: move;
+	}
+
+	/* Fingers are not mice: the marks stay small enough to see past, and the
+	   targets grow to something you can actually land on. */
+	@media (pointer: coarse) {
+		.handle {
+			--mark: calc(20px * var(--ui-scale, 1));
+			--reach: calc(14px * var(--ui-scale, 1));
+		}
+
+		.pivot {
+			--mark: calc(16px * var(--ui-scale, 1));
+			--reach: calc(14px * var(--ui-scale, 1));
+		}
+	}
+
+	.h-nw { top: calc(var(--mark) / -2); left: calc(var(--mark) / -2); cursor: nwse-resize; }
+	.h-n { top: calc(var(--mark) / -2); left: calc(50% - var(--mark) / 2); cursor: ns-resize; }
+	.h-ne { top: calc(var(--mark) / -2); right: calc(var(--mark) / -2); cursor: nesw-resize; }
+	.h-e { top: calc(50% - var(--mark) / 2); right: calc(var(--mark) / -2); cursor: ew-resize; }
+	.h-se { bottom: calc(var(--mark) / -2); right: calc(var(--mark) / -2); cursor: nwse-resize; }
+	.h-s { bottom: calc(var(--mark) / -2); left: calc(50% - var(--mark) / 2); cursor: ns-resize; }
+	.h-sw { bottom: calc(var(--mark) / -2); left: calc(var(--mark) / -2); cursor: nesw-resize; }
+	.h-w { top: calc(50% - var(--mark) / 2); left: calc(var(--mark) / -2); cursor: ew-resize; }
 
 	.crop-marks .mark {
 		position: absolute;

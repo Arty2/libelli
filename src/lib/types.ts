@@ -125,6 +125,19 @@ export interface QrSettings {
 	background?: string;
 }
 
+/**
+ * Where a box turns about, as a percentage of its own width and height.
+ *
+ * Percent rather than millimetres — the one place in this format that is not
+ * mm — because a box that grows or is resized should keep turning about the
+ * same point in itself. A pivot in mm would drift towards a corner as the box
+ * got taller. Absent is the middle, 50/50.
+ */
+export interface Centre {
+	x: number;
+	y: number;
+}
+
 export interface Anchor {
 	to: string;
 	/** mm between the target's rendered bottom and this box's top */
@@ -152,6 +165,9 @@ export interface Box extends TextStyle {
 	md?: MarkdownStyle;
 	qr?: QrSettings;
 	anchor?: Anchor | null;
+	/** degrees clockwise; the box turns about `centre`. Absent or 0 is upright. */
+	rotation?: number;
+	centre?: Centre;
 	hideWhenEmpty?: boolean;
 	static?: StaticContent;
 	/** fill behind the box's content; absent means the paper shows through */

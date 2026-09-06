@@ -6,6 +6,8 @@
 		BORDER_STYLES,
 		DEFAULT_QR,
 		PAGE_NUMBER_POSITIONS,
+		normaliseCentre,
+		normaliseRotation,
 		normaliseSides,
 		sidesOf
 	} from '$lib/template';
@@ -14,6 +16,7 @@
 		BackgroundFit,
 		BorderStyle,
 		Box,
+		Centre,
 		Dataset,
 		Mapping,
 		PageBackgroundImage,
@@ -221,6 +224,10 @@
 		if (!value) patch({ anchor: null });
 		else patch({ anchor: { to: value, gap: selected.anchor?.gap ?? 4 } });
 	}
+
+	/** The pivot only means anything against a rotation, so it travels with one. */
+	const setCentre = (change: Partial<Centre>) =>
+		patch({ centre: normaliseCentre({ ...(selected?.centre ?? { x: 50, y: 50 }), ...change }) });
 
 	function setQr(change: Partial<QrSettings>) {
 		patch({ qr: { ...DEFAULT_QR, ...selected?.qr, ...change } });
@@ -1051,6 +1058,58 @@
 				/>
 				Hide When Empty
 			</label>
+		</span>
+
+		<!-- How the box is turned, and the point it turns about. The pivot appears
+		     with a rotation, because on an upright box it has nothing to show for
+		     itself — the same rule Gap follows with Anchor. -->
+		<span class="group" role="group" aria-label="Rotation">
+			<label class="field">
+				<span>Rotation</span>
+				<input
+					class="n-3"
+					type="number"
+					step="1"
+					title="Degrees clockwise; the box turns about the centre marked on it"
+					value={selected.rotation ?? 0}
+					disabled={boxFrozen}
+					onchange={(e) => patch({ rotation: normaliseRotation(numeric(e, 0)) })}
+				/>
+				<span class="unit">°</span>
+			</label>
+			{#if selected.rotation}
+				<label class="field tight">
+					<span class="edge">X</span>
+					<input
+						class="n-3"
+						type="number"
+						step="5"
+						min="0"
+						max="100"
+						aria-label="Centre X"
+						title="The pivot across the box, as a percentage of its width"
+						value={selected.centre?.x ?? 50}
+						disabled={boxFrozen}
+						onchange={(e) => setCentre({ x: numeric(e, 50) })}
+					/>
+				</label>
+				<label class="field tight">
+					<span class="edge">Y</span>
+					<input
+						class="n-3"
+						type="number"
+						step="5"
+						min="0"
+						max="100"
+						aria-label="Centre Y"
+						title="The pivot down the box, as a percentage of its height"
+						value={selected.centre?.y ?? 50}
+						disabled={boxFrozen}
+						onchange={(e) => setCentre({ y: numeric(e, 50) })}
+					/>
+				</label>
+				<span class="unit">%</span>
+			{/if}
 		</span>
 
 		<span class="spacer"></span>
