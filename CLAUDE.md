@@ -35,8 +35,8 @@ src/lib/
   storage.ts      localStorage + IndexedDB, plus the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
   version.ts      VERSION, and the bumping rule
-  components/     Card, PagePreview, DataTable, OptionsBar, PrintPreview, PrintRoot, BoxMenu,
-                  SelectionTools, Icon
+  components/     Card, PagePreview, DataTable, OptionsBar, PrintPreview, PrintRoot, Lightbox,
+                  BoxMenu, SelectionTools, Icon
 src/routes/+page.svelte   all app state and wiring
 static/sample-cards.csv   sample data, bundled with ?raw and also served as a file
 ```
@@ -104,6 +104,25 @@ Load-bearing choices, in case they look arbitrary:
   positioned children of `.box` that hang past its edges, so measuring the box's
   own `scrollHeight` reports overflow on every selected box. The wrapper is what
   gets measured, and it is also the single flex item `justify-content` places.
+- **The lightbox is not a door to the printer.** `Lightbox` is one card, big, over
+  everything, and it prints and exports nothing — so it opens from the count under
+  the page as well as from an export thumbnail, without making a second way to the
+  printer. Both callers own the index and hand it back, so the card you were
+  looking at is the card you land on when it closes. It takes Escape and the
+  arrows for itself while it is open, and every screen underneath it stands down
+  on those keys rather than racing it. The tilt is a transform on the card's
+  wrapper: nothing under it moves, `prefers-reduced-motion` and a fine pointer
+  both switch it off entirely, and the first reading is the baseline so however
+  the phone is being held when it opens is level.
+- **The pager reserves its own height.** The sheet and the pager are one column, so
+  `fit` subtracts the pager's measured height and the column gap before it sizes
+  the page — otherwise the count is the first thing off the bottom of a short
+  stage. Measured, not assumed: it is text and icons, and it is absent when there
+  are no rows.
+- **The table follows the pager, and does not take focus.** Paging the card scrolls
+  the active row into view with `block: 'nearest'`, which leaves a row already on
+  screen exactly where it is. Focus stays on the arrow being pressed: moving it to
+  the row would break the second press.
 - **One door to the printer.** Print opens the preview; the preview prints. The
   page selection lives there, keyed by row index and reset every time it opens —
   sorting or deleting a row moves those indices, and a stale exclusion would drop

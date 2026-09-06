@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
+	import Lightbox from './Lightbox.svelte';
 	import { elementToPng, ratioForDpi } from '$lib/png';
 	import { mmToPx } from '$lib/layout';
 	import type { Dataset, Mapping, Template } from '$lib/types';
@@ -95,23 +96,12 @@
 	const sheetH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 
 	let fullscreen = $state<number | null>(null);
-	let viewport = $state({ w: 1200, h: 800 });
 
 	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 
 	const thumbWidth = 210;
 	const thumbScale = $derived(thumbWidth / mmToPx(outerW));
-	const fullScale = $derived(
-		Math.min((viewport.h - 120) / mmToPx(outerH), (viewport.w - 120) / mmToPx(outerW))
-	);
-
-	$effect(() => {
-		const read = () => (viewport = { w: window.innerWidth, h: window.innerHeight });
-		read();
-		window.addEventListener('resize', read);
-		return () => window.removeEventListener('resize', read);
-	});
 
 	function onKeydown(event: KeyboardEvent) {
 		// The same keys that opened this screen print from it, so the pair reads as
@@ -121,19 +111,11 @@
 			if (chosen > 0) onprint();
 			return;
 		}
+		// The lightbox is in front and takes Escape and the arrows for itself
+		// while it is open; this screen is only underneath it.
+		if (fullscreen !== null) return;
 		if (event.key === 'Escape') {
-			if (fullscreen !== null) fullscreen = null;
-			else onclose();
-			return;
-		}
-		if (fullscreen === null) return;
-		if (event.key === 'ArrowRight') {
-			event.preventDefault();
-			fullscreen = Math.min(dataset.rows.length - 1, fullscreen + 1);
-		}
-		if (event.key === 'ArrowLeft') {
-			event.preventDefault();
-			fullscreen = Math.max(0, fullscreen - 1);
+			onclose();
 		}
 	}
 
@@ -220,34 +202,18 @@
 	</section>
 
 	{#if fullscreen !== null}
-		{@const index = fullscreen}
-		<div class="full" role="presentation" onclick={() => (fullscreen = null)}>
-			<button class="plain close" onclick={() => (fullscreen = null)} title="Close" aria-label="Close">
-				<Icon name="close" size={22} />
-			</button>
-			<div class="full-card" role="presentation" onclick={(e) => e.stopPropagation()} style="width:{mmToPx(outerW) * fullScale}px;height:{mmToPx(outerH) * fullScale}px">
-				<span class="scaler" style="transform:scale({fullScale})">
-					<Card {template} row={dataset.rows[index]} {mapping} pageNumber={index + 1} {background} />
-				</span>
-			</div>
-			<!-- Under the card with the count between them: the two arrows and the
-			     number are one control, and either side of the page they were a
-			     screen-width apart from what they act on. -->
-			<div class="nav-bar" role="presentation" onclick={(e) => e.stopPropagation()}>
-				<button class="plain" disabled={index === 0} onclick={() => (fullscreen = Math.max(0, index - 1))} aria-label="Previous card">
-					<Icon name="caret-left" size={26} />
-				</button>
-				<span class="counter">{index + 1} / {dataset.rows.length}</span>
-				<button
-					class="plain"
-					disabled={index === dataset.rows.length - 1}
-					onclick={() => (fullscreen = Math.min(dataset.rows.length - 1, index + 1))}
-					aria-label="Next card"
-				>
-					<Icon name="caret-right" size={26} />
-				</button>
-			</div>
-		</div>
+		<Lightbox
+			{template}
+			{dataset}
+			{mapping}
+			{background}
+			index={fullscreen}
+			onactivate={(i) => {
+				fullscreen = i;
+				onactivate(i);
+			}}
+			onclose={() => (fullscreen = null)}
+		/>
 	{/if}
 </div>
 
@@ -418,60 +384,6 @@
 
 	.dropped figcaption {
 		color: #aaa;
-	}
-
-	.full {
-		position: fixed;
-		inset: 0;
-		z-index: 60;
-		background: rgba(20, 20, 20, 0.82);
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 18px;
-	}
-
-	/* No button around them: over a dark ground these are white marks on the
-	   image, and a bordered chip would be one more thing to look past. */
-	.plain {
-		border: none;
-		background: none;
-		padding: 4px;
-		color: #fff;
-		cursor: pointer;
-		display: grid;
-		place-items: center;
-	}
-
-	.plain:disabled {
-		opacity: 0.3;
-		cursor: default;
-	}
-
-	.plain.close {
-		position: absolute;
-		top: 14px;
-		right: 18px;
-	}
-
-	.nav-bar {
-		display: flex;
-		align-items: center;
-		gap: 22px;
-	}
-
-	.full-card {
-		background: #fff;
-		overflow: hidden;
-		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-	}
-
-	.counter {
-		color: #fff;
-		font: 24px ui-sans-serif, system-ui, sans-serif;
-		min-width: 6rem;
-		text-align: center;
 	}
 
 	@media (prefers-reduced-motion: no-preference) {
