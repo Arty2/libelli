@@ -87,6 +87,36 @@ export async function resolveBackground(image: PageBackgroundImage | undefined):
 	return cacheObjectUrl(key, new Blob([stored.bytes], { type: stored.type || 'image/png' }));
 }
 
+/** The picture formats a dropped file is allowed to be. */
+const DROPPABLE = ['image/png', 'image/jpeg', 'image/gif', 'image/svg+xml', 'image/webp', 'image/avif'];
+
+export const isDroppableImage = (file: File): boolean =>
+	DROPPABLE.includes(file.type) || /\.(png|jpe?g|gif|svg|webp|avif)$/i.test(file.name);
+
+/**
+ * Read a picture as a data URL, for a box that is holding one only for this
+ * session.
+ *
+ * A data URL rather than an object URL, and that is the whole reason this
+ * exists separately from the background path above. The PNG export serialises
+ * the card into an SVG `foreignObject` and loads it through an `Image`, and an
+ * SVG loaded that way resolves no external references at all — a `blob:` or an
+ * `https:` `<img src>` comes out blank. A data URL is the only form of picture
+ * that survives being exported, and it needs no revoking either.
+ */
+export function readImageAsDataUrl(file: File): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => {
+			const result = reader.result;
+			if (typeof result === 'string') resolve(result);
+			else reject(new Error('That image could not be read.'));
+		};
+		reader.onerror = () => reject(new Error('That image could not be read.'));
+		reader.readAsDataURL(file);
+	});
+}
+
 /** The CSS a resolved background turns into. The only place that mapping lives. */
 export function backgroundStyle(image: PageBackgroundImage | undefined, resolved: string | null): string[] {
 	if (!image || !resolved) return [];

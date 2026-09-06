@@ -30,11 +30,23 @@
 		 * component has to stay a pure function of its props.
 		 */
 		background?: string | null;
+		/**
+		 * Pictures dropped onto a box in this session, as box id -> data URL.
+		 * A resolved prop for the same reason `background` is one, and held by
+		 * the app rather than written into the box: the template names its
+		 * pictures, it never carries them, and a photo baked into a box would
+		 * put megabytes into a file meant to be small enough to paste into a
+		 * message. The cost is that these are gone on reload, which is what the
+		 * badge on the box is for.
+		 */
+		transient?: Record<string, string>;
 		/** `additive` is a modifier-click: add to or drop from the selection */
 		onselect?: (id: string | null, additive?: boolean) => void;
 		onchange?: (box: Box) => void;
 		/** right-click on a box, in viewport coordinates */
 		onmenu?: (id: string, x: number, y: number) => void;
+		/** take this session's dropped picture off a box */
+		ontransientclear?: (id: string) => void;
 	}
 
 	let {
@@ -48,9 +60,11 @@
 		selectedIds = [],
 		pageNumber = null,
 		background = null,
+		transient = {},
 		onselect,
 		onchange,
-		onmenu
+		onmenu,
+		ontransientclear
 	}: Props = $props();
 
 	let measured = $state<Record<string, number>>({});
@@ -69,7 +83,11 @@
 	};
 
 	const isEmpty = (box: Box) => {
-		if (box.mode === 'image') return !(box.static?.svg || box.static?.url || box.static?.dataUrl || contentOf(box).trim());
+		// A picture dropped on this box is showing, whatever the box would
+		// otherwise have held.
+		if (transient[box.id]) return false;
+		if (box.mode === 'image')
+			return !(box.static?.svg || box.static?.url || box.static?.dataUrl || contentOf(box).trim());
 		return contentOf(box).trim() === '';
 	};
 
@@ -460,7 +478,17 @@
 				role="presentation"
 			>
 				<div class="content">
-					{#if box.mode === 'markdown'}
+					{#if transient[box.id]}
+						<!-- Ahead of the mode, and deliberately: a dropped picture shows
+						     without editing the box at all. Setting mode to image here
+						     would be written into the template, and on a box bound to a
+						     column it would go on reading that column as an image
+						     address once the picture was gone — a broken image where
+						     there used to be text. -->
+						<span class="media" style="height:{box.h}mm">
+							<img src={transient[box.id]} alt="" style="object-fit:{box.fit ?? 'contain'}" />
+						</span>
+					{:else if box.mode === 'markdown'}
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf -->
 						{@html renderMarkdown(contentOf(box), { size: box.size ?? template.defaults.size, md: box.md })}
 					{:else if box.mode === 'qr'}
@@ -487,6 +515,28 @@
 					<span class="overflow-mark" title="The content does not fit — this box is clipping what will print">
 						<Icon name="warning" size={11} />
 					</span>
+				{/if}
+
+				{#if transient[box.id]}
+					<!-- Not gated behind bounds, and deliberately: the anchor and lock
+					     badges are furniture saying why a box will not move, but this
+					     one is a warning that what you are looking at is not saved and
+					     will not be here after a reload. Never printed, never exported:
+					     the print and preview cards are not interactive. -->
+					{#if interactive}
+						<button
+							class="transient-mark"
+							title="Only in this browser session — not saved with the template, and a reload clears it. Click to remove it now."
+							aria-label="Remove this session's picture from this area"
+							onpointerdown={(e) => e.stopPropagation()}
+							onclick={(e) => {
+								e.stopPropagation();
+								ontransientclear?.(box.id);
+							}}
+						>
+							<Icon name="image" size={11} />
+						</button>
+					{/if}
 				{/if}
 
 				{#if bounds && (box.anchor || box.locked)}
@@ -747,6 +797,26 @@
 			background: #b42318;
 			color: #fff;
 			pointer-events: none;
+			z-index: 3;
+		}
+
+		/* Bottom-left, so it never sits under the overflow mark on the right or
+		   the badge stack at the top. Amber rather than red: this is a "not
+		   saved", not a "this will print wrong". */
+		.transient-mark {
+			position: absolute;
+			left: -1px;
+			bottom: -1px;
+			display: grid;
+			place-items: center;
+			width: 15px;
+			height: 15px;
+			padding: 0;
+			border: 0;
+			border-radius: 0 var(--radius-button) 0 0;
+			background: #b45309;
+			color: #fff;
+			cursor: pointer;
 			z-index: 3;
 		}
 

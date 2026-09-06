@@ -23,6 +23,10 @@
 		onactivate: (index: number) => void;
 		/** the template's background image, resolved by the app */
 		background: string | null;
+		/** pictures dropped onto a box this session, box id -> data URL */
+		transient: Record<string, string>;
+		/** take this session's dropped picture off a box */
+		ontransientclear: (id: string) => void;
 		onselect: (id: string | null, additive?: boolean) => void;
 		onchange: (box: Box) => void;
 		onbounds: (show: boolean) => void;
@@ -60,6 +64,8 @@
 		rowCount,
 		onactivate,
 		background,
+		transient,
+		ontransientclear,
 		onselect,
 		onchange,
 		onbounds,
@@ -329,6 +335,8 @@
 				{scale}
 				{pageNumber}
 				{background}
+				{transient}
+				{ontransientclear}
 				interactive={true}
 				{selectedIds}
 				{onselect}
