@@ -126,6 +126,15 @@ resize boxes directly, or type exact millimetres.
   colour. A box that leaves those fields blank inherits them, so changing the
   page moves every box that never overrode it; a new box starts out inheriting
   everything.
+- **Sheet size** — **A5**, **A4**, **A3**, and **business**, **playing** and
+  **trading** cards, the last three at their real dimensions rather than round
+  numbers: a poker playing card is 63.5 × 88.9mm and a trading card is a hair
+  smaller at 63 × 88, and printing one at the other's size is what the list is
+  there to stop. A preset lands in the orientation you are already working in,
+  and the swap button beside the height turns the page over — an A4 on its side
+  is still called an A4. Neither moves anything on the card, because every
+  coordinate is measured from the trim edge. Type your own numbers and it reads
+  as *Custom*.
 - **Bleed** — an outset on the page, never an offset on content: turning it on
   changes the sheet size, optionally with crop marks, and every box stays
   visually where it was. On screen the trim edge is marked in purple, on the
@@ -331,7 +340,8 @@ nothing latches, because a box should never snap to a guide you cannot see.
 
 Both bars run in groups, outward from the thing itself:
 
-- **Page** — name · sheet size, bleed, crop marks · type defaults (font, size,
+- **Page** — name · sheet size (a preset or your own, and a button to turn it
+  over), bleed, crop marks · type defaults (font, size,
   leading, spacing, colour) · surface (paper colour, background image and fit) ·
   page number and its margin · then the actions: CSS, import, export, lock, add
   a box

@@ -6,9 +6,12 @@
 		BORDER_STYLES,
 		DEFAULT_QR,
 		PAGE_NUMBER_POSITIONS,
+		PAGE_PRESETS,
 		normaliseCentre,
 		normaliseRotation,
 		normaliseSides,
+		presetFor,
+		presetSize,
 		sidesOf
 	} from '$lib/template';
 	import type {
@@ -257,6 +260,27 @@
 	const setPadEdge = (edge: keyof Sides, value: number) =>
 		setPadding({ ...padSides, [edge]: Math.max(0, value) });
 
+	/** The named size this sheet already is, or Custom when it is its own. */
+	const preset = $derived(presetFor(template.page.w, template.page.h) ?? '');
+
+	function setPreset(name: string) {
+		const size = presetSize(name, template.page.w > template.page.h);
+		if (!size) return;
+		patchTemplate({ page: { ...template.page, ...size } });
+		onnotice(`${name} — ${size.w} × ${size.h}mm. Every box keeps the millimetres it had.`);
+	}
+
+	/**
+	 * Turning the page. Only the sheet changes: coordinates are measured from the
+	 * trim edge, so nothing on the card moves, which is exactly what you want
+	 * when you are trying the same design the other way round.
+	 */
+	function swapPage() {
+		const { w, h } = template.page;
+		patchTemplate({ page: { ...template.page, w: h, h: w } });
+		onnotice(`Page turned — ${h} × ${w}mm. Every box keeps the millimetres it had.`);
+	}
+
 	function setBackground(image: PageBackgroundImage | undefined) {
 		patchTemplate({ page: { ...template.page, ...(image ? { image } : { image: undefined }) } });
 	}
@@ -309,6 +333,20 @@
 
 		<span class="group" role="group" aria-label="Sheet size">
 			<label class="field">
+				<span>Size</span>
+				<select
+					value={preset}
+					title="A size worth having to hand, or set the two numbers yourself"
+					disabled={pageFrozen}
+					onchange={(e) => setPreset(e.currentTarget.value)}
+				>
+					<option value="">Custom</option>
+					{#each PAGE_PRESETS as option (option.name)}
+						<option value={option.name}>{option.name}</option>
+					{/each}
+				</select>
+			</label>
+			<label class="field">
 				<span>Width</span>
 				<input
 					class="n-3"
@@ -334,6 +372,15 @@
 				/>
 				<span class="unit">mm</span>
 			</label>
+			<button
+				class="square"
+				title="Swap width and height — turn the page over"
+				aria-label="Swap width and height"
+				disabled={pageFrozen}
+				onclick={swapPage}
+			>
+				<Icon name="arrows-horizontal" size={14} />
+			</button>
 			<label class="check">
 				<input
 					type="checkbox"

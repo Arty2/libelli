@@ -299,6 +299,47 @@ export function arrangeBoxes(boxes: Box[], ids: string[], where: Arrange): Box[]
 }
 
 /**
+ * Sheet sizes worth having to hand, in millimetres and in portrait.
+ *
+ * The card sizes are the real standards rather than round numbers: a poker
+ * playing card is 2.5 x 3.5 inches and a trading card is a hair smaller, and
+ * printing one at the other's size is exactly the sort of thing this list is
+ * meant to stop.
+ */
+export const PAGE_PRESETS: Array<{ name: string; w: number; h: number }> = [
+	{ name: 'A5', w: 148, h: 210 },
+	{ name: 'A4', w: 210, h: 297 },
+	{ name: 'A3', w: 297, h: 420 },
+	{ name: 'Business Card', w: 85, h: 55 },
+	{ name: 'Playing Card', w: 63.5, h: 88.9 },
+	{ name: 'Trading Card', w: 63, h: 88 }
+];
+
+const close = (a: number, b: number) => Math.abs(a - b) < 0.05;
+
+/**
+ * The preset a sheet matches, whichever way round it is turned, or nothing when
+ * it is a size of its own. Turning a page keeps its name — an A4 on its side is
+ * still an A4, and a dropdown that said "Custom" the moment you rotated would
+ * be lying about what is loaded.
+ */
+export function presetFor(w: number, h: number): string | undefined {
+	return PAGE_PRESETS.find(
+		(p) => (close(p.w, w) && close(p.h, h)) || (close(p.h, w) && close(p.w, h))
+	)?.name;
+}
+
+/**
+ * A preset's dimensions, kept in the orientation the page is already in: asking
+ * for A4 while working landscape should not turn the sheet under you.
+ */
+export function presetSize(name: string, landscape: boolean): { w: number; h: number } | undefined {
+	const preset = PAGE_PRESETS.find((p) => p.name === name);
+	if (!preset) return undefined;
+	return landscape ? { w: preset.h, h: preset.w } : { w: preset.w, h: preset.h };
+}
+
+/**
  * A per-edge measurement — a border width or a padding — in whichever of the
  * two shapes it was written.
  *

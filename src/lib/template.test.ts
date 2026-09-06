@@ -4,6 +4,8 @@ import {
 	arrangeBoxes,
 	autoMap,
 	normaliseCentre,
+	presetFor,
+	presetSize,
 	normaliseRotation,
 	sidesOf,
 	builtinTemplate,
@@ -218,6 +220,31 @@ describe('normaliseTemplate', () => {
 
 	it('rejects anything that is not a template', () => {
 		expect(() => normaliseTemplate({ schema: 1 })).toThrow(/no boxes/);
+	});
+});
+
+describe('page presets', () => {
+	it('names a sheet whichever way round it is turned', () => {
+		expect(presetFor(148, 210)).toBe('A5');
+		expect(presetFor(210, 148)).toBe('A5');
+		expect(presetFor(297, 420)).toBe('A3');
+		expect(presetFor(63.5, 88.9)).toBe('Playing Card');
+	});
+
+	it('tells a trading card from a playing card', () => {
+		expect(presetFor(63, 88)).toBe('Trading Card');
+		expect(presetFor(63.5, 88.9)).toBe('Playing Card');
+	});
+
+	it('leaves a size of its own unnamed', () => {
+		expect(presetFor(100, 150)).toBeUndefined();
+		expect(presetFor(148, 211)).toBeUndefined();
+	});
+
+	it('keeps the orientation the page is already in', () => {
+		expect(presetSize('A4', false)).toEqual({ w: 210, h: 297 });
+		expect(presetSize('A4', true)).toEqual({ w: 297, h: 210 });
+		expect(presetSize('Nothing', false)).toBeUndefined();
 	});
 });
 

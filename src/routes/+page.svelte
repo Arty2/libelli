@@ -925,6 +925,9 @@
 		<p>Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them. Dragging any one moves the whole set, and a column of icons appears beside the page to line them up against the box that encloses them all — left, centre, right, top, middle, bottom — and to group, lock, duplicate or delete the lot. Right-click carries the same set with its wording.</p>
 		<p><strong>Group</strong> makes that selection stick: clicking any member picks up all of them, until you ungroup. An anchored area sits out of a vertical align — an anchor would move it straight back — and the anchor badge at its corner says why.</p>
 
+		<h3>The sheet</h3>
+		<p><strong>Size</strong> in page setup has the sizes worth having to hand — A5, A4, A3, and business, playing and trading cards at their real dimensions rather than round numbers. Picking one keeps the orientation you are already in, and the <strong>⇄</strong> beside the height turns the page over. Neither moves anything on the card: coordinates are measured from the trim edge, so trying a design the other way round costs nothing. Anything you type yourself reads as <em>Custom</em>.</p>
+
 		<h3>Type</h3>
 		<p>Page setup holds the defaults — family, size, leading, spacing and colour. An area that leaves those fields blank inherits them, so changing the page changes every area that never overrode it.</p>
 		<p>Two shortcuts work on the type without going to the bar. <strong>Ctrl/Cmd + Shift</strong> and the scroll wheel sizes whatever the pointer is over, in points — the whole selection if that area is part of one, and it gives an inheriting area a size of its own on the first turn. <strong>Ctrl/Cmd + Shift</strong> and the arrows step the alignment of everything selected in the direction pressed: left and right along <em>left, centred, right, justified</em>, up and down along <em>top, middle, bottom</em>.</p>
