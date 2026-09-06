@@ -140,6 +140,12 @@ Load-bearing choices, in case they look arbitrary:
   asynchronous, and the component has to stay a pure function of its props.
   `assets.ts` also owns object-URL lifetime: an object URL outlives the value
   that made it, so each is revoked when replaced.
+- **The editor does not clip, the output does.** `.card` is `overflow: hidden`
+  so a print or a PNG never spills onto its neighbour; `.card.editing` — the
+  interactive preview only — turns that off, so a box dragged past the edge
+  stays visible and stays grabbable. Losing the handles of something you can no
+  longer see is worse than being shown what will not print, and the trim edge
+  already says where the paper stops.
 - **Screen furniture is sized in screen pixels.** Handles and the pivot live
   inside the scaled card, so a 14px handle is nine pixels under the finger at
   62%. `--ui-scale` on `.card` is `1 / scale`, and every screen-only measure is

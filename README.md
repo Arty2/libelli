@@ -104,6 +104,11 @@ resize boxes directly, or type exact millimetres.
 - **Overflow** — a red corner appears on a box whose content is taller than the
   box will let it be, because a clipped card looks fine on screen right up until
   it is printed.
+- **Past the edge** — the editor does not cut anything off at the card's edge:
+  drag an area half off the page and it stays visible, with its handles where
+  you can still reach them. What prints is another matter — the paper stops
+  where the card does, and the print, the PNG and the contact sheet all clip
+  there.
 - **Surface** — a fill colour, padding, a border and a corner radius, all in
   millimetres. A padding and a border each take one measurement all round, or
   one per edge behind the expander next to it; a border's style and the corner

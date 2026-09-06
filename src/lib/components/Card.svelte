@@ -428,7 +428,7 @@
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 </script>
 
-<div class="card" class:bleeding={bleed > 0} style={cardStyle()} lang="en">
+<div class="card" class:bleeding={bleed > 0} class:editing={interactive} style={cardStyle()} lang="en">
 	<div class="trim" class:bleed-marked={bounds && bleed > 0} style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
@@ -570,6 +570,15 @@
 		   drop — though the browser still asks for "background graphics". */
 		print-color-adjust: exact;
 		-webkit-print-color-adjust: exact;
+	}
+
+	/* The editor does not clip. A box dragged past the edge stays visible and
+	   stays grabbable — losing the handles of something you can no longer see is
+	   worse than showing you what will not print. Everywhere the card is *output*
+	   — the print run, the PNG export, the contact sheet — keeps the clip above,
+	   so nothing spills onto a neighbouring page. */
+	.card.editing {
+		overflow: visible;
 	}
 
 	.trim {
