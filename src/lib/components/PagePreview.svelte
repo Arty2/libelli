@@ -3,6 +3,7 @@
 	import Icon from './Icon.svelte';
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
+	import type { Arrange } from '$lib/template';
 	import { GRID_MAJOR, GRID_MINOR, mmToPx } from '$lib/layout';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -33,6 +34,7 @@
 		/** everything currently chosen; the selection tools appear for two or more */
 		selectedBoxes: Box[];
 		onalign: (edge: AlignEdge) => void;
+		onarrange: (where: Arrange) => void;
 		ongroup: () => void;
 		onlockselection: () => void;
 		onduplicate: () => void;
@@ -63,6 +65,7 @@
 		onmenu,
 		selectedBoxes,
 		onalign,
+		onarrange,
 		ongroup,
 		onlockselection,
 		onduplicate,
@@ -169,6 +172,7 @@
 				boxes={selectedBoxes}
 				frozen={!!template.locked}
 				{onalign}
+				{onarrange}
 				{ongroup}
 				onlock={onlockselection}
 				{onduplicate}
@@ -178,8 +182,8 @@
 	</div>
 
 	<div class="corner top right">
-		<button onclick={onaddbox} disabled={!!template.locked} title="Add a text box to the page">
-			<Icon name="text" size={14} /> Text
+		<button onclick={onaddbox} disabled={!!template.locked} title="Add an area to the page">
+			<Icon name="text" size={14} /> Area
 		</button>
 	</div>
 

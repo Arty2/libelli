@@ -161,17 +161,23 @@ const HORIZONTAL: AlignEdge[] = ['left', 'centre-x', 'right'];
  * "which box wins?" rule.
  *
  * Declared geometry, not resolved: this runs where measured heights are not
- * known, and a box's own `y`/`h` are what the template stores. That has one
- * consequence worth stating — an anchored box takes its top from another box,
- * so aligning it vertically would be undone on the next render. Those boxes
- * give up their anchor, which is the only reading of "line these up" that
- * survives. Horizontal alignment never touches an anchor.
+ * known, and a box's own `y`/`h` are what the template stores. So an anchored
+ * box sits out of a *vertical* align entirely — its top comes from another box,
+ * and moving its `y` would be undone on the next render. It keeps its anchor
+ * and its place, and the badge on the box says why. Horizontal alignment
+ * cannot fight an anchor, so anchored boxes take part in that as usual.
+ *
+ * The enclosing box is measured from the boxes that can actually move, so what
+ * you see line up is what defined the line.
  */
 export function alignBoxes(boxes: Box[], ids: string[], edge: AlignEdge): Box[] {
-	const chosen = boxes.filter((b) => ids.includes(b.id) && !b.locked);
+	const horizontalEdge = HORIZONTAL.includes(edge);
+	const chosen = boxes.filter(
+		(b) => ids.includes(b.id) && !b.locked && (horizontalEdge || !b.anchor)
+	);
 	if (chosen.length < 2) return boxes;
 
-	const horizontal = HORIZONTAL.includes(edge);
+	const horizontal = horizontalEdge;
 	const start = (b: Box) => (horizontal ? b.x : b.y);
 	const size = (b: Box) => (horizontal ? b.w : b.h);
 	const min = Math.min(...chosen.map(start));
@@ -195,6 +201,6 @@ export function alignBoxes(boxes: Box[], ids: string[], edge: AlignEdge): Box[] 
 	return boxes.map((box) => {
 		if (!moving.has(box.id)) return box;
 		const value = Math.round(place(box) * 100) / 100;
-		return horizontal ? { ...box, x: value } : { ...box, y: value, anchor: null };
+		return horizontal ? { ...box, x: value } : { ...box, y: value };
 	});
 }

@@ -1,19 +1,29 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import type { AlignEdge } from '$lib/layout';
+	import type { Arrange } from '$lib/template';
 	import type { Box } from '$lib/types';
 
 	interface Props {
 		boxes: Box[];
 		frozen: boolean;
 		onalign: (edge: AlignEdge) => void;
+		onarrange: (where: Arrange) => void;
 		ongroup: () => void;
 		onlock: () => void;
 		onduplicate: () => void;
 		ondelete: () => void;
 	}
 
-	let { boxes, frozen, onalign, ongroup, onlock, onduplicate, ondelete }: Props = $props();
+	let { boxes, frozen, onalign, onarrange, ongroup, onlock, onduplicate, ondelete }: Props = $props();
+
+	/** Several move as a block, keeping their order relative to each other. */
+	const ARRANGEMENTS: Array<{ value: Arrange; icon: string; label: string }> = [
+		{ value: 'front', icon: 'bring-to-front', label: 'Bring to Front' },
+		{ value: 'forward', icon: 'bring-forward', label: 'Bring Forward' },
+		{ value: 'backward', icon: 'send-backward', label: 'Send Backward' },
+		{ value: 'back', icon: 'send-to-back', label: 'Send to Back' }
+	];
 
 	const allLocked = $derived(boxes.length > 0 && boxes.every((b) => b.locked));
 	const grouped = $derived(
@@ -39,6 +49,14 @@
 
 	{#each ALIGN_EDGES as option (option.value)}
 		<button title={option.label} aria-label={option.label} disabled={frozen} onclick={() => onalign(option.value)}>
+			<Icon name={option.icon} size={16} />
+		</button>
+	{/each}
+
+	<hr />
+
+	{#each ARRANGEMENTS as option (option.value)}
+		<button title={option.label} aria-label={option.label} disabled={frozen} onclick={() => onarrange(option.value)}>
 			<Icon name={option.icon} size={16} />
 		</button>
 	{/each}
@@ -81,6 +99,10 @@
 		border-radius: 6px;
 		background: rgba(255, 255, 255, 0.92);
 		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+		/* Fourteen tools is taller than a short viewport; the rail scrolls rather
+		   than running off the bottom of the page it sits beside. */
+		max-height: calc(100dvh - 220px);
+		overflow-y: auto;
 	}
 
 	.count {

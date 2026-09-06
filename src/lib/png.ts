@@ -11,10 +11,13 @@ import type { StoredFont } from './fonts';
  * - **The stylesheets.** Every same-origin rule is collected and inlined. The
  *   card's geometry is already written as inline styles, but the component
  *   rules (and the template's own CSS) are not.
- * - **The fonts.** A font referenced by name will not resolve inside the SVG,
- *   so uploaded faces are inlined from IndexedDB as data URLs. A Google family
- *   cannot be inlined without fetching it, which this app does not do — such a
- *   card exports in the fallback stack, and `missingFonts` says which.
+ * - **The fonts.** A font referenced by name will not resolve inside the SVG, so
+ *   every face is inlined as a data URL. Uploaded ones come from IndexedDB. A
+ *   Google family has to be fetched to be embedded, and it is: the exception to
+ *   "this app fetches nothing" is deliberate and confined to this file, because
+ *   a PNG in the wrong typeface is not the card. It is best effort — a blocked
+ *   or offline request leaves that family in the fallback stack, and
+ *   `missingFonts` names it.
  */
 
 export interface PngResult {
@@ -48,27 +51,78 @@ function bytesToBase64(bytes: ArrayBuffer): string {
 }
 
 /** `@font-face` rules for every font this browser holds bytes for. */
-async function embeddedFonts(): Promise<string> {
+async function storedFaces(): Promise<{ css: string; families: Set<string> }> {
 	const faces: string[] = [];
+	const families = new Set<string>();
 	for (const ref of await idbKeys(STORE_FONTS)) {
 		const stored = await idbGet<StoredFont>(STORE_FONTS, ref);
 		if (!stored?.bytes) continue;
+		families.add(stored.family.toLowerCase());
 		const mime = stored.format === 'woff2' ? 'font/woff2' : stored.format === 'woff' ? 'font/woff' : 'font/ttf';
 		faces.push(
 			`@font-face{font-family:"${stored.family.replace(/"/g, '')}";src:url(data:${mime};base64,${bytesToBase64(stored.bytes)})}`
 		);
 	}
-	return faces.join('\n');
+	return { css: faces.join('\n'), families };
 }
 
-/** Families the card asks for that are not embeddable here. */
-async function unembeddableFamilies(families: string[]): Promise<string[]> {
-	const stored = new Set<string>();
-	for (const ref of await idbKeys(STORE_FONTS)) {
-		const font = await idbGet<StoredFont>(STORE_FONTS, ref);
-		if (font?.family) stored.add(font.family.toLowerCase());
+const MIME_BY_EXTENSION: Record<string, string> = {
+	woff2: 'font/woff2',
+	woff: 'font/woff',
+	ttf: 'font/ttf',
+	otf: 'font/otf'
+};
+
+async function fetchAsDataUrl(url: string): Promise<string | null> {
+	try {
+		const response = await fetch(url, { mode: 'cors' });
+		if (!response.ok) return null;
+		const extension = new URL(url, 'https://localhost/').pathname.split('.').pop()?.toLowerCase() ?? '';
+		const mime = MIME_BY_EXTENSION[extension] ?? response.headers.get('content-type') ?? 'font/woff2';
+		return `data:${mime};base64,${bytesToBase64(await response.arrayBuffer())}`;
+	} catch {
+		return null;
 	}
-	return families.filter((f) => f && !stored.has(f.toLowerCase()));
+}
+
+/**
+ * Pull the stylesheets this document loaded from a font service and rewrite
+ * every `url()` in them as data. The link elements are already in the page —
+ * the fetch is for their text, which is cross-origin and so unreadable through
+ * `cssRules`, and then for the font files those rules point at.
+ */
+async function fetchedFaces(): Promise<{ css: string; families: Set<string> }> {
+	if (typeof document === 'undefined') return { css: '', families: new Set() };
+	const links = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][data-font-family]'));
+	const blocks: string[] = [];
+	const families = new Set<string>();
+
+	for (const link of links) {
+		let css: string;
+		try {
+			const response = await fetch(link.href, { mode: 'cors' });
+			if (!response.ok) continue;
+			css = await response.text();
+		} catch {
+			continue;
+		}
+
+		const urls = Array.from(css.matchAll(/url\((https?:\/\/[^)"']+)\)/g)).map((m) => m[1]);
+		const embedded = await Promise.all(urls.map(fetchAsDataUrl));
+		let rewritten = css;
+		let complete = urls.length > 0;
+		urls.forEach((url, i) => {
+			const data = embedded[i];
+			if (data) rewritten = rewritten.split(url).join(data);
+			else complete = false;
+		});
+		if (!complete) continue;
+
+		blocks.push(rewritten);
+		if (link.dataset.fontFamily) families.add(link.dataset.fontFamily.toLowerCase());
+	}
+
+	return { css: blocks.join('\n'), families };
 }
 
 /**
@@ -91,7 +145,10 @@ export async function elementToPng(
 	clone.style.margin = '0';
 	clone.style.transform = 'none';
 
-	const css = `${await embeddedFonts()}\n${collectCss()}`;
+	const stored = await storedFaces();
+	const fetched = await fetchedFaces();
+	const embedded = new Set([...stored.families, ...fetched.families]);
+	const css = `${stored.css}\n${fetched.css}\n${collectCss()}`;
 	const serialised = new XMLSerializer().serializeToString(clone);
 	const svg =
 		`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
@@ -110,7 +167,7 @@ export async function elementToPng(
 
 	const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
 	if (!blob) throw new Error('The image could not be encoded.');
-	return { blob, missingFonts: await unembeddableFamilies(families) };
+	return { blob, missingFonts: families.filter((f) => f && !embedded.has(f.toLowerCase())) };
 }
 
 /** `</style>` inside a `<style>` would close it; `&` and `<` break the XML. */

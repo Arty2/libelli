@@ -126,14 +126,24 @@ describe('alignBoxes', () => {
 		expect(alignBoxes(boxes(), ['a'], 'left')).toEqual(boxes());
 	});
 
-	it('gives up an anchor when aligning vertically, since it would undo the move', () => {
+	it('leaves an anchored box out of a vertical align rather than breaking its anchor', () => {
+		const anchored = [
+			newBox({ id: 'a', x: 0, y: 10, w: 10, h: 10 }),
+			newBox({ id: 'b', x: 0, y: 40, w: 10, h: 10, anchor: { to: 'a', gap: 4 } }),
+			newBox({ id: 'c', x: 0, y: 60, w: 10, h: 10 })
+		];
+		const aligned = alignBoxes(anchored, ['a', 'b', 'c'], 'top');
+		expect(aligned[1].anchor).toEqual({ to: 'a', gap: 4 });
+		// a and c line up on the higher of the two that can move; b stays put.
+		expect(aligned.map((b) => b.y)).toEqual([10, 40, 10]);
+	});
+
+	it('will not align vertically when only one box is free to move', () => {
 		const anchored = [
 			newBox({ id: 'a', x: 0, y: 10, w: 10, h: 10 }),
 			newBox({ id: 'b', x: 0, y: 40, w: 10, h: 10, anchor: { to: 'a', gap: 4 } })
 		];
-		const aligned = alignBoxes(anchored, ['a', 'b'], 'top');
-		expect(aligned[1].anchor).toBeNull();
-		expect(aligned.map((b) => b.y)).toEqual([10, 10]);
+		expect(alignBoxes(anchored, ['a', 'b'], 'bottom')).toEqual(anchored);
 	});
 
 	it('keeps an anchor when aligning horizontally, which cannot fight it', () => {

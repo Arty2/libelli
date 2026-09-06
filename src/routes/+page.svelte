@@ -243,7 +243,8 @@
 		template = { ...template, boxes: template.boxes.map((b) => (b.id === box.id ? box : b)) };
 	}
 
-	/** Static text: it lives in the template, so it says the same on every card. */
+	/** A new area starts as static text: it lives in the template, so it says the
+	    same on every card until it is bound to a column. */
 	function addTextBox() {
 		const box = newBox({
 			id: nextBoxId(template.boxes),
@@ -260,8 +261,11 @@
 	}
 
 	function arrange(where: Arrange) {
-		if (!selected || template.locked) return;
-		const boxes = arrangeBoxes(template.boxes, selected.id, where);
+		if (template.locked) return;
+		// A locked area does not move, in the stack or anywhere else.
+		const movable = selectedBoxes.filter((b) => !b.locked).map((b) => b.id);
+		if (!movable.length) return;
+		const boxes = arrangeBoxes(template.boxes, movable, where);
 		if (boxes === template.boxes) return;
 		template = { ...template, boxes };
 	}
@@ -341,10 +345,11 @@
 		if (template.locked) return;
 		const boxes = alignBoxes(template.boxes, selectedIds, edge);
 		if (boxes === template.boxes) return;
-		const brokeAnchors = boxes.some((b, i) => template.boxes[i].anchor && !b.anchor);
+		const vertical = edge === 'top' || edge === 'centre-y' || edge === 'bottom';
+		const skipped = vertical ? selectedBoxes.filter((b) => b.anchor && !b.locked).length : 0;
 		template = { ...template, boxes };
-		status = brokeAnchors
-			? 'Aligned. An anchored box cannot also be lined up vertically, so those anchors were released.'
+		status = skipped
+			? `Aligned. ${skipped} anchored ${skipped === 1 ? 'area takes its top' : 'areas take their tops'} from another, so vertical alignment left ${skipped === 1 ? 'it' : 'them'} alone.`
 			: 'Aligned.';
 	}
 
@@ -709,6 +714,7 @@
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
 			{selectedBoxes}
 			onalign={alignSelection}
+			onarrange={arrange}
 			ongroup={groupSelection}
 			onlockselection={lockSelection}
 			onduplicate={duplicateBox}
@@ -780,16 +786,16 @@
 
 		<h3>What a box holds</h3>
 		<p>A box's <strong>Field</strong> is the template's own name for what it holds — <em>title</em>, <em>body</em>, and so on. The template names fields; the <strong>Column</strong> beside it says which spreadsheet column fills this one. That indirection is the point: the same template works against another spreadsheet by rebinding the columns, and no data is carried inside the template file.</p>
-		<p><strong>Content</strong> says where a box gets what it shows. A <strong>Data Field</strong> binds it to a column, so it changes card to card. <strong>Static Text</strong> is typed into the box and saved in the template, not in the data — the same on every card, travelling with the design. <strong>Decorative</strong> is neither: a box kept for its fill, its border or its size. <em>+ Text</em> beside the page adds a static text box.</p>
+		<p><strong>Content</strong> says where a box gets what it shows. A <strong>Data Field</strong> binds it to a column, so it changes card to card. <strong>Static Text</strong> is typed into the box and saved in the template, not in the data — the same on every card, travelling with the design. <strong>Decorative</strong> is neither: a box kept for its fill, its border or its size. <em>+ Area</em> beside the page adds one, starting as static text.</p>
 
 		<h3>Keys</h3>
 		<dl class="keys">
 			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
 			<dt>Ctrl/Cmd + Shift + Z</dt><dd>Redo</dd>
 			<dt>Arrows</dt><dd>Nudge the selected box by 1mm (Shift 5mm, Alt 0.25mm)</dd>
-			<dt>Shift / Ctrl / ⌘ + click</dt><dd>Add a box to the selection, or drop it</dd>
-			<dt>Ctrl/Cmd + A</dt><dd>Select every box</dd>
-			<dt>Delete</dt><dd>Remove the selected boxes</dd>
+			<dt>Shift / Ctrl / ⌘ + click</dt><dd>Add an area to the selection, or drop it</dd>
+			<dt>Ctrl/Cmd + A</dt><dd>Select every area</dd>
+			<dt>Delete</dt><dd>Remove the selected areas</dd>
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
 			<dt>← →</dt><dd>Previous / next card, in the print preview</dd>
 			<dt>Alt + drag</dt><dd>Ignore the grid and every snap</dd>
@@ -797,11 +803,11 @@
 
 		<h3>Placing boxes</h3>
 		<p>Drag boxes on the page or type exact millimetres. A box latches onto the edges and centres of its neighbours as it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid of a 10mm grid instead. A box anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link.</p>
-		<p>Right-click a box for its stacking order, lock, duplicate and delete — the same actions are in its bar. Boxes paint in the order they are listed, so <em>Bring to Front</em> is a move to the end of that list rather than a z-index to keep track of. A red corner on a box means its content does not fit and the print will clip it.</p>
+		<p>Right-click an area for its stacking order, lock, duplicate and delete — the same actions are in its bar. Areas paint in the order they are listed, so <em>Bring to Front</em> is a move to the end of that list rather than a z-index to keep track of. A red corner means the content does not fit and the print will clip it; a padlock or an anchor at the corner says why an area will not move.</p>
 
 		<h3>Several at once</h3>
 		<p>Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them. Dragging any one moves the whole set, and a column of icons appears beside the page, under undo and redo, to line them up against the box that encloses them all — left, centre, right, top, middle, bottom — and to group, lock, duplicate or delete the lot. Right-click carries the same set with its wording.</p>
-		<p><strong>Group</strong> makes that selection stick: clicking any member picks up all of them, until you ungroup. An anchored box cannot also be lined up vertically — an anchor would move it straight back — so aligning that way releases the anchor and says so.</p>
+		<p><strong>Group</strong> makes that selection stick: clicking any member picks up all of them, until you ungroup. An anchored area sits out of a vertical align — an anchor would move it straight back — and the anchor badge at its corner says why.</p>
 
 		<h3>Type</h3>
 		<p>Page setup holds the defaults — family, size, leading, tracking and colour. A box that leaves those fields blank inherits them, so changing the page changes every box that never overrode it.</p>

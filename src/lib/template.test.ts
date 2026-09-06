@@ -221,21 +221,33 @@ describe('arrangeBoxes', () => {
 	const boxes = () => ['a', 'b', 'c', 'd'].map((id) => newBox({ id }));
 
 	it('moves a box one step at a time, since paint order is array order', () => {
-		expect(ids(arrangeBoxes(boxes(), 'b', 'forward'))).toBe('acbd');
-		expect(ids(arrangeBoxes(boxes(), 'c', 'backward'))).toBe('acbd');
+		expect(ids(arrangeBoxes(boxes(), ['b'], 'forward'))).toBe('acbd');
+		expect(ids(arrangeBoxes(boxes(), ['c'], 'backward'))).toBe('acbd');
 	});
 
 	it('sends a box the whole way', () => {
-		expect(ids(arrangeBoxes(boxes(), 'b', 'front'))).toBe('acdb');
-		expect(ids(arrangeBoxes(boxes(), 'c', 'back'))).toBe('cabd');
+		expect(ids(arrangeBoxes(boxes(), ['b'], 'front'))).toBe('acdb');
+		expect(ids(arrangeBoxes(boxes(), ['c'], 'back'))).toBe('cabd');
+	});
+
+	it('moves several as a block, keeping their order relative to each other', () => {
+		expect(ids(arrangeBoxes(boxes(), ['a', 'c'], 'front'))).toBe('bdac');
+		expect(ids(arrangeBoxes(boxes(), ['b', 'd'], 'back'))).toBe('bdac');
+	});
+
+	it('steps a block past its neighbours without letting it swap past itself', () => {
+		expect(ids(arrangeBoxes(boxes(), ['a', 'b'], 'forward'))).toBe('cabd');
+		expect(ids(arrangeBoxes(boxes(), ['c', 'd'], 'backward'))).toBe('acdb');
+		// Already at the end: the block stays put rather than tearing apart.
+		expect(arrangeBoxes(boxes(), ['c', 'd'], 'forward')).toEqual(boxes());
 	});
 
 	it('returns the same array when there is nowhere to go, so no undo entry is made', () => {
 		const list = boxes();
-		expect(arrangeBoxes(list, 'd', 'front')).toBe(list);
-		expect(arrangeBoxes(list, 'd', 'forward')).toBe(list);
-		expect(arrangeBoxes(list, 'a', 'back')).toBe(list);
-		expect(arrangeBoxes(list, 'a', 'backward')).toBe(list);
-		expect(arrangeBoxes(list, 'ghost', 'front')).toBe(list);
+		expect(arrangeBoxes(list, ['d'], 'front')).toBe(list);
+		expect(arrangeBoxes(list, ['d'], 'forward')).toBe(list);
+		expect(arrangeBoxes(list, ['a'], 'back')).toBe(list);
+		expect(arrangeBoxes(list, ['a'], 'backward')).toBe(list);
+		expect(arrangeBoxes(list, ['ghost'], 'front')).toBe(list);
 	});
 });

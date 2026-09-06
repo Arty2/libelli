@@ -248,26 +248,51 @@ export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'doubl
 export type Arrange = 'front' | 'forward' | 'backward' | 'back';
 
 /**
- * Reorder one box in the paint order.
+ * Reorder boxes in the paint order.
  *
  * Stacking is array order — a later box paints over an earlier one — so
  * arranging is a move within the list rather than a z-index anyone has to keep
- * in step. Returns the array unchanged when the box is already where it is
- * being sent, so an undo entry is never recorded for a no-op.
+ * in step.
+ *
+ * Several at once move as a block, keeping their order relative to each other:
+ * front and back gather them at one end, and forward and backward step each one
+ * past its unselected neighbour, walking from the end being moved towards so
+ * they can never swap past each other. Boxes that sat between a scattered
+ * selection end up together — the part of "bring these to the front" with no
+ * right answer, resolved by keeping the selection intact rather than the gaps.
+ *
+ * Returns the array unchanged when nothing can move, so no undo entry is
+ * recorded for a no-op.
  */
-export function arrangeBoxes(boxes: Box[], id: string, where: Arrange): Box[] {
-	const from = boxes.findIndex((b) => b.id === id);
-	if (from === -1) return boxes;
-	const last = boxes.length - 1;
-	const to =
-		where === 'front' ? last
-		: where === 'back' ? 0
-		: where === 'forward' ? Math.min(last, from + 1)
-		: Math.max(0, from - 1);
-	if (to === from) return boxes;
+export function arrangeBoxes(boxes: Box[], ids: string[], where: Arrange): Box[] {
+	const chosen = new Set(ids.filter((id) => boxes.some((b) => b.id === id)));
+	if (!chosen.size) return boxes;
+
+	if (where === 'front' || where === 'back') {
+		const moving = boxes.filter((b) => chosen.has(b.id));
+		const rest = boxes.filter((b) => !chosen.has(b.id));
+		const next = where === 'front' ? [...rest, ...moving] : [...moving, ...rest];
+		return next.every((b, i) => b === boxes[i]) ? boxes : next;
+	}
+
 	const next = [...boxes];
-	next.splice(to, 0, next.splice(from, 1)[0]);
-	return next;
+	let moved = false;
+	if (where === 'forward') {
+		for (let i = next.length - 2; i >= 0; i--) {
+			if (chosen.has(next[i].id) && !chosen.has(next[i + 1].id)) {
+				[next[i], next[i + 1]] = [next[i + 1], next[i]];
+				moved = true;
+			}
+		}
+	} else {
+		for (let i = 1; i < next.length; i++) {
+			if (chosen.has(next[i].id) && !chosen.has(next[i - 1].id)) {
+				[next[i], next[i - 1]] = [next[i - 1], next[i]];
+				moved = true;
+			}
+		}
+	}
+	return moved ? next : boxes;
 }
 
 /**

@@ -560,8 +560,8 @@
 {:else if selected}
 	<!-- Same idea: what the box holds, how its type is set, where that type sits,
 	     what the box looks like, where it is, and only then what you can do to it. -->
-	<div class="options box-options" aria-label="Box settings">
-		<span class="context">Box</span>
+	<div class="options box-options" aria-label="Area settings">
+		<span class="context">Area</span>
 
 		<span class="group" role="group" aria-label="Content">
 			<label class="field">

@@ -69,9 +69,10 @@ resize boxes directly, or type exact millimetres.
   own Y however long the body above it runs.
 - **Alignment** — horizontal (left, centre, right, justified — justified text
   hyphenates) and vertical (top, middle, bottom) within the box's own frame.
-- **Stacking** — boxes paint in the order they are listed, so *Bring to Front*
-  is a move to the end of that list rather than a z-index to keep in step. In
-  the box bar and on right-click.
+- **Stacking** — areas paint in the order they are listed, so *Bring to Front*
+  is a move to the end of that list rather than a z-index to keep in step.
+  Several move as a block, keeping their order relative to each other. In the
+  bar, in the rail and on right-click.
 - **Several at once** — shift-click (or Ctrl/Cmd-click) to build a selection,
   Ctrl/Cmd+A for all of them. Dragging any one moves the set; a column of icons
   appears beside the page, under undo and redo, to line them up against the box
@@ -83,15 +84,17 @@ resize boxes directly, or type exact millimetres.
   the same things the bar does — the six alignments as one icon row, then group,
   lock, duplicate and delete — and keeps the selection rather than collapsing it.
 
-  One consequence worth stating: an anchored box takes its top from another box,
-  so lining it up vertically would be undone on the next render. Aligning that
-  way releases the anchor, and says so. Horizontal alignment never touches one.
+  One consequence worth stating: an anchored area takes its top from another,
+  so lining it up vertically would be undone on the next render. Those areas sit
+  the vertical alignments out and keep their anchor — the anchor badge at the
+  corner says why, and the status line says how many stayed put. Horizontal
+  alignment cannot fight an anchor, so they take part in that as usual.
 - **Where a box gets its content** — one choice with three answers. A **Data
   Field** binds it to a spreadsheet column, so it changes card to card. **Static
   Text** is typed into the box and saved in the template, so it says the same on
   every card and travels with the design rather than with the data.
-  **Decorative** is neither: a box kept for its fill, its border or its size.
-  *+ Text* on the page adds a static text box.
+  **Decorative** is neither: an area kept for its fill, its border or its size.
+  *+ Area* beside the page adds one, starting as static text.
 - **Overflow** — a red corner appears on a box whose content is taller than the
   box will let it be, because a clipped card looks fine on screen right up until
   it is printed.
@@ -123,7 +126,8 @@ resize boxes directly, or type exact millimetres.
   margin, and the template's default type. The number is the row's position, so
   the editor, the print preview and the print all agree.
 - **Lock** — **Lock** in either bar freezes what you have: no dragging, no
-  resizing, no option changes. A page lock covers every box and the page settings
+  resizing, no option changes. A locked area can still be *selected*, or the
+  button that unlocks it could never be reached. A page lock covers every box and the page settings
   as well. A padlock appears on the locked box, or at the corner of a locked
   page, as an indicator — the button that sets it is in the bar, with the rest of
   that subject's settings. Turning outlines off takes the padlocks with it.
@@ -235,9 +239,12 @@ the checklist are the same act, so they are the same screen.
 the look at what you are about to spend paper on. From it: **Print**, or
 **Export PNG** for one 300 dpi file per selected page — rendered here, with no
 library, by carrying the card into an SVG `foreignObject` and drawing that to a
-canvas. Uploaded fonts are embedded in the PNG; a Google family cannot be,
-because embedding it would mean fetching it, so the export says which families
-fell back.
+canvas. Every face is embedded: uploaded ones from this browser, and a Google
+family by fetching the stylesheet the page already loaded and the font files it
+points at. That fetch is the one exception to *the app fetches nothing*, and it
+is confined to the export, because a PNG in the wrong typeface is not the card.
+A request that is blocked or offline leaves that family in the fallback stack
+and the export says which.
 
 The print checklist sits at the bottom of that screen, under the pages: the
 cards are what you came to look at, and the four settings are what to do once

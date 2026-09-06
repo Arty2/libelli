@@ -88,9 +88,11 @@ Load-bearing choices, in case they look arbitrary:
   one member expands to the whole group in `selectBox`. `alignBoxes` works on
   declared geometry and releases the anchor of a box it moves vertically —
   an anchor would otherwise undo the alignment on the next render.
-- **Stacking is array order**, not a z-index: `arrangeBoxes` moves a box within
+- **Stacking is array order**, not a z-index: `arrangeBoxes` moves boxes within
   the list, and returns the same array when there is nowhere to go so no undo
-  entry is recorded for a no-op.
+  entry is recorded for a no-op. Several move as a block; front and back gather
+  them, forward and backward step each past its unselected neighbour, walking
+  from the end being moved towards so they cannot swap past each other.
 - **Radii are tokens.** `--radius-button` (3px) and `--radius-input` (1px) on
   `:root`; a surface (modal, menu, chip) keeps its own larger radius.
 - **A box's content lives in `.content`.** Handles and badges are absolutely
@@ -101,6 +103,13 @@ Load-bearing choices, in case they look arbitrary:
   page selection lives there, keyed by row index and reset every time it opens —
   sorting or deleting a row moves those indices, and a stale exclusion would drop
   a different card than the one that was unticked.
+- **A lock stops a box moving, not being picked.** `startDrag` selects before it
+  checks whether the box is editable, or the only control that could unlock a
+  box would be unreachable.
+- **The PNG export is the one thing that fetches.** `png.ts` inlines a Google
+  face by fetching the stylesheet the page already loaded and the files it names.
+  Deliberate, confined to that file, and best effort — a blocked request falls
+  back to the system stack and is reported rather than hidden.
 - **A lock is a button in the bar and an indicator on the canvas.** The padlock
   on a box or a page says *locked*; it is never the control, because the control
   belongs with the rest of that subject's settings. The button that sets a lock

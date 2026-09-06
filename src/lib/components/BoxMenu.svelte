@@ -54,9 +54,12 @@
 	];
 
 	const frozen = $derived(!!template.locked);
-	const index = $derived(template.boxes.findIndex((b) => b.id === box.id));
-	const atFront = $derived(index === template.boxes.length - 1);
-	const atBack = $derived(index === 0);
+	// Nowhere to go when the selection already occupies the end it is being sent to.
+	const positions = $derived(
+		selectedBoxes.map((b) => template.boxes.findIndex((one) => one.id === b.id)).sort((a, b) => a - b)
+	);
+	const atFront = $derived(positions.every((p, i) => p === template.boxes.length - positions.length + i));
+	const atBack = $derived(positions.every((p, i) => p === i));
 
 	let menu = $state<HTMLDivElement | null>(null);
 
@@ -111,31 +114,30 @@
 		</div>
 
 		<hr />
+	{/if}
 
+	<!-- Several move as a block, keeping their order relative to each other. -->
+	<button role="menuitem" disabled={frozen || atFront} onclick={() => run(() => onarrange('front'))}>
+		<Icon name="bring-to-front" size={15} /> Bring to Front
+	</button>
+	<button role="menuitem" disabled={frozen || atFront} onclick={() => run(() => onarrange('forward'))}>
+		<Icon name="bring-forward" size={15} /> Bring Forward
+	</button>
+	<button role="menuitem" disabled={frozen || atBack} onclick={() => run(() => onarrange('backward'))}>
+		<Icon name="send-backward" size={15} /> Send Backward
+	</button>
+	<button role="menuitem" disabled={frozen || atBack} onclick={() => run(() => onarrange('back'))}>
+		<Icon name="send-to-back" size={15} /> Send to Back
+	</button>
+
+	<hr />
+
+	{#if many}
 		<button role="menuitem" disabled={frozen} onclick={() => run(ongroup)}>
 			<Icon name="layers" size={15} />
 			{grouped ? 'Ungroup' : 'Group'}
 		</button>
 	{/if}
-
-	<!-- Stacking is about one box's place in the list, so it is offered for one. -->
-	{#if !many}
-		<button role="menuitem" disabled={frozen || atFront} onclick={() => run(() => onarrange('front'))}>
-			<Icon name="bring-to-front" size={15} /> Bring to Front
-		</button>
-		<button role="menuitem" disabled={frozen || atFront} onclick={() => run(() => onarrange('forward'))}>
-			<Icon name="bring-forward" size={15} /> Bring Forward
-		</button>
-		<button role="menuitem" disabled={frozen || atBack} onclick={() => run(() => onarrange('backward'))}>
-			<Icon name="send-backward" size={15} /> Send Backward
-		</button>
-		<button role="menuitem" disabled={frozen || atBack} onclick={() => run(() => onarrange('back'))}>
-			<Icon name="send-to-back" size={15} /> Send to Back
-		</button>
-
-		<hr />
-	{/if}
-
 	<button role="menuitem" disabled={frozen} onclick={() => run(() => onlock(!box.locked))}>
 		<Icon name="locked" size={15} />
 		{box.locked ? 'Unlock' : 'Lock'}{plural}

@@ -248,11 +248,14 @@
 		// Only the primary button drags. Without this a right-click starts one,
 		// and its non-additive select collapses a multi-selection to one box
 		// before the context menu it opened has a chance to act on the rest.
-		if (event.button !== 0) return;
-		if (!editable(box)) return;
+		if (event.button !== 0 || !interactive) return;
 		event.preventDefault();
 		event.stopPropagation();
+		// Selecting comes first and is never refused: a lock stops a box moving,
+		// not being picked — otherwise the only control that could unlock it
+		// could never be reached.
 		onselect?.(box.id, event.shiftKey || event.metaKey || event.ctrlKey);
+		if (!editable(box)) return;
 		drag = {
 			id: box.id,
 			mode,
@@ -444,6 +447,23 @@
 					</span>
 				{/if}
 
+				{#if outlines && (box.anchor || box.locked)}
+					<!-- Why the box will not do what you might ask of it, stacked at its
+					     corner: the anchor above the lock when it carries both. -->
+					<span class="badges">
+						{#if box.anchor}
+							<span class="badge" title="Anchored to another box — its top follows that box's bottom">
+								<Icon name="anchor" size={11} />
+							</span>
+						{/if}
+						{#if box.locked}
+							<span class="badge" title="Locked">
+								<Icon name="locked" size={11} />
+							</span>
+						{/if}
+					</span>
+				{/if}
+
 				{#if interactive && isSelected(box) && soleSelection}
 					{#if editable(box)}
 						{#each HANDLES as handle (handle)}
@@ -456,12 +476,6 @@
 								role="presentation"
 							></span>
 						{/each}
-					{:else if outlines}
-						<!-- A locked box shows why it will not move instead of handles that do
-						     nothing. Screen furniture, so the outlines toggle hides it too. -->
-						<span class="lock-badge" title="Locked">
-							<Icon name="locked" size={11} />
-						</span>
 					{/if}
 				{/if}
 			</div>
@@ -631,10 +645,18 @@
 			z-index: 3;
 		}
 
-		.lock-badge {
+		.badges {
 			position: absolute;
 			top: -9px;
 			right: -9px;
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
+			z-index: 3;
+			pointer-events: none;
+		}
+
+		.badge {
 			display: grid;
 			place-items: center;
 			width: 18px;
@@ -643,7 +665,6 @@
 			background: #fff;
 			border: 1px solid #2563eb;
 			color: #2563eb;
-			z-index: 3;
 		}
 
 		.guide {
