@@ -21,6 +21,8 @@
 		activeRow: number;
 		rowCount: number;
 		onactivate: (index: number) => void;
+		/** open the card full screen; the count under the page is the door */
+		onlightbox: () => void;
 		/** the template's background image, resolved by the app */
 		background: string | null;
 		onselect: (id: string | null, additive?: boolean) => void;
@@ -59,6 +61,7 @@
 		activeRow,
 		rowCount,
 		onactivate,
+		onlightbox,
 		background,
 		onselect,
 		onchange,
@@ -89,6 +92,15 @@
 
 	let host = $state<HTMLDivElement | null>(null);
 	let hostSize = $state({ w: 0, h: 0 });
+	/**
+	 * The pager sits under the sheet in the same column, so the height it takes
+	 * is height the page cannot have. Measured rather than assumed: it is a row
+	 * of text and icons, and it is not there at all when there are no rows.
+	 * Its own height never depends on the scale, so reading it back cannot loop.
+	 */
+	let pagerHeight = $state(0);
+	/** must match the `.page` column's gap, which is what separates the two */
+	const PAGE_GAP = 10;
 	/** the step the pad moves by, cycled 1 -> 5 -> 10; the keyboard has modifiers */
 	let padStep = $state(1);
 	const PAD_STEPS = [1, GRID_MINOR, 10];
@@ -122,7 +134,11 @@
 		// stage is the whole screen, so every millimetre of padding is a
 		// millimetre of card you cannot see.
 		const pad = hostSize.w < 560 ? 16 : 48;
-		const fit = Math.min((hostSize.w - pad) / mmToPx(outerW), (hostSize.h - pad) / mmToPx(outerH));
+		const under = pagerHeight ? pagerHeight + PAGE_GAP : 0;
+		const fit = Math.min(
+			(hostSize.w - pad) / mmToPx(outerW),
+			(hostSize.h - pad - under) / mmToPx(outerH)
+		);
 		return Math.max(0.15, Math.min(fit, 2));
 	});
 
@@ -365,24 +381,35 @@
 	</div>
 
 	<!-- Which card you are looking at, and how to get to the next one. The same
-	     shape as the lightbox's, because it is the same question. -->
-	{#if rowCount > 1}
-		<div class="pager" role="group" aria-label="Card">
+	     shape as the lightbox's, because it is the same question — and the count
+	     between the arrows is the way into it: the number naming the card you are
+	     looking at is the obvious thing to press to see it properly. A lone card
+	     keeps the door and loses the arrows, which would have nowhere to go. -->
+	{#if rowCount > 0}
+		<div class="pager" role="group" aria-label="Card" bind:clientHeight={pagerHeight}>
+			{#if rowCount > 1}
+				<button
+					class="step"
+					disabled={activeRow <= 0}
+					title="Previous card"
+					aria-label="Previous card"
+					onclick={() => onactivate(Math.max(0, activeRow - 1))}
+				><Icon name="caret-left" size={18} /></button>
+			{/if}
 			<button
-				class="step"
-				disabled={activeRow <= 0}
-				title="Previous card"
-				aria-label="Previous card"
-				onclick={() => onactivate(Math.max(0, activeRow - 1))}
-			><Icon name="caret-left" size={18} /></button>
-			<span class="count">{activeRow + 1} / {rowCount}</span>
-			<button
-				class="step"
-				disabled={activeRow >= rowCount - 1}
-				title="Next card"
-				aria-label="Next card"
-				onclick={() => onactivate(Math.min(rowCount - 1, activeRow + 1))}
-			><Icon name="caret-right" size={18} /></button>
+				class="count"
+				title="Look at this card full screen"
+				onclick={onlightbox}
+			>{activeRow + 1} / {rowCount}</button>
+			{#if rowCount > 1}
+				<button
+					class="step"
+					disabled={activeRow >= rowCount - 1}
+					title="Next card"
+					aria-label="Next card"
+					onclick={() => onactivate(Math.min(rowCount - 1, activeRow + 1))}
+				><Icon name="caret-right" size={18} /></button>
+			{/if}
 		</div>
 	{/if}
 	</div>
@@ -518,6 +545,8 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		/* Kept in step with PAGE_GAP, which takes it out of the height the sheet
+		   is allowed to fill. */
 		gap: 10px;
 	}
 
@@ -534,10 +563,21 @@
 		color: #555;
 	}
 
+	/* A control, not a readout, so it says so on hover — but no chip and no
+	   border, because it still has to read as the count first. */
 	.pager .count {
 		font: 500 12px ui-sans-serif, system-ui, sans-serif;
 		min-width: 3.5rem;
 		text-align: center;
+		border: none;
+		background: none;
+		color: inherit;
+		padding: 2px 4px;
+		cursor: zoom-in;
+	}
+
+	.pager .count:hover {
+		color: #111;
 	}
 
 	/* The triangle is the control, as in the lightbox: a chip around it would

@@ -4,6 +4,7 @@
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import Lightbox from '$lib/components/Lightbox.svelte';
 	import OptionsBar from '$lib/components/OptionsBar.svelte';
 	import PagePreview from '$lib/components/PagePreview.svelte';
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
@@ -48,6 +49,12 @@
 	let selectedIds = $state<string[]>([]);
 	let ready = $state(false);
 	let previewOpen = $state(false);
+	/**
+	 * The card on its own, big, over everything. Not a door to the printer — it
+	 * prints nothing and exports nothing — so it opens from the count under the
+	 * page rather than from the toolbar.
+	 */
+	let lightboxOpen = $state(false);
 	/**
 	 * Rows left out of the next print, by index. Excluded rather than included so
 	 * that adding a row prints it: a new card should not have to be opted in.
@@ -552,6 +559,9 @@
 			if (!previewOpen && !printing) requestPrint();
 			return;
 		}
+		// The lightbox is in front of everything and takes Escape and the arrows
+		// for itself; nothing back here should answer them underneath it.
+		if (lightboxOpen) return;
 		// While a field has focus, leave undo to the browser's own text history.
 		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
 			event.preventDefault();
@@ -877,6 +887,7 @@
 			{activeRow}
 			rowCount={dataset.rows.length}
 			onactivate={(i) => (activeRow = i)}
+			onlightbox={() => (lightboxOpen = true)}
 			{background}
 			onselect={selectBox}
 			onchange={updateBox}
@@ -890,7 +901,7 @@
 			onredo={redo}
 			onaddbox={addTextBox}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
-			modalOpen={helpOpen || cssOpen || previewOpen || boxMenu !== null}
+			modalOpen={helpOpen || cssOpen || previewOpen || lightboxOpen || boxMenu !== null}
 			{selectedBoxes}
 			onalign={alignSelection}
 			onarrange={arrange}
@@ -993,6 +1004,9 @@
 		<p><strong>Export</strong> — the button, or <strong>Ctrl/Cmd + P</strong> — opens one screen showing every card as a small page. The browser's own print dialog is taken over rather than left to fire: it would print the editor rather than the cards. Pressing it again from that screen sends the run.</p>
 		<p>Untick any card you do not want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The print checklist sits under the pages, because those four settings decide whether what you saw is what comes out.</p>
 
+		<h3>Looking at one card</h3>
+		<p>The <strong>count under the page</strong> — <em>3 / 12</em> — opens that card on its own, big, over everything; so does a thumbnail on the export screen. The arrows either side of it, and the left and right arrow keys, step through the run; <strong>Esc</strong> puts it away. Nothing is printed or exported from there, it is only a proper look. Paging with those arrows scrolls the table to the row you land on, so the highlighted row is one you can actually see. On a phone the card leans a few degrees with the handset, the way a real one catches the light — however you are holding it when it opens is level, and a device asking for less motion gets none.</p>
+
 		<h3>What an area holds</h3>
 		<p>An area's <strong>Field</strong> is the template's own name for what it holds — <em>title</em>, <em>body</em>, and so on. The template names fields; the <strong>Column</strong> beside it says which spreadsheet column fills this one. That indirection is the point: the same template works against another spreadsheet by rebinding the columns, and no data is carried inside the template file.</p>
 		<p><strong>Content</strong> says where an area gets what it shows. A <strong>Data Field</strong> binds it to a column, so it changes card to card. <strong>Static Text</strong> is typed into the area and saved in the template, not in the data — the same on every card, travelling with the design. An area with nothing typed into it is still an area: it keeps its fill, its border and its size, and <strong>Hide When Empty</strong> is what takes it away again. <em>+ Area</em> beside the page adds one.</p>
@@ -1009,6 +1023,7 @@
 			<dt>Ctrl/Cmd + D</dt><dd>Duplicate the selected areas</dd>
 			<dt>Delete</dt><dd>Remove the selected areas</dd>
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
+			<dt>← / →</dt><dd>Step through the cards, with one open full screen</dd>
 			<dt>? or /</dt><dd>This panel</dd>
 			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
 			<dt>Ctrl/Cmd + '</dt><dd>Grid on or off</dd>
@@ -1083,6 +1098,18 @@
 		onprint={printFromPreview}
 		onnotice={notify}
 		onclose={() => (previewOpen = false)}
+	/>
+{/if}
+
+{#if lightboxOpen && dataset.rows.length}
+	<Lightbox
+		{template}
+		{dataset}
+		{mapping}
+		{background}
+		index={activeRow}
+		onactivate={(i) => (activeRow = i)}
+		onclose={() => (lightboxOpen = false)}
 	/>
 {/if}
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import Icon from './Icon.svelte';
 	import { download } from '$lib/download';
 	import { parseTable, toCsv } from '$lib/parse';
@@ -15,6 +16,28 @@
 	}
 
 	let { dataset, activeRow, onactivate, onchange, onrenamecolumn }: Props = $props();
+
+	/**
+	 * The row the page is showing, brought into view. Paging the card with the
+	 * arrows under the sheet is a way of moving through the data, so the table has
+	 * to follow it — a highlighted row a hundred rows up the scroller is no
+	 * highlight at all. Only when the table is on screen: it is unmounted when the
+	 * tray is folded away, so there is nothing here to keep in step.
+	 *
+	 * Scrolled into view, not focused: the pager's own arrows are what you are
+	 * pressing, and taking focus off them after one press would break the second.
+	 * `nearest` is why clicking a cell does not yank the table about — a row
+	 * already on screen is left exactly where it is.
+	 */
+	let rowEls = $state<Array<HTMLTableRowElement | null>>([]);
+
+	$effect(() => {
+		const index = activeRow;
+		untrack(() => {
+			const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			rowEls[index]?.scrollIntoView({ block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
+		});
+	});
 
 	let pasteOpen = $state(false);
 	/** Two presses, because emptying the table is the one thing here undo cannot
@@ -293,7 +316,7 @@
 			</thead>
 			<tbody>
 				{#each dataset.rows as row, i (i)}
-					<tr class:active={i === activeRow}>
+					<tr class:active={i === activeRow} bind:this={rowEls[i]}>
 						<td class="gutter">
 							<button
 								class="row-pick"
