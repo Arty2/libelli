@@ -1,13 +1,31 @@
+import { safeImageUrl } from './assets';
 import { parseColour } from './colour';
 import defaultCard from './templates/default-card.json';
-import type { Box, Defaults, FontRef, Mapping, QrSettings, Template } from './types';
+import type {
+	BackgroundFit,
+	BorderStyle,
+	BorderWidth,
+	Box,
+	Defaults,
+	FontRef,
+	Mapping,
+	PageBackgroundImage,
+	PageNumberPosition,
+	PageNumberSpec,
+	QrSettings,
+	Sides,
+	Template
+} from './types';
 import { SCHEMA_VERSION } from './types';
 
 /**
- * Template defaults, validation, migration and import/export.
+ * Template defaults, validation and import/export.
  *
  * `schema` is load-bearing: the format will keep moving, and a version field is
- * the difference between a ten-line migration and silently corrupting saved work.
+ * the difference between a ten-line fix and silently corrupting saved work.
+ * There is no migration ladder — normalisation *is* the upgrade. Every field is
+ * read with a fallback, so a file written by an older build loads with the new
+ * defaults filled in, and is stamped forward on the way out.
  */
 
 export const BUILTIN_TEMPLATE_JSON = defaultCard as unknown;
@@ -18,8 +36,24 @@ export const DEFAULT_DEFAULTS: Defaults = {
 	lineHeight: 1.5,
 	weight: 400,
 	color: '#000000',
-	align: 'left'
+	align: 'left',
+	letterSpacing: 0
 };
+
+export const DEFAULT_PAGE_NUMBER: PageNumberSpec = {
+	enabled: false,
+	position: 'bottom-right',
+	margin: 8
+};
+
+export const PAGE_NUMBER_POSITIONS: PageNumberPosition[] = [
+	'top-left',
+	'top-center',
+	'top-right',
+	'bottom-left',
+	'bottom-center',
+	'bottom-right'
+];
 
 export function builtinTemplate(): Template {
 	return normaliseTemplate(BUILTIN_TEMPLATE_JSON);
@@ -31,6 +65,7 @@ export function blankTemplate(): Template {
 		name: 'Untitled card',
 		page: { w: 148, h: 210, unit: 'mm', background: '#ffffff' },
 		bleed: { enabled: false, amount: 3, cropMarks: false },
+		pageNumber: { ...DEFAULT_PAGE_NUMBER },
 		fonts: [{ family: 'Patrick Hand', source: 'google' }],
 		defaults: { ...DEFAULT_DEFAULTS },
 		slots: ['title', 'body'],
@@ -61,24 +96,36 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		h: num(partial.h, 12),
 		mode: partial.mode ?? 'plain',
 		overflow: partial.overflow ?? 'grow',
+		// Anything optional that is not named here is dropped on load: this list
+		// is the box format, so a new field has to be added in both places.
 		...stripUndefined({
 			font: partial.font,
 			size: partial.size,
 			weight: partial.weight,
 			lineHeight: partial.lineHeight,
-			color: partial.color,
+			// Every colour on a box goes through the parser before it can reach a
+			// style attribute; one that is not recognised is dropped rather than
+			// guessed at, the same rule the markdown renderer follows.
+			color: colour(partial.color),
 			align: partial.align,
+			valign: partial.valign,
 			italic: partial.italic,
 			letterSpacing: partial.letterSpacing,
+			textCase: partial.textCase,
 			md: partial.md,
 			qr: partial.mode === 'qr' ? normaliseQr(partial.qr) : partial.qr,
 			anchor: partial.anchor,
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
-			background: partial.background,
+			background: colour(partial.background),
 			padding: partial.padding,
+			borderWidth: normaliseBorderWidth(partial.borderWidth),
+			borderStyle: BORDER_STYLES.includes(partial.borderStyle as BorderStyle) ? partial.borderStyle : undefined,
+			borderColor: colour(partial.borderColor),
+			borderRadius: partial.borderRadius,
 			fit: partial.fit,
-			locked: partial.locked
+			locked: partial.locked,
+			group: typeof partial.group === 'string' && partial.group.trim() ? partial.group : undefined
 		})
 	};
 }
@@ -91,7 +138,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 export function normaliseTemplate(raw: unknown): Template {
 	if (!raw || typeof raw !== 'object') throw new Error('Not a template file.');
 	const t = raw as Record<string, any>;
-	const schema = Number(t.schema ?? 1);
+	const schema = Number(t.schema ?? SCHEMA_VERSION);
 	if (!Number.isFinite(schema)) throw new Error('Template is missing a schema version.');
 	if (schema > SCHEMA_VERSION) {
 		throw new Error(`This template needs a newer version of the app (schema ${schema}).`);
@@ -105,7 +152,6 @@ export function normaliseTemplate(raw: unknown): Template {
 		if (box.anchor && (!ids.has(box.anchor.to) || box.anchor.to === box.id)) box.anchor = null;
 	}
 
-	const bleed = normaliseBleed(t.bleed);
 	const slots = Array.isArray(t.slots) && t.slots.length
 		? t.slots.map(String)
 		: Array.from(new Set(boxes.map((b) => b.slot).filter((s): s is string => !!s)));
@@ -117,13 +163,23 @@ export function normaliseTemplate(raw: unknown): Template {
 			w: num(t.page?.w, 148),
 			h: num(t.page?.h, 210),
 			unit: 'mm',
-			background: parseColour(t.page?.background) ?? '#ffffff'
+			background: parseColour(t.page?.background) ?? '#ffffff',
+			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image) })
 		},
-		bleed,
+		bleed: normaliseBleed(t.bleed),
+		pageNumber: normalisePageNumber(t.pageNumber),
 		fonts: normaliseFonts(t.fonts),
-		defaults: { ...DEFAULT_DEFAULTS, ...stripUndefined(t.defaults ?? {}) },
+		defaults: {
+			...DEFAULT_DEFAULTS,
+			...stripUndefined(t.defaults ?? {}),
+			color: colour(t.defaults?.color) ?? DEFAULT_DEFAULTS.color
+		},
 		slots,
-		boxes
+		boxes,
+		...stripUndefined({
+			css: typeof t.css === 'string' && t.css.trim() ? t.css : undefined,
+			locked: t.locked ? true : undefined
+		})
 	};
 }
 
@@ -132,16 +188,44 @@ export const DEFAULT_QR: QrSettings = { level: 'M', margin: 2 };
 function normaliseQr(raw: any): QrSettings {
 	const level = ['L', 'M', 'Q', 'H'].includes(raw?.level) ? raw.level : DEFAULT_QR.level;
 	const margin = Math.max(0, Math.min(8, num(raw?.margin, DEFAULT_QR.margin)));
-	return { level, margin, ...(raw?.background ? { background: String(raw.background) } : {}) };
+	const background = parseColour(raw?.background);
+	return { level, margin, ...(background ? { background } : {}) };
 }
 
 function normaliseBleed(raw: any): Template['bleed'] {
-	// schema 1 drafts allowed `bleed: 0`; keep reading them.
-	if (typeof raw === 'number') return { enabled: raw > 0, amount: raw || 3, cropMarks: false };
 	return {
 		enabled: Boolean(raw?.enabled),
 		amount: num(raw?.amount, 3),
 		cropMarks: Boolean(raw?.cropMarks)
+	};
+}
+
+const BACKGROUND_FITS: BackgroundFit[] = ['cover', 'contain', 'repeat'];
+
+/**
+ * A background reference, or nothing. A `url` image has to survive
+ * `safeImageUrl` — a template is a file someone can hand you, and the only
+ * schemes it may point a browser at are http and https.
+ */
+function normaliseBackgroundImage(raw: any): PageBackgroundImage | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const fit: BackgroundFit = BACKGROUND_FITS.includes(raw.fit) ? raw.fit : 'cover';
+	if (raw.source === 'url') {
+		const src = safeImageUrl(raw.src);
+		return src ? { src, source: 'url', fit } : undefined;
+	}
+	const src = typeof raw.src === 'string' ? raw.src.trim() : '';
+	return src ? { src, source: 'local', fit } : undefined;
+}
+
+function normalisePageNumber(raw: any): PageNumberSpec {
+	const position: PageNumberPosition = PAGE_NUMBER_POSITIONS.includes(raw?.position)
+		? raw.position
+		: DEFAULT_PAGE_NUMBER.position;
+	return {
+		enabled: Boolean(raw?.enabled),
+		position,
+		margin: Math.max(0, num(raw?.margin, DEFAULT_PAGE_NUMBER.margin))
 	};
 }
 
@@ -158,12 +242,104 @@ function normaliseFonts(raw: any): FontRef[] {
 	return out;
 }
 
+export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'double'];
+
+/** Where a box is being moved to in the stack. */
+export type Arrange = 'front' | 'forward' | 'backward' | 'back';
+
+/**
+ * Reorder boxes in the paint order.
+ *
+ * Stacking is array order — a later box paints over an earlier one — so
+ * arranging is a move within the list rather than a z-index anyone has to keep
+ * in step.
+ *
+ * Several at once move as a block, keeping their order relative to each other:
+ * front and back gather them at one end, and forward and backward step each one
+ * past its unselected neighbour, walking from the end being moved towards so
+ * they can never swap past each other. Boxes that sat between a scattered
+ * selection end up together — the part of "bring these to the front" with no
+ * right answer, resolved by keeping the selection intact rather than the gaps.
+ *
+ * Returns the array unchanged when nothing can move, so no undo entry is
+ * recorded for a no-op.
+ */
+export function arrangeBoxes(boxes: Box[], ids: string[], where: Arrange): Box[] {
+	const chosen = new Set(ids.filter((id) => boxes.some((b) => b.id === id)));
+	if (!chosen.size) return boxes;
+
+	if (where === 'front' || where === 'back') {
+		const moving = boxes.filter((b) => chosen.has(b.id));
+		const rest = boxes.filter((b) => !chosen.has(b.id));
+		const next = where === 'front' ? [...rest, ...moving] : [...moving, ...rest];
+		return next.every((b, i) => b === boxes[i]) ? boxes : next;
+	}
+
+	const next = [...boxes];
+	let moved = false;
+	if (where === 'forward') {
+		for (let i = next.length - 2; i >= 0; i--) {
+			if (chosen.has(next[i].id) && !chosen.has(next[i + 1].id)) {
+				[next[i], next[i + 1]] = [next[i + 1], next[i]];
+				moved = true;
+			}
+		}
+	} else {
+		for (let i = 1; i < next.length; i++) {
+			if (chosen.has(next[i].id) && !chosen.has(next[i - 1].id)) {
+				[next[i], next[i - 1]] = [next[i - 1], next[i]];
+				moved = true;
+			}
+		}
+	}
+	return moved ? next : boxes;
+}
+
+/**
+ * A border thickness, in whichever of the two shapes it was written.
+ *
+ * Four equal edges collapse back to a single number, so a template that never
+ * used per-edge widths never grows an object it did not ask for, and a box that
+ * is nudged back to uniform tidies itself up again. A border of nothing is
+ * `undefined` rather than zero: absent is how this format says "no border".
+ */
+export function normaliseBorderWidth(raw: unknown): BorderWidth | undefined {
+	if (typeof raw === 'number') return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+	if (!raw || typeof raw !== 'object') return undefined;
+	const side = (value: unknown) => Math.max(0, num(value, 0));
+	const sides: Sides = {
+		top: side((raw as any).top),
+		right: side((raw as any).right),
+		bottom: side((raw as any).bottom),
+		left: side((raw as any).left)
+	};
+	const { top, right, bottom, left } = sides;
+	if (top === right && right === bottom && bottom === left) return top > 0 ? top : undefined;
+	return sides;
+}
+
+/** The four edges of a border, whichever shape it is stored in. */
+export function borderSides(width: BorderWidth | undefined): Sides {
+	if (typeof width === 'number') return { top: width, right: width, bottom: width, left: width };
+	return width ?? { top: 0, right: 0, bottom: 0, left: 0 };
+}
+
+/** A recognised colour, or nothing at all — never the string it was handed. */
+const colour = (raw: unknown): string | undefined =>
+	parseColour(typeof raw === 'string' ? raw : undefined) ?? undefined;
+
 function num(value: unknown, fallback: number): number {
 	const n = Number(value);
 	return Number.isFinite(n) ? n : fallback;
 }
 
-function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+/**
+ * Drop keys whose value is undefined. Exported because "back to the default" is
+ * expressed by removing a field, and structured clone — unlike JSON — keeps an
+ * undefined-valued key, so a box would otherwise accumulate dead fields.
+ * `null` survives: an anchor explicitly set to none is not the same as no anchor.
+ */
+export function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
 	const out: Record<string, any> = {};
 	for (const [k, v] of Object.entries(obj)) if (v !== undefined) out[k] = v;
 	return out as Partial<T>;
@@ -218,14 +394,4 @@ export function missingLocalFonts(t: Template, available: Set<string>): FontRef[
 
 export function exportTemplate(t: Template): string {
 	return JSON.stringify(t, null, 2);
-}
-
-export interface BundleFont extends FontRef {
-	/** base64 font bytes, present in bundles only */
-	data?: string;
-	format?: string;
-}
-
-export function exportBundle(t: Template, fonts: BundleFont[]): string {
-	return JSON.stringify({ ...t, bundled: true, fonts }, null, 2);
 }

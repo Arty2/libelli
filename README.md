@@ -49,9 +49,10 @@ localStorage's ~5MB. [Undo](#undo-and-redo) keeps its snapshots in memory.
 
 ## Cards and boxes
 
-A template is a list of boxes on a page. Select one on the page and the options
-bar above it becomes that box's inspector; click the background and it becomes
-the page's. Drag and resize boxes directly, or type exact millimetres.
+A template is a list of boxes on a page. Page setup and box settings are two
+separate bars: **Page Setup** in the toolbar shows or hides the template's own
+settings, and a box's bar appears under it whenever a box is selected. Drag and
+resize boxes directly, or type exact millimetres.
 
 - **Millimetres, from the trim edge** — changing the page size or switching bleed
   on moves nothing, because no coordinate was ever expressed in pixels.
@@ -66,9 +67,74 @@ the page's. Drag and resize boxes directly, or type exact millimetres.
   drops out of the anchor chain, so a card with no subtitle has no dead band
   where the subtitle would have been. A box with no anchor stays pinned to its
   own Y however long the body above it runs.
+- **Alignment** — horizontal (left, centre, right, justified — justified text
+  hyphenates) and vertical (top, middle, bottom) within the box's own frame.
+- **Stacking** — areas paint in the order they are listed, so *Bring to Front*
+  is a move to the end of that list rather than a z-index to keep in step.
+  Several move as a block, keeping their order relative to each other. In the
+  bar, in the rail and on right-click.
+- **Several at once** — shift-click (or Ctrl/Cmd-click) to build a selection,
+  Ctrl/Cmd+A for all of them. Dragging any one moves the set; a column of icons
+  appears beside the page, under undo and redo, to line them up against the box
+  that encloses them all — left, centre, right, top, middle, bottom — and to
+  lock, duplicate or delete the lot. **Group** makes
+  a selection stick, so clicking any member picks up all of them; it is a shared
+  name on each box rather than a container, which keeps the box list flat and
+  leaves anchoring and stacking alone. Right-clicking inside a selection offers
+  the same things the bar does — the six alignments as one icon row, then group,
+  lock, duplicate and delete — and keeps the selection rather than collapsing it.
+
+  One consequence worth stating: an anchored area takes its top from another,
+  so lining it up vertically would be undone on the next render. Those areas sit
+  the vertical alignments out and keep their anchor — the anchor badge at the
+  corner says why, and the status line says how many stayed put. Horizontal
+  alignment cannot fight an anchor, so they take part in that as usual.
+- **Where a box gets its content** — one choice with three answers. A **Data
+  Field** binds it to a spreadsheet column, so it changes card to card. **Static
+  Text** is typed into the box and saved in the template, so it says the same on
+  every card and travels with the design rather than with the data.
+  **Decorative** is neither: an area kept for its fill, its border or its size.
+  *+ Area* beside the page adds one, starting as static text.
+- **Overflow** — a red corner appears on a box whose content is taller than the
+  box will let it be, because a clipped card looks fine on screen right up until
+  it is printed.
+- **Surface** — a fill colour, padding, a border and a corner radius, all in
+  millimetres. A border takes one thickness all round, or one per edge behind
+  the expander next to it; its style and its radius are always for the whole
+  box. Four equal edges collapse back to a single number, so a template never
+  grows structure it did not ask for. The border sits *inside* the box's
+  millimetres rather than outside them, so framing a box does not move it or
+  anything anchored below it — though padding and a border do make the box
+  taller, which an anchored box below will follow, as it should.
+- **Type defaults** — page setup holds the family, size, leading, tracking and
+  colour. A box that leaves those fields blank inherits them, so changing the
+  page moves every box that never overrode it; a new box starts out inheriting
+  everything.
 - **Bleed** — an outset on the page, never an offset on content: turning it on
   changes the sheet size, optionally with crop marks, and every box stays
-  visually where it was.
+  visually where it was. On screen the trim edge is marked in purple, on the
+  same toggle as the box outlines.
+- **Background image** — *Upload…* takes a file from this machine, *Link…* takes
+  an http(s) address, and either can **cover**, be **contained**, or **tile**.
+  The image reaches the cut edge, bleed included, and sits on top of the paper
+  colour — so like the paper colour, it prints only with background graphics on.
+  **The picture is never part of the template.** An uploaded file's bytes stay in
+  this browser and the template carries only its name; a linked one carries the
+  address. Open a template on another machine and it asks for the file by name
+  rather than rendering a blank page — the same bargain as an uploaded font.
+- **Page numbers** — off by default; six corners to choose from, an adjustable
+  margin, and the template's default type. The number is the row's position, so
+  the editor, the print preview and the print all agree.
+- **Lock** — **Lock** in either bar freezes what you have: no dragging, no
+  resizing, no option changes. A locked area can still be *selected*, or the
+  button that unlocks it could never be reached. A page lock covers every box and the page settings
+  as well. A padlock appears on the locked box, or at the corner of a locked
+  page, as an indicator — the button that sets it is in the bar, with the rest of
+  that subject's settings. Turning outlines off takes the padlocks with it.
+- **Custom CSS** — page setup has a CSS button; what you write there is saved
+  inside the template and travels with it. Selectors are scoped to the card, so
+  nothing in a template can restyle the editor around it, and `@import` and any
+  `url()` pointing off this machine are stripped — the app fetches nothing.
 
 ## The data table
 
@@ -87,9 +153,13 @@ Clicking a row previews it.
   reverse it. Numbers sort by value rather than by digit, case is ignored, and
   blanks stay at the bottom either way. This reorders the data, not just the
   view, because row order *is* print order — and it is undoable.
-- **Add** — *+ Row* and *+ Column*, or the `+` at the end of the header row.
-- **Delete** — asks first, naming what goes: the number of filled cells for a
-  column, the opening text for a row. Undoable either way.
+- **Add** — the pale row and column at the end of the table are placeholders:
+  type into one and it becomes real. There is no separate button, because the
+  place you would click is the place you were already typing.
+- **Delete** — immediate, with a line saying what went. Undo covers it; a
+  confirmation you dismiss without reading protects nobody. The red bin at the
+  end of the toolbar is the exception: it empties the whole dataset and asks
+  twice, because that is not one row you can retype.
 
 ## Markdown and colour
 
@@ -156,16 +226,40 @@ Pick a curated Google family, type any other family name, or upload a file.
 Print renders every row into a dedicated container and hands it to the browser:
 `@page { size: <w>mm <h>mm; margin: 0 }`, one page per row, no trailing blank.
 
-The app keeps a short panel of dialog settings next to the button, because two
-of them catch everyone out: set **Margins** to *None*, uncheck **Headers and
-footers**, and switch on **Background graphics** — Chrome drops background
-colours by default, paper colour included.
+## Print preview
 
-## Contact sheet
+One screen holds both halves of getting a print right: every row rendered as a
+small page, and the four dialog settings the browser gets wrong by default —
+pick the **paper size** matching the card's millimetres, set **Margins** to
+*None*, uncheck **Headers and footers**, and switch on **Background graphics**,
+which Chrome drops along with the paper colour. Checking the cards and reading
+the checklist are the same act, so they are the same screen.
 
-Every row rendered as a small page in a grid, for checking a whole set at once.
-Click a thumbnail to open it full screen, <kbd>←</kbd> / <kbd>→</kbd> to move
-between cards, <kbd>Esc</kbd> to come back out.
+**Export…** is the only way in, so there is no route to the printer that skips
+the look at what you are about to spend paper on. From it: **Print**, or
+**Export PNG** for one 300 dpi file per selected page — rendered here, with no
+library, by carrying the card into an SVG `foreignObject` and drawing that to a
+canvas. Every face is embedded: uploaded ones from this browser, and a Google
+family by fetching the stylesheet the page already loaded and the font files it
+points at. That fetch is the one exception to *the app fetches nothing*, and it
+is confined to the export, because a PNG in the wrong typeface is not the card.
+A request that is blocked or offline leaves that family in the fallback stack
+and the export says which.
+
+The print checklist sits at the bottom of that screen, under the pages: the
+cards are what you came to look at, and the four settings are what to do once
+you have.
+
+Every page has a checkbox under it, and only the ticked ones print — untick the
+three proofs that came out wrong and reprint just those. **Select All** /
+**Select None** does the whole run, and the Print button says how many pages it
+is about to send. A page keeps the number it has in the table however few of
+them go, so page 4 prints as page 4 even when it is the only one selected. The
+selection is for one print: reopening the preview starts from every page again,
+because sorting or deleting a row moves the positions it was pinned to.
+
+Click a thumbnail to open that card full screen, <kbd>←</kbd> / <kbd>→</kbd> to
+move between cards, <kbd>Esc</kbd> to come back out.
 
 ## Undo and redo
 
@@ -190,40 +284,64 @@ and sample data, with your work one undo away. Uploaded fonts are the exception
 | <kbd>Alt</kbd> + arrows | Nudge by 0.25mm |
 | <kbd>Delete</kbd> | Remove the selected box |
 | <kbd>Esc</kbd> | Deselect, or close what is open |
-| <kbd>←</kbd> <kbd>→</kbd> | Previous / next card, in the contact sheet |
+| <kbd>←</kbd> <kbd>→</kbd> | Previous / next card, in the print preview |
 
 While a text field has focus, undo is left to the browser's own text history and
-<kbd>Delete</kbd> deletes characters — the app keeps its hands off both. Nudging
-needs the page area focused, which clicking a box does. Dragging snaps to 0.5mm;
-hold <kbd>Alt</kbd> for 0.01mm.
+<kbd>Delete</kbd> deletes characters — the app keeps its hands off both.
+Otherwise the arrow keys move the selected box wherever you are on the page. On
+a touch screen the same job is done by the four-way pad that appears beside the
+card, with a chip to switch between 1mm and 5mm.
+
+Dragging snaps in this order: hold <kbd>Alt</kbd> and nothing snaps at all;
+switch **Grid** on and everything snaps to the 5mm subgrid of a 10mm grid;
+otherwise a box latches onto the edges and centres of its neighbours as it
+passes them, and a guide shows what it caught.
 
 ## Settings
 
-- **Page** — template name, width, height, default font, default text colour,
-  paper colour, default size, bleed on/off, bleed amount, crop marks
-- **Box** — slot, bound column, font, size, weight, leading, alignment, colour,
-  mode (plain / markdown / image / QR), fit (image and QR), QR correction and
-  quiet zone, overflow (grow / clip), X, Y, W, H, anchor, anchor gap, hide when
-  empty
-- **View** — in the bottom corners of the page itself, not the toolbar: box
-  outlines on/off (screen only, never printed) at the left, zoom (fit, or 50% to
+Both bars run in groups, outward from the thing itself:
+
+- **Page** — name · sheet size, bleed, crop marks · type defaults (font, size,
+  leading, tracking, colour) · surface (paper colour, background image and fit) ·
+  page number and its margin · then the actions: CSS, import, export, lock, add
+  a box
+- **Box** — content (field, column or static text, mode, fit, QR settings) ·
+  type (font, size, weight, leading, tracking, case, colour) · alignment,
+  horizontal and vertical, and stacking order · surface (fill, padding, border
+  width, style and colour, radius) · position · size and overflow · flow
+  (anchor, gap, hide when empty) · then the actions: lock, duplicate, delete
+- **Selection** — not a bar at all: with more than one box chosen, a column of
+  icons appears beside the page under undo and redo — the six alignments, then
+  group, lock, duplicate, delete. The right-click menu carries the same set with
+  its wording.
+
+Undo and redo sit in a column at the page's top-left corner and *+ Text* at its
+top-right, rather than in the window's toolbar, next to the thing they act on. The top toolbar holds only what is about
+the whole app: Help, Page Setup, Export.
+- **View** — in the bottom corners of the page itself, not the toolbar: grid and
+  box outlines at the left (screen only, never printed), zoom (fit, or 50% to
   200%) at the right
+
+Every number says its unit: mm for geometry, bleed, tracking and gaps, pt for
+type size, modules for a QR quiet zone.
 
 ## Import and export
 
 A template travels as JSON and carries no data with it — that is the point of
 keeping the column mapping outside it.
 
-- **Export template** — fonts referenced by family name. Small, diffable,
-  git-friendly. The default.
-- **Export bundle** — the same file with font bytes embedded as base64.
-  Self-contained, larger, for handing to someone who does not have the fonts.
-- **Import** — one button takes either. A bundle is recognised by the font bytes
-  it carries, and those are installed into this browser before the template
-  renders.
+- **Export Template** — fonts referenced by family name, and a background image
+  by file name or address. Small, diffable, git-friendly — no picture and no font
+  bytes are ever folded into it. Custom CSS, page numbers and locks travel with
+  it.
+- **Import Template** — in page setup, next to the export, so it cannot be
+  mistaken for *Import CSV* under the table. Any font or background image the
+  template names but this browser does not have is asked for by name rather than
+  substituted. A linked background is only ever an http(s) address; a template
+  cannot smuggle one in as `data:` or point the browser at anything else.
 
-Whichever arrives, the column mapping is put to you for confirmation rather than
-assumed, since the template may have been built against a different spreadsheet.
+The column mapping is put to you for confirmation rather than assumed, since the
+template may have been built against a different spreadsheet.
 A template claiming a schema newer than the app understands is refused outright
 rather than half-read.
 

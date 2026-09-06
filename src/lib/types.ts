@@ -1,17 +1,57 @@
 /**
- * Template + runtime types.
+ * Shared shapes.
  *
- * Units: every coordinate and every spacing value is in millimetres, because
- * pixels are meaningless on paper. The one exception is `size` / `weight`,
- * which are typographic: `size` is in points (1pt = 1/72in), the unit a
- * designer expects to type into a font-size field.
+ * Every coordinate and every spacing in here is millimetres, measured from the
+ * trim edge. `size` is points and `weight` is typographic — the two places a
+ * print convention beats consistency.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export type BoxMode = 'plain' | 'markdown' | 'image' | 'qr';
 export type Overflow = 'clip' | 'grow';
-export type Align = 'left' | 'center' | 'right';
+export type Align = 'left' | 'center' | 'right' | 'justify';
+/** vertical placement of a box's content within its own frame */
+export type VAlign = 'top' | 'middle' | 'bottom';
+export type TextCase = 'none' | 'smallcaps' | 'uppercase';
+export type BorderStyle = 'solid' | 'dashed' | 'dotted' | 'double';
+
+/** mm on each edge, in CSS order */
+export interface Sides {
+	top: number;
+	right: number;
+	bottom: number;
+	left: number;
+}
+
+/** One thickness for the whole box, or one per edge. Style and radius are never per-edge. */
+export type BorderWidth = number | Sides;
+
+export type PageNumberPosition =
+	| 'top-left'
+	| 'top-center'
+	| 'top-right'
+	| 'bottom-left'
+	| 'bottom-center'
+	| 'bottom-right';
+
+/** how a background image fills the sheet */
+export type BackgroundFit = 'cover' | 'contain' | 'repeat';
+
+/**
+ * A background image for the page.
+ *
+ * The bytes are never part of the template: a `local` image is a file whose
+ * bytes live in this browser's storage under `src`, and a `url` image is
+ * fetched from wherever it says. Either way the template file carries a name,
+ * not a picture, so it stays small, diffable and quick to hand around.
+ */
+export interface PageBackgroundImage {
+	/** an http(s) URL, or the file name whose bytes are stored in this browser */
+	src: string;
+	source: 'url' | 'local';
+	fit: BackgroundFit;
+}
 
 export interface PageSpec {
 	w: number;
@@ -19,6 +59,7 @@ export interface PageSpec {
 	unit: 'mm';
 	/** paper colour; printed only when the browser's background graphics are on */
 	background?: string;
+	image?: PageBackgroundImage;
 }
 
 export interface BleedSpec {
@@ -26,6 +67,14 @@ export interface BleedSpec {
 	/** mm of bleed on every side */
 	amount: number;
 	cropMarks: boolean;
+}
+
+/** A page number printed on every card. Off unless asked for. */
+export interface PageNumberSpec {
+	enabled: boolean;
+	position: PageNumberPosition;
+	/** mm inset from the trim edge */
+	margin: number;
 }
 
 export interface FontRef {
@@ -43,11 +92,15 @@ export interface TextStyle {
 	lineHeight?: number;
 	color?: string;
 	align?: Align;
+	valign?: VAlign;
 	italic?: boolean;
+	/** mm */
 	letterSpacing?: number;
 }
 
-export type Defaults = Required<Pick<TextStyle, 'font' | 'size' | 'lineHeight' | 'weight' | 'color' | 'align'>>;
+export type Defaults = Required<
+	Pick<TextStyle, 'font' | 'size' | 'lineHeight' | 'weight' | 'color' | 'align' | 'letterSpacing'>
+>;
 
 /** Markdown block metrics. `size` values are multipliers of the box size; every spacing is mm. */
 export interface MarkdownStyle {
@@ -65,6 +118,7 @@ export interface QrSettings {
 	level: 'L' | 'M' | 'Q' | 'H';
 	/** quiet zone in modules — the white border a scanner needs */
 	margin: number;
+	/** absent means transparent: the paper (or the box background) shows through */
 	background?: string;
 }
 
@@ -91,16 +145,32 @@ export interface Box extends TextStyle {
 	h: number;
 	mode: BoxMode;
 	overflow: Overflow;
+	textCase?: TextCase;
 	md?: MarkdownStyle;
 	qr?: QrSettings;
 	anchor?: Anchor | null;
 	hideWhenEmpty?: boolean;
 	static?: StaticContent;
+	/** fill behind the box's content; absent means the paper shows through */
 	background?: string;
+	/** mm of space between the border and the content */
 	padding?: number;
+	/** mm; 0 or absent is no border. A number is every edge, an object is per edge. */
+	borderWidth?: BorderWidth;
+	borderStyle?: BorderStyle;
+	/** absent falls back to the box's own text colour */
+	borderColor?: string;
+	/** mm, applied to the whole box */
+	borderRadius?: number;
 	/** how an image or QR fills its box: contain fits it, cover crops it */
 	fit?: 'contain' | 'cover' | 'fill';
 	locked?: boolean;
+	/**
+	 * Boxes sharing a group id are selected, moved, locked and deleted together.
+	 * A plain string rather than a container: the boxes stay a flat list, so
+	 * grouping cannot break anchoring, stacking or anything else that reads it.
+	 */
+	group?: string;
 }
 
 export interface Template {
@@ -108,10 +178,15 @@ export interface Template {
 	name: string;
 	page: PageSpec;
 	bleed: BleedSpec;
+	pageNumber: PageNumberSpec;
 	fonts: FontRef[];
 	defaults: Defaults;
 	slots: string[];
 	boxes: Box[];
+	/** author's own CSS, scoped to the card at render time */
+	css?: string;
+	/** freezes the whole design: no dragging, no resizing, no option changes */
+	locked?: boolean;
 }
 
 /** Runtime state — never written into a template file. */
@@ -127,5 +202,6 @@ export type Mapping = Record<string, string>;
 
 export interface UiState {
 	showOutlines: boolean;
+	showGrid: boolean;
 	zoom: 'fit' | number;
 }

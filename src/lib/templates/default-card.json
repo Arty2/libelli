@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "name": "A5 Instruction Card",
   "page": {
     "w": 148,
@@ -10,6 +10,11 @@
     "enabled": false,
     "amount": 3,
     "cropMarks": false
+  },
+  "pageNumber": {
+    "enabled": false,
+    "position": "bottom-right",
+    "margin": 8
   },
   "fonts": [
     {
@@ -27,7 +32,8 @@
     "lineHeight": 1.5,
     "weight": 400,
     "color": "#000000",
-    "align": "left"
+    "align": "left",
+    "letterSpacing": 0
   },
   "slots": [
     "title",

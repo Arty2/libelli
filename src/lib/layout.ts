@@ -96,3 +96,111 @@ export function resolveLayout({ boxes, measured, hidden }: LayoutInput): LayoutR
 	}
 	return { tops, heights };
 }
+
+// ---- snapping ---------------------------------------------------------------
+
+/** The grid the editor draws and snaps to: 10mm majors, 5mm subdivisions. */
+export const GRID_MAJOR = 10;
+export const GRID_MINOR = 5;
+
+/** Free movement still rounds, or a drag leaves 0.3841mm coordinates behind. */
+export const FREE_STEP = 0.01;
+
+export const snapTo = (value: number, step: number) => Math.round(value / step) * step;
+
+/**
+ * Nearest candidate within `tolerance` mm, or null when nothing is close.
+ * Ties go to the first candidate, which keeps a repeated drag from oscillating
+ * between two edges the same distance away.
+ */
+export function snapToEdges(value: number, edges: number[], tolerance: number): number | null {
+	let best: number | null = null;
+	let bestDistance = tolerance;
+	for (const edge of edges) {
+		const distance = Math.abs(edge - value);
+		if (distance < bestDistance) {
+			bestDistance = distance;
+			best = edge;
+		}
+	}
+	return best;
+}
+
+/**
+ * Edges every other box offers to snap against: left/centre/right horizontally,
+ * and resolved top/centre/bottom vertically. Vertical edges come from the
+ * resolved layout rather than from `y`, so a box snaps to where a grown box
+ * actually ends rather than to where its declared height would put it.
+ */
+export function boxEdges(
+	boxes: Box[],
+	layout: LayoutResult,
+	exceptId: string
+): { x: number[]; y: number[] } {
+	const x: number[] = [];
+	const y: number[] = [];
+	for (const box of boxes) {
+		if (box.id === exceptId) continue;
+		x.push(box.x, box.x + box.w / 2, box.x + box.w);
+		const top = layout.tops[box.id] ?? box.y;
+		const height = layout.heights[box.id] ?? box.h;
+		y.push(top, top + height / 2, top + height);
+	}
+	return { x, y };
+}
+
+// ---- aligning a selection --------------------------------------------------
+
+export type AlignEdge = 'left' | 'centre-x' | 'right' | 'top' | 'centre-y' | 'bottom';
+
+const HORIZONTAL: AlignEdge[] = ['left', 'centre-x', 'right'];
+
+/**
+ * Line several boxes up on the edges of the box that encloses them all — the
+ * convention every drawing program uses, and the only one that does not need a
+ * "which box wins?" rule.
+ *
+ * Declared geometry, not resolved: this runs where measured heights are not
+ * known, and a box's own `y`/`h` are what the template stores. So an anchored
+ * box sits out of a *vertical* align entirely — its top comes from another box,
+ * and moving its `y` would be undone on the next render. It keeps its anchor
+ * and its place, and the badge on the box says why. Horizontal alignment
+ * cannot fight an anchor, so anchored boxes take part in that as usual.
+ *
+ * The enclosing box is measured from the boxes that can actually move, so what
+ * you see line up is what defined the line.
+ */
+export function alignBoxes(boxes: Box[], ids: string[], edge: AlignEdge): Box[] {
+	const horizontalEdge = HORIZONTAL.includes(edge);
+	const chosen = boxes.filter(
+		(b) => ids.includes(b.id) && !b.locked && (horizontalEdge || !b.anchor)
+	);
+	if (chosen.length < 2) return boxes;
+
+	const horizontal = horizontalEdge;
+	const start = (b: Box) => (horizontal ? b.x : b.y);
+	const size = (b: Box) => (horizontal ? b.w : b.h);
+	const min = Math.min(...chosen.map(start));
+	const max = Math.max(...chosen.map((b) => start(b) + size(b)));
+	const middle = (min + max) / 2;
+
+	const place = (b: Box): number => {
+		switch (edge) {
+			case 'left':
+			case 'top':
+				return min;
+			case 'right':
+			case 'bottom':
+				return max - size(b);
+			default:
+				return middle - size(b) / 2;
+		}
+	};
+
+	const moving = new Set(chosen.map((b) => b.id));
+	return boxes.map((box) => {
+		if (!moving.has(box.id)) return box;
+		const value = Math.round(place(box) * 100) / 100;
+		return horizontal ? { ...box, x: value } : { ...box, y: value };
+	});
+}

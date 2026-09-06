@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { autoMap, builtinTemplate, normaliseTemplate, usedSlots } from './template';
+import {
+	DEFAULT_DEFAULTS,
+	arrangeBoxes,
+	autoMap,
+	borderSides,
+	builtinTemplate,
+	newBox,
+	normaliseTemplate,
+	usedSlots
+} from './template';
 
 describe('the built-in template', () => {
 	const template = builtinTemplate();
@@ -27,9 +36,120 @@ describe('normaliseTemplate', () => {
 		expect(() => normaliseTemplate({ schema: 99, boxes: [] })).toThrow(/newer version/);
 	});
 
-	it('reads the early `bleed: 0` shorthand', () => {
-		expect(normaliseTemplate({ schema: 1, bleed: 0, boxes: [] }).bleed.enabled).toBe(false);
-		expect(normaliseTemplate({ schema: 1, bleed: 5, boxes: [] }).bleed).toEqual({ enabled: true, amount: 5, cropMarks: false });
+	it('gives a file that predates page numbers the default, switched off', () => {
+		expect(normaliseTemplate({ schema: 1, boxes: [] }).pageNumber).toEqual({
+			enabled: false,
+			position: 'bottom-right',
+			margin: 8
+		});
+	});
+
+	it('falls back to a corner it knows rather than trusting a position it does not', () => {
+		const t = normaliseTemplate({ schema: 2, pageNumber: { enabled: true, position: 'middle-of-nowhere' }, boxes: [] });
+		expect(t.pageNumber).toEqual({ enabled: true, position: 'bottom-right', margin: 8 });
+	});
+
+	it('fills in type defaults a file never named, so nothing renders undefined', () => {
+		const t = normaliseTemplate({ schema: 1, defaults: { font: 'Space Mono' }, boxes: [] });
+		expect(t.defaults.letterSpacing).toBe(DEFAULT_DEFAULTS.letterSpacing);
+		expect(t.defaults.font).toBe('Space Mono');
+	});
+
+	it('keeps a box at the default by not writing the field at all', () => {
+		const t = normaliseTemplate({ schema: 2, boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10 }] });
+		expect('size' in t.boxes[0]).toBe(false);
+		expect('font' in t.boxes[0]).toBe(false);
+	});
+
+	it('carries alignment, case and lock through a round trip', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			locked: true,
+			css: 'p { color: red }',
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, valign: 'middle', textCase: 'smallcaps', locked: true }]
+		});
+		expect(t.locked).toBe(true);
+		expect(t.css).toBe('p { color: red }');
+		expect(t.boxes[0].valign).toBe('middle');
+		expect(t.boxes[0].textCase).toBe('smallcaps');
+		expect(t.boxes[0].locked).toBe(true);
+	});
+
+	it('keeps a background image by name, and only the two safe schemes by URL', () => {
+		const local = normaliseTemplate({ schema: 2, page: { image: { src: 'paper.jpg', source: 'local', fit: 'repeat' } }, boxes: [] });
+		expect(local.page.image).toEqual({ src: 'paper.jpg', source: 'local', fit: 'repeat' });
+
+		const remote = normaliseTemplate({ schema: 2, page: { image: { src: 'https://example.com/p.jpg', source: 'url' } }, boxes: [] });
+		expect(remote.page.image).toEqual({ src: 'https://example.com/p.jpg', source: 'url', fit: 'cover' });
+
+		for (const src of ['javascript:alert(1)', 'data:image/png;base64,AAA', '']) {
+			expect(normaliseTemplate({ schema: 2, page: { image: { src, source: 'url' } }, boxes: [] }).page.image).toBeUndefined();
+		}
+		expect(normaliseTemplate({ schema: 2, page: { image: { src: 'x.jpg', source: 'local', fit: 'wonky' } }, boxes: [] }).page.image?.fit).toBe('cover');
+	});
+
+	it('keeps the surface fields on a box, and drops a colour it does not recognise', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			boxes: [
+				{ id: 'a', x: 0, y: 0, w: 10, h: 10, padding: 2, borderWidth: 0.4, borderColor: 'red', borderRadius: 1.5, background: '#eee8d5' },
+				{ id: 'b', x: 0, y: 0, w: 10, h: 10, color: 'url(x)', background: 'javascript:alert(1)', borderColor: 'not-a-colour' }
+			]
+		});
+		expect(t.boxes[0]).toMatchObject({
+			padding: 2,
+			borderWidth: 0.4,
+			borderColor: '#b42318',
+			borderRadius: 1.5,
+			background: '#eee8d5'
+		});
+		// A colour the parser refuses never reaches a style attribute at all.
+		expect('color' in t.boxes[1]).toBe(false);
+		expect('background' in t.boxes[1]).toBe(false);
+		expect('borderColor' in t.boxes[1]).toBe(false);
+	});
+
+	it('collapses four equal border edges back to one number, and keeps four when they differ', () => {
+		const uniform = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, borderWidth: { top: 0.5, right: 0.5, bottom: 0.5, left: 0.5 } }]
+		});
+		expect(uniform.boxes[0].borderWidth).toBe(0.5);
+
+		const varied = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, borderWidth: { top: 1, right: 0, bottom: 0.5, left: 0 } }]
+		});
+		expect(varied.boxes[0].borderWidth).toEqual({ top: 1, right: 0, bottom: 0.5, left: 0 });
+	});
+
+	it('treats a border of nothing as no border rather than a zero-width one', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			boxes: [
+				{ id: 'a', x: 0, y: 0, w: 10, h: 10, borderWidth: 0 },
+				{ id: 'b', x: 0, y: 0, w: 10, h: 10, borderWidth: { top: 0, right: 0, bottom: 0, left: 0 } }
+			]
+		});
+		expect('borderWidth' in t.boxes[0]).toBe(false);
+		expect('borderWidth' in t.boxes[1]).toBe(false);
+	});
+
+	it('keeps only a border style it can draw', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			boxes: [
+				{ id: 'a', x: 0, y: 0, w: 10, h: 10, borderWidth: 1, borderStyle: 'dashed' },
+				{ id: 'b', x: 0, y: 0, w: 10, h: 10, borderWidth: 1, borderStyle: 'groovy' }
+			]
+		});
+		expect(t.boxes[0].borderStyle).toBe('dashed');
+		expect('borderStyle' in t.boxes[1]).toBe(false);
+	});
+
+	it('falls back to the default text colour when a template names an unusable one', () => {
+		expect(normaliseTemplate({ schema: 2, defaults: { color: 'chartreuse' }, boxes: [] }).defaults.color).toBe('#000000');
+		expect(normaliseTemplate({ schema: 2, defaults: { color: 'navy' }, boxes: [] }).defaults.color).toBe('#14306b');
 	});
 
 	it('falls back to white for a page colour it cannot parse', () => {
@@ -40,6 +160,14 @@ describe('normaliseTemplate', () => {
 	it('drops anchors that point nowhere', () => {
 		const t = normaliseTemplate({ schema: 1, boxes: [{ id: 'a', slot: null, x: 0, y: 0, w: 10, h: 10, anchor: { to: 'ghost', gap: 2 } }] });
 		expect(t.boxes[0].anchor).toBeNull();
+	});
+
+	it('treats an unreadable QR background as no background at all', () => {
+		const t = normaliseTemplate({
+			schema: 2,
+			boxes: [{ id: 'a', x: 0, y: 0, w: 20, h: 20, mode: 'qr', qr: { level: 'M', margin: 2, background: 'javascript:x' } }]
+		});
+		expect(t.boxes[0].qr?.background).toBeUndefined();
 	});
 
 	it('fills in QR settings for a qr box and clamps a silly quiet zone', () => {
@@ -59,6 +187,18 @@ describe('normaliseTemplate', () => {
 	});
 });
 
+describe('borderSides', () => {
+	it('reads one number as four equal edges', () => {
+		expect(borderSides(0.4)).toEqual({ top: 0.4, right: 0.4, bottom: 0.4, left: 0.4 });
+	});
+
+	it('passes four edges through, and reads no border as four zeroes', () => {
+		const sides = { top: 1, right: 0, bottom: 0.5, left: 0 };
+		expect(borderSides(sides)).toEqual(sides);
+		expect(borderSides(undefined)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+	});
+});
+
 describe('mapping', () => {
 	it('guesses columns by name and by common alias', () => {
 		const slots = usedSlots(builtinTemplate());
@@ -73,5 +213,41 @@ describe('mapping', () => {
 
 	it('leaves a slot unmapped rather than binding the wrong column', () => {
 		expect(autoMap(['title', 'body'], ['Widget'])).toEqual({});
+	});
+});
+
+describe('arrangeBoxes', () => {
+	const ids = (boxes: ReturnType<typeof newBox>[]) => boxes.map((b) => b.id).join('');
+	const boxes = () => ['a', 'b', 'c', 'd'].map((id) => newBox({ id }));
+
+	it('moves a box one step at a time, since paint order is array order', () => {
+		expect(ids(arrangeBoxes(boxes(), ['b'], 'forward'))).toBe('acbd');
+		expect(ids(arrangeBoxes(boxes(), ['c'], 'backward'))).toBe('acbd');
+	});
+
+	it('sends a box the whole way', () => {
+		expect(ids(arrangeBoxes(boxes(), ['b'], 'front'))).toBe('acdb');
+		expect(ids(arrangeBoxes(boxes(), ['c'], 'back'))).toBe('cabd');
+	});
+
+	it('moves several as a block, keeping their order relative to each other', () => {
+		expect(ids(arrangeBoxes(boxes(), ['a', 'c'], 'front'))).toBe('bdac');
+		expect(ids(arrangeBoxes(boxes(), ['b', 'd'], 'back'))).toBe('bdac');
+	});
+
+	it('steps a block past its neighbours without letting it swap past itself', () => {
+		expect(ids(arrangeBoxes(boxes(), ['a', 'b'], 'forward'))).toBe('cabd');
+		expect(ids(arrangeBoxes(boxes(), ['c', 'd'], 'backward'))).toBe('acdb');
+		// Already at the end: the block stays put rather than tearing apart.
+		expect(arrangeBoxes(boxes(), ['c', 'd'], 'forward')).toEqual(boxes());
+	});
+
+	it('returns the same array when there is nowhere to go, so no undo entry is made', () => {
+		const list = boxes();
+		expect(arrangeBoxes(list, ['d'], 'front')).toBe(list);
+		expect(arrangeBoxes(list, ['d'], 'forward')).toBe(list);
+		expect(arrangeBoxes(list, ['a'], 'back')).toBe(list);
+		expect(arrangeBoxes(list, ['a'], 'backward')).toBe(list);
+		expect(arrangeBoxes(list, ['ghost'], 'front')).toBe(list);
 	});
 });

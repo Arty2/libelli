@@ -5,13 +5,14 @@ import type { Dataset, Mapping, Template, UiState } from './types';
  *
  * localStorage holds the small, string-shaped settings (column mapping, UI
  * state). IndexedDB holds anything that can get big or binary — datasets,
- * templates and uploaded font bytes — because localStorage is ~5MB per origin,
+ * templates, uploaded font bytes and background images — because localStorage
+ * is ~5MB per origin,
  * string-only, and synchronous on the main thread.
  */
 
 const PREFIX = 'libelli';
 const DB_NAME = 'libelli';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // Pre-release builds stored under the app's old name. Both are migrated once,
 // on boot, so nobody loses a template to a rename.
@@ -19,6 +20,9 @@ const LEGACY_PREFIX = 'a5cs';
 const LEGACY_DB_NAME = 'a5-card-studio';
 export const STORE_KV = 'kv';
 export const STORE_FONTS = 'fonts';
+// Uploaded background images. Kept out of `kv` so a template save can never
+// drag megabytes of picture along with it.
+export const STORE_ASSETS = 'assets';
 
 export const KEY_TEMPLATE = 'template:current';
 export const KEY_DATASET = 'dataset:current';
@@ -69,7 +73,11 @@ const mappingKey = (templateName: string) => `mapping:${templateName}`;
 export const loadMapping = (templateName: string): Mapping => local.get<Mapping>(mappingKey(templateName), {});
 export const saveMapping = (templateName: string, mapping: Mapping) => local.set(mappingKey(templateName), mapping);
 
-export const loadUi = (): UiState => local.get<UiState>('ui', { showOutlines: true, zoom: 'fit' });
+const UI_DEFAULTS: UiState = { showOutlines: true, showGrid: false, zoom: 'fit' };
+
+// Merged, not returned raw: a settings blob written by an older build is missing
+// whatever was added since, and an undefined toggle renders as neither on nor off.
+export const loadUi = (): UiState => ({ ...UI_DEFAULTS, ...local.get<Partial<UiState>>('ui', {}) });
 export const saveUi = (ui: UiState) => local.set('ui', ui);
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
@@ -89,6 +97,7 @@ function openDb(): Promise<IDBDatabase | null> {
 			const db = request.result;
 			if (!db.objectStoreNames.contains(STORE_KV)) db.createObjectStore(STORE_KV);
 			if (!db.objectStoreNames.contains(STORE_FONTS)) db.createObjectStore(STORE_FONTS);
+			if (!db.objectStoreNames.contains(STORE_ASSETS)) db.createObjectStore(STORE_ASSETS);
 		};
 		request.onsuccess = () => resolve(request.result);
 		request.onerror = () => resolve(null);
