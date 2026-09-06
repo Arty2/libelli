@@ -114,6 +114,13 @@
 	});
 
 	function onKeydown(event: KeyboardEvent) {
+		// The same keys that opened this screen print from it, so the pair reads as
+		// one gesture: once to look at what is going, again to send it.
+		if ((event.metaKey || event.ctrlKey) && (event.key.toLowerCase() === 'p' || (event.shiftKey && event.key.toLowerCase() === 's'))) {
+			event.preventDefault();
+			if (chosen > 0) onprint();
+			return;
+		}
 		if (event.key === 'Escape') {
 			if (fullscreen !== null) fullscreen = null;
 			else onclose();

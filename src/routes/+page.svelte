@@ -457,9 +457,32 @@
 		ArrowDown: [0, 1]
 	};
 
+	/**
+	 * The keys that mean "I want this on paper". All three land on the same
+	 * screen, because there is one door to the printer and it is the preview.
+	 *
+	 * Ctrl/Cmd+P is the point of the exercise: the browser's own print dialog
+	 * would take the editor's DOM rather than the print run, so it is
+	 * intercepted rather than left to fire. This works even while a field has
+	 * focus — the alternative is a print dialog opening because you were in a
+	 * text box at the time. Ctrl/Cmd+Shift+P is Firefox's private window and
+	 * cannot be taken from it there; the other two work everywhere.
+	 */
+	const wantsExport = (event: KeyboardEvent) => {
+		if (!event.metaKey && !event.ctrlKey) return false;
+		const key = event.key.toLowerCase();
+		return key === 'p' || (event.shiftKey && key === 's');
+	};
+
 	function onWindowKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
 		const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
+		if (wantsExport(event)) {
+			event.preventDefault();
+			// The preview has the key while it is open: a second press prints.
+			if (!previewOpen && !printing) requestPrint();
+			return;
+		}
 		// While a field has focus, leave undo to the browser's own text history.
 		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
 			event.preventDefault();
@@ -865,7 +888,8 @@
 		</p>
 
 		<h3>Getting cards out</h3>
-		<p><strong>Export</strong> opens one screen showing every card as a small page. Untick any you do not want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The print checklist sits under the pages, because those four settings decide whether what you saw is what comes out.</p>
+		<p><strong>Export</strong> — the button, or <strong>Ctrl/Cmd + P</strong> — opens one screen showing every card as a small page. The browser's own print dialog is taken over rather than left to fire: it would print the editor rather than the cards. Pressing it again from that screen sends the run.</p>
+		<p>Untick any card you do not want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The print checklist sits under the pages, because those four settings decide whether what you saw is what comes out.</p>
 
 		<h3>What an area holds</h3>
 		<p>An area's <strong>Field</strong> is the template's own name for what it holds — <em>title</em>, <em>body</em>, and so on. The template names fields; the <strong>Column</strong> beside it says which spreadsheet column fills this one. That indirection is the point: the same template works against another spreadsheet by rebinding the columns, and no data is carried inside the template file.</p>
@@ -884,6 +908,8 @@
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
 			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
 			<dt>Ctrl/Cmd + '</dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + P</dt><dd>Export — again from that screen to print</dd>
+			<dt>Ctrl/Cmd + Shift + P / S</dt><dd>The same door, for the fingers that reach for those</dd>
 			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
 			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
 			<dt>Ctrl/Cmd + + / −</dt><dd>Zoom the page in or out</dd>

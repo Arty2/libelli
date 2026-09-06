@@ -254,7 +254,10 @@ which Chrome drops along with the paper colour. Checking the cards and reading
 the checklist are the same act, so they are the same screen.
 
 **Export…** is the only way in, so there is no route to the printer that skips
-the look at what you are about to spend paper on. From it: **Print**, or
+the look at what you are about to spend paper on — <kbd>Ctrl</kbd>/<kbd>⌘</kbd>
+<kbd>p</kbd> included, which is intercepted rather than left to open the
+browser's own dialog on the editor. Press it again from that screen to send the
+run. From it: **Print**, or
 **PNG** for one 300 dpi file per selected page — rendered here, with no
 library, by carrying the card into an SVG `foreignObject` and drawing that to a
 canvas. Every face is embedded: uploaded ones from this browser, and a Google
@@ -304,6 +307,8 @@ and sample data, with your work one undo away. Uploaded fonts are the exception
 | <kbd>Esc</kbd> | Deselect, or close what is open |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>h</kbd> | Bounds on or off |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> | Grid on or off |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>p</kbd> | Export — again from that screen to print |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>p</kbd> / <kbd>s</kbd> | The same door |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + arrows | Step the alignment — left, right, top, bottom |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + scroll | Size the type in the area under the pointer |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> | Zoom the page in or out |
