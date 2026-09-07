@@ -133,6 +133,15 @@ drawn as four diagonal dashes came to be read as a stray `/` that nobody could
 identify. It is a ship's anchor now. A static text area gets a broken chain: its
 words live in the template rather than in a column.
 
+**The pivot is a crosshair, the lever a knob.** They sit a few pixels apart and
+do different things, so two blue circles meant reading them by remembering which
+was further out. A cross is what a point is drawn as, and it is unmistakable next
+to a knob. Its arms are background gradients rather than borders, for the same
+reason the box outlines are strokes: a gradient honours a sub-pixel width where a
+border is rounded to whole device pixels, so the arms come out the same weight as
+every other line on the card at any zoom. Three shapes, three jobs — rounded
+square for resize, cross for the point, circle for the swing.
+
 **Turning is a lever on the pivot.** A rotation handle on the box edge said
 nothing about where the box would actually turn, because the pivot moves. So the
 two controls sit together: the pivot ring is dragged to move the point turned

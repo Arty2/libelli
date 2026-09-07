@@ -816,15 +816,29 @@
 		inset: calc(-1 * var(--reach));
 	}
 
-	/* A ring, because a circle reads as a centre of rotation where a square reads
-	   as a resize grip. Centred on its own coordinates by the negative margin.
-	   Dragging it moves the point the box turns about; turning is the lever. */
+	/* A crosshair, which is what a point is drawn as — and, more to the point, not
+	   a circle: the lever's knob sits a few pixels away and does something else
+	   entirely, so the two marks have to be told apart at a glance rather than by
+	   remembering that the further one turns the box. Centred on its own
+	   coordinates by the negative margin. Dragging it moves the point the box
+	   turns about; turning is the lever. */
 	.pivot {
-		--mark: calc(13px * var(--ui-scale, 1));
+		--mark: calc(15px * var(--ui-scale, 1));
 		margin: calc(var(--mark) / -2) 0 0 calc(var(--mark) / -2);
 		border: none;
-		border-radius: 50%;
-		box-shadow: inset 0 0 0 calc(2px * var(--ui-scale, 1)) #2563eb;
+		border-radius: 0;
+		box-shadow: none;
+		/* Two crossed bars, as background gradients. A gradient honours a
+		   sub-pixel width where a border is rounded to whole device pixels, so the
+		   arms come out the same weight as every other line on the card at any
+		   zoom, straight off --line — and it costs no element, which matters
+		   because ::before is the hit target. */
+		background-image: linear-gradient(#2563eb, #2563eb), linear-gradient(#2563eb, #2563eb);
+		background-size:
+			100% var(--line),
+			var(--line) 100%;
+		background-position: center;
+		background-repeat: no-repeat;
 		cursor: move;
 	}
 
@@ -886,7 +900,7 @@
 		}
 
 		.pivot {
-			--mark: calc(8px * var(--ui-scale, 1));
+			--mark: calc(11px * var(--ui-scale, 1));
 			--reach: calc(20px * var(--ui-scale, 1));
 		}
 
