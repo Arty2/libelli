@@ -4,6 +4,7 @@
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
 	import type { Arrange } from '$lib/template';
+	import { swipe } from '$lib/gestures';
 	import { GRID_MAJOR, GRID_MINOR, mmToPx } from '$lib/layout';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -19,6 +20,10 @@
 		zoom: 'fit' | number;
 		/** 1-based position of the previewed row, for the page number */
 		pageNumber: number | null;
+		/** the area being typed into on the card itself, if any */
+		editingId?: string | null;
+		/** areas that are not wholly on the sheet, and so may be unreachable */
+		strayIds?: string[];
 		/** which row is previewed, and how many there are, for the pager */
 		activeRow: number;
 		rowCount: number;
@@ -51,6 +56,12 @@
 		onlockselection: () => void;
 		onduplicate: () => void;
 		ondelete: () => void;
+		/** start or stop typing into an area */
+		onedit?: (id: string | null) => void;
+		/** words typed into the card, forwarded to whoever owns them */
+		ontext?: (box: Box, value: string) => void;
+		/** bring every area that has wandered off the sheet back onto it */
+		onrescue?: () => void;
 	}
 
 	let {
@@ -63,6 +74,8 @@
 		selectedIds,
 		zoom,
 		pageNumber,
+		editingId = null,
+		strayIds = [],
 		activeRow,
 		rowCount,
 		onactivate,
@@ -88,7 +101,10 @@
 		ongroup,
 		onlockselection,
 		onduplicate,
-		ondelete
+		ondelete,
+		onedit,
+		ontext,
+		onrescue
 	}: Props = $props();
 
 	const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2];
@@ -105,6 +121,13 @@
 	 * Its own height never depends on the scale, so reading it back cannot loop.
 	 */
 	let pagerHeight = $state(0);
+	/**
+	 * And the padlock band above it, for the same reason. The page lock sits in
+	 * the column rather than hanging off the sheet on a negative offset, so that
+	 * on a phone — where the stage has eight pixels of padding — it cannot end up
+	 * above the top of the scroller with no way to reach it.
+	 */
+	let lockHeight = $state(0);
 	/** must match the `.page` column's gap, which is what separates the two */
 	const PAGE_GAP = 10;
 	/** the step the pad moves by, cycled 1 -> 5 -> 10; the keyboard has modifiers */
@@ -133,20 +156,30 @@
 	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 
-	const scale = $derived.by(() => {
-		if (typeof zoom === 'number') return zoom;
+	/**
+	 * What Fit *would* be, whether or not that is what the page is at.
+	 *
+	 * Its own value rather than a branch inside `scale`, because the zoom menu
+	 * has to be able to say "Fit — 43%" while sitting at 200%. Reading the
+	 * current scale there meant the Fit line renamed itself to whatever you had
+	 * just zoomed to, and so never once told you what it would do.
+	 */
+	const fitScale = $derived.by(() => {
 		if (!hostSize.w || !hostSize.h) return 1;
 		// Just enough room for the shadow and the corner chips. On a phone the
 		// stage is the whole screen, so every millimetre of padding is a
 		// millimetre of card you cannot see.
 		const pad = hostSize.w < 560 ? 16 : 48;
-		const under = pagerHeight ? pagerHeight + PAGE_GAP : 0;
+		// Everything sharing the page's column takes its height off the sheet.
+		const under = (pagerHeight ? pagerHeight + PAGE_GAP : 0) + (lockHeight ? lockHeight + PAGE_GAP : 0);
 		const fit = Math.min(
 			(hostSize.w - pad) / mmToPx(outerW),
 			(hostSize.h - pad - under) / mmToPx(outerH)
 		);
 		return Math.max(0.15, Math.min(fit, 2));
 	});
+
+	const scale = $derived(typeof zoom === 'number' ? zoom : fitScale);
 
 	$effect(() => {
 		if (!host) return;
@@ -339,6 +372,56 @@
 		clearInterval(repeat);
 		repeat = null;
 	}
+
+	/**
+	 * Where the pad sits, in pixels off the bottom right of the stage.
+	 *
+	 * It has to be movable because it is parked over the one corner of the page
+	 * a right-aligned area lives in, and on a phone that is exactly the area you
+	 * reached for the pad to nudge. Press and hold its middle button — the one
+	 * that is not already a press-and-hold, because the arrows repeat — and it
+	 * comes with your finger.
+	 */
+	const PAD_HOME = { right: 12, bottom: 52 };
+	let padAt = $state({ ...PAD_HOME });
+	let padDrag = $state<{ x: number; y: number; from: { right: number; bottom: number } } | null>(null);
+	let padHeld = $state(false);
+	let padHold: ReturnType<typeof setTimeout> | null = null;
+
+	function padPickup(event: PointerEvent) {
+		if (event.button !== 0) return;
+		const from = { ...padAt };
+		const { clientX: x, clientY: y } = event;
+		const target = event.currentTarget as HTMLElement;
+		padHold = setTimeout(() => {
+			padHold = null;
+			padHeld = true;
+			padDrag = { x, y, from };
+			target.setPointerCapture(event.pointerId);
+		}, 450);
+	}
+
+	function padMove(event: PointerEvent) {
+		if (!padDrag || !host) return;
+		event.preventDefault();
+		const stage = host.getBoundingClientRect();
+		// Clamped to the stage so the pad cannot be dragged off the edge of the
+		// screen, which on a phone is a control you never get back.
+		const clamp = (value: number, limit: number) => Math.max(4, Math.min(limit, value));
+		padAt = {
+			right: clamp(padDrag.from.right - (event.clientX - padDrag.x), stage.width - 140),
+			bottom: clamp(padDrag.from.bottom - (event.clientY - padDrag.y), stage.height - 140)
+		};
+	}
+
+	function padDrop() {
+		if (padHold) clearTimeout(padHold);
+		padHold = null;
+		padDrag = null;
+		// Cleared on the next tick, so the click that follows the hold — which is
+		// what would otherwise cycle the step — has already been swallowed.
+		setTimeout(() => (padHeld = false), 0);
+	}
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -364,6 +447,17 @@
 	tabindex="-1"
 >
 	<div class="page">
+	{#if template.locked && bounds}
+		<!-- An indicator, not a control: the button that sets this lives in page
+		     setup, where the rest of the page's settings are. Screen furniture, so
+		     the Bounds toggle takes it away with the rest — and part of the column
+		     rather than hung off the sheet, so it can never be scrolled off the
+		     top of the stage on a phone. -->
+		<div class="page-lock" bind:clientHeight={lockHeight}>
+			<Icon name="locked" size={13} />
+			<span>Locked</span>
+		</div>
+	{/if}
 	<div class="sheet" style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) * scale}px">
 		<div class="scaler" style="transform:scale({scale})">
 			<Card
@@ -377,11 +471,15 @@
 				{pageNumber}
 				{background}
 				interactive={true}
+				pageCount={rowCount}
+				{editingId}
 				{selectedIds}
 				{onselect}
 				{onchange}
 				{onaction}
 				{onmenu}
+				{onedit}
+				{ontext}
 			/>
 		</div>
 
@@ -401,14 +499,22 @@
 			></div>
 		{/if}
 
-		{#if template.locked && bounds}
-			<!-- An indicator, not a control: the button that sets this lives in page
-			     setup, where the rest of the page's settings are. Screen furniture,
-			     so the Bounds toggle takes it away with the rest. -->
-			<span class="page-lock" title="The design is locked">
-				<Icon name="locked" size={14} />
-				<span class="sr-only">The design is locked</span>
-			</span>
+		{#if bounds && template.bleed.enabled && template.bleed.amount > 0}
+			<!-- Where the paper will be cut.
+
+			     Drawn here rather than inside the card, and after the grid, because
+			     it has to sit above it: the grid overlay is a sibling of the scaled
+			     card, so nothing inside the card can paint over it, and a trim edge
+			     hidden under a gridline is a trim edge you cannot follow.
+
+			     Solid, and the same half-pixel hairline the grid uses. It used to be
+			     dashed and a whole pixel, which made it the loudest line on a page
+			     that already has dashed bounds on every box. -->
+			<svg
+				class="trim-line"
+				aria-hidden="true"
+				style="inset:{mmToPx(template.bleed.amount) * scale}px"
+			><rect width="100%" height="100%" /></svg>
 		{/if}
 	</div>
 
@@ -418,7 +524,13 @@
 	     looking at is the obvious thing to press to see it properly. A lone card
 	     keeps the door and loses the arrows, which would have nowhere to go. -->
 	{#if rowCount > 0}
-		<div class="pager" role="group" aria-label="Card" bind:clientHeight={pagerHeight}>
+		<div
+			class="pager"
+			role="group"
+			aria-label="Card"
+			bind:clientHeight={pagerHeight}
+			use:swipe={(by) => onactivate(Math.max(0, Math.min(rowCount - 1, activeRow + by)))}
+		>
 			{#if rowCount > 1}
 				<button
 					class="step"
@@ -495,6 +607,20 @@
 		<button class="square" onclick={onaddbox} disabled={!!template.locked} title="Add an area to the page">
 			<Icon name="text" size={14} /><span class="sr-only">Area</span>
 		</button>
+		{#if strayIds.length}
+			<!-- Only when there is something to rescue. The editor does not clip, so
+			     an area dragged off the sheet is still drawn — but only while the
+			     stage happens to be showing that much ground, and zoomed in or on a
+			     phone it is somewhere you cannot see and cannot reach. -->
+			<button
+				class="square"
+				onclick={onrescue}
+				disabled={!!template.locked}
+				title="{strayIds.length} area{strayIds.length === 1 ? ' is' : 's are'} off the page — bring {strayIds.length === 1 ? 'it' : 'them'} back on"
+			>
+				<Icon name="move" size={14} /><span class="sr-only">Bring stray areas back onto the page</span>
+			</button>
+		{/if}
 	</div>
 
 	<!-- View state sits on the page it affects, one control per bottom corner,
@@ -516,7 +642,7 @@
 			value={zoom === 'fit' ? 'fit' : String(zoom)}
 			onchange={(e) => onzoom(e.currentTarget.value === 'fit' ? 'fit' : Number(e.currentTarget.value))}
 		>
-			<option value="fit">Fit — {Math.round(scale * 100)}%</option>
+			<option value="fit">Fit — {Math.round(fitScale * 100)}%</option>
 			<!-- A pinch or a Ctrl+= lands between the steps, and a select with no
 			     matching option shows nothing at all. The odd value gets an option
 			     of its own so the control always says where the page is. -->
@@ -534,18 +660,30 @@
 		     hopeless. Shown only where there is no keyboard to fall back on. -->
 		<div
 			class="pad"
+			class:moving={!!padDrag}
 			role="group"
 			aria-label="Nudge the selected box"
+			style="right:{padAt.right}px;bottom:{padAt.bottom}px"
 			onpointerup={stopNudge}
 			onpointercancel={stopNudge}
 			onpointerleave={stopNudge}
 		>
 			<button class="up" title="Up {padStep}mm" onpointerdown={() => startNudge(0, -padStep)}><Icon name="caret-up" size={32} /></button>
 			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={32} /></button>
+			<!-- The middle button carries the second gesture, because the arrows
+			     already use press-and-hold to repeat: hold this one and the pad
+			     comes with your finger. A tap still cycles the step. -->
 			<button
 				class="step"
-				title="Step size — 1, 5 or 10mm"
-				onclick={() => (padStep = PAD_STEPS[(PAD_STEPS.indexOf(padStep) + 1) % PAD_STEPS.length])}>{padStep}</button
+				title="Step size — 1, 5 or 10mm. Press and hold to move the pad."
+				onpointerdown={padPickup}
+				onpointermove={padMove}
+				onpointerup={padDrop}
+				onpointercancel={padDrop}
+				onclick={() => {
+					if (padHeld) return;
+					padStep = PAD_STEPS[(PAD_STEPS.indexOf(padStep) + 1) % PAD_STEPS.length];
+				}}>{padStep}</button
 			>
 			<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={32} /></button>
 			<button class="down" title="Down {padStep}mm" onpointerdown={() => startNudge(0, padStep)}><Icon name="caret-down" size={32} /></button>
@@ -664,18 +802,36 @@
 		background-position: var(--origin) var(--origin);
 	}
 
-	.page-lock {
+	/* The same half-pixel hairline as the grid, and solid rather than dashed:
+	   the card already carries a dashed bound on every box, and a second dashed
+	   line a few millimetres away was two dashed lines rather than a trim edge.
+	   An SVG stroke, not a border, for the same reason the card's own lines are:
+	   a border of 0.5px is rounded up to a whole device pixel and a stroke is
+	   not. Sitting outside the card's transform, it is already in screen pixels,
+	   so its weight does not move with the zoom. */
+	.trim-line {
 		position: absolute;
-		top: -12px;
-		right: -12px;
-		display: grid;
-		place-items: center;
-		width: 26px;
-		height: 26px;
-		border: 1px solid #2563eb;
+		/* The stroke straddles the edge, so half of it is outside the rect. */
+		overflow: visible;
+		pointer-events: none;
+	}
+
+	.trim-line rect {
+		fill: none;
+		stroke: rgba(5, 150, 105, 0.85);
+		stroke-width: 0.5;
+	}
+
+	.page-lock {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		padding: 3px 9px;
+		border: 1px solid #999;
 		border-radius: var(--radius-button);
 		background: #fff;
-		color: #2563eb;
+		color: #555;
+		font: 500 11px/1 ui-sans-serif, system-ui, sans-serif;
 	}
 
 	.corner {
@@ -786,8 +942,6 @@
 	   top of it. The buttons keep the border every other tool here has. */
 	.pad {
 		position: absolute;
-		right: 12px;
-		bottom: 52px;
 		display: none;
 		grid-template-columns: repeat(3, 44px);
 		grid-template-rows: repeat(3, 44px);
@@ -805,6 +959,13 @@
 		cursor: pointer;
 		padding: 0;
 		touch-action: none;
+	}
+
+	/* While it is being carried: the pad itself says so, because the finger is
+	   on the one button whose look would otherwise not change. */
+	.pad.moving button {
+		border-color: #2563eb;
+		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
 	}
 
 	.pad .up { grid-area: 1 / 2; }

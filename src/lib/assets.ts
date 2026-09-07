@@ -52,6 +52,29 @@ export function safeImageUrl(raw: unknown): string | null {
 }
 
 /**
+ * What may reach an `<img src>` or a `background-image` on a card.
+ *
+ * Wider than `safeImageUrl` by exactly one scheme: a base64 `data:` URL naming
+ * an image type. A template may carry one inline, and an area bound to a column
+ * may be handed one in a cell — and a cell is untrusted, so the shape is
+ * checked rather than the prefix alone. An SVG is allowed because an `<img>` is
+ * an inert context for one: no script in it runs, and nothing in it can reach
+ * the page around it.
+ */
+const DATA_IMAGE = /^data:image\/(?:png|jpeg|jpg|gif|webp|avif|svg\+xml);base64,[A-Za-z0-9+/=\s]+$/i;
+
+export function safeMediaUrl(raw: unknown): string | null {
+	if (typeof raw !== 'string') return null;
+	const value = raw.trim();
+	if (!value) return null;
+	if (DATA_IMAGE.test(value)) return value;
+	return safeImageUrl(value);
+}
+
+/** A URL as it can be written inside a `url("…")`, quotes and all. */
+export const cssUrl = (src: string) => `url("${src.replace(/["\\]/g, '\\$&')}")`;
+
+/**
  * Store an uploaded file and return the reference the template will carry.
  * `nameOverride` is for supplying the bytes of an image a template already
  * names: the file you pick may be called anything, but the reference has to
@@ -90,7 +113,7 @@ export async function resolveBackground(image: PageBackgroundImage | undefined):
 /** The CSS a resolved background turns into. The only place that mapping lives. */
 export function backgroundStyle(image: PageBackgroundImage | undefined, resolved: string | null): string[] {
 	if (!image || !resolved) return [];
-	const parts = [`background-image:url("${resolved.replace(/["\\]/g, '\\$&')}")`, 'background-position:center'];
+	const parts = [`background-image:${cssUrl(resolved)}`, 'background-position:center'];
 	if (image.fit === 'repeat') parts.push('background-repeat:repeat', 'background-size:auto');
 	else parts.push('background-repeat:no-repeat', `background-size:${image.fit}`);
 	return parts;

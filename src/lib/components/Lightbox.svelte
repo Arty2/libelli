@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
+	import { swipe } from '$lib/gestures';
 	import { mmToPx } from '$lib/layout';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
@@ -162,7 +163,11 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="full" role="presentation" onclick={onclose}>
+<!-- The swipe is on the whole screen, not just on the card: on a phone the card
+     is most of it, and a flick that starts on the ground either side of it is
+     the same gesture. `swipe` is touch-only, so a click-drag on a desktop still
+     selects and still closes. -->
+<div class="full" role="presentation" onclick={onclose} use:swipe={(by) => step(index + by)}>
 	<button class="plain close" onclick={onclose} title="Close" aria-label="Close">
 		<Icon name="close" size={22} />
 	</button>
@@ -174,7 +179,14 @@
 			scale}px;transform:perspective(1100px) rotateX({tilt.x}deg) rotateY({tilt.y}deg)"
 	>
 		<span class="scaler" style="transform:scale({scale})">
-			<Card {template} row={dataset.rows[index]} {mapping} pageNumber={index + 1} {background} />
+			<Card
+				{template}
+				row={dataset.rows[index]}
+				{mapping}
+				pageNumber={index + 1}
+				pageCount={dataset.rows.length}
+				{background}
+			/>
 		</span>
 	</div>
 	<!-- Under the card with the count between them: the two arrows and the

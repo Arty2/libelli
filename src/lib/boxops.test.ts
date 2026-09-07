@@ -230,41 +230,42 @@ describe('copyStyle and applyStyle', () => {
 const page: PageSpec = { w: 100, h: 100, unit: 'mm' };
 
 describe('strayBoxes', () => {
-	it('finds only the boxes not wholly on the sheet', () => {
+	it('finds only the boxes with no overlap with the sheet at all', () => {
 		const boxes = [
-			box('in', { x: 10, y: 10, w: 30, h: 20 }),
-			box('left', { x: -4, y: 10, w: 30, h: 20 }),
-			box('past-right', { x: 80, y: 10, w: 30, h: 20 }),
-			box('below', { x: 10, y: 95, w: 30, h: 20 })
+			box('on', { x: 10, y: 10, w: 30, h: 20 }),
+			// Crossing the trim is what bleed is for, not something to rescue.
+			box('bleeding', { x: -6, y: 10, w: 30, h: 20 }),
+			box('past-right', { x: 140, y: 10, w: 30, h: 20 }),
+			box('above', { x: 10, y: -40, w: 30, h: 20 })
 		];
-		expect(strayBoxes(boxes, page).map((b) => b.id)).toEqual(['left', 'past-right', 'below']);
+		expect(strayBoxes(boxes, page).map((b) => b.id)).toEqual(['past-right', 'above']);
 	});
 
-	it('judges a grown box on the height it actually occupies', () => {
-		const boxes = [box('grown', { x: 10, y: 80, w: 30, h: 10, overflow: 'grow' })];
-		expect(strayBoxes(boxes, page)).toEqual([]);
-		expect(strayBoxes(boxes, page, { grown: 40 }).map((b) => b.id)).toEqual(['grown']);
+	it('counts the bleed as paper, so a box on it is not stray', () => {
+		const boxes = [box('a', { x: -22, y: 10, w: 20, h: 20 })];
+		expect(strayBoxes(boxes, page).map((b) => b.id)).toEqual(['a']);
+		expect(strayBoxes(boxes, page, 5)).toEqual([]);
 	});
 });
 
 describe('bringOnPage', () => {
-	it('slides a box the shortest way back onto the sheet', () => {
-		const boxes = [box('a', { x: -6, y: 95, w: 30, h: 20 })];
+	it('slides a box the shortest way back inside the trim', () => {
+		const boxes = [box('a', { x: -60, y: 95, w: 30, h: 20 })];
 		expect(bringOnPage(boxes, ['a'], page)[0]).toMatchObject({ x: 0, y: 80 });
 	});
 
 	it('pins a box bigger than the page to the top left rather than centring it', () => {
-		const boxes = [box('a', { x: 40, y: 40, w: 200, h: 200 })];
+		const boxes = [box('a', { x: 400, y: 400, w: 200, h: 200 })];
 		expect(bringOnPage(boxes, ['a'], page)[0]).toMatchObject({ x: 0, y: 0 });
 	});
 
 	it('leaves an anchored box its y, which comes from another box', () => {
-		const boxes = [box('a', { x: -6, y: 95, w: 30, h: 20, anchor: { to: 'b', gap: 4 } })];
+		const boxes = [box('a', { x: -60, y: 95, w: 30, h: 20, anchor: { to: 'b', gap: 4 } })];
 		expect(bringOnPage(boxes, ['a'], page)[0]).toMatchObject({ x: 0, y: 95 });
 	});
 
 	it('leaves a locked box alone, and returns the array itself when nothing moved', () => {
-		const boxes = [box('a', { x: -6, y: 10, locked: true })];
+		const boxes = [box('a', { x: -60, y: 10, locked: true })];
 		expect(bringOnPage(boxes, ['a'], page)).toBe(boxes);
 	});
 });

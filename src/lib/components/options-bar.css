@@ -220,13 +220,35 @@
 	z-index: 1;
 }
 
+/* The subject of the bar, and what can be done to it, in one block at the
+   start rather than at opposite ends of something that wraps to four rows.
+   Two lines of its own: the name reads as a title, and the buttons under it
+   read as the buttons for what the title names. */
+.options .head {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	padding-right: 10px;
+	border-right: 1px solid #ddd;
+}
+
+.box-options .head {
+	border-right-color: #cfdcf3;
+}
+
+.options .head-row {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
 /* Kept together so a wrap moves the whole set to the next line rather than
    stranding Delete on its own at the far left. */
 .options .actions {
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
-	margin-left: auto;
 }
 
 /* On a phone these bars wrap to a dozen rows and swallow the page they are
@@ -238,5 +260,12 @@
 		overflow-y: auto;
 		gap: 6px 8px;
 		padding: 6px 8px;
+	}
+
+	/* On a phone the bar is one column of wrapped controls anyway, so the head's
+	   rule would be a line down the left of nothing. */
+	.options .head {
+		border-right: none;
+		padding-right: 0;
 	}
 }

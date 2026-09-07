@@ -229,30 +229,32 @@ export function applyStyle(box: Box, style: BoxStyle): Box {
 // ---- areas that have wandered off the sheet ---------------------------------
 
 /**
- * Areas that are not wholly on the page.
+ * Areas that are nowhere on the sheet at all.
  *
  * The editor deliberately does not clip, so a box dragged past the edge is
  * still drawn and still grabbable — but only while the stage happens to be
  * showing that much ground. Zoomed in, or on a phone, a box a few centimetres
- * off the sheet is somewhere you cannot reach and cannot see, and the only
- * evidence it exists at all is that it is missing from the print.
+ * off the sheet is somewhere you cannot see and cannot reach, and the only
+ * evidence it exists is that it is missing from the print.
  *
- * Measured against the trim rectangle, not the bleed: coordinates are measured
- * from the trim edge, and a box outside it will not print whether or not bleed
- * is switched on. Heights come from the resolved layout, so a grown box is
- * judged on what it actually occupies.
+ * "Off the sheet" means *no overlap whatever* with the paper, bleed included —
+ * not merely crossing the trim. A box that runs off the edge is what bleed is
+ * for, and offering to drag every deliberate full-bleed panel back inside the
+ * trim would be worse than saying nothing.
  */
-export function strayBoxes(boxes: Box[], page: PageSpec, heights: Record<string, number> = {}, tops: Record<string, number> = {}): Box[] {
-	return boxes.filter((box) => {
-		const top = tops[box.id] ?? box.y;
-		const height = heights[box.id] ?? box.h;
-		return box.x < 0 || box.x + box.w > page.w || top < 0 || top + height > page.h;
-	});
+export function strayBoxes(boxes: Box[], page: PageSpec, bleed = 0): Box[] {
+	return boxes.filter(
+		(box) =>
+			box.x + box.w <= -bleed ||
+			box.x >= page.w + bleed ||
+			box.y + box.h <= -bleed ||
+			box.y >= page.h + bleed
+	);
 }
 
 /**
  * Bring them back. Each box is slid the shortest distance that puts it wholly
- * on the sheet; one bigger than the page in an axis is pinned to that edge
+ * inside the trim; one bigger than the page in an axis is pinned to that edge
  * rather than centred, because a box you can see the top left of is one you can
  * pick up.
  *
@@ -260,22 +262,16 @@ export function strayBoxes(boxes: Box[], page: PageSpec, heights: Record<string,
  * writing a y would be undone on the next render. The same rule vertical
  * alignment follows, and the badge on the box says why.
  */
-export function bringOnPage(
-	boxes: Box[],
-	ids: string[],
-	page: PageSpec,
-	heights: Record<string, number> = {}
-): Box[] {
+export function bringOnPage(boxes: Box[], ids: string[], page: PageSpec): Box[] {
 	const chosen = new Set(ids);
 	let moved = false;
+	const round = (v: number) => Math.round(v * 100) / 100;
+	const fit = (start: number, size: number, limit: number) =>
+		round(Math.max(0, Math.min(start, limit - size)));
 	const next = boxes.map((box) => {
 		if (!chosen.has(box.id) || box.locked) return box;
-		const round = (v: number) => Math.round(v * 100) / 100;
-		const fit = (start: number, size: number, limit: number) =>
-			round(Math.max(0, Math.min(start, limit - size)));
 		const x = fit(box.x, box.w, page.w);
-		// Unanchored, so the resolved top is the box's own y; the height is not.
-		const y = box.anchor ? box.y : fit(box.y, heights[box.id] ?? box.h, page.h);
+		const y = box.anchor ? box.y : fit(box.y, box.h, page.h);
 		if (x === box.x && y === box.y) return box;
 		moved = true;
 		return { ...box, x, y };

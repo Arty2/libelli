@@ -25,14 +25,19 @@
 	import { alignBoxes, type AlignEdge } from '$lib/layout';
 	import {
 		ALIGN_LABELS,
+		applyStyle,
+		bringOnPage,
+		copyStyle,
 		deleteBoxes,
 		duplicateBoxes,
 		groupMembers,
 		nudgeBox as nudge,
 		stepAlignment,
+		strayBoxes,
 		toggleGroup,
 		toggleLock,
-		toggleSelection
+		toggleSelection,
+		type BoxStyle
 	} from '$lib/boxops';
 	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport } from '$lib/keys';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
@@ -92,6 +97,20 @@
 	let dataOpen = $state(true);
 	let firstRun = $state(false);
 	let boxMenu = $state<{ id: string; x: number; y: number } | null>(null);
+	/**
+	 * The area whose words are being typed straight into the card. Held here
+	 * rather than in the card because only this file knows whether those words
+	 * are a cell of the dataset or a field of the template.
+	 */
+	let editingId = $state<string | null>(null);
+	/**
+	 * Shift-click builds a selection, and a touchscreen has no shift. With this
+	 * on, every press on an area adds it or drops it — the modifier as a mode,
+	 * turned on from the area menu and off again the same way or with Escape.
+	 */
+	let picking = $state(false);
+	/** The look of an area, lifted off one and waiting to be put onto another. */
+	let styleClipboard = $state<BoxStyle | null>(null);
 	let printing = $state(false);
 	let mappingPrompt = $state(false);
 	let missingFonts = $state<FontRef[]>([]);
@@ -130,6 +149,26 @@
 	/** Give a dialog its first focus so Esc/Tab work without a mouse trip. */
 	const focusOnOpen = (node: HTMLElement) => node.focus();
 
+	/**
+	 * What the CSS box says before anything is typed into it.
+	 *
+	 * The names an author can reach, as working declarations rather than as a
+	 * paragraph describing them. Every selector here is real: `.trim` is the
+	 * card, `.box` is an area, `.page-number .of` is the slash between the count
+	 * and the total. Scoping happens in css.ts, which anchors everything to the
+	 * card, strips `@import` and refuses any `url()` that is not a `data:` one.
+	 */
+	const CSS_PLACEHOLDER = `.box { }              /* every area */
+h1, h2, h3 { }        /* Markdown headings */
+p, ul, li { }         /* Markdown blocks */
+em, strong, code { }
+hr { }
+.page-number { }      /* the number on the card */
+.page-number .of::before { content: ' of ' }
+
+h1 { letter-spacing: 0.4mm }
+em { color: #b42318 }`;
+
 	const snapshot = (): Snapshot => ({
 		template: $state.snapshot(template),
 		dataset: $state.snapshot(dataset),
@@ -154,6 +193,16 @@
 	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
 	const row = $derived(dataset.rows[activeRow] ?? null);
 	const slots = $derived(usedSlots(template));
+	/** Areas with no overlap with the sheet at all — see `strayBoxes`. */
+	const strays = $derived(
+		strayBoxes(template.boxes, template.page, template.bleed.enabled ? template.bleed.amount : 0)
+	);
+	/**
+	 * The column the selected area draws from, so the table can point at the cell
+	 * that fills it. Only for one area: with several chosen there is no single
+	 * answer, and highlighting all of them would light up the whole row.
+	 */
+	const selectedColumn = $derived(selected?.slot ? (mapping[selected.slot] ?? null) : null);
 
 	// ---- boot ---------------------------------------------------------------
 
@@ -507,12 +556,17 @@
 	 */
 	function selectBox(id: string | null, additive = false) {
 		if (provisional && id !== provisional) settleProvisional();
+		// Typing into one area and then picking another ends the typing; the
+		// change is already in, so there is nothing to confirm or discard.
+		if (editingId && editingId !== id) editingId = null;
 		if (!id) {
 			selectedIds = [];
 			return;
 		}
 		const ids = groupMembers(template.boxes, id);
-		selectedIds = additive ? toggleSelection(selectedIds, ids) : ids;
+		// While Select Multiple is on, every press is a modifier-click. It is the
+		// only way to build a selection on a touchscreen, which has no shift key.
+		selectedIds = additive || picking ? toggleSelection(selectedIds, ids) : ids;
 	}
 
 	function duplicateBox() {
@@ -546,6 +600,65 @@
 		notify(skipped
 			? `Aligned. ${skipped} anchored ${skipped === 1 ? 'area takes its top' : 'areas take their tops'} from another, so vertical alignment left ${skipped === 1 ? 'it' : 'them'} alone.`
 			: 'Aligned.');
+	}
+
+	/**
+	 * Words typed straight into the card.
+	 *
+	 * The card cannot write them itself: an area bound to a column holds a cell of
+	 * the dataset, and one holding its own words holds a field of the template.
+	 * Both land in the same undo entry as anything else, because a snapshot is
+	 * template and data together.
+	 */
+	function setBoxText(box: Box, value: string) {
+		if (box.slot) {
+			const column = mapping[box.slot];
+			if (!column || !row) return;
+			describe('Edit the text');
+			dataset = {
+				...dataset,
+				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: value } : r))
+			};
+			return;
+		}
+		describe('Edit the text');
+		updateBox({ ...$state.snapshot(box), static: { ...box.static, text: value } } as Box);
+	}
+
+	/** Bring every area that has wandered off the sheet back onto it. */
+	function rescueStrays() {
+		if (template.locked || !strays.length) return;
+		const boxes = bringOnPage(template.boxes, strays.map((b) => b.id), template.page);
+		if (boxes === template.boxes) return;
+		describe(`Bring ${strays.length} area${strays.length === 1 ? '' : 's'} back on`);
+		template = { ...template, boxes };
+		notify(
+			`${strays.length} area${strays.length === 1 ? ' was' : 's were'} off the sheet and ${strays.length === 1 ? 'is' : 'are'} back on it. Ctrl/Cmd+Z puts ${strays.length === 1 ? 'it' : 'them'} back.`
+		);
+	}
+
+	/**
+	 * The look of an area, lifted off one and put onto others.
+	 *
+	 * Deliberately not the system clipboard: this is a structure, not text, and
+	 * putting it there would mean either inventing a serialisation nobody else
+	 * reads or fighting Ctrl+V over which paste was meant. It lives for as long
+	 * as the tab does, which is as long as the design it came from.
+	 */
+	function copyBoxStyle() {
+		const from = selected ?? selectedBoxes[0];
+		if (!from) return;
+		styleClipboard = copyStyle($state.snapshot(from) as Box);
+		notify('Style copied — Ctrl/Cmd+Shift+V puts it on another area.');
+	}
+
+	function pasteBoxStyle() {
+		if (!styleClipboard || template.locked) return;
+		const targets = selectedBoxes.filter((b) => !b.locked).map((b) => $state.snapshot(b) as Box);
+		if (!targets.length) return;
+		describe(targets.length === 1 ? 'Paste the style' : `Paste the style onto ${targets.length} areas`);
+		for (const box of targets) updateBox(applyStyle(box, styleClipboard));
+		notify(`Style pasted onto ${targets.length} area${targets.length === 1 ? '' : 's'}.`);
 	}
 
 	function lockSelection() {
@@ -594,6 +707,61 @@
 		notify(landed.size === 1 ? `Aligned ${ALIGN_LABELS[[...landed][0]]}.` : 'Alignment stepped.');
 	}
 
+	/**
+	 * Ctrl/Cmd+C and Ctrl/Cmd+V, on the card rather than in a field.
+	 *
+	 * Copy hands the selected area's words to the system clipboard; paste, when
+	 * what is on it is plain text, makes a new area holding those words. Both are
+	 * asynchronous — the Clipboard API is permissioned — so they are fired and
+	 * not awaited, and a browser that refuses says so in the status line rather
+	 * than failing silently.
+	 *
+	 * Only when nothing has focus. A field's own copy and paste are the browser's,
+	 * and taking them would be an unpleasant surprise in a text box.
+	 */
+	async function copySelectionText() {
+		const box = selected;
+		if (!box || !navigator.clipboard) return;
+		const text = box.slot ? (row?.[mapping[box.slot] ?? ''] ?? '') : (box.static?.text ?? '');
+		if (!text) {
+			notify('That area has no words to copy.', 'warning');
+			return;
+		}
+		try {
+			await navigator.clipboard.writeText(text);
+			notify('Copied the area\u2019s text.');
+		} catch {
+			notify('This browser would not let libelli reach the clipboard.', 'warning');
+		}
+	}
+
+	async function pasteTextAsBox() {
+		if (template.locked || !navigator.clipboard?.readText) return;
+		let text = '';
+		try {
+			text = await navigator.clipboard.readText();
+		} catch {
+			notify('This browser would not let libelli read the clipboard.', 'warning');
+			return;
+		}
+		if (!text.trim()) return;
+		describe('Paste an area');
+		const box = newBox({
+			id: nextBoxId(template.boxes),
+			slot: null,
+			x: 14,
+			y: 60,
+			w: 80,
+			h: 12,
+			mode: 'plain',
+			overflow: 'grow',
+			static: { text }
+		});
+		template = { ...template, boxes: [...template.boxes, box] };
+		selectedIds = [box.id];
+		notify('Pasted as a new area, holding its own words. Ctrl/Cmd+Z takes it away.');
+	}
+
 	function onWindowKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
 		const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
@@ -624,7 +792,37 @@
 			boxMenu = null;
 			return;
 		}
+		// The style clipboard, before the plain Ctrl/Cmd+C below sees the same key.
+		// It works while a field has focus too: the shift is what distinguishes it
+		// from the browser's own copy, and nothing in a text box answers to it.
+		if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'c' && selectedIds.length) {
+			event.preventDefault();
+			copyBoxStyle();
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'v' && selectedIds.length) {
+			event.preventDefault();
+			pasteBoxStyle();
+			return;
+		}
 		if (typing || previewOpen) return;
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c' && selected) {
+			event.preventDefault();
+			void copySelectionText();
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'v') {
+			event.preventDefault();
+			void pasteTextAsBox();
+			return;
+		}
+		// Enter opens the selected area for typing, the way it opens a cell in a
+		// spreadsheet. A double-click on the area does the same thing.
+		if (event.key === 'Enter' && selected && !editingId) {
+			event.preventDefault();
+			editingId = selected.id;
+			return;
+		}
 		// The first-run notice tells people to press ? for the tour, and for a
 		// long time nothing listened. `/` too, so it works without the shift on
 		// a keyboard that puts ? somewhere else.
@@ -690,7 +888,10 @@
 		}
 		if (event.key === 'Escape') {
 			settleProvisional();
-			selectedIds = [];
+			// One press peels off one mode: picking first, because it is the one
+			// that changes what the next click does.
+			if (picking) picking = false;
+			else selectedIds = [];
 		}
 	}
 
@@ -869,7 +1070,7 @@
 			aria-expanded={dataOpen}
 			title="Show or hide the table"
 		>
-			<Icon name="layers" size={15} /> <span class="label">Data</span>
+			<Icon name="table-split" size={15} /> <span class="label">Data</span>
 		</button>
 		<button
 			onclick={() => (pageSetupOpen = !pageSetupOpen)}
@@ -1004,7 +1205,12 @@
 			onredo={redo}
 			onaddbox={addTextBox}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
-			modalOpen={helpOpen || cssOpen || previewOpen || lightboxOpen || boxMenu !== null}
+			{editingId}
+			strayIds={strays.map((b) => b.id)}
+			onedit={(id) => (editingId = id)}
+			ontext={setBoxText}
+			onrescue={rescueStrays}
+			modalOpen={helpOpen || cssOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null}
 			{selectedBoxes}
 			onalign={alignSelection}
 			onarrange={arrange}
@@ -1019,7 +1225,9 @@
 			<DataTable
 				{dataset}
 				{activeRow}
+				{selectedColumn}
 				onactivate={(i) => (activeRow = i)}
+				onnotice={notify}
 				onloadsample={loadSample}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
@@ -1053,24 +1261,21 @@
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (cssOpen = false)}></div>
 	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title">
-		<h2 id="css-title">Custom CSS</h2>
-		<p>
-			Styles for this card, saved inside the template and exported with it. Selectors are scoped to the card, so
-			nothing here can reach the editor around it.
-		</p>
+		<h2 id="css-title">CSS</h2>
+		<!-- The placeholder is the documentation. It used to be two lines of
+		     example and two paragraphs of prose above and below it; what an author
+		     actually needs is the names of the things they can reach, and a
+		     placeholder is where they will look for them. The prose that was here
+		     is in the README, where prose belongs. -->
 		<textarea
 			class="code"
-			rows="12"
+			rows="14"
 			spellcheck="false"
 			use:focusOnOpen
-			placeholder={'h1 { letter-spacing: 0.4mm }\nem { color: #b42318 }'}
+			placeholder={CSS_PLACEHOLDER}
 			value={template.css ?? ''}
 			onchange={(e) => (template = { ...template, css: e.currentTarget.value.trim() || undefined })}
 		></textarea>
-		<p class="muted">
-			<code>@import</code> and any <code>url()</code> pointing off this machine are stripped: the app fetches nothing,
-			and a template you were handed should not be able to change that.
-		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button class="primary" onclick={() => (cssOpen = false)}>Done</button>
@@ -1181,12 +1386,16 @@
 		{selectedBoxes}
 		x={boxMenu.x}
 		y={boxMenu.y}
-		onarrange={arrange}
+		{picking}
+		hasStyle={styleClipboard !== null}
 		onalign={alignSelection}
 		ongroup={groupSelection}
 		onlock={lockSelection}
 		onduplicate={duplicateBox}
 		ondelete={deleteBox}
+		onpicking={(on) => (picking = on)}
+		oncopystyle={copyBoxStyle}
+		onpastestyle={pasteBoxStyle}
 		onclose={() => (boxMenu = null)}
 	/>
 {/if}
@@ -1282,10 +1491,6 @@
 		flex: 1;
 		min-height: 0;
 		min-width: 0;
-	}
-
-	.muted {
-		color: #767676;
 	}
 
 	.banner {
@@ -1398,8 +1603,13 @@
 		top: 50%;
 		left: 50%;
 		transform: translate(-50%, -50%);
-		width: min(560px, 92vw);
-		max-height: 86vh;
+		/* A real gutter, not a percentage of it: 92vw is 30px of margin on a
+		   desktop and 15px on a phone, which is exactly backwards — the narrower
+		   the screen, the more a dialog looked like it had been printed onto the
+		   bezel. A fixed 32px keeps the same air whatever the width, and the
+		   max-width still caps it on a large screen. */
+		width: min(560px, calc(100vw - 32px));
+		max-height: min(86dvh, calc(100dvh - 32px));
 		overflow: auto;
 		background: #fff;
 		border-radius: 10px;

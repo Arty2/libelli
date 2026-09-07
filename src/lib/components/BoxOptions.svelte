@@ -278,14 +278,52 @@
 	<!-- Same idea: what the box holds, how its type is set, where that type sits,
 	     what the box looks like, where it is, and only then what you can do to it. -->
 	<div class="options box-options" aria-label="Area settings">
-		<span class="context">Area</span>
+		<!-- What this is and what it is called on one line, and the three things
+		     you can do to it on the next. They used to be at opposite ends of a bar
+		     that wraps to five rows on a laptop, so acting on the area you had just
+		     selected meant finding the far end of it. -->
+		<span class="head">
+			<span class="head-row">
+				<span class="context">Area</span>
+				{#if source === 'field'}
+					<label class="field">
+						<span>Name</span>
+						<input
+							class="w-5"
+							value={selected.slot ?? ''}
+							title="The template's own name for what this area holds; the column beside it says which spreadsheet column fills it"
+							disabled={boxFrozen}
+							onchange={(e) => setSlot(e.currentTarget.value)}
+						/>
+					</label>
+				{/if}
+			</span>
+			<!-- The two things you do to an area, then the switch that stops you
+			     doing either: Lock is a state, not an action, so it sits after them
+			     and says what pressing it will do rather than what it is. -->
+			<span class="head-row actions">
+				<button onclick={onduplicate} disabled={pageFrozen}><Icon name="copy" size={14} /> Duplicate</button>
+				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen}>
+					<Icon name="trash" size={14} /> Delete
+				</button>
+				<button
+					aria-pressed={!!selected.locked}
+					title={selected.locked ? 'Unlock this area' : 'Lock this area — no dragging, no resizing, no option changes'}
+					disabled={pageFrozen}
+					onclick={() => patch({ locked: selected.locked ? undefined : true })}
+				>
+					<Icon name={selected.locked ? 'unlocked' : 'locked'} size={14} />
+					{selected.locked ? 'Unlock' : 'Lock'}
+				</button>
+			</span>
+		</span>
 
 		<span class="group" role="group" aria-label="Content">
 			<label class="field">
 				<span>Content</span>
 				<select
 					value={source}
-					title="Where this box gets what it shows"
+					title="Where this area gets what it shows"
 					disabled={boxFrozen}
 					onchange={(e) => setSource(e.currentTarget.value as Source)}
 				>
@@ -293,18 +331,6 @@
 					<option value="static">Static Text</option>
 				</select>
 			</label>
-			{#if source === 'field'}
-				<label class="field">
-					<span>Field</span>
-					<input
-						class="w-5"
-						value={selected.slot ?? ''}
-						title="The template's own name for what this box holds; the column beside it says which spreadsheet column fills it"
-						disabled={boxFrozen}
-						onchange={(e) => setSlot(e.currentTarget.value)}
-					/>
-				</label>
-			{/if}
 			{#if selected.slot}
 				<label class="field">
 					<span>Column</span>
@@ -325,8 +351,8 @@
 					<input
 						class="w-8"
 						value={selected.static?.url ?? ''}
-						placeholder="https://…"
-						title="The picture this box shows on every card, saved in the template"
+						placeholder="https://… or a colour"
+						title="What this area shows on every card, saved in the template: an image address, or a colour — a hex, an rgb() or hsl(), or a colour name"
 						disabled={boxFrozen}
 						onchange={(e) => setStatic({ url: e.currentTarget.value.trim() || undefined })}
 					/>
@@ -350,7 +376,7 @@
 				<select value={selected.mode} disabled={boxFrozen} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
 					<option value="plain">Plain Text</option>
 					<option value="markdown">Markdown</option>
-					<option value="image">Image</option>
+					<option value="image">Image / Colour</option>
 					<option value="qr">QR Code</option>
 				</select>
 			</label>
@@ -361,6 +387,10 @@
 						<option value="contain">Fit</option>
 						<option value="cover">Cover</option>
 						<option value="fill">Stretch</option>
+						<!-- Images only. A tiled QR code is not a QR code. -->
+						{#if selected.mode === 'image'}
+							<option value="repeat">Tile</option>
+						{/if}
 					</select>
 				</label>
 			{/if}
@@ -462,6 +492,22 @@
 				</select>
 			</label>
 			<label class="field">
+				<span>Colour</span>
+				<input
+					class="colour"
+					type="color"
+					value={selected.color ?? template.defaults.color}
+					disabled={boxFrozen}
+					onchange={(e) => patch({ color: e.currentTarget.value })}
+				/>
+			</label>
+		</span>
+
+		<!-- The face, its size, its weight and its colour are one choice; how the
+		     lines are set is another. They were one group of seven controls, which
+		     is the point at which a group stops naming a subject. -->
+		<span class="group" role="group" aria-label="Setting">
+			<label class="field">
 				<span>Leading</span>
 				<input
 					class="n-3"
@@ -496,16 +542,6 @@
 					<option value="smallcaps">Small Caps</option>
 					<option value="uppercase">Uppercase</option>
 				</select>
-			</label>
-			<label class="field">
-				<span>Colour</span>
-				<input
-					class="colour"
-					type="color"
-					value={selected.color ?? template.defaults.color}
-					disabled={boxFrozen}
-					onchange={(e) => patch({ color: e.currentTarget.value })}
-				/>
 			</label>
 		</span>
 
@@ -832,24 +868,6 @@
 			{/if}
 		</span>
 
-		<span class="spacer"></span>
-
-		<!-- The two things you do to an area, then the switch that stops you doing
-		     either: Lock is a state, not an action, so it sits after them. -->
-		<span class="actions">
-			<button onclick={onduplicate} disabled={pageFrozen}><Icon name="copy" size={14} /> Duplicate</button>
-			<button class="danger-outline" onclick={ondelete} disabled={boxFrozen}>
-				<Icon name="trash" size={14} /> Delete
-			</button>
-			<button
-				aria-pressed={!!selected.locked}
-				title={selected.locked ? 'Unlock this box' : 'Lock this box'}
-				disabled={pageFrozen}
-				onclick={() => patch({ locked: selected.locked ? undefined : true })}
-			>
-				<Icon name="locked" size={14} /> Lock
-			</button>
-		</span>
 	</div>
 
 <!-- As above: this bar's own picker, not one shared with the page bar. -->

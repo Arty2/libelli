@@ -126,7 +126,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			borderStyle: BORDER_STYLES.includes(partial.borderStyle as BorderStyle) ? partial.borderStyle : undefined,
 			borderColor: colour(partial.borderColor),
 			borderRadius: partial.borderRadius,
-			fit: partial.fit,
+			fit: BOX_FITS.includes(partial.fit as BoxFit) ? partial.fit : undefined,
 			locked: partial.locked,
 			group: typeof partial.group === 'string' && partial.group.trim() ? partial.group : undefined
 		})
@@ -228,7 +228,8 @@ function normalisePageNumber(raw: any): PageNumberSpec {
 	return {
 		enabled: Boolean(raw?.enabled),
 		position,
-		margin: Math.max(0, num(raw?.margin, DEFAULT_PAGE_NUMBER.margin))
+		margin: Math.max(0, num(raw?.margin, DEFAULT_PAGE_NUMBER.margin)),
+		...(raw?.showTotal ? { showTotal: true } : {})
 	};
 }
 
@@ -246,6 +247,9 @@ function normaliseFonts(raw: any): FontRef[] {
 }
 
 export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'double'];
+
+export type BoxFit = NonNullable<Box['fit']>;
+export const BOX_FITS: BoxFit[] = ['contain', 'cover', 'fill', 'repeat'];
 
 /** Where a box is being moved to in the stack. */
 export type Arrange = 'front' | 'forward' | 'backward' | 'back';
