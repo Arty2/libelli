@@ -285,8 +285,6 @@
 		startY: number;
 		origin: Box;
 		others: Box[];
-		/** where a rotation started measuring from, once the pointer left the pivot */
-		turnFrom?: { angle: number; rotation: number };
 	} | null = null;
 
 	const editable = (box: Box) => interactive && !box.locked && !template.locked;
@@ -399,26 +397,13 @@
 				const c = origin.centre ?? { x: 50, y: 50 };
 				const pivotX = trim.left + (boxEl.offsetLeft + (boxEl.offsetWidth * c.x) / 100) * scale;
 				const pivotY = trim.top + (boxEl.offsetTop + (boxEl.offsetHeight * c.y) / 100) * scale;
-				// The handle sits *on* the pivot, so the drag begins at the one point
-				// where the angle to the pointer does not exist — and just outside it,
-				// a pixel of movement swings the box through tens of degrees. So
-				// nothing turns until the pointer is clear of the mark, and the angle
-				// it leaves at is what the rest of the drag is measured against. It
-				// reads as pulling out a lever and then swinging it.
-				// In screen pixels, so it is the same distance to the hand at any zoom.
-				const reach = 16;
-				const away = Math.hypot(event.clientX - pivotX, event.clientY - pivotY);
-				if (!drag.turnFrom) {
-					if (away < reach) break;
-					drag.turnFrom = {
-						angle: Math.atan2(event.clientY - pivotY, event.clientX - pivotX),
-						rotation: origin.rotation ?? 0
-					};
-					break;
-				}
+				// The lever is grabbed at arm's length from the pivot, so the angle is
+				// well defined the moment the drag starts — which is the whole reason
+				// rotation is not dragged from the pivot itself, where atan2 has
+				// nothing to measure and a pixel of movement swings the box wildly.
 				const now = Math.atan2(event.clientY - pivotY, event.clientX - pivotX);
-				const then = drag.turnFrom.angle;
-				let deg = drag.turnFrom.rotation + ((now - then) * 180) / Math.PI;
+				const then = Math.atan2(drag.startY - pivotY, drag.startX - pivotX);
+				let deg = (origin.rotation ?? 0) + ((now - then) * 180) / Math.PI;
 				// Whole degrees, or a quarter turn with Shift — the same bargain the
 				// grid makes for position: coarse by default, exact when typed.
 				deg = event.shiftKey ? Math.round(deg / 15) * 15 : Math.round(deg);
@@ -652,8 +637,18 @@
 						<span
 							class="pivot"
 							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
-							title="Drag to turn this area — Shift for 15° steps, Alt to move the point it turns about"
-							onpointerdown={(e) => startDrag(e, box, e.altKey ? 'centre' : 'rotate')}
+							title="The point this area turns about — drag it, or type it in the bar"
+							onpointerdown={(e) => startDrag(e, box, 'centre')}
+							onpointermove={moveDrag}
+							onpointerup={endDrag}
+							onpointercancel={endDrag}
+							role="presentation"
+						></span>
+						<span
+							class="lever"
+							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
+							title="Drag to turn this area — hold Shift for 15° steps"
+							onpointerdown={(e) => startDrag(e, box, 'rotate')}
 							onpointermove={moveDrag}
 							onpointerup={endDrag}
 							onpointercancel={endDrag}
@@ -791,7 +786,8 @@
 	   Both are in screen pixels: multiplying by `--ui-scale` undoes the card's
 	   own zoom, so a handle is the same size to the hand at 40% as at 200%. */
 	.handle,
-	.pivot {
+	.pivot,
+	.lever {
 		--mark: calc(14px * var(--ui-scale, 1));
 		--reach: calc(8px * var(--ui-scale, 1));
 		position: absolute;
@@ -813,32 +809,67 @@
 	   grows a handle but is never hit-tested, so the target used to be the square
 	   and nothing more. A pseudo-element is hit-tested, and it costs no layout. */
 	.handle::before,
-	.pivot::before {
+	.pivot::before,
+	.lever::before {
 		content: '';
 		position: absolute;
 		inset: calc(-1 * var(--reach));
 	}
 
 	/* A ring, because a circle reads as a centre of rotation where a square reads
-	   as a resize grip. Centred on its own coordinates by the negative margin. */
+	   as a resize grip. Centred on its own coordinates by the negative margin.
+	   Dragging it moves the point the box turns about; turning is the lever. */
 	.pivot {
 		--mark: calc(13px * var(--ui-scale, 1));
 		margin: calc(var(--mark) / -2) 0 0 calc(var(--mark) / -2);
 		border: none;
 		border-radius: 50%;
 		box-shadow: inset 0 0 0 calc(2px * var(--ui-scale, 1)) #2563eb;
+		cursor: move;
+	}
+
+	/* The lever: a knob on a short arm off the pivot, which is what you swing to
+	   turn the box. It hangs off the pivot rather than off the box edge so it
+	   travels with the point the rotation is actually about, and being at arm's
+	   length is what gives the drag an angle to measure from the first pixel.
+	   Both it and the arm rotate with the box, because they are inside it. */
+	.lever {
+		--arm: calc(30px * var(--ui-scale, 1));
+		--mark: calc(11px * var(--ui-scale, 1));
+		margin: calc(-1 * (var(--arm) + var(--mark) / 2)) 0 0 calc(var(--mark) / -2);
+		border-radius: 50%;
 		cursor: grab;
 	}
 
-	.pivot:active {
+	.lever:active {
 		cursor: grabbing;
 	}
 
-	/* Above the resize handles. The pivot can be moved onto an edge or a corner,
-	   where a handle already sits, and it is the only way to turn a box — where
-	   resizing has eight other places to be grabbed from. */
-	.pivot {
+	/* The arm is drawn, not grabbed. It runs from the knob down to the pivot, so
+	   leaving it hit-testable put a lever-shaped hole over the pivot and the point
+	   the box turns about could never be picked up. */
+	.lever::after {
+		content: '';
+		position: absolute;
+		left: calc(50% - var(--line, 1px) / 2);
+		top: 100%;
+		width: var(--line, 1px);
+		height: var(--arm);
+		background: #2563eb;
+		pointer-events: none;
+	}
+
+	/* Above the resize handles. The pivot can be moved onto an edge or a corner
+	   where a handle already sits, and between them these two are the only way to
+	   turn a box — where resizing has eight other places to be grabbed from. */
+	.lever {
 		z-index: 4;
+	}
+
+	/* And the pivot above the lever: their reaches overlap near the pivot, and
+	   the one you mean there is always the pivot — the lever has its knob. */
+	.pivot {
+		z-index: 5;
 	}
 
 	/* Fingers are not mice: the marks stay small enough to see past, and the
@@ -857,6 +888,15 @@
 		.pivot {
 			--mark: calc(8px * var(--ui-scale, 1));
 			--reach: calc(20px * var(--ui-scale, 1));
+		}
+
+		/* The rotation control used to be left out of this block entirely, which
+		   is why it could not be worked on a phone: it kept the fine-pointer 8px
+		   reach, on a mark floating outside the box. */
+		.lever {
+			--arm: calc(34px * var(--ui-scale, 1));
+			--mark: calc(10px * var(--ui-scale, 1));
+			--reach: calc(19px * var(--ui-scale, 1));
 		}
 	}
 
