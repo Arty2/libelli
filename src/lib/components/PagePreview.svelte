@@ -346,7 +346,12 @@
 	bind:this={host}
 	onpointerdown={(e) => {
 		onPinchDown(e);
-		if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('sheet')) onselect(null);
+			// Bare paper counts as empty space, not just the grey around the sheet:
+			// clicking away from everything is how every canvas editor deselects,
+			// and stopping at the page edge made it look broken. A box swallows its
+			// own pointerdown, so this only ever fires on ground nobody owns.
+			const el = e.target as HTMLElement;
+			if (e.target === e.currentTarget || /\b(sheet|card|trim|scaler|page|grid-overlay)\b/.test(el.className)) onselect(null);
 	}}
 	onpointermove={onPinchMove}
 	onpointerup={onPinchUp}

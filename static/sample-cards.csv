@@ -11,7 +11,7 @@ The table underneath holds the words. This page holds the design. libelli prints
 - Change *Start here* in the table. This title changes as you type.
 - Scan the code in the corner to open libelli on your phone.
 
-These four cards are the tour. Read them, then type over them — they are only sample rows, and nothing here is precious.",1 of 4,https://libelli.vercel.app
+These four cards are the tour. Read them, then type over them — they are only sample rows, and nothing here is precious.",Basics,https://libelli.vercel.app
 The table below,"Change a cell, watch the card","## Columns are fields [2]{blue}
 
 The header of each column is its name. A box on the page asks for a field *by that name*, so renaming a column carries the design with it instead of breaking it.
@@ -23,7 +23,7 @@ The header of each column is its name. A box on the page asks for a field *by th
 
 This row's `link` cell is blank, which is why **the code in the corner is missing here** and present on the other three. A box set to Hide When Empty takes its space with it rather than leaving a hole.
 
-- Compare this footer with card 1's.",2 of 4,
+- Compare this footer with card 1's.",Data,
 The card above,Drag anything. Nothing is stuck.,"## Move things [3]{blue}
 
 Every box is dragged in millimetres from the trim edge, so the page size can change underneath a design without moving anything on it.
@@ -36,7 +36,7 @@ Every box is dragged in millimetres from the trim edge, so the page size can cha
 - [⚠]{red} A red corner means the words are longer than the box, and the rest is being cut off.
 - [⚠]{blue} A box can take its top from the box above instead of its own position — which is why this text moves down when a title runs to two lines.
 
-Try it: make this card's title very long, and watch everything below it give way.",3 of 4,https://heracl.es/libelli
+Try it: make this card's title very long, and watch everything below it give way.",Layout,https://heracl.es/libelli
 Getting it out,"Paper, picture, or the template","## To paper [4]{blue}
 
 1. Press **Print**, or Ctrl/Cmd+P.
@@ -49,4 +49,4 @@ Getting it out,"Paper, picture, or the template","## To paper [4]{blue}
 - **Export** saves the design as a small file you can send to someone. It carries the layout, not the data.
 - **Export CSV** saves the words on their own.
 
-Press and hold *Import CSV…* to bring these four cards back at any time. Scan the corner for the source code.",4 of 4,https://github.com/Arty2/libelli
+Press and hold *Import CSV…* to bring these four cards back at any time. Scan the corner for the source code.",Output,https://github.com/Arty2/libelli

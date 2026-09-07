@@ -34,10 +34,17 @@
 	}
 
 	let { section, ...rest }: Props = $props();
+
+	let boxBar = $state<BoxOptions | null>(null);
+
+	/** Forwarded so the page can put the cursor in a new area's Text field. */
+	export function focusText() {
+		boxBar?.focusText();
+	}
 </script>
 
 {#if section === 'page'}
 	<PageOptions {...rest} />
 {:else if rest.selected}
-	<BoxOptions {...rest} selected={rest.selected} />
+	<BoxOptions bind:this={boxBar} {...rest} selected={rest.selected} />
 {/if}

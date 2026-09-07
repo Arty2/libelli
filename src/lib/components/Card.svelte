@@ -5,7 +5,7 @@
 	import { fontStack } from '$lib/fonts';
 	import { FREE_STEP, GRID_MINOR, boxEdges, pxToMm, resolveLayout, snapTo, snapToEdges } from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
-	import { sidesOf } from '$lib/template';
+	import { normaliseRotation, sidesOf } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -277,7 +277,7 @@
 
 	// ---- direct manipulation -------------------------------------------------
 
-	type DragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | 'centre';
+	type DragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | 'centre' | 'rotate';
 	let drag: {
 		id: string;
 		mode: DragMode;
@@ -357,7 +357,12 @@
 		// box off at an angle to the pointer.
 		const screenX = pxToMm((event.clientX - drag.startX) / scale);
 		const screenY = pxToMm((event.clientY - drag.startY) / scale);
-		const turn = drag.mode === 'move' ? 0 : ((origin.rotation ?? 0) * Math.PI) / 180;
+		// 'move' and 'rotate' are both exempt, for different reasons: a translation
+		// in the parent's space is the same however the box is turned, and a
+		// rotation is read from where the pointer *is* rather than how far it has
+		// come. Every new mode lands in the un-rotating branch by default, which
+		// is why this reads as a list rather than a single comparison.
+		const turn = drag.mode === 'move' || drag.mode === 'rotate' ? 0 : ((origin.rotation ?? 0) * Math.PI) / 180;
 		const cos = Math.cos(turn);
 		const sin = Math.sin(turn);
 		const dx = screenX * cos + screenY * sin;
@@ -372,6 +377,27 @@
 		};
 
 		switch (drag.mode) {
+			case 'rotate': {
+				// The angle from the pivot to the pointer, against the angle it
+				// started at, so the box does not jump when the drag begins. Both
+				// are measured in the page's own space: the handle turns with the
+				// box, so a delta would chase itself.
+				const node = event.currentTarget as HTMLElement;
+				const boxEl = node.closest('.box') as HTMLElement | null;
+				if (!boxEl) break;
+				const rect = boxEl.getBoundingClientRect();
+				const c = origin.centre ?? { x: 50, y: 50 };
+				const pivotX = rect.left + (rect.width * c.x) / 100;
+				const pivotY = rect.top + (rect.height * c.y) / 100;
+				const now = Math.atan2(event.clientY - pivotY, event.clientX - pivotX);
+				const then = Math.atan2(drag.startY - pivotY, drag.startX - pivotX);
+				let deg = (origin.rotation ?? 0) + ((now - then) * 180) / Math.PI;
+				// Whole degrees, or a quarter turn with Shift — the same bargain the
+				// grid makes for position: coarse by default, exact when typed.
+				deg = event.shiftKey ? Math.round(deg / 15) * 15 : Math.round(deg);
+				next.rotation = normaliseRotation(deg) ?? 0;
+				break;
+			}
 			case 'centre': {
 				// Percent of the box, not millimetres, because that is how the pivot
 				// is stored — and clamped to the box, so it can never be dragged
@@ -581,6 +607,18 @@
 						></span>
 					{/if}
 					{#if editable(box)}
+						<!-- Rotation, on a stalk above the top edge. Not on the centre,
+						     which the pivot already owns once a box is turned, and not
+						     a corner, which would fight the resize handle there. -->
+						<span
+							class="rotate"
+							title="Drag to turn this area — hold Shift for 15° steps"
+							onpointerdown={(e) => startDrag(e, box, 'rotate')}
+							onpointermove={moveDrag}
+							onpointerup={endDrag}
+							onpointercancel={endDrag}
+							role="presentation"
+						></span>
 						{#each HANDLES as handle (handle)}
 							<span
 								class="handle h-{handle}"
@@ -713,7 +751,8 @@
 	   Both are in screen pixels: multiplying by `--ui-scale` undoes the card's
 	   own zoom, so a handle is the same size to the hand at 40% as at 200%. */
 	.handle,
-	.pivot {
+	.pivot,
+	.rotate {
 		--mark: calc(14px * var(--ui-scale, 1));
 		--reach: calc(8px * var(--ui-scale, 1));
 		position: absolute;
@@ -734,8 +773,32 @@
 	/* The target, as opposed to the mark. A transparent box-shadow looks like it
 	   grows a handle but is never hit-tested, so the target used to be the square
 	   and nothing more. A pseudo-element is hit-tested, and it costs no layout. */
+	/* Clear of the corner handles' reach, on a stalk so it reads as belonging to
+	   this box rather than floating over the one above it. */
+	.rotate {
+		left: calc(50% - var(--mark) / 2);
+		top: calc(-1 * (var(--mark) + 14px * var(--ui-scale, 1)));
+		border-radius: 50%;
+		cursor: grab;
+	}
+
+	.rotate:active {
+		cursor: grabbing;
+	}
+
+	.rotate::after {
+		content: '';
+		position: absolute;
+		left: calc(50% - var(--line, 1px) / 2);
+		top: 100%;
+		width: var(--line, 1px);
+		height: calc(14px * var(--ui-scale, 1));
+		background: #2563eb;
+	}
+
 	.handle::before,
-	.pivot::before {
+	.pivot::before,
+	.rotate::before {
 		content: '';
 		position: absolute;
 		inset: calc(-1 * var(--reach));

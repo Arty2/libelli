@@ -89,6 +89,46 @@ boxes that did not need it. A `MutationObserver` on the box's subtree catches
 the content change itself. It settles rather than looping, because `read()`
 writes state only when a number actually moved.
 
+**Bounds carry state; selection is an outline.** Four things want to draw on one
+box and there are two pseudo-elements, so the selection moved off `::after` onto
+an `outline` on the box itself — the same to look at, no layout cost. That frees
+`::after` for the bounds, coloured red when a box is locked and purple when it is
+grouped, and `::before` for the padding guide. It also means a state colour is
+not painted over the moment the box is selected, which is exactly when you want
+to know. Locked wins over grouped, with a coarser dash as well as a different
+red, because the overflow corner is red too and two reds a millimetre apart are
+one red.
+
+**Every screen mark is drawn against the zoom, and sizes are the only ones that
+land exactly.** Screen furniture lives inside the card's transform, so a plain
+1px line was 0.6px at Fit and 2px at 200%. One `--line` on the card, multiplied
+by `--ui-scale` like the handles already were, holds the bounds, the bleed line,
+the snap guides, the overflow corner and the badges. Anything with a width and a
+height comes out the same number of screen pixels at any zoom; a *border* does
+not, because browsers quantise border-width to whole device pixels, so weights
+land within about half a pixel of target. The grid is finer still — a half-pixel
+hairline in both rules, with the 10mm rhythm carried by darkness rather than
+thickness — and keeps its weight for a different reason: it sits outside the
+transform and was always measured in screen pixels.
+
+**A badge is an annotation, not a control.** They are grey on white, smaller than
+the blue chrome, and clear of the box rather than straddling its corner, where
+they covered the content they were annotating and fought the corner handle for
+the same pixels. The badges take pointer events while their column stays
+click-through, because the tooltip is the only thing that says what a mark means
+and `pointer-events: none` had made it unhoverable — which is how an anchor badge
+drawn as four diagonal dashes came to be read as a stray `/` that nobody could
+identify. It is a ship's anchor now. A static text area gets a broken chain: its
+words live in the template rather than in a column.
+
+**Rotation is dragged from above the top edge.** The centre was taken: the pivot
+ring already lives there on a turned box and is dragged to move the turning
+point. A rotation handle reads the angle from where the pointer *is* against the
+pivot, not from how far it has come, so it is exempt from the un-rotation that
+`moveDrag` applies to every other handle — the exemption is a list rather than a
+comparison precisely because a new mode otherwise joins the wrong branch in
+silence.
+
 **A handle's target is a pseudo-element, not a box-shadow.** A transparent
 `box-shadow` looks like a bigger hit area and is never hit-tested. `::before`
 with a negative inset is, and it grows again under `pointer: coarse`.
@@ -130,6 +170,21 @@ than being shown what will not print, and the trim edge already says where the
 paper stops.
 
 ## `src/lib/components/PagePreview.svelte`
+
+**Fit measured the thing its own answer resized.** The stage is observed to
+derive the scale, the scale sizes the sheet, the sheet's height decides whether a
+vertical scrollbar appears, and that scrollbar takes about fifteen pixels off the
+width the measurement started from. At a marginal size that oscillates until the
+browser's own resize-observer bail-out stops it, and closing Page Setup landed
+right in it. `scrollbar-gutter: stable` removes the causal edge rather than
+damping the swing; the observer is also coalesced to a frame and held to whole
+pixels so it cannot start again for some other reason. Reserving the *horizontal*
+gutter would have done nothing — it is the vertical scrollbar that steals width.
+
+**Bare paper counts as empty space.** Clicking away from everything is how a
+canvas editor deselects, and stopping at the page edge — grey ground yes, the
+paper no — made it look broken. A box swallows its own pointerdown, so widening
+the test only ever catches ground nobody owns.
 
 **One wheel listener, two gestures.** `Ctrl`/`Cmd` and the wheel zooms the page;
 add `Shift` and it sizes the type under the pointer instead. Both are
@@ -222,6 +277,24 @@ by fetching the stylesheet the page already loaded and the files it names.
 Deliberate, confined to that file, and best effort — a blocked request falls back
 to the system stack and is reported rather than hidden.
 
+## `src/lib/fonts.ts`
+
+**A font is asked for when it is chosen, not when the app starts.** Requesting a
+family only at boot and on import meant choosing one from a dropdown wrote the
+name into the template and stopped there: nothing fetched the face, the box fell
+back to the system stack, and the choice appeared to work only after the next
+reload. The effect that fixes it is keyed on the set of families in use rather
+than on the pickers, so a new way of choosing a font cannot forget to ask. An
+area whose family has not arrived pulses, because a box drawn in the fallback
+face is indistinguishable from a box whose font never applied.
+
+**A family name is a name.** `boxStyle` joins its parts with `;` into an inline
+style attribute, so a template carrying `"font": "X; color: red"` wrote extra
+declarations into every box — `box.font` was the one string reaching a style
+attribute without passing a chokepoint. A name that does not look like one is
+refused outright rather than cleaned, because a half-cleaned name is a family
+nobody asked for.
+
 ## `src/lib/assets.ts` and `src/lib/fonts.ts`
 
 **Big things are referenced, never embedded.** A template names a font family and
@@ -251,6 +324,13 @@ with the rest of that subject's settings. The button that sets a lock is never
 disabled by the lock it sets.
 
 ## `src/lib/boxops.ts` and `src/routes/+page.svelte`
+
+**A new area is provisional until it is given something.** It used to arrive
+carrying the literal word "Text", so abandoning one left a box on the card that
+said Text and had to be hunted down. It starts empty with the cursor already in
+the Text field, and is dropped again unless it is given words, a column, or a
+change to how it looks. Moving and resizing do not count: placing a box is what
+you do while deciding whether you want it at all.
 
 **A group is a shared name, not a container.** `Box.group` keeps the box list
 flat, so grouping cannot disturb anchoring, stacking or measurement; selecting one

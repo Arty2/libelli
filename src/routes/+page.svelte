@@ -107,6 +107,7 @@
 	/** The browser is offering an install, so the toolbar can offer one too. */
 	let installable = $state(false);
 	let templateInput = $state<HTMLInputElement | null>(null);
+	let boxBar = $state<OptionsBar | null>(null);
 	let missingFontInput = $state<HTMLInputElement | null>(null);
 	let missingFontTarget = $state<FontRef | null>(null);
 
@@ -382,6 +383,18 @@
 
 	/** A new area starts as static text: it lives in the template, so it says the
 	    same on every card until it is bound to a column. */
+	/**
+	 * A new area, on approval.
+	 *
+	 * It used to arrive carrying the literal word "Text", so abandoning one left a
+	 * box on the card that said Text and had to be found and deleted. It starts
+	 * empty now, with the cursor already in the Text field — and it is provisional
+	 * until it is given something: any text, a column to bind to, or any change to
+	 * how it looks. Moving and resizing do not count, because placing a box is
+	 * what you do while deciding whether you want it at all.
+	 */
+	let provisional = $state<string | null>(null);
+
 	function addTextBox() {
 		const box = newBox({
 			id: nextBoxId(template.boxes),
@@ -391,10 +404,36 @@
 			w: 80,
 			h: 12,
 			mode: 'plain',
-			static: { text: 'Text' }
+			static: { text: '' }
 		});
 		template = { ...template, boxes: [...template.boxes, box] };
 		selectedIds = [box.id];
+		provisional = box.id;
+		// After the bar has rendered for the new selection, or there is no field
+		// to put the cursor in yet.
+		void tick().then(() => boxBar?.focusText());
+	}
+
+	/** Everything about a box except where it is and how big — what "changed" means. */
+	function looksEdited(box: Box): boolean {
+		const { id, x, y, w, h, ...rest } = box;
+		if (rest.slot) return true;
+		if (rest.static?.text) return true;
+		const { slot: _s, static: _t, mode, overflow, anchor, ...styled } = rest;
+		// A fresh box is plain, clipped and unanchored; anything else is a choice.
+		if (mode !== 'plain' || overflow !== 'clip' || anchor) return true;
+		return Object.values(styled).some((v) => v !== undefined);
+	}
+
+	/** Drop a provisional box that was never given anything to say. */
+	function settleProvisional() {
+		const id = provisional;
+		if (!id) return;
+		provisional = null;
+		const box = template.boxes.find((b) => b.id === id);
+		if (!box || looksEdited(box)) return;
+		template = { ...template, boxes: template.boxes.filter((b) => b.id !== id) };
+		selectedIds = selectedIds.filter((one) => one !== id);
 	}
 
 	function arrange(where: Arrange) {
@@ -423,6 +462,7 @@
 	 * group is for. A modifier-click adds or drops that whole set.
 	 */
 	function selectBox(id: string | null, additive = false) {
+		if (provisional && id !== provisional) settleProvisional();
 		if (!id) {
 			selectedIds = [];
 			return;
@@ -555,6 +595,15 @@
 			deleteBox();
 			return;
 		}
+		// Paging the cards. PageUp and PageDown do it whatever is selected, because
+		// they mean nothing else here and reaching for them should not depend on
+		// what you last clicked. Both sit below the stand-downs above, so neither
+		// fires while a table cell has focus.
+		if (event.key === 'PageUp' || event.key === 'PageDown') {
+			event.preventDefault();
+			stepRow(event.key === 'PageUp' ? -1 : 1);
+			return;
+		}
 		// Ctrl/Cmd+Shift turns the arrows into alignment, in the direction pressed:
 		// the same keys, moving the content inside the box rather than the box
 		// itself. Checked before the nudge, which only looks at Shift and Alt.
@@ -577,7 +626,19 @@
 			nudgeBox(move[0] * step, move[1] * step);
 			return;
 		}
-		if (event.key === 'Escape') selectedIds = [];
+		// With nothing selected the arrows had nothing to nudge and did nothing at
+		// all, so they page instead. Left and up go back, right and down forward:
+		// a card is a page, and both axes read the same way in a stack of them.
+		if (NUDGES[event.key] && !selectedIds.length) {
+			event.preventDefault();
+			const [dx, dy] = NUDGES[event.key];
+			stepRow(dx + dy);
+			return;
+		}
+		if (event.key === 'Escape') {
+			settleProvisional();
+			selectedIds = [];
+		}
 	}
 
 	// ---- import / export ----------------------------------------------------
@@ -599,6 +660,16 @@
 		mapping = autoMap(usedSlots(template), dataset.columns);
 		activeRow = 0;
 		notify('Sample cards loaded. Ctrl/Cmd+Z puts your own rows back.');
+	}
+
+	/**
+	 * Step through the cards. The clamp lives here rather than at each call site,
+	 * which is how the pager, the table and the lightbox each ended up with their
+	 * own copy of it.
+	 */
+	function stepRow(by: number) {
+		if (!dataset.rows.length) return;
+		activeRow = Math.max(0, Math.min(dataset.rows.length - 1, activeRow + by));
 	}
 
 	function doExportTemplate() {
@@ -735,8 +806,8 @@
 				<Icon name="add" size={15} /> Install
 			</button>
 		{/if}
-		<button class="square" onclick={() => (helpOpen = true)} title="How this works, and the keys">
-			<Icon name="help" size={15} /><span class="sr-only">Help</span>
+		<button onclick={() => (helpOpen = true)} title="How this works, and the keys">
+			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
 		<button
 			onclick={() => (dataOpen = !dataOpen)}
@@ -786,6 +857,7 @@
 
 	{#if selected}
 		<OptionsBar
+			bind:this={boxBar}
 			section="box"
 			{template}
 			{dataset}
@@ -1220,17 +1292,6 @@
 		background: #fff;
 		color: #111;
 		cursor: pointer;
-	}
-
-	/* An icon-only button, squared off rather than left with the padding of a
-	   label it no longer has. Sized to this toolbar's own button height; the
-	   bars and the page corners have their own, a pixel apart, and making all
-	   three agree would change two designs to tidy one. */
-	.toolbar button.square {
-		width: 30px;
-		height: 30px;
-		padding: 0;
-		justify-content: center;
 	}
 
 	button:hover:not(:disabled) {

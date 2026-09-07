@@ -71,6 +71,17 @@
 	}: Props = $props();
 
 	let fontInput = $state<HTMLInputElement | null>(null);
+	let textInput = $state<HTMLInputElement | null>(null);
+
+	/**
+	 * Put the cursor in the Text field. A new area arrives empty with the cursor
+	 * already here, so it can be typed into without going looking for the field —
+	 * and so leaving without typing is a decision rather than an oversight.
+	 */
+	export function focusText() {
+		textInput?.focus();
+		textInput?.select();
+	}
 	/** whether the border is being edited edge by edge rather than all round */
 	let perSide = $state(false);
 	/** the same question for padding; the two expand independently */
@@ -128,7 +139,10 @@
 	function setSource(next: Source) {
 		if (!selected) return;
 		if (next === 'field') {
-			patch({ slot: selected.slot ?? 'field', static: undefined });
+			// The words are kept rather than dropped: going to a column and back
+			// used to lose whatever had been typed, so the comment below was only
+			// true in one direction.
+			patch({ slot: selected.slot ?? 'field' });
 			return;
 		}
 		// Static keeps whatever was typed before.
@@ -321,9 +335,10 @@
 				<label class="field">
 					<span>Text</span>
 					<input
+						bind:this={textInput}
 						class="w-8"
 						value={selected.static?.text ?? ''}
-						placeholder="same on every card"
+						placeholder="Text — the same on every card"
 						title="Text saved in the template, not in the data — the same on every card"
 						disabled={boxFrozen}
 						onchange={(e) => setStatic({ text: e.currentTarget.value })}
