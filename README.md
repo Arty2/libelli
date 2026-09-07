@@ -377,9 +377,9 @@ single step rather than forty. Snapshots rather than a command log: an inverse
 operation cannot drift out of step with the operation it undoes, and this state
 is small enough that the cost does not matter. The last 60 steps are kept.
 
-Reset is covered by it too: deleting everything returns you to the starter card
-and sample data, with your work one undo away. Uploaded fonts are the exception
-— those are gone from the browser, and the dialog says so before you confirm.
+Reset is covered by it too: it puts the template back to the starter card with
+the design you had one undo away, and it does not touch the data, the mapping or
+any font you uploaded.
 
 ## Keyboard shortcuts
 
@@ -531,8 +531,9 @@ npm run build    # static output in ./build, deployable anywhere
   with `?raw`, so a first run works offline and cannot land on an empty table
   because a request failed. The four rows are a walkthrough of the app rather
   than filler; pressing and holding *Import CSV…* brings them back at any time.
-- **Reset** — clears the template, data, mapping and fonts from this browser and
-  returns to that first-run state, after asking twice.
+- **Reset** — puts the template back to the starter card and leaves the data,
+  the mapping and any uploaded fonts alone. It does not ask, because one undo
+  snapshot carries the template and the data together and Ctrl/Cmd+Z reaches it.
 - **Components are verified by driving them** — the pure logic has unit tests;
   layout, printing and the dialogs are checked in a real browser, where the
   geometry can be read back in millimetres and the PDF counted page by page.

@@ -548,9 +548,12 @@ geometry and releases the anchor of a box it moves vertically — an anchor woul
 otherwise undo the alignment on the next render.
 
 **Destructive things are undoable, and only ask when undo cannot reach them.**
-Deleting a row or a box happens straight away and says so; Reset asks twice,
-because it clears browser storage and uploaded fonts that no undo can bring back.
-Two exceptions ask once, and neither is about undo: deleting a *column* is a
+Deleting a row or a box happens straight away and says so, and so does Reset —
+it replaces the template and leaves the data alone, and one snapshot carries
+both, so Ctrl/Cmd+Z reaches it. (This paragraph used to say Reset asked twice
+"because it clears browser storage and uploaded fonts". It does neither, and has
+not for some time.) Two things do ask once, and neither is about undo: deleting
+a *column* is a
 field of every card at once and takes cells under a header you may not have
 scrolled to, and deleting the whole table is not one row you can retype. Both
 questions are a count rather than a paragraph — a warning nobody reads is not a
