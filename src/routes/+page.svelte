@@ -1002,8 +1002,8 @@
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
 			<dt>← / →</dt><dd>Step through the cards, with one open full screen</dd>
 			<dt>? or /</dt><dd>This panel</dd>
-			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + '</dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + ; or H</dt><dd>Bounds on or off</dd>
+			<dt>Ctrl/Cmd + ' or #</dt><dd>Grid on or off</dd>
 			<dt>Ctrl/Cmd + P</dt><dd>Export — again from that screen to print</dd>
 			<dt>Ctrl/Cmd + Shift + P / S</dt><dd>The same door, for the fingers that reach for those</dd>
 			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>

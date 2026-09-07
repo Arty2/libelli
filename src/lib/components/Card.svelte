@@ -132,6 +132,12 @@
 			// under the finger at 62%. Everything screen-only is sized against this
 			// so a target stays the size it was drawn at, whatever the zoom.
 			`--ui-scale:${1 / (scale || 1)}`,
+			// One weight for every screen-only line on the card, drawn against the
+			// zoom so a bound, a guide and a badge border are the same thickness at
+			// 50% as at 200%. The grid is set in PagePreview, outside the transform,
+			// and is deliberately finer than this.
+			`--line:${1 / (scale || 1)}px`,
+			`--line-thick:${1.5 / (scale || 1)}px`,
 			`background-color:${template.page.background ?? '#ffffff'}`,
 			...backgroundStyle(template.page.image, background)
 		].join(';');
@@ -198,9 +204,18 @@
 		if (box.italic) parts.push('font-style:italic');
 		if (box.textCase === 'uppercase') parts.push('text-transform:uppercase');
 		if (box.textCase === 'smallcaps') parts.push('font-variant-caps:small-caps');
+		// Emitted whether or not there is any, because the selected-box padding
+		// guide reads these back and a missing custom property would fall to 0 and
+		// draw the guide exactly on top of the bounds.
+		const pad = sidesOf(box.padding ?? 0);
+		parts.push(
+			`--pad-t:${pad.top}mm`,
+			`--pad-r:${pad.right}mm`,
+			`--pad-b:${pad.bottom}mm`,
+			`--pad-l:${pad.left}mm`
+		);
 		if (box.padding) {
-			const p = sidesOf(box.padding);
-			parts.push(`padding:${p.top}mm ${p.right}mm ${p.bottom}mm ${p.left}mm`);
+			parts.push(`padding:${pad.top}mm ${pad.right}mm ${pad.bottom}mm ${pad.left}mm`);
 		}
 		if (box.background) parts.push(`background:${box.background}`);
 		// `.box` is border-box, so a border eats into the width rather than adding
@@ -449,6 +464,14 @@
 	 * looks exactly like a box whose font simply did not apply, which is how a
 	 * slow family reads as a broken one.
 	 */
+	/**
+	 * A text area carrying its own words rather than a column's. Only the text
+	 * modes: an unbound image or QR is static in the same sense, but its content
+	 * is visibly a fixed thing already, and a badge on every decorative box is
+	 * clutter rather than information.
+	 */
+	const isStatic = (box: Box) => !box.slot && (box.mode === 'plain' || box.mode === 'markdown');
+
 	const waitingFor = (box: Box) =>
 		loadingFonts.includes(box.font ?? template.defaults.font);
 </script>
@@ -468,6 +491,9 @@
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
 				class:clipped={box.overflow === 'clip' && !empty}
+				class:locked={!!box.locked}
+				class:no-padding={!box.padding}
+				class:grouped={!!box.group}
 				class:font-loading={interactive && waitingFor(box)}
 				style={boxStyle(box)}
 				data-box-id={box.id}
@@ -516,10 +542,15 @@
 					</span>
 				{/if}
 
-				{#if bounds && (box.anchor || box.locked)}
+				{#if bounds && (box.anchor || box.locked || isStatic(box))}
 					<!-- Why the box will not do what you might ask of it, stacked at its
 					     corner: the anchor above the lock when it carries both. -->
 					<span class="badges">
+						{#if isStatic(box)}
+							<span class="badge" title="Static text — this says the same on every card, because it is not bound to a column">
+								<Icon name="unlink" size={11} />
+							</span>
+						{/if}
 						{#if box.anchor}
 							<span class="badge" title="Anchored to another box — its top follows that box's bottom">
 								<Icon name="anchor" size={11} />
@@ -778,40 +809,93 @@
 			}
 		}
 
+		/* Four things want to draw on one box and there are two pseudo-elements,
+		   so the selection moved to an `outline` on the box itself — identical to
+		   look at, costs no layout, and leaves ::after for the bounds and ::before
+		   for the padding guide. It also means a locked or grouped box keeps its
+		   state colour while selected, instead of the blue overwriting it.
+
+		   Every weight here is multiplied by --ui-scale. Screen furniture lives
+		   inside the scaled card, so a plain 1px line is 0.6px at 64% and 2px at
+		   200%: the marks have to be drawn against the zoom to stay the size they
+		   were designed at.
+
+		   Sizes are exact; line weights are as close as a browser allows. Anything
+		   with a width and height — a handle, a badge, the overflow corner — comes
+		   out the same number of screen pixels at every zoom. A *border* does not:
+		   browsers quantise border-width to whole device pixels, so a line asked
+		   for at 1.33px is drawn at 1px and a line asked for at 0.5px is drawn at
+		   1px. The weight therefore lands within about half a pixel of its target
+		   rather than on it, which is the difference between a line that stays a
+		   line and the old behaviour, where a bound was 0.6px at Fit and 2px at
+		   200%. */
 		.box.outlined::after {
 			content: '';
 			position: absolute;
 			inset: 0;
-			border: 1px dashed rgba(37, 99, 235, 0.45);
-			pointer-events: none;
-		}
-		.box.selected::after {
-			content: '';
-			position: absolute;
-			inset: 0;
-			border: 1px solid #2563eb;
+			border: var(--line) dashed var(--bounds-colour, rgba(37, 99, 235, 0.45));
 			pointer-events: none;
 		}
 
-		/* Where the paper will be cut. Purple so it reads as a different kind of
-		   line from a box outline, and tied to the same toggle. */
+		/* A locked box cannot be moved, and a grouped one moves with others: both
+		   are reasons a drag will not do what you expect, so they colour the
+		   bounds. Locked wins when a box is both — it is the stronger refusal.
+		   The dash is coarser as well as red, because the overflow corner is
+		   already red and two reds a millimetre apart are one red. */
+		.box.grouped::after {
+			--bounds-colour: rgba(124, 58, 237, 0.75);
+		}
+
+		.box.locked::after {
+			--bounds-colour: rgba(180, 35, 24, 0.8);
+			border-style: dashed;
+			border-width: var(--line-thick);
+		}
+
+		.box.selected {
+			outline: var(--line) solid #2563eb;
+			outline-offset: calc(-1 * var(--line));
+		}
+
+		/* Where the words actually start. Only on the selected box: it is a
+		   measurement you want while you are setting the padding, and noise on
+		   every other box the rest of the time. */
+		.box.selected::before {
+			content: '';
+			position: absolute;
+			top: var(--pad-t, 0);
+			right: var(--pad-r, 0);
+			bottom: var(--pad-b, 0);
+			left: var(--pad-l, 0);
+			border: var(--line) dashed rgba(8, 145, 178, 0.8);
+			pointer-events: none;
+		}
+
+		/* Nothing to show when the padding is zero: the guide would sit exactly on
+		   the selection outline and read as a doubled line. */
+		.box.selected.no-padding::before {
+			display: none;
+		}
+
+		/* Where the paper will be cut. Green: it is not a box outline and not a
+		   state, it is the edge of the paper, and purple now means a grouped box. */
 		.trim.bleed-marked::before {
 			content: '';
 			position: absolute;
 			inset: 0;
-			border: 1px dashed rgba(124, 58, 237, 0.7);
+			border: var(--line) dashed rgba(5, 150, 105, 0.85);
 			pointer-events: none;
 			z-index: 2;
 		}
 
 		.overflow-mark {
 			position: absolute;
-			right: -1px;
-			bottom: -1px;
+			right: calc(-1 * var(--line));
+			bottom: calc(-1 * var(--line));
 			display: grid;
 			place-items: center;
-			width: 15px;
-			height: 15px;
+			width: calc(13px * var(--ui-scale, 1));
+			height: calc(13px * var(--ui-scale, 1));
 			border-radius: var(--radius-button) 0 0 0;
 			background: #b42318;
 			color: #fff;
@@ -819,26 +903,55 @@
 			z-index: 3;
 		}
 
+		/* Clear of the box, not straddling it: a badge sitting on the corner
+		   covered the content it was annotating and fought the corner handle for
+		   the same pixels. The column hangs to the right of the edge instead. */
 		.badges {
 			position: absolute;
-			top: -9px;
-			right: -9px;
+			top: 0;
+			left: 100%;
+			margin-left: calc(4px * var(--ui-scale, 1));
 			display: flex;
 			flex-direction: column;
-			gap: 2px;
+			gap: calc(2px * var(--ui-scale, 1));
 			z-index: 3;
+			/* The column is click-through so a drag started beside the box still
+			   reaches it; the badges themselves are not, or their title — the only
+			   thing that says what they mean — could never be hovered. */
 			pointer-events: none;
 		}
 
+		/* Quieter than the blue chrome around it. A badge is an annotation, not a
+		   control: it says why the box will not do what you asked, and it should
+		   not read as loudly as the thing you are dragging. */
 		.badge {
 			display: grid;
 			place-items: center;
-			width: 18px;
-			height: 18px;
+			width: calc(13px * var(--ui-scale, 1));
+			height: calc(13px * var(--ui-scale, 1));
+			/* Or the border is added to the width, and a badge drawn against the
+			   zoom would hold its size everywhere except its own edges. */
+			box-sizing: border-box;
 			border-radius: var(--radius-button);
 			background: #fff;
-			border: 1px solid #2563eb;
-			color: #2563eb;
+			border: var(--line) solid #c4c4c4;
+			color: #767676;
+			pointer-events: auto;
+			cursor: help;
+		}
+
+		.badge:hover {
+			border-color: #767676;
+			color: #333;
+		}
+
+		/* Icon takes a px size, which is inside the card's transform like
+		   everything else here, so the glyph is overridden against the zoom too —
+		   otherwise the badge would hold its size and its contents would not. */
+		.badge :global(svg),
+		.overflow-mark :global(svg) {
+			width: calc(9px * var(--ui-scale, 1));
+			height: calc(9px * var(--ui-scale, 1));
 		}
 
 		.guide {
@@ -847,7 +960,8 @@
 			pointer-events: none;
 			z-index: 4;
 		}
-		.guide.vertical { top: 0; bottom: 0; width: 1px; }
-		.guide.horizontal { left: 0; right: 0; height: 1px; }
+
+		.guide.vertical { top: 0; bottom: 0; width: var(--line); }
+		.guide.horizontal { left: 0; right: 0; height: var(--line); }
 	}
 </style>

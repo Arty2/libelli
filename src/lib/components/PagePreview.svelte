@@ -296,12 +296,20 @@
 				if (event.shiftKey) onzoom(1);
 				else onzoom('fit');
 				return;
+			// Two keys each: the punctuation is what they are named after on a
+			// keyboard that has it, and the letters are what still works on one
+			// that does not.
 			case 'h':
 			case 'H':
+			case ';':
+			case ':':
 				event.preventDefault();
 				onbounds(!bounds);
 				return;
 			case "'":
+			case '"':
+			case '#':
+			case '~':
 				event.preventDefault();
 				ongrid(!grid);
 		}
@@ -483,11 +491,11 @@
 	<!-- View state sits on the page it affects, one control per bottom corner,
 	     rather than in the toolbar among the actions. -->
 	<div class="corner left">
-		<label title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it (Ctrl/Cmd+')">
+		<label title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it (Ctrl/Cmd+' or Ctrl/Cmd+#)">
 			<input type="checkbox" checked={grid} onchange={(e) => ongrid(e.currentTarget.checked)} />
 			Grid
 		</label>
-		<label title="Dashed box bounds and the trim edge — screen only, never printed (Ctrl/Cmd+H)">
+		<label title="Dashed box bounds and the trim edge — screen only, never printed (Ctrl/Cmd+; or Ctrl/Cmd+H)">
 			<input type="checkbox" checked={bounds} onchange={(e) => onbounds(e.currentTarget.checked)} />
 			Bounds
 		</label>
@@ -629,18 +637,21 @@
 	}
 
 	/* Grey, and as thin as a screen will draw: the grid is there to be measured
-	   against, not looked at, and a coloured one competed with the card. The
-	   subgrid is a half-pixel hairline; the majors keep a whole pixel so the
-	   10mm rhythm still reads at a glance. */
+	   against, not looked at, and a coloured one competed with the card. Both
+	   rules are a half-pixel hairline — finer than any line on the card itself,
+	   which is a whole pixel — and the 10mm rhythm is carried by the majors being
+	   darker rather than thicker. This overlay sits outside the card's transform
+	   and is already sized in screen pixels, so its weight does not move with the
+	   zoom, which is the same promise the card's own --line makes. */
 	.grid-overlay {
 		position: absolute;
 		inset: 0;
 		pointer-events: none;
 		background-image:
-			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.24) 0 1px, transparent 1px var(--major)),
-			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.24) 0 1px, transparent 1px var(--major)),
-			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.1) 0 0.5px, transparent 0.5px var(--minor)),
-			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 0 0.5px, transparent 0.5px var(--minor));
+			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.3) 0 0.5px, transparent 0.5px var(--major)),
+			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0 0.5px, transparent 0.5px var(--major)),
+			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.11) 0 0.5px, transparent 0.5px var(--minor)),
+			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.11) 0 0.5px, transparent 0.5px var(--minor));
 		background-position: var(--origin) var(--origin);
 	}
 
