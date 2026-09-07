@@ -4,6 +4,12 @@
  * dependencies, and a handful of 32x32 paths is cheaper than a package.
  *
  * Every entry is the inner markup of a `0 0 32 32` viewBox.
+ *
+ * Four are drawn here rather than taken from Carbon, and are marked where they
+ * are defined: `anchor`, `unlink`, `knot` and `scissors`. Carbon's own diagonal-dashes glyph was
+ * being used for the anchor badge, and at 11px it read as a forward slash —
+ * people asked what the `/` on their box meant, which is a fair question about
+ * a mark that turned out to have no way of answering it.
  */
 
 export const ICONS: Record<string, string> = {
@@ -58,7 +64,22 @@ export const ICONS: Record<string, string> = {
 	'layers': '<path d="M16,24a.9967.9967,0,0,1-.4741-.12l-13-7L3.4741,15.12,16,21.8643,28.5259,15.12l.9482,1.7607-13,7A.9967.9967,0,0,1,16,24Z"/><path d="M16,30a.9967.9967,0,0,1-.4741-.12l-13-7L3.4741,21.12,16,27.8643,28.5259,21.12l.9482,1.7607-13,7A.9967.9967,0,0,1,16,30Z"/><path d="M16,18a.9967.9967,0,0,1-.4741-.12l-13-7a1,1,0,0,1,0-1.7607l13-7a.9982.9982,0,0,1,.9482,0l13,7a1,1,0,0,1,0,1.7607l-13,7A.9967.9967,0,0,1,16,18ZM5.1094,10,16,15.8643,26.8906,10,16,4.1358Z"/>',
 	'activity': '<path d="M12,29a1,1,0,0,1-.92-.62L6.33,17H2V15H7a1,1,0,0,1,.92.62L12,25.28,20.06,3.65A1,1,0,0,1,21,3a1,1,0,0,1,.93.68L25.72,15H30v2H25a1,1,0,0,1-.95-.68L21,7,12.94,28.35A1,1,0,0,1,12,29Z"/>',
 	'arrows-horizontal': '<polygon points="11.41 26.59 7.83 23 28 23 28 21 7.83 21 11.41 17.41 10 16 4 22 10 28 11.41 26.59"/><polygon points="28 10 22 4 20.59 5.41 24.17 9 4 9 4 11 24.17 11 20.59 14.59 22 16 28 10"/>',
-	'anchor': '<path stroke-width="0" d="M2.257 25.5H8.742V27.5H2.257z" transform="rotate(-45 5.5 26.5)"/><path stroke-width="0" d="M9.257 18.5H15.742V20.5H9.257z" transform="rotate(-45 12.5 19.5)"/><path stroke-width="0" d="M16.257 11.5H22.742V13.5H16.257z" transform="rotate(-45 19.5 12.5)"/><path stroke-width="0" d="M23.257 4.5H29.742V6.5H23.257z" transform="rotate(-45 26.5 5.5)"/>',
+	/* Drawn here, not Carbon: a ship's anchor — ring, stock, shank and flukes. */
+	'anchor': '<path d="M16 2a4 4 0 0 0-1 7.87V12H11v2h4v12.93A11 11 0 0 1 5.06 17H8l-4-5-4 5h3.05A13 13 0 0 0 16 30a13 13 0 0 0 12.95-13H32l-4-5-4 5h2.94A11 11 0 0 1 17 26.93V14h4v-2h-4V9.87A4 4 0 0 0 16 2Zm0 2a2 2 0 1 1-2 2 2 2 0 0 1 2-2Z"/>',
+
+	/* Drawn here, not Carbon: a loop of rope with its ends crossed below it —
+	   what an area anchored to another one is tied with. One ring and a crossing,
+	   because two rings turn to mush at 11px. */
+	'knot': '<path d="M16 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm0 2.6a5.4 5.4 0 1 1 0 10.8 5.4 5.4 0 0 1 0-10.8Z"/><path d="m11.4 18.6 1.9 1.8-7 7L4.4 25.6ZM20.6 18.6l7.1 7-1.9 1.8-7-7Z"/>',
+
+	/* Drawn here, not Carbon: shears. Two blades crossed over two finger rings,
+	   for the corner that says the words are being cut off. */
+	'scissors': '<path d="M9 2 7.3 3 15 16.2 16.7 13.3ZM23 2l1.7 1L17 16.2 15.3 13.3Z"/><path d="M7 18a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM25 18a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/>',
+
+	/* Drawn here, not Carbon: a chain pulled apart. Two half-links leaning away
+	   from a gap, which stays legible at 11px where a struck-through link turns
+	   into a smudge. */
+	'unlink': '<path d="M13.6 7.4 11.5 9.5A6 6 0 0 0 9.5 11.5l-4 4a6 6 0 0 0 8.5 8.5l2.1-2.1-1.4-1.4-2.1 2.1a4 4 0 0 1-5.7-5.7l4-4a4 4 0 0 1 5.7 0l1.4-1.4a6 6 0 0 0-4.4-1.7Z"/><path d="M26.5 5.5a6 6 0 0 0-8.5 0l-2.1 2.1 1.4 1.4 2.1-2.1a4 4 0 0 1 5.7 5.7l-4 4a4 4 0 0 1-5.7 0L14 18a6 6 0 0 0 8.5 0l4-4a6 6 0 0 0 0-8.5Z"/><path d="M23 22h5v2h-5zM24.5 26.5l1.4-1.4 3.5 3.5-1.4 1.4zM26 17h2v4h-2z"/>',
 };
 
 export type IconName = keyof typeof ICONS;

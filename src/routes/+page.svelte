@@ -10,9 +10,31 @@
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
 	import { resolveBackground, uploadBackgroundImage } from '$lib/assets';
 	import { download, slugify } from '$lib/download';
-	import { ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
-	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
-	import { GRID_MINOR, alignBoxes, type AlignEdge } from '$lib/layout';
+	import { ensureGoogleFont, ensureTemplateFonts, fontReady, uploadLocalFont } from '$lib/fonts';
+	import {
+		canRedo,
+		canUndo,
+		createHistory,
+		record,
+		redo as redoStep,
+		redoLabel,
+		reset as resetHistory,
+		undo as undoStep,
+		undoLabel
+	} from '$lib/history';
+	import { alignBoxes, type AlignEdge } from '$lib/layout';
+	import {
+		ALIGN_LABELS,
+		deleteBoxes,
+		duplicateBoxes,
+		groupMembers,
+		nudgeBox as nudge,
+		stepAlignment,
+		toggleGroup,
+		toggleLock,
+		toggleSelection
+	} from '$lib/boxops';
+	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport } from '$lib/keys';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { VERSION } from '$lib/version';
@@ -39,7 +61,7 @@
 		storageAvailable,
 		saveUi
 	} from '$lib/storage';
-	import type { Align, Box, Dataset, FontRef, Mapping, Template, UiState, VAlign } from '$lib/types';
+	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
@@ -95,6 +117,7 @@
 	/** The browser is offering an install, so the toolbar can offer one too. */
 	let installable = $state(false);
 	let templateInput = $state<HTMLInputElement | null>(null);
+	let boxBar = $state<OptionsBar | null>(null);
 	let missingFontInput = $state<HTMLInputElement | null>(null);
 	let missingFontTarget = $state<FontRef | null>(null);
 
@@ -191,7 +214,7 @@
 		} else if (unreadable)
 			notify('The saved template could not be read, so this is the starter card. Your data is untouched.', 'warning');
 		else if (firstRun)
-			notify('Sample cards loaded to play with. Edit the table, drag the boxes, then Print — or press ? for the tour.');
+			notify('Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.');
 		missingFonts = await ensureTemplateFonts(template);
 
 		// Last, so the precache download is not competing with the first paint.
@@ -200,6 +223,48 @@
 			notify('A new version of libelli is ready — reload when you are at a good stopping point.');
 		});
 	}
+
+	/**
+	 * Every family the template asks for, requested as soon as it is asked for.
+	 *
+	 * ensureTemplateFonts only ran at boot and on import, so choosing a font from
+	 * a dropdown wrote the name into the template and stopped there: the browser
+	 * had never been told to fetch it, the box quietly fell back to the system
+	 * stack, and the choice appeared to work only after the next reload. Keyed on
+	 * the set of families rather than on the pickers, so a new way to choose one
+	 * cannot forget to ask.
+	 */
+	const familiesInUse = $derived(
+		Array.from(
+			new Set(
+				[template.defaults.font, ...template.boxes.map((b) => b.font)].filter(
+					(f): f is string => !!f
+				)
+			)
+		)
+	);
+
+	$effect(() => {
+		for (const family of familiesInUse) ensureGoogleFont(family);
+	});
+
+	/**
+	 * Which of them are still arriving, so an area can say so rather than sitting
+	 * in the fallback face looking finished. document.fonts answers for both the
+	 * Google stylesheets and the local FontFaces, and `loadingdone` is the only
+	 * event that fires per batch as they land.
+	 */
+	let fontsLoading = $state<string[]>([]);
+
+	$effect(() => {
+		const families = familiesInUse;
+		if (typeof document === 'undefined' || !document.fonts) return;
+		const read = () => (fontsLoading = families.filter((f) => !fontReady(f)));
+		read();
+		document.fonts.addEventListener('loadingdone', read);
+		document.fonts.ready.then(read).catch(() => {});
+		return () => document.fonts.removeEventListener('loadingdone', read);
+	});
 
 	// No reactive reads, so this runs once and its return value is the cleanup.
 	$effect(() => watchInstall((available) => (installable = available)));
@@ -234,13 +299,30 @@
 
 	// ---- undo/redo ----------------------------------------------------------
 
+	/**
+	 * What the user did, waiting to be attached to the entry it produces.
+	 *
+	 * The recorder watches state and cannot know what changed, so each action
+	 * leaves its name here on the way past. First one wins until it is consumed:
+	 * the debounce has no maximum wait, so two actions inside a third of a second
+	 * become one entry, and the first is the one the user thinks they did — what
+	 * follows is a refinement of it.
+	 */
+	let pending = '';
+	const describe = (what: string) => {
+		if (!pending) pending = what;
+	};
+
 	// Debounced, so a drag or a burst of typing becomes one entry. `record`
 	// ignores a state equal to the present, which is what stops an applied undo
 	// from recording itself straight back.
 	$effect(() => {
 		if (!ready) return;
 		const snap = snapshot();
-		const timer = setTimeout(() => (history = record(history, snap)), 350);
+		const timer = setTimeout(() => {
+			history = record(history, snap, pending);
+			pending = '';
+		}, 350);
 		return () => clearTimeout(timer);
 	});
 
@@ -255,16 +337,22 @@
 
 	function undo() {
 		if (!undoable) return;
+		const what = undoLabel(history);
 		history = undoStep(history);
-		applySnapshot(history.present);
-		notify('Undone.');
+		applySnapshot(history.present.state);
+		// Cleared, or the label of whatever was pending when undo landed would
+		// attach itself to the user's next action instead.
+		pending = '';
+		notify(what ? `Undone: ${what}` : 'Undone.');
 	}
 
 	function redo() {
 		if (!redoable) return;
+		const what = redoLabel(history);
 		history = redoStep(history);
-		applySnapshot(history.present);
-		notify('Redone.');
+		applySnapshot(history.present.state);
+		pending = '';
+		notify(what ? `Redone: ${what}` : 'Redone.');
 	}
 
 	// ---- autosave -----------------------------------------------------------
@@ -315,6 +403,7 @@
 	 * where the image lives.
 	 */
 	function applyTemplate(next: Template) {
+		describe('Page settings');
 		template = { ...stripUndefined(next), page: stripUndefined(next.page) } as Template;
 	}
 
@@ -328,7 +417,20 @@
 
 	/** A new area starts as static text: it lives in the template, so it says the
 	    same on every card until it is bound to a column. */
+	/**
+	 * A new area, on approval.
+	 *
+	 * It used to arrive carrying the literal word "Text", so abandoning one left a
+	 * box on the card that said Text and had to be found and deleted. It starts
+	 * empty now, with the cursor already in the Text field — and it is provisional
+	 * until it is given something: any text, a column to bind to, or any change to
+	 * how it looks. Moving and resizing do not count, because placing a box is
+	 * what you do while deciding whether you want it at all.
+	 */
+	let provisional = $state<string | null>(null);
+
 	function addTextBox() {
+		describe('New area');
 		const box = newBox({
 			id: nextBoxId(template.boxes),
 			slot: null,
@@ -337,14 +439,48 @@
 			w: 80,
 			h: 12,
 			mode: 'plain',
-			static: { text: 'Text' }
+			static: { text: '' }
 		});
 		template = { ...template, boxes: [...template.boxes, box] };
 		selectedIds = [box.id];
+		provisional = box.id;
+		// After the bar has rendered for the new selection, or there is no field
+		// to put the cursor in yet.
+		void tick().then(() => boxBar?.focusText());
 	}
+
+	/** Everything about a box except where it is and how big — what "changed" means. */
+	function looksEdited(box: Box): boolean {
+		const { id, x, y, w, h, ...rest } = box;
+		if (rest.slot) return true;
+		if (rest.static?.text) return true;
+		const { slot: _s, static: _t, mode, overflow, anchor, ...styled } = rest;
+		// A fresh box is plain, clipped and unanchored; anything else is a choice.
+		if (mode !== 'plain' || overflow !== 'clip' || anchor) return true;
+		return Object.values(styled).some((v) => v !== undefined);
+	}
+
+	/** Drop a provisional box that was never given anything to say. */
+	function settleProvisional() {
+		const id = provisional;
+		if (!id) return;
+		provisional = null;
+		const box = template.boxes.find((b) => b.id === id);
+		if (!box || looksEdited(box)) return;
+		template = { ...template, boxes: template.boxes.filter((b) => b.id !== id) };
+		selectedIds = selectedIds.filter((one) => one !== id);
+	}
+
+	const ARRANGE_LABELS: Record<Arrange, string> = {
+		front: 'Bring to front',
+		forward: 'Bring forward',
+		backward: 'Send backward',
+		back: 'Send to back'
+	};
 
 	function arrange(where: Arrange) {
 		if (template.locked) return;
+		describe(ARRANGE_LABELS[where]);
 		// A locked area does not move, in the stack or anywhere else.
 		const movable = selectedBoxes.filter((b) => !b.locked).map((b) => b.id);
 		if (!movable.length) return;
@@ -358,6 +494,7 @@
 	 * they are — this is for starting the design again, not for clearing out.
 	 */
 	function resetTemplate() {
+		describe('Reset the template');
 		template = starterTemplate();
 		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
@@ -369,59 +506,33 @@
 	 * group is for. A modifier-click adds or drops that whole set.
 	 */
 	function selectBox(id: string | null, additive = false) {
+		if (provisional && id !== provisional) settleProvisional();
 		if (!id) {
 			selectedIds = [];
 			return;
 		}
-		const box = template.boxes.find((b) => b.id === id);
-		const ids = box?.group
-			? template.boxes.filter((b) => b.group === box.group).map((b) => b.id)
-			: [id];
-		if (!additive) {
-			selectedIds = ids;
-			return;
-		}
-		const already = ids.every((one) => selectedIds.includes(one));
-		selectedIds = already
-			? selectedIds.filter((one) => !ids.includes(one))
-			: Array.from(new Set([...selectedIds, ...ids]));
+		const ids = groupMembers(template.boxes, id);
+		selectedIds = additive ? toggleSelection(selectedIds, ids) : ids;
 	}
 
 	function duplicateBox() {
 		if (!selectedBoxes.length || template.locked) return;
-		const copies: Box[] = [];
-		// One fresh group id for the copies, or duplicating a group would splice
-		// the copies into the original.
-		const regroup = new Map<string, string>();
-		for (const box of selectedBoxes) {
-			const source = structuredClone($state.snapshot(box));
-			if (source.group && !regroup.has(source.group)) regroup.set(source.group, `g_${Math.random().toString(36).slice(2, 8)}`);
-			copies.push({
-				...source,
-				id: nextBoxId([...template.boxes, ...copies]),
-				anchor: null,
-				x: box.x + 4,
-				y: box.y + 6,
-				...(source.group ? { group: regroup.get(source.group) } : {})
-			});
-		}
-		template = { ...template, boxes: [...template.boxes, ...copies] };
-		selectedIds = copies.map((b) => b.id);
+		describe(selectedBoxes.length === 1 ? 'Duplicate area' : `Duplicate ${selectedBoxes.length} areas`);
+		// Snapshotted: duplicateBoxes deep-clones its sources, which a state
+		// proxy cannot be.
+		const { boxes, created } = duplicateBoxes($state.snapshot(template.boxes) as Box[], selectedIds);
+		template = { ...template, boxes };
+		selectedIds = created;
 	}
 
 	function deleteBox() {
 		if (template.locked) return;
-		const gone = new Set(selectedBoxes.filter((b) => !b.locked).map((b) => b.id));
-		if (!gone.size) return;
-		template = {
-			...template,
-			// Anything anchored to a deleted box falls back to its own Y.
-			boxes: template.boxes
-				.filter((b) => !gone.has(b.id))
-				.map((b) => (b.anchor && gone.has(b.anchor.to) ? { ...b, anchor: null } : b))
-		};
+		const { boxes, removed } = deleteBoxes(template.boxes, selectedIds);
+		if (!removed) return;
+		describe(`Delete ${removed} area${removed === 1 ? '' : 's'}`);
+		template = { ...template, boxes };
 		selectedIds = [];
-		notify(`${gone.size} area${gone.size === 1 ? '' : 's'} deleted. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`);
+		notify(`${removed} area${removed === 1 ? '' : 's'} deleted. Ctrl/Cmd+Z brings ${removed === 1 ? 'it' : 'them'} back.`);
 	}
 
 	function alignSelection(edge: AlignEdge) {
@@ -430,33 +541,25 @@
 		if (boxes === template.boxes) return;
 		const vertical = edge === 'top' || edge === 'centre-y' || edge === 'bottom';
 		const skipped = vertical ? selectedBoxes.filter((b) => b.anchor && !b.locked).length : 0;
+		describe('Align');
 		template = { ...template, boxes };
 		notify(skipped
 			? `Aligned. ${skipped} anchored ${skipped === 1 ? 'area takes its top' : 'areas take their tops'} from another, so vertical alignment left ${skipped === 1 ? 'it' : 'them'} alone.`
 			: 'Aligned.');
 	}
 
-	/** All of them locked already means the button unlocks; otherwise it locks. */
 	function lockSelection() {
 		if (template.locked || !selectedBoxes.length) return;
-		const unlock = selectedBoxes.every((b) => b.locked);
-		const ids = new Set(selectedIds);
-		template = {
-			...template,
-			boxes: template.boxes.map((b) => (ids.has(b.id) ? stripUndefined({ ...b, locked: unlock ? undefined : true }) as Box : b))
-		};
+		describe(selectedBoxes.every((b) => b.locked) ? 'Unlock' : 'Lock');
+		template = { ...template, boxes: toggleLock(template.boxes, selectedIds).boxes };
 	}
 
 	function groupSelection() {
 		if (template.locked || selectedBoxes.length < 2) return;
-		const grouped = selectedBoxes.every((b) => b.group) && new Set(selectedBoxes.map((b) => b.group)).size === 1;
-		const group = grouped ? undefined : `g_${Math.random().toString(36).slice(2, 8)}`;
-		const ids = new Set(selectedIds);
-		template = {
-			...template,
-			boxes: template.boxes.map((b) => (ids.has(b.id) ? (stripUndefined({ ...b, group }) as Box) : b))
-		};
-		notify(grouped ? 'Ungrouped.' : `${selectedBoxes.length} areas grouped — clicking any one now takes all of them.`);
+		const { boxes, grouped } = toggleGroup(template.boxes, selectedIds);
+		describe(grouped ? 'Group' : 'Ungroup');
+		template = { ...template, boxes };
+		notify(grouped ? `${selectedBoxes.length} areas grouped — clicking any one now takes all of them.` : 'Ungrouped.');
 	}
 
 	/**
@@ -466,32 +569,13 @@
 	 */
 	function nudgeBox(dx: number, dy: number) {
 		const box = selected;
-		if (!box || box.locked || template.locked) return;
-		const round = (v: number) => Math.round(v * 100) / 100;
-		const next: Box = { ...box, x: round(box.x + dx) };
-		if (dy) {
-			if (box.anchor) next.anchor = { ...box.anchor, gap: Math.max(0, round(box.anchor.gap + dy)) };
-			else next.y = round(box.y + dy);
-		}
-		updateBox(next);
+		if (!box || template.locked) return;
+		// Millimetres: the editor has no pixels, and a status line that invented
+		// them would be describing a different app.
+		describe(`Move ${Math.max(Math.abs(dx), Math.abs(dy))}mm`);
+		const next = nudge(box, dx, dy);
+		if (next) updateBox(next);
 	}
-
-	/**
-	 * Alignment, in the order the segmented control in the bar reads: stepping is
-	 * clamped at the ends rather than wrapping, so holding the key settles on
-	 * left or on justify instead of cycling past it forever.
-	 */
-	const H_ALIGN: Align[] = ['left', 'center', 'right', 'justify'];
-	const V_ALIGN: VAlign[] = ['top', 'middle', 'bottom'];
-	const ALIGN_LABELS: Record<string, string> = {
-		left: 'left',
-		center: 'centred',
-		right: 'right',
-		justify: 'justified',
-		top: 'top',
-		middle: 'middle',
-		bottom: 'bottom'
-	};
 
 	/** Move every chosen box one step along an axis of alignment. */
 	function stepAlign(axis: 'h' | 'v', direction: -1 | 1) {
@@ -502,53 +586,13 @@
 		if (!targets.length) return;
 		const landed = new Set<string>();
 		for (const box of targets) {
-			if (axis === 'h') {
-				const current = box.align ?? template.defaults.align;
-				const at = H_ALIGN.indexOf(current);
-				const next = H_ALIGN[Math.min(H_ALIGN.length - 1, Math.max(0, at + direction))];
-				landed.add(next);
-				if (next !== current) updateBox({ ...box, align: next });
-			} else {
-				const current = box.valign ?? 'top';
-				const at = V_ALIGN.indexOf(current);
-				const next = V_ALIGN[Math.min(V_ALIGN.length - 1, Math.max(0, at + direction))];
-				landed.add(next);
-				if (next !== current) updateBox({ ...box, valign: next });
-			}
+			const step = stepAlignment(box, axis, direction, template.defaults.align);
+			landed.add(step.landed);
+			if (step.changed) updateBox({ ...box, ...(axis === 'h' ? { align: step.align } : { valign: step.valign }) });
 		}
+		describe(landed.size === 1 ? `Align ${ALIGN_LABELS[[...landed][0]]}` : 'Step the alignment');
 		notify(landed.size === 1 ? `Aligned ${ALIGN_LABELS[[...landed][0]]}.` : 'Alignment stepped.');
 	}
-
-	const ALIGN_KEYS: Record<string, ['h' | 'v', -1 | 1]> = {
-		ArrowLeft: ['h', -1],
-		ArrowRight: ['h', 1],
-		ArrowUp: ['v', -1],
-		ArrowDown: ['v', 1]
-	};
-
-	const NUDGES: Record<string, [number, number]> = {
-		ArrowLeft: [-1, 0],
-		ArrowRight: [1, 0],
-		ArrowUp: [0, -1],
-		ArrowDown: [0, 1]
-	};
-
-	/**
-	 * The keys that mean "I want this on paper". All three land on the same
-	 * screen, because there is one door to the printer and it is the preview.
-	 *
-	 * Ctrl/Cmd+P is the point of the exercise: the browser's own print dialog
-	 * would take the editor's DOM rather than the print run, so it is
-	 * intercepted rather than left to fire. This works even while a field has
-	 * focus — the alternative is a print dialog opening because you were in a
-	 * text box at the time. Ctrl/Cmd+Shift+P is Firefox's private window and
-	 * cannot be taken from it there; the other two work everywhere.
-	 */
-	const wantsExport = (event: KeyboardEvent) => {
-		if (!event.metaKey && !event.ctrlKey) return false;
-		const key = event.key.toLowerCase();
-		return key === 'p' || (event.shiftKey && key === 's');
-	};
 
 	function onWindowKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
@@ -604,11 +648,20 @@
 			deleteBox();
 			return;
 		}
+		// Paging the cards. PageUp and PageDown do it whatever is selected, because
+		// they mean nothing else here and reaching for them should not depend on
+		// what you last clicked. Both sit below the stand-downs above, so neither
+		// fires while a table cell has focus.
+		if (event.key === 'PageUp' || event.key === 'PageDown') {
+			event.preventDefault();
+			stepRow(event.key === 'PageUp' ? -1 : 1);
+			return;
+		}
 		// Ctrl/Cmd+Shift turns the arrows into alignment, in the direction pressed:
 		// the same keys, moving the content inside the box rather than the box
 		// itself. Checked before the nudge, which only looks at Shift and Alt.
 		const align = ALIGN_KEYS[event.key];
-		if (align && (event.metaKey || event.ctrlKey) && event.shiftKey && selectedIds.length) {
+		if (align && isAlignChord(event) && selectedIds.length) {
 			event.preventDefault();
 			stepAlign(align[0], align[1]);
 			return;
@@ -622,14 +675,56 @@
 			// 1mm, 5mm with Shift, 10mm with Alt as well. The old 0.25mm step is
 			// gone: anything finer than a millimetre is typed into the bar, where
 			// you can see the number you are aiming at.
-			const step = event.shiftKey ? (event.altKey ? 10 : GRID_MINOR) : 1;
+			const step = nudgeStep(event);
 			nudgeBox(move[0] * step, move[1] * step);
 			return;
 		}
-		if (event.key === 'Escape') selectedIds = [];
+		// With nothing selected the arrows had nothing to nudge and did nothing at
+		// all, so they page instead. Left and up go back, right and down forward:
+		// a card is a page, and both axes read the same way in a stack of them.
+		if (NUDGES[event.key] && !selectedIds.length) {
+			event.preventDefault();
+			const [dx, dy] = NUDGES[event.key];
+			stepRow(dx + dy);
+			return;
+		}
+		if (event.key === 'Escape') {
+			settleProvisional();
+			selectedIds = [];
+		}
 	}
 
 	// ---- import / export ----------------------------------------------------
+
+	/**
+	 * The sample cards back, from a press and hold on Import. Data only: it hangs
+	 * off an import-data button and that is what it does — silently replacing a
+	 * template someone has built would be a far worse surprise than a card that
+	 * does not quite fit.
+	 *
+	 * No confirmation. A snapshot is template, data and mapping together, so
+	 * Ctrl/Cmd+Z brings their rows straight back, and the rule here is that
+	 * destructive things are undoable and only ask when undo cannot reach them.
+	 */
+	function loadSample() {
+		describe('Load the sample cards');
+		dataset = sampleDataset();
+		// Remapped the way a first run maps: their template's slots against the
+		// sample's columns, so the cards render rather than coming up blank.
+		mapping = autoMap(usedSlots(template), dataset.columns);
+		activeRow = 0;
+		notify('Sample cards loaded. Ctrl/Cmd+Z puts your own rows back.');
+	}
+
+	/**
+	 * Step through the cards. The clamp lives here rather than at each call site,
+	 * which is how the pager, the table and the lightbox each ended up with their
+	 * own copy of it.
+	 */
+	function stepRow(by: number) {
+		if (!dataset.rows.length) return;
+		activeRow = Math.max(0, Math.min(dataset.rows.length - 1, activeRow + by));
+	}
 
 	function doExportTemplate() {
 		download(`${slugify(template.name)}.json`, exportTemplate($state.snapshot(template)));
@@ -662,6 +757,12 @@
 			const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== ref.family.toLowerCase());
 			template = { ...template, fonts: [...fonts, ref] };
 			missingFonts = missingFonts.filter((f) => (f.ref ?? f.family) !== (ref.ref ?? ref.family));
+			// Uploading from a box's Font dropdown is a way of choosing a font, not
+			// just of installing one: it used to leave the box on its old family,
+			// so the file landed and nothing on the card changed. Only when the
+			// upload was started from a box, and only when it replaces no missing
+			// reference — that flow is repairing a name the template already uses.
+			if (!family && selected) updateBox({ ...$state.snapshot(selected), font: ref.family } as Box);
 			notify(`${ref.family} installed in this browser.`);
 		} catch {
 			notify('That font file could not be read.', 'warning');
@@ -760,7 +861,7 @@
 			</button>
 		{/if}
 		<button onclick={() => (helpOpen = true)} title="How this works, and the keys">
-			<Icon name="help" size={15} /> Help
+			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
 		<button
 			onclick={() => (dataOpen = !dataOpen)}
@@ -810,6 +911,7 @@
 
 	{#if selected}
 		<OptionsBar
+			bind:this={boxBar}
 			section="box"
 			{template}
 			{dataset}
@@ -891,6 +993,7 @@
 			{background}
 			onselect={selectBox}
 			onchange={updateBox}
+			onaction={describe}
 			onbounds={(show) => (ui = { ...ui, showBounds: show })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
 			onzoom={(zoom) => (ui = { ...ui, zoom })}
@@ -917,6 +1020,7 @@
 				{dataset}
 				{activeRow}
 				onactivate={(i) => (activeRow = i)}
+				onloadsample={loadSample}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
 					// follows it, so the card keeps rendering what it rendered before.
@@ -1025,8 +1129,8 @@
 			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
 			<dt>← / →</dt><dd>Step through the cards, with one open full screen</dd>
 			<dt>? or /</dt><dd>This panel</dd>
-			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + '</dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + ; or H</dt><dd>Bounds on or off</dd>
+			<dt>Ctrl/Cmd + ' or #</dt><dd>Grid on or off</dd>
 			<dt>Ctrl/Cmd + P</dt><dd>Export — again from that screen to print</dd>
 			<dt>Ctrl/Cmd + Shift + P / S</dt><dd>The same door, for the fingers that reach for those</dd>
 			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
@@ -1059,6 +1163,8 @@
 
 		<h3>Data</h3>
 		<p>Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column. Deleting a row or a column happens straight away — Ctrl/Cmd+Z brings it back. <strong>Export CSV</strong> hands the table back as a file; the red <strong>Delete</strong> under it empties the whole dataset and asks twice. That leaves the template alone, as <strong>Reset</strong> in page setup leaves the data alone. <strong>Data</strong> in the toolbar folds the table away when the page needs the room.</p>
+
+		<p><strong>Import CSV…</strong> takes a file. Press and <em>hold</em> it instead, and the four sample cards come back — they explain the app, and they are a place to start from when a blank table is not one. That replaces the rows and leaves your template alone, and Ctrl/Cmd+Z undoes it.</p>
 
 		<p class="credit">
 			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>
@@ -1118,46 +1224,6 @@
 {/if}
 
 <style>
-	/* Control radii and borders live here rather than in each component: a button
-	   is 3px and a field is 1px everywhere in the app, both are drawn in the same
-	   grey, and there is one place to change any of it. A button that did not
-	   match the field beside it was the loudest thing in these bars. */
-	:global(:root) {
-		--radius-button: 3px;
-		--radius-input: 1px;
-		--border-control: #ccc;
-		--border-control-hover: #999;
-	}
-
-	/* Chrome is not prose: dragging across a toolbar should not leave half the
-	   app highlighted. Fields opt back in, because their contents are yours. */
-	:global(button),
-	:global(label),
-	:global(th),
-	:global(dt),
-	:global(.unit),
-	:global(.context) {
-		user-select: none;
-	}
-
-	:global(input),
-	:global(textarea) {
-		user-select: text;
-	}
-
-	:global(html, body) {
-		margin: 0;
-		height: 100%;
-		background: #eee;
-		color: #111;
-		font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	}
-
-	:global(*:focus-visible) {
-		outline: 2px solid #2563eb;
-		outline-offset: 1px;
-	}
-
 	.app {
 		display: flex;
 		flex-direction: column;
@@ -1203,6 +1269,13 @@
 		min-height: 0;
 		min-width: 0;
 		background: #fff;
+		/* The table sits over the working area rather than beside it. Positioned
+		   on purpose: .stage is position: relative with an opaque background, so a
+		   static aside would paint its shadow in the earlier block-backgrounds
+		   layer and the stage would cover it. Later in tree order, so it wins. */
+		position: relative;
+		z-index: 1;
+		box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
 	}
 
 	aside :global(.data) {
@@ -1464,6 +1537,11 @@
 
 		main.no-data {
 			grid-template-rows: minmax(0, 1fr);
+		}
+
+		/* Stacked, not side by side: the shadow falls upwards onto the preview. */
+		aside {
+			box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
 		}
 
 		.toolbar {

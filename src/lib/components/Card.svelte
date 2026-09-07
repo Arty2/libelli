@@ -5,7 +5,7 @@
 	import { fontStack } from '$lib/fonts';
 	import { FREE_STEP, GRID_MINOR, boxEdges, pxToMm, resolveLayout, snapTo, snapToEdges } from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
-	import { sidesOf } from '$lib/template';
+	import { normaliseRotation, sidesOf } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -15,6 +15,8 @@
 		mapping?: Mapping;
 		/** dashed box bounds and the bleed marker; screen only, never printed */
 		bounds?: boolean;
+		/** families still arriving, so an area can say so rather than sit in the fallback */
+		loadingFonts?: string[];
 		/** snap drags to the 5mm subgrid rather than to sibling edges */
 		grid?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
@@ -35,6 +37,8 @@
 		onchange?: (box: Box) => void;
 		/** right-click on a box, in viewport coordinates */
 		onmenu?: (id: string, x: number, y: number) => void;
+		/** what a drag is about to do, so undo can name it afterwards */
+		onaction?: (what: string) => void;
 	}
 
 	let {
@@ -42,6 +46,7 @@
 		row = null,
 		mapping = {},
 		bounds = false,
+		loadingFonts = [],
 		grid = false,
 		scale = 1,
 		interactive = false,
@@ -50,7 +55,8 @@
 		background = null,
 		onselect,
 		onchange,
-		onmenu
+		onmenu,
+		onaction
 	}: Props = $props();
 
 	let measured = $state<Record<string, number>>({});
@@ -129,6 +135,12 @@
 			// under the finger at 62%. Everything screen-only is sized against this
 			// so a target stays the size it was drawn at, whatever the zoom.
 			`--ui-scale:${1 / (scale || 1)}`,
+			// One weight for every screen-only line on the card, drawn against the
+			// zoom so a bound, a guide and a badge border are the same thickness at
+			// 50% as at 200%. The grid is set in PagePreview, outside the transform,
+			// and is deliberately finer than this.
+			`--line:${1 / (scale || 1)}px`,
+			`--line-thick:${1.5 / (scale || 1)}px`,
 			`background-color:${template.page.background ?? '#ffffff'}`,
 			...backgroundStyle(template.page.image, background)
 		].join(';');
@@ -150,11 +162,23 @@
 		read();
 		const observer = new ResizeObserver(read);
 		observer.observe(node);
+		// A clipped box is a fixed height, so nothing it contains can ever change
+		// its size and the resize observer above never fires for it — which is why
+		// the overflow warning used to appear on growing boxes and never on the
+		// clipped ones it matters most for. Content changes are a mutation, not a
+		// resize, so they need watching as such. Cheap: it fires on an actual DOM
+		// change, and read() only writes state when a number actually moved, so
+		// the re-render it can cause settles on the next pass.
+		const mutations = new MutationObserver(read);
+		mutations.observe(node, { subtree: true, childList: true, characterData: true });
 		// Web fonts land after first paint and change every height on the card.
 		if (typeof document !== 'undefined' && document.fonts) document.fonts.ready.then(read).catch(() => {});
 		return {
 			update: read,
-			destroy: () => observer.disconnect()
+			destroy: () => {
+				observer.disconnect();
+				mutations.disconnect();
+			}
 		};
 	}
 
@@ -183,9 +207,18 @@
 		if (box.italic) parts.push('font-style:italic');
 		if (box.textCase === 'uppercase') parts.push('text-transform:uppercase');
 		if (box.textCase === 'smallcaps') parts.push('font-variant-caps:small-caps');
+		// Emitted whether or not there is any, because the selected-box padding
+		// guide reads these back and a missing custom property would fall to 0 and
+		// draw the guide exactly on top of the bounds.
+		const pad = sidesOf(box.padding ?? 0);
+		parts.push(
+			`--pad-t:${pad.top}mm`,
+			`--pad-r:${pad.right}mm`,
+			`--pad-b:${pad.bottom}mm`,
+			`--pad-l:${pad.left}mm`
+		);
 		if (box.padding) {
-			const p = sidesOf(box.padding);
-			parts.push(`padding:${p.top}mm ${p.right}mm ${p.bottom}mm ${p.left}mm`);
+			parts.push(`padding:${pad.top}mm ${pad.right}mm ${pad.bottom}mm ${pad.left}mm`);
 		}
 		if (box.background) parts.push(`background:${box.background}`);
 		// `.box` is border-box, so a border eats into the width rather than adding
@@ -211,7 +244,9 @@
 		if (hidden.has(box.id)) {
 			parts.push('height:0', 'overflow:hidden', 'visibility:hidden');
 		} else if (box.overflow === 'clip') {
-			parts.push(`height:${box.h}mm`, 'overflow:hidden');
+			// The height only. The clip itself is CSS, on .content — put here, on
+			// the box, it also ate the handles and badges that hang off its edges.
+			parts.push(`height:${box.h}mm`);
 		} else {
 			parts.push(`min-height:${box.h}mm`);
 		}
@@ -245,7 +280,7 @@
 
 	// ---- direct manipulation -------------------------------------------------
 
-	type DragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | 'centre';
+	type DragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | 'centre' | 'rotate';
 	let drag: {
 		id: string;
 		mode: DragMode;
@@ -253,6 +288,10 @@
 		startY: number;
 		origin: Box;
 		others: Box[];
+		/** boxes anchored to this one: they take the x delta and nothing else */
+		held: Box[];
+		/** whether this drag has said what it is, which it does once it moves */
+		named?: boolean;
 	} | null = null;
 
 	const editable = (box: Box) => interactive && !box.locked && !template.locked;
@@ -283,6 +322,15 @@
 			others:
 				mode === 'move' && selectedIds.length > 1
 					? template.boxes.filter((b) => b.id !== box.id && selectedIds.includes(b.id) && !b.locked).map((b) => ({ ...b }))
+					: [],
+			// Anchored boxes already follow this one downwards — resolveLayout takes
+			// their top from its bottom — so they only need the sideways half of the
+			// move. Applying the vertical delta as well would move them twice.
+			held:
+				mode === 'move'
+					? dependentsOf(box.id)
+							.filter((b) => !b.locked && !selectedIds.includes(b.id))
+							.map((b) => ({ ...b }))
 					: []
 		};
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -317,6 +365,15 @@
 		// A size is not a position: it rounds, but it never latches onto an edge.
 		const size = (value: number) => snapTo(value, grid ? GRID_MINOR : FREE_STEP);
 
+		// Named on the first movement rather than at pointerdown, and once only.
+		// Selecting a box goes through startDrag too, so naming it there labelled
+		// every click "Move" — and since the first label of a burst is the one
+		// that sticks, a click followed by an arrow key was recorded as a drag.
+		if (!drag.named) {
+			drag.named = true;
+			onaction?.(DRAG_LABELS[drag.mode]);
+		}
+
 		const origin = drag.origin;
 		// The handles turn with the box, so a pointer delta arrives in screen space
 		// and has to come back through the rotation before it can be read as a
@@ -325,7 +382,12 @@
 		// box off at an angle to the pointer.
 		const screenX = pxToMm((event.clientX - drag.startX) / scale);
 		const screenY = pxToMm((event.clientY - drag.startY) / scale);
-		const turn = drag.mode === 'move' ? 0 : ((origin.rotation ?? 0) * Math.PI) / 180;
+		// 'move' and 'rotate' are both exempt, for different reasons: a translation
+		// in the parent's space is the same however the box is turned, and a
+		// rotation is read from where the pointer *is* rather than how far it has
+		// come. Every new mode lands in the un-rotating branch by default, which
+		// is why this reads as a list rather than a single comparison.
+		const turn = drag.mode === 'move' || drag.mode === 'rotate' ? 0 : ((origin.rotation ?? 0) * Math.PI) / 180;
 		const cos = Math.cos(turn);
 		const sin = Math.sin(turn);
 		const dx = screenX * cos + screenY * sin;
@@ -340,6 +402,39 @@
 		};
 
 		switch (drag.mode) {
+			case 'rotate': {
+				// The angle from the pivot to the pointer, against the angle it
+				// started at, so the box does not jump when the drag begins. Both
+				// are measured in the page's own space: the handle turns with the
+				// box, so a delta would chase itself.
+				const node = event.currentTarget as HTMLElement;
+				const boxEl = node.closest('.box') as HTMLElement | null;
+				const trimEl = boxEl?.offsetParent as HTMLElement | null;
+				if (!boxEl || !trimEl) break;
+				// Read the box's *layout* geometry, not its rendered rectangle: once
+				// a box is turned, getBoundingClientRect reports the upright box that
+				// contains it, and the pivot taken from that is somewhere else
+				// entirely. offsetLeft and friends are measured against .trim, which
+				// never turns, so they describe the box as it was placed. The pivot
+				// is the transform origin, so it is the one point that does not move
+				// when the rotation changes — which is what makes this valid.
+				const trim = trimEl.getBoundingClientRect();
+				const c = origin.centre ?? { x: 50, y: 50 };
+				const pivotX = trim.left + (boxEl.offsetLeft + (boxEl.offsetWidth * c.x) / 100) * scale;
+				const pivotY = trim.top + (boxEl.offsetTop + (boxEl.offsetHeight * c.y) / 100) * scale;
+				// The lever is grabbed at arm's length from the pivot, so the angle is
+				// well defined the moment the drag starts — which is the whole reason
+				// rotation is not dragged from the pivot itself, where atan2 has
+				// nothing to measure and a pixel of movement swings the box wildly.
+				const now = Math.atan2(event.clientY - pivotY, event.clientX - pivotX);
+				const then = Math.atan2(drag.startY - pivotY, drag.startX - pivotX);
+				let deg = (origin.rotation ?? 0) + ((now - then) * 180) / Math.PI;
+				// Whole degrees, or a quarter turn with Shift — the same bargain the
+				// grid makes for position: coarse by default, exact when typed.
+				deg = event.shiftKey ? Math.round(deg / 15) * 15 : Math.round(deg);
+				next.rotation = normaliseRotation(deg) ?? 0;
+				break;
+			}
 			case 'centre': {
 				// Percent of the box, not millimetres, because that is how the pivot
 				// is stored — and clamped to the box, so it can never be dragged
@@ -410,6 +505,11 @@
 				onchange?.(moved);
 			}
 		}
+
+		if (drag.mode === 'move' && drag.held.length) {
+			const movedX = next.x - origin.x;
+			if (movedX) for (const held of drag.held) onchange?.({ ...held, x: round2(held.x + movedX) });
+		}
 	}
 
 	const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -426,13 +526,74 @@
 	}
 
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
+	const DRAG_LABELS: Record<DragMode, string> = {
+		move: 'Move',
+		rotate: 'Turn',
+		centre: 'Move the pivot',
+		n: 'Resize',
+		s: 'Resize',
+		e: 'Resize',
+		w: 'Resize',
+		ne: 'Resize',
+		nw: 'Resize',
+		se: 'Resize',
+		sw: 'Resize'
+	};
+
+	/**
+	 * Screen only, and only while it is true: a box drawn in the fallback face
+	 * looks exactly like a box whose font simply did not apply, which is how a
+	 * slow family reads as a broken one.
+	 */
+	/**
+	 * A text area carrying its own words rather than a column's. Only the text
+	 * modes: an unbound image or QR is static in the same sense, but its content
+	 * is visibly a fixed thing already, and a badge on every decorative box is
+	 * clutter rather than information.
+	 */
+	const isStatic = (box: Box) => !box.slot && (box.mode === 'plain' || box.mode === 'markdown');
+
+	/**
+	 * Boxes other areas hang from. Anchoring is a relationship, and until now only
+	 * one end of it was visible: the box that follows said so, and the box being
+	 * followed gave no sign that moving it would take anything with it.
+	 */
+	/** Every box that hangs off this one, at any depth. */
+	function dependentsOf(id: string): Box[] {
+		const out: Box[] = [];
+		const queue = [id];
+		const seen = new Set([id]);
+		while (queue.length) {
+			const held = queue.shift()!;
+			for (const box of template.boxes) {
+				if (box.anchor?.to !== held || seen.has(box.id)) continue;
+				seen.add(box.id);
+				out.push(box);
+				queue.push(box.id);
+			}
+		}
+		return out;
+	}
+
+	const anchorTargets = $derived(
+		new Set(template.boxes.map((b) => b.anchor?.to).filter((id): id is string => !!id))
+	);
+
+	const waitingFor = (box: Box) =>
+		loadingFonts.includes(box.font ?? template.defaults.font);
 </script>
 
 <div class="card" class:bleeding={bleed > 0} class:editing={interactive} style={cardStyle()} lang="en">
-	<div class="trim" class:bleed-marked={bounds && bleed > 0} style="width:{template.page.w}mm;height:{template.page.h}mm">
+	<div class="trim" style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
 			{@html styleTag(customCss)}
+		{/if}
+
+		{#if bounds && bleed > 0}
+			<!-- Where the paper will be cut. -->
+			<svg class="chrome trim-line" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 		{/if}
 
 		{#each template.boxes as box (box.id)}
@@ -442,6 +603,11 @@
 				class:outlined={bounds && !empty}
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
+				class:clipped={box.overflow === 'clip' && !empty}
+				class:locked={!!box.locked}
+				class:no-padding={!box.padding}
+				class:grouped={!!box.group}
+				class:font-loading={interactive && waitingFor(box)}
 				style={boxStyle(box)}
 				data-box-id={box.id}
 				use:measure={box.id}
@@ -481,20 +647,47 @@
 					{/if}
 				</div>
 
+				<!-- The lines around a box are strokes, not borders. A browser rounds
+				     border-width to whole device pixels, so a bound asked for at
+				     1.33px inside a 75% card was drawn at 1px and one asked for at
+				     0.5px inside a 200% card was drawn at 2px. An SVG stroke is not
+				     rounded, so var(--line) lands exactly whatever the zoom. -->
+				{#if bounds && !empty}
+					<svg class="chrome bounds" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+				{/if}
+				{#if interactive && isSelected(box)}
+					{#if box.padding}
+						<!-- Where the words actually start. -->
+						<svg class="chrome pad" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+					{/if}
+					<svg class="chrome selection" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+				{/if}
+
 				{#if bounds && !empty && overflowing[box.id]}
-					<!-- Always on screen, never gated behind bounds: this is not
-					     furniture, it is a warning that the print will be wrong. -->
-					<span class="overflow-mark" title="The content does not fit — this box is clipping what will print">
-						<Icon name="warning" size={11} />
+					<!-- A badge like the others, in the one colour that means the print
+					     will be wrong rather than merely constrained. Shears, because
+					     what is happening to the words is that they are being cut. -->
+					<span class="overflow-mark" title="The content does not fit — this area is cutting off what will print">
+						<Icon name="scissors" size={11} />
 					</span>
 				{/if}
 
-				{#if bounds && (box.anchor || box.locked)}
+				{#if bounds && (box.anchor || box.locked || isStatic(box) || anchorTargets.has(box.id))}
 					<!-- Why the box will not do what you might ask of it, stacked at its
 					     corner: the anchor above the lock when it carries both. -->
 					<span class="badges">
+						{#if isStatic(box)}
+							<span class="badge" title="Static text — this says the same on every card, because it is not bound to a column">
+								<Icon name="unlink" size={11} />
+							</span>
+						{/if}
 						{#if box.anchor}
-							<span class="badge" title="Anchored to another box — its top follows that box's bottom">
+							<span class="badge" title="Tied to another area — its top follows that area's bottom, and it moves when that one does">
+								<Icon name="knot" size={11} />
+							</span>
+						{/if}
+						{#if anchorTargets.has(box.id)}
+							<span class="badge" title="Other areas are anchored to this one — moving it moves them too">
 								<Icon name="anchor" size={11} />
 							</span>
 						{/if}
@@ -507,22 +700,36 @@
 				{/if}
 
 				{#if interactive && isSelected(box) && soleSelection}
-					{#if editable(box) && box.rotation}
-						<!-- The point the box turns about, draggable where it acts. Only
-						     drawn on a rotated box: on an upright one it would be a
-						     control with nothing to show for itself. -->
+					{#if editable(box)}
+						<!-- Turning happens about the pivot, so the handle for it is the
+						     pivot: a mark on the top edge would say nothing about where
+						     the box is actually going to turn, and the pivot moves. One
+						     mark, two gestures — drag to turn, Alt-drag to move the
+						     point turned about — with the X and Y in the bar as the
+						     precise way to place it for anyone who never finds the
+						     modifier. Drawn on an upright box too, unlike the old pivot,
+						     because it is the rotation control now and has to be there
+						     before there is any rotation to show. -->
 						<span
 							class="pivot"
 							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
-							title="The point this box turns about — drag it, or type it in the bar"
+							title="The point this area turns about — drag it, or type it in the bar"
 							onpointerdown={(e) => startDrag(e, box, 'centre')}
 							onpointermove={moveDrag}
 							onpointerup={endDrag}
 							onpointercancel={endDrag}
 							role="presentation"
 						></span>
-					{/if}
-					{#if editable(box)}
+						<span
+							class="lever"
+							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
+							title="Drag to turn this area — hold Shift for 15° steps"
+							onpointerdown={(e) => startDrag(e, box, 'rotate')}
+							onpointermove={moveDrag}
+							onpointerup={endDrag}
+							onpointercancel={endDrag}
+							role="presentation"
+						></span>
 						{#each HANDLES as handle (handle)}
 							<span
 								class="handle h-{handle}"
@@ -602,6 +809,19 @@
 		min-width: 0;
 	}
 
+	/* A clipped box cuts its content at its own edge, but must not cut the
+	   handles, pivot and badges that sit outside that edge — they are siblings of
+	   .content, so clipping here reaches the content and nothing else. The card
+	   settles the same argument one level up, in .card.editing.
+
+	   min-height: 0 is load-bearing: a flex item refuses by default to shrink
+	   below its content height, so without it the content would keep spilling out
+	   of the fixed-height box and there would be nothing for overflow to cut. */
+	.box.clipped > .content {
+		overflow: hidden;
+		min-height: 0;
+	}
+
 	.plain {
 		display: block;
 		white-space: pre-wrap;
@@ -642,13 +862,18 @@
 	   Both are in screen pixels: multiplying by `--ui-scale` undoes the card's
 	   own zoom, so a handle is the same size to the hand at 40% as at 200%. */
 	.handle,
-	.pivot {
+	.pivot,
+	.lever {
 		--mark: calc(14px * var(--ui-scale, 1));
 		--reach: calc(8px * var(--ui-scale, 1));
 		position: absolute;
 		width: var(--mark);
 		height: var(--mark);
-		background: #fff;
+		/* No fill: a handle sits on top of the content it is there to resize, and a
+		   white square hides the very edge you are trying to place. The trade-off
+		   is that the outline is all there is to see, so it carries the weight on
+		   a dark background image where a white square used to stand out. */
+		background: transparent;
 		border: calc(1px * var(--ui-scale, 1)) solid #2563eb;
 		border-radius: var(--radius-button);
 		box-sizing: border-box;
@@ -660,32 +885,121 @@
 	   grows a handle but is never hit-tested, so the target used to be the square
 	   and nothing more. A pseudo-element is hit-tested, and it costs no layout. */
 	.handle::before,
-	.pivot::before {
+	.pivot::before,
+	.lever::before {
 		content: '';
 		position: absolute;
 		inset: calc(-1 * var(--reach));
 	}
 
+	/* A crosshair, which is what a point is drawn as — and, more to the point, not
+	   a circle: the lever's knob sits a few pixels away and does something else
+	   entirely, so the two marks have to be told apart at a glance rather than by
+	   remembering that the further one turns the box. Centred on its own
+	   coordinates by the negative margin. Dragging it moves the point the box
+	   turns about; turning is the lever. */
 	.pivot {
-		--mark: calc(11px * var(--ui-scale, 1));
+		--mark: calc(15px * var(--ui-scale, 1));
+		/* The ring sits inside the arms, so the cross reads through it. */
+		--ring: calc(4.5px * var(--ui-scale, 1));
 		margin: calc(var(--mark) / -2) 0 0 calc(var(--mark) / -2);
 		border: none;
-		border-radius: 50%;
-		box-shadow: inset 0 0 0 calc(2px * var(--ui-scale, 1)) #2563eb;
+		border-radius: 0;
+		box-shadow: none;
+		/* Two crossed bars, as background gradients. A gradient honours a
+		   sub-pixel width where a border is rounded to whole device pixels, so the
+		   arms come out the same weight as every other line on the card at any
+		   zoom, straight off --line — and it costs no element, which matters
+		   because ::before is the hit target. */
+		background-image:
+			linear-gradient(#2563eb, #2563eb),
+			linear-gradient(#2563eb, #2563eb),
+			radial-gradient(
+				circle at center,
+				transparent calc(var(--ring) - var(--line)),
+				#2563eb calc(var(--ring) - var(--line)) var(--ring),
+				transparent var(--ring)
+			);
+		background-size:
+			100% var(--line),
+			var(--line) 100%,
+			100% 100%;
+		background-position: center;
+		background-repeat: no-repeat;
 		cursor: move;
+	}
+
+	/* The lever: a knob on a short arm off the pivot, which is what you swing to
+	   turn the box. It hangs off the pivot rather than off the box edge so it
+	   travels with the point the rotation is actually about, and being at arm's
+	   length is what gives the drag an angle to measure from the first pixel.
+	   Below the pivot rather than above it, where the box's own content and the
+	   area above it are not competing for the same few pixels. Both it and the
+	   arm rotate with the box, because they are inside it. */
+	.lever {
+		--arm: calc(30px * var(--ui-scale, 1));
+		--mark: calc(11px * var(--ui-scale, 1));
+		margin: calc(var(--arm) - var(--mark) / 2) 0 0 calc(var(--mark) / -2);
+		border-radius: 50%;
+		cursor: grab;
+	}
+
+	.lever:active {
+		cursor: grabbing;
+	}
+
+	/* The arm is drawn, not grabbed. It runs from the knob down to the pivot, so
+	   leaving it hit-testable put a lever-shaped hole over the pivot and the point
+	   the box turns about could never be picked up. */
+	.lever::after {
+		content: '';
+		position: absolute;
+		left: calc(50% - var(--line, 1px) / 2);
+		bottom: 100%;
+		width: var(--line, 1px);
+		height: var(--arm);
+		background: #2563eb;
+		pointer-events: none;
+	}
+
+	/* Above the resize handles. The pivot can be moved onto an edge or a corner
+	   where a handle already sits, and between them these two are the only way to
+	   turn a box — where resizing has eight other places to be grabbed from. */
+	.lever {
+		z-index: 4;
+	}
+
+	/* And the pivot above the lever: their reaches overlap near the pivot, and
+	   the one you mean there is always the pivot — the lever has its knob. */
+	.pivot {
+		z-index: 5;
 	}
 
 	/* Fingers are not mice: the marks stay small enough to see past, and the
 	   targets grow to something you can actually land on. */
 	@media (pointer: coarse) {
+		/* The mark shrinks and the reach grows by the same amount, so the target
+		   stays 48px for a handle and 44px for the pivot — what it was when the
+		   marks were 20px and 16px. A finger covers the thing it is dragging, so
+		   the less of it the mark takes up the better, and the target is the
+		   ::before, which costs no layout and does not have to be seen. */
 		.handle {
-			--mark: calc(20px * var(--ui-scale, 1));
-			--reach: calc(14px * var(--ui-scale, 1));
+			--mark: calc(10px * var(--ui-scale, 1));
+			--reach: calc(19px * var(--ui-scale, 1));
 		}
 
 		.pivot {
-			--mark: calc(16px * var(--ui-scale, 1));
-			--reach: calc(14px * var(--ui-scale, 1));
+			--mark: calc(11px * var(--ui-scale, 1));
+			--reach: calc(20px * var(--ui-scale, 1));
+		}
+
+		/* The rotation control used to be left out of this block entirely, which
+		   is why it could not be worked on a phone: it kept the fine-pointer 8px
+		   reach, on a mark floating outside the box. */
+		.lever {
+			--arm: calc(34px * var(--ui-scale, 1));
+			--mark: calc(10px * var(--ui-scale, 1));
+			--reach: calc(19px * var(--ui-scale, 1));
 		}
 	}
 
@@ -709,67 +1023,186 @@
 	.crop-marks .br { bottom: 0; right: 0; border-left: 0.2mm solid #000; border-top: 0.2mm solid #000; }
 
 	@media screen {
-		.box.outlined::after {
-			content: '';
-			position: absolute;
-			inset: 0;
-			border: 1px dashed rgba(37, 99, 235, 0.45);
-			pointer-events: none;
-		}
-		.box.selected::after {
-			content: '';
-			position: absolute;
-			inset: 0;
-			border: 1px solid #2563eb;
-			pointer-events: none;
+		/* A family that has not arrived draws in the system stack, which looks
+		   exactly like a font that never applied. The pulse says "wait" rather
+		   than letting a slow font read as a broken one. Screen only, and off
+		   entirely for anyone who has asked for less motion. */
+		@media (prefers-reduced-motion: no-preference) {
+			.box.font-loading .content {
+				animation: font-waiting 1.1s ease-in-out infinite;
+			}
 		}
 
-		/* Where the paper will be cut. Purple so it reads as a different kind of
-		   line from a box outline, and tied to the same toggle. */
-		.trim.bleed-marked::before {
-			content: '';
+		@keyframes font-waiting {
+			0%,
+			100% {
+				opacity: 1;
+			}
+			50% {
+				opacity: 0.45;
+			}
+		}
+
+		/* Four things want to draw on one box and there are two pseudo-elements,
+		   so the selection moved to an `outline` on the box itself — identical to
+		   look at, costs no layout, and leaves ::after for the bounds and ::before
+		   for the padding guide. It also means a locked or grouped box keeps its
+		   state colour while selected, instead of the blue overwriting it.
+
+		   Every weight here is multiplied by --ui-scale. Screen furniture lives
+		   inside the scaled card, so a plain 1px line is 0.6px at 64% and 2px at
+		   200%: the marks have to be drawn against the zoom to stay the size they
+		   were designed at.
+
+		   Both come out exact. Anything with a width and a height — a handle, a
+		   badge, the overflow corner — is sized against --ui-scale; every line is
+		   an SVG stroke rather than a border, because stroke widths are not
+		   quantised to whole device pixels the way border widths are. See the
+		   .chrome rules below. */
+		/* Every line on a card is one of these: an SVG rect whose stroke is set in
+		   var(--line), which is 1px divided by the zoom. Stroke widths are not
+		   quantised the way border widths are — a stroke of 0.5 is drawn as half a
+		   pixel rather than rounded up to one — so the line comes out the same
+		   thickness on screen at any scale. Dashes are expressed in --line too, or
+		   the pattern would breathe while the weight held still. */
+		.chrome {
 			position: absolute;
 			inset: 0;
-			border: 1px dashed rgba(124, 58, 237, 0.7);
+			width: 100%;
+			height: 100%;
+			/* The stroke straddles the edge it is drawn on, so half of it is
+			   outside the rect and must not be clipped away. */
+			overflow: visible;
 			pointer-events: none;
 			z-index: 2;
 		}
 
+		.chrome rect {
+			fill: none;
+			stroke-width: var(--line);
+		}
+
+		.bounds rect {
+			stroke: var(--bounds-colour, rgba(37, 99, 235, 0.45));
+			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
+		}
+
+		/* A locked box cannot be moved, and a grouped one moves with others: both
+		   are reasons a drag will not do what you expect, so they colour the
+		   bounds. Locked wins when a box is both — it is the stronger refusal.
+		   The dash is coarser as well as red, because the overflow corner is
+		   already red and two reds a millimetre apart are one red. */
+		.box.grouped {
+			--bounds-colour: rgba(124, 58, 237, 0.75);
+		}
+
+		.box.locked {
+			--bounds-colour: rgba(180, 35, 24, 0.8);
+		}
+
+		.box.locked .bounds rect {
+			stroke-width: var(--line-thick);
+			stroke-dasharray: calc(var(--line) * 5) calc(var(--line) * 3);
+		}
+
+		.selection rect {
+			stroke: #2563eb;
+		}
+
+		/* Positioned by the padding the box was given, so the guide moves with it
+		   without anything having to convert millimetres to pixels. */
+		.pad {
+			inset: var(--pad-t, 0) var(--pad-r, 0) var(--pad-b, 0) var(--pad-l, 0);
+			width: auto;
+			height: auto;
+		}
+
+		.pad rect {
+			stroke: rgba(8, 145, 178, 0.8);
+			stroke-dasharray: calc(var(--line) * 2) calc(var(--line) * 2);
+		}
+
+		/* Green: it is not a box outline and not a state, it is the edge of the
+		   paper, and purple now means a grouped box. */
+		.trim-line rect {
+			stroke: rgba(5, 150, 105, 0.85);
+			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
+		}
+
+		/* The same badge as the others — same size, radius and standing clear of
+		   the edge — in the one colour that says the print will be wrong. It hangs
+		   off the bottom right, where the words run out, rather than sharing the
+		   column of reasons at the top right. */
 		.overflow-mark {
 			position: absolute;
-			right: -1px;
-			bottom: -1px;
+			top: 100%;
+			left: 100%;
+			margin: calc(-13px * var(--ui-scale, 1)) 0 0 calc(4px * var(--ui-scale, 1));
 			display: grid;
 			place-items: center;
-			width: 15px;
-			height: 15px;
-			border-radius: var(--radius-button) 0 0 0;
+			width: calc(13px * var(--ui-scale, 1));
+			height: calc(13px * var(--ui-scale, 1));
+			box-sizing: border-box;
+			border-radius: var(--radius-button);
+			border: var(--line) solid #8f1c13;
 			background: #b42318;
 			color: #fff;
-			pointer-events: none;
+			/* Hoverable, like the badges: its title is the only thing that says what
+			   the mark means, and pointer-events: none meant it never showed. */
+			pointer-events: auto;
+			cursor: help;
 			z-index: 3;
 		}
 
+		/* Clear of the box, not straddling it: a badge sitting on the corner
+		   covered the content it was annotating and fought the corner handle for
+		   the same pixels. The column hangs to the right of the edge instead. */
 		.badges {
 			position: absolute;
-			top: -9px;
-			right: -9px;
+			top: 0;
+			left: 100%;
+			margin-left: calc(4px * var(--ui-scale, 1));
 			display: flex;
 			flex-direction: column;
-			gap: 2px;
+			gap: calc(2px * var(--ui-scale, 1));
 			z-index: 3;
+			/* The column is click-through so a drag started beside the box still
+			   reaches it; the badges themselves are not, or their title — the only
+			   thing that says what they mean — could never be hovered. */
 			pointer-events: none;
 		}
 
+		/* Quieter than the blue chrome around it. A badge is an annotation, not a
+		   control: it says why the box will not do what you asked, and it should
+		   not read as loudly as the thing you are dragging. */
 		.badge {
 			display: grid;
 			place-items: center;
-			width: 18px;
-			height: 18px;
+			width: calc(13px * var(--ui-scale, 1));
+			height: calc(13px * var(--ui-scale, 1));
+			/* Or the border is added to the width, and a badge drawn against the
+			   zoom would hold its size everywhere except its own edges. */
+			box-sizing: border-box;
 			border-radius: var(--radius-button);
 			background: #fff;
-			border: 1px solid #2563eb;
-			color: #2563eb;
+			border: var(--line) solid #c4c4c4;
+			color: #767676;
+			pointer-events: auto;
+			cursor: help;
+		}
+
+		.badge:hover {
+			border-color: #767676;
+			color: #333;
+		}
+
+		/* Icon takes a px size, which is inside the card's transform like
+		   everything else here, so the glyph is overridden against the zoom too —
+		   otherwise the badge would hold its size and its contents would not. */
+		.badge :global(svg),
+		.overflow-mark :global(svg) {
+			width: calc(9px * var(--ui-scale, 1));
+			height: calc(9px * var(--ui-scale, 1));
 		}
 
 		.guide {
@@ -778,7 +1211,19 @@
 			pointer-events: none;
 			z-index: 4;
 		}
-		.guide.vertical { top: 0; bottom: 0; width: 1px; }
-		.guide.horizontal { left: 0; right: 0; height: 1px; }
+
+		.guide.vertical { top: 0; bottom: 0; width: var(--line); }
+		.guide.horizontal { left: 0; right: 0; height: var(--line); }
+	}
+
+	/* The overlays are conditional on `bounds` and on being interactive, neither
+	   of which the print root passes, so they are not in the DOM on paper. Said
+	   again here because they are elements now rather than pseudo-elements inside
+	   @media screen: they no longer fail safe by construction, and a line on the
+	   paper is a printing error rather than a cosmetic one. */
+	@media print {
+		.chrome {
+			display: none !important;
+		}
 	}
 </style>

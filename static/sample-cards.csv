@@ -1,46 +1,52 @@
 title,subtitle,body,category,link
-Watering the Ferns,,"## Too dry [⚠]{red}
+Start here,One row below is one card,"## A row is a card [1]{blue}
 
-- Check the pots every second morning. The soil should feel like a wrung-out cloth.
+The table underneath holds the words. This page holds the design. libelli prints **one card per row** — four rows, four cards.
 
-## Too wet [⚠]{blue}
+- Page through them with the arrows under the sheet.
+- Nothing here is uploaded. It all stays in this browser.
 
-- If water is still sitting in the saucer an hour later, tip it out and let the pot drain.
+## Try it
 
-## Please…
+- Change *Start here* in the table. This title changes as you type.
+- Scan the code in the corner to open libelli on your phone.
 
-- Refill the watering cans and leave them on the low shelf.
-- Wipe up spills so the tiles stay dry.
-- Snip off yellowed fronds and put them in the green bin, not the compost crate.
-- Write the date on the tag whenever you repot something.
-- Tell the desk if a plant looks poorly two visits in a row.",Plants,https://meadowlark.example/care/ferns
-How to Move the Trolleys,,"- Push a trolley by the long handle, never by the shelves. Lock both wheels once it is parked.
-- Before raising a shelf, check that nothing is taped to the frame or wound around the uprights.
-- To raise a shelf, hold ↑ ↓ together on the grey lever until it clicks, then hold one arrow to move it.
-- Leave the lever clipped to the trolley frame when you have finished with it.
-- Don't lift a shelf off its brackets.",Equipment,https://meadowlark.example/kit/trolleys
-Potting Bench Rules,1/2 – Share the space ☺,"## Sharp tools [⚠]{red}
+These four cards are the tour. Read them, then type over them — they are only sample rows, and nothing here is precious.",Basics,https://libelli.vercel.app
+The table below,"Change a cell, watch the card","## Columns are fields [2]{blue}
 
-- Return secateurs to the rack closed.
-- No knives left blade-up in the tray.
-- Gloves stay with the bench, not in your bag.
+The header of each column is its name. A box on the page asks for a field *by that name*, so renaming a column carries the design with it instead of breaking it.
 
-## Spills [⚠]{blue}
+- Click a header to rename it. The card keeps rendering.
+- Click `+` to add a row, and you have another card.
 
-- Sweep loose compost into the tray before you leave.
-- Keep liquid feed away from the seed drawers.
+## The empty cell
 
-## Moving things
+This row's `link` cell is blank, which is why **the code in the corner is missing here** and present on the other three. A box set to Hide When Empty takes its space with it rather than leaving a hole.
 
-- Ask before shifting a bench; they are heavier than they look.
-- Don't stand on stools or crates. Use the step, with someone holding it.
-- Keep the aisle and the fire door clear.
-- Bring nothing in from the street: no soil, no found timber.",Benches,https://meadowlark.example/rules/benches
-How to Book a Grow Light,2/2 Booking a slot,"1. Send an email to **bookings@meadowlark.example** from the address on your membership card, saying which bench you need.
-2. Wait for the confirmation reply listing the slot you were given.
-3. Come to the desk and tap the **Bookings** tile on the screen.
-4. Enter your membership number.
-5. Enter the four-digit code from the confirmation email.
-6. Wait a moment for your slot to appear.
-7. Adjust the timer as needed: hours on, hours off, brightness.
-8. Press **Start**.",Equipment,https://meadowlark.example/book/grow-lights
+- Compare this footer with card 1's.",Data,
+The card above,Drag anything. Nothing is stuck.,"## Move things [3]{blue}
+
+Every box is dragged in millimetres from the trim edge, so the page size can change underneath a design without moving anything on it.
+
+- Drag a box. Grab a corner to resize it.
+- Grid and Bounds, bottom left, decide what it snaps to.
+
+## What the marks mean
+
+- [⚠]{red} A red corner means the words are longer than the box, and the rest is being cut off.
+- [⚠]{blue} A box can take its top from the box above instead of its own position — which is why this text moves down when a title runs to two lines.
+
+Try it: make this card's title very long, and watch everything below it give way.",Layout,https://heracl.es/libelli
+Getting it out,"Paper, picture, or the template","## To paper [4]{blue}
+
+1. Press **Print**, or Ctrl/Cmd+P.
+2. Check the preview — it shows every card, and you can untick any you do not want.
+3. Set your printer to the same paper size as the page, and turn on background graphics.
+
+## Other ways out
+
+- **PNG** saves one card as a picture, at print resolution.
+- **Export** saves the design as a small file you can send to someone. It carries the layout, not the data.
+- **Export CSV** saves the words on their own.
+
+Press and hold *Import CSV…* to bring these four cards back at any time. Scan the corner for the source code.",Output,https://github.com/Arty2/libelli

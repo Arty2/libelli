@@ -301,18 +301,19 @@ export function arrangeBoxes(boxes: Box[], ids: string[], where: Arrange): Box[]
 /**
  * Sheet sizes worth having to hand, in millimetres and in portrait.
  *
- * The card sizes are the real standards rather than round numbers: a poker
- * playing card is 2.5 x 3.5 inches and a trading card is a hair smaller, and
- * printing one at the other's size is exactly the sort of thing this list is
- * meant to stop.
+ * A6 and a postcard are close enough to be worth keeping apart: A6 is the ISO
+ * size and the European postcard, 105 x 148; Postcard here is the 4 x 6 inch
+ * one, 102 x 152. `presetFor` matches either orientation and answers with the
+ * first entry that fits, so two entries a couple of millimetres apart is the
+ * closest this list can safely go — a Postcard at 105 x 148 would be A6 turned
+ * on its side, and the Size menu would name it wrongly rather than offer both.
  */
 export const PAGE_PRESETS: Array<{ name: string; w: number; h: number }> = [
+	{ name: 'A6', w: 105, h: 148 },
 	{ name: 'A5', w: 148, h: 210 },
 	{ name: 'A4', w: 210, h: 297 },
 	{ name: 'A3', w: 297, h: 420 },
-	{ name: 'Business Card', w: 85, h: 55 },
-	{ name: 'Playing Card', w: 63.5, h: 88.9 },
-	{ name: 'Trading Card', w: 63, h: 88 }
+	{ name: 'Postcard', w: 102, h: 152 }
 ];
 
 const close = (a: number, b: number) => Math.abs(a - b) < 0.05;

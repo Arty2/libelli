@@ -13,9 +13,67 @@
 		onchange: (dataset: Dataset) => void;
 		/** so bindings can follow a renamed column instead of pointing at a ghost */
 		onrenamecolumn: (from: string, to: string) => void;
+		/** press and hold Import: put the sample cards back */
+		onloadsample: () => void;
 	}
 
-	let { dataset, activeRow, onactivate, onchange, onrenamecolumn }: Props = $props();
+	let { dataset, activeRow, onactivate, onchange, onrenamecolumn, onloadsample }: Props = $props();
+
+	/**
+	 * Press and hold, as a second action on a button that already has one.
+	 *
+	 * The actions bar is deliberately one line — it was costing the table a row
+	 * of its own height every time the tray narrowed — so bringing the samples
+	 * back hangs off Import rather than adding a fifth button. A held mouse
+	 * button and a held finger are the same pointer events, so there is no
+	 * separate touch path.
+	 *
+	 * The click that follows a completed hold has to be swallowed, or the file
+	 * picker would open on top of the rows just loaded.
+	 */
+	function hold(node: HTMLElement, action: () => void) {
+		const DELAY = 600;
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		let fired = false;
+
+		const cancel = () => {
+			if (timer) clearTimeout(timer);
+			timer = null;
+		};
+		const down = (event: PointerEvent) => {
+			// Only the primary button: a right-click opens a menu, not a hold.
+			if (event.button !== 0) return;
+			fired = false;
+			timer = setTimeout(() => {
+				timer = null;
+				fired = true;
+				action();
+			}, DELAY);
+		};
+		// Moving off the button is how you change your mind mid-press.
+		const click = (event: MouseEvent) => {
+			if (!fired) return;
+			event.preventDefault();
+			event.stopPropagation();
+			fired = false;
+		};
+
+		node.addEventListener('pointerdown', down);
+		node.addEventListener('pointerup', cancel);
+		node.addEventListener('pointerleave', cancel);
+		node.addEventListener('pointercancel', cancel);
+		node.addEventListener('click', click, true);
+		return {
+			destroy: () => {
+				cancel();
+				node.removeEventListener('pointerdown', down);
+				node.removeEventListener('pointerup', cancel);
+				node.removeEventListener('pointerleave', cancel);
+				node.removeEventListener('pointercancel', cancel);
+				node.removeEventListener('click', click, true);
+			}
+		};
+	}
 
 	/**
 	 * The row the page is showing, brought into view. Paging the card with the
@@ -372,7 +430,11 @@
 	     own height every time the tray narrowed. -->
 	<div class="actions">
 		<button onclick={() => (pasteOpen = true)}>Paste from Excel</button>
-		<button onclick={() => fileInput?.click()}>Import CSV…</button>
+		<button
+			use:hold={onloadsample}
+			title="Import a CSV file — press and hold to load the sample cards instead"
+			onclick={() => fileInput?.click()}>Import CSV…</button
+		>
 		<button onclick={exportCsv} disabled={!dataset.columns.length}>Export CSV</button>
 		<span class="spacer"></span>
 		<button
@@ -443,7 +505,6 @@
 		   off-centre on a phone. It scrolls sideways on its own instead. */
 		min-width: 0;
 		background: #fff;
-		border-left: 1px solid #ddd;
 	}
 
 	.scroll {
@@ -468,8 +529,18 @@
 	thead th {
 		position: sticky;
 		top: 0;
-		z-index: 1;
+		/* Above the row actions, which are z-index 2 and were painting over the
+		   header whenever the hovered row passed under it. */
+		z-index: 3;
 		background: #fafafa;
+		/* The rules are drawn as an inset shadow, not a border. Under
+		   border-collapse the borders belong to the table's shared grid rather
+		   than to each cell, so `position: sticky` translated the header cell and
+		   left its borders behind — the header stayed and its lines slid away up
+		   the page. A shadow is painted with the cell's own box, so it travels. */
+		box-shadow:
+			inset 0 -1px 0 #e6e6e6,
+			inset -1px 0 0 #e6e6e6;
 		display: table-cell;
 		white-space: nowrap;
 		padding: 2px 4px;
@@ -794,14 +865,5 @@
 
 	.spacer {
 		flex: 1;
-	}
-
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip: rect(0 0 0 0);
-		white-space: nowrap;
 	}
 </style>

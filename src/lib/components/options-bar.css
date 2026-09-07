@@ -1,0 +1,242 @@
+/* The styles both option bars share.
+
+   A plain stylesheet rather than a <style> block, because PageOptions and
+   BoxOptions are two components and Svelte would scope a copy to each. Every
+   selector is anchored to .options by hand, which is the scoping Svelte was
+   doing before; .options is on the root element of both bars.
+
+   Bar layout only. Anything about a control everywhere in the app belongs in
+   src/routes/app.css with the rest of the tokens. */
+
+.options {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px 10px;
+	padding: 8px 12px;
+	border-bottom: 1px solid #ddd;
+	background: #f7f7f7;
+	font: 12px ui-sans-serif, system-ui, sans-serif;
+}
+
+.box-options {
+	background: #eef3fb;
+	border-bottom-color: #cfdcf3;
+}
+
+.options .context {
+	font-weight: 600;
+	color: #767676;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-size: 10px;
+}
+
+.options .field {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: #555;
+}
+
+.options .field > span {
+	font-size: 11px;
+	white-space: nowrap;
+}
+
+.options .field.tight {
+	gap: 2px;
+}
+
+.options .edge {
+	color: #999;
+	font-size: 10px;
+	width: 0.7rem;
+	text-align: right;
+}
+
+.options .unit {
+	color: #999;
+	font-size: 10px;
+}
+
+.options .label {
+	font-size: 11px;
+	color: #555;
+}
+
+/* Related controls are one group with a rule either side, so the bar reads as
+   a handful of subjects rather than thirty loose fields. */
+.options .group {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 2px 8px;
+	border-left: 1px solid #ddd;
+	border-right: 1px solid #ddd;
+}
+
+.box-options .group {
+	border-color: #cfdcf3;
+}
+
+/* The image is named, not shown: a thumbnail in a toolbar this dense reads as
+   clutter, and the name is what the template actually carries. */
+.options .asset {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	max-width: 12rem;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: 11px;
+	color: #555;
+}
+
+.options .check {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: #555;
+	white-space: nowrap;
+}
+
+.options input,
+.options select {
+	font: 12px ui-sans-serif, system-ui, sans-serif;
+	padding: 4px 5px;
+	border: 1px solid var(--border-control);
+	border-radius: var(--radius-input);
+	background: #fff;
+	color: #111;
+	/* So a width below means the whole control, not the room inside it: an
+	   input is content-box by default, which made every field 12px wider
+	   than it was asked to be. */
+	box-sizing: border-box;
+}
+
+.options input:disabled,
+.options select:disabled {
+	background: #f0f0f0;
+	color: #999;
+}
+
+/* Sized to what goes in them, not to a grid: every rem saved here is a
+   control that stays on the same row instead of wrapping to the next. Two
+   characters covers a bleed, a margin or a quiet zone; three covers a
+   coordinate and anything with a decimal point in it. */
+.options .n-2 { width: 2.6rem; }
+.options .n-3 { width: 3.3rem; }
+.options .w-5 { width: 4.6rem; }
+.options .w-8 { width: 8.5rem; }
+.options .colour { width: 2rem; padding: 2px; }
+
+/* The spin buttons are what made a two-character field four wide. Arrow keys
+   still step the value, which is the only thing they were reachable for. */
+.options input[type='number'] {
+	appearance: textfield;
+}
+
+.options input[type='number']::-webkit-outer-spin-button,
+.options input[type='number']::-webkit-inner-spin-button {
+	appearance: none;
+	margin: 0;
+}
+
+.options select {
+	max-width: 9.5rem;
+}
+
+.options .spacer {
+	flex: 1;
+}
+
+.options button {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font: 12px ui-sans-serif, system-ui, sans-serif;
+	padding: 5px 10px;
+	border: 1px solid var(--border-control);
+	border-radius: var(--radius-button);
+	background: #fff;
+	color: #111;
+	cursor: pointer;
+}
+
+.options button:hover:not(:disabled) {
+	border-color: var(--border-control-hover);
+}
+
+.options button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.options button.square {
+	padding: 5px;
+	width: 27px;
+	justify-content: center;
+}
+
+.options button[aria-pressed='true'] {
+	border-color: #2563eb;
+	color: #2563eb;
+	background: #eaf1fe;
+}
+
+.options button.danger-outline {
+	border-color: #b42318;
+	color: #b42318;
+}
+
+.options button.danger-outline:hover:not(:disabled) {
+	border-color: #8f1c13;
+	background: #fdf3f2;
+}
+
+.options .segmented {
+	display: inline-flex;
+}
+
+.options .segmented button {
+	padding: 5px 7px;
+	border-radius: 0;
+	margin-left: -1px;
+}
+
+.options .segmented button:first-child {
+	border-radius: var(--radius-button) 0 0 var(--radius-button);
+	margin-left: 0;
+}
+
+.options .segmented button:last-child {
+	border-radius: 0 var(--radius-button) var(--radius-button) 0;
+}
+
+.options .segmented button[aria-pressed='true'] {
+	position: relative;
+	z-index: 1;
+}
+
+/* Kept together so a wrap moves the whole set to the next line rather than
+   stranding Delete on its own at the far left. */
+.options .actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: auto;
+}
+
+/* On a phone these bars wrap to a dozen rows and swallow the page they are
+   meant to be editing. Capped and scrolled instead, so the preview keeps the
+   larger share of the screen. */
+@media (max-width: 900px) {
+	.options {
+		max-height: 26dvh;
+		overflow-y: auto;
+		gap: 6px 8px;
+		padding: 6px 8px;
+	}
+}

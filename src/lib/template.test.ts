@@ -113,33 +113,24 @@ describe('normaliseTemplate', () => {
 		expect('borderColor' in t.boxes[1]).toBe(false);
 	});
 
-	it('collapses four equal border edges back to one number, and keeps four when they differ', () => {
-		const uniform = normaliseTemplate({
+	it.each([
+		['borderWidth', 0.5, { top: 1, right: 0, bottom: 0.5, left: 0 }],
+		['padding', 2, { top: 3, right: 1, bottom: 0, left: 1 }]
+	])('collapses four equal %s edges back to one number, and keeps four when they differ', (key, uniform, varied) => {
+		const same = normaliseTemplate({
 			schema: 2,
-			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, borderWidth: { top: 0.5, right: 0.5, bottom: 0.5, left: 0.5 } }]
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, [key]: { top: uniform, right: uniform, bottom: uniform, left: uniform } }]
 		});
-		expect(uniform.boxes[0].borderWidth).toBe(0.5);
+		expect(same.boxes[0][key as 'borderWidth' | 'padding']).toBe(uniform);
 
-		const varied = normaliseTemplate({
+		const differing = normaliseTemplate({
 			schema: 2,
-			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, borderWidth: { top: 1, right: 0, bottom: 0.5, left: 0 } }]
+			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, [key]: varied }]
 		});
-		expect(varied.boxes[0].borderWidth).toEqual({ top: 1, right: 0, bottom: 0.5, left: 0 });
+		expect(differing.boxes[0][key as 'borderWidth' | 'padding']).toEqual(varied);
 	});
 
-	it('gives padding the same one-or-four treatment as a border width', () => {
-		const uniform = normaliseTemplate({
-			schema: 2,
-			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, padding: { top: 2, right: 2, bottom: 2, left: 2 } }]
-		});
-		expect(uniform.boxes[0].padding).toBe(2);
-
-		const varied = normaliseTemplate({
-			schema: 2,
-			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, padding: { top: 3, right: 1, bottom: 0, left: 1 } }]
-		});
-		expect(varied.boxes[0].padding).toEqual({ top: 3, right: 1, bottom: 0, left: 1 });
-
+	it('drops a padding of zero rather than storing it', () => {
 		const none = normaliseTemplate({
 			schema: 2,
 			boxes: [{ id: 'a', x: 0, y: 0, w: 10, h: 10, padding: 0 }]
@@ -228,12 +219,14 @@ describe('page presets', () => {
 		expect(presetFor(148, 210)).toBe('A5');
 		expect(presetFor(210, 148)).toBe('A5');
 		expect(presetFor(297, 420)).toBe('A3');
-		expect(presetFor(63.5, 88.9)).toBe('Playing Card');
 	});
 
-	it('tells a trading card from a playing card', () => {
-		expect(presetFor(63, 88)).toBe('Trading Card');
-		expect(presetFor(63.5, 88.9)).toBe('Playing Card');
+	it('tells A6 from a postcard, which are three millimetres apart', () => {
+		expect(presetFor(105, 148)).toBe('A6');
+		expect(presetFor(102, 152)).toBe('Postcard');
+		// Turned over, each still answers with its own name rather than the other's.
+		expect(presetFor(148, 105)).toBe('A6');
+		expect(presetFor(152, 102)).toBe('Postcard');
 	});
 
 	it('leaves a size of its own unnamed', () => {

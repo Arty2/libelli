@@ -55,23 +55,46 @@ const googleHref = (family: string, weights: boolean) => {
  */
 export function ensureGoogleFont(family: string): void {
 	if (typeof document === 'undefined') return;
-	const key = family.trim().toLowerCase();
+	// Only a name that is safe to put in a stylesheet is safe to put in a URL.
+	const name = safeFamily(family);
+	const key = name.toLowerCase();
 	if (!key || loadedGoogle.has(key)) return;
 	loadedGoogle.add(key);
 
 	const link = document.createElement('link');
 	link.rel = 'stylesheet';
-	link.dataset.fontFamily = family;
-	link.href = googleHref(family, true);
+	link.dataset.fontFamily = name;
+	link.href = googleHref(name, true);
 	link.onerror = () => {
 		const fallback = document.createElement('link');
 		fallback.rel = 'stylesheet';
-		fallback.dataset.fontFamily = family;
-		fallback.href = googleHref(family, false);
+		fallback.dataset.fontFamily = name;
+		fallback.href = googleHref(name, false);
+		// Both cuts refused: forget the family so choosing it again can retry.
+		// It was being marked loaded before anything had loaded, so a family
+		// that failed once could never be asked for again in that session.
+		fallback.onerror = () => loadedGoogle.delete(key);
 		document.head.appendChild(fallback);
 		link.remove();
 	};
 	document.head.appendChild(link);
+}
+
+/**
+ * Whether a family is ready to draw with. `document.fonts.check` answers for
+ * both paths — the faces a Google stylesheet brings in and the FontFace objects
+ * local uploads add — which is what lets the editor say "still loading" without
+ * either path having to report in.
+ */
+export function fontReady(family: string | undefined): boolean {
+	const name = safeFamily(family);
+	if (!name || typeof document === 'undefined' || !document.fonts) return true;
+	try {
+		return document.fonts.check(`12pt "${name}"`);
+	} catch {
+		// An invalid font shorthand throws rather than returning false.
+		return true;
+	}
 }
 
 function formatFor(name: string): string {
@@ -142,8 +165,24 @@ export async function ensureTemplateFonts(template: Template): Promise<FontRef[]
 	return missing;
 }
 
+/**
+ * A family name is a name, never a fragment of CSS.
+ *
+ * `boxStyle` joins its parts with `;` into an inline style attribute, so a
+ * template carrying `"font": "X; color: red"` used to write extra declarations
+ * into every box on the card — the one string that reached a style attribute
+ * without passing a chokepoint. Anything but letters, digits, spaces and the
+ * punctuation a real family name uses is refused outright rather than stripped,
+ * because a half-cleaned name is a name nobody asked for.
+ */
+export function safeFamily(family: string | undefined): string {
+	const name = (family ?? '').trim();
+	if (!name || name.length > 64) return '';
+	return /^[A-Za-z0-9 ._'-]+$/.test(name) ? name : '';
+}
+
 export function fontStack(family: string | undefined, fallback: string): string {
-	const name = (family ?? fallback ?? '').trim();
+	const name = safeFamily(family) || safeFamily(fallback);
 	if (!name) return SYSTEM_FONT_STACK;
-	return `"${name.replace(/"/g, '')}", ${SYSTEM_FONT_STACK}`;
+	return `"${name}", ${SYSTEM_FONT_STACK}`;
 }

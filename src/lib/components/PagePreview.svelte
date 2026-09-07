@@ -12,6 +12,8 @@
 		row: Row | null;
 		mapping: Mapping;
 		bounds: boolean;
+		/** families still arriving, passed through so an area can pulse while it waits */
+		loadingFonts?: string[];
 		grid: boolean;
 		selectedIds: string[];
 		zoom: 'fit' | number;
@@ -27,6 +29,8 @@
 		background: string | null;
 		onselect: (id: string | null, additive?: boolean) => void;
 		onchange: (box: Box) => void;
+		/** forwarded to the card: what a drag is about to do, for the undo label */
+		onaction?: (what: string) => void;
 		onbounds: (show: boolean) => void;
 		ongrid: (show: boolean) => void;
 		onzoom: (zoom: 'fit' | number) => void;
@@ -54,6 +58,7 @@
 		row,
 		mapping,
 		bounds,
+		loadingFonts = [],
 		grid,
 		selectedIds,
 		zoom,
@@ -65,6 +70,7 @@
 		background,
 		onselect,
 		onchange,
+		onaction,
 		onbounds,
 		ongrid,
 		onzoom,
@@ -144,11 +150,22 @@
 
 	$effect(() => {
 		if (!host) return;
+		let frame = 0;
 		const observer = new ResizeObserver(([entry]) => {
-			hostSize = { w: entry.contentRect.width, h: entry.contentRect.height };
+			const { width: w, height: h } = entry.contentRect;
+			// Coalesced to a frame and held to whole pixels: the gutter above is
+			// what actually stops the loop, but a resize observer that writes state
+			// synchronously on every sub-pixel wobble is a loop waiting for the
+			// next reason to start.
+			if (Math.abs(w - hostSize.w) < 1 && Math.abs(h - hostSize.h) < 1) return;
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(() => (hostSize = { w, h }));
 		});
 		observer.observe(host);
-		return () => observer.disconnect();
+		return () => {
+			cancelAnimationFrame(frame);
+			observer.disconnect();
+		};
 	});
 
 	/**
@@ -282,12 +299,20 @@
 				if (event.shiftKey) onzoom(1);
 				else onzoom('fit');
 				return;
+			// Two keys each: the punctuation is what they are named after on a
+			// keyboard that has it, and the letters are what still works on one
+			// that does not.
 			case 'h':
 			case 'H':
+			case ';':
+			case ':':
 				event.preventDefault();
 				onbounds(!bounds);
 				return;
 			case "'":
+			case '"':
+			case '#':
+			case '~':
 				event.preventDefault();
 				ongrid(!grid);
 		}
@@ -324,7 +349,12 @@
 	bind:this={host}
 	onpointerdown={(e) => {
 		onPinchDown(e);
-		if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('sheet')) onselect(null);
+			// Bare paper counts as empty space, not just the grey around the sheet:
+			// clicking away from everything is how every canvas editor deselects,
+			// and stopping at the page edge made it look broken. A box swallows its
+			// own pointerdown, so this only ever fires on ground nobody owns.
+			const el = e.target as HTMLElement;
+			if (e.target === e.currentTarget || /\b(sheet|card|trim|scaler|page|grid-overlay)\b/.test(el.className)) onselect(null);
 	}}
 	onpointermove={onPinchMove}
 	onpointerup={onPinchUp}
@@ -341,6 +371,7 @@
 				{row}
 				{mapping}
 				{bounds}
+				{loadingFonts}
 				{grid}
 				{scale}
 				{pageNumber}
@@ -349,6 +380,7 @@
 				{selectedIds}
 				{onselect}
 				{onchange}
+				{onaction}
 				{onmenu}
 			/>
 		</div>
@@ -460,19 +492,19 @@
 	</div>
 
 	<div class="corner top right">
-		<button onclick={onaddbox} disabled={!!template.locked} title="Add an area to the page">
-			<Icon name="text" size={14} /> Area
+		<button class="square" onclick={onaddbox} disabled={!!template.locked} title="Add an area to the page">
+			<Icon name="text" size={14} /><span class="sr-only">Area</span>
 		</button>
 	</div>
 
 	<!-- View state sits on the page it affects, one control per bottom corner,
 	     rather than in the toolbar among the actions. -->
 	<div class="corner left">
-		<label title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it (Ctrl/Cmd+')">
+		<label title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it (Ctrl/Cmd+' or Ctrl/Cmd+#)">
 			<input type="checkbox" checked={grid} onchange={(e) => ongrid(e.currentTarget.checked)} />
 			Grid
 		</label>
-		<label title="Dashed box bounds and the trim edge — screen only, never printed (Ctrl/Cmd+H)">
+		<label title="Dashed box bounds and the trim edge — screen only, never printed (Ctrl/Cmd+; or Ctrl/Cmd+H)">
 			<input type="checkbox" checked={bounds} onchange={(e) => onbounds(e.currentTarget.checked)} />
 			Bounds
 		</label>
@@ -529,6 +561,14 @@
 		display: grid;
 		place-items: center;
 		overflow: auto;
+		/* The stage is measured to work out the Fit scale, and the scale decides
+		   how tall the sheet is, and the sheet's height decides whether a vertical
+		   scrollbar appears — which takes ~15px off the width the measurement
+		   started from. At a size where the scrollbar is marginal that is a loop,
+		   and closing Page Setup lands right in it. Reserving the gutter whether
+		   or not it is used breaks the cycle at its one causal edge, rather than
+		   damping the oscillation afterwards. */
+		scrollbar-gutter: stable;
 		padding: 24px;
 		background: #eee;
 	}
@@ -606,18 +646,21 @@
 	}
 
 	/* Grey, and as thin as a screen will draw: the grid is there to be measured
-	   against, not looked at, and a coloured one competed with the card. The
-	   subgrid is a half-pixel hairline; the majors keep a whole pixel so the
-	   10mm rhythm still reads at a glance. */
+	   against, not looked at, and a coloured one competed with the card. Both
+	   rules are a half-pixel hairline — finer than any line on the card itself,
+	   which is a whole pixel — and the 10mm rhythm is carried by the majors being
+	   darker rather than thicker. This overlay sits outside the card's transform
+	   and is already sized in screen pixels, so its weight does not move with the
+	   zoom, which is the same promise the card's own --line makes. */
 	.grid-overlay {
 		position: absolute;
 		inset: 0;
 		pointer-events: none;
 		background-image:
-			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.24) 0 1px, transparent 1px var(--major)),
-			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.24) 0 1px, transparent 1px var(--major)),
-			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.1) 0 0.5px, transparent 0.5px var(--minor)),
-			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 0 0.5px, transparent 0.5px var(--minor));
+			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.3) 0 0.5px, transparent 0.5px var(--major)),
+			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0 0.5px, transparent 0.5px var(--major)),
+			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.11) 0 0.5px, transparent 0.5px var(--minor)),
+			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.11) 0 0.5px, transparent 0.5px var(--minor));
 		background-position: var(--origin) var(--origin);
 	}
 
@@ -778,14 +821,5 @@
 		.pad {
 			display: grid;
 		}
-	}
-
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip: rect(0 0 0 0);
-		white-space: nowrap;
 	}
 </style>
