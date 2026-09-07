@@ -45,6 +45,29 @@ source: a static box with nothing typed into it still draws its fill, its border
 and its size, and `hideWhenEmpty` is what takes it away — two settings that
 already existed, rather than a third state to keep in step.
 
+## `src/lib/history.ts`
+
+**A label rides alongside each state, never inside it.** States are compared by
+value to decide whether anything changed, and that comparison is what stops an
+applied undo recording itself straight back — so a label folded into the snapshot
+would make two identical states look different and break undo. Entries are
+`{ state, label }` and only `state` is compared.
+
+A label describes the step *into* a state, so undo names the present it is
+leaving and redo names the entry it is about to restore.
+
+The recorder watches state and cannot know what changed, so actions leave their
+name in a pending slot on the way past. **The first name wins until it is
+consumed**: the debounce has no maximum wait, so two actions inside a third of a
+second become one entry, and the first is the one the user thinks they did.
+Undo and redo clear the slot, or a label left pending when they land would
+attach itself to whatever came next.
+
+That policy is also why a drag names itself on its first *movement* rather than
+at pointerdown: selecting a box goes through `startDrag` too, so naming it there
+labelled every click "Move", and a click followed by an arrow key was then
+recorded as a drag.
+
 ## `src/lib/components/Card.svelte`
 
 **A box's content lives in `.content`.** Handles and badges are absolutely
@@ -88,6 +111,21 @@ observer never fires. The overflow warning therefore appeared on exactly the
 boxes that did not need it. A `MutationObserver` on the box's subtree catches
 the content change itself. It settles rather than looping, because `read()`
 writes state only when a number actually moved.
+
+**Anchoring shows at both ends, and moves at both ends.** A box that hangs off
+another wears a knot; the box it hangs from wears an anchor. Until now only one
+end was visible, and the box being followed gave no sign that moving it would
+take anything with it. Moving it now does take them: `resolveLayout` already
+carried dependents *downwards*, because their top is read from the target's
+bottom, so a drag hands them the sideways half of the move and nothing else —
+applying the vertical delta as well would move them twice.
+
+**The overflow corner is a badge that happens to be red.** Same size, radius and
+standing-clear-of-the-edge as the others, at the bottom right where the words run
+out rather than in the column of reasons at the top right, and hoverable like the
+rest: it was `pointer-events: none`, so the title explaining it could never be
+read. Shears rather than a warning triangle, because what is happening to the
+words is that they are being cut.
 
 **Bounds carry state; selection is an outline.** Four things want to draw on one
 box and there are two pseudo-elements, so the selection moved off `::after` onto
@@ -257,6 +295,23 @@ they would shove every other control sideways each time a second box was picked
 up.
 
 ## `src/lib/components/DataTable.svelte`
+
+**A sticky header's borders are not sticky.** Under `border-collapse: collapse`
+the borders belong to the table's shared border grid rather than to each cell, so
+`position: sticky` translated the header cell and left its rules behind — the
+header stayed put and its lines slid away up the page. They are an inset
+`box-shadow` now, which is painted with the cell's own box and travels with it.
+The alternative, `border-collapse: separate`, would double every internal rule
+and disturb the gutter sizing to fix one row.
+
+**The table casts its shadow at the work.** Left on a wide screen where it sits
+beside the page, up on a phone where it sits under it. It is on `aside` rather
+than on the table's own root, because that is the grid item — and `aside` had to
+be given `position: relative` to cast anything at all: `.stage` is positioned
+with an opaque background, so a static sibling paints its shadow in the earlier
+block-backgrounds layer and the stage covers it. The `border-left` it replaces
+had no mobile override, so on a phone the table drew an edge down its left where
+the seam was along its top.
 
 **The sample rows are the tour.** A first run lands on four cards that explain
 the app rather than on invented filler, because they are the first thing anyone

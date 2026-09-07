@@ -29,6 +29,8 @@
 		background: string | null;
 		onselect: (id: string | null, additive?: boolean) => void;
 		onchange: (box: Box) => void;
+		/** forwarded to the card: what a drag is about to do, for the undo label */
+		onaction?: (what: string) => void;
 		onbounds: (show: boolean) => void;
 		ongrid: (show: boolean) => void;
 		onzoom: (zoom: 'fit' | number) => void;
@@ -68,6 +70,7 @@
 		background,
 		onselect,
 		onchange,
+		onaction,
 		onbounds,
 		ongrid,
 		onzoom,
@@ -377,6 +380,7 @@
 				{selectedIds}
 				{onselect}
 				{onchange}
+				{onaction}
 				{onmenu}
 			/>
 		</div>

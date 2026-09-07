@@ -505,7 +505,6 @@
 		   off-centre on a phone. It scrolls sideways on its own instead. */
 		min-width: 0;
 		background: #fff;
-		border-left: 1px solid #ddd;
 	}
 
 	.scroll {
@@ -530,8 +529,18 @@
 	thead th {
 		position: sticky;
 		top: 0;
-		z-index: 1;
+		/* Above the row actions, which are z-index 2 and were painting over the
+		   header whenever the hovered row passed under it. */
+		z-index: 3;
 		background: #fafafa;
+		/* The rules are drawn as an inset shadow, not a border. Under
+		   border-collapse the borders belong to the table's shared grid rather
+		   than to each cell, so `position: sticky` translated the header cell and
+		   left its borders behind — the header stayed and its lines slid away up
+		   the page. A shadow is painted with the cell's own box, so it travels. */
+		box-shadow:
+			inset 0 -1px 0 #e6e6e6,
+			inset -1px 0 0 #e6e6e6;
 		display: table-cell;
 		white-space: nowrap;
 		padding: 2px 4px;

@@ -221,9 +221,12 @@ describe('page presets', () => {
 		expect(presetFor(297, 420)).toBe('A3');
 	});
 
-	it('tells a trading card from a playing card', () => {
-		expect(presetFor(63, 88)).toBe('Trading Card');
-		expect(presetFor(63.5, 88.9)).toBe('Playing Card');
+	it('tells A6 from a postcard, which are three millimetres apart', () => {
+		expect(presetFor(105, 148)).toBe('A6');
+		expect(presetFor(102, 152)).toBe('Postcard');
+		// Turned over, each still answers with its own name rather than the other's.
+		expect(presetFor(148, 105)).toBe('A6');
+		expect(presetFor(152, 102)).toBe('Postcard');
 	});
 
 	it('leaves a size of its own unnamed', () => {

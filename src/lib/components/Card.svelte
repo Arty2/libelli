@@ -37,6 +37,8 @@
 		onchange?: (box: Box) => void;
 		/** right-click on a box, in viewport coordinates */
 		onmenu?: (id: string, x: number, y: number) => void;
+		/** what a drag is about to do, so undo can name it afterwards */
+		onaction?: (what: string) => void;
 	}
 
 	let {
@@ -53,7 +55,8 @@
 		background = null,
 		onselect,
 		onchange,
-		onmenu
+		onmenu,
+		onaction
 	}: Props = $props();
 
 	let measured = $state<Record<string, number>>({});
@@ -285,6 +288,10 @@
 		startY: number;
 		origin: Box;
 		others: Box[];
+		/** boxes anchored to this one: they take the x delta and nothing else */
+		held: Box[];
+		/** whether this drag has said what it is, which it does once it moves */
+		named?: boolean;
 	} | null = null;
 
 	const editable = (box: Box) => interactive && !box.locked && !template.locked;
@@ -315,6 +322,15 @@
 			others:
 				mode === 'move' && selectedIds.length > 1
 					? template.boxes.filter((b) => b.id !== box.id && selectedIds.includes(b.id) && !b.locked).map((b) => ({ ...b }))
+					: [],
+			// Anchored boxes already follow this one downwards — resolveLayout takes
+			// their top from its bottom — so they only need the sideways half of the
+			// move. Applying the vertical delta as well would move them twice.
+			held:
+				mode === 'move'
+					? dependentsOf(box.id)
+							.filter((b) => !b.locked && !selectedIds.includes(b.id))
+							.map((b) => ({ ...b }))
 					: []
 		};
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -348,6 +364,15 @@
 		};
 		// A size is not a position: it rounds, but it never latches onto an edge.
 		const size = (value: number) => snapTo(value, grid ? GRID_MINOR : FREE_STEP);
+
+		// Named on the first movement rather than at pointerdown, and once only.
+		// Selecting a box goes through startDrag too, so naming it there labelled
+		// every click "Move" — and since the first label of a burst is the one
+		// that sticks, a click followed by an arrow key was recorded as a drag.
+		if (!drag.named) {
+			drag.named = true;
+			onaction?.(DRAG_LABELS[drag.mode]);
+		}
 
 		const origin = drag.origin;
 		// The handles turn with the box, so a pointer delta arrives in screen space
@@ -480,6 +505,11 @@
 				onchange?.(moved);
 			}
 		}
+
+		if (drag.mode === 'move' && drag.held.length) {
+			const movedX = next.x - origin.x;
+			if (movedX) for (const held of drag.held) onchange?.({ ...held, x: round2(held.x + movedX) });
+		}
 	}
 
 	const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -497,6 +527,20 @@
 
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
+	const DRAG_LABELS: Record<DragMode, string> = {
+		move: 'Move',
+		rotate: 'Turn',
+		centre: 'Move the pivot',
+		n: 'Resize',
+		s: 'Resize',
+		e: 'Resize',
+		w: 'Resize',
+		ne: 'Resize',
+		nw: 'Resize',
+		se: 'Resize',
+		sw: 'Resize'
+	};
+
 	/**
 	 * Screen only, and only while it is true: a box drawn in the fallback face
 	 * looks exactly like a box whose font simply did not apply, which is how a
@@ -509,6 +553,32 @@
 	 * clutter rather than information.
 	 */
 	const isStatic = (box: Box) => !box.slot && (box.mode === 'plain' || box.mode === 'markdown');
+
+	/**
+	 * Boxes other areas hang from. Anchoring is a relationship, and until now only
+	 * one end of it was visible: the box that follows said so, and the box being
+	 * followed gave no sign that moving it would take anything with it.
+	 */
+	/** Every box that hangs off this one, at any depth. */
+	function dependentsOf(id: string): Box[] {
+		const out: Box[] = [];
+		const queue = [id];
+		const seen = new Set([id]);
+		while (queue.length) {
+			const held = queue.shift()!;
+			for (const box of template.boxes) {
+				if (box.anchor?.to !== held || seen.has(box.id)) continue;
+				seen.add(box.id);
+				out.push(box);
+				queue.push(box.id);
+			}
+		}
+		return out;
+	}
+
+	const anchorTargets = $derived(
+		new Set(template.boxes.map((b) => b.anchor?.to).filter((id): id is string => !!id))
+	);
 
 	const waitingFor = (box: Box) =>
 		loadingFonts.includes(box.font ?? template.defaults.font);
@@ -594,14 +664,15 @@
 				{/if}
 
 				{#if bounds && !empty && overflowing[box.id]}
-					<!-- Always on screen, never gated behind bounds: this is not
-					     furniture, it is a warning that the print will be wrong. -->
-					<span class="overflow-mark" title="The content does not fit — this box is clipping what will print">
-						<Icon name="warning" size={11} />
+					<!-- A badge like the others, in the one colour that means the print
+					     will be wrong rather than merely constrained. Shears, because
+					     what is happening to the words is that they are being cut. -->
+					<span class="overflow-mark" title="The content does not fit — this area is cutting off what will print">
+						<Icon name="scissors" size={11} />
 					</span>
 				{/if}
 
-				{#if bounds && (box.anchor || box.locked || isStatic(box))}
+				{#if bounds && (box.anchor || box.locked || isStatic(box) || anchorTargets.has(box.id))}
 					<!-- Why the box will not do what you might ask of it, stacked at its
 					     corner: the anchor above the lock when it carries both. -->
 					<span class="badges">
@@ -611,7 +682,12 @@
 							</span>
 						{/if}
 						{#if box.anchor}
-							<span class="badge" title="Anchored to another box — its top follows that box's bottom">
+							<span class="badge" title="Tied to another area — its top follows that area's bottom, and it moves when that one does">
+								<Icon name="knot" size={11} />
+							</span>
+						{/if}
+						{#if anchorTargets.has(box.id)}
+							<span class="badge" title="Other areas are anchored to this one — moving it moves them too">
 								<Icon name="anchor" size={11} />
 							</span>
 						{/if}
@@ -824,6 +900,8 @@
 	   turns about; turning is the lever. */
 	.pivot {
 		--mark: calc(15px * var(--ui-scale, 1));
+		/* The ring sits inside the arms, so the cross reads through it. */
+		--ring: calc(4.5px * var(--ui-scale, 1));
 		margin: calc(var(--mark) / -2) 0 0 calc(var(--mark) / -2);
 		border: none;
 		border-radius: 0;
@@ -833,10 +911,19 @@
 		   arms come out the same weight as every other line on the card at any
 		   zoom, straight off --line — and it costs no element, which matters
 		   because ::before is the hit target. */
-		background-image: linear-gradient(#2563eb, #2563eb), linear-gradient(#2563eb, #2563eb);
+		background-image:
+			linear-gradient(#2563eb, #2563eb),
+			linear-gradient(#2563eb, #2563eb),
+			radial-gradient(
+				circle at center,
+				transparent calc(var(--ring) - var(--line)),
+				#2563eb calc(var(--ring) - var(--line)) var(--ring),
+				transparent var(--ring)
+			);
 		background-size:
 			100% var(--line),
-			var(--line) 100%;
+			var(--line) 100%,
+			100% 100%;
 		background-position: center;
 		background-repeat: no-repeat;
 		cursor: move;
@@ -846,11 +933,13 @@
 	   turn the box. It hangs off the pivot rather than off the box edge so it
 	   travels with the point the rotation is actually about, and being at arm's
 	   length is what gives the drag an angle to measure from the first pixel.
-	   Both it and the arm rotate with the box, because they are inside it. */
+	   Below the pivot rather than above it, where the box's own content and the
+	   area above it are not competing for the same few pixels. Both it and the
+	   arm rotate with the box, because they are inside it. */
 	.lever {
 		--arm: calc(30px * var(--ui-scale, 1));
 		--mark: calc(11px * var(--ui-scale, 1));
-		margin: calc(-1 * (var(--arm) + var(--mark) / 2)) 0 0 calc(var(--mark) / -2);
+		margin: calc(var(--arm) - var(--mark) / 2) 0 0 calc(var(--mark) / -2);
 		border-radius: 50%;
 		cursor: grab;
 	}
@@ -866,7 +955,7 @@
 		content: '';
 		position: absolute;
 		left: calc(50% - var(--line, 1px) / 2);
-		top: 100%;
+		bottom: 100%;
 		width: var(--line, 1px);
 		height: var(--arm);
 		background: #2563eb;
@@ -1040,18 +1129,28 @@
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
+		/* The same badge as the others — same size, radius and standing clear of
+		   the edge — in the one colour that says the print will be wrong. It hangs
+		   off the bottom right, where the words run out, rather than sharing the
+		   column of reasons at the top right. */
 		.overflow-mark {
 			position: absolute;
-			right: calc(-1 * var(--line));
-			bottom: calc(-1 * var(--line));
+			top: 100%;
+			left: 100%;
+			margin: calc(-13px * var(--ui-scale, 1)) 0 0 calc(4px * var(--ui-scale, 1));
 			display: grid;
 			place-items: center;
 			width: calc(13px * var(--ui-scale, 1));
 			height: calc(13px * var(--ui-scale, 1));
-			border-radius: var(--radius-button) 0 0 0;
+			box-sizing: border-box;
+			border-radius: var(--radius-button);
+			border: var(--line) solid #8f1c13;
 			background: #b42318;
 			color: #fff;
-			pointer-events: none;
+			/* Hoverable, like the badges: its title is the only thing that says what
+			   the mark means, and pointer-events: none meant it never showed. */
+			pointer-events: auto;
+			cursor: help;
 			z-index: 3;
 		}
 

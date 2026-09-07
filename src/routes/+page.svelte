@@ -11,7 +11,17 @@
 	import { resolveBackground, uploadBackgroundImage } from '$lib/assets';
 	import { download, slugify } from '$lib/download';
 	import { ensureGoogleFont, ensureTemplateFonts, fontReady, uploadLocalFont } from '$lib/fonts';
-	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
+	import {
+		canRedo,
+		canUndo,
+		createHistory,
+		record,
+		redo as redoStep,
+		redoLabel,
+		reset as resetHistory,
+		undo as undoStep,
+		undoLabel
+	} from '$lib/history';
 	import { alignBoxes, type AlignEdge } from '$lib/layout';
 	import {
 		ALIGN_LABELS,
@@ -289,13 +299,30 @@
 
 	// ---- undo/redo ----------------------------------------------------------
 
+	/**
+	 * What the user did, waiting to be attached to the entry it produces.
+	 *
+	 * The recorder watches state and cannot know what changed, so each action
+	 * leaves its name here on the way past. First one wins until it is consumed:
+	 * the debounce has no maximum wait, so two actions inside a third of a second
+	 * become one entry, and the first is the one the user thinks they did — what
+	 * follows is a refinement of it.
+	 */
+	let pending = '';
+	const describe = (what: string) => {
+		if (!pending) pending = what;
+	};
+
 	// Debounced, so a drag or a burst of typing becomes one entry. `record`
 	// ignores a state equal to the present, which is what stops an applied undo
 	// from recording itself straight back.
 	$effect(() => {
 		if (!ready) return;
 		const snap = snapshot();
-		const timer = setTimeout(() => (history = record(history, snap)), 350);
+		const timer = setTimeout(() => {
+			history = record(history, snap, pending);
+			pending = '';
+		}, 350);
 		return () => clearTimeout(timer);
 	});
 
@@ -310,16 +337,22 @@
 
 	function undo() {
 		if (!undoable) return;
+		const what = undoLabel(history);
 		history = undoStep(history);
-		applySnapshot(history.present);
-		notify('Undone.');
+		applySnapshot(history.present.state);
+		// Cleared, or the label of whatever was pending when undo landed would
+		// attach itself to the user's next action instead.
+		pending = '';
+		notify(what ? `Undone: ${what}` : 'Undone.');
 	}
 
 	function redo() {
 		if (!redoable) return;
+		const what = redoLabel(history);
 		history = redoStep(history);
-		applySnapshot(history.present);
-		notify('Redone.');
+		applySnapshot(history.present.state);
+		pending = '';
+		notify(what ? `Redone: ${what}` : 'Redone.');
 	}
 
 	// ---- autosave -----------------------------------------------------------
@@ -370,6 +403,7 @@
 	 * where the image lives.
 	 */
 	function applyTemplate(next: Template) {
+		describe('Page settings');
 		template = { ...stripUndefined(next), page: stripUndefined(next.page) } as Template;
 	}
 
@@ -396,6 +430,7 @@
 	let provisional = $state<string | null>(null);
 
 	function addTextBox() {
+		describe('New area');
 		const box = newBox({
 			id: nextBoxId(template.boxes),
 			slot: null,
@@ -436,8 +471,16 @@
 		selectedIds = selectedIds.filter((one) => one !== id);
 	}
 
+	const ARRANGE_LABELS: Record<Arrange, string> = {
+		front: 'Bring to front',
+		forward: 'Bring forward',
+		backward: 'Send backward',
+		back: 'Send to back'
+	};
+
 	function arrange(where: Arrange) {
 		if (template.locked) return;
+		describe(ARRANGE_LABELS[where]);
 		// A locked area does not move, in the stack or anywhere else.
 		const movable = selectedBoxes.filter((b) => !b.locked).map((b) => b.id);
 		if (!movable.length) return;
@@ -451,6 +494,7 @@
 	 * they are — this is for starting the design again, not for clearing out.
 	 */
 	function resetTemplate() {
+		describe('Reset the template');
 		template = starterTemplate();
 		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
@@ -473,6 +517,7 @@
 
 	function duplicateBox() {
 		if (!selectedBoxes.length || template.locked) return;
+		describe(selectedBoxes.length === 1 ? 'Duplicate area' : `Duplicate ${selectedBoxes.length} areas`);
 		// Snapshotted: duplicateBoxes deep-clones its sources, which a state
 		// proxy cannot be.
 		const { boxes, created } = duplicateBoxes($state.snapshot(template.boxes) as Box[], selectedIds);
@@ -484,6 +529,7 @@
 		if (template.locked) return;
 		const { boxes, removed } = deleteBoxes(template.boxes, selectedIds);
 		if (!removed) return;
+		describe(`Delete ${removed} area${removed === 1 ? '' : 's'}`);
 		template = { ...template, boxes };
 		selectedIds = [];
 		notify(`${removed} area${removed === 1 ? '' : 's'} deleted. Ctrl/Cmd+Z brings ${removed === 1 ? 'it' : 'them'} back.`);
@@ -495,6 +541,7 @@
 		if (boxes === template.boxes) return;
 		const vertical = edge === 'top' || edge === 'centre-y' || edge === 'bottom';
 		const skipped = vertical ? selectedBoxes.filter((b) => b.anchor && !b.locked).length : 0;
+		describe('Align');
 		template = { ...template, boxes };
 		notify(skipped
 			? `Aligned. ${skipped} anchored ${skipped === 1 ? 'area takes its top' : 'areas take their tops'} from another, so vertical alignment left ${skipped === 1 ? 'it' : 'them'} alone.`
@@ -503,12 +550,14 @@
 
 	function lockSelection() {
 		if (template.locked || !selectedBoxes.length) return;
+		describe(selectedBoxes.every((b) => b.locked) ? 'Unlock' : 'Lock');
 		template = { ...template, boxes: toggleLock(template.boxes, selectedIds).boxes };
 	}
 
 	function groupSelection() {
 		if (template.locked || selectedBoxes.length < 2) return;
 		const { boxes, grouped } = toggleGroup(template.boxes, selectedIds);
+		describe(grouped ? 'Group' : 'Ungroup');
 		template = { ...template, boxes };
 		notify(grouped ? `${selectedBoxes.length} areas grouped — clicking any one now takes all of them.` : 'Ungrouped.');
 	}
@@ -521,6 +570,9 @@
 	function nudgeBox(dx: number, dy: number) {
 		const box = selected;
 		if (!box || template.locked) return;
+		// Millimetres: the editor has no pixels, and a status line that invented
+		// them would be describing a different app.
+		describe(`Move ${Math.max(Math.abs(dx), Math.abs(dy))}mm`);
 		const next = nudge(box, dx, dy);
 		if (next) updateBox(next);
 	}
@@ -538,6 +590,7 @@
 			landed.add(step.landed);
 			if (step.changed) updateBox({ ...box, ...(axis === 'h' ? { align: step.align } : { valign: step.valign }) });
 		}
+		describe(landed.size === 1 ? `Align ${ALIGN_LABELS[[...landed][0]]}` : 'Step the alignment');
 		notify(landed.size === 1 ? `Aligned ${ALIGN_LABELS[[...landed][0]]}.` : 'Alignment stepped.');
 	}
 
@@ -654,6 +707,7 @@
 	 * destructive things are undoable and only ask when undo cannot reach them.
 	 */
 	function loadSample() {
+		describe('Load the sample cards');
 		dataset = sampleDataset();
 		// Remapped the way a first run maps: their template's slots against the
 		// sample's columns, so the cards render rather than coming up blank.
@@ -939,6 +993,7 @@
 			{background}
 			onselect={selectBox}
 			onchange={updateBox}
+			onaction={describe}
 			onbounds={(show) => (ui = { ...ui, showBounds: show })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
 			onzoom={(zoom) => (ui = { ...ui, zoom })}
@@ -1214,6 +1269,13 @@
 		min-height: 0;
 		min-width: 0;
 		background: #fff;
+		/* The table sits over the working area rather than beside it. Positioned
+		   on purpose: .stage is position: relative with an opaque background, so a
+		   static aside would paint its shadow in the earlier block-backgrounds
+		   layer and the stage would cover it. Later in tree order, so it wins. */
+		position: relative;
+		z-index: 1;
+		box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
 	}
 
 	aside :global(.data) {
@@ -1475,6 +1537,11 @@
 
 		main.no-data {
 			grid-template-rows: minmax(0, 1fr);
+		}
+
+		/* Stacked, not side by side: the shadow falls upwards onto the preview. */
+		aside {
+			box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
 		}
 
 		.toolbar {

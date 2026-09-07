@@ -5,8 +5,8 @@
  *
  * Every entry is the inner markup of a `0 0 32 32` viewBox.
  *
- * Two are drawn here rather than taken from Carbon, and are marked where they
- * are defined: `anchor` and `unlink`. Carbon's own diagonal-dashes glyph was
+ * Four are drawn here rather than taken from Carbon, and are marked where they
+ * are defined: `anchor`, `unlink`, `knot` and `scissors`. Carbon's own diagonal-dashes glyph was
  * being used for the anchor badge, and at 11px it read as a forward slash —
  * people asked what the `/` on their box meant, which is a fair question about
  * a mark that turned out to have no way of answering it.
@@ -66,6 +66,15 @@ export const ICONS: Record<string, string> = {
 	'arrows-horizontal': '<polygon points="11.41 26.59 7.83 23 28 23 28 21 7.83 21 11.41 17.41 10 16 4 22 10 28 11.41 26.59"/><polygon points="28 10 22 4 20.59 5.41 24.17 9 4 9 4 11 24.17 11 20.59 14.59 22 16 28 10"/>',
 	/* Drawn here, not Carbon: a ship's anchor — ring, stock, shank and flukes. */
 	'anchor': '<path d="M16 2a4 4 0 0 0-1 7.87V12H11v2h4v12.93A11 11 0 0 1 5.06 17H8l-4-5-4 5h3.05A13 13 0 0 0 16 30a13 13 0 0 0 12.95-13H32l-4-5-4 5h2.94A11 11 0 0 1 17 26.93V14h4v-2h-4V9.87A4 4 0 0 0 16 2Zm0 2a2 2 0 1 1-2 2 2 2 0 0 1 2-2Z"/>',
+
+	/* Drawn here, not Carbon: a loop of rope with its ends crossed below it —
+	   what an area anchored to another one is tied with. One ring and a crossing,
+	   because two rings turn to mush at 11px. */
+	'knot': '<path d="M16 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm0 2.6a5.4 5.4 0 1 1 0 10.8 5.4 5.4 0 0 1 0-10.8Z"/><path d="m11.4 18.6 1.9 1.8-7 7L4.4 25.6ZM20.6 18.6l7.1 7-1.9 1.8-7-7Z"/>',
+
+	/* Drawn here, not Carbon: shears. Two blades crossed over two finger rings,
+	   for the corner that says the words are being cut off. */
+	'scissors': '<path d="M9 2 7.3 3 15 16.2 16.7 13.3ZM23 2l1.7 1L17 16.2 15.3 13.3Z"/><path d="M7 18a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM25 18a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/>',
 
 	/* Drawn here, not Carbon: a chain pulled apart. Two half-links leaning away
 	   from a gap, which stays legible at 11px where a struck-through link turns
