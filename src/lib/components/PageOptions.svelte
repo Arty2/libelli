@@ -105,6 +105,20 @@
 
 	const patchTemplate = (change: Partial<Template>) => ontemplatechange({ ...template, ...change });
 
+	/**
+	 * The page default is a font choice like any other, so it has to be declared
+	 * on the template — otherwise nothing asks Google for it and every box that
+	 * inherits the default quietly draws in the system stack.
+	 */
+	function setDefaultFont(family: string) {
+		const declared = template.fonts.some((f) => f.family.toLowerCase() === family.toLowerCase());
+		ontemplatechange({
+			...template,
+			defaults: { ...template.defaults, font: family },
+			fonts: declared ? template.fonts : [...template.fonts, { family, source: 'google' }]
+		});
+	}
+
 	const numeric = (event: Event, fallback: number) => {
 		const value = Number((event.currentTarget as HTMLInputElement).value);
 		return Number.isFinite(value) ? value : fallback;
@@ -273,7 +287,7 @@
 				<select
 					value={template.defaults.font}
 					disabled={pageFrozen}
-					onchange={(e) => patchTemplate({ defaults: { ...template.defaults, font: e.currentTarget.value } })}
+					onchange={(e) => setDefaultFont(e.currentTarget.value)}
 				>
 					{#each familyOptions as family (family)}
 						<option value={family}>{family}</option>

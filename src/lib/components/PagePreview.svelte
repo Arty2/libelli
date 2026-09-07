@@ -12,6 +12,8 @@
 		row: Row | null;
 		mapping: Mapping;
 		bounds: boolean;
+		/** families still arriving, passed through so an area can pulse while it waits */
+		loadingFonts?: string[];
 		grid: boolean;
 		selectedIds: string[];
 		zoom: 'fit' | number;
@@ -54,6 +56,7 @@
 		row,
 		mapping,
 		bounds,
+		loadingFonts = [],
 		grid,
 		selectedIds,
 		zoom,
@@ -144,11 +147,22 @@
 
 	$effect(() => {
 		if (!host) return;
+		let frame = 0;
 		const observer = new ResizeObserver(([entry]) => {
-			hostSize = { w: entry.contentRect.width, h: entry.contentRect.height };
+			const { width: w, height: h } = entry.contentRect;
+			// Coalesced to a frame and held to whole pixels: the gutter above is
+			// what actually stops the loop, but a resize observer that writes state
+			// synchronously on every sub-pixel wobble is a loop waiting for the
+			// next reason to start.
+			if (Math.abs(w - hostSize.w) < 1 && Math.abs(h - hostSize.h) < 1) return;
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(() => (hostSize = { w, h }));
 		});
 		observer.observe(host);
-		return () => observer.disconnect();
+		return () => {
+			cancelAnimationFrame(frame);
+			observer.disconnect();
+		};
 	});
 
 	/**
@@ -341,6 +355,7 @@
 				{row}
 				{mapping}
 				{bounds}
+				{loadingFonts}
 				{grid}
 				{scale}
 				{pageNumber}
@@ -529,6 +544,14 @@
 		display: grid;
 		place-items: center;
 		overflow: auto;
+		/* The stage is measured to work out the Fit scale, and the scale decides
+		   how tall the sheet is, and the sheet's height decides whether a vertical
+		   scrollbar appears — which takes ~15px off the width the measurement
+		   started from. At a size where the scrollbar is marginal that is a loop,
+		   and closing Page Setup lands right in it. Reserving the gutter whether
+		   or not it is used breaks the cycle at its one causal edge, rather than
+		   damping the oscillation afterwards. */
+		scrollbar-gutter: stable;
 		padding: 24px;
 		background: #eee;
 	}

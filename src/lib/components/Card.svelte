@@ -15,6 +15,8 @@
 		mapping?: Mapping;
 		/** dashed box bounds and the bleed marker; screen only, never printed */
 		bounds?: boolean;
+		/** families still arriving, so an area can say so rather than sit in the fallback */
+		loadingFonts?: string[];
 		/** snap drags to the 5mm subgrid rather than to sibling edges */
 		grid?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
@@ -42,6 +44,7 @@
 		row = null,
 		mapping = {},
 		bounds = false,
+		loadingFonts = [],
 		grid = false,
 		scale = 1,
 		interactive = false,
@@ -440,6 +443,14 @@
 	}
 
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
+	/**
+	 * Screen only, and only while it is true: a box drawn in the fallback face
+	 * looks exactly like a box whose font simply did not apply, which is how a
+	 * slow family reads as a broken one.
+	 */
+	const waitingFor = (box: Box) =>
+		loadingFonts.includes(box.font ?? template.defaults.font);
 </script>
 
 <div class="card" class:bleeding={bleed > 0} class:editing={interactive} style={cardStyle()} lang="en">
@@ -457,6 +468,7 @@
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
 				class:clipped={box.overflow === 'clip' && !empty}
+				class:font-loading={interactive && waitingFor(box)}
 				style={boxStyle(box)}
 				data-box-id={box.id}
 				use:measure={box.id}
@@ -746,6 +758,26 @@
 	.crop-marks .br { bottom: 0; right: 0; border-left: 0.2mm solid #000; border-top: 0.2mm solid #000; }
 
 	@media screen {
+		/* A family that has not arrived draws in the system stack, which looks
+		   exactly like a font that never applied. The pulse says "wait" rather
+		   than letting a slow font read as a broken one. Screen only, and off
+		   entirely for anyone who has asked for less motion. */
+		@media (prefers-reduced-motion: no-preference) {
+			.box.font-loading .content {
+				animation: font-waiting 1.1s ease-in-out infinite;
+			}
+		}
+
+		@keyframes font-waiting {
+			0%,
+			100% {
+				opacity: 1;
+			}
+			50% {
+				opacity: 0.45;
+			}
+		}
+
 		.box.outlined::after {
 			content: '';
 			position: absolute;

@@ -10,7 +10,7 @@
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
 	import { resolveBackground, uploadBackgroundImage } from '$lib/assets';
 	import { download, slugify } from '$lib/download';
-	import { ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
+	import { ensureGoogleFont, ensureTemplateFonts, fontReady, uploadLocalFont } from '$lib/fonts';
 	import { canRedo, canUndo, createHistory, record, redo as redoStep, reset as resetHistory, undo as undoStep } from '$lib/history';
 	import { alignBoxes, type AlignEdge } from '$lib/layout';
 	import {
@@ -212,6 +212,48 @@
 			notify('A new version of libelli is ready — reload when you are at a good stopping point.');
 		});
 	}
+
+	/**
+	 * Every family the template asks for, requested as soon as it is asked for.
+	 *
+	 * ensureTemplateFonts only ran at boot and on import, so choosing a font from
+	 * a dropdown wrote the name into the template and stopped there: the browser
+	 * had never been told to fetch it, the box quietly fell back to the system
+	 * stack, and the choice appeared to work only after the next reload. Keyed on
+	 * the set of families rather than on the pickers, so a new way to choose one
+	 * cannot forget to ask.
+	 */
+	const familiesInUse = $derived(
+		Array.from(
+			new Set(
+				[template.defaults.font, ...template.boxes.map((b) => b.font)].filter(
+					(f): f is string => !!f
+				)
+			)
+		)
+	);
+
+	$effect(() => {
+		for (const family of familiesInUse) ensureGoogleFont(family);
+	});
+
+	/**
+	 * Which of them are still arriving, so an area can say so rather than sitting
+	 * in the fallback face looking finished. document.fonts answers for both the
+	 * Google stylesheets and the local FontFaces, and `loadingdone` is the only
+	 * event that fires per batch as they land.
+	 */
+	let fontsLoading = $state<string[]>([]);
+
+	$effect(() => {
+		const families = familiesInUse;
+		if (typeof document === 'undefined' || !document.fonts) return;
+		const read = () => (fontsLoading = families.filter((f) => !fontReady(f)));
+		read();
+		document.fonts.addEventListener('loadingdone', read);
+		document.fonts.ready.then(read).catch(() => {});
+		return () => document.fonts.removeEventListener('loadingdone', read);
+	});
 
 	// No reactive reads, so this runs once and its return value is the cleanup.
 	$effect(() => watchInstall((available) => (installable = available)));
@@ -590,6 +632,12 @@
 			const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== ref.family.toLowerCase());
 			template = { ...template, fonts: [...fonts, ref] };
 			missingFonts = missingFonts.filter((f) => (f.ref ?? f.family) !== (ref.ref ?? ref.family));
+			// Uploading from a box's Font dropdown is a way of choosing a font, not
+			// just of installing one: it used to leave the box on its old family,
+			// so the file landed and nothing on the card changed. Only when the
+			// upload was started from a box, and only when it replaces no missing
+			// reference — that flow is repairing a name the template already uses.
+			if (!family && selected) updateBox({ ...$state.snapshot(selected), font: ref.family } as Box);
 			notify(`${ref.family} installed in this browser.`);
 		} catch {
 			notify('That font file could not be read.', 'warning');

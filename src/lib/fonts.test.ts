@@ -21,7 +21,25 @@ describe('fontStack', () => {
 		expect(fontStack('Bitter', '')).toBe(`"Bitter", ${bare}`);
 	});
 
-	it('strips a quote, which would otherwise close the family early', () => {
-		expect(fontStack('Bit"ter', 'Inter').startsWith('"Bitter", ')).toBe(true);
+	it('refuses a name that is not one, rather than cleaning it up', () => {
+		// Cleaning gives back a family nobody asked for; refusing falls to the
+		// fallback, which is a face that exists.
+		const bare = fontStack(undefined, '');
+		expect(fontStack('Bit"ter', 'Inter').startsWith('"Inter", ')).toBe(true);
+		expect(fontStack('Bit"ter', '')).toBe(bare);
+	});
+
+	it('will not let a family smuggle a declaration into the style attribute', () => {
+		// boxStyle joins its parts with `;` into an inline style, so a family
+		// carrying one used to write extra CSS into every box on the card.
+		for (const nasty of ['X; color: red', 'X}.card{display:none', 'X\\3b color:red', 'a'.repeat(65)]) {
+			expect(fontStack(nasty, 'Inter').startsWith('"Inter", ')).toBe(true);
+		}
+	});
+
+	it('keeps the punctuation real family names use', () => {
+		for (const real of ['Patrick Hand', 'Space Mono', 'PT Sans', "Amatic SC", 'Source Sans 3', 'Libre Baskerville']) {
+			expect(fontStack(real, 'Inter')).toBe(`"${real}", ${fontStack(undefined, '')}`);
+		}
 	});
 });
