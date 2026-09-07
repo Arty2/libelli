@@ -1213,6 +1213,8 @@ em { color: #b42318 }`;
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
 			{editingId}
 			strayIds={strays.map((b) => b.id)}
+			{picking}
+			onstoppicking={() => (picking = false)}
 			onedit={(id) => (editingId = id)}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
@@ -1365,7 +1367,8 @@ em { color: #b42318 }`;
 		<h3>Several at once</h3>
 		<p>
 			Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them; on a touchscreen,
-			<strong>Select Multiple</strong> in the right-click menu makes every press add or drop. Dragging any one moves the
+			<strong>Select Multiple</strong> in the right-click menu makes every press add or drop, with a chip beside
+			<em>+ Area</em> saying so until you press it or <strong>Esc</strong>. Dragging any one moves the
 			set, and a column of icons appears beside the page to line them up against the box enclosing them all, and to
 			group, lock, duplicate or delete the lot. <strong>Group</strong> makes a selection stick until you ungroup it. An
 			anchored area sits out of a vertical align, because an anchor would move it straight back.

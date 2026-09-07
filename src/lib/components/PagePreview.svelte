@@ -24,6 +24,8 @@
 		editingId?: string | null;
 		/** areas that are not wholly on the sheet, and so may be unreachable */
 		strayIds?: string[];
+		/** whether every press on an area is currently adding to or dropping from the selection */
+		picking?: boolean;
 		/** which row is previewed, and how many there are, for the pager */
 		activeRow: number;
 		rowCount: number;
@@ -62,6 +64,8 @@
 		ontext?: (box: Box, value: string) => void;
 		/** bring every area that has wandered off the sheet back onto it */
 		onrescue?: () => void;
+		/** leave Select Multiple */
+		onstoppicking?: () => void;
 	}
 
 	let {
@@ -76,6 +80,7 @@
 		pageNumber,
 		editingId = null,
 		strayIds = [],
+		picking = false,
 		activeRow,
 		rowCount,
 		onactivate,
@@ -104,7 +109,8 @@
 		ondelete,
 		onedit,
 		ontext,
-		onrescue
+		onrescue,
+		onstoppicking
 	}: Props = $props();
 
 	const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2];
@@ -607,6 +613,20 @@
 		<button class="square" onclick={onaddbox} disabled={!!template.locked} title="Add an area to the page">
 			<Icon name="text" size={14} /><span class="sr-only">Area</span>
 		</button>
+		{#if picking}
+			<!-- A mode with no visible sign is a trap: every press is doing something
+			     other than what it usually does, and the only place that was said is
+			     a menu you have already dismissed. This is the sign, and pressing it
+			     is the second way out — Escape is the first. -->
+			<button
+				class="square"
+				aria-pressed="true"
+				onclick={onstoppicking}
+				title="Selecting several — every press adds an area or drops it. Press to stop, or Esc."
+			>
+				<Icon name="checkbox-checked" size={14} /><span class="sr-only">Stop selecting multiple</span>
+			</button>
+		{/if}
 		{#if strayIds.length}
 			<!-- Only when there is something to rescue. The editor does not clip, so
 			     an area dragged off the sheet is still drawn — but only while the

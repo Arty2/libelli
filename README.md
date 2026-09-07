@@ -80,8 +80,9 @@ resize boxes directly, or type exact millimetres.
   bar, in the rail and on right-click.
 - **Several at once** — shift-click (or Ctrl/Cmd-click) to build a selection,
   Ctrl/Cmd+A for all of them; on a touchscreen, **Select Multiple** at the top of
-  the right-click menu makes every press add or drop, until you turn it off or
-  press <kbd>Esc</kbd>. Dragging any one moves the set; a column of icons
+  the right-click menu makes every press add or drop. A chip appears beside
+  *+ Area* while it is on — a mode with no visible sign is a trap — and pressing
+  that, or <kbd>Esc</kbd>, leaves it. Dragging any one moves the set; a column of icons
   appears beside the page, under undo and redo, to line them up against the box
   that encloses them all — left, centre, right, top, middle, bottom — and to
   lock, duplicate or delete the lot. **Group** makes
