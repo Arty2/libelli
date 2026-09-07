@@ -982,7 +982,7 @@
 	}
 
 	.modal.narrow {
-		width: min(420px, 92vw);
+		width: min(420px, calc(100vw - 32px));
 	}
 
 	.actions .spacer {
@@ -1008,7 +1008,12 @@
 		top: 50%;
 		left: 50%;
 		transform: translate(-50%, -50%);
-		width: min(680px, 92vw);
+		/* A real gutter rather than a percentage of one, and border-box so the
+		   padding is inside it — see the same rule in +page.svelte. */
+		width: min(680px, calc(100vw - 32px));
+		max-height: calc(100dvh - 32px);
+		overflow: auto;
+		box-sizing: border-box;
 		background: #fff;
 		border-radius: 10px;
 		padding: 18px;

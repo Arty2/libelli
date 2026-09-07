@@ -113,7 +113,7 @@ the content change itself. It settles rather than looping, because `read()`
 writes state only when a number actually moved.
 
 **Anchoring shows at both ends, and moves at both ends.** A box that hangs off
-another wears a knot; the box it hangs from wears an anchor. Until now only one
+another wears a link; the box it hangs from wears a harbour buoy. Until now only one
 end was visible, and the box being followed gave no sign that moving it would
 take anything with it. Moving it now does take them: `resolveLayout` already
 carried dependents *downwards*, because their top is read from the target's
@@ -254,6 +254,42 @@ stays grabbable. Losing the handles of something you can no longer see is worse
 than being shown what will not print, and the trim edge already says where the
 paper stops.
 
+**Two badges are controls, and they say so before you press them.** A badge is
+the reason a box will not do what you asked; the anchor pair is also the way out
+of that reason, in the same thirteen pixels. Each swaps to the icon of the
+undoing while the pointer is on it — and for a moment after a tap, because a
+touchscreen never hovers and would otherwise get no answer at all. Releasing an
+anchor writes the box's *resolved* top back as its own `y`: "leave it where it
+is" is the whole point, and releasing to a stale `y` would jump it up the card.
+
+**Typing happens in a textarea laid over the content, not a `contenteditable`.**
+A box holds text — Markdown source for a Markdown area — and a contenteditable
+would hand back markup nobody asked for. It inherits face, size, colour and
+alignment from the box, so what you type is set the way it will print, and the
+content stays in the DOM underneath (hidden) so the box keeps its measured height
+and nothing anchored below it hops about mid-sentence. The card cannot write the
+words itself: a bound area's text is a cell of the dataset and a static one's is
+a field of the template, and only `+page.svelte` knows which it is holding.
+
+**Image mode is image *or colour*, and the colour fills the box.** One mode
+rather than two, because a column of brand colours and a column of logo URLs are
+the same job and a template author should not have to know which the data holds.
+A resolved colour is emitted by `boxStyle` as the box's own `background`, so it
+reaches under the padding and takes the corner radius; a tile is a background
+too, because `<img>` cannot repeat. Everything else goes through `safeMediaUrl`,
+which is the only door between an untrusted cell and an `<img src>`.
+
+**Markdown links are inert in the editor.** A link on paper says where to go; it
+does not go there. Live in the editor, clicking a word to pick up the area it
+sits in navigated away from the app — and the app is the only place an unsaved
+design exists. Screen-and-editor only: the print root and the lightbox render the
+same DOM without `editing`, and paper has no pointer events to take away.
+
+**The page number's separator is an element with no content.** `.page-number .of`
+is empty and its glyph comes from CSS, precisely so a template's own stylesheet
+can reach it — `content: ' of '`, or nothing. A literal `" / "` in the markup
+would have been unaddressable.
+
 ## `src/lib/components/PagePreview.svelte`
 
 **Fit measured the thing its own answer resized.** The stage is observed to
@@ -283,7 +319,27 @@ same flick one step on one machine and forty on another.
 `fit` subtracts the pager's measured height and the column gap before it sizes
 the page — otherwise the count is the first thing off the bottom of a short
 stage. Measured, not assumed: it is text and icons, and it is absent when there
-are no rows.
+are no rows. The page-lock band above the sheet is in that column for the same
+reason, rather than hung off the sheet on a negative offset: on a phone the stage
+has eight pixels of padding, and anything overhanging it is scrolled off the top
+with no way to reach it.
+
+**`fitScale` is a value, not a branch inside `scale`.** The zoom menu has to be
+able to say "Fit — 43%" while the page sits at 200%; reading the current scale
+there meant the Fit line renamed itself to whatever you had just zoomed to, and
+so never once said what pressing it would do.
+
+**The trim edge is drawn outside the card, above the grid.** The grid overlay is
+a sibling of the scaled card, so nothing *inside* the card can paint over it —
+and a trim edge hidden under a gridline is a trim edge you cannot follow. It is a
+solid half-pixel SVG stroke, the same weight as the grid: a dashed whole-pixel
+line was the loudest mark on a page that already has dashed bounds on every box.
+
+**The nudge pad can be picked up.** It parks over the bottom-right corner of the
+page, which on a phone is exactly the corner of the card you reached for it to
+nudge. The second gesture goes on the middle button because the four arrows
+already use press-and-hold to repeat, and the pad is clamped to the stage — a
+control dragged off the edge of a phone is a control you do not get back.
 
 **Controls sit next to what they act on.** Undo and redo are a column at the
 page's top-left corner, with stacking order under them whenever anything is
@@ -338,6 +394,41 @@ button's `title`, the Help dialog and the README rather than in the bar.
 the active row into view with `block: 'nearest'`, which leaves a row already on
 screen exactly where it is. Focus stays on the arrow being pressed: moving it to
 the row would break the second press.
+
+**A row number is where the row came from, not where it is sitting.** Sorting
+really reorders the data, so numbering by position meant the labels stayed
+1, 2, 3 and told you nothing; they are read out of the pre-sort order by
+identity instead, so each number travels with its row and a sorted table still
+says where everything came from. That lookup is by object identity, so every
+edit that replaces a row object — `setCell` above all — has to swap the copy
+held in that order too, and every structural edit keeps it in step. It falls
+back to the position whenever a row cannot be found there, which is what makes
+it safe against anything that forgets.
+
+**Chosen and previewed are two different things**, and usually the same row. The
+previewed row is the card on the page; the chosen set is what duplicate and
+delete act on. Clicking anywhere on a row that is not the text does both, because
+a row is a card and picking one is the commonest act in here — it used to be a
+20px tick in the gutter. The tick now builds a set *without* moving the preview
+off the card you are looking at, and the chosen marker is on the gutter alone so
+a large selection does not repaint half the table.
+
+**Sorting is three states on one control.** A-Z, Z-A, and back to the order the
+rows arrived in. Unsorting used to be a separate button in the row-number gutter,
+which is two controls for one question with the way out a long way from the way
+in.
+
+**A paste is a block of cells; a file is a table.** Insisting on a header row
+meant copying cells out of a sheet and pasting them here quietly ate the first
+one. A paste lands in the columns the table already has, matched left to right —
+which is what a block copied out of those same columns is. Only when there are no
+columns at all is the first line read as a header, because there is then nothing
+else to name them with. `Import CSV` still parses a header, because a file is a
+whole table.
+
+**The table has nothing to say for itself.** Its notices go to the app's status
+bar. A line of its own under the buttons meant there were two places a message
+could appear and neither of them was where you were looking.
 
 ## `src/lib/components/Lightbox.svelte`
 
@@ -423,7 +514,23 @@ act on the rest.
 **A lock is a button in the bar and an indicator on the canvas.** The padlock on a
 box or a page says *locked*; it is never the control, because the control belongs
 with the rest of that subject's settings. The button that sets a lock is never
-disabled by the lock it sets.
+disabled by the lock it sets, and it says what pressing it will do — *Unlock* on
+something locked — rather than naming its own state.
+
+**Each bar opens with a two-line head**: what this is and what it is called, then
+the buttons that act on it. They were at opposite ends of a bar that wraps to
+four rows on a laptop, which meant acting on the thing you had just selected
+began with finding the other end of the bar.
+
+**Stacking order is not in the right-click menu.** It is the column beside the
+page — it is about where an area sits on the sheet, and it wants to be pressed
+four times in a row rather than reopened from a menu between each press.
+Everything else the menu carries is a single act.
+
+**Select Multiple is a mode, because a touchscreen has no shift key.** With it
+on, every press on an area adds it to the selection or drops it, which is exactly
+what a modifier-click does; `selectBox` treats the mode and the modifier as the
+same thing, so there is one path and not two.
 
 ## `src/lib/boxops.ts` and `src/routes/+page.svelte`
 
@@ -441,9 +548,50 @@ geometry and releases the anchor of a box it moves vertically — an anchor woul
 otherwise undo the alignment on the next render.
 
 **Destructive things are undoable, and only ask when undo cannot reach them.**
-Deleting a row, a column or a box happens straight away and says so; Reset asks
-twice, because it clears browser storage and uploaded fonts that no undo can
-bring back.
+Deleting a row or a box happens straight away and says so; Reset asks twice,
+because it clears browser storage and uploaded fonts that no undo can bring back.
+Two exceptions ask once, and neither is about undo: deleting a *column* is a
+field of every card at once and takes cells under a header you may not have
+scrolled to, and deleting the whole table is not one row you can retype. Both
+questions are a count rather than a paragraph — a warning nobody reads is not a
+warning, and the second press the table used to ask for was only ever a way of
+not reading the first.
+
+**The style clipboard names its keys rather than subtracting.** `STYLE_KEYS` in
+`boxops.ts` is written out in full: a copy defined as "everything except id, x, y
+and w" would silently start carrying every field added to `Box` afterwards, and
+one day pasting a style would move a box or rebind its column. Applying a style
+writes every key including the ones the source lacked, because a paste is "make
+this look like that" and a source with no border has to take the target's border
+away.
+
+**Areas are only rescued when they are wholly off the sheet.** `strayBoxes` asks
+for *no overlap at all* with the paper, bleed included — not merely crossing the
+trim. A box running off the edge is what bleed is for, and offering to drag every
+deliberate full-bleed panel back inside the trim would be worse than saying
+nothing. The button appears only when there is something genuinely unreachable.
+
+## `src/lib/placeholders.ts`
+
+**`{{date}}` is not a template language, and must not become one.** No
+conditionals, no loops, no field references: a card that can compute is a card
+whose output depends on something other than the row it was given. Anything
+unrecognised is returned exactly as written, which is what stops a cell that
+happens to contain braces being eaten. No time of day either — a card is printed
+once and read for months, and a timestamp on paper is stale before the ink dries.
+
+Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
+mode; `rawContentOf` beside it is what the inline editor shows, because typing
+over a substituted date would mean typing over yesterday's.
+
+## `src/lib/gestures.ts`
+
+**Reading a swipe is a pure function; feeding it events is an action.** A flick
+has to beat both a minimum distance and a slope, because a drag at 45 degrees is
+somebody scrolling and catching this on the way past — paging the cards out from
+under them is worse than doing nothing. Touch only: a mouse has a wheel and two
+arrows either side of the count, and treating a click-drag as a swipe would page
+the cards every time somebody tried to select the counter's text.
 
 ## Testing
 

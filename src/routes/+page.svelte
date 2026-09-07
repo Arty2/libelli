@@ -628,12 +628,18 @@ em { color: #b42318 }`;
 	/** Bring every area that has wandered off the sheet back onto it. */
 	function rescueStrays() {
 		if (template.locked || !strays.length) return;
+		// Counted before the move. `strays` is derived from the template, so it is
+		// empty the instant the boxes land — the notice used to say "0 areas were
+		// off the sheet", which is true by the time you read it and useless.
+		const rescued = strays.length;
 		const boxes = bringOnPage(template.boxes, strays.map((b) => b.id), template.page);
 		if (boxes === template.boxes) return;
-		describe(`Bring ${strays.length} area${strays.length === 1 ? '' : 's'} back on`);
+		describe(`Bring ${rescued} area${rescued === 1 ? '' : 's'} back on`);
 		template = { ...template, boxes };
 		notify(
-			`${strays.length} area${strays.length === 1 ? ' was' : 's were'} off the sheet and ${strays.length === 1 ? 'is' : 'are'} back on it. Ctrl/Cmd+Z puts ${strays.length === 1 ? 'it' : 'them'} back.`
+			rescued === 1
+				? 'One area was off the sheet and is back on it. Ctrl/Cmd+Z puts it back.'
+				: `${rescued} areas were off the sheet and are back on it. Ctrl/Cmd+Z puts them back.`
 		);
 	}
 
@@ -1297,79 +1303,162 @@ em { color: #b42318 }`;
 
 		<p>Rows of a spreadsheet in, print-ready cards out.</p>
 		<p>
-			All of it happens here, in this browser. Your rows, your template, the fonts and images you add — none of it is
-			uploaded, because there is no server to upload it to, no account to make and nothing watching what you do. It
-			keeps working with the network off, a template is a small file you can hand to somebody, and closing the tab is
-			the only thing that ever deletes anything.
+			All of it happens in this browser. Your rows, your template, the fonts and images you add — none of it is
+			uploaded, because there is no server to upload it to and no account to make. It works with the network off, a
+			template is a small file you can hand to somebody, and closing the tab is the only thing that deletes anything.
+			Where your browser offers it, <strong>Install</strong> gives libelli its own window; when a new version has
+			downloaded the status bar says so and waits, because a reload nobody asked for would take undo with it.
+		</p>
+
+		<h3>Areas</h3>
+		<p>
+			<em>+ Area</em> beside the page adds one. <strong>Content</strong> says where it gets what it shows:
+			<strong>Data Field</strong> binds it to a column, so it changes card to card, and <strong>Static Text</strong>
+			is typed into the template and says the same on every card. An area's <strong>Name</strong> is the template's own
+			word for what it holds — <em>title</em>, <em>body</em> — and <strong>Column</strong> beside it says which
+			spreadsheet column fills that. Rebinding the columns is how one template serves another spreadsheet.
 		</p>
 		<p>
-			It keeps a copy of itself here too, so it opens with no network at all. Where your browser offers it, an
-			<strong>Install</strong> button appears in the toolbar and gives libelli its own window and its own icon. When a
-			new version has downloaded the status bar says so and offers a reload, rather than swapping it in while you are
-			working — undo lives in memory, and a reload nobody asked for would take it.
+			Double-click an area, or press <strong>Enter</strong> with one selected, to type into it on the card itself.
+			Bound areas write to the cell, static ones to the template. Selecting an area points the table at the cells that
+			fill it.
+		</p>
+		<p>
+			<strong>Mode</strong> is Plain Text, Markdown, Image / Colour or QR Code. Image / Colour shows whatever its
+			source turns out to be — a picture if that is an address, a fill if it is a colour, in hex, <code>rgb()</code>,
+			<code>hsl()</code> or by name — so a column of brand colours and a column of logos need no different setting up.
+		</p>
+		<p>
+			<code>&#123;&#123;date&#125;&#125;</code> anywhere in an area or a cell prints today's date, and
+			<code>&#123;&#123;date:YYYY-MM-DD&#125;&#125;</code> prints it your way — <code>YYYY</code>, <code>MM</code>,
+			<code>DD</code> for the numbers, <code>MMMM</code> and <code>dddd</code> for the names. Anything else in braces
+			is left as written.
+		</p>
+
+		<h3>Placing them</h3>
+		<p>
+			Drag areas on the page or type exact millimetres. An area latches onto the edges and centres of its neighbours as
+			it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid instead. Grid off and
+			<strong>Bounds</strong> off is free movement, because an area should never latch onto a guide that is not drawn.
+		</p>
+		<p>
+			<strong>Rotation</strong> turns an area about a point you can drag — the crosshair on it, or the <strong>X</strong>
+			and <strong>Y</strong> beside the rotation, as a percentage of the area's own size. A turned area still occupies
+			the space it would have upright, so one rotation does not shuffle the card.
+		</p>
+		<p>
+			Stacking order is the column beside the page: areas paint in the order they are listed, so <em>Bring to Front</em>
+			is a move to the end of that list. If an area ends up entirely off the sheet, a button appears under
+			<em>Area</em> to bring it back.
+		</p>
+
+		<h3>Marks on an area</h3>
+		<p>
+			A red corner means the content does not fit and the print will clip it. A padlock says the area is locked. The
+			<strong>plug</strong> says it carries its own words rather than a column's. The <strong>link</strong> and the
+			<strong>buoy</strong> are the two ends of an anchor — an anchored area takes its top from another area's rendered
+			bottom, so dragging it changes the gap rather than breaking the tie. Both are buttons: the link breaks this area's
+			tie, the buoy casts off everything moored to this one, and neither moves anything. Selecting either end lights up
+			the other. <strong>Bounds</strong> takes all of it away.
+		</p>
+
+		<h3>Several at once</h3>
+		<p>
+			Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them; on a touchscreen,
+			<strong>Select Multiple</strong> in the right-click menu makes every press add or drop. Dragging any one moves the
+			set, and a column of icons appears beside the page to line them up against the box enclosing them all, and to
+			group, lock, duplicate or delete the lot. <strong>Group</strong> makes a selection stick until you ungroup it. An
+			anchored area sits out of a vertical align, because an anchor would move it straight back.
+		</p>
+		<p>
+			<strong>Copy Style</strong> and <strong>Paste Style</strong> carry type, fill, border, padding and radius from one
+			area to any number of others. A paste is "make this look like that", so it takes away what the source did not have.
+		</p>
+
+		<h3>The sheet</h3>
+		<p>
+			<strong>Size</strong> has A6 to A3 and the card sizes at their real dimensions; picking one keeps the orientation
+			you are in, and <strong>⇄</strong> turns the page over. Neither moves anything on the card — coordinates are
+			measured from the trim edge, so trying a design the other way round costs nothing. Bleed is an outset on the
+			sheet, never an offset on the content.
+		</p>
+		<p>
+			Page setup holds the type defaults — family, size, leading, spacing, colour. An area that leaves those fields
+			blank inherits them. It also sets the paper colour and a background image, and can print a page number, optionally
+			as <em>3 / 12</em>.
+		</p>
+		<p>
+			<strong>CSS</strong> holds styles saved inside the template. Selectors are scoped to the card, and
+			<code>@import</code> and any <code>url()</code> pointing off this machine are stripped: the app fetches nothing,
+			and a template you were handed must not be able to change that.
+		</p>
+
+		<h3>Locking</h3>
+		<p>
+			<strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page
+			lock covers every area and the page settings, greys every bound and says so above the sheet. The same button
+			unlocks.
+		</p>
+
+		<h3>Data</h3>
+		<p>
+			Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column.
+			Clicking a row previews it; the tick in the gutter chooses several, and duplicate and delete for those appear at
+			the head of the buttons below. The row numbers travel with their rows through a sort, and a column header sorts
+			A-Z, then Z-A, then back to the order the rows arrived in.
+		</p>
+		<p>
+			<strong>Paste from Sheet</strong> takes a block of cells with no header row and lands it in the columns you
+			already have. <strong>Import CSV…</strong> takes a whole file; press and <em>hold</em> it and the four sample
+			cards come back. <strong>Export CSV</strong> hands the table back as a file. Deleting a column asks, because it is
+			a field of every card at once; the red <strong>Delete</strong> empties the whole table. All of it is undoable, and
+			none of it touches the template — as <strong>Reset</strong> in page setup does not touch the data.
 		</p>
 
 		<h3>Getting cards out</h3>
-		<p><strong>Export</strong> — the button, or <strong>Ctrl/Cmd + P</strong> — opens one screen showing every card as a small page. The browser's own print dialog is taken over rather than left to fire: it would print the editor rather than the cards. Pressing it again from that screen sends the run.</p>
-		<p>Untick any card you do not want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The print checklist sits under the pages, because those four settings decide whether what you saw is what comes out.</p>
-
-		<h3>Looking at one card</h3>
-		<p>The <strong>count under the page</strong> — <em>3 / 12</em> — opens that card on its own, big, over everything; so does a thumbnail on the export screen. The arrows either side of it, and the left and right arrow keys, step through the run; <strong>Esc</strong> puts it away. Nothing is printed or exported from there, it is only a proper look. Paging with those arrows scrolls the table to the row you land on, so the highlighted row is one you can actually see. On a phone the card leans a few degrees with the handset, the way a real one catches the light — however you are holding it when it opens is level, and a device asking for less motion gets none.</p>
-
-		<h3>What an area holds</h3>
-		<p>An area's <strong>Field</strong> is the template's own name for what it holds — <em>title</em>, <em>body</em>, and so on. The template names fields; the <strong>Column</strong> beside it says which spreadsheet column fills this one. That indirection is the point: the same template works against another spreadsheet by rebinding the columns, and no data is carried inside the template file.</p>
-		<p><strong>Content</strong> says where an area gets what it shows. A <strong>Data Field</strong> binds it to a column, so it changes card to card. <strong>Static Text</strong> is typed into the area and saved in the template, not in the data — the same on every card, travelling with the design. An area with nothing typed into it is still an area: it keeps its fill, its border and its size, and <strong>Hide When Empty</strong> is what takes it away again. <em>+ Area</em> beside the page adds one.</p>
+		<p>
+			<strong>Export</strong>, or <strong>Ctrl/Cmd+P</strong>, opens every card as a small page. The browser's own print
+			dialog is intercepted rather than left to fire, because it would print the editor. Untick any card you do not
+			want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The checklist under the
+			pages is four settings that decide whether what you saw is what comes out; a PNG needs none of them.
+		</p>
+		<p>
+			The count under the sheet — <em>3 / 12</em> — opens that card on its own, big, over everything; so does a
+			thumbnail on the export screen. The arrows either side, the left and right arrow keys, and a swipe step through
+			the run. Nothing is printed from there.
+		</p>
 
 		<h3>Keys</h3>
 		<dl class="keys">
 			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
-			<dt>Ctrl/Cmd + Shift + Z</dt><dd>Redo</dd>
+			<dt>Ctrl/Cmd + Shift + Z, Ctrl/Cmd + Y</dt><dd>Redo</dd>
+			<dt>Enter</dt><dd>Type into the selected area</dd>
+			<dt>Esc</dt><dd>Stop typing, leave Select Multiple, deselect, or close what is open</dd>
 			<dt>Arrows</dt><dd>Nudge the selection by 1mm</dd>
 			<dt>Shift + Arrows</dt><dd>Nudge by 5mm</dd>
 			<dt>Alt + Shift + Arrows</dt><dd>Nudge by 10mm</dd>
+			<dt>Arrows, PageUp / PageDown</dt><dd>Step through the cards, with nothing selected</dd>
+			<dt>← / →</dt><dd>Step through the cards, with one open full screen</dd>
 			<dt>Shift / Ctrl / ⌘ + click</dt><dd>Add an area to the selection, or drop it</dd>
 			<dt>Ctrl/Cmd + A</dt><dd>Select every area</dd>
 			<dt>Ctrl/Cmd + D</dt><dd>Duplicate the selected areas</dd>
-			<dt>Delete</dt><dd>Remove the selected areas</dd>
-			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
-			<dt>← / →</dt><dd>Step through the cards, with one open full screen</dd>
-			<dt>? or /</dt><dd>This panel</dd>
-			<dt>Ctrl/Cmd + ; or H</dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + ' or #</dt><dd>Grid on or off</dd>
-			<dt>Ctrl/Cmd + P</dt><dd>Export — again from that screen to print</dd>
-			<dt>Ctrl/Cmd + Shift + P / S</dt><dd>The same door, for the fingers that reach for those</dd>
+			<dt>Delete / Backspace</dt><dd>Remove the selected areas</dd>
+			<dt>Ctrl/Cmd + C</dt><dd>Copy the selected area's words</dd>
+			<dt>Ctrl/Cmd + V</dt><dd>Paste plain text as a new area</dd>
+			<dt>Ctrl/Cmd + Shift + C</dt><dd>Copy the area's style</dd>
+			<dt>Ctrl/Cmd + Shift + V</dt><dd>Paste that style onto the selection</dd>
 			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
 			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
+			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page</dd>
 			<dt>Ctrl/Cmd + + / −</dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
+			<dt>Ctrl/Cmd + ; or H</dt><dd>Bounds on or off</dd>
+			<dt>Ctrl/Cmd + ' or #</dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + P</dt><dd>Export — press again from that screen to print</dd>
+			<dt>Ctrl/Cmd + Shift + S</dt><dd>Export, for the fingers that reach for that instead</dd>
+			<dt>? or /</dt><dd>This panel</dd>
 		</dl>
 
-		<h3>Placing areas</h3>
-		<p>Drag areas on the page or type exact millimetres. An area latches onto the edges and centres of its neighbours as it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid of a 10mm grid instead. There is no key to hold for free movement: the two toggles under the page are the control. Grid off and <strong>Bounds</strong> off and nothing latches, because an area should never snap to a guide that is not being drawn. An area anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link.</p>
-		<p><strong>Rotation</strong> turns an area by degrees about a point you can drag — the small ring that appears on it once it is turned, or the <strong>X</strong> and <strong>Y</strong> beside the rotation, as a percentage of the area's own width and height. A turned area still takes up the space it would have upright, so anything anchored below it stays where it is; that is deliberate, and it is what stops one rotation shuffling the whole card.</p>
-		<p>Stacking order is the column beside the page, under undo and redo, and it is in the right-click menu too. Areas paint in the order they are listed, so <em>Bring to Front</em> is a move to the end of that list rather than a z-index to keep track of. A red corner means the content does not fit and the print will clip it; a padlock or an anchor at the corner says why an area will not move.</p>
-
-		<h3>Several at once</h3>
-		<p>Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them. Dragging any one moves the whole set, and a column of icons appears beside the page to line them up against the box that encloses them all — left, centre, right, top, middle, bottom — and to group, lock, duplicate or delete the lot. Right-click carries the same set with its wording.</p>
-		<p><strong>Group</strong> makes that selection stick: clicking any member picks up all of them, until you ungroup. An anchored area sits out of a vertical align — an anchor would move it straight back — and the anchor badge at its corner says why.</p>
-
-		<h3>The sheet</h3>
-		<p><strong>Size</strong> in page setup has the sizes worth having to hand — A5, A4, A3, and business, playing and trading cards at their real dimensions rather than round numbers. Picking one keeps the orientation you are already in, and the <strong>⇄</strong> beside the height turns the page over. Neither moves anything on the card: coordinates are measured from the trim edge, so trying a design the other way round costs nothing. Anything you type yourself reads as <em>Custom</em>.</p>
-
-		<h3>Type</h3>
-		<p>Page setup holds the defaults — family, size, leading, spacing and colour. An area that leaves those fields blank inherits them, so changing the page changes every area that never overrode it.</p>
-		<p>Two shortcuts work on the type without going to the bar. <strong>Ctrl/Cmd + Shift</strong> and the scroll wheel sizes whatever the pointer is over, in points — the whole selection if that area is part of one, and it gives an inheriting area a size of its own on the first turn. <strong>Ctrl/Cmd + Shift</strong> and the arrows step the alignment of everything selected in the direction pressed: left and right along <em>left, centred, right, justified</em>, up and down along <em>top, middle, bottom</em>.</p>
-
-		<h3>Locking</h3>
-		<p><strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page lock covers every area and the page settings too. The padlock that appears on the area, or at the corner of the page, is telling you it is locked; the button that undoes it is in the bar. Bounds off takes the padlocks away with the rest of the screen furniture.</p>
-
-		<h3>Colour</h3>
-		<p>Page setup sets the default text colour and the paper colour, and an area can set its own. Inside a Markdown body, <code>[a few words]&#123;red&#125;</code> or <code>[…]&#123;#b42318&#125;</code> colours just those words. Paper colour prints only with background graphics switched on.</p>
-
-		<h3>Data</h3>
-		<p>Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column. Deleting a row or a column happens straight away — Ctrl/Cmd+Z brings it back. <strong>Export CSV</strong> hands the table back as a file; the red <strong>Delete</strong> under it empties the whole dataset and asks twice. That leaves the template alone, as <strong>Reset</strong> in page setup leaves the data alone. <strong>Data</strong> in the toolbar folds the table away when the page needs the room.</p>
-
-		<p><strong>Import CSV…</strong> takes a file. Press and <em>hold</em> it instead, and the four sample cards come back — they explain the app, and they are a place to start from when a blank table is not one. That replaces the rows and leaves your template alone, and Ctrl/Cmd+Z undoes it.</p>
 
 		<p class="credit">
 			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>
@@ -1610,6 +1699,10 @@ em { color: #b42318 }`;
 		   max-width still caps it on a large screen. */
 		width: min(560px, calc(100vw - 32px));
 		max-height: min(86dvh, calc(100dvh - 32px));
+		/* Or the 22px of padding either side is added to that width, and the
+		   dialog is 402px wide on a 390px phone — which is how a gutter measured
+		   in viewport units still ended up hanging over both edges. */
+		box-sizing: border-box;
 		overflow: auto;
 		background: #fff;
 		border-radius: 10px;

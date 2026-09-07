@@ -360,6 +360,18 @@
 	/** Handles belong to a single box: with several chosen, the bar does the work. */
 	const soleSelection = $derived(selectedIds.length === 1);
 
+	/**
+	 * A second tap on the same area, soon enough, opens it for typing.
+	 *
+	 * `dblclick` covers a mouse and does not cover a finger: the box is
+	 * `touch-action: none` so it can be dragged, and a browser will not
+	 * synthesise a double-click out of taps it has been told not to interpret.
+	 * So the pair is counted here, for touch only — a mouse still comes through
+	 * `ondblclick`, which is the event it actually fires.
+	 */
+	const DOUBLE_TAP = 350;
+	let lastTap: { id: string; at: number } | null = null;
+
 	function startDrag(event: PointerEvent, box: Box, mode: DragMode) {
 		// Only the primary button drags. Without this a right-click starts one,
 		// and its non-additive select collapses a multi-selection to one box
@@ -367,6 +379,16 @@
 		if (event.button !== 0 || !interactive) return;
 		event.preventDefault();
 		event.stopPropagation();
+		if (event.pointerType === 'touch' && mode === 'move') {
+			const now = event.timeStamp || Date.now();
+			if (lastTap && lastTap.id === box.id && now - lastTap.at < DOUBLE_TAP) {
+				lastTap = null;
+				onselect?.(box.id, false);
+				beginEdit(box);
+				return;
+			}
+			lastTap = { id: box.id, at: now };
+		}
 		// Selecting comes first and is never refused: a lock stops a box moving,
 		// not being picked — otherwise the only control that could unlock it
 		// could never be reached.
