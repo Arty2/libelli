@@ -133,13 +133,32 @@ drawn as four diagonal dashes came to be read as a stray `/` that nobody could
 identify. It is a ship's anchor now. A static text area gets a broken chain: its
 words live in the template rather than in a column.
 
-**Rotation is dragged from above the top edge.** The centre was taken: the pivot
-ring already lives there on a turned box and is dragged to move the turning
-point. A rotation handle reads the angle from where the pointer *is* against the
-pivot, not from how far it has come, so it is exempt from the un-rotation that
-`moveDrag` applies to every other handle — the exemption is a list rather than a
-comparison precisely because a new mode otherwise joins the wrong branch in
-silence.
+**The pivot is the rotation handle.** A mark on the top edge said nothing about
+where the box would actually turn, because the pivot moves. So there is one mark,
+on the pivot, with two gestures: drag to turn, Alt-drag to move the point turned
+about, and the X and Y in the bar as the precise way to place it for anyone who
+never finds the modifier. It is drawn on an upright box too, unlike the old pivot
+ring, because it is the rotation control now and has to be there before there is
+any rotation to show. It sits above the resize handles, since the pivot can be
+moved onto an edge where one already is and it is the only way to turn a box,
+where resizing has eight other places to be grabbed.
+
+Two things fall out of putting it *on* the pivot. The drag begins at the one
+point where the angle to the pointer does not exist, and just outside it a pixel
+of movement swings the box through tens of degrees — so nothing turns until the
+pointer is 16 screen pixels clear of the mark, and the angle it leaves at is what
+the rest of the drag measures against. It reads as pulling out a lever and then
+swinging it, and dragging straight outwards correctly does nothing at all. And
+the pivot's position has to be read from layout rather than from
+`getBoundingClientRect`, which on a turned box reports the upright rectangle that
+contains it: `offsetLeft` and friends are measured against `.trim`, which never
+turns. The pivot is the transform origin, so it is the one point that does not
+move when the rotation changes — which is what makes reading it that way valid.
+
+Rotation is also exempt from the un-rotation `moveDrag` applies to every other
+handle, because it reads where the pointer *is* rather than how far it has come.
+The exemption is written as a list rather than a comparison precisely because a
+new mode otherwise joins the wrong branch in silence.
 
 **A handle's target is a pseudo-element, not a box-shadow.** A transparent
 `box-shadow` looks like a bigger hit area and is never hit-tested. `::before`
