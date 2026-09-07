@@ -175,7 +175,7 @@ describe('normaliseTemplate', () => {
 	});
 
 	it('falls back to the default text colour when a template names an unusable one', () => {
-		expect(normaliseTemplate({ schema: 2, defaults: { color: 'chartreuse' }, boxes: [] }).defaults.color).toBe('#000000');
+		expect(normaliseTemplate({ schema: 2, defaults: { color: 'burnt sienna' }, boxes: [] }).defaults.color).toBe('#000000');
 		expect(normaliseTemplate({ schema: 2, defaults: { color: 'navy' }, boxes: [] }).defaults.color).toBe('#14306b');
 	});
 
