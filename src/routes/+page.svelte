@@ -203,7 +203,7 @@
 		} else if (unreadable)
 			notify('The saved template could not be read, so this is the starter card. Your data is untouched.', 'warning');
 		else if (firstRun)
-			notify('Sample cards loaded to play with. Edit the table, drag the boxes, then Print — or press ? for the tour.');
+			notify('Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.');
 		missingFonts = await ensureTemplateFonts(template);
 
 		// Last, so the precache download is not competing with the first paint.
@@ -540,6 +540,25 @@
 
 	// ---- import / export ----------------------------------------------------
 
+	/**
+	 * The sample cards back, from a press and hold on Import. Data only: it hangs
+	 * off an import-data button and that is what it does — silently replacing a
+	 * template someone has built would be a far worse surprise than a card that
+	 * does not quite fit.
+	 *
+	 * No confirmation. A snapshot is template, data and mapping together, so
+	 * Ctrl/Cmd+Z brings their rows straight back, and the rule here is that
+	 * destructive things are undoable and only ask when undo cannot reach them.
+	 */
+	function loadSample() {
+		dataset = sampleDataset();
+		// Remapped the way a first run maps: their template's slots against the
+		// sample's columns, so the cards render rather than coming up blank.
+		mapping = autoMap(usedSlots(template), dataset.columns);
+		activeRow = 0;
+		notify('Sample cards loaded. Ctrl/Cmd+Z puts your own rows back.');
+	}
+
 	function doExportTemplate() {
 		download(`${slugify(template.name)}.json`, exportTemplate($state.snapshot(template)));
 		notify('Template exported — fonts referenced by name.');
@@ -826,6 +845,7 @@
 				{dataset}
 				{activeRow}
 				onactivate={(i) => (activeRow = i)}
+				onloadsample={loadSample}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
 					// follows it, so the card keeps rendering what it rendered before.
@@ -968,6 +988,8 @@
 
 		<h3>Data</h3>
 		<p>Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column. Deleting a row or a column happens straight away — Ctrl/Cmd+Z brings it back. <strong>Export CSV</strong> hands the table back as a file; the red <strong>Delete</strong> under it empties the whole dataset and asks twice. That leaves the template alone, as <strong>Reset</strong> in page setup leaves the data alone. <strong>Data</strong> in the toolbar folds the table away when the page needs the room.</p>
+
+		<p><strong>Import CSV…</strong> takes a file. Press and <em>hold</em> it instead, and the four sample cards come back — they explain the app, and they are a place to start from when a blank table is not one. That replaces the rows and leaves your template alone, and Ctrl/Cmd+Z undoes it.</p>
 
 		<p class="credit">
 			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>

@@ -156,6 +156,27 @@ up.
 
 ## `src/lib/components/DataTable.svelte`
 
+**The sample rows are the tour.** A first run lands on four cards that explain
+the app rather than on invented filler, because they are the first thing anyone
+sees and they are rendered by the very machinery they describe: a row is a card,
+a column is a field, the Markdown subset is on the page in front of you. Card 2
+leaves its `link` cell empty on purpose, so its QR disappears and the card can
+point at the gap — one row teaching `hideWhenEmpty` by not having it. They stay
+inside what `markdown.ts` actually supports, and the QR URLs are decoded by an
+independent decoder in the verification pass, because a QR that does not scan
+looks exactly like one that does.
+
+**Press and hold Import to bring them back.** The actions bar is deliberately one
+line, so a fifth button would cost the table a row of its own height every time
+the tray narrowed; the gesture hangs off the button whose job is closest. A held
+mouse button and a held finger are the same pointer events, so there is no
+separate touch path, and the click that follows a completed hold is swallowed or
+the file picker would open on top of the rows just loaded. It replaces the data
+and leaves the template alone — it hangs off an import-*data* button — and it
+does not ask, because a snapshot carries data as well as design and Ctrl/Cmd+Z
+reaches it. A hidden gesture costs discoverability, which is paid back in the
+button's `title`, the Help dialog and the README rather than in the bar.
+
 **The table follows the pager, and does not take focus.** Paging the card scrolls
 the active row into view with `block: 'nearest'`, which leaves a row already on
 screen exactly where it is. Focus stays on the arrow being pressed: moving it to

@@ -171,7 +171,10 @@ Clicking a row previews it.
 - **Paste from Excel** — a modal that takes whatever the clipboard holds. Tabs,
   commas and semicolons are told apart by sniffing, quoted fields and embedded
   newlines survive, and rows can replace or append.
-- **Import CSV** — the same parser against a file.
+- **Import CSV** — the same parser against a file. Press and *hold* the button
+  instead of clicking it, and the four sample cards come back: they walk through
+  the app, and they are somewhere to start when a blank table is not. Your rows
+  are replaced, the template is untouched, and Ctrl/Cmd+Z undoes it.
 - **Rename in place** — type in a column header; the cells and any slot bound to
   that column follow the rename.
 - **Reorder** — ‹ › in a header move a column left or right. Row objects are
@@ -432,8 +435,8 @@ npm run build    # static output in ./build, deployable anywhere
 
 - **Sample data is bundled, not fetched** — `static/sample-cards.csv` is imported
   with `?raw`, so a first run works offline and cannot land on an empty table
-  because a request failed. *Load sample* in the table footer brings it back at
-  any time.
+  because a request failed. The four rows are a walkthrough of the app rather
+  than filler; pressing and holding *Import CSV…* brings them back at any time.
 - **Reset** — clears the template, data, mapping and fonts from this browser and
   returns to that first-run state, after asking twice.
 - **Components are verified by driving them** — the pure logic has unit tests;
