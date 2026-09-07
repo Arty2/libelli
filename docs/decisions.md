@@ -99,17 +99,29 @@ to know. Locked wins over grouped, with a coarser dash as well as a different
 red, because the overflow corner is red too and two reds a millimetre apart are
 one red.
 
-**Every screen mark is drawn against the zoom, and sizes are the only ones that
-land exactly.** Screen furniture lives inside the card's transform, so a plain
+**Every screen mark is drawn against the zoom, and the lines are strokes rather
+than borders.** Screen furniture lives inside the card's transform, so a plain
 1px line was 0.6px at Fit and 2px at 200%. One `--line` on the card, multiplied
 by `--ui-scale` like the handles already were, holds the bounds, the bleed line,
-the snap guides, the overflow corner and the badges. Anything with a width and a
-height comes out the same number of screen pixels at any zoom; a *border* does
-not, because browsers quantise border-width to whole device pixels, so weights
-land within about half a pixel of target. The grid is finer still — a half-pixel
-hairline in both rules, with the 10mm rhythm carried by darkness rather than
-thickness — and keeps its weight for a different reason: it sits outside the
-transform and was always measured in screen pixels.
+the snap guides, the overflow corner and the badges.
+
+Sizes were easy; weights were not, until the lines stopped being borders. A
+browser rounds `border-width` to whole device pixels, so a bound asked for at
+1.33px was drawn at 1px and one asked for at 0.5px was drawn at 1px — the weight
+could only ever land within half a pixel of its target, and above 100% it could
+not thin at all. An SVG stroke is not rounded: `stroke-width: 0.5` is drawn as
+half a pixel. So the bounds, the selection ring, the padding guide and the trim
+line are each an `<svg><rect>` overlay stroked at `var(--line)`, measured at
+exactly one screen pixel at 50%, 75%, 100% and 200%. Dash lengths are expressed
+in `--line` too, or the pattern would breathe while the weight held still. The
+overlays are `pointer-events: none` and hidden in print — as elements they no
+longer fail safe by being inside `@media screen`, and a line on the paper is a
+printing error rather than a cosmetic one.
+
+The grid is finer still — a half-pixel hairline in both rules, with the 10mm
+rhythm carried by darkness rather than thickness — and keeps its weight for a
+different reason: it sits outside the transform and was always measured in screen
+pixels.
 
 **A badge is an annotation, not a control.** They are grey on white, smaller than
 the blue chrome, and clear of the box rather than straddling its corner, where

@@ -503,10 +503,15 @@
 </script>
 
 <div class="card" class:bleeding={bleed > 0} class:editing={interactive} style={cardStyle()} lang="en">
-	<div class="trim" class:bleed-marked={bounds && bleed > 0} style="width:{template.page.w}mm;height:{template.page.h}mm">
+	<div class="trim" style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
 			{@html styleTag(customCss)}
+		{/if}
+
+		{#if bounds && bleed > 0}
+			<!-- Where the paper will be cut. -->
+			<svg class="chrome trim-line" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 		{/if}
 
 		{#each template.boxes as box (box.id)}
@@ -559,6 +564,22 @@
 						<span class="plain">{contentOf(box)}</span>
 					{/if}
 				</div>
+
+				<!-- The lines around a box are strokes, not borders. A browser rounds
+				     border-width to whole device pixels, so a bound asked for at
+				     1.33px inside a 75% card was drawn at 1px and one asked for at
+				     0.5px inside a 200% card was drawn at 2px. An SVG stroke is not
+				     rounded, so var(--line) lands exactly whatever the zoom. -->
+				{#if bounds && !empty}
+					<svg class="chrome bounds" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+				{/if}
+				{#if interactive && isSelected(box)}
+					{#if box.padding}
+						<!-- Where the words actually start. -->
+						<svg class="chrome pad" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+					{/if}
+					<svg class="chrome selection" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+				{/if}
 
 				{#if bounds && !empty && overflowing[box.id]}
 					<!-- Always on screen, never gated behind bounds: this is not
@@ -883,21 +904,37 @@
 		   200%: the marks have to be drawn against the zoom to stay the size they
 		   were designed at.
 
-		   Sizes are exact; line weights are as close as a browser allows. Anything
-		   with a width and height — a handle, a badge, the overflow corner — comes
-		   out the same number of screen pixels at every zoom. A *border* does not:
-		   browsers quantise border-width to whole device pixels, so a line asked
-		   for at 1.33px is drawn at 1px and a line asked for at 0.5px is drawn at
-		   1px. The weight therefore lands within about half a pixel of its target
-		   rather than on it, which is the difference between a line that stays a
-		   line and the old behaviour, where a bound was 0.6px at Fit and 2px at
-		   200%. */
-		.box.outlined::after {
-			content: '';
+		   Both come out exact. Anything with a width and a height — a handle, a
+		   badge, the overflow corner — is sized against --ui-scale; every line is
+		   an SVG stroke rather than a border, because stroke widths are not
+		   quantised to whole device pixels the way border widths are. See the
+		   .chrome rules below. */
+		/* Every line on a card is one of these: an SVG rect whose stroke is set in
+		   var(--line), which is 1px divided by the zoom. Stroke widths are not
+		   quantised the way border widths are — a stroke of 0.5 is drawn as half a
+		   pixel rather than rounded up to one — so the line comes out the same
+		   thickness on screen at any scale. Dashes are expressed in --line too, or
+		   the pattern would breathe while the weight held still. */
+		.chrome {
 			position: absolute;
 			inset: 0;
-			border: var(--line) dashed var(--bounds-colour, rgba(37, 99, 235, 0.45));
+			width: 100%;
+			height: 100%;
+			/* The stroke straddles the edge it is drawn on, so half of it is
+			   outside the rect and must not be clipped away. */
+			overflow: visible;
 			pointer-events: none;
+			z-index: 2;
+		}
+
+		.chrome rect {
+			fill: none;
+			stroke-width: var(--line);
+		}
+
+		.bounds rect {
+			stroke: var(--bounds-colour, rgba(37, 99, 235, 0.45));
+			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
 		/* A locked box cannot be moved, and a grouped one moves with others: both
@@ -905,50 +942,41 @@
 		   bounds. Locked wins when a box is both — it is the stronger refusal.
 		   The dash is coarser as well as red, because the overflow corner is
 		   already red and two reds a millimetre apart are one red. */
-		.box.grouped::after {
+		.box.grouped {
 			--bounds-colour: rgba(124, 58, 237, 0.75);
 		}
 
-		.box.locked::after {
+		.box.locked {
 			--bounds-colour: rgba(180, 35, 24, 0.8);
-			border-style: dashed;
-			border-width: var(--line-thick);
 		}
 
-		.box.selected {
-			outline: var(--line) solid #2563eb;
-			outline-offset: calc(-1 * var(--line));
+		.box.locked .bounds rect {
+			stroke-width: var(--line-thick);
+			stroke-dasharray: calc(var(--line) * 5) calc(var(--line) * 3);
 		}
 
-		/* Where the words actually start. Only on the selected box: it is a
-		   measurement you want while you are setting the padding, and noise on
-		   every other box the rest of the time. */
-		.box.selected::before {
-			content: '';
-			position: absolute;
-			top: var(--pad-t, 0);
-			right: var(--pad-r, 0);
-			bottom: var(--pad-b, 0);
-			left: var(--pad-l, 0);
-			border: var(--line) dashed rgba(8, 145, 178, 0.8);
-			pointer-events: none;
+		.selection rect {
+			stroke: #2563eb;
 		}
 
-		/* Nothing to show when the padding is zero: the guide would sit exactly on
-		   the selection outline and read as a doubled line. */
-		.box.selected.no-padding::before {
-			display: none;
+		/* Positioned by the padding the box was given, so the guide moves with it
+		   without anything having to convert millimetres to pixels. */
+		.pad {
+			inset: var(--pad-t, 0) var(--pad-r, 0) var(--pad-b, 0) var(--pad-l, 0);
+			width: auto;
+			height: auto;
 		}
 
-		/* Where the paper will be cut. Green: it is not a box outline and not a
-		   state, it is the edge of the paper, and purple now means a grouped box. */
-		.trim.bleed-marked::before {
-			content: '';
-			position: absolute;
-			inset: 0;
-			border: var(--line) dashed rgba(5, 150, 105, 0.85);
-			pointer-events: none;
-			z-index: 2;
+		.pad rect {
+			stroke: rgba(8, 145, 178, 0.8);
+			stroke-dasharray: calc(var(--line) * 2) calc(var(--line) * 2);
+		}
+
+		/* Green: it is not a box outline and not a state, it is the edge of the
+		   paper, and purple now means a grouped box. */
+		.trim-line rect {
+			stroke: rgba(5, 150, 105, 0.85);
+			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
 		.overflow-mark {
@@ -1026,5 +1054,16 @@
 
 		.guide.vertical { top: 0; bottom: 0; width: var(--line); }
 		.guide.horizontal { left: 0; right: 0; height: var(--line); }
+	}
+
+	/* The overlays are conditional on `bounds` and on being interactive, neither
+	   of which the print root passes, so they are not in the DOM on paper. Said
+	   again here because they are elements now rather than pseudo-elements inside
+	   @media screen: they no longer fail safe by construction, and a line on the
+	   paper is a printing error rather than a cosmetic one. */
+	@media print {
+		.chrome {
+			display: none !important;
+		}
 	}
 </style>
