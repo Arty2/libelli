@@ -668,8 +668,8 @@
 				<Icon name="add" size={15} /> Install
 			</button>
 		{/if}
-		<button onclick={() => (helpOpen = true)} title="How this works, and the keys">
-			<Icon name="help" size={15} /> Help
+		<button class="square" onclick={() => (helpOpen = true)} title="How this works, and the keys">
+			<Icon name="help" size={15} /><span class="sr-only">Help</span>
 		</button>
 		<button
 			onclick={() => (dataOpen = !dataOpen)}
@@ -1150,6 +1150,17 @@
 		background: #fff;
 		color: #111;
 		cursor: pointer;
+	}
+
+	/* An icon-only button, squared off rather than left with the padding of a
+	   label it no longer has. Sized to this toolbar's own button height; the
+	   bars and the page corners have their own, a pixel apart, and making all
+	   three agree would change two designs to tidy one. */
+	.toolbar button.square {
+		width: 30px;
+		height: 30px;
+		padding: 0;
+		justify-content: center;
 	}
 
 	button:hover:not(:disabled) {

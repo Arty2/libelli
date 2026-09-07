@@ -43,3 +43,15 @@ html, body {
 	outline: 2px solid #2563eb;
 	outline-offset: 1px;
 }
+
+/* Said to a screen reader, shown to nobody. Defined here because four
+   components need it and it is the same six lines in each; a label that is only
+   visible to assistive tech is app-wide furniture, not a component's own style. */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}

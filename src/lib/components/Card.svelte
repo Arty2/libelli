@@ -150,11 +150,23 @@
 		read();
 		const observer = new ResizeObserver(read);
 		observer.observe(node);
+		// A clipped box is a fixed height, so nothing it contains can ever change
+		// its size and the resize observer above never fires for it — which is why
+		// the overflow warning used to appear on growing boxes and never on the
+		// clipped ones it matters most for. Content changes are a mutation, not a
+		// resize, so they need watching as such. Cheap: it fires on an actual DOM
+		// change, and read() only writes state when a number actually moved, so
+		// the re-render it can cause settles on the next pass.
+		const mutations = new MutationObserver(read);
+		mutations.observe(node, { subtree: true, childList: true, characterData: true });
 		// Web fonts land after first paint and change every height on the card.
 		if (typeof document !== 'undefined' && document.fonts) document.fonts.ready.then(read).catch(() => {});
 		return {
 			update: read,
-			destroy: () => observer.disconnect()
+			destroy: () => {
+				observer.disconnect();
+				mutations.disconnect();
+			}
 		};
 	}
 
@@ -211,7 +223,9 @@
 		if (hidden.has(box.id)) {
 			parts.push('height:0', 'overflow:hidden', 'visibility:hidden');
 		} else if (box.overflow === 'clip') {
-			parts.push(`height:${box.h}mm`, 'overflow:hidden');
+			// The height only. The clip itself is CSS, on .content — put here, on
+			// the box, it also ate the handles and badges that hang off its edges.
+			parts.push(`height:${box.h}mm`);
 		} else {
 			parts.push(`min-height:${box.h}mm`);
 		}
@@ -442,6 +456,7 @@
 				class:outlined={bounds && !empty}
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
+				class:clipped={box.overflow === 'clip' && !empty}
 				style={boxStyle(box)}
 				data-box-id={box.id}
 				use:measure={box.id}
@@ -602,6 +617,19 @@
 		min-width: 0;
 	}
 
+	/* A clipped box cuts its content at its own edge, but must not cut the
+	   handles, pivot and badges that sit outside that edge — they are siblings of
+	   .content, so clipping here reaches the content and nothing else. The card
+	   settles the same argument one level up, in .card.editing.
+
+	   min-height: 0 is load-bearing: a flex item refuses by default to shrink
+	   below its content height, so without it the content would keep spilling out
+	   of the fixed-height box and there would be nothing for overflow to cut. */
+	.box.clipped > .content {
+		overflow: hidden;
+		min-height: 0;
+	}
+
 	.plain {
 		display: block;
 		white-space: pre-wrap;
@@ -648,7 +676,11 @@
 		position: absolute;
 		width: var(--mark);
 		height: var(--mark);
-		background: #fff;
+		/* No fill: a handle sits on top of the content it is there to resize, and a
+		   white square hides the very edge you are trying to place. The trade-off
+		   is that the outline is all there is to see, so it carries the weight on
+		   a dark background image where a white square used to stand out. */
+		background: transparent;
 		border: calc(1px * var(--ui-scale, 1)) solid #2563eb;
 		border-radius: var(--radius-button);
 		box-sizing: border-box;
@@ -678,14 +710,19 @@
 	/* Fingers are not mice: the marks stay small enough to see past, and the
 	   targets grow to something you can actually land on. */
 	@media (pointer: coarse) {
+		/* The mark shrinks and the reach grows by the same amount, so the target
+		   stays 48px for a handle and 44px for the pivot — what it was when the
+		   marks were 20px and 16px. A finger covers the thing it is dragging, so
+		   the less of it the mark takes up the better, and the target is the
+		   ::before, which costs no layout and does not have to be seen. */
 		.handle {
-			--mark: calc(20px * var(--ui-scale, 1));
-			--reach: calc(14px * var(--ui-scale, 1));
+			--mark: calc(10px * var(--ui-scale, 1));
+			--reach: calc(19px * var(--ui-scale, 1));
 		}
 
 		.pivot {
-			--mark: calc(16px * var(--ui-scale, 1));
-			--reach: calc(14px * var(--ui-scale, 1));
+			--mark: calc(8px * var(--ui-scale, 1));
+			--reach: calc(20px * var(--ui-scale, 1));
 		}
 	}
 

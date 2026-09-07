@@ -69,6 +69,26 @@ the scaled card, so a 14px handle is nine pixels under the finger at 62%.
 `--ui-scale` on `.card` is `1 / scale`, and every screen-only measure is
 multiplied by it, so a target is the size it was drawn at whatever the zoom.
 
+**A clipped box cuts its content, not its chrome.** `overflow: clip` on a box
+used to be an inline style on `.box` — the same element the handles, pivot and
+badges hang off, so a clipped box ate its own selection chrome. The clip is CSS
+now, on `.box.clipped > .content`, because those are all siblings of `.content`
+rather than children of it. The alternative was to suppress the clip in the
+editor the way `.card.editing` does, but a box is set to clip precisely so its
+content is cut at its edge: not cutting it in the editor would break WYSIWYG for
+the one setting whose whole purpose is visible. `min-height: 0` on that rule is
+load-bearing — a flex item will not shrink below its content height by default,
+so without it the content spills out of the fixed-height box and there is
+nothing for `overflow` to cut.
+
+**Overflow is a mutation, not a resize.** `measure()` watches the box with a
+`ResizeObserver`, which is enough for a growing box and useless for a clipped
+one: its height is fixed, so nothing inside it can change its size and the
+observer never fires. The overflow warning therefore appeared on exactly the
+boxes that did not need it. A `MutationObserver` on the box's subtree catches
+the content change itself. It settles rather than looping, because `read()`
+writes state only when a number actually moved.
+
 **A handle's target is a pseudo-element, not a box-shadow.** A transparent
 `box-shadow` looks like a bigger hit area and is never hit-tested. `::before`
 with a negative inset is, and it grows again under `pointer: coarse`.
@@ -86,6 +106,15 @@ The cost is that a resize handle on a turned box hands back a screen-space delta
 which `moveDrag` rotates by −θ before reading it as a width; `move` is exempt,
 because a translation in the parent's space is the same whichever way the box
 faces.
+
+**A handle is an outline, and the mark is not the target.** Handles have no fill:
+they sit on top of the content they resize, and a white square hides the very
+edge you are trying to place. The trade-off is that the outline carries the whole
+job, so a handle is harder to see on a dark background image than a white square
+was. On a coarse pointer the mark halves again — a finger covers what it drags —
+while `--reach` grows by the same amount, so the target stays 48px for a handle
+and 44px for the pivot. That separation is the point of the `::before`: what you
+see and what you can hit are set independently.
 
 **Snapping is the two view toggles, not a modifier.** The grid beats sibling
 edges, sibling edges beat plain `FREE_STEP` rounding, and there is no key to

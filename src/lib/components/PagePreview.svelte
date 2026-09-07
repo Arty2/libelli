@@ -460,8 +460,8 @@
 	</div>
 
 	<div class="corner top right">
-		<button onclick={onaddbox} disabled={!!template.locked} title="Add an area to the page">
-			<Icon name="text" size={14} /> Area
+		<button class="square" onclick={onaddbox} disabled={!!template.locked} title="Add an area to the page">
+			<Icon name="text" size={14} /><span class="sr-only">Area</span>
 		</button>
 	</div>
 
@@ -778,14 +778,5 @@
 		.pad {
 			display: grid;
 		}
-	}
-
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip: rect(0 0 0 0);
-		white-space: nowrap;
 	}
 </style>
