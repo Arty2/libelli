@@ -1,6 +1,8 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
-	import { backgroundStyle } from '$lib/assets';
+	import { backgroundStyle, cssUrl, safeMediaUrl } from '$lib/assets';
+	import { parseColor } from '$lib/color';
+	import { applyPlaceholders } from '$lib/placeholders';
 	import { scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { FREE_STEP, GRID_MINOR, boxEdges, pxToMm, resolveLayout, snapTo, snapToEdges } from '$lib/layout';
@@ -25,6 +27,16 @@
 		selectedIds?: string[];
 		/** 1-based position of this card in the run; drawn when the template asks for it */
 		pageNumber?: number | null;
+		/** how many cards there are, for the X/Y form of the page number */
+		pageCount?: number | null;
+		/** the area whose words are being typed straight into the card, if any */
+		editingId?: string | null;
+		/**
+		 * Areas to flash. A move you did not watch happen — an area brought back
+		 * onto the sheet from off it — needs to say which areas moved, or the
+		 * card simply looks different and you have to work out why.
+		 */
+		flashIds?: string[];
 		/**
 		 * The template's background image, already resolved to something a
 		 * `background-image` can use. Resolved by the app rather than here,
@@ -39,6 +51,14 @@
 		onmenu?: (id: string, x: number, y: number) => void;
 		/** what a drag is about to do, so undo can name it afterwards */
 		onaction?: (what: string) => void;
+		/** start or stop typing into an area on the card itself */
+		onedit?: (id: string | null) => void;
+		/**
+		 * Words typed into the card. The card cannot write them itself: a bound
+		 * area's text is a cell in the dataset and a static one's is a field in
+		 * the template, and only the app knows which of the two it is holding.
+		 */
+		ontext?: (box: Box, value: string) => void;
 	}
 
 	let {
@@ -53,10 +73,15 @@
 		selectedIds = [],
 		pageNumber = null,
 		background = null,
+		pageCount = null,
+		editingId = null,
+		flashIds = [],
 		onselect,
 		onchange,
 		onmenu,
-		onaction
+		onaction,
+		onedit,
+		ontext
 	}: Props = $props();
 
 	let measured = $state<Record<string, number>>({});
@@ -65,7 +90,12 @@
 	/** the edge a live drag has latched onto, drawn as a guide until it lets go */
 	let guide = $state<{ x: number | null; y: number | null }>({ x: null, y: null });
 
-	const contentOf = (box: Box): string => {
+	/**
+	 * What the area actually holds — a cell of the row, or its own words. This is
+	 * the text as written, which is what the inline editor has to put in front of
+	 * you: substituting into it would mean typing over yesterday's date.
+	 */
+	const rawContentOf = (box: Box): string => {
 		if (box.slot) {
 			const column = mapping[box.slot];
 			const value = column ? row?.[column] : undefined;
@@ -74,8 +104,34 @@
 		return box.static?.text ?? '';
 	};
 
+	/** The same text as it is drawn, with `{{date}}` and its like filled in. */
+	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box));
+
+	/**
+	 * What an image area resolves to: a picture, a fill, or nothing at all.
+	 *
+	 * The mode is one mode on purpose — see `BoxMode` — so the value decides.
+	 * A color wins over a URL because nothing that parses as a color is also a
+	 * usable address, and a value that is neither draws nothing rather than
+	 * reaching a `src` attribute: a cell is untrusted, and `safeMediaUrl` is the
+	 * only door between one and an `<img>`.
+	 */
+	function mediaOf(box: Box): { svg?: string; src?: string; color?: string } {
+		if (box.static?.svg) return { svg: box.static.svg };
+		const written = box.slot ? contentOf(box) : (box.static?.dataUrl ?? box.static?.url ?? '');
+		const value = written.trim();
+		if (!value) return {};
+		const color = parseColor(value);
+		if (color) return { color };
+		const src = safeMediaUrl(value);
+		return src ? { src } : {};
+	}
+
 	const isEmpty = (box: Box) => {
-		if (box.mode === 'image') return !(box.static?.svg || box.static?.url || box.static?.dataUrl || contentOf(box).trim());
+		if (box.mode === 'image') {
+			const media = mediaOf(box);
+			return !(media.svg || media.src || media.color);
+		}
 		return contentOf(box).trim() === '';
 	};
 
@@ -92,7 +148,7 @@
 				qrSvg(value, {
 					level: box.qr?.level ?? 'M',
 					margin: box.qr?.margin ?? 2,
-					colour: box.color ?? template.defaults.color,
+					color: box.color ?? template.defaults.color,
 					background: box.qr?.background
 				}),
 				box.fit
@@ -122,7 +178,7 @@
 	const VALIGN_TO_FLEX = { top: 'flex-start', middle: 'center', bottom: 'flex-end' } as const;
 
 	/**
-	 * Paper colour is the ground and the image sits on it, both covering the
+	 * Paper color is the ground and the image sits on it, both covering the
 	 * bleed as well as the trim — a background that stopped at the trim edge
 	 * would show a white rim on everything printed with bleed.
 	 */
@@ -221,6 +277,21 @@
 			parts.push(`padding:${pad.top}mm ${pad.right}mm ${pad.bottom}mm ${pad.left}mm`);
 		}
 		if (box.background) parts.push(`background:${box.background}`);
+		// A color out of the data fills the area itself, not a panel inside it, so
+		// it reaches under the padding and takes the corner radius with it. After
+		// the declared fill, because the row is the more specific answer.
+		if (box.mode === 'image') {
+			const media = mediaOf(box);
+			if (media.color) parts.push(`background:${media.color}`);
+			// A tile is a background, not an element: `<img>` has no way to repeat.
+			else if (media.src && box.fit === 'repeat') {
+				parts.push(
+					`background-image:${cssUrl(media.src)}`,
+					'background-repeat:repeat',
+					'background-size:auto'
+				);
+			}
+		}
 		// `.box` is border-box, so a border eats into the width rather than adding
 		// to it: the box still occupies exactly the millimetres it was given.
 		if (box.borderWidth) {
@@ -271,9 +342,6 @@
 		return parts.join(';');
 	}
 
-	const imageSource = (box: Box) =>
-		box.static?.dataUrl ?? box.static?.url ?? (box.slot ? contentOf(box) : '');
-
 	/** Inline SVG is a template author's own markup, but never let it carry script. */
 	const safeSvg = (svg: string) =>
 		svg.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
@@ -299,6 +367,18 @@
 	/** Handles belong to a single box: with several chosen, the bar does the work. */
 	const soleSelection = $derived(selectedIds.length === 1);
 
+	/**
+	 * A second tap on the same area, soon enough, opens it for typing.
+	 *
+	 * `dblclick` covers a mouse and does not cover a finger: the box is
+	 * `touch-action: none` so it can be dragged, and a browser will not
+	 * synthesise a double-click out of taps it has been told not to interpret.
+	 * So the pair is counted here, for touch only — a mouse still comes through
+	 * `ondblclick`, which is the event it actually fires.
+	 */
+	const DOUBLE_TAP = 350;
+	let lastTap: { id: string; at: number } | null = null;
+
 	function startDrag(event: PointerEvent, box: Box, mode: DragMode) {
 		// Only the primary button drags. Without this a right-click starts one,
 		// and its non-additive select collapses a multi-selection to one box
@@ -306,6 +386,16 @@
 		if (event.button !== 0 || !interactive) return;
 		event.preventDefault();
 		event.stopPropagation();
+		if (event.pointerType === 'touch' && mode === 'move') {
+			const now = event.timeStamp || Date.now();
+			if (lastTap && lastTap.id === box.id && now - lastTap.at < DOUBLE_TAP) {
+				lastTap = null;
+				onselect?.(box.id, false);
+				beginEdit(box);
+				return;
+			}
+			lastTap = { id: box.id, at: now };
+		}
 		// Selecting comes first and is never refused: a lock stops a box moving,
 		// not being picked — otherwise the only control that could unlock it
 		// could never be reached.
@@ -580,20 +670,118 @@
 		new Set(template.boxes.map((b) => b.anchor?.to).filter((id): id is string => !!id))
 	);
 
+	/**
+	 * The other end of the tie, lit up when this end is picked.
+	 *
+	 * An anchor is a relationship between two boxes and both badges are on
+	 * screen, so selecting either one says which the other is. Selecting the box
+	 * that is followed accents the badges of its followers; selecting a follower
+	 * accents the badge of what it follows. One hop, not the whole chain: two
+	 * hops away is not a relationship you have with this box.
+	 */
+	const litFollowers = $derived(
+		new Set(template.boxes.filter((b) => b.anchor && selectedIds.includes(b.anchor.to)).map((b) => b.id))
+	);
+	const litTargets = $derived(
+		new Set(
+			template.boxes
+				.filter((b) => selectedIds.includes(b.id))
+				.map((b) => b.anchor?.to)
+				.filter((id): id is string => !!id)
+		)
+	);
+
 	const waitingFor = (box: Box) =>
 		loadingFonts.includes(box.font ?? template.defaults.font);
+
+	// ---- the badges, which are controls -------------------------------------
+
+	/**
+	 * A badge says why a box will not do what you might ask of it; two of them
+	 * now also undo the reason. Both wear their resting icon until you are about
+	 * to act on them, and then the icon of the act itself — on hover, so the
+	 * badge says what pressing it does before you press it, and for a moment
+	 * afterwards, so a tap on a touchscreen (which never hovers) still gets an
+	 * answer.
+	 */
+	let hoveredBadge = $state<string | null>(null);
+	let flashedBadge = $state<string | null>(null);
+	let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const badgeArmed = (key: string) => hoveredBadge === key || flashedBadge === key;
+
+	function flashBadge(key: string) {
+		flashedBadge = key;
+		if (flashTimer) clearTimeout(flashTimer);
+		flashTimer = setTimeout(() => (flashedBadge = null), 900);
+	}
+
+	/** Cast off: every box moored to this one keeps its place and loses the tie. */
+	function releaseDependents(box: Box) {
+		const moored = dependentsOf(box.id).filter((b) => b.anchor?.to === box.id && !b.locked);
+		if (!moored.length) return;
+		onaction?.('Cast off');
+		// The resolved top is where the box is actually sitting, so writing it back
+		// as its own y is what "keeps its place" means — an anchor released to the
+		// box's stale y would jump it up the card.
+		for (const held of moored) onchange?.({ ...held, anchor: null, y: round2(layout.tops[held.id] ?? held.y) });
+	}
+
+	/** Break this box's own tie, again without moving it. */
+	function breakAnchor(box: Box) {
+		if (!box.anchor || box.locked) return;
+		onaction?.('Break the anchor');
+		onchange?.({ ...box, anchor: null, y: round2(layout.tops[box.id] ?? box.y) });
+	}
+
+	// ---- typing into the card ------------------------------------------------
+
+	/**
+	 * Words go into the card, not only into the bar or the table.
+	 *
+	 * A textarea laid over the content rather than a `contenteditable`: the box
+	 * holds *text* — Markdown source for a Markdown area — and a contenteditable
+	 * would hand back markup nobody asked for. It inherits everything from the
+	 * box it sits in, so what you type is set the way it will print.
+	 */
+	const canEdit = (box: Box) =>
+		editable(box) && (box.mode === 'plain' || box.mode === 'markdown');
+
+	function beginEdit(box: Box) {
+		if (!canEdit(box)) return;
+		onedit?.(box.id);
+	}
+
+	const focusOnMount = (node: HTMLTextAreaElement) => {
+		node.focus();
+		// At the end, not selecting everything: this is a double-click into words
+		// that already exist, and replacing them wholesale is rarely the intent.
+		node.setSelectionRange(node.value.length, node.value.length);
+	};
+
+	function onEditorKeydown(event: KeyboardEvent) {
+		// Escape and Ctrl/Cmd+Enter leave; a plain Enter is a line break, because
+		// a Markdown area is a paragraph or several.
+		if (event.key === 'Escape' || (event.key === 'Enter' && (event.metaKey || event.ctrlKey))) {
+			event.preventDefault();
+			event.stopPropagation();
+			onedit?.(null);
+		}
+	}
 </script>
 
-<div class="card" class:bleeding={bleed > 0} class:editing={interactive} style={cardStyle()} lang="en">
+<div
+	class="card"
+	class:bleeding={bleed > 0}
+	class:editing={interactive}
+	class:frozen={interactive && !!template.locked}
+	style={cardStyle()}
+	lang="en"
+>
 	<div class="trim" style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
 			{@html styleTag(customCss)}
-		{/if}
-
-		{#if bounds && bleed > 0}
-			<!-- Where the paper will be cut. -->
-			<svg class="chrome trim-line" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 		{/if}
 
 		{#each template.boxes as box (box.id)}
@@ -608,10 +796,16 @@
 				class:no-padding={!box.padding}
 				class:grouped={!!box.group}
 				class:font-loading={interactive && waitingFor(box)}
+				class:flashing={flashIds.includes(box.id)}
 				style={boxStyle(box)}
 				data-box-id={box.id}
 				use:measure={box.id}
 				onpointerdown={(e) => startDrag(e, box, 'move')}
+				ondblclick={(e) => {
+					if (!interactive) return;
+					e.preventDefault();
+					beginEdit(box);
+				}}
 				oncontextmenu={(e) => {
 					if (!interactive) return;
 					e.preventDefault();
@@ -625,7 +819,7 @@
 				onpointercancel={endDrag}
 				role="presentation"
 			>
-				<div class="content">
+				<div class="content" class:being-edited={editingId === box.id}>
 					{#if box.mode === 'markdown'}
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf -->
 						{@html renderMarkdown(contentOf(box), { size: box.size ?? template.defaults.size, md: box.md })}
@@ -635,17 +829,39 @@
 							{@html qrFor(box)}
 						</span>
 					{:else if box.mode === 'image'}
-						<span class="media" style="height:{box.h}mm">
-							{#if box.static?.svg}
-								{@html fitSvg(safeSvg(box.static.svg), box.fit)}
-							{:else if imageSource(box)}
-								<img src={imageSource(box)} alt="" style="object-fit:{box.fit ?? 'contain'}" />
-							{/if}
-						</span>
+						{@const media = mediaOf(box)}
+						<!-- A color and a tile are both drawn by the box's own background,
+						     in boxStyle, so there is nothing to put in here for either. -->
+						{#if media.svg || (media.src && box.fit !== 'repeat')}
+							<span class="media" style="height:{box.h}mm">
+								{#if media.svg}
+									{@html fitSvg(safeSvg(media.svg), box.fit)}
+								{:else}
+									<img src={media.src} alt="" style="object-fit:{box.fit ?? 'contain'}" />
+								{/if}
+							</span>
+						{/if}
 					{:else}
 						<span class="plain">{contentOf(box)}</span>
 					{/if}
 				</div>
+
+				{#if editingId === box.id && canEdit(box)}
+					<!-- Over the content, not instead of it: the box keeps its measured
+					     height, so nothing anchored below it hops about while you type,
+					     and the words underneath show through where the caret is not. -->
+					<textarea
+						class="inline-editor"
+						spellcheck="false"
+						use:focusOnMount
+						value={rawContentOf(box)}
+						oninput={(e) => ontext?.(box, e.currentTarget.value)}
+						onkeydown={onEditorKeydown}
+						onblur={() => onedit?.(null)}
+						onpointerdown={(e) => e.stopPropagation()}
+						ondblclick={(e) => e.stopPropagation()}
+					></textarea>
+				{/if}
 
 				<!-- The lines around a box are strokes, not borders. A browser rounds
 				     border-width to whole device pixels, so a bound asked for at
@@ -664,32 +880,73 @@
 				{/if}
 
 				{#if bounds && !empty && overflowing[box.id]}
-					<!-- A badge like the others, in the one colour that means the print
-					     will be wrong rather than merely constrained. Shears, because
-					     what is happening to the words is that they are being cut. -->
+					<!-- Where the words are actually severed, drawn as the cut it is: a
+					     dashed red line along the bottom edge, with the shears straddling
+					     it at the end of the stroke. The other three edges keep the plain
+					     bound they always had — only this one is doing the cutting, and
+					     saying so on all four would say nothing. -->
+					<svg class="chrome cut-line" aria-hidden="true">
+						<line x1="0" y1="100%" x2="100%" y2="100%" />
+					</svg>
 					<span class="overflow-mark" title="The content does not fit — this area is cutting off what will print">
-						<Icon name="scissors" size={11} />
+						<Icon name="cut" size={11} />
 					</span>
 				{/if}
 
-				{#if bounds && (box.anchor || box.locked || isStatic(box) || anchorTargets.has(box.id))}
+				<!-- Every badge here says why *this* area will not do what you might
+				     ask of it, and on a locked page that is the same answer for all
+				     of them: the page is locked. The band over the sheet says it once,
+				     so the column of per-area reasons is noise — and two of these are
+				     buttons that would be refused anyway. The overflow mark below is
+				     not one of these: it is about what will print, which a lock does
+				     not change. -->
+				{#if bounds && !template.locked && (box.anchor || box.locked || isStatic(box) || anchorTargets.has(box.id))}
 					<!-- Why the box will not do what you might ask of it, stacked at its
-					     corner: the anchor above the lock when it carries both. -->
+					     corner: the anchor above the lock when it carries both. The two
+					     about anchoring are buttons — the reason and the way out of it in
+					     the same 13 pixels — and they swap to the icon of the undoing
+					     while the pointer is on them, so pressing one holds no surprise. -->
 					<span class="badges">
 						{#if isStatic(box)}
-							<span class="badge" title="Static text — this says the same on every card, because it is not bound to a column">
-								<Icon name="unlink" size={11} />
+							<span class="badge" title="Static text — this says the same on every card, because it is not plugged into a column">
+								<Icon name="unplug" size={11} />
 							</span>
 						{/if}
 						{#if box.anchor}
-							<span class="badge" title="Tied to another area — its top follows that area's bottom, and it moves when that one does">
-								<Icon name="knot" size={11} />
-							</span>
+							<button
+								class="badge action"
+								class:lit={litFollowers.has(box.id)}
+								disabled={!editable(box)}
+								title="Tied to another area — its top follows that area's bottom. Press to break the tie and leave this area where it is."
+								aria-label="Break this area's anchor"
+								onpointerdown={(e) => e.stopPropagation()}
+								onpointerenter={() => (hoveredBadge = `${box.id}:tied`)}
+								onpointerleave={() => (hoveredBadge = null)}
+								onclick={() => {
+									flashBadge(`${box.id}:tied`);
+									breakAnchor(box);
+								}}
+							>
+								<Icon name={badgeArmed(`${box.id}:tied`) ? 'unlink' : 'link'} size={11} />
+							</button>
 						{/if}
 						{#if anchorTargets.has(box.id)}
-							<span class="badge" title="Other areas are anchored to this one — moving it moves them too">
-								<Icon name="anchor" size={11} />
-							</span>
+							<button
+								class="badge action"
+								class:lit={litTargets.has(box.id)}
+								disabled={!!template.locked}
+								title="Other areas are moored to this one — moving it moves them too. Press to cast them off and leave them where they are."
+								aria-label="Cast off the areas anchored to this one"
+								onpointerdown={(e) => e.stopPropagation()}
+								onpointerenter={() => (hoveredBadge = `${box.id}:moored`)}
+								onpointerleave={() => (hoveredBadge = null)}
+								onclick={() => {
+									flashBadge(`${box.id}:moored`);
+									releaseDependents(box);
+								}}
+							>
+								<Icon name={badgeArmed(`${box.id}:moored`) ? 'unlocked' : 'harbor'} size={11} />
+							</button>
 						{/if}
 						{#if box.locked}
 							<span class="badge" title="Locked">
@@ -701,15 +958,16 @@
 
 				{#if interactive && isSelected(box) && soleSelection}
 					{#if editable(box)}
-						<!-- Turning happens about the pivot, so the handle for it is the
-						     pivot: a mark on the top edge would say nothing about where
-						     the box is actually going to turn, and the pivot moves. One
-						     mark, two gestures — drag to turn, Alt-drag to move the
-						     point turned about — with the X and Y in the bar as the
-						     precise way to place it for anyone who never finds the
-						     modifier. Drawn on an upright box too, unlike the old pivot,
-						     because it is the rotation control now and has to be there
-						     before there is any rotation to show. -->
+						<!-- Turning happens about the pivot, so the controls for it live
+						     on the pivot: a mark on the top edge would say nothing about
+						     where the box is actually going to turn, and the pivot moves.
+						     Two marks rather than one gesture with a modifier, because
+						     they do two different things and a modifier nobody finds is a
+						     feature nobody has — the crosshair moves the point turned
+						     about, the knob on the arm below it swings the box. The X and
+						     Y in the bar place the pivot exactly. Both are drawn on an
+						     upright box, because the lever is the rotation control and
+						     has to be there before there is any rotation to show. -->
 						<span
 							class="pivot"
 							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
@@ -746,7 +1004,15 @@
 		{/each}
 
 		{#if template.pageNumber.enabled && pageNumber != null}
-			<div class="page-number" style={pageNumberStyle()}>{pageNumber}</div>
+			<!-- Three elements rather than one string, so a template's own CSS can
+			     reach each part: `.page-number .of::before { content: ' of ' }` is
+			     the whole point of the separator being an empty element. -->
+			<div class="page-number" style={pageNumberStyle()}>
+				<span class="of-current">{pageNumber}</span>
+				{#if template.pageNumber.showTotal && pageCount != null}
+					<span class="of" aria-hidden="true"></span><span class="of-total">{pageCount}</span>
+				{/if}
+			</div>
 		{/if}
 
 		{#if guide.x !== null}
@@ -773,7 +1039,7 @@
 		box-sizing: border-box;
 		overflow: hidden;
 		color: #000;
-		/* Paper colour is part of the artwork, not decoration the printer may
+		/* Paper color is part of the artwork, not decoration the printer may
 		   drop — though the browser still asks for "background graphics". */
 		print-color-adjust: exact;
 		-webkit-print-color-adjust: exact;
@@ -831,6 +1097,47 @@
 		position: absolute;
 	}
 
+	/* The separator is an empty element whose glyph comes from CSS, so a
+	   template's own stylesheet can say `.page-number .of::before { content:
+	   ' of ' }` — or take it away. Written here rather than as a literal " / "
+	   in the markup precisely so it can be reached. */
+	.page-number .of::before {
+		content: ' / ';
+		white-space: pre;
+	}
+
+	/* Laid over the content it is replacing, inheriting everything: what you
+	   type is set in the face, size, color and alignment it will print in.
+	   Transparent, so the words underneath keep the box its measured height —
+	   the editor has no height of its own to give it. */
+	.inline-editor {
+		position: absolute;
+		inset: var(--pad-t, 0) var(--pad-r, 0) var(--pad-b, 0) var(--pad-l, 0);
+		z-index: 4;
+		margin: 0;
+		padding: 0;
+		border: none;
+		background: rgba(255, 255, 255, 0.9);
+		box-sizing: border-box;
+		resize: none;
+		overflow: auto;
+		overscroll-behavior: contain;
+		font: inherit;
+		color: inherit;
+		text-align: inherit;
+		letter-spacing: inherit;
+		line-height: inherit;
+		outline: var(--line-thick) solid #2563eb;
+		/* The box is `touch-action: none` so it can be dragged; the editor inside
+		   it has to hand scrolling and text selection back. */
+		touch-action: auto;
+	}
+
+	/* The words under the editor would show through it and double every glyph. */
+	.content.being-edited {
+		visibility: hidden;
+	}
+
 	/* Media has no flow height of its own, so the box's declared height is the
 	   frame, and `cover` crops inside it rather than spilling onto the card. */
 	.media {
@@ -856,6 +1163,17 @@
 	.box.interactive {
 		cursor: move;
 		touch-action: none;
+	}
+
+	/* A link in a Markdown body is a link on paper: it says where to go, it does
+	   not go there. In the editor it was live, so clicking a word to select the
+	   area it is in navigated away from the app instead — and the app is the
+	   only place the unsaved design exists. Screen only and editor only: the
+	   print root and the lightbox render the same DOM without `editing`, and
+	   nothing on paper has pointer events to take away. */
+	.card.editing :global(.content a) {
+		pointer-events: none;
+		cursor: inherit;
 	}
 
 	/* `--mark` is what you see, `--reach` is how far past it the pointer counts.
@@ -1047,7 +1365,7 @@
 		   so the selection moved to an `outline` on the box itself — identical to
 		   look at, costs no layout, and leaves ::after for the bounds and ::before
 		   for the padding guide. It also means a locked or grouped box keeps its
-		   state colour while selected, instead of the blue overwriting it.
+		   state color while selected, instead of the blue overwriting it.
 
 		   Every weight here is multiplied by --ui-scale. Screen furniture lives
 		   inside the scaled card, so a plain 1px line is 0.6px at 64% and 2px at
@@ -1083,21 +1401,27 @@
 		}
 
 		.bounds rect {
-			stroke: var(--bounds-colour, rgba(37, 99, 235, 0.45));
+			stroke: var(--bounds-color, rgba(37, 99, 235, 0.45));
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
+		/* A locked *design* is not a box that happens to be locked: nothing on the
+		   card can be moved, so nothing on it is worth coloring for a reason. The
+		   whole set of bounds goes grey — one flat statement that the card is not
+		   currently yours to push around — and the padlock over the top edge says
+		   why. The rule is last of the three because it has to beat both. */
+
 		/* A locked box cannot be moved, and a grouped one moves with others: both
-		   are reasons a drag will not do what you expect, so they colour the
+		   are reasons a drag will not do what you expect, so they color the
 		   bounds. Locked wins when a box is both — it is the stronger refusal.
 		   The dash is coarser as well as red, because the overflow corner is
 		   already red and two reds a millimetre apart are one red. */
 		.box.grouped {
-			--bounds-colour: rgba(124, 58, 237, 0.75);
+			--bounds-color: rgba(124, 58, 237, 0.75);
 		}
 
 		.box.locked {
-			--bounds-colour: rgba(180, 35, 24, 0.8);
+			--bounds-color: rgba(180, 35, 24, 0.8);
 		}
 
 		.box.locked .bounds rect {
@@ -1107,6 +1431,19 @@
 
 		.selection rect {
 			stroke: #2563eb;
+		}
+
+		.card.frozen .box {
+			--bounds-color: rgba(0, 0, 0, 0.32);
+		}
+
+		.card.frozen .box.locked .bounds rect {
+			stroke-width: var(--line);
+			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
+		}
+
+		.card.frozen .selection rect {
+			stroke: rgba(0, 0, 0, 0.5);
 		}
 
 		/* Positioned by the padding the box was given, so the guide moves with it
@@ -1122,31 +1459,37 @@
 			stroke-dasharray: calc(var(--line) * 2) calc(var(--line) * 2);
 		}
 
-		/* Green: it is not a box outline and not a state, it is the edge of the
-		   paper, and purple now means a grouped box. */
-		.trim-line rect {
-			stroke: rgba(5, 150, 105, 0.85);
+		/* The line the words are cut on: dashed, the way a cut line is drawn on
+		   anything meant to be cut, and in the same rhythm as the bound it sits on
+		   so the two read as one language. Heavier and red, because this edge is
+		   doing something the other three are not. */
+		.cut-line line {
+			stroke: #b42318;
+			stroke-width: var(--line-thick);
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
-		/* The same badge as the others — same size, radius and standing clear of
-		   the edge — in the one colour that says the print will be wrong. It hangs
-		   off the bottom right, where the words run out, rather than sharing the
-		   column of reasons at the top right. */
+		/* The same badge as the others — same size and radius — sitting astride
+		   the line rather than above it, so the shears read as being *on* the cut
+		   they are making. Hollow, unlike every other mark here: a solid red chip
+		   at the corner was the heaviest thing on a card whose whole point is the
+		   artwork, and the line beside it is already carrying the warning. */
 		.overflow-mark {
 			position: absolute;
 			top: 100%;
 			left: 100%;
-			margin: calc(-13px * var(--ui-scale, 1)) 0 0 calc(4px * var(--ui-scale, 1));
+			/* Half its own height up, so the middle of it lands on the bottom
+			   edge — the blade meeting the paper. */
+			margin: calc(-6.5px * var(--ui-scale, 1)) 0 0 calc(4px * var(--ui-scale, 1));
 			display: grid;
 			place-items: center;
 			width: calc(13px * var(--ui-scale, 1));
 			height: calc(13px * var(--ui-scale, 1));
 			box-sizing: border-box;
 			border-radius: var(--radius-button);
-			border: var(--line) solid #8f1c13;
-			background: #b42318;
-			color: #fff;
+			border: var(--line) solid #b42318;
+			background: transparent;
+			color: #b42318;
 			/* Hoverable, like the badges: its title is the only thing that says what
 			   the mark means, and pointer-events: none meant it never showed. */
 			pointer-events: auto;
@@ -1194,6 +1537,60 @@
 		.badge:hover {
 			border-color: #767676;
 			color: #333;
+		}
+
+		/* A selected area's badges take the color of its own bounds. The column
+		   of them sits a few pixels off the edge of the box they annotate, and in
+		   a flat grey they read as belonging to the card rather than to the area —
+		   which matters most when several areas are close enough for their badges
+		   to be nearer a neighbour's edge than their own. */
+		.box.selected .badge {
+			border-color: var(--bounds-color, #2563eb);
+			color: var(--bounds-color, #2563eb);
+		}
+
+		/* Something moved that you were not watching. Long enough to catch out of
+		   the corner of the eye, short enough not to become part of the drawing —
+		   and off entirely for anyone who has asked for less motion, who gets the
+		   status line saying what happened instead. */
+		@media (prefers-reduced-motion: no-preference) {
+			.box.flashing {
+				animation: found 900ms ease-out;
+			}
+		}
+
+		@keyframes found {
+			0%,
+			70% {
+				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) rgba(37, 99, 235, 0.55);
+				background-color: rgba(37, 99, 235, 0.18);
+			}
+			100% {
+				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) rgba(37, 99, 235, 0);
+				background-color: rgba(37, 99, 235, 0);
+			}
+		}
+
+		/* A badge that is also a button. Reset rather than restyled: it inherits
+		   everything from .badge above and only has to stop looking like a
+		   browser's idea of a button. */
+		button.badge {
+			padding: 0;
+			font: inherit;
+			cursor: pointer;
+		}
+
+		button.badge:disabled {
+			cursor: help;
+		}
+
+		/* The other end of a tie that is selected. Blue and filled, because a
+		   badge is normally the quietest mark on the card and this one has to be
+		   found across it. */
+		.badge.lit {
+			border-color: #2563eb;
+			background: #eaf1fe;
+			color: #2563eb;
 		}
 
 		/* Icon takes a px size, which is inside the card's transform like

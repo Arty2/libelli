@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
+	applyStyle,
+	bringOnPage,
+	copyStyle,
 	deleteBoxes,
 	duplicateBoxes,
 	groupMembers,
 	nudgeBox,
 	stepAlignment,
+	strayBoxes,
 	toggleGroup,
 	toggleLock,
 	toggleSelection
 } from './boxops';
 import { newBox } from './template';
-import type { Box } from './types';
+import type { Box, PageSpec } from './types';
 
 const box = (id: string, extra: Partial<Box> = {}): Box => newBox({ id, x: 10, y: 10, w: 30, h: 20, ...extra });
 
@@ -69,6 +73,13 @@ describe('duplicateBoxes', () => {
 		const copy = next.find((b) => b.id === created[0])!;
 		copy.md!.list!.indent = 99;
 		expect(boxes[0].md!.list!.indent).toBe(7);
+	});
+
+	it('hands back an unlocked copy, so a copy of a locked area can be placed', () => {
+		const boxes = [box('a', { locked: true })];
+		const { boxes: next, created } = duplicateBoxes(boxes, ['a']);
+		expect(next.find((b) => b.id === created[0])!.locked).toBeUndefined();
+		expect(next.find((b) => b.id === 'a')!.locked).toBe(true);
 	});
 
 	it('leaves the list alone when nothing is selected', () => {
@@ -189,5 +200,72 @@ describe('stepAlignment', () => {
 
 	it('treats a box with no vertical alignment as top', () => {
 		expect(stepAlignment(box('a'), 'v', 1, 'left').valign).toBe('middle');
+	});
+});
+
+describe('copyStyle and applyStyle', () => {
+	it('carries the look and nothing else', () => {
+		const source = box('a', { size: 20, background: '#ffffff', borderRadius: 2, slot: 'title' });
+		const style = copyStyle(source);
+		expect(style).toEqual({ size: 20, background: '#ffffff', borderRadius: 2 });
+	});
+
+	it('leaves content, geometry and the lock where they were', () => {
+		const source = box('a', { size: 20, color: 'red' });
+		const target = box('b', { x: 90, y: 80, w: 5, h: 6, slot: 'body', locked: true });
+		const pasted = applyStyle(target, copyStyle(source));
+		expect(pasted).toMatchObject({ id: 'b', x: 90, y: 80, w: 5, h: 6, slot: 'body', locked: true });
+		expect(pasted.size).toBe(20);
+	});
+
+	it('takes away what the source did not have, so a paste is not a merge', () => {
+		const plain = box('a');
+		const decorated = box('b', { borderWidth: 1, borderStyle: 'dashed', background: '#ffffff' });
+		const pasted = applyStyle(decorated, copyStyle(plain));
+		expect(pasted.borderWidth).toBeUndefined();
+		expect(pasted.background).toBeUndefined();
+	});
+});
+
+const page: PageSpec = { w: 100, h: 100, unit: 'mm' };
+
+describe('strayBoxes', () => {
+	it('finds only the boxes with no overlap with the sheet at all', () => {
+		const boxes = [
+			box('on', { x: 10, y: 10, w: 30, h: 20 }),
+			// Crossing the trim is what bleed is for, not something to rescue.
+			box('bleeding', { x: -6, y: 10, w: 30, h: 20 }),
+			box('past-right', { x: 140, y: 10, w: 30, h: 20 }),
+			box('above', { x: 10, y: -40, w: 30, h: 20 })
+		];
+		expect(strayBoxes(boxes, page).map((b) => b.id)).toEqual(['past-right', 'above']);
+	});
+
+	it('counts the bleed as paper, so a box on it is not stray', () => {
+		const boxes = [box('a', { x: -22, y: 10, w: 20, h: 20 })];
+		expect(strayBoxes(boxes, page).map((b) => b.id)).toEqual(['a']);
+		expect(strayBoxes(boxes, page, 5)).toEqual([]);
+	});
+});
+
+describe('bringOnPage', () => {
+	it('slides a box the shortest way back inside the trim', () => {
+		const boxes = [box('a', { x: -60, y: 95, w: 30, h: 20 })];
+		expect(bringOnPage(boxes, ['a'], page)[0]).toMatchObject({ x: 0, y: 80 });
+	});
+
+	it('pins a box bigger than the page to the top left rather than centring it', () => {
+		const boxes = [box('a', { x: 400, y: 400, w: 200, h: 200 })];
+		expect(bringOnPage(boxes, ['a'], page)[0]).toMatchObject({ x: 0, y: 0 });
+	});
+
+	it('leaves an anchored box its y, which comes from another box', () => {
+		const boxes = [box('a', { x: -60, y: 95, w: 30, h: 20, anchor: { to: 'b', gap: 4 } })];
+		expect(bringOnPage(boxes, ['a'], page)[0]).toMatchObject({ x: 0, y: 95 });
+	});
+
+	it('leaves a locked box alone, and returns the array itself when nothing moved', () => {
+		const boxes = [box('a', { x: -60, y: 10, locked: true })];
+		expect(bringOnPage(boxes, ['a'], page)).toBe(boxes);
 	});
 });

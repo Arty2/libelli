@@ -11,7 +11,7 @@
  * 300dpi is the classic way to end up with a code no phone will read.
  */
 
-import { parseColour } from './colour';
+import { parseColor } from './color';
 
 export type EccLevel = 'L' | 'M' | 'Q' | 'H';
 
@@ -445,7 +445,7 @@ export function qrMatrix(text: string, options: QrOptions = {}): boolean[][] {
 export interface QrSvgOptions extends QrOptions {
 	/** quiet zone in modules; the spec asks for 4, print can live with 2 */
 	margin?: number;
-	colour?: string;
+	color?: string;
 	background?: string;
 }
 
@@ -457,8 +457,8 @@ export function qrSvg(text: string, options: QrSvgOptions = {}): string {
 	const modules = qrMatrix(text, options);
 	const margin = Math.max(0, Math.round(options.margin ?? 2));
 	const size = modules.length + margin * 2;
-	const colour = parseColour(options.colour ?? null) ?? '#000000';
-	const background = parseColour(options.background ?? null);
+	const color = parseColor(options.color ?? null) ?? '#000000';
+	const background = parseColor(options.background ?? null);
 
 	let path = '';
 	for (let r = 0; r < modules.length; r++) {
@@ -471,7 +471,7 @@ export function qrSvg(text: string, options: QrSvgOptions = {}): string {
 		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="100%" height="100%"`,
 		` shape-rendering="crispEdges" role="img" aria-label="QR code">`,
 		background ? `<rect width="${size}" height="${size}" fill="${background}"/>` : '',
-		`<path d="${path}" fill="${colour}"/>`,
+		`<path d="${path}" fill="${color}"/>`,
 		`</svg>`
 	].join('');
 }

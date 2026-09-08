@@ -1,7 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import type { AlignEdge } from '$lib/layout';
-	import type { Arrange } from '$lib/template';
 	import type { Box, Template } from '$lib/types';
 
 	interface Props {
@@ -13,12 +12,18 @@
 		/** viewport coordinates of the click that opened this */
 		x: number;
 		y: number;
-		onarrange: (where: Arrange) => void;
+		/** whether every click is currently adding to or dropping from the selection */
+		picking: boolean;
+		/** whether there is a look on the clipboard to paste */
+		hasStyle: boolean;
 		onalign: (edge: AlignEdge) => void;
 		ongroup: () => void;
 		onlock: (locked: boolean) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
+		onpicking: (on: boolean) => void;
+		oncopystyle: () => void;
+		onpastestyle: () => void;
 		onclose: () => void;
 	}
 
@@ -28,12 +33,16 @@
 		selectedBoxes,
 		x,
 		y,
-		onarrange,
+		picking,
+		hasStyle,
 		onalign,
 		ongroup,
 		onlock,
 		onduplicate,
 		ondelete,
+		onpicking,
+		oncopystyle,
+		onpastestyle,
 		onclose
 	}: Props = $props();
 
@@ -54,12 +63,6 @@
 	];
 
 	const frozen = $derived(!!template.locked);
-	// Nowhere to go when the selection already occupies the end it is being sent to.
-	const positions = $derived(
-		selectedBoxes.map((b) => template.boxes.findIndex((one) => one.id === b.id)).sort((a, b) => a - b)
-	);
-	const atFront = $derived(positions.every((p, i) => p === template.boxes.length - positions.length + i));
-	const atBack = $derived(positions.every((p, i) => p === i));
 
 	let menu = $state<HTMLDivElement | null>(null);
 
@@ -116,18 +119,39 @@
 		<hr />
 	{/if}
 
-	<!-- Several move as a block, keeping their order relative to each other. -->
-	<button role="menuitem" disabled={frozen || atFront} onclick={() => run(() => onarrange('front'))}>
-		<Icon name="bring-to-front" size={15} /> Bring to Front
+	<!-- First, because it changes what every click after it means: with this on,
+	     each area you press joins the selection or leaves it, which is what a
+	     shift-click does on a keyboard and what a touchscreen has no way to say. -->
+	<button
+		role="menuitemcheckbox"
+		aria-checked={picking}
+		class:on={picking}
+		onclick={() => run(() => onpicking(!picking))}
+	>
+		<Icon name={picking ? 'checkbox-checked' : 'checkbox'} size={15} />
+		{picking ? 'Stop Selecting Multiple' : 'Select Multiple'}
 	</button>
-	<button role="menuitem" disabled={frozen || atFront} onclick={() => run(() => onarrange('forward'))}>
-		<Icon name="bring-forward" size={15} /> Bring Forward
+
+	<hr />
+
+	<button role="menuitem" disabled={frozen} onclick={() => run(() => onlock(!box.locked))}>
+		<Icon name={box.locked ? 'unlocked' : 'locked'} size={15} />
+		{box.locked ? 'Unlock' : 'Lock'}{plural}
 	</button>
-	<button role="menuitem" disabled={frozen || atBack} onclick={() => run(() => onarrange('backward'))}>
-		<Icon name="send-backward" size={15} /> Send Backward
+
+	<hr />
+
+	<!-- Stacking order is not here any more: it is the column beside the page,
+	     which is where it belongs — it is about where an area sits on the sheet,
+	     and it wants to be pressed four times in a row rather than reopened from
+	     a menu between each press. -->
+	<button role="menuitem" onclick={() => run(oncopystyle)}>
+		<Icon name="copy" size={15} /> Copy Style
+		<span class="chord">Ctrl/⌘ ⇧ C</span>
 	</button>
-	<button role="menuitem" disabled={frozen || atBack} onclick={() => run(() => onarrange('back'))}>
-		<Icon name="send-to-back" size={15} /> Send to Back
+	<button role="menuitem" disabled={frozen || !hasStyle} onclick={() => run(onpastestyle)}>
+		<Icon name="paste" size={15} /> Paste Style{plural}
+		<span class="chord">Ctrl/⌘ ⇧ V</span>
 	</button>
 
 	<hr />
@@ -138,10 +162,6 @@
 			{grouped ? 'Ungroup' : 'Group'}
 		</button>
 	{/if}
-	<button role="menuitem" disabled={frozen} onclick={() => run(() => onlock(!box.locked))}>
-		<Icon name="locked" size={15} />
-		{box.locked ? 'Unlock' : 'Lock'}{plural}
-	</button>
 	<button role="menuitem" disabled={frozen} onclick={() => run(onduplicate)}>
 		<Icon name="copy" size={15} /> Duplicate{plural}
 	</button>
@@ -190,6 +210,20 @@
 	button:disabled {
 		opacity: 0.4;
 		cursor: default;
+	}
+
+	/* The keys that do the same thing, greyed and pushed to the right edge: a
+	   menu is where you find out what the chord is, not a second place to be
+	   told what the item does. */
+	.chord {
+		margin-left: auto;
+		padding-left: 12px;
+		font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+		color: #aaa;
+	}
+
+	button.on {
+		color: #2563eb;
 	}
 
 	button.danger {

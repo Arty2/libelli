@@ -37,6 +37,20 @@ html, body {
 	background: #eee;
 	color: #111;
 	font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	/* No pull-to-refresh, anywhere.
+
+	   A phone reads a downward drag that reaches the top of the scroll chain as
+	   "reload the page", and this app cannot afford that: the undo history lives
+	   in memory and a reload throws it away — which is the very reason a waiting
+	   service-worker update sits there asking rather than swapping itself in. It
+	   is worst in the lightbox, where dragging the card *is* the gesture that
+	   turns it, but the editor stage and the data table are one flick from the
+	   same accident.
+
+	   This stops the chain at the document; the scrollers inside it each say
+	   `overscroll-behavior: contain` so nothing reaches the document to begin
+	   with, and the lightbox refuses the browser the gesture outright. */
+	overscroll-behavior: none;
 }
 
 *:focus-visible {

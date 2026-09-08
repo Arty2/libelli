@@ -92,12 +92,12 @@ describe('normaliseTemplate', () => {
 		expect(normaliseTemplate({ schema: 2, page: { image: { src: 'x.jpg', source: 'local', fit: 'wonky' } }, boxes: [] }).page.image?.fit).toBe('cover');
 	});
 
-	it('keeps the surface fields on a box, and drops a colour it does not recognise', () => {
+	it('keeps the surface fields on a box, and drops a color it does not recognise', () => {
 		const t = normaliseTemplate({
 			schema: 2,
 			boxes: [
 				{ id: 'a', x: 0, y: 0, w: 10, h: 10, padding: 2, borderWidth: 0.4, borderColor: 'red', borderRadius: 1.5, background: '#eee8d5' },
-				{ id: 'b', x: 0, y: 0, w: 10, h: 10, color: 'url(x)', background: 'javascript:alert(1)', borderColor: 'not-a-colour' }
+				{ id: 'b', x: 0, y: 0, w: 10, h: 10, color: 'url(x)', background: 'javascript:alert(1)', borderColor: 'not-a-color' }
 			]
 		});
 		expect(t.boxes[0]).toMatchObject({
@@ -107,7 +107,7 @@ describe('normaliseTemplate', () => {
 			borderRadius: 1.5,
 			background: '#eee8d5'
 		});
-		// A colour the parser refuses never reaches a style attribute at all.
+		// A color the parser refuses never reaches a style attribute at all.
 		expect('color' in t.boxes[1]).toBe(false);
 		expect('background' in t.boxes[1]).toBe(false);
 		expect('borderColor' in t.boxes[1]).toBe(false);
@@ -174,12 +174,12 @@ describe('normaliseTemplate', () => {
 		expect('borderStyle' in t.boxes[1]).toBe(false);
 	});
 
-	it('falls back to the default text colour when a template names an unusable one', () => {
-		expect(normaliseTemplate({ schema: 2, defaults: { color: 'chartreuse' }, boxes: [] }).defaults.color).toBe('#000000');
+	it('falls back to the default text color when a template names an unusable one', () => {
+		expect(normaliseTemplate({ schema: 2, defaults: { color: 'burnt sienna' }, boxes: [] }).defaults.color).toBe('#000000');
 		expect(normaliseTemplate({ schema: 2, defaults: { color: 'navy' }, boxes: [] }).defaults.color).toBe('#14306b');
 	});
 
-	it('falls back to white for a page colour it cannot parse', () => {
+	it('falls back to white for a page color it cannot parse', () => {
 		expect(normaliseTemplate({ schema: 1, page: { background: 'url(x)' }, boxes: [] }).page.background).toBe('#ffffff');
 		expect(normaliseTemplate({ schema: 1, page: { background: '#eee8d5' }, boxes: [] }).page.background).toBe('#eee8d5');
 	});

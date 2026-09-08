@@ -27,3 +27,21 @@ export function downloadBlob(filename: string, blob: Blob) {
 /** A filename stem from a human name: lowercase, hyphens, nothing surprising. */
 export const slugify = (name: string) =>
 	name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'untitled';
+
+/**
+ * One file out of a numbered run, named so that a directory listing is the
+ * print order.
+ *
+ * `cards-9` and `cards-10` sort as 1, 10, 2 in every file manager there is, so
+ * the number is padded to the width of the run: twelve pages land as 01…12 and
+ * a hundred as 001…100. The separator is an underscore because `slugify` is
+ * free to produce hyphens of its own, and `my-cards-3` does not say which part
+ * is the name.
+ *
+ * `total` is the length of the run rather than the last index, so a run of one
+ * is `name_1` and not `name_01`.
+ */
+export function pageFilename(stem: string, page: number, total: number, extension: string): string {
+	const width = String(Math.max(1, total)).length;
+	return `${stem}_${String(page).padStart(width, '0')}.${extension}`;
+}

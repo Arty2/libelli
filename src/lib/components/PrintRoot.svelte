@@ -35,7 +35,14 @@
 	{#each pages as page (page.index)}
 		<!-- Sized to the sheet so nothing can spill sideways into an extra page. -->
 		<div class="print-page" style="width:{pageW}mm;height:{pageH}mm">
-			<Card {template} row={page.row} {mapping} pageNumber={page.index + 1} {background} />
+			<Card
+				{template}
+				row={page.row}
+				{mapping}
+				pageNumber={page.index + 1}
+				pageCount={dataset.rows.length}
+				{background}
+			/>
 		</div>
 	{/each}
 </div>

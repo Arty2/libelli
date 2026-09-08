@@ -8,7 +8,7 @@
  * The page keeps what is genuinely about live state: assigning the selection,
  * recording undo, and telling the user what happened.
  */
-import type { Align, Box, VAlign } from './types';
+import type { Align, Box, PageSpec, VAlign } from './types';
 import { nextBoxId, stripUndefined } from './template';
 
 /** Group ids only have to be unique within one template. */
@@ -40,6 +40,11 @@ export function toggleSelection(current: string[], ids: string[]): string[] {
  * follow the original, and with one fresh group id per source group — sharing
  * the id would splice the copies into the group they were copied from.
  *
+ * A copy arrives unlocked whatever its source was. Duplicating is how you get a
+ * second one of something to work on, and a copy that could not be moved was a
+ * box you had to hunt for the unlock button before you could place it — the
+ * lock protects the original, which is still locked.
+ *
  * `boxes` must be plain objects, not a state proxy: the sources are deep-cloned.
  */
 export function duplicateBoxes(boxes: Box[], ids: string[]): { boxes: Box[]; created: string[] } {
@@ -51,14 +56,17 @@ export function duplicateBoxes(boxes: Box[], ids: string[]): { boxes: Box[]; cre
 	for (const box of sources) {
 		const source = structuredClone(box);
 		if (source.group && !regroup.has(source.group)) regroup.set(source.group, newGroupId());
-		copies.push({
-			...source,
-			id: nextBoxId([...boxes, ...copies]),
-			anchor: null,
-			x: box.x + 4,
-			y: box.y + 6,
-			...(source.group ? { group: regroup.get(source.group) } : {})
-		});
+		copies.push(
+			stripUndefined({
+				...source,
+				id: nextBoxId([...boxes, ...copies]),
+				anchor: null,
+				locked: undefined,
+				x: box.x + 4,
+				y: box.y + 6,
+				...(source.group ? { group: regroup.get(source.group) } : {})
+			}) as Box
+		);
 	}
 	return { boxes: [...boxes, ...copies], created: copies.map((b) => b.id) };
 }
@@ -160,4 +168,113 @@ export function stepAlignment(
 	const at = V_ALIGN.indexOf(current);
 	const valign = V_ALIGN[Math.min(V_ALIGN.length - 1, Math.max(0, at + direction))];
 	return { valign, landed: valign, changed: valign !== current };
+}
+
+// ---- the style clipboard ----------------------------------------------------
+
+/**
+ * What "the look of this area" means, as a list rather than as a subtraction.
+ *
+ * Written out in full on purpose: a copy defined as "everything except id, x, y
+ * and w" would silently start carrying every field added to a box afterwards,
+ * and pasting a style would one day move the box or rebind its column. A new
+ * field is opted in here or it is not part of a style.
+ *
+ * Content, geometry, anchoring, rotation and the lock are all deliberately out.
+ * `overflow` is out too: whether words are cut or the box grows is what the box
+ * is for, not what it looks like.
+ */
+export const STYLE_KEYS = [
+	'font',
+	'size',
+	'weight',
+	'lineHeight',
+	'color',
+	'align',
+	'valign',
+	'italic',
+	'letterSpacing',
+	'textCase',
+	'md',
+	'background',
+	'padding',
+	'borderWidth',
+	'borderStyle',
+	'borderColor',
+	'borderRadius',
+	'fit'
+] as const satisfies ReadonlyArray<keyof Box>;
+
+export type BoxStyle = Partial<Pick<Box, (typeof STYLE_KEYS)[number]>>;
+
+/** Lift the look off a box. Deep-cloned, so `md` cannot be shared by reference. */
+export function copyStyle(box: Box): BoxStyle {
+	const style: Record<string, unknown> = {};
+	for (const key of STYLE_KEYS) if (box[key] !== undefined) style[key] = box[key];
+	return structuredClone(style) as BoxStyle;
+}
+
+/**
+ * Put that look onto a box. Every style key is written, including the ones the
+ * source did not have: a paste is "make this look like that", so a source with
+ * no border has to take the target's border away rather than leave it behind.
+ * The undefined values are dropped by `updateBox` on the way into the template.
+ */
+export function applyStyle(box: Box, style: BoxStyle): Box {
+	const next = { ...box } as Record<string, unknown>;
+	for (const key of STYLE_KEYS) next[key] = style[key];
+	return structuredClone(next) as unknown as Box;
+}
+
+// ---- areas that have wandered off the sheet ---------------------------------
+
+/**
+ * Areas that are nowhere on the sheet at all.
+ *
+ * The editor deliberately does not clip, so a box dragged past the edge is
+ * still drawn and still grabbable — but only while the stage happens to be
+ * showing that much ground. Zoomed in, or on a phone, a box a few centimetres
+ * off the sheet is somewhere you cannot see and cannot reach, and the only
+ * evidence it exists is that it is missing from the print.
+ *
+ * "Off the sheet" means *no overlap whatever* with the paper, bleed included —
+ * not merely crossing the trim. A box that runs off the edge is what bleed is
+ * for, and offering to drag every deliberate full-bleed panel back inside the
+ * trim would be worse than saying nothing.
+ */
+export function strayBoxes(boxes: Box[], page: PageSpec, bleed = 0): Box[] {
+	return boxes.filter(
+		(box) =>
+			box.x + box.w <= -bleed ||
+			box.x >= page.w + bleed ||
+			box.y + box.h <= -bleed ||
+			box.y >= page.h + bleed
+	);
+}
+
+/**
+ * Bring them back. Each box is slid the shortest distance that puts it wholly
+ * inside the trim; one bigger than the page in an axis is pinned to that edge
+ * rather than centred, because a box you can see the top left of is one you can
+ * pick up.
+ *
+ * An anchored box takes its top from another box, so only its x is corrected —
+ * writing a y would be undone on the next render. The same rule vertical
+ * alignment follows, and the badge on the box says why.
+ */
+export function bringOnPage(boxes: Box[], ids: string[], page: PageSpec): Box[] {
+	const chosen = new Set(ids);
+	let moved = false;
+	const round = (v: number) => Math.round(v * 100) / 100;
+	const fit = (start: number, size: number, limit: number) =>
+		round(Math.max(0, Math.min(start, limit - size)));
+	const next = boxes.map((box) => {
+		if (!chosen.has(box.id) || box.locked) return box;
+		const x = fit(box.x, box.w, page.w);
+		const y = box.anchor ? box.y : fit(box.y, box.h, page.h);
+		if (x === box.x && y === box.y) return box;
+		moved = true;
+		return { ...box, x, y };
+	});
+	return moved ? next : boxes;
 }

@@ -1,5 +1,5 @@
 import { safeImageUrl } from './assets';
-import { parseColour } from './colour';
+import { parseColor } from './color';
 import defaultCard from './templates/default-card.json';
 import type {
 	BackgroundFit,
@@ -104,10 +104,10 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			size: partial.size,
 			weight: partial.weight,
 			lineHeight: partial.lineHeight,
-			// Every colour on a box goes through the parser before it can reach a
+			// Every color on a box goes through the parser before it can reach a
 			// style attribute; one that is not recognised is dropped rather than
 			// guessed at, the same rule the markdown renderer follows.
-			color: colour(partial.color),
+			color: color(partial.color),
 			align: partial.align,
 			valign: partial.valign,
 			italic: partial.italic,
@@ -120,13 +120,13 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			centre: normaliseCentre(partial.centre),
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
-			background: colour(partial.background),
+			background: color(partial.background),
 			padding: normaliseSides(partial.padding),
 			borderWidth: normaliseSides(partial.borderWidth),
 			borderStyle: BORDER_STYLES.includes(partial.borderStyle as BorderStyle) ? partial.borderStyle : undefined,
-			borderColor: colour(partial.borderColor),
+			borderColor: color(partial.borderColor),
 			borderRadius: partial.borderRadius,
-			fit: partial.fit,
+			fit: BOX_FITS.includes(partial.fit as BoxFit) ? partial.fit : undefined,
 			locked: partial.locked,
 			group: typeof partial.group === 'string' && partial.group.trim() ? partial.group : undefined
 		})
@@ -166,7 +166,7 @@ export function normaliseTemplate(raw: unknown): Template {
 			w: num(t.page?.w, 148),
 			h: num(t.page?.h, 210),
 			unit: 'mm',
-			background: parseColour(t.page?.background) ?? '#ffffff',
+			background: parseColor(t.page?.background) ?? '#ffffff',
 			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image) })
 		},
 		bleed: normaliseBleed(t.bleed),
@@ -175,7 +175,7 @@ export function normaliseTemplate(raw: unknown): Template {
 		defaults: {
 			...DEFAULT_DEFAULTS,
 			...stripUndefined(t.defaults ?? {}),
-			color: colour(t.defaults?.color) ?? DEFAULT_DEFAULTS.color
+			color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color
 		},
 		slots,
 		boxes,
@@ -191,7 +191,7 @@ export const DEFAULT_QR: QrSettings = { level: 'M', margin: 2 };
 function normaliseQr(raw: any): QrSettings {
 	const level = ['L', 'M', 'Q', 'H'].includes(raw?.level) ? raw.level : DEFAULT_QR.level;
 	const margin = Math.max(0, Math.min(8, num(raw?.margin, DEFAULT_QR.margin)));
-	const background = parseColour(raw?.background);
+	const background = parseColor(raw?.background);
 	return { level, margin, ...(background ? { background } : {}) };
 }
 
@@ -228,7 +228,8 @@ function normalisePageNumber(raw: any): PageNumberSpec {
 	return {
 		enabled: Boolean(raw?.enabled),
 		position,
-		margin: Math.max(0, num(raw?.margin, DEFAULT_PAGE_NUMBER.margin))
+		margin: Math.max(0, num(raw?.margin, DEFAULT_PAGE_NUMBER.margin)),
+		...(raw?.showTotal ? { showTotal: true } : {})
 	};
 }
 
@@ -246,6 +247,9 @@ function normaliseFonts(raw: any): FontRef[] {
 }
 
 export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'double'];
+
+export type BoxFit = NonNullable<Box['fit']>;
+export const BOX_FITS: BoxFit[] = ['contain', 'cover', 'fill', 'repeat'];
 
 /** Where a box is being moved to in the stack. */
 export type Arrange = 'front' | 'forward' | 'backward' | 'back';
@@ -392,9 +396,9 @@ export function sidesOf(width: SideValue | undefined): Sides {
 	return width ?? { top: 0, right: 0, bottom: 0, left: 0 };
 }
 
-/** A recognised colour, or nothing at all — never the string it was handed. */
-const colour = (raw: unknown): string | undefined =>
-	parseColour(typeof raw === 'string' ? raw : undefined) ?? undefined;
+/** A recognised color, or nothing at all — never the string it was handed. */
+const color = (raw: unknown): string | undefined =>
+	parseColor(typeof raw === 'string' ? raw : undefined) ?? undefined;
 
 function num(value: unknown, fallback: number): number {
 	const n = Number(value);

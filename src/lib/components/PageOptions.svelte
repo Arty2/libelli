@@ -183,18 +183,44 @@
 	<!-- Ordered outwards from the thing itself: what it is, how big the sheet is,
 	     what it is made of, then what is printed on top and what you can do to it. -->
 	<div class="options" aria-label="Page setup">
-		<span class="context">Page</span>
-
-		<label class="field">
-			<span>Template</span>
-			<input
-				class="w-8"
-				value={template.name}
-				placeholder="Untitled card"
-				disabled={pageFrozen}
-				onchange={(e) => patchTemplate({ name: e.currentTarget.value })}
-			/>
-		</label>
+		<!-- What this is and what it is called on one line, and what you can do to
+		     the whole template on the next. The same shape the area bar uses, and
+		     for the same reason: these four used to sit at the far end of a bar
+		     that wraps to four rows on a laptop. -->
+		<span class="head">
+			<span class="head-row">
+				<span class="context">Page</span>
+				<label class="field">
+					<span>Template</span>
+					<input
+						class="w-8"
+						value={template.name}
+						placeholder="Untitled card"
+						disabled={pageFrozen}
+						onchange={(e) => patchTemplate({ name: e.currentTarget.value })}
+					/>
+				</label>
+			</span>
+			<span class="head-row actions">
+				<button onclick={onimporttemplate} disabled={pageFrozen}>Import…</button>
+				<button onclick={onexporttemplate}>Export</button>
+				<button
+					class="danger-outline"
+					onclick={onresettemplate}
+					disabled={pageFrozen}
+					title="Back to the starter card. Your rows are not touched."
+				><Icon name="reset" size={14} /> Reset</button>
+				<!-- Never disabled by the lock it sets, or there would be no way out of it. -->
+				<button
+					aria-pressed={pageFrozen}
+					title={pageFrozen ? 'Unlock the design' : 'Lock the design — no dragging, no option changes'}
+					onclick={() => patchTemplate({ locked: pageFrozen ? undefined : true })}
+				>
+					<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
+					{pageFrozen ? 'Unlock' : 'Lock'}
+				</button>
+			</span>
+		</span>
 
 		<span class="group" role="group" aria-label="Sheet size">
 			<label class="field">
@@ -310,6 +336,17 @@
 				<span class="unit">pt</span>
 			</label>
 			<label class="field">
+				<span>Color</span>
+				<input
+					class="color"
+					type="color"
+					title="Default text color for every box that does not set its own"
+					value={template.defaults.color}
+					disabled={pageFrozen}
+					onchange={(e) => patchTemplate({ defaults: { ...template.defaults, color: e.currentTarget.value } })}
+				/>
+			</label>
+			<label class="field">
 				<span>Leading</span>
 				<input
 					class="n-3"
@@ -341,32 +378,21 @@
 				/>
 				<span class="unit">mm</span>
 			</label>
-			<label class="field">
-				<span>Colour</span>
-				<input
-					class="colour"
-					type="color"
-					title="Default text colour for every box that does not set its own"
-					value={template.defaults.color}
-					disabled={pageFrozen}
-					onchange={(e) => patchTemplate({ defaults: { ...template.defaults, color: e.currentTarget.value } })}
-				/>
-			</label>
 		</span>
 
 		<span class="group" role="group" aria-label="Page surface">
 			<label class="field">
 				<span>Paper</span>
 				<input
-					class="colour"
+					class="color"
 					type="color"
-					title="Page colour — prints only with background graphics enabled"
+					title="Page color — prints only with background graphics enabled"
 					value={template.page.background ?? '#ffffff'}
 					disabled={pageFrozen}
 					onchange={(e) => patchTemplate({ page: { ...template.page, background: e.currentTarget.value } })}
 				/>
 			</label>
-			<span class="label">Image</span>
+			<span class="field-label">Image</span>
 			{#if template.page.image}
 				<span class="asset" title={template.page.image.src}>
 					<Icon name={template.page.image.source === 'url' ? 'link' : 'image'} size={12} />
@@ -397,7 +423,7 @@
 					title="A file from this machine; the picture stays in this browser, the template only names it"
 					onclick={() => imageInput?.click()}>Upload…</button
 				>
-				<button disabled={pageFrozen} title="An http(s) address the template will carry as written" onclick={linkBackground}>Link…</button>
+				<button disabled={pageFrozen} title="An http(s) address the template will carry as written" onclick={linkBackground}>URL…</button>
 			{/if}
 		</span>
 
@@ -425,6 +451,19 @@
 				</select>
 			</label>
 			{#if template.pageNumber.enabled}
+				<label class="check">
+					<input
+						type="checkbox"
+						checked={!!template.pageNumber.showTotal}
+						title="Print it as 3 / 12 rather than as 3. The slash is an element of its own — .page-number .of — so this template's CSS can set its content to anything, or take it away"
+						disabled={pageFrozen}
+						onchange={(e) =>
+							patchTemplate({
+								pageNumber: { ...template.pageNumber, showTotal: e.currentTarget.checked || undefined }
+							})}
+					/>
+					of Total
+				</label>
 				<label class="field">
 					<span>Margin</span>
 					<input
@@ -443,27 +482,9 @@
 			{/if}
 		</span>
 
-		<span class="spacer"></span>
-
-		<span class="actions">
+		<span class="group" role="group" aria-label="Stylesheet">
 			<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
-				Custom CSS{template.css ? ' •' : ''}
-			</button>
-			<button onclick={onimporttemplate} disabled={pageFrozen}>Import…</button>
-			<button onclick={onexporttemplate}>Export</button>
-			<button
-				class="danger-outline"
-				onclick={onresettemplate}
-				disabled={pageFrozen}
-				title="Back to the starter card. Your rows are not touched."
-			>Reset</button>
-			<!-- Never disabled by the lock it sets, or there would be no way out of it. -->
-			<button
-				aria-pressed={pageFrozen}
-				title={pageFrozen ? 'Unlock the design' : 'Lock the design — no dragging, no option changes'}
-				onclick={() => patchTemplate({ locked: pageFrozen ? undefined : true })}
-			>
-				<Icon name="locked" size={14} /> Lock
+				<Icon name="code" size={14} /> CSS{template.css ? ' •' : ''}
 			</button>
 		</span>
 	</div>

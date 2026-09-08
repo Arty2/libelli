@@ -113,7 +113,7 @@ the content change itself. It settles rather than looping, because `read()`
 writes state only when a number actually moved.
 
 **Anchoring shows at both ends, and moves at both ends.** A box that hangs off
-another wears a knot; the box it hangs from wears an anchor. Until now only one
+another wears a link; the box it hangs from wears a harbour buoy. Until now only one
 end was visible, and the box being followed gave no sign that moving it would
 take anything with it. Moving it now does take them: `resolveLayout` already
 carried dependents *downwards*, because their top is read from the target's
@@ -130,8 +130,8 @@ words is that they are being cut.
 **Bounds carry state; selection is an outline.** Four things want to draw on one
 box and there are two pseudo-elements, so the selection moved off `::after` onto
 an `outline` on the box itself — the same to look at, no layout cost. That frees
-`::after` for the bounds, coloured red when a box is locked and purple when it is
-grouped, and `::before` for the padding guide. It also means a state colour is
+`::after` for the bounds, colored red when a box is locked and purple when it is
+grouped, and `::before` for the padding guide. It also means a state color is
 not painted over the moment the box is selected, which is exactly when you want
 to know. Locked wins over grouped, with a coarser dash as well as a different
 red, because the overflow corner is red too and two reds a millimetre apart are
@@ -254,6 +254,72 @@ stays grabbable. Losing the handles of something you can no longer see is worse
 than being shown what will not print, and the trim edge already says where the
 paper stops.
 
+**A clipping area draws the cut, not just a warning about it.** The bottom edge
+— the one the words are actually severed on — takes a heavier dashed red line
+over its bound, and the shears sit astride that line rather than above it, so
+the mark reads as being *on* the cut it is making. Dashed because that is how a
+cut line is drawn on anything meant to be cut, and in the same rhythm as the
+bound it sits on so the two are one language. The other three edges are left
+alone: only one of them is doing the cutting, and saying so on all four would
+say nothing.
+
+The badge is hollow — red on nothing, where every other mark here is a filled
+chip. A solid red square at the corner was the heaviest thing on a card whose
+whole subject is the artwork, and the line beside it is already carrying the
+warning.
+
+**A locked page takes the badges away.** Every badge on an area says why *that*
+area will not do what you might ask of it, and on a locked page the answer is
+the same for all of them — so the band over the sheet gives it once and the
+column of per-area reasons is noise; two of them are buttons that would be
+refused anyway. The overflow shears are not one of these and stay: they are
+about what will print, which a lock does not change.
+
+**The Locked band is the one indicator that is also its own control.** The rule
+everywhere else is that a lock is set where the rest of that subject's settings
+are, and the mark on the canvas only reports it. A locked page is the exception
+because its settings bar is disabled behind the lock, leaving the band as the
+nearest thing to hand; it wears the open padlock for a moment after the press,
+and is kept on screen through that moment on purpose — the lock is gone by then,
+so without it the band would vanish on the same frame and the answer would never
+be seen.
+
+**Two badges are controls, and they say so before you press them.** A badge is
+the reason a box will not do what you asked; the anchor pair is also the way out
+of that reason, in the same thirteen pixels. Each swaps to the icon of the
+undoing while the pointer is on it — and for a moment after a tap, because a
+touchscreen never hovers and would otherwise get no answer at all. Releasing an
+anchor writes the box's *resolved* top back as its own `y`: "leave it where it
+is" is the whole point, and releasing to a stale `y` would jump it up the card.
+
+**Typing happens in a textarea laid over the content, not a `contenteditable`.**
+A box holds text — Markdown source for a Markdown area — and a contenteditable
+would hand back markup nobody asked for. It inherits face, size, color and
+alignment from the box, so what you type is set the way it will print, and the
+content stays in the DOM underneath (hidden) so the box keeps its measured height
+and nothing anchored below it hops about mid-sentence. The card cannot write the
+words itself: a bound area's text is a cell of the dataset and a static one's is
+a field of the template, and only `+page.svelte` knows which it is holding.
+
+**Image mode is image *or color*, and the color fills the box.** One mode
+rather than two, because a column of brand colors and a column of logo URLs are
+the same job and a template author should not have to know which the data holds.
+A resolved color is emitted by `boxStyle` as the box's own `background`, so it
+reaches under the padding and takes the corner radius; a tile is a background
+too, because `<img>` cannot repeat. Everything else goes through `safeMediaUrl`,
+which is the only door between an untrusted cell and an `<img src>`.
+
+**Markdown links are inert in the editor.** A link on paper says where to go; it
+does not go there. Live in the editor, clicking a word to pick up the area it
+sits in navigated away from the app — and the app is the only place an unsaved
+design exists. Screen-and-editor only: the print root and the lightbox render the
+same DOM without `editing`, and paper has no pointer events to take away.
+
+**The page number's separator is an element with no content.** `.page-number .of`
+is empty and its glyph comes from CSS, precisely so a template's own stylesheet
+can reach it — `content: ' of '`, or nothing. A literal `" / "` in the markup
+would have been unaddressable.
+
 ## `src/lib/components/PagePreview.svelte`
 
 **Fit measured the thing its own answer resized.** The stage is observed to
@@ -283,7 +349,55 @@ same flick one step on one machine and forty on another.
 `fit` subtracts the pager's measured height and the column gap before it sizes
 the page — otherwise the count is the first thing off the bottom of a short
 stage. Measured, not assumed: it is text and icons, and it is absent when there
-are no rows.
+are no rows. The page-lock band above the sheet is in that column for the same
+reason, rather than hung off the sheet on a negative offset: on a phone the stage
+has eight pixels of padding, and anything overhanging it is scrolled off the top
+with no way to reach it.
+
+**The stage is two elements: a frame that never scrolls and a viewport that
+does.** Undo, the view toggles, the zoom and the pager were absolutely
+positioned inside the scroller, so at any zoom past Fit they slid away with the
+page — a tool you have to scroll back to find is a tool that is not to hand. The
+frame holds every control; the viewport holds only the page. The pager's band is
+real bottom padding on the viewport rather than a number taken off the fitted
+scale, because the page is centred in what is left: subtracting it from the
+scale alone centred the sheet across the band and parked half of it under the
+count.
+
+**An `<svg>` sized only by `inset` is 300 × 150.** The trim edge was positioned
+with all four offsets and no width or height, which for a *replaced* element
+means `width: auto` resolves to the intrinsic size and the opposite offset is
+ignored — so it was drawn 300 × 150 at every zoom and only looked right by
+accident near 100%. Every screen-only SVG on the card sets `width: 100%; height:
+100%` for this reason; this one is given explicit pixels because it is inset
+from a parent that is the bleed rectangle, not the trim.
+
+**`fitScale` is a value, not a branch inside `scale`.** The zoom menu has to be
+able to say "Fit — 43%" while the page sits at 200%; reading the current scale
+there meant the Fit line renamed itself to whatever you had just zoomed to, and
+so never once said what pressing it would do.
+
+**The trim edge is drawn outside the card, above the grid.** The grid overlay is
+a sibling of the scaled card, so nothing *inside* the card can paint over it —
+and a trim edge hidden under a gridline is a trim edge you cannot follow. It is a
+solid half-pixel SVG stroke, the same weight as the grid: a dashed whole-pixel
+line was the loudest mark on a page that already has dashed bounds on every box.
+
+**The nudge pad is drawn only when it could do something.** A locked area does
+not move, and a pad whose every press is refused reads as a broken control
+rather than as a locked area — the padlock on the area and the Locked band over
+the page are what say why. An anchored area has no vertical freedom to give it
+either: its top is read off another area's bottom, so the two vertical keys wear
+the same link the area wears at its corner and are disabled, with the Gap field
+in the bar as the way to change the millimetres between them. The trade-off is
+that adjusting a gap on a touchscreen now means the bar; a pad key that silently
+changed a number the pad does not show was the worse of the two.
+
+**The nudge pad can be picked up.** It parks over the bottom-right corner of the
+page, which on a phone is exactly the corner of the card you reached for it to
+nudge. The second gesture goes on the middle button because the four arrows
+already use press-and-hold to repeat, and the pad is clamped to the stage — a
+control dragged off the edge of a phone is a control you do not get back.
 
 **Controls sit next to what they act on.** Undo and redo are a column at the
 page's top-left corner, with stacking order under them whenever anything is
@@ -339,6 +453,65 @@ the active row into view with `block: 'nearest'`, which leaves a row already on
 screen exactly where it is. Focus stays on the arrow being pressed: moving it to
 the row would break the second press.
 
+**The row gutter is sticky in both axes.** The numbers are how you know which
+card a cell belongs to, and they slid off the left edge the moment the table was
+wide enough to scroll — which is exactly when they are needed. Being sticky
+means carrying an opaque background, so the active and chosen tints have to be
+repainted on the gutter itself rather than inherited from the row.
+
+**A row number is where the row came from, not where it is sitting.** Sorting
+really reorders the data, so numbering by position meant the labels stayed
+1, 2, 3 and told you nothing; they are read out of the pre-sort order by
+identity instead, so each number travels with its row and a sorted table still
+says where everything came from. That lookup is by object identity, so every
+edit that replaces a row object — `setCell` above all — has to swap the copy
+held in that order too, and every structural edit keeps it in step. It falls
+back to the position whenever a row cannot be found there, which is what makes
+it safe against anything that forgets.
+
+**Chosen and previewed are two different things**, and usually the same row. The
+previewed row is the card on the page; the chosen set is what duplicate and
+delete act on. Clicking anywhere on a row that is not the text does both, because
+a row is a card and picking one is the commonest act in here — it used to be a
+20px tick in the gutter. The tick now builds a set *without* moving the preview
+off the card you are looking at, and the chosen marker is on the gutter alone so
+a large selection does not repaint half the table.
+
+**Sorting is three states on one control.** A-Z, Z-A, and back to the order the
+rows arrived in. Unsorting used to be a separate button in the row-number gutter,
+which is two controls for one question with the way out a long way from the way
+in.
+
+**A paste is a block of cells; a file is a table.** Insisting on a header row
+meant copying cells out of a sheet and pasting them here quietly ate the first
+one. A paste lands in the columns the table already has, matched left to right —
+which is what a block copied out of those same columns is. Only when there are no
+columns at all is the first line read as a header, because there is then nothing
+else to name them with. `Import CSV` still parses a header, because a file is a
+whole table.
+
+**The table has nothing to say for itself.** Its notices go to the app's status
+bar. A line of its own under the buttons meant there were two places a message
+could appear and neither of them was where you were looking.
+
+## Pull-to-refresh
+
+**A reload is the one accident this app cannot absorb, so the browser is not
+allowed to offer one.** Undo lives in memory: a phone reading a downward drag as
+"reload the page" throws away everything since the last save that storage does
+not carry, which is the same reason a waiting service-worker update sits there
+asking rather than swapping itself in. It is worst in the lightbox, where
+dragging the card *is* how you turn it, but the editor stage and the data table
+are one flick from it too.
+
+Three layers, because the platforms disagree about which one they honour:
+`overscroll-behavior: none` on the document stops the chain reaching the
+viewport; `contain` on every scroller inside it — the stage, the table, the
+bars, the dialogs, the inline editor — stops a flick that runs out of content
+becoming a page gesture at all; and the lightbox says `touch-action: none`,
+because every touch on that screen is already ours and there is nothing on it to
+scroll.
+
 ## `src/lib/components/Lightbox.svelte`
 
 **The lightbox is not a door to the printer.** `Lightbox` is one card, big, over
@@ -351,6 +524,83 @@ keys rather than racing it. The tilt is a transform on the card's wrapper:
 nothing under it moves, `prefers-reduced-motion` and a fine pointer both switch
 it off entirely, and the first reading is the baseline so however the phone is
 being held when it opens is level.
+
+**Stepping the run deals one card out and the next one in.** Both halves are
+on screen at once, moving the same way — the card you were looking at leaves by
+one edge as its replacement arrives from the other — because a card that only
+appears has come from nowhere, and what a step actually does is change which
+card you are looking at. That needs two nodes alive at the same time, so the
+card is keyed on the index (which is also what re-runs the animation: a node
+that merely had its props changed never plays one a second time) and the pair
+sit absolutely inside a `.card-stage` sized to one card, so they can overlap
+without either laying the other out and without the arrows under them jumping
+as they pass.
+
+On the `translate` and `rotate` properties, not on `transform`: the tilt owns
+`transform` and rewrites it every frame, so an animation there would be fighting
+the gyroscope for the same property. The individual transform properties compose
+with it — the used matrix is translate × rotate × transform — so the card
+arrives already leaning whichever way the phone is held.
+
+It is a hand-written Svelte transition rather than a CSS animation, because one
+expression has to serve both directions: `u`, the eased distance from home, runs
+1 → 0 arriving and 0 → 1 leaving, so neither card has to know which it is, and
+the leaving card is handed the opposite side so the two move as a pair rather
+than crossing. `travel` is 0 until the first step, which makes it a move from
+nowhere to nowhere — opening the lightbox should not deal a card at you from a
+side you did not choose — and a step clamped at either end of the run leaves it
+alone, because nothing moved.
+
+**A card arrives askew, but only where a gyroscope is reporting.** Seven degrees
+off square, righting itself as it lands: a card thrown down on a table lands
+crooked. That reads as physics on something already responding to how the device
+is held, and as a glitch on a card that has been sitting perfectly square, so it
+is gated on the same first reading the foil is. The one thing a Svelte
+transition does *not* do for free is honour `prefers-reduced-motion` — the media
+query the CSS animation this replaced sat inside — so the transition re-states
+it itself and returns a duration of zero, which swaps the cards outright.
+
+**Two things drive the tilt, and they add.** A gyroscope where there is one, and
+a drag — the same gesture on a desk that turning the phone is in the hand, and
+the only one available on a machine with no sensors in it. The settle loop runs
+whether or not there is a sensor, which it did not before: it was started only
+on the gyroscope path, so a mouse-and-keyboard machine had nothing easing
+anything. The lightbox refuses text selection for the drag's sake — sweeping a
+blue highlight across the card while turning it is not what the gesture is for,
+and nothing in there is text you would copy. A drag that ends over the ground
+either side of the card is a drag, not a click on the backdrop, so it does not
+put the card away.
+
+**The foil is gated on a gyroscope actually feeding us, not on one existing.**
+It is the only thing on the card that is *about* the light in the room, and
+without a real orientation to move against it is a painted-on smear rather than
+a sheen — so it is switched on by the first reading, not by the capability
+check. iOS hands readings out only after a grant that may never come, and a
+highlight that cannot move is worse than none. The lean and the roll take no
+such gate: a finger drives those too.
+
+Three stops, and no blend mode. The core is white, which is invisible on white
+paper — a specular highlight on a matt white card *is* nothing — and shows up
+over dark artwork, which is where a real one would. The flanks are a breath of
+blue on one side and amber on the other, and they are what you actually see on
+the paper; they are the whole of what makes foil read as foil rather than as a
+torch being shone at it. `overlay` and `soft-light` both resolve to nothing
+against a white base, which is most of a card, so plain alpha compositing it is.
+
+The band travels further than the card turns, because seven degrees' worth of
+movement does not read as movement — but not so far that it leaves the paper,
+because foil that goes blank when you tilt it is just a card again.
+
+**The card rolls against the lean, not with it.** A card held loosely does not
+turn with the hand: it hangs, and stays level in the world while the phone
+rotates around it, which on screen is a counter-rotation — roll the phone
+clockwise and the card appears to turn anticlockwise. Rolling *with* the tilt is
+what a sticker stuck to the glass does, and that is what it looked like. The
+roll rides on the same sideways reading as the lean and takes its sign from the
+opposite, at a third of the angle: the type on the card is level, and past a
+couple of degrees it stops reading as a card catching the light and starts
+reading as a crooked print. The drag resists the same way, for the same reason —
+push a card sideways and its mass lags behind.
 
 ## `src/lib/components/PrintPreview.svelte`
 
@@ -373,6 +623,15 @@ changes between builds, so a cached copy of it names the *previous* build's
 hashed assets, and activate has just binned the cache those lived in.
 
 ## `src/lib/png.ts`
+
+**A fetch that is refused and a fetch that never answers are different
+failures.** Both font fetches were wrapped in a try/catch that falls back to the
+system stack, which covers the first and not the second: a captive portal or a
+filtering proxy leaves the promise pending forever, and with it the whole export
+— the button sits on "Exporting 1/4…" with no way out but a reload, which costs
+the undo history. They carry an `AbortSignal.timeout` now, so the documented
+behaviour (the family stays in the fallback stack and the export says which)
+is what actually happens.
 
 **The PNG export is the one thing that fetches.** `png.ts` inlines a Google face
 by fetching the stylesheet the page already loaded and the files it names.
@@ -423,7 +682,23 @@ act on the rest.
 **A lock is a button in the bar and an indicator on the canvas.** The padlock on a
 box or a page says *locked*; it is never the control, because the control belongs
 with the rest of that subject's settings. The button that sets a lock is never
-disabled by the lock it sets.
+disabled by the lock it sets, and it says what pressing it will do — *Unlock* on
+something locked — rather than naming its own state.
+
+**Each bar opens with a two-line head**: what this is and what it is called, then
+the buttons that act on it. They were at opposite ends of a bar that wraps to
+four rows on a laptop, which meant acting on the thing you had just selected
+began with finding the other end of the bar.
+
+**Stacking order is not in the right-click menu.** It is the column beside the
+page — it is about where an area sits on the sheet, and it wants to be pressed
+four times in a row rather than reopened from a menu between each press.
+Everything else the menu carries is a single act.
+
+**Select Multiple is a mode, because a touchscreen has no shift key.** With it
+on, every press on an area adds it to the selection or drops it, which is exactly
+what a modifier-click does; `selectBox` treats the mode and the modifier as the
+same thing, so there is one path and not two.
 
 ## `src/lib/boxops.ts` and `src/routes/+page.svelte`
 
@@ -441,9 +716,53 @@ geometry and releases the anchor of a box it moves vertically — an anchor woul
 otherwise undo the alignment on the next render.
 
 **Destructive things are undoable, and only ask when undo cannot reach them.**
-Deleting a row, a column or a box happens straight away and says so; Reset asks
-twice, because it clears browser storage and uploaded fonts that no undo can
-bring back.
+Deleting a row or a box happens straight away and says so, and so does Reset —
+it replaces the template and leaves the data alone, and one snapshot carries
+both, so Ctrl/Cmd+Z reaches it. (This paragraph used to say Reset asked twice
+"because it clears browser storage and uploaded fonts". It does neither, and has
+not for some time.) Two things do ask once, and neither is about undo: deleting
+a *column* is a
+field of every card at once and takes cells under a header you may not have
+scrolled to, and deleting the whole table is not one row you can retype. Both
+questions are a count rather than a paragraph — a warning nobody reads is not a
+warning, and the second press the table used to ask for was only ever a way of
+not reading the first.
+
+**The style clipboard names its keys rather than subtracting.** `STYLE_KEYS` in
+`boxops.ts` is written out in full: a copy defined as "everything except id, x, y
+and w" would silently start carrying every field added to `Box` afterwards, and
+one day pasting a style would move a box or rebind its column. Applying a style
+writes every key including the ones the source lacked, because a paste is "make
+this look like that" and a source with no border has to take the target's border
+away.
+
+**Areas are only rescued when they are wholly off the sheet.** `strayBoxes` asks
+for *no overlap at all* with the paper, bleed included — not merely crossing the
+trim. A box running off the edge is what bleed is for, and offering to drag every
+deliberate full-bleed panel back inside the trim would be worse than saying
+nothing. The button appears only when there is something genuinely unreachable.
+
+## `src/lib/placeholders.ts`
+
+**`{{date}}` is not a template language, and must not become one.** No
+conditionals, no loops, no field references: a card that can compute is a card
+whose output depends on something other than the row it was given. Anything
+unrecognised is returned exactly as written, which is what stops a cell that
+happens to contain braces being eaten. No time of day either — a card is printed
+once and read for months, and a timestamp on paper is stale before the ink dries.
+
+Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
+mode; `rawContentOf` beside it is what the inline editor shows, because typing
+over a substituted date would mean typing over yesterday's.
+
+## `src/lib/gestures.ts`
+
+**Reading a swipe is a pure function; feeding it events is an action.** A flick
+has to beat both a minimum distance and a slope, because a drag at 45 degrees is
+somebody scrolling and catching this on the way past — paging the cards out from
+under them is worse than doing nothing. Touch only: a mouse has a wheel and two
+arrows either side of the count, and treating a click-drag as a swipe would page
+the cards every time somebody tried to select the counter's text.
 
 ## Testing
 

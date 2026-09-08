@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
+	import { swipe } from '$lib/gestures';
 	import { mmToPx } from '$lib/layout';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
@@ -36,7 +37,71 @@
 		return () => window.removeEventListener('resize', read);
 	});
 
-	const step = (to: number) => onactivate(Math.max(0, Math.min(dataset.rows.length - 1, to)));
+	/**
+	 * Which way the run is moving, so the arriving card knows which edge of the
+	 * window to come in from. Zero on the way in, so opening the lightbox does
+	 * not deal a card at you from a side you did not choose.
+	 *
+	 * Set before `onactivate`, which is what changes `index` and re-renders the
+	 * card: the animation reads this on the way past, so it has to be true by
+	 * then. A clamped step — next on the last card — leaves it alone, and there
+	 * is nothing to animate anyway because the index did not move.
+	 */
+	let travel = $state(0);
+
+	/**
+	 * A card being dealt in, or the one it replaces being dealt away.
+	 *
+	 * Written by hand rather than taken from `svelte/transition` because of what
+	 * it must *not* touch: the tilt owns `transform` and rewrites it every frame,
+	 * so an animation there would be fighting the gyroscope for the same
+	 * property. `translate` and `rotate` are separate properties that compose
+	 * with it — the used matrix is translate × rotate × transform — so a card can
+	 * fly in already leaning whichever way the phone is held.
+	 *
+	 * One function for both directions. `u` runs 1 → 0 on the way in and 0 → 1 on
+	 * the way out, so the same expression means "how far from home" either way;
+	 * the caller passes the side, and the leaving card is handed the opposite one
+	 * so the pair moves as a pair rather than crossing.
+	 */
+	const DEAL_MS = 340;
+
+	const reducedMotion = () =>
+		typeof window !== 'undefined' &&
+		!!window.matchMedia &&
+		window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	/**
+	 * How far askew a card arrives, in degrees. Only where a gyroscope is
+	 * reporting: a card thrown down on a table lands crooked and rights itself,
+	 * but that reads as physics on something already responding to how the device
+	 * is held, and as a glitch on a card that has been sitting perfectly square.
+	 */
+	const DEAL_SPIN = 7;
+
+	function deal(_node: Element, { side, spin }: { side: number; spin: number }) {
+		return {
+			// Svelte transitions do not consult `prefers-reduced-motion` — that was
+			// the media query the CSS animation this replaced sat inside, and it has
+			// to be re-stated here or the setting stops meaning anything.
+			duration: reducedMotion() ? 0 : DEAL_MS,
+			// Cubic out: it arrives quickly and settles, rather than coasting in at
+			// one speed and stopping dead.
+			easing: (t: number) => 1 - (1 - t) ** 3,
+			// `u` is the eased distance from home — 1 → 0 arriving, 0 → 1 leaving —
+			// so one expression serves both and neither has to know which it is.
+			css: (_t: number, u: number) =>
+				`translate: ${u * side * 110}vw; rotate: ${u * spin}deg`
+		};
+	}
+
+	function step(to: number) {
+		const next = Math.max(0, Math.min(dataset.rows.length - 1, to));
+		if (next === index) return;
+		travel = next > index ? 1 : -1;
+		onactivate(next);
+	}
+
 
 	/**
 	 * The lightbox owns these keys while it is open, so whatever opened it must
@@ -66,17 +131,58 @@
 	 * anything more than a few degrees stops reading as a card and starts reading
 	 * as a carousel.
 	 *
-	 * Only where there is a gyroscope to read and no keyboard-and-mouse to make it
-	 * pointless, and never against `prefers-reduced-motion` — a moving picture is
-	 * exactly what that setting is asking us not to draw.
+	 * Two things drive it. A gyroscope, where there is one to read, and a finger
+	 * or a pointer dragged across the card — the same gesture on a desk that
+	 * turning the phone is in the hand, and the only one available on a machine
+	 * with no sensors in it. Neither runs against `prefers-reduced-motion`: a
+	 * moving picture is exactly what that setting is asking us not to draw, and
+	 * a drag that leans the card is still a moving picture.
 	 */
 	const TILT_MAX = 7;
+	/**
+	 * And a little roll with it.
+	 *
+	 * A real card held loosely does not turn with the hand — it hangs, and stays
+	 * level in the world while the phone rotates around it. On screen that reads
+	 * as a counter-rotation: roll the phone clockwise and the card appears to
+	 * turn anticlockwise, because it is the frame that moved and not the card.
+	 * Hence the negative sign at both call sites; with the sign the other way the
+	 * card turned *with* the phone, which is what a sticker on the glass does.
+	 *
+	 * Much smaller than the lean, because roll is the one axis with a right
+	 * answer already on the card: the type is level, and anything past a couple
+	 * of degrees stops reading as a card catching the light and starts reading as
+	 * a crooked print.
+	 */
+	const ROLL_MAX = 2.5;
 	/** how far the phone turns to reach that lean, in degrees */
 	const TILT_RANGE = 24;
 	/** how much of the way to the target each frame moves; raw readings jitter */
 	const TILT_EASE = 0.12;
 
-	let tilt = $state({ x: 0, y: 0 });
+	let tilt = $state({ x: 0, y: 0, z: 0 });
+	/**
+	 * Where the sheen sits across the card, as a background position.
+	 *
+	 * Driven by the lean rather than by the raw reading, so it moves with what
+	 * you can see happening and a drag carries it too. It travels further than
+	 * the card turns — a band that moved only seven degrees' worth would not
+	 * read as moving at all — but not so far that it leaves: at the ends of the
+	 * range the flanks are still crossing the paper, because foil that goes
+	 * blank when you tilt it is just a card again.
+	 */
+	const sheen = $derived(50 - (tilt.y / TILT_MAX) * 34);
+
+	/**
+	 * Whether a gyroscope is actually feeding us, as against merely existing.
+	 *
+	 * Set on the first reading rather than on the capability check, because iOS
+	 * hands the readings out only after a grant that may never come: a card
+	 * wearing a highlight that cannot move is a smudge on the artwork, not a
+	 * sheen. It gates the foil and nothing else — the lean and the roll are
+	 * driven by a finger too, and want no gate.
+	 */
+	let sensed = $state(false);
 
 	/**
 	 * Whatever way the phone is being held when the lightbox opens is level: a
@@ -84,13 +190,64 @@
 	 * a hand, or lying in bed rather than snapping to attention.
 	 */
 	let baseline: { beta: number; gamma: number } | null = null;
-	let target = { x: 0, y: 0 };
+	let target = { x: 0, y: 0, z: 0 };
+
+	/**
+	 * What a drag is adding on top of that, and where it started.
+	 *
+	 * Added rather than replacing, so a phone that has both keeps both: a lean
+	 * you have introduced with your thumb rides on the lean the handset is
+	 * already showing. It springs back to nothing on release, because a card you
+	 * have let go of should not stay crooked — and because there is no gesture
+	 * for putting it back.
+	 */
+	const DRAG_MAX = 9;
+	/** how far the pointer travels to reach that lean, in pixels */
+	const DRAG_RANGE = 260;
+	let dragTilt = { x: 0, y: 0, z: 0 };
+	let dragFrom: { x: number; y: number; id: number } | null = null;
+	/**
+	 * Whether the pointer moved enough to be a drag rather than a click. The
+	 * backdrop closes on click, and turning the card and then letting go over the
+	 * ground either side of it must not put it away.
+	 */
+	let dragged = $state(false);
+
+	function tiltDown(event: PointerEvent) {
+		if (event.button !== 0) return;
+		dragFrom = { x: event.clientX, y: event.clientY, id: event.pointerId };
+		dragged = false;
+	}
+
+	function tiltMove(event: PointerEvent) {
+		if (!dragFrom || event.pointerId !== dragFrom.id) return;
+		const dx = event.clientX - dragFrom.x;
+		const dy = event.clientY - dragFrom.y;
+		if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragged = true;
+		const lean = (px: number) =>
+			(Math.max(-DRAG_RANGE, Math.min(DRAG_RANGE, px)) / DRAG_RANGE) * DRAG_MAX;
+		// Dragging right turns the card's left edge towards you, which is a
+		// positive rotateY; dragging down tips the top towards you, a positive
+		// rotateX. The roll rides on the sideways half and resists it, as the
+		// gyroscope's does — push the card sideways and its mass lags behind.
+		const across = lean(dx);
+		dragTilt = { x: lean(dy), y: across, z: -(across / DRAG_MAX) * ROLL_MAX };
+	}
+
+	function tiltUp(event: PointerEvent) {
+		if (!dragFrom || event.pointerId !== dragFrom.id) return;
+		dragFrom = null;
+		dragTilt = { x: 0, y: 0, z: 0 };
+	}
 
 	$effect(() => {
 		if (typeof window === 'undefined' || !window.matchMedia) return;
-		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-		if (!window.matchMedia('(pointer: coarse)').matches) return;
-		if (!('DeviceOrientationEvent' in window)) return;
+		if (reducedMotion()) return;
+		// The settle loop runs whether or not there is a gyroscope, because the
+		// drag needs it too — it used to be started only on the sensor path, so a
+		// machine with a mouse and no accelerometer had nothing easing anything.
+		const sensing =
+			window.matchMedia('(pointer: coarse)').matches && 'DeviceOrientationEvent' in window;
 
 		let frame = 0;
 
@@ -98,6 +255,7 @@
 			const { beta, gamma } = event;
 			if (beta === null || gamma === null) return;
 			baseline ??= { beta, gamma };
+			sensed = true;
 
 			// Turning the phone on its side swaps which way is left and which way is
 			// forward; the reading is in the device's frame, so rotate it into the
@@ -111,14 +269,27 @@
 			const lean = (degrees: number) =>
 				(Math.max(-TILT_RANGE, Math.min(TILT_RANGE, degrees)) / TILT_RANGE) * TILT_MAX;
 			// Tipping the top away leans the card away, so the axes cross over: a
-			// forward tilt is a rotation about X, a sideways one about Y.
-			target = { x: -lean(downScreen), y: lean(acrossScreen) };
+			// forward tilt is a rotation about X, a sideways one about Y. The roll
+			// rides on the same sideways reading — one wrist, one movement — at a
+			// fraction of the angle, and against it: the card hangs level while the
+			// phone turns around it.
+			const across = lean(acrossScreen);
+			target = { x: -lean(downScreen), y: across, z: -(across / TILT_MAX) * ROLL_MAX };
 		};
 
 		const settle = () => {
+			// The sensor's lean and the drag's, added: a phone that has both keeps
+			// both, and a machine with neither sits at zero and costs one lerp a
+			// frame that never moves.
+			const to = {
+				x: target.x + dragTilt.x,
+				y: target.y + dragTilt.y,
+				z: target.z + dragTilt.z
+			};
 			tilt = {
-				x: tilt.x + (target.x - tilt.x) * TILT_EASE,
-				y: tilt.y + (target.y - tilt.y) * TILT_EASE
+				x: tilt.x + (to.x - tilt.x) * TILT_EASE,
+				y: tilt.y + (to.y - tilt.y) * TILT_EASE,
+				z: tilt.z + (to.z - tilt.z) * TILT_EASE
 			};
 			frame = requestAnimationFrame(settle);
 		};
@@ -126,18 +297,24 @@
 		// iOS hands the readings out only after an explicit grant, and only asks
 		// when a gesture is in flight — so the first touch inside the lightbox is
 		// what asks. Everywhere else the listener goes straight on.
-		const request = (
-			DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }
-		).requestPermission;
+		// Read through `window`, not as a bare global: the early return that
+		// guaranteed the global existed is gone — the settle loop runs without a
+		// sensor now — and a bare reference would throw where there is none.
+		const orientation = (window as unknown as Record<string, unknown>).DeviceOrientationEvent as
+			| { requestPermission?: () => Promise<string> }
+			| undefined;
+		const request = orientation?.requestPermission;
 
 		const listen = () => window.addEventListener('deviceorientation', onOrientation);
 
 		let ask: ((event: Event) => void) | null = null;
-		if (typeof request === 'function') {
+		if (!sensing) {
+			// No sensor to ask for; the drag is the whole of it here.
+		} else if (typeof request === 'function') {
 			ask = () => {
 				window.removeEventListener('pointerdown', ask!);
 				ask = null;
-				request.call(DeviceOrientationEvent).then(
+				request.call(orientation).then(
 					(state) => state === 'granted' && listen(),
 					() => {
 						/* declined, or not available here; the card simply stays flat */
@@ -156,26 +333,73 @@
 			window.removeEventListener('deviceorientation', onOrientation);
 			if (ask) window.removeEventListener('pointerdown', ask);
 			baseline = null;
+			sensed = false;
 		};
 	});
 </script>
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="full" role="presentation" onclick={onclose}>
+<!-- The swipe is on the whole screen, not just on the card: on a phone the card
+     is most of it, and a flick that starts on the ground either side of it is
+     the same gesture. `swipe` is touch-only, so a click-drag on a desktop still
+     selects and still closes. -->
+<div
+	class="full"
+	role="presentation"
+	onclick={() => {
+		// A drag that ends over the ground either side of the card is a drag, not
+		// a click on the backdrop, and must not put the card away.
+		if (!dragged) onclose();
+		dragged = false;
+	}}
+	onpointerdown={tiltDown}
+	onpointermove={tiltMove}
+	onpointerup={tiltUp}
+	onpointercancel={tiltUp}
+	onpointerleave={tiltUp}
+	use:swipe={(by) => step(index + by)}
+>
 	<button class="plain close" onclick={onclose} title="Close" aria-label="Close">
 		<Icon name="close" size={22} />
 	</button>
+	<!-- A stage the size of one card, so the card arriving and the card leaving
+	     can both be in it at once without either laying the other out. Keyed on
+	     the index: that is what tears the old one down — with its outro — and
+	     builds the new one. -->
+	<div
+		class="card-stage"
+		style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) * scale}px"
+	>
+	{#key index}
 	<div
 		class="full-card"
 		role="presentation"
 		onclick={(e) => e.stopPropagation()}
-		style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) *
-			scale}px;transform:perspective(1100px) rotateX({tilt.x}deg) rotateY({tilt.y}deg)"
+		in:deal={{ side: travel, spin: sensed ? -travel * DEAL_SPIN : 0 }}
+		out:deal={{ side: -travel, spin: sensed ? travel * DEAL_SPIN : 0 }}
+		style="transform:perspective(1100px) rotateX({tilt.x}deg) rotateY({tilt.y}deg) rotateZ({tilt.z}deg)"
 	>
 		<span class="scaler" style="transform:scale({scale})">
-			<Card {template} row={dataset.rows[index]} {mapping} pageNumber={index + 1} {background} />
+			<Card
+				{template}
+				row={dataset.rows[index]}
+				{mapping}
+				pageNumber={index + 1}
+				pageCount={dataset.rows.length}
+				{background}
+			/>
 		</span>
+		{#if sensed}
+			<!-- The foil. Only where a gyroscope is feeding us, because this is the
+			     one thing on the card that is *about* the light in the room: without
+			     a real orientation to move against it is a painted-on smear.
+			     `aria-hidden`, and outside the scaler, so it covers the card rather
+			     than scaling with the artwork. -->
+			<span class="foil" aria-hidden="true" style="--sheen:{sheen}%"></span>
+		{/if}
+	</div>
+	{/key}
 	</div>
 	<!-- Under the card with the count between them: the two arrows and the
 	     number are one control, and either side of the page they were a
@@ -201,6 +425,25 @@
 		position: fixed;
 		inset: 0;
 		z-index: 60;
+		/* Dragging across the card turns it; it must not also sweep a blue
+		   highlight over every word on it. Nothing in here is text you copy —
+		   this is the card as it will print, held up to be looked at, and the
+		   words are back in the table if you want them. Selection starts at
+		   whatever the press landed on, so refusing it here is enough to stop
+		   the drag from reaching the editor behind as well. */
+		user-select: none;
+		-webkit-user-select: none;
+		/* Every touch in here is already ours: a horizontal flick pages the run
+		   and a drag in any direction turns the card. Handing the browser none of
+		   them is what stops a downward drag being read as pull-to-refresh — the
+		   one gesture this app can least afford, since a reload takes the undo
+		   history with it, and here it is the same movement as turning the card.
+		   `overscroll-behavior` in app.css covers the scroll chain; this covers
+		   the gesture itself, on the one screen with nothing to scroll. */
+		touch-action: none;
+		/* The cards fly in and out from past the edge of the window; without this
+		   that excursion is overflow the browser may offer to scroll to. */
+		overflow: hidden;
 		background: rgba(20, 20, 20, 0.82);
 		display: flex;
 		flex-direction: column;
@@ -238,14 +481,61 @@
 		gap: 22px;
 	}
 
+	/* Sized inline to one card, and the only thing in the column that holds a
+	   place: the card leaving and the card arriving are both absolute inside it,
+	   so the pair can overlap without either one laying the other out or the
+	   arrows jumping as they pass. */
+	.card-stage {
+		position: relative;
+		flex: none;
+	}
+
 	.full-card {
+		position: absolute;
+		inset: 0;
 		background: #fff;
 		overflow: hidden;
 		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 		/* The lean is drawn, not laid out: the card keeps the pixels it was given
 		   whichever way it is facing, so nothing under it moves. */
 		transform-origin: center;
-		will-change: transform;
+		will-change: transform, translate, rotate;
+	}
+
+	/* Foil.
+
+	   A band swept across the card as it turns, made of three things: a specular
+	   core and a cool and a warm flank. The core is white, which is invisible on
+	   white paper and exactly right — a highlight on a matt white card *is*
+	   nothing — and shows up where the artwork is dark, which is where a real one
+	   would. The flanks are what you see on the paper: a breath of blue on one
+	   side of the core and of amber on the other, which is the whole of what
+	   makes a foil read as foil rather than as a torch being shone at it.
+
+	   Plain alpha compositing, no blend mode. `overlay` and `soft-light` both
+	   resolve to nothing against a white base, which is most of a card, so the
+	   effect would have been visible only on the photographs.
+
+	   Everything here is deliberately at the edge of noticing. Foil that
+	   announces itself on a proofing tool is a distraction from the proof. */
+	.foil {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		opacity: 0.55;
+		background-image: linear-gradient(
+			104deg,
+			rgba(255, 255, 255, 0) 34%,
+			rgba(120, 190, 255, 0.13) 44%,
+			rgba(255, 255, 255, 0.5) 50%,
+			rgba(255, 200, 130, 0.13) 56%,
+			rgba(255, 255, 255, 0) 66%
+		);
+		/* Wider than the card, so the band can travel right off both edges rather
+		   than compressing towards the middle as it reaches the end of its run. */
+		background-size: 320% 100%;
+		background-position: var(--sheen, 50%) 0;
+		background-repeat: no-repeat;
 	}
 
 	.scaler {

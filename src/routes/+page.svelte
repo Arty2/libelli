@@ -25,14 +25,19 @@
 	import { alignBoxes, type AlignEdge } from '$lib/layout';
 	import {
 		ALIGN_LABELS,
+		applyStyle,
+		bringOnPage,
+		copyStyle,
 		deleteBoxes,
 		duplicateBoxes,
 		groupMembers,
 		nudgeBox as nudge,
 		stepAlignment,
+		strayBoxes,
 		toggleGroup,
 		toggleLock,
-		toggleSelection
+		toggleSelection,
+		type BoxStyle
 	} from '$lib/boxops';
 	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport } from '$lib/keys';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
@@ -92,6 +97,36 @@
 	let dataOpen = $state(true);
 	let firstRun = $state(false);
 	let boxMenu = $state<{ id: string; x: number; y: number } | null>(null);
+	/**
+	 * The area whose words are being typed straight into the card. Held here
+	 * rather than in the card because only this file knows whether those words
+	 * are a cell of the dataset or a field of the template.
+	 */
+	let editingId = $state<string | null>(null);
+	/**
+	 * Shift-click builds a selection, and a touchscreen has no shift. With this
+	 * on, every press on an area adds it or drops it — the modifier as a mode,
+	 * turned on from the area menu and off again the same way or with Escape.
+	 */
+	let picking = $state(false);
+	/** The look of an area, lifted off one and waiting to be put onto another. */
+	let styleClipboard = $state<BoxStyle | null>(null);
+	/**
+	 * Areas to flash on the card. Bringing a stray area back moves something you
+	 * were by definition not looking at — it was off the sheet — so the card has
+	 * to say which one arrived, or it simply looks different.
+	 */
+	let flashIds = $state<string[]>([]);
+	let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function flash(ids: string[]) {
+		flashIds = ids;
+		if (flashTimer) clearTimeout(flashTimer);
+		// Must outlast the animation in Card, or the class is pulled mid-flash.
+		flashTimer = setTimeout(() => (flashIds = []), 1000);
+	}
+	/** Reset replaces the design, so it asks first — as deleting the data does. */
+	let resetting = $state(false);
 	let printing = $state(false);
 	let mappingPrompt = $state(false);
 	let missingFonts = $state<FontRef[]>([]);
@@ -104,7 +139,7 @@
 	/**
 	 * A notice is either something that happened or something that went wrong,
 	 * and the two used to render identically in an 11px grey line. A warning
-	 * gets the warning mark and a colour; everything else reads as before.
+	 * gets the warning mark and a color; everything else reads as before.
 	 */
 	let statusTone = $state<'info' | 'warning'>('info');
 
@@ -130,6 +165,26 @@
 	/** Give a dialog its first focus so Esc/Tab work without a mouse trip. */
 	const focusOnOpen = (node: HTMLElement) => node.focus();
 
+	/**
+	 * What the CSS box says before anything is typed into it.
+	 *
+	 * The names an author can reach, as working declarations rather than as a
+	 * paragraph describing them. Every selector here is real: `.trim` is the
+	 * card, `.box` is an area, `.page-number .of` is the slash between the count
+	 * and the total. Scoping happens in css.ts, which anchors everything to the
+	 * card, strips `@import` and refuses any `url()` that is not a `data:` one.
+	 */
+	const CSS_PLACEHOLDER = `.box { }              /* every area */
+h1, h2, h3 { }        /* Markdown headings */
+p, ul, li { }         /* Markdown blocks */
+em, strong, code { }
+hr { }
+.page-number { }      /* the number on the card */
+.page-number .of::before { content: ' of ' }
+
+h1 { letter-spacing: 0.4mm }
+em { color: #b42318 }`;
+
 	const snapshot = (): Snapshot => ({
 		template: $state.snapshot(template),
 		dataset: $state.snapshot(dataset),
@@ -154,6 +209,16 @@
 	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
 	const row = $derived(dataset.rows[activeRow] ?? null);
 	const slots = $derived(usedSlots(template));
+	/** Areas with no overlap with the sheet at all — see `strayBoxes`. */
+	const strays = $derived(
+		strayBoxes(template.boxes, template.page, template.bleed.enabled ? template.bleed.amount : 0)
+	);
+	/**
+	 * The column the selected area draws from, so the table can point at the cell
+	 * that fills it. Only for one area: with several chosen there is no single
+	 * answer, and highlighting all of them would light up the whole row.
+	 */
+	const selectedColumn = $derived(selected?.slot ? (mapping[selected.slot] ?? null) : null);
 
 	// ---- boot ---------------------------------------------------------------
 
@@ -494,6 +559,7 @@
 	 * they are — this is for starting the design again, not for clearing out.
 	 */
 	function resetTemplate() {
+		resetting = false;
 		describe('Reset the template');
 		template = starterTemplate();
 		selectedIds = [];
@@ -507,12 +573,17 @@
 	 */
 	function selectBox(id: string | null, additive = false) {
 		if (provisional && id !== provisional) settleProvisional();
+		// Typing into one area and then picking another ends the typing; the
+		// change is already in, so there is nothing to confirm or discard.
+		if (editingId && editingId !== id) editingId = null;
 		if (!id) {
 			selectedIds = [];
 			return;
 		}
 		const ids = groupMembers(template.boxes, id);
-		selectedIds = additive ? toggleSelection(selectedIds, ids) : ids;
+		// While Select Multiple is on, every press is a modifier-click. It is the
+		// only way to build a selection on a touchscreen, which has no shift key.
+		selectedIds = additive || picking ? toggleSelection(selectedIds, ids) : ids;
 	}
 
 	function duplicateBox() {
@@ -548,6 +619,73 @@
 			: 'Aligned.');
 	}
 
+	/**
+	 * Words typed straight into the card.
+	 *
+	 * The card cannot write them itself: an area bound to a column holds a cell of
+	 * the dataset, and one holding its own words holds a field of the template.
+	 * Both land in the same undo entry as anything else, because a snapshot is
+	 * template and data together.
+	 */
+	function setBoxText(box: Box, value: string) {
+		if (box.slot) {
+			const column = mapping[box.slot];
+			if (!column || !row) return;
+			describe('Edit the text');
+			dataset = {
+				...dataset,
+				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: value } : r))
+			};
+			return;
+		}
+		describe('Edit the text');
+		updateBox({ ...$state.snapshot(box), static: { ...box.static, text: value } } as Box);
+	}
+
+	/** Bring every area that has wandered off the sheet back onto it. */
+	function rescueStrays() {
+		if (template.locked || !strays.length) return;
+		// Counted before the move. `strays` is derived from the template, so it is
+		// empty the instant the boxes land — the notice used to say "0 areas were
+		// off the sheet", which is true by the time you read it and useless.
+		const rescued = strays.length;
+		const boxes = bringOnPage(template.boxes, strays.map((b) => b.id), template.page);
+		if (boxes === template.boxes) return;
+		describe(`Bring ${rescued} area${rescued === 1 ? '' : 's'} back on`);
+		const moved = strays.map((b) => b.id);
+		template = { ...template, boxes };
+		flash(moved);
+		notify(
+			rescued === 1
+				? 'One area was off the sheet and is back on it. Ctrl/Cmd+Z puts it back.'
+				: `${rescued} areas were off the sheet and are back on it. Ctrl/Cmd+Z puts them back.`
+		);
+	}
+
+	/**
+	 * The look of an area, lifted off one and put onto others.
+	 *
+	 * Deliberately not the system clipboard: this is a structure, not text, and
+	 * putting it there would mean either inventing a serialisation nobody else
+	 * reads or fighting Ctrl+V over which paste was meant. It lives for as long
+	 * as the tab does, which is as long as the design it came from.
+	 */
+	function copyBoxStyle() {
+		const from = selected ?? selectedBoxes[0];
+		if (!from) return;
+		styleClipboard = copyStyle($state.snapshot(from) as Box);
+		notify('Style copied — Ctrl/Cmd+Shift+V puts it on another area.');
+	}
+
+	function pasteBoxStyle() {
+		if (!styleClipboard || template.locked) return;
+		const targets = selectedBoxes.filter((b) => !b.locked).map((b) => $state.snapshot(b) as Box);
+		if (!targets.length) return;
+		describe(targets.length === 1 ? 'Paste the style' : `Paste the style onto ${targets.length} areas`);
+		for (const box of targets) updateBox(applyStyle(box, styleClipboard));
+		notify(`Style pasted onto ${targets.length} area${targets.length === 1 ? '' : 's'}.`);
+	}
+
 	function lockSelection() {
 		if (template.locked || !selectedBoxes.length) return;
 		describe(selectedBoxes.every((b) => b.locked) ? 'Unlock' : 'Lock');
@@ -568,13 +706,23 @@
 	 * quietly break an anchor chain.
 	 */
 	function nudgeBox(dx: number, dy: number) {
-		const box = selected;
-		if (!box || template.locked) return;
+		if (template.locked) return;
+		// Every chosen area, not just a lone one. The arrows and the pad both come
+		// through here, and both used to do nothing at all with two areas picked
+		// up — `selected` is null unless the selection is exactly one, so the
+		// guard above it silently swallowed the press.
+		//
+		// Snapshotted first: `updateBox` replaces the template on every call, and
+		// `selectedBoxes` is derived from it.
+		const targets = selectedBoxes.filter((b) => !b.locked).map((b) => $state.snapshot(b) as Box);
+		if (!targets.length) return;
 		// Millimetres: the editor has no pixels, and a status line that invented
 		// them would be describing a different app.
 		describe(`Move ${Math.max(Math.abs(dx), Math.abs(dy))}mm`);
-		const next = nudge(box, dx, dy);
-		if (next) updateBox(next);
+		for (const box of targets) {
+			const next = nudge(box, dx, dy);
+			if (next) updateBox(next);
+		}
 	}
 
 	/** Move every chosen box one step along an axis of alignment. */
@@ -592,6 +740,61 @@
 		}
 		describe(landed.size === 1 ? `Align ${ALIGN_LABELS[[...landed][0]]}` : 'Step the alignment');
 		notify(landed.size === 1 ? `Aligned ${ALIGN_LABELS[[...landed][0]]}.` : 'Alignment stepped.');
+	}
+
+	/**
+	 * Ctrl/Cmd+C and Ctrl/Cmd+V, on the card rather than in a field.
+	 *
+	 * Copy hands the selected area's words to the system clipboard; paste, when
+	 * what is on it is plain text, makes a new area holding those words. Both are
+	 * asynchronous — the Clipboard API is permissioned — so they are fired and
+	 * not awaited, and a browser that refuses says so in the status line rather
+	 * than failing silently.
+	 *
+	 * Only when nothing has focus. A field's own copy and paste are the browser's,
+	 * and taking them would be an unpleasant surprise in a text box.
+	 */
+	async function copySelectionText() {
+		const box = selected;
+		if (!box || !navigator.clipboard) return;
+		const text = box.slot ? (row?.[mapping[box.slot] ?? ''] ?? '') : (box.static?.text ?? '');
+		if (!text) {
+			notify('That area has no words to copy.', 'warning');
+			return;
+		}
+		try {
+			await navigator.clipboard.writeText(text);
+			notify('Copied the area\u2019s text.');
+		} catch {
+			notify('This browser would not let libelli reach the clipboard.', 'warning');
+		}
+	}
+
+	async function pasteTextAsBox() {
+		if (template.locked || !navigator.clipboard?.readText) return;
+		let text = '';
+		try {
+			text = await navigator.clipboard.readText();
+		} catch {
+			notify('This browser would not let libelli read the clipboard.', 'warning');
+			return;
+		}
+		if (!text.trim()) return;
+		describe('Paste an area');
+		const box = newBox({
+			id: nextBoxId(template.boxes),
+			slot: null,
+			x: 14,
+			y: 60,
+			w: 80,
+			h: 12,
+			mode: 'plain',
+			overflow: 'grow',
+			static: { text }
+		});
+		template = { ...template, boxes: [...template.boxes, box] };
+		selectedIds = [box.id];
+		notify('Pasted as a new area, holding its own words. Ctrl/Cmd+Z takes it away.');
 	}
 
 	function onWindowKeydown(event: KeyboardEvent) {
@@ -618,13 +821,44 @@
 			redo();
 			return;
 		}
-		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu)) {
+		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu || resetting)) {
 			helpOpen = false;
 			cssOpen = false;
+			resetting = false;
 			boxMenu = null;
 			return;
 		}
+		// The style clipboard, before the plain Ctrl/Cmd+C below sees the same key.
+		// It works while a field has focus too: the shift is what distinguishes it
+		// from the browser's own copy, and nothing in a text box answers to it.
+		if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'c' && selectedIds.length) {
+			event.preventDefault();
+			copyBoxStyle();
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'v' && selectedIds.length) {
+			event.preventDefault();
+			pasteBoxStyle();
+			return;
+		}
 		if (typing || previewOpen) return;
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c' && selected) {
+			event.preventDefault();
+			void copySelectionText();
+			return;
+		}
+		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'v') {
+			event.preventDefault();
+			void pasteTextAsBox();
+			return;
+		}
+		// Enter opens the selected area for typing, the way it opens a cell in a
+		// spreadsheet. A double-click on the area does the same thing.
+		if (event.key === 'Enter' && selected && !editingId) {
+			event.preventDefault();
+			editingId = selected.id;
+			return;
+		}
 		// The first-run notice tells people to press ? for the tour, and for a
 		// long time nothing listened. `/` too, so it works without the shift on
 		// a keyboard that puts ? somewhere else.
@@ -690,7 +924,10 @@
 		}
 		if (event.key === 'Escape') {
 			settleProvisional();
-			selectedIds = [];
+			// One press peels off one mode: picking first, because it is the one
+			// that changes what the next click does.
+			if (picking) picking = false;
+			else selectedIds = [];
 		}
 	}
 
@@ -864,20 +1101,20 @@
 			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
 		<button
-			onclick={() => (dataOpen = !dataOpen)}
-			aria-pressed={dataOpen}
-			aria-expanded={dataOpen}
-			title="Show or hide the table"
-		>
-			<Icon name="layers" size={15} /> <span class="label">Data</span>
-		</button>
-		<button
 			onclick={() => (pageSetupOpen = !pageSetupOpen)}
 			aria-pressed={pageSetupOpen}
 			aria-expanded={pageSetupOpen}
 			title="Show or hide the page setup"
 		>
 			<Icon name="settings" size={15} /> <span class="label">Page Setup</span>
+		</button>
+		<button
+			onclick={() => (dataOpen = !dataOpen)}
+			aria-pressed={dataOpen}
+			aria-expanded={dataOpen}
+			title="Show or hide the table"
+		>
+			<Icon name="table-split" size={15} /> <span class="label">Data</span>
 		</button>
 		<button class="primary" onclick={requestPrint} disabled={!dataset.rows.length}>
 			<Icon name="download" size={15} /> Export…
@@ -899,7 +1136,7 @@
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
-			onresettemplate={resetTemplate}
+			onresettemplate={() => (resetting = true)}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
 			onnotice={notify}
@@ -922,7 +1159,7 @@
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
-			onresettemplate={resetTemplate}
+			onresettemplate={() => (resetting = true)}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
 			onnotice={notify}
@@ -1004,7 +1241,16 @@
 			onredo={redo}
 			onaddbox={addTextBox}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
-			modalOpen={helpOpen || cssOpen || previewOpen || lightboxOpen || boxMenu !== null}
+			{editingId}
+			strayIds={strays.map((b) => b.id)}
+			{picking}
+			{flashIds}
+			onstoppicking={() => (picking = false)}
+			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
+			onedit={(id) => (editingId = id)}
+			ontext={setBoxText}
+			onrescue={rescueStrays}
+			modalOpen={helpOpen || cssOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null}
 			{selectedBoxes}
 			onalign={alignSelection}
 			onarrange={arrange}
@@ -1019,7 +1265,9 @@
 			<DataTable
 				{dataset}
 				{activeRow}
+				{selectedColumn}
 				onactivate={(i) => (activeRow = i)}
+				onnotice={notify}
 				onloadsample={loadSample}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
@@ -1053,27 +1301,44 @@
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (cssOpen = false)}></div>
 	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title">
-		<h2 id="css-title">Custom CSS</h2>
-		<p>
-			Styles for this card, saved inside the template and exported with it. Selectors are scoped to the card, so
-			nothing here can reach the editor around it.
-		</p>
+		<h2 id="css-title">CSS</h2>
+		<!-- The placeholder is the documentation. It used to be two lines of
+		     example and two paragraphs of prose above and below it; what an author
+		     actually needs is the names of the things they can reach, and a
+		     placeholder is where they will look for them. The prose that was here
+		     is in the README, where prose belongs. -->
 		<textarea
 			class="code"
-			rows="12"
+			rows="14"
 			spellcheck="false"
 			use:focusOnOpen
-			placeholder={'h1 { letter-spacing: 0.4mm }\nem { color: #b42318 }'}
+			placeholder={CSS_PLACEHOLDER}
 			value={template.css ?? ''}
 			onchange={(e) => (template = { ...template, css: e.currentTarget.value.trim() || undefined })}
 		></textarea>
-		<p class="muted">
-			<code>@import</code> and any <code>url()</code> pointing off this machine are stripped: the app fetches nothing,
-			and a template you were handed should not be able to change that.
-		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button class="primary" onclick={() => (cssOpen = false)}>Done</button>
+		</div>
+	</div>
+{/if}
+
+<!-- Reset replaces the design with the starter card. Undo reaches it — one
+     snapshot carries template and data together — but it is still the whole
+     page going at once, and the table's own Delete asks for less than that.
+     A count rather than a paragraph, the same shape as that dialog. -->
+{#if resetting}
+	<div class="modal-backdrop" role="presentation" onclick={() => (resetting = false)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the template?">
+		<h2>Reset the template?</h2>
+		<p>
+			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the starter card. Your rows are
+			not touched.
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button use:focusOnOpen onclick={() => (resetting = false)}>Cancel</button>
+			<button class="danger-solid" onclick={resetTemplate}>Reset Template</button>
 		</div>
 	</div>
 {/if}
@@ -1084,7 +1349,7 @@
 		<!-- The header stays put while the rest scrolls: the way out of a long
 		     dialog should not be at the bottom of it. -->
 		<header class="modal-header">
-			<h2 id="help-title">libelli <span class="version">v{VERSION}</span></h2>
+			<h2 id="help-title">libelli</h2>
 			<button class="icon" use:focusOnOpen onclick={() => (helpOpen = false)} title="Close" aria-label="Close">
 				<Icon name="close" size={16} />
 			</button>
@@ -1092,79 +1357,166 @@
 
 		<p>Rows of a spreadsheet in, print-ready cards out.</p>
 		<p>
-			All of it happens here, in this browser. Your rows, your template, the fonts and images you add — none of it is
-			uploaded, because there is no server to upload it to, no account to make and nothing watching what you do. It
-			keeps working with the network off, a template is a small file you can hand to somebody, and closing the tab is
-			the only thing that ever deletes anything.
+			All of it happens in this browser. Your rows, your template, the fonts and images you add — none of it is
+			uploaded, because there is no server to upload it to and no account to make. It works with the network off, a
+			template is a small file you can hand to somebody, and closing the tab is the only thing that deletes anything.
+			Where your browser offers it, <strong>Install</strong> gives libelli its own window; when a new version has
+			downloaded the status bar says so and waits, because a reload nobody asked for would take undo with it.
+		</p>
+
+		<h3>Areas</h3>
+		<p>
+			<em>+ Area</em> beside the page adds one. <strong>Content</strong> says where it gets what it shows:
+			<strong>Data Field</strong> binds it to a column, so it changes card to card, and <strong>Static Text</strong>
+			is typed into the template and says the same on every card. An area's <strong>Name</strong> is the template's own
+			word for what it holds — <em>title</em>, <em>body</em> — and <strong>Column</strong> beside it says which
+			spreadsheet column fills that. Rebinding the columns is how one template serves another spreadsheet.
 		</p>
 		<p>
-			It keeps a copy of itself here too, so it opens with no network at all. Where your browser offers it, an
-			<strong>Install</strong> button appears in the toolbar and gives libelli its own window and its own icon. When a
-			new version has downloaded the status bar says so and offers a reload, rather than swapping it in while you are
-			working — undo lives in memory, and a reload nobody asked for would take it.
+			Double-click an area, or press <strong>Enter</strong> with one selected, to type into it on the card itself.
+			Bound areas write to the cell, static ones to the template. Selecting an area points the table at the cells that
+			fill it.
+		</p>
+		<p>
+			<strong>Mode</strong> is Plain Text, Markdown, Image / Color or QR Code. Image / Color shows whatever its
+			source turns out to be — a picture if that is an address, a fill if it is a color, in hex, <code>rgb()</code>,
+			<code>hsl()</code> or by name — so a column of brand colors and a column of logos need no different setting up.
+		</p>
+		<p>
+			<code>&#123;&#123;date&#125;&#125;</code> anywhere in an area or a cell prints today's date, and
+			<code>&#123;&#123;date:YYYY-MM-DD&#125;&#125;</code> prints it your way — <code>YYYY</code>, <code>MM</code>,
+			<code>DD</code> for the numbers, <code>MMMM</code> and <code>dddd</code> for the names. Anything else in braces
+			is left as written.
+		</p>
+
+		<h3>Placing them</h3>
+		<p>
+			Drag areas on the page or type exact millimetres. An area latches onto the edges and centres of its neighbours as
+			it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid instead. Grid off and
+			<strong>Bounds</strong> off is free movement, because an area should never latch onto a guide that is not drawn.
+		</p>
+		<p>
+			<strong>Rotation</strong> has two marks on a selected area, because they do two different things. The
+			<strong>crosshair</strong> is the pivot: drag it to move the point the area turns about. The <strong>knob</strong>
+			on the arm below it is the lever: swing it to turn the area, holding <strong>Shift</strong> for 15° steps. The
+			<strong>X</strong> and <strong>Y</strong> beside the rotation place the pivot exactly, as a percentage of the
+			area's own size. A turned area still occupies the space it would have upright, so one rotation does not shuffle
+			the card.
+		</p>
+		<p>
+			Stacking order is the column beside the page: areas paint in the order they are listed, so <em>Bring to Front</em>
+			is a move to the end of that list. If an area ends up entirely off the sheet, a button appears under
+			<em>Area</em> to bring it back.
+		</p>
+
+		<h3>Marks on an area</h3>
+		<p>
+			A red corner means the content does not fit and the print will clip it. A padlock says the area is locked. The
+			<strong>plug</strong> says it carries its own words rather than a column's. The <strong>link</strong> and the
+			<strong>buoy</strong> are the two ends of an anchor — an anchored area takes its top from another area's rendered
+			bottom, so dragging it changes the gap rather than breaking the tie. Both are buttons: the link breaks this area's
+			tie, the buoy casts off everything moored to this one, and neither moves anything. Selecting either end lights up
+			the other. <strong>Bounds</strong> takes all of it away.
+		</p>
+
+		<h3>Several at once</h3>
+		<p>
+			Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them; on a touchscreen,
+			<strong>Select Multiple</strong> in the right-click menu makes every press add or drop, with a chip beside
+			<em>+ Area</em> saying so until you press it or <strong>Esc</strong>. Dragging any one moves the
+			set, and a column of icons appears beside the page to line them up against the box enclosing them all, and to
+			group, lock, duplicate or delete the lot. <strong>Group</strong> makes a selection stick until you ungroup it. An
+			anchored area sits out of a vertical align, because an anchor would move it straight back.
+		</p>
+		<p>
+			<strong>Copy Style</strong> and <strong>Paste Style</strong> carry type, fill, border, padding and radius from one
+			area to any number of others. A paste is "make this look like that", so it takes away what the source did not have.
+		</p>
+
+		<h3>The sheet</h3>
+		<p>
+			<strong>Size</strong> has A6, A5, A4, A3 and a 4 × 6 inch postcard; picking one keeps the orientation you are
+			in, and <strong>⇄</strong> turns the page over. Neither moves anything on the card — coordinates are
+			measured from the trim edge, so trying a design the other way round costs nothing. Bleed is an outset on the
+			sheet, never an offset on the content.
+		</p>
+		<p>
+			Page setup holds the type defaults — family, size, leading, spacing, color. An area that leaves those fields
+			blank inherits them. It also sets the paper color and a background image, and can print a page number, optionally
+			as <em>3 / 12</em>.
+		</p>
+		<p>
+			<strong>CSS</strong> holds styles saved inside the template. Selectors are scoped to the card, and
+			<code>@import</code> and any <code>url()</code> pointing off this machine are stripped: the app fetches nothing,
+			and a template you were handed must not be able to change that.
+		</p>
+
+		<h3>Locking</h3>
+		<p>
+			<strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page
+			lock covers every area and the page settings, greys every bound and says so above the sheet. The same button
+			unlocks.
+		</p>
+
+		<h3>Data</h3>
+		<p>
+			Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column.
+			Clicking a row previews it; the tick in the gutter chooses several, and duplicate and delete for those appear at
+			the head of the buttons below. The row numbers travel with their rows through a sort, and a column header sorts
+			A-Z, then Z-A, then back to the order the rows arrived in.
+		</p>
+		<p>
+			<strong>Paste from Sheet</strong> takes a block of cells with no header row and lands it in the columns you
+			already have. <strong>Import CSV…</strong> takes a whole file; press and <em>hold</em> it and the four sample
+			cards come back. <strong>Export CSV</strong> hands the table back as a file. Deleting a column asks, because it is
+			a field of every card at once; the red <strong>Delete</strong> empties the whole table. All of it is undoable, and
+			none of it touches the template — as <strong>Reset</strong> in page setup does not touch the data.
 		</p>
 
 		<h3>Getting cards out</h3>
-		<p><strong>Export</strong> — the button, or <strong>Ctrl/Cmd + P</strong> — opens one screen showing every card as a small page. The browser's own print dialog is taken over rather than left to fire: it would print the editor rather than the cards. Pressing it again from that screen sends the run.</p>
-		<p>Untick any card you do not want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The print checklist sits under the pages, because those four settings decide whether what you saw is what comes out.</p>
-
-		<h3>Looking at one card</h3>
-		<p>The <strong>count under the page</strong> — <em>3 / 12</em> — opens that card on its own, big, over everything; so does a thumbnail on the export screen. The arrows either side of it, and the left and right arrow keys, step through the run; <strong>Esc</strong> puts it away. Nothing is printed or exported from there, it is only a proper look. Paging with those arrows scrolls the table to the row you land on, so the highlighted row is one you can actually see. On a phone the card leans a few degrees with the handset, the way a real one catches the light — however you are holding it when it opens is level, and a device asking for less motion gets none.</p>
-
-		<h3>What an area holds</h3>
-		<p>An area's <strong>Field</strong> is the template's own name for what it holds — <em>title</em>, <em>body</em>, and so on. The template names fields; the <strong>Column</strong> beside it says which spreadsheet column fills this one. That indirection is the point: the same template works against another spreadsheet by rebinding the columns, and no data is carried inside the template file.</p>
-		<p><strong>Content</strong> says where an area gets what it shows. A <strong>Data Field</strong> binds it to a column, so it changes card to card. <strong>Static Text</strong> is typed into the area and saved in the template, not in the data — the same on every card, travelling with the design. An area with nothing typed into it is still an area: it keeps its fill, its border and its size, and <strong>Hide When Empty</strong> is what takes it away again. <em>+ Area</em> beside the page adds one.</p>
+		<p>
+			<strong>Export</strong>, or <strong>Ctrl/Cmd+P</strong>, opens every card as a small page. The browser's own print
+			dialog is intercepted rather than left to fire, because it would print the editor. Untick any card you do not
+			want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The checklist under the
+			pages is four settings that decide whether what you saw is what comes out; a PNG needs none of them.
+		</p>
+		<p>
+			The count under the sheet — <em>3 / 12</em> — opens that card on its own, big, over everything; so does a
+			thumbnail on the export screen. The arrows either side, the left and right arrow keys, and a swipe step through
+			the run. Nothing is printed from there.
+		</p>
 
 		<h3>Keys</h3>
 		<dl class="keys">
 			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
-			<dt>Ctrl/Cmd + Shift + Z</dt><dd>Redo</dd>
+			<dt>Ctrl/Cmd + Shift + Z<span>Ctrl/Cmd + Y</span></dt><dd>Redo</dd>
+			<dt>Enter</dt><dd>Type into the selected area</dd>
+			<dt>Esc</dt><dd>Stop typing, leave Select Multiple, deselect, or close what is open</dd>
 			<dt>Arrows</dt><dd>Nudge the selection by 1mm</dd>
 			<dt>Shift + Arrows</dt><dd>Nudge by 5mm</dd>
 			<dt>Alt + Shift + Arrows</dt><dd>Nudge by 10mm</dd>
-			<dt>Shift / Ctrl / ⌘ + click</dt><dd>Add an area to the selection, or drop it</dd>
+			<dt>Arrows<span>PageUp / PageDown</span></dt><dd>Step through the cards, with nothing selected</dd>
+			<dt>← / →</dt><dd>Step through the cards, with one open full screen</dd>
+			<dt>Shift + click<span>Ctrl / ⌘ + click</span></dt><dd>Add an area to the selection, or drop it</dd>
 			<dt>Ctrl/Cmd + A</dt><dd>Select every area</dd>
 			<dt>Ctrl/Cmd + D</dt><dd>Duplicate the selected areas</dd>
-			<dt>Delete</dt><dd>Remove the selected areas</dd>
-			<dt>Esc</dt><dd>Deselect, or close what is open</dd>
-			<dt>← / →</dt><dd>Step through the cards, with one open full screen</dd>
-			<dt>? or /</dt><dd>This panel</dd>
-			<dt>Ctrl/Cmd + ; or H</dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + ' or #</dt><dd>Grid on or off</dd>
-			<dt>Ctrl/Cmd + P</dt><dd>Export — again from that screen to print</dd>
-			<dt>Ctrl/Cmd + Shift + P / S</dt><dd>The same door, for the fingers that reach for those</dd>
+			<dt>Delete<span>Backspace</span></dt><dd>Remove the selected areas</dd>
+			<dt>Ctrl/Cmd + C</dt><dd>Copy the selected area's words</dd>
+			<dt>Ctrl/Cmd + V</dt><dd>Paste plain text as a new area</dd>
+			<dt>Ctrl/Cmd + Shift + C</dt><dd>Copy the area's style</dd>
+			<dt>Ctrl/Cmd + Shift + V</dt><dd>Paste that style onto the selection</dd>
 			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
 			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
-			<dt>Ctrl/Cmd + + / −</dt><dd>Zoom the page in or out</dd>
+			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page</dd>
+			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
+			<dt>Ctrl/Cmd + ;<span>Ctrl/Cmd + H</span></dt><dd>Bounds on or off</dd>
+			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + P</dt><dd>Export — press again from that screen to print</dd>
+			<dt>Ctrl/Cmd + Shift + S</dt><dd>Export, for the fingers that reach for that instead</dd>
+			<dt>?<span>/</span></dt><dd>This panel</dd>
 		</dl>
 
-		<h3>Placing areas</h3>
-		<p>Drag areas on the page or type exact millimetres. An area latches onto the edges and centres of its neighbours as it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid of a 10mm grid instead. There is no key to hold for free movement: the two toggles under the page are the control. Grid off and <strong>Bounds</strong> off and nothing latches, because an area should never snap to a guide that is not being drawn. An area anchored to another follows its rendered bottom, so dragging it vertically changes the gap rather than breaking the link.</p>
-		<p><strong>Rotation</strong> turns an area by degrees about a point you can drag — the small ring that appears on it once it is turned, or the <strong>X</strong> and <strong>Y</strong> beside the rotation, as a percentage of the area's own width and height. A turned area still takes up the space it would have upright, so anything anchored below it stays where it is; that is deliberate, and it is what stops one rotation shuffling the whole card.</p>
-		<p>Stacking order is the column beside the page, under undo and redo, and it is in the right-click menu too. Areas paint in the order they are listed, so <em>Bring to Front</em> is a move to the end of that list rather than a z-index to keep track of. A red corner means the content does not fit and the print will clip it; a padlock or an anchor at the corner says why an area will not move.</p>
-
-		<h3>Several at once</h3>
-		<p>Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them. Dragging any one moves the whole set, and a column of icons appears beside the page to line them up against the box that encloses them all — left, centre, right, top, middle, bottom — and to group, lock, duplicate or delete the lot. Right-click carries the same set with its wording.</p>
-		<p><strong>Group</strong> makes that selection stick: clicking any member picks up all of them, until you ungroup. An anchored area sits out of a vertical align — an anchor would move it straight back — and the anchor badge at its corner says why.</p>
-
-		<h3>The sheet</h3>
-		<p><strong>Size</strong> in page setup has the sizes worth having to hand — A5, A4, A3, and business, playing and trading cards at their real dimensions rather than round numbers. Picking one keeps the orientation you are already in, and the <strong>⇄</strong> beside the height turns the page over. Neither moves anything on the card: coordinates are measured from the trim edge, so trying a design the other way round costs nothing. Anything you type yourself reads as <em>Custom</em>.</p>
-
-		<h3>Type</h3>
-		<p>Page setup holds the defaults — family, size, leading, spacing and colour. An area that leaves those fields blank inherits them, so changing the page changes every area that never overrode it.</p>
-		<p>Two shortcuts work on the type without going to the bar. <strong>Ctrl/Cmd + Shift</strong> and the scroll wheel sizes whatever the pointer is over, in points — the whole selection if that area is part of one, and it gives an inheriting area a size of its own on the first turn. <strong>Ctrl/Cmd + Shift</strong> and the arrows step the alignment of everything selected in the direction pressed: left and right along <em>left, centred, right, justified</em>, up and down along <em>top, middle, bottom</em>.</p>
-
-		<h3>Locking</h3>
-		<p><strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page lock covers every area and the page settings too. The padlock that appears on the area, or at the corner of the page, is telling you it is locked; the button that undoes it is in the bar. Bounds off takes the padlocks away with the rest of the screen furniture.</p>
-
-		<h3>Colour</h3>
-		<p>Page setup sets the default text colour and the paper colour, and an area can set its own. Inside a Markdown body, <code>[a few words]&#123;red&#125;</code> or <code>[…]&#123;#b42318&#125;</code> colours just those words. Paper colour prints only with background graphics switched on.</p>
-
-		<h3>Data</h3>
-		<p>Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column. Deleting a row or a column happens straight away — Ctrl/Cmd+Z brings it back. <strong>Export CSV</strong> hands the table back as a file; the red <strong>Delete</strong> under it empties the whole dataset and asks twice. That leaves the template alone, as <strong>Reset</strong> in page setup leaves the data alone. <strong>Data</strong> in the toolbar folds the table away when the page needs the room.</p>
-
-		<p><strong>Import CSV…</strong> takes a file. Press and <em>hold</em> it instead, and the four sample cards come back — they explain the app, and they are a place to start from when a blank table is not one. That replaces the rows and leaves your template alone, and Ctrl/Cmd+Z undoes it.</p>
 
 		<p class="credit">
 			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>
@@ -1181,12 +1533,16 @@
 		{selectedBoxes}
 		x={boxMenu.x}
 		y={boxMenu.y}
-		onarrange={arrange}
+		{picking}
+		hasStyle={styleClipboard !== null}
 		onalign={alignSelection}
 		ongroup={groupSelection}
 		onlock={lockSelection}
 		onduplicate={duplicateBox}
 		ondelete={deleteBox}
+		onpicking={(on) => (picking = on)}
+		oncopystyle={copyBoxStyle}
+		onpastestyle={pasteBoxStyle}
 		onclose={() => (boxMenu = null)}
 	/>
 {/if}
@@ -1282,10 +1638,6 @@
 		flex: 1;
 		min-height: 0;
 		min-width: 0;
-	}
-
-	.muted {
-		color: #767676;
 	}
 
 	.banner {
@@ -1398,9 +1750,19 @@
 		top: 50%;
 		left: 50%;
 		transform: translate(-50%, -50%);
-		width: min(560px, 92vw);
-		max-height: 86vh;
+		/* A real gutter, not a percentage of it: 92vw is 30px of margin on a
+		   desktop and 15px on a phone, which is exactly backwards — the narrower
+		   the screen, the more a dialog looked like it had been printed onto the
+		   bezel. A fixed 32px keeps the same air whatever the width, and the
+		   max-width still caps it on a large screen. */
+		width: min(560px, calc(100vw - 32px));
+		max-height: min(86dvh, calc(100dvh - 32px));
+		/* Or the 22px of padding either side is added to that width, and the
+		   dialog is 402px wide on a 390px phone — which is how a gutter measured
+		   in viewport units still ended up hanging over both edges. */
+		box-sizing: border-box;
 		overflow: auto;
+		overscroll-behavior: contain;
 		background: #fff;
 		border-radius: 10px;
 		padding: 20px 22px;
@@ -1485,6 +1847,33 @@
 		white-space: nowrap;
 	}
 
+	/* A second way of pressing the same thing goes under the first rather than
+	   beside it. The key column is `max-content`, so one row carrying two chords
+	   set the width of all thirty of them — on a phone that left the descriptions
+	   a few words wide. */
+	.keys dt span {
+		display: block;
+		color: #767676;
+	}
+
+	/* Breaking the alternatives apart takes the key column from four chords wide
+	   to one, which is most of the fix; on a phone even one chord is half the
+	   dialog, so the pair stacks instead and the description gets the width. */
+	@media (max-width: 560px) {
+		.keys {
+			grid-template-columns: 1fr;
+			gap: 0;
+		}
+
+		.keys dt {
+			margin-top: 8px;
+		}
+
+		.keys dt:first-of-type {
+			margin-top: 0;
+		}
+	}
+
 	.keys dd {
 		margin: 0;
 		color: #333;
@@ -1517,11 +1906,21 @@
 		text-align: center;
 	}
 
+	.modal.narrow {
+		width: min(420px, calc(100vw - 32px));
+	}
+
 	.modal-actions {
 		display: flex;
 		align-items: center;
 		gap: 10px;
 		margin-top: 14px;
+	}
+
+	button.danger-solid {
+		background: #b42318;
+		border-color: #b42318;
+		color: #fff;
 	}
 
 	@media (max-width: 900px) {

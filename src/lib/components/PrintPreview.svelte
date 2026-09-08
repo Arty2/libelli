@@ -2,7 +2,7 @@
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
 	import Lightbox from './Lightbox.svelte';
-	import { downloadBlob, slugify } from '$lib/download';
+	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
 	import { mmToPx } from '$lib/layout';
 	import type { Dataset, Mapping, Template } from '$lib/types';
@@ -62,7 +62,9 @@
 			for (const [i, card] of cards.entries()) {
 				const { blob, missingFonts } = await elementToPng(card, families, ratioForDpi(300));
 				for (const family of missingFonts) missing.add(family);
-				downloadBlob(`${slugify(template.name)}-${i + 1}.png`, blob);
+				// Padded to the width of the run, so a directory listing comes back
+				// in print order rather than as 1, 10, 2 — see `pageFilename`.
+				downloadBlob(pageFilename(slugify(template.name), i + 1, cards.length, 'png'), blob);
 				written += 1;
 				progress = { done: written, total: cards.length };
 			}
@@ -108,7 +110,18 @@
 	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 
-	const thumbWidth = 210;
+	/**
+	 * How wide a page is on the contact sheet.
+	 *
+	 * Fixed at 210px where there is room for it, and two-to-a-row below that:
+	 * on a phone one 210px card per row turns a sheet meant for comparing pages
+	 * into a slideshow of them. Measured off the grid rather than off the window
+	 * so the two numbers cannot disagree about the padding between them.
+	 */
+	let gridWidth = $state(0);
+	const NARROW = 520;
+	const narrow = $derived(gridWidth > 0 && gridWidth < NARROW);
+	const thumbWidth = $derived(narrow ? Math.max(84, Math.floor((gridWidth - 24 - 12) / 2)) : 210);
 	const thumbScale = $derived(thumbWidth / mmToPx(outerW));
 
 	function onKeydown(event: KeyboardEvent) {
@@ -140,13 +153,16 @@
 		<h2>
 			Export —
 			{#if allChosen}
-				{dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}, one per row
+				{dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}
 			{:else}
 				{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}
 			{/if}
 		</h2>
+		<!-- Choosing which pages go is about the sheet below; PNG and Print are what
+		     you came here to press. They sit at opposite ends so the two are not
+		     read as one row of three equal things. -->
+		<button class="choose" onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
 		<div class="header-actions">
-			<button onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
 			<button onclick={exportPng} disabled={chosen === 0 || exporting}>
 				<Icon name="download" size={15} />
 				{#if exporting}
@@ -161,14 +177,23 @@
 				<Icon name="print" size={15} />
 				Print
 			</button>
-			<button class="icon" onclick={onclose} title="Close" aria-label="Close">
-				<Icon name="close" size={16} />
-			</button>
 		</div>
+		<!-- Out of the row of actions and into the corner, unstyled, where the
+		     lightbox puts its own: leaving is not one of the things you came here
+		     to do, and a fourth button beside Print read as though it were. -->
+		<button class="close" onclick={onclose} title="Close" aria-label="Close">
+			<Icon name="close" size={20} />
+		</button>
 	</header>
 
 
-	<div class="grid" bind:this={grid}>
+	<div
+		class="grid"
+		class:narrow
+		bind:this={grid}
+		bind:clientWidth={gridWidth}
+		style="--thumb:{thumbWidth}px"
+	>
 		{#each dataset.rows as row, i (i)}
 			{@const included = !excluded.has(i)}
 			<figure class:dropped={!included}>
@@ -180,7 +205,7 @@
 					aria-label="Open card {i + 1} full screen"
 				>
 					<span class="scaler" style="transform:scale({thumbScale})">
-						<Card {template} {row} {mapping} pageNumber={i + 1} {background} />
+						<Card {template} {row} {mapping} pageNumber={i + 1} pageCount={dataset.rows.length} {background} />
 					</span>
 				</button>
 				<figcaption>
@@ -207,7 +232,7 @@
 			<li><strong>Paper size</strong> — the one matching <strong>{sheetW} × {sheetH} mm</strong>, or a larger sheet you trim.</li>
 			<li><strong>Margins</strong> — <em>None</em>.</li>
 			<li><strong>Headers and footers</strong> — off.</li>
-			<li><strong>Background graphics</strong> — on, or Chrome drops the paper colour.</li>
+			<li><strong>Background graphics</strong> — on, or Chrome drops the paper color.</li>
 		</ol>
 		<p class="muted">
 			A PNG export needs none of this — it comes out at 300 dpi whatever the print dialog says. Everything stays in
@@ -238,6 +263,7 @@
 		z-index: 50;
 		background: #eee;
 		overflow: auto;
+		overscroll-behavior: contain;
 	}
 
 	header {
@@ -245,8 +271,8 @@
 		top: 0;
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		padding: 12px 18px;
+		gap: 12px;
+		padding: 12px 54px 12px 18px;
 		background: rgba(238, 238, 238, 0.94);
 		backdrop-filter: blur(6px);
 		border-bottom: 1px solid #ddd;
@@ -256,6 +282,12 @@
 	h2 {
 		margin: 0;
 		font: 600 14px ui-sans-serif, system-ui, sans-serif;
+	}
+
+	/* Pushed off the title, and the actions pushed to the far end by the margin
+	   below — `space-between` cannot place three children the way two want to be. */
+	header .choose {
+		margin-right: auto;
 	}
 
 	.header-actions {
@@ -281,12 +313,24 @@
 		border-color: var(--border-control-hover);
 	}
 
-	header button.icon {
+	/* The way out, in the corner, with no chip around it — the lightbox's close
+	   rather than a fourth button in the row of things you came here to do. */
+	header .close {
+		position: absolute;
+		top: 8px;
+		right: 10px;
 		display: grid;
 		place-items: center;
-		width: 30px;
-		height: 30px;
+		width: 32px;
+		height: 32px;
 		padding: 0;
+		border: none;
+		background: none;
+		color: #555;
+	}
+
+	header .close:hover {
+		color: #111;
 	}
 
 	header button.primary {
@@ -345,10 +389,19 @@
 
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(var(--thumb, 210px), 1fr));
 		gap: 18px;
 		padding: 18px;
 		justify-items: center;
+	}
+
+	/* Two to a row on a phone rather than one. A contact sheet is for comparing
+	   pages against each other, and a column of one is a slideshow. The cards
+	   shrink to fit — see `thumbWidth`, which is what actually sizes them. */
+	.grid.narrow {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 12px;
+		padding: 12px;
 	}
 
 	figure {
