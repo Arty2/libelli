@@ -75,7 +75,7 @@ out a little smaller. So `resolveImposition` always returns a layout when
 imposition is on, `scale` included, and never `undefined` — printing is the
 one place a card's millimetres are not the final word; the editor, a single
 card's own print, and every other reader of `template.page` never see
-anything but the number that was typed in. `PrintRoot.svelte` renders each
+anything but the number that was typed in. `PrintSheet.svelte` renders each
 card at its own full size and then scales the wrapping element down with a
 plain CSS `transform`, so nothing about layout, anchors or measurement
 changes — only what ends up on paper. `PrintSettingsPanel.svelte` shows the
@@ -675,12 +675,39 @@ of `$effect`s that set `.value` directly — an `$effect` runs after the DOM
 for that render (children, including the each block, included) has already
 committed, so there is no ordering race left to lose.
 
+## `src/lib/components/PrintSheet.svelte`
+
+**One component, two contexts, the same pixels.** `PrintRoot.svelte` mounts
+this off-screen for the actual print run; `PrintPreview.svelte` mounts the
+identical component — same props, same DOM — inside a scaled thumbnail for
+the Sheet Preview, and again as the element a PNG export of a sheet reads.
+Nothing about layout, background or card scaling is duplicated or
+approximated for the preview, so there is no way for the preview to promise
+something the print or the export does not deliver. It was pulled out of
+`PrintRoot.svelte`, which used to inline this per-sheet markup directly —
+splitting it was what let the preview reuse it at all.
+
 ## `src/lib/components/PrintPreview.svelte`
 
 **One door to the printer.** Print opens the preview; the preview prints. The
 page selection lives there, keyed by row index and reset every time it opens —
 sorting or deleting a row moves those indices, and a stale exclusion would drop a
 different card than the one that was unticked.
+
+**Sheet Preview groups the same rows Print and the PNG export will.** With
+several cards to a sheet, `sheetGroups` chunks the *included* rows (excluded
+ones already filtered out) into the identical `rows * cols` batches
+`PrintRoot.svelte` uses — so reordering or excluding a row before printing
+moves it between sheets in the preview exactly as it will on paper, rather
+than the preview showing a grouping the print will not match.
+
+**PNG export reads whichever grid is on screen for the setting that is on.**
+`exportPng` was one query (`.card` inside the per-card grid) before several
+cards to a sheet existed; with it on, a PNG of an individual card is not what
+was asked for — a PNG of the *sheet* is, so the export switches to reading
+`.print-sheet` elements out of the Sheet Preview grid instead, named
+`stem-sheet_N.png` rather than `stem_N.png` so the two exports are never
+confused for each other in a directory listing.
 
 ## `src/lib/sw-policy.ts` and `src/service-worker.ts`
 

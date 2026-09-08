@@ -99,7 +99,7 @@
 
 <span class="group" role="group" aria-label="Print Settings">
 	<label class="field">
-		<span>Per Sheet</span>
+		<span>Print Per Sheet</span>
 		<select
 			bind:this={perSheetSelect}
 			title="Print several cards to one physical sheet"

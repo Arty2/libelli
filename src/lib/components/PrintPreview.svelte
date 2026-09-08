@@ -3,6 +3,7 @@
 	import Icon from './Icon.svelte';
 	import Lightbox from './Lightbox.svelte';
 	import PrintSettingsPanel from './PrintSettingsPanel.svelte';
+	import PrintSheet from './PrintSheet.svelte';
 	import './options-bar.css';
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
@@ -16,6 +17,8 @@
 		mapping: Mapping;
 		activeRow: number;
 		background: string | null;
+		/** the sheet's own background, resolved the same way as the card's */
+		printBackground: string | null;
 		/** row indices left out of the print; empty means every page goes */
 		excluded: Set<number>;
 		onactivate: (index: number) => void;
@@ -33,6 +36,7 @@
 		mapping,
 		activeRow,
 		background,
+		printBackground,
 		excluded,
 		onactivate,
 		onexcludedchange,
@@ -47,17 +51,29 @@
 	const pageFrozen = $derived(!!template.locked);
 
 	let grid = $state<HTMLDivElement | null>(null);
+	let sheetGrid = $state<HTMLDivElement | null>(null);
 	let exporting = $state(false);
 	/** How far through a run, so a long export is not a frozen button. */
 	let progress = $state<{ done: number; total: number } | null>(null);
 
+	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
+	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
+
+	// What Print actually puts on paper: several cards tiled onto one physical
+	// sheet when it's on, otherwise one card per sheet as before.
+	const imposed = $derived(resolveImposition(outerW, outerH, template.print));
+	const printSheetW = $derived(imposed ? template.print.sheet.w : outerW);
+	const printSheetH = $derived(imposed ? template.print.sheet.h : outerH);
+
 	/**
-	 * One file per selected page, at 300 dpi. A card is already rendered here at
-	 * full size behind the thumbnail's transform, so the export reads the same
-	 * DOM the preview is showing rather than building a second one.
+	 * One file per selected page — or, with several cards to a sheet, one file
+	 * per sheet — at 300 dpi. Everything is already rendered here at full size
+	 * behind a thumbnail's transform, so the export reads the same DOM the
+	 * preview is showing rather than building a second one.
 	 */
 	async function exportPng() {
-		if (!grid || exporting) return;
+		const container = imposed ? sheetGrid : grid;
+		if (!container || exporting) return;
 		exporting = true;
 		const families = Array.from(
 			new Set([template.defaults.font, ...template.boxes.map((b) => b.font).filter(Boolean)])
@@ -67,26 +83,30 @@
 		const missing = new Set<string>();
 		let written = 0;
 		try {
-			const cards = Array.from(grid.querySelectorAll<HTMLElement>('figure:not(.dropped) .card'));
-			progress = { done: 0, total: cards.length };
-			for (const [i, card] of cards.entries()) {
-				const { blob, missingFonts } = await elementToPng(card, families, ratioForDpi(300));
+			const elements = imposed
+				? Array.from(container.querySelectorAll<HTMLElement>('.print-sheet'))
+				: Array.from(container.querySelectorAll<HTMLElement>('figure:not(.dropped) .card'));
+			const stem = imposed ? `${slugify(template.name)}-sheet` : slugify(template.name);
+			progress = { done: 0, total: elements.length };
+			for (const [i, element] of elements.entries()) {
+				const { blob, missingFonts } = await elementToPng(element, families, ratioForDpi(300));
 				for (const family of missingFonts) missing.add(family);
 				// Padded to the width of the run, so a directory listing comes back
 				// in print order rather than as 1, 10, 2 — see `pageFilename`.
-				downloadBlob(pageFilename(slugify(template.name), i + 1, cards.length, 'png'), blob);
+				downloadBlob(pageFilename(stem, i + 1, elements.length, 'png'), blob);
 				written += 1;
-				progress = { done: written, total: cards.length };
+				progress = { done: written, total: elements.length };
 			}
+			const noun = imposed ? 'sheet' : 'page';
 			onnotice(
-				`${written} PNG${written === 1 ? '' : 's'} exported at 300 dpi.` +
+				`${written} PNG${written === 1 ? '' : 's'} exported at 300 dpi, one per ${noun}.` +
 					(missing.size
 						? ` ${[...missing].join(', ')} could not be embedded — upload the font file to export it as itself.`
 						: '')
 			);
 		} catch (error) {
 			const reason = error instanceof Error ? error.message : 'That could not be exported.';
-			// Which card it died on matters: the files already saved are real, and
+			// Which file it died on matters: the ones already saved are real, and
 			// saying nothing about them reads as though the whole run was lost.
 			onnotice(
 				written ? `${reason} ${written} PNG${written === 1 ? '' : 's'} had already been saved.` : reason,
@@ -114,15 +134,6 @@
 
 	let fullscreen = $state<number | null>(null);
 
-	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
-	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
-
-	// What Print actually puts on paper: several cards tiled onto one physical
-	// sheet when it's on, otherwise one card per sheet as before.
-	const imposed = $derived(resolveImposition(outerW, outerH, template.print));
-	const printSheetW = $derived(imposed ? template.print.sheet.w : outerW);
-	const printSheetH = $derived(imposed ? template.print.sheet.h : outerH);
-
 	/**
 	 * How wide a page is on the contact sheet.
 	 *
@@ -136,6 +147,27 @@
 	const narrow = $derived(gridWidth > 0 && gridWidth < NARROW);
 	const thumbWidth = $derived(narrow ? Math.max(84, Math.floor((gridWidth - 24 - 12) / 2)) : 210);
 	const thumbScale = $derived(thumbWidth / mmToPx(outerW));
+
+	// Included rows only, grouped into the same sheets Print and PNG-per-sheet
+	// will actually produce — so this preview can never show a grouping the
+	// output does not match.
+	const includedPages = $derived(
+		dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index))
+	);
+	const perSheet = $derived(imposed ? imposed.grid.rows * imposed.grid.cols : 1);
+	const sheetGroups = $derived(
+		imposed
+			? Array.from({ length: Math.ceil(includedPages.length / perSheet) }, (_, i) =>
+					includedPages.slice(i * perSheet, i * perSheet + perSheet)
+				)
+			: []
+	);
+
+	/** Same reasoning as the card thumbnail, sized off the sheet instead. */
+	let sheetGridWidth = $state(0);
+	const sheetNarrow = $derived(sheetGridWidth > 0 && sheetGridWidth < NARROW);
+	const sheetThumbWidth = $derived(sheetNarrow ? Math.max(84, Math.floor((sheetGridWidth - 24 - 12) / 2)) : 210);
+	const sheetThumbScale = $derived(sheetThumbWidth / mmToPx(printSheetW));
 
 	function onKeydown(event: KeyboardEvent) {
 		// The same keys that opened this screen print from it, so the pair reads as
@@ -234,6 +266,45 @@
 			</figure>
 		{/each}
 	</div>
+
+	{#if imposed}
+		<hr />
+
+		<!-- What Print (and a PNG export) will actually produce: the chosen cards
+		     above, tiled onto physical sheets exactly as PrintRoot.svelte renders
+		     them for real, only scaled down for the screen. -->
+		<section class="sheets" aria-label="Sheet preview">
+			<h3>Sheets — what will print</h3>
+			<div
+				class="grid sheet-grid"
+				class:narrow={sheetNarrow}
+				bind:this={sheetGrid}
+				bind:clientWidth={sheetGridWidth}
+				style="--thumb:{sheetThumbWidth}px"
+			>
+				{#each sheetGroups as sheetPages, i (i)}
+					<figure>
+						<span
+							class="thumb sheet-thumb"
+							style="width:{mmToPx(printSheetW) * sheetThumbScale}px;height:{mmToPx(printSheetH) * sheetThumbScale}px"
+						>
+							<span class="scaler" style="transform:scale({sheetThumbScale})">
+								<PrintSheet
+									{template}
+									{mapping}
+									{background}
+									{printBackground}
+									pages={sheetPages}
+									pageCount={dataset.rows.length}
+								/>
+							</span>
+						</span>
+						<figcaption>Sheet {i + 1}</figcaption>
+					</figure>
+				{/each}
+			</div>
+		</section>
+	{/if}
 
 	<hr />
 
@@ -394,6 +465,31 @@
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		color: #767676;
+	}
+
+	.sheets {
+		padding: 12px 18px 0;
+	}
+
+	/* Same treatment as the checklist's own heading — a small grey label rather
+	   than a second, competing title on a screen that already has one. */
+	.sheets h3 {
+		margin: 0 0 12px;
+		font-size: 11px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: #767676;
+	}
+
+	/* A sheet's own paper color and background image are real content here,
+	   not decoration the preview can drop — the whole point is showing what
+	   will print. Not a button like a card thumb — there is no fullscreen for
+	   a sheet yet — so the zoom cursor `.thumb` sets for that gesture is wrong
+	   here. */
+	.sheet-thumb {
+		background: #fff;
+		cursor: default;
 	}
 
 	.checklist ol {

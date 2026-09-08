@@ -1612,6 +1612,7 @@ em { color: #b42318 }`;
 		{mapping}
 		{activeRow}
 		{background}
+		{printBackground}
 		excluded={excludedRows}
 		onactivate={(i) => (activeRow = i)}
 		onexcludedchange={(next) => (excludedRows = next)}

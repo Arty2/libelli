@@ -370,7 +370,7 @@ Pick a curated Google family, type any other family name, or upload a file.
 
 Print renders every row into a dedicated container and hands it to the browser:
 `@page { size: <w>mm <h>mm; margin: 0 }`, one physical sheet per row, no
-trailing blank. With **Per Sheet** on, several rows tile onto each sheet
+trailing blank. With **Print Per Sheet** on, several rows tile onto each sheet
 instead, in the grid **Print Settings** works out — scaled down together when
 they do not fit the sheet at full size — and `@page` names the physical sheet
 rather than the card's.
@@ -380,7 +380,7 @@ rather than the card's.
 One screen holds both halves of getting a print right: every row rendered as a
 small page, and the four dialog settings the browser gets wrong by default —
 pick the **paper size** matching the physical sheet's millimetres (the card's,
-or the imposed sheet's when **Per Sheet** is on), set **Margins** to *None*,
+or the imposed sheet's when **Print Per Sheet** is on), set **Margins** to *None*,
 uncheck **Headers and footers**, and switch on **Background graphics**, which
 Chrome drops along with the paper color. Checking the cards and reading the
 checklist are the same act, so they are the same screen — and **Print
@@ -388,20 +388,29 @@ Settings** itself sits right there too: the same panel Page Setup shows, so a
 sheet size or count picked wrong does not send you back to the editor to fix
 it before you print.
 
+With **Print Per Sheet** on, a second grid appears under the cards: **Sheets —
+what will print**, one thumbnail per physical sheet, each showing exactly the
+cards that land on it — the same component `PrintRoot.svelte` renders for the
+real print, only scaled down, so the preview can never promise a layout the
+output does not match. Excluding a card above regroups the sheets below it
+immediately.
+
 **Export…** is the only way in, so there is no route to the printer that skips
 the look at what you are about to spend paper on — <kbd>Ctrl</kbd>/<kbd>⌘</kbd>
 <kbd>p</kbd> included, which is intercepted rather than left to open the
 browser's own dialog on the editor. Press it again from that screen to send the
 run. Choosing which pages go is at the left of that screen and **Print** and
 **PNG** are at the right, because the two are not one row of three equal things.
-From it: **Print**, or **PNG** for one 300 dpi file per selected page — rendered
-here, with no library, by carrying the card into an SVG `foreignObject` and
-drawing that to a canvas. Every face is embedded: uploaded ones from this
-browser, and a Google family by fetching the stylesheet the page already loaded
-and the font files it points at. That fetch is the one exception to *the app
-fetches nothing*, and it is confined to the export, because a PNG in the wrong
-typeface is not the card. A request that is blocked or offline leaves that
-family in the fallback stack and the export says which.
+From it: **Print**, or **PNG** — one 300 dpi file per selected page, or with
+**Print Per Sheet** on, one per sheet instead, each carrying every card tiled
+onto it — rendered here, with no library, by carrying the element into an SVG
+`foreignObject` and drawing that to a canvas. Every face is embedded: uploaded
+ones from this browser, and a Google family by fetching the stylesheet the
+page already loaded and the font files it points at. That fetch is the one
+exception to *the app fetches nothing*, and it is confined to the export,
+because a PNG in the wrong typeface is not the card. A request that is
+blocked or offline leaves that family in the fallback stack and the export
+says which.
 
 The print checklist sits at the bottom of that screen, under the pages: the
 cards are what you came to look at, and the four settings are what to do once

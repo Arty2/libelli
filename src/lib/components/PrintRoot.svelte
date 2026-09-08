@@ -1,6 +1,5 @@
 <script lang="ts">
-	import Card from './Card.svelte';
-	import { backgroundStyle } from '$lib/assets';
+	import PrintSheet from './PrintSheet.svelte';
 	import { resolveImposition } from '$lib/imposition';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
@@ -27,28 +26,15 @@
 	const cardW = $derived(template.page.w + bleed * 2);
 	const cardH = $derived(template.page.h + bleed * 2);
 
-	// A count that does not fit the sheet at the card's own size scales every
-	// card on the sheet down together — see resolveImposition — rather than
-	// clipping or overlapping cards nobody asked to see printed that way.
+	// Only needed here for the physical sheet size the browser prints onto —
+	// PrintSheet.svelte works this same geometry out again for its own layout.
 	const imposed = $derived(resolveImposition(cardW, cardH, template.print));
-	const grid = $derived(imposed?.grid ?? { rows: 1, cols: 1 });
-	const scale = $derived(imposed?.scale ?? 1);
 	const sheetW = $derived(imposed ? template.print.sheet.w : cardW);
 	const sheetH = $derived(imposed ? template.print.sheet.h : cardH);
-	const blockW = $derived(imposed?.blockW ?? cardW);
-	const blockH = $derived(imposed?.blockH ?? cardH);
-	const marginX = $derived(imposed?.marginX ?? 0);
-	const marginY = $derived(imposed?.marginY ?? 0);
-	const cellW = $derived(cardW * scale);
-	const cellH = $derived(cardH * scale);
-
-	const sheetBackgroundStyle = $derived(
-		backgroundStyle(template.print.background, printBackground).join(';')
-	);
+	const perSheet = $derived(imposed ? imposed.grid.rows * imposed.grid.cols : 1);
 
 	// Rows tile into sheets of `rows * cols` — the last sheet short of a full
 	// grid just leaves the remaining cells empty.
-	const perSheet = $derived(grid.rows * grid.cols);
 	const sheets = $derived(
 		Array.from({ length: Math.ceil(pages.length / perSheet) }, (_, i) =>
 			pages.slice(i * perSheet, i * perSheet + perSheet)
@@ -65,32 +51,8 @@
 </svelte:head>
 
 <div class="print-root" aria-hidden="true" style="width:{sheetW}mm">
-	{#each sheets as sheet, sheetIndex (sheetIndex)}
-		<!-- Sized to the sheet so nothing can spill sideways into an extra page. -->
-		<div class="print-sheet" style="width:{sheetW}mm;height:{sheetH}mm;{sheetBackgroundStyle}">
-			<div
-				class="print-grid"
-				style="width:{blockW}mm;height:{blockH}mm;margin:{marginY}mm {marginX}mm;grid-template-columns:repeat({grid.cols},{cellW}mm);grid-template-rows:repeat({grid.rows},{cellH}mm)"
-			>
-				{#each sheet as page (page.index)}
-					<!-- The card itself always renders at its own millimetres — see
-					     CLAUDE.md — and is only ever shrunk visually, by scaling this
-					     wrapper down to the cell it has to fit. -->
-					<div class="print-page" style="width:{cellW}mm;height:{cellH}mm">
-						<div class="print-page-scale" style="width:{cardW}mm;height:{cardH}mm;transform:scale({scale})">
-							<Card
-								{template}
-								row={page.row}
-								{mapping}
-								pageNumber={page.index + 1}
-								pageCount={dataset.rows.length}
-								{background}
-							/>
-						</div>
-					</div>
-				{/each}
-			</div>
-		</div>
+	{#each sheets as sheetPages, sheetIndex (sheetIndex)}
+		<PrintSheet {template} {mapping} {background} {printBackground} pages={sheetPages} pageCount={dataset.rows.length} />
 	{/each}
 </div>
 
@@ -106,33 +68,9 @@
 		}
 	}
 
-	.print-grid {
-		display: grid;
-	}
-
-	.print-page {
-		overflow: hidden;
-	}
-
-	.print-page-scale {
-		transform-origin: top left;
-	}
-
 	@media print {
 		.print-root {
 			position: static;
-		}
-
-		.print-sheet {
-			break-after: page;
-			page-break-after: always;
-			print-color-adjust: exact;
-			-webkit-print-color-adjust: exact;
-		}
-
-		.print-sheet:last-child {
-			break-after: auto;
-			page-break-after: auto;
 		}
 	}
 </style>
