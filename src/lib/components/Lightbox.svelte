@@ -49,6 +49,52 @@
 	 */
 	let travel = $state(0);
 
+	/**
+	 * A card being dealt in, or the one it replaces being dealt away.
+	 *
+	 * Written by hand rather than taken from `svelte/transition` because of what
+	 * it must *not* touch: the tilt owns `transform` and rewrites it every frame,
+	 * so an animation there would be fighting the gyroscope for the same
+	 * property. `translate` and `rotate` are separate properties that compose
+	 * with it — the used matrix is translate × rotate × transform — so a card can
+	 * fly in already leaning whichever way the phone is held.
+	 *
+	 * One function for both directions. `u` runs 1 → 0 on the way in and 0 → 1 on
+	 * the way out, so the same expression means "how far from home" either way;
+	 * the caller passes the side, and the leaving card is handed the opposite one
+	 * so the pair moves as a pair rather than crossing.
+	 */
+	const DEAL_MS = 340;
+
+	const reducedMotion = () =>
+		typeof window !== 'undefined' &&
+		!!window.matchMedia &&
+		window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	/**
+	 * How far askew a card arrives, in degrees. Only where a gyroscope is
+	 * reporting: a card thrown down on a table lands crooked and rights itself,
+	 * but that reads as physics on something already responding to how the device
+	 * is held, and as a glitch on a card that has been sitting perfectly square.
+	 */
+	const DEAL_SPIN = 7;
+
+	function deal(_node: Element, { side, spin }: { side: number; spin: number }) {
+		return {
+			// Svelte transitions do not consult `prefers-reduced-motion` — that was
+			// the media query the CSS animation this replaced sat inside, and it has
+			// to be re-stated here or the setting stops meaning anything.
+			duration: reducedMotion() ? 0 : DEAL_MS,
+			// Cubic out: it arrives quickly and settles, rather than coasting in at
+			// one speed and stopping dead.
+			easing: (t: number) => 1 - (1 - t) ** 3,
+			// `u` is the eased distance from home — 1 → 0 arriving, 0 → 1 leaving —
+			// so one expression serves both and neither has to know which it is.
+			css: (_t: number, u: number) =>
+				`translate: ${u * side * 110}vw; rotate: ${u * spin}deg`
+		};
+	}
+
 	function step(to: number) {
 		const next = Math.max(0, Math.min(dataset.rows.length - 1, to));
 		if (next === index) return;
@@ -196,7 +242,7 @@
 
 	$effect(() => {
 		if (typeof window === 'undefined' || !window.matchMedia) return;
-		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+		if (reducedMotion()) return;
 		// The settle loop runs whether or not there is a gyroscope, because the
 		// drag needs it too — it used to be started only on the sensor path, so a
 		// machine with a mouse and no accelerometer had nothing easing anything.
@@ -317,16 +363,22 @@
 	<button class="plain close" onclick={onclose} title="Close" aria-label="Close">
 		<Icon name="close" size={22} />
 	</button>
-	<!-- Keyed on the index so the node is rebuilt on every step, which is what
-	     re-runs the deal animation below — a CSS animation on a node that merely
-	     had its props changed would never play a second time. -->
+	<!-- A stage the size of one card, so the card arriving and the card leaving
+	     can both be in it at once without either laying the other out. Keyed on
+	     the index: that is what tears the old one down — with its outro — and
+	     builds the new one. -->
+	<div
+		class="card-stage"
+		style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) * scale}px"
+	>
 	{#key index}
 	<div
 		class="full-card"
 		role="presentation"
 		onclick={(e) => e.stopPropagation()}
-		style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) *
-			scale}px;--travel:{travel};transform:perspective(1100px) rotateX({tilt.x}deg) rotateY({tilt.y}deg) rotateZ({tilt.z}deg)"
+		in:deal={{ side: travel, spin: sensed ? -travel * DEAL_SPIN : 0 }}
+		out:deal={{ side: -travel, spin: sensed ? travel * DEAL_SPIN : 0 }}
+		style="transform:perspective(1100px) rotateX({tilt.x}deg) rotateY({tilt.y}deg) rotateZ({tilt.z}deg)"
 	>
 		<span class="scaler" style="transform:scale({scale})">
 			<Card
@@ -348,6 +400,7 @@
 		{/if}
 	</div>
 	{/key}
+	</div>
 	<!-- Under the card with the count between them: the two arrows and the
 	     number are one control, and either side of the page they were a
 	     screen-width apart from what they act on. -->
@@ -388,6 +441,9 @@
 		   `overscroll-behavior` in app.css covers the scroll chain; this covers
 		   the gesture itself, on the one screen with nothing to scroll. */
 		touch-action: none;
+		/* The cards fly in and out from past the edge of the window; without this
+		   that excursion is overflow the browser may offer to scroll to. */
+		overflow: hidden;
 		background: rgba(20, 20, 20, 0.82);
 		display: flex;
 		flex-direction: column;
@@ -425,38 +481,25 @@
 		gap: 22px;
 	}
 
+	/* Sized inline to one card, and the only thing in the column that holds a
+	   place: the card leaving and the card arriving are both absolute inside it,
+	   so the pair can overlap without either one laying the other out or the
+	   arrows jumping as they pass. */
+	.card-stage {
+		position: relative;
+		flex: none;
+	}
+
 	.full-card {
+		position: absolute;
+		inset: 0;
 		background: #fff;
 		overflow: hidden;
 		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 		/* The lean is drawn, not laid out: the card keeps the pixels it was given
 		   whichever way it is facing, so nothing under it moves. */
 		transform-origin: center;
-		will-change: transform, translate;
-	}
-
-	/* Stepping the run deals the next card in from off the screen.
-
-	   On `translate`, not on `transform`: the tilt owns `transform` and rewrites
-	   it every frame, so an animation there would fight the gyroscope for the
-	   same property. The individual transform properties compose with it — the
-	   used matrix is translate × transform — so the card arrives already leaning
-	   whichever way the phone is held.
-
-	   `--travel` is 0 on the way in, which makes the animation a move from
-	   nowhere to nowhere: opening the lightbox should not deal a card at you
-	   from a side you did not choose. 110vw guarantees it starts past the edge of
-	   the window whatever the card's own width. */
-	@media (prefers-reduced-motion: no-preference) {
-		.full-card {
-			animation: deal 300ms cubic-bezier(0.22, 0.61, 0.36, 1);
-		}
-	}
-
-	@keyframes deal {
-		from {
-			translate: calc(var(--travel, 0) * 110vw);
-		}
+		will-change: transform, translate, rotate;
 	}
 
 	/* Foil.

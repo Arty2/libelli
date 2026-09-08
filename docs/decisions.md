@@ -525,19 +525,40 @@ nothing under it moves, `prefers-reduced-motion` and a fine pointer both switch
 it off entirely, and the first reading is the baseline so however the phone is
 being held when it opens is level.
 
-**Stepping the run deals the next card in from off the screen.** On the
-`translate` property, not on `transform`: the tilt owns `transform` and rewrites
-it every frame, so an animation there would be fighting the gyroscope for the
-same property. The individual transform properties compose with it — the used
-matrix is translate × transform — so the card arrives already leaning whichever
-way the phone is held.
+**Stepping the run deals one card out and the next one in.** Both halves are
+on screen at once, moving the same way — the card you were looking at leaves by
+one edge as its replacement arrives from the other — because a card that only
+appears has come from nowhere, and what a step actually does is change which
+card you are looking at. That needs two nodes alive at the same time, so the
+card is keyed on the index (which is also what re-runs the animation: a node
+that merely had its props changed never plays one a second time) and the pair
+sit absolutely inside a `.card-stage` sized to one card, so they can overlap
+without either laying the other out and without the arrows under them jumping
+as they pass.
 
-The card is keyed on the index, because a CSS animation on a node that merely
-had its props changed never plays a second time; rebuilding it is what re-runs
-the deal. `--travel` is 0 until the first step, which makes the animation a move
-from nowhere to nowhere — opening the lightbox should not deal a card at you
-from a side you did not choose — and a step clamped at either end of the run
-leaves it alone, because nothing moved.
+On the `translate` and `rotate` properties, not on `transform`: the tilt owns
+`transform` and rewrites it every frame, so an animation there would be fighting
+the gyroscope for the same property. The individual transform properties compose
+with it — the used matrix is translate × rotate × transform — so the card
+arrives already leaning whichever way the phone is held.
+
+It is a hand-written Svelte transition rather than a CSS animation, because one
+expression has to serve both directions: `u`, the eased distance from home, runs
+1 → 0 arriving and 0 → 1 leaving, so neither card has to know which it is, and
+the leaving card is handed the opposite side so the two move as a pair rather
+than crossing. `travel` is 0 until the first step, which makes it a move from
+nowhere to nowhere — opening the lightbox should not deal a card at you from a
+side you did not choose — and a step clamped at either end of the run leaves it
+alone, because nothing moved.
+
+**A card arrives askew, but only where a gyroscope is reporting.** Seven degrees
+off square, righting itself as it lands: a card thrown down on a table lands
+crooked. That reads as physics on something already responding to how the device
+is held, and as a glitch on a card that has been sitting perfectly square, so it
+is gated on the same first reading the foil is. The one thing a Svelte
+transition does *not* do for free is honour `prefers-reduced-motion` — the media
+query the CSS animation this replaced sat inside — so the transition re-states
+it itself and returns a duration of zero, which swaps the cards outright.
 
 **Two things drive the tilt, and they add.** A gyroscope where there is one, and
 a drag — the same gesture on a desk that turning the phone is in the hand, and
