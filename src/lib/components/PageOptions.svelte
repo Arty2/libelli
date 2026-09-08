@@ -1,9 +1,9 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import PrintSettingsPanel from './PrintSettingsPanel.svelte';
 	import './options-bar.css';
 	import { safeImageUrl } from '$lib/assets';
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
-	import { IMPOSITION_COUNTS, resolveImposition } from '$lib/imposition';
 	import {
 		BORDER_STYLES,
 		DEFAULT_QR,
@@ -23,7 +23,6 @@
 		Box,
 		Centre,
 		Dataset,
-		ImpositionSpec,
 		Mapping,
 		PageBackgroundImage,
 		PageNumberPosition,
@@ -46,6 +45,8 @@
 		onresettemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
+		/** the sheet's own background, distinct from the card's */
+		onuploadprintbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
 		onimporttemplate: () => void;
@@ -66,6 +67,7 @@
 		onresettemplate,
 		onuploadfont,
 		onuploadbackground,
+		onuploadprintbackground,
 		onnotice,
 		onimporttemplate,
 		onexporttemplate,
@@ -146,25 +148,6 @@
 		patchTemplate({ page: { ...template.page, w: h, h: w } });
 		onnotice(`Page turned — ${h} × ${w}mm. Every box keeps the millimetres it had.`);
 	}
-
-	const patchImposition = (change: Partial<ImpositionSpec>) =>
-		patchTemplate({ imposition: { ...template.imposition, ...change } });
-
-	/** The named size this sheet already is, or Custom when it is its own. */
-	const impositionPreset = $derived(presetFor(template.imposition.sheet.w, template.imposition.sheet.h) ?? '');
-
-	function setImpositionPreset(name: string) {
-		const size = presetSize(name, template.imposition.sheet.w > template.imposition.sheet.h);
-		if (!size) return;
-		patchImposition({ sheet: size });
-	}
-
-	const bleed = $derived(template.bleed.enabled ? template.bleed.amount : 0);
-
-	/** Whether the chosen count actually fits the chosen sheet at this card size. */
-	const impositionFit = $derived(
-		resolveImposition(template.page.w + bleed * 2, template.page.h + bleed * 2, template.imposition)
-	);
 
 	function setBackground(image: PageBackgroundImage | undefined) {
 		patchTemplate({ page: { ...template.page, ...(image ? { image } : { image: undefined }) } });
@@ -329,76 +312,13 @@
 			{/if}
 		</span>
 
-		<span class="group" role="group" aria-label="Sheet imposition">
-			<label class="field">
-				<span>Per Sheet</span>
-				<select
-					value={template.imposition.enabled ? String(template.imposition.count) : ''}
-					title="Print several cards to one physical sheet"
-					disabled={pageFrozen}
-					onchange={(e) => {
-						const value = e.currentTarget.value;
-						if (!value) {
-							patchImposition({ enabled: false });
-							return;
-						}
-						patchImposition({ enabled: true, count: Number(value) as ImpositionSpec['count'] });
-					}}
-				>
-					<option value="">Off</option>
-					{#each IMPOSITION_COUNTS as count (count)}
-						<option value={count}>{count}-up</option>
-					{/each}
-				</select>
-			</label>
-			{#if template.imposition.enabled}
-				<label class="field">
-					<span>Sheet</span>
-					<select
-						value={impositionPreset}
-						title="The physical paper the cards print onto"
-						disabled={pageFrozen}
-						onchange={(e) => setImpositionPreset(e.currentTarget.value)}
-					>
-						<option value="">Custom</option>
-						{#each PAGE_PRESETS as option (option.name)}
-							<option value={option.name}>{option.name}</option>
-						{/each}
-					</select>
-				</label>
-				<label class="field">
-					<span>Width</span>
-					<input
-						class="n-3"
-						type="number"
-						step="1"
-						value={template.imposition.sheet.w}
-						disabled={pageFrozen}
-						onchange={(e) =>
-							patchImposition({ sheet: { ...template.imposition.sheet, w: numeric(e, template.imposition.sheet.w) } })}
-					/>
-					<span class="unit">mm</span>
-				</label>
-				<label class="field">
-					<span>Height</span>
-					<input
-						class="n-3"
-						type="number"
-						step="1"
-						value={template.imposition.sheet.h}
-						disabled={pageFrozen}
-						onchange={(e) =>
-							patchImposition({ sheet: { ...template.imposition.sheet, h: numeric(e, template.imposition.sheet.h) } })}
-					/>
-					<span class="unit">mm</span>
-				</label>
-				{#if !impositionFit}
-					<span class="field-label warning" title="This many cards, this size, do not fit this sheet in any orientation — make the sheet bigger, the card smaller, or ask for fewer per sheet">
-						<Icon name="warning" size={13} /> Won't fit
-					</span>
-				{/if}
-			{/if}
-		</span>
+		<PrintSettingsPanel
+			{template}
+			{pageFrozen}
+			{ontemplatechange}
+			onuploadbackground={onuploadprintbackground}
+			{onnotice}
+		/>
 
 		<span class="group" role="group" aria-label="Type defaults">
 			<label class="field">

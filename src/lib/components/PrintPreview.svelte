@@ -2,6 +2,8 @@
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
 	import Lightbox from './Lightbox.svelte';
+	import PrintSettingsPanel from './PrintSettingsPanel.svelte';
+	import './options-bar.css';
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
 	import { mmToPx } from '$lib/layout';
@@ -19,6 +21,8 @@
 		onactivate: (index: number) => void;
 		onexcludedchange: (excluded: Set<number>) => void;
 		onprint: () => void;
+		ontemplatechange: (template: Template) => void;
+		onuploadprintbackground: (file: File) => void;
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
 		onclose: () => void;
 	}
@@ -33,9 +37,14 @@
 		onactivate,
 		onexcludedchange,
 		onprint,
+		ontemplatechange,
+		onuploadprintbackground,
 		onnotice,
 		onclose
 	}: Props = $props();
+
+	/** A locked design leaves Print Settings alone too — the same freeze the editor gives it. */
+	const pageFrozen = $derived(!!template.locked);
 
 	let grid = $state<HTMLDivElement | null>(null);
 	let exporting = $state(false);
@@ -109,10 +118,10 @@
 	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 
 	// What Print actually puts on paper: several cards tiled onto one physical
-	// sheet when imposition fits, otherwise one card per sheet as before.
-	const imposed = $derived(resolveImposition(outerW, outerH, template.imposition));
-	const printSheetW = $derived(imposed ? template.imposition.sheet.w : outerW);
-	const printSheetH = $derived(imposed ? template.imposition.sheet.h : outerH);
+	// sheet when it's on, otherwise one card per sheet as before.
+	const imposed = $derived(resolveImposition(outerW, outerH, template.print));
+	const printSheetW = $derived(imposed ? template.print.sheet.w : outerW);
+	const printSheetH = $derived(imposed ? template.print.sheet.h : outerH);
 
 	/**
 	 * How wide a page is on the contact sheet.
@@ -228,6 +237,13 @@
 
 	<hr />
 
+	<!-- The same Print Settings shared with Page Setup, so a sheet size or count
+	     picked wrong does not send you back to the editor to fix it — see
+	     PrintSettingsPanel.svelte and docs/decisions.md. -->
+	<div class="options settings-strip">
+		<PrintSettingsPanel {template} {pageFrozen} {ontemplatechange} onuploadbackground={onuploadprintbackground} {onnotice} />
+	</div>
+
 	<!-- Under the pages, not above them: the cards are what you came to look at,
 	     and these four settings are what to do once you have. -->
 	<section class="checklist" aria-label="Before you print">
@@ -235,7 +251,7 @@
 		<ol>
 			<li>
 				<strong>Paper size</strong> — the one matching <strong>{printSheetW} × {printSheetH} mm</strong>, or a larger sheet you trim.
-				{#if imposed}{template.imposition.count} cards per sheet.{/if}
+				{#if imposed}{template.print.count} cards per sheet{imposed.scale < 0.999 ? `, scaled to ${Math.round(imposed.scale * 100)}%` : ''}.{/if}
 			</li>
 			<li><strong>Margins</strong> — <em>None</em>.</li>
 			<li><strong>Headers and footers</strong> — off.</li>
@@ -355,6 +371,15 @@
 		margin: 8px 18px 0;
 		border: none;
 		border-top: 1px solid #ddd;
+	}
+
+	/* The shared options bar is built for the toolbar's full-width strip; here
+	   it sits inside a modal's padding, so it gets its own margin and a border
+	   all round rather than the single bottom rule it draws itself. */
+	.settings-strip {
+		margin: 12px 18px 0;
+		border: 1px solid #ddd;
+		border-radius: var(--radius-button);
 	}
 
 	.checklist {

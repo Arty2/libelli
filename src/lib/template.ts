@@ -9,11 +9,12 @@ import type {
 	Centre,
 	Defaults,
 	FontRef,
-	ImpositionSpec,
 	Mapping,
+	Orientation,
 	PageBackgroundImage,
 	PageNumberPosition,
 	PageNumberSpec,
+	PrintSettings,
 	QrSettings,
 	SideValue,
 	Sides,
@@ -43,15 +44,18 @@ export const DEFAULT_DEFAULTS: Defaults = {
 	letterSpacing: 0
 };
 
+export const ORIENTATIONS: Orientation[] = ['portrait', 'landscape'];
+
 /**
- * Off by default, and A4 4-up when first switched on — a sheet size and a
- * count worth having ready, not a blank someone has to fill in before
- * imposition does anything at all.
+ * Off by default, and A4 4-up portrait when first switched on — a sheet size
+ * and a count worth having ready, not a blank someone has to fill in before
+ * printing several to a sheet does anything at all.
  */
-export const DEFAULT_IMPOSITION: ImpositionSpec = {
+export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
 	enabled: false,
 	count: 4,
-	sheet: { w: 210, h: 297 }
+	sheet: { w: 210, h: 297 },
+	orientation: 'portrait'
 };
 
 export const DEFAULT_PAGE_NUMBER: PageNumberSpec = {
@@ -79,7 +83,7 @@ export function blankTemplate(): Template {
 		name: 'Untitled card',
 		page: { w: 148, h: 210, unit: 'mm', background: '#ffffff' },
 		bleed: { enabled: false, amount: 3, cropMarks: false },
-		imposition: { ...DEFAULT_IMPOSITION },
+		print: { ...DEFAULT_PRINT_SETTINGS },
 		pageNumber: { ...DEFAULT_PAGE_NUMBER },
 		fonts: [{ family: 'Patrick Hand', source: 'google' }],
 		defaults: { ...DEFAULT_DEFAULTS },
@@ -184,7 +188,7 @@ export function normaliseTemplate(raw: unknown): Template {
 			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image) })
 		},
 		bleed: normaliseBleed(t.bleed),
-		imposition: normaliseImposition(t.imposition),
+		print: normalisePrintSettings(t.print),
 		pageNumber: normalisePageNumber(t.pageNumber),
 		fonts: normaliseFonts(t.fonts),
 		defaults: {
@@ -218,15 +222,18 @@ function normaliseBleed(raw: any): Template['bleed'] {
 	};
 }
 
-function normaliseImposition(raw: any): ImpositionSpec {
-	const count = IMPOSITION_COUNTS.includes(raw?.count) ? raw.count : DEFAULT_IMPOSITION.count;
+function normalisePrintSettings(raw: any): PrintSettings {
+	const count = IMPOSITION_COUNTS.includes(raw?.count) ? raw.count : DEFAULT_PRINT_SETTINGS.count;
+	const orientation: Orientation = raw?.orientation === 'landscape' ? 'landscape' : 'portrait';
 	return {
 		enabled: Boolean(raw?.enabled),
 		count,
 		sheet: {
-			w: num(raw?.sheet?.w, DEFAULT_IMPOSITION.sheet.w),
-			h: num(raw?.sheet?.h, DEFAULT_IMPOSITION.sheet.h)
-		}
+			w: num(raw?.sheet?.w, DEFAULT_PRINT_SETTINGS.sheet.w),
+			h: num(raw?.sheet?.h, DEFAULT_PRINT_SETTINGS.sheet.h)
+		},
+		orientation,
+		...stripUndefined({ background: normaliseBackgroundImage(raw?.background) })
 	};
 }
 

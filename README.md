@@ -187,16 +187,22 @@ resize boxes directly, or type exact millimetres.
   bounds. The grid keeps its corner at the trim, not at the sheet, so turning
   bleed on does not slide the gridlines under the boxes they are there to
   measure.
-- **Per Sheet** — several cards printed to one physical sheet: 2, 4, 6 or 8,
-  onto A5, A4, A3 or a sheet of your own size in millimetres. Cards keep the
-  millimetres they were designed at — imposition never scales anything, it
-  only decides how many trim-sized copies fit and tiles them edge to edge,
-  centred on the sheet. Bleed does double duty here: the gap between
-  neighbouring cards, and the crop marks between them, are the card's own
-  bleed and **Crop Marks** setting, so there is nothing extra to keep in
-  step. A count that does not fit the sheet at this card size, in any
-  orientation, is called out rather than clipped or overlapped — make the
-  sheet bigger, the card smaller, or ask for fewer per sheet.
+- **Print Settings** — several cards printed to one physical sheet: 2, 4, 6 or
+  8, onto A5, A4, A3 or a sheet of your own size in millimetres, **Portrait**
+  or **Landscape**. Cards keep the millimetres they were designed at
+  everywhere they are edited; imposition only decides how many trim-sized
+  copies fit and tiles them edge to edge, centred on the sheet. Bleed does
+  double duty here: the gap between neighbouring cards, and the crop marks
+  between them, are the card's own bleed and **Crop Marks** setting, so there
+  is nothing extra to keep in step. A count that does not fit the sheet at the
+  card's own size, in any orientation, prints scaled down instead of
+  refusing — every card on the sheet shrinks together, and the amount shows
+  as *Scaled to n%* rather than leaving it a surprise. The sheet can carry its
+  own background image too — **Upload…** or **URL…**, **Cover**/**Contain**/
+  **Tile** — separate from the card's own background and showing only in the
+  margin around the tiled cards. This whole group is the one place both
+  **Page Setup** and the print screen change the same settings: see
+  **Print preview** below.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
@@ -364,9 +370,10 @@ Pick a curated Google family, type any other family name, or upload a file.
 
 Print renders every row into a dedicated container and hands it to the browser:
 `@page { size: <w>mm <h>mm; margin: 0 }`, one physical sheet per row, no
-trailing blank. With imposition on and the count fitting the sheet, several
-rows tile onto each sheet instead, in the grid **Per Sheet** works out, and
-`@page` names the physical sheet size rather than the card's.
+trailing blank. With **Per Sheet** on, several rows tile onto each sheet
+instead, in the grid **Print Settings** works out — scaled down together when
+they do not fit the sheet at full size — and `@page` names the physical sheet
+rather than the card's.
 
 ## Print preview
 
@@ -376,7 +383,10 @@ pick the **paper size** matching the physical sheet's millimetres (the card's,
 or the imposed sheet's when **Per Sheet** is on), set **Margins** to *None*,
 uncheck **Headers and footers**, and switch on **Background graphics**, which
 Chrome drops along with the paper color. Checking the cards and reading the
-checklist are the same act, so they are the same screen.
+checklist are the same act, so they are the same screen — and **Print
+Settings** itself sits right there too: the same panel Page Setup shows, so a
+sheet size or count picked wrong does not send you back to the editor to fix
+it before you print.
 
 **Export…** is the only way in, so there is no route to the printer that skips
 the look at what you are about to spend paper on — <kbd>Ctrl</kbd>/<kbd>⌘</kbd>

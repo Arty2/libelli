@@ -33,6 +33,7 @@ src/lib/
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
   table.ts        column reorder, row sorting
+  imposition.ts   grid math for tiling several cards onto one physical sheet
   download.ts     hand the browser a file; the one copy both exports use
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
@@ -51,6 +52,7 @@ src/lib/
     PageOptions.svelte  page settings bar
     BoxOptions.svelte   box settings bar                                   (~19k)
     options-bar.css     the styles both bars share
+    PrintSettingsPanel.svelte  Per Sheet, orientation, sheet background — shared with the print screen
     PrintPreview, PrintRoot, Lightbox, BoxMenu, SelectionTools, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   app state and wiring                             (~40k)

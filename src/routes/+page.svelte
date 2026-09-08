@@ -135,6 +135,10 @@
 	/** a local background image this browser has never been given the file for */
 	let missingImage = $state<string | null>(null);
 	let backgroundInput = $state<HTMLInputElement | null>(null);
+	/** the print sheet's own background — same bargain as the page's, kept apart */
+	let printBackground = $state<string | null>(null);
+	let missingPrintImage = $state<string | null>(null);
+	let printBackgroundInput = $state<HTMLInputElement | null>(null);
 	let status = $state('');
 	/**
 	 * A notice is either something that happened or something that went wrong,
@@ -356,6 +360,21 @@ em { color: #b42318 }`;
 			if (stale) return;
 			background = resolved;
 			missingImage = image && image.source === 'local' && !resolved ? image.src : null;
+		})();
+		return () => {
+			stale = true;
+		};
+	});
+
+	/** Same bargain as the page background, kept as a separate reference so the two never collide. */
+	$effect(() => {
+		const image = template.print.background ? $state.snapshot(template.print.background) : undefined;
+		let stale = false;
+		void (async () => {
+			const resolved = await resolveBackground(image);
+			if (stale) return;
+			printBackground = resolved;
+			missingPrintImage = image && image.source === 'local' && !resolved ? image.src : null;
 		})();
 		return () => {
 			stale = true;
@@ -1025,6 +1044,23 @@ em { color: #b42318 }`;
 		if (file && missingImage) await handleBackgroundUpload(file, missingImage);
 	}
 
+	async function handlePrintBackgroundUpload(file: File, nameOverride?: string) {
+		try {
+			const image = await uploadBackgroundImage(file, template.print.background?.fit ?? 'cover', nameOverride);
+			template = { ...template, print: { ...template.print, background: image } };
+			notify(`${image.src} set as the sheet background — the picture stays in this browser, the template only names it.`);
+		} catch {
+			notify('That image could not be read.', 'warning');
+		}
+	}
+
+	async function onMissingPrintBackgroundChosen(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (file && missingPrintImage) await handlePrintBackgroundUpload(file, missingPrintImage);
+	}
+
 	function pickMissingFont(font: FontRef) {
 		missingFontTarget = font;
 		missingFontInput?.click();
@@ -1122,6 +1158,13 @@ em { color: #b42318 }`;
 		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
 		<input bind:this={backgroundInput} type="file" accept="image/*" hidden onchange={onMissingBackgroundChosen} />
+		<input
+			bind:this={printBackgroundInput}
+			type="file"
+			accept="image/*"
+			hidden
+			onchange={onMissingPrintBackgroundChosen}
+		/>
 	</header>
 
 	{#if pageSetupOpen}
@@ -1139,6 +1182,7 @@ em { color: #b42318 }`;
 			onresettemplate={() => (resetting = true)}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
+			onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 			onnotice={notify}
 			onimporttemplate={() => templateInput?.click()}
 			onexporttemplate={doExportTemplate}
@@ -1162,6 +1206,7 @@ em { color: #b42318 }`;
 			onresettemplate={() => (resetting = true)}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
+			onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 			onnotice={notify}
 			onimporttemplate={() => templateInput?.click()}
 			onexporttemplate={doExportTemplate}
@@ -1191,6 +1236,19 @@ em { color: #b42318 }`;
 			<button onclick={() => backgroundInput?.click()}>Choose {missingImage}…</button>
 			<button
 				onclick={() => (template = { ...template, page: { ...template.page, image: undefined } })}
+			>Remove It</button>
+		</div>
+	{/if}
+
+	{#if missingPrintImage}
+		<div class="banner" role="alert">
+			<span>
+				This template's sheet background image, <strong>{missingPrintImage}</strong>, is not in this browser. The
+				template carries its name, never the picture.
+			</span>
+			<button onclick={() => printBackgroundInput?.click()}>Choose {missingPrintImage}…</button>
+			<button
+				onclick={() => (template = { ...template, print: { ...template.print, background: undefined } })}
 			>Remove It</button>
 		</div>
 	{/if}
@@ -1558,6 +1616,8 @@ em { color: #b42318 }`;
 		onactivate={(i) => (activeRow = i)}
 		onexcludedchange={(next) => (excludedRows = next)}
 		onprint={printFromPreview}
+		ontemplatechange={applyTemplate}
+		onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 		onnotice={notify}
 		onclose={() => (previewOpen = false)}
 	/>
@@ -1576,7 +1636,7 @@ em { color: #b42318 }`;
 {/if}
 
 {#if printing}
-	<PrintRoot {template} {dataset} {mapping} {background} excluded={excludedRows} />
+	<PrintRoot {template} {dataset} {mapping} {background} {printBackground} excluded={excludedRows} />
 {/if}
 
 <style>

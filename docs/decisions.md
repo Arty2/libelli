@@ -55,20 +55,39 @@ extra gutter, means that gap and those marks fall out of the per-card bleed
 size and a count and touches nothing about bleed itself.
 
 **A grid's footprint does not depend on its shape.** `cardW * cols` by
-`cardH * rows` covers `cardW * cardH * count` either way round, so "which
-orientation wastes less paper" is not a real question — only "which
-orientation fits" is. `GRIDS` lists the more balanced arrangement first (2x2
-before 4x1), and `resolveImposition` returns the first one that fits; an
-earlier version compared block area to pick a "best" grid, which was
-comparing numbers that could never differ.
+`cardH * rows` covers `cardW * cardH * count` either way round, so it was
+never a real tiebreak between orientations — an earlier version compared
+block area to pick a "best" grid, which was comparing numbers that could
+never differ. What genuinely varies by orientation is the *scale* a card
+needs to fit at all, so that is what `resolveImposition` now scores: every
+orientation is tried, each capped at `scale <= 1` (imposition shrinks, it
+never enlarges), and the one needing the least shrinkage wins — a tie falls
+to whichever `GRIDS` lists first, the more balanced arrangement (2x2 before
+4x1).
 
-**A count that will not fit is reported, not forced.** Scaling the cards down
-to make them fit would break "millimetres everywhere," and silently printing
-fewer per sheet than asked would surprise whoever is about to feed paper into
-a printer. `resolveImposition` returns `undefined` when nothing fits, and
-callers — `PageOptions.svelte`'s warning, `PrintRoot.svelte`'s fallback —
-treat that the same way: say so, and print one card per sheet, the layout
-from before imposition existed.
+**Scaling for print is not the same promise as "millimetres everywhere."**
+That rule is about the *design*: a box's coordinates do not move when the
+page size or bleed changes, so the editor stays predictable. Printing four
+A5 cards onto one A4 sheet needs them smaller than their own trim size in
+no orientation — refusing was the original call, but a print run that
+quietly comes out 1-up when you asked for 4-up is worse than one that comes
+out a little smaller. So `resolveImposition` always returns a layout when
+imposition is on, `scale` included, and never `undefined` — printing is the
+one place a card's millimetres are not the final word; the editor, a single
+card's own print, and every other reader of `template.page` never see
+anything but the number that was typed in. `PrintRoot.svelte` renders each
+card at its own full size and then scales the wrapping element down with a
+plain CSS `transform`, so nothing about layout, anchors or measurement
+changes — only what ends up on paper. `PrintSettingsPanel.svelte` shows the
+percentage rather than staying silent about it.
+
+**The sheet's own background is a second, separate reference.** A card's
+background (`template.page.image`) and the sheet's (`template.print.background`)
+are stored, resolved and asked-for-when-missing exactly the same way, but as
+two independent fields — the sheet's is `undefined` far more often (only
+imposition draws a sheet distinct from the card), and conflating them would
+mean turning imposition off could silently reach for a picture nobody chose
+for that context.
 
 ## `src/lib/history.ts`
 
@@ -626,6 +645,35 @@ opposite, at a third of the angle: the type on the card is level, and past a
 couple of degrees it stops reading as a card catching the light and starts
 reading as a crooked print. The drag resists the same way, for the same reason —
 push a card sideways and its mass lags behind.
+
+## `src/lib/components/PrintSettingsPanel.svelte`
+
+**Shared, not duplicated.** Print Settings is one component mounted from two
+places — `PageOptions.svelte`, where every other page-level setting lives,
+and `PrintPreview.svelte`, so a sheet size or count picked wrong does not
+send you back to the editor before you can print. Both pass the same
+`template`/`ontemplatechange` shape the rest of the page-setup bar uses; the
+panel itself does not know or care which screen it is in.
+
+**A `<select>`'s `value=` binding loses a selection that is not the first
+option, on a fresh mount.** The browser applies `<select>.value` against
+whatever `<option>` children already exist at that moment; Svelte renders
+this component's `{#each}`-generated options as a child effect of the
+`<select>`, and on a *fresh* mount (this component appearing for the first
+time, template imported with imposition already on, or the print screen
+opened first) the parent's `value=` assignment can run before that child
+effect has inserted the options — the browser then finds nothing matching,
+clears the selection to `-1`, and does not retry once the options do land, so
+the picker silently shows "Off" or "Custom" no matter what the template
+actually says. Marking the matching `<option selected>` does not fix it
+either: once a `<select>` has had its `.value` set imperatively even once, a
+later `selected` *attribute* only updates `defaultSelected`, not the live
+selection. `bind:value` with a function binding looked like Svelte's own
+answer to exactly this, but did not correct it in practice here either. What
+does: `perSheetSelect`/`sheetPresetSelect` bound with `bind:this`, and a pair
+of `$effect`s that set `.value` directly — an `$effect` runs after the DOM
+for that render (children, including the each block, included) has already
+committed, so there is no ordering race left to lose.
 
 ## `src/lib/components/PrintPreview.svelte`
 

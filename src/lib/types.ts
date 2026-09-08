@@ -6,7 +6,7 @@
  * print convention beats consistency.
  */
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /**
  * `image` is really "image or color": it shows whatever its source resolves
@@ -79,16 +79,21 @@ export interface BleedSpec {
 	cropMarks: boolean;
 }
 
+export type Orientation = 'portrait' | 'landscape';
+
 /**
- * Several virtual pages tiled onto one physical sheet — a way to print, not a
+ * How several virtual pages reach one physical sheet — a way to print, not a
  * way to design, so it lives beside `page` and `bleed` rather than changing
  * what either of them means. `sheet` is the physical paper; `page` is still
  * the card, measured from its own trim edge exactly as it is without
  * imposition. Cards tile edge to edge: the space between them, and the crop
  * marks that show where to cut, come from the template's own `bleed` — there
- * is no second bleed to keep in step with the first.
+ * is no second bleed to keep in step with the first. When the card at its own
+ * size does not fit the requested count, printing scales every card down
+ * together rather than refusing — a card's own millimetres are still what
+ * the editor and a single-up print use; scale is print output only.
  */
-export interface ImpositionSpec {
+export interface PrintSettings {
 	enabled: boolean;
 	/** virtual pages per physical sheet */
 	count: 2 | 4 | 6 | 8;
@@ -96,6 +101,9 @@ export interface ImpositionSpec {
 		w: number;
 		h: number;
 	};
+	orientation: Orientation;
+	/** shows through the sheet's outer margin, behind every card */
+	background?: PageBackgroundImage;
 }
 
 /** A page number printed on every card. Off unless asked for. */
@@ -229,7 +237,7 @@ export interface Template {
 	name: string;
 	page: PageSpec;
 	bleed: BleedSpec;
-	imposition: ImpositionSpec;
+	print: PrintSettings;
 	pageNumber: PageNumberSpec;
 	fonts: FontRef[];
 	defaults: Defaults;

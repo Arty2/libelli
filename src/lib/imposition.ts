@@ -1,11 +1,14 @@
-import type { ImpositionSpec } from './types';
+import type { PrintSettings } from './types';
 
 /**
  * Grid math for tiling several cards onto one physical sheet.
  *
- * A card keeps the millimetres it was designed at — imposition never scales
- * anything, it only decides how many trim-sized copies fit on a bigger sheet
- * and where the block of them sits. Bleed does double duty here: cards are
+ * A card keeps the millimetres it was designed at everywhere the app measures
+ * or edits it — imposition only decides how many trim-sized copies fit on a
+ * bigger sheet and where the block of them sits. When they do not fit at
+ * their own size in any orientation, the print output shrinks every card on
+ * the sheet together rather than refusing: `scale` says by how much, and it
+ * is 1 whenever the cards fit already. Bleed does double duty here: cards are
  * tiled edge to edge, so the space between neighbours is whatever bleed the
  * template already has, and the crop marks `Card.svelte` draws at its own
  * corners are what marks the cut on both the outer sheet edge and every seam
@@ -46,7 +49,9 @@ const GRIDS: Record<number, Grid[]> = {
 
 export interface ImpositionLayout {
 	grid: Grid;
-	/** mm, the tiled block of cards (bleed included) */
+	/** 1 when the cards fit at their own size; less when the sheet forced a shrink */
+	scale: number;
+	/** mm, the tiled block of cards (bleed included), after `scale` */
 	blockW: number;
 	blockH: number;
 	/** mm, split evenly outside the block to centre it on the sheet */
@@ -55,29 +60,31 @@ export interface ImpositionLayout {
 }
 
 /**
- * Where cards land on the sheet, or `undefined` when the requested count does
- * not fit this card at this sheet size in any orientation — the caller's cue
- * to warn rather than clip or overlap.
+ * Where cards land on the sheet, or `undefined` when imposition is off.
  *
  * `cardW`/`cardH` are the card's own footprint including bleed on every side,
  * the same number `PrintRoot` and `Card` already compute for a single page.
- * A grid's footprint is `cardW * cardH * count` whichever way round it is
- * arranged, so "fits" is the only thing that distinguishes one orientation
- * from another; `GRIDS` lists the more balanced arrangement first (2x2
- * before 4x1) and the first one that fits wins.
+ * Every orientation for the requested count is scored by the scale it would
+ * need to fit the sheet (capped at 1 — imposition shrinks, it never
+ * enlarges), and the orientation needing the *least* shrinkage wins; a tie
+ * falls to whichever is listed first, the more balanced arrangement.
  */
 export function resolveImposition(
 	cardW: number,
 	cardH: number,
-	imposition: ImpositionSpec
+	print: PrintSettings
 ): ImpositionLayout | undefined {
-	if (!imposition.enabled) return undefined;
-	const { w: sheetW, h: sheetH } = imposition.sheet;
-	for (const grid of GRIDS[imposition.count] ?? []) {
-		const blockW = cardW * grid.cols;
-		const blockH = cardH * grid.rows;
-		if (blockW > sheetW || blockH > sheetH) continue;
-		return { grid, blockW, blockH, marginX: (sheetW - blockW) / 2, marginY: (sheetH - blockH) / 2 };
+	if (!print.enabled) return undefined;
+	const { w: sheetW, h: sheetH } = print.sheet;
+	let best: ImpositionLayout | undefined;
+	for (const grid of GRIDS[print.count] ?? []) {
+		const rawW = cardW * grid.cols;
+		const rawH = cardH * grid.rows;
+		const scale = Math.min(1, sheetW / rawW, sheetH / rawH);
+		if (best && scale <= best.scale) continue;
+		const blockW = rawW * scale;
+		const blockH = rawH * scale;
+		best = { grid, scale, blockW, blockH, marginX: (sheetW - blockW) / 2, marginY: (sheetH - blockH) / 2 };
 	}
-	return undefined;
+	return best;
 }
