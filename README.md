@@ -400,7 +400,9 @@ Click a thumbnail to open that card full screen; so does the count under the
 sheet in the editor — *3 / 12*, the number naming the card being the obvious
 thing to press to see it properly. <kbd>←</kbd> / <kbd>→</kbd>, the arrows
 either side of the count, and a swipe move between cards; <kbd>Esc</kbd> comes
-back out. Nothing is printed or exported from there — it is only a proper look.
+back out; each new card is dealt in from off the edge of the window, in the
+direction you are travelling. Nothing is printed or exported from there — it is
+only a proper look.
 The card leans a few degrees as you drag across it, and turns a fraction of a
 degree *against* the lean — the way a card held loosely hangs level while the
 hand around it turns. Roll the phone clockwise and the card appears to turn

@@ -37,7 +37,24 @@
 		return () => window.removeEventListener('resize', read);
 	});
 
-	const step = (to: number) => onactivate(Math.max(0, Math.min(dataset.rows.length - 1, to)));
+	/**
+	 * Which way the run is moving, so the arriving card knows which edge of the
+	 * window to come in from. Zero on the way in, so opening the lightbox does
+	 * not deal a card at you from a side you did not choose.
+	 *
+	 * Set before `onactivate`, which is what changes `index` and re-renders the
+	 * card: the animation reads this on the way past, so it has to be true by
+	 * then. A clamped step — next on the last card — leaves it alone, and there
+	 * is nothing to animate anyway because the index did not move.
+	 */
+	let travel = $state(0);
+
+	function step(to: number) {
+		const next = Math.max(0, Math.min(dataset.rows.length - 1, to));
+		if (next === index) return;
+		travel = next > index ? 1 : -1;
+		onactivate(next);
+	}
 
 
 	/**
@@ -300,12 +317,16 @@
 	<button class="plain close" onclick={onclose} title="Close" aria-label="Close">
 		<Icon name="close" size={22} />
 	</button>
+	<!-- Keyed on the index so the node is rebuilt on every step, which is what
+	     re-runs the deal animation below — a CSS animation on a node that merely
+	     had its props changed would never play a second time. -->
+	{#key index}
 	<div
 		class="full-card"
 		role="presentation"
 		onclick={(e) => e.stopPropagation()}
 		style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) *
-			scale}px;transform:perspective(1100px) rotateX({tilt.x}deg) rotateY({tilt.y}deg) rotateZ({tilt.z}deg)"
+			scale}px;--travel:{travel};transform:perspective(1100px) rotateX({tilt.x}deg) rotateY({tilt.y}deg) rotateZ({tilt.z}deg)"
 	>
 		<span class="scaler" style="transform:scale({scale})">
 			<Card
@@ -326,6 +347,7 @@
 			<span class="foil" aria-hidden="true" style="--sheen:{sheen}%"></span>
 		{/if}
 	</div>
+	{/key}
 	<!-- Under the card with the count between them: the two arrows and the
 	     number are one control, and either side of the page they were a
 	     screen-width apart from what they act on. -->
@@ -410,7 +432,31 @@
 		/* The lean is drawn, not laid out: the card keeps the pixels it was given
 		   whichever way it is facing, so nothing under it moves. */
 		transform-origin: center;
-		will-change: transform;
+		will-change: transform, translate;
+	}
+
+	/* Stepping the run deals the next card in from off the screen.
+
+	   On `translate`, not on `transform`: the tilt owns `transform` and rewrites
+	   it every frame, so an animation there would fight the gyroscope for the
+	   same property. The individual transform properties compose with it — the
+	   used matrix is translate × transform — so the card arrives already leaning
+	   whichever way the phone is held.
+
+	   `--travel` is 0 on the way in, which makes the animation a move from
+	   nowhere to nowhere: opening the lightbox should not deal a card at you
+	   from a side you did not choose. 110vw guarantees it starts past the edge of
+	   the window whatever the card's own width. */
+	@media (prefers-reduced-motion: no-preference) {
+		.full-card {
+			animation: deal 300ms cubic-bezier(0.22, 0.61, 0.36, 1);
+		}
+	}
+
+	@keyframes deal {
+		from {
+			translate: calc(var(--travel, 0) * 110vw);
+		}
 	}
 
 	/* Foil.

@@ -525,6 +525,20 @@ nothing under it moves, `prefers-reduced-motion` and a fine pointer both switch
 it off entirely, and the first reading is the baseline so however the phone is
 being held when it opens is level.
 
+**Stepping the run deals the next card in from off the screen.** On the
+`translate` property, not on `transform`: the tilt owns `transform` and rewrites
+it every frame, so an animation there would be fighting the gyroscope for the
+same property. The individual transform properties compose with it — the used
+matrix is translate × transform — so the card arrives already leaning whichever
+way the phone is held.
+
+The card is keyed on the index, because a CSS animation on a node that merely
+had its props changed never plays a second time; rebuilding it is what re-runs
+the deal. `--travel` is 0 until the first step, which makes the animation a move
+from nowhere to nowhere — opening the lightbox should not deal a card at you
+from a side you did not choose — and a step clamped at either end of the run
+leaves it alone, because nothing moved.
+
 **Two things drive the tilt, and they add.** A gyroscope where there is one, and
 a drag — the same gesture on a desk that turning the phone is in the hand, and
 the only one available on a machine with no sensors in it. The settle loop runs
