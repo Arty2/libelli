@@ -938,15 +938,16 @@
 
 				{#if interactive && isSelected(box) && soleSelection}
 					{#if editable(box)}
-						<!-- Turning happens about the pivot, so the handle for it is the
-						     pivot: a mark on the top edge would say nothing about where
-						     the box is actually going to turn, and the pivot moves. One
-						     mark, two gestures — drag to turn, Alt-drag to move the
-						     point turned about — with the X and Y in the bar as the
-						     precise way to place it for anyone who never finds the
-						     modifier. Drawn on an upright box too, unlike the old pivot,
-						     because it is the rotation control now and has to be there
-						     before there is any rotation to show. -->
+						<!-- Turning happens about the pivot, so the controls for it live
+						     on the pivot: a mark on the top edge would say nothing about
+						     where the box is actually going to turn, and the pivot moves.
+						     Two marks rather than one gesture with a modifier, because
+						     they do two different things and a modifier nobody finds is a
+						     feature nobody has — the crosshair moves the point turned
+						     about, the knob on the arm below it swings the box. The X and
+						     Y in the bar place the pivot exactly. Both are drawn on an
+						     upright box, because the lever is the rotation control and
+						     has to be there before there is any rotation to show. -->
 						<span
 							class="pivot"
 							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"

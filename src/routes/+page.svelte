@@ -1344,9 +1344,12 @@ em { color: #b42318 }`;
 			<strong>Bounds</strong> off is free movement, because an area should never latch onto a guide that is not drawn.
 		</p>
 		<p>
-			<strong>Rotation</strong> turns an area about a point you can drag — the crosshair on it, or the <strong>X</strong>
-			and <strong>Y</strong> beside the rotation, as a percentage of the area's own size. A turned area still occupies
-			the space it would have upright, so one rotation does not shuffle the card.
+			<strong>Rotation</strong> has two marks on a selected area, because they do two different things. The
+			<strong>crosshair</strong> is the pivot: drag it to move the point the area turns about. The <strong>knob</strong>
+			on the arm below it is the lever: swing it to turn the area, holding <strong>Shift</strong> for 15° steps. The
+			<strong>X</strong> and <strong>Y</strong> beside the rotation place the pivot exactly, as a percentage of the
+			area's own size. A turned area still occupies the space it would have upright, so one rotation does not shuffle
+			the card.
 		</p>
 		<p>
 			Stacking order is the column beside the page: areas paint in the order they are listed, so <em>Bring to Front</em>
@@ -1380,8 +1383,8 @@ em { color: #b42318 }`;
 
 		<h3>The sheet</h3>
 		<p>
-			<strong>Size</strong> has A6 to A3 and the card sizes at their real dimensions; picking one keeps the orientation
-			you are in, and <strong>⇄</strong> turns the page over. Neither moves anything on the card — coordinates are
+			<strong>Size</strong> has A6, A5, A4, A3 and a 4 × 6 inch postcard; picking one keeps the orientation you are
+			in, and <strong>⇄</strong> turns the page over. Neither moves anything on the card — coordinates are
 			measured from the trim edge, so trying a design the other way round costs nothing. Bleed is an outset on the
 			sheet, never an offset on the content.
 		</p>
