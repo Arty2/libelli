@@ -32,6 +32,12 @@
 		/** the area whose words are being typed straight into the card, if any */
 		editingId?: string | null;
 		/**
+		 * Areas to flash. A move you did not watch happen — an area brought back
+		 * onto the sheet from off it — needs to say which areas moved, or the
+		 * card simply looks different and you have to work out why.
+		 */
+		flashIds?: string[];
+		/**
 		 * The template's background image, already resolved to something a
 		 * `background-image` can use. Resolved by the app rather than here,
 		 * because reading it back out of storage is asynchronous and this
@@ -69,6 +75,7 @@
 		background = null,
 		pageCount = null,
 		editingId = null,
+		flashIds = [],
 		onselect,
 		onchange,
 		onmenu,
@@ -789,6 +796,7 @@
 				class:no-padding={!box.padding}
 				class:grouped={!!box.group}
 				class:font-loading={interactive && waitingFor(box)}
+				class:flashing={flashIds.includes(box.id)}
 				style={boxStyle(box)}
 				data-box-id={box.id}
 				use:measure={box.id}
@@ -1503,6 +1511,38 @@
 		.badge:hover {
 			border-color: #767676;
 			color: #333;
+		}
+
+		/* A selected area's badges take the colour of its own bounds. The column
+		   of them sits a few pixels off the edge of the box they annotate, and in
+		   a flat grey they read as belonging to the card rather than to the area —
+		   which matters most when several areas are close enough for their badges
+		   to be nearer a neighbour's edge than their own. */
+		.box.selected .badge {
+			border-color: var(--bounds-colour, #2563eb);
+			color: var(--bounds-colour, #2563eb);
+		}
+
+		/* Something moved that you were not watching. Long enough to catch out of
+		   the corner of the eye, short enough not to become part of the drawing —
+		   and off entirely for anyone who has asked for less motion, who gets the
+		   status line saying what happened instead. */
+		@media (prefers-reduced-motion: no-preference) {
+			.box.flashing {
+				animation: found 900ms ease-out;
+			}
+		}
+
+		@keyframes found {
+			0%,
+			70% {
+				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) rgba(37, 99, 235, 0.55);
+				background-color: rgba(37, 99, 235, 0.18);
+			}
+			100% {
+				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) rgba(37, 99, 235, 0);
+				background-color: rgba(37, 99, 235, 0);
+			}
 		}
 
 		/* A badge that is also a button. Reset rather than restyled: it inherits

@@ -482,7 +482,7 @@
 											? sortedBy.direction === 'asc'
 												? 'sort-asc'
 												: 'sort-desc'
-											: 'sort'}
+											: 'activity'}
 										size={14}
 									/>
 								</button>
@@ -796,13 +796,39 @@
 
 	/* As narrow as a two-digit number and its tick: every millimetre here is a
 	   millimetre the actual data does not get. */
+	/* Frozen against a sideways scroll: the row numbers are how you know which
+	   card a cell belongs to, and they used to slide off the left edge the moment
+	   the table was wide enough to scroll — which is exactly when they are needed.
+	   A background is required, or the cells travelling underneath show through. */
 	.gutter {
-		position: relative;
+		position: sticky;
+		left: 0;
+		z-index: 2;
 		width: 1%;
 		white-space: nowrap;
-		padding: 3px 4px;
+		padding: 5px 6px 3px;
 		color: #767676;
 		text-align: center;
+		background: #fff;
+		box-shadow: inset -1px 0 0 #e6e6e6;
+	}
+
+	/* Sticky both ways, so the corner cell stays put in either scroll. Above the
+	   header's own z-index 3, or the first column's header slides under it. */
+	thead th.gutter {
+		z-index: 4;
+		background: #fafafa;
+	}
+
+	/* The active and chosen tints have to be repainted here: the gutter carries
+	   its own opaque background now, so the row's would not show through it. */
+	tr.active .gutter {
+		background: #eff5ff;
+	}
+
+	tr.chosen .gutter {
+		background: #dbe7fd;
+		color: #1d4ed8;
 	}
 
 	.gutter .number {
@@ -838,11 +864,8 @@
 	/* Two different things, and they are usually the same row: `active` is the
 	   card on the page, `chosen` is a row waiting to be acted on. The chosen
 	   marker is on the gutter alone, so a set of chosen rows does not repaint
-	   half the table. */
-	tr.chosen .gutter {
-		background: #dbe7fd;
-		color: #1d4ed8;
-	}
+	   half the table — see the sticky-gutter rules above, which is where both
+	   tints have to be painted. */
 
 	/* Which cells fill the area selected on the page. Quiet — it is an answer to
 	   "where does this come from", not a selection of its own. */

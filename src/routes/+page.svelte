@@ -111,6 +111,22 @@
 	let picking = $state(false);
 	/** The look of an area, lifted off one and waiting to be put onto another. */
 	let styleClipboard = $state<BoxStyle | null>(null);
+	/**
+	 * Areas to flash on the card. Bringing a stray area back moves something you
+	 * were by definition not looking at — it was off the sheet — so the card has
+	 * to say which one arrived, or it simply looks different.
+	 */
+	let flashIds = $state<string[]>([]);
+	let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function flash(ids: string[]) {
+		flashIds = ids;
+		if (flashTimer) clearTimeout(flashTimer);
+		// Must outlast the animation in Card, or the class is pulled mid-flash.
+		flashTimer = setTimeout(() => (flashIds = []), 1000);
+	}
+	/** Reset replaces the design, so it asks first — as deleting the data does. */
+	let resetting = $state(false);
 	let printing = $state(false);
 	let mappingPrompt = $state(false);
 	let missingFonts = $state<FontRef[]>([]);
@@ -543,6 +559,7 @@ em { color: #b42318 }`;
 	 * they are — this is for starting the design again, not for clearing out.
 	 */
 	function resetTemplate() {
+		resetting = false;
 		describe('Reset the template');
 		template = starterTemplate();
 		selectedIds = [];
@@ -635,7 +652,9 @@ em { color: #b42318 }`;
 		const boxes = bringOnPage(template.boxes, strays.map((b) => b.id), template.page);
 		if (boxes === template.boxes) return;
 		describe(`Bring ${rescued} area${rescued === 1 ? '' : 's'} back on`);
+		const moved = strays.map((b) => b.id);
 		template = { ...template, boxes };
+		flash(moved);
 		notify(
 			rescued === 1
 				? 'One area was off the sheet and is back on it. Ctrl/Cmd+Z puts it back.'
@@ -687,13 +706,23 @@ em { color: #b42318 }`;
 	 * quietly break an anchor chain.
 	 */
 	function nudgeBox(dx: number, dy: number) {
-		const box = selected;
-		if (!box || template.locked) return;
+		if (template.locked) return;
+		// Every chosen area, not just a lone one. The arrows and the pad both come
+		// through here, and both used to do nothing at all with two areas picked
+		// up — `selected` is null unless the selection is exactly one, so the
+		// guard above it silently swallowed the press.
+		//
+		// Snapshotted first: `updateBox` replaces the template on every call, and
+		// `selectedBoxes` is derived from it.
+		const targets = selectedBoxes.filter((b) => !b.locked).map((b) => $state.snapshot(b) as Box);
+		if (!targets.length) return;
 		// Millimetres: the editor has no pixels, and a status line that invented
 		// them would be describing a different app.
 		describe(`Move ${Math.max(Math.abs(dx), Math.abs(dy))}mm`);
-		const next = nudge(box, dx, dy);
-		if (next) updateBox(next);
+		for (const box of targets) {
+			const next = nudge(box, dx, dy);
+			if (next) updateBox(next);
+		}
 	}
 
 	/** Move every chosen box one step along an axis of alignment. */
@@ -792,9 +821,10 @@ em { color: #b42318 }`;
 			redo();
 			return;
 		}
-		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu)) {
+		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu || resetting)) {
 			helpOpen = false;
 			cssOpen = false;
+			resetting = false;
 			boxMenu = null;
 			return;
 		}
@@ -1106,7 +1136,7 @@ em { color: #b42318 }`;
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
-			onresettemplate={resetTemplate}
+			onresettemplate={() => (resetting = true)}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
 			onnotice={notify}
@@ -1129,7 +1159,7 @@ em { color: #b42318 }`;
 			onmappingchange={(m) => (mapping = m)}
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
-			onresettemplate={resetTemplate}
+			onresettemplate={() => (resetting = true)}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
 			onnotice={notify}
@@ -1214,6 +1244,7 @@ em { color: #b42318 }`;
 			{editingId}
 			strayIds={strays.map((b) => b.id)}
 			{picking}
+			{flashIds}
 			onstoppicking={() => (picking = false)}
 			onedit={(id) => (editingId = id)}
 			ontext={setBoxText}
@@ -1287,6 +1318,26 @@ em { color: #b42318 }`;
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button class="primary" onclick={() => (cssOpen = false)}>Done</button>
+		</div>
+	</div>
+{/if}
+
+<!-- Reset replaces the design with the starter card. Undo reaches it — one
+     snapshot carries template and data together — but it is still the whole
+     page going at once, and the table's own Delete asks for less than that.
+     A count rather than a paragraph, the same shape as that dialog. -->
+{#if resetting}
+	<div class="modal-backdrop" role="presentation" onclick={() => (resetting = false)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the template?">
+		<h2>Reset the template?</h2>
+		<p>
+			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the starter card. Your rows are
+			not touched.
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button use:focusOnOpen onclick={() => (resetting = false)}>Cancel</button>
+			<button class="danger-solid" onclick={resetTemplate}>Reset Template</button>
 		</div>
 	</div>
 {/if}
@@ -1437,18 +1488,18 @@ em { color: #b42318 }`;
 		<h3>Keys</h3>
 		<dl class="keys">
 			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
-			<dt>Ctrl/Cmd + Shift + Z, Ctrl/Cmd + Y</dt><dd>Redo</dd>
+			<dt>Ctrl/Cmd + Shift + Z<span>Ctrl/Cmd + Y</span></dt><dd>Redo</dd>
 			<dt>Enter</dt><dd>Type into the selected area</dd>
 			<dt>Esc</dt><dd>Stop typing, leave Select Multiple, deselect, or close what is open</dd>
 			<dt>Arrows</dt><dd>Nudge the selection by 1mm</dd>
 			<dt>Shift + Arrows</dt><dd>Nudge by 5mm</dd>
 			<dt>Alt + Shift + Arrows</dt><dd>Nudge by 10mm</dd>
-			<dt>Arrows, PageUp / PageDown</dt><dd>Step through the cards, with nothing selected</dd>
+			<dt>Arrows<span>PageUp / PageDown</span></dt><dd>Step through the cards, with nothing selected</dd>
 			<dt>← / →</dt><dd>Step through the cards, with one open full screen</dd>
-			<dt>Shift / Ctrl / ⌘ + click</dt><dd>Add an area to the selection, or drop it</dd>
+			<dt>Shift + click<span>Ctrl / ⌘ + click</span></dt><dd>Add an area to the selection, or drop it</dd>
 			<dt>Ctrl/Cmd + A</dt><dd>Select every area</dd>
 			<dt>Ctrl/Cmd + D</dt><dd>Duplicate the selected areas</dd>
-			<dt>Delete / Backspace</dt><dd>Remove the selected areas</dd>
+			<dt>Delete<span>Backspace</span></dt><dd>Remove the selected areas</dd>
 			<dt>Ctrl/Cmd + C</dt><dd>Copy the selected area's words</dd>
 			<dt>Ctrl/Cmd + V</dt><dd>Paste plain text as a new area</dd>
 			<dt>Ctrl/Cmd + Shift + C</dt><dd>Copy the area's style</dd>
@@ -1456,13 +1507,13 @@ em { color: #b42318 }`;
 			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
 			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
 			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page</dd>
-			<dt>Ctrl/Cmd + + / −</dt><dd>Zoom the page in or out</dd>
+			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
-			<dt>Ctrl/Cmd + ; or H</dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + ' or #</dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + ;<span>Ctrl/Cmd + H</span></dt><dd>Bounds on or off</dd>
+			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off</dd>
 			<dt>Ctrl/Cmd + P</dt><dd>Export — press again from that screen to print</dd>
 			<dt>Ctrl/Cmd + Shift + S</dt><dd>Export, for the fingers that reach for that instead</dd>
-			<dt>? or /</dt><dd>This panel</dd>
+			<dt>?<span>/</span></dt><dd>This panel</dd>
 		</dl>
 
 
@@ -1794,6 +1845,33 @@ em { color: #b42318 }`;
 		white-space: nowrap;
 	}
 
+	/* A second way of pressing the same thing goes under the first rather than
+	   beside it. The key column is `max-content`, so one row carrying two chords
+	   set the width of all thirty of them — on a phone that left the descriptions
+	   a few words wide. */
+	.keys dt span {
+		display: block;
+		color: #767676;
+	}
+
+	/* Breaking the alternatives apart takes the key column from four chords wide
+	   to one, which is most of the fix; on a phone even one chord is half the
+	   dialog, so the pair stacks instead and the description gets the width. */
+	@media (max-width: 560px) {
+		.keys {
+			grid-template-columns: 1fr;
+			gap: 0;
+		}
+
+		.keys dt {
+			margin-top: 8px;
+		}
+
+		.keys dt:first-of-type {
+			margin-top: 0;
+		}
+	}
+
 	.keys dd {
 		margin: 0;
 		color: #333;
@@ -1826,11 +1904,21 @@ em { color: #b42318 }`;
 		text-align: center;
 	}
 
+	.modal.narrow {
+		width: min(420px, calc(100vw - 32px));
+	}
+
 	.modal-actions {
 		display: flex;
 		align-items: center;
 		gap: 10px;
 		margin-top: 14px;
+	}
+
+	button.danger-solid {
+		background: #b42318;
+		border-color: #b42318;
+		color: #fff;
 	}
 
 	@media (max-width: 900px) {

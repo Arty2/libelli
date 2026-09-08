@@ -73,9 +73,28 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 	otf: 'font/otf'
 };
 
+/**
+ * How long a font fetch gets before the export gives up on it.
+ *
+ * Every fetch here is already wrapped in a try/catch that falls back to the
+ * system stack, which covers a request that is refused — but not one that
+ * simply never answers. A captive portal, a filtering proxy or a flaky
+ * connection leaves the promise pending forever, and with it the export: the
+ * button sits on "Exporting 1/4…" with no way out but a reload, which costs the
+ * undo history. Ten seconds is long enough for a slow connection to deliver a
+ * font file and short enough that nobody thinks the app has died.
+ */
+const FONT_FETCH_TIMEOUT = 10_000;
+
+/** `AbortSignal.timeout` where there is one; no timeout is better than no fetch. */
+const deadline = () =>
+	typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+		? { signal: AbortSignal.timeout(FONT_FETCH_TIMEOUT) }
+		: {};
+
 async function fetchAsDataUrl(url: string): Promise<string | null> {
 	try {
-		const response = await fetch(url, { mode: 'cors' });
+		const response = await fetch(url, { mode: 'cors', ...deadline() });
 		if (!response.ok) return null;
 		const extension = new URL(url, 'https://localhost/').pathname.split('.').pop()?.toLowerCase() ?? '';
 		const mime = MIME_BY_EXTENSION[extension] ?? response.headers.get('content-type') ?? 'font/woff2';
@@ -100,7 +119,7 @@ async function fetchedFaces(): Promise<{ css: string; families: Set<string> }> {
 	for (const link of links) {
 		let css: string;
 		try {
-			const response = await fetch(link.href, { mode: 'cors' });
+			const response = await fetch(link.href, { mode: 'cors', ...deadline() });
 			if (!response.ok) continue;
 			css = await response.text();
 		} catch {

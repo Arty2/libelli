@@ -746,12 +746,12 @@
 		     are two answers to one question and belong on one line. -->
 		<span class="group" role="group" aria-label="Position">
 			<label class="field"><span>X</span>
-				<input class="n-3" type="number" step="0.5" value={selected.x} disabled={boxFrozen} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
+				<input class="n-4" type="number" step="0.5" value={selected.x} disabled={boxFrozen} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
 				<span class="unit">mm</span>
 			</label>
 			<label class="field"><span>Y</span>
 				<input
-					class="n-3"
+					class="n-4"
 					type="number"
 					step="0.5"
 					value={selected.y}
@@ -791,11 +791,11 @@
 		     push past them, and whether an empty one shows at all. -->
 		<span class="group" role="group" aria-label="Size">
 			<label class="field"><span>W</span>
-				<input class="n-3" type="number" step="0.5" value={selected.w} disabled={boxFrozen} onchange={(e) => patch({ w: numeric(e, selected.w) })} />
+				<input class="n-4" type="number" step="0.5" value={selected.w} disabled={boxFrozen} onchange={(e) => patch({ w: numeric(e, selected.w) })} />
 				<span class="unit">mm</span>
 			</label>
 			<label class="field"><span>H</span>
-				<input class="n-3" type="number" step="0.5" value={selected.h} disabled={boxFrozen} onchange={(e) => patch({ h: numeric(e, selected.h) })} />
+				<input class="n-4" type="number" step="0.5" value={selected.h} disabled={boxFrozen} onchange={(e) => patch({ h: numeric(e, selected.h) })} />
 				<span class="unit">mm</span>
 			</label>
 			<label class="field">

@@ -324,6 +324,24 @@ reason, rather than hung off the sheet on a negative offset: on a phone the stag
 has eight pixels of padding, and anything overhanging it is scrolled off the top
 with no way to reach it.
 
+**The stage is two elements: a frame that never scrolls and a viewport that
+does.** Undo, the view toggles, the zoom and the pager were absolutely
+positioned inside the scroller, so at any zoom past Fit they slid away with the
+page — a tool you have to scroll back to find is a tool that is not to hand. The
+frame holds every control; the viewport holds only the page. The pager's band is
+real bottom padding on the viewport rather than a number taken off the fitted
+scale, because the page is centred in what is left: subtracting it from the
+scale alone centred the sheet across the band and parked half of it under the
+count.
+
+**An `<svg>` sized only by `inset` is 300 × 150.** The trim edge was positioned
+with all four offsets and no width or height, which for a *replaced* element
+means `width: auto` resolves to the intrinsic size and the opposite offset is
+ignored — so it was drawn 300 × 150 at every zoom and only looked right by
+accident near 100%. Every screen-only SVG on the card sets `width: 100%; height:
+100%` for this reason; this one is given explicit pixels because it is inset
+from a parent that is the bleed rectangle, not the trim.
+
 **`fitScale` is a value, not a branch inside `scale`.** The zoom menu has to be
 able to say "Fit — 43%" while the page sits at 200%; reading the current scale
 there meant the Fit line renamed itself to whatever you had just zoomed to, and
@@ -334,6 +352,16 @@ a sibling of the scaled card, so nothing *inside* the card can paint over it —
 and a trim edge hidden under a gridline is a trim edge you cannot follow. It is a
 solid half-pixel SVG stroke, the same weight as the grid: a dashed whole-pixel
 line was the loudest mark on a page that already has dashed bounds on every box.
+
+**The nudge pad is drawn only when it could do something.** A locked area does
+not move, and a pad whose every press is refused reads as a broken control
+rather than as a locked area — the padlock on the area and the Locked band over
+the page are what say why. An anchored area has no vertical freedom to give it
+either: its top is read off another area's bottom, so the two vertical keys wear
+the same link the area wears at its corner and are disabled, with the Gap field
+in the bar as the way to change the millimetres between them. The trade-off is
+that adjusting a gap on a touchscreen now means the bar; a pad key that silently
+changed a number the pad does not show was the worse of the two.
 
 **The nudge pad can be picked up.** It parks over the bottom-right corner of the
 page, which on a phone is exactly the corner of the card you reached for it to
@@ -394,6 +422,12 @@ button's `title`, the Help dialog and the README rather than in the bar.
 the active row into view with `block: 'nearest'`, which leaves a row already on
 screen exactly where it is. Focus stays on the arrow being pressed: moving it to
 the row would break the second press.
+
+**The row gutter is sticky in both axes.** The numbers are how you know which
+card a cell belongs to, and they slid off the left edge the moment the table was
+wide enough to scroll — which is exactly when they are needed. Being sticky
+means carrying an opaque background, so the active and chosen tints have to be
+repainted on the gutter itself rather than inherited from the row.
 
 **A row number is where the row came from, not where it is sitting.** Sorting
 really reorders the data, so numbering by position meant the labels stayed
@@ -464,6 +498,15 @@ changes between builds, so a cached copy of it names the *previous* build's
 hashed assets, and activate has just binned the cache those lived in.
 
 ## `src/lib/png.ts`
+
+**A fetch that is refused and a fetch that never answers are different
+failures.** Both font fetches were wrapped in a try/catch that falls back to the
+system stack, which covers the first and not the second: a captive portal or a
+filtering proxy leaves the promise pending forever, and with it the whole export
+— the button sits on "Exporting 1/4…" with no way out but a reload, which costs
+the undo history. They carry an `AbortSignal.timeout` now, so the documented
+behaviour (the family stays in the fallback stack and the export says which)
+is what actually happens.
 
 **The PNG export is the one thing that fetches.** `png.ts` inlines a Google face
 by fetching the stylesheet the page already loaded and the files it names.

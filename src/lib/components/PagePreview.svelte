@@ -64,6 +64,8 @@
 		ontext?: (box: Box, value: string) => void;
 		/** bring every area that has wandered off the sheet back onto it */
 		onrescue?: () => void;
+		/** areas to flash, so a move you did not watch happen is still visible */
+		flashIds?: string[];
 		/** leave Select Multiple */
 		onstoppicking?: () => void;
 	}
@@ -110,7 +112,8 @@
 		onedit,
 		ontext,
 		onrescue,
-		onstoppicking
+		onstoppicking,
+		flashIds = []
 	}: Props = $props();
 
 	const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2];
@@ -139,6 +142,26 @@
 	/** the step the pad moves by, cycled 1 -> 5 -> 10; the keyboard has modifiers */
 	let padStep = $state(1);
 	const PAD_STEPS = [1, GRID_MINOR, 10];
+
+	/**
+	 * Nothing to nudge, so no pad. A locked area does not move, and a pad whose
+	 * every press is refused is worse than no pad — it reads as a broken control
+	 * rather than as a locked area. The lock badge on the area, and the Locked
+	 * band over a locked page, are what say why.
+	 */
+	const padUsable = $derived(
+		selectedBoxes.length > 0 && !template.locked && !selectedBoxes.every((b) => b.locked)
+	);
+
+	/**
+	 * An anchored area has no vertical freedom to give the pad: its top is read
+	 * off another area's bottom, and the millimetres between them are the Gap
+	 * field in the bar. The two vertical keys say so with the same link the area
+	 * wears at its corner, rather than looking pressable and doing nothing.
+	 */
+	const verticalTied = $derived(
+		selectedBoxes.length > 0 && selectedBoxes.every((b) => !!b.anchor)
+	);
 
 	/** Paint order is array order, so "front" is last in the list, not a z-index. */
 	const ARRANGEMENTS: Array<{ value: Arrange; icon: string; label: string }> = [
@@ -176,8 +199,11 @@
 		// stage is the whole screen, so every millimetre of padding is a
 		// millimetre of card you cannot see.
 		const pad = hostSize.w < 560 ? 16 : 48;
-		// Everything sharing the page's column takes its height off the sheet.
-		const under = (pagerHeight ? pagerHeight + PAGE_GAP : 0) + (lockHeight ? lockHeight + PAGE_GAP : 0);
+		// The lock band shares the page's column, so its height comes off the
+		// sheet. The pager does not any more — it is fixed to the stage and its
+		// band is real bottom padding on the viewport, which `contentRect` has
+		// already taken out of `hostSize.h`.
+		const under = lockHeight ? lockHeight + PAGE_GAP : 0;
 		const fit = Math.min(
 			(hostSize.w - pad) / mmToPx(outerW),
 			(hostSize.h - pad - under) / mmToPx(outerH)
@@ -432,10 +458,21 @@
 
 <svelte:window onkeydown={onKeydown} />
 
+<!--
+	The stage is two elements: an outer one that does not scroll and holds every
+	control, and an inner viewport that scrolls and holds only the page.
+
+	They used to be one, which meant undo, the view toggles, the zoom and the
+	pager were absolutely positioned inside the scroller and slid away with the
+	page the moment it was too big to fit. A tool you have to scroll back to find
+	is a tool that is not to hand.
+-->
+<div class="stage">
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
-	class="stage"
+	class="viewport"
 	bind:this={host}
+	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px"
 	onpointerdown={(e) => {
 		onPinchDown(e);
 			// Bare paper counts as empty space, not just the grey around the sheet:
@@ -479,6 +516,7 @@
 				interactive={true}
 				pageCount={rowCount}
 				{editingId}
+				{flashIds}
 				{selectedIds}
 				{onselect}
 				{onchange}
@@ -516,19 +554,31 @@
 			     Solid, and the same half-pixel hairline the grid uses. It used to be
 			     dashed and a whole pixel, which made it the loudest line on a page
 			     that already has dashed bounds on every box. -->
+			<!-- Sized in pixels rather than by `inset` alone. An `<svg>` is a replaced
+			     element: with `width: auto` it takes its intrinsic 300 × 150 and
+			     ignores the opposite offset, so the trim edge was drawn 300 × 150 at
+			     every zoom and only looked right by accident near 100%. -->
 			<svg
 				class="trim-line"
 				aria-hidden="true"
-				style="inset:{mmToPx(template.bleed.amount) * scale}px"
+				style="left:{mmToPx(template.bleed.amount) * scale}px;top:{mmToPx(template.bleed.amount) *
+					scale}px;width:{mmToPx(template.page.w) * scale}px;height:{mmToPx(template.page.h) * scale}px"
 			><rect width="100%" height="100%" /></svg>
 		{/if}
+	</div>
+
+	</div>
 	</div>
 
 	<!-- Which card you are looking at, and how to get to the next one. The same
 	     shape as the lightbox's, because it is the same question — and the count
 	     between the arrows is the way into it: the number naming the card you are
 	     looking at is the obvious thing to press to see it properly. A lone card
-	     keeps the door and loses the arrows, which would have nowhere to go. -->
+	     keeps the door and loses the arrows, which would have nowhere to go.
+
+	     Outside the viewport, so it stays under the sheet at every zoom; the
+	     band it occupies is bottom padding on the viewport, which is what keeps
+	     the page clear of it. -->
 	{#if rowCount > 0}
 		<div
 			class="pager"
@@ -562,7 +612,6 @@
 			{/if}
 		</div>
 	{/if}
-	</div>
 
 	<!-- Editing the page happens at the page, not in a bar at the top of the
 	     window: undoing is on one side, adding a box on the other, and the view
@@ -609,7 +658,10 @@
 		{/if}
 	</div>
 
-	<div class="corner top right">
+	<!-- A column, not a row: Area is the button that is always there, and the two
+	     that come and go belong under it rather than pushing it sideways every
+	     time one of them appears. -->
+	<div class="corner top right stacked">
 		<button class="square" onclick={onaddbox} disabled={!!template.locked} title="Add an area to the page">
 			<Icon name="text" size={14} /><span class="sr-only">Area</span>
 		</button>
@@ -675,9 +727,10 @@
 		</select>
 	</label>
 
-	{#if selectedIds.length}
+	{#if padUsable}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
-		     hopeless. Shown only where there is no keyboard to fall back on. -->
+		     hopeless. Shown only where there is no keyboard to fall back on, and
+		     only while there is something it could actually move. -->
 		<div
 			class="pad"
 			class:moving={!!padDrag}
@@ -688,7 +741,16 @@
 			onpointercancel={stopNudge}
 			onpointerleave={stopNudge}
 		>
-			<button class="up" title="Up {padStep}mm" onpointerdown={() => startNudge(0, -padStep)}><Icon name="caret-up" size={32} /></button>
+			<button
+				class="up"
+				disabled={verticalTied}
+				title={verticalTied
+					? 'Tied to another area — its top follows that area\u2019s bottom. Change the Gap in the bar.'
+					: `Up ${padStep}mm`}
+				onpointerdown={() => startNudge(0, -padStep)}
+			>
+				<Icon name={verticalTied ? 'link' : 'caret-up'} size={verticalTied ? 15 : 32} />
+			</button>
 			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={32} /></button>
 			<!-- The middle button carries the second gesture, because the arrows
 			     already use press-and-hold to repeat: hold this one and the pad
@@ -706,16 +768,35 @@
 				}}>{padStep}</button
 			>
 			<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={32} /></button>
-			<button class="down" title="Down {padStep}mm" onpointerdown={() => startNudge(0, padStep)}><Icon name="caret-down" size={32} /></button>
+			<button
+				class="down"
+				disabled={verticalTied}
+				title={verticalTied
+					? 'Tied to another area — its top follows that area\u2019s bottom. Change the Gap in the bar.'
+					: `Down ${padStep}mm`}
+				onpointerdown={() => startNudge(0, padStep)}
+			>
+				<Icon name={verticalTied ? 'link' : 'caret-down'} size={verticalTied ? 15 : 32} />
+			</button>
 		</div>
 	{/if}
 </div>
 
 <style>
+	/* The frame: it holds every control and never scrolls, so nothing on it can
+	   slide away with the page. */
 	.stage {
 		position: relative;
 		flex: 1;
 		min-width: 0;
+		overflow: hidden;
+		background: #eee;
+	}
+
+	/* And the scroller inside it, which holds only the page. */
+	.viewport {
+		position: absolute;
+		inset: 0;
 		display: grid;
 		place-items: center;
 		overflow: auto;
@@ -727,11 +808,14 @@
 		   or not it is used breaks the cycle at its one causal edge, rather than
 		   damping the oscillation afterwards. */
 		scrollbar-gutter: stable;
-		padding: 24px;
-		background: #eee;
+		/* The pager's band is real padding rather than a number subtracted from
+		   the fitted scale, because the page is centred in what is left: taking it
+		   off the scale alone would have centred the sheet across the band and
+		   parked half of it under the count. */
+		padding: 24px 24px calc(24px + var(--pager-band, 0px));
 	}
 
-	.stage:focus-visible {
+	.viewport:focus-visible {
 		outline: 2px solid #2563eb;
 		outline-offset: -2px;
 	}
@@ -754,11 +838,26 @@
 		background: #fff;
 	}
 
+	/* Fixed to the stage, under the sheet, whatever the page is doing. */
 	.pager {
-		display: inline-flex;
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 10px;
+		display: flex;
+		justify-content: center;
 		align-items: center;
 		gap: 10px;
 		color: #555;
+		/* The row spans the stage so the count stays centred on the page rather
+		   than on whatever is left between the two bottom corners; only the
+		   controls in it are hit-testable, so it does not swallow clicks on the
+		   ground either side. */
+		pointer-events: none;
+	}
+
+	.pager > * {
+		pointer-events: auto;
 	}
 
 	/* A control, not a readout, so it says so on hover — but no chip and no
@@ -917,6 +1016,13 @@
 		padding: 4px;
 	}
 
+	/* Area is always there; the rescue button and the Select Multiple chip come
+	   and go, so they go under it rather than shifting it sideways. */
+	.corner.stacked {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
 	.corner button {
 		display: inline-flex;
 		align-items: center;
@@ -960,11 +1066,16 @@
 
 	/* No panel behind it: five controls over the page, not a widget parked on
 	   top of it. The buttons keep the border every other tool here has. */
+	/* One button size in this editor, and the pad now uses it: at 44px it was
+	   the biggest thing on the page and read as a widget parked on top of the
+	   card rather than as five controls beside it. The arrowheads keep the size
+	   they were drawn at — a caret glyph fills half its own box, so a 32px icon
+	   is a 16px mark and sits inside a 28px button with room to spare. */
 	.pad {
 		position: absolute;
 		display: none;
-		grid-template-columns: repeat(3, 44px);
-		grid-template-rows: repeat(3, 44px);
+		grid-template-columns: repeat(3, 28px);
+		grid-template-rows: repeat(3, 28px);
 		gap: 4px;
 	}
 
@@ -975,10 +1086,18 @@
 		border-radius: var(--radius-button);
 		background: rgba(255, 255, 255, 0.92);
 		color: #333;
-		font: 600 13px ui-sans-serif, system-ui, sans-serif;
+		font: 600 12px ui-sans-serif, system-ui, sans-serif;
 		cursor: pointer;
 		padding: 0;
 		touch-action: none;
+	}
+
+	/* A direction an anchor has spoken for. Not merely dimmed: it carries the
+	   same link the area wears at its corner, so the refusal names its reason. */
+	.pad button:disabled {
+		opacity: 0.55;
+		cursor: default;
+		color: #767676;
 	}
 
 	/* While it is being carried: the pad itself says so, because the finger is

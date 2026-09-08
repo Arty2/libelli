@@ -39,9 +39,25 @@
 	color: #555;
 }
 
-.options .field > span {
-	font-size: 11px;
+/* Uppercased here rather than in the markup, so the label a screen reader
+   announces and the title a tooltip carries stay in sentence case — and so the
+   same string can be written once and read either way. The unit beside a field
+   is excluded: `MM` and `PT` are not how anyone writes a unit, and the point of
+   setting them small and grey was that they read as an annotation rather than
+   as a second label. */
+.options .field > span:not(.unit) {
+	font-size: 10px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
 	white-space: nowrap;
+}
+
+/* A checkbox's words are its label too, and a bar where half the labels shout
+   and half do not looks broken rather than considered. */
+.options .check {
+	font-size: 10px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
 }
 
 .options .field.tight {
@@ -102,13 +118,22 @@
 	white-space: nowrap;
 }
 
+/* A field is a line under a value, not a box around it.
+
+   Thirty controls in a row, each in its own white well with its own grey
+   frame, is thirty rectangles competing with the one thing on screen that
+   matters — the card. Dropping the fill and three of the four borders leaves
+   the values themselves as the marks, with a rule under each saying "this is
+   editable". Buttons keep their frames: a button is a thing you press, and it
+   has to look like one. */
 .options input,
 .options select {
 	font: 12px ui-sans-serif, system-ui, sans-serif;
-	padding: 4px 5px;
-	border: 1px solid var(--border-control);
-	border-radius: var(--radius-input);
-	background: #fff;
+	padding: 3px 2px;
+	border: none;
+	border-bottom: 1px solid var(--border-control);
+	border-radius: 0;
+	background: transparent;
 	color: #111;
 	/* So a width below means the whole control, not the room inside it: an
 	   input is content-box by default, which made every field 12px wider
@@ -116,18 +141,41 @@
 	box-sizing: border-box;
 }
 
+.options input:hover:not(:disabled),
+.options select:hover:not(:disabled) {
+	border-bottom-color: var(--border-control-hover);
+}
+
+/* Nothing to fill in, so nothing to underline: a disabled field is a value
+   being reported rather than one being asked for. */
 .options input:disabled,
 .options select:disabled {
-	background: #f0f0f0;
+	border-bottom-color: transparent;
 	color: #999;
 }
 
-/* Sized to what goes in them, not to a grid: every rem saved here is a
-   control that stays on the same row instead of wrapping to the next. Two
-   characters covers a bleed, a margin or a quiet zone; three covers a
-   coordinate and anything with a decimal point in it. */
-.options .n-2 { width: 2.6rem; }
-.options .n-3 { width: 3.3rem; }
+/* The colour swatch is the exception — it is a sample of the colour, and a
+   sample needs an edge to be a sample rather than a smear. */
+.options input[type='color'] {
+	border: 1px solid var(--border-control);
+	border-radius: var(--radius-input);
+}
+
+/* Sized to the widest value each one actually holds, not to a grid: every rem
+   saved here is a control that stays on the same row instead of wrapping to the
+   next, and a field with room for characters that can never arrive reads as a
+   field you have failed to fill in.
+
+   The numbers are what a digit costs at 12px plus the 2px of padding either
+   side. They were all a couple of characters too wide when the fields still had
+   a frame and spin buttons to leave room for; neither is there now.
+
+     n-2  three digits   a bleed, a margin, a quiet zone, a page number
+     n-3  four           a type size or a leading — 12.5, 1.05
+     n-4  five           a coordinate or a dimension — 148, 210.5 */
+.options .n-2 { width: 1.9rem; }
+.options .n-3 { width: 2.4rem; }
+.options .n-4 { width: 2.9rem; }
 .options .w-5 { width: 4.6rem; }
 .options .w-8 { width: 8.5rem; }
 .options .colour { width: 2rem; padding: 2px; }

@@ -145,8 +145,10 @@ resize boxes directly, or type exact millimetres.
   where the card does, and the print, the PNG and the contact sheet all clip
   there. If an area ends up with no overlap with the sheet at all — dragged
   clean off it, where zooming in or a small screen would leave it out of reach —
-  a button appears under *Area* to bring every such area back on. Crossing the
-  trim does not count: that is what bleed is for.
+  a button appears under *Area* to bring every such area back on, and each one
+  flashes as it lands, because a move you were not watching happen otherwise just
+  leaves the card looking different. Crossing the trim does not count: that is
+  what bleed is for.
 - **Surface** — a fill colour, padding, a border and a corner radius, all in
   millimetres. A padding and a border each take one measurement all round, or
   one per edge behind the expander next to it; a border's style and the corner
@@ -355,15 +357,16 @@ the checklist are the same act, so they are the same screen.
 the look at what you are about to spend paper on — <kbd>Ctrl</kbd>/<kbd>⌘</kbd>
 <kbd>p</kbd> included, which is intercepted rather than left to open the
 browser's own dialog on the editor. Press it again from that screen to send the
-run. From it: **Print**, or
-**PNG** for one 300 dpi file per selected page — rendered here, with no
-library, by carrying the card into an SVG `foreignObject` and drawing that to a
-canvas. Every face is embedded: uploaded ones from this browser, and a Google
-family by fetching the stylesheet the page already loaded and the font files it
-points at. That fetch is the one exception to *the app fetches nothing*, and it
-is confined to the export, because a PNG in the wrong typeface is not the card.
-A request that is blocked or offline leaves that family in the fallback stack
-and the export says which.
+run. Choosing which pages go is at the left of that screen and **Print** and
+**PNG** are at the right, because the two are not one row of three equal things.
+From it: **Print**, or **PNG** for one 300 dpi file per selected page — rendered
+here, with no library, by carrying the card into an SVG `foreignObject` and
+drawing that to a canvas. Every face is embedded: uploaded ones from this
+browser, and a Google family by fetching the stylesheet the page already loaded
+and the font files it points at. That fetch is the one exception to *the app
+fetches nothing*, and it is confined to the export, because a PNG in the wrong
+typeface is not the card. A request that is blocked or offline leaves that
+family in the fallback stack and the export says which.
 
 The print checklist sits at the bottom of that screen, under the pages: the
 cards are what you came to look at, and the four settings are what to do once
@@ -376,7 +379,9 @@ Every page has a checkbox under it, and only the ticked ones print — untick th
 three proofs that came out wrong and reprint just those. **Select All** /
 **Select None** does the whole run, and the title says how many pages are going.
 A page keeps the number it has in the table however few of
-them go, so page 4 prints as page 4 even when it is the only one selected. The
+them go, so page 4 prints as page 4 even when it is the only one selected. A PNG
+run names its files `stem_01.png`, padded to the width of the run, so a directory
+listing comes back in print order rather than as 1, 10, 2. The
 selection is for one print: reopening the preview starts from every page again,
 because sorting or deleting a row moves the positions it was pinned to.
 
@@ -440,8 +445,14 @@ a touch screen the same job is done by the four-way pad that appears beside the
 card, with a chip cycling between 1mm, 5mm and 10mm; holding an arrow keeps it
 moving. The pad parks over the bottom-right corner of the page, which is exactly
 the corner you may have reached for it to nudge — press and hold that middle
-chip and the pad comes with your finger. Pinching zooms the page, as do the zoom
-keys above.
+chip and the pad comes with your finger. It is not drawn at all when nothing it
+could move is selected, and an area whose top comes from an anchor shows the link
+on its two vertical keys rather than an arrow that would do nothing: the
+millimetres between the two areas are the **Gap** in the bar. Pinching zooms the
+page, as do the zoom keys above.
+
+The arrow keys and the pad both move every area in the selection, not only a
+lone one.
 
 Dragging snaps in this order: switch **Grid** on and everything snaps to the 5mm
 subgrid of a 10mm grid; otherwise a box latches onto the edges and centres of
@@ -508,7 +519,14 @@ thing itself.
 - **Beside the page** — undo and redo at the top left, *+ Area* at the top
   right, with the button that rescues stray areas and the chip for Select
   Multiple appearing under it when either has something to say. Next to the
-  thing they act on, rather than in the window's toolbar.
+  thing they act on, rather than in the window's toolbar. None of it scrolls:
+  the page moves inside the stage and every control stays where you left it,
+  because a tool you have to scroll back to find is a tool that is not to hand.
+- **The fields** — a value with a rule under it rather than a box around it.
+  Thirty controls each in its own white well with its own frame is thirty
+  rectangles competing with the card; labels are set small and uppercase, units
+  stay lowercase beside the number, and buttons keep their frames because a
+  button is a thing you press.
 - **View** — in the bottom corners of the page itself, not the toolbar: grid and
   area bounds at the left (screen only, never printed), zoom at the right;
   between them, under the sheet, which card of how many you are looking at.
@@ -558,8 +576,9 @@ npm run build    # static output in ./build, deployable anywhere
   because a request failed. The four rows are a walkthrough of the app rather
   than filler; pressing and holding *Import CSV…* brings them back at any time.
 - **Reset** — puts the template back to the starter card and leaves the data,
-  the mapping and any uploaded fonts alone. It does not ask, because one undo
-  snapshot carries the template and the data together and Ctrl/Cmd+Z reaches it.
+  the mapping and any uploaded fonts alone. Undo reaches it — one snapshot
+  carries the template and the data together — but it asks first anyway, because
+  it is the whole design going at once and the table's own Delete asks for less.
 - **Components are verified by driving them** — the pure logic has unit tests;
   layout, printing and the dialogs are checked in a real browser, where the
   geometry can be read back in millimetres and the PDF counted page by page.

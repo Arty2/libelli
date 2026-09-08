@@ -2,7 +2,7 @@
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
 	import Lightbox from './Lightbox.svelte';
-	import { downloadBlob, slugify } from '$lib/download';
+	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
 	import { mmToPx } from '$lib/layout';
 	import type { Dataset, Mapping, Template } from '$lib/types';
@@ -62,7 +62,9 @@
 			for (const [i, card] of cards.entries()) {
 				const { blob, missingFonts } = await elementToPng(card, families, ratioForDpi(300));
 				for (const family of missingFonts) missing.add(family);
-				downloadBlob(`${slugify(template.name)}-${i + 1}.png`, blob);
+				// Padded to the width of the run, so a directory listing comes back
+				// in print order rather than as 1, 10, 2 — see `pageFilename`.
+				downloadBlob(pageFilename(slugify(template.name), i + 1, cards.length, 'png'), blob);
 				written += 1;
 				progress = { done: written, total: cards.length };
 			}
@@ -156,8 +158,11 @@
 				{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}
 			{/if}
 		</h2>
+		<!-- Choosing which pages go is about the sheet below; PNG and Print are what
+		     you came here to press. They sit at opposite ends so the two are not
+		     read as one row of three equal things. -->
+		<button class="choose" onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
 		<div class="header-actions">
-			<button onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
 			<button onclick={exportPng} disabled={chosen === 0 || exporting}>
 				<Icon name="download" size={15} />
 				{#if exporting}
@@ -265,7 +270,7 @@
 		top: 0;
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		gap: 12px;
 		padding: 12px 54px 12px 18px;
 		background: rgba(238, 238, 238, 0.94);
 		backdrop-filter: blur(6px);
@@ -276,6 +281,12 @@
 	h2 {
 		margin: 0;
 		font: 600 14px ui-sans-serif, system-ui, sans-serif;
+	}
+
+	/* Pushed off the title, and the actions pushed to the far end by the margin
+	   below — `space-between` cannot place three children the way two want to be. */
+	header .choose {
+		margin-right: auto;
 	}
 
 	.header-actions {
