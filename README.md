@@ -409,8 +409,14 @@ rides on the one the phone is already showing. Letting go springs it back to
 level, because there is no gesture for putting it back. The roll is a third of
 the lean, since the type on the card is level and anything more reads as a
 crooked print rather than as a card. However you are holding it when it opens is
-level, and a
-device asking for less motion gets none.
+level, and a device asking for less motion gets none.
+
+Where there is a gyroscope actually reporting, the card also picks up the
+faintest foil: a band that sweeps across it as it turns, white at its core and
+tinted blue and amber at its flanks. Deliberately at the edge of noticing — foil
+that announces itself on a proofing tool is a distraction from the proof — and
+absent on a machine with no sensor, since without a real orientation to move
+against it would be a painted-on smear rather than a sheen.
 
 ## Undo and redo
 

@@ -522,6 +522,26 @@ and nothing in there is text you would copy. A drag that ends over the ground
 either side of the card is a drag, not a click on the backdrop, so it does not
 put the card away.
 
+**The foil is gated on a gyroscope actually feeding us, not on one existing.**
+It is the only thing on the card that is *about* the light in the room, and
+without a real orientation to move against it is a painted-on smear rather than
+a sheen — so it is switched on by the first reading, not by the capability
+check. iOS hands readings out only after a grant that may never come, and a
+highlight that cannot move is worse than none. The lean and the roll take no
+such gate: a finger drives those too.
+
+Three stops, and no blend mode. The core is white, which is invisible on white
+paper — a specular highlight on a matt white card *is* nothing — and shows up
+over dark artwork, which is where a real one would. The flanks are a breath of
+blue on one side and amber on the other, and they are what you actually see on
+the paper; they are the whole of what makes foil read as foil rather than as a
+torch being shone at it. `overlay` and `soft-light` both resolve to nothing
+against a white base, which is most of a card, so plain alpha compositing it is.
+
+The band travels further than the card turns, because seven degrees' worth of
+movement does not read as movement — but not so far that it leaves the paper,
+because foil that goes blank when you tilt it is just a card again.
+
 **The card rolls against the lean, not with it.** A card held loosely does not
 turn with the hand: it hangs, and stays level in the world while the phone
 rotates around it, which on screen is a counter-rotation — roll the phone

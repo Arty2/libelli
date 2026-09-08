@@ -39,6 +39,7 @@
 
 	const step = (to: number) => onactivate(Math.max(0, Math.min(dataset.rows.length - 1, to)));
 
+
 	/**
 	 * The lightbox owns these keys while it is open, so whatever opened it must
 	 * leave Escape and the arrows alone until it closes.
@@ -97,6 +98,28 @@
 	const TILT_EASE = 0.12;
 
 	let tilt = $state({ x: 0, y: 0, z: 0 });
+	/**
+	 * Where the sheen sits across the card, as a background position.
+	 *
+	 * Driven by the lean rather than by the raw reading, so it moves with what
+	 * you can see happening and a drag carries it too. It travels further than
+	 * the card turns — a band that moved only seven degrees' worth would not
+	 * read as moving at all — but not so far that it leaves: at the ends of the
+	 * range the flanks are still crossing the paper, because foil that goes
+	 * blank when you tilt it is just a card again.
+	 */
+	const sheen = $derived(50 - (tilt.y / TILT_MAX) * 34);
+
+	/**
+	 * Whether a gyroscope is actually feeding us, as against merely existing.
+	 *
+	 * Set on the first reading rather than on the capability check, because iOS
+	 * hands the readings out only after a grant that may never come: a card
+	 * wearing a highlight that cannot move is a smudge on the artwork, not a
+	 * sheen. It gates the foil and nothing else — the lean and the roll are
+	 * driven by a finger too, and want no gate.
+	 */
+	let sensed = $state(false);
 
 	/**
 	 * Whatever way the phone is being held when the lightbox opens is level: a
@@ -169,6 +192,7 @@
 			const { beta, gamma } = event;
 			if (beta === null || gamma === null) return;
 			baseline ??= { beta, gamma };
+			sensed = true;
 
 			// Turning the phone on its side swaps which way is left and which way is
 			// forward; the reading is in the device's frame, so rotate it into the
@@ -246,6 +270,7 @@
 			window.removeEventListener('deviceorientation', onOrientation);
 			if (ask) window.removeEventListener('pointerdown', ask);
 			baseline = null;
+			sensed = false;
 		};
 	});
 </script>
@@ -292,6 +317,14 @@
 				{background}
 			/>
 		</span>
+		{#if sensed}
+			<!-- The foil. Only where a gyroscope is feeding us, because this is the
+			     one thing on the card that is *about* the light in the room: without
+			     a real orientation to move against it is a painted-on smear.
+			     `aria-hidden`, and outside the scaler, so it covers the card rather
+			     than scaling with the artwork. -->
+			<span class="foil" aria-hidden="true" style="--sheen:{sheen}%"></span>
+		{/if}
 	</div>
 	<!-- Under the card with the count between them: the two arrows and the
 	     number are one control, and either side of the page they were a
@@ -378,6 +411,42 @@
 		   whichever way it is facing, so nothing under it moves. */
 		transform-origin: center;
 		will-change: transform;
+	}
+
+	/* Foil.
+
+	   A band swept across the card as it turns, made of three things: a specular
+	   core and a cool and a warm flank. The core is white, which is invisible on
+	   white paper and exactly right — a highlight on a matt white card *is*
+	   nothing — and shows up where the artwork is dark, which is where a real one
+	   would. The flanks are what you see on the paper: a breath of blue on one
+	   side of the core and of amber on the other, which is the whole of what
+	   makes a foil read as foil rather than as a torch being shone at it.
+
+	   Plain alpha compositing, no blend mode. `overlay` and `soft-light` both
+	   resolve to nothing against a white base, which is most of a card, so the
+	   effect would have been visible only on the photographs.
+
+	   Everything here is deliberately at the edge of noticing. Foil that
+	   announces itself on a proofing tool is a distraction from the proof. */
+	.foil {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		opacity: 0.55;
+		background-image: linear-gradient(
+			104deg,
+			rgba(255, 255, 255, 0) 34%,
+			rgba(120, 190, 255, 0.13) 44%,
+			rgba(255, 255, 255, 0.5) 50%,
+			rgba(255, 200, 130, 0.13) 56%,
+			rgba(255, 255, 255, 0) 66%
+		);
+		/* Wider than the card, so the band can travel right off both edges rather
+		   than compressing towards the middle as it reaches the end of its run. */
+		background-size: 320% 100%;
+		background-position: var(--sheen, 50%) 0;
+		background-repeat: no-repeat;
 	}
 
 	.scaler {
