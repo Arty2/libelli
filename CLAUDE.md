@@ -116,6 +116,12 @@ version of their own. Size the single bump by the largest change in the session
 — one feature among five fixes still makes it a minor. Bump again within a
 session only when asked to.
 
+**Once the session has a pull request open, every further push bumps the
+patch.** The one-bump rule holds while the work is still the session's own;
+a PR hands it to a reviewer, and from then on each push is something they may
+already have read the last version of. So: no bump until the PR exists, then
+`0.8.0` → `0.8.1` → `0.8.2`, one per push, whatever the push contains.
+
 ## How we work
 
 - **Build the risky thing first.** Rendering and printing were proven on day one,
