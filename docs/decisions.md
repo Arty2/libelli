@@ -480,6 +480,24 @@ whole table.
 bar. A line of its own under the buttons meant there were two places a message
 could appear and neither of them was where you were looking.
 
+## Pull-to-refresh
+
+**A reload is the one accident this app cannot absorb, so the browser is not
+allowed to offer one.** Undo lives in memory: a phone reading a downward drag as
+"reload the page" throws away everything since the last save that storage does
+not carry, which is the same reason a waiting service-worker update sits there
+asking rather than swapping itself in. It is worst in the lightbox, where
+dragging the card *is* how you turn it, but the editor stage and the data table
+are one flick from it too.
+
+Three layers, because the platforms disagree about which one they honour:
+`overscroll-behavior: none` on the document stops the chain reaching the
+viewport; `contain` on every scroller inside it — the stage, the table, the
+bars, the dialogs, the inline editor — stops a flick that runs out of content
+becoming a page gesture at all; and the lightbox says `touch-action: none`,
+because every touch on that screen is already ours and there is nothing on it to
+scroll.
+
 ## `src/lib/components/Lightbox.svelte`
 
 **The lightbox is not a door to the printer.** `Lightbox` is one card, big, over

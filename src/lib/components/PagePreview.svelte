@@ -831,6 +831,9 @@
 		display: grid;
 		place-items: center;
 		overflow: auto;
+		/* A flick that runs past the end of the page must not become the
+		   browser's pull-to-refresh — see app.css. */
+		overscroll-behavior: contain;
 		/* The stage is measured to work out the Fit scale, and the scale decides
 		   how tall the sheet is, and the sheet's height decides whether a vertical
 		   scrollbar appears — which takes ~15px off the width the measurement

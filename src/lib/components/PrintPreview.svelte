@@ -263,6 +263,7 @@
 		z-index: 50;
 		background: #eee;
 		overflow: auto;
+		overscroll-behavior: contain;
 	}
 
 	header {

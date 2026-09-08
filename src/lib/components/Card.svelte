@@ -1116,6 +1116,7 @@
 		box-sizing: border-box;
 		resize: none;
 		overflow: auto;
+		overscroll-behavior: contain;
 		font: inherit;
 		color: inherit;
 		text-align: inherit;

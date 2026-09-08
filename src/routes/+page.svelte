@@ -1762,6 +1762,7 @@ em { color: #b42318 }`;
 		   in viewport units still ended up hanging over both edges. */
 		box-sizing: border-box;
 		overflow: auto;
+		overscroll-behavior: contain;
 		background: #fff;
 		border-radius: 10px;
 		padding: 20px 22px;

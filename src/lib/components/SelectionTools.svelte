@@ -85,6 +85,7 @@
 		   running off the bottom of the page it sits beside. */
 		max-height: calc(100dvh - 220px);
 		overflow-y: auto;
+		overscroll-behavior: contain;
 	}
 
 	.count {

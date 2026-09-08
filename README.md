@@ -497,6 +497,10 @@ holds this app's own files and nothing else — a font from Google or a backgrou
 image you pointed at a URL goes to the network exactly as it did before, and is
 never stored.
 
+Pull-to-refresh is switched off throughout. Undo lives in memory, so a reload
+takes it with it — and in the lightbox, dragging the card downwards is how you
+turn it, which is the same movement a phone reads as "reload the page".
+
 **On iPhone and iPad**, Add to Home Screen deliberately keeps Safari's chrome.
 A chromeless iOS web app has no Share → Print and no working print command, and
 printing is the entire point of this app, so it keeps the browser's printer

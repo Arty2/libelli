@@ -317,6 +317,14 @@
 		   the drag from reaching the editor behind as well. */
 		user-select: none;
 		-webkit-user-select: none;
+		/* Every touch in here is already ours: a horizontal flick pages the run
+		   and a drag in any direction turns the card. Handing the browser none of
+		   them is what stops a downward drag being read as pull-to-refresh — the
+		   one gesture this app can least afford, since a reload takes the undo
+		   history with it, and here it is the same movement as turning the card.
+		   `overscroll-behavior` in app.css covers the scroll chain; this covers
+		   the gesture itself, on the one screen with nothing to scroll. */
+		touch-action: none;
 		background: rgba(20, 20, 20, 0.82);
 		display: flex;
 		flex-direction: column;

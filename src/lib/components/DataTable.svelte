@@ -695,6 +695,8 @@
 		flex: 1;
 		overflow: auto;
 		min-height: 0;
+		/* Scrolled to the top and flicked down, this would otherwise reload. */
+		overscroll-behavior: contain;
 	}
 
 	table {
@@ -1039,6 +1041,7 @@
 		width: min(680px, calc(100vw - 32px));
 		max-height: calc(100dvh - 32px);
 		overflow: auto;
+		overscroll-behavior: contain;
 		box-sizing: border-box;
 		background: #fff;
 		border-radius: 10px;
