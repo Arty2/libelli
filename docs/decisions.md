@@ -254,6 +254,22 @@ stays grabbable. Losing the handles of something you can no longer see is worse
 than being shown what will not print, and the trim edge already says where the
 paper stops.
 
+**A locked page takes the badges away.** Every badge on an area says why *that*
+area will not do what you might ask of it, and on a locked page the answer is
+the same for all of them — so the band over the sheet gives it once and the
+column of per-area reasons is noise; two of them are buttons that would be
+refused anyway. The overflow shears are not one of these and stay: they are
+about what will print, which a lock does not change.
+
+**The Locked band is the one indicator that is also its own control.** The rule
+everywhere else is that a lock is set where the rest of that subject's settings
+are, and the mark on the canvas only reports it. A locked page is the exception
+because its settings bar is disabled behind the lock, leaving the band as the
+nearest thing to hand; it wears the open padlock for a moment after the press,
+and is kept on screen through that moment on purpose — the lock is gone by then,
+so without it the band would vanish on the same frame and the answer would never
+be seen.
+
 **Two badges are controls, and they say so before you press them.** A badge is
 the reason a box will not do what you asked; the anchor pair is also the way out
 of that reason, in the same thirteen pixels. Each swaps to the icon of the
@@ -476,6 +492,12 @@ keys rather than racing it. The tilt is a transform on the card's wrapper:
 nothing under it moves, `prefers-reduced-motion` and a fine pointer both switch
 it off entirely, and the first reading is the baseline so however the phone is
 being held when it opens is level.
+
+**The card rolls as well as leans.** A real card held in one hand does not stay
+square to the eye while it tips — the wrist turns with it. The roll rides on the
+same sideways reading as the lean, at a tenth of the angle: the type on the card
+is level, and past a couple of degrees it stops reading as a card catching the
+light and starts reading as a crooked print.
 
 ## `src/lib/components/PrintPreview.svelte`
 

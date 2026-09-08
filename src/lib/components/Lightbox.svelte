@@ -72,12 +72,22 @@
 	 * exactly what that setting is asking us not to draw.
 	 */
 	const TILT_MAX = 7;
+	/**
+	 * And a little roll with it.
+	 *
+	 * A real card held in one hand does not stay square to your eye while it
+	 * leans — it turns slightly in the hand as the wrist does. Much smaller than
+	 * the lean, because roll is the one axis with a right answer already on the
+	 * card: the type is level, and anything past a couple of degrees stops
+	 * reading as a card catching the light and starts reading as a crooked print.
+	 */
+	const ROLL_MAX = 2.5;
 	/** how far the phone turns to reach that lean, in degrees */
 	const TILT_RANGE = 24;
 	/** how much of the way to the target each frame moves; raw readings jitter */
 	const TILT_EASE = 0.12;
 
-	let tilt = $state({ x: 0, y: 0 });
+	let tilt = $state({ x: 0, y: 0, z: 0 });
 
 	/**
 	 * Whatever way the phone is being held when the lightbox opens is level: a
@@ -85,7 +95,7 @@
 	 * a hand, or lying in bed rather than snapping to attention.
 	 */
 	let baseline: { beta: number; gamma: number } | null = null;
-	let target = { x: 0, y: 0 };
+	let target = { x: 0, y: 0, z: 0 };
 
 	$effect(() => {
 		if (typeof window === 'undefined' || !window.matchMedia) return;
@@ -112,14 +122,18 @@
 			const lean = (degrees: number) =>
 				(Math.max(-TILT_RANGE, Math.min(TILT_RANGE, degrees)) / TILT_RANGE) * TILT_MAX;
 			// Tipping the top away leans the card away, so the axes cross over: a
-			// forward tilt is a rotation about X, a sideways one about Y.
-			target = { x: -lean(downScreen), y: lean(acrossScreen) };
+			// forward tilt is a rotation about X, a sideways one about Y. The roll
+			// rides on the same sideways reading — one wrist, one movement — at a
+			// fraction of the angle.
+			const across = lean(acrossScreen);
+			target = { x: -lean(downScreen), y: across, z: (across / TILT_MAX) * ROLL_MAX };
 		};
 
 		const settle = () => {
 			tilt = {
 				x: tilt.x + (target.x - tilt.x) * TILT_EASE,
-				y: tilt.y + (target.y - tilt.y) * TILT_EASE
+				y: tilt.y + (target.y - tilt.y) * TILT_EASE,
+				z: tilt.z + (target.z - tilt.z) * TILT_EASE
 			};
 			frame = requestAnimationFrame(settle);
 		};
@@ -176,7 +190,7 @@
 		role="presentation"
 		onclick={(e) => e.stopPropagation()}
 		style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) *
-			scale}px;transform:perspective(1100px) rotateX({tilt.x}deg) rotateY({tilt.y}deg)"
+			scale}px;transform:perspective(1100px) rotateX({tilt.x}deg) rotateY({tilt.y}deg) rotateZ({tilt.z}deg)"
 	>
 		<span class="scaler" style="transform:scale({scale})">
 			<Card

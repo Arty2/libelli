@@ -940,8 +940,11 @@
 
 	/* The count and the two icons that act on the chosen rows, then a rule
 	   before the things that act on the whole table. */
+	/* Sized to the icons it introduces, not to the small print: it is the count
+	   of what the two buttons beside it are about to act on, and at 11px it read
+	   as a footnote to them rather than as their subject. */
 	.actions .chosen-count {
-		font: 600 11px ui-sans-serif, system-ui, sans-serif;
+		font: 600 15px ui-sans-serif, system-ui, sans-serif;
 		color: #1d4ed8;
 		padding: 0 2px;
 	}

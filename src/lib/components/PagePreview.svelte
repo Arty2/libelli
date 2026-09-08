@@ -68,6 +68,8 @@
 		flashIds?: string[];
 		/** leave Select Multiple */
 		onstoppicking?: () => void;
+		/** unlock the design, from the band that says it is locked */
+		onunlock?: () => void;
 	}
 
 	let {
@@ -113,6 +115,7 @@
 		ontext,
 		onrescue,
 		onstoppicking,
+		onunlock,
 		flashIds = []
 	}: Props = $props();
 
@@ -446,6 +449,26 @@
 		};
 	}
 
+	/**
+	 * The Locked band is the one indicator that is also the way out.
+	 *
+	 * Everything else on the page that says "you cannot do this" points at a
+	 * button elsewhere — a lock is set where the rest of that subject's settings
+	 * are. But a locked page has its whole settings bar disabled behind it, so
+	 * the band is the nearest thing to hand, and it briefly wears the open
+	 * padlock so a tap is answered rather than merely obeyed.
+	 */
+	let unlocking = $state(false);
+	let unlockTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function unlock() {
+		if (unlocking) return;
+		unlocking = true;
+		if (unlockTimer) clearTimeout(unlockTimer);
+		unlockTimer = setTimeout(() => (unlocking = false), 700);
+		onunlock?.();
+	}
+
 	function padDrop() {
 		if (padHold) clearTimeout(padHold);
 		padHold = null;
@@ -490,16 +513,24 @@
 	tabindex="-1"
 >
 	<div class="page">
-	{#if template.locked && bounds}
+	<!-- `unlocking` keeps the band up for the moment after it is pressed: the
+	     lock is gone by then, so without it the band would vanish on the same
+	     frame and the open padlock it answers with would never be seen. -->
+	{#if (template.locked || unlocking) && bounds}
 		<!-- An indicator, not a control: the button that sets this lives in page
 		     setup, where the rest of the page's settings are. Screen furniture, so
 		     the Bounds toggle takes it away with the rest — and part of the column
 		     rather than hung off the sheet, so it can never be scrolled off the
 		     top of the stage on a phone. -->
-		<div class="page-lock" bind:clientHeight={lockHeight}>
-			<Icon name="locked" size={13} />
-			<span>Locked</span>
-		</div>
+		<button
+			class="page-lock"
+			bind:clientHeight={lockHeight}
+			title="The design is locked — press to unlock it"
+			onclick={unlock}
+		>
+			<Icon name={unlocking ? 'unlocked' : 'locked'} size={13} />
+			<span>{unlocking ? 'Unlocked' : 'Locked'}</span>
+		</button>
 	{/if}
 	<div class="sheet" style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) * scale}px">
 		<div class="scaler" style="transform:scale({scale})">
@@ -945,12 +976,22 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
-		padding: 3px 9px;
+		padding: 4px 9px;
 		border: 1px solid #999;
 		border-radius: var(--radius-button);
 		background: #fff;
 		color: #555;
 		font: 500 11px/1 ui-sans-serif, system-ui, sans-serif;
+		cursor: pointer;
+		/* It reads as a label and behaves as a button, so dragging across it must
+		   not leave the word highlighted — the rest of this app's chrome opts out
+		   of selection for the same reason, in app.css. */
+		user-select: none;
+	}
+
+	.page-lock:hover {
+		border-color: #555;
+		color: #111;
 	}
 
 	.corner {

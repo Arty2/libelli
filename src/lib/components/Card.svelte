@@ -888,7 +888,14 @@
 					</span>
 				{/if}
 
-				{#if bounds && (box.anchor || box.locked || isStatic(box) || anchorTargets.has(box.id))}
+				<!-- Every badge here says why *this* area will not do what you might
+				     ask of it, and on a locked page that is the same answer for all
+				     of them: the page is locked. The band over the sheet says it once,
+				     so the column of per-area reasons is noise — and two of these are
+				     buttons that would be refused anyway. The overflow mark below is
+				     not one of these: it is about what will print, which a lock does
+				     not change. -->
+				{#if bounds && !template.locked && (box.anchor || box.locked || isStatic(box) || anchorTargets.has(box.id))}
 					<!-- Why the box will not do what you might ask of it, stacked at its
 					     corner: the anchor above the lock when it carries both. The two
 					     about anchoring are buttons — the reason and the way out of it in

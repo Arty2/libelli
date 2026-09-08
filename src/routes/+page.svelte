@@ -1101,20 +1101,20 @@ em { color: #b42318 }`;
 			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
 		<button
-			onclick={() => (dataOpen = !dataOpen)}
-			aria-pressed={dataOpen}
-			aria-expanded={dataOpen}
-			title="Show or hide the table"
-		>
-			<Icon name="table-split" size={15} /> <span class="label">Data</span>
-		</button>
-		<button
 			onclick={() => (pageSetupOpen = !pageSetupOpen)}
 			aria-pressed={pageSetupOpen}
 			aria-expanded={pageSetupOpen}
 			title="Show or hide the page setup"
 		>
 			<Icon name="settings" size={15} /> <span class="label">Page Setup</span>
+		</button>
+		<button
+			onclick={() => (dataOpen = !dataOpen)}
+			aria-pressed={dataOpen}
+			aria-expanded={dataOpen}
+			title="Show or hide the table"
+		>
+			<Icon name="table-split" size={15} /> <span class="label">Data</span>
 		</button>
 		<button class="primary" onclick={requestPrint} disabled={!dataset.rows.length}>
 			<Icon name="download" size={15} /> Export…
@@ -1246,6 +1246,7 @@ em { color: #b42318 }`;
 			{picking}
 			{flashIds}
 			onstoppicking={() => (picking = false)}
+			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
 			onedit={(id) => (editingId = id)}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
@@ -1348,7 +1349,7 @@ em { color: #b42318 }`;
 		<!-- The header stays put while the rest scrolls: the way out of a long
 		     dialog should not be at the bottom of it. -->
 		<header class="modal-header">
-			<h2 id="help-title">libelli <span class="version">v{VERSION}</span></h2>
+			<h2 id="help-title">libelli</h2>
 			<button class="icon" use:focusOnOpen onclick={() => (helpOpen = false)} title="Close" aria-label="Close">
 				<Icon name="close" size={16} />
 			</button>

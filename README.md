@@ -204,9 +204,18 @@ resize boxes directly, or type exact millimetres.
   and the page settings as well. A padlock appears on a locked area; a locked
   *page* says **Locked** in a band above the sheet and greys every bound on the
   card, because nothing on it can be moved and so nothing on it is worth
-  colouring for a reason. Both are indicators — the button that sets a lock is
-  in the bar with the rest of that subject's settings, and it says **Unlock**
-  when that is what it will do. Turning bounds off takes all of it with it.
+  colouring for a reason. It also takes the per-area badges away: every one of
+  them says why *that* area will not do what you ask, and on a locked page the
+  answer is the same for all of them and the band has already given it. The
+  shears that warn of a clipped print stay, because a lock does not change what
+  will come out.
+
+  The band is the one indicator that is also the way out — the rest of the
+  settings bar is disabled behind it, so a press unlocks the design and it
+  answers with the open padlock for a moment before it goes. Elsewhere the
+  button that sets a lock is in the bar with the rest of that subject's
+  settings, and it says **Unlock** when that is what it will do. Turning bounds
+  off takes all of it with it.
 - **CSS** — page setup has a CSS button; what you write there is saved
   inside the template and travels with it. Selectors are scoped to the card, so
   nothing in a template can restyle the editor around it, and `@import` and any
@@ -390,8 +399,11 @@ sheet in the editor — *3 / 12*, the number naming the card being the obvious
 thing to press to see it properly. <kbd>←</kbd> / <kbd>→</kbd>, the arrows
 either side of the count, and a swipe move between cards; <kbd>Esc</kbd> comes
 back out. Nothing is printed or exported from there — it is only a proper look.
-On a phone the card leans a few degrees with the handset, the way a real one
-catches the light; however you are holding it when it opens is level, and a
+On a phone the card leans a few degrees with the handset, and turns a fraction of
+a degree with it — the way a real one catches the light and shifts in the hand.
+The roll is a tenth of the lean, because the type on the card is level and
+anything more reads as a crooked print rather than as a card. However you are
+holding it when it opens is level, and a
 device asking for less motion gets none.
 
 ## Undo and redo
@@ -532,8 +544,9 @@ thing itself.
   between them, under the sheet, which card of how many you are looking at.
   **Fit** in the zoom menu says the percentage fitting *would* give you, not the
   one you are at.
-- **The window toolbar** holds only what is about the whole app: Help, Data,
-  Page Setup and Export.
+- **The window toolbar** holds only what is about the whole app: Help, Page
+  Setup, Data and Export — the two panels in the order they sit on screen,
+  settings above the page and the table beside it.
 
 Every number says its unit: mm for geometry, bleed, spacing and gaps, pt for
 type size, modules for a QR padding.
