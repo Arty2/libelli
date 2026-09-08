@@ -412,12 +412,19 @@ because a PNG in the wrong typeface is not the card. A request that is
 blocked or offline leaves that family in the fallback stack and the export
 says which.
 
-The print checklist sits at the bottom of that screen, under the pages: the
-cards are what you came to look at, and the four settings are what to do once
-you have.
+**Print Settings** sits at the top of that screen, above the pages: it decides
+how many sheets there are and what goes on each, so it is the thing to check
+first. The print checklist stays at the bottom, under the pages — that one is
+about the browser's own dialog, which is the last thing to happen.
 
-Two pages to a row on a phone rather than one: a contact sheet is for comparing
-pages against each other, and a column of one is a slideshow.
+On a phone each grid is a strip you swipe along rather than rows you scroll
+past. A hundred pages was a hundred rows between you and everything below
+them; sideways, the run costs one screen however long it is, and each
+thumbnail takes two thirds of the width so the next one peeks in and says the
+strip moves. A desktop keeps the wrapping grid, where the whole run is a few
+scrolls whatever its length. The header also carries a jump straight to the
+sheets, counting them as it goes — the sheets are what comes out of the
+printer, and they sit below every page in the run.
 
 Every page has a checkbox under it, and only the ticked ones print — untick the
 three proofs that came out wrong and reprint just those. **Select All** /
@@ -455,6 +462,13 @@ tinted blue and amber at its flanks. Deliberately at the edge of noticing — fo
 that announces itself on a proofing tool is a distraction from the proof — and
 absent on a machine with no sensor, since without a real orientation to move
 against it would be a painted-on smear rather than a sheen.
+
+A sheet thumbnail opens full screen too, and gets a screen of its own rather
+than the card's: the sheet flat and as large as the window allows, the arrows,
+a swipe and <kbd>Esc</kbd> doing what they do for cards, and none of the lean,
+foil or dealing — those read as a card in the hand and as nothing at all on an
+A3 sheet of them. The ground behind it is slate rather than near-black, so
+which of the two you are in takes a glance rather than a read of the counter.
 
 ## Undo and redo
 

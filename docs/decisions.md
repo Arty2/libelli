@@ -556,6 +556,31 @@ becoming a page gesture at all; and the lightbox says `touch-action: none`,
 because every touch on that screen is already ours and there is nothing on it to
 scroll.
 
+## `src/lib/components/SheetLightbox.svelte`
+
+**A separate component, not `Lightbox` with a flag.** Everything that makes
+the card lightbox what it is — the lean with the phone, the foil that moves
+with it, a card dealt in from the side — reads as a printed card held in the
+hand, and reads as nothing at all on an A3 imposition sheet. A sheet is a
+proof: flat, as big as the window allows, arrows and a swipe to the next one.
+Sharing one component would mean a `kind` prop threaded through the tilt, the
+sensor grant, the deal transition and the foil, all switched off for one of
+its two callers.
+
+**A different ground, on purpose.** Near-black for a card, slate for a sheet.
+The two are one tap apart inside the same modal, and a sheet of cards at
+thumbnail scale is easy to mistake for a card at a glance — the backdrop is
+what says which of the two you are looking at without reading the counter.
+Still dark and still desaturated, because what sits on it is being judged for
+print.
+
+**No drag guard, because there is no drag.** `Lightbox` tracks pointer
+movement so that turning the card and releasing over the ground does not also
+put it away; here a swipe is the only gesture, and Chromium suppresses the
+click after a touch that travels past tap-slop, so the backdrop's close and
+the swipe cannot fire together. Driven and confirmed in a real browser rather
+than assumed.
+
 ## `src/lib/components/Lightbox.svelte`
 
 **The lightbox is not a door to the printer.** `Lightbox` is one card, big, over
@@ -700,6 +725,30 @@ ones already filtered out) into the identical `rows * cols` batches
 `PrintRoot.svelte` uses — so reordering or excluding a row before printing
 moves it between sheets in the preview exactly as it will on paper, rather
 than the preview showing a grouping the print will not match.
+
+**Print Settings sits above the grids, not under them.** It decides what both
+grids even show — how many sheets there are and what is on each — so a
+setting you reach by scrolling past every page in the run reads as an
+afterthought. The checklist stays at the bottom: that one is about the
+browser's print dialog, which is the last thing that happens.
+
+**A strip on a phone, a wrapping grid on a desktop.** Two thumbnails to a row
+was fine for a dozen pages and hopeless for a hundred: everything else on the
+screen — the sheets, the checklist — sat below the pages, so reaching it meant
+scrolling past all of them. Narrow screens get one horizontally scrolling
+strip per grid instead, each thumbnail two thirds of the width so the next one
+peeks in and says the strip moves; the run then costs one screen however long
+it is. A desktop keeps the wrapping grid, where the whole run is a few scrolls
+whatever its length. The strip declares `touch-action: pan-x pan-y` and
+`overscroll-behavior-x: contain` because it scrolls sideways inside a modal
+that scrolls down, and a flick running off the end of it must not drag the
+modal with it.
+
+**A jump to the sheets, in the header.** Same problem, other half of the
+answer: the sheets are what actually comes out of the printer and they are
+below every page in the run, so the header carries a button straight to them,
+counting them as it goes. `scroll-margin-top` on the section is what stops the
+sticky header landing on top of the heading it scrolls to.
 
 **PNG export reads whichever grid is on screen for the setting that is on.**
 `exportPng` was one query (`.card` inside the per-card grid) before several

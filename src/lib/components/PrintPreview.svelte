@@ -4,6 +4,7 @@
 	import Lightbox from './Lightbox.svelte';
 	import PrintSettingsPanel from './PrintSettingsPanel.svelte';
 	import PrintSheet from './PrintSheet.svelte';
+	import SheetLightbox from './SheetLightbox.svelte';
 	import './options-bar.css';
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
@@ -133,19 +134,23 @@
 		onexcludedchange(include ? new Set() : new Set(dataset.rows.map((_, i) => i)));
 
 	let fullscreen = $state<number | null>(null);
+	let sheetFullscreen = $state<number | null>(null);
 
 	/**
 	 * How wide a page is on the contact sheet.
 	 *
-	 * Fixed at 210px where there is room for it, and two-to-a-row below that:
-	 * on a phone one 210px card per row turns a sheet meant for comparing pages
-	 * into a slideshow of them. Measured off the grid rather than off the window
+	 * Fixed at 210px where there is room for it, and a swipeable strip below
+	 * that: a run of forty pages is forty rows of scrolling on a phone, and the
+	 * sheets under them are then unreachable without passing every one. Two
+	 * thirds of the width rather than the whole of it, so the next one peeks in
+	 * and says the strip moves. Measured off the grid rather than off the window
 	 * so the two numbers cannot disagree about the padding between them.
 	 */
 	let gridWidth = $state(0);
 	const NARROW = 520;
+	const STRIP_SHARE = 0.66;
 	const narrow = $derived(gridWidth > 0 && gridWidth < NARROW);
-	const thumbWidth = $derived(narrow ? Math.max(84, Math.floor((gridWidth - 24 - 12) / 2)) : 210);
+	const thumbWidth = $derived(narrow ? Math.max(120, Math.floor(gridWidth * STRIP_SHARE)) : 210);
 	const thumbScale = $derived(thumbWidth / mmToPx(outerW));
 
 	// Included rows only, grouped into the same sheets Print and PNG-per-sheet
@@ -166,8 +171,30 @@
 	/** Same reasoning as the card thumbnail, sized off the sheet instead. */
 	let sheetGridWidth = $state(0);
 	const sheetNarrow = $derived(sheetGridWidth > 0 && sheetGridWidth < NARROW);
-	const sheetThumbWidth = $derived(sheetNarrow ? Math.max(84, Math.floor((sheetGridWidth - 24 - 12) / 2)) : 210);
+	const sheetThumbWidth = $derived(
+		sheetNarrow ? Math.max(120, Math.floor(sheetGridWidth * STRIP_SHARE)) : 210
+	);
 	const sheetThumbScale = $derived(sheetThumbWidth / mmToPx(printSheetW));
+
+	/**
+	 * Skip the pages and land on the sheets.
+	 *
+	 * A run of any size puts the sheets — the thing that actually comes out of
+	 * the printer — below every page in it, so the header carries a way past
+	 * them. `scroll-margin-top` on the section is what keeps the sticky header
+	 * off the heading it lands on.
+	 */
+	let sheetSection = $state<HTMLElement | null>(null);
+	function jumpToSheets() {
+		sheetSection?.scrollIntoView({
+			behavior:
+				typeof window !== 'undefined' &&
+				window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+					? 'auto'
+					: 'smooth',
+			block: 'start'
+		});
+	}
 
 	function onKeydown(event: KeyboardEvent) {
 		// The same keys that opened this screen print from it, so the pair reads as
@@ -177,9 +204,9 @@
 			if (chosen > 0) onprint();
 			return;
 		}
-		// The lightbox is in front and takes Escape and the arrows for itself
-		// while it is open; this screen is only underneath it.
-		if (fullscreen !== null) return;
+		// Either lightbox is in front and takes Escape and the arrows for itself
+		// while it is open; this screen is only underneath them.
+		if (fullscreen !== null || sheetFullscreen !== null) return;
 		if (event.key === 'Escape') {
 			onclose();
 		}
@@ -203,10 +230,18 @@
 				{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}
 			{/if}
 		</h2>
-		<!-- Choosing which pages go is about the sheet below; PNG and Print are what
-		     you came here to press. They sit at opposite ends so the two are not
-		     read as one row of three equal things. -->
-		<button class="choose" onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
+		<!-- Choosing which pages go, and skipping past them, are both about the
+		     grids below; PNG and Print are what you came here to press. They sit
+		     at opposite ends so the two are not read as one row of equal things. -->
+		<div class="header-jumps">
+			<button class="choose" onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
+			{#if imposed}
+				<button onclick={jumpToSheets} title="Skip the pages and go to the sheets">
+					<Icon name="caret-down" size={14} />
+					{sheetGroups.length} sheet{sheetGroups.length === 1 ? '' : 's'}
+				</button>
+			{/if}
+		</div>
 		<div class="header-actions">
 			<button onclick={exportPng} disabled={chosen === 0 || exporting}>
 				<Icon name="download" size={15} />
@@ -231,6 +266,15 @@
 		</button>
 	</header>
 
+	<!-- The same Print Settings shared with Page Setup, so a sheet size or count
+	     picked wrong does not send you back to the editor to fix it — see
+	     PrintSettingsPanel.svelte and docs/decisions.md. Above the pages, not
+	     under them: it decides what the two grids below it even show, and a
+	     setting you have to scroll past every page to reach reads as an
+	     afterthought rather than as the thing to check first. -->
+	<div class="options settings-strip">
+		<PrintSettingsPanel {template} {pageFrozen} {ontemplatechange} onuploadbackground={onuploadprintbackground} {onnotice} />
+	</div>
 
 	<div
 		class="grid"
@@ -273,7 +317,7 @@
 		<!-- What Print (and a PNG export) will actually produce: the chosen cards
 		     above, tiled onto physical sheets exactly as PrintRoot.svelte renders
 		     them for real, only scaled down for the screen. -->
-		<section class="sheets" aria-label="Sheet preview">
+		<section class="sheets" aria-label="Sheet preview" bind:this={sheetSection}>
 			<h3>Sheets — what will print</h3>
 			<div
 				class="grid sheet-grid"
@@ -284,9 +328,11 @@
 			>
 				{#each sheetGroups as sheetPages, i (i)}
 					<figure>
-						<span
+						<button
 							class="thumb sheet-thumb"
 							style="width:{mmToPx(printSheetW) * sheetThumbScale}px;height:{mmToPx(printSheetH) * sheetThumbScale}px"
+							onclick={() => (sheetFullscreen = i)}
+							aria-label="Open sheet {i + 1} full screen"
 						>
 							<span class="scaler" style="transform:scale({sheetThumbScale})">
 								<PrintSheet
@@ -298,7 +344,7 @@
 									pageCount={dataset.rows.length}
 								/>
 							</span>
-						</span>
+						</button>
 						<figcaption>Sheet {i + 1}</figcaption>
 					</figure>
 				{/each}
@@ -307,13 +353,6 @@
 	{/if}
 
 	<hr />
-
-	<!-- The same Print Settings shared with Page Setup, so a sheet size or count
-	     picked wrong does not send you back to the editor to fix it — see
-	     PrintSettingsPanel.svelte and docs/decisions.md. -->
-	<div class="options settings-strip">
-		<PrintSettingsPanel {template} {pageFrozen} {ontemplatechange} onuploadbackground={onuploadprintbackground} {onnotice} />
-	</div>
 
 	<!-- Under the pages, not above them: the cards are what you came to look at,
 	     and these four settings are what to do once you have. -->
@@ -348,6 +387,22 @@
 			onclose={() => (fullscreen = null)}
 		/>
 	{/if}
+
+	{#if sheetFullscreen !== null && sheetGroups.length}
+		<SheetLightbox
+			{template}
+			{mapping}
+			{background}
+			{printBackground}
+			sheets={sheetGroups}
+			index={Math.min(sheetFullscreen, sheetGroups.length - 1)}
+			pageCount={dataset.rows.length}
+			sheetW={printSheetW}
+			sheetH={printSheetH}
+			onactivate={(i) => (sheetFullscreen = i)}
+			onclose={() => (sheetFullscreen = null)}
+		/>
+	{/if}
 </div>
 
 <style>
@@ -379,8 +434,14 @@
 	}
 
 	/* Pushed off the title, and the actions pushed to the far end by the margin
-	   below — `space-between` cannot place three children the way two want to be. */
-	header .choose {
+	   below — `space-between` cannot place three children the way two want to be.
+	   The margin is on the cluster rather than on Select All itself, so the jump
+	   to the sheets travels with it instead of being flung across to the
+	   actions. */
+	.header-jumps {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 		margin-right: auto;
 	}
 
@@ -467,8 +528,11 @@
 		color: #767676;
 	}
 
+	/* The jump from the header lands here, and the header is sticky — without
+	   this it would land behind it. */
 	.sheets {
 		padding: 12px 18px 0;
+		scroll-margin-top: 60px;
 	}
 
 	/* Same treatment as the checklist's own heading — a small grey label rather
@@ -484,12 +548,9 @@
 
 	/* A sheet's own paper color and background image are real content here,
 	   not decoration the preview can drop — the whole point is showing what
-	   will print. Not a button like a card thumb — there is no fullscreen for
-	   a sheet yet — so the zoom cursor `.thumb` sets for that gesture is wrong
-	   here. */
+	   will print. */
 	.sheet-thumb {
 		background: #fff;
-		cursor: default;
 	}
 
 	.checklist ol {
@@ -523,13 +584,31 @@
 		justify-items: center;
 	}
 
-	/* Two to a row on a phone rather than one. A contact sheet is for comparing
-	   pages against each other, and a column of one is a slideshow. The cards
-	   shrink to fit — see `thumbWidth`, which is what actually sizes them. */
+	/* On a phone, a strip you swipe along rather than rows you scroll past.
+	   Two to a row was fine for a dozen pages and hopeless for a hundred: the
+	   sheets, the settings and the checklist all sit below the pages, and every
+	   one of them was a hundred rows of scrolling away. Sideways, the run costs
+	   one screen however long it is. A desktop keeps the wrapping grid — there
+	   the whole run is a few scrolls whatever its length. */
 	.grid.narrow {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		display: flex;
+		overflow-x: auto;
+		overflow-y: hidden;
 		gap: 12px;
 		padding: 12px;
+		scroll-snap-type: x proximity;
+		scroll-padding: 0 12px;
+		/* The strip scrolls sideways inside a modal that scrolls down: hand the
+		   browser both axes by name rather than letting it guess, and stop a
+		   flick that runs off the end of the strip from dragging the modal
+		   sideways with it. */
+		touch-action: pan-x pan-y;
+		overscroll-behavior-x: contain;
+	}
+
+	.grid.narrow figure {
+		flex: 0 0 var(--thumb, 210px);
+		scroll-snap-align: center;
 	}
 
 	figure {

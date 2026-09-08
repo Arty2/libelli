@@ -54,6 +54,7 @@ src/lib/
     options-bar.css     the styles both bars share
     PrintSettingsPanel.svelte  Per Sheet, orientation, sheet background — shared with the print screen
     PrintSheet.svelte  one physical sheet — used off-screen by PrintRoot and, scaled down, as PrintPreview's sheet thumbnails
+    SheetLightbox.svelte  one sheet full screen; Lightbox's opposite number, on a different ground
     PrintPreview, PrintRoot, Lightbox, BoxMenu, SelectionTools, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   app state and wiring                             (~40k)
