@@ -209,7 +209,7 @@
 					onclick={onresettemplate}
 					disabled={pageFrozen}
 					title="Back to the starter card. Your rows are not touched."
-				>Reset</button>
+				><Icon name="reset" size={14} /> Reset</button>
 				<!-- Never disabled by the lock it sets, or there would be no way out of it. -->
 				<button
 					aria-pressed={pageFrozen}
@@ -336,6 +336,17 @@
 				<span class="unit">pt</span>
 			</label>
 			<label class="field">
+				<span>Color</span>
+				<input
+					class="color"
+					type="color"
+					title="Default text color for every box that does not set its own"
+					value={template.defaults.color}
+					disabled={pageFrozen}
+					onchange={(e) => patchTemplate({ defaults: { ...template.defaults, color: e.currentTarget.value } })}
+				/>
+			</label>
+			<label class="field">
 				<span>Leading</span>
 				<input
 					class="n-3"
@@ -367,32 +378,21 @@
 				/>
 				<span class="unit">mm</span>
 			</label>
-			<label class="field">
-				<span>Colour</span>
-				<input
-					class="colour"
-					type="color"
-					title="Default text colour for every box that does not set its own"
-					value={template.defaults.color}
-					disabled={pageFrozen}
-					onchange={(e) => patchTemplate({ defaults: { ...template.defaults, color: e.currentTarget.value } })}
-				/>
-			</label>
 		</span>
 
 		<span class="group" role="group" aria-label="Page surface">
 			<label class="field">
 				<span>Paper</span>
 				<input
-					class="colour"
+					class="color"
 					type="color"
-					title="Page colour — prints only with background graphics enabled"
+					title="Page color — prints only with background graphics enabled"
 					value={template.page.background ?? '#ffffff'}
 					disabled={pageFrozen}
 					onchange={(e) => patchTemplate({ page: { ...template.page, background: e.currentTarget.value } })}
 				/>
 			</label>
-			<span class="label">Image</span>
+			<span class="field-label">Image</span>
 			{#if template.page.image}
 				<span class="asset" title={template.page.image.src}>
 					<Icon name={template.page.image.source === 'url' ? 'link' : 'image'} size={12} />

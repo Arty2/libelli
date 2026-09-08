@@ -1,13 +1,13 @@
 /**
- * Colour parsing shared by the markdown renderer, the template loader and the
- * areas that take a colour out of a spreadsheet cell.
+ * Color parsing shared by the markdown renderer, the template loader and the
+ * areas that take a color out of a spreadsheet cell.
  *
- * Colours reach us from template files and from spreadsheet cells, so a value
+ * Colors reach us from template files and from spreadsheet cells, so a value
  * is only ever emitted into a style attribute after it has been recognised
  * here. Anything unrecognised is refused rather than guessed at, which keeps
  * `color: red; background: url(…)` out of the CSS we generate — and nothing
  * that comes back out of this file is the string that went in: a recognised
- * colour is rebuilt from what it parsed to, so there is no path by which a
+ * color is rebuilt from what it parsed to, so there is no path by which a
  * cell's own punctuation reaches a stylesheet.
  */
 
@@ -17,10 +17,10 @@ const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
  * A short, print-sensible set of names, so `[warning]{red}` works without a hex.
  *
  * These deliberately shadow the CSS keywords of the same name below: CSS `red`
- * is #ff0000, which is a screen colour and comes off a press as a shout. Anyone
+ * is #ff0000, which is a screen color and comes off a press as a shout. Anyone
  * who wants that exact value can write the hex.
  */
-export const NAMED_COLOURS: Record<string, string> = {
+export const NAMED_COLORS: Record<string, string> = {
 	black: '#000000',
 	white: '#ffffff',
 	grey: '#767676',
@@ -48,7 +48,7 @@ function expand(packed: string): Record<string, string> {
 }
 
 /**
- * The CSS colour keywords, as `name hex` pairs in one string.
+ * The CSS color keywords, as `name hex` pairs in one string.
  *
  * Packed rather than written out as 148 object entries, because that is 148
  * lines in a file whose actual subject is two screens long — and the shape of
@@ -56,7 +56,7 @@ function expand(packed: string): Record<string, string> {
  * to read past. Expanded once, at module load.
  *
  * Here at all because an area can take its fill from a spreadsheet column, and
- * a spreadsheet that holds colours holds them the way people write them:
+ * a spreadsheet that holds colors holds them the way people write them:
  * `crimson`, `cornflowerblue`, `rebeccapurple`. The print palette above still
  * wins on the seventeen names it defines.
  */
@@ -135,12 +135,12 @@ function parseFunctional(value: string): string | null {
 		: `hsla(${hue}, ${saturation}%, ${lightness}%, ${round(alpha)})`;
 }
 
-/** Returns a CSS colour string, or null when the input is not one we accept. */
-export function parseColour(raw: string | undefined | null): string | null {
+/** Returns a CSS color string, or null when the input is not one we accept. */
+export function parseColor(raw: string | undefined | null): string | null {
 	if (!raw) return null;
 	const value = raw.trim().toLowerCase();
 	if (HEX.test(value)) return value;
-	if (NAMED_COLOURS[value]) return NAMED_COLOURS[value];
+	if (NAMED_COLORS[value]) return NAMED_COLORS[value];
 	if (CSS_KEYWORDS[value]) return CSS_KEYWORDS[value];
 	return parseFunctional(value);
 }

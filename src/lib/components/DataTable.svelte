@@ -890,7 +890,7 @@
 		text-align: center;
 	}
 
-	/* One square, one size, one colour for every tool in the table — the row and
+	/* One square, one size, one color for every tool in the table — the row and
 	   column controls used to be typed glyphs with wildly different metrics. */
 	.icon {
 		display: inline-grid;

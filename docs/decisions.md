@@ -130,8 +130,8 @@ words is that they are being cut.
 **Bounds carry state; selection is an outline.** Four things want to draw on one
 box and there are two pseudo-elements, so the selection moved off `::after` onto
 an `outline` on the box itself — the same to look at, no layout cost. That frees
-`::after` for the bounds, coloured red when a box is locked and purple when it is
-grouped, and `::before` for the padding guide. It also means a state colour is
+`::after` for the bounds, colored red when a box is locked and purple when it is
+grouped, and `::before` for the padding guide. It also means a state color is
 not painted over the moment the box is selected, which is exactly when you want
 to know. Locked wins over grouped, with a coarser dash as well as a different
 red, because the overflow corner is red too and two reds a millimetre apart are
@@ -280,17 +280,17 @@ is" is the whole point, and releasing to a stale `y` would jump it up the card.
 
 **Typing happens in a textarea laid over the content, not a `contenteditable`.**
 A box holds text — Markdown source for a Markdown area — and a contenteditable
-would hand back markup nobody asked for. It inherits face, size, colour and
+would hand back markup nobody asked for. It inherits face, size, color and
 alignment from the box, so what you type is set the way it will print, and the
 content stays in the DOM underneath (hidden) so the box keeps its measured height
 and nothing anchored below it hops about mid-sentence. The card cannot write the
 words itself: a bound area's text is a cell of the dataset and a static one's is
 a field of the template, and only `+page.svelte` knows which it is holding.
 
-**Image mode is image *or colour*, and the colour fills the box.** One mode
-rather than two, because a column of brand colours and a column of logo URLs are
+**Image mode is image *or color*, and the color fills the box.** One mode
+rather than two, because a column of brand colors and a column of logo URLs are
 the same job and a template author should not have to know which the data holds.
-A resolved colour is emitted by `boxStyle` as the box's own `background`, so it
+A resolved color is emitted by `boxStyle` as the box's own `background`, so it
 reaches under the padding and takes the corner radius; a tile is a background
 too, because `<img>` cannot repeat. Everything else goes through `safeMediaUrl`,
 which is the only door between an untrusted cell and an `<img src>`.
@@ -492,6 +492,17 @@ keys rather than racing it. The tilt is a transform on the card's wrapper:
 nothing under it moves, `prefers-reduced-motion` and a fine pointer both switch
 it off entirely, and the first reading is the baseline so however the phone is
 being held when it opens is level.
+
+**Two things drive the tilt, and they add.** A gyroscope where there is one, and
+a drag — the same gesture on a desk that turning the phone is in the hand, and
+the only one available on a machine with no sensors in it. The settle loop runs
+whether or not there is a sensor, which it did not before: it was started only
+on the gyroscope path, so a mouse-and-keyboard machine had nothing easing
+anything. The lightbox refuses text selection for the drag's sake — sweeping a
+blue highlight across the card while turning it is not what the gesture is for,
+and nothing in there is text you would copy. A drag that ends over the ground
+either side of the card is a drag, not a click on the backdrop, so it does not
+put the card away.
 
 **The card rolls as well as leans.** A real card held in one hand does not stay
 square to the eye while it tips — the wrist turns with it. The roll rides on the

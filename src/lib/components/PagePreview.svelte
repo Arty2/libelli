@@ -657,7 +657,7 @@
 			</button>
 		</div>
 
-		<!-- Stacking order is about the page, not about type or colour, so it sits
+		<!-- Stacking order is about the page, not about type or color, so it sits
 		     beside the page with undo and redo rather than in the options bar,
 		     where it shoved every other control sideways. -->
 		{#if selectedIds.length}
@@ -934,7 +934,7 @@
 	}
 
 	/* Grey, and as thin as a screen will draw: the grid is there to be measured
-	   against, not looked at, and a coloured one competed with the card. Both
+	   against, not looked at, and a colored one competed with the card. Both
 	   rules are a half-pixel hairline — finer than any line on the card itself,
 	   which is a whole pixel — and the 10mm rhythm is carried by the majors being
 	   darker rather than thicker. This overlay sits outside the card's transform

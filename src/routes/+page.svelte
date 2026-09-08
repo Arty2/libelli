@@ -139,7 +139,7 @@
 	/**
 	 * A notice is either something that happened or something that went wrong,
 	 * and the two used to render identically in an 11px grey line. A warning
-	 * gets the warning mark and a colour; everything else reads as before.
+	 * gets the warning mark and a color; everything else reads as before.
 	 */
 	let statusTone = $state<'info' | 'warning'>('info');
 
@@ -1378,9 +1378,9 @@ em { color: #b42318 }`;
 			fill it.
 		</p>
 		<p>
-			<strong>Mode</strong> is Plain Text, Markdown, Image / Colour or QR Code. Image / Colour shows whatever its
-			source turns out to be — a picture if that is an address, a fill if it is a colour, in hex, <code>rgb()</code>,
-			<code>hsl()</code> or by name — so a column of brand colours and a column of logos need no different setting up.
+			<strong>Mode</strong> is Plain Text, Markdown, Image / Color or QR Code. Image / Color shows whatever its
+			source turns out to be — a picture if that is an address, a fill if it is a color, in hex, <code>rgb()</code>,
+			<code>hsl()</code> or by name — so a column of brand colors and a column of logos need no different setting up.
 		</p>
 		<p>
 			<code>&#123;&#123;date&#125;&#125;</code> anywhere in an area or a cell prints today's date, and
@@ -1441,8 +1441,8 @@ em { color: #b42318 }`;
 			sheet, never an offset on the content.
 		</p>
 		<p>
-			Page setup holds the type defaults — family, size, leading, spacing, colour. An area that leaves those fields
-			blank inherits them. It also sets the paper colour and a background image, and can print a page number, optionally
+			Page setup holds the type defaults — family, size, leading, spacing, color. An area that leaves those fields
+			blank inherits them. It also sets the paper color and a background image, and can print a page number, optionally
 			as <em>3 / 12</em>.
 		</p>
 		<p>

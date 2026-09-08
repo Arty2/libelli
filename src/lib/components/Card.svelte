@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import { backgroundStyle, cssUrl, safeMediaUrl } from '$lib/assets';
-	import { parseColour } from '$lib/colour';
+	import { parseColor } from '$lib/color';
 	import { applyPlaceholders } from '$lib/placeholders';
 	import { scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
@@ -111,18 +111,18 @@
 	 * What an image area resolves to: a picture, a fill, or nothing at all.
 	 *
 	 * The mode is one mode on purpose — see `BoxMode` — so the value decides.
-	 * A colour wins over a URL because nothing that parses as a colour is also a
+	 * A color wins over a URL because nothing that parses as a color is also a
 	 * usable address, and a value that is neither draws nothing rather than
 	 * reaching a `src` attribute: a cell is untrusted, and `safeMediaUrl` is the
 	 * only door between one and an `<img>`.
 	 */
-	function mediaOf(box: Box): { svg?: string; src?: string; colour?: string } {
+	function mediaOf(box: Box): { svg?: string; src?: string; color?: string } {
 		if (box.static?.svg) return { svg: box.static.svg };
 		const written = box.slot ? contentOf(box) : (box.static?.dataUrl ?? box.static?.url ?? '');
 		const value = written.trim();
 		if (!value) return {};
-		const colour = parseColour(value);
-		if (colour) return { colour };
+		const color = parseColor(value);
+		if (color) return { color };
 		const src = safeMediaUrl(value);
 		return src ? { src } : {};
 	}
@@ -130,7 +130,7 @@
 	const isEmpty = (box: Box) => {
 		if (box.mode === 'image') {
 			const media = mediaOf(box);
-			return !(media.svg || media.src || media.colour);
+			return !(media.svg || media.src || media.color);
 		}
 		return contentOf(box).trim() === '';
 	};
@@ -148,7 +148,7 @@
 				qrSvg(value, {
 					level: box.qr?.level ?? 'M',
 					margin: box.qr?.margin ?? 2,
-					colour: box.color ?? template.defaults.color,
+					color: box.color ?? template.defaults.color,
 					background: box.qr?.background
 				}),
 				box.fit
@@ -178,7 +178,7 @@
 	const VALIGN_TO_FLEX = { top: 'flex-start', middle: 'center', bottom: 'flex-end' } as const;
 
 	/**
-	 * Paper colour is the ground and the image sits on it, both covering the
+	 * Paper color is the ground and the image sits on it, both covering the
 	 * bleed as well as the trim — a background that stopped at the trim edge
 	 * would show a white rim on everything printed with bleed.
 	 */
@@ -277,12 +277,12 @@
 			parts.push(`padding:${pad.top}mm ${pad.right}mm ${pad.bottom}mm ${pad.left}mm`);
 		}
 		if (box.background) parts.push(`background:${box.background}`);
-		// A colour out of the data fills the area itself, not a panel inside it, so
+		// A color out of the data fills the area itself, not a panel inside it, so
 		// it reaches under the padding and takes the corner radius with it. After
 		// the declared fill, because the row is the more specific answer.
 		if (box.mode === 'image') {
 			const media = mediaOf(box);
-			if (media.colour) parts.push(`background:${media.colour}`);
+			if (media.color) parts.push(`background:${media.color}`);
 			// A tile is a background, not an element: `<img>` has no way to repeat.
 			else if (media.src && box.fit === 'repeat') {
 				parts.push(
@@ -830,7 +830,7 @@
 						</span>
 					{:else if box.mode === 'image'}
 						{@const media = mediaOf(box)}
-						<!-- A colour and a tile are both drawn by the box's own background,
+						<!-- A color and a tile are both drawn by the box's own background,
 						     in boxStyle, so there is nothing to put in here for either. -->
 						{#if media.svg || (media.src && box.fit !== 'repeat')}
 							<span class="media" style="height:{box.h}mm">
@@ -880,11 +880,11 @@
 				{/if}
 
 				{#if bounds && !empty && overflowing[box.id]}
-					<!-- A badge like the others, in the one colour that means the print
+					<!-- A badge like the others, in the one color that means the print
 					     will be wrong rather than merely constrained. Shears, because
 					     what is happening to the words is that they are being cut. -->
 					<span class="overflow-mark" title="The content does not fit — this area is cutting off what will print">
-						<Icon name="scissors" size={11} />
+						<Icon name="cut" size={11} />
 					</span>
 				{/if}
 
@@ -1034,7 +1034,7 @@
 		box-sizing: border-box;
 		overflow: hidden;
 		color: #000;
-		/* Paper colour is part of the artwork, not decoration the printer may
+		/* Paper color is part of the artwork, not decoration the printer may
 		   drop — though the browser still asks for "background graphics". */
 		print-color-adjust: exact;
 		-webkit-print-color-adjust: exact;
@@ -1102,7 +1102,7 @@
 	}
 
 	/* Laid over the content it is replacing, inheriting everything: what you
-	   type is set in the face, size, colour and alignment it will print in.
+	   type is set in the face, size, color and alignment it will print in.
 	   Transparent, so the words underneath keep the box its measured height —
 	   the editor has no height of its own to give it. */
 	.inline-editor {
@@ -1359,7 +1359,7 @@
 		   so the selection moved to an `outline` on the box itself — identical to
 		   look at, costs no layout, and leaves ::after for the bounds and ::before
 		   for the padding guide. It also means a locked or grouped box keeps its
-		   state colour while selected, instead of the blue overwriting it.
+		   state color while selected, instead of the blue overwriting it.
 
 		   Every weight here is multiplied by --ui-scale. Screen furniture lives
 		   inside the scaled card, so a plain 1px line is 0.6px at 64% and 2px at
@@ -1395,27 +1395,27 @@
 		}
 
 		.bounds rect {
-			stroke: var(--bounds-colour, rgba(37, 99, 235, 0.45));
+			stroke: var(--bounds-color, rgba(37, 99, 235, 0.45));
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
 		/* A locked *design* is not a box that happens to be locked: nothing on the
-		   card can be moved, so nothing on it is worth colouring for a reason. The
+		   card can be moved, so nothing on it is worth coloring for a reason. The
 		   whole set of bounds goes grey — one flat statement that the card is not
 		   currently yours to push around — and the padlock over the top edge says
 		   why. The rule is last of the three because it has to beat both. */
 
 		/* A locked box cannot be moved, and a grouped one moves with others: both
-		   are reasons a drag will not do what you expect, so they colour the
+		   are reasons a drag will not do what you expect, so they color the
 		   bounds. Locked wins when a box is both — it is the stronger refusal.
 		   The dash is coarser as well as red, because the overflow corner is
 		   already red and two reds a millimetre apart are one red. */
 		.box.grouped {
-			--bounds-colour: rgba(124, 58, 237, 0.75);
+			--bounds-color: rgba(124, 58, 237, 0.75);
 		}
 
 		.box.locked {
-			--bounds-colour: rgba(180, 35, 24, 0.8);
+			--bounds-color: rgba(180, 35, 24, 0.8);
 		}
 
 		.box.locked .bounds rect {
@@ -1428,7 +1428,7 @@
 		}
 
 		.card.frozen .box {
-			--bounds-colour: rgba(0, 0, 0, 0.32);
+			--bounds-color: rgba(0, 0, 0, 0.32);
 		}
 
 		.card.frozen .box.locked .bounds rect {
@@ -1454,7 +1454,7 @@
 		}
 
 		/* The same badge as the others — same size, radius and standing clear of
-		   the edge — in the one colour that says the print will be wrong. It hangs
+		   the edge — in the one color that says the print will be wrong. It hangs
 		   off the bottom right, where the words run out, rather than sharing the
 		   column of reasons at the top right. */
 		.overflow-mark {
@@ -1520,14 +1520,14 @@
 			color: #333;
 		}
 
-		/* A selected area's badges take the colour of its own bounds. The column
+		/* A selected area's badges take the color of its own bounds. The column
 		   of them sits a few pixels off the edge of the box they annotate, and in
 		   a flat grey they read as belonging to the card rather than to the area —
 		   which matters most when several areas are close enough for their badges
 		   to be nearer a neighbour's edge than their own. */
 		.box.selected .badge {
-			border-color: var(--bounds-colour, #2563eb);
-			color: var(--bounds-colour, #2563eb);
+			border-color: var(--bounds-color, #2563eb);
+			color: var(--bounds-color, #2563eb);
 		}
 
 		/* Something moved that you were not watching. Long enough to catch out of

@@ -9,9 +9,9 @@
 export const SCHEMA_VERSION = 2;
 
 /**
- * `image` is really "image or colour": it shows whatever its source resolves
- * to, which is a picture when that is a URL and a fill when it is a colour. One
- * mode rather than two, because a column of brand colours and a column of logo
+ * `image` is really "image or color": it shows whatever its source resolves
+ * to, which is a picture when that is a URL and a fill when it is a color. One
+ * mode rather than two, because a column of brand colors and a column of logo
  * URLs are the same job — put what this row says in the background of this area
  * — and a template author should not have to know which the data holds.
  */
@@ -67,7 +67,7 @@ export interface PageSpec {
 	w: number;
 	h: number;
 	unit: 'mm';
-	/** paper colour; printed only when the browser's background graphics are on */
+	/** paper color; printed only when the browser's background graphics are on */
 	background?: string;
 	image?: PageBackgroundImage;
 }
@@ -186,7 +186,7 @@ export interface Box extends TextStyle {
 	/** mm; 0 or absent is no border. A number is every edge, an object is per edge. */
 	borderWidth?: SideValue;
 	borderStyle?: BorderStyle;
-	/** absent falls back to the box's own text colour */
+	/** absent falls back to the box's own text color */
 	borderColor?: string;
 	/** mm, applied to the whole box */
 	borderRadius?: number;

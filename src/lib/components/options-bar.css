@@ -76,8 +76,14 @@
 	font-size: 10px;
 }
 
-.options .label {
-	font-size: 11px;
+/* A label with no field of its own to sit inside — the background image is two
+   buttons or a name and a menu, depending on whether there is one. Set like
+   every other label in the bar, which is what it is. */
+.options .field-label {
+	font-size: 10px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	white-space: nowrap;
 	color: #555;
 }
 
@@ -154,7 +160,7 @@
 	color: #999;
 }
 
-/* The colour swatch is the exception — it is a sample of the colour, and a
+/* The color swatch is the exception — it is a sample of the color, and a
    sample needs an edge to be a sample rather than a smear. */
 .options input[type='color'] {
 	border: 1px solid var(--border-control);
@@ -178,7 +184,7 @@
 .options .n-4 { width: 2.9rem; }
 .options .w-5 { width: 4.6rem; }
 .options .w-8 { width: 8.5rem; }
-.options .colour { width: 2rem; padding: 2px; }
+.options .color { width: 2rem; padding: 2px; }
 
 /* The spin buttons are what made a two-character field four wide. Arrow keys
    still step the value, which is the only thing they were reachable for. */

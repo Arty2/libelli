@@ -1,4 +1,4 @@
-import { parseColour } from './colour';
+import { parseColor } from './color';
 import type { MarkdownStyle } from './types';
 
 /**
@@ -7,7 +7,7 @@ import type { MarkdownStyle } from './types';
  *
  * Supported: `#`/`##`/`###` headings, `-`/`*` bullets (one nesting level),
  * `1.` ordered lists, `**bold**`, `*italic*`, `` `code` ``, `[text](url)`,
- * `[text]{colour}` for a coloured run of words, blank-line paragraphs and `---`
+ * `[text]{color}` for a colored run of words, blank-line paragraphs and `---`
  * rules. Everything else is literal text.
  *
  * Every leaf text node is HTML-escaped before any markup is emitted, because
@@ -167,11 +167,11 @@ export function renderInline(text: string): string {
 		if (!url) return whole;
 		return `<a href="${escapeHtml(url)}" style="color:inherit">${label}</a>`;
 	});
-	// [words]{red} / [words]{#b42318} — per-word colour, the reason a colour
+	// [words]{red} / [words]{#b42318} — per-word color, the reason a color
 	// parser sits between the text and the style attribute.
 	out = out.replace(/\[([^\]]*)\]\{([^}\s]{1,32})\}/g, (whole, label: string, name: string) => {
-		const colour = parseColour(unescapeEntities(name));
-		return colour ? `<span style="color:${colour}">${label}</span>` : whole;
+		const color = parseColor(unescapeEntities(name));
+		return color ? `<span style="color:${color}">${label}</span>` : whole;
 	});
 	out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 	out = out.replace(/__([^_]+)__/g, '<strong>$1</strong>');

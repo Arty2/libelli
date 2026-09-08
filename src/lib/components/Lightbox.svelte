@@ -67,9 +67,12 @@
 	 * anything more than a few degrees stops reading as a card and starts reading
 	 * as a carousel.
 	 *
-	 * Only where there is a gyroscope to read and no keyboard-and-mouse to make it
-	 * pointless, and never against `prefers-reduced-motion` — a moving picture is
-	 * exactly what that setting is asking us not to draw.
+	 * Two things drive it. A gyroscope, where there is one to read, and a finger
+	 * or a pointer dragged across the card — the same gesture on a desk that
+	 * turning the phone is in the hand, and the only one available on a machine
+	 * with no sensors in it. Neither runs against `prefers-reduced-motion`: a
+	 * moving picture is exactly what that setting is asking us not to draw, and
+	 * a drag that leans the card is still a moving picture.
 	 */
 	const TILT_MAX = 7;
 	/**
@@ -97,11 +100,61 @@
 	let baseline: { beta: number; gamma: number } | null = null;
 	let target = { x: 0, y: 0, z: 0 };
 
+	/**
+	 * What a drag is adding on top of that, and where it started.
+	 *
+	 * Added rather than replacing, so a phone that has both keeps both: a lean
+	 * you have introduced with your thumb rides on the lean the handset is
+	 * already showing. It springs back to nothing on release, because a card you
+	 * have let go of should not stay crooked — and because there is no gesture
+	 * for putting it back.
+	 */
+	const DRAG_MAX = 9;
+	/** how far the pointer travels to reach that lean, in pixels */
+	const DRAG_RANGE = 260;
+	let dragTilt = { x: 0, y: 0, z: 0 };
+	let dragFrom: { x: number; y: number; id: number } | null = null;
+	/**
+	 * Whether the pointer moved enough to be a drag rather than a click. The
+	 * backdrop closes on click, and turning the card and then letting go over the
+	 * ground either side of it must not put it away.
+	 */
+	let dragged = $state(false);
+
+	function tiltDown(event: PointerEvent) {
+		if (event.button !== 0) return;
+		dragFrom = { x: event.clientX, y: event.clientY, id: event.pointerId };
+		dragged = false;
+	}
+
+	function tiltMove(event: PointerEvent) {
+		if (!dragFrom || event.pointerId !== dragFrom.id) return;
+		const dx = event.clientX - dragFrom.x;
+		const dy = event.clientY - dragFrom.y;
+		if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragged = true;
+		const lean = (px: number) =>
+			(Math.max(-DRAG_RANGE, Math.min(DRAG_RANGE, px)) / DRAG_RANGE) * DRAG_MAX;
+		// Dragging right turns the card's left edge towards you, which is a
+		// positive rotateY; dragging down tips the top towards you, a positive
+		// rotateX. The roll rides on the sideways half, as the gyroscope's does.
+		const across = lean(dx);
+		dragTilt = { x: lean(dy), y: across, z: (across / DRAG_MAX) * ROLL_MAX };
+	}
+
+	function tiltUp(event: PointerEvent) {
+		if (!dragFrom || event.pointerId !== dragFrom.id) return;
+		dragFrom = null;
+		dragTilt = { x: 0, y: 0, z: 0 };
+	}
+
 	$effect(() => {
 		if (typeof window === 'undefined' || !window.matchMedia) return;
 		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-		if (!window.matchMedia('(pointer: coarse)').matches) return;
-		if (!('DeviceOrientationEvent' in window)) return;
+		// The settle loop runs whether or not there is a gyroscope, because the
+		// drag needs it too — it used to be started only on the sensor path, so a
+		// machine with a mouse and no accelerometer had nothing easing anything.
+		const sensing =
+			window.matchMedia('(pointer: coarse)').matches && 'DeviceOrientationEvent' in window;
 
 		let frame = 0;
 
@@ -130,10 +183,18 @@
 		};
 
 		const settle = () => {
+			// The sensor's lean and the drag's, added: a phone that has both keeps
+			// both, and a machine with neither sits at zero and costs one lerp a
+			// frame that never moves.
+			const to = {
+				x: target.x + dragTilt.x,
+				y: target.y + dragTilt.y,
+				z: target.z + dragTilt.z
+			};
 			tilt = {
-				x: tilt.x + (target.x - tilt.x) * TILT_EASE,
-				y: tilt.y + (target.y - tilt.y) * TILT_EASE,
-				z: tilt.z + (target.z - tilt.z) * TILT_EASE
+				x: tilt.x + (to.x - tilt.x) * TILT_EASE,
+				y: tilt.y + (to.y - tilt.y) * TILT_EASE,
+				z: tilt.z + (to.z - tilt.z) * TILT_EASE
 			};
 			frame = requestAnimationFrame(settle);
 		};
@@ -141,18 +202,24 @@
 		// iOS hands the readings out only after an explicit grant, and only asks
 		// when a gesture is in flight — so the first touch inside the lightbox is
 		// what asks. Everywhere else the listener goes straight on.
-		const request = (
-			DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }
-		).requestPermission;
+		// Read through `window`, not as a bare global: the early return that
+		// guaranteed the global existed is gone — the settle loop runs without a
+		// sensor now — and a bare reference would throw where there is none.
+		const orientation = (window as unknown as Record<string, unknown>).DeviceOrientationEvent as
+			| { requestPermission?: () => Promise<string> }
+			| undefined;
+		const request = orientation?.requestPermission;
 
 		const listen = () => window.addEventListener('deviceorientation', onOrientation);
 
 		let ask: ((event: Event) => void) | null = null;
-		if (typeof request === 'function') {
+		if (!sensing) {
+			// No sensor to ask for; the drag is the whole of it here.
+		} else if (typeof request === 'function') {
 			ask = () => {
 				window.removeEventListener('pointerdown', ask!);
 				ask = null;
-				request.call(DeviceOrientationEvent).then(
+				request.call(orientation).then(
 					(state) => state === 'granted' && listen(),
 					() => {
 						/* declined, or not available here; the card simply stays flat */
@@ -181,7 +248,22 @@
      is most of it, and a flick that starts on the ground either side of it is
      the same gesture. `swipe` is touch-only, so a click-drag on a desktop still
      selects and still closes. -->
-<div class="full" role="presentation" onclick={onclose} use:swipe={(by) => step(index + by)}>
+<div
+	class="full"
+	role="presentation"
+	onclick={() => {
+		// A drag that ends over the ground either side of the card is a drag, not
+		// a click on the backdrop, and must not put the card away.
+		if (!dragged) onclose();
+		dragged = false;
+	}}
+	onpointerdown={tiltDown}
+	onpointermove={tiltMove}
+	onpointerup={tiltUp}
+	onpointercancel={tiltUp}
+	onpointerleave={tiltUp}
+	use:swipe={(by) => step(index + by)}
+>
 	<button class="plain close" onclick={onclose} title="Close" aria-label="Close">
 		<Icon name="close" size={22} />
 	</button>
@@ -227,6 +309,14 @@
 		position: fixed;
 		inset: 0;
 		z-index: 60;
+		/* Dragging across the card turns it; it must not also sweep a blue
+		   highlight over every word on it. Nothing in here is text you copy —
+		   this is the card as it will print, held up to be looked at, and the
+		   words are back in the table if you want them. Selection starts at
+		   whatever the press landed on, so refusing it here is enough to stop
+		   the drag from reaching the editor behind as well. */
+		user-select: none;
+		-webkit-user-select: none;
 		background: rgba(20, 20, 20, 0.82);
 		display: flex;
 		flex-direction: column;

@@ -67,9 +67,9 @@ describe('qrSvg', () => {
 		expect(svg).toContain('<path');
 	});
 
-	it('only emits colours the parser recognises', () => {
-		expect(qrSvg('x', { colour: '#123456' })).toContain('fill="#123456"');
-		expect(qrSvg('x', { colour: 'url(javascript:1)' })).toContain('fill="#000000"');
+	it('only emits colors the parser recognises', () => {
+		expect(qrSvg('x', { color: '#123456' })).toContain('fill="#123456"');
+		expect(qrSvg('x', { color: 'url(javascript:1)' })).toContain('fill="#000000"');
 		expect(qrSvg('x', { background: 'nonsense' })).not.toContain('<rect');
 		expect(qrSvg('x', { background: 'white' })).toContain('<rect');
 	});

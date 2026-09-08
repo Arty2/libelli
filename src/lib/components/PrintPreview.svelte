@@ -232,7 +232,7 @@
 			<li><strong>Paper size</strong> — the one matching <strong>{sheetW} × {sheetH} mm</strong>, or a larger sheet you trim.</li>
 			<li><strong>Margins</strong> — <em>None</em>.</li>
 			<li><strong>Headers and footers</strong> — off.</li>
-			<li><strong>Background graphics</strong> — on, or Chrome drops the paper colour.</li>
+			<li><strong>Background graphics</strong> — on, or Chrome drops the paper color.</li>
 		</ol>
 		<p class="muted">
 			A PNG export needs none of this — it comes out at 300 dpi whatever the print dialog says. Everything stays in

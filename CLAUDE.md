@@ -22,7 +22,7 @@ Sizes are marked where a file is big enough that opening it is a decision.
 ```
 src/lib/
   types.ts        template + runtime types; every coordinate is mm, font sizes are pt
-  colour.ts       the only place a colour string is allowed to become CSS
+  color.ts       the only place a color string is allowed to become CSS
   css.ts          scopes the template's own CSS to the card; strips @import and remote url()
   parse.ts        CSV / TSV parsing (quoted fields, embedded newlines, delimiter sniffing)
   markdown.ts     hand-written Markdown subset -> HTML, escaping at the leaves
@@ -74,9 +74,9 @@ static/sample-cards.csv   sample data, bundled with ?raw and also served as a fi
 - **The app fetches nothing.** The single deliberate exception is `png.ts`,
   which inlines a web font for export. A template is a file someone can hand
   you, and it must not be able to change that.
-- **Escaping, colour parsing and CSS scoping are chokepoints.** Cell content is
-  untrusted: every leaf text node is HTML-escaped in `markdown.ts`; every colour
-  goes through `colour.ts` before it can reach a `style` attribute, and one it
+- **Escaping, color parsing and CSS scoping are chokepoints.** Cell content is
+  untrusted: every leaf text node is HTML-escaped in `markdown.ts`; every color
+  goes through `color.ts` before it can reach a `style` attribute, and one it
   does not recognise is dropped rather than guessed at; a template's custom CSS
   goes through `css.ts`, which scopes every selector to the card and strips
   `@import` and any non-`data:` `url()`. Tests assert that each renderer *routes*
@@ -125,8 +125,12 @@ session only when asked to.
   was verified. No model names in anything that lands in the repo.
 - **Comments explain the why.** Not what the line does — why it is that way, and
   what breaks otherwise. Delete a comment that only restates the code.
-- **British spelling in prose and in identifiers** (`colour`, `normalise`),
-  except where a web API forces `color`.
+- **British spelling in prose and in identifiers** (`normalise`, `centre`,
+  `recognise`) — with one standing exception: **colour is spelled `color`**,
+  everywhere, from the CSS property to the module name to the label in the bar.
+  The web platform spells it that way, `Box.color` and `TextStyle.color` are the
+  format's own field names, and a codebase that said `parseColour` on one line
+  and `color:` on the next was carrying the seam around for no benefit.
 - **Say the trade-off out loud.** If a choice is arguable, note it in the commit
   or in a comment rather than leaving the next reader to rediscover it.
 - **Never ship anything traceable to reference material.** Sample data and

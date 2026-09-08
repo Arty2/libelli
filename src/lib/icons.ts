@@ -5,11 +5,11 @@
  *
  * Every entry is the inner markup of a `0 0 32 32` viewBox.
  *
- * One is drawn here rather than taken from Carbon, and is marked where it is
- * defined: `scissors`. The badge glyphs that used to be drawn here — an anchor,
- * a knot and a broken chain — are Carbon's own `harbor`, `link` and `unlink`
- * now: the badges became controls, and a control should wear the icon the rest
- * of the world uses for it rather than one invented for this app.
+ * Every glyph here is Carbon's. The set used to carry four drawn for this app —
+ * an anchor, a knot, a broken chain and a pair of shears — and each has been
+ * replaced by the icon the rest of the world uses for the same thing: `harbor`,
+ * `link`, `unlink` and `cut`. Marks that became controls, in particular, should
+ * not be wearing something invented here.
  */
 
 export const ICONS: Record<string, string> = {
@@ -64,9 +64,7 @@ export const ICONS: Record<string, string> = {
 	'layers': '<path d="M16,24a.9967.9967,0,0,1-.4741-.12l-13-7L3.4741,15.12,16,21.8643,28.5259,15.12l.9482,1.7607-13,7A.9967.9967,0,0,1,16,24Z"/><path d="M16,30a.9967.9967,0,0,1-.4741-.12l-13-7L3.4741,21.12,16,27.8643,28.5259,21.12l.9482,1.7607-13,7A.9967.9967,0,0,1,16,30Z"/><path d="M16,18a.9967.9967,0,0,1-.4741-.12l-13-7a1,1,0,0,1,0-1.7607l13-7a.9982.9982,0,0,1,.9482,0l13,7a1,1,0,0,1,0,1.7607l-13,7A.9967.9967,0,0,1,16,18ZM5.1094,10,16,15.8643,26.8906,10,16,4.1358Z"/>',
 	'activity': '<path d="M12,29a1,1,0,0,1-.92-.62L6.33,17H2V15H7a1,1,0,0,1,.92.62L12,25.28,20.06,3.65A1,1,0,0,1,21,3a1,1,0,0,1,.93.68L25.72,15H30v2H25a1,1,0,0,1-.95-.68L21,7,12.94,28.35A1,1,0,0,1,12,29Z"/>',
 	'arrows-horizontal': '<polygon points="11.41 26.59 7.83 23 28 23 28 21 7.83 21 11.41 17.41 10 16 4 22 10 28 11.41 26.59"/><polygon points="28 10 22 4 20.59 5.41 24.17 9 4 9 4 11 24.17 11 20.59 14.59 22 16 28 10"/>',
-	/* Drawn here, not Carbon: shears. Two blades crossed over two finger rings,
-	   for the corner that says the words are being cut off. */
-	'scissors': '<path d="M9 2 7.3 3 15 16.2 16.7 13.3ZM23 2l1.7 1L17 16.2 15.3 13.3Z"/><path d="M7 18a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM25 18a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/>',
+	'cut': '<path d="M26.5,19.63,20.24,16l6.26-3.63a5,5,0,0,0-1.21-9.2A5.19,5.19,0,0,0,24,3a5,5,0,0,0-4.33,7.53,5,5,0,0,0,2.39,2.1l-3.82,2.21L4,6.6,3,8.34,16.24,16,3,23.68l1,1.74,14.24-8.26,3.82,2.21a5,5,0,0,0-2.39,2.1A5,5,0,0,0,24,29a5.19,5.19,0,0,0,1.29-.17,5,5,0,0,0,1.21-9.2ZM21.4,9.53a3,3,0,0,1,1.1-4.12,3,3,0,0,1,4.1,1.11,3,3,0,0,1-1.1,4.11h0A3,3,0,0,1,21.4,9.53Zm5.2,16a3,3,0,0,1-4.1,1.11,3,3,0,0,1-1.1-4.12,3,3,0,0,1,4.1-1.1h0A3,3,0,0,1,26.6,25.48Z"/>',
 
 	'unlink': '<path d="M5 3.59H7V8.42H5z" transform="rotate(-45.01 5.996 6.005)"/><path d="M25 23.58H27V28.409999999999997H25z" transform="rotate(-44.99 25.995 25.999)"/><path d="M11 2H13V6H11z"/><path d="M2 11H6V13H2z"/><path d="M26 19H30V21H26z"/><path d="M19 26H21V30H19z"/><path d="M16.58,21.07l-3.71,3.72a4,4,0,1,1-5.66-5.66l3.72-3.72L9.51,14,5.8,17.72a6,6,0,0,0-.06,8.54A6,6,0,0,0,10,28a6.07,6.07,0,0,0,4.32-1.8L18,22.49Z"/><path d="M15.41,10.93l3.72-3.72a4,4,0,1,1,5.66,5.66l-3.72,3.72L22.49,18l3.71-3.72a6,6,0,0,0,.06-8.54A6,6,0,0,0,22,4a6.07,6.07,0,0,0-4.32,1.8L14,9.51Z"/>',
 	/* A harbour buoy: what an area other areas are moored to wears. */

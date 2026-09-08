@@ -334,9 +334,14 @@
 			{#if selected.slot}
 				<label class="field">
 					<span>Column</span>
+					<!-- Frozen with the rest of them. Which column an area draws from is an
+					     option like any other — it changes what the area shows — and this
+					     was the one control in the bar a lock did not reach, so a locked
+					     area sat there with eight fields gone quiet and one still lit. -->
 					<select
 						value={mapping[selected.slot] ?? ''}
 						title="Which spreadsheet column fills this field"
+						disabled={boxFrozen}
 						onchange={(e) => onmappingchange({ ...mapping, [selected.slot as string]: e.currentTarget.value })}
 					>
 						<option value="">— None —</option>
@@ -351,8 +356,8 @@
 					<input
 						class="w-8"
 						value={selected.static?.url ?? ''}
-						placeholder="https://… or a colour"
-						title="What this area shows on every card, saved in the template: an image address, or a colour — a hex, an rgb() or hsl(), or a colour name"
+						placeholder="https://… or a color"
+						title="What this area shows on every card, saved in the template: an image address, or a color — a hex, an rgb() or hsl(), or a color name"
 						disabled={boxFrozen}
 						onchange={(e) => setStatic({ url: e.currentTarget.value.trim() || undefined })}
 					/>
@@ -376,7 +381,7 @@
 				<select value={selected.mode} disabled={boxFrozen} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
 					<option value="plain">Plain Text</option>
 					<option value="markdown">Markdown</option>
-					<option value="image">Image / Colour</option>
+					<option value="image">Image / Color</option>
 					<option value="qr">QR Code</option>
 				</select>
 			</label>
@@ -438,9 +443,9 @@
 				</label>
 				{#if selected.qr?.background}
 					<label class="field">
-						<span class="sr-only">QR Background Colour</span>
+						<span class="sr-only">QR Background Color</span>
 						<input
-							class="colour"
+							class="color"
 							type="color"
 							value={selected.qr.background}
 							disabled={boxFrozen}
@@ -492,9 +497,9 @@
 				</select>
 			</label>
 			<label class="field">
-				<span>Colour</span>
+				<span>Color</span>
 				<input
-					class="colour"
+					class="color"
 					type="color"
 					value={selected.color ?? template.defaults.color}
 					disabled={boxFrozen}
@@ -503,7 +508,7 @@
 			</label>
 		</span>
 
-		<!-- The face, its size, its weight and its colour are one choice; how the
+		<!-- The face, its size, its weight and its color are one choice; how the
 		     lines are set is another. They were one group of seven controls, which
 		     is the point at which a group stops naming a subject. -->
 		<span class="group" role="group" aria-label="Setting">
@@ -589,9 +594,9 @@
 			</label>
 			{#if selected.background}
 				<label class="field">
-					<span class="sr-only">Fill Colour</span>
+					<span class="sr-only">Fill Color</span>
 					<input
-						class="colour"
+						class="color"
 						type="color"
 						value={selected.background}
 						disabled={boxFrozen}
@@ -713,11 +718,11 @@
 					</select>
 				</label>
 				<label class="field">
-					<span class="sr-only">Border Colour</span>
+					<span class="sr-only">Border Color</span>
 					<input
-						class="colour"
+						class="color"
 						type="color"
-						title="Border colour; follows the text colour until you set one"
+						title="Border color; follows the text color until you set one"
 						value={selected.borderColor ?? selected.color ?? template.defaults.color}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ borderColor: e.currentTarget.value })}

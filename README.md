@@ -34,7 +34,7 @@ serverless functions anywhere.
 Data comes in through the [table](#the-data-table) as rows of strings, and a
 mapping binds each template *slot* to a column. A [card](#cards-and-boxes) is
 absolutely-positioned divs inside a page-sized div, with every coordinate in
-millimetres measured from the trim edge; [Markdown](#markdown-and-colour) bodies
+millimetres measured from the trim edge; [Markdown](#markdown-and-color) bodies
 are rendered to HTML by a small hand-written renderer. The browser does the line
 breaking, the wrapping and the [fonts](#fonts), then anchored boxes are placed
 against the heights it produced. [Printing](#printing) re-renders the same card
@@ -109,7 +109,7 @@ resize boxes directly, or type exact millimetres.
   plug pulled out of its socket, because it is not plugged into the data.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with
   one selected, and a text box lies over the content inheriting the face, size,
-  colour and alignment it will print in. A bound area writes through to the cell;
+  color and alignment it will print in. A bound area writes through to the cell;
   a static one writes to the template. <kbd>Esc</kbd> or
   <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Enter</kbd> leaves, and a plain
   <kbd>Enter</kbd> is a line break. Selecting an area also points the data table
@@ -149,7 +149,7 @@ resize boxes directly, or type exact millimetres.
   flashes as it lands, because a move you were not watching happen otherwise just
   leaves the card looking different. Crossing the trim does not count: that is
   what bleed is for.
-- **Surface** — a fill colour, padding, a border and a corner radius, all in
+- **Surface** — a fill color, padding, a border and a corner radius, all in
   millimetres. A padding and a border each take one measurement all round, or
   one per edge behind the expander next to it; a border's style and the corner
   radius are always for the whole box. Four equal edges collapse back to a
@@ -164,7 +164,7 @@ resize boxes directly, or type exact millimetres.
   pressed. Both give an area a value of its own on the first go, so an area that
   was inheriting stops.
 - **Type defaults** — page setup holds the family, size, leading, spacing and
-  colour. A box that leaves those fields blank inherits them, so changing the
+  color. A box that leaves those fields blank inherits them, so changing the
   page moves every box that never overrode it; a new box starts out inheriting
   everything.
 - **Sheet size** — **A6**, **A5**, **A4**, **A3** and **Postcard**. A6 and a
@@ -188,7 +188,7 @@ resize boxes directly, or type exact millimetres.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
-  colour — so like the paper colour, it prints only with background graphics on.
+  color — so like the paper color, it prints only with background graphics on.
   **The picture is never part of the template.** An uploaded file's bytes stay in
   this browser and the template carries only its name; a linked one carries the
   address. Open a template on another machine and it asks for the file by name
@@ -204,7 +204,7 @@ resize boxes directly, or type exact millimetres.
   and the page settings as well. A padlock appears on a locked area; a locked
   *page* says **Locked** in a band above the sheet and greys every bound on the
   card, because nothing on it can be moved and so nothing on it is worth
-  colouring for a reason. It also takes the per-area badges away: every one of
+  coloring for a reason. It also takes the per-area badges away: every one of
   them says why *that* area will not do what you ask, and on a locked page the
   answer is the same for all of them and the band has already given it. The
   shears that warn of a clipped print stay, because a lock does not change what
@@ -267,7 +267,7 @@ appear.
   the end of the toolbar empties the whole table and asks once, saying a count
   rather than a paragraph.
 
-## Markdown and colour
+## Markdown and color
 
 Body boxes render a deliberately small Markdown subset, written by hand so the
 app carries no runtime dependencies and works offline. Everything outside the
@@ -286,24 +286,24 @@ nesting, `1.` and `1)` ordered lists, `**bold**`, `*italic*`, `` `code` ``,
   editor they are inert: a link on paper says where to go, it does not go there,
   and clicking a word to pick up the area it is in should not navigate away from
   a design that lives only in this tab.
-- **Per-word colour** — `[a few words]{red}` or `[…]{#b42318}` colours just that
-  run. Hex, `rgb()`, `hsl()` and the CSS colour keywords all work; seventeen
+- **Per-word color** — `[a few words]{red}` or `[…]{#b42318}` colors just that
+  run. Hex, `rgb()`, `hsl()` and the CSS color keywords all work; seventeen
   common names — `red`, `green`, `blue` and their neighbours — are deliberately
-  shadowed by a print-sensible palette, because CSS `red` is a screen colour and
+  shadowed by a print-sensible palette, because CSS `red` is a screen color and
   comes off a press as a shout. Write the hex if you want that exact value.
-- **Three levels of colour** — a default text colour for the card, a colour for
-  any single box, and the inline form above. A box's colour beats the default;
+- **Three levels of color** — a default text color for the card, a color for
+  any single box, and the inline form above. A box's color beats the default;
   the inline form beats both.
-- **Paper colour** — set on the page. It prints only with the browser's
+- **Paper color** — set on the page. It prints only with the browser's
   background graphics switched on, which the app says out loud next to Print.
 
-Colours from a template file, a settings field or a spreadsheet cell all go
+Colors from a template file, a settings field or a spreadsheet cell all go
 through one parser that accepts hex, the named sets and `rgb()`/`hsl()` and
 refuses everything else, so nothing can ride into a style attribute behind a
-colour. Nothing that comes back out of it is the string that went in: a
+color. Nothing that comes back out of it is the string that went in: a
 functional notation is rebuilt from the numbers it parsed to.
 
-## Images, colours and QR codes
+## Images, colors and QR codes
 
 Two box modes carry something other than text. Both are framed by the box's
 declared height, and both take a **Fit**: *fit* puts the whole thing inside the
@@ -311,11 +311,11 @@ box, *cover* fills the box and crops the overflow, *stretch* distorts it to the
 box exactly, and *tile* — images only, since a tiled QR is not a QR — repeats it
 at its own size.
 
-- **Image / Colour** — one mode, not two: the source is resolved, and it shows a
+- **Image / Color** — one mode, not two: the source is resolved, and it shows a
   picture when that turns out to be an address and a fill when it turns out to
-  be a colour. A column of brand colours and a column of logo URLs are the same
+  be a color. A column of brand colors and a column of logo URLs are the same
   job — put what this row says behind this area — and a template author should
-  not have to know which the data holds. Colours are read in hex, `rgb()`,
+  not have to know which the data holds. Colors are read in hex, `rgb()`,
   `hsl()` or by name, and they fill the area itself, so the fill reaches under
   the padding and takes the corner radius with it. Pictures come from a data
   URL, an external URL, or inline SVG held in the template.
@@ -359,7 +359,7 @@ One screen holds both halves of getting a print right: every row rendered as a
 small page, and the four dialog settings the browser gets wrong by default —
 pick the **paper size** matching the card's millimetres, set **Margins** to
 *None*, uncheck **Headers and footers**, and switch on **Background graphics**,
-which Chrome drops along with the paper colour. Checking the cards and reading
+which Chrome drops along with the paper color. Checking the cards and reading
 the checklist are the same act, so they are the same screen.
 
 **Export…** is the only way in, so there is no route to the printer that skips
@@ -399,11 +399,14 @@ sheet in the editor — *3 / 12*, the number naming the card being the obvious
 thing to press to see it properly. <kbd>←</kbd> / <kbd>→</kbd>, the arrows
 either side of the count, and a swipe move between cards; <kbd>Esc</kbd> comes
 back out. Nothing is printed or exported from there — it is only a proper look.
-On a phone the card leans a few degrees with the handset, and turns a fraction of
-a degree with it — the way a real one catches the light and shifts in the hand.
-The roll is a tenth of the lean, because the type on the card is level and
-anything more reads as a crooked print rather than as a card. However you are
-holding it when it opens is level, and a
+The card leans a few degrees as you drag across it, and turns a fraction of a
+degree with the lean — the way a real one catches the light and shifts in the
+hand. On a phone the handset's own tilt does the same thing, and the two add, so
+a lean you introduce with your thumb rides on the one the phone is already
+showing. Letting go springs it back to level, because there is no gesture for
+putting it back. The roll is a tenth of the lean, since the type on the card is
+level and anything more reads as a crooked print rather than as a card. However
+you are holding it when it opens is level, and a
 device asking for less motion gets none.
 
 ## Undo and redo
@@ -507,14 +510,14 @@ thing itself.
 
 - **Page** — head: the template's name, then import, export, reset, lock ·
   sheet size (a preset or your own, and a button to turn it over), bleed, crop
-  marks · type defaults (font, size, leading, spacing, colour) · surface (paper
-  colour, background image and fit) · page number, whether to print the total,
+  marks · type defaults (font, size, leading, spacing, color) · surface (paper
+  color, background image and fit) · page number, whether to print the total,
   and its margin · CSS
 - **Area** — head: the field's name, then duplicate, delete, lock · content
   (data field or static text, column, mode, fit, QR settings) · type (font,
-  size, weight, colour) · setting (leading, spacing, case) · alignment,
+  size, weight, color) · setting (leading, spacing, case) · alignment,
   horizontal and vertical · surface (fill, padding, border width, style and
-  colour, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
+  color, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
   when empty) · rotation and its pivot
 - **Stacking order** — not in either bar and not in the right-click menu: a
   column beside the page, under undo and redo, whenever anything is selected.
