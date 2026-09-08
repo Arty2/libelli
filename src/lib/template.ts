@@ -1,6 +1,7 @@
 import { safeImageUrl } from './assets';
 import { parseColor } from './color';
 import defaultCard from './templates/default-card.json';
+import { IMPOSITION_COUNTS } from './imposition';
 import type {
 	BackgroundFit,
 	BorderStyle,
@@ -8,6 +9,7 @@ import type {
 	Centre,
 	Defaults,
 	FontRef,
+	ImpositionSpec,
 	Mapping,
 	PageBackgroundImage,
 	PageNumberPosition,
@@ -41,6 +43,17 @@ export const DEFAULT_DEFAULTS: Defaults = {
 	letterSpacing: 0
 };
 
+/**
+ * Off by default, and A4 4-up when first switched on — a sheet size and a
+ * count worth having ready, not a blank someone has to fill in before
+ * imposition does anything at all.
+ */
+export const DEFAULT_IMPOSITION: ImpositionSpec = {
+	enabled: false,
+	count: 4,
+	sheet: { w: 210, h: 297 }
+};
+
 export const DEFAULT_PAGE_NUMBER: PageNumberSpec = {
 	enabled: false,
 	position: 'bottom-right',
@@ -66,6 +79,7 @@ export function blankTemplate(): Template {
 		name: 'Untitled card',
 		page: { w: 148, h: 210, unit: 'mm', background: '#ffffff' },
 		bleed: { enabled: false, amount: 3, cropMarks: false },
+		imposition: { ...DEFAULT_IMPOSITION },
 		pageNumber: { ...DEFAULT_PAGE_NUMBER },
 		fonts: [{ family: 'Patrick Hand', source: 'google' }],
 		defaults: { ...DEFAULT_DEFAULTS },
@@ -170,6 +184,7 @@ export function normaliseTemplate(raw: unknown): Template {
 			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image) })
 		},
 		bleed: normaliseBleed(t.bleed),
+		imposition: normaliseImposition(t.imposition),
 		pageNumber: normalisePageNumber(t.pageNumber),
 		fonts: normaliseFonts(t.fonts),
 		defaults: {
@@ -200,6 +215,18 @@ function normaliseBleed(raw: any): Template['bleed'] {
 		enabled: Boolean(raw?.enabled),
 		amount: num(raw?.amount, 3),
 		cropMarks: Boolean(raw?.cropMarks)
+	};
+}
+
+function normaliseImposition(raw: any): ImpositionSpec {
+	const count = IMPOSITION_COUNTS.includes(raw?.count) ? raw.count : DEFAULT_IMPOSITION.count;
+	return {
+		enabled: Boolean(raw?.enabled),
+		count,
+		sheet: {
+			w: num(raw?.sheet?.w, DEFAULT_IMPOSITION.sheet.w),
+			h: num(raw?.sheet?.h, DEFAULT_IMPOSITION.sheet.h)
+		}
 	};
 }
 

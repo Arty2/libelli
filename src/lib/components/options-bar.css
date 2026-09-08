@@ -87,6 +87,16 @@
 	color: #555;
 }
 
+/* The count and sheet the imposition group is offering right now do not
+   actually fit together — same red as the destructive actions, because this
+   is also something to stop and look at before printing. */
+.options .field-label.warning {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: #b42318;
+}
+
 /* Related controls are one group with a rule either side, so the bar reads as
    a handful of subjects rather than thirty loose fields. */
 .options .group {

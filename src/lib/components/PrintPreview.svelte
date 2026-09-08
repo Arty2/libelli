@@ -5,6 +5,7 @@
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
 	import { mmToPx } from '$lib/layout';
+	import { resolveImposition } from '$lib/imposition';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
 	interface Props {
@@ -102,13 +103,16 @@
 	const setAll = (include: boolean) =>
 		onexcludedchange(include ? new Set() : new Set(dataset.rows.map((_, i) => i)));
 
-	const sheetW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
-	const sheetH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
-
 	let fullscreen = $state<number | null>(null);
 
 	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
+
+	// What Print actually puts on paper: several cards tiled onto one physical
+	// sheet when imposition fits, otherwise one card per sheet as before.
+	const imposed = $derived(resolveImposition(outerW, outerH, template.imposition));
+	const printSheetW = $derived(imposed ? template.imposition.sheet.w : outerW);
+	const printSheetH = $derived(imposed ? template.imposition.sheet.h : outerH);
 
 	/**
 	 * How wide a page is on the contact sheet.
@@ -229,7 +233,10 @@
 	<section class="checklist" aria-label="Before you print">
 		<h3>Before you print</h3>
 		<ol>
-			<li><strong>Paper size</strong> — the one matching <strong>{sheetW} × {sheetH} mm</strong>, or a larger sheet you trim.</li>
+			<li>
+				<strong>Paper size</strong> — the one matching <strong>{printSheetW} × {printSheetH} mm</strong>, or a larger sheet you trim.
+				{#if imposed}{template.imposition.count} cards per sheet.{/if}
+			</li>
 			<li><strong>Margins</strong> — <em>None</em>.</li>
 			<li><strong>Headers and footers</strong> — off.</li>
 			<li><strong>Background graphics</strong> — on, or Chrome drops the paper color.</li>

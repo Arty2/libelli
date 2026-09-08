@@ -24,6 +24,7 @@ describe('the built-in template', () => {
 		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 8 });
 		expect(template.boxes.find((b) => b.id === 'b_category')?.anchor).toBeNull();
 		expect(template.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });
+		expect(template.imposition.enabled).toBe(false);
 	});
 
 	it('keeps the markdown metrics on the body box', () => {
@@ -211,6 +212,23 @@ describe('normaliseTemplate', () => {
 
 	it('rejects anything that is not a template', () => {
 		expect(() => normaliseTemplate({ schema: 1 })).toThrow(/no boxes/);
+	});
+
+	it('defaults imposition to off for a template written before it existed', () => {
+		const t = normaliseTemplate({ schema: 2, boxes: [] });
+		expect(t.imposition).toEqual({ enabled: false, count: 4, sheet: { w: 210, h: 297 } });
+	});
+
+	it('keeps a valid imposition setting and drops a count outside 2/4/6/8', () => {
+		const t = normaliseTemplate({
+			schema: 3,
+			imposition: { enabled: true, count: 4, sheet: { w: 297, h: 420 } },
+			boxes: []
+		});
+		expect(t.imposition).toEqual({ enabled: true, count: 4, sheet: { w: 297, h: 420 } });
+
+		const bogus = normaliseTemplate({ schema: 3, imposition: { enabled: true, count: 5 }, boxes: [] });
+		expect(bogus.imposition.count).toBe(4);
 	});
 });
 

@@ -187,6 +187,16 @@ resize boxes directly, or type exact millimetres.
   bounds. The grid keeps its corner at the trim, not at the sheet, so turning
   bleed on does not slide the gridlines under the boxes they are there to
   measure.
+- **Per Sheet** — several cards printed to one physical sheet: 2, 4, 6 or 8,
+  onto A5, A4, A3 or a sheet of your own size in millimetres. Cards keep the
+  millimetres they were designed at — imposition never scales anything, it
+  only decides how many trim-sized copies fit and tiles them edge to edge,
+  centred on the sheet. Bleed does double duty here: the gap between
+  neighbouring cards, and the crop marks between them, are the card's own
+  bleed and **Crop Marks** setting, so there is nothing extra to keep in
+  step. A count that does not fit the sheet at this card size, in any
+  orientation, is called out rather than clipped or overlapped — make the
+  sheet bigger, the card smaller, or ask for fewer per sheet.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
@@ -353,16 +363,20 @@ Pick a curated Google family, type any other family name, or upload a file.
 ## Printing
 
 Print renders every row into a dedicated container and hands it to the browser:
-`@page { size: <w>mm <h>mm; margin: 0 }`, one page per row, no trailing blank.
+`@page { size: <w>mm <h>mm; margin: 0 }`, one physical sheet per row, no
+trailing blank. With imposition on and the count fitting the sheet, several
+rows tile onto each sheet instead, in the grid **Per Sheet** works out, and
+`@page` names the physical sheet size rather than the card's.
 
 ## Print preview
 
 One screen holds both halves of getting a print right: every row rendered as a
 small page, and the four dialog settings the browser gets wrong by default —
-pick the **paper size** matching the card's millimetres, set **Margins** to
-*None*, uncheck **Headers and footers**, and switch on **Background graphics**,
-which Chrome drops along with the paper color. Checking the cards and reading
-the checklist are the same act, so they are the same screen.
+pick the **paper size** matching the physical sheet's millimetres (the card's,
+or the imposed sheet's when **Per Sheet** is on), set **Margins** to *None*,
+uncheck **Headers and footers**, and switch on **Background graphics**, which
+Chrome drops along with the paper color. Checking the cards and reading the
+checklist are the same act, so they are the same screen.
 
 **Export…** is the only way in, so there is no route to the printer that skips
 the look at what you are about to spend paper on — <kbd>Ctrl</kbd>/<kbd>⌘</kbd>

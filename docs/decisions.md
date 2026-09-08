@@ -45,6 +45,31 @@ source: a static box with nothing typed into it still draws its fill, its border
 and its size, and `hideWhenEmpty` is what takes it away — two settings that
 already existed, rather than a third state to keep in step.
 
+## `src/lib/imposition.ts`
+
+**No second bleed.** Several cards on one sheet need a gap between neighbours
+and a mark showing where to cut — exactly what `template.bleed` already
+gives one card against the paper edge. Tiling cards edge to edge, with no
+extra gutter, means that gap and those marks fall out of the per-card bleed
+`Card.svelte` already draws at its own corners, so imposition adds a sheet
+size and a count and touches nothing about bleed itself.
+
+**A grid's footprint does not depend on its shape.** `cardW * cols` by
+`cardH * rows` covers `cardW * cardH * count` either way round, so "which
+orientation wastes less paper" is not a real question — only "which
+orientation fits" is. `GRIDS` lists the more balanced arrangement first (2x2
+before 4x1), and `resolveImposition` returns the first one that fits; an
+earlier version compared block area to pick a "best" grid, which was
+comparing numbers that could never differ.
+
+**A count that will not fit is reported, not forced.** Scaling the cards down
+to make them fit would break "millimetres everywhere," and silently printing
+fewer per sheet than asked would surprise whoever is about to feed paper into
+a printer. `resolveImposition` returns `undefined` when nothing fits, and
+callers — `PageOptions.svelte`'s warning, `PrintRoot.svelte`'s fallback —
+treat that the same way: say so, and print one card per sheet, the layout
+from before imposition existed.
+
 ## `src/lib/history.ts`
 
 **A label rides alongside each state, never inside it.** States are compared by

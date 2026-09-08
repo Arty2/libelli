@@ -6,7 +6,7 @@
  * print convention beats consistency.
  */
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /**
  * `image` is really "image or color": it shows whatever its source resolves
@@ -77,6 +77,25 @@ export interface BleedSpec {
 	/** mm of bleed on every side */
 	amount: number;
 	cropMarks: boolean;
+}
+
+/**
+ * Several virtual pages tiled onto one physical sheet — a way to print, not a
+ * way to design, so it lives beside `page` and `bleed` rather than changing
+ * what either of them means. `sheet` is the physical paper; `page` is still
+ * the card, measured from its own trim edge exactly as it is without
+ * imposition. Cards tile edge to edge: the space between them, and the crop
+ * marks that show where to cut, come from the template's own `bleed` — there
+ * is no second bleed to keep in step with the first.
+ */
+export interface ImpositionSpec {
+	enabled: boolean;
+	/** virtual pages per physical sheet */
+	count: 2 | 4 | 6 | 8;
+	sheet: {
+		w: number;
+		h: number;
+	};
 }
 
 /** A page number printed on every card. Off unless asked for. */
@@ -210,6 +229,7 @@ export interface Template {
 	name: string;
 	page: PageSpec;
 	bleed: BleedSpec;
+	imposition: ImpositionSpec;
 	pageNumber: PageNumberSpec;
 	fonts: FontRef[];
 	defaults: Defaults;
