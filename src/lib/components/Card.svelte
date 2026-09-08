@@ -880,9 +880,14 @@
 				{/if}
 
 				{#if bounds && !empty && overflowing[box.id]}
-					<!-- A badge like the others, in the one color that means the print
-					     will be wrong rather than merely constrained. Shears, because
-					     what is happening to the words is that they are being cut. -->
+					<!-- Where the words are actually severed, drawn as the cut it is: a
+					     dashed red line along the bottom edge, with the shears straddling
+					     it at the end of the stroke. The other three edges keep the plain
+					     bound they always had — only this one is doing the cutting, and
+					     saying so on all four would say nothing. -->
+					<svg class="chrome cut-line" aria-hidden="true">
+						<line x1="0" y1="100%" x2="100%" y2="100%" />
+					</svg>
 					<span class="overflow-mark" title="The content does not fit — this area is cutting off what will print">
 						<Icon name="cut" size={11} />
 					</span>
@@ -1454,24 +1459,37 @@
 			stroke-dasharray: calc(var(--line) * 2) calc(var(--line) * 2);
 		}
 
-		/* The same badge as the others — same size, radius and standing clear of
-		   the edge — in the one color that says the print will be wrong. It hangs
-		   off the bottom right, where the words run out, rather than sharing the
-		   column of reasons at the top right. */
+		/* The line the words are cut on: dashed, the way a cut line is drawn on
+		   anything meant to be cut, and in the same rhythm as the bound it sits on
+		   so the two read as one language. Heavier and red, because this edge is
+		   doing something the other three are not. */
+		.cut-line line {
+			stroke: #b42318;
+			stroke-width: var(--line-thick);
+			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
+		}
+
+		/* The same badge as the others — same size and radius — sitting astride
+		   the line rather than above it, so the shears read as being *on* the cut
+		   they are making. Hollow, unlike every other mark here: a solid red chip
+		   at the corner was the heaviest thing on a card whose whole point is the
+		   artwork, and the line beside it is already carrying the warning. */
 		.overflow-mark {
 			position: absolute;
 			top: 100%;
 			left: 100%;
-			margin: calc(-13px * var(--ui-scale, 1)) 0 0 calc(4px * var(--ui-scale, 1));
+			/* Half its own height up, so the middle of it lands on the bottom
+			   edge — the blade meeting the paper. */
+			margin: calc(-6.5px * var(--ui-scale, 1)) 0 0 calc(4px * var(--ui-scale, 1));
 			display: grid;
 			place-items: center;
 			width: calc(13px * var(--ui-scale, 1));
 			height: calc(13px * var(--ui-scale, 1));
 			box-sizing: border-box;
 			border-radius: var(--radius-button);
-			border: var(--line) solid #8f1c13;
-			background: #b42318;
-			color: #fff;
+			border: var(--line) solid #b42318;
+			background: transparent;
+			color: #b42318;
 			/* Hoverable, like the badges: its title is the only thing that says what
 			   the mark means, and pointer-events: none meant it never showed. */
 			pointer-events: auto;

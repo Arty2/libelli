@@ -254,6 +254,20 @@ stays grabbable. Losing the handles of something you can no longer see is worse
 than being shown what will not print, and the trim edge already says where the
 paper stops.
 
+**A clipping area draws the cut, not just a warning about it.** The bottom edge
+— the one the words are actually severed on — takes a heavier dashed red line
+over its bound, and the shears sit astride that line rather than above it, so
+the mark reads as being *on* the cut it is making. Dashed because that is how a
+cut line is drawn on anything meant to be cut, and in the same rhythm as the
+bound it sits on so the two are one language. The other three edges are left
+alone: only one of them is doing the cutting, and saying so on all four would
+say nothing.
+
+The badge is hollow — red on nothing, where every other mark here is a filled
+chip. A solid red square at the corner was the heaviest thing on a card whose
+whole subject is the artwork, and the line beside it is already carrying the
+warning.
+
 **A locked page takes the badges away.** Every badge on an area says why *that*
 area will not do what you might ask of it, and on a locked page the answer is
 the same for all of them — so the band over the sheet gives it once and the

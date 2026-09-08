@@ -136,9 +136,11 @@ resize boxes directly, or type exact millimetres.
   the pivot exactly, as a percentage of the area's own width and height. A
   turned area still occupies the space it would have upright, so anchored areas
   below it do not move — turning one thing never shuffles the card.
-- **Overflow** — a red badge with a pair of shears appears at the bottom right
-  of a box whose content is taller than the box will let it be, because a
-  clipped card looks fine on screen right up until it is printed.
+- **Overflow** — a box whose content is taller than the box will let it be draws
+  the cut: a dashed red line along its bottom edge, where the words are actually
+  severed, with a pair of shears astride that line at the right-hand end. A
+  clipped card looks fine on screen right up until it is printed, and the line
+  says where.
 - **Past the edge** — the editor does not cut anything off at the card's edge:
   drag an area half off the page and it stays visible, with its handles where
   you can still reach them. What prints is another matter — the paper stops
