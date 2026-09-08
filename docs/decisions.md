@@ -522,11 +522,16 @@ and nothing in there is text you would copy. A drag that ends over the ground
 either side of the card is a drag, not a click on the backdrop, so it does not
 put the card away.
 
-**The card rolls as well as leans.** A real card held in one hand does not stay
-square to the eye while it tips — the wrist turns with it. The roll rides on the
-same sideways reading as the lean, at a tenth of the angle: the type on the card
-is level, and past a couple of degrees it stops reading as a card catching the
-light and starts reading as a crooked print.
+**The card rolls against the lean, not with it.** A card held loosely does not
+turn with the hand: it hangs, and stays level in the world while the phone
+rotates around it, which on screen is a counter-rotation — roll the phone
+clockwise and the card appears to turn anticlockwise. Rolling *with* the tilt is
+what a sticker stuck to the glass does, and that is what it looked like. The
+roll rides on the same sideways reading as the lean and takes its sign from the
+opposite, at a third of the angle: the type on the card is level, and past a
+couple of degrees it stops reading as a card catching the light and starts
+reading as a crooked print. The drag resists the same way, for the same reason —
+push a card sideways and its mass lags behind.
 
 ## `src/lib/components/PrintPreview.svelte`
 

@@ -78,11 +78,17 @@
 	/**
 	 * And a little roll with it.
 	 *
-	 * A real card held in one hand does not stay square to your eye while it
-	 * leans — it turns slightly in the hand as the wrist does. Much smaller than
-	 * the lean, because roll is the one axis with a right answer already on the
-	 * card: the type is level, and anything past a couple of degrees stops
-	 * reading as a card catching the light and starts reading as a crooked print.
+	 * A real card held loosely does not turn with the hand — it hangs, and stays
+	 * level in the world while the phone rotates around it. On screen that reads
+	 * as a counter-rotation: roll the phone clockwise and the card appears to
+	 * turn anticlockwise, because it is the frame that moved and not the card.
+	 * Hence the negative sign at both call sites; with the sign the other way the
+	 * card turned *with* the phone, which is what a sticker on the glass does.
+	 *
+	 * Much smaller than the lean, because roll is the one axis with a right
+	 * answer already on the card: the type is level, and anything past a couple
+	 * of degrees stops reading as a card catching the light and starts reading as
+	 * a crooked print.
 	 */
 	const ROLL_MAX = 2.5;
 	/** how far the phone turns to reach that lean, in degrees */
@@ -136,9 +142,10 @@
 			(Math.max(-DRAG_RANGE, Math.min(DRAG_RANGE, px)) / DRAG_RANGE) * DRAG_MAX;
 		// Dragging right turns the card's left edge towards you, which is a
 		// positive rotateY; dragging down tips the top towards you, a positive
-		// rotateX. The roll rides on the sideways half, as the gyroscope's does.
+		// rotateX. The roll rides on the sideways half and resists it, as the
+		// gyroscope's does — push the card sideways and its mass lags behind.
 		const across = lean(dx);
-		dragTilt = { x: lean(dy), y: across, z: (across / DRAG_MAX) * ROLL_MAX };
+		dragTilt = { x: lean(dy), y: across, z: -(across / DRAG_MAX) * ROLL_MAX };
 	}
 
 	function tiltUp(event: PointerEvent) {
@@ -177,9 +184,10 @@
 			// Tipping the top away leans the card away, so the axes cross over: a
 			// forward tilt is a rotation about X, a sideways one about Y. The roll
 			// rides on the same sideways reading — one wrist, one movement — at a
-			// fraction of the angle.
+			// fraction of the angle, and against it: the card hangs level while the
+			// phone turns around it.
 			const across = lean(acrossScreen);
-			target = { x: -lean(downScreen), y: across, z: (across / TILT_MAX) * ROLL_MAX };
+			target = { x: -lean(downScreen), y: across, z: -(across / TILT_MAX) * ROLL_MAX };
 		};
 
 		const settle = () => {

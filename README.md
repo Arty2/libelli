@@ -400,13 +400,16 @@ thing to press to see it properly. <kbd>←</kbd> / <kbd>→</kbd>, the arrows
 either side of the count, and a swipe move between cards; <kbd>Esc</kbd> comes
 back out. Nothing is printed or exported from there — it is only a proper look.
 The card leans a few degrees as you drag across it, and turns a fraction of a
-degree with the lean — the way a real one catches the light and shifts in the
-hand. On a phone the handset's own tilt does the same thing, and the two add, so
-a lean you introduce with your thumb rides on the one the phone is already
-showing. Letting go springs it back to level, because there is no gesture for
-putting it back. The roll is a tenth of the lean, since the type on the card is
-level and anything more reads as a crooked print rather than as a card. However
-you are holding it when it opens is level, and a
+degree *against* the lean — the way a card held loosely hangs level while the
+hand around it turns. Roll the phone clockwise and the card appears to turn
+anticlockwise, because what moved was the frame and not the card; the other way
+round is what a sticker on the glass does. On a phone the handset's own tilt
+drives the same thing, and the two add, so a lean you introduce with your thumb
+rides on the one the phone is already showing. Letting go springs it back to
+level, because there is no gesture for putting it back. The roll is a third of
+the lean, since the type on the card is level and anything more reads as a
+crooked print rather than as a card. However you are holding it when it opens is
+level, and a
 device asking for less motion gets none.
 
 ## Undo and redo
