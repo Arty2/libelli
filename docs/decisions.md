@@ -741,6 +741,20 @@ paper (and `@page` with it) and its marks go at the corners of the tiled
 *block*. Those two cuts are made by different people at different times, and a
 single setting would have to mean both.
 
+**A crop mark is held to a pixel of the screen, and 0.2mm of the paper.**
+0.2mm is three quarters of a pixel at full size and a quarter of one in a
+thumbnail, so a browser rounded the marks away: they were in the DOM, correct,
+and invisible on the glass — which reads exactly like a feature that does not
+work. `previewScale` is the scale the preview is showing the sheet at, and
+under `@media screen` the tick thickness is `max(0.2mm, 1px / that)`. Print
+never sees the rule and keeps its 0.2mm.
+
+**Each tick is as long as its own axis allows.** One length for both, taken
+from the smaller padding, meant a block filling the sheet's width — the common
+case — drew 2mm marks in a 77mm top margin. The vertical tick measures against
+the vertical room and the horizontal against the horizontal, both capped at
+`SHEET_MARK_MAX`.
+
 **Sheet marks are drawn in the room the sheet already has, and never make
 their own.** They take the sheet bleed plus whatever the centred block is not
 using, capped at `SHEET_MARK_MAX`, and are skipped when that comes to
@@ -767,6 +781,19 @@ splitting it was what let the preview reuse it at all.
 page selection lives there, keyed by row index and reset every time it opens —
 sorting or deleting a row moves those indices, and a stale exclusion would drop a
 different card than the one that was unticked.
+
+**PNG and Print are positioned, not laid out.** They are the two things this
+screen exists for, and in the flow they moved: a title growing a "3 of 4", an
+export renaming its own button "Exporting 2/12…", a second select button
+appearing — each shoved them along. Absolutely placed inside the close
+button's corner, they are in the same place at every width and in every state,
+and the narrow header ellipsises its title rather than sliding under them.
+
+**The whole caption row is the checkbox.** A 13px box beside a number is a pin
+to aim at, and on a phone this row is the one control pressed over and over.
+The `<label>` is what carries the hit area — as wide as the thumbnail above it
+and tall enough to hit — so the target and the box it toggles cannot come
+apart the way a separately-padded wrapper would.
 
 **A sheet's selection is a second filter, not a rewrite of the first.**
 Unticking a sheet drops the sheet and leaves the pages on it ticked as pages.

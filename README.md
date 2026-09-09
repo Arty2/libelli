@@ -442,8 +442,10 @@ strip moves. A desktop keeps the wrapping grid, where the whole run is a few
 scrolls whatever its length.
 
 Every page has a checkbox under it, and only the ticked ones print — untick the
-three proofs that came out wrong and reprint just those. **Select All Pages** /
-**Select None** does the whole run, and the title says how many pages are going.
+three proofs that came out wrong and reprint just those — the whole caption row
+under a thumbnail is the target, not the box in the middle of it. **All Pages**
+takes the lot, and once they are all ticked the same button reads **Choose
+Pages** and clears them so you can pick; the title says how many are going.
 A page keeps the number it has in the table however few of
 them go, so page 4 prints as page 4 even when it is the only one selected. A PNG
 run names its files `stem_01.png`, padded to the width of the run, so a directory
@@ -451,10 +453,9 @@ listing comes back in print order rather than as 1, 10, 2. The
 selection is for one print: reopening the preview starts from every page again,
 because sorting or deleting a row moves the positions it was pinned to.
 
-Sheets have checkboxes of their own, and **Select All Sheets** / **Select
-None** beside the pages' button — one sheet of a run misfed or came out
-streaked, and reprinting it should not mean working out which four rows were
-on it. It is a second filter over the first: unticking a sheet drops that
+Sheets have checkboxes of their own, and **All Sheets** / **Choose Sheets**
+beside the pages' button — one sheet of a run misfed or came out streaked, and
+reprinting it should not mean working out which four rows were on it. It is a second filter over the first: unticking a sheet drops that
 sheet, and the pages on it stay ticked as pages. Changing which pages go
 regroups the sheets, so it brings every sheet back — sheet 2 of a different
 grouping is different paper, and a selection held over would drop the wrong
@@ -574,9 +575,10 @@ The button is only there when the browser is actually offering an install, and
 goes once you have taken it.
 
 The copy is replaced a whole build at a time. When a new version has downloaded,
-the status bar says so and offers **Reload** rather than swapping it in
-underneath you: undo history lives in memory, and a reload you did not ask for
-would throw it away.
+the status bar says *New version — keep undo history or update now to restart
+this session* and offers **Update** rather than swapping it in underneath you:
+undo history lives in memory, and a restart you did not ask for would throw it
+away.
 
 None of this changes what leaves the browser, because nothing does. The cache
 holds this app's own files and nothing else — a font from Google or a background

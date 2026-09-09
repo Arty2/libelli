@@ -115,6 +115,7 @@
 				{printBackground}
 				pages={sheets[index] ?? []}
 				{pageCount}
+				previewScale={scale}
 			/>
 		</span>
 	</div>

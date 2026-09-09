@@ -242,27 +242,30 @@
 				sheet{sheetGroups.length === 1 ? '' : 's'}
 			{/if}
 		</h2>
-		<!-- One row, whatever the width: what to select is about the grids below
-		     and sits at its left end, PNG and Print are what you came here to
-		     press and stay pinned to its right. Wrapping the pair means a narrow
-		     header drops the title onto its own line rather than breaking the row
-		     of actions apart. Pages and sheets get a button each, because they
-		     are two selections and one button could only ever mean one of them. -->
+		<!-- Pages and sheets get a button each, because they are two selections
+		     and one button could only ever mean one of them. Each says what
+		     pressing it does: everything is ticked, so it hands the choosing
+		     over; nothing is, so it takes the lot. -->
 		<div class="header-bar">
 			<button
 				class="choose"
-				title={allChosen ? 'Untick every page' : 'Tick every page'}
-				onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All Pages'}</button
+				title={allChosen ? 'Untick every page, and choose the ones to print' : 'Tick every page'}
+				onclick={() => setAll(!allChosen)}>{allChosen ? 'Choose Pages' : 'All Pages'}</button
 			>
 			{#if imposed}
 				<button
 					class="choose"
-					title={allSheetsChosen ? 'Untick every sheet' : 'Tick every sheet'}
+					title={allSheetsChosen ? 'Untick every sheet, and choose the ones to print' : 'Tick every sheet'}
 					onclick={() => setAllSheets(!allSheetsChosen)}
-					>{allSheetsChosen ? 'Select None' : 'Select All Sheets'}</button
+					>{allSheetsChosen ? 'Choose Sheets' : 'All Sheets'}</button
 				>
 			{/if}
-			<div class="header-actions">
+		</div>
+		<!-- Taken out of the flow and pinned to the right, inside the close
+		     button: PNG and Print are the two things this screen is for, and they
+		     are in the same place whatever the title says and however narrow the
+		     window gets. -->
+		<div class="header-actions">
 			<button onclick={exportPng} disabled={goingOut === 0 || exporting}>
 				<Icon name="download" size={15} />
 				{#if exporting}
@@ -277,7 +280,6 @@
 				<Icon name="print" size={15} />
 				Print
 			</button>
-			</div>
 		</div>
 		<!-- Out of the row of actions and into the corner, unstyled, where the
 		     lightbox puts its own: leaving is not one of the things you came here
@@ -360,6 +362,7 @@
 									{printBackground}
 									pages={sheetPages}
 									pageCount={dataset.rows.length}
+									previewScale={sheetThumbScale}
 								/>
 							</span>
 						</button>
@@ -461,27 +464,23 @@
 		font: 600 14px ui-sans-serif, system-ui, sans-serif;
 	}
 
-	/* Select All and the two actions are one row that takes whatever width is
-	   left beside the title; Select All holds its left end and the actions are
-	   pushed to its right by the margin below. When the header wraps, the row
-	   wraps whole, so PNG and Print are never split from each other or pulled
-	   off the right edge. */
+	/* The two select buttons, in the flow beside the title, wrapping under it
+	   when there is no room. */
 	.header-bar {
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		flex: 1 1 auto;
 		min-width: 0;
 	}
 
-	/* On the actions rather than on the first button: there are two select
-	   buttons now, and an auto margin on the first would have pushed the second
-	   away with the actions. */
-	.header-bar .header-actions {
-		margin-left: auto;
-	}
-
+	/* Absolute, so they hold the right edge whatever the flow beside them does:
+	   a title that grows a "3 of 4" or an export that renames itself
+	   "Exporting 2/12…" used to shove them about. Inside the close button's
+	   corner, and the header's own right padding is what keeps the two apart. */
 	.header-actions {
+		position: absolute;
+		top: 10px;
+		right: 48px;
 		display: flex;
 		align-items: center;
 		gap: 10px;
@@ -606,6 +605,21 @@
 			flex-wrap: wrap;
 			gap: 8px;
 		}
+
+		/* The actions are pinned to the right of the first line, so the title
+		   stops before them and ellipsises rather than sliding underneath. The
+		   select buttons wrap to a line of their own, where there is no such
+		   competition. */
+		header h2 {
+			max-width: calc(100% - 180px);
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.header-bar {
+			flex-basis: 100%;
+		}
 	}
 
 	.grid {
@@ -675,11 +689,29 @@
 		margin-top: 6px;
 	}
 
+	/* The whole caption is the target, as wide as the thumbnail above it and
+	   tall enough to hit: a 13px box beside a number was a pin to aim at, and
+	   this row is the one control on a phone that gets pressed repeatedly. The
+	   label is what carries it, so the hit area and the checkbox cannot come
+	   apart. */
 	figcaption label {
-		display: inline-flex;
+		display: flex;
 		align-items: center;
-		gap: 5px;
+		justify-content: center;
+		gap: 6px;
 		cursor: pointer;
+		padding: 6px 4px;
+		border-radius: var(--radius-button);
+	}
+
+	figcaption label:hover {
+		background: rgba(0, 0, 0, 0.05);
+	}
+
+	figcaption input[type='checkbox'] {
+		/* Bigger than the browser default, to match the row it now sits in. */
+		width: 15px;
+		height: 15px;
 	}
 
 	/* A dropped page stays legible — you are deciding about it, not deleting it. */

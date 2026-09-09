@@ -299,7 +299,7 @@ em { color: #b42318 }`;
 		// Last, so the precache download is not competing with the first paint.
 		registerServiceWorker(() => {
 			updateReady = true;
-			notify('A new version of libelli is ready — reload when you are at a good stopping point.');
+			notify('New version — keep undo history or update now to restart this session.');
 		});
 	}
 
@@ -1361,7 +1361,7 @@ em { color: #b42318 }`;
 			{#if statusTone === 'warning'}<Icon name="warning" size={12} />{/if}{status}
 		</span>
 		{#if updateReady}
-			<button class="reload" onclick={applyUpdate}>Reload</button>
+			<button class="reload" onclick={applyUpdate}>Update</button>
 		{/if}
 		<span class="version">v{VERSION}</span>
 	</footer>
@@ -1430,7 +1430,8 @@ em { color: #b42318 }`;
 			uploaded, because there is no server to upload it to and no account to make. It works with the network off, a
 			template is a small file you can hand to somebody, and closing the tab is the only thing that deletes anything.
 			Where your browser offers it, <strong>Install</strong> gives libelli its own window; when a new version has
-			downloaded the status bar says so and waits, because a reload nobody asked for would take undo with it.
+			downloaded the status bar says so and waits for <strong>Update</strong>, because a restart nobody asked
+				for would take undo with it.
 		</p>
 
 		<h3>Areas</h3>

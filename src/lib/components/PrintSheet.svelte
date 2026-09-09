@@ -23,9 +23,26 @@
 		pages: { row: Row; index: number }[];
 		/** total rows in the dataset, for "n / total" numbering on each card */
 		pageCount: number;
+		/**
+		 * What a preview is scaling this sheet down by, if one is.
+		 *
+		 * Screen only, and only for the weight of the crop marks: a mark is
+		 * 0.2mm, which is three quarters of a pixel at full size and a quarter of
+		 * one in a thumbnail — thin enough that a browser rounds it away and the
+		 * marks look missing. Print keeps the 0.2mm.
+		 */
+		previewScale?: number;
 	}
 
-	let { template, mapping, background, printBackground, pages, pageCount }: Props = $props();
+	let {
+		template,
+		mapping,
+		background,
+		printBackground,
+		pages,
+		pageCount,
+		previewScale = 1
+	}: Props = $props();
 
 	const bleed = $derived(template.bleed.enabled ? template.bleed.amount : 0);
 	const cardW = $derived(template.page.w + bleed * 2);
@@ -70,11 +87,17 @@
 	 * block is not using. Switching them on moves nothing, so a block filling
 	 * its sheet edge to edge with no sheet bleed simply has nowhere to put
 	 * them, and gets none.
+	 *
+	 * Each tick is measured against the room on its *own* axis. Taking the
+	 * smaller of the two wasted a generous top margin whenever the block filled
+	 * the sheet's width, which is the common case — the marks came out 2mm long
+	 * and read as dust.
 	 */
-	const outerMark = $derived(
-		Math.min(SHEET_MARK_MAX, Math.max(0, Math.min(padX, padY) - SHEET_MARK_GAP))
+	const markX = $derived(Math.min(SHEET_MARK_MAX, Math.max(0, padX - SHEET_MARK_GAP)));
+	const markY = $derived(Math.min(SHEET_MARK_MAX, Math.max(0, padY - SHEET_MARK_GAP)));
+	const showOuterMarks = $derived(
+		!!imposed && template.print.bleed.cropMarks && Math.max(markX, markY) > 0
 	);
-	const showOuterMarks = $derived(!!imposed && template.print.bleed.cropMarks && outerMark > 0);
 
 	const sheetBackgroundStyle = $derived(
 		backgroundStyle(template.print.background, printBackground).join(';')
@@ -84,7 +107,7 @@
 <!-- Sized to the paper so nothing can spill sideways into an extra page. -->
 <div
 	class="print-sheet"
-	style="width:{paperW}mm;height:{paperH}mm;padding:{padY}mm {padX}mm;{sheetBackgroundStyle}"
+	style="width:{paperW}mm;height:{paperH}mm;padding:{padY}mm {padX}mm;--preview-scale:{previewScale};{sheetBackgroundStyle}"
 >
 	<div
 		class="print-grid"
@@ -107,7 +130,7 @@
 			{#each ['tl', 'tr', 'bl', 'br'] as corner (corner)}
 				<span
 					class="mark {corner}"
-					style="--len:{outerMark}mm;--gap:{SHEET_MARK_GAP}mm;--pad-x:{padX}mm;--pad-y:{padY}mm"
+					style="--len-x:{markX}mm;--len-y:{markY}mm;--gap:{SHEET_MARK_GAP}mm;--pad-x:{padX}mm;--pad-y:{padY}mm"
 				></span>
 			{/each}
 		</div>
@@ -138,8 +161,8 @@
 	   of the tiled block instead, and running outward from it. */
 	.sheet-marks .mark {
 		position: absolute;
-		width: var(--len);
-		height: var(--len);
+		width: var(--len-x);
+		height: var(--len-y);
 	}
 
 	.sheet-marks .mark::before,
@@ -149,29 +172,46 @@
 		background: #000;
 	}
 
+	/* The tick on the vertical block edge takes the vertical room, the one on
+	   the horizontal edge takes the horizontal. */
 	.sheet-marks .mark::before {
 		width: 0.2mm;
-		height: calc(var(--len) - var(--gap));
+		height: max(0mm, calc(var(--len-y) - var(--gap)));
 	}
 
 	.sheet-marks .mark::after {
 		height: 0.2mm;
-		width: calc(var(--len) - var(--gap));
+		width: max(0mm, calc(var(--len-x) - var(--gap)));
 	}
 
-	.sheet-marks .tl { top: calc(var(--pad-y) - var(--len)); left: calc(var(--pad-x) - var(--len)); }
+	/* On screen the sheet is drawn at whatever a thumbnail or a lightbox scales
+	   it to, and 0.2mm of that is a fraction of a pixel the browser rounds
+	   away — the marks were there in the DOM and invisible on the glass. Held
+	   to a pixel of the *screen* by dividing out the scale it is being shown
+	   at. Print is untouched and stays at 0.2mm. */
+	@media screen {
+		.sheet-marks .mark::before {
+			width: max(0.2mm, calc(1px / var(--preview-scale, 1)));
+		}
+
+		.sheet-marks .mark::after {
+			height: max(0.2mm, calc(1px / var(--preview-scale, 1)));
+		}
+	}
+
+	.sheet-marks .tl { top: calc(var(--pad-y) - var(--len-y)); left: calc(var(--pad-x) - var(--len-x)); }
 	.sheet-marks .tl::before { top: 0; right: 0; }
 	.sheet-marks .tl::after { left: 0; bottom: 0; }
 
-	.sheet-marks .tr { top: calc(var(--pad-y) - var(--len)); right: calc(var(--pad-x) - var(--len)); }
+	.sheet-marks .tr { top: calc(var(--pad-y) - var(--len-y)); right: calc(var(--pad-x) - var(--len-x)); }
 	.sheet-marks .tr::before { top: 0; left: 0; }
 	.sheet-marks .tr::after { right: 0; bottom: 0; }
 
-	.sheet-marks .bl { bottom: calc(var(--pad-y) - var(--len)); left: calc(var(--pad-x) - var(--len)); }
+	.sheet-marks .bl { bottom: calc(var(--pad-y) - var(--len-y)); left: calc(var(--pad-x) - var(--len-x)); }
 	.sheet-marks .bl::before { bottom: 0; right: 0; }
 	.sheet-marks .bl::after { left: 0; top: 0; }
 
-	.sheet-marks .br { bottom: calc(var(--pad-y) - var(--len)); right: calc(var(--pad-x) - var(--len)); }
+	.sheet-marks .br { bottom: calc(var(--pad-y) - var(--len-y)); right: calc(var(--pad-x) - var(--len-x)); }
 	.sheet-marks .br::before { bottom: 0; left: 0; }
 	.sheet-marks .br::after { right: 0; top: 0; }
 
