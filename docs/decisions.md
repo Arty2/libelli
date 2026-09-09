@@ -32,9 +32,77 @@ end being moved towards so they cannot swap past each other.
 keeps the millimetres it was given until someone asks it to reflow. The starter
 template's title and body say `grow` for themselves.
 
+**`blankTemplate` is genuinely blank.** It used to arrive carrying a title and a
+body — a guess at a card made before anything was known about the data. Now that
+the columns can be laid out on request, an empty page is not a gap in the offer
+but the state that *makes* it: the button that fills a page from the spreadsheet
+only appears where there is nothing to overwrite.
+
 **A border width is one number or four, and so is a padding.** `normaliseSides`
 collapses four equal edges back to one, so a template never grows structure it
 did not ask for; `sidesOf` reads either shape back out as four edges.
+
+## `src/lib/autolayout.ts`
+
+**It guesses about columns, never about words.** Nothing in here reads a cell to
+decide what a card should *say*; it reads cells to find out how long they are and
+what shape they have. That line is what keeps this a layout aid rather than a
+content generator, and it is the reason the module can be trusted with a
+spreadsheet it has never seen.
+
+**Shape beats name beats length.** A column of `https://` is a fact about the
+data, so it wins over whatever the heading claims; a column of forty-character
+lines is not a fact about anything, so there the heading wins. Where neither
+says anything, length decides and the guess is *marked* as one — `sure: false` is
+what the review dialog shows as "guess", so the guessing is visible rather than
+implied.
+
+**The arithmetic is an estimate, and is allowed to be wrong.** Type is measured
+by the browser, never here: `charsPerLine` assumes an average glyph is half an em
+and picks a size from that. Every text box it writes is `grow` and anchored to
+the one above, so an estimate that is out by a few per cent costs a millimetre of
+white space and the card corrects itself on the first render. This is why a page
+of arithmetic is not a second layout engine — it chooses starting sizes, and the
+one engine still does the layout.
+
+**The foot is pinned; everything above it is anchored.** A footer's place belongs
+to the paper, not to the text: a body that runs long should push past the footer
+rather than push it off the sheet. It is capped by *room* — a quarter of the card
+— rather than by a count, because how many small lines that buys depends on the
+page. Columns past the cap are reported, never silently dropped.
+
+**Slot names are the column names.** No second naming scheme to keep in step, and
+`usedSlots`, the mapping and the table's cell highlighting all work on a generated
+template exactly as they do on a hand-built one.
+
+**It never chooses a font.** Only the template's own defaults, so laying a card
+out cannot quietly add a family the template then has to carry.
+
+## `src/lib/storage.ts`
+
+**`template:current` is still the working copy.** The library did not replace it:
+boot reads it first, every edit writes it, and a browser that has never opened
+the picker behaves exactly as it did before. The library is a *second* place the
+same template is kept, under an id that survives renaming — which is how one
+existing template joins a library without a migration.
+
+**Templates are keyed by id, and the list is read from the documents.** An index
+record kept beside them would be a second copy of the same truth, and the first
+write that lands in one and not the other has the picker naming templates that
+are not there. `listTemplates` reads the documents, which is also the repair.
+
+**The mapping moved from name to id.** A library makes two templates called
+"Untitled card" ordinary rather than freakish, and they would otherwise share one
+mapping. The name is still read as a fallback, because that is what mappings were
+keyed by before, and because an *imported* template arrives with a name and no id
+— the one case where the name is the better key.
+
+**Undo carries the template id.** Undoing across a switch or a delete restores the
+design you came from, and without the id travelling in the same snapshot the
+autosave would write that design into whichever template happened to be open —
+overwriting a different one to undo something you did to this one. It is also
+what makes deleting recoverable: the template comes back on screen, and the
+autosave writes it out again under the id it had.
 
 ## `src/lib/types.ts`
 
@@ -940,6 +1008,21 @@ the component has to stay a pure function of its props.
 **`assets.ts` owns object-URL lifetime**: an object URL outlives the value that
 made it, so each is revoked when replaced.
 
+## `src/lib/components/PageOptions.svelte`
+
+**The template picker is built by hand rather than being an `<input list>` and a
+`<datalist>`**, which is the native shape of exactly this control. A datalist
+holds values, not commands, so it cannot carry a rule or a New Template row; it
+filters as you type, so renaming a template to something near another's name
+buries the list you were trying to see; and it renders differently in every
+browser. This is the one menu in either bar, and it earns that by having an
+action at the bottom of the list.
+
+**It closes on a press elsewhere rather than behind a backdrop.** `BoxMenu`'s
+full-screen backdrop swallows the click that dismisses it, which is right for a
+menu opened *at* the pointer and wrong for a dropdown in a toolbar, where the
+next thing you press is usually the next thing you meant to do.
+
 ## `src/lib/components/OptionsBar.svelte`
 
 **Both option bars read in groups**, outward from the subject: what the thing is,
@@ -1028,6 +1111,14 @@ mode; `rawContentOf` beside it is what the inline editor shows, because typing
 over a substituted date would mean typing over yesterday's.
 
 ## `src/lib/gestures.ts`
+
+**A hold is always the bigger of a button's two actions, and always one undo
+away.** `hold` exists because both bars are fighting for width and a second
+button costs a row; it is only ever used where the two actions are the same
+*kind* of thing — import a file or import the samples, add an area or lay every
+area out. A gesture nobody was taught has to be survivable when it fires by
+accident, which is what the undo entry is for. The click behind a completed hold
+is swallowed, or the tap action runs straight after the hold action.
 
 **Reading a swipe is a pure function; feeding it events is an action.** A flick
 has to beat both a minimum distance and a slope, because a drag at 45 degrees is

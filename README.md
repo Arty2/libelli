@@ -254,6 +254,48 @@ resize boxes directly, or type exact millimetres.
   nothing in a template can restyle the editor around it, and `@import` and any
   `url()` pointing off this machine are stripped — the app fetches nothing.
 
+## Templates, and laying one out
+
+**Several templates, one browser.** The **Template** field in page setup names the
+loaded template; the caret beside it opens every template this browser has saved,
+with **New template…** under a rule at the bottom. Renaming is typing in the
+field — the template keeps its identity, so two of them may share a name without
+sharing anything else. **Delete** sits next to **Reset** and takes the loaded
+template only: Reset puts the starter card back under the same name, Delete
+removes the template and opens the next one. Both ask first, and both are one
+Ctrl/Cmd+Z away — an undone delete is written back out under the id it had.
+
+The library lives in this browser and travels nowhere. **Export** is still how a
+template leaves; an **Import** joins the library rather than replacing what is
+loaded.
+
+**Laying a card out from the columns.** The button below *+ Area* — the one
+wearing three shapes — reads your columns and writes a first draft of a card:
+title, subtitle, body, a picture, a footer of small lines and a QR code, sized
+and placed for the page you are on. It appears on an empty template, where it is
+the answer to *now what?*; on a template that already has areas it is a **press
+and hold** on *+ Area* instead, because a control that replaces a whole design
+should not sit one mis-tap away from one you have built.
+
+Either way it shows you what it thinks first: one line per column, the kind it
+took the column for, and a sample cell to check it against. Change anything it
+has read wrongly, or set a column to **Leave out**. Columns it reached by length
+alone are marked *guess*.
+
+- **What it reads** — the heading (a column called Price, Notes, Photo), and the
+  shape of the cells (`https://` addresses, image file names, colors, numbers,
+  dates, Markdown, how long the text runs). Facts about the cells beat the
+  heading; the heading beats mere length.
+- **What it never reads** — what a cell *says*. It measures and matches patterns;
+  it does not write your cards.
+- **What it produces** — ordinary areas. Nothing marks them as generated, and
+  every one of them can be dragged, restyled or deleted like any other.
+- **One undo** — the whole layout is a single history entry, so Ctrl/Cmd+Z puts
+  the previous design straight back.
+
+It works offline like everything else here: no service is consulted and no
+library is loaded to do it.
+
 ## The data table
 
 The dataset is one row per card, one column per field. It sits beside the page
@@ -602,7 +644,8 @@ Each bar opens with a two-line head — what this is and what it is called, then
 the buttons that act on it — and runs in groups after that, outward from the
 thing itself.
 
-- **Page** — head: the template's name, then import, export, reset, lock ·
+- **Page** — head: the template's name and the library behind its caret, then
+  import, export, reset, delete, lock ·
   sheet size (a preset or your own, and a button to turn it over), bleed, crop
   marks · type defaults (font, size, leading, spacing, color) · surface (paper
   color, background image and fit) · page number, whether to print the total,
@@ -626,8 +669,9 @@ thing itself.
   carries the six alignments as one icon row.
 
 - **Beside the page** — undo and redo at the top left, *+ Area* at the top
-  right, with the button that rescues stray areas and the chip for Select
-  Multiple appearing under it when either has something to say. Next to the
+  right, with the button that lays every area out from the columns (on an empty
+  template), the button that rescues stray areas, and the chip for Select
+  Multiple appearing under it when any of them has something to say. Next to the
   thing they act on, rather than in the window's toolbar. None of it scrolls:
   the page moves inside the stage and every control stays where you left it,
   because a tool you have to scroll back to find is a tool that is not to hand.
@@ -662,6 +706,10 @@ keeping the column mapping outside it.
   template names but this browser does not have is asked for by name rather than
   substituted. A linked background is only ever an http(s) address; a template
   cannot smuggle one in as `data:` or point the browser at anything else.
+
+An imported template joins this browser's library under a new name of its own
+rather than replacing the one that is loaded, so importing can never cost you the
+template you were working on.
 
 The column mapping is put to you for confirmation rather than assumed, since the
 template may have been built against a different spreadsheet.
