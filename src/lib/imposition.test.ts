@@ -49,6 +49,23 @@ describe('resolveImposition', () => {
 		expect(layout?.marginY).toBeCloseTo(43.5);
 	});
 
+	it('holds room back for the sheet marks, so a page bleed cannot squeeze them out', () => {
+		// A6 plus 3mm of page bleed is 111 x 154, which tiles 4-up on A4 at full
+		// size with nothing to spare on the short edge (222 of 210 — so it
+		// scales) — and with marks asked for, the fit has 5mm less to play with
+		// on each edge and every margin clears them.
+		const withMarks = resolveImposition(111, 154, printSettings({
+			count: 4,
+			bleed: { enabled: false, amount: 3, cropMarks: true }
+		}));
+		expect(withMarks?.marginX).toBeGreaterThanOrEqual(5);
+		expect(withMarks?.marginY).toBeGreaterThanOrEqual(5);
+
+		// Without them the block is free to use the whole sheet, so it is bigger.
+		const without = resolveImposition(111, 154, printSettings({ count: 4 }));
+		expect(without!.scale).toBeGreaterThan(withMarks!.scale);
+	});
+
 	it('accepts a custom sheet size, not just the presets', () => {
 		const layout = resolveImposition(50, 50, printSettings({ count: 2, sheet: { w: 100, h: 60 } }));
 		expect(layout?.grid).toEqual({ rows: 1, cols: 2 });

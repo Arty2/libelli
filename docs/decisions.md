@@ -683,6 +683,21 @@ push a card sideways and its mass lags behind.
 
 ## `src/lib/components/PrintSettingsPanel.svelte`
 
+**The two bleeds sit together, on the line above the sheet.** Page bleed and
+sheet bleed are the same question asked about two different cuts, and they are
+answered in one sitting; separated by half a bar, the second one read as
+having replaced the first. On the print screen the sheet group is given
+`flex-basis: 100%` so it takes a line of its own, which pins that order
+however wide the modal is: what the paper is cut to first, what goes on it
+second.
+
+**The millimetre fields appear for Custom only.** A4 is 210 x 297 whatever
+else happens, and two boxes restating it are two boxes to mis-type. The catch
+is that *Custom* cannot be read off the size — picking it while the sheet
+still measures exactly A4 leaves the derived preset saying A4 — so the choice
+is held in `sizeMode`, and choosing a named size puts it back. Orientation
+stays either way: it is a decision about the sheet, not about its numbers.
+
 **Shared, not duplicated.** Print Settings is one component mounted from two
 places — `PageOptions.svelte`, where every other page-level setting lives,
 and `PrintPreview.svelte`, so a sheet size or count picked wrong does not
@@ -726,11 +741,16 @@ paper (and `@page` with it) and its marks go at the corners of the tiled
 *block*. Those two cuts are made by different people at different times, and a
 single setting would have to mean both.
 
-**Sheet marks are drawn in whatever room there is.** Their length is the
-smaller of the two paddings less the 1mm gap, capped at 6mm, and they are
-skipped entirely when that comes out at zero — a block that fills its sheet
-edge to edge has nowhere to put a mark, and drawing one over the artwork would
-be worse than drawing none.
+**The room for the sheet's marks is reserved by the fit, not scavenged.** It
+was the leftover centring margin at first, which meant a page bleed decided
+whether the sheet's marks existed: bleed grows every card, the block grows
+with them, the margin goes to nothing, and asking for marks did nothing at
+all. Two independent settings, one silently overriding the other.
+`resolveImposition` now fits the block into the sheet less
+`SHEET_MARK_ROOM` per edge whenever the marks are on, so they always have
+somewhere to be. The cost is honest and visible: the cards come out a few per
+cent smaller, and the panel says so — marks need paper, and paper spent on
+marks is not paper spent on cards.
 
 **One component, two contexts, the same pixels.** `PrintRoot.svelte` mounts
 this off-screen for the actual print run; `PrintPreview.svelte` mounts the

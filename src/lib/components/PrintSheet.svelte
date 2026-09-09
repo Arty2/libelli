@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Card from './Card.svelte';
 	import { backgroundStyle } from '$lib/assets';
-	import { resolveImposition } from '$lib/imposition';
+	import { SHEET_MARK_ROOM, resolveImposition } from '$lib/imposition';
 	import type { Mapping, Row, Template } from '$lib/types';
 
 	/**
@@ -62,14 +62,14 @@
 	const padY = $derived(sheetBleed + (imposed?.marginY ?? 0));
 
 	/**
-	 * Marks for the block's outer edge, drawn in whatever room there is around
-	 * it. This is the cut that takes the tiled block off the sheet, which the
-	 * cards' own marks cannot show: theirs stop at each card's bleed.
+	 * Marks for the block's outer edge. This is the cut that takes the tiled
+	 * block off the sheet, which the cards' own marks cannot show: theirs stop
+	 * at each card's bleed. `resolveImposition` has already held room back for
+	 * these, so they do not have to make do with whatever a page bleed left.
 	 */
-	const OUTER_MARK_MAX = 6;
 	const OUTER_MARK_GAP = 1;
 	const outerMark = $derived(
-		Math.min(OUTER_MARK_MAX, Math.max(0, Math.min(padX, padY) - OUTER_MARK_GAP))
+		Math.min(SHEET_MARK_ROOM - OUTER_MARK_GAP, Math.max(0, Math.min(padX, padY) - OUTER_MARK_GAP))
 	);
 	const showOuterMarks = $derived(!!imposed && template.print.bleed.cropMarks && outerMark > 0);
 

@@ -49,6 +49,19 @@
 	const preset = $derived(presetFor(template.print.sheet.w, template.print.sheet.h) ?? '');
 
 	/**
+	 * Whether the two millimetre fields are showing.
+	 *
+	 * A named size does not need them — A4 is 210 x 297 and typing that again
+	 * is not a decision anyone is making — so they appear for Custom only. That
+	 * cannot be read off `preset` alone: picking *Custom* while the sheet still
+	 * measures exactly A4 leaves `preset` saying A4, and the fields would never
+	 * appear to be typed into. So the choice is held here, and a named size
+	 * puts it back.
+	 */
+	let sizeMode = $state<'preset' | 'custom'>('preset');
+	const showSize = $derived(sizeMode === 'custom' || preset === '');
+
+	/**
 	 * A `<select>`'s `value=` is applied before an `{#each}`-rendered option
 	 * list exists in the DOM, which silently drops a selection that is not the
 	 * first option — these two run after the DOM (options included) has
@@ -58,10 +71,11 @@
 		if (perSheetSelect) perSheetSelect.value = template.print.enabled ? String(template.print.count) : '';
 	});
 	$effect(() => {
-		if (sheetPresetSelect) sheetPresetSelect.value = preset;
+		if (sheetPresetSelect) sheetPresetSelect.value = showSize ? '' : preset;
 	});
 
 	function setPreset(name: string) {
+		sizeMode = name ? 'preset' : 'custom';
 		const size = presetSize(name, template.print.orientation === 'landscape');
 		if (!size) return;
 		patchPrint({ sheet: size });
@@ -142,6 +156,49 @@
 			Crop Marks
 		</label>
 	{/if}
+
+	<!-- The sheet's own, beside the page's rather than further down the bar:
+	     they are the same decision asked twice, about two different cuts, and
+	     they are set together. Neither turns the other off — the room these
+	     marks need is held back by the fit, not taken from what a page bleed
+	     happens to leave. -->
+	{#if template.print.enabled}
+		<label class="check">
+			<input
+				type="checkbox"
+				checked={template.print.bleed.enabled}
+				disabled={pageFrozen}
+				title="An outset on the paper around the sheet, for printing a sheet that runs to its own edge"
+				onchange={(e) => patchSheetBleed({ enabled: e.currentTarget.checked })}
+			/>
+			Sheet Bleed
+		</label>
+		{#if template.print.bleed.enabled}
+			<label class="field">
+				<input
+					class="n-2"
+					type="number"
+					step="0.5"
+					min="0"
+					aria-label="Sheet bleed amount"
+					value={template.print.bleed.amount}
+					disabled={pageFrozen}
+					onchange={(e) => patchSheetBleed({ amount: numeric(e, template.print.bleed.amount) })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+		{/if}
+		<label class="check">
+			<input
+				type="checkbox"
+				checked={template.print.bleed.cropMarks}
+				disabled={pageFrozen}
+				title="Marks at the corners of the tiled block, for the cut that takes it off the sheet"
+				onchange={(e) => patchSheetBleed({ cropMarks: e.currentTarget.checked })}
+			/>
+			Sheet Marks
+		</label>
+	{/if}
 </span>
 
 <span class="group" role="group" aria-label="Print Settings">
@@ -181,30 +238,32 @@
 				{/each}
 			</select>
 		</label>
-		<label class="field">
-			<span>Width</span>
-			<input
-				class="n-3"
-				type="number"
-				step="1"
-				value={template.print.sheet.w}
-				disabled={pageFrozen}
-				onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, w: numeric(e, template.print.sheet.w) } })}
-			/>
-			<span class="unit">mm</span>
-		</label>
-		<label class="field">
-			<span>Height</span>
-			<input
-				class="n-3"
-				type="number"
-				step="1"
-				value={template.print.sheet.h}
-				disabled={pageFrozen}
-				onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, h: numeric(e, template.print.sheet.h) } })}
-			/>
-			<span class="unit">mm</span>
-		</label>
+		{#if showSize}
+			<label class="field">
+				<span>Width</span>
+				<input
+					class="n-3"
+					type="number"
+					step="1"
+					value={template.print.sheet.w}
+					disabled={pageFrozen}
+					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, w: numeric(e, template.print.sheet.w) } })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+			<label class="field">
+				<span>Height</span>
+				<input
+					class="n-3"
+					type="number"
+					step="1"
+					value={template.print.sheet.h}
+					disabled={pageFrozen}
+					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, h: numeric(e, template.print.sheet.h) } })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+		{/if}
 		<label class="field">
 			<span>Orientation</span>
 			<select
@@ -224,43 +283,6 @@
 				Scaled to {Math.round(fit.scale * 100)}%
 			</span>
 		{/if}
-		<!-- The sheet's own bleed and marks: where to cut the sheet, as against
-		     where to cut a card out of it. -->
-		<label class="check">
-			<input
-				type="checkbox"
-				checked={template.print.bleed.enabled}
-				disabled={pageFrozen}
-				title="An outset on the paper around the sheet, for printing a sheet that runs to its own edge"
-				onchange={(e) => patchSheetBleed({ enabled: e.currentTarget.checked })}
-			/>
-			Sheet Bleed
-		</label>
-		{#if template.print.bleed.enabled}
-			<label class="field">
-				<input
-					class="n-2"
-					type="number"
-					step="0.5"
-					min="0"
-					aria-label="Sheet bleed amount"
-					value={template.print.bleed.amount}
-					disabled={pageFrozen}
-					onchange={(e) => patchSheetBleed({ amount: numeric(e, template.print.bleed.amount) })}
-				/>
-				<span class="unit">mm</span>
-			</label>
-		{/if}
-		<label class="check">
-			<input
-				type="checkbox"
-				checked={template.print.bleed.cropMarks}
-				disabled={pageFrozen}
-				title="Marks at the corners of the tiled block, for the cut that takes it off the sheet"
-				onchange={(e) => patchSheetBleed({ cropMarks: e.currentTarget.checked })}
-			/>
-			Sheet Marks
-		</label>
 		<span class="field-label">Sheet Image</span>
 		{#if template.print.background}
 			<span class="asset" title={template.print.background.src}>

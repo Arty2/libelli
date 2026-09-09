@@ -192,8 +192,9 @@ resize boxes directly, or type exact millimetres.
   of the corner: a mark that meets the artwork cannot be told from a rule the
   design meant to have, and that corner is what the guillotine lines up on.
 - **Print Settings** — several cards printed to one physical sheet: 2, 4, 6 or
-  8, onto A5, A4, A3 or a sheet of your own size in millimetres, **Portrait**
-  or **Landscape**. Cards keep the millimetres they were designed at
+  8, onto A5, A4, A3 or a sheet of your own size in millimetres (the two
+  millimetre fields appear for **Custom** — a named size already knows its
+  numbers), **Portrait** or **Landscape**. Cards keep the millimetres they were designed at
   everywhere they are edited; imposition only decides how many trim-sized
   copies fit and tiles them edge to edge, centred on the sheet. Bleed does
   double duty here: the gap between neighbouring cards, and the crop marks
@@ -208,11 +209,14 @@ resize boxes directly, or type exact millimetres.
   **Page Setup** and the print screen change the same settings: see
   **Print preview** below.
 - **Sheet Bleed** and **Sheet Marks** — the sheet's own, distinct from the
-  card's: bleed outsets the paper around the sheet size, so a sheet whose
-  background runs to its edge has something to trim into, and the marks go at
-  the corners of the tiled block — the cut that takes the block off the sheet,
-  which no card's own marks can show, since each of those stops at its own
-  bleed.
+  card's, and set beside them: bleed outsets the paper around the sheet size,
+  so a sheet whose background runs to its edge has something to trim into, and
+  the marks go at the corners of the tiled block — the cut that takes the block
+  off the sheet, which no card's own marks can show, since each of those stops
+  at its own bleed. All four settings hold at once; asking for the sheet's
+  marks holds a few millimetres of the sheet back for them, so a page bleed
+  can never crowd them out, and the cards scale down by however much that
+  costs.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper

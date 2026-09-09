@@ -217,11 +217,14 @@
 				/ {sheetGroups.length} sheet{sheetGroups.length === 1 ? '' : 's'}
 			{/if}
 		</h2>
-		<!-- Choosing which pages go is about the grids below; PNG and Print are
-		     what you came here to press. They sit at opposite ends so the two are
-		     not read as one row of equal things. -->
-		<button class="choose" onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
-		<div class="header-actions">
+		<!-- One row, whatever the width: choosing which pages go is about the
+		     grids below and sits at its left end, PNG and Print are what you came
+		     here to press and stay pinned to its right. Wrapping the pair means a
+		     narrow header drops the title onto its own line rather than breaking
+		     the row of actions apart. -->
+		<div class="header-bar">
+			<button class="choose" onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
+			<div class="header-actions">
 			<button onclick={exportPng} disabled={chosen === 0 || exporting}>
 				<Icon name="download" size={15} />
 				{#if exporting}
@@ -236,6 +239,7 @@
 				<Icon name="print" size={15} />
 				Print
 			</button>
+			</div>
 		</div>
 		<!-- Out of the row of actions and into the corner, unstyled, where the
 		     lightbox puts its own: leaving is not one of the things you came here
@@ -407,9 +411,20 @@
 		font: 600 14px ui-sans-serif, system-ui, sans-serif;
 	}
 
-	/* Pushed off the title, and the actions pushed to the far end by the margin
-	   below — `space-between` cannot place three children the way two want to be. */
-	header .choose {
+	/* Select All and the two actions are one row that takes whatever width is
+	   left beside the title; Select All holds its left end and the actions are
+	   pushed to its right by the margin below. When the header wraps, the row
+	   wraps whole, so PNG and Print are never split from each other or pulled
+	   off the right edge. */
+	.header-bar {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	.header-bar .choose {
 		margin-right: auto;
 	}
 
@@ -479,6 +494,14 @@
 	   itself, since here it has grids on both sides. */
 	.settings-strip {
 		border-top: 1px solid #ddd;
+	}
+
+	/* Two lines, in this order: what the paper is cut to on the first, what
+	   goes on it on the second. The bleeds are one decision asked twice and
+	   belong together; giving the sheet group its own full-width line is what
+	   keeps them from being separated by a wrap that lands anywhere. */
+	.settings-strip :global(.group[aria-label='Print Settings']) {
+		flex-basis: 100%;
 	}
 
 	.checklist {
