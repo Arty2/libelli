@@ -45,6 +45,50 @@ source: a static box with nothing typed into it still draws its fill, its border
 and its size, and `hideWhenEmpty` is what takes it away — two settings that
 already existed, rather than a third state to keep in step.
 
+## `src/lib/imposition.ts`
+
+**No second bleed.** Several cards on one sheet need a gap between neighbours
+and a mark showing where to cut — exactly what `template.bleed` already
+gives one card against the paper edge. Tiling cards edge to edge, with no
+extra gutter, means that gap and those marks fall out of the per-card bleed
+`Card.svelte` already draws at its own corners, so imposition adds a sheet
+size and a count and touches nothing about bleed itself.
+
+**A grid's footprint does not depend on its shape.** `cardW * cols` by
+`cardH * rows` covers `cardW * cardH * count` either way round, so it was
+never a real tiebreak between orientations — an earlier version compared
+block area to pick a "best" grid, which was comparing numbers that could
+never differ. What genuinely varies by orientation is the *scale* a card
+needs to fit at all, so that is what `resolveImposition` now scores: every
+orientation is tried, each capped at `scale <= 1` (imposition shrinks, it
+never enlarges), and the one needing the least shrinkage wins — a tie falls
+to whichever `GRIDS` lists first, the more balanced arrangement (2x2 before
+4x1).
+
+**Scaling for print is not the same promise as "millimetres everywhere."**
+That rule is about the *design*: a box's coordinates do not move when the
+page size or bleed changes, so the editor stays predictable. Printing four
+A5 cards onto one A4 sheet needs them smaller than their own trim size in
+no orientation — refusing was the original call, but a print run that
+quietly comes out 1-up when you asked for 4-up is worse than one that comes
+out a little smaller. So `resolveImposition` always returns a layout when
+imposition is on, `scale` included, and never `undefined` — printing is the
+one place a card's millimetres are not the final word; the editor, a single
+card's own print, and every other reader of `template.page` never see
+anything but the number that was typed in. `PrintSheet.svelte` renders each
+card at its own full size and then scales the wrapping element down with a
+plain CSS `transform`, so nothing about layout, anchors or measurement
+changes — only what ends up on paper. `PrintSettingsPanel.svelte` shows the
+percentage rather than staying silent about it.
+
+**The sheet's own background is a second, separate reference.** A card's
+background (`template.page.image`) and the sheet's (`template.print.background`)
+are stored, resolved and asked-for-when-missing exactly the same way, but as
+two independent fields — the sheet's is `undefined` far more often (only
+imposition draws a sheet distinct from the card), and conflating them would
+mean turning imposition off could silently reach for a picture nobody chose
+for that context.
+
 ## `src/lib/history.ts`
 
 **A label rides alongside each state, never inside it.** States are compared by
@@ -69,6 +113,16 @@ labelled every click "Move", and a click followed by an arrow key was then
 recorded as a drag.
 
 ## `src/lib/components/Card.svelte`
+
+**A crop mark is two ticks with a gap, not an L of borders.** These were a
+corner-sized box carrying two borders, so the two lines met exactly at the
+trim corner — the one point a guillotine operator is lining up on, and a mark
+touching the artwork there cannot be told from a rule the design meant to
+have. Each tick now lies on its own trim line, runs outward into the bleed,
+and stops 1mm short of the corner. The gap is along the tick's own direction
+only: the lines stay *on* the trim, because that is what makes them a
+straightedge to cut against. `max(0mm, …)` on the length is what keeps a bleed
+thinner than the gap from drawing a negative mark.
 
 **A box's content lives in `.content`.** Handles and badges are absolutely
 positioned children of `.box` that hang past its edges, so measuring the box's
@@ -408,6 +462,18 @@ and go with a selection belong on that rail rather than in the options bar, wher
 they would shove every other control sideways each time a second box was picked
 up.
 
+**The view toggles stack on a phone rather than shrink.** *Grid* and *Bounds*
+side by side measure a fixed 124px of the bottom band, and the card pager is
+centred in that same band: at 390px the previous-card arrow already sat on top
+of *Bounds*, and at 320px it overlapped by 41px, so a press meant for one could
+land on the other. Below 520px — the same width the export screen calls narrow —
+the two labels become a column instead. The block keeps its `bottom`, so it
+grows upward into empty stage rather than sideways into the pager, which buys
+back roughly half the width: 15px of clearance at 320px and 50px at 390px, 10px
+at 320px with the widest counter a deck can show. Icons in place of the words
+were tried first and read as two anonymous chips; the words are what make the
+toggles guessable, and a column keeps them.
+
 ## `src/lib/components/DataTable.svelte`
 
 **A sticky header's borders are not sticky.** Under `border-collapse: collapse`
@@ -512,6 +578,31 @@ becoming a page gesture at all; and the lightbox says `touch-action: none`,
 because every touch on that screen is already ours and there is nothing on it to
 scroll.
 
+## `src/lib/components/SheetLightbox.svelte`
+
+**A separate component, not `Lightbox` with a flag.** Everything that makes
+the card lightbox what it is — the lean with the phone, the foil that moves
+with it, a card dealt in from the side — reads as a printed card held in the
+hand, and reads as nothing at all on an A3 imposition sheet. A sheet is a
+proof: flat, as big as the window allows, arrows and a swipe to the next one.
+Sharing one component would mean a `kind` prop threaded through the tilt, the
+sensor grant, the deal transition and the foil, all switched off for one of
+its two callers.
+
+**A different ground, on purpose.** Near-black for a card, slate for a sheet.
+The two are one tap apart inside the same modal, and a sheet of cards at
+thumbnail scale is easy to mistake for a card at a glance — the backdrop is
+what says which of the two you are looking at without reading the counter.
+Still dark and still desaturated, because what sits on it is being judged for
+print.
+
+**No drag guard, because there is no drag.** `Lightbox` tracks pointer
+movement so that turning the card and releasing over the ground does not also
+put it away; here a swipe is the only gesture, and Chromium suppresses the
+click after a touch that travels past tap-slop, so the backdrop's close and
+the swipe cannot fire together. Driven and confirmed in a real browser rather
+than assumed.
+
 ## `src/lib/components/Lightbox.svelte`
 
 **The lightbox is not a door to the printer.** `Lightbox` is one card, big, over
@@ -602,12 +693,193 @@ couple of degrees it stops reading as a card catching the light and starts
 reading as a crooked print. The drag resists the same way, for the same reason —
 push a card sideways and its mass lags behind.
 
+## `src/lib/components/PrintSettingsPanel.svelte`
+
+**The two bleeds sit together, on the line above the sheet.** Page bleed and
+sheet bleed are the same question asked about two different cuts, and they are
+answered in one sitting; separated by half a bar, the second one read as
+having replaced the first. On the print screen the sheet group is given
+`flex-basis: 100%` so it takes a line of its own, which pins that order
+however wide the modal is: what the paper is cut to first, what goes on it
+second.
+
+**The millimetre fields appear for Custom only.** A4 is 210 x 297 whatever
+else happens, and two boxes restating it are two boxes to mis-type. The catch
+is that *Custom* cannot be read off the size — picking it while the sheet
+still measures exactly A4 leaves the derived preset saying A4 — so the choice
+is held in `sizeMode`, and choosing a named size puts it back. Orientation
+stays either way: it is a decision about the sheet, not about its numbers.
+
+**Shared, not duplicated.** Print Settings is one component mounted from two
+places — `PageOptions.svelte`, where every other page-level setting lives,
+and `PrintPreview.svelte`, so a sheet size or count picked wrong does not
+send you back to the editor before you can print. Both pass the same
+`template`/`ontemplatechange` shape the rest of the page-setup bar uses; the
+panel itself does not know or care which screen it is in.
+
+**A `<select>`'s `value=` binding loses a selection that is not the first
+option, on a fresh mount.** The browser applies `<select>.value` against
+whatever `<option>` children already exist at that moment; Svelte renders
+this component's `{#each}`-generated options as a child effect of the
+`<select>`, and on a *fresh* mount (this component appearing for the first
+time, template imported with imposition already on, or the print screen
+opened first) the parent's `value=` assignment can run before that child
+effect has inserted the options — the browser then finds nothing matching,
+clears the selection to `-1`, and does not retry once the options do land, so
+the picker silently shows "Off" or "Custom" no matter what the template
+actually says. Marking the matching `<option selected>` does not fix it
+either: once a `<select>` has had its `.value` set imperatively even once, a
+later `selected` *attribute* only updates `defaultSelected`, not the live
+selection. `bind:value` with a function binding looked like Svelte's own
+answer to exactly this, but did not correct it in practice here either. What
+does: `perSheetSelect`/`sheetPresetSelect` bound with `bind:this`, and a pair
+of `$effect`s that set `.value` directly — an `$effect` runs after the DOM
+for that render (children, including the each block, included) has already
+committed, so there is no ordering race left to lose.
+
+## `src/lib/components/PrintSheet.svelte`
+
+**The block is centred with padding on the sheet, never a margin on the grid.**
+A top margin on a first child collapses straight out of its parent: the block
+landed at the *top* of the sheet and the sheet itself was pushed down by the
+margin that escaped, so a thumbnail read as blank paper with a sliver of card
+at the bottom — and the real print was off-centre in the same way, which the
+first version of this shipped with. Padding cannot collapse. The sheet is
+`box-sizing: border-box` so it still measures exactly the paper it names.
+
+**The sheet's bleed is not the card's.** The card's says where to cut one card
+out of the sheet; the sheet's says where to cut the sheet, so it outsets the
+paper (and `@page` with it) and its marks go at the corners of the tiled
+*block*. Those two cuts are made by different people at different times, and a
+single setting would have to mean both.
+
+**A crop mark is held to a pixel of the screen, and 0.2mm of the paper.**
+0.2mm is three quarters of a pixel at full size and a quarter of one in a
+thumbnail, so a browser rounded the marks away: they were in the DOM, correct,
+and invisible on the glass — which reads exactly like a feature that does not
+work. `previewScale` is the scale the preview is showing the sheet at, and
+under `@media screen` the tick thickness is `max(0.2mm, 1px / that)`. Print
+never sees the rule and keeps its 0.2mm.
+
+**Each tick is as long as its own axis allows.** One length for both, taken
+from the smaller padding, meant a block filling the sheet's width — the common
+case — drew 2mm marks in a 77mm top margin. The vertical tick measures against
+the vertical room and the horizontal against the horizontal, both capped at
+`SHEET_MARK_MAX`.
+
+**Sheet marks are drawn in the room the sheet already has, and never make
+their own.** They take the sheet bleed plus whatever the centred block is not
+using, capped at `SHEET_MARK_MAX`, and are skipped when that comes to
+nothing — a block filling its sheet edge to edge with no sheet bleed has
+nowhere to put a mark. A version in between reserved room for them in the
+fit, which guaranteed they always appeared but moved every card on the sheet
+the moment they were switched on: a bleed by another name, and not what a
+marks toggle is for. Where they have nowhere to go, the sheet bleed is what
+makes room — that is the setting for it.
+
+**One component, two contexts, the same pixels.** `PrintRoot.svelte` mounts
+this off-screen for the actual print run; `PrintPreview.svelte` mounts the
+identical component — same props, same DOM — inside a scaled thumbnail for
+the Sheet Preview, and again as the element a PNG export of a sheet reads.
+Nothing about layout, background or card scaling is duplicated or
+approximated for the preview, so there is no way for the preview to promise
+something the print or the export does not deliver. It was pulled out of
+`PrintRoot.svelte`, which used to inline this per-sheet markup directly —
+splitting it was what let the preview reuse it at all.
+
 ## `src/lib/components/PrintPreview.svelte`
 
 **One door to the printer.** Print opens the preview; the preview prints. The
 page selection lives there, keyed by row index and reset every time it opens —
 sorting or deleting a row moves those indices, and a stale exclusion would drop a
 different card than the one that was unticked.
+
+**Two rows, each with one item at either end.** The header carried a 14px
+title, two 28px buttons and a close in one row, and no vertical alignment
+reads as deliberate between things that different in height — it looks like a
+mistake rather than a choice. The name of the screen and the way out take the
+first row; what is going and what to do with it take the second. Nothing sits
+in the middle of either, so `justify-content: space-between` is the whole
+layout, the two right-hand ends line up with each other down the edge, and no
+width needs a rule of its own: PNG and Print no longer have to be positioned
+out of the flow to stay put, because there is nothing left in the flow to
+shove them.
+
+**The count in the title *is* the select-all control.** There were two buttons
+for it, "All Pages" and "All Sheets", which on a phone needed a line of their
+own directly beneath a title reciting the same two numbers back. The count
+already says what is going and already moves as the checkboxes do, so pressing
+it is the only gesture it was missing: all of them, or none and choose. The
+header now fits one line at 390px — count, count, PNG, Print, close — where it
+took two.
+
+A `<button>`, not an anchor: it acts here rather than going anywhere. Sized and
+weighted as the sentence it sits in, and underlined *dotted* rather than solid,
+which is the convention for in-text controls that are not links; hover firms
+the line to solid, standing in for the colour change a link would give. The
+word "Export" is what gives way below 700px — the dialog carries that name for
+a screen reader, and two buttons at the right say it plainly enough — so the
+title wraps or shortens without ever truncating a control off the edge.
+
+**The whole caption row is the checkbox.** A 13px box beside a number is a pin
+to aim at, and on a phone this row is the one control pressed over and over.
+The `<label>` is what carries the hit area — as wide as the thumbnail above it
+and tall enough to hit — so the target and the box it toggles cannot come
+apart the way a separately-padded wrapper would.
+
+**A sheet's selection is a second filter, not a rewrite of the first.**
+Unticking a sheet drops the sheet and leaves the pages on it ticked as pages.
+The alternative — a sheet checkbox that unticks its four rows — would regroup
+the run under the hand doing the unticking, so sheet 3 would become sheet 2
+mid-gesture. Sheets are grouped from the included rows first, and
+`excludedSheets` is applied to that grouping by position, in the preview, the
+print and the PNG run alike.
+
+The cost is that a sheet's number only means something for one grouping, so
+changing the *page* selection clears the sheet selection — every sheet comes
+back. Same reasoning as reopening the preview clearing the page selection: an
+index held over from a different grouping would drop paper nobody pointed at.
+
+**Sheet Preview groups the same rows Print and the PNG export will.** With
+several cards to a sheet, `sheetGroups` chunks the *included* rows (excluded
+ones already filtered out) into the identical `rows * cols` batches
+`PrintRoot.svelte` uses — so reordering or excluding a row before printing
+moves it between sheets in the preview exactly as it will on paper, rather
+than the preview showing a grouping the print will not match.
+
+**Print Settings sits between the two grids.** It is what turns the pages
+above it into the sheets below it, so standing there it separates them and the
+sheets need no heading of its own — which is why they no longer have one. It
+runs edge to edge, like the toolbar it is: its own padding is the inset, and a
+second one around it only made the strip look narrower than the grids it
+divides. The checklist stays at the bottom: that one is about the browser's
+print dialog, which is the last thing that happens.
+
+**The title counts pages and sheets.** *Export — 4 pages / 2 sheets*, so how
+many sheets a run comes to is answered before scrolling to them. It replaced a
+button that jumped to the sheets: with the settings strip now between the two
+grids, the sheets are one landmark away rather than a run's length away, and a
+count in the title says more than a button that only moves you.
+
+**A strip on a phone, a wrapping grid on a desktop.** Two thumbnails to a row
+was fine for a dozen pages and hopeless for a hundred: everything else on the
+screen — the sheets, the checklist — sat below the pages, so reaching it meant
+scrolling past all of them. Narrow screens get one horizontally scrolling
+strip per grid instead, each thumbnail two thirds of the width so the next one
+peeks in and says the strip moves; the run then costs one screen however long
+it is. A desktop keeps the wrapping grid, where the whole run is a few scrolls
+whatever its length. The strip declares `touch-action: pan-x pan-y` and
+`overscroll-behavior-x: contain` because it scrolls sideways inside a modal
+that scrolls down, and a flick running off the end of it must not drag the
+modal with it.
+
+**PNG export reads whichever grid is on screen for the setting that is on.**
+`exportPng` was one query (`.card` inside the per-card grid) before several
+cards to a sheet existed; with it on, a PNG of an individual card is not what
+was asked for — a PNG of the *sheet* is, so the export switches to reading
+`.print-sheet` elements out of the Sheet Preview grid instead, named
+`stem-sheet_N.png` rather than `stem_N.png` so the two exports are never
+confused for each other in a directory listing.
 
 ## `src/lib/sw-policy.ts` and `src/service-worker.ts`
 

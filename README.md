@@ -180,13 +180,44 @@ resize boxes directly, or type exact millimetres.
   still called an A4. Neither moves anything on the card, because every
   coordinate is measured from the trim edge. Type your own numbers and it reads
   as *Custom*.
-- **Bleed** — an outset on the page, never an offset on content: turning it on
-  changes the sheet size, optionally with crop marks, and every box stays
+- **Page Bleed** — an outset on the page, never an offset on content: turning it
+  on changes the sheet size, optionally with crop marks, and every box stays
   visually where it was. On screen the trim edge is a solid green hairline, the
   same weight as the grid and drawn above it, on the same toggle as the area
   bounds. The grid keeps its corner at the trim, not at the sheet, so turning
   bleed on does not slide the gridlines under the boxes they are there to
-  measure.
+  measure. It sits in **Print Settings** with the rest of the print decisions,
+  which means it is also to hand on the print screen. Crop marks lie on the
+  trim lines and run outward into the bleed, each stopping a millimetre short
+  of the corner: a mark that meets the artwork cannot be told from a rule the
+  design meant to have, and that corner is what the guillotine lines up on.
+- **Print Settings** — several cards printed to one physical sheet: 2, 4, 6 or
+  8, onto A5, A4, A3 or a sheet of your own size in millimetres (the two
+  millimetre fields appear for **Custom** — a named size already knows its
+  numbers), **Portrait** or **Landscape**. Cards keep the millimetres they were designed at
+  everywhere they are edited; imposition only decides how many trim-sized
+  copies fit and tiles them edge to edge, centred on the sheet. Bleed does
+  double duty here: the gap between neighbouring cards, and the crop marks
+  between them, are the card's own bleed and **Crop Marks** setting, so there
+  is nothing extra to keep in step. A count that does not fit the sheet at the
+  card's own size, in any orientation, prints scaled down instead of
+  refusing — every card on the sheet shrinks together, and the amount shows
+  as *Scaled to n%* rather than leaving it a surprise. The sheet can carry its
+  own background image too — **Upload…** or **URL…**, **Cover**/**Contain**/
+  **Tile** — separate from the card's own background and showing only in the
+  margin around the tiled cards. This whole group is the one place both
+  **Page Setup** and the print screen change the same settings: see
+  **Print preview** below.
+- **Sheet Bleed** and **Sheet Marks** — the sheet's own, distinct from the
+  card's, and set beside them: bleed outsets the paper around the sheet size,
+  so a sheet whose background runs to its edge has something to trim into, and
+  the marks go at the corners of the tiled block — the cut that takes the block
+  off the sheet, which no card's own marks can show, since each of those stops
+  at its own bleed. All four settings hold at once. The marks are drawn in the
+  room the sheet already has — its bleed, and whatever the centred block is
+  not using — so switching them on never moves a card; a block filling its
+  sheet with no bleed to spare has nowhere to put them, and the sheet bleed is
+  what makes that room.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
@@ -353,16 +384,31 @@ Pick a curated Google family, type any other family name, or upload a file.
 ## Printing
 
 Print renders every row into a dedicated container and hands it to the browser:
-`@page { size: <w>mm <h>mm; margin: 0 }`, one page per row, no trailing blank.
+`@page { size: <w>mm <h>mm; margin: 0 }`, one physical sheet per row, no
+trailing blank. With **Print Per Sheet** on, several rows tile onto each sheet
+instead, in the grid **Print Settings** works out — scaled down together when
+they do not fit the sheet at full size — and `@page` names the physical sheet
+rather than the card's.
 
 ## Print preview
 
 One screen holds both halves of getting a print right: every row rendered as a
 small page, and the four dialog settings the browser gets wrong by default —
-pick the **paper size** matching the card's millimetres, set **Margins** to
-*None*, uncheck **Headers and footers**, and switch on **Background graphics**,
-which Chrome drops along with the paper color. Checking the cards and reading
-the checklist are the same act, so they are the same screen.
+pick the **paper size** matching the physical sheet's millimetres (the card's,
+or the imposed sheet's when **Print Per Sheet** is on), set **Margins** to *None*,
+uncheck **Headers and footers**, and switch on **Background graphics**, which
+Chrome drops along with the paper color. Checking the cards and reading the
+checklist are the same act, so they are the same screen — and **Print
+Settings** itself sits right there too: the same panel Page Setup shows, so a
+sheet size or count picked wrong does not send you back to the editor to fix
+it before you print.
+
+With **Print Per Sheet** on, a second grid appears under the cards: **Sheets —
+what will print**, one thumbnail per physical sheet, each showing exactly the
+cards that land on it — the same component `PrintRoot.svelte` renders for the
+real print, only scaled down, so the preview can never promise a layout the
+output does not match. Excluding a card above regroups the sheets below it
+immediately.
 
 **Export…** is the only way in, so there is no route to the printer that skips
 the look at what you are about to spend paper on — <kbd>Ctrl</kbd>/<kbd>⌘</kbd>
@@ -370,31 +416,53 @@ the look at what you are about to spend paper on — <kbd>Ctrl</kbd>/<kbd>⌘</k
 browser's own dialog on the editor. Press it again from that screen to send the
 run. Choosing which pages go is at the left of that screen and **Print** and
 **PNG** are at the right, because the two are not one row of three equal things.
-From it: **Print**, or **PNG** for one 300 dpi file per selected page — rendered
-here, with no library, by carrying the card into an SVG `foreignObject` and
-drawing that to a canvas. Every face is embedded: uploaded ones from this
-browser, and a Google family by fetching the stylesheet the page already loaded
-and the font files it points at. That fetch is the one exception to *the app
-fetches nothing*, and it is confined to the export, because a PNG in the wrong
-typeface is not the card. A request that is blocked or offline leaves that
-family in the fallback stack and the export says which.
+From it: **Print**, or **PNG** — one 300 dpi file per selected page, or with
+**Print Per Sheet** on, one per sheet instead, each carrying every card tiled
+onto it — rendered here, with no library, by carrying the element into an SVG
+`foreignObject` and drawing that to a canvas. Every face is embedded: uploaded
+ones from this browser, and a Google family by fetching the stylesheet the
+page already loaded and the font files it points at. That fetch is the one
+exception to *the app fetches nothing*, and it is confined to the export,
+because a PNG in the wrong typeface is not the card. A request that is
+blocked or offline leaves that family in the fallback stack and the export
+says which.
 
-The print checklist sits at the bottom of that screen, under the pages: the
-cards are what you came to look at, and the four settings are what to do once
-you have.
+**Print Settings** sits between the two grids, edge to edge: it is what turns
+the pages above it into the sheets below it, so standing there it separates
+them and needs no heading of its own. The print checklist stays at the bottom
+— that one is about the browser's own dialog, which is the last thing to
+happen. The title counts both units, *Export — 4 pages / 2 sheets*, so the
+number of sheets is known before scrolling to them.
 
-Two pages to a row on a phone rather than one: a contact sheet is for comparing
-pages against each other, and a column of one is a slideshow.
+On a phone each grid is a strip you swipe along rather than rows you scroll
+past. A hundred pages was a hundred rows between you and everything below
+them; sideways, the run costs one screen however long it is, and each
+thumbnail takes two thirds of the width so the next one peeks in and says the
+strip moves. A desktop keeps the wrapping grid, where the whole run is a few
+scrolls whatever its length.
 
 Every page has a checkbox under it, and only the ticked ones print — untick the
-three proofs that came out wrong and reprint just those. **Select All** /
-**Select None** does the whole run, and the title says how many pages are going.
+three proofs that came out wrong and reprint just those — the whole caption row
+under a thumbnail is the target, not the box in the middle of it. The count is
+the control for the whole run — it sits at the left of the second header row,
+opposite **PNG** and **Print** — and reads **4 pages**; pressing it clears them
+to **0 pages** so you can choose, and pressing it again takes them all back. It is the same number that counts up as you tick, so what it says and
+what it does are one thing.
 A page keeps the number it has in the table however few of
 them go, so page 4 prints as page 4 even when it is the only one selected. A PNG
 run names its files `stem_01.png`, padded to the width of the run, so a directory
 listing comes back in print order rather than as 1, 10, 2. The
 selection is for one print: reopening the preview starts from every page again,
 because sorting or deleting a row moves the positions it was pinned to.
+
+Sheets have checkboxes of their own, and their own count beside the pages' one
+— *4 pages / 2 sheets* — one sheet of a run misfed or came out streaked, and
+reprinting it should not mean working out which four rows were on it. It is a second filter over the first: unticking a sheet drops that
+sheet, and the pages on it stay ticked as pages. Changing which pages go
+regroups the sheets, so it brings every sheet back — sheet 2 of a different
+grouping is different paper, and a selection held over would drop the wrong
+one. The title counts both, and both the print and a PNG-per-sheet run send
+only the sheets still ticked.
 
 Click a thumbnail to open that card full screen; so does the count under the
 sheet in the editor — *3 / 12*, the number naming the card being the obvious
@@ -422,6 +490,13 @@ tinted blue and amber at its flanks. Deliberately at the edge of noticing — fo
 that announces itself on a proofing tool is a distraction from the proof — and
 absent on a machine with no sensor, since without a real orientation to move
 against it would be a painted-on smear rather than a sheen.
+
+A sheet thumbnail opens full screen too, and gets a screen of its own rather
+than the card's: the sheet flat and as large as the window allows, the arrows,
+a swipe and <kbd>Esc</kbd> doing what they do for cards, and none of the lean,
+foil or dealing — those read as a card in the hand and as nothing at all on an
+A3 sheet of them. The ground behind it is slate rather than near-black, so
+which of the two you are in takes a glance rather than a read of the counter.
 
 ## Undo and redo
 
@@ -502,9 +577,10 @@ The button is only there when the browser is actually offering an install, and
 goes once you have taken it.
 
 The copy is replaced a whole build at a time. When a new version has downloaded,
-the status bar says so and offers **Reload** rather than swapping it in
-underneath you: undo history lives in memory, and a reload you did not ask for
-would throw it away.
+the status bar says *New version — keep undo history or update now to restart
+this session* and offers **Update** rather than swapping it in underneath you:
+undo history lives in memory, and a restart you did not ask for would throw it
+away.
 
 None of this changes what leaves the browser, because nothing does. The cache
 holds this app's own files and nothing else — a font from Google or a background

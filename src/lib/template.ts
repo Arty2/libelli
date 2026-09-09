@@ -1,6 +1,7 @@
 import { safeImageUrl } from './assets';
 import { parseColor } from './color';
 import defaultCard from './templates/default-card.json';
+import { IMPOSITION_COUNTS } from './imposition';
 import type {
 	BackgroundFit,
 	BorderStyle,
@@ -9,9 +10,11 @@ import type {
 	Defaults,
 	FontRef,
 	Mapping,
+	Orientation,
 	PageBackgroundImage,
 	PageNumberPosition,
 	PageNumberSpec,
+	PrintSettings,
 	QrSettings,
 	SideValue,
 	Sides,
@@ -41,6 +44,21 @@ export const DEFAULT_DEFAULTS: Defaults = {
 	letterSpacing: 0
 };
 
+export const ORIENTATIONS: Orientation[] = ['portrait', 'landscape'];
+
+/**
+ * Off by default, and A4 4-up portrait when first switched on — a sheet size
+ * and a count worth having ready, not a blank someone has to fill in before
+ * printing several to a sheet does anything at all.
+ */
+export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
+	enabled: false,
+	count: 4,
+	sheet: { w: 210, h: 297 },
+	orientation: 'portrait',
+	bleed: { enabled: false, amount: 3, cropMarks: false }
+};
+
 export const DEFAULT_PAGE_NUMBER: PageNumberSpec = {
 	enabled: false,
 	position: 'bottom-right',
@@ -66,6 +84,7 @@ export function blankTemplate(): Template {
 		name: 'Untitled card',
 		page: { w: 148, h: 210, unit: 'mm', background: '#ffffff' },
 		bleed: { enabled: false, amount: 3, cropMarks: false },
+		print: { ...DEFAULT_PRINT_SETTINGS },
 		pageNumber: { ...DEFAULT_PAGE_NUMBER },
 		fonts: [{ family: 'Patrick Hand', source: 'google' }],
 		defaults: { ...DEFAULT_DEFAULTS },
@@ -170,6 +189,7 @@ export function normaliseTemplate(raw: unknown): Template {
 			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image) })
 		},
 		bleed: normaliseBleed(t.bleed),
+		print: normalisePrintSettings(t.print),
 		pageNumber: normalisePageNumber(t.pageNumber),
 		fonts: normaliseFonts(t.fonts),
 		defaults: {
@@ -200,6 +220,22 @@ function normaliseBleed(raw: any): Template['bleed'] {
 		enabled: Boolean(raw?.enabled),
 		amount: num(raw?.amount, 3),
 		cropMarks: Boolean(raw?.cropMarks)
+	};
+}
+
+function normalisePrintSettings(raw: any): PrintSettings {
+	const count = IMPOSITION_COUNTS.includes(raw?.count) ? raw.count : DEFAULT_PRINT_SETTINGS.count;
+	const orientation: Orientation = raw?.orientation === 'landscape' ? 'landscape' : 'portrait';
+	return {
+		enabled: Boolean(raw?.enabled),
+		count,
+		sheet: {
+			w: num(raw?.sheet?.w, DEFAULT_PRINT_SETTINGS.sheet.w),
+			h: num(raw?.sheet?.h, DEFAULT_PRINT_SETTINGS.sheet.h)
+		},
+		orientation,
+		bleed: normaliseBleed(raw?.bleed),
+		...stripUndefined({ background: normaliseBackgroundImage(raw?.background) })
 	};
 }
 

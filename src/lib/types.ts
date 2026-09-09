@@ -6,7 +6,7 @@
  * print convention beats consistency.
  */
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 5;
 
 /**
  * `image` is really "image or color": it shows whatever its source resolves
@@ -77,6 +77,41 @@ export interface BleedSpec {
 	/** mm of bleed on every side */
 	amount: number;
 	cropMarks: boolean;
+}
+
+export type Orientation = 'portrait' | 'landscape';
+
+/**
+ * How several virtual pages reach one physical sheet — a way to print, not a
+ * way to design, so it lives beside `page` and `bleed` rather than changing
+ * what either of them means. `sheet` is the physical paper; `page` is still
+ * the card, measured from its own trim edge exactly as it is without
+ * imposition. Cards tile edge to edge: the space between them, and the crop
+ * marks that show where to cut one card out, come from the template's own
+ * `bleed`; the sheet's own `bleed` below is about cutting the sheet, which is
+ * a different cut. When the card at its own
+ * size does not fit the requested count, printing scales every card down
+ * together rather than refusing — a card's own millimetres are still what
+ * the editor and a single-up print use; scale is print output only.
+ */
+export interface PrintSettings {
+	enabled: boolean;
+	/** virtual pages per physical sheet */
+	count: 2 | 4 | 6 | 8;
+	sheet: {
+		w: number;
+		h: number;
+	};
+	orientation: Orientation;
+	/**
+	 * The sheet's own bleed, distinct from the card's: an outset on the paper
+	 * around `sheet`, with crop marks for the tiled block's outer edge. The
+	 * card's bleed says where to cut one card out; this says where to cut the
+	 * sheet.
+	 */
+	bleed: BleedSpec;
+	/** shows through the sheet's outer margin, behind every card */
+	background?: PageBackgroundImage;
 }
 
 /** A page number printed on every card. Off unless asked for. */
@@ -210,6 +245,7 @@ export interface Template {
 	name: string;
 	page: PageSpec;
 	bleed: BleedSpec;
+	print: PrintSettings;
 	pageNumber: PageNumberSpec;
 	fonts: FontRef[];
 	defaults: Defaults;

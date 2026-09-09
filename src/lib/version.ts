@@ -5,5 +5,8 @@
  * feature is a minor (0.1.1 -> 0.2.0). The leading zero never moves: this is a
  * vibe-coded app and it is always in flux, so it never claims to be 1.0.
  * Keep this in step with `version` in package.json.
+ *
+ * One bump per session while the work is still its own; once that session has
+ * a pull request open, every further push takes a patch — see CLAUDE.md.
  */
-export const VERSION = '0.7.0';
+export const VERSION = '0.8.8';

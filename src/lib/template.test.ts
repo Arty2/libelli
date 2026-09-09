@@ -24,6 +24,7 @@ describe('the built-in template', () => {
 		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 8 });
 		expect(template.boxes.find((b) => b.id === 'b_category')?.anchor).toBeNull();
 		expect(template.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });
+		expect(template.print.enabled).toBe(false);
 	});
 
 	it('keeps the markdown metrics on the body box', () => {
@@ -211,6 +212,59 @@ describe('normaliseTemplate', () => {
 
 	it('rejects anything that is not a template', () => {
 		expect(() => normaliseTemplate({ schema: 1 })).toThrow(/no boxes/);
+	});
+
+	it('defaults print settings to off for a template written before they existed', () => {
+		const t = normaliseTemplate({ schema: 2, boxes: [] });
+		expect(t.print).toEqual({
+			enabled: false,
+			count: 4,
+			sheet: { w: 210, h: 297 },
+			orientation: 'portrait',
+			bleed: { enabled: false, amount: 3, cropMarks: false }
+		});
+	});
+
+	it('keeps valid print settings and drops a count outside 2/4/6/8', () => {
+		const t = normaliseTemplate({
+			schema: 4,
+			print: {
+				enabled: true,
+				count: 4,
+				sheet: { w: 297, h: 420 },
+				orientation: 'landscape',
+				bleed: { enabled: true, amount: 5, cropMarks: true }
+			},
+			boxes: []
+		});
+		expect(t.print).toEqual({
+			enabled: true,
+			count: 4,
+			sheet: { w: 297, h: 420 },
+			orientation: 'landscape',
+			bleed: { enabled: true, amount: 5, cropMarks: true }
+		});
+
+		const bogus = normaliseTemplate({ schema: 4, print: { enabled: true, count: 5 }, boxes: [] });
+		expect(bogus.print.count).toBe(4);
+		// A template from before the sheet had a bleed of its own loads with one off.
+		expect(bogus.print.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });
+	});
+
+	it('keeps a valid sheet background image and drops an unsafe one', () => {
+		const withImage = normaliseTemplate({
+			schema: 4,
+			print: { background: { src: 'https://example.com/sheet.jpg', source: 'url', fit: 'repeat' } },
+			boxes: []
+		});
+		expect(withImage.print.background).toEqual({ src: 'https://example.com/sheet.jpg', source: 'url', fit: 'repeat' });
+
+		const unsafe = normaliseTemplate({
+			schema: 4,
+			print: { background: { src: 'javascript:alert(1)', source: 'url' } },
+			boxes: []
+		});
+		expect(unsafe.print.background).toBeUndefined();
 	});
 });
 

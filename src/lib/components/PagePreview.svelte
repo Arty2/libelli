@@ -727,7 +727,11 @@
 	</div>
 
 	<!-- View state sits on the page it affects, one control per bottom corner,
-	     rather than in the toolbar among the actions. -->
+	     rather than in the toolbar among the actions. On a phone the two words
+	     side by side reach far enough into the band that the pager's first arrow,
+	     centred in the same band, lands on top of "Bounds"; they stack instead,
+	     which halves the width and grows upward into empty stage rather than
+	     sideways into the pager. -->
 	<div class="corner left">
 		<label title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it (Ctrl/Cmd+' or Ctrl/Cmd+#)">
 			<input type="checkbox" checked={grid} onchange={(e) => ongrid(e.currentTarget.checked)} />
@@ -1164,6 +1168,15 @@
 
 		.pad {
 			display: grid;
+		}
+	}
+
+	/* Same 520px the export screen calls narrow, so the app has one idea of it. */
+	@media (max-width: 520px) {
+		.corner.left {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 4px;
 		}
 	}
 </style>

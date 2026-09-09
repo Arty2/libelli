@@ -1026,7 +1026,7 @@
 	{#if bleed > 0 && template.bleed.cropMarks}
 		<div class="crop-marks" aria-hidden="true">
 			{#each ['tl', 'tr', 'bl', 'br'] as corner (corner)}
-				<span class="mark {corner}" style="--bleed:{bleed}mm"></span>
+				<span class="mark {corner}" style="--bleed:{bleed}mm;--crop-gap:1mm"></span>
 			{/each}
 		</div>
 	{/if}
@@ -1330,15 +1330,55 @@
 	.h-sw { bottom: calc(var(--mark) / -2); left: calc(var(--mark) / -2); cursor: nesw-resize; }
 	.h-w { top: calc(50% - var(--mark) / 2); left: calc(var(--mark) / -2); cursor: ew-resize; }
 
+	/**
+	 * A mark is two ticks, each lying on one of the trim lines and running
+	 * outward into the bleed — not an L of borders around a corner box, which
+	 * is what these were. The difference is the gap: a tick stops 1mm short of
+	 * the corner along its own direction, so nothing touches the artwork. A
+	 * mark that meets the trim corner cannot be told apart from a rule the
+	 * design meant to have, and it is exactly the corner a guillotine operator
+	 * is lining up on.
+	 */
 	.crop-marks .mark {
 		position: absolute;
 		width: var(--bleed);
 		height: var(--bleed);
 	}
-	.crop-marks .tl { top: 0; left: 0; border-right: 0.2mm solid #000; border-bottom: 0.2mm solid #000; }
-	.crop-marks .tr { top: 0; right: 0; border-left: 0.2mm solid #000; border-bottom: 0.2mm solid #000; }
-	.crop-marks .bl { bottom: 0; left: 0; border-right: 0.2mm solid #000; border-top: 0.2mm solid #000; }
-	.crop-marks .br { bottom: 0; right: 0; border-left: 0.2mm solid #000; border-top: 0.2mm solid #000; }
+
+	.crop-marks .mark::before,
+	.crop-marks .mark::after {
+		content: '';
+		position: absolute;
+		background: #000;
+	}
+
+	/* Along the vertical trim line, and along the horizontal one. `max` because
+	   a bleed thinner than the gap has no room for a mark at all. */
+	.crop-marks .mark::before {
+		width: 0.2mm;
+		height: max(0mm, calc(var(--bleed) - var(--crop-gap)));
+	}
+
+	.crop-marks .mark::after {
+		height: 0.2mm;
+		width: max(0mm, calc(var(--bleed) - var(--crop-gap)));
+	}
+
+	.crop-marks .tl { top: 0; left: 0; }
+	.crop-marks .tl::before { top: 0; right: 0; }
+	.crop-marks .tl::after { left: 0; bottom: 0; }
+
+	.crop-marks .tr { top: 0; right: 0; }
+	.crop-marks .tr::before { top: 0; left: 0; }
+	.crop-marks .tr::after { right: 0; bottom: 0; }
+
+	.crop-marks .bl { bottom: 0; left: 0; }
+	.crop-marks .bl::before { bottom: 0; right: 0; }
+	.crop-marks .bl::after { left: 0; top: 0; }
+
+	.crop-marks .br { bottom: 0; right: 0; }
+	.crop-marks .br::before { bottom: 0; left: 0; }
+	.crop-marks .br::after { right: 0; top: 0; }
 
 	@media screen {
 		/* A family that has not arrived draws in the system stack, which looks

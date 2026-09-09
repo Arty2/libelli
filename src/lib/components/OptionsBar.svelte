@@ -26,6 +26,7 @@
 		onresettemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
+		onuploadprintbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
 		onimporttemplate: () => void;
