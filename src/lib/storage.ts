@@ -27,6 +27,18 @@ export const STORE_ASSETS = 'assets';
 export const KEY_TEMPLATE = 'template:current';
 export const KEY_DATASET = 'dataset:current';
 
+/**
+ * Every saved template is one record under this prefix, keyed by its id.
+ *
+ * Deliberately not an index record listing them: a list kept beside the
+ * documents is a second copy of the same truth, and the moment a write lands in
+ * one and not the other the picker is naming templates that are not there. The
+ * documents are small, there are a handful of them, and `listTemplates` reads
+ * the lot — which is also the repair, since a document with no index entry is
+ * simply in the list.
+ */
+export const KEY_TEMPLATE_PREFIX = 'template:doc:';
+
 const hasWindow = () => typeof window !== 'undefined';
 
 export const local = {
@@ -67,11 +79,24 @@ export const local = {
 	}
 };
 
-/** Mapping is keyed by template name so switching templates keeps both bindings. */
-const mappingKey = (templateName: string) => `mapping:${templateName}`;
+/**
+ * Mapping is keyed per template, so switching templates keeps every binding.
+ *
+ * By id rather than by name, because a library makes two templates called
+ * "Untitled card" ordinary rather than freakish, and they would otherwise share
+ * one mapping and overwrite each other's. The name is still read as a fallback:
+ * mappings saved before this were keyed that way, and an *imported* template
+ * carries a name and no id at all — matching it to the bindings last used under
+ * that name is the one case where the name is the better key.
+ */
+const mappingKey = (key: string) => `mapping:${key}`;
 
-export const loadMapping = (templateName: string): Mapping => local.get<Mapping>(mappingKey(templateName), {});
-export const saveMapping = (templateName: string, mapping: Mapping) => local.set(mappingKey(templateName), mapping);
+export const loadMapping = (id: string, templateName: string): Mapping => {
+	const own = local.get<Mapping>(mappingKey(id), {});
+	if (Object.keys(own).length) return own;
+	return local.get<Mapping>(mappingKey(templateName), {});
+};
+export const saveMapping = (id: string, mapping: Mapping) => local.set(mappingKey(id), mapping);
 
 const UI_DEFAULTS: UiState = { showBounds: true, showGrid: false, zoom: 'fit' };
 
@@ -147,6 +172,64 @@ export const saveTemplate = (t: Template) => idbSet(STORE_KV, KEY_TEMPLATE, t);
 export const loadTemplate = () => idbGet<Template>(STORE_KV, KEY_TEMPLATE);
 export const saveDataset = (d: Dataset) => idbSet(STORE_KV, KEY_DATASET, d);
 export const loadDataset = () => idbGet<Dataset>(STORE_KV, KEY_DATASET);
+
+// ---- the template library --------------------------------------------------
+
+/**
+ * The saved templates, as the picker needs to list them.
+ *
+ * `template:current` above is untouched by any of this: it is still the working
+ * copy, still written on every edit, and still what boot reads first. The
+ * library is a second place the same template is kept, under an id that
+ * survives renaming — so somebody who has never opened the picker keeps exactly
+ * the app they had, and their one template joins the library the first time
+ * they do.
+ */
+export interface TemplateEntry {
+	id: string;
+	name: string;
+}
+
+/** Which of them is loaded. A short string, so localStorage rather than the database. */
+export const loadTemplateId = (): string => local.get<string>('template:id', '');
+export const saveTemplateId = (id: string) => local.set('template:id', id);
+
+/**
+ * Identity for a stored template, and nothing more — never shown, never used as
+ * a file name. Time-ordered so the library's natural order is the order things
+ * were made, with a random tail because two templates can be created in the
+ * same millisecond by holding a button down.
+ */
+export const nextTemplateId = (): string =>
+	`t_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+const templateDocKey = (id: string) => `${KEY_TEMPLATE_PREFIX}${id}`;
+
+export const saveTemplateDoc = (id: string, t: Template) => idbSet(STORE_KV, templateDocKey(id), t);
+export const loadTemplateDoc = (id: string) => idbGet<Template>(STORE_KV, templateDocKey(id));
+export const deleteTemplateDoc = (id: string) => idbDelete(STORE_KV, templateDocKey(id));
+
+/**
+ * Every saved template, by id and name, in name order.
+ *
+ * Read out of the documents themselves rather than from an index kept beside
+ * them — see `KEY_TEMPLATE_PREFIX`. A document that will not load at all is
+ * left out rather than listed as a name that opens nothing.
+ */
+export async function listTemplates(): Promise<TemplateEntry[]> {
+	const keys = await idbKeys(STORE_KV);
+	const ids = keys
+		.filter((key) => key.startsWith(KEY_TEMPLATE_PREFIX))
+		.map((key) => key.slice(KEY_TEMPLATE_PREFIX.length));
+	const entries: TemplateEntry[] = [];
+	for (const id of ids) {
+		const doc = await loadTemplateDoc(id);
+		if (!doc) continue;
+		const name = typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : 'Untitled card';
+		entries.push({ id, name });
+	}
+	return entries.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+}
 
 /**
  * Carry work saved by pre-release builds over to the current keys. Runs once

@@ -9,6 +9,7 @@
 	 */
 	import BoxOptions from './BoxOptions.svelte';
 	import PageOptions from './PageOptions.svelte';
+	import type { TemplateEntry } from '$lib/storage';
 	import type { Box, Dataset, Mapping, Template } from '$lib/types';
 
 	interface Props {
@@ -24,6 +25,11 @@
 		onduplicate: () => void;
 		ondelete: () => void;
 		onresettemplate: () => void;
+		library: TemplateEntry[];
+		templateId: string;
+		onselecttemplate: (id: string) => void;
+		onnewtemplate: () => void;
+		ondeletetemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
 		onuploadprintbackground: (file: File) => void;
