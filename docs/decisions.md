@@ -782,11 +782,16 @@ page selection lives there, keyed by row index and reset every time it opens —
 sorting or deleting a row moves those indices, and a stale exclusion would drop a
 different card than the one that was unticked.
 
-**PNG and Print are positioned, not laid out.** They are the two things this
-screen exists for, and in the flow they moved: a title growing a "3 of 4", an
-export renaming its own button "Exporting 2/12…", a second select button
-appearing — each shoved them along. Absolutely placed inside the close
-button's corner, they are in the same place at every width and in every state.
+**Two rows, each with one item at either end.** The header carried a 14px
+title, two 28px buttons and a close in one row, and no vertical alignment
+reads as deliberate between things that different in height — it looks like a
+mistake rather than a choice. The name of the screen and the way out take the
+first row; what is going and what to do with it take the second. Nothing sits
+in the middle of either, so `justify-content: space-between` is the whole
+layout, the two right-hand ends line up with each other down the edge, and no
+width needs a rule of its own: PNG and Print no longer have to be positioned
+out of the flow to stay put, because there is nothing left in the flow to
+shove them.
 
 **The count in the title *is* the select-all control.** There were two buttons
 for it, "All Pages" and "All Sheets", which on a phone needed a line of their

@@ -443,10 +443,10 @@ scrolls whatever its length.
 
 Every page has a checkbox under it, and only the ticked ones print — untick the
 three proofs that came out wrong and reprint just those — the whole caption row
-under a thumbnail is the target, not the box in the middle of it. The count in
-the title is the control for the whole run: it reads **4 pages**, pressing it
-clears them to **0 pages** so you can choose, and pressing it again takes them
-all back. It is the same number that counts up as you tick, so what it says and
+under a thumbnail is the target, not the box in the middle of it. The count is
+the control for the whole run — it sits at the left of the second header row,
+opposite **PNG** and **Print** — and reads **4 pages**; pressing it clears them
+to **0 pages** so you can choose, and pressing it again takes them all back. It is the same number that counts up as you tick, so what it says and
 what it does are one thing.
 A page keeps the number it has in the table however few of
 them go, so page 4 prints as page 4 even when it is the only one selected. A PNG

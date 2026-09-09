@@ -227,66 +227,72 @@
 <svelte:window onkeydown={onKeydown} />
 
 <div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Export">
+	<!--
+		Two rows, each with one thing at either end and nothing in the middle to
+		align against: the name of the screen and the way out on the first, what
+		is going and what to do with it on the second. One row of four items had
+		a 14px title sitting beside 28px buttons, and no vertical alignment reads
+		as deliberate when the things being aligned are that different in height.
+	-->
 	<header>
-		<!-- The count is the control.
-		     It already says what is going, in the units it will go in, and it
-		     already changes as the checkboxes below do — so pressing it is the
-		     one gesture that has no other home: take the lot, or clear it and
-		     choose. Two buttons for that took a line of their own on a phone,
-		     beside a title that was saying the same numbers back. A button
-		     rather than a link, because it acts here rather than going
-		     somewhere, and a dotted underline rather than a link's solid one to
-		     say as much. -->
-		<h2>
-			<span class="what">Export —</span>
-			<button
-				class="count"
-				title="{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'} going. Press to {allChosen
-					? 'clear them and choose'
-					: 'take all of them'}."
-				onclick={() => setAll(!allChosen)}
-			>
-				{chosen} page{chosen === 1 ? '' : 's'}
-			</button>
-			{#if imposed}
-				<span class="divider">/</span>
-				<button
-					class="count"
-					title="{chosenSheets} of {sheetGroups.length} sheet{sheetGroups.length === 1
-						? ''
-						: 's'} going. Press to {allSheetsChosen ? 'clear them and choose' : 'take all of them'}."
-					onclick={() => setAllSheets(!allSheetsChosen)}
-				>
-					{chosenSheets} sheet{chosenSheets === 1 ? '' : 's'}
-				</button>
-			{/if}
-		</h2>
-		<!-- Taken out of the flow and pinned to the right, inside the close
-		     button: PNG and Print are the two things this screen is for, and they
-		     are in the same place whatever the title says and however narrow the
-		     window gets. -->
-		<div class="header-actions">
-			<button onclick={exportPng} disabled={goingOut === 0 || exporting}>
-				<Icon name="download" size={15} />
-				{#if exporting}
-					{progress && progress.total > 1
-						? `Exporting ${Math.min(progress.done + 1, progress.total)}/${progress.total}…`
-						: 'Exporting…'}
-				{:else}
-					PNG
-				{/if}
-			</button>
-			<button class="primary" onclick={onprint} disabled={goingOut === 0}>
-				<Icon name="print" size={15} />
-				Print
+		<div class="header-row">
+			<h2>Export</h2>
+			<!-- Unstyled, in the corner, where the lightbox puts its own: leaving
+			     is not one of the things you came here to do, and a button beside
+			     Print read as though it were. -->
+			<button class="close" onclick={onclose} title="Close" aria-label="Close">
+				<Icon name="close" size={20} />
 			</button>
 		</div>
-		<!-- Out of the row of actions and into the corner, unstyled, where the
-		     lightbox puts its own: leaving is not one of the things you came here
-		     to do, and a fourth button beside Print read as though it were. -->
-		<button class="close" onclick={onclose} title="Close" aria-label="Close">
-			<Icon name="close" size={20} />
-		</button>
+
+		<div class="header-row">
+			<!-- The count is the control.
+			     It already says what is going, in the units it will go in, and it
+			     already changes as the checkboxes below do — so pressing it is the
+			     one gesture that had no other home: take the lot, or clear it and
+			     choose. A button rather than a link, because it acts here rather
+			     than going somewhere, and a dotted underline rather than a link's
+			     solid one to say as much. -->
+			<p class="counts">
+				<button
+					class="count"
+					title="{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'} going. Press to {allChosen
+						? 'clear them and choose'
+						: 'take all of them'}."
+					onclick={() => setAll(!allChosen)}
+				>
+					{chosen} page{chosen === 1 ? '' : 's'}
+				</button>
+				{#if imposed}
+					<span class="divider">/</span>
+					<button
+						class="count"
+						title="{chosenSheets} of {sheetGroups.length} sheet{sheetGroups.length === 1
+							? ''
+							: 's'} going. Press to {allSheetsChosen ? 'clear them and choose' : 'take all of them'}."
+						onclick={() => setAllSheets(!allSheetsChosen)}
+					>
+						{chosenSheets} sheet{chosenSheets === 1 ? '' : 's'}
+					</button>
+				{/if}
+			</p>
+			<div class="header-actions">
+				<button onclick={exportPng} disabled={goingOut === 0 || exporting}>
+					<Icon name="download" size={15} />
+					{#if exporting}
+						{progress && progress.total > 1
+							? `Exporting ${Math.min(progress.done + 1, progress.total)}/${progress.total}…`
+							: 'Exporting…'}
+					{:else}
+						PNG
+					{/if}
+				</button>
+				<button class="primary" onclick={onprint} disabled={goingOut === 0}>
+					<Icon name="print" size={15} />
+					Print
+				</button>
+			</div>
+		</div>
 	</header>
 
 	<div
@@ -450,13 +456,24 @@
 		position: sticky;
 		top: 0;
 		display: flex;
-		align-items: center;
-		gap: 12px;
-		padding: 12px 54px 12px 18px;
+		flex-direction: column;
+		gap: 10px;
+		padding: 10px 14px 12px 18px;
 		background: rgba(238, 238, 238, 0.94);
 		backdrop-filter: blur(6px);
 		border-bottom: 1px solid #ddd;
 		z-index: 2;
+	}
+
+	/* One thing at either end, nothing in the middle: whatever heights the two
+	   ends happen to be, there is no third item for them to fail to line up
+	   with. */
+	.header-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		min-width: 0;
 	}
 
 	h2 {
@@ -464,13 +481,19 @@
 		font: 600 14px ui-sans-serif, system-ui, sans-serif;
 	}
 
-	/* A count in the title that presses.
+	.counts {
+		margin: 0;
+		font: 600 14px ui-sans-serif, system-ui, sans-serif;
+		color: #111;
+	}
+
+	/* A count that presses.
 	   Sized and weighted exactly like the words around it — it is the sentence,
 	   not a control dropped into it — with a dotted underline to say it does
 	   something. Dotted rather than solid on purpose: solid underlines mean a
 	   link, and this goes nowhere. Hovering firms the line up, which is the
 	   feedback a link would give by changing colour. */
-	h2 .count {
+	.counts .count {
 		border: none;
 		background: none;
 		padding: 0;
@@ -485,12 +508,12 @@
 		text-underline-offset: 3px;
 	}
 
-	h2 .count:hover {
+	.counts .count:hover {
 		text-decoration-style: solid;
 		text-decoration-color: currentColor;
 	}
 
-	h2 .count:focus-visible {
+	.counts .count:focus-visible {
 		outline: 2px solid #2563eb;
 		outline-offset: 2px;
 		border-radius: 2px;
@@ -498,22 +521,19 @@
 
 	/* Grey, and not a target: the two counts are separate controls and the mark
 	   between them belongs to neither. */
-	h2 .divider {
+	.counts .divider {
 		color: #aaa;
 		font-weight: 400;
 	}
 
-	/* Absolute, so they hold the right edge whatever the flow beside them does:
-	   a title that grows a "3 of 4" or an export that renames itself
-	   "Exporting 2/12…" used to shove them about. Inside the close button's
-	   corner, and the header's own right padding is what keeps the two apart. */
+	/* At the right end of their own row, so nothing in the flow beside them can
+	   shove them about — not a title growing a count, nor the export renaming
+	   its own button "Exporting 2/12…". */
 	.header-actions {
-		position: absolute;
-		top: 10px;
-		right: 48px;
 		display: flex;
 		align-items: center;
 		gap: 10px;
+		flex: none;
 	}
 
 	header button {
@@ -533,12 +553,9 @@
 		border-color: var(--border-control-hover);
 	}
 
-	/* The way out, in the corner, with no chip around it — the lightbox's close
-	   rather than a fourth button in the row of things you came here to do. */
+	/* No chip around it — the lightbox's close rather than a fourth button in
+	   the row of things you came here to do. */
 	header .close {
-		position: absolute;
-		top: 8px;
-		right: 10px;
 		display: grid;
 		place-items: center;
 		width: 32px;
@@ -631,23 +648,12 @@
 			columns: 1;
 		}
 
+		/* Nothing to rearrange: each row already has one item at either end, and
+		   two ends fit any width worth supporting. Only the room around them
+		   tightens. */
 		header {
-			flex-wrap: wrap;
 			gap: 8px;
-		}
-
-		/* The actions are pinned to the right of the first line, so the title
-		   stops before them. It wraps rather than ellipsising: the counts in it
-		   are buttons now, and a truncated title would cut one of them off the
-		   screen. The word "Export" goes instead — the dialog is named that for
-		   a screen reader, and the two buttons at its right say it plainly
-		   enough. */
-		header h2 {
-			max-width: calc(100% - 170px);
-		}
-
-		header h2 .what {
-			display: none;
+			padding: 8px 10px 10px 14px;
 		}
 	}
 
