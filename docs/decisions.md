@@ -786,8 +786,23 @@ different card than the one that was unticked.
 screen exists for, and in the flow they moved: a title growing a "3 of 4", an
 export renaming its own button "Exporting 2/12…", a second select button
 appearing — each shoved them along. Absolutely placed inside the close
-button's corner, they are in the same place at every width and in every state,
-and the narrow header ellipsises its title rather than sliding under them.
+button's corner, they are in the same place at every width and in every state.
+
+**The count in the title *is* the select-all control.** There were two buttons
+for it, "All Pages" and "All Sheets", which on a phone needed a line of their
+own directly beneath a title reciting the same two numbers back. The count
+already says what is going and already moves as the checkboxes do, so pressing
+it is the only gesture it was missing: all of them, or none and choose. The
+header now fits one line at 390px — count, count, PNG, Print, close — where it
+took two.
+
+A `<button>`, not an anchor: it acts here rather than going anywhere. Sized and
+weighted as the sentence it sits in, and underlined *dotted* rather than solid,
+which is the convention for in-text controls that are not links; hover firms
+the line to solid, standing in for the colour change a link would give. The
+word "Export" is what gives way below 700px — the dialog carries that name for
+a screen reader, and two buttons at the right say it plainly enough — so the
+title wraps or shortens without ever truncating a control off the edge.
 
 **The whole caption row is the checkbox.** A 13px box beside a number is a pin
 to aim at, and on a phone this row is the one control pressed over and over.

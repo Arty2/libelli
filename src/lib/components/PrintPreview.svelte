@@ -228,39 +228,39 @@
 
 <div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Export">
 	<header>
-		<!-- The count says what is going, in the units it will go in: pages
-		     always, and the sheets they land on when there are any. -->
+		<!-- The count is the control.
+		     It already says what is going, in the units it will go in, and it
+		     already changes as the checkboxes below do — so pressing it is the
+		     one gesture that has no other home: take the lot, or clear it and
+		     choose. Two buttons for that took a line of their own on a phone,
+		     beside a title that was saying the same numbers back. A button
+		     rather than a link, because it acts here rather than going
+		     somewhere, and a dotted underline rather than a link's solid one to
+		     say as much. -->
 		<h2>
-			Export —
-			{#if allChosen}
-				{dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}
-			{:else}
-				{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}
-			{/if}
+			<span class="what">Export —</span>
+			<button
+				class="count"
+				title="{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'} going. Press to {allChosen
+					? 'clear them and choose'
+					: 'take all of them'}."
+				onclick={() => setAll(!allChosen)}
+			>
+				{chosen} page{chosen === 1 ? '' : 's'}
+			</button>
 			{#if imposed}
-				/ {#if allSheetsChosen}{sheetGroups.length}{:else}{chosenSheets} of {sheetGroups.length}{/if}
-				sheet{sheetGroups.length === 1 ? '' : 's'}
+				<span class="divider">/</span>
+				<button
+					class="count"
+					title="{chosenSheets} of {sheetGroups.length} sheet{sheetGroups.length === 1
+						? ''
+						: 's'} going. Press to {allSheetsChosen ? 'clear them and choose' : 'take all of them'}."
+					onclick={() => setAllSheets(!allSheetsChosen)}
+				>
+					{chosenSheets} sheet{chosenSheets === 1 ? '' : 's'}
+				</button>
 			{/if}
 		</h2>
-		<!-- Pages and sheets get a button each, because they are two selections
-		     and one button could only ever mean one of them. Each says what
-		     pressing it does: everything is ticked, so it hands the choosing
-		     over; nothing is, so it takes the lot. -->
-		<div class="header-bar">
-			<button
-				class="choose"
-				title={allChosen ? 'Untick every page, and choose the ones to print' : 'Tick every page'}
-				onclick={() => setAll(!allChosen)}>{allChosen ? 'Choose Pages' : 'All Pages'}</button
-			>
-			{#if imposed}
-				<button
-					class="choose"
-					title={allSheetsChosen ? 'Untick every sheet, and choose the ones to print' : 'Tick every sheet'}
-					onclick={() => setAllSheets(!allSheetsChosen)}
-					>{allSheetsChosen ? 'Choose Sheets' : 'All Sheets'}</button
-				>
-			{/if}
-		</div>
 		<!-- Taken out of the flow and pinned to the right, inside the close
 		     button: PNG and Print are the two things this screen is for, and they
 		     are in the same place whatever the title says and however narrow the
@@ -464,13 +464,43 @@
 		font: 600 14px ui-sans-serif, system-ui, sans-serif;
 	}
 
-	/* The two select buttons, in the flow beside the title, wrapping under it
-	   when there is no room. */
-	.header-bar {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		min-width: 0;
+	/* A count in the title that presses.
+	   Sized and weighted exactly like the words around it — it is the sentence,
+	   not a control dropped into it — with a dotted underline to say it does
+	   something. Dotted rather than solid on purpose: solid underlines mean a
+	   link, and this goes nowhere. Hovering firms the line up, which is the
+	   feedback a link would give by changing colour. */
+	h2 .count {
+		border: none;
+		background: none;
+		padding: 0;
+		margin: 0;
+		font: inherit;
+		color: inherit;
+		cursor: pointer;
+		text-decoration: underline;
+		text-decoration-style: dotted;
+		text-decoration-color: #999;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 3px;
+	}
+
+	h2 .count:hover {
+		text-decoration-style: solid;
+		text-decoration-color: currentColor;
+	}
+
+	h2 .count:focus-visible {
+		outline: 2px solid #2563eb;
+		outline-offset: 2px;
+		border-radius: 2px;
+	}
+
+	/* Grey, and not a target: the two counts are separate controls and the mark
+	   between them belongs to neither. */
+	h2 .divider {
+		color: #aaa;
+		font-weight: 400;
 	}
 
 	/* Absolute, so they hold the right edge whatever the flow beside them does:
@@ -607,18 +637,17 @@
 		}
 
 		/* The actions are pinned to the right of the first line, so the title
-		   stops before them and ellipsises rather than sliding underneath. The
-		   select buttons wrap to a line of their own, where there is no such
-		   competition. */
+		   stops before them. It wraps rather than ellipsising: the counts in it
+		   are buttons now, and a truncated title would cut one of them off the
+		   screen. The word "Export" goes instead — the dialog is named that for
+		   a screen reader, and the two buttons at its right say it plainly
+		   enough. */
 		header h2 {
-			max-width: calc(100% - 180px);
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
+			max-width: calc(100% - 170px);
 		}
 
-		.header-bar {
-			flex-basis: 100%;
+		header h2 .what {
+			display: none;
 		}
 	}
 

@@ -443,9 +443,11 @@ scrolls whatever its length.
 
 Every page has a checkbox under it, and only the ticked ones print — untick the
 three proofs that came out wrong and reprint just those — the whole caption row
-under a thumbnail is the target, not the box in the middle of it. **All Pages**
-takes the lot, and once they are all ticked the same button reads **Choose
-Pages** and clears them so you can pick; the title says how many are going.
+under a thumbnail is the target, not the box in the middle of it. The count in
+the title is the control for the whole run: it reads **4 pages**, pressing it
+clears them to **0 pages** so you can choose, and pressing it again takes them
+all back. It is the same number that counts up as you tick, so what it says and
+what it does are one thing.
 A page keeps the number it has in the table however few of
 them go, so page 4 prints as page 4 even when it is the only one selected. A PNG
 run names its files `stem_01.png`, padded to the width of the run, so a directory
@@ -453,8 +455,8 @@ listing comes back in print order rather than as 1, 10, 2. The
 selection is for one print: reopening the preview starts from every page again,
 because sorting or deleting a row moves the positions it was pinned to.
 
-Sheets have checkboxes of their own, and **All Sheets** / **Choose Sheets**
-beside the pages' button — one sheet of a run misfed or came out streaked, and
+Sheets have checkboxes of their own, and their own count beside the pages' one
+— *4 pages / 2 sheets* — one sheet of a run misfed or came out streaked, and
 reprinting it should not mean working out which four rows were on it. It is a second filter over the first: unticking a sheet drops that
 sheet, and the pages on it stay ticked as pages. Changing which pages go
 regroups the sheets, so it brings every sheet back — sheet 2 of a different
