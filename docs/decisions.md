@@ -462,6 +462,18 @@ and go with a selection belong on that rail rather than in the options bar, wher
 they would shove every other control sideways each time a second box was picked
 up.
 
+**The view toggles stack on a phone rather than shrink.** *Grid* and *Bounds*
+side by side measure a fixed 124px of the bottom band, and the card pager is
+centred in that same band: at 390px the previous-card arrow already sat on top
+of *Bounds*, and at 320px it overlapped by 41px, so a press meant for one could
+land on the other. Below 520px — the same width the export screen calls narrow —
+the two labels become a column instead. The block keeps its `bottom`, so it
+grows upward into empty stage rather than sideways into the pager, which buys
+back roughly half the width: 15px of clearance at 320px and 50px at 390px, 10px
+at 320px with the widest counter a deck can show. Icons in place of the words
+were tried first and read as two anonymous chips; the words are what make the
+toggles guessable, and a column keeps them.
+
 ## `src/lib/components/DataTable.svelte`
 
 **A sticky header's borders are not sticky.** Under `border-collapse: collapse`
