@@ -87,6 +87,16 @@
 	 * that adding a row prints it: a new card should not have to be opted in.
 	 */
 	let excludedRows = $state<Set<number>>(new Set());
+	/**
+	 * Whole sheets left out of the next print, by their position in the run.
+	 *
+	 * A second filter over the first rather than a rewrite of it: unticking a
+	 * sheet drops the sheet, and leaves the pages on it ticked as pages. The
+	 * set is cleared whenever the page selection changes, because that is what
+	 * regroups the sheets — sheet 2 after a change is a different sheet 2, and
+	 * a stale exclusion would drop paper nobody pointed at.
+	 */
+	let excludedSheets = $state<Set<number>>(new Set());
 	let helpOpen = $state(false);
 	let cssOpen = $state(false);
 	// Page setup is a panel, not a mode: it opens on wide screens and stays out of
@@ -1087,10 +1097,11 @@ em { color: #b42318 }`;
 			notify('Nothing to print yet.', 'warning');
 			return;
 		}
-		// Every page, every time. The selection is by row index, and sorting or
-		// deleting a row moves those indices under it — a stale exclusion would
-		// quietly drop a different card than the one you unticked.
+		// Every page and every sheet, every time. The selection is by row index,
+		// and sorting or deleting a row moves those indices under it — a stale
+		// exclusion would quietly drop a different card than the one you unticked.
 		excludedRows = new Set();
+		excludedSheets = new Set();
 		previewOpen = true;
 	}
 
@@ -1614,8 +1625,15 @@ em { color: #b42318 }`;
 		{background}
 		{printBackground}
 		excluded={excludedRows}
+		{excludedSheets}
 		onactivate={(i) => (activeRow = i)}
-		onexcludedchange={(next) => (excludedRows = next)}
+		onexcludedchange={(next) => {
+			// Changing which pages go regroups the sheets, so every sheet comes
+			// back rather than an old index pointing at new paper.
+			excludedRows = next;
+			excludedSheets = new Set();
+		}}
+		onexcludedsheetschange={(next) => (excludedSheets = next)}
 		onprint={printFromPreview}
 		ontemplatechange={applyTemplate}
 		onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
@@ -1637,7 +1655,15 @@ em { color: #b42318 }`;
 {/if}
 
 {#if printing}
-	<PrintRoot {template} {dataset} {mapping} {background} {printBackground} excluded={excludedRows} />
+	<PrintRoot
+		{template}
+		{dataset}
+		{mapping}
+		{background}
+		{printBackground}
+		excluded={excludedRows}
+		{excludedSheets}
+	/>
 {/if}
 
 <style>

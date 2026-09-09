@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Card from './Card.svelte';
 	import { backgroundStyle } from '$lib/assets';
-	import { SHEET_MARK_ROOM, resolveImposition } from '$lib/imposition';
+	import { SHEET_MARK_GAP, SHEET_MARK_MAX, resolveImposition } from '$lib/imposition';
 	import type { Mapping, Row, Template } from '$lib/types';
 
 	/**
@@ -62,14 +62,17 @@
 	const padY = $derived(sheetBleed + (imposed?.marginY ?? 0));
 
 	/**
-	 * Marks for the block's outer edge. This is the cut that takes the tiled
-	 * block off the sheet, which the cards' own marks cannot show: theirs stop
-	 * at each card's bleed. `resolveImposition` has already held room back for
-	 * these, so they do not have to make do with whatever a page bleed left.
+	 * Marks for the block's outer edge — the cut that takes the tiled block off
+	 * the sheet, which the cards' own marks cannot show, since theirs stop at
+	 * each card's bleed.
+	 *
+	 * Drawn in the room the sheet already has: the sheet bleed and whatever the
+	 * block is not using. Switching them on moves nothing, so a block filling
+	 * its sheet edge to edge with no sheet bleed simply has nowhere to put
+	 * them, and gets none.
 	 */
-	const OUTER_MARK_GAP = 1;
 	const outerMark = $derived(
-		Math.min(SHEET_MARK_ROOM - OUTER_MARK_GAP, Math.max(0, Math.min(padX, padY) - OUTER_MARK_GAP))
+		Math.min(SHEET_MARK_MAX, Math.max(0, Math.min(padX, padY) - SHEET_MARK_GAP))
 	);
 	const showOuterMarks = $derived(!!imposed && template.print.bleed.cropMarks && outerMark > 0);
 
@@ -104,7 +107,7 @@
 			{#each ['tl', 'tr', 'bl', 'br'] as corner (corner)}
 				<span
 					class="mark {corner}"
-					style="--len:{outerMark}mm;--gap:{OUTER_MARK_GAP}mm;--pad-x:{padX}mm;--pad-y:{padY}mm"
+					style="--len:{outerMark}mm;--gap:{SHEET_MARK_GAP}mm;--pad-x:{padX}mm;--pad-y:{padY}mm"
 				></span>
 			{/each}
 		</div>

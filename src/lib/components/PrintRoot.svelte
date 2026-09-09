@@ -12,9 +12,12 @@
 		printBackground: string | null;
 		/** row indices the preview left out */
 		excluded: Set<number>;
+		/** whole sheets the preview left out, by position in the run */
+		excludedSheets: Set<number>;
 	}
 
-	let { template, dataset, mapping, background, printBackground, excluded }: Props = $props();
+	let { template, dataset, mapping, background, printBackground, excluded, excludedSheets }: Props =
+		$props();
 
 	// Filtered into a list up front, carrying each row's original index: a page
 	// keeps the number it has in the table however few of them are printed.
@@ -35,11 +38,13 @@
 	const perSheet = $derived(imposed ? imposed.grid.rows * imposed.grid.cols : 1);
 
 	// Rows tile into sheets of `rows * cols` — the last sheet short of a full
-	// grid just leaves the remaining cells empty.
+	// grid just leaves the remaining cells empty. Grouped before the sheet
+	// exclusions are applied, so a sheet's number here is the number the
+	// preview showed it under.
 	const sheets = $derived(
 		Array.from({ length: Math.ceil(pages.length / perSheet) }, (_, i) =>
 			pages.slice(i * perSheet, i * perSheet + perSheet)
-		)
+		).filter((_, i) => !excludedSheets.has(i))
 	);
 </script>
 

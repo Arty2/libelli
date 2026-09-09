@@ -22,8 +22,11 @@
 		printBackground: string | null;
 		/** row indices left out of the print; empty means every page goes */
 		excluded: Set<number>;
+		/** whole sheets left out of the print; empty means every sheet goes */
+		excludedSheets: Set<number>;
 		onactivate: (index: number) => void;
 		onexcludedchange: (excluded: Set<number>) => void;
+		onexcludedsheetschange: (excluded: Set<number>) => void;
 		onprint: () => void;
 		ontemplatechange: (template: Template) => void;
 		onuploadprintbackground: (file: File) => void;
@@ -39,8 +42,10 @@
 		background,
 		printBackground,
 		excluded,
+		excludedSheets,
 		onactivate,
 		onexcludedchange,
+		onexcludedsheetschange,
 		onprint,
 		ontemplatechange,
 		onuploadprintbackground,
@@ -86,8 +91,11 @@
 		const missing = new Set<string>();
 		let written = 0;
 		try {
+			// `:not(.dropped)` either way: unticked pages and unticked sheets are
+			// both marked that way, so what is exported is what the grid shows as
+			// going.
 			const elements = imposed
-				? Array.from(container.querySelectorAll<HTMLElement>('.print-sheet'))
+				? Array.from(container.querySelectorAll<HTMLElement>('figure:not(.dropped) .print-sheet'))
 				: Array.from(container.querySelectorAll<HTMLElement>('figure:not(.dropped) .card'));
 			const stem = imposed ? `${slugify(template.name)}-sheet` : slugify(template.name);
 			progress = { done: 0, total: elements.length };
@@ -135,6 +143,17 @@
 	const setAll = (include: boolean) =>
 		onexcludedchange(include ? new Set() : new Set(dataset.rows.map((_, i) => i)));
 
+	/** The same again for whole sheets, which are their own selection. */
+	function toggleSheet(index: number, include: boolean) {
+		const next = new Set(excludedSheets);
+		if (include) next.delete(index);
+		else next.add(index);
+		onexcludedsheetschange(next);
+	}
+
+	const setAllSheets = (include: boolean) =>
+		onexcludedsheetschange(include ? new Set() : new Set(sheetGroups.map((_, i) => i)));
+
 	let fullscreen = $state<number | null>(null);
 	let sheetFullscreen = $state<number | null>(null);
 
@@ -170,6 +189,11 @@
 			: []
 	);
 
+	const chosenSheets = $derived(sheetGroups.filter((_, i) => !excludedSheets.has(i)).length);
+	const allSheetsChosen = $derived(chosenSheets === sheetGroups.length);
+	/** What Print and PNG will actually produce, in the unit they produce it in. */
+	const goingOut = $derived(imposed ? chosenSheets : chosen);
+
 	/** Same reasoning as the card thumbnail, sized off the sheet instead. */
 	let sheetGridWidth = $state(0);
 	const sheetNarrow = $derived(sheetGridWidth > 0 && sheetGridWidth < NARROW);
@@ -183,7 +207,7 @@
 		// one gesture: once to look at what is going, again to send it.
 		if ((event.metaKey || event.ctrlKey) && (event.key.toLowerCase() === 'p' || (event.shiftKey && event.key.toLowerCase() === 's'))) {
 			event.preventDefault();
-			if (chosen > 0) onprint();
+			if (goingOut > 0) onprint();
 			return;
 		}
 		// Either lightbox is in front and takes Escape and the arrows for itself
@@ -214,18 +238,32 @@
 				{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}
 			{/if}
 			{#if imposed}
-				/ {sheetGroups.length} sheet{sheetGroups.length === 1 ? '' : 's'}
+				/ {#if allSheetsChosen}{sheetGroups.length}{:else}{chosenSheets} of {sheetGroups.length}{/if}
+				sheet{sheetGroups.length === 1 ? '' : 's'}
 			{/if}
 		</h2>
-		<!-- One row, whatever the width: choosing which pages go is about the
-		     grids below and sits at its left end, PNG and Print are what you came
-		     here to press and stay pinned to its right. Wrapping the pair means a
-		     narrow header drops the title onto its own line rather than breaking
-		     the row of actions apart. -->
+		<!-- One row, whatever the width: what to select is about the grids below
+		     and sits at its left end, PNG and Print are what you came here to
+		     press and stay pinned to its right. Wrapping the pair means a narrow
+		     header drops the title onto its own line rather than breaking the row
+		     of actions apart. Pages and sheets get a button each, because they
+		     are two selections and one button could only ever mean one of them. -->
 		<div class="header-bar">
-			<button class="choose" onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
+			<button
+				class="choose"
+				title={allChosen ? 'Untick every page' : 'Tick every page'}
+				onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All Pages'}</button
+			>
+			{#if imposed}
+				<button
+					class="choose"
+					title={allSheetsChosen ? 'Untick every sheet' : 'Tick every sheet'}
+					onclick={() => setAllSheets(!allSheetsChosen)}
+					>{allSheetsChosen ? 'Select None' : 'Select All Sheets'}</button
+				>
+			{/if}
 			<div class="header-actions">
-			<button onclick={exportPng} disabled={chosen === 0 || exporting}>
+			<button onclick={exportPng} disabled={goingOut === 0 || exporting}>
 				<Icon name="download" size={15} />
 				{#if exporting}
 					{progress && progress.total > 1
@@ -235,7 +273,7 @@
 					PNG
 				{/if}
 			</button>
-			<button class="primary" onclick={onprint} disabled={chosen === 0}>
+			<button class="primary" onclick={onprint} disabled={goingOut === 0}>
 				<Icon name="print" size={15} />
 				Print
 			</button>
@@ -306,7 +344,8 @@
 				style="--thumb:{sheetThumbWidth}px"
 			>
 				{#each sheetGroups as sheetPages, i (i)}
-					<figure>
+					{@const included = !excludedSheets.has(i)}
+					<figure class:dropped={!included}>
 						<button
 							class="thumb sheet-thumb"
 							style="width:{mmToPx(printSheetW) * sheetThumbScale}px;height:{mmToPx(printSheetH) * sheetThumbScale}px"
@@ -324,7 +363,18 @@
 								/>
 							</span>
 						</button>
-						<figcaption>Sheet {i + 1}</figcaption>
+						<!-- A sheet is its own thing to tick: the pages on it stay ticked
+						     as pages, and the sheet simply does not go. -->
+						<figcaption>
+							<label>
+								<input
+									type="checkbox"
+									checked={included}
+									onchange={(e) => toggleSheet(i, e.currentTarget.checked)}
+								/>
+								Sheet {i + 1}
+							</label>
+						</figcaption>
 					</figure>
 				{/each}
 			</div>
@@ -424,8 +474,11 @@
 		min-width: 0;
 	}
 
-	.header-bar .choose {
-		margin-right: auto;
+	/* On the actions rather than on the first button: there are two select
+	   buttons now, and an auto margin on the first would have pushed the second
+	   away with the actions. */
+	.header-bar .header-actions {
+		margin-left: auto;
 	}
 
 	.header-actions {

@@ -60,15 +60,13 @@ export interface ImpositionLayout {
 }
 
 /**
- * How much of the sheet the sheet's own crop marks need, per edge.
- *
- * Reserved by the fit rather than taken out of whatever margin happens to be
- * left over: a page bleed grows every card, which grows the block, which used
- * to leave nothing for these marks — so asking for them did nothing at all,
- * and the page's bleed silently decided whether the sheet's marks existed.
- * The two settings are independent, so the room is too.
+ * The longest a sheet's own crop mark is drawn, and the gap it leaves at the
+ * corner. Both are limits on the drawing, never on the fit: asking for marks
+ * must not move a single card, so they take whatever room the sheet bleed and
+ * the centring margin already leave and are skipped when that is nothing.
  */
-export const SHEET_MARK_ROOM = 5;
+export const SHEET_MARK_MAX = 6;
+export const SHEET_MARK_GAP = 1;
 
 /**
  * Where cards land on the sheet, or `undefined` when imposition is off.
@@ -80,8 +78,9 @@ export const SHEET_MARK_ROOM = 5;
  * enlarges), and the orientation needing the *least* shrinkage wins; a tie
  * falls to whichever is listed first, the more balanced arrangement.
  *
- * The block is centred on the whole sheet, but only ever fitted into the part
- * of it the sheet's marks are not holding — see `SHEET_MARK_ROOM`.
+ * Nothing here consults the sheet's crop marks: they are drawn in the room
+ * the sheet already has, so switching them on never moves a card. An earlier
+ * version reserved room for them, which was a bleed by another name.
  */
 export function resolveImposition(
 	cardW: number,
@@ -90,18 +89,11 @@ export function resolveImposition(
 ): ImpositionLayout | undefined {
 	if (!print.enabled) return undefined;
 	const { w: sheetW, h: sheetH } = print.sheet;
-	// Never past half the sheet: a mark reservation that swallowed the paper
-	// would leave nothing to print on.
-	const room = print.bleed.cropMarks
-		? Math.min(SHEET_MARK_ROOM, sheetW / 4, sheetH / 4)
-		: 0;
-	const fitW = sheetW - room * 2;
-	const fitH = sheetH - room * 2;
 	let best: ImpositionLayout | undefined;
 	for (const grid of GRIDS[print.count] ?? []) {
 		const rawW = cardW * grid.cols;
 		const rawH = cardH * grid.rows;
-		const scale = Math.min(1, fitW / rawW, fitH / rawH);
+		const scale = Math.min(1, sheetW / rawW, sheetH / rawH);
 		if (best && scale <= best.scale) continue;
 		const blockW = rawW * scale;
 		const blockH = rawH * scale;

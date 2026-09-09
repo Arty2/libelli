@@ -213,10 +213,11 @@ resize boxes directly, or type exact millimetres.
   so a sheet whose background runs to its edge has something to trim into, and
   the marks go at the corners of the tiled block — the cut that takes the block
   off the sheet, which no card's own marks can show, since each of those stops
-  at its own bleed. All four settings hold at once; asking for the sheet's
-  marks holds a few millimetres of the sheet back for them, so a page bleed
-  can never crowd them out, and the cards scale down by however much that
-  costs.
+  at its own bleed. All four settings hold at once. The marks are drawn in the
+  room the sheet already has — its bleed, and whatever the centred block is
+  not using — so switching them on never moves a card; a block filling its
+  sheet with no bleed to spare has nowhere to put them, and the sheet bleed is
+  what makes that room.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
@@ -441,7 +442,7 @@ strip moves. A desktop keeps the wrapping grid, where the whole run is a few
 scrolls whatever its length.
 
 Every page has a checkbox under it, and only the ticked ones print — untick the
-three proofs that came out wrong and reprint just those. **Select All** /
+three proofs that came out wrong and reprint just those. **Select All Pages** /
 **Select None** does the whole run, and the title says how many pages are going.
 A page keeps the number it has in the table however few of
 them go, so page 4 prints as page 4 even when it is the only one selected. A PNG
@@ -449,6 +450,16 @@ run names its files `stem_01.png`, padded to the width of the run, so a director
 listing comes back in print order rather than as 1, 10, 2. The
 selection is for one print: reopening the preview starts from every page again,
 because sorting or deleting a row moves the positions it was pinned to.
+
+Sheets have checkboxes of their own, and **Select All Sheets** / **Select
+None** beside the pages' button — one sheet of a run misfed or came out
+streaked, and reprinting it should not mean working out which four rows were
+on it. It is a second filter over the first: unticking a sheet drops that
+sheet, and the pages on it stay ticked as pages. Changing which pages go
+regroups the sheets, so it brings every sheet back — sheet 2 of a different
+grouping is different paper, and a selection held over would drop the wrong
+one. The title counts both, and both the print and a PNG-per-sheet run send
+only the sheets still ticked.
 
 Click a thumbnail to open that card full screen; so does the count under the
 sheet in the editor — *3 / 12*, the number naming the card being the obvious

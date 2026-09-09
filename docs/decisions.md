@@ -741,16 +741,15 @@ paper (and `@page` with it) and its marks go at the corners of the tiled
 *block*. Those two cuts are made by different people at different times, and a
 single setting would have to mean both.
 
-**The room for the sheet's marks is reserved by the fit, not scavenged.** It
-was the leftover centring margin at first, which meant a page bleed decided
-whether the sheet's marks existed: bleed grows every card, the block grows
-with them, the margin goes to nothing, and asking for marks did nothing at
-all. Two independent settings, one silently overriding the other.
-`resolveImposition` now fits the block into the sheet less
-`SHEET_MARK_ROOM` per edge whenever the marks are on, so they always have
-somewhere to be. The cost is honest and visible: the cards come out a few per
-cent smaller, and the panel says so — marks need paper, and paper spent on
-marks is not paper spent on cards.
+**Sheet marks are drawn in the room the sheet already has, and never make
+their own.** They take the sheet bleed plus whatever the centred block is not
+using, capped at `SHEET_MARK_MAX`, and are skipped when that comes to
+nothing — a block filling its sheet edge to edge with no sheet bleed has
+nowhere to put a mark. A version in between reserved room for them in the
+fit, which guaranteed they always appeared but moved every card on the sheet
+the moment they were switched on: a bleed by another name, and not what a
+marks toggle is for. Where they have nowhere to go, the sheet bleed is what
+makes room — that is the setting for it.
 
 **One component, two contexts, the same pixels.** `PrintRoot.svelte` mounts
 this off-screen for the actual print run; `PrintPreview.svelte` mounts the
@@ -768,6 +767,19 @@ splitting it was what let the preview reuse it at all.
 page selection lives there, keyed by row index and reset every time it opens —
 sorting or deleting a row moves those indices, and a stale exclusion would drop a
 different card than the one that was unticked.
+
+**A sheet's selection is a second filter, not a rewrite of the first.**
+Unticking a sheet drops the sheet and leaves the pages on it ticked as pages.
+The alternative — a sheet checkbox that unticks its four rows — would regroup
+the run under the hand doing the unticking, so sheet 3 would become sheet 2
+mid-gesture. Sheets are grouped from the included rows first, and
+`excludedSheets` is applied to that grouping by position, in the preview, the
+print and the PNG run alike.
+
+The cost is that a sheet's number only means something for one grouping, so
+changing the *page* selection clears the sheet selection — every sheet comes
+back. Same reasoning as reopening the preview clearing the page selection: an
+index held over from a different grouping would drop paper nobody pointed at.
 
 **Sheet Preview groups the same rows Print and the PNG export will.** With
 several cards to a sheet, `sheetGroups` chunks the *included* rows (excluded
