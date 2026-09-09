@@ -7,6 +7,7 @@ const printSettings = (over: Partial<PrintSettings> = {}): PrintSettings => ({
 	count: 4,
 	sheet: { w: 210, h: 297 },
 	orientation: 'portrait',
+	bleed: { enabled: false, amount: 3, cropMarks: false },
 	...over
 });
 

@@ -6,7 +6,7 @@
  * print convention beats consistency.
  */
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /**
  * `image` is really "image or color": it shows whatever its source resolves
@@ -87,8 +87,9 @@ export type Orientation = 'portrait' | 'landscape';
  * what either of them means. `sheet` is the physical paper; `page` is still
  * the card, measured from its own trim edge exactly as it is without
  * imposition. Cards tile edge to edge: the space between them, and the crop
- * marks that show where to cut, come from the template's own `bleed` — there
- * is no second bleed to keep in step with the first. When the card at its own
+ * marks that show where to cut one card out, come from the template's own
+ * `bleed`; the sheet's own `bleed` below is about cutting the sheet, which is
+ * a different cut. When the card at its own
  * size does not fit the requested count, printing scales every card down
  * together rather than refusing — a card's own millimetres are still what
  * the editor and a single-up print use; scale is print output only.
@@ -102,6 +103,13 @@ export interface PrintSettings {
 		h: number;
 	};
 	orientation: Orientation;
+	/**
+	 * The sheet's own bleed, distinct from the card's: an outset on the paper
+	 * around `sheet`, with crop marks for the tiled block's outer edge. The
+	 * card's bleed says where to cut one card out; this says where to cut the
+	 * sheet.
+	 */
+	bleed: BleedSpec;
 	/** shows through the sheet's outer margin, behind every card */
 	background?: PageBackgroundImage;
 }

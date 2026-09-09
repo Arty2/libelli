@@ -55,7 +55,8 @@ export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
 	enabled: false,
 	count: 4,
 	sheet: { w: 210, h: 297 },
-	orientation: 'portrait'
+	orientation: 'portrait',
+	bleed: { enabled: false, amount: 3, cropMarks: false }
 };
 
 export const DEFAULT_PAGE_NUMBER: PageNumberSpec = {
@@ -233,6 +234,7 @@ function normalisePrintSettings(raw: any): PrintSettings {
 			h: num(raw?.sheet?.h, DEFAULT_PRINT_SETTINGS.sheet.h)
 		},
 		orientation,
+		bleed: normaliseBleed(raw?.bleed),
 		...stripUndefined({ background: normaliseBackgroundImage(raw?.background) })
 	};
 }

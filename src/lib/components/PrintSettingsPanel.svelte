@@ -33,6 +33,13 @@
 	const patchPrint = (change: Partial<PrintSettings>) =>
 		ontemplatechange({ ...template, print: { ...template.print, ...change } });
 
+	/** The card's own bleed, which lives on the template beside `print`, not inside it. */
+	const patchBleed = (change: Partial<Template['bleed']>) =>
+		ontemplatechange({ ...template, bleed: { ...template.bleed, ...change } });
+
+	const patchSheetBleed = (change: Partial<Template['bleed']>) =>
+		patchPrint({ bleed: { ...template.print.bleed, ...change } });
+
 	const numeric = (event: Event, fallback: number) => {
 		const value = Number((event.currentTarget as HTMLInputElement).value);
 		return Number.isFinite(value) ? value : fallback;
@@ -96,6 +103,46 @@
 		input.value = '';
 	}
 </script>
+
+<!-- The card's own bleed, here rather than only in the Card size group: it is a
+     print decision, and the print screen is where you are when you notice the
+     cards need one. -->
+<span class="group" role="group" aria-label="Page bleed">
+	<label class="check">
+		<input
+			type="checkbox"
+			checked={template.bleed.enabled}
+			disabled={pageFrozen}
+			title="Also the gap between cards, and the crop marks between them, when several are printed to a sheet"
+			onchange={(e) => patchBleed({ enabled: e.currentTarget.checked })}
+		/>
+		Page Bleed
+	</label>
+	{#if template.bleed.enabled}
+		<label class="field">
+			<input
+				class="n-2"
+				type="number"
+				step="0.5"
+				min="0"
+				aria-label="Page bleed amount"
+				value={template.bleed.amount}
+				disabled={pageFrozen}
+				onchange={(e) => patchBleed({ amount: numeric(e, template.bleed.amount) })}
+			/>
+			<span class="unit">mm</span>
+		</label>
+		<label class="check">
+			<input
+				type="checkbox"
+				checked={template.bleed.cropMarks}
+				disabled={pageFrozen}
+				onchange={(e) => patchBleed({ cropMarks: e.currentTarget.checked })}
+			/>
+			Crop Marks
+		</label>
+	{/if}
+</span>
 
 <span class="group" role="group" aria-label="Print Settings">
 	<label class="field">
@@ -177,6 +224,43 @@
 				Scaled to {Math.round(fit.scale * 100)}%
 			</span>
 		{/if}
+		<!-- The sheet's own bleed and marks: where to cut the sheet, as against
+		     where to cut a card out of it. -->
+		<label class="check">
+			<input
+				type="checkbox"
+				checked={template.print.bleed.enabled}
+				disabled={pageFrozen}
+				title="An outset on the paper around the sheet, for printing a sheet that runs to its own edge"
+				onchange={(e) => patchSheetBleed({ enabled: e.currentTarget.checked })}
+			/>
+			Sheet Bleed
+		</label>
+		{#if template.print.bleed.enabled}
+			<label class="field">
+				<input
+					class="n-2"
+					type="number"
+					step="0.5"
+					min="0"
+					aria-label="Sheet bleed amount"
+					value={template.print.bleed.amount}
+					disabled={pageFrozen}
+					onchange={(e) => patchSheetBleed({ amount: numeric(e, template.print.bleed.amount) })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+		{/if}
+		<label class="check">
+			<input
+				type="checkbox"
+				checked={template.print.bleed.cropMarks}
+				disabled={pageFrozen}
+				title="Marks at the corners of the tiled block, for the cut that takes it off the sheet"
+				onchange={(e) => patchSheetBleed({ cropMarks: e.currentTarget.checked })}
+			/>
+			Sheet Marks
+		</label>
 		<span class="field-label">Sheet Image</span>
 		{#if template.print.background}
 			<span class="asset" title={template.print.background.src}>

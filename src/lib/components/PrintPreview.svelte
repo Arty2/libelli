@@ -61,10 +61,12 @@
 	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 
 	// What Print actually puts on paper: several cards tiled onto one physical
-	// sheet when it's on, otherwise one card per sheet as before.
+	// sheet when it's on, otherwise one card per sheet as before — and the
+	// sheet's own bleed, where it has one, is part of the paper.
 	const imposed = $derived(resolveImposition(outerW, outerH, template.print));
-	const printSheetW = $derived(imposed ? template.print.sheet.w : outerW);
-	const printSheetH = $derived(imposed ? template.print.sheet.h : outerH);
+	const sheetBleed = $derived(imposed && template.print.bleed.enabled ? template.print.bleed.amount : 0);
+	const printSheetW = $derived((imposed ? template.print.sheet.w : outerW) + sheetBleed * 2);
+	const printSheetH = $derived((imposed ? template.print.sheet.h : outerH) + sheetBleed * 2);
 
 	/**
 	 * One file per selected page — or, with several cards to a sheet, one file
@@ -176,26 +178,6 @@
 	);
 	const sheetThumbScale = $derived(sheetThumbWidth / mmToPx(printSheetW));
 
-	/**
-	 * Skip the pages and land on the sheets.
-	 *
-	 * A run of any size puts the sheets — the thing that actually comes out of
-	 * the printer — below every page in it, so the header carries a way past
-	 * them. `scroll-margin-top` on the section is what keeps the sticky header
-	 * off the heading it lands on.
-	 */
-	let sheetSection = $state<HTMLElement | null>(null);
-	function jumpToSheets() {
-		sheetSection?.scrollIntoView({
-			behavior:
-				typeof window !== 'undefined' &&
-				window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-					? 'auto'
-					: 'smooth',
-			block: 'start'
-		});
-	}
-
 	function onKeydown(event: KeyboardEvent) {
 		// The same keys that opened this screen print from it, so the pair reads as
 		// one gesture: once to look at what is going, again to send it.
@@ -222,6 +204,8 @@
 
 <div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Export">
 	<header>
+		<!-- The count says what is going, in the units it will go in: pages
+		     always, and the sheets they land on when there are any. -->
 		<h2>
 			Export —
 			{#if allChosen}
@@ -229,19 +213,14 @@
 			{:else}
 				{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'}
 			{/if}
-		</h2>
-		<!-- Choosing which pages go, and skipping past them, are both about the
-		     grids below; PNG and Print are what you came here to press. They sit
-		     at opposite ends so the two are not read as one row of equal things. -->
-		<div class="header-jumps">
-			<button class="choose" onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
 			{#if imposed}
-				<button onclick={jumpToSheets} title="Skip the pages and go to the sheets">
-					<Icon name="caret-down" size={14} />
-					{sheetGroups.length} sheet{sheetGroups.length === 1 ? '' : 's'}
-				</button>
+				/ {sheetGroups.length} sheet{sheetGroups.length === 1 ? '' : 's'}
 			{/if}
-		</div>
+		</h2>
+		<!-- Choosing which pages go is about the grids below; PNG and Print are
+		     what you came here to press. They sit at opposite ends so the two are
+		     not read as one row of equal things. -->
+		<button class="choose" onclick={() => setAll(!allChosen)}>{allChosen ? 'Select None' : 'Select All'}</button>
 		<div class="header-actions">
 			<button onclick={exportPng} disabled={chosen === 0 || exporting}>
 				<Icon name="download" size={15} />
@@ -265,16 +244,6 @@
 			<Icon name="close" size={20} />
 		</button>
 	</header>
-
-	<!-- The same Print Settings shared with Page Setup, so a sheet size or count
-	     picked wrong does not send you back to the editor to fix it — see
-	     PrintSettingsPanel.svelte and docs/decisions.md. Above the pages, not
-	     under them: it decides what the two grids below it even show, and a
-	     setting you have to scroll past every page to reach reads as an
-	     afterthought rather than as the thing to check first. -->
-	<div class="options settings-strip">
-		<PrintSettingsPanel {template} {pageFrozen} {ontemplatechange} onuploadbackground={onuploadprintbackground} {onnotice} />
-	</div>
 
 	<div
 		class="grid"
@@ -311,14 +280,20 @@
 		{/each}
 	</div>
 
-	{#if imposed}
-		<hr />
+	<!-- The same Print Settings shared with Page Setup, so a sheet size or count
+	     picked wrong does not send you back to the editor to fix it — see
+	     PrintSettingsPanel.svelte and docs/decisions.md. Between the two grids:
+	     it is what turns the pages above into the sheets below, and standing
+	     there it separates them without a heading of its own. -->
+	<div class="options settings-strip">
+		<PrintSettingsPanel {template} {pageFrozen} {ontemplatechange} onuploadbackground={onuploadprintbackground} {onnotice} />
+	</div>
 
+	{#if imposed}
 		<!-- What Print (and a PNG export) will actually produce: the chosen cards
 		     above, tiled onto physical sheets exactly as PrintRoot.svelte renders
 		     them for real, only scaled down for the screen. -->
-		<section class="sheets" aria-label="Sheet preview" bind:this={sheetSection}>
-			<h3>Sheets — what will print</h3>
+		<section class="sheets" aria-label="Sheet preview">
 			<div
 				class="grid sheet-grid"
 				class:narrow={sheetNarrow}
@@ -365,11 +340,10 @@
 			</li>
 			<li><strong>Margins</strong> — <em>None</em>.</li>
 			<li><strong>Headers and footers</strong> — off.</li>
-			<li><strong>Background graphics</strong> — on, or Chrome drops the paper color.</li>
+			<li><strong>Background graphics</strong> — on, or the browser drops the paper color.</li>
 		</ol>
 		<p class="muted">
-			A PNG export needs none of this — it comes out at 300 dpi whatever the print dialog says. Everything stays in
-			this browser; nothing is uploaded.
+			A PNG export needs none of this — it comes out at 300 dpi whatever the print dialog says.
 		</p>
 	</section>
 
@@ -434,14 +408,8 @@
 	}
 
 	/* Pushed off the title, and the actions pushed to the far end by the margin
-	   below — `space-between` cannot place three children the way two want to be.
-	   The margin is on the cluster rather than on Select All itself, so the jump
-	   to the sheets travels with it instead of being flung across to the
-	   actions. */
-	.header-jumps {
-		display: flex;
-		align-items: center;
-		gap: 10px;
+	   below — `space-between` cannot place three children the way two want to be. */
+	header .choose {
 		margin-right: auto;
 	}
 
@@ -505,13 +473,12 @@
 		border-top: 1px solid #ddd;
 	}
 
-	/* The shared options bar is built for the toolbar's full-width strip; here
-	   it sits inside a modal's padding, so it gets its own margin and a border
-	   all round rather than the single bottom rule it draws itself. */
+	/* Edge to edge, the way it is in the toolbar: it is the rule between the
+	   pages above and the sheets below, and its own padding is inset enough.
+	   A border top and bottom rather than the single bottom rule it draws
+	   itself, since here it has grids on both sides. */
 	.settings-strip {
-		margin: 12px 18px 0;
-		border: 1px solid #ddd;
-		border-radius: var(--radius-button);
+		border-top: 1px solid #ddd;
 	}
 
 	.checklist {
@@ -528,22 +495,11 @@
 		color: #767676;
 	}
 
-	/* The jump from the header lands here, and the header is sticky — without
-	   this it would land behind it. */
+	/* No inset of its own: the grid inside carries the same padding the pages
+	   grid does, and a section padding on top of that would inset the sheets
+	   further than the pages for no reason. */
 	.sheets {
-		padding: 12px 18px 0;
-		scroll-margin-top: 60px;
-	}
-
-	/* Same treatment as the checklist's own heading — a small grey label rather
-	   than a second, competing title on a screen that already has one. */
-	.sheets h3 {
-		margin: 0 0 12px;
-		font-size: 11px;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: #767676;
+		padding: 0;
 	}
 
 	/* A sheet's own paper color and background image are real content here,

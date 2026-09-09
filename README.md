@@ -180,13 +180,17 @@ resize boxes directly, or type exact millimetres.
   still called an A4. Neither moves anything on the card, because every
   coordinate is measured from the trim edge. Type your own numbers and it reads
   as *Custom*.
-- **Bleed** — an outset on the page, never an offset on content: turning it on
-  changes the sheet size, optionally with crop marks, and every box stays
+- **Page Bleed** — an outset on the page, never an offset on content: turning it
+  on changes the sheet size, optionally with crop marks, and every box stays
   visually where it was. On screen the trim edge is a solid green hairline, the
   same weight as the grid and drawn above it, on the same toggle as the area
   bounds. The grid keeps its corner at the trim, not at the sheet, so turning
   bleed on does not slide the gridlines under the boxes they are there to
-  measure.
+  measure. It sits in **Print Settings** with the rest of the print decisions,
+  which means it is also to hand on the print screen. Crop marks lie on the
+  trim lines and run outward into the bleed, each stopping a millimetre short
+  of the corner: a mark that meets the artwork cannot be told from a rule the
+  design meant to have, and that corner is what the guillotine lines up on.
 - **Print Settings** — several cards printed to one physical sheet: 2, 4, 6 or
   8, onto A5, A4, A3 or a sheet of your own size in millimetres, **Portrait**
   or **Landscape**. Cards keep the millimetres they were designed at
@@ -203,6 +207,12 @@ resize boxes directly, or type exact millimetres.
   margin around the tiled cards. This whole group is the one place both
   **Page Setup** and the print screen change the same settings: see
   **Print preview** below.
+- **Sheet Bleed** and **Sheet Marks** — the sheet's own, distinct from the
+  card's: bleed outsets the paper around the sheet size, so a sheet whose
+  background runs to its edge has something to trim into, and the marks go at
+  the corners of the tiled block — the cut that takes the block off the sheet,
+  which no card's own marks can show, since each of those stops at its own
+  bleed.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
@@ -412,19 +422,19 @@ because a PNG in the wrong typeface is not the card. A request that is
 blocked or offline leaves that family in the fallback stack and the export
 says which.
 
-**Print Settings** sits at the top of that screen, above the pages: it decides
-how many sheets there are and what goes on each, so it is the thing to check
-first. The print checklist stays at the bottom, under the pages — that one is
-about the browser's own dialog, which is the last thing to happen.
+**Print Settings** sits between the two grids, edge to edge: it is what turns
+the pages above it into the sheets below it, so standing there it separates
+them and needs no heading of its own. The print checklist stays at the bottom
+— that one is about the browser's own dialog, which is the last thing to
+happen. The title counts both units, *Export — 4 pages / 2 sheets*, so the
+number of sheets is known before scrolling to them.
 
 On a phone each grid is a strip you swipe along rather than rows you scroll
 past. A hundred pages was a hundred rows between you and everything below
 them; sideways, the run costs one screen however long it is, and each
 thumbnail takes two thirds of the width so the next one peeks in and says the
 strip moves. A desktop keeps the wrapping grid, where the whole run is a few
-scrolls whatever its length. The header also carries a jump straight to the
-sheets, counting them as it goes — the sheets are what comes out of the
-printer, and they sit below every page in the run.
+scrolls whatever its length.
 
 Every page has a checkbox under it, and only the ticked ones print — untick the
 three proofs that came out wrong and reprint just those. **Select All** /

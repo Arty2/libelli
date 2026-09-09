@@ -276,40 +276,6 @@
 			>
 				<Icon name="arrows-horizontal" size={14} />
 			</button>
-			<label class="check">
-				<input
-					type="checkbox"
-					checked={template.bleed.enabled}
-					disabled={pageFrozen}
-					title="Also the gap between cards, and the crop marks between them, when several are printed to a sheet"
-					onchange={(e) => patchTemplate({ bleed: { ...template.bleed, enabled: e.currentTarget.checked } })}
-				/>
-				Bleed
-			</label>
-			{#if template.bleed.enabled}
-				<label class="field">
-					<input
-						class="n-2"
-						type="number"
-						step="0.5"
-						min="0"
-						aria-label="Bleed amount"
-						value={template.bleed.amount}
-						disabled={pageFrozen}
-						onchange={(e) => patchTemplate({ bleed: { ...template.bleed, amount: numeric(e, template.bleed.amount) } })}
-					/>
-					<span class="unit">mm</span>
-				</label>
-				<label class="check">
-					<input
-						type="checkbox"
-						checked={template.bleed.cropMarks}
-						disabled={pageFrozen}
-						onchange={(e) => patchTemplate({ bleed: { ...template.bleed, cropMarks: e.currentTarget.checked } })}
-					/>
-					Crop Marks
-				</label>
-			{/if}
 		</span>
 
 		<PrintSettingsPanel

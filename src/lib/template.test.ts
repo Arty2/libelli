@@ -220,25 +220,35 @@ describe('normaliseTemplate', () => {
 			enabled: false,
 			count: 4,
 			sheet: { w: 210, h: 297 },
-			orientation: 'portrait'
+			orientation: 'portrait',
+			bleed: { enabled: false, amount: 3, cropMarks: false }
 		});
 	});
 
 	it('keeps valid print settings and drops a count outside 2/4/6/8', () => {
 		const t = normaliseTemplate({
 			schema: 4,
-			print: { enabled: true, count: 4, sheet: { w: 297, h: 420 }, orientation: 'landscape' },
+			print: {
+				enabled: true,
+				count: 4,
+				sheet: { w: 297, h: 420 },
+				orientation: 'landscape',
+				bleed: { enabled: true, amount: 5, cropMarks: true }
+			},
 			boxes: []
 		});
 		expect(t.print).toEqual({
 			enabled: true,
 			count: 4,
 			sheet: { w: 297, h: 420 },
-			orientation: 'landscape'
+			orientation: 'landscape',
+			bleed: { enabled: true, amount: 5, cropMarks: true }
 		});
 
 		const bogus = normaliseTemplate({ schema: 4, print: { enabled: true, count: 5 }, boxes: [] });
 		expect(bogus.print.count).toBe(4);
+		// A template from before the sheet had a bleed of its own loads with one off.
+		expect(bogus.print.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });
 	});
 
 	it('keeps a valid sheet background image and drops an unsafe one', () => {

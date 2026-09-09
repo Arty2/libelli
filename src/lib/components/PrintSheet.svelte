@@ -37,25 +37,55 @@
 	const imposed = $derived(resolveImposition(cardW, cardH, template.print));
 	const grid = $derived(imposed?.grid ?? { rows: 1, cols: 1 });
 	const scale = $derived(imposed?.scale ?? 1);
-	const sheetW = $derived(imposed ? template.print.sheet.w : cardW);
-	const sheetH = $derived(imposed ? template.print.sheet.h : cardH);
 	const blockW = $derived(imposed?.blockW ?? cardW);
 	const blockH = $derived(imposed?.blockH ?? cardH);
-	const marginX = $derived(imposed?.marginX ?? 0);
-	const marginY = $derived(imposed?.marginY ?? 0);
 	const cellW = $derived(cardW * scale);
 	const cellH = $derived(cardH * scale);
+
+	/** The sheet's own bleed outsets the paper; only imposition draws a sheet at all. */
+	const sheetBleed = $derived(imposed && template.print.bleed.enabled ? template.print.bleed.amount : 0);
+	/** What the sheet trims to, and what goes on the printer. */
+	const trimW = $derived(imposed ? template.print.sheet.w : cardW);
+	const trimH = $derived(imposed ? template.print.sheet.h : cardH);
+	const paperW = $derived(trimW + sheetBleed * 2);
+	const paperH = $derived(trimH + sheetBleed * 2);
+
+	/**
+	 * Padding, not a margin on the grid inside.
+	 *
+	 * A top margin on the first child collapses straight out of its parent: the
+	 * block landed at the top of the sheet and the sheet itself was pushed down
+	 * by the margin that escaped, which is what made a thumbnail read as blank.
+	 * Padding cannot collapse. See docs/decisions.md.
+	 */
+	const padX = $derived(sheetBleed + (imposed?.marginX ?? 0));
+	const padY = $derived(sheetBleed + (imposed?.marginY ?? 0));
+
+	/**
+	 * Marks for the block's outer edge, drawn in whatever room there is around
+	 * it. This is the cut that takes the tiled block off the sheet, which the
+	 * cards' own marks cannot show: theirs stop at each card's bleed.
+	 */
+	const OUTER_MARK_MAX = 6;
+	const OUTER_MARK_GAP = 1;
+	const outerMark = $derived(
+		Math.min(OUTER_MARK_MAX, Math.max(0, Math.min(padX, padY) - OUTER_MARK_GAP))
+	);
+	const showOuterMarks = $derived(!!imposed && template.print.bleed.cropMarks && outerMark > 0);
 
 	const sheetBackgroundStyle = $derived(
 		backgroundStyle(template.print.background, printBackground).join(';')
 	);
 </script>
 
-<!-- Sized to the sheet so nothing can spill sideways into an extra page. -->
-<div class="print-sheet" style="width:{sheetW}mm;height:{sheetH}mm;{sheetBackgroundStyle}">
+<!-- Sized to the paper so nothing can spill sideways into an extra page. -->
+<div
+	class="print-sheet"
+	style="width:{paperW}mm;height:{paperH}mm;padding:{padY}mm {padX}mm;{sheetBackgroundStyle}"
+>
 	<div
 		class="print-grid"
-		style="width:{blockW}mm;height:{blockH}mm;margin:{marginY}mm {marginX}mm;grid-template-columns:repeat({grid.cols},{cellW}mm);grid-template-rows:repeat({grid.rows},{cellH}mm)"
+		style="width:{blockW}mm;height:{blockH}mm;grid-template-columns:repeat({grid.cols},{cellW}mm);grid-template-rows:repeat({grid.rows},{cellH}mm)"
 	>
 		{#each pages as page (page.index)}
 			<!-- The card itself always renders at its own millimetres — see
@@ -68,9 +98,27 @@
 			</div>
 		{/each}
 	</div>
+
+	{#if showOuterMarks}
+		<div class="sheet-marks" aria-hidden="true">
+			{#each ['tl', 'tr', 'bl', 'br'] as corner (corner)}
+				<span
+					class="mark {corner}"
+					style="--len:{outerMark}mm;--gap:{OUTER_MARK_GAP}mm;--pad-x:{padX}mm;--pad-y:{padY}mm"
+				></span>
+			{/each}
+		</div>
+	{/if}
 </div>
 
 <style>
+	.print-sheet {
+		position: relative;
+		/* The padding is the sheet's bleed plus the room the block is centred
+		   in; the sheet still has to measure exactly the paper it names. */
+		box-sizing: border-box;
+	}
+
 	.print-grid {
 		display: grid;
 	}
@@ -82,6 +130,47 @@
 	.print-page-scale {
 		transform-origin: top left;
 	}
+
+	/* The same two-tick mark the card draws at its trim corners, at the corners
+	   of the tiled block instead, and running outward from it. */
+	.sheet-marks .mark {
+		position: absolute;
+		width: var(--len);
+		height: var(--len);
+	}
+
+	.sheet-marks .mark::before,
+	.sheet-marks .mark::after {
+		content: '';
+		position: absolute;
+		background: #000;
+	}
+
+	.sheet-marks .mark::before {
+		width: 0.2mm;
+		height: calc(var(--len) - var(--gap));
+	}
+
+	.sheet-marks .mark::after {
+		height: 0.2mm;
+		width: calc(var(--len) - var(--gap));
+	}
+
+	.sheet-marks .tl { top: calc(var(--pad-y) - var(--len)); left: calc(var(--pad-x) - var(--len)); }
+	.sheet-marks .tl::before { top: 0; right: 0; }
+	.sheet-marks .tl::after { left: 0; bottom: 0; }
+
+	.sheet-marks .tr { top: calc(var(--pad-y) - var(--len)); right: calc(var(--pad-x) - var(--len)); }
+	.sheet-marks .tr::before { top: 0; left: 0; }
+	.sheet-marks .tr::after { right: 0; bottom: 0; }
+
+	.sheet-marks .bl { bottom: calc(var(--pad-y) - var(--len)); left: calc(var(--pad-x) - var(--len)); }
+	.sheet-marks .bl::before { bottom: 0; right: 0; }
+	.sheet-marks .bl::after { left: 0; top: 0; }
+
+	.sheet-marks .br { bottom: calc(var(--pad-y) - var(--len)); right: calc(var(--pad-x) - var(--len)); }
+	.sheet-marks .br::before { bottom: 0; left: 0; }
+	.sheet-marks .br::after { right: 0; top: 0; }
 
 	@media print {
 		.print-sheet {

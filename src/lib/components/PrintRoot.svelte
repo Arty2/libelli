@@ -29,8 +29,9 @@
 	// Only needed here for the physical sheet size the browser prints onto —
 	// PrintSheet.svelte works this same geometry out again for its own layout.
 	const imposed = $derived(resolveImposition(cardW, cardH, template.print));
-	const sheetW = $derived(imposed ? template.print.sheet.w : cardW);
-	const sheetH = $derived(imposed ? template.print.sheet.h : cardH);
+	const sheetBleed = $derived(imposed && template.print.bleed.enabled ? template.print.bleed.amount : 0);
+	const sheetW = $derived((imposed ? template.print.sheet.w : cardW) + sheetBleed * 2);
+	const sheetH = $derived((imposed ? template.print.sheet.h : cardH) + sheetBleed * 2);
 	const perSheet = $derived(imposed ? imposed.grid.rows * imposed.grid.cols : 1);
 
 	// Rows tile into sheets of `rows * cols` — the last sheet short of a full

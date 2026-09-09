@@ -114,6 +114,16 @@ recorded as a drag.
 
 ## `src/lib/components/Card.svelte`
 
+**A crop mark is two ticks with a gap, not an L of borders.** These were a
+corner-sized box carrying two borders, so the two lines met exactly at the
+trim corner — the one point a guillotine operator is lining up on, and a mark
+touching the artwork there cannot be told from a rule the design meant to
+have. Each tick now lies on its own trim line, runs outward into the bleed,
+and stops 1mm short of the corner. The gap is along the tick's own direction
+only: the lines stay *on* the trim, because that is what makes them a
+straightedge to cut against. `max(0mm, …)` on the length is what keeps a bleed
+thinner than the gap from drawing a negative mark.
+
 **A box's content lives in `.content`.** Handles and badges are absolutely
 positioned children of `.box` that hang past its edges, so measuring the box's
 own `scrollHeight` reports overflow on every selected box. The wrapper is what
@@ -702,6 +712,26 @@ committed, so there is no ordering race left to lose.
 
 ## `src/lib/components/PrintSheet.svelte`
 
+**The block is centred with padding on the sheet, never a margin on the grid.**
+A top margin on a first child collapses straight out of its parent: the block
+landed at the *top* of the sheet and the sheet itself was pushed down by the
+margin that escaped, so a thumbnail read as blank paper with a sliver of card
+at the bottom — and the real print was off-centre in the same way, which the
+first version of this shipped with. Padding cannot collapse. The sheet is
+`box-sizing: border-box` so it still measures exactly the paper it names.
+
+**The sheet's bleed is not the card's.** The card's says where to cut one card
+out of the sheet; the sheet's says where to cut the sheet, so it outsets the
+paper (and `@page` with it) and its marks go at the corners of the tiled
+*block*. Those two cuts are made by different people at different times, and a
+single setting would have to mean both.
+
+**Sheet marks are drawn in whatever room there is.** Their length is the
+smaller of the two paddings less the 1mm gap, capped at 6mm, and they are
+skipped entirely when that comes out at zero — a block that fills its sheet
+edge to edge has nowhere to put a mark, and drawing one over the artwork would
+be worse than drawing none.
+
 **One component, two contexts, the same pixels.** `PrintRoot.svelte` mounts
 this off-screen for the actual print run; `PrintPreview.svelte` mounts the
 identical component — same props, same DOM — inside a scaled thumbnail for
@@ -726,11 +756,19 @@ ones already filtered out) into the identical `rows * cols` batches
 moves it between sheets in the preview exactly as it will on paper, rather
 than the preview showing a grouping the print will not match.
 
-**Print Settings sits above the grids, not under them.** It decides what both
-grids even show — how many sheets there are and what is on each — so a
-setting you reach by scrolling past every page in the run reads as an
-afterthought. The checklist stays at the bottom: that one is about the
-browser's print dialog, which is the last thing that happens.
+**Print Settings sits between the two grids.** It is what turns the pages
+above it into the sheets below it, so standing there it separates them and the
+sheets need no heading of its own — which is why they no longer have one. It
+runs edge to edge, like the toolbar it is: its own padding is the inset, and a
+second one around it only made the strip look narrower than the grids it
+divides. The checklist stays at the bottom: that one is about the browser's
+print dialog, which is the last thing that happens.
+
+**The title counts pages and sheets.** *Export — 4 pages / 2 sheets*, so how
+many sheets a run comes to is answered before scrolling to them. It replaced a
+button that jumped to the sheets: with the settings strip now between the two
+grids, the sheets are one landmark away rather than a run's length away, and a
+count in the title says more than a button that only moves you.
 
 **A strip on a phone, a wrapping grid on a desktop.** Two thumbnails to a row
 was fine for a dozen pages and hopeless for a hundred: everything else on the
@@ -743,12 +781,6 @@ whatever its length. The strip declares `touch-action: pan-x pan-y` and
 `overscroll-behavior-x: contain` because it scrolls sideways inside a modal
 that scrolls down, and a flick running off the end of it must not drag the
 modal with it.
-
-**A jump to the sheets, in the header.** Same problem, other half of the
-answer: the sheets are what actually comes out of the printer and they are
-below every page in the run, so the header carries a button straight to them,
-counting them as it goes. `scroll-margin-top` on the section is what stops the
-sticky header landing on top of the heading it scrolls to.
 
 **PNG export reads whichever grid is on screen for the setting that is on.**
 `exportPng` was one query (`.card` inside the per-card grid) before several
