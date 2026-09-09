@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import Icon from './Icon.svelte';
 	import { download } from '$lib/download';
+	import { hold } from '$lib/gestures';
 	import { parseTable, toCsv } from '$lib/parse';
 	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
 	import type { Dataset, Row } from '$lib/types';
@@ -35,62 +36,6 @@
 		onloadsample,
 		onnotice
 	}: Props = $props();
-
-	/**
-	 * Press and hold, as a second action on a button that already has one.
-	 *
-	 * The actions bar is deliberately one line — it was costing the table a row
-	 * of its own height every time the tray narrowed — so bringing the samples
-	 * back hangs off Import rather than adding a fifth button. A held mouse
-	 * button and a held finger are the same pointer events, so there is no
-	 * separate touch path.
-	 *
-	 * The click that follows a completed hold has to be swallowed, or the file
-	 * picker would open on top of the rows just loaded.
-	 */
-	function hold(node: HTMLElement, action: () => void) {
-		const DELAY = 600;
-		let timer: ReturnType<typeof setTimeout> | null = null;
-		let fired = false;
-
-		const cancel = () => {
-			if (timer) clearTimeout(timer);
-			timer = null;
-		};
-		const down = (event: PointerEvent) => {
-			// Only the primary button: a right-click opens a menu, not a hold.
-			if (event.button !== 0) return;
-			fired = false;
-			timer = setTimeout(() => {
-				timer = null;
-				fired = true;
-				action();
-			}, DELAY);
-		};
-		// Moving off the button is how you change your mind mid-press.
-		const click = (event: MouseEvent) => {
-			if (!fired) return;
-			event.preventDefault();
-			event.stopPropagation();
-			fired = false;
-		};
-
-		node.addEventListener('pointerdown', down);
-		node.addEventListener('pointerup', cancel);
-		node.addEventListener('pointerleave', cancel);
-		node.addEventListener('pointercancel', cancel);
-		node.addEventListener('click', click, true);
-		return {
-			destroy: () => {
-				cancel();
-				node.removeEventListener('pointerdown', down);
-				node.removeEventListener('pointerup', cancel);
-				node.removeEventListener('pointerleave', cancel);
-				node.removeEventListener('pointercancel', cancel);
-				node.removeEventListener('click', click, true);
-			}
-		};
-	}
 
 	/**
 	 * The row the page is showing, brought into view. Paging the card with the
