@@ -280,10 +280,11 @@ and hold** on *+ Area* instead, because a control that replaces a whole design
 should not sit one mis-tap away from one you have built.
 
 Either way it shows you what it thinks first: one line per column, the kind it
-took the column for, and a sample cell to check it against. That list is the
-whole of the dialog — no paragraph explaining it, because the rows say it better.
-Change anything it has read wrongly, or set a column to **Leave out**. Columns it
-reached by length alone are marked *guess*.
+took the column for, and a sample cell to check it against. That list is nearly
+the whole of the dialog — no paragraph explaining it, because the rows say it
+better. Change anything it has read wrongly, or set a column to **Leave out**.
+Columns it reached by length alone are marked *guess*. Where the template already
+has areas, a line above the buttons says how many are about to be replaced.
 
 - **What it reads** — the heading (a column called Price, Notes, Photo), and the
   shape of the cells (`https://` addresses, image file names, colors, numbers,

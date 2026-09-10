@@ -1758,6 +1758,19 @@ em { color: #b42318 }`;
 				</li>
 			{/each}
 		</ul>
+		<!-- Only where there is something to lose. The button says OK either way, so
+		     without this the destructive case and the harmless one read identically
+		     — and on a template with areas the only way in is a press and hold,
+		     which is easy to trigger without meaning to. -->
+		{#if template.boxes.length}
+			<p class="magic-warning" role="status">
+				<Icon name="warning" size={13} />
+				<span>
+					Replaces the {template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} already on this card.
+					Ctrl/Cmd+Z puts {template.boxes.length === 1 ? 'it' : 'them'} back.
+				</span>
+			</p>
+		{/if}
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button onclick={() => (magic = null)}>Cancel</button>
@@ -2414,6 +2427,28 @@ em { color: #b42318 }`;
 		border: 1px solid #d5d5d5;
 		border-radius: 4px;
 		background: #fff;
+	}
+
+	/* The one real warning in this dialog, so it wears the mark and the colour the
+	   status bar's warnings use. Sits above the buttons rather than beside them:
+	   read before the press, not noticed after it. */
+	.magic-warning {
+		display: flex;
+		align-items: flex-start;
+		gap: 6px;
+		margin: 12px 0 0;
+		padding: 7px 9px;
+		border-radius: 5px;
+		background: #fdf4dc;
+		color: #8a6d1f;
+		font-size: 12px;
+		line-height: 1.45;
+	}
+
+	/* The icon keeps its size while the sentence beside it wraps. */
+	.magic-warning :global(svg) {
+		flex: none;
+		margin-top: 1px;
 	}
 
 	/* Says which rows were reached by length alone. Quiet: it is a caveat on a
