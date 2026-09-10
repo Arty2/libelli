@@ -47,7 +47,7 @@
 		onundo: () => void;
 		onredo: () => void;
 		onaddbox: () => void;
-		/** lay every area out from the columns — the button below Area, and its hold */
+		/** position every area from the columns — the button below Area, and its hold */
 		onmagiclayout: () => void;
 		/** whether there is any data to lay out; the button says so rather than hiding */
 		hasColumns: boolean;
@@ -704,7 +704,7 @@
 			onclick={onaddbox}
 			use:hold={onmagiclayout}
 			disabled={!!template.locked}
-			title="Add an area to the page — press and hold to lay every area out from the columns instead"
+			title="Add an area to the page — press and hold to position every area from the columns instead"
 		>
 			<Icon name="text" size={14} /><span class="sr-only">Area</span>
 		</button>
@@ -718,10 +718,10 @@
 				onclick={onmagiclayout}
 				disabled={!!template.locked}
 				title={hasColumns
-					? 'Lay the areas out from the columns — a card worked out from your headings and data'
+					? 'Position areas automagically — a card worked out from your headings and your data'
 					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
 			>
-				<Icon name="shapes" size={14} /><span class="sr-only">Lay the areas out from the columns</span>
+				<Icon name="shapes" size={14} /><span class="sr-only">Position areas automagically</span>
 			</button>
 		{/if}
 		{#if picking}

@@ -631,7 +631,7 @@ em { color: #b42318 }`;
 		void tick().then(() => boxBar?.focusText());
 	}
 
-	// ---- laying a card out from the columns ---------------------------------
+	// ---- positioning the areas from the columns -----------------------------
 
 	/**
 	 * The roles the auto layout is about to use, open for correction.
@@ -678,7 +678,7 @@ em { color: #b42318 }`;
 			// anchoring the moment one came back.
 			nextId: () => nextBoxId(current.boxes)
 		});
-		describe(current.boxes.length ? 'Lay the areas out again' : 'Lay the areas out');
+		describe(current.boxes.length ? 'Position the areas again' : 'Position the areas');
 		template = { ...current, slots, boxes };
 		mapping = { ...bound };
 		selectedIds = [];
@@ -843,18 +843,25 @@ em { color: #b42318 }`;
 			templateId = '';
 			await switchTemplate(rest[0].id);
 		} else {
-			// The last one out leaves the starter card rather than a blank page:
-			// an editor with nothing in it and no way back is not a state to strand
-			// somebody in.
+			// The last one out lands on a new, empty template — the same thing New
+			// Template gives you. It used to rebuild the starter card, which meant
+			// deleting the card a first run lands on appeared to do nothing at all:
+			// the name came back, the areas came back, and the only honest reading
+			// was that this template could not be deleted.
 			templateId = nextTemplateId();
 			saveTemplateId(templateId);
-			template = starterTemplate();
+			template = blankTemplate();
 			selectedIds = [];
+			editingId = null;
 			mapping = autoMap(usedSlots(template), dataset.columns);
 			await saveTemplateDoc(templateId, $state.snapshot(template));
 		}
 		await refreshLibrary();
-		notify(`“${name}” deleted. Ctrl/Cmd+Z brings the design back.`);
+		notify(
+			rest.length
+				? `“${name}” deleted. Ctrl/Cmd+Z brings the design back.`
+				: `“${name}” deleted — that was the last one, so this is a new empty template. Ctrl/Cmd+Z brings the design back.`
+		);
 	}
 
 	/**
@@ -1708,7 +1715,7 @@ em { color: #b42318 }`;
 		<h2>Delete “{template.name}”?</h2>
 		<p>
 			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'}, and this template's own settings.
-			{library.length > 1 ? 'The next template in the list opens.' : 'The starter card opens, since this is the last one.'}
+			{library.length > 1 ? 'The next template in the list opens.' : 'A new empty template opens, since this is the last one.'}
 			Your rows are not touched.
 		</p>
 		<div class="modal-actions">
@@ -1721,15 +1728,12 @@ em { color: #b42318 }`;
 
 <!-- What the auto layout thinks each column is, before it acts on any of it.
      The guessing is the whole feature, so it is shown rather than described:
+     the list *is* the explanation, which is why there is no paragraph over it —
      every row can be corrected, and a column set to Leave Out gets no area. -->
 {#if magic}
 	<div class="modal-backdrop" role="presentation" onclick={() => (magic = null)}></div>
 	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title">
-		<h2 id="magic-title">Lay the areas out</h2>
-		<p>
-			Worked out from the column names and what is in the cells. Change anything it has taken wrongly —
-			one title, one subtitle and one body are used; the rest become small lines.
-		</p>
+		<h2 id="magic-title">Position Areas Automagically</h2>
 		<ul class="magic-list">
 			{#each magic as guess, index (guess.column)}
 				<li>
@@ -1757,9 +1761,7 @@ em { color: #b42318 }`;
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button onclick={() => (magic = null)}>Cancel</button>
-			<button class="primary" use:focusOnOpen onclick={applyMagic}>
-				{template.boxes.length ? 'Replace the Areas' : 'Lay Them Out'}
-			</button>
+			<button class="primary" use:focusOnOpen onclick={applyMagic}>OK</button>
 		</div>
 	</div>
 {/if}
@@ -1866,8 +1868,9 @@ em { color: #b42318 }`;
 		<p>
 			The <strong>Template</strong> field names the one you are working on; the caret beside it lists every
 			template saved in this browser, with <em>New template…</em> under a rule. Renaming is typing in the field.
-			<strong>Delete</strong> takes the loaded template and opens the next one, where <strong>Reset</strong> puts
-			the starter card back under the same name — both ask first, and both are one Ctrl/Cmd+Z away. The list lives
+			<strong>Delete</strong> takes the loaded template and opens the next one — or a new empty template, if it was
+			the last — where <strong>Reset</strong> puts the starter card back under the same name. Both ask first, and
+			both are one Ctrl/Cmd+Z away. The list lives
 			in this browser only; <strong>Export</strong> is how a template leaves, and an import joins the list rather
 			than replacing what is open.
 		</p>

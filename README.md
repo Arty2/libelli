@@ -262,15 +262,17 @@ with **New template…** under a rule at the bottom. Renaming is typing in the
 field — the template keeps its identity, so two of them may share a name without
 sharing anything else. **Delete** sits next to **Reset** and takes the loaded
 template only: Reset puts the starter card back under the same name, Delete
-removes the template and opens the next one. Both ask first, and both are one
-Ctrl/Cmd+Z away — an undone delete is written back out under the id it had.
+removes the template and opens the next one — or a new empty template, when it
+was the last one, so the card a first run lands on can be deleted like any other.
+Both ask first, and both are one Ctrl/Cmd+Z away — an undone delete is written
+back out under the id it had.
 
 The library lives in this browser and travels nowhere. **Export** is still how a
 template leaves; an **Import** joins the library rather than replacing what is
 loaded.
 
-**Laying a card out from the columns.** The button below *+ Area* — the one
-wearing three shapes — reads your columns and writes a first draft of a card:
+**Position areas automagically.** The button below *+ Area* — the one wearing
+three shapes — reads your columns and writes a first draft of a card:
 title, subtitle, body, a picture, a footer of small lines and a QR code, sized
 and placed for the page you are on. It appears on an empty template, where it is
 the answer to *now what?*; on a template that already has areas it is a **press
@@ -278,9 +280,10 @@ and hold** on *+ Area* instead, because a control that replaces a whole design
 should not sit one mis-tap away from one you have built.
 
 Either way it shows you what it thinks first: one line per column, the kind it
-took the column for, and a sample cell to check it against. Change anything it
-has read wrongly, or set a column to **Leave out**. Columns it reached by length
-alone are marked *guess*.
+took the column for, and a sample cell to check it against. That list is the
+whole of the dialog — no paragraph explaining it, because the rows say it better.
+Change anything it has read wrongly, or set a column to **Leave out**. Columns it
+reached by length alone are marked *guess*.
 
 - **What it reads** — the heading (a column called Price, Notes, Photo), and the
   shape of the cells (`https://` addresses, image file names, colors, numbers,

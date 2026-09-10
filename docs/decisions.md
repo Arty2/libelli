@@ -97,6 +97,11 @@ mapping. The name is still read as a fallback, because that is what mappings wer
 keyed by before, and because an *imported* template arrives with a name and no id
 — the one case where the name is the better key.
 
+**Deleting the last template leaves a new empty one, not the starter card.** It
+used to rebuild the starter card, which meant deleting the template a first run
+lands on appeared to do nothing at all — the name came back and so did the areas,
+and the only honest reading was that this one template could not be deleted.
+
 **Undo carries the template id.** Undoing across a switch or a delete restores the
 design you came from, and without the id travelling in the same snapshot the
 autosave would write that design into whichever template happened to be open —
