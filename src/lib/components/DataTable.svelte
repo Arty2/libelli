@@ -484,11 +484,25 @@
 			</colgroup>
 			<thead>
 				<tr>
-					<!-- Just the gutter now. Unsorting used to live here, a long way from
-					     the header that did the sorting; it is the third press on that
-					     header instead. -->
+					<!-- Unsorting is the third press on the header that did the sorting,
+					     and it is also here whenever a sort is on. The third press means
+					     finding that header again — which, in a table wide enough to
+					     scroll, can be off the side of the tray — and remembering that a
+					     third press is what it takes. This is in the corner the row
+					     numbers are frozen to, it says so by wearing the same mark an
+					     unsorted header wears, and it is only there while there is
+					     something to undo. -->
 					<th class="gutter" scope="col">
-						<span class="sr-only">Row</span>
+						{#if sortedBy}
+							<button
+								class="icon unsort"
+								title="Sorted by “{sortedBy.column}” — press to put the rows back in the order they arrived in"
+								aria-label="Clear the sorting"
+								onclick={clearSort}
+							><Icon name="activity" size={14} /></button>
+						{:else}
+							<span class="sr-only">Row</span>
+						{/if}
 					</th>
 					{#each dataset.columns as column, i (column)}
 						<th scope="col" aria-sort={sortedBy?.column === column ? (sortedBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
@@ -969,6 +983,12 @@
 
 	tr.chosen .gutter {
 		background: #dbe7fd;
+		color: #1d4ed8;
+	}
+
+	/* Sized and coloured like the sort control in a column header, because it is
+	   the same act — it just reaches every column at once. */
+	.unsort {
 		color: #1d4ed8;
 	}
 
