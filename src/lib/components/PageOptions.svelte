@@ -56,6 +56,13 @@
 		onuploadprintbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
+		/**
+		 * The library menu has opened or closed. It matters outside this bar
+		 * because on a narrow screen the bar gives up its height cap while the
+		 * menu is up — see options-bar.css — and whoever is reserving room for
+		 * the bar must not take that transient height for a permanent one.
+		 */
+		onmenu?: (open: boolean) => void;
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
@@ -81,6 +88,7 @@
 		onuploadbackground,
 		onuploadprintbackground,
 		onnotice,
+		onmenu,
 		onimporttemplate,
 		onexporttemplate,
 		oneditcss
@@ -100,6 +108,14 @@
 	 * own, and it earns it by having an action at the bottom of the list.
 	 */
 	let pickerOpen = $state(false);
+
+	$effect(() => {
+		onmenu?.(pickerOpen);
+	});
+
+	// No dependencies, so this cleanup runs once, on destroy: a bar that is
+	// unmounted with its menu still up must not leave the flag set behind it.
+	$effect(() => () => onmenu?.(false));
 	let pickerEl = $state<HTMLElement | null>(null);
 
 	/**

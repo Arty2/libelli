@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
@@ -88,9 +88,25 @@
 	 */
 	let barFloor = $state(0);
 	let barHeight = $state(0);
+	/**
+	 * The page bar's library menu is open.
+	 *
+	 * On a narrow screen the bar gives up its height cap while a menu is up, so
+	 * the menu is not clipped by the bar's own scroller — a moment, and not a
+	 * height the bar ever needs to stand at. Taken as a floor it stayed: opening
+	 * the template switcher once left a band of empty grey under the bar for the
+	 * rest of the session, which is the bug this guard is for.
+	 */
+	let barMenuOpen = $state(false);
 
 	$effect(() => {
-		if (barHeight > barFloor) barFloor = barHeight;
+		const height = barHeight;
+		// Read untracked on purpose: only a fresh measurement may raise the floor.
+		// Tracked, the flag going false at the end of a menu re-ran this while
+		// `barHeight` still held the uncapped height, and the floor took the very
+		// number the guard above exists to refuse.
+		if (untrack(() => barMenuOpen)) return;
+		if (height > barFloor) barFloor = height;
 	});
 
 	let ui = $state<UiState>({ showBounds: true, showGrid: false, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
@@ -1532,6 +1548,9 @@ em { color: #b42318 }`;
 		<div class="bar-row" class:box={!!selected} style="min-height:{barFloor}px">
 			<div class="bar-fit" bind:clientHeight={barHeight}>
 				{#if selected}
+					<!-- No menu here, and the guard above is only ever set by the page
+					     bar; the box bar taking the row clears it because the page bar
+					     unmounts with its menu. -->
 					<OptionsBar
 						bind:this={boxBar}
 						section="box"
@@ -1580,6 +1599,7 @@ em { color: #b42318 }`;
 						onuploadbackground={(file) => void handleBackgroundUpload(file)}
 						onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 						onnotice={notify}
+						onmenu={(open) => (barMenuOpen = open)}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={() => (cssOpen = true)}
@@ -2578,7 +2598,11 @@ em { color: #b42318 }`;
 	/* The one real warning in this dialog, so it wears the mark and the colour the
 	   status bar's warnings use. Sits above the buttons rather than beside them:
 	   read before the press, not noticed after it. */
-	.magic-warning {
+	/* `.modal p` sets the margins for prose in a dialog and outranks a lone
+	   class, so this said 12px and got 0 — the warning sat flush against the
+	   last row of the list it was warning about. Named with the element it is,
+	   which is what it takes to win. */
+	.modal p.magic-warning {
 		display: flex;
 		align-items: flex-start;
 		gap: 6px;

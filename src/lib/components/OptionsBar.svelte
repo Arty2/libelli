@@ -35,6 +35,8 @@
 		onuploadprintbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
+		/** the page bar's library menu opened or closed; the box bar has no menu */
+		onmenu?: (open: boolean) => void;
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
