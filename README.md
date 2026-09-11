@@ -134,7 +134,13 @@ resize boxes directly, or type exact millimetres.
   <kbd>⇧</kbd> while you swing snaps to 15°. Both are drawn whether or not there
   is any rotation yet, because the lever is the rotation control and has to be
   there before there is a rotation to show; the **X** and **Y** in the bar place
-  the pivot exactly, as a percentage of the area's own width and height. A
+  the pivot exactly, as a percentage of the area's own width and height. Press
+  and *hold* either mark to put it back: the crosshair to the middle, the knob
+  upright. Both are dragged to a value with no number written anywhere on the
+  card, and both have a resting state most cards want — getting back to either
+  by dragging is pixel-hunting, and the two fields in the bar are only there for
+  a single selection. The hold gives up the moment the pointer moves, so the
+  drag it shares a mark with is never mistaken for one. A
   turned area still occupies the space it would have upright, so anchored areas
   below it do not move — turning one thing never shuffles the card.
 - **Overflow** — a box whose content is taller than the box will let it be draws
@@ -209,7 +215,7 @@ resize boxes directly, or type exact millimetres.
   margin around the tiled cards. This whole group is the one place both
   **Page Setup** and the print screen change the same settings: see
   **Print preview** below.
-- **Sheet Bleed** and **Sheet Marks** — the sheet's own, distinct from the
+- **Sheet Bleed** and **Sheet Crop Marks** — the sheet's own, distinct from the
   card's, and set beside them: bleed outsets the paper around the sheet size,
   so a sheet whose background runs to its edge has something to trim into, and
   the marks go at the corners of the tiled block — the cut that takes the block
@@ -218,7 +224,9 @@ resize boxes directly, or type exact millimetres.
   room the sheet already has — its bleed, and whatever the centred block is
   not using — so switching them on never moves a card; a block filling its
   sheet with no bleed to spare has nowhere to put them, and the sheet bleed is
-  what makes that room.
+  what makes that room. Which is why the tick only appears once **Sheet Bleed**
+  is on, the way the card's **Crop Marks** appears under **Page Bleed**: without
+  the room, it was a setting you could switch on and see nothing come of.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
@@ -341,7 +349,11 @@ appear.
   case is ignored, and blanks stay at the bottom either way. This reorders the
   data, not just the view, because row order *is* print order — and it is
   undoable. The **row numbers travel with their rows**, so a sorted table still
-  says where each row came from.
+  says where each row came from. While any sort is on, the corner above those
+  numbers wears the same mark an unsorted header wears, and pressing it puts the
+  rows back — the third press on the header that did the sorting does the same
+  thing, but only if you can still find that header, which in a table wide
+  enough to scroll you may not be able to.
 - **Add** — the pale row and column at the end of the table are placeholders:
   type into one and it becomes real. There is no separate button, because the
   place you would click is the place you were already typing.
@@ -646,14 +658,17 @@ While a text field has focus, undo is left to the browser's own text history and
 <kbd>Delete</kbd> deletes characters — the app keeps its hands off both.
 Otherwise the arrow keys move the selected box wherever you are on the page. On
 a touch screen the same job is done by the four-way pad that appears beside the
-card, with a chip cycling between 1mm, 5mm and 10mm; holding an arrow keeps it
-moving. The pad parks over the bottom-right corner of the page, which is exactly
-the corner you may have reached for it to nudge — press and hold that middle
-chip and the pad comes with your finger. It is not drawn at all when nothing it
-could move is selected, and an area whose top comes from an anchor shows the link
-on its two vertical keys rather than an arrow that would do nothing: the
-millimetres between the two areas are the **Gap** in the bar. Pinching zooms the
-page, as do the zoom keys above.
+card — one cross with one outline, not five tiles in the shape of a cross — with
+a chip in the middle cycling between 1mm, 5mm and 10mm; holding an arrow keeps
+it moving. The pad parks over the bottom-right corner of the page, which is
+exactly the corner you may have reached for it to nudge — press and hold that
+middle chip and the pad comes with your finger. It can be pushed off the edge of
+the stage to get that corner back, as far as the middle chip: the arm you are
+not using goes out of sight, the chip you pick it up by never does. It is not
+drawn at all when nothing it could move is selected, and an area whose top comes
+from an anchor shows the link on its two vertical keys rather than an arrow that
+would do nothing: the millimetres between the two areas are the **Gap** in the
+bar. Pinching zooms the page, as do the zoom keys above.
 
 The arrow keys and the pad both move every area in the selection, not only a
 lone one.

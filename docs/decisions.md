@@ -456,6 +456,14 @@ is empty and its glyph comes from CSS, precisely so a template's own stylesheet
 can reach it — `content: ' of '`, or nothing. A literal `" / "` in the markup
 would have been unaddressable.
 
+**Press and hold the pivot or the lever to put it back.** Both marks are dragged
+to a value with no number written anywhere on the card, and both have a resting
+state that is the only one most cards want — the middle, and upright. Dragging
+back to either is pixel-hunting, and the fields in the bar are three clicks away
+and only there for a single selection. The reset drops the drag in flight along
+with it: the drag snapshotted the old value at pointerdown, and a move arriving
+afterwards would write that snapshot straight back over the reset.
+
 ## `src/lib/components/PagePreview.svelte`
 
 **Fit measured the thing its own answer resized.** The stage is observed to
@@ -586,6 +594,34 @@ path has the major positions taken out of it. In dot mode that subtraction is of
 *intersections*, not of coordinates: a minor dot sitting on a major column is
 still a minor dot unless its row is major too.
 
+**The nudge pad is one cross, not five tiles.** It was five rounded rectangles
+with a gap between them, which read as five buttons that happened to be arranged
+in a plus. The grid is still 3 x 3; what changed is that the cells touch, share a
+ground, and carry a border only on the edges that are on the outside of the
+cross — twelve segments, each drawn once by the cell that owns it, with the four
+re-entrant corners where two of them meet at a point. The corner cells stay
+empty, so the card under them is still reachable. Every cell keeps a border on
+all four edges and colours only the perimeter ones: transparent rather than
+absent, because a cell bordered on three edges and not the fourth has an
+asymmetric content box and centres its glyph half a pixel off.
+
+**And the arrowheads are centred, which needed saying in numbers.** Carbon's
+carets are drawn with the triangle 1/32 of the viewBox towards the point they
+face — `caret-up` spans y 10-20, whose middle is 15 against a viewBox centre of
+16 — so a centred glyph is not a centred arrowhead. Each one is pulled back by
+that unit at the size it is drawn, along its own axis. Only while it *is* an
+arrowhead: a tied direction wears the link instead, which is centred as drawn,
+and that is also the only state in which those two are disabled, so `:disabled`
+is what tells the two apart.
+
+**The pad may be stashed off the edge, but never its middle button.** The pad
+parks over the one corner of the page a right-aligned area lives in, which is
+exactly the corner you may have reached for it to nudge. Pushing the far arm out
+of sight is the cheapest way to get that corner back, so the clamp lets the pad
+hang over the edge — and stops at one cell, which is where the middle button's
+outer edge meets the edge of the stage. That button is how the pad is picked up
+again; a pad you cannot reach is a control you have lost.
+
 ## `src/lib/components/DataTable.svelte`
 
 **A sticky header's borders are not sticky.** Under `border-collapse: collapse`
@@ -703,6 +739,13 @@ wants to be, and the tallest cell sets the row; `height: 100%` is what stops eve
 *other* field in that row from sitting as a one-line box with a band of dead white
 under it that looks like the cell and is not the target. A percentage height in a
 table cell resolves after the row is measured, so the two do not fight.
+
+**Unsorting is in two places on purpose.** The third press on a sorted header
+puts the rows back, and that is where the hand already is — but only if the
+header is still on screen, and the table scrolls sideways. The corner above the
+row numbers is frozen to the left edge, so it is always there; it wears the same
+mark an unsorted header wears, and it is only drawn while there is a sort to
+undo.
 
 ## Pull-to-refresh
 
@@ -880,6 +923,14 @@ does: `perSheetSelect`/`sheetPresetSelect` bound with `bind:this`, and a pair
 of `$effect`s that set `.value` directly — an `$effect` runs after the DOM
 for that render (children, including the each block, included) has already
 committed, so there is no ordering race left to lose.
+
+**The sheet's crop marks only exist once the sheet has bleed.** They are drawn
+in the room the sheet already has — its bleed, and whatever the centred block is
+not using — so with no sheet bleed there is usually nowhere to put them, and the
+tick was a setting you could switch on and see nothing come of. It sits inside
+the bleed branch now, the way the card's own **Crop Marks** sits inside
+**Page Bleed**, and it is named **Sheet Crop Marks** so the pair reads as the
+same decision asked twice about two different cuts.
 
 ## `src/lib/components/PrintSheet.svelte`
 
@@ -1133,6 +1184,17 @@ two; it buys a page that does not move when you pick something up. The floor is
 dropped on a resize, because both bars wrap and neither height survives a change
 of width.
 
+**A transient height is not a floor.** The reserved row above took its floor
+from the tallest bar it had seen, which on a narrow screen included a height the
+bar only ever stands at for a moment: `.options.menu-open` gives up the 26dvh
+cap while the template switcher is up, so the menu is not clipped by the bar's
+own scroller. Opening that switcher once left a band of empty grey under the bar
+for the rest of the session. The bar now says when its menu is open and the floor
+declines to move while it is — and reads that flag *untracked*, because the flag
+going false at the end of a menu would otherwise re-run the floor with the
+measured height still holding the uncapped number, taking the very value the
+guard exists to refuse. Only a fresh measurement raises the floor.
+
 **The right-click menu carries no key hints.** The two items that had them were
 the only two that did, so the column of grey chords read as a property of those
 items rather than as a key map. The key map is the help panel, once, for all of
@@ -1234,6 +1296,13 @@ button costs a row; it is only ever used where the two actions are the same
 area out. A gesture nobody was taught has to be survivable when it fires by
 accident, which is what the undo entry is for. The click behind a completed hold
 is swallowed, or the tap action runs straight after the hold action.
+
+**A hold gives up as soon as the pointer moves.** It used to end only on
+pointerup or pointerleave, which is enough for a button but not for a mark that
+is also a drag target: the pivot and the rotation lever both reset on a hold and
+both move on a drag, and a slow drag would sit still long enough to fire the
+reset it was trying to avoid. A few pixels of slop, because a finger is never
+still and a deliberate drag clears it in the first moment.
 
 **Reading a swipe is a pure function; feeding it events is an action.** A flick
 has to beat both a minimum distance and a slope, because a drag at 45 degrees is
