@@ -185,6 +185,15 @@ at pointerdown: selecting a box goes through `startDrag` too, so naming it there
 labelled every click "Move", and a click followed by an arrow key was then
 recorded as a drag.
 
+**Ctrl/Cmd+Shift+Z is the pair on one key, not a second redo.** Undo and redo
+each walk the stack a step further with every press, which is not what the fingers
+want while deciding: that is the page with the last change and the page without
+it, back and forth, as many times as it takes. So this chord alternates — it
+undoes, and the next press redoes exactly what it just undid. Anything else
+touching the history resets the alternation, because after a fresh edit, a plain
+undo or a redo, "the last change" is a different change and an alternating key
+would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
+
 ## `src/lib/components/Card.svelte`
 
 **A crop mark is two ticks with a gap, not an L of borders.** These were a
@@ -547,6 +556,36 @@ at 320px with the widest counter a deck can show. Icons in place of the words
 were tried first and read as two anonymous chips; the words are what make the
 toggles guessable, and a column keeps them.
 
+**The grid is geometry, not a background.** It used to be four
+`repeating-linear-gradient`s. A repeating gradient is rasterised once as a tile
+and then repeated, so the tile's period is rounded to whole device pixels and
+that rounding is multiplied by however many tiles fit. On a 5mm subgrid the
+period is fractional at nearly every scale, so lines landed on the same pixel as
+their neighbour and vanished — and *which* lines vanished changed with the zoom,
+which is what "the grid does not show all its lines" looked like from the
+outside. A standalone check of the old rule at the periods the app actually used
+painted 47 of 89 lines at 0.5, 23 of 45 at 1.0, with gaps of two, three and four
+times the period. Every line is now placed from its own millimetre and handed to
+one `<path>` per weight — two paths, whatever the page size, and no rounding
+between the measurement and the mark. The SVG sits outside the card's transform,
+so the hairline is in screen pixels and does not thicken with the zoom, the same
+bargain the trim line makes.
+
+**Press and hold the Grid box for a dot grid.** Same millimetres, same snapping,
+a dot at each intersection instead of a line across the card — quieter to lay
+type over. Dots are one path too: a zero-length subpath with a round cap is a
+dot, so an A3 page is one `d` string rather than five thousand circles. The
+gesture is `hold` on the label, so the click it swallows does not toggle the
+checkbox under it; the word beside the box changes to *Dots*, because a mode with
+no visible sign is a trap, and the hold turns the grid *on* if it was off — there
+is no answering "which way is it drawn" about something invisible.
+
+**A major line is drawn once.** Every major tick is also a minor one; drawing
+both would double the ink exactly where the grid must stay quietest, so the minor
+path has the major positions taken out of it. In dot mode that subtraction is of
+*intersections*, not of coordinates: a minor dot sitting on a major column is
+still a minor dot unless its row is major too.
+
 ## `src/lib/components/DataTable.svelte`
 
 **A sticky header's borders are not sticky.** Under `border-collapse: collapse`
@@ -632,6 +671,38 @@ whole table.
 **The table has nothing to say for itself.** Its notices go to the app's status
 bar. A line of its own under the buttons meant there were two places a message
 could appear and neither of them was where you were looking.
+
+**Separate borders, not collapsed ones.** Under `border-collapse: collapse` the
+rules belong to the table's own grid rather than to the cells, so a cell that
+travels leaves its lines behind. The sticky header shed its underline and worked
+around it with an inset shadow; the frozen row-number gutter could not be fixed
+the same way, because the strip that leaked was *outside* the cell's own
+background — a hairline down its left edge through which the text of columns
+three away slid past. `border-collapse: separate` with zero spacing and a rule on
+two edges of every cell draws exactly what collapse drew, travels with the cell,
+and ends both.
+
+**The table lays out `fixed`, and the columns own their widths.** Auto layout
+gives a column to whichever cell in it is widest, which means a width you drag
+springs back the moment you let go, and one long cell shoves every other column
+sideways. The widths live in the app's UI state rather than in this component,
+because the tray is unmounted whenever it is folded away and widths kept here
+would last until the first time you closed the table. They are a view preference
+of this browser's — not data, not template: they follow a column through a rename
+and go with it when it is deleted.
+
+**The slack goes to the column that did not ask.** A fixed table hands any width
+beyond the sum of its columns to whichever column named none, which is the empty
+header at the end carrying Add Column. So the table is `width: 100%` with the sum
+as its floor: too narrow a tray and it scrolls with every column at its stated
+width, too wide a one and the extra lands on the end rather than being shared out
+over columns somebody sized by hand.
+
+**A field fills its cell.** `field-sizing: content` still decides how tall a cell
+wants to be, and the tallest cell sets the row; `height: 100%` is what stops every
+*other* field in that row from sitting as a one-line box with a band of dead white
+under it that looks like the cell and is not the target. A percentage height in a
+table cell resolves after the row is measured, so the two do not fight.
 
 ## Pull-to-refresh
 
@@ -1039,11 +1110,33 @@ the only way to reach them. Only the primary pointer button drags: a right-click
 that started one would collapse a multi-selection before the menu it opened could
 act on the rest.
 
-**A lock is a button in the bar and an indicator on the canvas.** The padlock on a
-box or a page says *locked*; it is never the control, because the control belongs
-with the rest of that subject's settings. The button that sets a lock is never
-disabled by the lock it sets, and it says what pressing it will do — *Unlock* on
-something locked — rather than naming its own state.
+**A lock is a button in the bar, and the badge on the area undoes it.** The
+button that *sets* a lock belongs with the rest of that subject's settings and is
+never disabled by the lock it sets; it says what pressing it will do — *Unlock* on
+something locked — rather than naming its own state. The padlock badge on the
+area is the way out of that area's own lock, which is what the two anchor badges
+beside it already were: a badge that only said something, sitting between two that
+also undid what they said, sent the pointer to the wrong one. The buoy has stopped
+wearing an open padlock when armed for the same reason — it casts off, so it shows
+a boat. No two badges answer with the same mark.
+
+**The page bar and the area bar share one row, and the row never shrinks.** They
+used to stack, so every selection and deselection added or removed a whole toolbar
+from the top of the window: the stage lost that much height, the fitted scale
+changed with it, and the page jumped and resized under the pointer. Selecting an
+area now gives it the row and Page Setup takes it back, letting go of the area to
+do it — pressing Page Setup means "show me the page", not "stack a second bar".
+That leaves the two bars being different heights, which is the same jump again
+and smaller, so the row is floored at the tallest bar it has held at this window
+size. The trade-off is a band of the bar's own colour under the shorter of the
+two; it buys a page that does not move when you pick something up. The floor is
+dropped on a resize, because both bars wrap and neither height survives a change
+of width.
+
+**The right-click menu carries no key hints.** The two items that had them were
+the only two that did, so the column of grey chords read as a property of those
+items rather than as a key map. The key map is the help panel, once, for all of
+them.
 
 **Each bar opens with a two-line head**: what this is and what it is called, then
 the buttons that act on it. They were at opposite ends of a bar that wraps to
@@ -1114,6 +1207,23 @@ once and read for months, and a timestamp on paper is stale before the ink dries
 Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
 mode; `rawContentOf` beside it is what the inline editor shows, because typing
 over a substituted date would mean typing over yesterday's.
+
+## `src/lib/modal.ts`
+
+**Enter in a dialog is two presses.** A dialog used to open with the focus
+already on a button, so a stray Return — the one that dismissed whatever was on
+screen a moment ago, arriving a beat late — pressed it. Deleting a template,
+replacing every row, throwing away a design: each was one keystroke nobody aimed.
+The focus lands on the dialog itself instead; the first Enter moves it onto the
+default action, where it is outlined and named, and the second is the browser's
+own. Nothing intercepts that second press, which is what makes it trustworthy —
+by then it is an ordinary Return on an ordinary button.
+
+**Which button is the default is markup, not order.** `data-default` marks it, so
+the action a dialog suggests is stated where the button is rather than inferred
+from where it sits in the row. A textarea and a select are left alone, because
+Return means something else in both, and a focused button is left alone because
+that press *is* the second one.
 
 ## `src/lib/gestures.ts`
 

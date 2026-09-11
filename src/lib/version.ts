@@ -9,4 +9,4 @@
  * One bump per session while the work is still its own; once that session has
  * a pull request open, every further push takes a patch — see CLAUDE.md.
  */
-export const VERSION = '0.9.0';
+export const VERSION = '0.10.0';

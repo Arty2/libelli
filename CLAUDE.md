@@ -31,6 +31,7 @@ src/lib/
   boxops.ts       box and selection transforms: duplicate, delete, group, lock, nudge
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
   gestures.ts     swipe and press-and-hold, shared by the components that need them
+  modal.ts        the two-Enter rule every dialog with a default action shares
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
@@ -43,6 +44,7 @@ src/lib/
   history.ts      undo/redo snapshots
   storage.ts      localStorage + IndexedDB, the template library, the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
+  sample-cards.csv  those rows, as a CSV anyone can open in a spreadsheet
   sw-policy.ts    what the service worker does with a request, kept testable
   pwa.ts          worker registration, the update handshake, the install offer
   version.ts      VERSION, and the bumping rule
@@ -61,7 +63,6 @@ src/lib/
 src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   app state and wiring                             (~40k)
 src/routes/app.css        the :root tokens and app-wide rules
-static/sample-cards.csv   sample data, bundled with ?raw and also served as a file
 ```
 
 ## Before you change anything
