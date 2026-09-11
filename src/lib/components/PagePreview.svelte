@@ -4,7 +4,7 @@
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
 	import type { Arrange } from '$lib/template';
-	import { swipe } from '$lib/gestures';
+	import { hold, swipe } from '$lib/gestures';
 	import { GRID_MAJOR, GRID_MINOR, mmToPx } from '$lib/layout';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -47,6 +47,10 @@
 		onundo: () => void;
 		onredo: () => void;
 		onaddbox: () => void;
+		/** position every area from the columns — the button below Area, and its hold */
+		onmagiclayout: () => void;
+		/** whether there is any data to lay out; the button says so rather than hiding */
+		hasColumns: boolean;
 		onmenu: (id: string, x: number, y: number) => void;
 		/** a dialog has the screen: the view keys are not the page's right now */
 		modalOpen: boolean;
@@ -102,6 +106,8 @@
 		onundo,
 		onredo,
 		onaddbox,
+		onmagiclayout,
+		hasColumns,
 		onmenu,
 		modalOpen,
 		selectedBoxes,
@@ -689,13 +695,35 @@
 		{/if}
 	</div>
 
-	<!-- A column, not a row: Area is the button that is always there, and the two
-	     that come and go belong under it rather than pushing it sideways every
-	     time one of them appears. -->
+	<!-- A column, not a row: Area is the button that is always there, and the
+	     three that come and go belong under it rather than pushing it sideways
+	     every time one of them appears. -->
 	<div class="corner top right stacked">
-		<button class="square" onclick={onaddbox} disabled={!!template.locked} title="Add an area to the page">
+		<button
+			class="square"
+			onclick={onaddbox}
+			use:hold={onmagiclayout}
+			disabled={!!template.locked}
+			title="Add an area to the page — press and hold to position every area from the columns instead"
+		>
 			<Icon name="text" size={14} /><span class="sr-only">Area</span>
 		</button>
+		{#if !template.boxes.length}
+			<!-- Only on an empty page, where it is the answer to "now what?" and
+			     there is nothing for it to destroy. Once there are areas it is the
+			     hold on the button above: a control that replaces the whole design
+			     should not sit one mis-tap away from a page somebody has built. -->
+			<button
+				class="square"
+				onclick={onmagiclayout}
+				disabled={!!template.locked}
+				title={hasColumns
+					? 'Position areas automagically — a card worked out from your headings and your data'
+					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
+			>
+				<Icon name="shapes" size={14} /><span class="sr-only">Position areas automagically</span>
+			</button>
+		{/if}
 		{#if picking}
 			<!-- A mode with no visible sign is a trap: every press is doing something
 			     other than what it usually does, and the only place that was said is

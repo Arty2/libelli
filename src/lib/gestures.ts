@@ -32,6 +32,68 @@ export function swipeStep(dx: number, dy: number): -1 | 0 | 1 {
 	return dx < 0 ? 1 : -1;
 }
 
+/** How long a button has to be held before the second action fires. */
+export const HOLD_DELAY = 600;
+
+/**
+ * Press and hold, as a second action on a button that already has one.
+ *
+ * Where a button's two actions are the same *kind* of thing — import a file or
+ * import the samples, add an area or add all of them — a hold is cheaper than a
+ * second button, and both bars here are already fighting for width. It is
+ * always the *bigger* of the two actions, and always one undo away, because a
+ * gesture nobody was taught has to be survivable when it fires by accident.
+ *
+ * A held mouse button and a held finger are the same pointer events, so there
+ * is no separate touch path. The click that follows a completed hold has to be
+ * swallowed, or the tap action runs straight after the hold action — a file
+ * picker opening on top of the rows just loaded.
+ */
+export function hold(node: HTMLElement, action: () => void) {
+	let timer: ReturnType<typeof setTimeout> | null = null;
+	let fired = false;
+	let handler = action;
+
+	const cancel = () => {
+		if (timer) clearTimeout(timer);
+		timer = null;
+	};
+	const down = (event: PointerEvent) => {
+		// Only the primary button: a right-click opens a menu, not a hold.
+		if (event.button !== 0) return;
+		fired = false;
+		timer = setTimeout(() => {
+			timer = null;
+			fired = true;
+			handler();
+		}, HOLD_DELAY);
+	};
+	const click = (event: MouseEvent) => {
+		if (!fired) return;
+		event.preventDefault();
+		event.stopPropagation();
+		fired = false;
+	};
+
+	node.addEventListener('pointerdown', down);
+	// Moving off the button is how you change your mind mid-press.
+	node.addEventListener('pointerup', cancel);
+	node.addEventListener('pointerleave', cancel);
+	node.addEventListener('pointercancel', cancel);
+	node.addEventListener('click', click, true);
+	return {
+		update: (next: () => void) => (handler = next),
+		destroy: () => {
+			cancel();
+			node.removeEventListener('pointerdown', down);
+			node.removeEventListener('pointerup', cancel);
+			node.removeEventListener('pointerleave', cancel);
+			node.removeEventListener('pointercancel', cancel);
+			node.removeEventListener('click', click, true);
+		}
+	};
+}
+
 /**
  * Turn horizontal flicks over a node into steps.
  *

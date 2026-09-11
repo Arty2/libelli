@@ -40,11 +40,13 @@
 		type BoxStyle
 	} from '$lib/boxops';
 	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport } from '$lib/keys';
+	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
+		blankTemplate,
 		exportTemplate,
 		newBox,
 		nextBoxId,
@@ -55,16 +57,24 @@
 		type Arrange
 	} from '$lib/template';
 	import {
+		deleteTemplateDoc,
+		listTemplates,
 		loadDataset,
 		loadMapping,
 		loadTemplate,
+		loadTemplateDoc,
+		loadTemplateId,
 		loadUi,
 		migrateLegacyStorage,
+		nextTemplateId,
 		saveDataset,
 		saveMapping,
 		saveTemplate,
+		saveTemplateDoc,
+		saveTemplateId,
 		storageAvailable,
-		saveUi
+		saveUi,
+		type TemplateEntry
 	} from '$lib/storage';
 	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
@@ -137,6 +147,29 @@
 	}
 	/** Reset replaces the design, so it asks first — as deleting the data does. */
 	let resetting = $state(false);
+	/**
+	 * Deleting asks for the same reason and one more: undo reaches what is on
+	 * screen, but the stored copy is gone the moment this runs.
+	 */
+	let deleting = $state(false);
+	/**
+	 * The saved templates, and which one is loaded.
+	 *
+	 * The id is the identity: renaming a template is typing in a field, and a
+	 * library keyed by name would either forbid two "Untitled card"s or quietly
+	 * merge them. Held here rather than read on demand so the picker can open
+	 * without waiting on the database.
+	 */
+	let templateId = $state('');
+	let library = $state<TemplateEntry[]>([]);
+
+	/** The order the picker lists them in, and the order `listTemplates` returns. */
+	const byName = (a: TemplateEntry, b: TemplateEntry) =>
+		a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+
+	async function refreshLibrary() {
+		library = await listTemplates();
+	}
 	let printing = $state(false);
 	let mappingPrompt = $state(false);
 	let missingFonts = $state<FontRef[]>([]);
@@ -170,11 +203,22 @@
 	let missingFontInput = $state<HTMLInputElement | null>(null);
 	let missingFontTarget = $state<FontRef | null>(null);
 
-	/** One undo entry is the whole editable state: template, data and mapping. */
+	/**
+	 * One undo entry is the whole editable state: template, data and mapping —
+	 * and which template that is.
+	 *
+	 * The id is in here for the same reason the rest is: undo has to leave the
+	 * app in a state that is *consistent*, not merely one that looks right. Undo
+	 * across a switch or a delete restores the design you came from, and without
+	 * the id travelling with it the autosave would then write that design into
+	 * whichever template happened to be open — quietly overwriting a different
+	 * one to undo something you did to this one.
+	 */
 	interface Snapshot {
 		template: Template;
 		dataset: Dataset;
 		mapping: Mapping;
+		templateId: string;
 	}
 	/** Give a dialog its first focus so Esc/Tab work without a mouse trip. */
 	const focusOnOpen = (node: HTMLElement) => node.focus();
@@ -202,14 +246,20 @@ em { color: #b42318 }`;
 	const snapshot = (): Snapshot => ({
 		template: $state.snapshot(template),
 		dataset: $state.snapshot(dataset),
-		mapping: $state.snapshot(mapping)
+		mapping: $state.snapshot(mapping),
+		templateId
 	});
 	// Raw state: the history is replaced wholesale on every step, and its entries
 	// are plain snapshots that must stay plain — a deep state proxy over them
 	// cannot be cloned back out. Seeded from constants; boot() replaces it with
 	// the first real snapshot once the stored template and data have loaded.
 	let history = $state.raw(
-		createHistory<Snapshot>({ template: starterTemplate(), dataset: { columns: [], rows: [] }, mapping: {} })
+		createHistory<Snapshot>({
+			template: starterTemplate(),
+			dataset: { columns: [], rows: [] },
+			mapping: {},
+			templateId: ''
+		})
 	);
 	const undoable = $derived(canUndo(history));
 	const redoable = $derived(canRedo(history));
@@ -272,7 +322,15 @@ em { color: #b42318 }`;
 			firstRun = true;
 		}
 
-		const storedMapping = loadMapping(template.name);
+		// The working copy above is the authority for what is on screen; the
+		// library is where it is also kept under a name you can come back to. An
+		// id nobody has yet is minted here, which is how a browser that has only
+		// ever had one template acquires a library containing exactly that one.
+		templateId = loadTemplateId() || nextTemplateId();
+		saveTemplateId(templateId);
+		void refreshLibrary();
+
+		const storedMapping = loadMapping(templateId, template.name);
 		mapping = Object.keys(storedMapping).length ? storedMapping : autoMap(usedSlots(template), dataset.columns);
 		ui = loadUi();
 		if (typeof window !== 'undefined' && window.innerWidth <= 900) {
@@ -424,6 +482,14 @@ em { color: #b42318 }`;
 		template = structuredClone(next.template);
 		dataset = structuredClone(next.dataset);
 		mapping = structuredClone(next.mapping);
+		if (next.templateId && next.templateId !== templateId) {
+			templateId = next.templateId;
+			saveTemplateId(templateId);
+			// A template undone back into existence is written out again by the
+			// autosave, under the id it had — which is what makes deleting one
+			// recoverable rather than merely reversible on screen.
+			void refreshLibrary();
+		}
 		if (activeRow >= dataset.rows.length) activeRow = Math.max(0, dataset.rows.length - 1);
 		// A snapshot can be from before a box existed, or after it was deleted.
 		selectedIds = selectedIds.filter((id) => template.boxes.some((b) => b.id === id));
@@ -464,11 +530,33 @@ em { color: #b42318 }`;
 		notify('Your work is no longer being saved — this browser is out of room, or has stopped allowing it. Export what you have.', 'warning');
 	}
 
+	// The working copy and the library entry are written together, on one
+	// debounce: they are the same template, and a save that landed in one of them
+	// only would show a different card after a reload than before it.
 	$effect(() => {
 		if (!ready) return;
 		const saved = $state.snapshot(template);
-		const timer = setTimeout(() => void saveTemplate(saved).then(reportSave), 300);
+		const id = templateId;
+		const timer = setTimeout(() => {
+			void saveTemplate(saved).then(reportSave);
+			if (id) void saveTemplateDoc(id, saved);
+		}, 300);
 		return () => clearTimeout(timer);
+	});
+
+	/**
+	 * Keep the picker's label in step with the name field, without re-reading the
+	 * library to find out something this page already knows. Renaming is typing,
+	 * and a database round trip per keystroke to relabel one entry is a lot of
+	 * work to discover the letter you just pressed.
+	 */
+	$effect(() => {
+		const name = template.name.trim() || 'Untitled card';
+		const id = templateId;
+		if (!ready || !id) return;
+		if (library.some((entry) => entry.id === id && entry.name === name)) return;
+		const rest = library.filter((entry) => entry.id !== id);
+		library = [...rest, { id, name }].sort(byName);
 	});
 
 	$effect(() => {
@@ -480,7 +568,7 @@ em { color: #b42318 }`;
 
 	$effect(() => {
 		if (!ready) return;
-		saveMapping(template.name, $state.snapshot(mapping));
+		saveMapping(templateId, $state.snapshot(mapping));
 	});
 
 	$effect(() => {
@@ -543,6 +631,67 @@ em { color: #b42318 }`;
 		void tick().then(() => boxBar?.focusText());
 	}
 
+	// ---- positioning the areas from the columns -----------------------------
+
+	/**
+	 * The roles the auto layout is about to use, open for correction.
+	 *
+	 * It guesses from headings and cell shapes and it will sometimes be wrong,
+	 * and a page of boxes that silently decided your Reference column was the
+	 * title is worse than being asked. So the guess is shown first: one line per
+	 * column, the kind it was taken for, and Leave Out for the ones you do not
+	 * want on the card at all.
+	 */
+	let magic = $state<FieldGuess[] | null>(null);
+
+	function openMagic() {
+		if (template.locked) return;
+		if (!dataset.columns.length) {
+			notify('There are no columns to lay out yet — import a CSV or paste a table under the page first.', 'warning');
+			return;
+		}
+		settleProvisional();
+		magic = guessRoles(dataset.columns, $state.snapshot(dataset).rows);
+	}
+
+	/**
+	 * Replace every area with one worked out from the columns.
+	 *
+	 * Wholesale rather than a merge: half a generated card and half a hand-placed
+	 * one is a layout neither of us chose, and the anchored stack only holds
+	 * together if the whole chain came out of the same pass. It is one undo
+	 * entry, which is what makes replacing everything a fair thing to offer.
+	 */
+	function applyMagic() {
+		const roles = magic;
+		magic = null;
+		if (!roles || template.locked) return;
+		const current = $state.snapshot(template);
+		const { boxes, slots, mapping: bound, left } = autoLayout({
+			page: current.page,
+			defaults: current.defaults,
+			columns: dataset.columns,
+			rows: $state.snapshot(dataset).rows,
+			roles,
+			// Unique against the boxes already here: they are about to go, but the
+			// undo snapshot keeps them, and two boxes sharing an id would confuse
+			// anchoring the moment one came back.
+			nextId: () => nextBoxId(current.boxes)
+		});
+		describe(current.boxes.length ? 'Position the areas again' : 'Position the areas');
+		template = { ...current, slots, boxes };
+		mapping = { ...bound };
+		selectedIds = [];
+		const skipped = roles.filter((role) => role.kind === 'skip').map((role) => role.column);
+		const notes = [
+			`${boxes.length} area${boxes.length === 1 ? '' : 's'} laid out from ${dataset.columns.length} column${dataset.columns.length === 1 ? '' : 's'}.`,
+			skipped.length ? `Left out: ${skipped.join(', ')}.` : '',
+			left.length ? `No room on the card for ${left.join(', ')} — add ${left.length === 1 ? 'an area' : 'areas'} by hand if you need ${left.length === 1 ? 'it' : 'them'}.` : '',
+			'Ctrl/Cmd+Z puts the old design back.'
+		];
+		notify(notes.filter(Boolean).join(' '));
+	}
+
 	/** Everything about a box except where it is and how big — what "changed" means. */
 	function looksEdited(box: Box): boolean {
 		const { id, x, y, w, h, ...rest } = box;
@@ -594,6 +743,125 @@ em { color: #b42318 }`;
 		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
 		notify('Template reset to the starter card. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
+	}
+
+	// ---- the template library -----------------------------------------------
+
+	/**
+	 * Put the working copy into the library now rather than on the next tick of
+	 * the autosave.
+	 *
+	 * Switching templates replaces `template`, which cancels the debounce that
+	 * was about to save it — so without this, the last few hundred milliseconds
+	 * of work on the template you are leaving are simply gone.
+	 */
+	async function flushTemplate() {
+		if (!templateId) return;
+		await saveTemplateDoc(templateId, $state.snapshot(template));
+	}
+
+	/**
+	 * Load a saved template. Undoable, like everything else that replaces the
+	 * design: one snapshot is template, data and mapping together, so Ctrl/Cmd+Z
+	 * puts back the one you came from — including its bindings.
+	 */
+	async function switchTemplate(id: string) {
+		if (id === templateId) return;
+		settleProvisional();
+		await flushTemplate();
+		const doc = await loadTemplateDoc(id);
+		if (!doc) {
+			notify('That template is no longer in this browser.', 'warning');
+			await refreshLibrary();
+			return;
+		}
+		let next: Template;
+		try {
+			next = normaliseTemplate(doc);
+		} catch (error) {
+			notify(error instanceof Error ? error.message : 'That template could not be read.', 'warning');
+			return;
+		}
+		describe(`Load “${next.name}”`);
+		templateId = id;
+		saveTemplateId(id);
+		template = next;
+		selectedIds = [];
+		editingId = null;
+		const stored = loadMapping(id, next.name);
+		mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(next), dataset.columns);
+		missingFonts = await ensureTemplateFonts(next);
+		notify(`“${next.name}” loaded. Your rows are untouched.`);
+	}
+
+	/** A name nothing else in the library is already using. */
+	function freeName(wanted: string): string {
+		const taken = new Set(library.filter((e) => e.id !== templateId).map((e) => e.name));
+		if (!taken.has(wanted)) return wanted;
+		let n = 2;
+		while (taken.has(`${wanted} ${n}`)) n++;
+		return `${wanted} ${n}`;
+	}
+
+	/**
+	 * A new, empty template, and the one place `blankTemplate` is for: the
+	 * starter card is what a first run *lands* on, but somebody who has pressed
+	 * New has a design in mind and does not want four cards about the app.
+	 */
+	async function newTemplate() {
+		settleProvisional();
+		await flushTemplate();
+		describe('New template');
+		const next = blankTemplate();
+		next.name = freeName(next.name);
+		templateId = nextTemplateId();
+		saveTemplateId(templateId);
+		template = next;
+		selectedIds = [];
+		editingId = null;
+		mapping = autoMap(usedSlots(next), dataset.columns);
+		await saveTemplateDoc(templateId, $state.snapshot(template));
+		await refreshLibrary();
+		notify(`“${next.name}” started. Your rows are untouched — press ${dataset.columns.length ? 'the shapes button beside the page to lay them out' : 'Import under the table to bring some in'}.`);
+	}
+
+	/**
+	 * Delete the loaded template and open whatever is next in the library.
+	 *
+	 * Undo brings the design back on screen, and the autosave then writes it out
+	 * again under the same id — so this is recoverable in practice. It still
+	 * asks, because that is a sentence nobody should have to know.
+	 */
+	async function deleteTemplate() {
+		deleting = false;
+		const gone = templateId;
+		const name = template.name;
+		await deleteTemplateDoc(gone);
+		const rest = library.filter((entry) => entry.id !== gone);
+		describe(`Delete “${name}”`);
+		if (rest.length) {
+			templateId = '';
+			await switchTemplate(rest[0].id);
+		} else {
+			// The last one out lands on a new, empty template — the same thing New
+			// Template gives you. It used to rebuild the starter card, which meant
+			// deleting the card a first run lands on appeared to do nothing at all:
+			// the name came back, the areas came back, and the only honest reading
+			// was that this template could not be deleted.
+			templateId = nextTemplateId();
+			saveTemplateId(templateId);
+			template = blankTemplate();
+			selectedIds = [];
+			editingId = null;
+			mapping = autoMap(usedSlots(template), dataset.columns);
+			await saveTemplateDoc(templateId, $state.snapshot(template));
+		}
+		await refreshLibrary();
+		notify(
+			rest.length
+				? `“${name}” deleted. Ctrl/Cmd+Z brings the design back.`
+				: `“${name}” deleted — that was the last one, so this is a new empty template. Ctrl/Cmd+Z brings the design back.`
+		);
 	}
 
 	/**
@@ -850,10 +1118,12 @@ em { color: #b42318 }`;
 			redo();
 			return;
 		}
-		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu || resetting)) {
+		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu || resetting || deleting || magic)) {
 			helpOpen = false;
 			cssOpen = false;
 			resetting = false;
+			deleting = false;
+			magic = null;
 			boxMenu = null;
 			return;
 		}
@@ -1004,13 +1274,23 @@ em { color: #b42318 }`;
 		if (!file) return;
 		try {
 			const raw = JSON.parse(await file.text());
+			await flushTemplate();
 			template = normaliseTemplate(raw);
 			selectedIds = [];
+			// An import joins the library rather than replacing what is loaded:
+			// a file someone handed you is a template you now have, not a
+			// correction to the one you were working on.
+			templateId = nextTemplateId();
+			saveTemplateId(templateId);
 			// Never assume the mapping: a template is shared between spreadsheets.
-			const stored = loadMapping(template.name);
+			// By name here, since a file arrives with no id — the one case where
+			// the name is the better key.
+			const stored = loadMapping(templateId, template.name);
 			mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(template), dataset.columns);
 			mappingPrompt = true;
 			missingFonts = await ensureTemplateFonts(template);
+			await saveTemplateDoc(templateId, $state.snapshot(template));
+			await refreshLibrary();
 			notify(`Loaded “${template.name}”.`);
 		} catch (error) {
 			notify(error instanceof Error ? error.message : 'That file is not a template.', 'warning');
@@ -1191,6 +1471,11 @@ em { color: #b42318 }`;
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
 			onresettemplate={() => (resetting = true)}
+			{library}
+			{templateId}
+			onselecttemplate={(id) => void switchTemplate(id)}
+			onnewtemplate={() => void newTemplate()}
+			ondeletetemplate={() => (deleting = true)}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
 			onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
@@ -1215,6 +1500,11 @@ em { color: #b42318 }`;
 			onduplicate={duplicateBox}
 			ondelete={deleteBox}
 			onresettemplate={() => (resetting = true)}
+			{library}
+			{templateId}
+			onselecttemplate={(id) => void switchTemplate(id)}
+			onnewtemplate={() => void newTemplate()}
+			ondeletetemplate={() => (deleting = true)}
 			onuploadfont={(file) => handleFontUpload(file)}
 			onuploadbackground={(file) => void handleBackgroundUpload(file)}
 			onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
@@ -1309,6 +1599,8 @@ em { color: #b42318 }`;
 			onundo={undo}
 			onredo={redo}
 			onaddbox={addTextBox}
+			onmagiclayout={openMagic}
+			hasColumns={dataset.columns.length > 0}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
 			{editingId}
 			strayIds={strays.map((b) => b.id)}
@@ -1319,7 +1611,7 @@ em { color: #b42318 }`;
 			onedit={(id) => (editingId = id)}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
-			modalOpen={helpOpen || cssOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null}
+			modalOpen={helpOpen || cssOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null || magic !== null}
 			{selectedBoxes}
 			onalign={alignSelection}
 			onarrange={arrange}
@@ -1412,6 +1704,81 @@ em { color: #b42318 }`;
 	</div>
 {/if}
 
+<!-- Deleting takes the stored copy, which no other dialog here does: Reset
+     replaces a design that undo can still reach, and the table's Delete clears
+     rows that are in the same snapshot. This one asks because the sentence that
+     makes it recoverable — undo, then wait for the autosave — is not one anybody
+     should have to know. -->
+{#if deleting}
+	<div class="modal-backdrop" role="presentation" onclick={() => (deleting = false)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete this template?">
+		<h2>Delete “{template.name}”?</h2>
+		<p>
+			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'}, and this template's own settings.
+			{library.length > 1 ? 'The next template in the list opens.' : 'A new empty template opens, since this is the last one.'}
+			Your rows are not touched.
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button use:focusOnOpen onclick={() => (deleting = false)}>Cancel</button>
+			<button class="danger-solid" onclick={() => void deleteTemplate()}>Delete Template</button>
+		</div>
+	</div>
+{/if}
+
+<!-- What the auto layout thinks each column is, before it acts on any of it.
+     The guessing is the whole feature, so it is shown rather than described:
+     the list *is* the explanation, which is why there is no paragraph over it —
+     every row can be corrected, and a column set to Leave Out gets no area. -->
+{#if magic}
+	<div class="modal-backdrop" role="presentation" onclick={() => (magic = null)}></div>
+	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title">
+		<h2 id="magic-title">Position Areas Automagically</h2>
+		<ul class="magic-list">
+			{#each magic as guess, index (guess.column)}
+				<li>
+					<span class="magic-column" title={guess.column}>{guess.column}</span>
+					<span class="magic-sample" title={guess.sample}>{guess.sample.slice(0, 60) || '—'}</span>
+					<select
+						aria-label="What {guess.column} is"
+						value={guess.kind}
+						onchange={(e) => {
+							const kind = e.currentTarget.value as FieldGuess['kind'];
+							// Chosen by hand is never a guess, so the mark comes off.
+							magic = magic!.map((one, i) => (i === index ? { ...one, kind, sure: true } : one));
+						}}
+					>
+						{#each FIELD_KINDS as kind (kind)}
+							<option value={kind}>{KIND_LABELS[kind]}</option>
+						{/each}
+					</select>
+					{#if !guess.sure}
+						<span class="magic-unsure" title="Nothing but the length of the cells pointed at this">guess</span>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+		<!-- Only where there is something to lose. The button says OK either way, so
+		     without this the destructive case and the harmless one read identically
+		     — and on a template with areas the only way in is a press and hold,
+		     which is easy to trigger without meaning to. -->
+		{#if template.boxes.length}
+			<p class="magic-warning" role="status">
+				<Icon name="warning" size={13} />
+				<span>
+					Replaces the {template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} already on this card.
+					Ctrl/Cmd+Z puts {template.boxes.length === 1 ? 'it' : 'them'} back.
+				</span>
+			</p>
+		{/if}
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (magic = null)}>Cancel</button>
+			<button class="primary" use:focusOnOpen onclick={applyMagic}>OK</button>
+		</div>
+	</div>
+{/if}
+
 {#if helpOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (helpOpen = false)}></div>
 	<div class="modal help" role="dialog" aria-modal="true" aria-labelledby="help-title">
@@ -1441,6 +1808,13 @@ em { color: #b42318 }`;
 			is typed into the template and says the same on every card. An area's <strong>Name</strong> is the template's own
 			word for what it holds — <em>title</em>, <em>body</em> — and <strong>Column</strong> beside it says which
 			spreadsheet column fills that. Rebinding the columns is how one template serves another spreadsheet.
+		</p>
+		<p>
+			The button under it — the one wearing three shapes — writes a whole card from your columns: a title, a
+			body, a picture, a footer and a QR code, sized for the page. It shows you what it took each column for
+			before it moves anything, and marks the ones it reached by guesswork. On an empty template it is that
+			button; on a template that already has areas it is <strong>press and hold</strong> on <em>+ Area</em>,
+			since it replaces every area you have. One Ctrl/Cmd+Z puts the old design back.
 		</p>
 		<p>
 			Double-click an area, or press <strong>Enter</strong> with one selected, to type into it on the card itself.
@@ -1501,6 +1875,17 @@ em { color: #b42318 }`;
 		<p>
 			<strong>Copy Style</strong> and <strong>Paste Style</strong> carry type, fill, border, padding and radius from one
 			area to any number of others. A paste is "make this look like that", so it takes away what the source did not have.
+		</p>
+
+		<h3>Templates</h3>
+		<p>
+			The <strong>Template</strong> field names the one you are working on; the caret beside it lists every
+			template saved in this browser, with <em>New template…</em> under a rule. Renaming is typing in the field.
+			<strong>Delete</strong> takes the loaded template and opens the next one — or a new empty template, if it was
+			the last — where <strong>Reset</strong> puts the starter card back under the same name. Both ask first, and
+			both are one Ctrl/Cmd+Z away. The list lives
+			in this browser only; <strong>Export</strong> is how a template leaves, and an import joins the list rather
+			than replacing what is open.
 		</p>
 
 		<h3>The sheet</h3>
@@ -1996,6 +2381,98 @@ em { color: #b42318 }`;
 
 	.modal.narrow {
 		width: min(420px, calc(100vw - 32px));
+	}
+
+	/* One row per column, and the column names are the part worth reading: the
+	   name takes what it needs, the sample gives up whatever is left, and the
+	   control keeps a fixed width so the selects line up as a column rather than
+	   stepping in and out with the length of the heading beside them. */
+	.magic-list {
+		list-style: none;
+		margin: 12px 0 0;
+		padding: 0;
+		display: grid;
+		gap: 6px;
+	}
+
+	.magic-list li {
+		display: grid;
+		grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr) 8.5rem auto;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.magic-column {
+		font-weight: 600;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* A cell of the data, shown to make the guess checkable — clipped hard,
+	   because a body column would otherwise be a paragraph in a dialog. */
+	.magic-sample {
+		color: #767676;
+		font-size: 12px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.magic-list select {
+		width: 100%;
+		font: inherit;
+		font-size: 12px;
+		padding: 3px 4px;
+		border: 1px solid #d5d5d5;
+		border-radius: 4px;
+		background: #fff;
+	}
+
+	/* The one real warning in this dialog, so it wears the mark and the colour the
+	   status bar's warnings use. Sits above the buttons rather than beside them:
+	   read before the press, not noticed after it. */
+	.magic-warning {
+		display: flex;
+		align-items: flex-start;
+		gap: 6px;
+		margin: 12px 0 0;
+		padding: 7px 9px;
+		border-radius: 5px;
+		background: #fdf4dc;
+		color: #8a6d1f;
+		font-size: 12px;
+		line-height: 1.45;
+	}
+
+	/* The icon keeps its size while the sentence beside it wraps. */
+	.magic-warning :global(svg) {
+		flex: none;
+		margin-top: 1px;
+	}
+
+	/* Says which rows were reached by length alone. Quiet: it is a caveat on a
+	   choice you can already see and change, not a warning. */
+	.magic-unsure {
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: #8a6d1f;
+		background: #fdf4dc;
+		border-radius: 3px;
+		padding: 1px 5px;
+	}
+
+	@media (max-width: 560px) {
+		/* The sample is the first thing to go: it is there to check a guess, and
+		   on a phone the name and the control are what have to fit. */
+		.magic-list li {
+			grid-template-columns: minmax(0, 1fr) 8.5rem auto;
+		}
+
+		.magic-sample {
+			display: none;
+		}
 	}
 
 	.modal-actions {

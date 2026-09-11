@@ -16,6 +16,7 @@
 		presetSize,
 		sidesOf
 	} from '$lib/template';
+	import type { TemplateEntry } from '$lib/storage';
 	import type {
 		Align,
 		BackgroundFit,
@@ -43,6 +44,12 @@
 		onduplicate: () => void;
 		ondelete: () => void;
 		onresettemplate: () => void;
+		/** every saved template, and which of them is loaded */
+		library: TemplateEntry[];
+		templateId: string;
+		onselecttemplate: (id: string) => void;
+		onnewtemplate: () => void;
+		ondeletetemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
 		/** the sheet's own background, distinct from the card's */
@@ -65,6 +72,11 @@
 		onduplicate,
 		ondelete,
 		onresettemplate,
+		library,
+		templateId,
+		onselecttemplate,
+		onnewtemplate,
+		ondeletetemplate,
 		onuploadfont,
 		onuploadbackground,
 		onuploadprintbackground,
@@ -75,6 +87,41 @@
 	}: Props = $props();
 
 	let imageInput = $state<HTMLInputElement | null>(null);
+
+	/**
+	 * The template picker: a name you can type in, with the library behind a
+	 * caret.
+	 *
+	 * Not an `<input list>` and a `<datalist>`, which is the native shape of
+	 * exactly this control. A datalist cannot carry a rule or a New Template row
+	 * — it holds values, not commands — and it filters as you type, so renaming
+	 * a template to something close to another one's name buries the list you
+	 * were trying to see. This is the one place in the bar with a menu of its
+	 * own, and it earns it by having an action at the bottom of the list.
+	 */
+	let pickerOpen = $state(false);
+	let pickerEl = $state<HTMLElement | null>(null);
+
+	/**
+	 * Close on a press anywhere else, or on Escape.
+	 *
+	 * A containment check rather than the full-screen backdrop `BoxMenu` uses:
+	 * that pattern swallows the click that dismisses it, which is right for a
+	 * menu opened *at* the pointer and wrong for a dropdown in a toolbar, where
+	 * the next thing you press is usually the next thing you meant to do.
+	 */
+	function onWindowPointer(event: PointerEvent) {
+		if (!pickerOpen || pickerEl?.contains(event.target as Node)) return;
+		pickerOpen = false;
+	}
+
+	function onWindowKey(event: KeyboardEvent) {
+		if (!pickerOpen || event.key !== 'Escape') return;
+		// Stopped here, or the page's own Escape handler reads it as a second
+		// dismissal and closes something behind this.
+		event.stopPropagation();
+		pickerOpen = false;
+	}
 
 	const familyOptions = $derived(
 		Array.from(new Set([...template.fonts.map((f) => f.family), ...CURATED_GOOGLE_FONTS])).sort((a, b) =>
@@ -175,6 +222,8 @@
 	}
 </script>
 
+<svelte:window onpointerdown={onWindowPointer} onkeydown={onWindowKey} />
+
 <!--
 	The page settings bar: what the sheet is, how big, what it is made of, then
 	what is printed on top and what you can do to it. Ordered outwards from the
@@ -186,7 +235,7 @@
 -->
 	<!-- Ordered outwards from the thing itself: what it is, how big the sheet is,
 	     what it is made of, then what is printed on top and what you can do to it. -->
-	<div class="options" aria-label="Page setup">
+	<div class="options" class:menu-open={pickerOpen} aria-label="Page setup">
 		<!-- What this is and what it is called on one line, and what you can do to
 		     the whole template on the next. The same shape the area bar uses, and
 		     for the same reason: these four used to sit at the far end of a bar
@@ -194,7 +243,7 @@
 		<span class="head">
 			<span class="head-row">
 				<span class="context">Page</span>
-				<label class="field">
+				<label class="field picker" bind:this={pickerEl}>
 					<span>Template</span>
 					<input
 						class="w-8"
@@ -203,6 +252,52 @@
 						disabled={pageFrozen}
 						onchange={(e) => patchTemplate({ name: e.currentTarget.value })}
 					/>
+					<button
+						class="caret"
+						aria-haspopup="menu"
+						aria-expanded={pickerOpen}
+						title="{library.length} saved template{library.length === 1 ? '' : 's'} in this browser"
+						aria-label="Saved templates"
+						onclick={() => (pickerOpen = !pickerOpen)}
+					>
+						<Icon name="caret-down" size={12} />
+					</button>
+					{#if pickerOpen}
+						<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+						<ul class="picker-menu" role="menu">
+							{#each library as entry (entry.id)}
+								<li role="none">
+									<button
+										role="menuitemradio"
+										aria-checked={entry.id === templateId}
+										onclick={() => {
+											pickerOpen = false;
+											if (entry.id !== templateId) onselecttemplate(entry.id);
+										}}
+									>
+										<span class="tick" aria-hidden="true">{entry.id === templateId ? '•' : ''}</span>
+										{entry.name}
+									</button>
+								</li>
+							{/each}
+							<!-- The rule is the point of building this by hand: below it is a
+							     thing to do, not a template to open. -->
+							<li role="separator"><hr /></li>
+							<li role="none">
+								<button
+									role="menuitem"
+									disabled={pageFrozen}
+									onclick={() => {
+										pickerOpen = false;
+										onnewtemplate();
+									}}
+								>
+									<span class="tick" aria-hidden="true"></span>
+									<Icon name="add" size={12} /> New template…
+								</button>
+							</li>
+						</ul>
+					{/if}
 				</label>
 			</span>
 			<span class="head-row actions">
@@ -214,6 +309,12 @@
 					disabled={pageFrozen}
 					title="Back to the starter card. Your rows are not touched."
 				><Icon name="reset" size={14} /> Reset</button>
+				<button
+					class="danger-outline"
+					onclick={ondeletetemplate}
+					disabled={pageFrozen}
+					title="Delete this template from this browser. Your rows are not touched."
+				><Icon name="trash" size={14} /> Delete</button>
 				<!-- Never disabled by the lock it sets, or there would be no way out of it. -->
 				<button
 					aria-pressed={pageFrozen}

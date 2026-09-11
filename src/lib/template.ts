@@ -78,6 +78,15 @@ export function builtinTemplate(): Template {
 	return normaliseTemplate(BUILTIN_TEMPLATE_JSON);
 }
 
+/**
+ * An empty page with the defaults filled in — what New Template starts from.
+ *
+ * Genuinely empty, boxes and slots both. It used to arrive carrying a title and
+ * a body, which was a guess at a card made before anything was known about the
+ * data; now that the columns can be laid out on request, an empty page is not a
+ * gap in the offer but the state that *makes* the offer — the button that fills
+ * a page from the spreadsheet only shows where there is nothing to overwrite.
+ */
 export function blankTemplate(): Template {
 	return {
 		schema: SCHEMA_VERSION,
@@ -88,11 +97,8 @@ export function blankTemplate(): Template {
 		pageNumber: { ...DEFAULT_PAGE_NUMBER },
 		fonts: [{ family: 'Patrick Hand', source: 'google' }],
 		defaults: { ...DEFAULT_DEFAULTS },
-		slots: ['title', 'body'],
-		boxes: [
-			newBox({ id: 'b_title', slot: 'title', x: 14, y: 14, w: 120, h: 16, size: 30, lineHeight: 1.1, overflow: 'grow' }),
-			newBox({ id: 'b_body', slot: 'body', x: 14, y: 36, w: 120, h: 150, mode: 'markdown', overflow: 'grow', anchor: { to: 'b_title', gap: 6 } })
-		]
+		slots: [],
+		boxes: []
 	};
 }
 

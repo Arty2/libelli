@@ -27,8 +27,10 @@ src/lib/
   parse.ts        CSV / TSV parsing (quoted fields, embedded newlines, delimiter sniffing)
   markdown.ts     hand-written Markdown subset -> HTML, escaping at the leaves
   layout.ts       mm geometry, anchor resolution, grid and sibling-edge snapping
+  autolayout.ts   reads the columns, writes a first draft of a card
   boxops.ts       box and selection transforms: duplicate, delete, group, lock, nudge
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
+  gestures.ts     swipe and press-and-hold, shared by the components that need them
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
@@ -39,7 +41,7 @@ src/lib/
   fonts.ts        Google families + local files via FontFace/IndexedDB
   assets.ts       background images: bytes in IndexedDB, object-URL lifetime, url() safety
   history.ts      undo/redo snapshots
-  storage.ts      localStorage + IndexedDB, plus the legacy-key migration
+  storage.ts      localStorage + IndexedDB, the template library, the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
   sw-policy.ts    what the service worker does with a request, kept testable
   pwa.ts          worker registration, the update handshake, the install offer

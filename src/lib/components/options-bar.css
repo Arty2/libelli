@@ -307,6 +307,90 @@
 	gap: 8px;
 }
 
+/* The template name and the library behind it. The menu is positioned against
+   this, so it has to establish the containing block; `overflow` stays visible
+   here even though the bar scrolls on a phone — see the media query below. */
+.options .field.picker {
+	position: relative;
+}
+
+/* Sits against the field's own rule rather than carrying a frame of its own:
+   the field is a value with a line under it, and a bordered button beside it
+   would read as a second control rather than as this one's handle. */
+.options .field.picker .caret {
+	border: none;
+	background: none;
+	padding: 2px;
+	margin-left: -2px;
+	color: #555;
+	cursor: pointer;
+	border-radius: 3px;
+}
+
+.options .field.picker .caret:hover {
+	background: #eaeaea;
+	color: #111;
+}
+
+.options .picker-menu {
+	position: absolute;
+	z-index: 30;
+	top: calc(100% + 4px);
+	left: 0;
+	min-width: max(100%, 12rem);
+	max-width: 20rem;
+	max-height: 60dvh;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	margin: 0;
+	padding: 4px;
+	list-style: none;
+	background: #fff;
+	border: 1px solid #d5d5d5;
+	border-radius: 6px;
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+.options .picker-menu button {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	border: none;
+	background: none;
+	padding: 5px 8px;
+	border-radius: 4px;
+	font: inherit;
+	font-size: 12px;
+	text-align: left;
+	cursor: pointer;
+	/* A long template name wraps rather than widening the menu past its cap. */
+	overflow-wrap: anywhere;
+}
+
+.options .picker-menu button:hover:not(:disabled) {
+	background: #f0f0f0;
+}
+
+.options .picker-menu button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+/* A fixed gutter for the mark, so the names line up whether or not one of them
+   is the loaded template. */
+.options .picker-menu .tick {
+	flex: none;
+	width: 0.7rem;
+	color: #1a5fb4;
+}
+
+.options .picker-menu hr {
+	margin: 4px 2px;
+	border: none;
+	border-top: 1px solid #e2e2e2;
+}
+
 /* Kept together so a wrap moves the whole set to the next line rather than
    stranding Delete on its own at the far left. */
 .options .actions {
@@ -325,6 +409,15 @@
 		overscroll-behavior: contain;
 		gap: 6px 8px;
 		padding: 6px 8px;
+	}
+
+	/* The bar scrolls at this width, which would cut the picker's menu off at
+	   whatever the 26dvh cap left of it. While the menu is open the bar gives up
+	   its cap instead: it is a moment, the menu is the thing being looked at,
+	   and a list you can only see three of is not a list. */
+	.options.menu-open {
+		max-height: none;
+		overflow: visible;
 	}
 
 	/* On a phone the bar is one column of wrapped controls anyway, so the head's
