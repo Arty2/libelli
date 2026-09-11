@@ -526,16 +526,31 @@
 		}, 450);
 	}
 
+	/**
+	 * The pad's geometry, in px. Must match `--cell` in the stylesheet: the
+	 * stashing limit below is measured in cells, because what it is really about
+	 * is the middle button.
+	 */
+	const PAD_CELL = 32;
+	const PAD_SIZE = PAD_CELL * 3;
+
 	function padMove(event: PointerEvent) {
 		if (!padDrag || !host) return;
 		event.preventDefault();
 		const stage = host.getBoundingClientRect();
-		// Clamped to the stage so the pad cannot be dragged off the edge of the
-		// screen, which on a phone is a control you never get back.
-		const clamp = (value: number, limit: number) => Math.max(4, Math.min(limit, value));
+		/**
+		 * The pad may hang off the edge of the stage — a cross parked over the
+		 * corner of the page is still covering the corner, and tucking the far arm
+		 * of it out of sight is the cheapest way to get that corner back. What it
+		 * may not do is take the middle button with it: that button is how the pad
+		 * is picked up again, and a pad you cannot reach is a control you have
+		 * lost. So the far edge may reach the edge of the stage, and stop.
+		 */
+		const stash = (value: number, extent: number) =>
+			Math.max(-PAD_CELL, Math.min(extent - PAD_SIZE + PAD_CELL, value));
 		padAt = {
-			right: clamp(padDrag.from.right - (event.clientX - padDrag.x), stage.width - 140),
-			bottom: clamp(padDrag.from.bottom - (event.clientY - padDrag.y), stage.height - 140)
+			right: stash(padDrag.from.right - (event.clientX - padDrag.x), stage.width),
+			bottom: stash(padDrag.from.bottom - (event.clientY - padDrag.y), stage.height)
 		};
 	}
 
@@ -794,7 +809,12 @@
 
 	<!-- A column, not a row: Area is the button that is always there, and the
 	     three that come and go belong under it rather than pushing it sideways
-	     every time one of them appears. -->
+	     every time one of them appears.
+
+	     16px, not 14: these are Carbon's 32-grid glyphs, and `blog` in
+	     particular carries a bar, two rules and a square — below 16 the three
+	     merge into a smudge. The column moves together, because one button
+	     drawn larger than the four beside it reads as a mistake. -->
 	<div class="corner top right stacked">
 		<button
 			class="square"
@@ -803,7 +823,7 @@
 			disabled={!!template.locked}
 			title="Add an area to the page — press and hold to position every area from the columns instead"
 		>
-			<Icon name="blog" size={14} /><span class="sr-only">Area</span>
+			<Icon name="blog" size={16} /><span class="sr-only">Area</span>
 		</button>
 		{#if !template.boxes.length}
 			<!-- Only on an empty page, where it is the answer to "now what?" and
@@ -818,7 +838,7 @@
 					? 'Position areas automagically — a card worked out from your headings and your data'
 					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
 			>
-				<Icon name="shapes" size={14} /><span class="sr-only">Position areas automagically</span>
+				<Icon name="shapes" size={16} /><span class="sr-only">Position areas automagically</span>
 			</button>
 		{/if}
 		{#if picking}
@@ -832,7 +852,7 @@
 				onclick={onstoppicking}
 				title="Selecting several — every press adds an area or drops it. Press to stop, or Esc."
 			>
-				<Icon name="checkbox-checked" size={14} /><span class="sr-only">Stop selecting multiple</span>
+				<Icon name="checkbox-checked" size={16} /><span class="sr-only">Stop selecting multiple</span>
 			</button>
 		{/if}
 		{#if strayIds.length}
@@ -846,7 +866,7 @@
 				disabled={!!template.locked}
 				title="{strayIds.length} area{strayIds.length === 1 ? ' is' : 's are'} off the page — bring {strayIds.length === 1 ? 'it' : 'them'} back on"
 			>
-				<Icon name="move" size={14} /><span class="sr-only">Bring stray areas back onto the page</span>
+				<Icon name="move" size={16} /><span class="sr-only">Bring stray areas back onto the page</span>
 			</button>
 		{/if}
 	</div>
@@ -920,9 +940,9 @@
 					: `Up ${padStep}mm`}
 				onpointerdown={() => startNudge(0, -padStep)}
 			>
-				<Icon name={verticalTied ? 'link' : 'caret-up'} size={verticalTied ? 15 : 32} />
+				<Icon name={verticalTied ? 'link' : 'caret-up'} size={verticalTied ? 15 : 30} />
 			</button>
-			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={32} /></button>
+			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
 			<!-- The middle button carries the second gesture, because the arrows
 			     already use press-and-hold to repeat: hold this one and the pad
 			     comes with your finger. A tap still cycles the step. -->
@@ -938,7 +958,7 @@
 					padStep = PAD_STEPS[(PAD_STEPS.indexOf(padStep) + 1) % PAD_STEPS.length];
 				}}>{padStep}</button
 			>
-			<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={32} /></button>
+			<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={30} /></button>
 			<button
 				class="down"
 				disabled={verticalTied}
@@ -947,7 +967,7 @@
 					: `Down ${padStep}mm`}
 				onpointerdown={() => startNudge(0, padStep)}
 			>
-				<Icon name={verticalTied ? 'link' : 'caret-down'} size={verticalTied ? 15 : 32} />
+				<Icon name={verticalTied ? 'link' : 'caret-down'} size={verticalTied ? 15 : 30} />
 			</button>
 		</div>
 	{/if}
@@ -1274,25 +1294,98 @@
 	   card rather than as five controls beside it. The arrowheads keep the size
 	   they were drawn at — a caret glyph fills half its own box, so a 32px icon
 	   is a 16px mark and sits inside a 28px button with room to spare. */
+	/* One cross, not five tiles.
+
+	   It was five separate rounded rectangles with a gap between them, which read
+	   as five buttons that happened to be arranged in a plus rather than as the
+	   one control a d-pad is. The grid is the same 3 x 3; what changed is that
+	   the cells touch, share a ground, and carry a border only on the edges that
+	   are actually on the outside of the cross. The four corner cells stay empty,
+	   so the card under them is still reachable.
+
+	   `--cell` is the unit the whole thing is measured in, including the stashing
+	   limit in the script — keep the two in step. */
 	.pad {
+		--cell: 32px;
+		/* Carbon's carets sit 1/32 of the viewBox towards the point they face, so
+		   a centred glyph is not a centred arrowhead. This is that unit at the
+		   size they are drawn, taken back off along each one's own axis. */
+		--arrow: 30px;
+		--arrow-centre: calc(var(--arrow) / 32);
 		position: absolute;
 		display: none;
-		grid-template-columns: repeat(3, 28px);
-		grid-template-rows: repeat(3, 28px);
-		gap: 4px;
+		grid-template-columns: repeat(3, var(--cell));
+		grid-template-rows: repeat(3, var(--cell));
+		gap: 0;
 	}
 
+	/* Every cell carries a border on all four edges and colours only the ones on
+	   the perimeter. Transparent rather than absent, so each content box is inset
+	   by the same pixel on every side: a cell bordered on three edges and not the
+	   fourth centres its glyph half a pixel off, which is the whole thing this
+	   was asked to fix. The ground is the same under all five, so a transparent
+	   border between two of them is invisible. */
 	.pad button {
 		display: grid;
 		place-items: center;
-		border: 1px solid var(--border-control);
-		border-radius: var(--radius-button);
+		box-sizing: border-box;
+		border: 1px solid transparent;
 		background: rgba(255, 255, 255, 0.92);
 		color: #333;
 		font: 600 12px ui-sans-serif, system-ui, sans-serif;
 		cursor: pointer;
 		padding: 0;
 		touch-action: none;
+	}
+
+	/* The twelve segments of the cross. Each edge is drawn once, by the cell that
+	   owns it; the four re-entrant corners are where two of them meet at a point. */
+	.pad .up {
+		border-top-color: var(--border-control);
+		border-left-color: var(--border-control);
+		border-right-color: var(--border-control);
+		border-radius: var(--radius-button) var(--radius-button) 0 0;
+	}
+
+	.pad .left {
+		border-top-color: var(--border-control);
+		border-left-color: var(--border-control);
+		border-bottom-color: var(--border-control);
+		border-radius: var(--radius-button) 0 0 var(--radius-button);
+	}
+
+	.pad .right {
+		border-top-color: var(--border-control);
+		border-right-color: var(--border-control);
+		border-bottom-color: var(--border-control);
+		border-radius: 0 var(--radius-button) var(--radius-button) 0;
+	}
+
+	.pad .down {
+		border-bottom-color: var(--border-control);
+		border-left-color: var(--border-control);
+		border-right-color: var(--border-control);
+		border-radius: 0 0 var(--radius-button) var(--radius-button);
+	}
+
+	/* Each arrowhead pulled back onto the centre of its own cell, along the axis
+	   it points down — see `--arrow-centre`. Only while it is an arrowhead: a
+	   tied direction wears the link instead, which is centred as drawn, and that
+	   is also the only state in which these are disabled. */
+	.pad .up:not(:disabled) :global(svg) {
+		transform: translateY(var(--arrow-centre));
+	}
+
+	.pad .down:not(:disabled) :global(svg) {
+		transform: translateY(calc(-1 * var(--arrow-centre)));
+	}
+
+	.pad .left :global(svg) {
+		transform: translateX(var(--arrow-centre));
+	}
+
+	.pad .right :global(svg) {
+		transform: translateX(calc(-1 * var(--arrow-centre)));
 	}
 
 	/* A direction an anchor has spoken for. Not merely dimmed: it carries the
@@ -1303,11 +1396,40 @@
 		color: #767676;
 	}
 
-	/* While it is being carried: the pad itself says so, because the finger is
-	   on the one button whose look would otherwise not change. */
-	.pad.moving button {
-		border-color: #2563eb;
+	/* While it is being carried: the pad itself says so, because the finger is on
+	   the one button whose look would otherwise not change. Only the coloured
+	   edges change colour — the transparent ones stay transparent, or the cross
+	   would light up as five boxes again. */
+	.pad.moving .up,
+	.pad.moving .left,
+	.pad.moving .right,
+	.pad.moving .down {
+		border-color: transparent;
 		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+	}
+
+	.pad.moving .up {
+		border-top-color: #2563eb;
+		border-left-color: #2563eb;
+		border-right-color: #2563eb;
+	}
+
+	.pad.moving .left {
+		border-top-color: #2563eb;
+		border-left-color: #2563eb;
+		border-bottom-color: #2563eb;
+	}
+
+	.pad.moving .right {
+		border-top-color: #2563eb;
+		border-right-color: #2563eb;
+		border-bottom-color: #2563eb;
+	}
+
+	.pad.moving .down {
+		border-bottom-color: #2563eb;
+		border-left-color: #2563eb;
+		border-right-color: #2563eb;
 	}
 
 	.pad .up { grid-area: 1 / 2; }
