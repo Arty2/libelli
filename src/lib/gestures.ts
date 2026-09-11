@@ -36,6 +36,17 @@ export function swipeStep(dx: number, dy: number): -1 | 0 | 1 {
 export const HOLD_DELAY = 600;
 
 /**
+ * How far the pointer may wander during a hold before it stops being one.
+ *
+ * A finger is never still, so this cannot be zero; it is small enough that a
+ * deliberate drag clears it in the first few pixels. It matters wherever a hold
+ * shares an element with a drag — the pivot and the rotation lever on an area
+ * both reset on a hold and both move on a drag — because there the alternative
+ * is a slow drag quietly firing the reset it was trying to avoid.
+ */
+export const HOLD_SLOP = 8;
+
+/**
  * Press and hold, as a second action on a button that already has one.
  *
  * Where a button's two actions are the same *kind* of thing — import a file or
@@ -53,20 +64,29 @@ export function hold(node: HTMLElement, action: () => void) {
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	let fired = false;
 	let handler = action;
+	let from: { x: number; y: number } | null = null;
 
 	const cancel = () => {
 		if (timer) clearTimeout(timer);
 		timer = null;
+		from = null;
 	};
 	const down = (event: PointerEvent) => {
 		// Only the primary button: a right-click opens a menu, not a hold.
 		if (event.button !== 0) return;
 		fired = false;
+		from = { x: event.clientX, y: event.clientY };
 		timer = setTimeout(() => {
 			timer = null;
 			fired = true;
 			handler();
 		}, HOLD_DELAY);
+	};
+	// Moving off is how you change your mind, and on an element that is also a
+	// drag target it is how you say you meant to drag.
+	const move = (event: PointerEvent) => {
+		if (!from) return;
+		if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > HOLD_SLOP) cancel();
 	};
 	const click = (event: MouseEvent) => {
 		if (!fired) return;
@@ -76,6 +96,7 @@ export function hold(node: HTMLElement, action: () => void) {
 	};
 
 	node.addEventListener('pointerdown', down);
+	node.addEventListener('pointermove', move);
 	// Moving off the button is how you change your mind mid-press.
 	node.addEventListener('pointerup', cancel);
 	node.addEventListener('pointerleave', cancel);
@@ -86,6 +107,7 @@ export function hold(node: HTMLElement, action: () => void) {
 		destroy: () => {
 			cancel();
 			node.removeEventListener('pointerdown', down);
+			node.removeEventListener('pointermove', move);
 			node.removeEventListener('pointerup', cancel);
 			node.removeEventListener('pointerleave', cancel);
 			node.removeEventListener('pointercancel', cancel);

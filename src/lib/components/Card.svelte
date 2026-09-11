@@ -5,6 +5,7 @@
 	import { applyPlaceholders } from '$lib/placeholders';
 	import { scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
+	import { hold } from '$lib/gestures';
 	import { FREE_STEP, GRID_MINOR, boxEdges, pxToMm, resolveLayout, snapTo, snapToEdges } from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
 	import { normaliseRotation, sidesOf } from '$lib/template';
@@ -742,6 +743,35 @@
 		onchange?.({ ...box, locked: undefined });
 	}
 
+	/**
+	 * Press and hold the pivot, or the knob on its arm, to put it back.
+	 *
+	 * Both marks are dragged to a value with no number written anywhere on the
+	 * card, and both have a resting state that is the only one most cards want:
+	 * the middle, and upright. Getting back to either by dragging is a game of
+	 * pixel-hunting, and the two fields in the bar are three clicks away and only
+	 * there for a single selection. A hold on the mark itself is the shortest
+	 * line back, and `hold` gives up the moment the pointer moves, so the drag
+	 * these share an element with is never mistaken for one.
+	 *
+	 * The drag in flight is dropped along with it: it snapshotted the old value
+	 * at pointerdown, and a move arriving afterwards would write that snapshot
+	 * straight back over the reset.
+	 */
+	function resetPivot(box: Box) {
+		if (!editable(box) || !box.centre) return;
+		drag = null;
+		onaction?.('Centre the pivot');
+		onchange?.({ ...box, centre: undefined });
+	}
+
+	function resetRotation(box: Box) {
+		if (!editable(box) || !box.rotation) return;
+		drag = null;
+		onaction?.('Straighten the area');
+		onchange?.({ ...box, rotation: undefined });
+	}
+
 	/** Break this box's own tie, again without moving it. */
 	function breakAnchor(box: Box) {
 		if (!box.anchor || box.locked) return;
@@ -998,8 +1028,9 @@
 						     has to be there before there is any rotation to show. -->
 						<span
 							class="pivot"
+							use:hold={() => resetPivot(box)}
 							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
-							title="The point this area turns about — drag it, or type it in the bar"
+							title="The point this area turns about — drag it, or type it in the bar. Press and hold to put it back in the middle."
 							onpointerdown={(e) => startDrag(e, box, 'centre')}
 							onpointermove={moveDrag}
 							onpointerup={endDrag}
@@ -1008,8 +1039,9 @@
 						></span>
 						<span
 							class="lever"
+							use:hold={() => resetRotation(box)}
 							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
-							title="Drag to turn this area — hold Shift for 15° steps"
+							title="Drag to turn this area — hold Shift for 15° steps. Press and hold to set it upright."
 							onpointerdown={(e) => startDrag(e, box, 'rotate')}
 							onpointermove={moveDrag}
 							onpointerup={endDrag}
