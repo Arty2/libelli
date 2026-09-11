@@ -1480,7 +1480,7 @@ em { color: #b42318 }`;
 
 <div class="app">
 	<header class="toolbar">
-		<img class="brand" src="{base}/logo.svg" alt="libelli" width="389" height="285" />
+		<img class="brand" src="{base}/logo.svg" alt="libelli" width="389" height="314" />
 		<span class="spacer"></span>
 		{#if installable}
 			<button class="install" onclick={() => void install()} title="Install libelli on this device">
@@ -2225,14 +2225,14 @@ em { color: #b42318 }`;
 		border-bottom: none;
 	}
 
-	/* The mark, where the word used to be. Its height is set under the height of
-	   a button — icon 15px, 6px of padding either side, 1px of border, so 29px —
-	   which is what keeps the row exactly as tall as it was when this was 13px
-	   of text. Width follows the intrinsic ratio; the width and height
-	   attributes on the tag hold the box before the file arrives, so the buttons
-	   do not shuffle sideways on load. */
+	/* The mark, where the word used to be. Its height is the height of a button
+	   — icon 15px, 6px of padding either side, 1px of border, so 29px — and not
+	   a pixel more, which is what keeps the row exactly as tall as it was when
+	   this was 13px of text. Width follows the intrinsic ratio; the width and
+	   height attributes on the tag hold the box before the file arrives, so the
+	   buttons do not shuffle sideways on load. */
 	.brand {
-		height: 28px;
+		height: 29px;
 		width: auto;
 	}
 

@@ -7,7 +7,8 @@ Turn spreadsheet rows into print-ready cards, entirely in the browser.
 - **Source** — https://github.com/Arty2/libelli
 
 *Libelli* is the plural of *libellus*, a little book — about the size of the
-thing coming out of your printer.
+thing coming out of your printer. The dragonfly in the mark is the same word
+taking another turn: a *libellula* is one of those.
 
 ## What it does
 

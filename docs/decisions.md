@@ -1323,22 +1323,38 @@ see. It sits the same distance over the stroke beneath it — 16.7 units — as 
 dot it came from, which is what makes it read as an `i` rather than as a full
 stop after `ell`.
 
+**The dragonfly is the pun, and it is traced rather than drawn.** A *libellula*
+is a dragonfly, so the mark carries one. It came in as a sketch over a render of
+the mark, which makes that render the ruler: the wordmark in the sketch is the
+same ink as the wordmark in `icon.svg`, so matching the two boxes puts the
+dragonfly exactly where it was drawn, at the size it was drawn, without a
+judgement call about either. The trace is marching squares over the thresholded
+scan, simplified at one pixel of it and smoothed through Catmull-Rom — a pixel
+staircase is all right angles, and it is joining something drawn with a brush.
+One pixel is the setting worth knowing: below it the JPEG's own noise survives
+into the outline, above it the pen starts to go.
+
 **Centring moved it, and nothing scaled.** The mark is as wide as it ever was
 and the square's side margin was drawn around that width; only the two rows'
 worth of height went, so the art is re-centred in the same box at the same size.
-Scaling up to fill the height the third row left would have cost the margin.
+Scaling up to fill the height the third row left would have cost the margin. The
+dragonfly then took some of that height back, which moves the centre and nothing
+else.
 
 **`icon.svg`, `icon-maskable.svg` and `logo.svg` are the masters**; the PNGs
 beside them are rendered from those and nothing is hand-edited — the geometry is
 machine-made. The maskable copy is sized so the art's diagonal stays inside the
 inner 80% circle a launcher may crop to, which is the rule the three-row version
-was sized by as well; two rows are shorter than three, so the number changed and
-the rule did not.
+was sized by as well; the art has changed shape twice since, so that scale is
+computed from the rule rather than written down as a number.
 
 **`logo.svg` is the same outlines with no ground under them**, trimmed to the
 ink, and it is sized by height wherever it is used. In the toolbar that height
-is 28px against a 29px button — icon 15, padding 6 either side, 1 of border —
-so the mark can never be the thing that sets the row's height. The `width` and
+is 29px, exactly a button's — icon 15, padding 6 either side, 1 of border — and
+never more, so the mark can never be the thing that sets the row's height. The
+dragonfly is part of that height, so the letters are a little smaller in the bar
+than the same 29px of wordmark alone would be; the mark is one drawing, and
+cropping the insect off for the bar would make it two. The `width` and
 `height` attributes on the tag hold its box before the file arrives, so the
 buttons do not shuffle sideways on load.
 
