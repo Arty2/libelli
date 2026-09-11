@@ -301,8 +301,8 @@
 				</label>
 			</span>
 			<span class="head-row actions">
-				<button onclick={onimporttemplate} disabled={pageFrozen}>Import…</button>
-				<button onclick={onexporttemplate}>Export</button>
+				<button onclick={onimporttemplate} disabled={pageFrozen}><Icon name="document-import" size={14} /> Import…</button>
+				<button onclick={onexporttemplate}><Icon name="document-download" size={14} /> Export</button>
 				<button
 					class="danger-outline"
 					onclick={onresettemplate}
