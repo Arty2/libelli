@@ -6,7 +6,7 @@
 	import type { Arrange } from '$lib/template';
 	import { hold, swipe } from '$lib/gestures';
 	import { GRID_MAJOR, GRID_MINOR, mmToPx } from '$lib/layout';
-	import type { Box, Mapping, Row, Template } from '$lib/types';
+	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
@@ -16,6 +16,8 @@
 		/** families still arriving, passed through so an area can pulse while it waits */
 		loadingFonts?: string[];
 		grid: boolean;
+		/** ruled lines, or a dot at every intersection */
+		gridStyle: GridStyle;
 		selectedIds: string[];
 		zoom: 'fit' | number;
 		/** 1-based position of the previewed row, for the page number */
@@ -40,6 +42,8 @@
 		onaction?: (what: string) => void;
 		onbounds: (show: boolean) => void;
 		ongrid: (show: boolean) => void;
+		/** press and hold the Grid toggle: the same grid, drawn the other way */
+		ongridstyle: (style: GridStyle) => void;
 		onzoom: (zoom: 'fit' | number) => void;
 		onnudge: (dx: number, dy: number) => void;
 		undoable: boolean;
@@ -83,6 +87,7 @@
 		bounds,
 		loadingFonts = [],
 		grid,
+		gridStyle,
 		selectedIds,
 		zoom,
 		pageNumber,
@@ -99,6 +104,7 @@
 		onaction,
 		onbounds,
 		ongrid,
+		ongridstyle,
 		onzoom,
 		onnudge,
 		undoable,
@@ -194,6 +200,7 @@
 	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 
+
 	/**
 	 * What Fit *would* be, whether or not that is what the page is at.
 	 *
@@ -221,6 +228,83 @@
 	});
 
 	const scale = $derived(typeof zoom === 'number' ? zoom : fitScale);
+
+	/**
+	 * The grid, as geometry rather than as a background.
+	 *
+	 * It used to be four `repeating-linear-gradient`s. A repeating gradient is
+	 * rasterised as one tile and then repeated, so the tile's width is rounded to
+	 * whole device pixels once and that rounding is multiplied by however many
+	 * tiles fit: on a 5mm subgrid at most scales the period is fractional, and
+	 * the line that should sit at 18.9px landed on the same pixel as the one at
+	 * 18.4px. Whole gridlines went missing, and which ones went missing changed
+	 * with the zoom — which is exactly what it looked like from the outside.
+	 *
+	 * Every line is placed here instead, from the same millimetres the boxes use,
+	 * and handed to the renderer as one path per weight. Two paths, whatever the
+	 * page size, and no rounding between the measurement and the mark.
+	 *
+	 * Both run from the trim corner, not the sheet corner, and outwards in both
+	 * directions: coordinates are measured from the trim edge, so turning bleed
+	 * on must not slide the grid sideways under the boxes it is there to measure.
+	 */
+	const GRID_HAIRLINE = 0.5;
+
+	/** Two decimals is finer than a device pixel and keeps the path strings short. */
+	const round = (v: number) => Math.round(v * 100) / 100;
+
+	/** Where the lines fall along one axis, in screen px from the sheet corner. */
+	function gridTicks(extentMm: number, stepMm: number, originMm: number): number[] {
+		const out: number[] = [];
+		const first = Math.ceil(-originMm / stepMm);
+		const last = Math.floor((extentMm - originMm) / stepMm);
+		for (let k = first; k <= last; k++) out.push(mmToPx(originMm + k * stepMm) * scale);
+		return out;
+	}
+
+	const gridArt = $derived.by(() => {
+		if (!grid) return null;
+		const originMm = template.bleed.enabled ? template.bleed.amount : 0;
+		const w = mmToPx(outerW) * scale;
+		const h = mmToPx(outerH) * scale;
+		const at = (stepMm: number) => ({
+			xs: gridTicks(outerW, stepMm, originMm),
+			ys: gridTicks(outerH, stepMm, originMm)
+		});
+		const major = at(GRID_MAJOR);
+		const minor = at(GRID_MINOR);
+		// A major line is also a minor one; drawing both would double its weight
+		// where they coincide, which is the one place the grid must stay quiet.
+		const onMajor = new Set([...major.xs, ...major.ys].map((v) => Math.round(v * 100)));
+		const notMajor = (v: number) => !onMajor.has(Math.round(v * 100));
+
+		if (gridStyle === 'dots') {
+			// A zero-length subpath with a round cap is a dot — one path for the
+			// lot rather than several thousand circles.
+			const dots = (xs: number[], ys: number[]) =>
+				xs.map((x) => ys.map((y) => `M${round(x)} ${round(y)}h0`).join('')).join('');
+			return {
+				w,
+				h,
+				dots: true,
+				majorPath: dots(major.xs, major.ys),
+				// Every intersection that is not a major one: the minor dots at a
+				// major column still belong to the minor grid.
+				minorPath:
+					dots(minor.xs.filter(notMajor), minor.ys) + dots(minor.xs.filter((v) => !notMajor(v)), minor.ys.filter(notMajor))
+			};
+		}
+		const rules = (xs: number[], ys: number[]) =>
+			xs.map((x) => `M${round(x)} 0V${round(h)}`).join('') +
+			ys.map((y) => `M0 ${round(y)}H${round(w)}`).join('');
+		return {
+			w,
+			h,
+			dots: false,
+			majorPath: rules(major.xs, major.ys),
+			minorPath: rules(minor.xs.filter(notMajor), minor.ys.filter(notMajor))
+		};
+	});
 
 	$effect(() => {
 		if (!host) return;
@@ -564,20 +648,33 @@
 			/>
 		</div>
 
-		{#if grid}
+		{#if gridArt}
 			<!-- Drawn over the card, never inside it: this is editor furniture and
 			     must not appear in a print or a contact sheet thumbnail.
 
-			     It starts at the trim corner rather than at the sheet corner, so
-			     turning bleed on does not slide every gridline sideways under the
-			     boxes it is there to measure — coordinates are measured from the
-			     trim edge, and the grid has to agree with them. -->
-			<div
+			     An SVG rather than a background, and sitting outside the card's
+			     transform so its hairlines are already in screen pixels — see
+			     `gridArt` above for why the gradients had to go. -->
+			<svg
 				class="grid-overlay"
 				aria-hidden="true"
-				style="--minor:{mmToPx(GRID_MINOR) * scale}px;--major:{mmToPx(GRID_MAJOR) *
-					scale}px;--origin:{mmToPx(template.bleed.enabled ? template.bleed.amount : 0) * scale}px"
-			></div>
+				width={gridArt.w}
+				height={gridArt.h}
+				style="width:{gridArt.w}px;height:{gridArt.h}px"
+			>
+				<path
+					class="minor"
+					class:dot={gridArt.dots}
+					d={gridArt.minorPath}
+					stroke-width={gridArt.dots ? 1.1 : GRID_HAIRLINE}
+				/>
+				<path
+					class="major"
+					class:dot={gridArt.dots}
+					d={gridArt.majorPath}
+					stroke-width={gridArt.dots ? 2 : GRID_HAIRLINE}
+				/>
+			</svg>
 		{/if}
 
 		{#if bounds && template.bleed.enabled && template.bleed.amount > 0}
@@ -706,7 +803,7 @@
 			disabled={!!template.locked}
 			title="Add an area to the page — press and hold to position every area from the columns instead"
 		>
-			<Icon name="text" size={14} /><span class="sr-only">Area</span>
+			<Icon name="blog" size={14} /><span class="sr-only">Area</span>
 		</button>
 		{#if !template.boxes.length}
 			<!-- Only on an empty page, where it is the answer to "now what?" and
@@ -761,9 +858,20 @@
 	     which halves the width and grows upward into empty stage rather than
 	     sideways into the pager. -->
 	<div class="corner left">
-		<label title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it (Ctrl/Cmd+' or Ctrl/Cmd+#)">
+		<!-- Press and hold swaps the ruling for a dot at every intersection: the
+		     same grid and the same snapping, drawn quietly enough to lay type
+		     over. A hold rather than a second control, because the corner has two
+		     words in it and the grid already has a checkbox — and the label says
+		     which of the two it is currently drawing. -->
+		<label
+			use:hold={() => ongridstyle(gridStyle === 'dots' ? 'lines' : 'dots')}
+			title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it (Ctrl/Cmd+' or Ctrl/Cmd+#). Press and hold for {gridStyle ===
+			'dots'
+				? 'ruled lines'
+				: 'a dot grid'}."
+		>
 			<input type="checkbox" checked={grid} onchange={(e) => ongrid(e.currentTarget.checked)} />
-			Grid
+			{gridStyle === 'dots' ? 'Dots' : 'Grid'}
 		</label>
 		<label title="Dashed box bounds and the trim edge — screen only, never printed (Ctrl/Cmd+; or Ctrl/Cmd+H)">
 			<input type="checkbox" checked={bounds} onchange={(e) => onbounds(e.currentTarget.checked)} />
@@ -977,14 +1085,33 @@
 	   zoom, which is the same promise the card's own --line makes. */
 	.grid-overlay {
 		position: absolute;
-		inset: 0;
+		left: 0;
+		top: 0;
 		pointer-events: none;
-		background-image:
-			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.3) 0 0.5px, transparent 0.5px var(--major)),
-			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0 0.5px, transparent 0.5px var(--major)),
-			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.11) 0 0.5px, transparent 0.5px var(--minor)),
-			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.11) 0 0.5px, transparent 0.5px var(--minor));
-		background-position: var(--origin) var(--origin);
+	}
+
+	.grid-overlay path {
+		fill: none;
+		/* A zero-length subpath draws nothing without this, and a dot with it. */
+		stroke-linecap: round;
+	}
+
+	.grid-overlay .minor {
+		stroke: rgba(0, 0, 0, 0.11);
+	}
+
+	.grid-overlay .major {
+		stroke: rgba(0, 0, 0, 0.3);
+	}
+
+	/* Dots carry less ink than rules at the same value, so both weights come up
+	   to stay legible against the paper they are drawn on. */
+	.grid-overlay .minor.dot {
+		stroke: rgba(0, 0, 0, 0.22);
+	}
+
+	.grid-overlay .major.dot {
+		stroke: rgba(0, 0, 0, 0.42);
 	}
 
 	/* The same half-pixel hairline as the grid, and solid rather than dashed:
