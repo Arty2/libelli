@@ -1311,6 +1311,54 @@ under them is worse than doing nothing. Touch only: a mouse has a wheel and two
 arrows either side of the count, and treating a click-drag as a swipe would page
 the cards every time somebody tried to select the counter's text.
 
+## The mark — `static/icon.svg`, `static/logo.svg` and the toolbar brand
+
+**The wordmark was cut down, not redrawn.** It read *libellum* over three rows,
+and the app is called libelli. The art is one traced path of nine contours under
+`fill-rule: evenodd`, so the `um` row is a single contour and dropping it leaves
+nothing behind; the terminal `i` is the `ll` flick the second row already ended
+on, given a dot. That dot is the dot from the `i` in `lib`, mirrored and moved,
+because a second hand drawing one blob next to another is the thing you would
+see. It sits the same distance over the stroke beneath it — 16.7 units — as the
+dot it came from, which is what makes it read as an `i` rather than as a full
+stop after `ell`.
+
+**Centring moved it, and nothing scaled.** The mark is as wide as it ever was
+and the square's side margin was drawn around that width; only the two rows'
+worth of height went, so the art is re-centred in the same box at the same size.
+Scaling up to fill the height the third row left would have cost the margin.
+
+**`icon.svg`, `icon-maskable.svg` and `logo.svg` are the masters**; the PNGs
+beside them are rendered from those and nothing is hand-edited — the geometry is
+machine-made. The maskable copy is sized so the art's diagonal stays inside the
+inner 80% circle a launcher may crop to, which is the rule the three-row version
+was sized by as well; two rows are shorter than three, so the number changed and
+the rule did not.
+
+**`logo.svg` is the same outlines with no ground under them**, trimmed to the
+ink, and it is sized by height wherever it is used. In the toolbar that height
+is 28px against a 29px button — icon 15, padding 6 either side, 1 of border —
+so the mark can never be the thing that sets the row's height. The `width` and
+`height` attributes on the tag hold its box before the file arrives, so the
+buttons do not shuffle sideways on load.
+
+**On a phone the bar is read from the outside in.** Help first, because it is
+the one button about the app rather than about the card, then Install where
+there is one, then the mark, then the three that act on what is on screen.
+Export drops its word there like the rest, so all four of those are icons and
+the row is the same either way. The order is `order:`, not markup: the source
+order is the one the wide bar reads in, and moving the mark out of it would have
+the app's name announced from the middle of the controls.
+
+**The mark is centred out of the flow.** Two flex spacers would centre it
+between the two groups of buttons, and those groups are never the same width, so
+it would sit off to one side of the bar it is meant to be the middle of.
+Absolute positioning also keeps it out of the row's height, which is the
+buttons' to set. The exception is 320px with an Install button in the row: that
+is where the two groups meet in the middle and a centred mark would be under one
+of them, so it steps back into the flow beside the left-hand group. The controls
+win the row, because they are the ones you press.
+
 ## Testing
 
 Tests cover the pure logic. Components are verified by driving them in a real

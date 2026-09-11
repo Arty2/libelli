@@ -766,9 +766,12 @@ thing itself.
   between them, under the sheet, which card of how many you are looking at.
   **Fit** in the zoom menu says the percentage fitting *would* give you, not the
   one you are at.
-- **The window toolbar** holds only what is about the whole app: Help, Page
-  Setup, Data and Export — the two panels in the order they sit on screen,
-  settings above the page and the table beside it.
+- **The window toolbar** holds only what is about the whole app: the mark, then
+  Help, Page Setup, Data and Export — the two panels in the order they sit on
+  screen, settings above the page and the table beside it. On a phone the
+  buttons drop their words and keep their icons, and the row is read from the
+  outside in: Help and, where the browser offers it, Install on the left, the
+  mark in the middle, the three that act on what is on screen at the right.
 
 Every number says its unit: mm for geometry, bleed, spacing and gaps, pt for
 type size, modules for a QR padding.
