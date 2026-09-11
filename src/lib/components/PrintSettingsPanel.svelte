@@ -187,17 +187,21 @@
 				/>
 				<span class="unit">mm</span>
 			</label>
+			<!-- Under the sheet's bleed, the way Crop Marks sits under the page's.
+			     These marks say where to cut the sheet down to its own edge, which
+			     is a cut that only exists once there is bleed to cut into: outside
+			     this branch it was a tick you could set and nothing would print. -->
+			<label class="check">
+				<input
+					type="checkbox"
+					checked={template.print.bleed.cropMarks}
+					disabled={pageFrozen}
+					title="Marks at the corners of the tiled block, for the cut that takes it off the sheet"
+					onchange={(e) => patchSheetBleed({ cropMarks: e.currentTarget.checked })}
+				/>
+				Sheet Crop Marks
+			</label>
 		{/if}
-		<label class="check">
-			<input
-				type="checkbox"
-				checked={template.print.bleed.cropMarks}
-				disabled={pageFrozen}
-				title="Marks at the corners of the tiled block, for the cut that takes it off the sheet"
-				onchange={(e) => patchSheetBleed({ cropMarks: e.currentTarget.checked })}
-			/>
-			Sheet Marks
-		</label>
 	{/if}
 </span>
 
