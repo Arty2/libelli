@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
+	import { base } from '$app/paths';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
@@ -1479,17 +1480,18 @@ em { color: #b42318 }`;
 
 <div class="app">
 	<header class="toolbar">
-		<strong class="brand">libelli</strong>
+		<img class="brand" src="{base}/logo.svg" alt="libelli" width="389" height="285" />
 		<span class="spacer"></span>
 		{#if installable}
-			<button onclick={() => void install()} title="Install libelli on this device">
+			<button class="install" onclick={() => void install()} title="Install libelli on this device">
 				<Icon name="package" size={15} /> Install
 			</button>
 		{/if}
-		<button onclick={() => (helpOpen = true)} title="How this works, and the keys">
+		<button class="help" onclick={() => (helpOpen = true)} title="How this works, and the keys">
 			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
 		<button
+			class="page"
 			onclick={() => {
 				// Not a plain toggle any more: the two bars share one row, so this
 				// says "show me the page" — which, with an area selected, means
@@ -1507,6 +1509,7 @@ em { color: #b42318 }`;
 			<Icon name="document-configuration" size={15} /> <span class="label">Page Setup</span>
 		</button>
 		<button
+			class="data"
 			onclick={() => (dataOpen = !dataOpen)}
 			aria-pressed={dataOpen}
 			aria-expanded={dataOpen}
@@ -1514,8 +1517,13 @@ em { color: #b42318 }`;
 		>
 			<Icon name="table-split" size={15} /> <span class="label">Data</span>
 		</button>
-		<button class="primary" onclick={requestPrint} disabled={!dataset.rows.length}>
-			<Icon name="document-multiple" size={15} /> Export…
+		<button
+			class="primary export"
+			onclick={requestPrint}
+			disabled={!dataset.rows.length}
+			title="Open every card as a page to print or save"
+		>
+			<Icon name="document-multiple" size={15} /> <span class="label">Export…</span>
 		</button>
 		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
@@ -2217,8 +2225,15 @@ em { color: #b42318 }`;
 		border-bottom: none;
 	}
 
+	/* The mark, where the word used to be. Its height is set under the height of
+	   a button — icon 15px, 6px of padding either side, 1px of border, so 29px —
+	   which is what keeps the row exactly as tall as it was when this was 13px
+	   of text. Width follows the intrinsic ratio; the width and height
+	   attributes on the tag hold the box before the file arrives, so the buttons
+	   do not shuffle sideways on load. */
 	.brand {
-		font-size: 13px;
+		height: 28px;
+		width: auto;
 	}
 
 	.spacer {
@@ -2681,10 +2696,72 @@ em { color: #b42318 }`;
 		.toolbar {
 			gap: 6px;
 			padding: 6px 8px;
+			position: relative;
 		}
 
 		.toolbar .label {
 			display: none;
+		}
+
+		/* Phone order: what the app is on the left — Help first, because it is the
+		   one button that is about the app rather than about the card, and Install
+		   behind it when there is one — then the mark, then the three that act on
+		   what is on screen. Order, not markup: the source order is the one the
+		   wide bar reads in, and moving the brand out of it would leave the name
+		   announced in the middle of the controls.
+
+		   The mark is taken out of the flow to be centred. Two flex spacers would
+		   centre it in what is left between the two groups, and those groups are
+		   never the same width, so it would sit off to one side of the bar it is
+		   supposed to be the middle of. Out of the flow it also stops counting
+		   towards the row's height, which is the buttons' to set. */
+		.toolbar .help {
+			order: 1;
+		}
+
+		.toolbar .install {
+			order: 2;
+		}
+
+		.toolbar .spacer {
+			order: 3;
+		}
+
+		.toolbar .page {
+			order: 4;
+		}
+
+		.toolbar .data {
+			order: 5;
+		}
+
+		.toolbar .export {
+			order: 6;
+		}
+
+		.brand {
+			position: absolute;
+			left: 50%;
+			top: 50%;
+			transform: translate(-50%, -50%);
+			/* Nothing to press, and it sits over the middle of the row: a tap that
+			   lands on it belongs to whatever is underneath. */
+			pointer-events: none;
+		}
+	}
+
+	/* 320px with an Install button in the row is where the two groups of
+	   controls meet in the middle, and a mark held in the centre of the bar
+	   would be under one of them. Out of the centre, back into the row: it keeps
+	   its place in the order, sitting against the left-hand group instead. The
+	   controls win the row, because they are the ones you press. */
+	@media (max-width: 320px) {
+		.brand {
+			position: static;
+			transform: none;
+			/* Level with the spacer, and first in the markup, so it lands between
+			   the left-hand group and the space that pushes the rest right. */
+			order: 3;
 		}
 	}
 
