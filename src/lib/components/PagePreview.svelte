@@ -6,7 +6,7 @@
 	import type { Arrange } from '$lib/template';
 	import { hold, swipe } from '$lib/gestures';
 	import { GRID_MAJOR, GRID_MINOR, mmToPx } from '$lib/layout';
-	import type { Box, Mapping, Row, Template } from '$lib/types';
+	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
@@ -16,6 +16,8 @@
 		/** families still arriving, passed through so an area can pulse while it waits */
 		loadingFonts?: string[];
 		grid: boolean;
+		/** ruled lines, or a dot at every intersection */
+		gridStyle: GridStyle;
 		selectedIds: string[];
 		zoom: 'fit' | number;
 		/** 1-based position of the previewed row, for the page number */
@@ -40,6 +42,8 @@
 		onaction?: (what: string) => void;
 		onbounds: (show: boolean) => void;
 		ongrid: (show: boolean) => void;
+		/** press and hold the Grid toggle: the same grid, drawn the other way */
+		ongridstyle: (style: GridStyle) => void;
 		onzoom: (zoom: 'fit' | number) => void;
 		onnudge: (dx: number, dy: number) => void;
 		undoable: boolean;
@@ -83,6 +87,7 @@
 		bounds,
 		loadingFonts = [],
 		grid,
+		gridStyle,
 		selectedIds,
 		zoom,
 		pageNumber,
@@ -99,6 +104,7 @@
 		onaction,
 		onbounds,
 		ongrid,
+		ongridstyle,
 		onzoom,
 		onnudge,
 		undoable,
@@ -194,6 +200,7 @@
 	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
 
+
 	/**
 	 * What Fit *would* be, whether or not that is what the page is at.
 	 *
@@ -221,6 +228,83 @@
 	});
 
 	const scale = $derived(typeof zoom === 'number' ? zoom : fitScale);
+
+	/**
+	 * The grid, as geometry rather than as a background.
+	 *
+	 * It used to be four `repeating-linear-gradient`s. A repeating gradient is
+	 * rasterised as one tile and then repeated, so the tile's width is rounded to
+	 * whole device pixels once and that rounding is multiplied by however many
+	 * tiles fit: on a 5mm subgrid at most scales the period is fractional, and
+	 * the line that should sit at 18.9px landed on the same pixel as the one at
+	 * 18.4px. Whole gridlines went missing, and which ones went missing changed
+	 * with the zoom — which is exactly what it looked like from the outside.
+	 *
+	 * Every line is placed here instead, from the same millimetres the boxes use,
+	 * and handed to the renderer as one path per weight. Two paths, whatever the
+	 * page size, and no rounding between the measurement and the mark.
+	 *
+	 * Both run from the trim corner, not the sheet corner, and outwards in both
+	 * directions: coordinates are measured from the trim edge, so turning bleed
+	 * on must not slide the grid sideways under the boxes it is there to measure.
+	 */
+	const GRID_HAIRLINE = 0.5;
+
+	/** Two decimals is finer than a device pixel and keeps the path strings short. */
+	const round = (v: number) => Math.round(v * 100) / 100;
+
+	/** Where the lines fall along one axis, in screen px from the sheet corner. */
+	function gridTicks(extentMm: number, stepMm: number, originMm: number): number[] {
+		const out: number[] = [];
+		const first = Math.ceil(-originMm / stepMm);
+		const last = Math.floor((extentMm - originMm) / stepMm);
+		for (let k = first; k <= last; k++) out.push(mmToPx(originMm + k * stepMm) * scale);
+		return out;
+	}
+
+	const gridArt = $derived.by(() => {
+		if (!grid) return null;
+		const originMm = template.bleed.enabled ? template.bleed.amount : 0;
+		const w = mmToPx(outerW) * scale;
+		const h = mmToPx(outerH) * scale;
+		const at = (stepMm: number) => ({
+			xs: gridTicks(outerW, stepMm, originMm),
+			ys: gridTicks(outerH, stepMm, originMm)
+		});
+		const major = at(GRID_MAJOR);
+		const minor = at(GRID_MINOR);
+		// A major line is also a minor one; drawing both would double its weight
+		// where they coincide, which is the one place the grid must stay quiet.
+		const onMajor = new Set([...major.xs, ...major.ys].map((v) => Math.round(v * 100)));
+		const notMajor = (v: number) => !onMajor.has(Math.round(v * 100));
+
+		if (gridStyle === 'dots') {
+			// A zero-length subpath with a round cap is a dot — one path for the
+			// lot rather than several thousand circles.
+			const dots = (xs: number[], ys: number[]) =>
+				xs.map((x) => ys.map((y) => `M${round(x)} ${round(y)}h0`).join('')).join('');
+			return {
+				w,
+				h,
+				dots: true,
+				majorPath: dots(major.xs, major.ys),
+				// Every intersection that is not a major one: the minor dots at a
+				// major column still belong to the minor grid.
+				minorPath:
+					dots(minor.xs.filter(notMajor), minor.ys) + dots(minor.xs.filter((v) => !notMajor(v)), minor.ys.filter(notMajor))
+			};
+		}
+		const rules = (xs: number[], ys: number[]) =>
+			xs.map((x) => `M${round(x)} 0V${round(h)}`).join('') +
+			ys.map((y) => `M0 ${round(y)}H${round(w)}`).join('');
+		return {
+			w,
+			h,
+			dots: false,
+			majorPath: rules(major.xs, major.ys),
+			minorPath: rules(minor.xs.filter(notMajor), minor.ys.filter(notMajor))
+		};
+	});
 
 	$effect(() => {
 		if (!host) return;
@@ -442,16 +526,31 @@
 		}, 450);
 	}
 
+	/**
+	 * The pad's geometry, in px. Must match `--cell` in the stylesheet: the
+	 * stashing limit below is measured in cells, because what it is really about
+	 * is the middle button.
+	 */
+	const PAD_CELL = 32;
+	const PAD_SIZE = PAD_CELL * 3;
+
 	function padMove(event: PointerEvent) {
 		if (!padDrag || !host) return;
 		event.preventDefault();
 		const stage = host.getBoundingClientRect();
-		// Clamped to the stage so the pad cannot be dragged off the edge of the
-		// screen, which on a phone is a control you never get back.
-		const clamp = (value: number, limit: number) => Math.max(4, Math.min(limit, value));
+		/**
+		 * The pad may hang off the edge of the stage — a cross parked over the
+		 * corner of the page is still covering the corner, and tucking the far arm
+		 * of it out of sight is the cheapest way to get that corner back. What it
+		 * may not do is take the middle button with it: that button is how the pad
+		 * is picked up again, and a pad you cannot reach is a control you have
+		 * lost. So the far edge may reach the edge of the stage, and stop.
+		 */
+		const stash = (value: number, extent: number) =>
+			Math.max(-PAD_CELL, Math.min(extent - PAD_SIZE + PAD_CELL, value));
 		padAt = {
-			right: clamp(padDrag.from.right - (event.clientX - padDrag.x), stage.width - 140),
-			bottom: clamp(padDrag.from.bottom - (event.clientY - padDrag.y), stage.height - 140)
+			right: stash(padDrag.from.right - (event.clientX - padDrag.x), stage.width),
+			bottom: stash(padDrag.from.bottom - (event.clientY - padDrag.y), stage.height)
 		};
 	}
 
@@ -564,20 +663,33 @@
 			/>
 		</div>
 
-		{#if grid}
+		{#if gridArt}
 			<!-- Drawn over the card, never inside it: this is editor furniture and
 			     must not appear in a print or a contact sheet thumbnail.
 
-			     It starts at the trim corner rather than at the sheet corner, so
-			     turning bleed on does not slide every gridline sideways under the
-			     boxes it is there to measure — coordinates are measured from the
-			     trim edge, and the grid has to agree with them. -->
-			<div
+			     An SVG rather than a background, and sitting outside the card's
+			     transform so its hairlines are already in screen pixels — see
+			     `gridArt` above for why the gradients had to go. -->
+			<svg
 				class="grid-overlay"
 				aria-hidden="true"
-				style="--minor:{mmToPx(GRID_MINOR) * scale}px;--major:{mmToPx(GRID_MAJOR) *
-					scale}px;--origin:{mmToPx(template.bleed.enabled ? template.bleed.amount : 0) * scale}px"
-			></div>
+				width={gridArt.w}
+				height={gridArt.h}
+				style="width:{gridArt.w}px;height:{gridArt.h}px"
+			>
+				<path
+					class="minor"
+					class:dot={gridArt.dots}
+					d={gridArt.minorPath}
+					stroke-width={gridArt.dots ? 1.1 : GRID_HAIRLINE}
+				/>
+				<path
+					class="major"
+					class:dot={gridArt.dots}
+					d={gridArt.majorPath}
+					stroke-width={gridArt.dots ? 2 : GRID_HAIRLINE}
+				/>
+			</svg>
 		{/if}
 
 		{#if bounds && template.bleed.enabled && template.bleed.amount > 0}
@@ -697,7 +809,12 @@
 
 	<!-- A column, not a row: Area is the button that is always there, and the
 	     three that come and go belong under it rather than pushing it sideways
-	     every time one of them appears. -->
+	     every time one of them appears.
+
+	     16px, not 14: these are Carbon's 32-grid glyphs, and `blog` in
+	     particular carries a bar, two rules and a square — below 16 the three
+	     merge into a smudge. The column moves together, because one button
+	     drawn larger than the four beside it reads as a mistake. -->
 	<div class="corner top right stacked">
 		<button
 			class="square"
@@ -706,7 +823,7 @@
 			disabled={!!template.locked}
 			title="Add an area to the page — press and hold to position every area from the columns instead"
 		>
-			<Icon name="text" size={14} /><span class="sr-only">Area</span>
+			<Icon name="blog" size={16} /><span class="sr-only">Area</span>
 		</button>
 		{#if !template.boxes.length}
 			<!-- Only on an empty page, where it is the answer to "now what?" and
@@ -721,7 +838,7 @@
 					? 'Position areas automagically — a card worked out from your headings and your data'
 					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
 			>
-				<Icon name="shapes" size={14} /><span class="sr-only">Position areas automagically</span>
+				<Icon name="shapes" size={16} /><span class="sr-only">Position areas automagically</span>
 			</button>
 		{/if}
 		{#if picking}
@@ -735,7 +852,7 @@
 				onclick={onstoppicking}
 				title="Selecting several — every press adds an area or drops it. Press to stop, or Esc."
 			>
-				<Icon name="checkbox-checked" size={14} /><span class="sr-only">Stop selecting multiple</span>
+				<Icon name="checkbox-checked" size={16} /><span class="sr-only">Stop selecting multiple</span>
 			</button>
 		{/if}
 		{#if strayIds.length}
@@ -749,7 +866,7 @@
 				disabled={!!template.locked}
 				title="{strayIds.length} area{strayIds.length === 1 ? ' is' : 's are'} off the page — bring {strayIds.length === 1 ? 'it' : 'them'} back on"
 			>
-				<Icon name="move" size={14} /><span class="sr-only">Bring stray areas back onto the page</span>
+				<Icon name="move" size={16} /><span class="sr-only">Bring stray areas back onto the page</span>
 			</button>
 		{/if}
 	</div>
@@ -761,9 +878,20 @@
 	     which halves the width and grows upward into empty stage rather than
 	     sideways into the pager. -->
 	<div class="corner left">
-		<label title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it (Ctrl/Cmd+' or Ctrl/Cmd+#)">
+		<!-- Press and hold swaps the ruling for a dot at every intersection: the
+		     same grid and the same snapping, drawn quietly enough to lay type
+		     over. A hold rather than a second control, because the corner has two
+		     words in it and the grid already has a checkbox — and the label says
+		     which of the two it is currently drawing. -->
+		<label
+			use:hold={() => ongridstyle(gridStyle === 'dots' ? 'lines' : 'dots')}
+			title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it (Ctrl/Cmd+' or Ctrl/Cmd+#). Press and hold for {gridStyle ===
+			'dots'
+				? 'ruled lines'
+				: 'a dot grid'}."
+		>
 			<input type="checkbox" checked={grid} onchange={(e) => ongrid(e.currentTarget.checked)} />
-			Grid
+			{gridStyle === 'dots' ? 'Dots' : 'Grid'}
 		</label>
 		<label title="Dashed box bounds and the trim edge — screen only, never printed (Ctrl/Cmd+; or Ctrl/Cmd+H)">
 			<input type="checkbox" checked={bounds} onchange={(e) => onbounds(e.currentTarget.checked)} />
@@ -812,9 +940,9 @@
 					: `Up ${padStep}mm`}
 				onpointerdown={() => startNudge(0, -padStep)}
 			>
-				<Icon name={verticalTied ? 'link' : 'caret-up'} size={verticalTied ? 15 : 32} />
+				<Icon name={verticalTied ? 'link' : 'caret-up'} size={verticalTied ? 15 : 30} />
 			</button>
-			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={32} /></button>
+			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
 			<!-- The middle button carries the second gesture, because the arrows
 			     already use press-and-hold to repeat: hold this one and the pad
 			     comes with your finger. A tap still cycles the step. -->
@@ -830,7 +958,7 @@
 					padStep = PAD_STEPS[(PAD_STEPS.indexOf(padStep) + 1) % PAD_STEPS.length];
 				}}>{padStep}</button
 			>
-			<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={32} /></button>
+			<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={30} /></button>
 			<button
 				class="down"
 				disabled={verticalTied}
@@ -839,7 +967,7 @@
 					: `Down ${padStep}mm`}
 				onpointerdown={() => startNudge(0, padStep)}
 			>
-				<Icon name={verticalTied ? 'link' : 'caret-down'} size={verticalTied ? 15 : 32} />
+				<Icon name={verticalTied ? 'link' : 'caret-down'} size={verticalTied ? 15 : 30} />
 			</button>
 		</div>
 	{/if}
@@ -977,14 +1105,33 @@
 	   zoom, which is the same promise the card's own --line makes. */
 	.grid-overlay {
 		position: absolute;
-		inset: 0;
+		left: 0;
+		top: 0;
 		pointer-events: none;
-		background-image:
-			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.3) 0 0.5px, transparent 0.5px var(--major)),
-			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0 0.5px, transparent 0.5px var(--major)),
-			repeating-linear-gradient(to right, rgba(0, 0, 0, 0.11) 0 0.5px, transparent 0.5px var(--minor)),
-			repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.11) 0 0.5px, transparent 0.5px var(--minor));
-		background-position: var(--origin) var(--origin);
+	}
+
+	.grid-overlay path {
+		fill: none;
+		/* A zero-length subpath draws nothing without this, and a dot with it. */
+		stroke-linecap: round;
+	}
+
+	.grid-overlay .minor {
+		stroke: rgba(0, 0, 0, 0.11);
+	}
+
+	.grid-overlay .major {
+		stroke: rgba(0, 0, 0, 0.3);
+	}
+
+	/* Dots carry less ink than rules at the same value, so both weights come up
+	   to stay legible against the paper they are drawn on. */
+	.grid-overlay .minor.dot {
+		stroke: rgba(0, 0, 0, 0.22);
+	}
+
+	.grid-overlay .major.dot {
+		stroke: rgba(0, 0, 0, 0.42);
 	}
 
 	/* The same half-pixel hairline as the grid, and solid rather than dashed:
@@ -1147,25 +1294,98 @@
 	   card rather than as five controls beside it. The arrowheads keep the size
 	   they were drawn at — a caret glyph fills half its own box, so a 32px icon
 	   is a 16px mark and sits inside a 28px button with room to spare. */
+	/* One cross, not five tiles.
+
+	   It was five separate rounded rectangles with a gap between them, which read
+	   as five buttons that happened to be arranged in a plus rather than as the
+	   one control a d-pad is. The grid is the same 3 x 3; what changed is that
+	   the cells touch, share a ground, and carry a border only on the edges that
+	   are actually on the outside of the cross. The four corner cells stay empty,
+	   so the card under them is still reachable.
+
+	   `--cell` is the unit the whole thing is measured in, including the stashing
+	   limit in the script — keep the two in step. */
 	.pad {
+		--cell: 32px;
+		/* Carbon's carets sit 1/32 of the viewBox towards the point they face, so
+		   a centred glyph is not a centred arrowhead. This is that unit at the
+		   size they are drawn, taken back off along each one's own axis. */
+		--arrow: 30px;
+		--arrow-centre: calc(var(--arrow) / 32);
 		position: absolute;
 		display: none;
-		grid-template-columns: repeat(3, 28px);
-		grid-template-rows: repeat(3, 28px);
-		gap: 4px;
+		grid-template-columns: repeat(3, var(--cell));
+		grid-template-rows: repeat(3, var(--cell));
+		gap: 0;
 	}
 
+	/* Every cell carries a border on all four edges and colours only the ones on
+	   the perimeter. Transparent rather than absent, so each content box is inset
+	   by the same pixel on every side: a cell bordered on three edges and not the
+	   fourth centres its glyph half a pixel off, which is the whole thing this
+	   was asked to fix. The ground is the same under all five, so a transparent
+	   border between two of them is invisible. */
 	.pad button {
 		display: grid;
 		place-items: center;
-		border: 1px solid var(--border-control);
-		border-radius: var(--radius-button);
+		box-sizing: border-box;
+		border: 1px solid transparent;
 		background: rgba(255, 255, 255, 0.92);
 		color: #333;
 		font: 600 12px ui-sans-serif, system-ui, sans-serif;
 		cursor: pointer;
 		padding: 0;
 		touch-action: none;
+	}
+
+	/* The twelve segments of the cross. Each edge is drawn once, by the cell that
+	   owns it; the four re-entrant corners are where two of them meet at a point. */
+	.pad .up {
+		border-top-color: var(--border-control);
+		border-left-color: var(--border-control);
+		border-right-color: var(--border-control);
+		border-radius: var(--radius-button) var(--radius-button) 0 0;
+	}
+
+	.pad .left {
+		border-top-color: var(--border-control);
+		border-left-color: var(--border-control);
+		border-bottom-color: var(--border-control);
+		border-radius: var(--radius-button) 0 0 var(--radius-button);
+	}
+
+	.pad .right {
+		border-top-color: var(--border-control);
+		border-right-color: var(--border-control);
+		border-bottom-color: var(--border-control);
+		border-radius: 0 var(--radius-button) var(--radius-button) 0;
+	}
+
+	.pad .down {
+		border-bottom-color: var(--border-control);
+		border-left-color: var(--border-control);
+		border-right-color: var(--border-control);
+		border-radius: 0 0 var(--radius-button) var(--radius-button);
+	}
+
+	/* Each arrowhead pulled back onto the centre of its own cell, along the axis
+	   it points down — see `--arrow-centre`. Only while it is an arrowhead: a
+	   tied direction wears the link instead, which is centred as drawn, and that
+	   is also the only state in which these are disabled. */
+	.pad .up:not(:disabled) :global(svg) {
+		transform: translateY(var(--arrow-centre));
+	}
+
+	.pad .down:not(:disabled) :global(svg) {
+		transform: translateY(calc(-1 * var(--arrow-centre)));
+	}
+
+	.pad .left :global(svg) {
+		transform: translateX(var(--arrow-centre));
+	}
+
+	.pad .right :global(svg) {
+		transform: translateX(calc(-1 * var(--arrow-centre)));
 	}
 
 	/* A direction an anchor has spoken for. Not merely dimmed: it carries the
@@ -1176,11 +1396,40 @@
 		color: #767676;
 	}
 
-	/* While it is being carried: the pad itself says so, because the finger is
-	   on the one button whose look would otherwise not change. */
-	.pad.moving button {
-		border-color: #2563eb;
+	/* While it is being carried: the pad itself says so, because the finger is on
+	   the one button whose look would otherwise not change. Only the coloured
+	   edges change colour — the transparent ones stay transparent, or the cross
+	   would light up as five boxes again. */
+	.pad.moving .up,
+	.pad.moving .left,
+	.pad.moving .right,
+	.pad.moving .down {
+		border-color: transparent;
 		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+	}
+
+	.pad.moving .up {
+		border-top-color: #2563eb;
+		border-left-color: #2563eb;
+		border-right-color: #2563eb;
+	}
+
+	.pad.moving .left {
+		border-top-color: #2563eb;
+		border-left-color: #2563eb;
+		border-bottom-color: #2563eb;
+	}
+
+	.pad.moving .right {
+		border-top-color: #2563eb;
+		border-right-color: #2563eb;
+		border-bottom-color: #2563eb;
+	}
+
+	.pad.moving .down {
+		border-bottom-color: #2563eb;
+		border-left-color: #2563eb;
+		border-right-color: #2563eb;
 	}
 
 	.pad .up { grid-area: 1 / 2; }

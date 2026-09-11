@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
@@ -43,6 +43,7 @@
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
+	import { armDefault } from '$lib/modal';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
@@ -81,7 +82,34 @@
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
 	let mapping = $state<Mapping>({});
-	let ui = $state<UiState>({ showBounds: true, showGrid: false, zoom: 'fit' });
+	/**
+	 * The options row's floor, in px — see the comment above the row itself.
+	 * `barHeight` is what the bar currently in it actually needs.
+	 */
+	let barFloor = $state(0);
+	let barHeight = $state(0);
+	/**
+	 * The page bar's library menu is open.
+	 *
+	 * On a narrow screen the bar gives up its height cap while a menu is up, so
+	 * the menu is not clipped by the bar's own scroller — a moment, and not a
+	 * height the bar ever needs to stand at. Taken as a floor it stayed: opening
+	 * the template switcher once left a band of empty grey under the bar for the
+	 * rest of the session, which is the bug this guard is for.
+	 */
+	let barMenuOpen = $state(false);
+
+	$effect(() => {
+		const height = barHeight;
+		// Read untracked on purpose: only a fresh measurement may raise the floor.
+		// Tracked, the flag going false at the end of a menu re-ran this while
+		// `barHeight` still held the uncapped height, and the floor took the very
+		// number the guard above exists to refuse.
+		if (untrack(() => barMenuOpen)) return;
+		if (height > barFloor) barFloor = height;
+	});
+
+	let ui = $state<UiState>({ showBounds: true, showGrid: false, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
 	let activeRow = $state(0);
 	let selectedIds = $state<string[]>([]);
 	let ready = $state(false);
@@ -472,7 +500,11 @@ em { color: #b42318 }`;
 		if (!ready) return;
 		const snap = snapshot();
 		const timer = setTimeout(() => {
+			const before = history;
 			history = record(history, snap, pending);
+			// A fresh edit makes "the last change" a different change, so the
+			// alternating chord starts over rather than flipping the wrong one.
+			if (history !== before) toggledOff = false;
 			pending = '';
 		}, 350);
 		return () => clearTimeout(timer);
@@ -497,6 +529,7 @@ em { color: #b42318 }`;
 
 	function undo() {
 		if (!undoable) return;
+		toggledOff = false;
 		const what = undoLabel(history);
 		history = undoStep(history);
 		applySnapshot(history.present.state);
@@ -508,11 +541,40 @@ em { color: #b42318 }`;
 
 	function redo() {
 		if (!redoable) return;
+		toggledOff = false;
 		const what = redoLabel(history);
 		history = redoStep(history);
 		applySnapshot(history.present.state);
 		pending = '';
 		notify(what ? `Redone: ${what}` : 'Redone.');
+	}
+
+	/**
+	 * Ctrl/Cmd+Shift+Z: the last change off, and on again.
+	 *
+	 * Undo and redo each have a key of their own — Ctrl/Cmd+Z and Ctrl/Cmd+Y —
+	 * and both walk the stack a step at a time. This is the other thing the
+	 * fingers want, which neither of those does: hold one change up against the
+	 * page without it and put it straight back, as many times as it takes to
+	 * decide. So the chord alternates rather than repeating: it undoes, and the
+	 * next press redoes exactly what it just undid.
+	 *
+	 * Anything else touching the history resets it — a fresh edit, a plain undo,
+	 * a redo — because after any of those "the last change" is a different change
+	 * and an alternating key would be flipping the wrong one.
+	 */
+	let toggledOff = $state(false);
+
+	function toggleLastChange() {
+		if (toggledOff && redoable) {
+			redo();
+			return;
+		}
+		if (!undoable) return;
+		undo();
+		// After undo(), which clears it: the flag says "this chord took the last
+		// change off", and only this chord may put it back.
+		toggledOff = true;
 	}
 
 	// ---- autosave -----------------------------------------------------------
@@ -1109,7 +1171,7 @@ em { color: #b42318 }`;
 		// While a field has focus, leave undo to the browser's own text history.
 		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
 			event.preventDefault();
-			if (event.shiftKey) redo();
+			if (event.shiftKey) toggleLastChange();
 			else undo();
 			return;
 		}
@@ -1410,7 +1472,7 @@ em { color: #b42318 }`;
 
 </script>
 
-<svelte:window onkeydown={onWindowKeydown} onafterprint={onAfterPrint} />
+<svelte:window onkeydown={onWindowKeydown} onafterprint={onAfterPrint} onresize={() => (barFloor = 0)} />
 <svelte:head>
 	<title>libelli</title>
 </svelte:head>
@@ -1421,19 +1483,28 @@ em { color: #b42318 }`;
 		<span class="spacer"></span>
 		{#if installable}
 			<button onclick={() => void install()} title="Install libelli on this device">
-				<Icon name="add" size={15} /> Install
+				<Icon name="package" size={15} /> Install
 			</button>
 		{/if}
 		<button onclick={() => (helpOpen = true)} title="How this works, and the keys">
 			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
 		<button
-			onclick={() => (pageSetupOpen = !pageSetupOpen)}
-			aria-pressed={pageSetupOpen}
-			aria-expanded={pageSetupOpen}
-			title="Show or hide the page setup"
+			onclick={() => {
+				// Not a plain toggle any more: the two bars share one row, so this
+				// says "show me the page" — which, with an area selected, means
+				// letting go of the area rather than stacking a second bar on top.
+				const showing = pageSetupOpen && !selected;
+				pageSetupOpen = !showing;
+				if (!showing) selectBox(null);
+			}}
+			aria-pressed={pageSetupOpen && !selected}
+			aria-expanded={pageSetupOpen && !selected}
+			title={selected && pageSetupOpen
+				? 'Page setup — the area bar has the row; this takes it back'
+				: 'Show or hide the page setup'}
 		>
-			<Icon name="settings" size={15} /> <span class="label">Page Setup</span>
+			<Icon name="document-configuration" size={15} /> <span class="label">Page Setup</span>
 		</button>
 		<button
 			onclick={() => (dataOpen = !dataOpen)}
@@ -1444,7 +1515,7 @@ em { color: #b42318 }`;
 			<Icon name="table-split" size={15} /> <span class="label">Data</span>
 		</button>
 		<button class="primary" onclick={requestPrint} disabled={!dataset.rows.length}>
-			<Icon name="download" size={15} /> Export…
+			<Icon name="document-multiple" size={15} /> Export…
 		</button>
 		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
@@ -1458,61 +1529,84 @@ em { color: #b42318 }`;
 		/>
 	</header>
 
-	{#if pageSetupOpen}
-		<OptionsBar
-			section="page"
-			{template}
-			{dataset}
-			{mapping}
-			{selected}
-			onboxchange={updateBox}
-			ontemplatechange={applyTemplate}
-			onmappingchange={(m) => (mapping = m)}
-			onduplicate={duplicateBox}
-			ondelete={deleteBox}
-			onresettemplate={() => (resetting = true)}
-			{library}
-			{templateId}
-			onselecttemplate={(id) => void switchTemplate(id)}
-			onnewtemplate={() => void newTemplate()}
-			ondeletetemplate={() => (deleting = true)}
-			onuploadfont={(file) => handleFontUpload(file)}
-			onuploadbackground={(file) => void handleBackgroundUpload(file)}
-			onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
-			onnotice={notify}
-			onimporttemplate={() => templateInput?.click()}
-			onexporttemplate={doExportTemplate}
-			oneditcss={() => (cssOpen = true)}
-		/>
-	{/if}
+	<!-- One bar at a time, never two, and the row keeps its height between them.
 
-	{#if selected}
-		<OptionsBar
-			bind:this={boxBar}
-			section="box"
-			{template}
-			{dataset}
-			{mapping}
-			{selected}
-			onboxchange={updateBox}
-			ontemplatechange={applyTemplate}
-			onmappingchange={(m) => (mapping = m)}
-			onduplicate={duplicateBox}
-			ondelete={deleteBox}
-			onresettemplate={() => (resetting = true)}
-			{library}
-			{templateId}
-			onselecttemplate={(id) => void switchTemplate(id)}
-			onnewtemplate={() => void newTemplate()}
-			ondeletetemplate={() => (deleting = true)}
-			onuploadfont={(file) => handleFontUpload(file)}
-			onuploadbackground={(file) => void handleBackgroundUpload(file)}
-			onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
-			onnotice={notify}
-			onimporttemplate={() => templateInput?.click()}
-			onexporttemplate={doExportTemplate}
-			oneditcss={() => (cssOpen = true)}
-		/>
+	     They used to stack, so every selection and deselection added or removed a
+	     whole toolbar from the top of the window: the stage changed height, the
+	     fitted scale changed with it, and the page you were working on jumped and
+	     resized under the pointer. The area bar takes the row while an area is
+	     selected; Page Setup takes it back, and lets go of the area to do it.
+
+	     That leaves the two bars being different heights, which is the same jump
+	     again, smaller. So the row never shrinks: it is floored at the tallest bar
+	     it has held at this window size, and the difference shows as a band of the
+	     bar's own colour under the shorter one. The floor is dropped on a resize,
+	     because both bars wrap and neither height survives a change of width. The
+	     trade-off is that band; it buys a page that does not move when you pick
+	     something up. -->
+	{#if (pageSetupOpen && !selected) || selected}
+		<div class="bar-row" class:box={!!selected} style="min-height:{barFloor}px">
+			<div class="bar-fit" bind:clientHeight={barHeight}>
+				{#if selected}
+					<!-- No menu here, and the guard above is only ever set by the page
+					     bar; the box bar taking the row clears it because the page bar
+					     unmounts with its menu. -->
+					<OptionsBar
+						bind:this={boxBar}
+						section="box"
+						{template}
+						{dataset}
+						{mapping}
+						{selected}
+						onboxchange={updateBox}
+						ontemplatechange={applyTemplate}
+						onmappingchange={(m) => (mapping = m)}
+						onduplicate={duplicateBox}
+						ondelete={deleteBox}
+						onresettemplate={() => (resetting = true)}
+						{library}
+						{templateId}
+						onselecttemplate={(id) => void switchTemplate(id)}
+						onnewtemplate={() => void newTemplate()}
+						ondeletetemplate={() => (deleting = true)}
+						onuploadfont={(file) => handleFontUpload(file)}
+						onuploadbackground={(file) => void handleBackgroundUpload(file)}
+						onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
+						onnotice={notify}
+						onimporttemplate={() => templateInput?.click()}
+						onexporttemplate={doExportTemplate}
+						oneditcss={() => (cssOpen = true)}
+					/>
+				{:else}
+					<OptionsBar
+						section="page"
+						{template}
+						{dataset}
+						{mapping}
+						{selected}
+						onboxchange={updateBox}
+						ontemplatechange={applyTemplate}
+						onmappingchange={(m) => (mapping = m)}
+						onduplicate={duplicateBox}
+						ondelete={deleteBox}
+						onresettemplate={() => (resetting = true)}
+						{library}
+						{templateId}
+						onselecttemplate={(id) => void switchTemplate(id)}
+						onnewtemplate={() => void newTemplate()}
+						ondeletetemplate={() => (deleting = true)}
+						onuploadfont={(file) => handleFontUpload(file)}
+						onuploadbackground={(file) => void handleBackgroundUpload(file)}
+						onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
+						onnotice={notify}
+						onmenu={(open) => (barMenuOpen = open)}
+						onimporttemplate={() => templateInput?.click()}
+						onexporttemplate={doExportTemplate}
+						oneditcss={() => (cssOpen = true)}
+					/>
+				{/if}
+			</div>
+		</div>
 	{/if}
 
 	{#if missingFonts.length}
@@ -1579,6 +1673,7 @@ em { color: #b42318 }`;
 			{mapping}
 			bounds={ui.showBounds}
 			grid={ui.showGrid}
+			gridStyle={ui.gridStyle}
 			{selectedIds}
 			zoom={ui.zoom}
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
@@ -1592,6 +1687,13 @@ em { color: #b42318 }`;
 			onaction={describe}
 			onbounds={(show) => (ui = { ...ui, showBounds: show })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
+			ongridstyle={(gridStyle) => {
+				// A hold on a checkbox is a gesture nobody was taught, so it says what
+				// it did — and it turns the grid on if it was off, because changing
+				// how something invisible is drawn is otherwise no answer at all.
+				ui = { ...ui, gridStyle, showGrid: true };
+				notify(gridStyle === 'dots' ? 'Dot grid.' : 'Ruled grid.');
+			}}
 			onzoom={(zoom) => (ui = { ...ui, zoom })}
 			onnudge={nudgeBox}
 			{undoable}
@@ -1625,6 +1727,15 @@ em { color: #b42318 }`;
 		<aside>
 			<DataTable
 				{dataset}
+				columnWidths={ui.columnWidths}
+				oncolumnwidths={(widths) => {
+					// Kept to the columns that exist, so an imported table does not
+					// carry the last one's widths around in this browser forever.
+					const kept = Object.fromEntries(
+						Object.entries(widths).filter(([column]) => dataset.columns.includes(column))
+					);
+					ui = { ...ui, columnWidths: kept };
+				}}
 				{activeRow}
 				{selectedColumn}
 				onactivate={(i) => (activeRow = i)}
@@ -1690,7 +1801,7 @@ em { color: #b42318 }`;
      A count rather than a paragraph, the same shape as that dialog. -->
 {#if resetting}
 	<div class="modal-backdrop" role="presentation" onclick={() => (resetting = false)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the template?">
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the template?" use:armDefault>
 		<h2>Reset the template?</h2>
 		<p>
 			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the starter card. Your rows are
@@ -1698,8 +1809,8 @@ em { color: #b42318 }`;
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button use:focusOnOpen onclick={() => (resetting = false)}>Cancel</button>
-			<button class="danger-solid" onclick={resetTemplate}>Reset Template</button>
+			<button onclick={() => (resetting = false)}>Cancel</button>
+			<button class="danger-solid" data-default onclick={resetTemplate}>Reset Template</button>
 		</div>
 	</div>
 {/if}
@@ -1711,7 +1822,7 @@ em { color: #b42318 }`;
      should have to know. -->
 {#if deleting}
 	<div class="modal-backdrop" role="presentation" onclick={() => (deleting = false)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete this template?">
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete this template?" use:armDefault>
 		<h2>Delete “{template.name}”?</h2>
 		<p>
 			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'}, and this template's own settings.
@@ -1720,8 +1831,8 @@ em { color: #b42318 }`;
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button use:focusOnOpen onclick={() => (deleting = false)}>Cancel</button>
-			<button class="danger-solid" onclick={() => void deleteTemplate()}>Delete Template</button>
+			<button onclick={() => (deleting = false)}>Cancel</button>
+			<button class="danger-solid" data-default onclick={() => void deleteTemplate()}>Delete Template</button>
 		</div>
 	</div>
 {/if}
@@ -1732,7 +1843,7 @@ em { color: #b42318 }`;
      every row can be corrected, and a column set to Leave Out gets no area. -->
 {#if magic}
 	<div class="modal-backdrop" role="presentation" onclick={() => (magic = null)}></div>
-	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title">
+	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title" use:armDefault>
 		<h2 id="magic-title">Position Areas Automagically</h2>
 		<ul class="magic-list">
 			{#each magic as guess, index (guess.column)}
@@ -1774,7 +1885,7 @@ em { color: #b42318 }`;
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button onclick={() => (magic = null)}>Cancel</button>
-			<button class="primary" use:focusOnOpen onclick={applyMagic}>OK</button>
+			<button class="primary" data-default onclick={applyMagic}>OK</button>
 		</div>
 	</div>
 {/if}
@@ -1838,6 +1949,9 @@ em { color: #b42318 }`;
 			Drag areas on the page or type exact millimetres. An area latches onto the edges and centres of its neighbours as
 			it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid instead. Grid off and
 			<strong>Bounds</strong> off is free movement, because an area should never latch onto a guide that is not drawn.
+			Press and <em>hold</em> the Grid box for a <strong>dot grid</strong> — the same grid and the same snapping,
+			drawn as a dot at each intersection rather than as ruled lines, which is quieter under a page of type. The
+			word beside the box says which of the two you are on.
 		</p>
 		<p>
 			<strong>Rotation</strong> has two marks on a selected area, because they do two different things. The
@@ -1855,12 +1969,14 @@ em { color: #b42318 }`;
 
 		<h3>Marks on an area</h3>
 		<p>
-			A red corner means the content does not fit and the print will clip it. A padlock says the area is locked. The
-			<strong>plug</strong> says it carries its own words rather than a column's. The <strong>link</strong> and the
-			<strong>buoy</strong> are the two ends of an anchor — an anchored area takes its top from another area's rendered
-			bottom, so dragging it changes the gap rather than breaking the tie. Both are buttons: the link breaks this area's
-			tie, the buoy casts off everything moored to this one, and neither moves anything. Selecting either end lights up
-			the other. <strong>Bounds</strong> takes all of it away.
+			A red corner means the content does not fit and the print will clip it. The <strong>plug</strong> says the area
+			carries its own words rather than a column's. The <strong>link</strong> and the <strong>buoy</strong> are the
+			two ends of an anchor — an anchored area takes its top from another area's rendered bottom, so dragging it
+			changes the gap rather than breaking the tie — and the <strong>padlock</strong> says the area is locked. All
+			three are buttons, and each undoes what it says: the link breaks this area's tie, the buoy casts off everything
+			moored to this one, the padlock unlocks the area. Neither anchor button moves anything. Each shows the icon of
+			its own undoing as you reach for it, so no two of them answer with the same mark. Selecting either end of an
+			anchor lights up the other. <strong>Bounds</strong> takes all of it away.
 		</p>
 
 		<h3>Several at once</h3>
@@ -1916,13 +2032,15 @@ em { color: #b42318 }`;
 		<h3>Data</h3>
 		<p>
 			Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column.
+			Drag the right edge of a header to set that column's width, or double-click that edge to hand it back the
+			default; the widths stay in this browser and follow a column through a rename.
 			Clicking a row previews it; the tick in the gutter chooses several, and duplicate and delete for those appear at
 			the head of the buttons below. The row numbers travel with their rows through a sort, and a column header sorts
 			A-Z, then Z-A, then back to the order the rows arrived in.
 		</p>
 		<p>
-			<strong>Paste from Sheet</strong> takes a block of cells with no header row and lands it in the columns you
-			already have. <strong>Import CSV…</strong> takes a whole file; press and <em>hold</em> it and the four sample
+			<strong>Paste</strong> takes a block of cells off a spreadsheet with no header row and lands it in the columns
+			you already have. <strong>Import CSV…</strong> takes a whole file; press and <em>hold</em> it and the four sample
 			cards come back. <strong>Export CSV</strong> hands the table back as a file. Deleting a column asks, because it is
 			a field of every card at once; the red <strong>Delete</strong> empties the whole table. All of it is undoable, and
 			none of it touches the template — as <strong>Reset</strong> in page setup does not touch the data.
@@ -1941,10 +2059,18 @@ em { color: #b42318 }`;
 			the run. Nothing is printed from there.
 		</p>
 
+		<h3>Dialogs</h3>
+		<p>
+			A dialog opens with nothing pressed. <strong>Enter</strong> moves onto the action it suggests, and a second
+			Enter presses it — so a stray Return arriving a beat late cannot delete a template or replace every row on its
+			own. <strong>Esc</strong> closes the dialog at any point.
+		</p>
+
 		<h3>Keys</h3>
 		<dl class="keys">
 			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
-			<dt>Ctrl/Cmd + Shift + Z<span>Ctrl/Cmd + Y</span></dt><dd>Redo</dd>
+			<dt>Ctrl/Cmd + Y</dt><dd>Redo</dd>
+			<dt>Ctrl/Cmd + Shift + Z</dt><dd>The last change off, and on again — press it twice to compare</dd>
 			<dt>Enter</dt><dd>Type into the selected area</dd>
 			<dt>Esc</dt><dd>Stop typing, leave Select Multiple, deselect, or close what is open</dd>
 			<dt>Arrows</dt><dd>Nudge the selection by 1mm</dd>
@@ -1966,7 +2092,7 @@ em { color: #b42318 }`;
 			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
 			<dt>Ctrl/Cmd + ;<span>Ctrl/Cmd + H</span></dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off (hold the Grid box for dots)</dd>
 			<dt>Ctrl/Cmd + P</dt><dd>Export — press again from that screen to print</dd>
 			<dt>Ctrl/Cmd + Shift + S</dt><dd>Export, for the fingers that reach for that instead</dd>
 			<dt>?<span>/</span></dt><dd>This panel</dd>
@@ -2071,6 +2197,24 @@ em { color: #b42318 }`;
 		border-bottom: 1px solid #ddd;
 		font-size: 12px;
 		flex-wrap: wrap;
+	}
+
+	/* The row the two option bars share. It owns the ground and the rule under
+	   it, so the band left over when the shorter bar is in it reads as part of
+	   the bar rather than as a gap above the stage. */
+	.bar-row {
+		background: #f7f7f7;
+		border-bottom: 1px solid #ddd;
+	}
+
+	.bar-row.box {
+		background: #eef3fb;
+		border-bottom-color: #cfdcf3;
+	}
+
+	.bar-row :global(.options) {
+		background: transparent;
+		border-bottom: none;
 	}
 
 	.brand {
@@ -2309,8 +2453,20 @@ em { color: #b42318 }`;
 	.keys {
 		display: grid;
 		grid-template-columns: max-content 1fr;
-		gap: 3px 14px;
+		/* No row gap: the rows are separated by a rule now, and a gap as well
+		   would set the line adrift between two rows rather than under one. */
+		gap: 0 14px;
 		margin: 0;
+	}
+
+	/* A hairline under every row. Thirty pairs with nothing between them read as
+	   one grey block, and the eye loses which description belongs to which chord
+	   somewhere around the tenth. Both cells carry the border, because a grid row
+	   is two boxes and a rule on one of them stops halfway across. */
+	.keys dt,
+	.keys dd {
+		padding: 5px 0;
+		border-bottom: 1px solid #ececec;
 	}
 
 	.keys dt {
@@ -2335,15 +2491,18 @@ em { color: #b42318 }`;
 	@media (max-width: 560px) {
 		.keys {
 			grid-template-columns: 1fr;
-			gap: 0;
 		}
 
+		/* One column, so the pair is two stacked rows: only the description ends
+		   the pair, and only it carries the rule. */
 		.keys dt {
-			margin-top: 8px;
+			padding-top: 9px;
+			padding-bottom: 0;
+			border-bottom: none;
 		}
 
 		.keys dt:first-of-type {
-			margin-top: 0;
+			padding-top: 0;
 		}
 	}
 
@@ -2356,6 +2515,13 @@ em { color: #b42318 }`;
 		font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
 		color: #767676;
 		vertical-align: 2px;
+	}
+
+	/* The dialog takes the focus as it opens, so its first Enter has somewhere to
+	   land — see modal.ts. It is not a control, and does not wear a control's
+	   ring. */
+	.modal:focus {
+		outline: none;
 	}
 
 	.modal code {
@@ -2432,7 +2598,11 @@ em { color: #b42318 }`;
 	/* The one real warning in this dialog, so it wears the mark and the colour the
 	   status bar's warnings use. Sits above the buttons rather than beside them:
 	   read before the press, not noticed after it. */
-	.magic-warning {
+	/* `.modal p` sets the margins for prose in a dialog and outranks a lone
+	   class, so this said 12px and got 0 — the warning sat flush against the
+	   last row of the list it was warning about. Named with the element it is,
+	   which is what it takes to win. */
+	.modal p.magic-warning {
 		display: flex;
 		align-items: flex-start;
 		gap: 6px;

@@ -98,7 +98,7 @@ export const loadMapping = (id: string, templateName: string): Mapping => {
 };
 export const saveMapping = (id: string, mapping: Mapping) => local.set(mappingKey(id), mapping);
 
-const UI_DEFAULTS: UiState = { showBounds: true, showGrid: false, zoom: 'fit' };
+const UI_DEFAULTS: UiState = { showBounds: true, showGrid: false, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' };
 
 // Merged, not returned raw: a settings blob written by an older build is missing
 // whatever was added since, and an undefined toggle renders as neither on nor off.

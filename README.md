@@ -68,7 +68,8 @@ resize boxes directly, or type exact millimetres.
   followed area casts off everything moored to it, and neither moves anything —
   the released box keeps the place it was sitting in. Each swaps to the icon of
   the undoing while the pointer is on it, and for a moment after a tap, so
-  pressing one holds no surprise. Selecting either end lights up the other.
+  pressing one holds no surprise: the link shows a broken link, and the buoy
+  shows a boat that has left it. Selecting either end lights up the other.
 - **Hide when empty** — a box whose column is blank collapses to nothing *and*
   drops out of the anchor chain, so a card with no subtitle has no dead band
   where the subtitle would have been. A box with no anchor stays pinned to its
@@ -133,7 +134,13 @@ resize boxes directly, or type exact millimetres.
   <kbd>⇧</kbd> while you swing snaps to 15°. Both are drawn whether or not there
   is any rotation yet, because the lever is the rotation control and has to be
   there before there is a rotation to show; the **X** and **Y** in the bar place
-  the pivot exactly, as a percentage of the area's own width and height. A
+  the pivot exactly, as a percentage of the area's own width and height. Press
+  and *hold* either mark to put it back: the crosshair to the middle, the knob
+  upright. Both are dragged to a value with no number written anywhere on the
+  card, and both have a resting state most cards want — getting back to either
+  by dragging is pixel-hunting, and the two fields in the bar are only there for
+  a single selection. The hold gives up the moment the pointer moves, so the
+  drag it shares a mark with is never mistaken for one. A
   turned area still occupies the space it would have upright, so anchored areas
   below it do not move — turning one thing never shuffles the card.
 - **Overflow** — a box whose content is taller than the box will let it be draws
@@ -208,7 +215,7 @@ resize boxes directly, or type exact millimetres.
   margin around the tiled cards. This whole group is the one place both
   **Page Setup** and the print screen change the same settings: see
   **Print preview** below.
-- **Sheet Bleed** and **Sheet Marks** — the sheet's own, distinct from the
+- **Sheet Bleed** and **Sheet Crop Marks** — the sheet's own, distinct from the
   card's, and set beside them: bleed outsets the paper around the sheet size,
   so a sheet whose background runs to its edge has something to trim into, and
   the marks go at the corners of the tiled block — the cut that takes the block
@@ -217,7 +224,9 @@ resize boxes directly, or type exact millimetres.
   room the sheet already has — its bleed, and whatever the centred block is
   not using — so switching them on never moves a card; a block filling its
   sheet with no bleed to spare has nowhere to put them, and the sheet bleed is
-  what makes that room.
+  what makes that room. Which is why the tick only appears once **Sheet Bleed**
+  is on, the way the card's **Crop Marks** appears under **Page Bleed**: without
+  the room, it was a setting you could switch on and see nothing come of.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
@@ -234,7 +243,9 @@ resize boxes directly, or type exact millimetres.
 - **Lock** — **Lock** in either bar freezes what you have: no dragging, no
   resizing, no option changes. A locked area can still be *selected*, or the
   button that unlocks it could never be reached. A page lock covers every box
-  and the page settings as well. A padlock appears on a locked area; a locked
+  and the page settings as well. A padlock appears on a locked area, and it is a
+  button: pressing it unlocks that area, the way the two anchor badges beside it
+  undo what they say. A locked
   *page* says **Locked** in a band above the sheet and greys every bound on the
   card, because nothing on it can be moved and so nothing on it is worth
   coloring for a reason. It also takes the per-area badges away: every one of
@@ -310,7 +321,7 @@ without moving the preview off the card you are looking at. Whatever the table
 has to say goes to the app's status bar, so there is one place a notice can
 appear.
 
-- **Paste from Sheet** — a modal that takes a block of cells. Tabs, commas and
+- **Paste** — a modal that takes a block of cells off a spreadsheet. Tabs, commas and
   semicolons are told apart by sniffing, and quoted fields with embedded
   newlines survive. **No header row needed**: the cells land in the columns you
   already have, matched left to right, which is what a block copied out of those
@@ -326,12 +337,23 @@ appear.
   that column follow the rename.
 - **Reorder** — ‹ › in a header move a column left or right. Row objects are
   keyed by name, so this changes the view and nothing else.
+- **Column widths** — drag the right edge of a header, or double-click that edge
+  for the default. The widths are a view preference of this browser's, not part
+  of the data or the template: they follow a column through a rename and go with
+  it when it is deleted. The table lays out `fixed`, so a width you set is the
+  width you get and one long cell cannot shove every other column sideways.
+- **Cells fill their row** — a row is as tall as its tallest cell, and every
+  field in it is that tall, so the target you click is the cell you can see.
 - **Sort** — the arrow in a header is a three-way toggle: A-Z, Z-A, then back to
   the order the rows arrived in. Numbers sort by value rather than by digit,
   case is ignored, and blanks stay at the bottom either way. This reorders the
   data, not just the view, because row order *is* print order — and it is
   undoable. The **row numbers travel with their rows**, so a sorted table still
-  says where each row came from.
+  says where each row came from. While any sort is on, the corner above those
+  numbers wears the same mark an unsorted header wears, and pressing it puts the
+  rows back — the third press on the header that did the sorting does the same
+  thing, but only if you can still find that header, which in a table wide
+  enough to scroll you may not be able to.
 - **Add** — the pale row and column at the end of the table are placeholders:
   type into one and it becomes real. There is no separate button, because the
   place you would click is the place you were already typing.
@@ -456,6 +478,10 @@ real print, only scaled down, so the preview can never promise a layout the
 output does not match. Excluding a card above regroups the sheets below it
 immediately.
 
+The tick under each thumbnail is as wide as the page above it and set like the
+count in the header: on this screen it is the control that gets pressed over and
+over, and a 15px box beside a small grey number was a pin to aim at.
+
 **Export…** is the only way in, so there is no route to the printer that skips
 the look at what you are about to spend paper on — <kbd>Ctrl</kbd>/<kbd>⌘</kbd>
 <kbd>p</kbd> included, which is intercepted rather than left to open the
@@ -556,12 +582,52 @@ Reset is covered by it too: it puts the template back to the starter card with
 the design you had one undo away, and it does not touch the data, the mapping or
 any font you uploaded.
 
+<kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>z</kbd> is neither undo nor redo
+but the pair on one key: it takes the last change off, and the next press puts it
+straight back. That is the thing the fingers want while deciding — the page with
+the change and the page without it, as many times as it takes — and neither
+<kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>z</kbd> nor <kbd>Ctrl</kbd>/<kbd>⌘</kbd>
+<kbd>y</kbd> does it, because both walk the stack a step further each press.
+Anything else touching the history — a fresh edit, a plain undo, a redo — starts
+the alternation over, since "the last change" is then a different change.
+
+## Dialogs
+
+Every dialog with an action opens with **nothing** pressed, and the focus on the
+dialog itself. <kbd>Enter</kbd> moves onto the action it suggests, where it is
+outlined and named; a second <kbd>Enter</kbd> presses it, and nothing intercepts
+that second press — by then it is an ordinary Return on an ordinary button. The
+point is a stray Return arriving a beat late after something else was dismissed:
+it used to land on a focused button and delete a template or replace every row.
+<kbd>Esc</kbd> still closes the dialog at any point, and a textarea inside one
+still takes <kbd>Enter</kbd> as a newline.
+
+The right-click menu carries no key hints. The two items that had them were the
+only two that did, so the column of grey chords read as a property of those items
+rather than as a key map; the key map lives here and in the help panel, once, for
+all of them.
+
+## One options row
+
+The page bar and the area bar share a single row, and only one of them is ever in
+it: selecting an area gives it the row, and **Page Setup** takes it back by
+letting go of the area. They used to stack, which meant every selection added a
+whole toolbar to the top of the window — the stage lost that much height, the
+fitted scale changed with it, and the page jumped and resized under the pointer.
+
+The row also never shrinks: it is floored at the tallest bar it has held at this
+window size, so swapping one bar for the other does not move the page either. The
+cost is a band of the bar's own colour under the shorter of the two; the floor is
+dropped on a resize, because both bars wrap and neither height survives a change
+of width.
+
 ## Keyboard shortcuts
 
 | Keys | Action |
 | --- | --- |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>z</kbd> | Undo |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>z</kbd>, <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>y</kbd> | Redo |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>y</kbd> | Redo |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>z</kbd> | The last change off, and on again — an A/B on one key |
 | <kbd>Enter</kbd> | Type into the selected area, on the card |
 | <kbd>Esc</kbd> | Stop typing, leave Select Multiple, deselect, or close what is open |
 | <kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd> | Nudge the selection by 1mm |
@@ -578,7 +644,7 @@ any font you uploaded.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>v</kbd> | Paste that style onto the selection |
 | <kbd>?</kbd> or <kbd>/</kbd> | The help panel |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>;</kbd> or <kbd>h</kbd> | Bounds on or off |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> or <kbd>#</kbd> | Grid on or off |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> or <kbd>#</kbd> | Grid on or off (press and hold the Grid box for dots) |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>p</kbd> | Export — again from that screen to print |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>p</kbd> / <kbd>s</kbd> | Export, for the fingers that reach for those |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + arrows | Step the alignment — left, right, top, bottom |
@@ -592,14 +658,17 @@ While a text field has focus, undo is left to the browser's own text history and
 <kbd>Delete</kbd> deletes characters — the app keeps its hands off both.
 Otherwise the arrow keys move the selected box wherever you are on the page. On
 a touch screen the same job is done by the four-way pad that appears beside the
-card, with a chip cycling between 1mm, 5mm and 10mm; holding an arrow keeps it
-moving. The pad parks over the bottom-right corner of the page, which is exactly
-the corner you may have reached for it to nudge — press and hold that middle
-chip and the pad comes with your finger. It is not drawn at all when nothing it
-could move is selected, and an area whose top comes from an anchor shows the link
-on its two vertical keys rather than an arrow that would do nothing: the
-millimetres between the two areas are the **Gap** in the bar. Pinching zooms the
-page, as do the zoom keys above.
+card — one cross with one outline, not five tiles in the shape of a cross — with
+a chip in the middle cycling between 1mm, 5mm and 10mm; holding an arrow keeps
+it moving. The pad parks over the bottom-right corner of the page, which is
+exactly the corner you may have reached for it to nudge — press and hold that
+middle chip and the pad comes with your finger. It can be pushed off the edge of
+the stage to get that corner back, as far as the middle chip: the arm you are
+not using goes out of sight, the chip you pick it up by never does. It is not
+drawn at all when nothing it could move is selected, and an area whose top comes
+from an anchor shows the link on its two vertical keys rather than an arrow that
+would do nothing: the millimetres between the two areas are the **Gap** in the
+bar. Pinching zooms the page, as do the zoom keys above.
 
 The arrow keys and the pad both move every area in the selection, not only a
 lone one.
@@ -609,6 +678,14 @@ subgrid of a 10mm grid; otherwise a box latches onto the edges and centres of
 its neighbours as it passes them, and a guide shows what it caught. There is no
 key to hold for free movement — switch **Grid** and **Bounds** both off and
 nothing latches, because a box should never snap to a guide you cannot see.
+
+Press and *hold* the **Grid** box and the ruling becomes a **dot grid**: the same
+millimetres and the same snapping, marked with a dot at each intersection instead
+of a line through the card. The word beside the box says which it is drawing. Both
+are placed as geometry rather than as a tiled background, so every line is where
+its millimetre is at any zoom — a repeating gradient rounds its tile to whole
+device pixels and drops whichever lines fall inside the rounding, which is why the
+grid used to be missing lines at some scales and not others.
 
 ## Installing it, and working offline
 
@@ -733,9 +810,10 @@ npm run check    # svelte-check; kept at zero errors and zero warnings
 npm run build    # static output in ./build, deployable anywhere
 ```
 
-- **Sample data is bundled, not fetched** — `static/sample-cards.csv` is imported
+- **Sample data is bundled, not fetched** — `src/lib/sample-cards.csv` is imported
   with `?raw`, so a first run works offline and cannot land on an empty table
-  because a request failed. The four rows are a walkthrough of the app rather
+  because a request failed. It is a plain CSV precisely so the walkthrough can be
+  edited in a spreadsheet rather than in a string literal. The four rows are a walkthrough of the app rather
   than filler; pressing and holding *Import CSV…* brings them back at any time.
 - **Reset** — puts the template back to the starter card and leaves the data,
   the mapping and any uploaded fonts alone. Undo reaches it — one snapshot

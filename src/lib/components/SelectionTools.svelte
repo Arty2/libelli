@@ -52,7 +52,7 @@
 		disabled={frozen}
 		onclick={ongroup}
 	>
-		<Icon name="layers" size={16} />
+		<Icon name={grouped ? 'ungroup-objects' : 'group-objects'} size={16} />
 	</button>
 	<button
 		aria-pressed={allLocked}

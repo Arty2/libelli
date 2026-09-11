@@ -272,5 +272,15 @@ export interface UiState {
 	/** dashed box bounds and the trim edge; screen furniture, never printed */
 	showBounds: boolean;
 	showGrid: boolean;
+	/** how the grid draws itself: ruled lines, or a dot at every intersection */
+	gridStyle: GridStyle;
+	/**
+	 * Table column widths in px, keyed by column name. A view preference, not
+	 * data and not template: it belongs to this browser's table, follows a
+	 * renamed column, and is dropped for a column that no longer exists.
+	 */
+	columnWidths: Record<string, number>;
 	zoom: 'fit' | number;
 }
+
+export type GridStyle = 'lines' | 'dots';
