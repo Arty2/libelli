@@ -316,7 +316,13 @@
 						<Card {template} {row} {mapping} pageNumber={i + 1} pageCount={dataset.rows.length} {background} />
 					</span>
 				</button>
-				<figcaption>
+				<!-- As wide as the page above it, and set like the count in the
+				     header: this row is the one control on this screen that gets
+				     pressed over and over, and it used to be a 15px tick with a
+				     number beside it floating in the middle of a 210px column. The
+				     width is the thumbnail's own, so the target and the thing it is
+				     about are the same shape. -->
+				<figcaption style="width:{mmToPx(outerW) * thumbScale}px">
 					<label>
 						<input
 							type="checkbox"
@@ -374,7 +380,7 @@
 						</button>
 						<!-- A sheet is its own thing to tick: the pages on it stay ticked
 						     as pages, and the sheet simply does not go. -->
-						<figcaption>
+						<figcaption style="width:{mmToPx(printSheetW) * sheetThumbScale}px">
 							<label>
 								<input
 									type="checkbox"
@@ -718,10 +724,17 @@
 		transform-origin: top left;
 	}
 
+	/* Set like the page count in the header, because it says the same kind of
+	   thing about the same pages — 11px grey read as a caption under a picture
+	   rather than as the switch that decides whether the picture goes. */
 	figcaption {
-		font: 11px ui-sans-serif, system-ui, sans-serif;
-		color: #767676;
+		font: 600 14px ui-sans-serif, system-ui, sans-serif;
+		color: #555;
 		margin-top: 6px;
+		/* Its width is set inline, from the thumbnail's; centred so a caption
+		   wider than its figure would still sit under the page it belongs to. */
+		max-width: 100%;
+		margin-inline: auto;
 	}
 
 	/* The whole caption is the target, as wide as the thumbnail above it and
@@ -743,10 +756,16 @@
 		background: rgba(0, 0, 0, 0.05);
 	}
 
+	.dropped figcaption label {
+		/* Unticked, the row is still the way back: it stays a target, and only
+		   the page above it dims. */
+		background: rgba(0, 0, 0, 0.03);
+	}
+
 	figcaption input[type='checkbox'] {
 		/* Bigger than the browser default, to match the row it now sits in. */
-		width: 15px;
-		height: 15px;
+		width: 17px;
+		height: 17px;
 	}
 
 	/* A dropped page stays legible — you are deciding about it, not deleting it. */
