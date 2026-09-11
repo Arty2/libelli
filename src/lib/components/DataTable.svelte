@@ -3,12 +3,16 @@
 	import Icon from './Icon.svelte';
 	import { download } from '$lib/download';
 	import { hold } from '$lib/gestures';
+	import { armDefault } from '$lib/modal';
 	import { parseTable, toCsv } from '$lib/parse';
 	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
 	import type { Dataset, Row } from '$lib/types';
 
 	interface Props {
 		dataset: Dataset;
+		/** column widths in px, keyed by column name; owned by the app's UI state */
+		columnWidths: Record<string, number>;
+		oncolumnwidths: (widths: Record<string, number>) => void;
 		activeRow: number;
 		/** the column the selected area draws from, so its cells can be pointed at */
 		selectedColumn?: string | null;
@@ -28,6 +32,8 @@
 
 	let {
 		dataset,
+		columnWidths,
+		oncolumnwidths,
 		activeRow,
 		selectedColumn = null,
 		onactivate,
@@ -88,6 +94,74 @@
 	/** Two rows of two tab-separated cells: what comes off a spreadsheet. */
 	const PASTE_EXAMPLE = 'Bellwether\tA quiet start\nCatalogue\tThe second card';
 	let fileInput = $state<HTMLInputElement | null>(null);
+
+	/**
+	 * Column widths.
+	 *
+	 * The table lays out `fixed` rather than `auto` so that a width set here is
+	 * the width you get: under auto layout the widest cell in a column wins, and
+	 * a handle you drag left that springs back as soon as you let go is worse
+	 * than no handle. It also means one long cell can no longer shove every other
+	 * column off the right-hand side of the tray.
+	 *
+	 * The numbers live in the app's UI state rather than in this component,
+	 * because the tray is unmounted whenever it is folded away — widths kept here
+	 * would last until the first time you closed the table.
+	 */
+	const COLUMN_DEFAULT = 180;
+	const COLUMN_MIN = 64;
+
+	const widthOf = (column: string) => columnWidths[column] ?? COLUMN_DEFAULT;
+
+	/** As narrow as the widest row number it has to hold, and no narrower. */
+	const gutterWidth = $derived(36 + String(Math.max(dataset.rows.length, 1)).length * 7);
+
+	/**
+	 * How wide the table has to be for every column to get what it asked for.
+	 *
+	 * A fixed table hands any width beyond the sum of its columns to whichever
+	 * column did not name one — which is the empty header at the end carrying the
+	 * Add Column button, and exactly where spare room should go. So the table is
+	 * `width: 100%` with this as its floor: too narrow a tray and it scrolls with
+	 * every column at its stated width; too wide a one and the slack lands on the
+	 * end instead of being shared out over columns somebody sized by hand.
+	 */
+	const GHOST_COLUMN = 40;
+	const tableWidth = $derived(
+		gutterWidth + dataset.columns.reduce((sum, c) => sum + widthOf(c), 0) + GHOST_COLUMN
+	);
+
+	let resizing = $state<{ column: string; from: number; x: number } | null>(null);
+
+	function startResize(event: PointerEvent, column: string) {
+		if (event.button !== 0) return;
+		// The handle sits inside the header, which sorts on click and renames on
+		// focus; neither is what a drag on the edge is asking for.
+		event.preventDefault();
+		event.stopPropagation();
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		resizing = { column, from: widthOf(column), x: event.clientX };
+	}
+
+	function moveResize(event: PointerEvent) {
+		if (!resizing) return;
+		const next = Math.max(COLUMN_MIN, Math.round(resizing.from + (event.clientX - resizing.x)));
+		if (next === widthOf(resizing.column)) return;
+		oncolumnwidths({ ...columnWidths, [resizing.column]: next });
+	}
+
+	function endResize(event: PointerEvent) {
+		if (!resizing) return;
+		(event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+		resizing = null;
+	}
+
+	/** Double-click the handle to hand the column back its default width. */
+	function resetWidth(column: string) {
+		if (!(column in columnWidths)) return;
+		const { [column]: _gone, ...rest } = columnWidths;
+		oncolumnwidths(rest);
+	}
 
 	function onKeydown(event: KeyboardEvent) {
 		if (event.key !== 'Escape') return;
@@ -158,6 +232,11 @@
 		});
 		onchange({ columns, rows });
 		onrenamecolumn(from, to);
+		// A width belongs to the column, not to the name it had at the time.
+		if (from in columnWidths) {
+			const { [from]: width, ...rest } = columnWidths;
+			oncolumnwidths({ ...rest, [to]: width });
+		}
 	}
 
 	function shiftColumn(index: number, by: number) {
@@ -248,6 +327,7 @@
 				return next;
 			})
 		});
+		resetWidth(column);
 		onnotice(`Deleted the column \u201c${column}\u201d. Ctrl/Cmd+Z brings it back.`);
 	}
 
@@ -390,7 +470,18 @@
 
 <section class="data" aria-label="Card data">
 	<div class="scroll">
-		<table>
+		<table style="min-width:{tableWidth}px">
+			<!-- Widths belong to the columns, not to the cells: one place to set
+			     them, and `table-layout: fixed` above means they are obeyed rather
+			     than treated as a suggestion the widest cell can overrule. -->
+			<colgroup>
+				<col style="width:{gutterWidth}px" />
+				{#each dataset.columns as column (column)}
+					<col style="width:{widthOf(column)}px" />
+				{/each}
+				<!-- No width: this is the column that takes up the slack. -->
+				<col />
+			</colgroup>
 			<thead>
 				<tr>
 					<!-- Just the gutter now. Unsorting used to live here, a long way from
@@ -401,6 +492,7 @@
 					</th>
 					{#each dataset.columns as column, i (column)}
 						<th scope="col" aria-sort={sortedBy?.column === column ? (sortedBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+							<span class="column-head">
 							<input
 								class="column-name"
 								value={column}
@@ -435,6 +527,23 @@
 								<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
 								<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
 							</span>
+							</span>
+							<!-- The right edge of the header is the grip, which is where
+							     every spreadsheet has taught the pointer to look for it.
+							     A span rather than a button: it is a drag target, it has
+							     no click, and the keyboard reaches the width through the
+							     same header's own controls rather than through this. -->
+							<span
+								class="resize"
+								class:on={resizing?.column === column}
+								role="presentation"
+								title="Drag to set this column's width — double-click for the default"
+								onpointerdown={(e) => startResize(e, column)}
+								onpointermove={moveResize}
+								onpointerup={endResize}
+								onpointercancel={endResize}
+								ondblclick={() => resetWidth(column)}
+							></span>
 						</th>
 					{/each}
 						<!-- A button rather than a field to type a name into: adding a
@@ -539,13 +648,17 @@
 			><Icon name="trash" size={15} /></button>
 			<span class="rule"></span>
 		{/if}
-		<button onclick={() => (pasteOpen = true)}>Paste from Sheet</button>
+		<button title="Paste a block of cells straight off a spreadsheet" onclick={() => (pasteOpen = true)}>
+			<Icon name="report-growth" size={15} /> Paste
+		</button>
 		<button
 			use:hold={onloadsample}
 			title="Import a CSV file — press and hold to load the sample cards instead"
-			onclick={() => fileInput?.click()}>Import CSV…</button
+			onclick={() => fileInput?.click()}><Icon name="table-shortcut" size={15} /> Import CSV…</button
 		>
-		<button onclick={exportCsv} disabled={!dataset.columns.length}>Export CSV</button>
+		<button onclick={exportCsv} disabled={!dataset.columns.length}>
+			<Icon name="table-built" size={15} /> Export CSV
+		</button>
 		<span class="spacer"></span>
 		<button
 			class="danger"
@@ -570,7 +683,7 @@
      and the second press was only ever a way of not reading the first. -->
 {#if clearing}
 	<div class="modal-backdrop" role="presentation" onclick={() => (clearing = false)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete all data?">
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete all data?" use:armDefault>
 		<h2>Delete all data?</h2>
 		<p>
 			{dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'}, {dataset.columns.length}
@@ -579,7 +692,7 @@
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button onclick={() => (clearing = false)}>Cancel</button>
-			<button class="danger-solid" onclick={clearData}>Delete All Data</button>
+			<button class="danger-solid" data-default onclick={clearData}>Delete All Data</button>
 		</div>
 	</div>
 {/if}
@@ -587,7 +700,7 @@
 {#if confirmColumn !== null && dataset.columns[confirmColumn]}
 	{@const column = dataset.columns[confirmColumn]}
 	<div class="modal-backdrop" role="presentation" onclick={() => (confirmColumn = null)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete this column?">
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete this column?" use:armDefault>
 		<h2>Delete “{column}”?</h2>
 		<p>
 			{filledCells(column)} filled cell{filledCells(column) === 1 ? '' : 's'}, across {dataset.rows.length}
@@ -596,30 +709,29 @@
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button onclick={() => (confirmColumn = null)}>Cancel</button>
-			<button class="danger-solid" onclick={() => deleteColumn(confirmColumn!)}>Delete Column</button>
+			<button class="danger-solid" data-default onclick={() => deleteColumn(confirmColumn!)}>Delete Column</button>
 		</div>
 	</div>
 {/if}
 
 {#if pasteOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (pasteOpen = false)}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-label="Paste from Sheet">
+	<div class="modal" role="dialog" aria-modal="true" aria-label="Paste from Sheet" use:armDefault>
 		<h2>Paste from Sheet</h2>
-		<!-- One line, and it says the only thing that is not obvious: what happens
-		     to the first row. A choice made by which button you press rather than
-		     by a radio you set and then a Load you press — two controls for one
-		     decision, and the second one never told you what it was going to do. -->
-		<p>
-			{dataset.columns.length
-				? 'Cells land in the columns you already have, left to right. No header row needed.'
-				: 'The first line names the columns — there is nothing else here to name them with yet.'}
-		</p>
+		<!-- Only where the answer is not already on screen. With columns in the
+		     table the paste lands in them left to right, which is what the table
+		     behind this dialog shows; saying it as well was a line everybody read
+		     once and then read past. With no columns yet there is nothing behind
+		     the dialog to read, so the first row's fate still has to be said. -->
+		{#if !dataset.columns.length}
+			<p>The first line names the columns — there is nothing else here to name them with yet.</p>
+		{/if}
 		<textarea bind:value={pasteText} rows="10" placeholder={PASTE_EXAMPLE}></textarea>
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button onclick={() => (pasteOpen = false)}>Cancel</button>
 			<button disabled={!dataset.rows.length} onclick={() => applyPaste('append')}>Add Rows</button>
-			<button class="primary" onclick={() => applyPaste('replace')}>Replace Rows</button>
+			<button class="primary" data-default onclick={() => applyPaste('replace')}>Replace Rows</button>
 		</div>
 	</div>
 {/if}
@@ -645,16 +757,48 @@
 	}
 
 	table {
-		border-collapse: collapse;
+		/* Separate, not collapsed.
+
+		   Under `border-collapse: collapse` the rules belong to the table's own
+		   grid rather than to the cells, so a cell that travels leaves its lines
+		   behind: the sticky header used to shed its underline, and the frozen row
+		   numbers left a hairline of the scrolled-past columns showing down their
+		   left edge — text from three columns away, sliding through a one-pixel
+		   gap. The header worked around it with an inset shadow; the gutter could
+		   not, because the strip is outside the cell's own background. Separate
+		   rules, one per cell, travel with the cell and end both.
+
+		   Zero spacing and a rule on two edges of each cell draws exactly what
+		   collapse drew: no doubled lines, and the outer edges come from the first
+		   column and the header row. */
+		border-collapse: separate;
+		border-spacing: 0;
+		/* Fixed, so the widths in the colgroup are the widths — see the note on
+		   COLUMN_DEFAULT. `max-content` on a fixed table is the sum of those
+		   widths, and the min-width fills the tray when they do not reach across
+		   it. */
+		table-layout: fixed;
+		/* The floor is set inline, from the columns themselves — see tableWidth. */
 		width: 100%;
 		font: 12px/1.4 ui-sans-serif, system-ui, sans-serif;
 	}
 
 	th,
 	td {
-		border: 1px solid #e6e6e6;
+		border: 0 solid #e6e6e6;
+		border-right-width: 1px;
+		border-bottom-width: 1px;
 		vertical-align: top;
 		padding: 0;
+	}
+
+	/* The table's own outside, which no cell's right or bottom edge covers. */
+	tr > :first-child {
+		border-left-width: 1px;
+	}
+
+	thead th {
+		border-top-width: 1px;
 	}
 
 	thead th {
@@ -664,17 +808,24 @@
 		   header whenever the hovered row passed under it. */
 		z-index: 3;
 		background: #fafafa;
-		/* The rules are drawn as an inset shadow, not a border. Under
-		   border-collapse the borders belong to the table's shared grid rather
-		   than to each cell, so `position: sticky` translated the header cell and
-		   left its borders behind — the header stayed and its lines slid away up
-		   the page. A shadow is painted with the cell's own box, so it travels. */
-		box-shadow:
-			inset 0 -1px 0 #e6e6e6,
-			inset -1px 0 0 #e6e6e6;
 		display: table-cell;
 		white-space: nowrap;
+		/* Fixed layout lets a header wider than its column paint over the next
+		   one; the column owns its width, so what does not fit is clipped. */
+		overflow: hidden;
 		padding: 2px 4px;
+	}
+
+	/* The name takes whatever the tools leave. Under `table-layout: fixed` a
+	   header wider than its column simply spills over the one beside it, and a
+	   fixed 8.5rem name plus four 22px buttons was wider than any column anybody
+	   would choose — so the name is the part that gives, and the column can be
+	   dragged wider when the name matters more than the room. */
+	.column-head {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		min-width: 0;
 	}
 
 	.column-name {
@@ -682,7 +833,8 @@
 		border-radius: var(--radius-input);
 		background: transparent;
 		font: 600 12px ui-sans-serif, system-ui, sans-serif;
-		width: 8.5rem;
+		flex: 1 1 auto;
+		min-width: 0;
 		padding: 3px;
 	}
 
@@ -698,8 +850,39 @@
 
 	.column-tools {
 		display: inline-flex;
+		flex: none;
 		gap: 1px;
 		opacity: 0.35;
+	}
+
+	/* The grip straddles the rule between two columns, which is where the
+	   pointer aims — wider than the line it sits on, because a 1px target is
+	   not a target. It shows itself on hover and stays lit while it is being
+	   dragged, so the column you are sizing is never in doubt. */
+	.resize {
+		position: absolute;
+		top: 0;
+		/* Inside the cell, because the header clips what hangs outside it. */
+		right: 0;
+		width: 7px;
+		height: 100%;
+		cursor: col-resize;
+		touch-action: none;
+		z-index: 1;
+	}
+
+	.resize::after {
+		content: '';
+		position: absolute;
+		inset: 2px 3px;
+		border-radius: 1px;
+		background: #2563eb;
+		opacity: 0;
+	}
+
+	.resize:hover::after,
+	.resize.on::after {
+		opacity: 1;
 	}
 
 	th:hover .column-tools,
@@ -717,9 +900,22 @@
 		color: #767676;
 	}
 
+	/* The field fills its cell.
+
+	   `field-sizing: content` still decides how tall the cell wants to be — the
+	   tallest cell in a row is what sets the row's height — and `height: 100%`
+	   is what stops every *other* field in that row from sitting as a one-line
+	   box with a band of dead white beneath it that looks like the cell but is
+	   not the target. A percentage height inside a table cell resolves against
+	   the cell's final height, after the row has been measured, so the two do
+	   not fight: the content sizes the row, the row sizes the fields.
+
+	   The old `min-width` is gone with it: the colgroup owns the widths now, and
+	   a field that refused to go under 9rem was a floor under every column. */
 	td textarea {
 		width: 100%;
-		min-width: 9rem;
+		min-width: 0;
+		height: 100%;
 		border: none;
 		background: transparent;
 		resize: vertical;
@@ -751,13 +947,11 @@
 		position: sticky;
 		left: 0;
 		z-index: 2;
-		width: 1%;
 		white-space: nowrap;
 		padding: 5px 6px 3px;
 		color: #767676;
 		text-align: center;
 		background: #fff;
-		box-shadow: inset -1px 0 0 #e6e6e6;
 	}
 
 	/* Sticky both ways, so the corner cell stays put in either scroll. Above the
@@ -993,6 +1187,12 @@
 		padding: 18px;
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
 		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+	}
+
+	/* Focused as it opens so its first Enter is caught — see modal.ts — and not
+	   a control, so no control's ring. */
+	.modal:focus {
+		outline: none;
 	}
 
 	.modal h2 {
