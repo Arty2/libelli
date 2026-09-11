@@ -147,18 +147,16 @@
 	     a menu between each press. -->
 	<button role="menuitem" onclick={() => run(oncopystyle)}>
 		<Icon name="copy" size={15} /> Copy Style
-		<span class="chord">Ctrl/⌘ ⇧ C</span>
 	</button>
 	<button role="menuitem" disabled={frozen || !hasStyle} onclick={() => run(onpastestyle)}>
 		<Icon name="paste" size={15} /> Paste Style{plural}
-		<span class="chord">Ctrl/⌘ ⇧ V</span>
 	</button>
 
 	<hr />
 
 	{#if many}
 		<button role="menuitem" disabled={frozen} onclick={() => run(ongroup)}>
-			<Icon name="layers" size={15} />
+			<Icon name={grouped ? 'ungroup-objects' : 'group-objects'} size={15} />
 			{grouped ? 'Ungroup' : 'Group'}
 		</button>
 	{/if}
@@ -212,15 +210,10 @@
 		cursor: default;
 	}
 
-	/* The keys that do the same thing, greyed and pushed to the right edge: a
-	   menu is where you find out what the chord is, not a second place to be
-	   told what the item does. */
-	.chord {
-		margin-left: auto;
-		padding-left: 12px;
-		font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
-		color: #aaa;
-	}
+	/* No chords in here. The two items that carried them were the only two that
+	   did, so the column of grey keys read as a property of those items rather
+	   than as a key map — and Help is where the key map lives, in one place, for
+	   all of them. */
 
 	button.on {
 		color: #2563eb;

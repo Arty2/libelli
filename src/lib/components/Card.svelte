@@ -727,6 +727,21 @@
 		for (const held of moored) onchange?.({ ...held, anchor: null, y: round2(layout.tops[held.id] ?? held.y) });
 	}
 
+	/**
+	 * Take this box's own lock off.
+	 *
+	 * The padlock badge used to be the one mark here that only *said* something
+	 * while the two anchor badges beside it were also the way out of what they
+	 * said — so the pointer landed on the padlock, found it dead, and the badge
+	 * that did answer was the buoy, which is not about locking at all. It is a
+	 * button now, and the buoy has stopped wearing an open padlock when armed.
+	 */
+	function unlockBox(box: Box) {
+		if (!box.locked || template.locked) return;
+		onaction?.('Unlock the area');
+		onchange?.({ ...box, locked: undefined });
+	}
+
 	/** Break this box's own tie, again without moving it. */
 	function breakAnchor(box: Box) {
 		if (!box.anchor || box.locked) return;
@@ -902,10 +917,12 @@
 				     not change. -->
 				{#if bounds && !template.locked && (box.anchor || box.locked || isStatic(box) || anchorTargets.has(box.id))}
 					<!-- Why the box will not do what you might ask of it, stacked at its
-					     corner: the anchor above the lock when it carries both. The two
-					     about anchoring are buttons — the reason and the way out of it in
-					     the same 13 pixels — and they swap to the icon of the undoing
-					     while the pointer is on them, so pressing one holds no surprise. -->
+					     corner: the anchor above the lock when it carries both. All but
+					     the plug are buttons — the reason and the way out of it in the
+					     same 13 pixels — and each swaps to the icon of the undoing while
+					     the pointer is on it, so pressing one holds no surprise. Which is
+					     also why no two of them wear the same armed icon: the padlock
+					     opens the padlock, and the buoy casts off, which is a boat. -->
 					<span class="badges">
 						{#if isStatic(box)}
 							<span class="badge" title="Static text — this says the same on every card, because it is not plugged into a column">
@@ -945,13 +962,24 @@
 									releaseDependents(box);
 								}}
 							>
-								<Icon name={badgeArmed(`${box.id}:moored`) ? 'unlocked' : 'harbor'} size={11} />
+								<Icon name={badgeArmed(`${box.id}:moored`) ? 'sailboat' : 'harbor'} size={11} />
 							</button>
 						{/if}
 						{#if box.locked}
-							<span class="badge" title="Locked">
-								<Icon name="locked" size={11} />
-							</span>
+							<button
+								class="badge action"
+								title="Locked — no dragging, no resizing, no option changes. Press to unlock this area."
+								aria-label="Unlock this area"
+								onpointerdown={(e) => e.stopPropagation()}
+								onpointerenter={() => (hoveredBadge = `${box.id}:locked`)}
+								onpointerleave={() => (hoveredBadge = null)}
+								onclick={() => {
+									flashBadge(`${box.id}:locked`);
+									unlockBox(box);
+								}}
+							>
+								<Icon name={badgeArmed(`${box.id}:locked`) ? 'unlocked' : 'locked'} size={11} />
+							</button>
 						{/if}
 					</span>
 				{/if}
