@@ -3,7 +3,7 @@
 	import { backgroundStyle, cssUrl, safeMediaUrl } from '$lib/assets';
 	import { parseColor } from '$lib/color';
 	import { applyPlaceholders } from '$lib/placeholders';
-	import { scopeCss, styleTag } from '$lib/css';
+	import { cssIdent, scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { hold } from '$lib/gestures';
 	import { FREE_STEP, GRID_MINOR, boxEdges, pxToMm, resolveLayout, snapTo, snapToEdges } from '$lib/layout';
@@ -170,7 +170,34 @@
 		});
 	}
 
-	const hidden = $derived(new Set(template.boxes.filter((b) => b.hideWhenEmpty && isEmpty(b)).map((b) => b.id)));
+	/**
+	 * A card with no row behind it at all — an empty table, or one whose rows
+	 * have just been deleted.
+	 *
+	 * Every bound area then draws nothing, and any of them set to hide when
+	 * empty collapses to no height and no visibility. In the editor that left a
+	 * sheet of areas that could not be clicked, selected or moved: the design
+	 * was still there and there was no way to get at it. So with no data the
+	 * editor draws each area's own name in it instead and lets none of them
+	 * hide. It is the editor's doing only — `interactive` is false everywhere
+	 * that renders for paper, the lightbox and PNG export among them, so a
+	 * placeholder can never be printed or exported.
+	 *
+	 * Not extended to an empty *cell* while other rows exist: hiding when empty
+	 * is exactly what that area was asked to do, and the card has to show what
+	 * it will print.
+	 */
+	const dataless = $derived(interactive && !row);
+
+	/** An area's name, drawn in it while there is no data to draw instead. */
+	const placeholderFor = (box: Box): string =>
+		dataless && isEmpty(box) ? (box.slot || 'Area') : '';
+
+	const hidden = $derived(
+		new Set(
+			template.boxes.filter((b) => !dataless && b.hideWhenEmpty && isEmpty(b)).map((b) => b.id)
+		)
+	);
 	const layout = $derived(resolveLayout({ boxes: template.boxes, measured, hidden }));
 
 	const bleed = $derived(template.bleed.enabled ? template.bleed.amount : 0);
@@ -324,6 +351,32 @@
 		}
 		return parts.join(';');
 	}
+
+	/**
+	 * The area's name, as the `id` its element wears.
+	 *
+	 * This is what makes `#Job-Title { … }` in a template's own CSS reach one
+	 * named area — the whole reason an area has a name you can type. Spread as
+	 * an object rather than written as `id={…}`, because an unnamed area must
+	 * carry no `id` attribute at all rather than an empty one.
+	 *
+	 * The trade-off, said out loud: a sheet of several cards renders the same
+	 * design several times, so the same id appears once per card on it. CSS is
+	 * fine with that — an id selector matches every element wearing it, which is
+	 * exactly what styling "this area on every card" needs — but a validator is
+	 * not, and `getElementById` answers with the first. Nothing in the app looks
+	 * an area up that way: `data-box-id` is what the editor addresses, and it
+	 * stays unique because it is generated.
+	 *
+	 * Renaming cannot make two areas share a name — `BoxOptions.setSlot` refuses
+	 * it — but duplicating one still can, deliberately: a copy that kept the name
+	 * kept the binding with it, and a template that styles `#Job-Title` means
+	 * both of them.
+	 */
+	const idFor = (box: Box) => {
+		const ident = cssIdent(box.slot ?? '');
+		return ident ? { id: ident } : {};
+	};
 
 	/** The page number rides on the template's own defaults, never on a box's. */
 	function pageNumberStyle(): string {
@@ -843,6 +896,7 @@
 				class:font-loading={interactive && waitingFor(box)}
 				class:flashing={flashIds.includes(box.id)}
 				style={boxStyle(box)}
+				{...idFor(box)}
 				data-box-id={box.id}
 				use:measure={box.id}
 				onpointerdown={(e) => startDrag(e, box, 'move')}
@@ -865,7 +919,9 @@
 				role="presentation"
 			>
 				<div class="content" class:being-edited={editingId === box.id}>
-					{#if box.mode === 'markdown'}
+					{#if placeholderFor(box)}
+						<span class="placeholder">{placeholderFor(box)}</span>
+					{:else if box.mode === 'markdown'}
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf -->
 						{@html renderMarkdown(contentOf(box), { size: box.size ?? template.defaults.size, md: box.md })}
 					{:else if box.mode === 'qr'}
@@ -1022,7 +1078,7 @@
 						     Two marks rather than one gesture with a modifier, because
 						     they do two different things and a modifier nobody finds is a
 						     feature nobody has — the crosshair moves the point turned
-						     about, the knob on the arm below it swings the box. The X and
+						     about, the knob on the arm beside it swings the box. The X and
 						     Y in the bar place the pivot exactly. Both are drawn on an
 						     upright box, because the lever is the rotation control and
 						     has to be there before there is any rotation to show. -->
@@ -1198,6 +1254,16 @@
 		visibility: hidden;
 	}
 
+	/* The area's own name, standing in for a row that is not there. Grey and
+	   italic, so it cannot be mistaken for content whatever color the area sets;
+	   everything else about it — face, size, alignment — is the area's own, so
+	   it shows where the area is and how big what lands in it will be. Drawn
+	   only where `interactive` is set, so nothing on paper reaches this rule. */
+	.placeholder {
+		color: #b0b0b0;
+		font-style: italic;
+	}
+
 	/* Media has no flow height of its own, so the box's declared height is the
 	   frame, and `cover` crops inside it rather than spilling onto the card. */
 	.media {
@@ -1311,13 +1377,18 @@
 	   turn the box. It hangs off the pivot rather than off the box edge so it
 	   travels with the point the rotation is actually about, and being at arm's
 	   length is what gives the drag an angle to measure from the first pixel.
-	   Below the pivot rather than above it, where the box's own content and the
-	   area above it are not competing for the same few pixels. Both it and the
-	   arm rotate with the box, because they are inside it. */
+	   Both it and the arm rotate with the box, because they are inside it.
+
+	   To the right of the pivot, not below it. The arm used to run downward,
+	   straight at the south handle and the two corners either side of it, and an
+	   area is usually wider than it is tall — so on the axis it had least room
+	   the knob sat on top of the handles you resize with, and grabbing the
+	   bottom edge of a shallow area turned it instead. Rightward the arm has the
+	   long axis to itself and only the east handle to clear. */
 	.lever {
 		--arm: calc(30px * var(--ui-scale, 1));
 		--mark: calc(11px * var(--ui-scale, 1));
-		margin: calc(var(--arm) - var(--mark) / 2) 0 0 calc(var(--mark) / -2);
+		margin: calc(var(--mark) / -2) 0 0 calc(var(--arm) - var(--mark) / 2);
 		border-radius: 50%;
 		cursor: grab;
 	}
@@ -1326,16 +1397,16 @@
 		cursor: grabbing;
 	}
 
-	/* The arm is drawn, not grabbed. It runs from the knob down to the pivot, so
+	/* The arm is drawn, not grabbed. It runs from the knob back to the pivot, so
 	   leaving it hit-testable put a lever-shaped hole over the pivot and the point
 	   the box turns about could never be picked up. */
 	.lever::after {
 		content: '';
 		position: absolute;
-		left: calc(50% - var(--line, 1px) / 2);
-		bottom: 100%;
-		width: var(--line, 1px);
-		height: var(--arm);
+		top: calc(50% - var(--line, 1px) / 2);
+		right: 100%;
+		height: var(--line, 1px);
+		width: var(--arm);
 		background: #2563eb;
 		pointer-events: none;
 	}

@@ -62,8 +62,8 @@
 	/** The sheet's own bleed outsets the paper; only imposition draws a sheet at all. */
 	const sheetBleed = $derived(imposed && template.print.bleed.enabled ? template.print.bleed.amount : 0);
 	/** What the sheet trims to, and what goes on the printer. */
-	const trimW = $derived(imposed ? template.print.sheet.w : cardW);
-	const trimH = $derived(imposed ? template.print.sheet.h : cardH);
+	const trimW = $derived(imposed?.sheetW ?? cardW);
+	const trimH = $derived(imposed?.sheetH ?? cardH);
 	const paperW = $derived(trimW + sheetBleed * 2);
 	const paperH = $derived(trimH + sheetBleed * 2);
 

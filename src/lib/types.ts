@@ -82,6 +82,17 @@ export interface BleedSpec {
 export type Orientation = 'portrait' | 'landscape';
 
 /**
+ * A sheet's orientation, plus the one the fit works out for itself.
+ *
+ * `auto` is the default and is not a third way round: it means the sheet is
+ * turned to whichever of the two holds the requested count at the least
+ * shrinkage, re-decided whenever the count, the card or the sheet changes.
+ * Naming a side pins it, which is what you want when the paper is already in
+ * the tray one way round.
+ */
+export type SheetOrientation = Orientation | 'auto';
+
+/**
  * How several virtual pages reach one physical sheet — a way to print, not a
  * way to design, so it lives beside `page` and `bleed` rather than changing
  * what either of them means. `sheet` is the physical paper; `page` is still
@@ -102,7 +113,7 @@ export interface PrintSettings {
 		w: number;
 		h: number;
 	};
-	orientation: Orientation;
+	orientation: SheetOrientation;
 	/**
 	 * The sheet's own bleed, distinct from the card's: an outset on the paper
 	 * around `sheet`, with crop marks for the tiled block's outer edge. The

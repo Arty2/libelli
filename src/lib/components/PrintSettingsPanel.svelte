@@ -2,8 +2,14 @@
 	import Icon from './Icon.svelte';
 	import { safeImageUrl } from '$lib/assets';
 	import { IMPOSITION_COUNTS, resolveImposition } from '$lib/imposition';
-	import { ORIENTATIONS, PAGE_PRESETS, presetFor, presetSize } from '$lib/template';
-	import type { BackgroundFit, Orientation, PageBackgroundImage, PrintSettings, Template } from '$lib/types';
+	import { PAGE_PRESETS, presetFor, presetSize } from '$lib/template';
+	import type {
+		BackgroundFit,
+		PageBackgroundImage,
+		PrintSettings,
+		SheetOrientation,
+		Template
+	} from '$lib/types';
 
 	/**
 	 * Everything about the physical sheet the cards print onto: how many to a
@@ -48,6 +54,9 @@
 	/** The named size this sheet already is, or Custom when it is its own. */
 	const preset = $derived(presetFor(template.print.sheet.w, template.print.sheet.h) ?? '');
 
+	/** Whether the sheet is the fit's to turn, rather than one that was named. */
+	const autoTurned = $derived(template.print.orientation === 'auto');
+
 	/**
 	 * Whether the two millimetre fields are showing.
 	 *
@@ -76,13 +85,20 @@
 
 	function setPreset(name: string) {
 		sizeMode = name ? 'preset' : 'custom';
-		const size = presetSize(name, template.print.orientation === 'landscape');
+		const size = presetSize(name, template.print.sheet.w > template.print.sheet.h);
 		if (!size) return;
 		patchPrint({ sheet: size });
 	}
 
-	/** Swaps width and height to match, the same bargain `swapPage` makes for the card. */
-	function setOrientation(orientation: Orientation) {
+	/**
+	 * A named orientation swaps the stored width and height to match, the same
+	 * bargain `swapPage` makes for the card, so the two millimetre fields keep
+	 * saying what the paper actually measures. Going back to Auto leaves them
+	 * exactly where they are: the fit turns the sheet from then on, and turning
+	 * the numbers under it as well would be a second answer to the same
+	 * question.
+	 */
+	function setOrientation(orientation: SheetOrientation) {
 		const { w, h } = template.print.sheet;
 		const swap = (orientation === 'landscape' && h > w) || (orientation === 'portrait' && w > h);
 		patchPrint({ orientation, sheet: swap ? { w: h, h: w } : { w, h } });
@@ -207,7 +223,7 @@
 
 <span class="group" role="group" aria-label="Print Settings">
 	<label class="field">
-		<span>Print Per Sheet</span>
+		<span>Pages per Sheet</span>
 		<select
 			bind:this={perSheetSelect}
 			title="Print several cards to one physical sheet"
@@ -268,17 +284,31 @@
 				<span class="unit">mm</span>
 			</label>
 		{/if}
+		<!-- Auto is the default and the interesting one: the count and the card
+		     decide which way the paper goes, re-decided every time either changes,
+		     so asking for 8-up of a card that only tiles well the other way round
+		     no longer means noticing that and turning the sheet by hand. Naming a
+		     side pins it — the paper is in the tray that way round — and the label
+		     beside it says what Auto settled on, because an orientation nothing
+		     reports is one you find out about at the printer. -->
 		<label class="field">
 			<span>Orientation</span>
 			<select
 				value={template.print.orientation}
+				title="Which way round the paper goes. Auto turns it to whichever way fits these cards with the least shrinking."
 				disabled={pageFrozen}
-				onchange={(e) => setOrientation(e.currentTarget.value as Orientation)}
+				onchange={(e) => setOrientation(e.currentTarget.value as SheetOrientation)}
 			>
+				<option value="auto">Auto</option>
 				<option value="portrait">Portrait</option>
 				<option value="landscape">Landscape</option>
 			</select>
 		</label>
+		{#if autoTurned && fit}
+			<span class="field-label" title="What Auto settled on for this count and this card: {fit.sheetW} × {fit.sheetH}mm">
+				{fit.orientation === 'landscape' ? 'Landscape' : 'Portrait'}
+			</span>
+		{/if}
 		{#if fit && fit.scale < 0.999}
 			<span
 				class="field-label"

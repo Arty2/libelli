@@ -2,6 +2,7 @@
 	import Icon from './Icon.svelte';
 	import './options-bar.css';
 	import { safeImageUrl } from '$lib/assets';
+	import { cssIdent } from '$lib/css';
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
 	import {
 		BORDER_STYLES,
@@ -216,8 +217,47 @@
 		patchTemplate({ fonts: [...template.fonts, { family, source: 'google' }] });
 	}
 
-	function setSlot(slot: string) {
+	/**
+	 * Rename the area — and refuse the rename if the name is taken.
+	 *
+	 * An area's name is the `id` its element wears on the card, so a template's
+	 * own CSS can reach one named area by writing `#Job-Title`. An id that two
+	 * areas answer to is not an id, so no two may share a name, and no two may
+	 * share what that name reduces to as a CSS identifier either — `Job Title`
+	 * and `Job.Title` are different words and the same selector.
+	 *
+	 * A refusal puts the field back to the name it had rather than leaving the
+	 * rejected text sitting there looking accepted. The field has to be written
+	 * to by hand: it is uncontrolled, so the box's unchanged name is not a
+	 * change Svelte would re-render, and the typed text would stay on screen.
+	 */
+	function setSlot(slot: string, field?: HTMLInputElement) {
+		if (!selected) return;
 		const value = slot.trim();
+		const previous = selected.slot ?? '';
+		const putBack = () => {
+			if (field) field.value = previous;
+		};
+		if (value === previous) return putBack();
+
+		const ident = cssIdent(value);
+		const clash = value
+			? template.boxes.find(
+					(b) =>
+						b.id !== selected.id &&
+						!!b.slot &&
+						(b.slot === value || (!!ident && cssIdent(b.slot!) === ident))
+				)
+			: undefined;
+		if (clash) {
+			putBack();
+			onnotice(
+				`Another area is already called “${clash.slot}”. A name is that area's CSS id, so no two can share one.`,
+				'warning'
+			);
+			return;
+		}
+
 		patch({ slot: value || null });
 		if (value && !template.slots.includes(value)) {
 			patchTemplate({ slots: [...template.slots, value] });
@@ -291,9 +331,9 @@
 						<input
 							class="w-5"
 							value={selected.slot ?? ''}
-							title="The template's own name for what this area holds; the column beside it says which spreadsheet column fills it"
+							title={`The template's own name for what this area holds; the column beside it says which spreadsheet column fills it. It is also this area's CSS id${cssIdent(selected.slot ?? '') ? ` — #${cssIdent(selected.slot ?? '')}` : ''}, so no two areas may share a name.`}
 							disabled={boxFrozen}
-							onchange={(e) => setSlot(e.currentTarget.value)}
+							onchange={(e) => setSlot(e.currentTarget.value, e.currentTarget)}
 						/>
 					</label>
 				{/if}

@@ -4,7 +4,7 @@
 	import { download } from '$lib/download';
 	import { hold } from '$lib/gestures';
 	import { armDefault } from '$lib/modal';
-	import { parseTable, toCsv } from '$lib/parse';
+	import { parseTable, toCsv, toTsv } from '$lib/parse';
 	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
 	import type { Dataset, Row } from '$lib/types';
 
@@ -367,6 +367,22 @@
 
 	const chosenRows = $derived([...selectedRows].filter((i) => i < dataset.rows.length).sort((a, b) => a - b));
 
+	/**
+	 * The tick in the corner of the header: every row, or none of them.
+	 *
+	 * Three states rather than two, because a checkbox that reads as empty while
+	 * six rows are chosen is lying about what the next press will do. `mixed` is
+	 * what a tri-state checkbox is for, and pressing it from there chooses the
+	 * rest rather than dropping what is already chosen — the commoner intent,
+	 * and one undo away in either case since nothing here changes the data.
+	 */
+	const allChosen = $derived(dataset.rows.length > 0 && chosenRows.length === dataset.rows.length);
+	const someChosen = $derived(chosenRows.length > 0 && !allChosen);
+
+	function toggleAll() {
+		selectedRows = allChosen ? new Set() : new Set(dataset.rows.map((_, i) => i));
+	}
+
 	function deleteChosen() {
 		const gone = new Set(chosenRows);
 		if (!gone.size) return;
@@ -459,6 +475,34 @@
 		input.value = '';
 	}
 
+	/**
+	 * The table onto the clipboard, as tab-separated text.
+	 *
+	 * The counterpart of Paste, and it answers the same question from the other
+	 * side: a block of cells goes back to the spreadsheet it came from without a
+	 * file and without an import dialog. Tabs are what a spreadsheet writes and
+	 * reads — see `toTsv`. The chosen rows when there are any, the whole table
+	 * when there are none: a selection is already the app's word for "these
+	 * ones", and copying all forty rows when four are lit would be ignoring it.
+	 * The header goes either way, so the paste lands under column names.
+	 */
+	async function copyTsv() {
+		if (!dataset.columns.length) return;
+		const rows = chosenRows.length ? chosenRows.map((i) => dataset.rows[i]) : dataset.rows;
+		try {
+			await navigator.clipboard.writeText(toTsv({ columns: dataset.columns, rows }));
+		} catch {
+			// No clipboard at all (an insecure origin) or permission refused. There
+			// is no silent fallback worth having — the old execCommand path needs a
+			// visible selection — so it says so and points at the one that works.
+			onnotice('This browser would not hand over the clipboard. Export CSV instead.', 'warning');
+			return;
+		}
+		onnotice(
+			`${rows.length} row${rows.length === 1 ? '' : 's'} copied${chosenRows.length ? ' — the chosen ones' : ''}, ready to paste into a spreadsheet.`
+		);
+	}
+
 	/** The table as it stands, back out as a file. Nothing leaves the browser. */
 	function exportCsv() {
 		download('card-data.csv', toCsv(dataset), 'text/csv');
@@ -493,6 +537,19 @@
 					     unsorted header wears, and it is only there while there is
 					     something to undo. -->
 					<th class="gutter" scope="col">
+						<!-- Where the row ticks are, and wearing the same mark, because it
+						     is the same act reaching every row at once. Only while there
+						     are rows: a tick over an empty table chooses nothing. -->
+						{#if dataset.rows.length}
+							<button
+								class="tick"
+								role="checkbox"
+								aria-checked={allChosen ? 'true' : someChosen ? 'mixed' : 'false'}
+								title={allChosen ? 'Drop every row' : 'Choose every row'}
+								aria-label={allChosen ? 'Drop every row' : 'Choose every row'}
+								onclick={toggleAll}
+							></button>
+						{/if}
 						{#if sortedBy}
 							<button
 								class="icon unsort"
@@ -500,7 +557,7 @@
 								aria-label="Clear the sorting"
 								onclick={clearSort}
 							><Icon name="activity" size={14} /></button>
-						{:else}
+						{:else if !dataset.rows.length}
 							<span class="sr-only">Row</span>
 						{/if}
 					</th>
@@ -664,6 +721,17 @@
 		{/if}
 		<button title="Paste a block of cells straight off a spreadsheet" onclick={() => (pasteOpen = true)}>
 			<Icon name="report-growth" size={15} /> Paste
+		</button>
+		<!-- Beside Paste, because it is the same door the other way round. It
+		     wears the same glyph as Duplicate, back in the chosen-rows group —
+		     they are both copies — but that one is icon-only and copies rows into
+		     the table, where this one carries them out of the app. -->
+		<button
+			title="Copy the table — or just the chosen rows — as tab-separated text, ready to paste into a spreadsheet"
+			disabled={!dataset.columns.length}
+			onclick={copyTsv}
+		>
+			<Icon name="copy" size={15} /> Copy
 		</button>
 		<button
 			use:hold={onloadsample}
@@ -1016,6 +1084,17 @@
 		border-color: #2563eb;
 		background: #2563eb;
 		box-shadow: inset 0 0 0 2px #fff;
+	}
+
+	/* Some but not all: a dash, which is what every tri-state checkbox draws and
+	   the one mark that is neither the empty square nor the filled one. A
+	   smaller version of the filled square would have read as "chosen" at the
+	   size this tick actually is. */
+	.tick[aria-checked='mixed'] {
+		border-color: #2563eb;
+		background:
+			linear-gradient(#2563eb, #2563eb) center / 5px 2px no-repeat,
+			#fff;
 	}
 
 	tbody tr {

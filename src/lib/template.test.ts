@@ -220,7 +220,9 @@ describe('normaliseTemplate', () => {
 			enabled: false,
 			count: 4,
 			sheet: { w: 210, h: 297 },
-			orientation: 'portrait',
+			// Nothing said which way round, so nothing is claimed: the fit turns
+			// the sheet when imposition is switched on.
+			orientation: 'auto',
 			bleed: { enabled: false, amount: 3, cropMarks: false }
 		});
 	});

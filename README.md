@@ -60,6 +60,13 @@ resize boxes directly, or type exact millimetres.
 - **Slots** — a box renders the column its slot is bound to. The bar calls it the
   area's **Name**; *slot* is what the file format calls it. The mapping lives
   outside the template, so the same template works against another spreadsheet.
+  A name is also the area's **CSS id**, which is how a template's own CSS reaches
+  one named area: call an area *Job Title* and `#Job-Title { … }` styles it —
+  spaces and punctuation become hyphens, a leading digit gets one in front of it,
+  and the rest of the name is left exactly as typed. Because an id only means
+  anything if one area answers to it, two areas may not share a name: a rename
+  onto a name already in use is refused, the field goes back to what it said, and
+  the status bar names the area that already has it.
 - **`grow` / `clip`** — a grow box keeps its top edge and lengthens downward; a
   clip box keeps its height and hard-cuts what does not fit.
 - **Anchors** — a box can take its top edge from the *rendered* bottom of another
@@ -107,7 +114,11 @@ resize boxes directly, or type exact millimetres.
   every card and travels with the design rather than with the data. An area with
   nothing typed into it is still an area — it keeps its fill, its border and its
   size, and **Hide When Empty** is what takes it away again. *+ Area* beside the
-  page adds one, starting as static text. An area carrying its own words wears a
+  page adds one, starting as static text. With **no data at all** — an empty
+  table, or one you have just cleared — every area draws its own name in grey
+  italics and none of them hide, because a design whose areas have all collapsed
+  to nothing is a design you cannot click on. That is the editor's doing only: a
+  placeholder never reaches paper, the lightbox or a PNG. An area carrying its own words wears a
   plug pulled out of its socket, because it is not plugged into the data.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with
   one selected, and a text box lies over the content inheriting the face, size,
@@ -131,7 +142,10 @@ resize boxes directly, or type exact millimetres.
 - **Rotation** — degrees clockwise, about a pivot you can move. Two marks on a
   selected area, because they do two different things: the **crosshair** is the
   pivot, and dragging it moves the point the area turns about; the **knob** on
-  the short arm below it is the lever, and swinging that turns the area. Holding
+  the short arm to its right is the lever, and swinging that turns the area. The
+  arm runs rightward rather than downward because an area is usually wider than
+  it is tall: pointing down, the knob sat over the bottom resize handles, and
+  grabbing the bottom edge of a shallow area turned it instead. Holding
   <kbd>⇧</kbd> while you swing snaps to 15°. Both are drawn whether or not there
   is any rotation yet, because the lever is the rotation control and has to be
   there before there is a rotation to show; the **X** and **Y** in the bar place
@@ -199,10 +213,17 @@ resize boxes directly, or type exact millimetres.
   trim lines and run outward into the bleed, each stopping a millimetre short
   of the corner: a mark that meets the artwork cannot be told from a rule the
   design meant to have, and that corner is what the guillotine lines up on.
-- **Print Settings** — several cards printed to one physical sheet: 2, 4, 6 or
-  8, onto A5, A4, A3 or a sheet of your own size in millimetres (the two
-  millimetre fields appear for **Custom** — a named size already knows its
-  numbers), **Portrait** or **Landscape**. Cards keep the millimetres they were designed at
+- **Print Settings** — several cards printed to one physical sheet: **Pages per
+  Sheet** is 2, 4, 6 or 8, onto A5, A4, A3 or a sheet of your own size in
+  millimetres (the two millimetre fields appear for **Custom** — a named size
+  already knows its numbers). Orientation is **Auto**, **Portrait** or
+  **Landscape**, and Auto is the default: the sheet is turned to whichever way
+  round holds the count with the least shrinking, worked out again every time the
+  count, the card or the sheet changes, and the word beside the menu says which
+  way it settled on. Eight A6 cards on A4 come out landscape without anybody
+  noticing they had to. Naming a side pins it — the paper is already in the tray
+  that way round — and the two millimetre fields are swapped to match, so they
+  never disagree with the paper. Cards keep the millimetres they were designed at
   everywhere they are edited; imposition only decides how many trim-sized
   copies fit and tiles them edge to edge, centred on the sheet. Bleed does
   double duty here: the gap between neighbouring cards, and the crop marks
@@ -265,6 +286,8 @@ resize boxes directly, or type exact millimetres.
   inside the template and travels with it. Selectors are scoped to the card, so
   nothing in a template can restyle the editor around it, and `@import` and any
   `url()` pointing off this machine are stripped — the app fetches nothing.
+  Each area wears its own **Name** as an id, so `#Job-Title { … }` reaches that
+  one area and nothing else; `.box` reaches all of them.
 
 ## Templates, and laying one out
 
@@ -318,9 +341,11 @@ The dataset is one row per card, one column per field. It sits beside the page
 on a wide screen and under it on a phone, and **Data** in the toolbar folds it
 away when the page needs the room. Clicking anywhere on a row that is not the
 text itself previews it and chooses it; the tick in the gutter chooses several
-without moving the preview off the card you are looking at. Whatever the table
-has to say goes to the app's status bar, so there is one place a notice can
-appear.
+without moving the preview off the card you are looking at, and the tick in the
+corner of the header chooses every row or drops every row — it shows a dash while
+some but not all of them are chosen, which is what the next press will change.
+Whatever the table has to say goes to the app's status bar, so there is one place
+a notice can appear.
 
 - **Paste** — a modal that takes a block of cells off a spreadsheet. Tabs, commas and
   semicolons are told apart by sniffing, and quoted fields with embedded
@@ -329,6 +354,10 @@ appear.
   same columns is. Only when the table has no columns at all is the first line
   read as a header, because there is then nothing else to name them with. Two
   buttons rather than a mode and a Load — **Replace Rows** and **Add Rows**.
+- **Copy** — the same door the other way round: the table onto the clipboard as
+  tab-separated text, header included, ready to paste straight into a spreadsheet
+  (tabs rather than commas, so it lands in cells instead of arriving as one long
+  column). With rows chosen it copies those; with none chosen it copies the lot.
 - **Import CSV** — the same parser against a whole file, header and all. Press
   and *hold* the button instead of clicking it, and the four sample cards come
   back: they walk through the app, and they are somewhere to start when a blank
@@ -454,7 +483,7 @@ Pick a curated Google family, type any other family name, or upload a file.
 
 Print renders every row into a dedicated container and hands it to the browser:
 `@page { size: <w>mm <h>mm; margin: 0 }`, one physical sheet per row, no
-trailing blank. With **Print Per Sheet** on, several rows tile onto each sheet
+trailing blank. With **Pages per Sheet** on, several rows tile onto each sheet
 instead, in the grid **Print Settings** works out — scaled down together when
 they do not fit the sheet at full size — and `@page` names the physical sheet
 rather than the card's.
@@ -464,7 +493,7 @@ rather than the card's.
 One screen holds both halves of getting a print right: every row rendered as a
 small page, and the four dialog settings the browser gets wrong by default —
 pick the **paper size** matching the physical sheet's millimetres (the card's,
-or the imposed sheet's when **Print Per Sheet** is on), set **Margins** to *None*,
+or the imposed sheet's when **Pages per Sheet** is on), set **Margins** to *None*,
 uncheck **Headers and footers**, and switch on **Background graphics**, which
 Chrome drops along with the paper color. Checking the cards and reading the
 checklist are the same act, so they are the same screen — and **Print
@@ -472,7 +501,7 @@ Settings** itself sits right there too: the same panel Page Setup shows, so a
 sheet size or count picked wrong does not send you back to the editor to fix
 it before you print.
 
-With **Print Per Sheet** on, a second grid appears under the cards: **Sheets —
+With **Pages per Sheet** on, a second grid appears under the cards: **Sheets —
 what will print**, one thumbnail per physical sheet, each showing exactly the
 cards that land on it — the same component `PrintRoot.svelte` renders for the
 real print, only scaled down, so the preview can never promise a layout the
@@ -490,7 +519,7 @@ browser's own dialog on the editor. Press it again from that screen to send the
 run. Choosing which pages go is at the left of that screen and **Print** and
 **PNG** are at the right, because the two are not one row of three equal things.
 From it: **Print**, or **PNG** — one 300 dpi file per selected page, or with
-**Print Per Sheet** on, one per sheet instead, each carrying every card tiled
+**Pages per Sheet** on, one per sheet instead, each carrying every card tiled
 onto it — rendered here, with no library, by carrying the element into an SVG
 `foreignObject` and drawing that to a canvas. Every face is embedded: uploaded
 ones from this browser, and a Google family by fetching the stylesheet the
@@ -766,7 +795,15 @@ thing itself.
   area bounds at the left (screen only, never printed), zoom at the right;
   between them, under the sheet, which card of how many you are looking at.
   **Fit** in the zoom menu says the percentage fitting *would* give you, not the
-  one you are at.
+  one you are at. On a phone the two left-hand toggles keep their row and lose
+  their words — a **#** for the grid and a **B** for the bounds, beside ticks
+  that already say whether they are on — rather than stacking into a two-line
+  panel that grew up over the sheet. What a screen reader is told does not
+  change with the width.
+- **The pager** — the two arrows and the count under the sheet are also a swipe
+  surface: flick left or right anywhere across them, including over the count
+  and over an arrow that has greyed out at the end of the run, and the card
+  steps. Up and down still scroll.
 - **The window toolbar** holds only what is about the whole app: the mark, then
   Help, Page Setup, Data and Export — the two panels in the order they sit on
   screen, settings above the page and the table beside it. On a phone the
