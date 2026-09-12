@@ -10,12 +10,12 @@ import type {
 	Defaults,
 	FontRef,
 	Mapping,
-	Orientation,
 	PageBackgroundImage,
 	PageNumberPosition,
 	PageNumberSpec,
 	PrintSettings,
 	QrSettings,
+	SheetOrientation,
 	SideValue,
 	Sides,
 	Template
@@ -44,18 +44,21 @@ export const DEFAULT_DEFAULTS: Defaults = {
 	letterSpacing: 0
 };
 
-export const ORIENTATIONS: Orientation[] = ['portrait', 'landscape'];
+/** What `print.orientation` may say — `auto` first, because it is the default. */
+export const SHEET_ORIENTATIONS: SheetOrientation[] = ['auto', 'portrait', 'landscape'];
 
 /**
- * Off by default, and A4 4-up portrait when first switched on — a sheet size
- * and a count worth having ready, not a blank someone has to fill in before
- * printing several to a sheet does anything at all.
+ * Off by default, and A4 4-up when first switched on — a sheet size and a
+ * count worth having ready, not a blank someone has to fill in before
+ * printing several to a sheet does anything at all. Which way round the A4
+ * goes is `auto`'s to answer: the count and the card decide it, and they are
+ * both about to change.
  */
 export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
 	enabled: false,
 	count: 4,
 	sheet: { w: 210, h: 297 },
-	orientation: 'portrait',
+	orientation: 'auto',
 	bleed: { enabled: false, amount: 3, cropMarks: false }
 };
 
@@ -231,7 +234,13 @@ function normaliseBleed(raw: any): Template['bleed'] {
 
 function normalisePrintSettings(raw: any): PrintSettings {
 	const count = IMPOSITION_COUNTS.includes(raw?.count) ? raw.count : DEFAULT_PRINT_SETTINGS.count;
-	const orientation: Orientation = raw?.orientation === 'landscape' ? 'landscape' : 'portrait';
+	// A template written before `auto` existed named a side, and keeps it: the
+	// sheet it was designed against is not ours to turn. Anything unrecognised —
+	// including the absent key of a template written before print settings had
+	// an orientation at all — takes the default.
+	const orientation: SheetOrientation = SHEET_ORIENTATIONS.includes(raw?.orientation)
+		? raw.orientation
+		: DEFAULT_PRINT_SETTINGS.orientation;
 	return {
 		enabled: Boolean(raw?.enabled),
 		count,

@@ -1,4 +1,4 @@
-import type { PrintSettings } from './types';
+import type { Orientation, PrintSettings } from './types';
 
 /**
  * Grid math for tiling several cards onto one physical sheet.
@@ -51,6 +51,17 @@ export interface ImpositionLayout {
 	grid: Grid;
 	/** 1 when the cards fit at their own size; less when the sheet forced a shrink */
 	scale: number;
+	/**
+	 * mm, the sheet this layout is for, the way round it is actually printed.
+	 * The same numbers as `print.sheet` unless the orientation is `auto` and the
+	 * cards fit better with the paper turned — every reader of the sheet size
+	 * takes it from here rather than from `print.sheet`, so nothing can draw the
+	 * sheet one way round and tile it the other.
+	 */
+	sheetW: number;
+	sheetH: number;
+	/** which way round that is, so the bar can say what `auto` decided */
+	orientation: Orientation;
 	/** mm, the tiled block of cards (bleed included), after `scale` */
 	blockW: number;
 	blockH: number;
@@ -69,14 +80,36 @@ export const SHEET_MARK_MAX = 6;
 export const SHEET_MARK_GAP = 1;
 
 /**
+ * Which way round the sheet is tried, and in what order.
+ *
+ * A named orientation means the stored width and height are already the way
+ * round they were asked for — `PrintSettingsPanel` swaps them when the
+ * orientation is set, so the millimetre fields never disagree with the paper
+ * — and turning them again here would be a second answer to a settled
+ * question. `auto` is the one that has something to decide: it tries the
+ * sheet as stored first and its own transpose second, and the first only
+ * loses on a *strictly* better fit, so a count that fits either way round
+ * leaves the sheet exactly as the template wrote it.
+ */
+function sheetCandidates(print: PrintSettings): Array<{ w: number; h: number }> {
+	const { w, h } = print.sheet;
+	if (print.orientation !== 'auto') return [{ w, h }];
+	return [
+		{ w, h },
+		{ w: h, h: w }
+	];
+}
+
+/**
  * Where cards land on the sheet, or `undefined` when imposition is off.
  *
  * `cardW`/`cardH` are the card's own footprint including bleed on every side,
  * the same number `PrintRoot` and `Card` already compute for a single page.
- * Every orientation for the requested count is scored by the scale it would
- * need to fit the sheet (capped at 1 — imposition shrinks, it never
- * enlarges), and the orientation needing the *least* shrinkage wins; a tie
- * falls to whichever is listed first, the more balanced arrangement.
+ * Every arrangement for the requested count — and, under `auto`, both ways
+ * round the sheet can go — is scored by the scale it would need to fit,
+ * capped at 1 (imposition shrinks, it never enlarges), and the one needing
+ * the *least* shrinkage wins; a tie falls to whichever is tried first, which
+ * is the more balanced arrangement on the sheet as the template stores it.
  *
  * Nothing here consults the sheet's crop marks: they are drawn in the room
  * the sheet already has, so switching them on never moves a card. An earlier
@@ -88,16 +121,28 @@ export function resolveImposition(
 	print: PrintSettings
 ): ImpositionLayout | undefined {
 	if (!print.enabled) return undefined;
-	const { w: sheetW, h: sheetH } = print.sheet;
 	let best: ImpositionLayout | undefined;
-	for (const grid of GRIDS[print.count] ?? []) {
-		const rawW = cardW * grid.cols;
-		const rawH = cardH * grid.rows;
-		const scale = Math.min(1, sheetW / rawW, sheetH / rawH);
-		if (best && scale <= best.scale) continue;
-		const blockW = rawW * scale;
-		const blockH = rawH * scale;
-		best = { grid, scale, blockW, blockH, marginX: (sheetW - blockW) / 2, marginY: (sheetH - blockH) / 2 };
+	for (const sheet of sheetCandidates(print)) {
+		const orientation: Orientation = sheet.w > sheet.h ? 'landscape' : 'portrait';
+		for (const grid of GRIDS[print.count] ?? []) {
+			const rawW = cardW * grid.cols;
+			const rawH = cardH * grid.rows;
+			const scale = Math.min(1, sheet.w / rawW, sheet.h / rawH);
+			if (best && scale <= best.scale) continue;
+			const blockW = rawW * scale;
+			const blockH = rawH * scale;
+			best = {
+				grid,
+				scale,
+				sheetW: sheet.w,
+				sheetH: sheet.h,
+				orientation,
+				blockW,
+				blockH,
+				marginX: (sheet.w - blockW) / 2,
+				marginY: (sheet.h - blockH) / 2
+			};
+		}
 	}
 	return best;
 }

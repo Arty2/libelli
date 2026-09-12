@@ -70,8 +70,8 @@
 	// sheet's own bleed, where it has one, is part of the paper.
 	const imposed = $derived(resolveImposition(outerW, outerH, template.print));
 	const sheetBleed = $derived(imposed && template.print.bleed.enabled ? template.print.bleed.amount : 0);
-	const printSheetW = $derived((imposed ? template.print.sheet.w : outerW) + sheetBleed * 2);
-	const printSheetH = $derived((imposed ? template.print.sheet.h : outerH) + sheetBleed * 2);
+	const printSheetW = $derived((imposed?.sheetW ?? outerW) + sheetBleed * 2);
+	const printSheetH = $derived((imposed?.sheetH ?? outerH) + sheetBleed * 2);
 
 	/**
 	 * One file per selected page — or, with several cards to a sheet, one file

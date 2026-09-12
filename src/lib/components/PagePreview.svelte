@@ -729,36 +729,42 @@
 	     band it occupies is bottom padding on the viewport, which is what keeps
 	     the page clear of it. -->
 	{#if rowCount > 0}
-		<div
-			class="pager"
-			role="group"
-			aria-label="Card"
-			bind:clientHeight={pagerHeight}
-			use:swipe={(by) => onactivate(Math.max(0, Math.min(rowCount - 1, activeRow + by)))}
-		>
-			{#if rowCount > 1}
+		<div class="pager" role="group" aria-label="Card" bind:clientHeight={pagerHeight}>
+			<!-- The swipe lives on this inner chip rather than on the row, because
+			     the row spans the whole stage: hit-testing it would swallow every
+			     press on the ground either side of the controls, and hit-testing
+			     only the buttons left the gaps between them — and either arrow once
+			     it greys out at an end — as dead patches where a flick did nothing.
+			     The chip is exactly the three controls and the air between them,
+			     which is the thing a thumb is aiming at. -->
+			<div
+				class="controls"
+				use:swipe={(by) => onactivate(Math.max(0, Math.min(rowCount - 1, activeRow + by)))}
+			>
+				{#if rowCount > 1}
+					<button
+						class="step"
+						disabled={activeRow <= 0}
+						title="Previous card"
+						aria-label="Previous card"
+						onclick={() => onactivate(Math.max(0, activeRow - 1))}
+					><Icon name="caret-left" size={18} /></button>
+				{/if}
 				<button
-					class="step"
-					disabled={activeRow <= 0}
-					title="Previous card"
-					aria-label="Previous card"
-					onclick={() => onactivate(Math.max(0, activeRow - 1))}
-				><Icon name="caret-left" size={18} /></button>
-			{/if}
-			<button
-				class="count"
-				title="Look at this card full screen"
-				onclick={onlightbox}
-			>{activeRow + 1} / {rowCount}</button>
-			{#if rowCount > 1}
-				<button
-					class="step"
-					disabled={activeRow >= rowCount - 1}
-					title="Next card"
-					aria-label="Next card"
-					onclick={() => onactivate(Math.min(rowCount - 1, activeRow + 1))}
-				><Icon name="caret-right" size={18} /></button>
-			{/if}
+					class="count"
+					title="Look at this card full screen"
+					onclick={onlightbox}
+				>{activeRow + 1} / {rowCount}</button>
+				{#if rowCount > 1}
+					<button
+						class="step"
+						disabled={activeRow >= rowCount - 1}
+						title="Next card"
+						aria-label="Next card"
+						onclick={() => onactivate(Math.min(rowCount - 1, activeRow + 1))}
+					><Icon name="caret-right" size={18} /></button>
+				{/if}
+			</div>
 		</div>
 	{/if}
 
@@ -874,9 +880,12 @@
 	<!-- View state sits on the page it affects, one control per bottom corner,
 	     rather than in the toolbar among the actions. On a phone the two words
 	     side by side reach far enough into the band that the pager's first arrow,
-	     centred in the same band, lands on top of "Bounds"; they stack instead,
-	     which halves the width and grows upward into empty stage rather than
-	     sideways into the pager. -->
+	     centred in the same band, lands on top of "Bounds". They used to stack
+	     into a column for that, which grew a two-line panel up over the sheet;
+	     now the words go instead and the ticks keep their row — a # for the grid
+	     and a B for the bounds, beside checkboxes that already say whether they
+	     are on. The full word stays the accessible name either way, so nothing
+	     read aloud is reduced to a single letter. -->
 	<div class="corner left">
 		<!-- Press and hold swaps the ruling for a dot at every intersection: the
 		     same grid and the same snapping, drawn quietly enough to lay type
@@ -890,12 +899,24 @@
 				? 'ruled lines'
 				: 'a dot grid'}."
 		>
-			<input type="checkbox" checked={grid} onchange={(e) => ongrid(e.currentTarget.checked)} />
-			{gridStyle === 'dots' ? 'Dots' : 'Grid'}
+			<input
+				type="checkbox"
+				aria-label={gridStyle === 'dots' ? 'Dots' : 'Grid'}
+				checked={grid}
+				onchange={(e) => ongrid(e.currentTarget.checked)}
+			/>
+			<span class="wide">{gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
+			<span class="narrow" aria-hidden="true">#</span>
 		</label>
 		<label title="Dashed box bounds and the trim edge — screen only, never printed (Ctrl/Cmd+; or Ctrl/Cmd+H)">
-			<input type="checkbox" checked={bounds} onchange={(e) => onbounds(e.currentTarget.checked)} />
-			Bounds
+			<input
+				type="checkbox"
+				aria-label="Bounds"
+				checked={bounds}
+				onchange={(e) => onbounds(e.currentTarget.checked)}
+			/>
+			<span class="wide">Bounds</span>
+			<span class="narrow" aria-hidden="true">B</span>
 		</label>
 	</div>
 
@@ -1050,8 +1071,24 @@
 		pointer-events: none;
 	}
 
-	.pager > * {
+	.pager .controls {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 		pointer-events: auto;
+		/* A flick across the pager is the gesture; without this the browser reads
+		   the first few pixels of it as a pan, takes the pointer away with a
+		   pointercancel, and the swipe never completes. Vertical is left alone so
+		   a flick that was meant for the page still scrolls it. */
+		touch-action: pan-y;
+	}
+
+	/* An arrow at the end of the run says so by greying out, but a disabled
+	   button receives no pointer events at all — which made it a hole in the
+	   chip a swipe could fall through. The chip behind it takes the gesture
+	   instead, and the arrow still refuses the press. */
+	.pager .step:disabled {
+		pointer-events: none;
 	}
 
 	/* A control, not a readout, so it says so on hover — but no chip and no
@@ -1448,12 +1485,32 @@
 		}
 	}
 
+	/* The short forms are the phone's; the words are everywhere else's. Both are
+	   in the DOM at every width so the swap costs nothing at the moment it
+	   happens. */
+	.corner .narrow {
+		display: none;
+	}
+
 	/* Same 520px the export screen calls narrow, so the app has one idea of it. */
 	@media (max-width: 520px) {
 		.corner.left {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 4px;
+			gap: 8px;
+		}
+
+		.corner.left .wide {
+			display: none;
+		}
+
+		.corner.left .narrow {
+			/* inline-block, because a width means nothing on an inline box: the
+			   two marks are different widths and the ticks would not line up. */
+			display: inline-block;
+			/* A lone # or B is a mark, not a word: it needs the weight to read as
+			   a label rather than as a stray glyph beside a tick. */
+			font-weight: 700;
+			width: 0.75em;
+			text-align: center;
 		}
 	}
 </style>

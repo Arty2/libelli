@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scopeCss, styleTag } from './css';
+import { cssIdent, scopeCss, styleTag } from './css';
 
 const scoped = (css: string) => scopeCss(css, '.trim').replace(/\s+/g, ' ').trim();
 
@@ -65,5 +65,27 @@ describe('scopeCss', () => {
 describe('styleTag', () => {
 	it('wraps scoped css without writing a literal tag pair into a component', () => {
 		expect(styleTag('.trim p { color: red }')).toBe('<style>.trim p { color: red }</style>');
+	});
+});
+
+describe('cssIdent', () => {
+	it('keeps a name that is already an identifier, case and all', () => {
+		expect(cssIdent('Title')).toBe('Title');
+		expect(cssIdent('job_title-2')).toBe('job_title-2');
+	});
+
+	it('hyphenates anything a selector cannot carry', () => {
+		expect(cssIdent('Job Title')).toBe('Job-Title');
+		expect(cssIdent('  price (£)  ')).toBe('price');
+		expect(cssIdent('née')).toBe('n-e');
+	});
+
+	it('gets a leading digit out of the way, since #2nd is not a selector', () => {
+		expect(cssIdent('2nd line')).toBe('n-2nd-line');
+	});
+
+	it('answers with nothing when there is nothing left to name', () => {
+		expect(cssIdent('  ')).toBe('');
+		expect(cssIdent('!!!')).toBe('');
 	});
 });

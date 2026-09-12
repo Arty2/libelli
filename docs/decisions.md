@@ -118,6 +118,26 @@ source: a static box with nothing typed into it still draws its fill, its border
 and its size, and `hideWhenEmpty` is what takes it away — two settings that
 already existed, rather than a third state to keep in step.
 
+## `src/lib/css.ts`
+
+**An area's name is its CSS id, and `cssIdent` is the one place a name becomes
+one.** A template's own CSS is the escape hatch for everything the bar does not
+offer, and it was reaching areas by nothing but `.box` — all of them at once.
+Naming one needs a selector, and the area already has a name the author typed;
+`cssIdent` is what turns that name into something a selector can carry. Case is
+kept, because the name as typed is what the author is looking at while writing
+the rule, and anything a CSS identifier cannot hold becomes a hyphen. A leading
+digit takes an `n-` in front of it rather than being dropped, since `#2nd` is
+not a selector but the area is still called *2nd*.
+
+Two different names can still reduce to the same identifier (`Job Title` and
+`Job.Title` both give `Job-Title`), which is why `BoxOptions` refuses a rename
+on the *identifier* and not just on the name: an id that two areas answer to is
+not an id. Duplicating an area deliberately still produces two boxes with one
+name, because a copy that kept its name kept its binding with it, and a rule
+written for `#Job-Title` means both of them — CSS matches every element wearing
+an id, which is exactly the behaviour that case wants.
+
 ## `src/lib/imposition.ts`
 
 **No second bleed.** Several cards on one sheet need a gap between neighbours
@@ -137,6 +157,29 @@ orientation is tried, each capped at `scale <= 1` (imposition shrinks, it
 never enlarges), and the one needing the least shrinkage wins — a tie falls
 to whichever `GRIDS` lists first, the more balanced arrangement (2x2 before
 4x1).
+
+**`auto` is the default orientation, and the fit is what decides it.** Which
+way round the paper goes is not a taste question once a count has been asked
+for: eight A6 cards tile onto a portrait A4 at half size and onto a landscape
+one at 0.707, and nobody asking for 8-up wants the smaller of those. So
+`orientation` has a third value, `auto`, which is what a new template gets: the
+sheet as stored is tried, its transpose is tried, and the transpose only wins
+on a *strictly* better scale — a count that fits either way round leaves the
+sheet exactly as it was written. A named orientation is taken at its word and
+the stored pair is used as-is, because `PrintSettingsPanel` swaps the two
+millimetre fields when the orientation is set; turning them again here would be
+a second answer to a settled question, and it would silently rotate a custom
+sheet somebody typed in by hand.
+
+**The layout reports the sheet it used.** `sheetW`/`sheetH` are on
+`ImpositionLayout` rather than read back off `print.sheet` by each caller,
+because under `auto` those two can differ — and three components (`PrintSheet`,
+`PrintRoot` for the `@page` size, `PrintPreview` for the thumbnails) each need
+the same answer. One of them reading `print.sheet` while the others read the
+resolved layout would draw the sheet one way round and tile it the other, and
+the `@page` mismatch is a blank second page on every sheet. `orientation` comes
+back with it so the bar can say what `auto` settled on: an orientation nothing
+reports is one you find out about at the printer.
 
 **Scaling for print is not the same promise as "millimetres everywhere."**
 That rule is about the *design*: a box's coordinates do not move when the
@@ -195,6 +238,50 @@ undo or a redo, "the last change" is a different change and an alternating key
 would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
+
+**An area with nothing to draw from draws its own name.** Set to *Hide When
+Empty*, such an area collapses to no height and no visibility, and a sheet of
+those cannot be clicked, selected, moved or renamed: the design is still there
+and there is no way to get at it. So in the editor those areas draw their own
+name in grey italics instead, and none of them hide.
+
+The line is between an area with *nothing* to draw from and one whose cell is
+merely blank. Nothing means either there is no row at all — an empty table, or
+one just cleared — or the area is bound to a column the data has not got: an
+unmapped slot, or one still pointing at a column that has been renamed or
+deleted. Either way it will be empty on every card there is, so hiding it shows
+nobody what this row prints. The second half of that matters as much as the
+first: clearing the table and adding a column back gives you one empty row, at
+which point "no row at all" no longer holds and every area would have collapsed
+again one click after being rescued.
+
+An area bound to a column that *does* exist and happens to be blank here is left
+alone — hiding is exactly what it was asked to do, and the editor has to show
+what will print. `interactive` is false in every renderer that is not the editor
+— `PrintRoot`, `PrintSheet`, both lightboxes, and the DOM `png.ts` clones — so a
+placeholder cannot reach paper or an export, and `hidden` falls back to exactly
+its old behaviour there.
+
+**The area's name is the element's `id`.** That is the whole point of a name you
+can type: `#Job-Title { … }` in the template's own CSS reaches one area, where
+`.box` reaches all of them. It is spread as an object rather than written as
+`id={…}` so an unnamed area carries no `id` attribute at all rather than an
+empty one. The trade-off, said out loud: a sheet of several cards renders the
+same design several times, so each id appears once per card. CSS is happy with
+that — an id selector matches every element wearing it, which is what styling
+"this area on every card" needs — a validator is not, and `getElementById` would
+answer with the first. Nothing in the app looks an area up that way: the editor
+addresses `data-box-id`, which is generated and stays unique.
+
+**The rotation lever points right, not down.** The knob hangs off the pivot on a
+30px arm, and that arm used to run downward — straight at the south handle and
+the two corners either side of it. An area is usually wider than it is tall, so
+that was the axis with the least room to give: on a shallow area the knob sat on
+top of the handles you resize with, and reaching for the bottom edge turned the
+area instead. Rightward the arm has the long axis to itself and only the east
+handle to clear. Nothing about the drag maths changes — rotation is the angle
+from the pivot to the pointer against the angle it started at, so where the knob
+rests is presentation.
 
 **A crop mark is two ticks with a gap, not an L of borders.** These were a
 corner-sized box carrying two borders, so the two lines met exactly at the
@@ -466,6 +553,36 @@ afterwards would write that snapshot straight back over the reset.
 
 ## `src/lib/components/PagePreview.svelte`
 
+**The pager's swipe lives on a chip, not on the row.** The row spans the whole
+stage so the count stays centred under the sheet rather than on whatever is left
+between the two bottom corners, which means it cannot be hit-testable: every
+press on the bare ground either side would be swallowed and never reach the
+stage's own deselect. Hanging the gesture off the three controls instead left
+the gaps between them — and either arrow the moment it greys out at an end of
+the run, since a disabled button receives no pointer events — as dead patches
+where a flick did nothing. An inner chip wrapping exactly the controls and the
+air between them is hit-testable, is the thing a thumb is actually aiming at,
+and leaves the ground alone; the disabled arrows are given
+`pointer-events: none` so the chip behind takes the gesture while the arrow
+still refuses the press.
+
+**`touch-action: pan-y` is what makes the swipe happen at all.** With the
+default the browser reads the first few pixels of a horizontal flick as a pan,
+takes the pointer away with a `pointercancel`, and the gesture never completes —
+which is exactly what it was doing: the swipe worked under synthetic events and
+did nothing under a real finger. `pan-y` rather than `none` so a flick that was
+meant for the page still scrolls it.
+
+**On a phone the view toggles lose their words, not their row.** Grid and Bounds
+side by side reach far enough into the bottom band that the pager's first arrow,
+centred in the same band, lands on top of "Bounds". They used to stack into a
+column for that, which halved the width by growing a two-line panel up over the
+sheet. Now the words go instead — a `#` for the grid, a `B` for the bounds —
+beside ticks that already say whether they are on, which is the part doing the
+work. Both forms are in the DOM at every width and CSS picks one, and the
+checkbox carries an `aria-label` either way, so nothing read aloud is ever
+reduced to a single letter.
+
 **Fit measured the thing its own answer resized.** The stage is observed to
 derive the scale, the scale sizes the sheet, the sheet's height decides whether a
 vertical scrollbar appears, and that scrollbar takes about fifteen pixels off the
@@ -623,6 +740,52 @@ outer edge meets the edge of the stage. That button is how the pad is picked up
 again; a pad you cannot reach is a control you have lost.
 
 ## `src/lib/components/DataTable.svelte`
+
+**The first column brings a row with it.** The button that adds a row is drawn
+under the row numbers, which only exist once there is a column — so a table with
+nothing in it had exactly one `+`, in the header, and pressing it left you with
+a column, no rows, and still no way to type anything. The empty-table line said
+"add a row with the + below" at a table that had no `+` below. Adding the first
+column now adds the row that makes it usable, and the line has a second form for
+the no-columns case that points at the `+` that is actually there. A later column
+adds a cell to the rows that exist, as it always did.
+
+**Copy is Paste's opposite number, and it writes tabs.** The tray could take a
+block of cells off a spreadsheet and could write a CSV file, and had no way to
+put cells *back* on the clipboard — so getting forty edited rows into a sheet
+meant a download and an import. Tab-separated rather than comma-separated
+because that is what a spreadsheet reads off a clipboard: a TSV paste lands in
+cells, a CSV paste arrives as one long column and needs a text-import dialog to
+undo. The header goes with it, so the paste lands under column names. A refused
+clipboard says so and points at Export CSV rather than falling back to the old
+`execCommand` path, which needs a visible selection and a hidden textarea to
+have one.
+
+**It is a row action, not a table action.** It first sat beside Paste and copied
+the whole table when nothing was chosen, which made it the one button in the bar
+whose subject changed underneath you. It is now in the chosen-rows group with
+Duplicate and Delete, where "these ones" means the same thing for all three, and
+the tri-state tick in the header's corner says *all of them* in one press —
+a clearer way to ask for the whole table than a button that quietly reinterprets
+an empty selection. Export CSV is still there for the whole table as a file.
+
+**One glyph per meaning: `copy` puts a copy somewhere else, `replicate` makes
+another one here.** They were the same Carbon `copy` mark until the two ended up
+side by side: `BoxMenu` carried Copy Style and Duplicate wearing it, and the
+data tray now carries Copy and Duplicate a button apart. Duplicate takes
+`replicate` everywhere it appears — the area bar, the selection tools, the
+right-click menu and the data tray — rather than only where the collision showed,
+because two marks for one action is the same confusion filed under a different
+screen.
+
+**The header's tick is tri-state.** Choose every row or drop every row, in the
+corner the row ticks are frozen to and wearing the same mark, because it is the
+same act reaching every row at once. Three states rather than two: a checkbox
+reading as empty while six rows are chosen is lying about what the next press
+will do. `mixed` draws the conventional dash — a smaller filled square would
+have read as "chosen" at the eleven pixels this tick actually is — and pressing
+from there chooses the rest rather than dropping what is chosen, which is the
+commoner intent and undoes nothing either way.
 
 **A sticky header's borders are not sticky.** Under `border-collapse: collapse`
 the borders belong to the table's shared border grid rather than to each cell, so
@@ -896,6 +1059,18 @@ is that *Custom* cannot be read off the size — picking it while the sheet
 still measures exactly A4 leaves the derived preset saying A4 — so the choice
 is held in `sizeMode`, and choosing a named size puts it back. Orientation
 stays either way: it is a decision about the sheet, not about its numbers.
+
+**Auto is the orientation, and the other two are overrides.** Turning the sheet
+to suit the count is arithmetic, not taste — see `imposition.ts` — so it is the
+default, and the panel's job is only to report it: a word beside the menu saying
+which way Auto settled on, because an orientation nothing shows is one you find
+out about at the printer. Naming a side still swaps the stored width and height,
+the same bargain `swapPage` makes for the card, so the two millimetre fields
+never disagree with the paper they describe. Going back to Auto leaves those
+numbers exactly where they are — the fit turns the sheet from then on, and
+turning the stored pair as well would be two answers to one question. `setPreset`
+asks the stored numbers which way round the sheet currently is rather than asking
+the orientation, so picking A4 under Auto keeps the sheet the way it is sitting.
 
 **Shared, not duplicated.** Print Settings is one component mounted from two
 places — `PageOptions.svelte`, where every other page-level setting lives,
@@ -1379,6 +1554,19 @@ win the row, because they are the ones you press.
 
 Tests cover the pure logic. Components are verified by driving them in a real
 browser, which is the project's standing rule and not a substitute for it.
+
+**One test reads source rather than calling it.**
+`components/card-interactive.test.ts` parses the `.svelte` files for every
+`<Card>` tag and asserts that exactly one of them — the editor's — passes
+`interactive`. The editor's screen-only furniture, the placeholder an area with
+nothing to draw from shows, is editor-only purely because the other three
+renderers leave that prop alone; that is a promise kept by call sites
+remembering something, and it breaks silently. A fifth renderer copied from the
+editor's markup would print the word "title" onto somebody's cards and nothing
+would fail. It is the same bargain the color, escaping and CSS-scoping tests
+make: assert that each renderer *routes* through the guard, not merely that the
+guard works. Adding a render site is meant to fail this test — the fix is to
+name it in the list, having decided which side it is on.
 
 Two things worth knowing before trusting a green run:
 
