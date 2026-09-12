@@ -24,6 +24,11 @@ export const ICONS: Record<string, string> = {
 	'trash': '<path d="M12 12H14V24H12z"/><path d="M18 12H20V24H18z"/><path d="M4,6V8H6V28a2,2,0,0,0,2,2H24a2,2,0,0,0,2-2V8h2V6ZM8,28V8H24V28Z"/><path d="M12 2H20V4H12z"/>',
 	'close': '<path d="M17.4141 16 24 9.4141 22.5859 8 16 14.5859 9.4143 8 8 9.4141 14.5859 16 8 22.5859 9.4143 24 16 17.4141 22.5859 24 24 22.5859 17.4141 16z"/>',
 	'copy': '<path d="M28,10V28H10V10H28m0-2H10a2,2,0,0,0-2,2V28a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V10a2,2,0,0,0-2-2Z"/><path d="M4,18H2V4A2,2,0,0,1,4,2H18V4H4Z"/>',
+	// `copy` is "put a copy somewhere else" — the clipboard, the style clipboard —
+	// and `replicate` is "make another one right here". They were the same glyph
+	// until the two landed in one menu: BoxMenu carried Copy Style and Duplicate
+	// wearing it, and the data tray now carries Copy and Duplicate side by side.
+	'replicate': '<path d="M28,8h2V4a2.0021,2.0021,0,0,0-2-2H24V4h4Z"/><path d="M17 2H21V4H17z"/><path d="M28 11H30V15H28z"/><path d="M28,18v4H24V10a2.0023,2.0023,0,0,0-2-2H10V4h4V2H10A2.0023,2.0023,0,0,0,8,4V8H4a2.0023,2.0023,0,0,0-2,2V28a2.0023,2.0023,0,0,0,2,2H22a2.0023,2.0023,0,0,0,2-2V24h4a2.0023,2.0023,0,0,0,2-2V18ZM22,28H4V10H22Z"/>',
 	'add': '<path d="M17 15 17 8 15 8 15 15 8 15 8 17 15 17 15 24 17 24 17 17 24 17 24 15z"/>',
 	'code': '<path d="M31 16 24 23 22.59 21.59 28.17 16 22.59 10.41 24 9 31 16z"/><path d="M1 16 8 9 9.41 10.41 3.83 16 9.41 21.59 8 23 1 16z"/><path d="M5.91 15H26.080000000000002V17H5.91z" transform="rotate(-75 15.996 16)"/>',
 	'caret-up': '<path d="M8 20 16 10 24 20z"/>',

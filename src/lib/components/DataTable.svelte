@@ -485,19 +485,23 @@
 	}
 
 	/**
-	 * The table onto the clipboard, as tab-separated text.
+	 * The chosen rows onto the clipboard, as tab-separated text.
 	 *
 	 * The counterpart of Paste, and it answers the same question from the other
 	 * side: a block of cells goes back to the spreadsheet it came from without a
 	 * file and without an import dialog. Tabs are what a spreadsheet writes and
-	 * reads — see `toTsv`. The chosen rows when there are any, the whole table
-	 * when there are none: a selection is already the app's word for "these
-	 * ones", and copying all forty rows when four are lit would be ignoring it.
-	 * The header goes either way, so the paste lands under column names.
+	 * reads — see `toTsv`.
+	 *
+	 * A row action, beside Duplicate and Delete, because "these ones" means the
+	 * same thing for all three. It used to sit beside Paste and copy the whole
+	 * table when nothing was chosen; the tick in the header's corner says "all of
+	 * them" in one press, which is a clearer way to ask for it than a button
+	 * whose subject changed underneath you. The header row goes with it either
+	 * way, so the paste lands under column names.
 	 */
 	async function copyTsv() {
-		if (!dataset.columns.length) return;
-		const rows = chosenRows.length ? chosenRows.map((i) => dataset.rows[i]) : dataset.rows;
+		if (!chosenRows.length) return;
+		const rows = chosenRows.map((i) => dataset.rows[i]);
 		try {
 			await navigator.clipboard.writeText(toTsv({ columns: dataset.columns, rows }));
 		} catch {
@@ -507,9 +511,7 @@
 			onnotice('This browser would not hand over the clipboard. Export CSV instead.', 'warning');
 			return;
 		}
-		onnotice(
-			`${rows.length} row${rows.length === 1 ? '' : 's'} copied${chosenRows.length ? ' — the chosen ones' : ''}, ready to paste into a spreadsheet.`
-		);
+		onnotice(`${rows.length} row${rows.length === 1 ? '' : 's'} copied, ready to paste into a spreadsheet.`);
 	}
 
 	/** The table as it stands, back out as a file. Nothing leaves the browser. */
@@ -722,14 +724,25 @@
 			<!-- What you can do to the rows you have chosen, in front of the things
 			     that act on the whole table, with a rule between the two. It appears
 			     only when there is a selection, so the bar is its usual length the
-			     rest of the time. -->
+			     rest of the time.
+
+			     Three things in one order: out of the app, into the table, gone.
+			     Copy sat beside Paste until it turned out to be a row action like
+			     the other two — "these ones" is the chosen rows for all three, and
+			     the tick in the header's corner is how you say "all of them". -->
 			<span class="chosen-count">{chosenRows.length}</span>
+			<button
+				class="icon"
+				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
+				aria-label="Copy the chosen rows"
+				onclick={copyTsv}
+			><Icon name="copy" size={15} /></button>
 			<button
 				class="icon"
 				title="Duplicate the chosen rows"
 				aria-label="Duplicate the chosen rows"
 				onclick={duplicateChosen}
-			><Icon name="copy" size={15} /></button>
+			><Icon name="replicate" size={15} /></button>
 			<button
 				class="icon danger"
 				title="Delete the chosen rows"
@@ -740,17 +753,6 @@
 		{/if}
 		<button title="Paste a block of cells straight off a spreadsheet" onclick={() => (pasteOpen = true)}>
 			<Icon name="report-growth" size={15} /> Paste
-		</button>
-		<!-- Beside Paste, because it is the same door the other way round. It
-		     wears the same glyph as Duplicate, back in the chosen-rows group —
-		     they are both copies — but that one is icon-only and copies rows into
-		     the table, where this one carries them out of the app. -->
-		<button
-			title="Copy the table — or just the chosen rows — as tab-separated text, ready to paste into a spreadsheet"
-			disabled={!dataset.columns.length}
-			onclick={copyTsv}
-		>
-			<Icon name="copy" size={15} /> Copy
 		</button>
 		<button
 			use:hold={onloadsample}

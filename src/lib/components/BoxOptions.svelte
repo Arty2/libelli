@@ -342,7 +342,7 @@
 			     doing either: Lock is a state, not an action, so it sits after them
 			     and says what pressing it will do rather than what it is. -->
 			<span class="head-row actions">
-				<button onclick={onduplicate} disabled={pageFrozen}><Icon name="copy" size={14} /> Duplicate</button>
+				<button onclick={onduplicate} disabled={pageFrozen}><Icon name="replicate" size={14} /> Duplicate</button>
 				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen}>
 					<Icon name="trash" size={14} /> Delete
 				</button>

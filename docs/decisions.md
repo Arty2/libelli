@@ -756,12 +756,27 @@ put cells *back* on the clipboard — so getting forty edited rows into a sheet
 meant a download and an import. Tab-separated rather than comma-separated
 because that is what a spreadsheet reads off a clipboard: a TSV paste lands in
 cells, a CSV paste arrives as one long column and needs a text-import dialog to
-undo. The header goes with it either way, so the paste lands under column names.
-With rows chosen it copies those and says so; with none it copies the lot — a
-selection is already the app's word for "these ones", and copying all forty when
-four are lit would be ignoring it. A refused clipboard says so and points at
-Export CSV rather than falling back to the old `execCommand` path, which needs a
-visible selection and a hidden textarea to have one.
+undo. The header goes with it, so the paste lands under column names. A refused
+clipboard says so and points at Export CSV rather than falling back to the old
+`execCommand` path, which needs a visible selection and a hidden textarea to
+have one.
+
+**It is a row action, not a table action.** It first sat beside Paste and copied
+the whole table when nothing was chosen, which made it the one button in the bar
+whose subject changed underneath you. It is now in the chosen-rows group with
+Duplicate and Delete, where "these ones" means the same thing for all three, and
+the tri-state tick in the header's corner says *all of them* in one press —
+a clearer way to ask for the whole table than a button that quietly reinterprets
+an empty selection. Export CSV is still there for the whole table as a file.
+
+**One glyph per meaning: `copy` puts a copy somewhere else, `replicate` makes
+another one here.** They were the same Carbon `copy` mark until the two ended up
+side by side: `BoxMenu` carried Copy Style and Duplicate wearing it, and the
+data tray now carries Copy and Duplicate a button apart. Duplicate takes
+`replicate` everywhere it appears — the area bar, the selection tools, the
+right-click menu and the data tray — rather than only where the collision showed,
+because two marks for one action is the same confusion filed under a different
+screen.
 
 **The header's tick is tri-state.** Choose every row or drop every row, in the
 corner the row ticks are frozen to and wearing the same mark, because it is the

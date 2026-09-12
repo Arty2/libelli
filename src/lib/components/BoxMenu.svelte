@@ -161,7 +161,7 @@
 		</button>
 	{/if}
 	<button role="menuitem" disabled={frozen} onclick={() => run(onduplicate)}>
-		<Icon name="copy" size={15} /> Duplicate{plural}
+		<Icon name="replicate" size={15} /> Duplicate{plural}
 	</button>
 	<button class="danger" role="menuitem" disabled={frozen || (!many && !!box.locked)} onclick={() => run(ondelete)}>
 		<Icon name="trash" size={15} /> Delete{plural}

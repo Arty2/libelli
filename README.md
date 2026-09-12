@@ -357,10 +357,12 @@ a notice can appear.
   same columns is. Only when the table has no columns at all is the first line
   read as a header, because there is then nothing else to name them with. Two
   buttons rather than a mode and a Load — **Replace Rows** and **Add Rows**.
-- **Copy** — the same door the other way round: the table onto the clipboard as
+- **Copy** — Paste's opposite number: the chosen rows onto the clipboard as
   tab-separated text, header included, ready to paste straight into a spreadsheet
   (tabs rather than commas, so it lands in cells instead of arriving as one long
-  column). With rows chosen it copies those; with none chosen it copies the lot.
+  column). It sits with **Duplicate** and **Delete** in the group that appears
+  when rows are chosen, because "these ones" means the same thing for all three;
+  the tick in the header's corner is how you say *all of them*.
 - **Import CSV** — the same parser against a whole file, header and all. Press
   and *hold* the button instead of clicking it, and the four sample cards come
   back: they walk through the app, and they are somewhere to start when a blank
