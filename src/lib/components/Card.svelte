@@ -170,32 +170,48 @@
 		});
 	}
 
-	/**
-	 * A card with no row behind it at all — an empty table, or one whose rows
-	 * have just been deleted.
-	 *
-	 * Every bound area then draws nothing, and any of them set to hide when
-	 * empty collapses to no height and no visibility. In the editor that left a
-	 * sheet of areas that could not be clicked, selected or moved: the design
-	 * was still there and there was no way to get at it. So with no data the
-	 * editor draws each area's own name in it instead and lets none of them
-	 * hide. It is the editor's doing only — `interactive` is false everywhere
-	 * that renders for paper, the lightbox and PNG export among them, so a
-	 * placeholder can never be printed or exported.
-	 *
-	 * Not extended to an empty *cell* while other rows exist: hiding when empty
-	 * is exactly what that area was asked to do, and the card has to show what
-	 * it will print.
-	 */
+	/** No row behind the card at all — an empty table, or one just cleared. */
 	const dataless = $derived(interactive && !row);
 
-	/** An area's name, drawn in it while there is no data to draw instead. */
+	/**
+	 * An area with nothing to draw from, as against one whose cell happens to
+	 * be blank on this card.
+	 *
+	 * Two ways to have nothing: there is no row at all, or the area is bound to
+	 * a column the data has not got — an unmapped slot, or one still pointing
+	 * at a column that has been renamed or deleted. Either way the area will be
+	 * empty on every card there is, so hiding it is not showing anyone what
+	 * this row prints; it is taking a piece of the design away and giving no
+	 * way to get it back. Which is what it did: set to hide when empty, such an
+	 * area collapses to no height and no visibility, and a sheet of those
+	 * cannot be clicked, selected or moved.
+	 *
+	 * An area bound to a column that *does* exist and happens to be blank here
+	 * is left alone — hiding is exactly what it was asked to do, and the card
+	 * has to show what it will print.
+	 */
+	const unsourced = (box: Box): boolean => {
+		if (dataless) return true;
+		if (!box.slot || !row) return false;
+		const column = mapping[box.slot];
+		return !column || !(column in row);
+	};
+
+	/**
+	 * An area's name, drawn in it while it has nothing of its own to draw. The
+	 * editor's doing only: `interactive` is false in every renderer that reaches
+	 * paper, a lightbox or a PNG, so a placeholder cannot be printed or
+	 * exported — and `hidden` below falls straight back to its old behaviour
+	 * there, since nothing is standing in for anything.
+	 */
 	const placeholderFor = (box: Box): string =>
-		dataless && isEmpty(box) ? (box.slot || 'Area') : '';
+		interactive && unsourced(box) && isEmpty(box) ? (box.slot || 'Area') : '';
 
 	const hidden = $derived(
 		new Set(
-			template.boxes.filter((b) => !dataless && b.hideWhenEmpty && isEmpty(b)).map((b) => b.id)
+			template.boxes
+				.filter((b) => b.hideWhenEmpty && isEmpty(b) && !placeholderFor(b))
+				.map((b) => b.id)
 		)
 	);
 	const layout = $derived(resolveLayout({ boxes: template.boxes, measured, hidden }));

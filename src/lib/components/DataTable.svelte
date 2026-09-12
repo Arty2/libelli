@@ -299,10 +299,19 @@
 			while (dataset.columns.includes(`Column ${n}`)) n++;
 			column = `Column ${n}`;
 		}
+		const columns = [...dataset.columns, column];
+		// The first column brings a row with it. A column with nothing under it
+		// is a table you cannot type in, and the button that would add a row is
+		// only drawn once there is a column to put it beside — so an empty table
+		// had one + in the header, and using it left you exactly as stuck.
+		const filling = !dataset.rows.length;
 		onchange({
-			columns: [...dataset.columns, column],
-			rows: dataset.rows.map((r) => ({ ...r, [column]: '' }))
+			columns,
+			rows: filling ? [emptyRow(columns)] : dataset.rows.map((r) => ({ ...r, [column]: '' }))
 		});
+		// Whatever card was being previewed, it is the new one now: there is only
+		// the one, and a stale index would preview a row that is not there.
+		if (filling) onactivate(0);
 	}
 
 	/**
@@ -676,8 +685,18 @@
 				{/each}
 				{#if !dataset.rows.length}
 					<tr>
+						<!-- Two ways to be empty, and they have different ways out: with
+						     columns there is a + under the row numbers, and with none
+						     there is only the one in the header — which now adds the
+						     first row along with the column. Saying "the + below" when
+						     nothing was below it was the whole of the trouble. -->
 						<td class="empty" colspan={dataset.columns.length + 2}>
-							No rows yet. Paste from a spreadsheet, import a CSV, or add a row with the + below.
+							{#if dataset.columns.length}
+								No rows yet. Paste from a spreadsheet, import a CSV, or add a row with the + below.
+							{:else}
+								Nothing here yet. Paste from a spreadsheet, import a CSV, or add a column with
+								the + above — it arrives with a row in it.
+							{/if}
 						</td>
 					</tr>
 				{/if}

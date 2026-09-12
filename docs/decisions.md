@@ -239,18 +239,28 @@ would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
 
-**With no data at all, the editor draws names instead of nothing.** A card whose
-row is `null` — an empty table, or one just cleared — has nothing in any bound
-area, and every area set to *Hide When Empty* collapses to no height and no
-visibility. That left a sheet of areas that could not be clicked, selected,
-moved or renamed: the design was still there and there was no way to get at it.
-So while the card is `interactive` and there is no row, each area draws its own
-name in grey italics and none of them hide. The condition is "no row at all",
-not "this cell is empty": with rows present, hiding when empty is exactly what
-that area was asked to do, and the editor has to show what will print.
-`interactive` is false in every renderer that is not the editor — `PrintRoot`,
-`PrintSheet`, both lightboxes, and the DOM `png.ts` clones — so a placeholder
-cannot reach paper or an export.
+**An area with nothing to draw from draws its own name.** Set to *Hide When
+Empty*, such an area collapses to no height and no visibility, and a sheet of
+those cannot be clicked, selected, moved or renamed: the design is still there
+and there is no way to get at it. So in the editor those areas draw their own
+name in grey italics instead, and none of them hide.
+
+The line is between an area with *nothing* to draw from and one whose cell is
+merely blank. Nothing means either there is no row at all — an empty table, or
+one just cleared — or the area is bound to a column the data has not got: an
+unmapped slot, or one still pointing at a column that has been renamed or
+deleted. Either way it will be empty on every card there is, so hiding it shows
+nobody what this row prints. The second half of that matters as much as the
+first: clearing the table and adding a column back gives you one empty row, at
+which point "no row at all" no longer holds and every area would have collapsed
+again one click after being rescued.
+
+An area bound to a column that *does* exist and happens to be blank here is left
+alone — hiding is exactly what it was asked to do, and the editor has to show
+what will print. `interactive` is false in every renderer that is not the editor
+— `PrintRoot`, `PrintSheet`, both lightboxes, and the DOM `png.ts` clones — so a
+placeholder cannot reach paper or an export, and `hidden` falls back to exactly
+its old behaviour there.
 
 **The area's name is the element's `id`.** That is the whole point of a name you
 can type: `#Job-Title { … }` in the template's own CSS reaches one area, where
@@ -730,6 +740,15 @@ outer edge meets the edge of the stage. That button is how the pad is picked up
 again; a pad you cannot reach is a control you have lost.
 
 ## `src/lib/components/DataTable.svelte`
+
+**The first column brings a row with it.** The button that adds a row is drawn
+under the row numbers, which only exist once there is a column — so a table with
+nothing in it had exactly one `+`, in the header, and pressing it left you with
+a column, no rows, and still no way to type anything. The empty-table line said
+"add a row with the + below" at a table that had no `+` below. Adding the first
+column now adds the row that makes it usable, and the line has a second form for
+the no-columns case that points at the `+` that is actually there. A later column
+adds a cell to the rows that exist, as it always did.
 
 **Copy is Paste's opposite number, and it writes tabs.** The tray could take a
 block of cells off a spreadsheet and could write a CSV file, and had no way to

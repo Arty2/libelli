@@ -114,11 +114,14 @@ resize boxes directly, or type exact millimetres.
   every card and travels with the design rather than with the data. An area with
   nothing typed into it is still an area — it keeps its fill, its border and its
   size, and **Hide When Empty** is what takes it away again. *+ Area* beside the
-  page adds one, starting as static text. With **no data at all** — an empty
-  table, or one you have just cleared — every area draws its own name in grey
-  italics and none of them hide, because a design whose areas have all collapsed
-  to nothing is a design you cannot click on. That is the editor's doing only: a
-  placeholder never reaches paper, the lightbox or a PNG. An area carrying its own words wears a
+  page adds one, starting as static text. An area with **nothing to draw from**
+  — because there are no rows at all, or because its name is bound to no column,
+  or to one that has since been renamed or deleted — draws its own name in grey
+  italics instead, and does not hide: a design whose areas have all collapsed to
+  nothing is a design you cannot click on. An area bound to a column that does
+  exist and is simply blank on this card still hides, because that is what it
+  will do on paper. The placeholder is the editor's doing only: it never reaches
+  paper, the lightbox or a PNG. An area carrying its own words wears a
   plug pulled out of its socket, because it is not plugged into the data.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with
   one selected, and a text box lies over the content inheriting the face, size,
@@ -363,6 +366,10 @@ a notice can appear.
   back: they walk through the app, and they are somewhere to start when a blank
   table is not. Your rows are replaced, the template is untouched, and
   Ctrl/Cmd+Z undoes it.
+- **Add a column** — the `+` in the header. On an empty table it brings the first
+  row with it: the `+` that adds rows lives under the row numbers, so until there
+  is a column there is nowhere for it to be, and a column with no row under it is
+  a table you cannot type in.
 - **Rename in place** — type in a column header; the cells and any slot bound to
   that column follow the rename.
 - **Reorder** — ‹ › in a header move a column left or right. Row objects are
