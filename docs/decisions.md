@@ -1540,6 +1540,19 @@ win the row, because they are the ones you press.
 Tests cover the pure logic. Components are verified by driving them in a real
 browser, which is the project's standing rule and not a substitute for it.
 
+**One test reads source rather than calling it.**
+`components/card-interactive.test.ts` parses the `.svelte` files for every
+`<Card>` tag and asserts that exactly one of them — the editor's — passes
+`interactive`. The editor's screen-only furniture, the placeholder an area with
+nothing to draw from shows, is editor-only purely because the other three
+renderers leave that prop alone; that is a promise kept by call sites
+remembering something, and it breaks silently. A fifth renderer copied from the
+editor's markup would print the word "title" onto somebody's cards and nothing
+would fail. It is the same bargain the color, escaping and CSS-scoping tests
+make: assert that each renderer *routes* through the guard, not merely that the
+guard works. Adding a render site is meant to fail this test — the fix is to
+name it in the list, having decided which side it is on.
+
 Two things worth knowing before trusting a green run:
 
 - **Some tests assert on generated CSS rather than behaviour** —
