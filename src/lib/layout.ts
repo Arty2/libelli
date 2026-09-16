@@ -25,6 +25,35 @@ export function pxPerMm(): number {
 export const mmToPx = (mm: number) => mm * pxPerMm();
 export const pxToMm = (px: number) => px / pxPerMm();
 
+/**
+ * The smallest paper this app will draw, in mm. A bleed cuts inwards as well as
+ * outwards now, and a page whose width has been eaten entirely is a card that
+ * has silently disappeared — so the cut stops here rather than at nothing.
+ */
+export const MIN_PAPER = 1;
+
+/**
+ * A bleed as geometry: what to add on every side of a trim box.
+ *
+ * Positive is the printer's bleed — paper outside the cut. Negative is the same
+ * decision the other way: the paper stops short of the trim, so the artwork
+ * runs off it and what would have been the margin is cropped away. Both are the
+ * same sum, `size + amount * 2`, which is why one number does both and why
+ * nothing inside the page moves either way — coordinates are measured from the
+ * trim edge, never from the paper.
+ *
+ * Clamped against the trim it applies to: half of it, less `MIN_PAPER`, is all
+ * a negative bleed can eat before the paper stops existing.
+ */
+export function bleedFor(
+	bleed: { enabled: boolean; amount: number } | undefined,
+	w: number,
+	h: number
+): number {
+	if (!bleed?.enabled) return 0;
+	return Math.max(bleed.amount, -(Math.min(w, h) - MIN_PAPER) / 2);
+}
+
 export interface LayoutInput {
 	boxes: Box[];
 	/** rendered content height in mm, keyed by box id */

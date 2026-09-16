@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PrintSheet from './PrintSheet.svelte';
 	import { resolveImposition } from '$lib/imposition';
+	import { bleedFor } from '$lib/layout';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
 	interface Props {
@@ -25,14 +26,16 @@
 		dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index))
 	);
 
-	const bleed = $derived(template.bleed.enabled ? template.bleed.amount : 0);
+	const bleed = $derived(bleedFor(template.bleed, template.page.w, template.page.h));
 	const cardW = $derived(template.page.w + bleed * 2);
 	const cardH = $derived(template.page.h + bleed * 2);
 
 	// Only needed here for the physical sheet size the browser prints onto —
 	// PrintSheet.svelte works this same geometry out again for its own layout.
 	const imposed = $derived(resolveImposition(cardW, cardH, template.print));
-	const sheetBleed = $derived(imposed && template.print.bleed.enabled ? template.print.bleed.amount : 0);
+	const sheetBleed = $derived(
+		imposed ? bleedFor(template.print.bleed, imposed.sheetW, imposed.sheetH) : 0
+	);
 	const sheetW = $derived((imposed?.sheetW ?? cardW) + sheetBleed * 2);
 	const sheetH = $derived((imposed?.sheetH ?? cardH) + sheetBleed * 2);
 	const perSheet = $derived(imposed ? imposed.grid.rows * imposed.grid.cols : 1);

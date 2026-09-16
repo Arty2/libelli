@@ -2,7 +2,7 @@
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
 	import { swipe } from '$lib/gestures';
-	import { mmToPx } from '$lib/layout';
+	import { bleedFor, mmToPx } from '$lib/layout';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
 	interface Props {
@@ -20,8 +20,9 @@
 
 	let viewport = $state({ w: 1200, h: 800 });
 
-	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
-	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
+	const bleed = $derived(bleedFor(template.bleed, template.page.w, template.page.h));
+	const outerW = $derived(template.page.w + bleed * 2);
+	const outerH = $derived(template.page.h + bleed * 2);
 	const scale = $derived.by(() => {
 		// The nav bar and its gap sit under the card and always need their band.
 		// Sideways there is nothing but ground, and on a phone 120px of it is a
@@ -29,6 +30,10 @@
 		const sides = viewport.w < 560 ? 24 : 120;
 		return Math.min((viewport.h - 120) / mmToPx(outerH), (viewport.w - sides) / mmToPx(outerW));
 	});
+
+	/** The card's size on screen at rest, which is what the pan is measured against. */
+	const stageW = $derived(mmToPx(outerW) * scale);
+	const stageH = $derived(mmToPx(outerH) * scale);
 
 	$effect(() => {
 		const read = () => (viewport = { w: window.innerWidth, h: window.innerHeight });
@@ -123,6 +128,147 @@
 		}
 	}
 
+
+	// ---- zoom ---------------------------------------------------------------
+
+	/**
+	 * Pinch to zoom, here and not in the editor.
+	 *
+	 * This is the one screen where zooming means what a phone means by it: the
+	 * card is already as big as the window will take it, and the reason to pinch
+	 * is to read the six-point line at the bottom of it. In the editor the same
+	 * gesture sizes the type of the area under it — there the page has a zoom
+	 * control, a wheel and two keys, and the areas have nothing.
+	 *
+	 * The zoom is drawn on the stage rather than the card, so it composes with
+	 * the tilt the card is already wearing instead of fighting it for
+	 * `transform`, and the deal animation keeps `translate` and `rotate` to
+	 * itself.
+	 */
+	const ZOOM_MAX = 6;
+	/** Under this much, a pinch was a fumble rather than a zoom, and it snaps back. */
+	const ZOOM_SNAP = 1.05;
+
+	let zoom = $state(1);
+	let pan = $state({ x: 0, y: 0 });
+	let stage = $state<HTMLDivElement | null>(null);
+
+	/**
+	 * How far the card may be pushed: half of what the zoom added, so an edge can
+	 * be brought to the middle of the window and no further. A card at rest has
+	 * no slack at all, which is what keeps a stray drag from nudging it off
+	 * centre.
+	 */
+	function clampPan(next: { x: number; y: number }, at: number) {
+		// From the size the card is drawn at, not from a measurement: the element
+		// is measured *after* the zoom is applied, and by then the number this is
+		// meant to limit has already gone in.
+		const w = stageW * (at - 1);
+		const h = stageH * (at - 1);
+		return {
+			x: Math.max(-w / 2, Math.min(w / 2, next.x)),
+			y: Math.max(-h / 2, Math.min(h / 2, next.y))
+		};
+	}
+
+	function zoomReset() {
+		zoom = 1;
+		pan = { x: 0, y: 0 };
+	}
+
+	// A new card arrives at rest: the zoom belonged to the one you were reading.
+	let shown = -1;
+	$effect(() => {
+		if (shown === index) return;
+		shown = index;
+		zoomReset();
+	});
+
+	/** Two fingers, tracked by id so a third does nothing. */
+	let pinch = new Map<number, { x: number; y: number }>();
+	/**
+	 * Whether the gesture in flight was ever a pinch. A pinch ends with two
+	 * fingers coming off at whatever distance apart they finished, and the last
+	 * one up looks exactly like a flick to the swipe — which paged the card out
+	 * from under a zoom that had just been let go of. Cleared by the next press
+	 * that starts from nothing, not by a finger lifting, because the order in
+	 * which two handlers on the same node see the same pointerup is not ours to
+	 * depend on.
+	 */
+	let pinched = false;
+	let pinchStart: {
+		spread: number;
+		zoom: number;
+		pan: { x: number; y: number };
+		/** where the fingers were, and where the untransformed stage was centred */
+		mid: { x: number; y: number };
+		centre: { x: number; y: number };
+	} | null = null;
+
+	const spread = () => {
+		const [a, b] = [...pinch.values()];
+		return Math.hypot(a.x - b.x, a.y - b.y);
+	};
+	const midpoint = () => {
+		const [a, b] = [...pinch.values()];
+		return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+	};
+
+	function pinchDown(event: PointerEvent) {
+		if (event.pointerType !== 'touch') return;
+		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
+		if (pinch.size === 1) pinched = false;
+		if (pinch.size !== 2) return;
+		pinched = true;
+		// The backdrop closes on a click, and the click that ends a pinch lands on
+		// whatever was under the last finger up. A pinch is a drag as far as that
+		// is concerned: it is not how you put the card away.
+		dragged = true;
+		// The drag the first finger started is not a drag any more.
+		dragFrom = null;
+		dragTilt = { x: 0, y: 0, z: 0 };
+		const rect = stage?.getBoundingClientRect();
+		pinchStart = {
+			spread: spread(),
+			zoom,
+			pan: { ...pan },
+			mid: midpoint(),
+			// Scaling is about the centre, so the centre is the one point the zoom
+			// does not move: taking the pan back off the measured centre gives where
+			// the stage sits with nothing applied to it.
+			centre: {
+				x: (rect ? rect.left + rect.width / 2 : 0) - pan.x,
+				y: (rect ? rect.top + rect.height / 2 : 0) - pan.y
+			}
+		};
+	}
+
+	function pinchMove(event: PointerEvent) {
+		if (!pinch.has(event.pointerId)) return;
+		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
+		if (pinch.size !== 2 || !pinchStart || pinchStart.spread === 0) return;
+		event.preventDefault();
+		const next = Math.max(1, Math.min(ZOOM_MAX, pinchStart.zoom * (spread() / pinchStart.spread)));
+		// The paper under the fingers stays under the fingers: where that point
+		// sits on the unzoomed card is fixed, so the pan is whatever puts it back
+		// under the midpoint at the new scale — and the midpoint may travel, which
+		// is what lets a pinch pan as well as zoom.
+		const u = {
+			x: (pinchStart.mid.x - pinchStart.centre.x - pinchStart.pan.x) / pinchStart.zoom,
+			y: (pinchStart.mid.y - pinchStart.centre.y - pinchStart.pan.y) / pinchStart.zoom
+		};
+		const mid = midpoint();
+		zoom = next;
+		pan = clampPan({ x: mid.x - pinchStart.centre.x - u.x * next, y: mid.y - pinchStart.centre.y - u.y * next }, next);
+	}
+
+	function pinchUp(event: PointerEvent) {
+		pinch.delete(event.pointerId);
+		if (pinch.size >= 2) return;
+		pinchStart = null;
+		if (zoom < ZOOM_SNAP) zoomReset();
+	}
+
 	// ---- tilt ---------------------------------------------------------------
 
 	/**
@@ -205,7 +351,7 @@
 	/** how far the pointer travels to reach that lean, in pixels */
 	const DRAG_RANGE = 260;
 	let dragTilt = { x: 0, y: 0, z: 0 };
-	let dragFrom: { x: number; y: number; id: number } | null = null;
+	let dragFrom: { x: number; y: number; id: number; pan: { x: number; y: number } } | null = null;
 	/**
 	 * Whether the pointer moved enough to be a drag rather than a click. The
 	 * backdrop closes on click, and turning the card and then letting go over the
@@ -215,7 +361,7 @@
 
 	function tiltDown(event: PointerEvent) {
 		if (event.button !== 0) return;
-		dragFrom = { x: event.clientX, y: event.clientY, id: event.pointerId };
+		dragFrom = { x: event.clientX, y: event.clientY, id: event.pointerId, pan: { ...pan } };
 		dragged = false;
 	}
 
@@ -224,6 +370,13 @@
 		const dx = event.clientX - dragFrom.x;
 		const dy = event.clientY - dragFrom.y;
 		if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragged = true;
+		// Zoomed in, the drag is how you get to the rest of the card. Leaning it is
+		// what a finger does while the whole card is on screen and there is nothing
+		// to go and look at.
+		if (zoom > 1) {
+			pan = clampPan({ x: dragFrom.pan.x + dx, y: dragFrom.pan.y + dy }, zoom);
+			return;
+		}
 		const lean = (px: number) =>
 			(Math.max(-DRAG_RANGE, Math.min(DRAG_RANGE, px)) / DRAG_RANGE) * DRAG_MAX;
 		// Dragging right turns the card's left edge towards you, which is a
@@ -353,12 +506,28 @@
 		if (!dragged) onclose();
 		dragged = false;
 	}}
-	onpointerdown={tiltDown}
-	onpointermove={tiltMove}
-	onpointerup={tiltUp}
-	onpointercancel={tiltUp}
+	onpointerdown={(e) => {
+		pinchDown(e);
+		tiltDown(e);
+	}}
+	onpointermove={(e) => {
+		pinchMove(e);
+		tiltMove(e);
+	}}
+	onpointerup={(e) => {
+		pinchUp(e);
+		tiltUp(e);
+	}}
+	onpointercancel={(e) => {
+		pinchUp(e);
+		tiltUp(e);
+	}}
 	onpointerleave={tiltUp}
-	use:swipe={(by) => step(index + by)}
+	use:swipe={(by) => {
+		// Zoomed in, a flick is how you get across the card, not how you leave it —
+		// and the last finger of a pinch is not a flick at all.
+		if (zoom === 1 && !pinched) step(index + by);
+	}}
 >
 	<button class="plain close" onclick={onclose} title="Close" aria-label="Close">
 		<Icon name="close" size={22} />
@@ -368,8 +537,9 @@
 	     the index: that is what tears the old one down — with its outro — and
 	     builds the new one. -->
 	<div
+		bind:this={stage}
 		class="card-stage"
-		style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) * scale}px"
+		style="width:{stageW}px;height:{stageH}px;translate:{pan.x}px {pan.y}px;scale:{zoom}"
 	>
 	{#key index}
 	<div

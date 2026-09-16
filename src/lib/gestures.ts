@@ -1,3 +1,5 @@
+import { HOLD_MS, vibrate } from './haptics';
+
 /**
  * Pointer gestures that more than one component needs.
  *
@@ -76,9 +78,14 @@ export function hold(node: HTMLElement, action: () => void) {
 		if (event.button !== 0) return;
 		fired = false;
 		from = { x: event.clientX, y: event.clientY };
+		const touch = event.pointerType === 'touch';
 		timer = setTimeout(() => {
 			timer = null;
 			fired = true;
+			// A hold fires with nothing let go of and nothing on screen to say so —
+			// the whole gesture is invisible until its action happens. On a phone
+			// this is the only thing that says the wait is over.
+			if (touch) vibrate(HOLD_MS);
 			handler();
 		}, HOLD_DELAY);
 	};

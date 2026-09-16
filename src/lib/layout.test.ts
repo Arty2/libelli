@@ -3,7 +3,9 @@ import {
 	FREE_STEP,
 	GRID_MAJOR,
 	GRID_MINOR,
+	MIN_PAPER,
 	alignBoxes,
+	bleedFor,
 	boxEdges,
 	resolveLayout,
 	snapTo,
@@ -154,5 +156,25 @@ describe('alignBoxes', () => {
 			newBox({ id: 'b', x: 30, y: 40, w: 10, h: 10, anchor: { to: 'a', gap: 4 } })
 		];
 		expect(alignBoxes(anchored, ['a', 'b'], 'left')[1].anchor).toEqual({ to: 'a', gap: 4 });
+	});
+});
+
+describe('bleed', () => {
+	it('is nothing at all while it is off, whatever the amount says', () => {
+		expect(bleedFor({ enabled: false, amount: 3 }, 148, 210)).toBe(0);
+		expect(bleedFor(undefined, 148, 210)).toBe(0);
+	});
+
+	it('outsets the paper on both sides, and insets it when negative', () => {
+		expect(bleedFor({ enabled: true, amount: 3 }, 148, 210)).toBe(3);
+		expect(bleedFor({ enabled: true, amount: -4 }, 148, 210)).toBe(-4);
+	});
+
+	it('will not let a negative bleed eat the paper', () => {
+		const page = { w: 50, h: 90 };
+		const eaten = bleedFor({ enabled: true, amount: -999 }, page.w, page.h);
+		expect(page.w + eaten * 2).toBeCloseTo(MIN_PAPER);
+		// The narrow side is what runs out first; the other keeps what is left.
+		expect(page.h + eaten * 2).toBeGreaterThan(MIN_PAPER);
 	});
 });

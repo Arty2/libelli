@@ -4,8 +4,9 @@
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
 	import type { Arrange } from '$lib/template';
-	import { hold, swipe } from '$lib/gestures';
-	import { GRID_MAJOR, GRID_MINOR, mmToPx } from '$lib/layout';
+	import { HOLD_DELAY, hold, swipe } from '$lib/gestures';
+	import { HOLD_MS, vibrate } from '$lib/haptics';
+	import { GRID_MAJOR, GRID_MINOR, bleedFor, mmToPx, pxToMm } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
@@ -178,6 +179,106 @@
 		selectedBoxes.length > 0 && selectedBoxes.every((b) => !!b.anchor)
 	);
 
+	/**
+	 * What the tied pair of keys does instead of nudging.
+	 *
+	 * An anchored area has no vertical freedom of its own, and the two keys used
+	 * to say so by going dead — which is honest and completely unhelpful on the
+	 * one device that has no other way in. They are live now, and they carry the
+	 * two things you actually want at that moment.
+	 *
+	 * Hold one, and the selection moves to the area this one hangs from: that is
+	 * the area that can still go up and down, and now the same key will move it.
+	 * Tap one three times in a row and the tie itself goes, leaving the area
+	 * exactly where it sits — after the first tap the key wears the broken link,
+	 * so the second and third taps are something you are choosing rather than
+	 * something that happens to you.
+	 */
+	const tiedTo = $derived(verticalTied ? (selectedBoxes[0]?.anchor?.to ?? null) : null);
+
+	const UNTIE_TAPS = 3;
+	/** A run of taps, not three taps in a session: the count lapses after this. */
+	const UNTIE_WINDOW = 1500;
+	let tiedTaps = $state(0);
+	let tiedAt = 0;
+	let tiedHold: ReturnType<typeof setTimeout> | null = null;
+	let tiedLapse: ReturnType<typeof setTimeout> | null = null;
+
+	/**
+	 * The count lapses on its own, and the key stops wearing the broken link when
+	 * it does. Left to be noticed on the next tap, a key tapped once an hour ago
+	 * would still be showing a run that is long over — and the icon is the only
+	 * thing saying a second tap is now the middle of something.
+	 */
+	function tiedLapsed() {
+		if (tiedLapse) clearTimeout(tiedLapse);
+		tiedLapse = setTimeout(() => (tiedTaps = 0), UNTIE_WINDOW);
+	}
+
+	// A different tie is a different run of taps.
+	let tiedLast: string | null = null;
+	$effect(() => {
+		if (tiedLast === tiedTo) return;
+		tiedLast = tiedTo;
+		tiedTaps = 0;
+	});
+
+	/**
+	 * Where an area actually sits, read back off the page.
+	 *
+	 * An anchored area's top is resolved during layout, from the rendered bottom
+	 * of the area above it, and only the card knows the answer because only the
+	 * card measured it. Writing the box's stale `y` back instead would drop it up
+	 * the page at the moment the tie broke, which is the one thing breaking a tie
+	 * must not do.
+	 */
+	function renderedTop(id: string): number | null {
+		const el = host?.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`);
+		return el ? Math.round(pxToMm(el.offsetTop) * 100) / 100 : null;
+	}
+
+	function untie() {
+		const tied = selectedBoxes.filter((b) => b.anchor && !b.locked);
+		if (!tied.length) return;
+		onaction?.('Break the anchor');
+		for (const box of tied) onchange({ ...box, anchor: null, y: renderedTop(box.id) ?? box.y });
+	}
+
+	function tiedDown() {
+		tiedHold = setTimeout(() => {
+			tiedHold = null;
+			tiedTaps = 0;
+			// The hold is over and nothing on screen has said so yet — see haptics.ts.
+			vibrate(HOLD_MS);
+			if (tiedTo) onselect(tiedTo);
+		}, HOLD_DELAY);
+	}
+
+	function tiedUp() {
+		// Still running means the press was short: a tap, and one of a run.
+		if (!tiedHold) return;
+		clearTimeout(tiedHold);
+		tiedHold = null;
+		const now = Date.now();
+		tiedTaps = now - tiedAt > UNTIE_WINDOW ? 1 : tiedTaps + 1;
+		tiedAt = now;
+		if (tiedTaps < UNTIE_TAPS) {
+			tiedLapsed();
+			return;
+		}
+		tiedTaps = 0;
+		untie();
+	}
+
+	function tiedCancel() {
+		if (tiedHold) clearTimeout(tiedHold);
+		tiedHold = null;
+	}
+
+	const tiedTitle = $derived(
+		`Tied to another area — its top follows that area\u2019s bottom. Hold to move that area instead; tap ${UNTIE_TAPS} times to break the tie and leave this one where it is.`
+	);
+
 	/** Paint order is array order, so "front" is last in the list, not a z-index. */
 	const ARRANGEMENTS: Array<{ value: Arrange; icon: string; label: string }> = [
 		{ value: 'front', icon: 'bring-to-front', label: 'Bring to Front' },
@@ -197,8 +298,9 @@
 		!!template.locked ||
 		(stackIndex >= 0 && ((where === 'front' || where === 'forward') ? atFront : atBack));
 
-	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
-	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
+	const bleed = $derived(bleedFor(template.bleed, template.page.w, template.page.h));
+	const outerW = $derived(template.page.w + bleed * 2);
+	const outerH = $derived(template.page.h + bleed * 2);
 
 
 	/**
@@ -264,7 +366,7 @@
 
 	const gridArt = $derived.by(() => {
 		if (!grid) return null;
-		const originMm = template.bleed.enabled ? template.bleed.amount : 0;
+		const originMm = bleed;
 		const w = mmToPx(outerW) * scale;
 		const h = mmToPx(outerH) * scale;
 		const at = (stepMm: number) => ({
@@ -400,17 +502,59 @@
 
 	/** Two fingers on the page. Tracked by pointer id, so a stray third does nothing. */
 	let pinch = new Map<number, { x: number; y: number }>();
-	let pinchStart: { spread: number; scale: number } | null = null;
+	let pinchStart:
+		| {
+				spread: number;
+				scale: number;
+				/** the type sizes the pinch started from, keyed by box; null zooms the page instead */
+				sizes: Map<string, number> | null;
+				/** whether the undo entry has been named, which happens on the first change */
+				named: boolean;
+		  }
+		| null = null;
 
 	const spread = () => {
 		const [a, b] = [...pinch.values()];
 		return Math.hypot(a.x - b.x, a.y - b.y);
 	};
 
+	/**
+	 * What a pinch that lands on an area is about: its type.
+	 *
+	 * A pinch over the page is the gesture everyone already has for making the
+	 * words bigger, and the page has a zoom control, a wheel, two keys and the
+	 * lightbox for the other reading. So a pinch whose middle is over an area
+	 * sizes that area — the whole selection when it is part of one, the same
+	 * bargain dragging one of several makes — and a pinch over bare ground or
+	 * over a locked design still zooms the page, which is what keeps the gesture
+	 * from being lost on a phone.
+	 */
+	function sizesUnder(x: number, y: number): Map<string, number> | null {
+		if (template.locked) return null;
+		const el = document.elementFromPoint(x, y) as HTMLElement | null;
+		const id = el?.closest<HTMLElement>('[data-box-id]')?.dataset.boxId;
+		if (!id) return null;
+		const chosen = selectedIds.includes(id) ? selectedIds : [id];
+		const sizes = new Map<string, number>();
+		for (const box of template.boxes) {
+			// A box with no size of its own inherits the page's; the first pinch is
+			// what gives it one to change.
+			if (chosen.includes(box.id) && !box.locked) sizes.set(box.id, box.size ?? template.defaults.size);
+		}
+		return sizes.size ? sizes : null;
+	}
+
 	function onPinchDown(event: PointerEvent) {
 		if (event.pointerType !== 'touch') return;
 		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
-		if (pinch.size === 2) pinchStart = { spread: spread(), scale };
+		if (pinch.size !== 2) return;
+		const [a, b] = [...pinch.values()];
+		pinchStart = {
+			spread: spread(),
+			scale,
+			sizes: sizesUnder((a.x + b.x) / 2, (a.y + b.y) / 2),
+			named: false
+		};
 	}
 
 	function onPinchMove(event: PointerEvent) {
@@ -418,13 +562,51 @@
 		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
 		if (pinch.size !== 2 || !pinchStart || pinchStart.spread === 0) return;
 		event.preventDefault();
-		zoomTo(pinchStart.scale * (spread() / pinchStart.spread));
+		const by = spread() / pinchStart.spread;
+		if (!pinchStart.sizes) {
+			zoomTo(pinchStart.scale * by);
+			return;
+		}
+		for (const box of template.boxes) {
+			const from = pinchStart.sizes.get(box.id);
+			if (from === undefined) continue;
+			const size = Math.round(Math.max(1, from * by) * 10) / 10;
+			if (size === box.size) continue;
+			// Named on the first size that actually changes, and once only, so a
+			// pinch that never grew past a tenth of a point leaves no undo entry.
+			if (!pinchStart.named) {
+				pinchStart.named = true;
+				onaction?.('Resize the type');
+			}
+			onchange({ ...box, size });
+		}
 	}
 
 	function onPinchUp(event: PointerEvent) {
 		pinch.delete(event.pointerId);
 		if (pinch.size < 2) pinchStart = null;
 	}
+
+	/**
+	 * The pinch listens in the capture phase, on the way down to whatever was
+	 * touched, because an area swallows its own pointer events — without this a
+	 * pinch worked on the grey around the page and nowhere on the page itself,
+	 * which is exactly where the areas are.
+	 */
+	$effect(() => {
+		if (!host) return;
+		const node = host;
+		node.addEventListener('pointerdown', onPinchDown, true);
+		node.addEventListener('pointermove', onPinchMove, true);
+		node.addEventListener('pointerup', onPinchUp, true);
+		node.addEventListener('pointercancel', onPinchUp, true);
+		return () => {
+			node.removeEventListener('pointerdown', onPinchDown, true);
+			node.removeEventListener('pointermove', onPinchMove, true);
+			node.removeEventListener('pointerup', onPinchUp, true);
+			node.removeEventListener('pointercancel', onPinchUp, true);
+		};
+	});
 
 	/**
 	 * View keys live here because this is where `scale` is known. Photoshop's
@@ -602,17 +784,13 @@
 	bind:this={host}
 	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px"
 	onpointerdown={(e) => {
-		onPinchDown(e);
-			// Bare paper counts as empty space, not just the grey around the sheet:
-			// clicking away from everything is how every canvas editor deselects,
-			// and stopping at the page edge made it look broken. A box swallows its
-			// own pointerdown, so this only ever fires on ground nobody owns.
-			const el = e.target as HTMLElement;
-			if (e.target === e.currentTarget || /\b(sheet|card|trim|scaler|page|grid-overlay)\b/.test(el.className)) onselect(null);
+		// Bare paper counts as empty space, not just the grey around the sheet:
+		// clicking away from everything is how every canvas editor deselects, and
+		// stopping at the page edge made it look broken. A box swallows its own
+		// pointerdown, so this only ever fires on ground nobody owns.
+		const el = e.target as HTMLElement;
+		if (e.target === e.currentTarget || /\b(sheet|card|trim|scaler|page|grid-overlay)\b/.test(el.className)) onselect(null);
 	}}
-	onpointermove={onPinchMove}
-	onpointerup={onPinchUp}
-	onpointercancel={onPinchUp}
 	role="region"
 	aria-label="Card preview"
 	tabindex="-1"
@@ -692,7 +870,7 @@
 			</svg>
 		{/if}
 
-		{#if bounds && template.bleed.enabled && template.bleed.amount > 0}
+		{#if bounds && bleed !== 0}
 			<!-- Where the paper will be cut.
 
 			     Drawn here rather than inside the card, and after the grid, because
@@ -702,7 +880,11 @@
 
 			     Solid, and the same half-pixel hairline the grid uses. It used to be
 			     dashed and a whole pixel, which made it the loudest line on a page
-			     that already has dashed bounds on every box. -->
+			     that already has dashed bounds on every box.
+
+			     A negative bleed puts this line *outside* the paper, which is right:
+			     it is still where the artwork is cut, and the strip between it and
+			     the sheet is what that cut is taking away. -->
 			<!-- Sized in pixels rather than by `inset` alone. An `<svg>` is a replaced
 			     element: with `width: auto` it takes its intrinsic 300 × 150 and
 			     ignores the opposite offset, so the trim edge was drawn 300 × 150 at
@@ -710,7 +892,7 @@
 			<svg
 				class="trim-line"
 				aria-hidden="true"
-				style="left:{mmToPx(template.bleed.amount) * scale}px;top:{mmToPx(template.bleed.amount) *
+				style="left:{mmToPx(bleed) * scale}px;top:{mmToPx(bleed) *
 					scale}px;width:{mmToPx(template.page.w) * scale}px;height:{mmToPx(template.page.h) * scale}px"
 			><rect width="100%" height="100%" /></svg>
 		{/if}
@@ -955,13 +1137,17 @@
 		>
 			<button
 				class="up"
-				disabled={verticalTied}
-				title={verticalTied
-					? 'Tied to another area — its top follows that area\u2019s bottom. Change the Gap in the bar.'
-					: `Up ${padStep}mm`}
-				onpointerdown={() => startNudge(0, -padStep)}
+				class:tied={verticalTied}
+				title={verticalTied ? tiedTitle : `Up ${padStep}mm`}
+				onpointerdown={() => (verticalTied ? tiedDown() : startNudge(0, -padStep))}
+				onpointerup={tiedUp}
+				onpointerleave={tiedCancel}
+				onpointercancel={tiedCancel}
 			>
-				<Icon name={verticalTied ? 'link' : 'caret-up'} size={verticalTied ? 15 : 30} />
+				<Icon
+					name={verticalTied ? (tiedTaps ? 'unlink' : 'link') : 'caret-up'}
+					size={verticalTied ? 15 : 30}
+				/>
 			</button>
 			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
 			<!-- The middle button carries the second gesture, because the arrows
@@ -982,13 +1168,17 @@
 			<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={30} /></button>
 			<button
 				class="down"
-				disabled={verticalTied}
-				title={verticalTied
-					? 'Tied to another area — its top follows that area\u2019s bottom. Change the Gap in the bar.'
-					: `Down ${padStep}mm`}
-				onpointerdown={() => startNudge(0, padStep)}
+				class:tied={verticalTied}
+				title={verticalTied ? tiedTitle : `Down ${padStep}mm`}
+				onpointerdown={() => (verticalTied ? tiedDown() : startNudge(0, padStep))}
+				onpointerup={tiedUp}
+				onpointerleave={tiedCancel}
+				onpointercancel={tiedCancel}
 			>
-				<Icon name={verticalTied ? 'link' : 'caret-down'} size={verticalTied ? 15 : 30} />
+				<Icon
+					name={verticalTied ? (tiedTaps ? 'unlink' : 'link') : 'caret-down'}
+					size={verticalTied ? 15 : 30}
+				/>
 			</button>
 		</div>
 	{/if}
@@ -1431,6 +1621,14 @@
 		opacity: 0.55;
 		cursor: default;
 		color: #767676;
+	}
+
+	/* A key that cannot nudge, but is not dead: it holds the two ways out of the
+	   tie. Quieter than a live arrow and louder than a disabled one, which is
+	   exactly what it is. */
+	.pad button.tied {
+		color: #767676;
+		background: rgba(255, 255, 255, 0.72);
 	}
 
 	/* While it is being carried: the pad itself says so, because the finger is on

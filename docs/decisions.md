@@ -20,6 +20,21 @@ that number would otherwise reach the field and the exported template.
 **Sibling edges come from `resolveLayout`**, so a box snaps to where a grown box
 actually ends, not to where its declared geometry says it starts.
 
+**A bleed is one number and one sum, `size + amount * 2`, and it goes both
+ways.** `bleedFor` is the only place that turns the setting into geometry, for
+the card and for the sheet alike — six components were each writing
+`enabled ? amount : 0` and each would have had to learn the negative case
+separately. Positive is the printer's bleed, paper outside the cut. Negative is
+the same decision run the other way: the paper stops short of the trim, the
+artwork runs off it, and the strip between is cut away rather than kept. Nothing
+inside the page moves either way, because coordinates are measured from the trim
+edge and never from the paper — which is exactly why one sum can serve both. The
+clamp is the only asymmetry: a negative bleed may eat half the *narrower* side
+less `MIN_PAPER`, because past that there is no paper left to print on and the
+card has silently disappeared. The fields carry the same floor as their `min`, so
+the limit is visible before it is hit rather than applied behind the number you
+typed.
+
 ## `src/lib/template.ts`
 
 **Stacking is array order**, not a z-index: `arrangeBoxes` moves boxes within the
@@ -551,6 +566,35 @@ and only there for a single selection. The reset drops the drag in flight along
 with it: the drag snapshotted the old value at pointerdown, and a move arriving
 afterwards would write that snapshot straight back over the reset.
 
+**A negative bleed is a `translate` on `.trim`, not a negative margin.** The
+positive case is padding on the card, which is what insets the trim inside the
+paper. The negative case is the trim hanging over the paper on all four sides,
+and padding cannot go that way. A negative margin can, but a negative *top*
+margin collapses straight out of the card and pulls the card itself up the page
+instead of moving the trim inside it — measured: the x offset was right and the y
+offset was zero. `translate` is a used-value offset, so it moves nothing in
+layout, and the overflow it makes is what the card's own `overflow: hidden`
+crops. That crop is the cut.
+
+**A second finger cancels the drag and puts the area back.** A pinch over an area
+sizes its type (see `PagePreview.svelte`), and the finger that started the pinch
+had already picked up whatever it landed on — so a two-finger gesture scaled the
+type and walked the area across the card at once. The window listens in the
+capture phase for every touch, because a box stops its own pointerdown from
+propagating and the second finger may land anywhere at all. The area goes back to
+where the drag started rather than staying where it had got to: a pinch is not a
+move, so it must leave no move behind. Only when the drag had actually moved
+something, so a pinch that begins with a finger resting on an area writes
+nothing.
+
+**An anchor chain lights up at two strengths.** Selecting an area fills the badge
+of what follows it directly and outlines the badges further down — grandchildren,
+and on to the end of the chain. Moving the selected area moves all of them, so
+all of them are marked; but a card where every badge below the selection is
+filled has nothing left to find, and the near end is the one the eye wants.
+Upwards it stays one hop, as it always did: what this area follows is a
+relationship it has, and what that one follows is not.
+
 ## `src/lib/components/PagePreview.svelte`
 
 **The pager's swipe lives on a chip, not on the row.** The row spans the whole
@@ -738,6 +782,43 @@ of sight is the cheapest way to get that corner back, so the clamp lets the pad
 hang over the edge — and stops at one cell, which is where the middle button's
 outer edge meets the edge of the stage. That button is how the pad is picked up
 again; a pad you cannot reach is a control you have lost.
+
+**A pinch that lands on an area sizes its type; a pinch on the ground zooms the
+page.** Both readings of the gesture are right, and only one of them can be the
+default, so the answer is what is under the fingers: the page already has a zoom
+menu, a wheel, two keys and the full-screen view, and the areas had nothing at
+all on a phone. The midpoint at the moment the second finger lands decides it,
+and the whole selection is sized when the area under it is part of one — the same
+bargain dragging one of several makes. A locked design is never sized, and falls
+back to the zoom. The trade-off worth saying out loud: on a card whose areas
+cover most of the paper, pinch-to-zoom in the editor is mostly reachable in the
+margin around it, which is why the full-screen view now takes the pinch as a zoom
+outright.
+
+**The pinch listens in the capture phase.** An area swallows its own pointer
+events, so the bubbling listeners this used to have saw two fingers on the grey
+around the page and never saw them on the page itself — which is exactly where
+the areas are, and where a pinch now has something to do.
+
+**The pad's tied keys are not dead.** An anchored area has no vertical freedom,
+and the two vertical keys used to say so by being `disabled` — honest, and
+completely unhelpful on the one device with no other way in. They carry the two
+things you actually want at that moment: a **hold** moves the selection to the
+area this one hangs from, which is the area that can still go up and down, so the
+same key you were pressing moves it; **three taps in a run** break the tie and
+leave the area exactly where it sits. Three, not one, because the keys are also
+where a finger goes to nudge, and an accidental tap must not quietly undo a
+relationship the design depends on; after the first tap the key wears the broken
+link, and the run lapses after a second and a half so the icon never lies about
+what a second tap would do.
+
+**Where the freed area's top comes from.** Breaking a tie writes the *rendered*
+top back as the box's own `y` — that is what "leave it where it sits" means, and
+an anchor released to the box's stale `y` would jump it up the page. Only the
+card knows that number, because only the card measured it, so the pad reads it
+back off the DOM (`offsetTop` inside `.trim`, which is mm by construction) rather
+than plumbing the resolved layout up through two components. The cost is a
+rounding of a few hundredths of a millimetre, from going through pixels and back.
 
 ## `src/lib/components/DataTable.svelte`
 
@@ -1043,6 +1124,29 @@ couple of degrees it stops reading as a card catching the light and starts
 reading as a crooked print. The drag resists the same way, for the same reason —
 push a card sideways and its mass lags behind.
 
+**Pinch to zoom lives here, and only here.** This is the one screen where
+zooming means what a phone means by it: the card is already as large as the
+window will take it, and the reason to pinch is to read the six-point line at the
+bottom. Elsewhere the same gesture sizes the area under it. The zoom is drawn on
+the *stage* rather than on the card, with the `scale` and `translate` properties
+rather than `transform`, because the card is already wearing a tilt on
+`transform` and a deal animation on `translate` and `rotate` — three owners, three
+properties, no fighting. The paper under the fingers stays under the fingers: the
+centre the scale is about is the one point a scale does not move, so taking the
+pan off the measured centre gives where the stage sits untransformed, and the
+rest is arithmetic. The pan is clamped to half of what the zoom added, so an edge
+can be brought to the middle of the window and no further; a card at rest has no
+slack at all, which is what keeps a stray drag from nudging it off centre.
+
+**A pinch is not a flick, and a new card arrives at rest.** A pinch ends with two
+fingers coming off at whatever distance apart they finished, and the last one up
+looks exactly like a swipe — which paged the card out from under a zoom that had
+just been let go of. A flag says the gesture in flight was ever a pinch, cleared
+by the next press that starts from nothing rather than by a finger lifting,
+because the order in which two handlers on the same node see the same pointerup
+is not ours to depend on. Stepping to another card resets the zoom: it belonged
+to the card you were reading.
+
 ## `src/lib/components/PrintSettingsPanel.svelte`
 
 **The two bleeds sit together, on the line above the sheet.** Page bleed and
@@ -1156,6 +1260,15 @@ approximated for the preview, so there is no way for the preview to promise
 something the print or the export does not deliver. It was pulled out of
 `PrintRoot.svelte`, which used to inline this per-sheet markup directly —
 splitting it was what let the preview reuse it at all.
+
+**A negative sheet bleed is padding the sheet cannot have.** The block is
+centred with padding, deliberately — a top margin on the first child collapses
+out of the sheet and takes the sheet with it. A sheet bleed that goes inwards
+makes that padding negative, which padding cannot be, so what padding cannot
+express is moved onto the block as a `translate`: a used-value offset, so the
+sheet still measures exactly the paper it names and the overhang is symmetrical.
+The sheet clips it, because the paper is what goes on the printer and what hangs
+over it is cut, not carried onto a page of its own.
 
 ## `src/lib/components/PrintPreview.svelte`
 
@@ -1485,6 +1598,33 @@ somebody scrolling and catching this on the way past — paging the cards out fr
 under them is worse than doing nothing. Touch only: a mouse has a wheel and two
 arrows either side of the count, and treating a click-drag as a swipe would page
 the cards every time somebody tried to select the counter's text.
+
+**A hold buzzes as it fires.** A hold is the one gesture with nothing on screen
+to say it has happened until its action does, and on touch that vibration is the
+whole of the feedback. Touch only: a mouse hold on a touchscreen laptop should
+not shake the machine.
+
+## `src/lib/haptics.ts`
+
+**One delegated listener, not a rule every button has to remember.** There are
+getting on for two hundred controls across the bars, the table, the dialogs and
+the two lightboxes; a feedback rule applied at each one is a rule that will be
+missing from the next one. The listener is on the document and in the capture
+phase, because plenty of these controls stop their own pointer events — an area
+on the card, a badge on it, the pad — and a press that is swallowed is still a
+press that happened.
+
+**On the way down, touch only, and silent when refused.** The point of it is to
+say *received*, and a confirmation that waits for the release is late by exactly
+the length of the press. A mouse has the button going down under a pointer you
+can see, and no desktop vibrates on a click. A disabled control says nothing at
+all: it is refusing, and a refusal that feels like an action is worse than one
+that feels like nothing.
+
+**No `prefers-reduced-motion` gate.** That setting is about what moves on screen,
+which is what can make a reader ill; a phone already has a system switch for
+haptics, which `navigator.vibrate` obeys. Arguable either way, which is why it is
+written down rather than decided twice.
 
 ## The mark — `static/icon.svg`, `static/logo.svg` and the toolbar brand
 

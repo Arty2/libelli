@@ -77,7 +77,15 @@ resize boxes directly, or type exact millimetres.
   the released box keeps the place it was sitting in. Each swaps to the icon of
   the undoing while the pointer is on it, and for a moment after a tap, so
   pressing one holds no surprise: the link shows a broken link, and the buoy
-  shows a boat that has left it. Selecting either end lights up the other.
+  shows a boat that has left it. Selecting either end lights up the other, and
+  an anchor chain lights up at two strengths: the badge on what follows the
+  selected area directly is filled, and the ones further down — what hangs off
+  *that*, and so on to the end of the chain — take the color on their outline
+  only. Moving the area you have picked moves all of them, so all of them are
+  marked; the near end is still the one that stands out, because a card where
+  every badge below is filled has nothing left to find. Upwards it stays one
+  hop: what this area follows is a relationship it has, and what that one
+  follows is not.
 - **Hide when empty** — a box whose column is blank collapses to nothing *and*
   drops out of the anchor chain, so a card with no subtitle has no dead band
   where the subtitle would have been. A box with no anchor stays pinned to its
@@ -216,6 +224,14 @@ resize boxes directly, or type exact millimetres.
   trim lines and run outward into the bleed, each stopping a millimetre short
   of the corner: a mark that meets the artwork cannot be told from a rule the
   design meant to have, and that corner is what the guillotine lines up on.
+  The amount may be **negative**, which is the same outset run the other way:
+  the paper stops short of the trim, so the artwork runs off it and the strip
+  between the trim line and the sheet is cut away rather than kept. Nothing on
+  the card moves either way — the coordinates are still measured from the trim
+  edge — and the trim line is still drawn where the cut is, outside the paper
+  rather than inside it. The field will not take it further than the paper can
+  survive: a millimetre of sheet is the floor, and the field's own minimum says
+  so.
 - **Print Settings** — several cards printed to one physical sheet: **Pages per
   Sheet** is 2, 4, 6 or 8, onto A5, A4, A3 or a sheet of your own size in
   millimetres (the two millimetre fields appear for **Custom** — a named size
@@ -251,7 +267,10 @@ resize boxes directly, or type exact millimetres.
   sheet with no bleed to spare has nowhere to put them, and the sheet bleed is
   what makes that room. Which is why the tick only appears once **Sheet Bleed**
   is on, the way the card's **Crop Marks** appears under **Page Bleed**: without
-  the room, it was a setting you could switch on and see nothing come of.
+  the room, it was a setting you could switch on and see nothing come of. The
+  sheet's bleed goes negative too, and means for the sheet what the page's means
+  for the card: the paper is trimmed inside the tiled block, and whatever hangs
+  over it is cut.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
@@ -414,8 +433,8 @@ app carries no runtime dependencies and works offline. Everything outside the
 subset renders as literal text, and every leaf text node is escaped.
 
 Supported: `#`/`##`/`###` headings, `-` and `*` bullets with one level of
-nesting, `1.` and `1)` ordered lists, `**bold**`, `*italic*`, `` `code` ``,
-`[text](url)`, blank-line paragraphs, and `---`.
+nesting, `1.` and `1)` ordered lists, `**bold**`, `*italic*`, `~~strikethrough~~`,
+`` `code` ``, `[text](url)`, blank-line paragraphs, and `---`.
 
 - **Ordered lists renumber** — from the source order, so a list that restarts
   part-way through still prints as one sequence.
@@ -688,7 +707,7 @@ of width.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>p</kbd> / <kbd>s</kbd> | Export, for the fingers that reach for those |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + arrows | Step the alignment — left, right, top, bottom |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + scroll | Size the type in the area under the pointer |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll, pinch | Zoom the page |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll | Zoom the page — as does a pinch on the ground around it |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> | Zoom the page in or out |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>0</kbd> | Fit the page (<kbd>⇧</kbd> for 100%) |
 | <kbd>←</kbd> / <kbd>→</kbd> | Step through the cards, with one open full screen |
@@ -707,7 +726,35 @@ not using goes out of sight, the chip you pick it up by never does. It is not
 drawn at all when nothing it could move is selected, and an area whose top comes
 from an anchor shows the link on its two vertical keys rather than an arrow that
 would do nothing: the millimetres between the two areas are the **Gap** in the
-bar. Pinching zooms the page, as do the zoom keys above.
+bar. Those two keys are not dead, though — they carry the two ways out of the
+tie. **Hold** one and the selection moves to the area this one hangs from, which
+is the area that can still go up and down, so the same key you were pressing now
+moves it. **Tap** one three times in a row and the tie itself goes, leaving the
+area exactly where it was sitting — the resolved top is written back as its own,
+so nothing jumps. After the first tap the key wears the broken link, and the run
+lapses after a second and a half, so the second and third taps are a decision
+rather than an accident.
+
+### Touch gestures
+
+- **Pinch an area** and its type grows and shrinks with your fingers — the whole
+  selection when the area is part of one, the same bargain dragging one of
+  several makes. The pinch listens on the way down to whatever was touched, so
+  it works over the areas and not only in the gaps between them.
+- **Pinch the ground** around the page and the page zooms, as it always did. The
+  page has a zoom menu, a wheel and two keys; the areas had nothing, which is
+  why the gesture goes to them where they are under it.
+- **A second finger is never a drag.** An area that was moving under one finger
+  goes back where it started the moment a second one lands, so a pinch changes
+  the size and nothing else.
+- **Full screen, a pinch zooms the card** — up to six times, with a drag to move
+  around it and a flick to page the run once it is back at rest. That is the one
+  screen where zooming means what a phone means by it: the card is already as
+  large as the window will take it, and the reason to pinch is to read the small
+  print.
+- **Buttons answer.** A press on any control gives a few milliseconds of
+  vibration where the device has it, and a press-and-hold gives a firmer one as
+  it fires — the only thing that says a gesture nobody can see is over.
 
 The arrow keys and the pad both move every area in the selection, not only a
 lone one.

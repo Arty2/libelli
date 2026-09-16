@@ -2,6 +2,7 @@
 	import Icon from './Icon.svelte';
 	import { safeImageUrl } from '$lib/assets';
 	import { IMPOSITION_COUNTS, resolveImposition } from '$lib/imposition';
+	import { MIN_PAPER, bleedFor } from '$lib/layout';
 	import { PAGE_PRESETS, presetFor, presetSize } from '$lib/template';
 	import type {
 		BackgroundFit,
@@ -104,12 +105,26 @@
 		patchPrint({ orientation, sheet: swap ? { w: h, h: w } : { w, h } });
 	}
 
-	const bleed = $derived(template.bleed.enabled ? template.bleed.amount : 0);
+	const bleed = $derived(bleedFor(template.bleed, template.page.w, template.page.h));
 
 	/** How the requested count actually lands on the chosen sheet. */
 	const fit = $derived(
 		resolveImposition(template.page.w + bleed * 2, template.page.h + bleed * 2, template.print)
 	);
+
+	/**
+	 * How far a bleed may be taken inwards, per box.
+	 *
+	 * A bleed is an outset on the paper, and a negative one is the same outset
+	 * run the other way: the paper stops short of the trim and the artwork is cut
+	 * into rather than around. Nothing inside the page moves either way — see
+	 * CLAUDE.md — so the only limit is that the paper has to survive it. The
+	 * fields say so themselves rather than clamping silently, which is why this
+	 * is the input's `min` and not only `bleedFor`'s.
+	 */
+	const floorFor = (w: number, h: number) => -Math.round(((Math.min(w, h) - MIN_PAPER) / 2) * 2) / 2;
+	const pageBleedFloor = $derived(floorFor(template.page.w, template.page.h));
+	const sheetBleedFloor = $derived(fit ? floorFor(fit.sheetW, fit.sheetH) : 0);
 
 	function setBackground(image: PageBackgroundImage | undefined) {
 		patchPrint({ background: image });
@@ -143,7 +158,7 @@
 			type="checkbox"
 			checked={template.bleed.enabled}
 			disabled={pageFrozen}
-			title="Also the gap between cards, and the crop marks between them, when several are printed to a sheet"
+			title="Also the gap between cards, and the crop marks between them, when several are printed to a sheet. A negative amount cuts inside the page instead."
 			onchange={(e) => patchBleed({ enabled: e.currentTarget.checked })}
 		/>
 		Page Bleed
@@ -154,7 +169,7 @@
 				class="n-2"
 				type="number"
 				step="0.5"
-				min="0"
+				min={pageBleedFloor}
 				aria-label="Page bleed amount"
 				value={template.bleed.amount}
 				disabled={pageFrozen}
@@ -184,7 +199,7 @@
 				type="checkbox"
 				checked={template.print.bleed.enabled}
 				disabled={pageFrozen}
-				title="An outset on the paper around the sheet, for printing a sheet that runs to its own edge"
+				title="An outset on the paper around the sheet, for printing a sheet that runs to its own edge. A negative amount trims the paper inside the block instead."
 				onchange={(e) => patchSheetBleed({ enabled: e.currentTarget.checked })}
 			/>
 			Sheet Bleed
@@ -195,7 +210,7 @@
 					class="n-2"
 					type="number"
 					step="0.5"
-					min="0"
+					min={sheetBleedFloor}
 					aria-label="Sheet bleed amount"
 					value={template.print.bleed.amount}
 					disabled={pageFrozen}

@@ -23,7 +23,7 @@
 		undo as undoStep,
 		undoLabel
 	} from '$lib/history';
-	import { alignBoxes, type AlignEdge } from '$lib/layout';
+	import { alignBoxes, bleedFor, type AlignEdge } from '$lib/layout';
 	import {
 		ALIGN_LABELS,
 		applyStyle,
@@ -45,6 +45,7 @@
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault } from '$lib/modal';
+	import { watchPresses } from '$lib/haptics';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
@@ -304,7 +305,11 @@ em { color: #b42318 }`;
 	const slots = $derived(usedSlots(template));
 	/** Areas with no overlap with the sheet at all — see `strayBoxes`. */
 	const strays = $derived(
-		strayBoxes(template.boxes, template.page, template.bleed.enabled ? template.bleed.amount : 0)
+		strayBoxes(
+			template.boxes,
+			template.page,
+			bleedFor(template.bleed, template.page.w, template.page.h)
+		)
 	);
 	/**
 	 * The column the selected area draws from, so the table can point at the cell
@@ -412,6 +417,16 @@ em { color: #b42318 }`;
 
 	$effect(() => {
 		for (const family of familiesInUse) ensureGoogleFont(family);
+	});
+
+	/**
+	 * A press on any control, anywhere in the app, answered with a few
+	 * milliseconds of vibration on a touchscreen. One listener on the document
+	 * rather than a rule every button has to remember — see haptics.ts.
+	 */
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+		return watchPresses(document);
 	});
 
 	/**
@@ -1984,7 +1999,8 @@ em { color: #b42318 }`;
 			three are buttons, and each undoes what it says: the link breaks this area's tie, the buoy casts off everything
 			moored to this one, the padlock unlocks the area. Neither anchor button moves anything. Each shows the icon of
 			its own undoing as you reach for it, so no two of them answer with the same mark. Selecting either end of an
-			anchor lights up the other. <strong>Bounds</strong> takes all of it away.
+			anchor lights up the other — filled on what follows this area directly, outlined further down the chain, so a
+			stack of tied areas says how far the tie reaches. <strong>Bounds</strong> takes all of it away.
 		</p>
 
 		<h3>Several at once</h3>
@@ -2017,7 +2033,8 @@ em { color: #b42318 }`;
 			<strong>Size</strong> has A6, A5, A4, A3 and a 4 × 6 inch postcard; picking one keeps the orientation you are
 			in, and <strong>⇄</strong> turns the page over. Neither moves anything on the card — coordinates are
 			measured from the trim edge, so trying a design the other way round costs nothing. Bleed is an outset on the
-			sheet, never an offset on the content.
+			sheet, never an offset on the content — and a <em>negative</em> bleed is the same outset run the other way: the
+			paper stops short of the trim and the artwork is cut into rather than around.
 		</p>
 		<p>
 			Page setup holds the type defaults — family, size, leading, spacing, color. An area that leaves those fields
@@ -2074,6 +2091,25 @@ em { color: #b42318 }`;
 			own. <strong>Esc</strong> closes the dialog at any point.
 		</p>
 
+		<h3>On a touchscreen</h3>
+		<p>
+			<strong>Pinch an area</strong> and its type grows or shrinks with your fingers — the whole selection, if it is
+			part of one. Pinch the ground around the page and the page zooms instead. A second finger never drags: an area
+			that was moving goes back where it was, so a pinch changes the size and nothing else. Every button answers a
+			press with a few milliseconds of vibration, where the device has it.
+		</p>
+		<p>
+			The <strong>cross of arrows</strong> by the page nudges the selection; its middle button cycles the step, and
+			holding it moves the pad out of the way. When the selection is <em>tied</em> to another area, the two vertical
+			arrows wear a link instead: <strong>hold</strong> one and you take hold of the area it hangs from, which is
+			the one that can still move up and down — or <strong>tap</strong> it three times to break the tie and leave the
+			area exactly where it sits.
+		</p>
+		<p>
+			A card opened <strong>full screen</strong> is the one place a pinch zooms the card itself, up to six times, with
+			a drag to move around it. Pinch back and it settles; a flick pages the run again.
+		</p>
+
 		<h3>Keys</h3>
 		<dl class="keys">
 			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
@@ -2096,7 +2132,7 @@ em { color: #b42318 }`;
 			<dt>Ctrl/Cmd + Shift + V</dt><dd>Paste that style onto the selection</dd>
 			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
 			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
-			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page</dd>
+			<dt>Ctrl/Cmd + scroll</dt><dd>Zoom the page — as does a pinch on the ground around it</dd>
 			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
 			<dt>Ctrl/Cmd + ;<span>Ctrl/Cmd + H</span></dt><dd>Bounds on or off</dd>

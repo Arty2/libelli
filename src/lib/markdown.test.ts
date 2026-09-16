@@ -68,6 +68,12 @@ describe('inline', () => {
 		expect(html).toContain('<code');
 	});
 
+	it('strikes through a doubled tilde and leaves a single one alone', () => {
+		expect(renderInline('~~gone~~')).toBe('<s>gone</s>');
+		expect(renderInline('approx ~5mm')).toBe('approx ~5mm');
+		expect(renderInline('~~*both*~~')).toBe('<s><em>both</em></s>');
+	});
+
 	it('does not let bold be re-read as italic', () => {
 		expect(renderInline('**bold**')).not.toContain('<em>');
 	});
