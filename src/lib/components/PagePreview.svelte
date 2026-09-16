@@ -25,7 +25,7 @@
 		pageNumber: number | null;
 		/** the area being typed into on the card itself, if any */
 		editingId?: string | null;
-		/** areas that are not wholly on the sheet, and so may be unreachable */
+		/** areas hanging off the sheet, in part or entirely, and so cut or unreachable */
 		strayIds?: string[];
 		/** whether every press on an area is currently adding to or dropping from the selection */
 		picking?: boolean;
@@ -71,7 +71,7 @@
 		onedit?: (id: string | null) => void;
 		/** words typed into the card, forwarded to whoever owns them */
 		ontext?: (box: Box, value: string) => void;
-		/** bring every area that has wandered off the sheet back onto it */
+		/** bring the areas that are hanging off the sheet back onto it, and only those */
 		onrescue?: () => void;
 		/** areas to flash, so a move you did not watch happen is still visible */
 		flashIds?: string[];
@@ -1047,12 +1047,14 @@
 			<!-- Only when there is something to rescue. The editor does not clip, so
 			     an area dragged off the sheet is still drawn — but only while the
 			     stage happens to be showing that much ground, and zoomed in or on a
-			     phone it is somewhere you cannot see and cannot reach. -->
+			     phone it is somewhere you cannot see and cannot reach. An area only
+			     half off is the same problem by halves: the half out there is not
+			     going to print, and nothing else on the page says so. -->
 			<button
 				class="square"
 				onclick={onrescue}
 				disabled={!!template.locked}
-				title="{strayIds.length} area{strayIds.length === 1 ? ' is' : 's are'} off the page — bring {strayIds.length === 1 ? 'it' : 'them'} back on"
+				title="{strayIds.length} area{strayIds.length === 1 ? ' is' : 's are'} not wholly on the page — bring {strayIds.length === 1 ? 'it' : 'them'} back on, and nothing else"
 			>
 				<Icon name="move" size={16} /><span class="sr-only">Bring stray areas back onto the page</span>
 			</button>

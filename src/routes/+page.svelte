@@ -303,7 +303,7 @@ em { color: #b42318 }`;
 	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
 	const row = $derived(dataset.rows[activeRow] ?? null);
 	const slots = $derived(usedSlots(template));
-	/** Areas with no overlap with the sheet at all — see `strayBoxes`. */
+	/** Areas that are not wholly on the sheet, half off or all off — see `strayBoxes`. */
 	const strays = $derived(
 		strayBoxes(
 			template.boxes,
@@ -1017,23 +1017,35 @@ em { color: #b42318 }`;
 		updateBox({ ...$state.snapshot(box), static: { ...box.static, text: value } } as Box);
 	}
 
-	/** Bring every area that has wandered off the sheet back onto it. */
+	/**
+	 * Bring the areas that are hanging off the sheet back onto it.
+	 *
+	 * Only those areas. A card is a composition, and an area that is where it was
+	 * put is not part of this problem — nothing that is already on the paper
+	 * moves, however little room the ones coming back need.
+	 */
 	function rescueStrays() {
 		if (template.locked || !strays.length) return;
+		// A locked area is not this button's to move, and counting it would promise
+		// a rescue that `bringOnPage` refuses.
+		const movable = strays.filter((b) => !b.locked);
+		const boxes = bringOnPage(template.boxes, movable.map((b) => b.id), template.page);
+		if (boxes === template.boxes) {
+			notify('Every area hanging off the sheet is locked, so none of them moved.', 'warning');
+			return;
+		}
 		// Counted before the move. `strays` is derived from the template, so it is
 		// empty the instant the boxes land — the notice used to say "0 areas were
 		// off the sheet", which is true by the time you read it and useless.
-		const rescued = strays.length;
-		const boxes = bringOnPage(template.boxes, strays.map((b) => b.id), template.page);
-		if (boxes === template.boxes) return;
+		const rescued = movable.length;
 		describe(`Bring ${rescued} area${rescued === 1 ? '' : 's'} back on`);
-		const moved = strays.map((b) => b.id);
+		const moved = movable.map((b) => b.id);
 		template = { ...template, boxes };
 		flash(moved);
 		notify(
 			rescued === 1
-				? 'One area was off the sheet and is back on it. Ctrl/Cmd+Z puts it back.'
-				: `${rescued} areas were off the sheet and are back on it. Ctrl/Cmd+Z puts them back.`
+				? 'One area was hanging off the sheet and is wholly on it now. Ctrl/Cmd+Z puts it back.'
+				: `${rescued} areas were hanging off the sheet and are wholly on it now. Ctrl/Cmd+Z puts them back.`
 		);
 	}
 
@@ -1986,8 +1998,10 @@ em { color: #b42318 }`;
 		</p>
 		<p>
 			Stacking order is the column beside the page: areas paint in the order they are listed, so <em>Bring to Front</em>
-			is a move to the end of that list. If an area ends up entirely off the sheet, a button appears under
-			<em>Area</em> to bring it back.
+			is a move to the end of that list. If an area ends up off the sheet — all of it, or a corner of it — a
+			button appears under <em>Area</em> to bring that area back on, and only that area: everything already on
+			the paper stays where it was put. Crossing into the bleed does not count, because that is what bleed is
+			for.
 		</p>
 
 		<h3>Marks on an area</h3>

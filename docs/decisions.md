@@ -566,6 +566,17 @@ and only there for a single selection. The reset drops the drag in flight along
 with it: the drag snapshotted the old value at pointerdown, and a move arriving
 afterwards would write that snapshot straight back over the reset.
 
+**A badge is half again the size of a drag corner, and says so in a token.**
+Both are marks on an area and they sit a few pixels apart, so the two sizes are
+one decision: `--handle` is what a drag corner measures and `--badge` is
+`--handle * 1.5`, which follows the handle down on a coarse pointer without
+anything being restated. Bigger rather than matching, for two reasons. A badge
+is an indicator that is also a button — it breaks a tie, casts off, unlocks —
+and at the handle's own size it was the smallest target on the card while being
+the one whose press cannot be taken back by letting go. And a mark the same size
+as the handle beside it reads as another handle; a larger one reads as something
+else, which it is.
+
 **A negative bleed is a `translate` on `.trim`, not a negative margin.** The
 positive case is padding on the card, which is what insets the trim inside the
 paper. The negative case is the trim hanging over the paper on all four sides,
@@ -1539,11 +1550,29 @@ writes every key including the ones the source lacked, because a paste is "make
 this look like that" and a source with no border has to take the target's border
 away.
 
-**Areas are only rescued when they are wholly off the sheet.** `strayBoxes` asks
-for *no overlap at all* with the paper, bleed included — not merely crossing the
-trim. A box running off the edge is what bleed is for, and offering to drag every
-deliberate full-bleed panel back inside the trim would be worse than saying
-nothing. The button appears only when there is something genuinely unreachable.
+**An area is stray when it is not wholly on the paper — half off counts.** It
+used to ask for *no overlap at all*, which meant the button stayed away while a
+corner of an area sat outside the sheet being quietly cut off every print. Both
+are the same problem at different sizes, and the half-off one is the harder to
+notice: the editor does not clip, so on screen the area looks whole. The paper is
+the trim *plus the bleed*, so a deliberate full-bleed panel is still not stray —
+that is what the bleed is for, and dragging every one of them back inside the
+trim would be worse than saying nothing.
+
+**Only the strays move.** A card is a composition and the areas that are where
+they were put are not part of this problem, so `bringOnPage` is handed the stray
+ids alone and everything else is left untouched — including when the ones coming
+back land on top of something. Where they land is the shortest way in; what to do
+about the overlap is a design decision, and not one a rescue button gets to make.
+
+**Stray is tested only on the axes that can be corrected.** An anchored box takes
+its top from another box during layout, so the `y` on it is the stale one it had
+before the tie and `bringOnPage` deliberately will not write it. Judging such a
+box on that number lit the button up over a position nothing was ever going to
+change — press, nothing moves, button still lit. So an anchored box is judged on
+x alone; its vertical position is the Gap field in the bar. For the same reason
+the handler counts the *unlocked* strays: a locked area is not this button's to
+move, and when every stray is locked it says so rather than doing nothing.
 
 ## `src/lib/placeholders.ts`
 

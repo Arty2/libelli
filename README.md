@@ -178,12 +178,16 @@ resize boxes directly, or type exact millimetres.
   drag an area half off the page and it stays visible, with its handles where
   you can still reach them. What prints is another matter — the paper stops
   where the card does, and the print, the PNG and the contact sheet all clip
-  there. If an area ends up with no overlap with the sheet at all — dragged
-  clean off it, where zooming in or a small screen would leave it out of reach —
-  a button appears under *Area* to bring every such area back on, and each one
-  flashes as it lands, because a move you were not watching happen otherwise just
-  leaves the card looking different. Crossing the trim does not count: that is
-  what bleed is for.
+  there. So if an area is not wholly on the sheet — a corner of it hanging over
+  the edge, or the whole of it dragged clean off, where zooming in or a small
+  screen would leave it out of reach — a button appears under *Area* to bring it
+  back on. It moves **only the areas that are off**: everything already on the
+  paper is where somebody put it, and a rescue that rearranged the card to make
+  room would be a worse problem than the one it solved. Each rescued area flashes
+  as it lands, because a move you were not watching happen otherwise just leaves
+  the card looking different. Running into the bleed does not count: that is what
+  bleed is for. Neither does an anchored area's vertical position, which is the
+  *Gap* in the bar and not something this button can write.
 - **Surface** — a fill color, padding, a border and a corner radius, all in
   millimetres. A padding and a border each take one measurement all round, or
   one per edge behind the expander next to it; a border's style and the corner

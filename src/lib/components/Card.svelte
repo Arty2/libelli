@@ -1259,6 +1259,18 @@
 		box-sizing: border-box;
 		overflow: hidden;
 		color: #000;
+		/* What a drag corner measures, before the zoom is taken back off it. It is
+		   a token because the badges are sized from it: the marks on an area are
+		   one family, and a handle and a badge drifting apart is how a card ends
+		   up with two ideas of how big a small thing is. Restated for a coarse
+		   pointer below, where a handle is smaller so a finger can see past it. */
+		--handle: 14px;
+		/* Half again the drag corner. A badge is an indicator that is also a
+		   button — it breaks a tie, casts off, unlocks — and at the handle's own
+		   size it was the smallest target on the card while being the one that
+		   does something irreversible. Bigger than what it sits beside is also
+		   what stops it reading as a fourth handle. */
+		--badge: calc(var(--handle) * 1.5 * var(--ui-scale, 1));
 		/* Paper color is part of the artwork, not decoration the printer may
 		   drop — though the browser still asks for "background graphics". */
 		print-color-adjust: exact;
@@ -1412,7 +1424,7 @@
 	.handle,
 	.pivot,
 	.lever {
-		--mark: calc(14px * var(--ui-scale, 1));
+		--mark: calc(var(--handle) * var(--ui-scale, 1));
 		--reach: calc(8px * var(--ui-scale, 1));
 		position: absolute;
 		width: var(--mark);
@@ -1536,8 +1548,11 @@
 		   marks were 20px and 16px. A finger covers the thing it is dragging, so
 		   the less of it the mark takes up the better, and the target is the
 		   ::before, which costs no layout and does not have to be seen. */
+		.card {
+			--handle: 10px;
+		}
+
 		.handle {
-			--mark: calc(10px * var(--ui-scale, 1));
 			--reach: calc(19px * var(--ui-scale, 1));
 		}
 
@@ -1755,11 +1770,11 @@
 			left: 100%;
 			/* Half its own height up, so the middle of it lands on the bottom
 			   edge — the blade meeting the paper. */
-			margin: calc(-6.5px * var(--ui-scale, 1)) 0 0 calc(4px * var(--ui-scale, 1));
+			margin: calc(var(--badge) / -2) 0 0 calc(4px * var(--ui-scale, 1));
 			display: grid;
 			place-items: center;
-			width: calc(13px * var(--ui-scale, 1));
-			height: calc(13px * var(--ui-scale, 1));
+			width: var(--badge);
+			height: var(--badge);
 			box-sizing: border-box;
 			border-radius: var(--radius-button);
 			border: var(--line) solid #b42318;
@@ -1796,8 +1811,8 @@
 		.badge {
 			display: grid;
 			place-items: center;
-			width: calc(13px * var(--ui-scale, 1));
-			height: calc(13px * var(--ui-scale, 1));
+			width: var(--badge);
+			height: var(--badge);
 			/* Or the border is added to the width, and a badge drawn against the
 			   zoom would hold its size everywhere except its own edges. */
 			box-sizing: border-box;
@@ -1882,8 +1897,8 @@
 		   otherwise the badge would hold its size and its contents would not. */
 		.badge :global(svg),
 		.overflow-mark :global(svg) {
-			width: calc(9px * var(--ui-scale, 1));
-			height: calc(9px * var(--ui-scale, 1));
+			width: calc(var(--badge) * 0.7);
+			height: calc(var(--badge) * 0.7);
 		}
 
 		.guide {
