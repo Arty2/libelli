@@ -9,7 +9,7 @@
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
 	import { mmToPx } from '$lib/layout';
-	import { resolveImposition } from '$lib/imposition';
+	import { planSheets, resolveImposition } from '$lib/imposition';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
 	interface Props {
@@ -180,13 +180,8 @@
 	const includedPages = $derived(
 		dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index))
 	);
-	const perSheet = $derived(imposed ? imposed.grid.rows * imposed.grid.cols : 1);
 	const sheetGroups = $derived(
-		imposed
-			? Array.from({ length: Math.ceil(includedPages.length / perSheet) }, (_, i) =>
-					includedPages.slice(i * perSheet, i * perSheet + perSheet)
-				)
-			: []
+		imposed ? planSheets(includedPages, imposed.grid, template.print.order) : []
 	);
 
 	const chosenSheets = $derived(sheetGroups.filter((_, i) => !excludedSheets.has(i)).length);
@@ -357,7 +352,7 @@
 				bind:clientWidth={sheetGridWidth}
 				style="--thumb:{sheetThumbWidth}px"
 			>
-				{#each sheetGroups as sheetPages, i (i)}
+				{#each sheetGroups as cells, i (i)}
 					{@const included = !excludedSheets.has(i)}
 					<figure class:dropped={!included}>
 						<button
@@ -372,7 +367,7 @@
 									{mapping}
 									{background}
 									{printBackground}
-									pages={sheetPages}
+									{cells}
 									pageCount={dataset.rows.length}
 									previewScale={sheetThumbScale}
 								/>

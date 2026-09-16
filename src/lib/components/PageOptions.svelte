@@ -7,6 +7,7 @@
 	import {
 		BORDER_STYLES,
 		DEFAULT_QR,
+		FACING_PAGE_NUMBER_POSITIONS,
 		PAGE_NUMBER_POSITIONS,
 		PAGE_PRESETS,
 		normaliseCentre,
@@ -154,7 +155,11 @@
 		'top-right': 'Top Right',
 		'bottom-left': 'Bottom Left',
 		'bottom-center': 'Bottom Centre',
-		'bottom-right': 'Bottom Right'
+		'bottom-right': 'Bottom Right',
+		'top-outer': 'Top Outer',
+		'top-inner': 'Top Inner',
+		'bottom-outer': 'Bottom Outer',
+		'bottom-inner': 'Bottom Inner'
 	};
 
 	/**
@@ -169,6 +174,18 @@
 	 */
 	type Source = 'field' | 'static';
 	const source = $derived.by<Source>(() => (selected?.slot ? 'field' : 'static'));
+
+	/**
+	 * The six fixed corners, and the four that follow the fold once the template
+	 * has one. A file can arrive asking for an outer page number with facing
+	 * pages off — it still prints, on the right — so what it chose stays in the
+	 * list rather than leaving the select showing a blank.
+	 */
+	const positions = $derived(
+		template.facing || FACING_PAGE_NUMBER_POSITIONS.includes(template.pageNumber.position)
+			? [...PAGE_NUMBER_POSITIONS, ...FACING_PAGE_NUMBER_POSITIONS]
+			: PAGE_NUMBER_POSITIONS
+	);
 
 	const patchTemplate = (change: Partial<Template>) => ontemplatechange({ ...template, ...change });
 
@@ -393,6 +410,16 @@
 			>
 				<Icon name="arrows-horizontal" size={14} />
 			</button>
+			<label class="check">
+				<input
+					type="checkbox"
+					checked={!!template.facing}
+					title="Odd rows are right-hand pages and even rows their facing left-hand pages. Areas mirror across the fold unless an area says otherwise, and Outer and Inner page numbers know which edge they are on"
+					disabled={pageFrozen}
+					onchange={(e) => patchTemplate({ facing: e.currentTarget.checked || undefined })}
+				/>
+				Left &amp; Right
+			</label>
 		</span>
 
 		<PrintSettingsPanel
@@ -541,7 +568,7 @@
 					}}
 				>
 					<option value="">Off</option>
-					{#each PAGE_NUMBER_POSITIONS as position (position)}
+					{#each positions as position (position)}
 						<option value={position}>{POSITION_LABELS[position]}</option>
 					{/each}
 				</select>

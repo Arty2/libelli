@@ -37,13 +37,26 @@ export interface Sides {
  */
 export type SideValue = number | Sides;
 
+/**
+ * `outer` and `inner` are the two that know about the fold: on a right-hand
+ * page outer is the right edge, on a left-hand page it is the left one. A
+ * template without facing pages has only right-hand pages, so they still mean
+ * something definite there rather than needing to be hidden.
+ */
 export type PageNumberPosition =
 	| 'top-left'
 	| 'top-center'
 	| 'top-right'
 	| 'bottom-left'
 	| 'bottom-center'
-	| 'bottom-right';
+	| 'bottom-right'
+	| 'top-outer'
+	| 'top-inner'
+	| 'bottom-outer'
+	| 'bottom-inner';
+
+/** Which side of the fold a page falls on. Page 1 is a right-hand page. */
+export type PageSide = 'recto' | 'verso';
 
 /** how a background image fills the sheet */
 export type BackgroundFit = 'cover' | 'contain' | 'repeat';
@@ -81,6 +94,8 @@ export interface BleedSpec {
 
 export type Orientation = 'portrait' | 'landscape';
 
+export type SheetOrder = 'sequential' | 'zine';
+
 /**
  * How several virtual pages reach one physical sheet — a way to print, not a
  * way to design, so it lives beside `page` and `bleed` rather than changing
@@ -98,6 +113,13 @@ export interface PrintSettings {
 	enabled: boolean;
 	/** virtual pages per physical sheet */
 	count: 2 | 4 | 6 | 8;
+	/**
+	 * Which page lands in which cell: `sequential` fills the sheet in reading
+	 * order, for a stack of cards to cut apart; `zine` lays the pages out so
+	 * that folding the printed sheet gives a booklet in reading order — see
+	 * `imposition.ts` for the two folds it knows.
+	 */
+	order: SheetOrder;
 	sheet: {
 		w: number;
 		h: number;
@@ -233,6 +255,14 @@ export interface Box extends TextStyle {
 	fit?: 'contain' | 'cover' | 'fill' | 'repeat';
 	locked?: boolean;
 	/**
+	 * Whether this box mirrors onto the facing page, when the template has
+	 * left and right pages at all. Absent follows the page, which mirrors;
+	 * `false` pins the box to the same millimetres on every page — a logo that
+	 * belongs in one corner of the sheet rather than in the outer corner of the
+	 * spread.
+	 */
+	mirror?: boolean;
+	/**
 	 * Boxes sharing a group id are selected, moved, locked and deleted together.
 	 * A plain string rather than a container: the boxes stay a flat list, so
 	 * grouping cannot break anchoring, stacking or anything else that reads it.
@@ -251,6 +281,14 @@ export interface Template {
 	defaults: Defaults;
 	slots: string[];
 	boxes: Box[];
+	/**
+	 * Left and right pages. Off is a run of identical pages — the card case,
+	 * and what every template without this field is. On, an odd page is a
+	 * right-hand page and an even one its facing left-hand page: boxes mirror
+	 * across the fold unless they opt out, and `outer`/`inner` page numbers
+	 * know which edge they are on.
+	 */
+	facing?: boolean;
 	/** author's own CSS, scoped to the card at render time */
 	css?: string;
 	/** freezes the whole design: no dragging, no resizing, no option changes */

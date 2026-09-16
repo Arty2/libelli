@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PrintSheet from './PrintSheet.svelte';
-	import { resolveImposition } from '$lib/imposition';
+	import { planSheets, resolveImposition } from '$lib/imposition';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
 	interface Props {
@@ -35,16 +35,14 @@
 	const sheetBleed = $derived(imposed && template.print.bleed.enabled ? template.print.bleed.amount : 0);
 	const sheetW = $derived((imposed ? template.print.sheet.w : cardW) + sheetBleed * 2);
 	const sheetH = $derived((imposed ? template.print.sheet.h : cardH) + sheetBleed * 2);
-	const perSheet = $derived(imposed ? imposed.grid.rows * imposed.grid.cols : 1);
-
-	// Rows tile into sheets of `rows * cols` — the last sheet short of a full
-	// grid just leaves the remaining cells empty. Grouped before the sheet
-	// exclusions are applied, so a sheet's number here is the number the
-	// preview showed it under.
+	// Rows fill the sheet in the order the template asks for — reading order, or
+	// the fold's — and a cell the run does not reach is left empty. Grouped
+	// before the sheet exclusions are applied, so a sheet's number here is the
+	// number the preview showed it under.
 	const sheets = $derived(
-		Array.from({ length: Math.ceil(pages.length / perSheet) }, (_, i) =>
-			pages.slice(i * perSheet, i * perSheet + perSheet)
-		).filter((_, i) => !excludedSheets.has(i))
+		planSheets(pages, imposed?.grid ?? { rows: 1, cols: 1 }, template.print.order).filter(
+			(_, i) => !excludedSheets.has(i)
+		)
 	);
 </script>
 
@@ -57,8 +55,8 @@
 </svelte:head>
 
 <div class="print-root" aria-hidden="true" style="width:{sheetW}mm">
-	{#each sheets as sheetPages, sheetIndex (sheetIndex)}
-		<PrintSheet {template} {mapping} {background} {printBackground} pages={sheetPages} pageCount={dataset.rows.length} />
+	{#each sheets as cells, sheetIndex (sheetIndex)}
+		<PrintSheet {template} {mapping} {background} {printBackground} {cells} pageCount={dataset.rows.length} />
 	{/each}
 </div>
 

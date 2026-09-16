@@ -219,6 +219,7 @@ describe('normaliseTemplate', () => {
 		expect(t.print).toEqual({
 			enabled: false,
 			count: 4,
+			order: 'sequential',
 			sheet: { w: 210, h: 297 },
 			orientation: 'portrait',
 			bleed: { enabled: false, amount: 3, cropMarks: false }
@@ -240,6 +241,8 @@ describe('normaliseTemplate', () => {
 		expect(t.print).toEqual({
 			enabled: true,
 			count: 4,
+			// A template from before the fold order existed prints in reading order.
+			order: 'sequential',
 			sheet: { w: 297, h: 420 },
 			orientation: 'landscape',
 			bleed: { enabled: true, amount: 5, cropMarks: true }

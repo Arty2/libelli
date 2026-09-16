@@ -210,7 +210,8 @@ resize boxes directly, or type exact millimetres.
   is nothing extra to keep in step. A count that does not fit the sheet at the
   card's own size, in any orientation, prints scaled down instead of
   refusing — every card on the sheet shrinks together, and the amount shows
-  as *Scaled to n%* rather than leaving it a surprise. The sheet can carry its
+  as *Scaled to n%* rather than leaving it a surprise. **Order** decides which
+  page lands in which cell — see **Zines** below. The sheet can carry its
   own background image too — **Upload…** or **URL…**, **Cover**/**Contain**/
   **Tile** — separate from the card's own background and showing only in the
   margin around the tiled cards. This whole group is the one place both
@@ -240,7 +241,28 @@ resize boxes directly, or type exact millimetres.
   margin, and the template's default type. The number is the row's position, so
   the editor, the print preview and the print all agree. **of Total** prints it
   as *3 / 12*; the slash is an element of its own, `.page-number .of`, so a
-  template's CSS can set its content to anything or take it away.
+  template's CSS can set its content to anything or take it away. With **Left
+  &amp; Right** on, four more positions appear: **Top**/**Bottom Outer** and
+  **Inner**, which are the right edge on a right-hand page and the left edge on
+  a left-hand one, or the other way about. Outer is where a page number goes in
+  anything that is bound, because it is the corner a thumb turns the page by.
+- **Left &amp; Right** — beside the page size, and off by default: a run of
+  identical pages is what a deck of cards is. On, the run is a booklet — odd
+  rows are right-hand pages, even rows the left-hand pages facing them — and
+  three things follow. Areas **mirror** across the fold, keeping the distance
+  from the *outer* trim edge they were given rather than from the left one, so
+  a wide inner margin stays a wide inner margin on both sides of a spread; an
+  area that should stay put says so with **Mirror** off in its own bar. An
+  alignment you *chose* mirrors with it, so text pushed against one edge hugs
+  the other edge on the facing page, while an alignment inherited from the page
+  defaults is left alone — body text reads the same way on both sides of a
+  spread. And **Outer**/**Inner** page numbers know which edge they are on.
+  Mirroring is worked out as the page is drawn: the template stores one set of
+  millimetres, measured on the right-hand page, so nothing is duplicated and
+  turning the setting off puts everything back. Page through the rows and the
+  editor shows each page on the side it will be printed on — including while
+  dragging, which follows the pointer on a left-hand page and writes the mirror
+  of it back.
 - **Lock** — **Lock** in either bar freezes what you have: no dragging, no
   resizing, no option changes. A locked area can still be *selected*, or the
   button that unlocks it could never be reached. A page lock covers every box
@@ -457,7 +479,42 @@ Print renders every row into a dedicated container and hands it to the browser:
 trailing blank. With **Print Per Sheet** on, several rows tile onto each sheet
 instead, in the grid **Print Settings** works out — scaled down together when
 they do not fit the sheet at full size — and `@page` names the physical sheet
-rather than the card's.
+rather than the card's. Which row lands in which cell is **Order**: reading
+order, or the order a fold needs. See **Zines** below.
+
+## Zines
+
+**Order**, beside **Print Per Sheet**, decides which page lands in which cell of
+the sheet.
+
+- **Sequential** is the card case and the default: the run is poured into the
+  grid in reading order, sheet after sheet, to be cut apart.
+- **Zinemaker** arranges the pages so that *folding* the printed paper gives a
+  booklet that reads 1, 2, 3. Two folds are known, and they are the two people
+  actually make:
+  - **8-up** is the mini zine — eight pages on one side of one sheet, which is
+    folded in half three times, slit along the middle fold between the two
+    centre panels, and collapsed into a little book. Half the pages print upside
+    down, because that half of the sheet ends up the other way up. Nothing is
+    printed on the back.
+  - **2-up** is a stapled booklet: two pages to a side, each sheet coming out as
+    its front and then its back. Print double-sided, flipped on the long edge
+    (if a proof comes out with the backs upside down, it is the other flip
+    setting), fold the stack in half with each sheet inside the one before it,
+    and staple the spine.
+
+  Eight up is held to two rows of four and two up to one row of two whatever
+  else would fit the sheet better — a fold has only one arrangement — so a page
+  size that does not suit the paper shows as *Scaled to n%* rather than folding
+  wrongly. The other counts, 4 and 6, have no fold here and keep the sequential
+  order; the panel says so rather than pretending.
+
+A zine is a multiple of four pages (of eight, for the mini zine) whether or not
+that many were written, so a short run leaves **blank pages** where the fold has
+none, in the places the fold puts them, rather than shifting everything after
+them. Page 1 is the front cover and the last page the back — with **Left &amp;
+Right** on as well, page 1 is a right-hand page and the spreads fall where the
+fold puts them, which is what makes a cover a cover.
 
 ## Print preview
 
@@ -728,16 +785,17 @@ thing itself.
 
 - **Page** — head: the template's name and the library behind its caret, then
   import, export, reset, delete, lock ·
-  sheet size (a preset or your own, and a button to turn it over), bleed, crop
-  marks · type defaults (font, size, leading, spacing, color) · surface (paper
-  color, background image and fit) · page number, whether to print the total,
-  and its margin · CSS
+  sheet size (a preset or your own, a button to turn it over, and left and
+  right pages), bleed, crop marks · type defaults (font, size, leading,
+  spacing, color) · surface (paper color, background image and fit) · page
+  number, whether to print the total, and its margin · CSS
 - **Area** — head: the field's name, then duplicate, delete, lock · content
   (data field or static text, column, mode, fit, QR settings) · type (font,
   size, weight, color) · setting (leading, spacing, case) · alignment,
   horizontal and vertical · surface (fill, padding, border width, style and
   color, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
-  when empty) · rotation and its pivot
+  when empty, and mirror where the template has left and right pages) ·
+  rotation and its pivot
 - **Stacking order** — not in either bar and not in the right-click menu: a
   column beside the page, under undo and redo, whenever anything is selected.
   Bring to front, forward, backward, send to back. It lives there because it is
@@ -784,8 +842,8 @@ keeping the column mapping outside it.
 
 - **Export** — in page setup: fonts referenced by family name, and a background image
   by file name or address. Small, diffable, git-friendly — no picture and no font
-  bytes are ever folded into it. Its CSS, page numbers and locks travel with
-  it.
+  bytes are ever folded into it. Its CSS, page numbers, locks, whether it has
+  left and right pages and how its sheets are ordered all travel with it.
 - **Import** — next to that export, so it cannot be mistaken for *Import CSV*
   under the table. Any font or background image the
   template names but this browser does not have is asked for by name rather than

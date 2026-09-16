@@ -6,7 +6,19 @@
 	import { scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { hold } from '$lib/gestures';
-	import { FREE_STEP, GRID_MINOR, boxEdges, pxToMm, resolveLayout, snapTo, snapToEdges } from '$lib/layout';
+	import {
+		FREE_STEP,
+		GRID_MINOR,
+		boxEdges,
+		facingPosition,
+		mirrorBox,
+		mirrors,
+		pageSide,
+		pxToMm,
+		resolveLayout,
+		snapTo,
+		snapToEdges
+	} from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
 	import { normaliseRotation, sidesOf } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
@@ -88,8 +100,13 @@
 	let measured = $state<Record<string, number>>({});
 	/** boxes whose content is taller than the box will let it be */
 	let overflowing = $state<Record<string, boolean>>({});
-	/** the edge a live drag has latched onto, drawn as a guide until it lets go */
-	let guide = $state<{ x: number | null; y: number | null }>({ x: null, y: null });
+	/**
+	 * The edge a live drag has latched onto, drawn as a guide until it lets go.
+	 * `flip` records that the latch was measured against a mirrored box, so the
+	 * line is drawn where the eye sees the edge rather than where the template
+	 * stores it.
+	 */
+	let guide = $state<{ x: number | null; y: number | null; flip?: boolean }>({ x: null, y: null });
 
 	/**
 	 * What the area actually holds — a cell of the row, or its own words. This is
@@ -239,9 +256,26 @@
 		};
 	}
 
+	/**
+	 * Whether this card is a left-hand page. Everything about facing pages hangs
+	 * off the page number the card was handed, so the editor shows the fold as
+	 * it pages through the rows without being told about it separately.
+	 */
+	const verso = $derived(template.facing === true && pageSide(pageNumber) === 'verso');
+
+	/**
+	 * A box where it is drawn, which on a left-hand page is its mirror. The
+	 * template still stores the right-hand page, so this is the only place the
+	 * two frames differ — and the drag below undoes it again before writing
+	 * anything back.
+	 */
+	const placed = (box: Box): Box => (verso && mirrors(box) ? mirrorBox(box, template.page.w) : box);
+
 	function boxStyle(box: Box): string {
+		const drawn = placed(box);
+		const align = drawn.align ?? template.defaults.align;
 		const parts = [
-			`left:${box.x}mm`,
+			`left:${drawn.x}mm`,
 			`top:${layout.tops[box.id] ?? box.y}mm`,
 			`width:${box.w}mm`,
 			`font-family:${fontStack(box.font ?? template.defaults.font, template.defaults.font)}`,
@@ -249,7 +283,7 @@
 			`font-weight:${box.weight ?? template.defaults.weight}`,
 			`line-height:${box.lineHeight ?? template.defaults.lineHeight}`,
 			`color:${box.color ?? template.defaults.color}`,
-			`text-align:${box.align ?? template.defaults.align}`,
+			`text-align:${align}`,
 			// Vertical placement needs the box to be a flex column. That stops the
 			// first child's top margin collapsing out of the box, which the
 			// `:first-child { margin-top: 0 }` rules below already neutralise; the
@@ -258,7 +292,7 @@
 		];
 		// Justified text without hyphenation opens rivers; the card is `lang="en"`
 		// so the browser has a dictionary to break with.
-		if ((box.align ?? template.defaults.align) === 'justify') parts.push('hyphens:auto');
+		if (align === 'justify') parts.push('hyphens:auto');
 		const letterSpacing = box.letterSpacing ?? template.defaults.letterSpacing;
 		if (letterSpacing) parts.push(`letter-spacing:${letterSpacing}mm`);
 		if (box.italic) parts.push('font-style:italic');
@@ -327,7 +361,11 @@
 
 	/** The page number rides on the template's own defaults, never on a box's. */
 	function pageNumberStyle(): string {
-		const { position, margin } = template.pageNumber;
+		const { margin } = template.pageNumber;
+		// Outer and inner are the whole reason a page number knows about the
+		// fold: resolved here to the edge this page actually has. Without facing
+		// pages there are only right-hand pages, so outer is the right edge.
+		const position = facingPosition(template.pageNumber.position, verso ? 'verso' : 'recto');
 		const [vertical, horizontal] = position.split('-');
 		const parts = [
 			vertical === 'top' ? `top:${margin}mm` : `bottom:${margin}mm`,
@@ -440,6 +478,24 @@
 	 */
 	const SNAP_TOLERANCE = 1.5;
 
+	/** Whether a drag on this box is happening against its mirror image. */
+	const mirroredDrag = (box: Box) => verso && mirrors(box);
+
+	/** The handle a mirrored box's opposite edge answers to. */
+	const MIRRORED_MODE: Record<DragMode, DragMode> = {
+		move: 'move',
+		n: 'n',
+		s: 's',
+		e: 'w',
+		w: 'e',
+		ne: 'nw',
+		nw: 'ne',
+		se: 'sw',
+		sw: 'se',
+		centre: 'centre',
+		rotate: 'rotate'
+	};
+
 	function moveDrag(event: PointerEvent) {
 		if (!drag) return;
 		const latch = !grid && bounds;
@@ -481,8 +537,16 @@
 		const turn = drag.mode === 'move' || drag.mode === 'rotate' ? 0 : ((origin.rotation ?? 0) * Math.PI) / 180;
 		const cos = Math.cos(turn);
 		const sin = Math.sin(turn);
-		const dx = screenX * cos + screenY * sin;
+		// On a left-hand page a mirrored box is drawn at its facing position, so
+		// a pointer that went right moved it *left* in the millimetres the
+		// template stores, and the handle it grabbed is the opposite edge of the
+		// stored box. Undoing both here keeps every case below in one frame — the
+		// one the template is written in. The pivot and the rotation handle are
+		// exempt: mirroring places a box, it does not flip what is inside it.
+		const flip = mirroredDrag(origin) && drag.mode !== 'centre' && drag.mode !== 'rotate';
+		const dx = (screenX * cos + screenY * sin) * (flip ? -1 : 1);
 		const dy = -screenX * sin + screenY * cos;
+		const mode = flip ? MIRRORED_MODE[drag.mode] : drag.mode;
 		const next: Box = { ...origin };
 
 		const setTop = (deltaY: number) => {
@@ -492,7 +556,7 @@
 			else next.y = place(origin.y + deltaY, 'y');
 		};
 
-		switch (drag.mode) {
+		switch (mode) {
 			case 'rotate': {
 				// The angle from the pivot to the pointer, against the angle it
 				// started at, so the box does not jump when the drag begins. Both
@@ -577,7 +641,7 @@
 				next.h = Math.max(3, size(origin.h - dy));
 				break;
 		}
-		guide = latched;
+		guide = { ...latched, flip };
 		onchange?.(next);
 
 		// Whatever snapping did to the box under the pointer is what the others
@@ -588,7 +652,7 @@
 				? (next.anchor?.gap ?? 0) - origin.anchor.gap
 				: next.y - origin.y;
 			for (const other of drag.others) {
-				const moved: Box = { ...other, x: round2(other.x + movedX) };
+				const moved: Box = { ...other, x: round2(other.x + alongX(other, origin, movedX)) };
 				if (movedY) {
 					if (other.anchor) moved.anchor = { ...other.anchor, gap: Math.max(0, round2(other.anchor.gap + movedY)) };
 					else moved.y = round2(other.y + movedY);
@@ -599,9 +663,21 @@
 
 		if (drag.mode === 'move' && drag.held.length) {
 			const movedX = next.x - origin.x;
-			if (movedX) for (const held of drag.held) onchange?.({ ...held, x: round2(held.x + movedX) });
+			if (movedX) {
+				for (const held of drag.held) onchange?.({ ...held, x: round2(held.x + alongX(held, origin, movedX)) });
+			}
 		}
 	}
+
+	/**
+	 * A sideways move of `movedX`, as the box being carried has to store it.
+	 *
+	 * A selection can mix areas that follow the fold with areas pinned in place,
+	 * and on a left-hand page those two run in opposite directions. Without this
+	 * the pinned ones walk the wrong way and the group comes apart as it moves.
+	 */
+	const alongX = (box: Box, dragged: Box, movedX: number) =>
+		mirroredDrag(box) === mirroredDrag(dragged) ? movedX : -movedX;
 
 	const round2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -1076,7 +1152,10 @@
 		{/if}
 
 		{#if guide.x !== null}
-			<span class="guide vertical" style="left:{guide.x}mm"></span>
+			<span
+				class="guide vertical"
+				style="left:{guide.flip ? template.page.w - guide.x : guide.x}mm"
+			></span>
 		{/if}
 		{#if guide.y !== null}
 			<span class="guide horizontal" style="top:{guide.y}mm"></span>

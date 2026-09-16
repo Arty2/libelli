@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Card from './Card.svelte';
 	import { backgroundStyle } from '$lib/assets';
-	import { SHEET_MARK_GAP, SHEET_MARK_MAX, resolveImposition } from '$lib/imposition';
+	import { SHEET_MARK_GAP, SHEET_MARK_MAX, resolveImposition, type PlacedPage } from '$lib/imposition';
 	import type { Mapping, Row, Template } from '$lib/types';
 
 	/**
@@ -19,8 +19,13 @@
 		background: string | null;
 		/** the sheet's own background, resolved the same way as the card's */
 		printBackground: string | null;
-		/** the rows landing on this one sheet, carrying each row's original index */
-		pages: { row: Row; index: number }[];
+		/**
+		 * The cells of this one sheet, in grid order: the row that falls in each,
+		 * carrying its original index, and how the cell is turned. A fold can
+		 * leave a cell empty and can stand half of them on their heads — see
+		 * `imposition.ts`.
+		 */
+		cells: PlacedPage<{ row: Row; index: number }>[];
 		/** total rows in the dataset, for "n / total" numbering on each card */
 		pageCount: number;
 		/**
@@ -39,7 +44,7 @@
 		mapping,
 		background,
 		printBackground,
-		pages,
+		cells,
 		pageCount,
 		previewScale = 1
 	}: Props = $props();
@@ -113,14 +118,31 @@
 		class="print-grid"
 		style="width:{blockW}mm;height:{blockH}mm;grid-template-columns:repeat({grid.cols},{cellW}mm);grid-template-rows:repeat({grid.rows},{cellH}mm)"
 	>
-		{#each pages as page (page.index)}
-			<!-- The card itself always renders at its own millimetres — see
-			     CLAUDE.md — and is only ever shrunk visually, by scaling this
-			     wrapper down to the cell it has to fit. -->
-			<div class="print-page" style="width:{cellW}mm;height:{cellH}mm">
-				<div class="print-page-scale" style="width:{cardW}mm;height:{cardH}mm;transform:scale({scale})">
-					<Card {template} row={page.row} {mapping} pageNumber={page.index + 1} {pageCount} {background} />
-				</div>
+		{#each cells as cell, position (position)}
+			<!-- Turned on the cell rather than on the card, because the cell is the
+			     one rectangle that is already exactly the room a page has: it turns
+			     about its own middle and lands back on itself. The scaler below
+			     turns about its top left corner, and rotating there would send the
+			     page off the sheet. -->
+			<div
+				class="print-page"
+				style="width:{cellW}mm;height:{cellH}mm{cell.rotate ? ';transform:rotate(180deg)' : ''}"
+			>
+				{#if cell.page}
+					<!-- The card itself always renders at its own millimetres — see
+					     CLAUDE.md — and is only ever shrunk visually, by scaling this
+					     wrapper down to the cell it has to fit. -->
+					<div class="print-page-scale" style="width:{cardW}mm;height:{cardH}mm;transform:scale({scale})">
+						<Card
+							{template}
+							row={cell.page.row}
+							{mapping}
+							pageNumber={cell.page.index + 1}
+							{pageCount}
+							{background}
+						/>
+					</div>
+				{/if}
 			</div>
 		{/each}
 	</div>

@@ -1,7 +1,7 @@
 import { safeImageUrl } from './assets';
 import { parseColor } from './color';
 import defaultCard from './templates/default-card.json';
-import { IMPOSITION_COUNTS } from './imposition';
+import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
 import type {
 	BackgroundFit,
 	BorderStyle,
@@ -54,6 +54,7 @@ export const ORIENTATIONS: Orientation[] = ['portrait', 'landscape'];
 export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
 	enabled: false,
 	count: 4,
+	order: 'sequential',
 	sheet: { w: 210, h: 297 },
 	orientation: 'portrait',
 	bleed: { enabled: false, amount: 3, cropMarks: false }
@@ -73,6 +74,16 @@ export const PAGE_NUMBER_POSITIONS: PageNumberPosition[] = [
 	'bottom-center',
 	'bottom-right'
 ];
+
+/** The two that follow the fold, offered beside the six fixed ones. */
+export const FACING_PAGE_NUMBER_POSITIONS: PageNumberPosition[] = [
+	'top-outer',
+	'top-inner',
+	'bottom-outer',
+	'bottom-inner'
+];
+
+const ALL_PAGE_NUMBER_POSITIONS = [...PAGE_NUMBER_POSITIONS, ...FACING_PAGE_NUMBER_POSITIONS];
 
 export function builtinTemplate(): Template {
 	return normaliseTemplate(BUILTIN_TEMPLATE_JSON);
@@ -153,6 +164,9 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			borderRadius: partial.borderRadius,
 			fit: BOX_FITS.includes(partial.fit as BoxFit) ? partial.fit : undefined,
 			locked: partial.locked,
+			// Only the opt-out is stored: following the fold is what a box does
+			// by default, so `true` is the absence of the field.
+			mirror: partial.mirror === false ? false : undefined,
 			group: typeof partial.group === 'string' && partial.group.trim() ? partial.group : undefined
 		})
 	};
@@ -206,6 +220,7 @@ export function normaliseTemplate(raw: unknown): Template {
 		slots,
 		boxes,
 		...stripUndefined({
+			facing: t.facing ? true : undefined,
 			css: typeof t.css === 'string' && t.css.trim() ? t.css : undefined,
 			locked: t.locked ? true : undefined
 		})
@@ -235,6 +250,7 @@ function normalisePrintSettings(raw: any): PrintSettings {
 	return {
 		enabled: Boolean(raw?.enabled),
 		count,
+		order: SHEET_ORDERS.includes(raw?.order) ? raw.order : DEFAULT_PRINT_SETTINGS.order,
 		sheet: {
 			w: num(raw?.sheet?.w, DEFAULT_PRINT_SETTINGS.sheet.w),
 			h: num(raw?.sheet?.h, DEFAULT_PRINT_SETTINGS.sheet.h)
@@ -264,7 +280,7 @@ function normaliseBackgroundImage(raw: any): PageBackgroundImage | undefined {
 }
 
 function normalisePageNumber(raw: any): PageNumberSpec {
-	const position: PageNumberPosition = PAGE_NUMBER_POSITIONS.includes(raw?.position)
+	const position: PageNumberPosition = ALL_PAGE_NUMBER_POSITIONS.includes(raw?.position)
 		? raw.position
 		: DEFAULT_PAGE_NUMBER.position;
 	return {

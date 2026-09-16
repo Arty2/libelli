@@ -819,6 +819,20 @@
 				/>
 				Hide When Empty
 			</label>
+			<!-- Only where there is a fold to mirror across: on a run of identical
+			     pages this control would have nothing to do. -->
+			{#if template.facing}
+				<label class="check">
+					<input
+						type="checkbox"
+						checked={selected.mirror !== false}
+						title="Mirror this area onto left-hand pages, so it keeps its distance from the outer edge. Off pins it to the same millimetres on every page"
+						disabled={boxFrozen}
+						onchange={(e) => patch({ mirror: e.currentTarget.checked ? undefined : false })}
+					/>
+					Mirror
+				</label>
+			{/if}
 		</span>
 
 		<!-- How the box is turned, and the point it turns about. The pivot appears

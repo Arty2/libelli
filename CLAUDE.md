@@ -26,7 +26,7 @@ src/lib/
   css.ts          scopes the template's own CSS to the card; strips @import and remote url()
   parse.ts        CSV / TSV parsing (quoted fields, embedded newlines, delimiter sniffing)
   markdown.ts     hand-written Markdown subset -> HTML, escaping at the leaves
-  layout.ts       mm geometry, anchor resolution, grid and sibling-edge snapping
+  layout.ts       mm geometry, anchors, snapping, and the left/right page mirror
   autolayout.ts   reads the columns, writes a first draft of a card
   boxops.ts       box and selection transforms: duplicate, delete, group, lock, nudge
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
@@ -36,7 +36,7 @@ src/lib/
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
   table.ts        column reorder, row sorting
-  imposition.ts   grid math for tiling several cards onto one physical sheet
+  imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
   download.ts     hand the browser a file; the one copy both exports use
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
@@ -73,6 +73,11 @@ src/routes/app.css        the :root tokens and app-wide rules
   percent.
 - **One layout engine.** The editor and the printed page render through the same
   DOM and the same CSS; never add a second layout path for print.
+- **A template stores the right-hand page.** With facing pages on, a left-hand
+  page is `mirrorBox` applied as the card is drawn — never a second set of
+  coordinates. Anything that writes geometry back (dragging, nudging, the
+  fields in the bar) works in the stored frame, so a mirrored drag is undone
+  before it is written, not stored mirrored.
 - **No runtime dependencies.** The Markdown renderer, the CSV parser and the QR
   encoder are hand-written, so the app works offline and nothing can rot
   underneath it. `jsqr` is a dev dependency only — the tests decode generated

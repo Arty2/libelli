@@ -20,6 +20,27 @@ that number would otherwise reach the field and the exported template.
 **Sibling edges come from `resolveLayout`**, so a box snaps to where a grown box
 actually ends, not to where its declared geometry says it starts.
 
+**A left-hand page is derived, never stored.** `mirrorBox` is a pure function of
+a box and the page width, applied as the card is drawn. The alternative — a
+second set of coordinates for the facing page, or two templates — would need
+every edit made twice and would drift the first time someone changed one side
+and not the other. The template holds one set of millimetres, measured on the
+right-hand page; `pageSide` reads the parity of the page number the card was
+handed, which is why the editor shows the fold as it pages through the rows
+without being told about it separately.
+
+**Mirroring places a box; it does not turn it over.** Rotation and the pivot are
+carried across untouched. A true mirror of the *appearance* would stand a
+signature or a corner flourish on its head, which no spread wants, and a box
+that means to be turned the other way on the other page can say so itself.
+
+**Only an alignment that was chosen mirrors.** An explicit `left` or `right`
+swaps, because that is an area deliberately pushed against an edge and the edge
+it wants is the outer one. An absent alignment stays absent and keeps inheriting
+the page default: that is body text, and body text reads the same way on both
+sides of a spread. The rule is one sentence and it is the difference between a
+mirrored margin and a mirrored paragraph.
+
 ## `src/lib/template.ts`
 
 **Stacking is array order**, not a z-index: `arrangeBoxes` moves boxes within the
@@ -153,6 +174,36 @@ card at its own full size and then scales the wrapping element down with a
 plain CSS `transform`, so nothing about layout, anchors or measurement
 changes — only what ends up on paper. `PrintSettingsPanel.svelte` shows the
 percentage rather than staying silent about it.
+
+**A fold has one arrangement, and it outranks the fit.** `resolveImposition`
+picks the grid needing the least shrinkage — except in `zine` order, where the
+count names its grid outright: eight pages fold as two rows of four or they do
+not fold, and two as one row of two. A sheet where some other shape would fit
+better is then printed scaled down, which is the honest failure; folding a
+sheet whose pages are in the wrong cells is not a failure anyone can see until
+the paper is cut.
+
+**Only the folds people actually make.** Two up is a saddle stitch and eight up
+is the single-sheet mini zine. Four would be a quarto — a second fold, and its
+two sides only line up if you know which edge the printer flips on, which is a
+setting in someone else's dialog and not one this app can read. Six does not
+fold at all. So those two counts keep the sequential order they already had and
+`PrintSettingsPanel.svelte` says so, rather than offering a fold that comes out
+wrong on half the printers in the world.
+
+**Blank pages are part of the object, so they keep their places.** A booklet is
+a multiple of four pages because that is what a folded sheet makes. A run of
+five gets three `null` cells, sitting where the fold puts them rather than all
+at the end: shifting the remaining pages up to close the gaps would renumber
+everything after the first short sheet and break the nesting. `orderPages`
+returns cells, not pages, for exactly this reason.
+
+**Ordering is pure, and one function serves both renderings.** `planSheets` is
+what `PrintRoot.svelte` prints and what `PrintPreview.svelte` draws thumbnails
+of. The preview used to do its own slicing beside a comment promising it
+matched — a promise the next change to either would have quietly broken. A fold
+is much easier to get wrong than a slice, so the two now share the arithmetic
+rather than a comment about it.
 
 **The sheet's own background is a second, separate reference.** A card's
 background (`template.page.image`) and the sheet's (`template.print.background`)
@@ -463,6 +514,17 @@ back to either is pixel-hunting, and the fields in the bar are three clicks away
 and only there for a single selection. The reset drops the drag in flight along
 with it: the drag snapshotted the old value at pointerdown, and a move arriving
 afterwards would write that snapshot straight back over the reset.
+
+**A drag on a left-hand page is undone into the stored frame, not handled in
+two.** A mirrored box is drawn at its facing position, so a pointer going right
+moves it left in the millimetres the template keeps, and the handle under the
+pointer is the opposite edge of the stored box. Rather than a mirrored twin of
+every case in `moveDrag`, the delta is negated and the handle swapped once, at
+the top — after which every case below is the code that was already there,
+working in the one frame the template is written in. The pivot and the rotation
+handle sit outside that, because mirroring places a box without flipping what is
+inside it. The latch guide carries a `flip` flag for the same reason: it is
+measured against stored edges and drawn where the eye sees them.
 
 ## `src/lib/components/PagePreview.svelte`
 
@@ -941,6 +1003,14 @@ margin that escaped, so a thumbnail read as blank paper with a sliver of card
 at the bottom — and the real print was off-centre in the same way, which the
 first version of this shipped with. Padding cannot collapse. The sheet is
 `box-sizing: border-box` so it still measures exactly the paper it names.
+
+**A turned page turns its cell, not itself.** Half a mini zine prints upside
+down. The cell is the one rectangle already exactly the room a page has, so
+rotating it about its own middle lands it back on itself; the scaler inside
+turns about its top left corner, where a rotation would swing the page clean off
+the sheet. It also keeps the rotation off `Card.svelte`, which has a rotation of
+its own — the one a box can be given — and no business knowing which way up the
+paper wants it.
 
 **The sheet's bleed is not the card's.** The card's says where to cut one card
 out of the sheet; the sheet's says where to cut the sheet, so it outsets the
