@@ -5,6 +5,7 @@
 	import { applyPlaceholders } from '$lib/placeholders';
 	import { scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
+	import { handBorder, type HandStroke } from '$lib/hand';
 	import { hold } from '$lib/gestures';
 	import {
 		FREE_STEP,
@@ -333,8 +334,16 @@
 			const { top, right, bottom, left } = sidesOf(box.borderWidth);
 			parts.push(
 				`border-width:${top}mm ${right}mm ${bottom}mm ${left}mm`,
-				`border-style:${box.borderStyle ?? 'solid'}`,
-				`border-color:${box.borderColor ?? box.color ?? template.defaults.color}`
+				// A hand-drawn border still keeps the room a CSS one would take —
+				// solid, and painted in nothing — so switching it on moves no text
+				// and changes no measurement. Only what is drawn in that room
+				// changes, and the SVG below draws it.
+				`border-style:${box.borderHand ? 'solid' : (box.borderStyle ?? 'solid')}`,
+				`border-color:${box.borderHand ? 'transparent' : borderColorOf(box)}`,
+				`--bw-t:${top}mm`,
+				`--bw-r:${right}mm`,
+				`--bw-b:${bottom}mm`,
+				`--bw-l:${left}mm`
 			);
 		}
 		if (box.borderRadius) parts.push(`border-radius:${box.borderRadius}mm`);
@@ -357,6 +366,28 @@
 			parts.push(`min-height:${box.h}mm`);
 		}
 		return parts.join(';');
+	}
+
+	const borderColorOf = (box: Box) => box.borderColor ?? box.color ?? template.defaults.color;
+
+	/**
+	 * The strokes of a hand-drawn border, in the millimetres of the box's own
+	 * border box — its declared width, and the height the layout resolved, which
+	 * is the same number `measure` read off the element.
+	 *
+	 * Seeded with the box id, so the wobble is the same on every page of the run
+	 * and does not redraw itself as the words underneath it are typed.
+	 */
+	function handStrokes(box: Box): HandStroke[] {
+		if (!box.borderHand || !box.borderWidth) return [];
+		return handBorder({
+			w: box.w,
+			h: layout.heights[box.id] ?? box.h,
+			widths: sidesOf(box.borderWidth),
+			radius: box.borderRadius ?? 0,
+			style: box.borderStyle ?? 'solid',
+			seed: box.id
+		});
 	}
 
 	/** The page number rides on the template's own defaults, never on a box's. */
@@ -907,6 +938,7 @@
 
 		{#each template.boxes as box (box.id)}
 			{@const empty = hidden.has(box.id)}
+			{@const strokes = handStrokes(box)}
 			<div
 				class="box"
 				class:outlined={bounds && !empty}
@@ -940,6 +972,30 @@
 				onpointercancel={endDrag}
 				role="presentation"
 			>
+				{#if strokes.length}
+					<!-- Drawn over the room the transparent CSS border is holding, so
+					     it covers exactly what that border would have painted. Sized
+					     in millimetres against a viewBox of the same numbers, which
+					     makes one user unit one millimetre and the stroke widths
+					     literal. -->
+					<svg
+						class="hand-border"
+						aria-hidden="true"
+						viewBox="0 0 {box.w} {layout.heights[box.id] ?? box.h}"
+						style="width:{box.w}mm;height:{layout.heights[box.id] ?? box.h}mm"
+						fill="none"
+						stroke={borderColorOf(box)}
+					>
+						{#each strokes as stroke, i (i)}
+							<path
+								d={stroke.d}
+								stroke-width={stroke.width}
+								stroke-dasharray={stroke.dash ?? 'none'}
+								stroke-linecap={stroke.cap ?? 'butt'}
+							/>
+						{/each}
+					</svg>
+				{/if}
 				<div class="content" class:being-edited={editingId === box.id}>
 					{#if box.mode === 'markdown'}
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf -->
@@ -1204,6 +1260,22 @@
 		overflow-wrap: break-word;
 		display: flex;
 		flex-direction: column;
+	}
+
+	/* Out of flow, and anchored to the *border* box: an absolutely positioned
+	   child is placed against the padding box, so it is pushed back out by the
+	   border widths the box put in these properties. Out of flow also means it
+	   is not part of what `measure` reads, so a border cannot grow the box it
+	   is drawn around. */
+	.hand-border {
+		position: absolute;
+		top: calc(-1 * var(--bw-t, 0mm));
+		left: calc(-1 * var(--bw-l, 0mm));
+		pointer-events: none;
+		/* A wobble strays a fraction of a millimetre past the line it follows,
+		   which at the trim edge of the card is the difference between a drawn
+		   border and a clipped one. */
+		overflow: visible;
 	}
 
 	/* The one flex item in the box, so `justify-content` still places the content

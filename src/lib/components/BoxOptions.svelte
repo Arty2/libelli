@@ -728,6 +728,16 @@
 						onchange={(e) => patch({ borderColor: e.currentTarget.value })}
 					/>
 				</label>
+				<button
+					class="square"
+					aria-pressed={!!selected.borderHand}
+					aria-label="Hand-drawn border"
+					title="Draw the border by hand: the same width, style and radius, wobbling. The line is the same on every card — it is drawn from this area's own name, not from chance"
+					disabled={boxFrozen}
+					onclick={() => patch({ borderHand: selected?.borderHand ? undefined : true })}
+				>
+					<Icon name="edit" size={14} />
+				</button>
 			{/if}
 
 			<label class="field">

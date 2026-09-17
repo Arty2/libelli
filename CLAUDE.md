@@ -35,6 +35,7 @@ src/lib/
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
+  hand.ts         a border drawn by hand: seeded wobble -> SVG paths, in mm
   table.ts        column reorder, row sorting
   imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
   download.ts     hand the browser a file; the one copy both exports use

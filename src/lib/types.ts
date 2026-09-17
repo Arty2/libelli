@@ -248,6 +248,12 @@ export interface Box extends TextStyle {
 	/** mm, applied to the whole box */
 	borderRadius?: number;
 	/**
+	 * Draw the border by hand: the same width, style and radius, wobbling. The
+	 * CSS border still holds the room it always did and is simply painted in
+	 * nothing, so turning this on moves no text and changes no measurement.
+	 */
+	borderHand?: boolean;
+	/**
 	 * How an image or QR fills its box: contain fits it, cover crops it, fill
 	 * stretches it, repeat tiles it at its own size. `repeat` is image-only —
 	 * a tiled QR code is not a QR code.

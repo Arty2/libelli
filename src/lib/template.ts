@@ -162,6 +162,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			borderStyle: BORDER_STYLES.includes(partial.borderStyle as BorderStyle) ? partial.borderStyle : undefined,
 			borderColor: color(partial.borderColor),
 			borderRadius: partial.borderRadius,
+			borderHand: partial.borderHand ? true : undefined,
 			fit: BOX_FITS.includes(partial.fit as BoxFit) ? partial.fit : undefined,
 			locked: partial.locked,
 			// Only the opt-out is stored: following the fold is what a box does

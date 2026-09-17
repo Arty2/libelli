@@ -213,6 +213,39 @@ imposition draws a sheet distinct from the card), and conflating them would
 mean turning imposition off could silently reach for a picture nobody chose
 for that context.
 
+## `src/lib/hand.ts`
+
+**The wobble is seeded, not random.** A border drawn from `Math.random` is a
+different border on every keystroke, every re-measure and every page of the
+run — which reads as a fault, not as a hand. The seed is the box's own id, so
+one area is always drawn the same way and no two areas are drawn alike. It is
+also what makes the module testable at all: the same input gives the same path
+string, every time.
+
+**The wobble is in millimetres, not in percent.** A pen strays by a fixed
+physical amount whatever it is drawing around, so a small box is not drawn more
+neatly than a large one, and the same border drawn on an A7 zine page and an A3
+poster is the same *hand*. It is the rule the rest of this codebase already
+follows, for once for a reason that is about ink rather than about geometry.
+
+**The CSS border stays, painted in nothing.** A hand border could have replaced
+the CSS one, and then switching it on would have changed the box's content
+height, moved every anchored box below it and re-measured the card. Instead the
+border keeps the room it always had — `solid`, `transparent` — and the SVG draws
+in that room. Nothing about layout, measurement or anchoring knows this feature
+exists.
+
+**Each corner belongs to the edge that arrives at it.** Not to a closed path
+around the whole box, which would have had to pick one width for a corner
+between a 2mm edge and a hairline. Drawing each side as its own stroke, corner
+included, is what a pen does when the sides are drawn one after another — and it
+falls out of that rule that an edge with no width takes its corner with it, so a
+bottom edge alone is an underline rather than three quarters of a box.
+
+**Ends are exact, middles stray.** Only the interior points of a run are pushed
+off the line. If the ends wobbled too, the corners would not meet, and a gap
+where two strokes should join does not read as hand-drawn — it reads as broken.
+
 ## `src/lib/history.ts`
 
 **A label rides alongside each state, never inside it.** States are compared by

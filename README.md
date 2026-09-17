@@ -168,6 +168,18 @@ resize boxes directly, or type exact millimetres.
   a box does not move it or anything anchored below it — though padding and a
   border do make the box taller, which an anchored box below will follow, as it
   should.
+- **A border drawn by hand** — the pencil beside the border color draws it
+  wobbling, as a line rather than a rule. Width, style and radius all still
+  mean what they meant: a dashed 1mm hand border is dashed, 1mm and hand-drawn,
+  and a dotted one is dots. Each edge is drawn with its own width, so an area
+  with a bottom edge only comes out as an underline, and each corner is drawn
+  by the edge arriving at it — which is what a pen does when the sides are
+  drawn one after another. The wobble is worked out from the area's own name
+  rather than from chance, so it is the same line on every card of the run and
+  it does not redraw itself while you type; two areas are never drawn alike.
+  It is an SVG over the room the CSS border was already holding, so switching
+  it on moves no text and changes no measurement, and it prints and exports
+  like anything else on the card.
 - **Type without the bar** — <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> and the
   scroll wheel sizes whatever the pointer is over, in points, and the same
   modifiers with the arrows step the alignment of the selection in the direction
@@ -792,7 +804,7 @@ thing itself.
 - **Area** — head: the field's name, then duplicate, delete, lock · content
   (data field or static text, column, mode, fit, QR settings) · type (font,
   size, weight, color) · setting (leading, spacing, case) · alignment,
-  horizontal and vertical · surface (fill, padding, border width, style and
+  horizontal and vertical · surface (fill, padding, border width, style, hand and
   color, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
   when empty, and mirror where the template has left and right pages) ·
   rotation and its pivot
