@@ -1204,9 +1204,20 @@ behaviour (the family stays in the fallback stack and the export says which)
 is what actually happens.
 
 **The PNG export is the one thing that fetches.** `png.ts` inlines a Google face
-by fetching the stylesheet the page already loaded and the files it names.
-Deliberate, confined to that file, and best effort — a blocked request falls back
-to the system stack and is reported rather than hidden.
+by fetching the stylesheet the page already loaded and the files it names, and
+reads back the pictures on the card the same way. Deliberate, confined to that
+file, and best effort — a blocked request falls back to the system stack and is
+reported rather than hidden.
+
+**An SVG rendered through an `<img>` loads nothing at all.** Not a `blob:` URL,
+not an `https:` one, not even a same-origin file — and it fails silently, with
+no error and no broken-image mark. So every card with an uploaded background or
+a picture in an area exported as a blank where the picture was, and nothing said
+so; the fonts had been noticed and fixed years before the images, because a
+missing typeface is visible and a missing picture just looks like a card that
+was designed that way. `inlineImages` rewrites every `<img src>` and every
+`url()` in an inline style as data before the SVG is built. Each distinct
+address is fetched once per card however many areas share it.
 
 ## `src/lib/fonts.ts`
 
@@ -1237,6 +1248,24 @@ the component has to stay a pure function of its props.
 
 **`assets.ts` owns object-URL lifetime**: an object URL outlives the value that
 made it, so each is revoked when replaced.
+
+**A row's image is `local:name`, and deliberately not `file:`.** A page served
+over http cannot read a `file://` address: the browser refuses outright and no
+setting changes it, so a cell holding one would be a reference that renders
+nothing, for ever, with a name that promises otherwise. What a cell can carry is
+a *name*, and the bytes under it sit in the same store as the backgrounds — an
+image is an image, and one uploaded as a background can be put in a row without
+uploading it twice.
+
+**The prefix is load-bearing.** A bare `sketch.png` in a cell is
+indistinguishable from a relative URL, and a relative URL resolves against the
+app's own address — so the app would have gone to the network for it, which is
+the one thing this app does not do. `local:` cannot be mistaken for an address
+by anything, `safeMediaUrl` included.
+
+**Names are resolved in one pass, keyed on the names.** Not on the rows: typing
+in a cell full of words must not send the whole run back to IndexedDB. A run of
+forty cards sharing one logo reads it once and holds one object URL for it.
 
 ## `src/lib/components/PageOptions.svelte`
 

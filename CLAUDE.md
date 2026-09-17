@@ -41,7 +41,7 @@ src/lib/
   download.ts     hand the browser a file; the one copy both exports use
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
-  assets.ts       background images: bytes in IndexedDB, object-URL lifetime, url() safety
+  assets.ts       images — page backgrounds and a row's own; bytes in IndexedDB, url() safety
   history.ts      undo/redo snapshots
   storage.ts      localStorage + IndexedDB, the template library, the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
@@ -85,8 +85,10 @@ src/routes/app.css        the :root tokens and app-wide rules
   codes with an independent decoder, because a QR that does not scan looks
   exactly like one that does.
 - **The app fetches nothing.** The single deliberate exception is `png.ts`,
-  which inlines a web font for export. A template is a file someone can hand
-  you, and it must not be able to change that.
+  which inlines a web font and the card's own pictures for export. A template is
+  a file someone can hand you, and it must not be able to change that. It is
+  also why a cell names a stored image as `local:name` rather than as a bare
+  file name: a bare one is a relative URL, and a relative URL is a request.
 - **Escaping, color parsing and CSS scoping are chokepoints.** Cell content is
   untrusted: every leaf text node is HTML-escaped in `markdown.ts`; every color
   goes through `color.ts` before it can reach a `style` attribute, and one it

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
-	import { backgroundStyle, cssUrl, safeMediaUrl } from '$lib/assets';
+	import { backgroundStyle, cssUrl, localImageName, safeMediaUrl } from '$lib/assets';
 	import { parseColor } from '$lib/color';
 	import { applyPlaceholders } from '$lib/placeholders';
 	import { scopeCss, styleTag } from '$lib/css';
@@ -58,8 +58,17 @@
 		 * component has to stay a pure function of its props.
 		 */
 		background?: string | null;
+		/**
+		 * Images this browser is holding, by the name a cell calls them —
+		 * `local:sketch.png` finds `images['sketch.png']`. Resolved by the app for
+		 * the same reason the background is: reading bytes out of storage is
+		 * asynchronous, and this component is a pure function of its props.
+		 */
+		images?: Record<string, string>;
 		/** `additive` is a modifier-click: add to or drop from the selection */
 		onselect?: (id: string | null, additive?: boolean) => void;
+		/** an image file dropped on an area, for the app to store and bind */
+		onimagedrop?: (box: Box, file: File) => void;
 		onchange?: (box: Box) => void;
 		/** right-click on a box, in viewport coordinates */
 		onmenu?: (id: string, x: number, y: number) => void;
@@ -87,11 +96,13 @@
 		selectedIds = [],
 		pageNumber = null,
 		background = null,
+		images = {},
 		pageCount = null,
 		editingId = null,
 		flashIds = [],
 		onselect,
 		onchange,
+		onimagedrop,
 		onmenu,
 		onaction,
 		onedit,
@@ -140,6 +151,11 @@
 		const written = box.slot ? contentOf(box) : (box.static?.dataUrl ?? box.static?.url ?? '');
 		const value = written.trim();
 		if (!value) return {};
+		// An image this browser is holding, named by the cell. Nothing when it
+		// is a name this browser has never seen — the same blank as an address
+		// that does not resolve, and the app says which names are missing.
+		const local = localImageName(value);
+		if (local) return images[local] ? { src: images[local] } : {};
 		const color = parseColor(value);
 		if (color) return { color };
 		const src = safeMediaUrl(value);
@@ -433,6 +449,36 @@
 	} | null = null;
 
 	const editable = (box: Box) => interactive && !box.locked && !template.locked;
+
+	// ---- an image dropped on an area ------------------------------------------
+
+	/** The area a file is being held over, so the drop has somewhere to land. */
+	let dropId = $state<string | null>(null);
+
+	/** The first image among what is being dragged, before it can be read. */
+	const draggingImage = (event: DragEvent) =>
+		Array.from(event.dataTransfer?.items ?? []).some(
+			(item) => item.kind === 'file' && item.type.startsWith('image/')
+		);
+
+	function dragOver(event: DragEvent, box: Box) {
+		if (!onimagedrop || !editable(box) || !draggingImage(event)) return;
+		// Without this the browser takes the drop itself and navigates to the
+		// file, which leaves the design behind.
+		event.preventDefault();
+		if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+		dropId = box.id;
+	}
+
+	function drop(event: DragEvent, box: Box) {
+		if (!onimagedrop || !editable(box)) return;
+		const file = Array.from(event.dataTransfer?.files ?? []).find((f) => f.type.startsWith('image/'));
+		dropId = null;
+		if (!file) return;
+		event.preventDefault();
+		event.stopPropagation();
+		onimagedrop(box, file);
+	}
 	const isSelected = (box: Box) => selectedIds.includes(box.id);
 	/** Handles belong to a single box: with several chosen, the bar does the work. */
 	const soleSelection = $derived(selectedIds.length === 1);
@@ -950,6 +996,7 @@
 				class:grouped={!!box.group}
 				class:font-loading={interactive && waitingFor(box)}
 				class:flashing={flashIds.includes(box.id)}
+				class:dropping={dropId === box.id}
 				style={boxStyle(box)}
 				data-box-id={box.id}
 				use:measure={box.id}
@@ -970,6 +1017,9 @@
 				onpointermove={moveDrag}
 				onpointerup={endDrag}
 				onpointercancel={endDrag}
+				ondragover={(e) => dragOver(e, box)}
+				ondragleave={() => (dropId = dropId === box.id ? null : dropId)}
+				ondrop={(e) => drop(e, box)}
 				role="presentation"
 			>
 				{#if strokes.length}
@@ -1807,6 +1857,14 @@
 		@media (prefers-reduced-motion: no-preference) {
 			.box.flashing {
 				animation: found 900ms ease-out;
+			}
+
+			/* Says where a held picture will land. Screen only, like every other
+			   mark on this card, and drawn against the zoom so it is the same
+			   weight at 50% as at 200%. */
+			.box.dropping {
+				box-shadow: 0 0 0 calc(2px * var(--ui-scale, 1)) rgba(37, 99, 235, 0.9);
+				background-color: rgba(37, 99, 235, 0.08);
 			}
 		}
 

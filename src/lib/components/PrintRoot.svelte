@@ -8,6 +8,8 @@
 		dataset: Dataset;
 		mapping: Mapping;
 		background: string | null;
+		/** stored images by name, for the areas whose cells point at one */
+		images?: Record<string, string>;
 		/** the sheet's own background, resolved the same way as the card's */
 		printBackground: string | null;
 		/** row indices the preview left out */
@@ -16,8 +18,16 @@
 		excludedSheets: Set<number>;
 	}
 
-	let { template, dataset, mapping, background, printBackground, excluded, excludedSheets }: Props =
-		$props();
+	let {
+		template,
+		dataset,
+		mapping,
+		background,
+		images = {},
+		printBackground,
+		excluded,
+		excludedSheets
+	}: Props = $props();
 
 	// Filtered into a list up front, carrying each row's original index: a page
 	// keeps the number it has in the table however few of them are printed.
@@ -56,7 +66,15 @@
 
 <div class="print-root" aria-hidden="true" style="width:{sheetW}mm">
 	{#each sheets as cells, sheetIndex (sheetIndex)}
-		<PrintSheet {template} {mapping} {background} {printBackground} {cells} pageCount={dataset.rows.length} />
+		<PrintSheet
+			{template}
+			{mapping}
+			{background}
+			{images}
+			{printBackground}
+			{cells}
+			pageCount={dataset.rows.length}
+		/>
 	{/each}
 </div>
 

@@ -110,6 +110,72 @@ export async function resolveBackground(image: PageBackgroundImage | undefined):
 	return cacheObjectUrl(key, new Blob([stored.bytes], { type: stored.type || 'image/png' }));
 }
 
+// ---- images a row carries ---------------------------------------------------
+
+/**
+ * How a cell names an image that lives in this browser: `local:sketch.png`.
+ *
+ * Not `file:`, which it would be easy to reach for and which would be a lie: a
+ * page served over http cannot read a file:// address — the browser refuses
+ * outright, and no setting changes that. What a cell can carry is a *name*, and
+ * the bytes under that name are in IndexedDB beside the fonts and the
+ * backgrounds. It is the same bargain a template already makes for its
+ * background image, written as a string because a cell is a string.
+ *
+ * A prefix rather than a bare file name, because a bare one is indistinguishable
+ * from a relative URL — and a relative URL resolves against the app's own
+ * address and would be fetched off the network.
+ */
+export const LOCAL_IMAGE = 'local:';
+
+/** The name in a `local:` reference, or null for anything else. */
+export function localImageName(raw: unknown): string | null {
+	if (typeof raw !== 'string') return null;
+	const value = raw.trim();
+	if (!value.toLowerCase().startsWith(LOCAL_IMAGE)) return null;
+	const name = value.slice(LOCAL_IMAGE.length).trim();
+	return name || null;
+}
+
+/** What a cell has to say to point at a stored image of this name. */
+export const localImageRef = (name: string) => `${LOCAL_IMAGE}${name.trim()}`;
+
+/**
+ * Store a file and answer with the name a cell should carry. Shares its
+ * store — and so its names — with background images: an image is an image, and
+ * one uploaded as a background can be put in a row without uploading it twice.
+ */
+export async function storeLocalImage(file: File): Promise<string> {
+	const name = file.name.trim() || 'image';
+	await idbSet(STORE_ASSETS, assetKey(name), {
+		name,
+		type: file.type || 'image/png',
+		bytes: await file.arrayBuffer()
+	} satisfies StoredImage);
+	return name;
+}
+
+/**
+ * Object URLs for every stored image named here, and the names this browser
+ * has never seen. Resolved in one pass because the alternative is a read per
+ * card per render; `cacheObjectUrl` then keeps one URL per name however many
+ * rows point at it.
+ */
+export async function resolveLocalImages(
+	names: Iterable<string>
+): Promise<{ urls: Record<string, string>; missing: string[] }> {
+	const urls: Record<string, string> = {};
+	const missing: string[] = [];
+	if (typeof window === 'undefined') return { urls, missing };
+	for (const name of new Set(names)) {
+		const key = assetKey(name);
+		const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
+		if (stored?.bytes) urls[name] = cacheObjectUrl(key, new Blob([stored.bytes], { type: stored.type || 'image/png' }));
+		else missing.push(name);
+	}
+	return { urls, missing };
+}
+
 /** The CSS a resolved background turns into. The only place that mapping lives. */
 export function backgroundStyle(image: PageBackgroundImage | undefined, resolved: string | null): string[] {
 	if (!image || !resolved) return [];

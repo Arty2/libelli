@@ -17,6 +17,8 @@
 		template: Template;
 		mapping: Mapping;
 		background: string | null;
+		/** stored images by name, for the areas whose cells point at one */
+		images?: Record<string, string>;
 		/** the sheet's own background, resolved the same way as the card's */
 		printBackground: string | null;
 		/**
@@ -43,6 +45,7 @@
 		template,
 		mapping,
 		background,
+		images = {},
 		printBackground,
 		cells,
 		pageCount,
@@ -140,6 +143,7 @@
 							pageNumber={cell.page.index + 1}
 							{pageCount}
 							{background}
+							{images}
 						/>
 					</div>
 				{/if}

@@ -459,6 +459,25 @@ at its own size.
   Everything that can reach an `<img src>` from a cell goes through one guard
   that allows `http`, `https` and a base64 `data:` image and nothing else. A
   cell is untrusted; a template is a file someone can hand you.
+- **A picture from this machine** — drag an image file onto an area. The area
+  turns into an image area, the bytes go into this browser, and the *name* goes
+  into the table: the cell for that row reads `local:sketch.png`, so every row
+  can carry its own picture and nothing about the design has to change. An area
+  bound to no column has nowhere in the table to put it, so it keeps the
+  reference itself and shows the same picture on every card.
+
+  `local:` is a name, not an address — the bytes are in this browser, beside the
+  fonts and the page backgrounds, and a cell that named a file any other way
+  would either be fetched off the network or be a promise the browser cannot
+  keep. **A page served over http cannot read a `file://` address at all**: the
+  browser refuses, and no setting anywhere changes that, which is why dropping
+  the file is the way in rather than typing a path.
+
+  Nothing is uploaded and nothing is copied into the template, so a template or
+  a CSV handed to someone else carries the *names*: their copy says which
+  pictures it is missing, and dropping the files on again puts them back. An
+  image uploaded as a page background can be used in a row without uploading it
+  twice — they share one store, because an image is an image.
 - **QR code** — the bound cell is encoded as a QR and drawn as SVG, so it stays
   sharp at any print size; a raster QR at print resolution is the classic way to
   end up with a code no phone will read. Byte mode, versions 1–10, which holds
@@ -568,6 +587,13 @@ exception to *the app fetches nothing*, and it is confined to the export,
 because a PNG in the wrong typeface is not the card. A request that is
 blocked or offline leaves that family in the fallback stack and the export
 says which.
+
+Every picture is embedded the same way, and for a sharper reason: an SVG
+rasterised through an `<img>` — which is how this becomes a PNG — cannot load a
+single external resource, and it fails *silently*. A card with an uploaded
+background or a photo in an area used to export as a blank where the picture
+was, with nothing to say so. They are read back and inlined as data before the
+SVG is built, each address once per card however many areas share it.
 
 **Print Settings** sits between the two grids, edge to edge: it is what turns
 the pages above it into the sheets below it, so standing there it separates

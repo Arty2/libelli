@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backgroundStyle, safeImageUrl } from './assets';
+import { backgroundStyle, localImageName, localImageRef, safeImageUrl, safeMediaUrl } from './assets';
 
 describe('safeImageUrl', () => {
 	it('accepts the two schemes a browser should be pointed at', () => {
@@ -52,5 +52,33 @@ describe('backgroundStyle', () => {
 
 	it('escapes a quote rather than letting it close the url()', () => {
 		expect(backgroundStyle(image('cover'), 'blob:a"b')[0]).toBe('background-image:url("blob:a\\"b")');
+	});
+});
+
+describe('localImageName', () => {
+	it('reads the name out of a reference a cell can hold', () => {
+		expect(localImageName('local:sketch.png')).toBe('sketch.png');
+		expect(localImageName('  LOCAL:Sketch.png  ')).toBe('Sketch.png');
+	});
+
+	it('is nothing for anything that is not one', () => {
+		expect(localImageName('https://example.com/a.png')).toBe(null);
+		expect(localImageName('data:image/png;base64,AAA')).toBe(null);
+		expect(localImageName('sketch.png')).toBe(null);
+		expect(localImageName('local:')).toBe(null);
+		expect(localImageName('')).toBe(null);
+		expect(localImageName(undefined)).toBe(null);
+	});
+
+	it('round-trips whatever a dropped file was called', () => {
+		expect(localImageName(localImageRef('a cat.png'))).toBe('a cat.png');
+	});
+
+	it('is not an address, so nothing can be fetched with it', () => {
+		// A bare file name in a cell resolves against the app's own address and
+		// would be a request off the network; the prefix is what keeps a stored
+		// image and a relative URL apart.
+		expect(safeMediaUrl('local:sketch.png')).toBe(null);
+		expect(safeImageUrl('local:sketch.png')).toBe(null);
 	});
 });

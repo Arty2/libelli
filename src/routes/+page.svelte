@@ -9,7 +9,14 @@
 	import OptionsBar from '$lib/components/OptionsBar.svelte';
 	import PagePreview from '$lib/components/PagePreview.svelte';
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
-	import { resolveBackground, uploadBackgroundImage } from '$lib/assets';
+	import {
+		localImageName,
+		localImageRef,
+		resolveBackground,
+		resolveLocalImages,
+		storeLocalImage,
+		uploadBackgroundImage
+	} from '$lib/assets';
 	import { download, slugify } from '$lib/download';
 	import { ensureGoogleFont, ensureTemplateFonts, fontReady, uploadLocalFont } from '$lib/fonts';
 	import {
@@ -211,6 +218,8 @@
 	let printBackground = $state<string | null>(null);
 	let missingPrintImage = $state<string | null>(null);
 	let printBackgroundInput = $state<HTMLInputElement | null>(null);
+	/** stored images the rows point at, by name — see `local:` in assets.ts */
+	let images = $state<Record<string, string>>({});
 	let status = $state('');
 	/**
 	 * A notice is either something that happened or something that went wrong,
@@ -477,6 +486,82 @@ em { color: #b42318 }`;
 			stale = true;
 		};
 	});
+
+	/**
+	 * Every image the table and the template name, resolved to something an
+	 * `<img>` can use.
+	 *
+	 * Keyed on the names rather than on the rows: typing in a cell that holds
+	 * words must not send the whole run back to IndexedDB, and a name that is
+	 * already resolved keeps the object URL it had. Missing ones are said once,
+	 * as a notice — the areas simply draw nothing, and a card that is blank for
+	 * a reason should say so.
+	 */
+	const imageNames = $derived.by(() => {
+		const names = new Set<string>();
+		for (const row of dataset.rows) {
+			for (const value of Object.values(row)) {
+				const name = localImageName(value);
+				if (name) names.add(name);
+			}
+		}
+		for (const box of template.boxes) {
+			const name = localImageName(box.static?.url);
+			if (name) names.add(name);
+		}
+		return [...names].sort();
+	});
+
+	$effect(() => {
+		const wanted = imageNames;
+		let stale = false;
+		void (async () => {
+			const { urls, missing } = await resolveLocalImages(wanted);
+			if (stale) return;
+			images = urls;
+			if (missing.length) {
+				notify(
+					`${missing.length === 1 ? 'An image' : `${missing.length} images`} named here ` +
+						`${missing.length === 1 ? 'is' : 'are'} not in this browser: ${missing.join(', ')}. ` +
+						'Drop the file onto the area again to put it back.',
+					'warning'
+				);
+			}
+		})();
+		return () => {
+			stale = true;
+		};
+	});
+
+	/**
+	 * A picture dropped on an area.
+	 *
+	 * The bytes go to this browser's storage and the *name* goes into the table,
+	 * which is the whole point: the image belongs to the row, so every card gets
+	 * its own, and the template stays a small file that can be pasted into a
+	 * message. An area bound to no column has nowhere in the table to put it, so
+	 * it keeps the reference itself and the picture is the same on every card.
+	 */
+	async function handleImageDrop(box: Box, file: File) {
+		const name = await storeLocalImage(file);
+		const reference = localImageRef(name);
+		const column = box.slot ? mapping[box.slot] : undefined;
+		describe('Drop image');
+		// A picture dropped on a text area was meant as a picture: an area left
+		// in text mode would render the reference as the words `local:…`.
+		const next = { ...$state.snapshot(box), mode: 'image' } as Box;
+		if (column && row) {
+			updateBox(next);
+			dataset = {
+				...dataset,
+				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: reference } : r))
+			};
+			notify(`${name} is in ${column} for this row, and stays in this browser.`);
+		} else {
+			updateBox({ ...next, static: { ...box.static, url: reference } });
+			notify(`${name} is on this area, the same on every card, and stays in this browser.`);
+		}
+	}
 
 	// ---- undo/redo ----------------------------------------------------------
 
@@ -1473,7 +1558,17 @@ em { color: #b42318 }`;
 
 </script>
 
-<svelte:window onkeydown={onWindowKeydown} onafterprint={onAfterPrint} onresize={() => (barFloor = 0)} />
+<!-- A file dropped anywhere but on an area is swallowed here. The browser's own
+     answer to a dropped image is to navigate to it, which leaves the design
+     behind — and the one place a drop means something is the card, which takes
+     it before this ever sees it. -->
+<svelte:window
+	onkeydown={onWindowKeydown}
+	onafterprint={onAfterPrint}
+	onresize={() => (barFloor = 0)}
+	ondragover={(e) => e.preventDefault()}
+	ondrop={(e) => e.preventDefault()}
+/>
 <svelte:head>
 	<title>libelli</title>
 </svelte:head>
@@ -1690,8 +1785,10 @@ em { color: #b42318 }`;
 			onactivate={(i) => (activeRow = i)}
 			onlightbox={() => (lightboxOpen = true)}
 			{background}
+			{images}
 			onselect={selectBox}
 			onchange={updateBox}
+			onimagedrop={(box, file) => void handleImageDrop(box, file)}
 			onaction={describe}
 			onbounds={(show) => (ui = { ...ui, showBounds: show })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
@@ -2143,6 +2240,7 @@ em { color: #b42318 }`;
 		{mapping}
 		{activeRow}
 		{background}
+		{images}
 		{printBackground}
 		excluded={excludedRows}
 		{excludedSheets}
@@ -2168,6 +2266,7 @@ em { color: #b42318 }`;
 		{dataset}
 		{mapping}
 		{background}
+		{images}
 		index={activeRow}
 		onactivate={(i) => (activeRow = i)}
 		onclose={() => (lightboxOpen = false)}
@@ -2180,6 +2279,7 @@ em { color: #b42318 }`;
 		{dataset}
 		{mapping}
 		{background}
+		{images}
 		{printBackground}
 		excluded={excludedRows}
 		{excludedSheets}

@@ -12,11 +12,14 @@
 		/** which row is shown, and what the arrows step through */
 		index: number;
 		background: string | null;
+		/** stored images by name, for the areas whose cells point at one */
+		images?: Record<string, string>;
 		onactivate: (index: number) => void;
 		onclose: () => void;
 	}
 
-	let { template, dataset, mapping, index, background, onactivate, onclose }: Props = $props();
+	let { template, dataset, mapping, index, background, images = {}, onactivate, onclose }: Props =
+		$props();
 
 	let viewport = $state({ w: 1200, h: 800 });
 
@@ -388,6 +391,7 @@
 				pageNumber={index + 1}
 				pageCount={dataset.rows.length}
 				{background}
+				{images}
 			/>
 		</span>
 		{#if sensed}

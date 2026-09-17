@@ -36,8 +36,12 @@
 		onlightbox: () => void;
 		/** the template's background image, resolved by the app */
 		background: string | null;
+		/** stored images by name, for the areas whose cells point at one */
+		images?: Record<string, string>;
 		onselect: (id: string | null, additive?: boolean) => void;
 		onchange: (box: Box) => void;
+		/** an image file dropped on an area, handed up for the app to store */
+		onimagedrop?: (box: Box, file: File) => void;
 		/** forwarded to the card: what a drag is about to do, for the undo label */
 		onaction?: (what: string) => void;
 		onbounds: (show: boolean) => void;
@@ -99,8 +103,10 @@
 		onactivate,
 		onlightbox,
 		background,
+		images = {},
 		onselect,
 		onchange,
+		onimagedrop,
 		onaction,
 		onbounds,
 		ongrid,
@@ -649,6 +655,7 @@
 				{scale}
 				{pageNumber}
 				{background}
+				{images}
 				interactive={true}
 				pageCount={rowCount}
 				{editingId}
@@ -656,6 +663,7 @@
 				{selectedIds}
 				{onselect}
 				{onchange}
+				{onimagedrop}
 				{onaction}
 				{onmenu}
 				{onedit}

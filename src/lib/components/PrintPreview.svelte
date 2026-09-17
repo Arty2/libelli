@@ -18,6 +18,8 @@
 		mapping: Mapping;
 		activeRow: number;
 		background: string | null;
+		/** stored images by name, for the areas whose cells point at one */
+		images?: Record<string, string>;
 		/** the sheet's own background, resolved the same way as the card's */
 		printBackground: string | null;
 		/** row indices left out of the print; empty means every page goes */
@@ -40,6 +42,7 @@
 		mapping,
 		activeRow,
 		background,
+		images = {},
 		printBackground,
 		excluded,
 		excludedSheets,
@@ -308,7 +311,15 @@
 					aria-label="Open card {i + 1} full screen"
 				>
 					<span class="scaler" style="transform:scale({thumbScale})">
-						<Card {template} {row} {mapping} pageNumber={i + 1} pageCount={dataset.rows.length} {background} />
+						<Card
+							{template}
+							{row}
+							{mapping}
+							pageNumber={i + 1}
+							pageCount={dataset.rows.length}
+							{background}
+							{images}
+						/>
 					</span>
 				</button>
 				<!-- As wide as the page above it, and set like the count in the
@@ -366,6 +377,7 @@
 									{template}
 									{mapping}
 									{background}
+									{images}
 									{printBackground}
 									{cells}
 									pageCount={dataset.rows.length}
@@ -417,6 +429,7 @@
 			{dataset}
 			{mapping}
 			{background}
+			{images}
 			index={fullscreen}
 			onactivate={(i) => {
 				fullscreen = i;
@@ -431,6 +444,7 @@
 			{template}
 			{mapping}
 			{background}
+			{images}
 			{printBackground}
 			sheets={sheetGroups}
 			index={Math.min(sheetFullscreen, sheetGroups.length - 1)}

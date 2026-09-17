@@ -23,6 +23,8 @@
 		template: Template;
 		mapping: Mapping;
 		background: string | null;
+		/** stored images by name, for the areas whose cells point at one */
+		images?: Record<string, string>;
 		/** the sheet's own background, resolved the same way as the card's */
 		printBackground: string | null;
 		/** every sheet of the run, each carrying the cells that land on it */
@@ -41,6 +43,7 @@
 		template,
 		mapping,
 		background,
+		images = {},
 		printBackground,
 		sheets,
 		index,
@@ -113,6 +116,7 @@
 				{template}
 				{mapping}
 				{background}
+				{images}
 				{printBackground}
 				cells={sheets[index] ?? []}
 				{pageCount}
