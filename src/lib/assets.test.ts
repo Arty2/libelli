@@ -82,3 +82,20 @@ describe('localImageName', () => {
 		expect(safeImageUrl('local:sketch.png')).toBe(null);
 	});
 });
+
+describe('safeImageUrl, on anything that is not an address', () => {
+	it('refuses a relative path, which would be a request to this app', () => {
+		// The words in a cell are the real case: an image area bound to a column
+		// of prose used to resolve every one of them against the app's own
+		// address and ask the network for it.
+		expect(safeImageUrl('paper.jpg')).toBe(null);
+		expect(safeImageUrl('/paper.jpg')).toBe(null);
+		expect(safeImageUrl('../paper.jpg')).toBe(null);
+		expect(safeImageUrl('The table below')).toBe(null);
+		expect(safeMediaUrl('Change a cell, watch the card')).toBe(null);
+	});
+
+	it('still takes an address that says what it is', () => {
+		expect(safeImageUrl('https://example.com/paper.jpg')).toBe('https://example.com/paper.jpg');
+	});
+});

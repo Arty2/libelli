@@ -44,7 +44,12 @@ export function safeImageUrl(raw: unknown): string | null {
 	const value = raw.trim();
 	if (!value) return null;
 	try {
-		const url = new URL(value, typeof window === 'undefined' ? 'https://localhost/' : window.location.href);
+		// Parsed *without* a base, so a relative address cannot become an
+		// absolute one. It used to be resolved against the app's own location,
+		// which meant any words at all in an image area — `The table below` —
+		// came out as a URL pointing back at this app, and the browser went and
+		// asked for it. The app fetches nothing: an address has to say so itself.
+		const url = new URL(value);
 		return url.protocol === 'http:' || url.protocol === 'https:' ? value : null;
 	} catch {
 		return null;

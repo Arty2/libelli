@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import Icon from './Icon.svelte';
 	import { bitmapGrid, line, pixelAt, type Grid } from '$lib/bitmap';
 	import type { Box } from '$lib/types';
@@ -22,28 +21,35 @@
 		box: Box;
 		/** what the area holds now: a data URL to draw on top of, or nothing */
 		value: string;
+		/**
+		 * The one ink, resolved: the area's own colour where it has one, and the
+		 * page default where it inherits. There is no palette here on purpose —
+		 * an area is set to a colour in the bar, and a drawing made in it should
+		 * be that colour rather than a second decision made in a second place.
+		 */
+		ink: string;
 		onsave: (dataUrl: string) => void;
 		oncancel: () => void;
 	}
 
-	let { box, value, onsave, oncancel }: Props = $props();
+	let { box, value, ink, onsave, oncancel }: Props = $props();
 
 	const grid: Grid = $derived(bitmapGrid(box.w, box.h));
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
 	let tool = $state<'pen' | 'eraser'>('pen');
-	/**
-	 * The pen starts in the area's own colour and belongs to whoever is drawing
-	 * from then on — deliberately the value the area had when this opened, which
-	 * is what `untrack` says out loud.
-	 */
-	let color = $state(untrack(() => box.color) ?? '#000000');
 	/** brush width in pixels of the grid, not of the screen */
 	let nib = $state(1);
 	let weight = $state<number | null>(null);
 
-	/** Whole canvases rather than a list of strokes: at this size it is nothing. */
+	/**
+	 * Whole canvases rather than a list of strokes: at this size it is nothing.
+	 * `history` is what has been done and `future` what has been undone — a new
+	 * stroke empties the second, because a drawing cannot be redone onto a
+	 * different one.
+	 */
 	let history = $state<ImageData[]>([]);
+	let future = $state<ImageData[]>([]);
 	let drawing = $state(false);
 	let last: { x: number; y: number } | null = null;
 
@@ -69,18 +75,34 @@
 		image.src = value;
 	}
 
+	const snapshot = () => context()?.getImageData(0, 0, grid.w, grid.h) ?? null;
+
 	function remember() {
-		const ctx = context();
-		if (!ctx) return;
-		history = [...history.slice(-29), ctx.getImageData(0, 0, grid.w, grid.h)];
+		const taken = snapshot();
+		if (!taken) return;
+		history = [...history.slice(-29), taken];
+		future = [];
 	}
 
 	function undo() {
 		const ctx = context();
-		const previous = history.pop();
-		if (!ctx || !previous) return;
+		const previous = history.at(-1);
+		const current = snapshot();
+		if (!ctx || !previous || !current) return;
 		ctx.putImageData(previous, 0, 0);
-		history = [...history];
+		history = history.slice(0, -1);
+		future = [...future, current];
+		measure();
+	}
+
+	function redo() {
+		const ctx = context();
+		const next = future.at(-1);
+		const current = snapshot();
+		if (!ctx || !next || !current) return;
+		ctx.putImageData(next, 0, 0);
+		future = future.slice(0, -1);
+		history = [...history, current];
 		measure();
 	}
 
@@ -106,7 +128,7 @@
 		// off where the pointer was is the one thing a pixel editor cannot do.
 		if (tool === 'eraser') ctx.clearRect(at.x, at.y, nib, nib);
 		else {
-			ctx.fillStyle = color;
+			ctx.fillStyle = ink;
 			ctx.fillRect(at.x, at.y, nib, nib);
 		}
 	}
@@ -156,7 +178,9 @@
 		}
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
 			event.preventDefault();
-			undo();
+			// The same chord the app itself uses, shifted for the way back.
+			if (event.shiftKey) redo();
+			else undo();
 		}
 	}
 
@@ -177,7 +201,6 @@
 		return () => window.removeEventListener('resize', read);
 	});
 
-	const SWATCHES = ['#000000', '#ffffff', '#e5243b', '#f2a900', '#1f7a3f', '#2563eb', '#7b3fa0', '#8a5a2b'];
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -196,8 +219,16 @@
 
 	<div class="tools" role="toolbar" aria-label="Drawing tools">
 		<span class="segmented">
-			<button aria-pressed={tool === 'pen'} title="Draw" aria-label="Draw" onclick={() => (tool = 'pen')}>
-				<Icon name="edit" size={15} />
+			<button
+				aria-pressed={tool === 'pen'}
+				title="Draw in this area's own colour"
+				aria-label="Draw"
+				onclick={() => (tool = 'pen')}
+			>
+				<!-- The ink itself, rather than a pencil: there is one colour here and
+				     it is the area's, so the button may as well be the swatch that
+				     says which. -->
+				<span class="ink" style="background:{ink}"></span>
 			</button>
 			<button
 				aria-pressed={tool === 'eraser'}
@@ -205,44 +236,40 @@
 				aria-label="Erase"
 				onclick={() => (tool = 'eraser')}
 			>
-				<Icon name="close" size={15} />
+				<Icon name="erase" size={15} />
 			</button>
 		</span>
 
+		<!-- The weight drawn rather than numbered: a nib is a square of pixels, and
+		     a square of pixels is the thing to put on the button. The number is in
+		     the title for anyone who wants it. -->
 		<span class="segmented">
 			{#each [1, 2, 4] as size (size)}
-				<button aria-pressed={nib === size} title="{size} pixel nib" onclick={() => (nib = size)}>{size}</button>
-			{/each}
-		</span>
-
-		<span class="swatches">
-			{#each SWATCHES as swatch (swatch)}
 				<button
-					class="swatch"
-					class:chosen={color.toLowerCase() === swatch && tool === 'pen'}
-					style="background:{swatch}"
-					title={swatch}
-					aria-label="Draw in {swatch}"
-					onclick={() => {
-						color = swatch;
-						tool = 'pen';
-					}}
-				></button>
+					aria-pressed={nib === size}
+					title="{size} pixel{size === 1 ? '' : 's'} wide"
+					aria-label="{size} pixel nib"
+					onclick={() => (nib = size)}
+				>
+					<span
+						class="nib"
+						style="width:{2 + size * 3}px;height:{2 + size * 3}px;background:{tool === 'eraser' ? '#767676' : ink}"
+					></span>
+				</button>
 			{/each}
-			<input
-				type="color"
-				value={color}
-				title="Any other color"
-				aria-label="Choose a color"
-				onchange={(e) => {
-					color = e.currentTarget.value;
-					tool = 'pen';
-				}}
-			/>
 		</span>
 
-		<button onclick={undo} disabled={!history.length}>Undo</button>
-		<button onclick={clear}>Clear</button>
+		<span class="segmented">
+			<button onclick={undo} disabled={!history.length} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
+				<Icon name="undo" size={15} />
+			</button>
+			<button onclick={redo} disabled={!future.length} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
+				<Icon name="redo" size={15} />
+			</button>
+			<button onclick={clear} title="Clear the whole drawing" aria-label="Clear">
+				<Icon name="trash" size={15} />
+			</button>
+		</span>
 	</div>
 
 	<!-- The checks show through where nothing has been drawn: an area's fill and
@@ -338,33 +365,22 @@
 		gap: 4px;
 	}
 
-	.swatches {
-		display: flex;
-		align-items: center;
-		gap: 4px;
+	/* The ink, at the size of a glyph so the row stays one height. A border
+	   against the button's own white, or an area set to white would be an empty
+	   square where the colour should be. */
+	.ink {
+		width: 15px;
+		height: 15px;
+		border-radius: 3px;
+		border: 1px solid rgba(0, 0, 0, 0.25);
+		box-sizing: border-box;
 	}
 
-	.swatch {
-		width: 22px;
-		height: 22px;
-		border-radius: 4px;
-		border: 1px solid #c9cdd4;
-		padding: 0;
-		cursor: pointer;
-	}
-
-	.swatch.chosen {
-		outline: 2px solid #2563eb;
-		outline-offset: 1px;
-	}
-
-	.swatches input[type='color'] {
-		width: 28px;
-		height: 26px;
-		padding: 0;
-		border: 1px solid #c9cdd4;
-		border-radius: 4px;
-		background: #fff;
+	/* The weight, drawn: 1, 2 and 4 pixels as squares that grow with them, in
+	   the ink they will actually put down — grey while the rubber is the tool,
+	   because what they will put down then is nothing. */
+	.nib {
+		border-radius: 1px;
 	}
 
 	.stage {

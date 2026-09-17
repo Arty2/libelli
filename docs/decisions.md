@@ -255,6 +255,13 @@ to someone. In the cell it travels with the words, and a row's picture is
 exactly as portable as its text. The cost is a long cell, which is why the next
 decision is what it is.
 
+**One ink, and it is the area's own.** There is no palette here. An area is set
+to a colour in the bar, and a drawing made in it should be that colour rather
+than a second decision made in a second place — so the pen is that colour and the
+only other tool is the rubber. The trade-off is that the ink is fixed at the
+moment of drawing: this is a PNG, not a mask, so changing the area's colour
+afterwards does not recolour what was drawn.
+
 **Low resolution is the feature.** Sixty-four pixels on the longest side is a
 kilobyte or two of base64 — a long cell, but one a spreadsheet can hold and a
 person can scroll past. Four times the side is sixteen times the pixels and a
@@ -585,6 +592,20 @@ and only there for a single selection. The reset drops the drag in flight along
 with it: the drag snapshotted the old value at pointerdown, and a move arriving
 afterwards would write that snapshot straight back over the reset.
 
+**The tie badge sits at the other end of the area from the rest.** Every badge
+used to stack at the top corner, and on a shallow area four of them are taller
+than the area they are about. The tie is the one an area carries most often, so
+moving it to the bottom corner halves that column in the common case — and it
+clears the shears by their own half-height when the area is cutting its words
+off, because two marks on one corner is worse than either alone.
+
+**Blending is one word, checked on the way in.** `mix-blend-mode` is written
+straight into a style attribute, so `newBox` only lets through the thirteen
+modes the format names — the same rule colors follow. It reaches the paper and
+whatever is stacked under the area and stops at the card, because the scaler
+above it is a transform and a transform is a stacking context: nothing on a card
+can blend with the editor around it.
+
 **A drag on a left-hand page is undone into the stored frame, not handled in
 two.** A mirrored box is drawn at its facing position, so a pointer going right
 moves it left in the millimetres the template keeps, and the handle under the
@@ -753,6 +774,13 @@ of sight is the cheapest way to get that corner back, so the clamp lets the pad
 hang over the edge — and stops at one cell, which is where the middle button's
 outer edge meets the edge of the stage. That button is how the pad is picked up
 again; a pad you cannot reach is a control you have lost.
+
+**A tied key is not disabled, it is refused.** The two vertical keys of the pad
+can do nothing for an anchored area, but `disabled` makes a button dead to the
+pointer — and the hold that walks the selection up the tie has to arrive
+somehow. So the press is refused in the handler instead, and the key keeps the
+pad's own face with only its mark faded: a fully faded key reads as a hole in
+the cross rather than as a direction this area cannot go.
 
 ## `src/lib/components/DataTable.svelte`
 
@@ -1293,6 +1321,13 @@ nothing, for ever, with a name that promises otherwise. What a cell can carry is
 a *name*, and the bytes under it sit in the same store as the backgrounds — an
 image is an image, and one uploaded as a background can be put in a row without
 uploading it twice.
+
+**An address has to say what it is.** `safeImageUrl` used to parse against the
+page's own location, so `paper.jpg` became `https://this-app/paper.jpg` and was
+duly fetched — and *every* string in an image-bound cell is a relative address,
+so a column of prose in an image area was a column of requests to the app. It is
+parsed with no base now: an address that does not name http or https is not an
+address.
 
 **The prefix is load-bearing.** A bare `sketch.png` in a cell is
 indistinguishable from a relative URL, and a relative URL resolves against the

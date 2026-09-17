@@ -4,6 +4,7 @@ import defaultCard from './templates/default-card.json';
 import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
 import type {
 	BackgroundFit,
+	BlendMode,
 	BorderStyle,
 	Box,
 	Centre,
@@ -157,6 +158,9 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
 			background: color(partial.background),
+			// A blend mode is written straight into a style attribute, so nothing
+			// but one of these thirteen words may reach it.
+			blend: BLEND_MODES.includes(partial.blend as BlendMode) ? partial.blend : undefined,
 			padding: normaliseSides(partial.padding),
 			borderWidth: normaliseSides(partial.borderWidth),
 			borderStyle: BORDER_STYLES.includes(partial.borderStyle as BorderStyle) ? partial.borderStyle : undefined,
@@ -306,6 +310,22 @@ function normaliseFonts(raw: any): FontRef[] {
 }
 
 export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'double'];
+
+export const BLEND_MODES: BlendMode[] = [
+	'multiply',
+	'screen',
+	'overlay',
+	'darken',
+	'lighten',
+	'difference',
+	'exclusion',
+	'hard-light',
+	'soft-light',
+	'hue',
+	'saturation',
+	'color',
+	'luminosity'
+];
 
 export type BoxFit = NonNullable<Box['fit']>;
 export const BOX_FITS: BoxFit[] = ['contain', 'cover', 'fill', 'repeat'];

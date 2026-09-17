@@ -168,6 +168,14 @@ resize boxes directly, or type exact millimetres.
   a box does not move it or anything anchored below it — though padding and a
   border do make the box taller, which an anchored box below will follow, as it
   should.
+- **Blend** — how an area meets what is under it: the paper, its own background
+  image, and any area it overlaps. Thirteen of CSS's blend modes, the ones a
+  printed page can show — **Multiply** is ink on paper and the one to reach for,
+  **Difference** and **Exclusion** are the photocopier-zine ones, and *Normal*
+  is what every area has always been. Blending stops at the card, so an area can
+  never blend with the editor around it. Like the paper colour, it prints only
+  with the browser's **Background graphics** on — and it survives the PNG export,
+  which was checked rather than assumed.
 - **A border drawn by hand** — the pencil beside the border color draws it
   wobbling, as a line rather than a rule. Width, style and radius all still
   mean what they meant: a dashed 1mm hand border is dashed, 1mm and hand-drawn,
@@ -458,7 +466,11 @@ at its own size.
 
   Everything that can reach an `<img src>` from a cell goes through one guard
   that allows `http`, `https` and a base64 `data:` image and nothing else. A
-  cell is untrusted; a template is a file someone can hand you.
+  cell is untrusted; a template is a file someone can hand you. An address has
+  to say what it is: a relative one like `paper.jpg` is refused rather than
+  resolved against this app's own address, because the words in an ordinary
+  cell are all relative addresses and every one of them would have been a
+  request back to the app.
 - **A picture from this machine** — drag an image file onto an area. The area
   turns into an image area, the bytes go into this browser, and the *name* goes
   into the table: the cell for that row reads `local:sketch.png`, so every row
@@ -788,7 +800,11 @@ not using goes out of sight, the chip you pick it up by never does. It is not
 drawn at all when nothing it could move is selected, and an area whose top comes
 from an anchor shows the link on its two vertical keys rather than an arrow that
 would do nothing: the millimetres between the two areas are the **Gap** in the
-bar. Pinching zooms the page, as do the zoom keys above.
+bar. Those two keys keep the pad's own face — a faded mark on them, not a faded
+key, which would read as a hole in the cross — and they are not dead: **hold
+one** and the selection walks up the tie, to the area this one is following.
+That is where the Gap you actually want is, and finding that area by eye on a
+full page is the hard part. Pinching zooms the page, as do the zoom keys above.
 
 The arrow keys and the pad both move every area in the selection, not only a
 lone one.

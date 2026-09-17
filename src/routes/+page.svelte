@@ -2322,6 +2322,7 @@ em { color: #b42318 }`;
 	<BitmapEditor
 		box={drawingBox}
 		value={drawingValue}
+		ink={drawingBox.color ?? template.defaults.color}
 		onsave={saveDrawing}
 		oncancel={() => (drawing = null)}
 	/>
@@ -2367,7 +2368,11 @@ em { color: #b42318 }`;
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		padding: 8px 12px;
+		/* 16px at the sides, which is where the editor's own buttons start: the
+		   undo column and the Area column are both inset that far from the
+		   stage's edge, and the row above them should not be on a different
+		   grid from the row below. */
+		padding: 8px 16px;
 		background: #fff;
 		border-bottom: 1px solid #ddd;
 		font-size: 12px;
@@ -2862,12 +2867,28 @@ em { color: #b42318 }`;
 
 		.toolbar {
 			gap: 6px;
-			padding: 6px 8px;
+			/* Tighter top and bottom on a phone; the sides hold their 16, because
+			   that is the line the editor's buttons are on. */
+			padding: 6px 16px;
 			position: relative;
 		}
 
 		.toolbar .label {
 			display: none;
+		}
+
+		/* With the words gone, a button drawn to fit them is a wide box round a
+		   15px glyph. Square, at the height the row already has — icon, 6px of
+		   padding either side, 1px of border — so the icons sit on a grid rather
+		   than at the middle of four different widths. `:has(.label)` is the
+		   condition itself: exactly the buttons that lost their words. Install
+		   keeps its own, because an offer nobody recognises needs the word. */
+		.toolbar button:has(.label) {
+			width: 29px;
+			height: 29px;
+			padding: 0;
+			display: grid;
+			place-items: center;
 		}
 
 		/* Phone order: what the app is on the left — Help first, because it is the

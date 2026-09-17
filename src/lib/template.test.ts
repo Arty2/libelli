@@ -395,3 +395,16 @@ describe('arrangeBoxes', () => {
 		expect(arrangeBoxes(list, ['ghost'], 'front')).toBe(list);
 	});
 });
+
+describe('newBox blending', () => {
+	it('keeps a blend mode it recognises', () => {
+		expect(newBox({ blend: 'multiply' }).blend).toBe('multiply');
+		expect(newBox({ blend: 'difference' }).blend).toBe('difference');
+	});
+
+	it('drops anything else, because this is written into a style attribute', () => {
+		expect(newBox({ blend: 'plaid' as never }).blend).toBeUndefined();
+		expect(newBox({ blend: 'multiply;position:fixed' as never }).blend).toBeUndefined();
+		expect(newBox({}).blend).toBeUndefined();
+	});
+});

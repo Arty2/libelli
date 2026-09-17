@@ -4,6 +4,7 @@
 	import { safeImageUrl } from '$lib/assets';
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
 	import {
+		BLEND_MODES,
 		BORDER_STYLES,
 		DEFAULT_QR,
 		PAGE_NUMBER_POSITIONS,
@@ -18,6 +19,7 @@
 	import type {
 		Align,
 		BackgroundFit,
+		BlendMode,
 		BorderStyle,
 		Box,
 		Centre,
@@ -108,6 +110,23 @@
 
 	const padSides = $derived(sidesOf(selected?.padding));
 	const showPadSides = $derived(perSidePadding || typeof selected?.padding === 'object');
+
+	/** Title case, and Carbon's own words where CSS's are hyphenated. */
+	const BLEND_LABELS: Record<BlendMode, string> = {
+		multiply: 'Multiply',
+		screen: 'Screen',
+		overlay: 'Overlay',
+		darken: 'Darken',
+		lighten: 'Lighten',
+		difference: 'Difference',
+		exclusion: 'Exclusion',
+		'hard-light': 'Hard Light',
+		'soft-light': 'Soft Light',
+		hue: 'Hue',
+		saturation: 'Saturation',
+		color: 'Color',
+		luminosity: 'Luminosity'
+	};
 
 	const STYLE_LABELS: Record<BorderStyle, string> = {
 		solid: 'Solid',
@@ -619,6 +638,20 @@
 					/>
 				</label>
 			{/if}
+			<label class="field">
+				<span>Blend</span>
+				<select
+					value={selected.blend ?? ''}
+					title="How this area meets what is under it — the paper, its own background image, and any area it overlaps. Multiply is ink on paper. Prints only with background graphics on, like the paper colour"
+					disabled={boxFrozen}
+					onchange={(e) => patch({ blend: (e.currentTarget.value || undefined) as Box['blend'] })}
+				>
+					<option value="">Normal</option>
+					{#each BLEND_MODES as mode (mode)}
+						<option value={mode}>{BLEND_LABELS[mode]}</option>
+					{/each}
+				</select>
+			</label>
 
 			<span class="field">
 				<span>Padding</span>

@@ -23,6 +23,28 @@ export type VAlign = 'top' | 'middle' | 'bottom';
 export type TextCase = 'none' | 'smallcaps' | 'uppercase';
 export type BorderStyle = 'solid' | 'dashed' | 'dotted' | 'double';
 
+/**
+ * How an area's ink meets what is under it — the paper, its background image,
+ * and any area it overlaps. A subset of CSS's sixteen: the ones that do
+ * something a printed page can show. `multiply` is ink on paper and the reason
+ * this exists; `difference` and `exclusion` are the photocopier-zine ones.
+ * Absent is `normal`, which is how everything has always drawn.
+ */
+export type BlendMode =
+	| 'multiply'
+	| 'screen'
+	| 'overlay'
+	| 'darken'
+	| 'lighten'
+	| 'difference'
+	| 'exclusion'
+	| 'hard-light'
+	| 'soft-light'
+	| 'hue'
+	| 'saturation'
+	| 'color'
+	| 'luminosity';
+
 /** mm on each edge, in CSS order */
 export interface Sides {
 	top: number;
@@ -238,6 +260,12 @@ export interface Box extends TextStyle {
 	static?: StaticContent;
 	/** fill behind the box's content; absent means the paper shows through */
 	background?: string;
+	/**
+	 * How this whole area blends with what is under it. Absent draws it over
+	 * the top, as everything did before this existed. Prints only where the
+	 * browser is printing background graphics, like the paper colour.
+	 */
+	blend?: BlendMode;
 	/** mm between the border and the content. A number is every edge, an object is per edge. */
 	padding?: SideValue;
 	/** mm; 0 or absent is no border. A number is every edge, an object is per edge. */

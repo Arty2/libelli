@@ -366,6 +366,11 @@
 			);
 		}
 		if (box.borderRadius) parts.push(`border-radius:${box.borderRadius}mm`);
+		// One of thirteen words, checked on the way into the template — see
+		// `newBox`. Blending reaches the paper and whatever is stacked under this
+		// area, and stops at the card: the scaler above it is a transform, and a
+		// transform is a stacking context.
+		if (box.blend) parts.push(`mix-blend-mode:${box.blend}`);
 		// A CSS transform does not touch layout, so a rotated box still reports the
 		// height it would have had upright — which is what `measure()` reads and
 		// what anchored boxes below follow. That is the intended bargain: turning a
@@ -1137,37 +1142,48 @@
 				     buttons that would be refused anyway. The overflow mark below is
 				     not one of these: it is about what will print, which a lock does
 				     not change. -->
-				{#if bounds && !template.locked && (box.anchor || box.locked || isStatic(box) || anchorTargets.has(box.id))}
+				{#if bounds && !template.locked && box.anchor}
+					<!-- The tie sits at the *bottom* corner, on its own.
+					     Two reasons, and they agree. The column at the top corner is the
+					     one every other badge is in, and on a shallow area four of them
+					     are taller than the area itself; and the tie is the badge an area
+					     is most often carrying, so moving it halves that column in the
+					     common case. It stacks up from the bottom edge, clearing the
+					     shears when this area is also cutting its words off — two marks
+					     on one corner would otherwise land on top of each other. -->
+					<span class="badges foot" class:clears-cut={!empty && overflowing[box.id]}>
+						<button
+							class="badge action"
+							class:lit={litFollowers.has(box.id)}
+							disabled={!editable(box)}
+							title="Tied to another area — its top follows that area's bottom. Press to break the tie and leave this area where it is."
+							aria-label="Break this area's anchor"
+							onpointerdown={(e) => e.stopPropagation()}
+							onpointerenter={() => (hoveredBadge = `${box.id}:tied`)}
+							onpointerleave={() => (hoveredBadge = null)}
+							onclick={() => {
+								flashBadge(`${box.id}:tied`);
+								breakAnchor(box);
+							}}
+						>
+							<Icon name={badgeArmed(`${box.id}:tied`) ? 'unlink' : 'link'} size={11} />
+						</button>
+					</span>
+				{/if}
+
+				{#if bounds && !template.locked && (box.locked || isStatic(box) || anchorTargets.has(box.id))}
 					<!-- Why the box will not do what you might ask of it, stacked at its
-					     corner: the anchor above the lock when it carries both. All but
-					     the plug are buttons — the reason and the way out of it in the
-					     same 13 pixels — and each swaps to the icon of the undoing while
-					     the pointer is on it, so pressing one holds no surprise. Which is
-					     also why no two of them wear the same armed icon: the padlock
-					     opens the padlock, and the buoy casts off, which is a boat. -->
+					     corner. All but the plug are buttons — the reason and the way out
+					     of it in the same 13 pixels — and each swaps to the icon of the
+					     undoing while the pointer is on it, so pressing one holds no
+					     surprise. Which is also why no two of them wear the same armed
+					     icon: the padlock opens the padlock, and the buoy casts off,
+					     which is a boat. -->
 					<span class="badges">
 						{#if isStatic(box)}
 							<span class="badge" title="Static text — this says the same on every card, because it is not plugged into a column">
 								<Icon name="unplug" size={11} />
 							</span>
-						{/if}
-						{#if box.anchor}
-							<button
-								class="badge action"
-								class:lit={litFollowers.has(box.id)}
-								disabled={!editable(box)}
-								title="Tied to another area — its top follows that area's bottom. Press to break the tie and leave this area where it is."
-								aria-label="Break this area's anchor"
-								onpointerdown={(e) => e.stopPropagation()}
-								onpointerenter={() => (hoveredBadge = `${box.id}:tied`)}
-								onpointerleave={() => (hoveredBadge = null)}
-								onclick={() => {
-									flashBadge(`${box.id}:tied`);
-									breakAnchor(box);
-								}}
-							>
-								<Icon name={badgeArmed(`${box.id}:tied`) ? 'unlink' : 'link'} size={11} />
-							</button>
 						{/if}
 						{#if anchorTargets.has(box.id)}
 							<button
@@ -1824,6 +1840,20 @@
 			   reaches it; the badges themselves are not, or their title — the only
 			   thing that says what they mean — could never be hovered. */
 			pointer-events: none;
+		}
+
+		/* The tie, at the other end of the same edge: stacked up from the bottom
+		   rather than down from the top, so it stays put as the area grows. */
+		.badges.foot {
+			top: auto;
+			bottom: 0;
+			flex-direction: column-reverse;
+		}
+
+		/* The shears straddle the bottom edge — half of their 13 above it — so
+		   the tie clears them by their own half-height and a hair. */
+		.badges.foot.clears-cut {
+			bottom: calc(8px * var(--ui-scale, 1));
 		}
 
 		/* Quieter than the blue chrome around it. A badge is an annotation, not a

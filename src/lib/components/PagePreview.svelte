@@ -187,6 +187,27 @@
 		selectedBoxes.length > 0 && selectedBoxes.every((b) => !!b.anchor)
 	);
 
+	/**
+	 * What a tied key does instead of nudging: hold it and the selection walks up
+	 * the tie, to the area this one is following.
+	 *
+	 * The key is the only place the tie is *in the way*, so it is where the way
+	 * out belongs — the Gap that the vertical keys cannot change lives on the
+	 * other area, and finding that area by eye on a page of a dozen is the whole
+	 * difficulty. One target only: with several tied areas selected they can be
+	 * following different things, and picking one of them would be a guess.
+	 */
+	const tieTarget = $derived.by(() => {
+		if (!verticalTied || selectedBoxes.length !== 1) return null;
+		const to = selectedBoxes[0].anchor?.to;
+		return (to && template.boxes.find((b) => b.id === to)) || null;
+	});
+
+	function followTie() {
+		if (!tieTarget) return;
+		onselect(tieTarget.id, false);
+	}
+
 	/** Paint order is array order, so "front" is last in the list, not a z-index. */
 	const ARRANGEMENTS: Array<{ value: Arrange; icon: string; label: string }> = [
 		{ value: 'front', icon: 'bring-to-front', label: 'Bring to Front' },
@@ -823,6 +844,10 @@
 	     three that come and go belong under it rather than pushing it sideways
 	     every time one of them appears.
 
+	     Area wears `shapes` and the automagic layout wears `blog`: one adds a
+	     shape to the page, the other writes a page out of the columns, and a
+	     glyph of stacked rules is what that second one looks like.
+
 	     16px, not 14: these are Carbon's 32-grid glyphs, and `blog` in
 	     particular carries a bar, two rules and a square — below 16 the three
 	     merge into a smudge. The column moves together, because one button
@@ -835,7 +860,7 @@
 			disabled={!!template.locked}
 			title="Add an area to the page — press and hold to position every area from the columns instead"
 		>
-			<Icon name="blog" size={16} /><span class="sr-only">Area</span>
+			<Icon name="shapes" size={16} /><span class="sr-only">Area</span>
 		</button>
 		{#if !template.boxes.length}
 			<!-- Only on an empty page, where it is the answer to "now what?" and
@@ -850,7 +875,7 @@
 					? 'Position areas automagically — a card worked out from your headings and your data'
 					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
 			>
-				<Icon name="shapes" size={16} /><span class="sr-only">Position areas automagically</span>
+				<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
 			</button>
 		{/if}
 		{#if picking}
@@ -944,13 +969,18 @@
 			onpointercancel={stopNudge}
 			onpointerleave={stopNudge}
 		>
+			<!-- Tied rather than disabled: a disabled button is dead to the
+			     pointer, and the hold that walks up the tie has to arrive
+			     somehow. The press itself is refused instead. -->
 			<button
 				class="up"
-				disabled={verticalTied}
+				class:tied={verticalTied}
+				aria-disabled={verticalTied}
 				title={verticalTied
-					? 'Tied to another area — its top follows that area\u2019s bottom. Change the Gap in the bar.'
+					? `Tied to another area \u2014 its top follows that area\u2019s bottom. Change the Gap in the bar${tieTarget ? ', or hold this to select that area' : ''}.`
 					: `Up ${padStep}mm`}
-				onpointerdown={() => startNudge(0, -padStep)}
+				use:hold={followTie}
+				onpointerdown={() => !verticalTied && startNudge(0, -padStep)}
 			>
 				<Icon name={verticalTied ? 'link' : 'caret-up'} size={verticalTied ? 15 : 30} />
 			</button>
@@ -973,11 +1003,13 @@
 			<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={30} /></button>
 			<button
 				class="down"
-				disabled={verticalTied}
+				class:tied={verticalTied}
+				aria-disabled={verticalTied}
 				title={verticalTied
-					? 'Tied to another area — its top follows that area\u2019s bottom. Change the Gap in the bar.'
+					? `Tied to another area \u2014 its top follows that area\u2019s bottom. Change the Gap in the bar${tieTarget ? ', or hold this to select that area' : ''}.`
 					: `Down ${padStep}mm`}
-				onpointerdown={() => startNudge(0, padStep)}
+				use:hold={followTie}
+				onpointerdown={() => !verticalTied && startNudge(0, padStep)}
 			>
 				<Icon name={verticalTied ? 'link' : 'caret-down'} size={verticalTied ? 15 : 30} />
 			</button>
@@ -1406,6 +1438,18 @@
 		opacity: 0.55;
 		cursor: default;
 		color: #767676;
+	}
+
+	/* A tied key keeps the pad's own face — fading the whole button left a hole
+	   in the cross, which reads as a missing key rather than as a key that will
+	   not move this way. Only the mark on it goes quiet. */
+	.pad button.tied {
+		cursor: default;
+		color: #767676;
+	}
+
+	.pad button.tied :global(svg) {
+		opacity: 0.5;
 	}
 
 	/* While it is being carried: the pad itself says so, because the finger is on
