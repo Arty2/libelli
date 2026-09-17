@@ -246,6 +246,43 @@ bottom edge alone is an underline rather than three quarters of a box.
 off the line. If the ends wobbled too, the corners would not meet, and a gap
 where two strokes should join does not read as hand-drawn — it reads as broken.
 
+## `src/lib/bitmap.ts` and `src/lib/components/BitmapEditor.svelte`
+
+**The drawing goes in the cell, as base64.** Not into this browser's store like
+a dropped file: a drawing made here has no existence anywhere else, and a
+picture that lives beside the table would be lost the moment the CSV was handed
+to someone. In the cell it travels with the words, and a row's picture is
+exactly as portable as its text. The cost is a long cell, which is why the next
+decision is what it is.
+
+**Low resolution is the feature.** Sixty-four pixels on the longest side is a
+kilobyte or two of base64 — a long cell, but one a spreadsheet can hold and a
+person can scroll past. Four times the side is sixteen times the pixels and a
+cell nobody can do anything with. The header says what the drawing is costing as
+it is drawn, so the limit is visible rather than a rule that bites later.
+
+**The grid takes the area's proportions.** A banner is drawn on a banner and a
+stamp on a square. A fixed square grid would have meant drawing a wide title
+inside a square and watching `fit` letterbox it — designing against a shape that
+is not the shape it will print at.
+
+**Full screen, never in place.** Every other kind of area is edited where it
+sits, and this one cannot be: areas are frequently a centimetre across, which is
+somewhere to show a drawing and nowhere to make one. The same double-click that
+opens words for typing opens this instead.
+
+**Nothing is written until Done, and it is one undo entry.** The editor keeps
+its own stack of whole canvases — at this size a canvas is nothing — so undo in
+there is strokes, and undo out here is the drawing. Mixing the two would have
+made a fifty-stroke drawing fifty steps of the app's history, and the app's
+undo is snapshots of the whole editable state.
+
+**A picture from off this machine opens blank.** Drawing a cross-origin image
+onto a canvas taints it, and a tainted canvas refuses `toDataURL` — so the
+surface would open on a photo, take a stroke, and fail to save at the very end.
+Opening blank is the honest version of that, and a `blob:` URL from this
+browser's own store is same-origin and draws in fine.
+
 ## `src/lib/history.ts`
 
 **A label rides alongside each state, never inside it.** States are compared by

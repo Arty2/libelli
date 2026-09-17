@@ -72,6 +72,8 @@
 		ondelete: () => void;
 		/** start or stop typing into an area */
 		onedit?: (id: string | null) => void;
+		/** open the drawing surface for an area */
+		ondraw?: (id: string) => void;
 		/** words typed into the card, forwarded to whoever owns them */
 		ontext?: (box: Box, value: string) => void;
 		/** bring every area that has wandered off the sheet back onto it */
@@ -130,6 +132,7 @@
 		onduplicate,
 		ondelete,
 		onedit,
+		ondraw,
 		ontext,
 		onrescue,
 		onstoppicking,
@@ -667,6 +670,7 @@
 				{onaction}
 				{onmenu}
 				{onedit}
+				{ondraw}
 				{ontext}
 			/>
 		</div>

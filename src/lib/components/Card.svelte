@@ -76,6 +76,8 @@
 		onaction?: (what: string) => void;
 		/** start or stop typing into an area on the card itself */
 		onedit?: (id: string | null) => void;
+		/** open the drawing surface for an area; a picture is never edited in place */
+		ondraw?: (id: string) => void;
 		/**
 		 * Words typed into the card. The card cannot write them itself: a bound
 		 * area's text is a cell in the dataset and a static one's is a field in
@@ -106,6 +108,7 @@
 		onmenu,
 		onaction,
 		onedit,
+		ondraw,
 		ontext
 	}: Props = $props();
 
@@ -946,6 +949,13 @@
 		editable(box) && (box.mode === 'plain' || box.mode === 'markdown');
 
 	function beginEdit(box: Box) {
+		// A picture is the one thing not edited in place: an area on a card is
+		// often a centimetre across, which is somewhere to show a drawing and
+		// nowhere to make one. The same double-click opens it full screen.
+		if (editable(box) && box.mode === 'image') {
+			ondraw?.(box.id);
+			return;
+		}
 		if (!canEdit(box)) return;
 		onedit?.(box.id);
 	}

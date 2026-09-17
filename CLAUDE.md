@@ -36,6 +36,7 @@ src/lib/
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
   hand.ts         a border drawn by hand: seeded wobble -> SVG paths, in mm
+  bitmap.ts       the pixel grid a drawn area gets, and pointing at it
   table.ts        column reorder, row sorting
   imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
   download.ts     hand the browser a file; the one copy both exports use
@@ -60,6 +61,7 @@ src/lib/
     PrintSettingsPanel.svelte  Per Sheet, orientation, sheet background — shared with the print screen
     PrintSheet.svelte  one physical sheet — used off-screen by PrintRoot and, scaled down, as PrintPreview's sheet thumbnails
     SheetLightbox.svelte  one sheet full screen; Lightbox's opposite number, on a different ground
+    BitmapEditor.svelte  the drawing surface, full screen; writes a base64 PNG into the row
     PrintPreview, PrintRoot, Lightbox, BoxMenu, SelectionTools, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   app state and wiring                             (~40k)

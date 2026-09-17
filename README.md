@@ -478,6 +478,30 @@ at its own size.
   pictures it is missing, and dropping the files on again puts them back. An
   image uploaded as a page background can be used in a row without uploading it
   twice — they share one store, because an image is an image.
+- **Drawing one** — double-click an image area, or press **Draw…** in the area
+  bar, and the drawing surface opens **full screen**. Never in place: an area on
+  a card is often a centimetre across, which is somewhere to show a drawing and
+  nowhere to make one. A pen, a rubber, three nib widths, eight colours and any
+  other, undo and clear; Escape or **Cancel** leaves the cell as it was, and
+  <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Z</kbd> steps back inside the surface. The
+  whole drawing is *one* entry in the app's own undo however many strokes it
+  took.
+
+  The grid is the area's own proportions with the longest side at 64 pixels, so
+  a banner is drawn on a banner and a stamp on a square, and it is drawn at
+  whole screen pixels each — a pixel editor that blurs its own edges is no use.
+  What comes out is a base64 PNG written **into the row's cell**, which is the
+  point: the picture travels with the table, so a CSV carries the drawings with
+  the words and a row's picture is as portable as its text. That is also why the
+  grid is small — the header says what the drawing is costing the cell as you
+  draw it, and a couple of hundred bytes is a long cell but a real one.
+
+  Unpainted pixels stay transparent, not white: the area's own fill and the
+  paper show through, which is a thing you would otherwise discover on paper.
+  Opening the surface on an area that already holds a picture draws it in, so a
+  dropped photo can be scribbled on — unless it came from an address off this
+  machine, which a canvas refuses to hand back once drawn, and which therefore
+  opens blank rather than opening on something it could never save.
 - **QR code** — the bound cell is encoded as a QR and drawn as SVG, so it stays
   sharp at any print size; a raster QR at print resolution is the classic way to
   end up with a code no phone will read. Byte mode, versions 1–10, which holds

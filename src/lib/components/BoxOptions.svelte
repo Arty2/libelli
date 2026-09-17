@@ -49,6 +49,8 @@
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
+		/** open the drawing surface for the selected area */
+		ondraw?: (id: string) => void;
 	}
 
 	let {
@@ -67,7 +69,8 @@
 		onnotice,
 		onimporttemplate,
 		onexporttemplate,
-		oneditcss
+		oneditcss,
+		ondraw
 	}: Props = $props();
 
 	let fontInput = $state<HTMLInputElement | null>(null);
@@ -398,6 +401,18 @@
 						{/if}
 					</select>
 				</label>
+			{/if}
+			{#if selected.mode === 'image'}
+				<!-- Full screen, never in place: an area on the card is somewhere to
+				     show a drawing and nowhere to make one. A double-click on the
+				     area itself opens the same surface. -->
+				<button
+					disabled={boxFrozen}
+					title="Draw a small picture for this area. It is written into this row's cell, so every row can have its own"
+					onclick={() => ondraw?.(selected.id)}
+				>
+					<Icon name="edit" size={14} /> Draw…
+				</button>
 			{/if}
 			{#if selected.mode === 'qr'}
 				<label class="field">

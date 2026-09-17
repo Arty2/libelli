@@ -2,6 +2,7 @@
 	import { tick, untrack } from 'svelte';
 	import { base } from '$app/paths';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
+	import BitmapEditor from '$lib/components/BitmapEditor.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -560,6 +561,53 @@ em { color: #b42318 }`;
 		} else {
 			updateBox({ ...next, static: { ...box.static, url: reference } });
 			notify(`${name} is on this area, the same on every card, and stays in this browser.`);
+		}
+	}
+
+	/** the area whose picture is being drawn, if any — full screen, never in place */
+	let drawing = $state<string | null>(null);
+	const drawingBox = $derived(drawing ? (template.boxes.find((b) => b.id === drawing) ?? null) : null);
+
+	/**
+	 * What the drawing surface opens on.
+	 *
+	 * A data URL, or one of this browser's own images, can be drawn on top of.
+	 * An address from somewhere else cannot: drawing a cross-origin picture onto
+	 * a canvas taints it, and a tainted canvas refuses to hand back what was
+	 * drawn — so the drawing could never be saved. That one case opens blank
+	 * rather than opening on something it would lose.
+	 */
+	const drawingValue = $derived.by(() => {
+		const box = drawingBox;
+		if (!box) return '';
+		const column = box.slot ? mapping[box.slot] : undefined;
+		const written = column ? (row?.[column] ?? '') : (box.static?.dataUrl ?? box.static?.url ?? '');
+		const value = String(written).trim();
+		if (value.startsWith('data:image/')) return value;
+		const name = localImageName(value);
+		return name ? (images[name] ?? '') : '';
+	});
+
+	/**
+	 * A drawing goes where the words of that area go: into the row's cell when it
+	 * is bound to a column, so every row can have its own picture and it travels
+	 * with the table, and onto the area itself when it is not. One undo entry
+	 * however many strokes it took — the editor's own undo goes no further than
+	 * the editor.
+	 */
+	function saveDrawing(dataUrl: string) {
+		const box = drawingBox;
+		drawing = null;
+		if (!box) return;
+		describe('Draw');
+		const column = box.slot ? mapping[box.slot] : undefined;
+		if (column && row) {
+			dataset = {
+				...dataset,
+				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: dataUrl } : r))
+			};
+		} else {
+			updateBox({ ...$state.snapshot(box), static: { ...box.static, dataUrl } } as Box);
 		}
 	}
 
@@ -1679,6 +1727,7 @@ em { color: #b42318 }`;
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={() => (cssOpen = true)}
+						ondraw={(id) => (drawing = id)}
 					/>
 				{:else}
 					<OptionsBar
@@ -1706,6 +1755,7 @@ em { color: #b42318 }`;
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={() => (cssOpen = true)}
+						ondraw={(id) => (drawing = id)}
 					/>
 				{/if}
 			</div>
@@ -1816,9 +1866,17 @@ em { color: #b42318 }`;
 			onstoppicking={() => (picking = false)}
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
 			onedit={(id) => (editingId = id)}
+			ondraw={(id) => (drawing = id)}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
-			modalOpen={helpOpen || cssOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null || magic !== null}
+			modalOpen={helpOpen ||
+				cssOpen ||
+				previewOpen ||
+				lightboxOpen ||
+				boxMenu !== null ||
+				editingId !== null ||
+				drawing !== null ||
+				magic !== null}
 			{selectedBoxes}
 			onalign={alignSelection}
 			onarrange={arrange}
@@ -2257,6 +2315,15 @@ em { color: #b42318 }`;
 		onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 		onnotice={notify}
 		onclose={() => (previewOpen = false)}
+	/>
+{/if}
+
+{#if drawingBox}
+	<BitmapEditor
+		box={drawingBox}
+		value={drawingValue}
+		onsave={saveDrawing}
+		oncancel={() => (drawing = null)}
 	/>
 {/if}
 
