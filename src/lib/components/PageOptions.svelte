@@ -69,6 +69,8 @@
 		oneditcss: () => void;
 		/** open the drawing surface for the selected area */
 		ondraw?: (id: string) => void;
+		/** open the panel listing every stored picture */
+		onmanageimages?: () => void;
 	}
 
 	let {
@@ -94,7 +96,8 @@
 		onmenu,
 		onimporttemplate,
 		onexporttemplate,
-		oneditcss
+		oneditcss,
+		onmanageimages
 	}: Props = $props();
 
 	let imageInput = $state<HTMLInputElement | null>(null);
@@ -550,6 +553,15 @@
 				>
 				<button disabled={pageFrozen} title="An http(s) address the template will carry as written" onclick={linkBackground}>URL…</button>
 			{/if}
+			<!-- Every stored picture, not just this page's: it belongs beside the
+			     upload that puts one there, and it is the only place they can be
+			     weighed or thrown away. -->
+			<button
+				title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
+				onclick={() => onmanageimages?.()}
+			>
+				<Icon name="image" size={14} /> Images…
+			</button>
 		</span>
 
 		<span class="group" role="group" aria-label="Page number">

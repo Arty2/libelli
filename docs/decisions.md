@@ -1335,6 +1335,37 @@ app's own address — so the app would have gone to the network for it, which is
 the one thing this app does not do. `local:` cannot be mistaken for an address
 by anything, `safeMediaUrl` included.
 
+**Pictures can live outside the browser, and everything else cannot.** A
+template is a page of JSON and a dataset is text; a run of photographs is
+neither. Browser storage is a bucket nobody can look into, shared with
+everything else this origin keeps and emptied at the browser's discretion — so
+where the File System Access API exists, the bytes go into a folder the user
+picked and are ordinary files from then on. It is Chromium's API only, so this
+is an offer with a fallback rather than a change of architecture: the IndexedDB
+path is untouched and is what runs in Firefox and Safari.
+
+**The folder is read first and written alone.** Read first, so a run made before
+a folder was chosen keeps rendering and a name put in the folder afterwards wins
+from then on. Written alone — a name written to the folder deletes the copy in
+IndexedDB — because two copies under one name resolve to whichever was looked at
+first, which is a bug waiting for someone to edit the wrong one.
+
+**A handle survives a restart; the permission does not.** A directory handle is
+structured-cloneable, so it goes in IndexedDB like everything else, but the
+browser asks to be let in again once per visit and will only ask during a press.
+So `imageFolder` reports `ready: false` rather than silently failing, the panel
+carries the button that asks, and until it is pressed pictures come from browser
+storage — which is the same fallback as having no folder at all.
+
+**The panel exists because storage that cannot be seen cannot be managed.** The
+list is what is stored, what it weighs, where it is, and whether anything
+currently points at it. That last one is the question — *which of these can I
+delete* — and nothing else in the app could answer it.
+
+**The folder is listed by extension.** It is an ordinary folder that may hold
+anything, and a panel offering to delete a file this app never wrote would be a
+trap.
+
 **Names are resolved in one pass, keyed on the names.** Not on the rows: typing
 in a cell full of words must not send the whole run back to IndexedDB. A run of
 forty cards sharing one logo reads it once and holds one object URL for it.

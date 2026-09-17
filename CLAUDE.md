@@ -42,7 +42,7 @@ src/lib/
   download.ts     hand the browser a file; the one copy both exports use
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
-  assets.ts       images — page backgrounds and a row's own; bytes in IndexedDB, url() safety
+  assets.ts       images — page backgrounds and a row's own; bytes in a folder or IndexedDB
   history.ts      undo/redo snapshots
   storage.ts      localStorage + IndexedDB, the template library, the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
@@ -62,6 +62,7 @@ src/lib/
     PrintSheet.svelte  one physical sheet — used off-screen by PrintRoot and, scaled down, as PrintPreview's sheet thumbnails
     SheetLightbox.svelte  one sheet full screen; Lightbox's opposite number, on a different ground
     BitmapEditor.svelte  the drawing surface, full screen; writes a base64 PNG into the row
+    ImagesPanel.svelte  what is stored, what it weighs, and the folder to keep it in instead
     PrintPreview, PrintRoot, Lightbox, BoxMenu, SelectionTools, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   app state and wiring                             (~40k)
@@ -105,8 +106,11 @@ src/routes/app.css        the :root tokens and app-wide rules
   "no border" are all an absent key, so `updateBox` strips undefined values:
   structured clone, unlike JSON, keeps an undefined-valued key.
 - **Big things are referenced, never embedded.** A template names a font family
-  and a background image; the bytes live in IndexedDB under that name. That is
-  what keeps a template small enough to paste into a message.
+  and a background image; the bytes live under that name in the folder the user
+  chose, or in IndexedDB where there is none. That is what keeps a template small
+  enough to paste into a message. The one exception is a drawing, which is base64
+  in the cell on purpose: it has no existence anywhere else, so it travels with
+  the table.
 - **`css.ts` also builds the `<style>` tag.** A literal `<style>…</style>` pair
   written in a `.svelte` file gets picked up by the Svelte toolchain as that
   component's own stylesheet.

@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
 	import BitmapEditor from '$lib/components/BitmapEditor.svelte';
+	import ImagesPanel from '$lib/components/ImagesPanel.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -221,6 +222,14 @@
 	let printBackgroundInput = $state<HTMLInputElement | null>(null);
 	/** stored images the rows point at, by name — see `local:` in assets.ts */
 	let images = $state<Record<string, string>>({});
+	let imagesOpen = $state(false);
+	/**
+	 * Bumped when the Images panel changes what is stored. The resolver below is
+	 * keyed on the *names* a template and table use, and deleting a picture or
+	 * choosing a folder changes neither — so there has to be something else for
+	 * it to watch.
+	 */
+	let imagesVersion = $state(0);
 	let status = $state('');
 	/**
 	 * A notice is either something that happened or something that went wrong,
@@ -515,6 +524,7 @@ em { color: #b42318 }`;
 
 	$effect(() => {
 		const wanted = imageNames;
+		imagesVersion;
 		let stale = false;
 		void (async () => {
 			const { urls, missing } = await resolveLocalImages(wanted);
@@ -1727,6 +1737,7 @@ em { color: #b42318 }`;
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={() => (cssOpen = true)}
+						onmanageimages={() => (imagesOpen = true)}
 						ondraw={(id) => (drawing = id)}
 					/>
 				{:else}
@@ -1755,6 +1766,7 @@ em { color: #b42318 }`;
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={() => (cssOpen = true)}
+						onmanageimages={() => (imagesOpen = true)}
 						ondraw={(id) => (drawing = id)}
 					/>
 				{/if}
@@ -2316,6 +2328,22 @@ em { color: #b42318 }`;
 		onnotice={notify}
 		onclose={() => (previewOpen = false)}
 	/>
+{/if}
+
+{#if imagesOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (imagesOpen = false)}></div>
+	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="images-title">
+		<h2 id="images-title">Images</h2>
+		<ImagesPanel
+			used={new Set(imageNames)}
+			onnotice={notify}
+			onchanged={() => (imagesVersion += 1)}
+		/>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button class="primary" onclick={() => (imagesOpen = false)}>Done</button>
+		</div>
+	</div>
 {/if}
 
 {#if drawingBox}

@@ -53,6 +53,8 @@
 		oneditcss: () => void;
 		/** open the drawing surface for the selected area */
 		ondraw?: (id: string) => void;
+		/** open the panel listing every stored picture */
+		onmanageimages?: () => void;
 	}
 
 	let {

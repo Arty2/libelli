@@ -46,7 +46,9 @@ Nothing leaves the browser, because there is nowhere for it to go. Small
 settings — the column mapping, keyed by template name, and UI state — live in
 `localStorage`; the dataset, the template and any uploaded font bytes live in
 IndexedDB, which is where base64 fonts have to go once they blow past
-localStorage's ~5MB. [Undo](#undo-and-redo) keeps its snapshots in memory.
+localStorage's ~5MB. Pictures can live in a [folder of your
+own](#where-the-pictures-live) instead, where the browser offers one.
+[Undo](#undo-and-redo) keeps its snapshots in memory.
 
 ## Cards and boxes
 
@@ -489,7 +491,8 @@ at its own size.
   a CSV handed to someone else carries the *names*: their copy says which
   pictures it is missing, and dropping the files on again puts them back. An
   image uploaded as a page background can be used in a row without uploading it
-  twice — they share one store, because an image is an image.
+  twice — they share one store, because an image is an image. Which store that is, and how to
+  empty it, is **Images…** in page setup — see below.
 - **Drawing one** — double-click an image area, or press **Draw…** in the area
   bar, and the drawing surface opens **full screen**. Never in place: an area on
   a card is often a centimetre across, which is somewhere to show a drawing and
@@ -526,6 +529,40 @@ at its own size.
 The encoder is written here rather than pulled in, like the Markdown renderer
 and the CSV parser. Its tests decode what it produces with an independent
 decoder, since a QR that does not scan looks exactly like one that does.
+
+## Where the pictures live
+
+Everything else this app keeps is small — a template is a page of JSON, a
+dataset is text. Pictures are not, and browser storage is a poor place for them:
+it is a bucket you cannot look into, shared with everything else the app saves,
+and the browser may empty it. **Images…**, beside the background controls in
+page setup, is the panel that takes them seriously.
+
+- **What is stored** — every picture this app can see, what each weighs, where
+  it is being kept, and whether the current table or template actually points at
+  one. That last column is the whole point: *which of these forty can I delete*
+  is not a question browser storage can answer. Deleting is one press, and it
+  says so if something was using it.
+- **A folder of your own** — press **Choose a folder…** and pictures are written
+  there as ordinary files from then on: replace one from a photo editor and the
+  card follows, back them up with the rest of your work, and clear them out with
+  your file manager rather than through this app. The folder is remembered
+  between visits, but a browser asks to be let into it once per visit — the
+  panel says so, with the button to do it — and until then pictures come from
+  browser storage as before. **Forget it** lets go of the folder; nothing in it
+  is deleted.
+- **Where that works** — the File System Access API is Chromium's: Chrome, Edge,
+  Opera and Arc have it; Firefox and Safari do not. Everywhere else the app keeps
+  pictures in IndexedDB exactly as it always did, and the panel says which of
+  the two is in force rather than hiding a button that would not work.
+- **Both at once** — a picture is looked for in the folder first and in this
+  browser second, so a run made before you chose a folder keeps rendering, and
+  a name put in the folder afterwards is what that name means from then on. New
+  pictures only ever go to one place, and a name written to the folder drops its
+  copy out of browser storage.
+
+Drawings are the exception, and deliberately: they are base64 in the cell, so
+they travel with the table. See **Drawing one**, above.
 
 ## Fonts
 
