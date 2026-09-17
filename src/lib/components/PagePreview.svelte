@@ -1365,16 +1365,28 @@
 
 	/* Every cell carries a border on all four edges and colours only the ones on
 	   the perimeter. Transparent rather than absent, so each content box is inset
-	   by the same pixel on every side: a cell bordered on three edges and not the
-	   fourth centres its glyph half a pixel off, which is the whole thing this
-	   was asked to fix. The ground is the same under all five, so a transparent
-	   border between two of them is invisible. */
+	   by the same amount on every cell: a cell bordered on three edges and not
+	   the fourth centres its glyph half a pixel off, which is the whole thing
+	   this was asked to fix. The ground is the same under all five, so a
+	   transparent border between two of them is invisible.
+
+	   The widths are uneven and the colours are lit from the top left, which is
+	   what makes the cross read as five keys standing up off the page rather
+	   than as an outline of one: 1px along the top and left, 2px along the
+	   bottom and right, and the shade is the same on every cell — so they are
+	   inset unevenly but *identically*, and the cross is still square with
+	   itself. The light is a gradient across the same diagonal. */
 	.pad button {
+		--pad-light: #fff;
+		--pad-edge: #b9bcc2;
+		--pad-shade: #8f949c;
 		display: grid;
 		place-items: center;
 		box-sizing: border-box;
-		border: 1px solid transparent;
-		background: rgba(255, 255, 255, 0.92);
+		border-width: 1px 2px 2px 1px;
+		border-style: solid;
+		border-color: transparent;
+		background: linear-gradient(145deg, #fff, #eceef1);
 		color: #333;
 		font: 600 12px ui-sans-serif, system-ui, sans-serif;
 		cursor: pointer;
@@ -1382,33 +1394,42 @@
 		touch-action: none;
 	}
 
+	/* Pressed: the light comes from the other side and the key sits a pixel
+	   into the page. A raised key that does not go down when it is pressed is
+	   the one thing a drawn key must not do. The two that an anchor has spoken
+	   for do not move, because they are not going to do anything either. */
+	.pad button:active:not(.tied):not(:disabled) {
+		background: linear-gradient(145deg, #e4e7ea, #f6f7f8);
+		border-width: 2px 1px 1px 2px;
+	}
+
 	/* The twelve segments of the cross. Each edge is drawn once, by the cell that
 	   owns it; the four re-entrant corners are where two of them meet at a point. */
 	.pad .up {
-		border-top-color: var(--border-control);
-		border-left-color: var(--border-control);
-		border-right-color: var(--border-control);
+		border-top-color: var(--pad-light);
+		border-left-color: var(--pad-light);
+		border-right-color: var(--pad-shade);
 		border-radius: var(--radius-button) var(--radius-button) 0 0;
 	}
 
 	.pad .left {
-		border-top-color: var(--border-control);
-		border-left-color: var(--border-control);
-		border-bottom-color: var(--border-control);
+		border-top-color: var(--pad-light);
+		border-left-color: var(--pad-light);
+		border-bottom-color: var(--pad-shade);
 		border-radius: var(--radius-button) 0 0 var(--radius-button);
 	}
 
 	.pad .right {
-		border-top-color: var(--border-control);
-		border-right-color: var(--border-control);
-		border-bottom-color: var(--border-control);
+		border-top-color: var(--pad-light);
+		border-right-color: var(--pad-shade);
+		border-bottom-color: var(--pad-shade);
 		border-radius: 0 var(--radius-button) var(--radius-button) 0;
 	}
 
 	.pad .down {
-		border-bottom-color: var(--border-control);
-		border-left-color: var(--border-control);
-		border-right-color: var(--border-control);
+		border-bottom-color: var(--pad-shade);
+		border-left-color: var(--pad-light);
+		border-right-color: var(--pad-shade);
 		border-radius: 0 0 var(--radius-button) var(--radius-button);
 	}
 

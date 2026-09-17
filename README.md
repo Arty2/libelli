@@ -69,10 +69,14 @@ resize boxes directly, or type exact millimetres.
   than the link breaking. Both ends of the tie are marked and both marks are
   buttons: the **link** on the follower breaks its own tie, the **buoy** on the
   followed area casts off everything moored to it, and neither moves anything —
-  the released box keeps the place it was sitting in. Each swaps to the icon of
+  the released box keeps the place it was sitting in. Selecting either end lights
+  the *mark* on the other — the glyph only, never a fill, because those badges
+  are on areas you have not selected and a filled badge reads as a second
+  selection. The one fill is on the area you do have: what is moored to it, which
+  is the hub of the relationship the other marks are pointing at. Each swaps to the icon of
   the undoing while the pointer is on it, and for a moment after a tap, so
   pressing one holds no surprise: the link shows a broken link, and the buoy
-  shows a boat that has left it. Selecting either end lights up the other.
+  shows a boat that has left it.
 - **Hide when empty** — a box whose column is blank collapses to nothing *and*
   drops out of the anchor chain, so a card with no subtitle has no dead band
   where the subtitle would have been. A box with no anchor stays pinned to its
@@ -829,7 +833,9 @@ Otherwise the arrow keys move the selected box wherever you are on the page. On
 a touch screen the same job is done by the four-way pad that appears beside the
 card — one cross with one outline, not five tiles in the shape of a cross — with
 a chip in the middle cycling between 1mm, 5mm and 10mm; holding an arrow keeps
-it moving. The pad parks over the bottom-right corner of the page, which is
+it moving. The cross is drawn as a raised thing — lit from the top left, thicker
+along the bottom and right, and it goes down under a press — because on a touch
+screen it is the one control with no cursor to tell you it is a control. The pad parks over the bottom-right corner of the page, which is
 exactly the corner you may have reached for it to nudge — press and hold that
 middle chip and the pad comes with your finger. It can be pushed off the edge of
 the stage to get that corner back, as far as the middle chip: the arm you are

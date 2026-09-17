@@ -592,6 +592,13 @@ and only there for a single selection. The reset drops the drag in flight along
 with it: the drag snapshotted the old value at pointerdown, and a move arriving
 afterwards would write that snapshot straight back over the reset.
 
+**The other end of a tie is lit by its mark alone.** A filled badge on an
+unselected area reads as a second selection, and the whole point of lighting the
+counterpart is to say *that one is related to the one you have*. The glyph goes
+blue and the badge keeps the card's quiet white. The exception is on the
+selected area itself, where what is moored to it is filled: that badge is the
+hub the others are pointing at, and it is on the area you already have.
+
 **The tie badge sits at the other end of the area from the rest.** Every badge
 used to stack at the top corner, and on a shallow area four of them are taller
 than the area they are about. The tie is the one an area carries most often, so
@@ -774,6 +781,14 @@ of sight is the cheapest way to get that corner back, so the clamp lets the pad
 hang over the edge — and stops at one cell, which is where the middle button's
 outer edge meets the edge of the stage. That button is how the pad is picked up
 again; a pad you cannot reach is a control you have lost.
+
+**The pad is drawn as a raised thing.** Lit from the top left, 1px along the top
+and left edges against 2px along the bottom and right, and the bevel inverts
+under a press. The uneven widths are the same on every cell, so the five content
+boxes are inset unevenly but identically and the cross is still square with
+itself — which is the same reason every cell carries a transparent border on all
+four edges. On a touch screen this is the one control with no cursor to say it
+is a control, and a flat outline was doing nothing to say so.
 
 **A tied key is not disabled, it is refused.** The two vertical keys of the pad
 can do nothing for an anchored area, but `disabled` makes a button dead to the

@@ -1187,7 +1187,7 @@
 						{/if}
 						{#if anchorTargets.has(box.id)}
 							<button
-								class="badge action"
+								class="badge action moored"
 								class:lit={litTargets.has(box.id)}
 								disabled={!!template.locked}
 								title="Other areas are moored to this one — moving it moves them too. Press to cast them off and leave them where they are."
@@ -1933,13 +1933,20 @@
 			cursor: help;
 		}
 
-		/* The other end of a tie that is selected. Blue and filled, because a
-		   badge is normally the quietest mark on the card and this one has to be
-		   found across it. */
+		/* The other end of a tie that is selected — the area this one follows, and
+		   the areas that follow it. The *mark* goes blue and nothing else does:
+		   these badges belong to areas you have not selected, and a filled badge
+		   on an unselected area reads as a second selection. A coloured glyph on
+		   the card's own quiet badge is enough to find it. */
 		.badge.lit {
-			border-color: #2563eb;
-			background: #eaf1fe;
 			color: #2563eb;
+		}
+
+		/* The exception, on the selected area itself: what is moored to it is
+		   filled. That one is the hub of the relationship the other badges are
+		   only pointing at, and it is on the area you already have. */
+		.box.selected .badge.moored {
+			background: #eaf1fe;
 		}
 
 		/* Icon takes a px size, which is inside the card's transform like
