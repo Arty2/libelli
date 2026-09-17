@@ -43,8 +43,12 @@
 	// PrintSheet.svelte works this same geometry out again for its own layout.
 	const imposed = $derived(resolveImposition(cardW, cardH, template.print));
 	const sheetBleed = $derived(imposed && template.print.bleed.enabled ? template.print.bleed.amount : 0);
-	const sheetW = $derived((imposed ? template.print.sheet.w : cardW) + sheetBleed * 2);
-	const sheetH = $derived((imposed ? template.print.sheet.h : cardH) + sheetBleed * 2);
+	// The sheet says how wide it is now: with `auto` the fit decides which way
+	// round the paper goes, so the size @page names comes off the layout rather
+	// than off the settings.
+	const sheetW = $derived((imposed?.sheetW ?? cardW) + sheetBleed * 2);
+	const sheetH = $derived((imposed?.sheetH ?? cardH) + sheetBleed * 2);
+
 	// Rows fill the sheet in the order the template asks for — reading order, or
 	// the fold's — and a cell the run does not reach is left empty. Grouped
 	// before the sheet exclusions are applied, so a sheet's number here is the

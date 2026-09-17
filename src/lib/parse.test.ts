@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normaliseHeaders, parseDelimited, parseTable, sniffDelimiter, toCsv } from './parse';
+import { normaliseHeaders, parseDelimited, parseTable, sniffDelimiter, toCsv, toTsv } from './parse';
 
 describe('parseDelimited', () => {
 	it('keeps quoted delimiters and embedded newlines inside one field', () => {
@@ -61,5 +61,28 @@ describe('parseTable', () => {
 	it('round-trips through toCsv', () => {
 		const parsed = parseTable(csv);
 		expect(parseTable(toCsv(parsed))).toEqual(parsed);
+	});
+
+	it('round-trips through toTsv, which is what the clipboard carries', () => {
+		const parsed = parseTable(csv);
+		expect(parseTable(toTsv(parsed))).toEqual(parsed);
+	});
+});
+
+describe('toTsv', () => {
+	const dataset = {
+		columns: ['title', 'body'],
+		rows: [{ title: 'Ferns', body: 'Water\tthem' }, { title: 'Moss', body: 'Two\nlines' }]
+	};
+
+	it('separates with tabs, so a paste lands in cells', () => {
+		expect(toTsv({ columns: ['a', 'b'], rows: [{ a: '1', b: '2' }] })).toBe('a\tb\r\n1\t2');
+	});
+
+	it('quotes a cell holding a tab or a line ending, and nothing else', () => {
+		const lines = toTsv(dataset).split('\r\n');
+		expect(lines[0]).toBe('title\tbody');
+		expect(lines[1]).toBe('Ferns\t"Water\tthem"');
+		expect(toTsv(dataset)).toContain('Moss\t"Two\nlines"');
 	});
 });

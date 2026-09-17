@@ -64,7 +64,7 @@
 		<Icon name="locked" size={16} />
 	</button>
 	<button title="Duplicate" aria-label="Duplicate" disabled={frozen} onclick={onduplicate}>
-		<Icon name="copy" size={16} />
+		<Icon name="replicate" size={16} />
 	</button>
 	<button class="danger" title="Delete" aria-label="Delete" disabled={frozen || allLocked} onclick={ondelete}>
 		<Icon name="trash" size={16} />

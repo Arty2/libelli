@@ -31,6 +31,31 @@ const ROOT_SELECTORS = new Set([':root', 'html', 'body', ':host']);
 const STYLE = 'style';
 export const styleTag = (css: string) => `<${STYLE}>${css}</${STYLE}>`;
 
+/**
+ * An area's name, as the `id` its box wears and as the selector a template
+ * author writes to reach it: name an area `Job Title` and `#Job-Title` styles
+ * it.
+ *
+ * Case is kept, because the name as typed is what the author is looking at
+ * when they write the rule; everything a CSS identifier cannot carry — spaces,
+ * punctuation, an accent — becomes a hyphen, and a leading digit takes one in
+ * front of it, since `#2nd` is not a selector. A name that reduces to nothing
+ * at all gets no id rather than an empty one.
+ *
+ * Two different names can still land on the same id (`Job Title` and
+ * `Job.Title` both give `Job-Title`), which is why `BoxOptions` checks the id
+ * and not just the name before accepting a rename: an id is a CSS identifier
+ * and the whole point of it is that exactly one area answers to it.
+ */
+export function cssIdent(name: string): string {
+	const slug = name
+		.trim()
+		.replace(/[^A-Za-z0-9_-]+/g, '-')
+		.replace(/^-+|-+$/g, '');
+	if (!slug) return '';
+	return /^\d/.test(slug) ? `n-${slug}` : slug;
+}
+
 export function scopeCss(css: string, scope: string): string {
 	if (!css || !css.trim()) return '';
 	return scopeRules(sanitise(css), scope);

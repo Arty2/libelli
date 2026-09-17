@@ -4,7 +4,7 @@
 	import { download } from '$lib/download';
 	import { hold } from '$lib/gestures';
 	import { armDefault } from '$lib/modal';
-	import { parseTable, toCsv } from '$lib/parse';
+	import { parseTable, toCsv, toTsv } from '$lib/parse';
 	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
 	import type { Dataset, Row } from '$lib/types';
 
@@ -299,10 +299,19 @@
 			while (dataset.columns.includes(`Column ${n}`)) n++;
 			column = `Column ${n}`;
 		}
+		const columns = [...dataset.columns, column];
+		// The first column brings a row with it. A column with nothing under it
+		// is a table you cannot type in, and the button that would add a row is
+		// only drawn once there is a column to put it beside — so an empty table
+		// had one + in the header, and using it left you exactly as stuck.
+		const filling = !dataset.rows.length;
 		onchange({
-			columns: [...dataset.columns, column],
-			rows: dataset.rows.map((r) => ({ ...r, [column]: '' }))
+			columns,
+			rows: filling ? [emptyRow(columns)] : dataset.rows.map((r) => ({ ...r, [column]: '' }))
 		});
+		// Whatever card was being previewed, it is the new one now: there is only
+		// the one, and a stale index would preview a row that is not there.
+		if (filling) onactivate(0);
 	}
 
 	/**
@@ -366,6 +375,22 @@
 	}
 
 	const chosenRows = $derived([...selectedRows].filter((i) => i < dataset.rows.length).sort((a, b) => a - b));
+
+	/**
+	 * The tick in the corner of the header: every row, or none of them.
+	 *
+	 * Three states rather than two, because a checkbox that reads as empty while
+	 * six rows are chosen is lying about what the next press will do. `mixed` is
+	 * what a tri-state checkbox is for, and pressing it from there chooses the
+	 * rest rather than dropping what is already chosen — the commoner intent,
+	 * and one undo away in either case since nothing here changes the data.
+	 */
+	const allChosen = $derived(dataset.rows.length > 0 && chosenRows.length === dataset.rows.length);
+	const someChosen = $derived(chosenRows.length > 0 && !allChosen);
+
+	function toggleAll() {
+		selectedRows = allChosen ? new Set() : new Set(dataset.rows.map((_, i) => i));
+	}
 
 	function deleteChosen() {
 		const gone = new Set(chosenRows);
@@ -459,6 +484,36 @@
 		input.value = '';
 	}
 
+	/**
+	 * The chosen rows onto the clipboard, as tab-separated text.
+	 *
+	 * The counterpart of Paste, and it answers the same question from the other
+	 * side: a block of cells goes back to the spreadsheet it came from without a
+	 * file and without an import dialog. Tabs are what a spreadsheet writes and
+	 * reads — see `toTsv`.
+	 *
+	 * A row action, beside Duplicate and Delete, because "these ones" means the
+	 * same thing for all three. It used to sit beside Paste and copy the whole
+	 * table when nothing was chosen; the tick in the header's corner says "all of
+	 * them" in one press, which is a clearer way to ask for it than a button
+	 * whose subject changed underneath you. The header row goes with it either
+	 * way, so the paste lands under column names.
+	 */
+	async function copyTsv() {
+		if (!chosenRows.length) return;
+		const rows = chosenRows.map((i) => dataset.rows[i]);
+		try {
+			await navigator.clipboard.writeText(toTsv({ columns: dataset.columns, rows }));
+		} catch {
+			// No clipboard at all (an insecure origin) or permission refused. There
+			// is no silent fallback worth having — the old execCommand path needs a
+			// visible selection — so it says so and points at the one that works.
+			onnotice('This browser would not hand over the clipboard. Export CSV instead.', 'warning');
+			return;
+		}
+		onnotice(`${rows.length} row${rows.length === 1 ? '' : 's'} copied, ready to paste into a spreadsheet.`);
+	}
+
 	/** The table as it stands, back out as a file. Nothing leaves the browser. */
 	function exportCsv() {
 		download('card-data.csv', toCsv(dataset), 'text/csv');
@@ -493,6 +548,19 @@
 					     unsorted header wears, and it is only there while there is
 					     something to undo. -->
 					<th class="gutter" scope="col">
+						<!-- Where the row ticks are, and wearing the same mark, because it
+						     is the same act reaching every row at once. Only while there
+						     are rows: a tick over an empty table chooses nothing. -->
+						{#if dataset.rows.length}
+							<button
+								class="tick"
+								role="checkbox"
+								aria-checked={allChosen ? 'true' : someChosen ? 'mixed' : 'false'}
+								title={allChosen ? 'Drop every row' : 'Choose every row'}
+								aria-label={allChosen ? 'Drop every row' : 'Choose every row'}
+								onclick={toggleAll}
+							></button>
+						{/if}
 						{#if sortedBy}
 							<button
 								class="icon unsort"
@@ -500,7 +568,7 @@
 								aria-label="Clear the sorting"
 								onclick={clearSort}
 							><Icon name="activity" size={14} /></button>
-						{:else}
+						{:else if !dataset.rows.length}
 							<span class="sr-only">Row</span>
 						{/if}
 					</th>
@@ -619,8 +687,18 @@
 				{/each}
 				{#if !dataset.rows.length}
 					<tr>
+						<!-- Two ways to be empty, and they have different ways out: with
+						     columns there is a + under the row numbers, and with none
+						     there is only the one in the header — which now adds the
+						     first row along with the column. Saying "the + below" when
+						     nothing was below it was the whole of the trouble. -->
 						<td class="empty" colspan={dataset.columns.length + 2}>
-							No rows yet. Paste from a spreadsheet, import a CSV, or add a row with the + below.
+							{#if dataset.columns.length}
+								No rows yet. Paste from a spreadsheet, import a CSV, or add a row with the + below.
+							{:else}
+								Nothing here yet. Paste from a spreadsheet, import a CSV, or add a column with
+								the + above — it arrives with a row in it.
+							{/if}
 						</td>
 					</tr>
 				{/if}
@@ -646,14 +724,25 @@
 			<!-- What you can do to the rows you have chosen, in front of the things
 			     that act on the whole table, with a rule between the two. It appears
 			     only when there is a selection, so the bar is its usual length the
-			     rest of the time. -->
+			     rest of the time.
+
+			     Three things in one order: out of the app, into the table, gone.
+			     Copy sat beside Paste until it turned out to be a row action like
+			     the other two — "these ones" is the chosen rows for all three, and
+			     the tick in the header's corner is how you say "all of them". -->
 			<span class="chosen-count">{chosenRows.length}</span>
+			<button
+				class="icon"
+				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
+				aria-label="Copy the chosen rows"
+				onclick={copyTsv}
+			><Icon name="copy" size={15} /></button>
 			<button
 				class="icon"
 				title="Duplicate the chosen rows"
 				aria-label="Duplicate the chosen rows"
 				onclick={duplicateChosen}
-			><Icon name="copy" size={15} /></button>
+			><Icon name="replicate" size={15} /></button>
 			<button
 				class="icon danger"
 				title="Delete the chosen rows"
@@ -1016,6 +1105,17 @@
 		border-color: #2563eb;
 		background: #2563eb;
 		box-shadow: inset 0 0 0 2px #fff;
+	}
+
+	/* Some but not all: a dash, which is what every tri-state checkbox draws and
+	   the one mark that is neither the empty square nor the filled one. A
+	   smaller version of the filled square would have read as "chosen" at the
+	   size this tick actually is. */
+	.tick[aria-checked='mixed'] {
+		border-color: #2563eb;
+		background:
+			linear-gradient(#2563eb, #2563eb) center / 5px 2px no-repeat,
+			#fff;
 	}
 
 	tbody tr {

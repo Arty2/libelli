@@ -139,10 +139,31 @@ function pad(cells: string[], width: number): string[] {
 	return [...cells, ...Array<string>(width - cells.length).fill('')];
 }
 
-/** Serialise back out, for "export CSV" round-trips. */
-export function toCsv(dataset: Dataset): string {
-	const esc = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-	const lines = [dataset.columns.map(esc).join(',')];
-	for (const row of dataset.rows) lines.push(dataset.columns.map((c) => esc(row[c] ?? '')).join(','));
+/**
+ * Serialise back out, for "export CSV" round-trips and for the clipboard.
+ *
+ * A field is quoted only when it holds something that would otherwise break
+ * the record — the delimiter, a quote, or a line ending — which is what every
+ * spreadsheet writes and what `parseDelimited` above reads back. CRLF between
+ * records, because that is what a spreadsheet puts on the clipboard and what
+ * Excel wants to find there.
+ */
+function serialise(dataset: Dataset, delimiter: string): string {
+	const esc = (v: string) =>
+		v.includes(delimiter) || /["\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+	const lines = [dataset.columns.map(esc).join(delimiter)];
+	for (const row of dataset.rows) {
+		lines.push(dataset.columns.map((c) => esc(row[c] ?? '')).join(delimiter));
+	}
 	return lines.join('\r\n');
 }
+
+export const toCsv = (dataset: Dataset): string => serialise(dataset, ',');
+
+/**
+ * The table as tab-separated text: what a spreadsheet puts on the clipboard,
+ * and what it reads back off one. Tabs rather than commas because a paste into
+ * Excel or Sheets lands in cells straight away — a comma-separated paste
+ * arrives as one column per row and needs a text-import dialog to undo.
+ */
+export const toTsv = (dataset: Dataset): string => serialise(dataset, '\t');
