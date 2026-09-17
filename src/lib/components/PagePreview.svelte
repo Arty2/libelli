@@ -1398,6 +1398,11 @@
 		grid-template-columns: repeat(3, var(--cell));
 		grid-template-rows: repeat(3, var(--cell));
 		gap: 0;
+		/* A drop shadow rather than a box shadow on each key: this one follows
+		   the painted shape, so the cross casts one shadow and the seams between
+		   its arms cast none. It is there all the time now — a thing that stands
+		   up off the page casts a shadow whether or not it is being moved. */
+		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.16));
 	}
 
 	/* Every cell carries a border on all four edges and colours only the ones on
@@ -1514,12 +1519,17 @@
 	   the one button whose look would otherwise not change. Only the coloured
 	   edges change colour — the transparent ones stay transparent, or the cross
 	   would light up as five boxes again. */
+	/* Being carried: the same shadow, thrown further, so the pad reads as picked
+	   up rather than as merely recoloured. */
+	.pad.moving {
+		filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.3));
+	}
+
 	.pad.moving .up,
 	.pad.moving .left,
 	.pad.moving .right,
 	.pad.moving .down {
 		border-color: transparent;
-		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
 	}
 
 	.pad.moving .up {
@@ -1548,7 +1558,42 @@
 
 	.pad .up { grid-area: 1 / 2; }
 	.pad .left { grid-area: 2 / 1; }
-	.pad .step { grid-area: 2 / 2; }
+	/* The middle is round: it is not a direction — it is the step, and the grip
+	   the pad is carried by — so it should not read as a fifth arm. Drawn *in*
+	   the cross rather than cut out of it: the cell keeps the square ground the
+	   four arms meet at, and the circle is a key sitting on it, bevelled the
+	   same way as everything else here. A circular cell would have left four
+	   notches of card showing where the arms come together. */
+	.pad .step {
+		grid-area: 2 / 2;
+		position: relative;
+		z-index: 0;
+		/* The well the round key sits in, a shade darker than the arms. Without
+		   it the key's lit edge is white against white and only half the ring
+		   shows — a circle that stops halfway round reads as a drawing fault
+		   rather than as a key catching the light. */
+		background: linear-gradient(145deg, #e9ebef, #dfe2e7);
+	}
+
+	.pad .step::before {
+		content: '';
+		position: absolute;
+		inset: 3px;
+		z-index: -1;
+		border-radius: 50%;
+		border-width: 1px 2px 2px 1px;
+		border-style: solid;
+		border-color: var(--pad-light) var(--pad-shade) var(--pad-shade) var(--pad-light);
+		background: linear-gradient(145deg, #fff, #eef0f2);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+	}
+
+	/* Pressed, the round key goes down with the rest of them. */
+	.pad .step:active::before {
+		border-width: 2px 1px 1px 2px;
+		background: linear-gradient(145deg, #e4e7ea, #f6f7f8);
+		box-shadow: none;
+	}
 	.pad .right { grid-area: 2 / 3; }
 	.pad .down { grid-area: 3 / 2; }
 

@@ -693,6 +693,15 @@ moving it to the bottom corner halves that column in the common case — and it
 clears the shears by their own half-height when the area is cutting its words
 off, because two marks on one corner is worse than either alone.
 
+**A drawing is drawn hard.** An area whose picture is a `data:` URL renders
+with `image-rendering: pixelated`. The drawing surface is the only thing that
+writes one — it puts a base64 PNG straight into the cell — and it is 64 pixels
+on its longest side deliberately; a browser interpolating that up to a
+centimetre turns a drawing into a smudge. The honest edge, said out loud: a cell
+someone pastes a base64 *photograph* into is drawn hard too. Nothing in the
+bytes says which of the two it is, and the alternative — a per-area setting for
+something with one sensible answer — is worse than the edge case.
+
 **Blending is one word, checked on the way in.** `mix-blend-mode` is written
 straight into a style attribute, so `newBox` only lets through the thirteen
 modes the format names — the same rule colors follow. It reaches the paper and
@@ -898,6 +907,20 @@ of sight is the cheapest way to get that corner back, so the clamp lets the pad
 hang over the edge — and stops at one cell, which is where the middle button's
 outer edge meets the edge of the stage. That button is how the pad is picked up
 again; a pad you cannot reach is a control you have lost.
+
+**The round key sits in a well.** The middle of the pad is the step and the
+grip rather than a direction, so it is a circle — but a circle drawn *in* the
+cross rather than cut out of it, because a round cell would have left four
+notches of card showing where the arms come together. It needed a ground of its
+own a shade darker than the arms: lit from the top left, the key's bright edge
+is white against white, and only the shaded half of the ring showed. A circle
+that stops halfway round reads as a drawing fault, not as a key catching light.
+
+**One shadow, thrown by the shape.** `filter: drop-shadow` on the pad rather
+than a `box-shadow` on each key, so the cross casts a single shadow and the
+seams between its arms cast none — and it is there all the time now. A thing
+that stands up off the page casts a shadow whether or not it is being carried;
+being carried just throws it further.
 
 **The pad is drawn as a raised thing.** Lit from the top left, 1px along the top
 and left edges against 2px along the bottom and right, and the bevel inverts

@@ -555,6 +555,12 @@ at its own size.
 
   Unpainted pixels stay transparent, not white: the area's own fill and the
   paper show through, which is a thing you would otherwise discover on paper.
+  And the area draws it *hard* — `image-rendering: pixelated` — so sixty-four
+  pixels blown up to a centimetre or ten stay the pixels that were drawn rather
+  than being smudged into a gradient by the browser. That applies to any picture
+  an area holds as a data URL, which in practice means the ones drawn here; a
+  photograph dropped on an area comes from a folder or this browser's store and
+  keeps its smoothing.
   Opening the surface on an area that already holds a picture draws it in, so a
   dropped photo can be scribbled on — unless it came from an address off this
   machine, which a canvas refuses to hand back once drawn, and which therefore
@@ -872,8 +878,11 @@ a touch screen the same job is done by the four-way pad that appears beside the
 card — one cross with one outline, not five tiles in the shape of a cross — with
 a chip in the middle cycling between 1mm, 5mm and 10mm; holding an arrow keeps
 it moving. The cross is drawn as a raised thing — lit from the top left, thicker
-along the bottom and right, and it goes down under a press — because on a touch
-screen it is the one control with no cursor to tell you it is a control. The pad parks over the bottom-right corner of the page, which is
+along the bottom and right, casting one shadow of its own, and it goes down
+under a press — because on a touch screen it is the one control with no cursor
+to tell you it is a control. The middle is round and set in a shallow well: it
+is not a direction, it is the step and the grip, and it should not read as a
+fifth arm. The pad parks over the bottom-right corner of the page, which is
 exactly the corner you may have reached for it to nudge — press and hold that
 middle chip and the pad comes with your finger. It can be pushed off the edge of
 the stage to get that corner back, as far as the middle chip: the arm you are

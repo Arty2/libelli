@@ -388,6 +388,9 @@
 					'background-repeat:repeat',
 					'background-size:auto'
 				);
+				// A tiled drawing is drawn hard for the same reason a fitted one
+				// is — see `drawnByHand`.
+				if (drawnByHand(media.src)) parts.push('image-rendering:pixelated');
 			}
 		}
 		// `.box` is border-box, so a border eats into the width rather than adding
@@ -434,6 +437,21 @@
 		}
 		return parts.join(';');
 	}
+
+/**
+	 * Whether a picture should be drawn hard rather than smoothed.
+	 *
+	 * A drawing made here is the only thing that arrives as `data:` — the
+	 * surface writes a base64 PNG straight into the cell — and it is 64 pixels
+	 * on its longest side on purpose. Blown up to a centimetre or ten, a browser
+	 * would interpolate it into a smudge, which is not what was drawn. A
+	 * photograph comes from a folder or an address and keeps its smoothing.
+	 *
+	 * The honest edge of this: a cell someone pastes a base64 *photograph* into
+	 * is drawn hard as well. It is the same trade a name like `local:` avoids
+	 * and a data URL cannot — nothing in the bytes says which of the two it is.
+	 */
+	const drawnByHand = (src: string | undefined) => !!src?.startsWith('data:');
 
 	const borderColorOf = (box: Box) => box.borderColor ?? box.color ?? template.defaults.color;
 
@@ -1150,7 +1168,13 @@
 								{#if media.svg}
 									{@html fitSvg(safeSvg(media.svg), box.fit)}
 								{:else}
-									<img src={media.src} alt="" style="object-fit:{box.fit ?? 'contain'}" />
+									<img
+									src={media.src}
+									alt=""
+									style="object-fit:{box.fit ?? 'contain'}{drawnByHand(media.src)
+										? ';image-rendering:pixelated'
+										: ''}"
+								/>
 								{/if}
 							</span>
 						{/if}
