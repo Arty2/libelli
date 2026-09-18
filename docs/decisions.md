@@ -753,8 +753,14 @@ and `image` keeps answering to both because it was the only mode for both and
 every template written until now relies on that. The cost is one mode that is
 less strict than its name; the alternative was breaking files we cannot inspect,
 since whether a column holds colors is a fact about the data, not the template.
-The schema goes to 6, so an older build refuses a file naming the new modes
-rather than rendering base64 as a paragraph.
+
+The schema stays at 5 and nothing migrates. Adding names to an enum is not a
+change to the shape of the file, and bumping the number would have made every
+template written from here on unreadable to a build that is only one release
+behind — a heavy price for a case that degrades quietly anyway: an older build
+reads an unknown mode as words, which is what it does with any word it does not
+recognise. Said out loud because it is arguable, and because the reverse — bump
+whenever the format learns anything — is the rule most projects would pick.
 
 A resolved color is emitted by `boxStyle` as the box's own `background`, so it
 reaches under the padding and takes the corner radius; a tile is a background

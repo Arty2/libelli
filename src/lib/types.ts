@@ -6,7 +6,7 @@
  * print convention beats consistency.
  */
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 5;
 
 /**
  * What an area draws, given what its cell or its template says.
