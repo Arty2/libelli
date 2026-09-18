@@ -363,6 +363,13 @@ and they are not the same area. Static Text no longer offers the image mode at
 all, because the two picture answers are that answer, said where the question is
 asked.
 
+**The line tool previews from the board, not from the last preview.** A line is
+drawn again on every pointer report while the drag is going on, so each one
+starts from a copy of the board taken when the drag began — otherwise dragging a
+line around leaves a fan of every line it passed through. The copy is the
+editor's own, not a history entry: the whole drag is one step in undo, the same
+as a stroke.
+
 **Rotate and crop are board transforms, not drawing.** Both could be done by
 hand with the pen and neither should have to be: a quarter turn resamples
 nothing (the same pixels, arranged the other way up, and the budget cannot
@@ -1001,15 +1008,15 @@ hang over the edge — and stops at one cell, which is where the middle button's
 outer edge meets the edge of the stage. That button is how the pad is picked up
 again; a pad you cannot reach is a control you have lost.
 
-**The round key sits on the same ground as the arms.** The middle of the pad is
-the step and the grip rather than a direction, so it is a circle — but a circle
-drawn *in* the cross rather than cut out of it, because a round cell would have
-left four notches of card showing where the arms come together. It had a darker
-well of its own for a while, which fixed the ring and broke the cross: the
-middle read as a hole in a surface that is meant to be continuous. The ground is
-the arms' again, and what closes the ring is a hairline round the key itself —
-lit from the top left, its bright edge is white against white, and without that
-line only the shaded half of the circle shows.
+**The round key sits on the same ground as the arms, with no line round it.**
+The middle of the pad is the step and the grip rather than a direction, so it is
+a circle — but a circle drawn *in* the cross rather than cut out of it, because a
+round cell would have left four notches of card showing where the arms come
+together. Two things were tried and dropped: a darker well under the key, which
+fixed the ring and made the middle read as a hole in a surface meant to be
+continuous, and then a hairline round the key, which drew the same hole in one
+line instead of a fill. What says the key is there is its own shadow and the
+light across its face, and nothing else.
 
 **The whole pad tilts; the keys do not sink one by one.** Pressing a key used to
 swap that key's bevel, which made it look redrawn rather than pushed — and five

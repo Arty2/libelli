@@ -93,6 +93,10 @@ export const ICONS: Record<string, string> = {
 	'pen': '<path d="M27.3069,6.1069,30,3.4141,28.5859,2,25.8931,4.6929,24.8,3.6a1.9328,1.9328,0,0,0-2.8,0L4,21.6V28h6.4l18-18a1.9329,1.9329,0,0,0,0-2.8ZM9.6,26H6V22.4L23.4,5,27,8.6Z"/><path d="M8.136 7.5H18.863999999999997V9.5H8.136z" transform="rotate(-45 13.5 8.5)"/>',
 	'rotate': '<path d="M28,30H16a2.0023,2.0023,0,0,1-2-2V16a2.0023,2.0023,0,0,1,2-2H28a2.0023,2.0023,0,0,1,2,2V28A2.0023,2.0023,0,0,1,28,30ZM16,16V28H28.0012L28,16Z"/><path d="M15,2,13.59,3.41,16.17,6H11a7.0078,7.0078,0,0,0-7,7v5H6V13a5.0057,5.0057,0,0,1,5-5h5.17l-2.58,2.59L15,12l5-5Z"/>',
 	'crop': '<path d="M25,20H23V9H12V7H23a2,2,0,0,1,2,2Z"/><path d="M9,23V2H7V7H2V9H7V23a2,2,0,0,0,2,2H23v5h2V25h5V23Z"/>',
+	/* Drawn here rather than taken from the set, which has no plain line: a
+	   segment on Carbon's 32 grid with a node at each end, which is what a line
+	   tool looks like everywhere it exists. */
+	'line': '<path d="M5.29 25.29 25.29 5.29 26.71 6.71 6.71 26.71z"/><path d="M3 23H9V29H3z"/><path d="M23 3H29V9H23z"/>',
 
 	/* What + Area wears: a page with a block of words and a picture on it. */
 	'blog': '<path d="M4 24H14V26H4z"/><path d="M4 18H14V20H4z"/><path d="M26,14H6a2,2,0,0,1-2-2V6A2,2,0,0,1,6,4H26a2,2,0,0,1,2,2v6A2,2,0,0,1,26,14ZM6,6v6H26V6Z"/><path d="M26,28H20a2,2,0,0,1-2-2V20a2,2,0,0,1,2-2h6a2,2,0,0,1,2,2v6A2,2,0,0,1,26,28Zm-6-8v6h6V20Z"/>',

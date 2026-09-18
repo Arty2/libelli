@@ -55,7 +55,7 @@
 	let grid = $state<Grid>(untrack(() => boardSize(box)));
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
-	let tool = $state<'pen' | 'eraser'>('pen');
+	let tool = $state<'pen' | 'eraser' | 'line'>('pen');
 	/** brush width in pixels of the grid, not of the screen */
 	let nib = $state(1);
 	let weight = $state<number | null>(null);
@@ -76,6 +76,15 @@
 	let future = $state<Shot[]>([]);
 	let drawing = $state(false);
 	let last: { x: number; y: number } | null = null;
+	/**
+	 * Where a straight line started, and the board as it was before the line was
+	 * previewed onto it. A line is drawn over and over while the pointer moves,
+	 * so each preview starts from the same clean board rather than from the last
+	 * one — otherwise a line dragged around leaves a fan of every line it passed
+	 * through.
+	 */
+	let lineFrom: { x: number; y: number } | null = null;
+	let beneath: ImageData | null = null;
 
 	const context = () => canvas?.getContext('2d', { willReadFrequently: true }) ?? null;
 
@@ -400,12 +409,26 @@
 		drawing = true;
 		const at = positionOf(event);
 		last = at;
+		if (tool === 'line') {
+			lineFrom = at;
+			beneath = snapshot();
+		}
+		// A line of no length is a dot, which is what a tap should leave behind
+		// whichever tool is up.
 		paint(at);
 	}
 
 	function move(event: PointerEvent) {
 		if (!drawing) return;
 		const at = positionOf(event);
+		if (tool === 'line' && lineFrom) {
+			// The board as it was, then this line on top of it: the drag is a
+			// preview of one line, not a trail of them.
+			if (beneath) restore(beneath);
+			for (const point of line(lineFrom, at)) paint(point);
+			last = at;
+			return;
+		}
 		// Every pixel between the last report and this one: a quick stroke reports
 		// a handful of points and would otherwise draw as dots.
 		for (const point of line(last ?? at, at)) paint(point);
@@ -416,6 +439,8 @@
 		if (!drawing) return;
 		drawing = false;
 		last = null;
+		lineFrom = null;
+		beneath = null;
 		canvas?.releasePointerCapture(event.pointerId);
 		measure();
 	}
@@ -548,6 +573,14 @@
 				     it is the area's, so the button may as well be the swatch that
 				     says which. -->
 				<span class="ink" style="background:{ink}"></span>
+			</button>
+			<button
+				aria-pressed={tool === 'line'}
+				title="Straight line — press where it starts and let go where it ends"
+				aria-label="Line"
+				onclick={() => (tool = 'line')}
+			>
+				<Icon name="line" size={15} />
 			</button>
 			<button
 				aria-pressed={tool === 'eraser'}

@@ -1668,24 +1668,19 @@
 		inset: 3px;
 		z-index: -1;
 		border-radius: 50%;
-		border-width: 1px 2px 2px 1px;
-		border-style: solid;
-		border-color: var(--pad-light) var(--pad-shade) var(--pad-shade) var(--pad-light);
 		background: linear-gradient(145deg, #fff, #eef0f2);
-		/* A hairline all the way round, under the bevel. The key's lit edge is
-		   white on the white it now sits on, so without this the ring stops
-		   halfway and reads as a drawing fault rather than as a round key
-		   catching the light from the top left. */
-		box-shadow:
-			0 0 0 1px rgba(0, 0, 0, 0.09),
-			0 1px 2px rgba(0, 0, 0, 0.16);
+		/* No line round it at all: the cross is one surface, and a ring drawn on
+		   that surface made the middle read as a part cut out of it rather than
+		   as the grip sitting on it. What says the key is there is its own
+		   shadow and the light across its face. */
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
 	}
 
-	/* Pressed, the round key darkens and its shadow goes; the bevel stays as
-	   drawn, because the pad's own movement is what says it went down. */
+	/* Pressed, the round key darkens and its shadow goes; the pad's own movement
+	   is what says it went down. */
 	.pad .step:active::before {
 		background: linear-gradient(145deg, #e4e7ea, #f6f7f8);
-		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.09);
+		box-shadow: none;
 	}
 	.pad .right { grid-area: 2 / 3; }
 	.pad .down { grid-area: 3 / 2; }

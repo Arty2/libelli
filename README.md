@@ -559,8 +559,9 @@ at its own size.
   selected is one a drawing can go in, which is the same rule the bar follows. Never in place: an area on
   a card is often a centimetre across, which is somewhere to show a drawing and
   nowhere to make one. The board sits above its tools, and the tools are one
-  row: a pen in the area's own colour, a rubber, three nib widths, undo, redo
-  and clear, the size of the board, **rotate** and **crop**, **copy** and
+  row: a pen in the area's own colour, a **line** — press where it starts, let
+  go where it ends — a rubber, three nib widths, undo, redo and clear, the size
+  of the board, **rotate** and **crop**, **copy** and
   **paste**, and then Cancel and Done — leaving is a drawing tool like the rest
   of them, and a row of its own under the board put the two most final buttons
   furthest from the hand that had been drawing.
