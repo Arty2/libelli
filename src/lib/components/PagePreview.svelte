@@ -173,6 +173,19 @@
 	 * rather than as a locked area. The lock badge on the area, and the Locked
 	 * band over a locked page, are what say why.
 	 */
+	/**
+	 * The area a drawing could be made in, when exactly one is selected and it is
+	 * one that holds a picture of its own. A pen beside the page rather than only
+	 * in the bar: the bar scrolls sideways on a phone, and drawing is the one
+	 * thing you do *to* an area rather than *about* it.
+	 */
+	const drawTarget = $derived.by(() => {
+		if (template.locked || selectedBoxes.length !== 1) return null;
+		const box = selectedBoxes[0];
+		if (box.locked || box.mode !== 'image' || box.static?.url) return null;
+		return box.id;
+	});
+
 	const padUsable = $derived(
 		selectedBoxes.length > 0 && !template.locked && !selectedBoxes.every((b) => b.locked)
 	);
@@ -514,7 +527,16 @@
 	 */
 	let repeat: ReturnType<typeof setTimeout> | null = null;
 
+	/**
+	 * Which key is being held down, so the pad can lean that way. The whole pad
+	 * tilts rather than the one key sinking: five keys that each go down on their
+	 * own read as five buttons, and this is one thing you push at a corner — the
+	 * way a real pad rocks on the pivot under its middle.
+	 */
+	let pushed = $state<'up' | 'down' | 'left' | 'right' | 'centre' | null>(null);
+
 	function startNudge(dx: number, dy: number) {
+		pushed = dy < 0 ? 'up' : dy > 0 ? 'down' : dx < 0 ? 'left' : 'right';
 		onnudge(dx, dy);
 		repeat = setTimeout(() => {
 			repeat = setInterval(() => onnudge(dx, dy), 90);
@@ -522,6 +544,7 @@
 	}
 
 	function stopNudge() {
+		pushed = null;
 		if (repeat === null) return;
 		clearTimeout(repeat);
 		clearInterval(repeat);
@@ -868,6 +891,17 @@
 		>
 			<Icon name="shapes" size={16} /><span class="sr-only">Area</span>
 		</button>
+		{#if drawTarget}
+			<!-- Under Area, because it is the same kind of thing: Area makes one,
+			     this draws in the one you have. -->
+			<button
+				class="square"
+				onclick={() => ondraw?.(drawTarget)}
+				title="Draw this area's picture"
+			>
+				<Icon name="pen" size={16} /><span class="sr-only">Draw this area</span>
+			</button>
+		{/if}
 		{#if !template.boxes.length}
 			<!-- Only on an empty page, where it is the answer to "now what?" and
 			     there is nothing for it to destroy. Once there are areas it is the
@@ -983,6 +1017,11 @@
 		<div
 			class="pad"
 			class:moving={!!padDrag}
+			class:push-up={pushed === 'up'}
+			class:push-down={pushed === 'down'}
+			class:push-left={pushed === 'left'}
+			class:push-right={pushed === 'right'}
+			class:push-centre={pushed === 'centre'}
 			role="group"
 			aria-label="Nudge the selected box"
 			style="right:{padAt.right}px;bottom:{padAt.bottom}px"
@@ -1012,7 +1051,10 @@
 			<button
 				class="step"
 				title="Step size — 1, 5 or 10mm. Press and hold to move the pad."
-				onpointerdown={padPickup}
+				onpointerdown={(e) => {
+					pushed = 'centre';
+					padPickup(e);
+				}}
 				onpointermove={padMove}
 				onpointerup={padDrop}
 				onpointercancel={padDrop}
@@ -1403,14 +1445,51 @@
 		   its arms cast none. It is there all the time now — a thing that stands
 		   up off the page casts a shadow whether or not it is being moved. */
 		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.16));
+		/* The tilt below is a 3D rotation, so it needs the perspective in its own
+		   transform: the property of that name applies to a box's children, not
+		   to the box itself. Short, because a pad that takes a tenth of a second
+		   to answer a tap does not feel like a button. */
+		transform: perspective(340px);
+		transition: transform 80ms ease-out;
 	}
 
-	/* Every cell carries a border on all four edges and colours only the ones on
-	   the perimeter. Transparent rather than absent, so each content box is inset
-	   by the same amount on every cell: a cell bordered on three edges and not
-	   the fourth centres its glyph half a pixel off, which is the whole thing
-	   this was asked to fix. The ground is the same under all five, so a
-	   transparent border between two of them is invisible.
+	/* Pressed, the whole pad leans the way you pressed it — rocking on the pivot
+	   under its middle, the way a real one does. This replaces the keys each
+	   sinking on their own: five keys that go down individually read as five
+	   buttons that happen to touch, and this is one thing you push at a corner. */
+	.pad.push-up {
+		transform: perspective(340px) rotateX(9deg);
+	}
+
+	.pad.push-down {
+		transform: perspective(340px) rotateX(-9deg);
+	}
+
+	.pad.push-left {
+		transform: perspective(340px) rotateY(-9deg);
+	}
+
+	.pad.push-right {
+		transform: perspective(340px) rotateY(9deg);
+	}
+
+	/* The middle is not a direction, so it goes straight down. */
+	.pad.push-centre {
+		transform: perspective(340px) scale(0.97);
+	}
+
+	/* While it is being carried it follows the finger and nothing else: a pad
+	   tilted and moving at once reads as a bug in the drag. */
+	.pad.moving {
+		transform: perspective(340px);
+	}
+
+	/* Every cell carries a border on the three edges that are on the perimeter of
+	   the cross and none at all on the edge facing its middle — the arms run into
+	   the centre without a seam, so the cross is one shape rather than five. The
+	   room that border took is given back as padding on the same edge, because a
+	   cell inset on three sides and not the fourth centres its glyph half a pixel
+	   off.
 
 	   The widths are uneven and the colours are lit from the top left, which is
 	   what makes the cross read as five keys standing up off the page rather
@@ -1436,13 +1515,13 @@
 		touch-action: none;
 	}
 
-	/* Pressed: the light comes from the other side and the key sits a pixel
-	   into the page. A raised key that does not go down when it is pressed is
-	   the one thing a drawn key must not do. The two that an anchor has spoken
-	   for do not move, because they are not going to do anything either. */
+	/* Pressed: the face darkens, and that is all that changes on the key itself
+	   — the pad's own tilt says which one went down. Swapping the bevel here as
+	   well made the key look like it had been redrawn rather than pushed. The
+	   two an anchor has spoken for do not change, because they are not going to
+	   do anything either. */
 	.pad button:active:not(.tied):not(:disabled) {
 		background: linear-gradient(145deg, #e4e7ea, #f6f7f8);
-		border-width: 2px 1px 1px 2px;
 	}
 
 	/* The twelve segments of the cross. Each edge is drawn once, by the cell that
@@ -1451,6 +1530,8 @@
 		border-top-color: var(--pad-light);
 		border-left-color: var(--pad-light);
 		border-right-color: var(--pad-shade);
+		border-bottom-width: 0;
+		padding-bottom: 2px;
 		border-radius: var(--radius-button) var(--radius-button) 0 0;
 	}
 
@@ -1458,6 +1539,8 @@
 		border-top-color: var(--pad-light);
 		border-left-color: var(--pad-light);
 		border-bottom-color: var(--pad-shade);
+		border-right-width: 0;
+		padding-right: 2px;
 		border-radius: var(--radius-button) 0 0 var(--radius-button);
 	}
 
@@ -1465,6 +1548,8 @@
 		border-top-color: var(--pad-light);
 		border-right-color: var(--pad-shade);
 		border-bottom-color: var(--pad-shade);
+		border-left-width: 0;
+		padding-left: 1px;
 		border-radius: 0 var(--radius-button) var(--radius-button) 0;
 	}
 
@@ -1472,6 +1557,8 @@
 		border-bottom-color: var(--pad-shade);
 		border-left-color: var(--pad-light);
 		border-right-color: var(--pad-shade);
+		border-top-width: 0;
+		padding-top: 1px;
 		border-radius: 0 0 var(--radius-button) var(--radius-button);
 	}
 
@@ -1568,11 +1655,11 @@
 		grid-area: 2 / 2;
 		position: relative;
 		z-index: 0;
-		/* The well the round key sits in, a shade darker than the arms. Without
-		   it the key's lit edge is white against white and only half the ring
-		   shows — a circle that stops halfway round reads as a drawing fault
-		   rather than as a key catching the light. */
-		background: linear-gradient(145deg, #e9ebef, #dfe2e7);
+		/* The same face as the arms around it: the cross is one continuous
+		   surface with a round key drawn on it, and a darker well under that key
+		   made the middle read as a hole. What keeps the ring visible against it
+		   is the key's own shadow rather than a change of ground. */
+		background: linear-gradient(145deg, #fff, #eceef1);
 	}
 
 	.pad .step::before {
@@ -1585,14 +1672,20 @@
 		border-style: solid;
 		border-color: var(--pad-light) var(--pad-shade) var(--pad-shade) var(--pad-light);
 		background: linear-gradient(145deg, #fff, #eef0f2);
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+		/* A hairline all the way round, under the bevel. The key's lit edge is
+		   white on the white it now sits on, so without this the ring stops
+		   halfway and reads as a drawing fault rather than as a round key
+		   catching the light from the top left. */
+		box-shadow:
+			0 0 0 1px rgba(0, 0, 0, 0.09),
+			0 1px 2px rgba(0, 0, 0, 0.16);
 	}
 
-	/* Pressed, the round key goes down with the rest of them. */
+	/* Pressed, the round key darkens and its shadow goes; the bevel stays as
+	   drawn, because the pad's own movement is what says it went down. */
 	.pad .step:active::before {
-		border-width: 2px 1px 1px 2px;
 		background: linear-gradient(145deg, #e4e7ea, #f6f7f8);
-		box-shadow: none;
+		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.09);
 	}
 	.pad .right { grid-area: 2 / 3; }
 	.pad .down { grid-area: 3 / 2; }

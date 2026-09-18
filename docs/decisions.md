@@ -349,6 +349,47 @@ is also the only kind a canvas will read back, since anything from elsewhere
 taints it and refuses `toDataURL`. The cost is that the crop is asynchronous: a
 card drawn in the very first frame tiles the whole board until the crop lands.
 
+**Content is one question with four answers, and the format did not change.**
+A drawing used to be reached by setting a static area's *mode* to "Image /
+Color", which asked the person placing it to know that a paragraph and a drawing
+are the same kind of thing with a different renderer. They are not, to anyone
+placing them. **Data Field**, **Static Text**, **Bitmap** and **Image** are now
+the one question the bar asks first, derived from the slot, the mode and which
+of `static`'s fields holds the value — so no template written before this reads
+any differently, and none written after this carries anything new. Which field
+is *present* decides between the last two, not which one has something in it: a
+bitmap nobody has drawn yet and an address nobody has typed yet are both empty,
+and they are not the same area. Static Text no longer offers the image mode at
+all, because the two picture answers are that answer, said where the question is
+asked.
+
+**Rotate and crop are board transforms, not drawing.** Both could be done by
+hand with the pen and neither should have to be: a quarter turn resamples
+nothing (the same pixels, arranged the other way up, and the budget cannot
+notice because w x h is unchanged), and cropping to the ink is the same
+rectangle a tiled area repeats, made permanent. Each one is a single entry in
+the editor's own stack, board and all, so either is one undo away.
+
+**Copy and paste go through the system clipboard as a PNG.** Not an internal
+buffer: the point is to get a drawing out to another program and a picture in
+from one. A paste replaces the board and brings its own size, the same rule as
+opening the editor on a picture that is already in the cell, so the two ways a
+picture arrives behave alike. A browser that refuses the clipboard — Firefox
+wants a gesture it recognises, and a page without the permission gets nothing —
+is told out loud in the header, because a copy that did not happen looks exactly
+like one that did until you paste.
+
+**The board sits above its tools, and leaving is a tool.** Cancel and Done used
+to be a row of their own under the board, which put the two most final buttons
+furthest from the hand that had been drawing, and pushed the board up under the
+header. One toolbar, one place to look.
+
+**There is no pinch on the board.** It had one for a day. The fingers that would
+make a pinch are the fingers drawing on it, and a stroke that turns into a zoom
+halfway through is worse than no zoom at all — so the board fits the viewport by
+itself and Ctrl and the wheel step it from there. The pinch stays what it was
+everywhere else: the page editor's zoom.
+
 **The zoom steps through whole numbers.** Whole screen pixels per pixel of the
 board, pinch and Ctrl+wheel included: a board at 7.5 screen pixels a side lands
 half its pixels on half a screen pixel, and a pixel editor that blurs its own
@@ -937,10 +978,11 @@ in a plus. The grid is still 3 x 3; what changed is that the cells touch, share 
 ground, and carry a border only on the edges that are on the outside of the
 cross — twelve segments, each drawn once by the cell that owns it, with the four
 re-entrant corners where two of them meet at a point. The corner cells stay
-empty, so the card under them is still reachable. Every cell keeps a border on
-all four edges and colours only the perimeter ones: transparent rather than
-absent, because a cell bordered on three edges and not the fourth has an
-asymmetric content box and centres its glyph half a pixel off.
+empty, so the card under them is still reachable. The edge facing the middle
+carries no border at all, so the arms run into the centre without a seam; the
+room that border used to take is given back as padding on the same edge,
+because a cell inset on three sides and not the fourth centres its glyph half a
+pixel off.
 
 **And the arrowheads are centred, which needed saying in numbers.** Carbon's
 carets are drawn with the triangle 1/32 of the viewBox towards the point they
@@ -959,13 +1001,26 @@ hang over the edge — and stops at one cell, which is where the middle button's
 outer edge meets the edge of the stage. That button is how the pad is picked up
 again; a pad you cannot reach is a control you have lost.
 
-**The round key sits in a well.** The middle of the pad is the step and the
-grip rather than a direction, so it is a circle — but a circle drawn *in* the
-cross rather than cut out of it, because a round cell would have left four
-notches of card showing where the arms come together. It needed a ground of its
-own a shade darker than the arms: lit from the top left, the key's bright edge
-is white against white, and only the shaded half of the ring showed. A circle
-that stops halfway round reads as a drawing fault, not as a key catching light.
+**The round key sits on the same ground as the arms.** The middle of the pad is
+the step and the grip rather than a direction, so it is a circle — but a circle
+drawn *in* the cross rather than cut out of it, because a round cell would have
+left four notches of card showing where the arms come together. It had a darker
+well of its own for a while, which fixed the ring and broke the cross: the
+middle read as a hole in a surface that is meant to be continuous. The ground is
+the arms' again, and what closes the ring is a hairline round the key itself —
+lit from the top left, its bright edge is white against white, and without that
+line only the shaded half of the circle shows.
+
+**The whole pad tilts; the keys do not sink one by one.** Pressing a key used to
+swap that key's bevel, which made it look redrawn rather than pushed — and five
+keys that each go down on their own read as five buttons that happen to touch.
+Now the pad leans toward the key being held, a `rotateX`/`rotateY` of nine
+degrees on the pad itself with the perspective in its own transform (the
+property of that name applies to a box's children, not the box). It rocks on the
+pivot under its middle, the way a real pad does; the middle key goes straight
+down instead, because it is not a direction. While the pad is being carried it
+does not tilt at all — a pad tilted and moving at once reads as a bug in the
+drag.
 
 **One shadow, thrown by the shape.** `filter: drop-shadow` on the pad rather
 than a `box-shadow` on each key, so the cross casts a single shadow and the

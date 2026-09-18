@@ -59,6 +59,17 @@ resize boxes directly, or type exact millimetres.
 
 - **Millimetres, from the trim edge** — changing the page size or switching bleed
   on moves nothing, because no coordinate was ever expressed in pixels.
+- **Content** — what an area holds, as one question with four answers.
+  **Data Field** takes it from a column, so every card says something different;
+  **Static Text** is words typed into the template, the same on every card;
+  **Bitmap** is a drawing made here, and **Image** is a picture from an address
+  or from this browser. The first two then take a **Mode** — plain text,
+  Markdown, or a QR code, and a data field can also be *Image / Color*, since a
+  column can hold either. Words typed into the template cannot be a picture, so
+  Static Text does not offer that mode: Bitmap and Image are that answer, said
+  where the question is asked. Nothing about the file format changes — the four
+  are the slot, the mode and which field holds the value, read back as one
+  choice.
 - **Slots** — a box renders the column its slot is bound to. The bar calls it the
   area's **Name**; *slot* is what the file format calls it. The mapping lives
   outside the template, so the same template works against another spreadsheet.
@@ -498,7 +509,9 @@ functional notation is rebuilt from the numbers it parsed to.
 
 ## Images, colors and QR codes
 
-Two box modes carry something other than text. Both are framed by the box's
+Two box modes carry something other than text — reached as **Bitmap** or
+**Image** where the content is static, and as *Image / Color* where a column
+supplies it. Both are framed by the box's
 declared height, and both take a **Fit**: *fit* puts the whole thing inside the
 box, *cover* fills the box and crops the overflow, *stretch* distorts it to the
 box exactly, and *tile* — images only, since a tiled QR is not a QR — repeats it
@@ -540,14 +553,31 @@ at its own size.
   image uploaded as a page background can be used in a row without uploading it
   twice — they share one store, because an image is an image. Which store that is, and how to
   empty it, is **Images…** in page setup — see below.
-- **Drawing one** — double-click an image area, or press **Draw…** in the area
-  bar, and the drawing surface opens **full screen**. Never in place: an area on
+- **Drawing one** — double-click an image area, press the **pen** beside the
+  page, or press **Draw…** in the area bar, and the drawing surface opens
+  **full screen**. The pen appears under **Area** whenever the one area you have
+  selected is one a drawing can go in, which is the same rule the bar follows. Never in place: an area on
   a card is often a centimetre across, which is somewhere to show a drawing and
-  nowhere to make one. A pen in the area's own colour, a rubber, three nib
-  widths, undo, redo and clear, and the size of the board; Escape or **Cancel**
-  leaves the cell as it was, and <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Z</kbd> steps
-  back inside the surface. The whole drawing is *one* entry in the app's own
-  undo however many strokes it took.
+  nowhere to make one. The board sits above its tools, and the tools are one
+  row: a pen in the area's own colour, a rubber, three nib widths, undo, redo
+  and clear, the size of the board, **rotate** and **crop**, **copy** and
+  **paste**, and then Cancel and Done — leaving is a drawing tool like the rest
+  of them, and a row of its own under the board put the two most final buttons
+  furthest from the hand that had been drawing.
+
+  **Rotate** turns the drawing a quarter turn clockwise, board and all — the
+  budget does not notice, because the same pixels are arranged the other way up.
+  **Crop** takes the board down to what is actually drawn on it. **Copy** puts
+  the board on the clipboard as a PNG and **paste** takes one off it, replacing
+  the board and bringing its own size with it; both are on
+  <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>C</kbd> and <kbd>V</kbd>, and a browser that
+  refuses the clipboard says so in the header rather than failing quietly. All
+  four are one undo away, board and all.
+
+  Escape or **Cancel** leaves the cell as it was, and
+  <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Z</kbd> steps back inside the surface. The
+  whole drawing is *one* entry in the app's own undo however many strokes it
+  took.
 
   The board is **64 by 64 pixels' worth**, spent however you like: type a width
   and the height moves to pay for it, so 64 × 64, 128 × 32 and 512 × 8 are all
@@ -567,8 +597,10 @@ at its own size.
   size, because what is in the cell is the thing being edited.
 
   It is drawn at whole screen pixels each — a pixel editor that blurs its own
-  edges is no use — which is also why a pinch, or <kbd>Ctrl</kbd> and the wheel,
-  steps the zoom through whole numbers rather than scaling smoothly.
+  edges is no use — which is also why <kbd>Ctrl</kbd> and the wheel step the
+  zoom through whole numbers rather than scaling smoothly. There is no
+  two-finger pinch on the board: the fingers that would make one are the fingers
+  drawing on it. A pinch is the page editor's, and stays that.
 
   What comes out is a base64 PNG written **into the row's cell**, which is the
   point: the picture travels with the table, so a CSV carries the drawings with

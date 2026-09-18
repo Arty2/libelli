@@ -5,6 +5,7 @@
 		boardFor,
 		boardSize,
 		fitBoard,
+		inkBounds,
 		isDefaultBoard,
 		line,
 		pixelAt,
@@ -127,9 +128,10 @@
 	/**
 	 * A remembered canvas back onto the current board. Scaled when the board has
 	 * been resized since, which is what lets undo still reach across a resize:
-	 * the drawing comes back at the size it is being drawn at now.
+	 * the drawing comes back at the size it is being drawn at now. Not the
+	 * clipboard's paste — that is `paste`, below.
 	 */
-	function paste(data: ImageData) {
+	function restore(data: ImageData) {
 		const ctx = context();
 		if (!ctx) return;
 		ctx.imageSmoothingEnabled = false;
@@ -162,7 +164,7 @@
 			// The canvas is cleared by its own resize, so the pixels go back after.
 			await tick();
 		}
-		paste(step.image);
+		restore(step.image);
 		measure();
 	}
 
@@ -206,7 +208,7 @@
 		// one is not an answer to the question the new one asks.
 		manualZoom = null;
 		await tick();
-		if (before) paste(before.image);
+		if (before) restore(before.image);
 		measure();
 	}
 
@@ -219,6 +221,149 @@
 		const fitted = axis === 'w' ? fitBoard(raw, grid.h) : fitBoard(raw, grid.w);
 		setSize(axis === 'w' ? fitted : { w: fitted.h, h: fitted.w });
 	};
+
+	/**
+	 * A quarter turn clockwise. The board turns with the drawing — a landscape
+	 * board rotated onto a portrait one would have to crop or letterbox, and
+	 * neither is what "rotate" means — and the pixel budget does not notice,
+	 * because w x h is the same number either way.
+	 */
+	async function rotate() {
+		const before = remember();
+		if (!before) return;
+		grid = { w: grid.h, h: grid.w };
+		manualZoom = null;
+		await tick();
+		const ctx = context();
+		if (!ctx) return;
+		ctx.imageSmoothingEnabled = false;
+		ctx.clearRect(0, 0, grid.w, grid.h);
+		const from = document.createElement('canvas');
+		from.width = before.image.width;
+		from.height = before.image.height;
+		from.getContext('2d')?.putImageData(before.image, 0, 0);
+		ctx.save();
+		// The turn is about the origin, so the canvas is walked to the top right
+		// corner first — which is where the old top left lands.
+		ctx.translate(grid.w, 0);
+		ctx.rotate(Math.PI / 2);
+		ctx.drawImage(from, 0, 0);
+		ctx.restore();
+		measure();
+	}
+
+	/**
+	 * The board down to what is drawn on it. The same rectangle a tiled area
+	 * repeats — see `tile.ts` — made permanent: useful when the drawing found
+	 * its own size somewhere inside the board it started on.
+	 */
+	async function crop() {
+		const before = remember();
+		const bounds = before && inkBounds(before.image);
+		if (!before || !bounds) {
+			say('Nothing drawn to crop to');
+			return;
+		}
+		const next = fitBoard(Math.max(MIN_SIDE, bounds.w), Math.max(MIN_SIDE, bounds.h));
+		if (next.w === grid.w && next.h === grid.h) {
+			say('Already cropped');
+			return;
+		}
+		grid = next;
+		manualZoom = null;
+		await tick();
+		const ctx = context();
+		if (!ctx) return;
+		ctx.imageSmoothingEnabled = false;
+		ctx.clearRect(0, 0, grid.w, grid.h);
+		const from = document.createElement('canvas');
+		from.width = before.image.width;
+		from.height = before.image.height;
+		from.getContext('2d')?.putImageData(before.image, 0, 0);
+		// One to one, offset so the ink lands at the origin: cropping must not
+		// resample what it keeps.
+		ctx.drawImage(from, -bounds.x, -bounds.y);
+		measure();
+	}
+
+	/**
+	 * The board onto the clipboard as a PNG, and back off it.
+	 *
+	 * A picture pasted in replaces what is on the board and brings its own size
+	 * with it, the same rule as opening the editor on a picture that is already
+	 * in the cell — and like everything else here it is one undo away.
+	 */
+	async function copy() {
+		const data = canvas && (await new Promise<Blob | null>((done) => canvas!.toBlob(done, 'image/png')));
+		if (!data) return;
+		try {
+			await navigator.clipboard.write([new ClipboardItem({ 'image/png': data })]);
+			say('Copied');
+		} catch {
+			// Firefox writes images only from a user gesture it recognises, and a
+			// page without the permission gets nothing. Said out loud rather than
+			// failing quietly, because a copy that did not happen looks exactly
+			// like one that did until you paste.
+			say('This browser would not let go of the clipboard');
+		}
+	}
+
+	async function paste() {
+		let source: string | null = null;
+		try {
+			for (const item of await navigator.clipboard.read()) {
+				const type = item.types.find((t) => t.startsWith('image/'));
+				if (!type) continue;
+				source = URL.createObjectURL(await item.getType(type));
+				break;
+			}
+		} catch {
+			say('This browser would not let go of the clipboard');
+			return;
+		}
+		if (!source) {
+			say('No picture on the clipboard');
+			return;
+		}
+		try {
+			const image = new Image();
+			await new Promise((done, fail) => {
+				image.onload = done;
+				image.onerror = fail;
+				image.src = source as string;
+			});
+			remember();
+			const own = boardFor(image.naturalWidth, image.naturalHeight);
+			if (own.w !== grid.w || own.h !== grid.h) {
+				grid = own;
+				manualZoom = null;
+				await tick();
+			}
+			const ctx = context();
+			if (!ctx) return;
+			ctx.imageSmoothingEnabled = false;
+			ctx.clearRect(0, 0, grid.w, grid.h);
+			if (image.naturalWidth <= grid.w && image.naturalHeight <= grid.h) {
+				ctx.drawImage(image, 0, 0);
+			} else {
+				ctx.drawImage(image, 0, 0, grid.w, grid.h);
+			}
+			measure();
+			say('Pasted');
+		} finally {
+			URL.revokeObjectURL(source);
+		}
+	}
+
+	/** A word in the header for a moment: the clipboard's answers are invisible otherwise. */
+	let said = $state<string | null>(null);
+	let saying: ReturnType<typeof setTimeout> | null = null;
+
+	function say(words: string) {
+		said = words;
+		if (saying) clearTimeout(saying);
+		saying = setTimeout(() => (said = null), 2200);
+	}
 
 	/**
 	 * What goes into the cell: the whole board, always. An area set to repeat
@@ -248,7 +393,7 @@
 	}
 
 	function down(event: PointerEvent) {
-		if (event.button !== 0 || !canvas || pinch.size > 1) return;
+		if (event.button !== 0 || !canvas) return;
 		event.preventDefault();
 		canvas.setPointerCapture(event.pointerId);
 		remember();
@@ -292,18 +437,30 @@
 			event.preventDefault();
 			oncancel();
 		}
-		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+		if (!(event.metaKey || event.ctrlKey)) return;
+		const key = event.key.toLowerCase();
+		if (key === 'z') {
 			event.preventDefault();
 			// The same chord the app itself uses, shifted for the way back.
 			if (event.shiftKey) redo();
 			else undo();
+		}
+		// The board is the document while this is open, so the usual two chords
+		// mean the board rather than the page behind it.
+		if (key === 'c') {
+			event.preventDefault();
+			void copy();
+		}
+		if (key === 'v') {
+			event.preventDefault();
+			void paste();
 		}
 	}
 
 	/**
 	 * How large the board is drawn. Whole screen pixels per pixel of the board,
 	 * so the drawing never lands on half a screen pixel and blurs its own edges
-	 * — the one thing a pixel editor must not do. That is also why a pinch steps
+	 * — the one thing a pixel editor must not do. That is also why the zoom steps
 	 * through whole numbers rather than scaling smoothly.
 	 */
 	let viewport = $state({ w: 1200, h: 800 });
@@ -320,46 +477,14 @@
 		return () => window.removeEventListener('resize', read);
 	});
 
-	/** Two fingers on the surface, tracked by id so a stray third does nothing. */
-	let pinch = new Map<number, { x: number; y: number }>();
-	let pinchStart: { spread: number; zoom: number } | null = null;
-
-	const spread = () => {
-		const [a, b] = [...pinch.values()];
-		return Math.hypot(a.x - b.x, a.y - b.y);
-	};
-
-	function pinchDown(event: PointerEvent) {
-		if (event.pointerType !== 'touch') return;
-		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
-		if (pinch.size !== 2) return;
-		// The first finger has already put a dot down. A pinch is not a stroke,
-		// so that dot goes back where it came from rather than needing an undo.
-		if (drawing) {
-			drawing = false;
-			last = null;
-			undo();
-		}
-		pinchStart = { spread: spread(), zoom };
-	}
-
-	function pinchMove(event: PointerEvent) {
-		if (!pinch.has(event.pointerId)) return;
-		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
-		if (pinch.size !== 2 || !pinchStart || pinchStart.spread === 0) return;
-		event.preventDefault();
-		manualZoom = Math.round(pinchStart.zoom * (spread() / pinchStart.spread));
-	}
-
-	function pinchUp(event: PointerEvent) {
-		pinch.delete(event.pointerId);
-		if (pinch.size < 2) pinchStart = null;
-	}
-
 	/**
-	 * A trackpad pinch and a Ctrl+wheel are the same event. `preventDefault` is
-	 * what stops the browser zooming the whole app around the drawing, and it
-	 * only works on a non-passive listener, so this is added by hand.
+	 * Ctrl and the wheel, which is also how a trackpad reports a zoom. There is
+	 * no two-finger pinch on the board: the fingers that would make it are the
+	 * ones drawing on it, and a stroke that turns into a zoom halfway through is
+	 * worse than no zoom at all. A pinch is the page editor's, behind this.
+	 * `preventDefault` is what stops the browser zooming the whole app around the
+	 * drawing, and it only works on a non-passive listener, so this is added by
+	 * hand rather than as an `onwheel` attribute.
 	 */
 	let overlay = $state<HTMLElement | null>(null);
 	$effect(() => {
@@ -377,20 +502,9 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<!-- The pinch and the wheel are held by the whole surface, not by the board: a
-     pinch that starts with a finger on the dark around it is still a pinch. -->
-<div
-	class="full"
-	role="dialog"
-	aria-modal="true"
-	aria-label="Draw"
-	tabindex="-1"
-	bind:this={overlay}
-	onpointerdown={pinchDown}
-	onpointermove={pinchMove}
-	onpointerup={pinchUp}
-	onpointercancel={pinchUp}
->
+<!-- The wheel is held by the whole surface rather than by the board, so a zoom
+     works wherever the pointer is. -->
+<div class="full" role="dialog" aria-modal="true" aria-label="Draw" bind:this={overlay}>
 	<header>
 		<span class="what">{grid.w} × {grid.h}</span>
 		<!-- Said out loud, because this is going into a cell of the table and a
@@ -400,7 +514,27 @@
 				/ {weight} KB
 			</span>
 		{/if}
+		{#if said}
+			<span class="said" role="status">{said}</span>
+		{/if}
 	</header>
+
+	<!-- The checks show through where nothing has been drawn: an area's fill and
+	     the paper behind it will, and a white square instead of a transparent one
+	     is a thing you only find out about on paper. One check to a pixel, so the
+	     pattern is also the grid. -->
+	<div class="stage">
+		<canvas
+			use:start
+			width={grid.w}
+			height={grid.h}
+			style="width:{grid.w * zoom}px;height:{grid.h * zoom}px;--check:{zoom}px"
+			onpointerdown={down}
+			onpointermove={move}
+			onpointerup={up}
+			onpointercancel={up}
+		></canvas>
+	</div>
 
 	<div class="tools" role="toolbar" aria-label="Drawing tools">
 		<span class="segmented">
@@ -479,29 +613,40 @@
 				onchange={(e) => setSide('h', e.currentTarget.value)}
 			/>
 		</span>
+
+		<!-- The two that redraw the whole board rather than a pixel of it. Both
+		     are one undo away, board and all. -->
+		<span class="segmented">
+			<button onclick={rotate} title="Turn the drawing a quarter turn clockwise" aria-label="Rotate">
+				<Icon name="rotate" size={15} />
+			</button>
+			<button onclick={crop} title="Crop the board to what is drawn on it" aria-label="Crop">
+				<Icon name="crop" size={15} />
+			</button>
+		</span>
+
+		<span class="segmented">
+			<button onclick={copy} title="Copy the drawing as a picture (Ctrl/Cmd+C)" aria-label="Copy">
+				<Icon name="copy" size={15} />
+			</button>
+			<button
+				onclick={paste}
+				title="Paste a picture from the clipboard — it replaces the board and brings its own size (Ctrl/Cmd+V)"
+				aria-label="Paste"
+			>
+				<Icon name="paste" size={15} />
+			</button>
+		</span>
+
+		<!-- Leaving is a drawing tool like the rest of them: a row of its own
+		     under the board put the two most final buttons furthest from the
+		     hand that had been drawing. -->
+		<span class="segmented done">
+			<button onclick={oncancel} title="Leave the cell as it was (Esc)">Cancel</button>
+			<button class="primary" onclick={done} title="Write this drawing into the area">Done</button>
+		</span>
 	</div>
 
-	<!-- The checks show through where nothing has been drawn: an area's fill and
-	     the paper behind it will, and a white square instead of a transparent one
-	     is a thing you only find out about on paper. One check to a pixel, so the
-	     pattern is also the grid. -->
-	<div class="stage">
-		<canvas
-			use:start
-			width={grid.w}
-			height={grid.h}
-			style="width:{grid.w * zoom}px;height:{grid.h * zoom}px;--check:{zoom}px"
-			onpointerdown={down}
-			onpointermove={move}
-			onpointerup={up}
-			onpointercancel={up}
-		></canvas>
-	</div>
-
-	<div class="actions">
-		<button onclick={oncancel}>Cancel</button>
-		<button class="primary" onclick={done}>Done</button>
-	</div>
 </div>
 
 <style>
@@ -629,7 +774,7 @@
 		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 		line-height: 0;
 		max-width: calc(100vw - 32px);
-		max-height: 62vh;
+		max-height: 66vh;
 		overflow: auto;
 		/* A finger on the paper round the board scrolls it; a finger on the board
 		   itself draws. */
@@ -655,23 +800,23 @@
 		touch-action: none;
 	}
 
-	.actions {
-		display: flex;
-		gap: 10px;
+	/* The only two that carry words, so the only two that are not squares. */
+	.tools .done button {
+		width: auto;
+		padding: 0 12px;
 	}
 
-	.actions button {
-		font: 600 14px ui-sans-serif, system-ui, sans-serif;
-		padding: 7px 16px;
-		border-radius: 7px;
-		border: 1px solid #c9cdd4;
-		background: #fff;
-		cursor: pointer;
-	}
-
-	.actions button.primary {
+	.tools .done button.primary {
 		background: #2563eb;
 		border-color: #2563eb;
 		color: #fff;
+	}
+
+	.said {
+		color: #fff;
+		font-size: 13px;
+		background: rgba(255, 255, 255, 0.16);
+		border-radius: 999px;
+		padding: 1px 10px;
 	}
 </style>

@@ -158,8 +158,29 @@
 	 * typed in it is that box, and it still draws its fill, its border and its
 	 * size. Hide When Empty is what turns it back off again.
 	 */
-	type Source = 'field' | 'static';
-	const source = $derived.by<Source>(() => (selected?.slot ? 'field' : 'static'));
+	/**
+	 * What an area holds, as one question.
+	 *
+	 * Four answers rather than two: a column, words typed here, a drawing made
+	 * here, or a picture from somewhere. The last two used to be the *mode* of a
+	 * static area — "Image / Color" — which asked people to know that a drawing
+	 * and a paragraph are the same kind of thing with a different renderer. They
+	 * are not, to anyone placing them.
+	 *
+	 * Nothing about the format changes: this is derived from the slot, the mode
+	 * and which of `static`'s fields holds the value, and written back to the
+	 * same three.
+	 */
+	type Source = 'field' | 'static' | 'bitmap' | 'image';
+	const source = $derived.by<Source>(() => {
+		if (!selected) return 'static';
+		if (selected.slot) return 'field';
+		if (selected.mode !== 'image') return 'static';
+		// Which field is *there*, not which one has something in it: a bitmap
+		// that has not been drawn yet and an address that has not been typed yet
+		// are both empty, and they are not the same area.
+		return selected.static?.url !== undefined ? 'image' : 'bitmap';
+	});
 
 	function setSource(next: Source) {
 		if (!selected) return;
@@ -170,9 +191,30 @@
 			patch({ slot: selected.slot ?? 'field' });
 			return;
 		}
-		// Static keeps whatever was typed before.
-		patch({ slot: null, static: { text: selected.static?.text ?? '' } });
+		if (next === 'static') {
+			// Static keeps whatever was typed before. A mode of image belongs to
+			// the two below now, so words that arrive here arrive as words.
+			patch({
+				slot: null,
+				mode: selected.mode === 'image' ? 'plain' : selected.mode,
+				static: { text: selected.static?.text ?? '' }
+			});
+			return;
+		}
+		// Both picture kinds are `mode: image`; which field holds the value is
+		// what tells them apart, so each keeps only its own and drops the other's.
+		patch({
+			slot: null,
+			mode: 'image',
+			static:
+				next === 'bitmap'
+					? { dataUrl: selected.static?.dataUrl }
+					: { url: selected.static?.url ?? '' }
+		});
 	}
+
+	/** Whether this area is one a drawing can be made in — see the pen, below. */
+	const drawable = $derived(!!selected && selected.mode === 'image' && !selected.static?.url);
 
 	const VERTICALS: Array<{ value: VAlign; icon: string; label: string }> = [
 		{ value: 'top', icon: 'valign-top', label: 'Top' },
@@ -393,6 +435,8 @@
 				>
 					<option value="field">Data Field</option>
 					<option value="static">Static Text</option>
+					<option value="bitmap">Bitmap</option>
+					<option value="image">Image</option>
 				</select>
 			</label>
 			{#if selected.slot}
@@ -414,7 +458,7 @@
 						{/each}
 					</select>
 				</label>
-			{:else if selected.mode === 'image'}
+			{:else if source === 'image'}
 				<label class="field">
 					<span>Source</span>
 					<input
@@ -426,6 +470,19 @@
 						onchange={(e) => setStatic({ url: e.currentTarget.value.trim() || undefined })}
 					/>
 				</label>
+			{:else if source === 'bitmap'}
+				<!-- A drawing has no field to type into: the picture is the value, and
+				     the pen is how you change it. -->
+				<span class="field">
+					<span>Drawing</span>
+					<button
+						disabled={boxFrozen}
+						title="Draw a small picture for this area, saved in the template"
+						onclick={() => ondraw?.(selected.id)}
+					>
+						<Icon name="pen" size={14} /> {selected.static?.dataUrl ? 'Edit…' : 'Draw…'}
+					</button>
+				</span>
 			{:else}
 				<label class="field">
 					<span>Text</span>
@@ -440,15 +497,25 @@
 					/>
 				</label>
 			{/if}
-			<label class="field">
-				<span>Mode</span>
-				<select value={selected.mode} disabled={boxFrozen} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
-					<option value="plain">Plain Text</option>
-					<option value="markdown">Markdown</option>
-					<option value="image">Image / Color</option>
-					<option value="qr">QR Code</option>
-				</select>
-			</label>
+			<!-- Only where there is a choice left to make. A bitmap and an image are
+			     already the mode they are, and saying "Mode: Image / Color" beside
+			     "Content: Bitmap" is the same fact twice. -->
+			{#if source === 'field' || source === 'static'}
+				<label class="field">
+					<span>Mode</span>
+					<select value={selected.mode} disabled={boxFrozen} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
+						<option value="plain">Plain Text</option>
+						<option value="markdown">Markdown</option>
+						<!-- A column can hold an address or a color, so a field still
+						     offers it. Words typed into the template cannot be either:
+						     that is what Bitmap and Image are for. -->
+						{#if source === 'field'}
+							<option value="image">Image / Color</option>
+						{/if}
+						<option value="qr">QR Code</option>
+					</select>
+				</label>
+			{/if}
 			{#if selected.mode === 'image' || selected.mode === 'qr'}
 				<label class="field">
 					<span>Fit</span>
@@ -463,16 +530,17 @@
 					</select>
 				</label>
 			{/if}
-			{#if selected.mode === 'image'}
+			{#if drawable && source === 'field'}
 				<!-- Full screen, never in place: an area on the card is somewhere to
 				     show a drawing and nowhere to make one. A double-click on the
-				     area itself opens the same surface. -->
+				     area itself opens the same surface, as does the pen beside the
+				     page. -->
 				<button
 					disabled={boxFrozen}
 					title="Draw a small picture for this area. It is written into this row's cell, so every row can have its own"
 					onclick={() => ondraw?.(selected.id)}
 				>
-					<Icon name="edit" size={14} /> Draw…
+					<Icon name="pen" size={14} /> Draw…
 				</button>
 			{/if}
 			{#if selected.mode === 'qr'}
