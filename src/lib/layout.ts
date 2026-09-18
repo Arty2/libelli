@@ -1,4 +1,4 @@
-import type { Box } from './types';
+import type { Align, Box, PageNumberPosition, PageSide } from './types';
 
 /**
  * Millimetre geometry: unit conversion and anchor resolution.
@@ -95,6 +95,59 @@ export function resolveLayout({ boxes, measured, hidden }: LayoutInput): LayoutR
 		heights[box.id] = height(box);
 	}
 	return { tops, heights };
+}
+
+// ---- facing pages -----------------------------------------------------------
+
+/**
+ * Which side of the fold a page falls on. Page 1 is a right-hand page, the
+ * convention every bound thing follows, so odd is recto and even is verso.
+ * A page with no number at all — the editor with no rows loaded — is a
+ * right-hand page, which is what a single page is.
+ */
+export const pageSide = (pageNumber: number | null | undefined): PageSide =>
+	pageNumber != null && pageNumber % 2 === 0 ? 'verso' : 'recto';
+
+/** An area follows the fold unless it has said not to. See `Box.mirror`. */
+export const mirrors = (box: Box) => box.mirror !== false;
+
+const FACING_ALIGN: Partial<Record<Align, Align>> = { left: 'right', right: 'left' };
+
+/**
+ * A box as it falls on the facing page: the same distance from the outer trim
+ * edge, with an explicitly chosen left or right alignment swapped to match.
+ *
+ * Only an explicit alignment turns. An area that follows the page default is
+ * body text, and body text reads the same way on both sides of a spread —
+ * flipping it would be a mirror of the words rather than of the layout. An
+ * area deliberately pushed against one edge is the other case, and it hugs the
+ * outer edge on both pages.
+ *
+ * Placement only: rotation and the pivot are left alone, so turning a box does
+ * not also flip it on the facing page. A mirror of the *appearance* would put
+ * a signature or a corner flourish on its head, which is never what a spread
+ * wants. This is derived at render time and never stored — the template holds
+ * one set of millimetres, measured on the right-hand page.
+ */
+export function mirrorBox(box: Box, pageW: number): Box {
+	const x = Math.round((pageW - box.x - box.w) * 1000) / 1000;
+	const align = box.align ? FACING_ALIGN[box.align] : undefined;
+	return align ? { ...box, x, align } : { ...box, x };
+}
+
+/**
+ * An `outer`/`inner` page-number position resolved to the edge it lands on.
+ * Anything already naming a side comes back untouched.
+ */
+export function facingPosition(
+	position: PageNumberPosition,
+	side: PageSide
+): PageNumberPosition {
+	const [vertical, horizontal] = position.split('-');
+	if (horizontal !== 'outer' && horizontal !== 'inner') return position;
+	const outer = side === 'verso' ? 'left' : 'right';
+	const inner = side === 'verso' ? 'right' : 'left';
+	return `${vertical}-${horizontal === 'outer' ? outer : inner}` as PageNumberPosition;
 }
 
 // ---- snapping ---------------------------------------------------------------

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	BOX_MODES,
 	DEFAULT_DEFAULTS,
 	arrangeBoxes,
 	autoMap,
@@ -11,6 +12,8 @@ import {
 	builtinTemplate,
 	newBox,
 	normaliseTemplate,
+	shownAsMedia,
+	takesADrawing,
 	usedSlots
 } from './template';
 
@@ -219,6 +222,7 @@ describe('normaliseTemplate', () => {
 		expect(t.print).toEqual({
 			enabled: false,
 			count: 4,
+			order: 'sequential',
 			sheet: { w: 210, h: 297 },
 			// Nothing said which way round, so nothing is claimed: the fit turns
 			// the sheet when imposition is switched on.
@@ -242,6 +246,8 @@ describe('normaliseTemplate', () => {
 		expect(t.print).toEqual({
 			enabled: true,
 			count: 4,
+			// A template from before the fold order existed prints in reading order.
+			order: 'sequential',
 			sheet: { w: 297, h: 420 },
 			orientation: 'landscape',
 			bleed: { enabled: true, amount: 5, cropMarks: true }
@@ -392,5 +398,78 @@ describe('arrangeBoxes', () => {
 		expect(arrangeBoxes(list, ['a'], 'back')).toBe(list);
 		expect(arrangeBoxes(list, ['a'], 'backward')).toBe(list);
 		expect(arrangeBoxes(list, ['ghost'], 'front')).toBe(list);
+	});
+});
+
+describe('newBox blending', () => {
+	it('keeps a blend mode it recognises', () => {
+		expect(newBox({ blend: 'multiply' }).blend).toBe('multiply');
+		expect(newBox({ blend: 'difference' }).blend).toBe('difference');
+	});
+
+	it('drops anything else, because this is written into a style attribute', () => {
+		expect(newBox({ blend: 'plaid' as never }).blend).toBeUndefined();
+		expect(newBox({ blend: 'multiply;position:fixed' as never }).blend).toBeUndefined();
+		expect(newBox({}).blend).toBeUndefined();
+	});
+});
+
+describe('newBox opacity', () => {
+	it('keeps a value between 0 and 1, to the nearest hundredth', () => {
+		expect(newBox({ opacity: 0.5 }).opacity).toBe(0.5);
+		expect(newBox({ opacity: 0.333 }).opacity).toBe(0.33);
+		expect(newBox({ opacity: 0 }).opacity).toBe(0);
+	});
+
+	it('drops opaque, because that is what an absent field means', () => {
+		expect(newBox({ opacity: 1 }).opacity).toBeUndefined();
+		expect(newBox({ opacity: 4 }).opacity).toBeUndefined();
+		expect(newBox({}).opacity).toBeUndefined();
+	});
+
+	it('refuses anything that is not a number, and never a fragment of CSS', () => {
+		expect(newBox({ opacity: '0.5;position:fixed' as never }).opacity).toBeUndefined();
+		expect(newBox({ opacity: 'half' as never }).opacity).toBeUndefined();
+	});
+
+	it('will not fade past invisible', () => {
+		expect(newBox({ opacity: -3 }).opacity).toBe(0);
+	});
+});
+
+describe('newBox board size', () => {
+	it('keeps a size the pixel budget can pay for', () => {
+		expect(newBox({ pixels: { w: 128, h: 32 } }).pixels).toEqual({ w: 128, h: 32 });
+		expect(newBox({ pixels: { w: 64, h: 64 } }).pixels).toEqual({ w: 64, h: 64 });
+	});
+
+	it('spends a template down to the budget rather than trusting it', () => {
+		expect(newBox({ pixels: { w: 128, h: 128 } }).pixels).toEqual({ w: 128, h: 32 });
+		expect(newBox({ pixels: { w: 9999, h: 9999 } }).pixels).toEqual({ w: 512, h: 8 });
+	});
+
+	it('drops half a size rather than pairing it with a guess', () => {
+		expect(newBox({ pixels: { w: 40 } as never }).pixels).toBeUndefined();
+		expect(newBox({ pixels: 'big' as never }).pixels).toBeUndefined();
+		expect(newBox({}).pixels).toBeUndefined();
+	});
+});
+
+describe('newBox modes', () => {
+	it('keeps every mode the format names', () => {
+		for (const mode of BOX_MODES) expect(newBox({ mode }).mode).toBe(mode);
+	});
+
+	it('reads anything else as words', () => {
+		// A mode decides which renderer a cell reaches, so an unknown one must
+		// not fall through to whichever branch happens to be last.
+		expect(newBox({ mode: 'iframe' as never }).mode).toBe('plain');
+		expect(newBox({ mode: '' as never }).mode).toBe('plain');
+		expect(newBox({}).mode).toBe('plain');
+	});
+
+	it('knows which modes draw and which take a drawing', () => {
+		expect(BOX_MODES.filter(shownAsMedia)).toEqual(['image', 'color', 'bitmap']);
+		expect(BOX_MODES.filter(takesADrawing)).toEqual(['image', 'bitmap']);
 	});
 });

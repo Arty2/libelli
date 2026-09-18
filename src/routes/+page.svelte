@@ -2,6 +2,8 @@
 	import { tick, untrack } from 'svelte';
 	import { base } from '$app/paths';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
+	import BitmapEditor from '$lib/components/BitmapEditor.svelte';
+	import ImagesPanel from '$lib/components/ImagesPanel.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -9,7 +11,14 @@
 	import OptionsBar from '$lib/components/OptionsBar.svelte';
 	import PagePreview from '$lib/components/PagePreview.svelte';
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
-	import { resolveBackground, uploadBackgroundImage } from '$lib/assets';
+	import {
+		localImageName,
+		localImageRef,
+		resolveBackground,
+		resolveLocalImages,
+		storeLocalImage,
+		uploadBackgroundImage
+	} from '$lib/assets';
 	import { download, slugify } from '$lib/download';
 	import { ensureGoogleFont, ensureTemplateFonts, fontReady, uploadLocalFont } from '$lib/fonts';
 	import {
@@ -211,6 +220,16 @@
 	let printBackground = $state<string | null>(null);
 	let missingPrintImage = $state<string | null>(null);
 	let printBackgroundInput = $state<HTMLInputElement | null>(null);
+	/** stored images the rows point at, by name — see `local:` in assets.ts */
+	let images = $state<Record<string, string>>({});
+	let imagesOpen = $state(false);
+	/**
+	 * Bumped when the Images panel changes what is stored. The resolver below is
+	 * keyed on the *names* a template and table use, and deleting a picture or
+	 * choosing a folder changes neither — so there has to be something else for
+	 * it to watch.
+	 */
+	let imagesVersion = $state(0);
 	let status = $state('');
 	/**
 	 * A notice is either something that happened or something that went wrong,
@@ -477,6 +496,138 @@ em { color: #b42318 }`;
 			stale = true;
 		};
 	});
+
+	/**
+	 * Every image the table and the template name, resolved to something an
+	 * `<img>` can use.
+	 *
+	 * Keyed on the names rather than on the rows: typing in a cell that holds
+	 * words must not send the whole run back to IndexedDB, and a name that is
+	 * already resolved keeps the object URL it had. Missing ones are said once,
+	 * as a notice — the areas simply draw nothing, and a card that is blank for
+	 * a reason should say so.
+	 */
+	const imageNames = $derived.by(() => {
+		const names = new Set<string>();
+		for (const row of dataset.rows) {
+			for (const value of Object.values(row)) {
+				const name = localImageName(value);
+				if (name) names.add(name);
+			}
+		}
+		for (const box of template.boxes) {
+			const name = localImageName(box.static?.url);
+			if (name) names.add(name);
+		}
+		return [...names].sort();
+	});
+
+	$effect(() => {
+		const wanted = imageNames;
+		imagesVersion;
+		let stale = false;
+		void (async () => {
+			const { urls, missing } = await resolveLocalImages(wanted);
+			if (stale) return;
+			images = urls;
+			if (missing.length) {
+				notify(
+					`${missing.length === 1 ? 'An image' : `${missing.length} images`} named here ` +
+						`${missing.length === 1 ? 'is' : 'are'} not in this browser: ${missing.join(', ')}. ` +
+						'Drop the file onto the area again to put it back.',
+					'warning'
+				);
+			}
+		})();
+		return () => {
+			stale = true;
+		};
+	});
+
+	/**
+	 * A picture dropped on an area.
+	 *
+	 * The bytes go to this browser's storage and the *name* goes into the table,
+	 * which is the whole point: the image belongs to the row, so every card gets
+	 * its own, and the template stays a small file that can be pasted into a
+	 * message. An area bound to no column has nowhere in the table to put it, so
+	 * it keeps the reference itself and the picture is the same on every card.
+	 */
+	async function handleImageDrop(box: Box, file: File) {
+		const name = await storeLocalImage(file);
+		const reference = localImageRef(name);
+		const column = box.slot ? mapping[box.slot] : undefined;
+		describe('Drop image');
+		// A picture dropped on a text area was meant as a picture: an area left
+		// in text mode would render the reference as the words `local:…`.
+		const next = { ...$state.snapshot(box), mode: 'image' } as Box;
+		if (column && row) {
+			updateBox(next);
+			dataset = {
+				...dataset,
+				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: reference } : r))
+			};
+			notify(`${name} is in ${column} for this row, and stays in this browser.`);
+		} else {
+			updateBox({ ...next, static: { ...box.static, url: reference } });
+			notify(`${name} is on this area, the same on every card, and stays in this browser.`);
+		}
+	}
+
+	/** the area whose picture is being drawn, if any — full screen, never in place */
+	let drawing = $state<string | null>(null);
+	const drawingBox = $derived(drawing ? (template.boxes.find((b) => b.id === drawing) ?? null) : null);
+
+	/**
+	 * What the drawing surface opens on.
+	 *
+	 * A data URL, or one of this browser's own images, can be drawn on top of.
+	 * An address from somewhere else cannot: drawing a cross-origin picture onto
+	 * a canvas taints it, and a tainted canvas refuses to hand back what was
+	 * drawn — so the drawing could never be saved. That one case opens blank
+	 * rather than opening on something it would lose.
+	 */
+	const drawingValue = $derived.by(() => {
+		const box = drawingBox;
+		if (!box) return '';
+		const column = box.slot ? mapping[box.slot] : undefined;
+		const written = column ? (row?.[column] ?? '') : (box.static?.dataUrl ?? box.static?.url ?? '');
+		const value = String(written).trim();
+		if (value.startsWith('data:image/')) return value;
+		const name = localImageName(value);
+		return name ? (images[name] ?? '') : '';
+	});
+
+	/**
+	 * A drawing goes where the words of that area go: into the row's cell when it
+	 * is bound to a column, so every row can have its own picture and it travels
+	 * with the table, and onto the area itself when it is not. One undo entry
+	 * however many strokes it took — the editor's own undo goes no further than
+	 * the editor.
+	 */
+	function saveDrawing(dataUrl: string, pixels: { w: number; h: number } | undefined) {
+		const box = drawingBox;
+		drawing = null;
+		if (!box) return;
+		describe('Draw');
+		const column = box.slot ? mapping[box.slot] : undefined;
+		const current = $state.snapshot(box) as Box;
+		if (column && row) {
+			dataset = {
+				...dataset,
+				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: dataUrl } : r))
+			};
+			// The drawing goes in the cell, but the board is remembered on the
+			// area: it is where the next row's drawing starts. A row that already
+			// holds a picture of another size still opens at that size — what is
+			// in the cell wins over what the area remembers.
+			if (JSON.stringify(pixels ?? null) !== JSON.stringify(box.pixels ?? null)) {
+				updateBox({ ...current, pixels });
+			}
+		} else {
+			updateBox({ ...current, pixels, static: { ...box.static, dataUrl } });
+		}
+	}
 
 	// ---- undo/redo ----------------------------------------------------------
 
@@ -1473,7 +1624,17 @@ em { color: #b42318 }`;
 
 </script>
 
-<svelte:window onkeydown={onWindowKeydown} onafterprint={onAfterPrint} onresize={() => (barFloor = 0)} />
+<!-- A file dropped anywhere but on an area is swallowed here. The browser's own
+     answer to a dropped image is to navigate to it, which leaves the design
+     behind — and the one place a drop means something is the card, which takes
+     it before this ever sees it. -->
+<svelte:window
+	onkeydown={onWindowKeydown}
+	onafterprint={onAfterPrint}
+	onresize={() => (barFloor = 0)}
+	ondragover={(e) => e.preventDefault()}
+	ondrop={(e) => e.preventDefault()}
+/>
 <svelte:head>
 	<title>libelli</title>
 </svelte:head>
@@ -1507,6 +1668,16 @@ em { color: #b42318 }`;
 				: 'Show or hide the page setup'}
 		>
 			<Icon name="document-configuration" size={15} /> <span class="label">Page Setup</span>
+		</button>
+		<!-- Every stored picture, beside the two bars rather than inside one of
+		     them: the pictures are the browser's, not the page's — a row's own
+		     photograph is in there too — and Page Setup was a place you had to
+		     already know to look. -->
+		<button
+			onclick={() => (imagesOpen = true)}
+			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
+		>
+			<Icon name="image" size={15} /> <span class="label">Images</span>
 		</button>
 		<button
 			class="data"
@@ -1584,6 +1755,7 @@ em { color: #b42318 }`;
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={() => (cssOpen = true)}
+						ondraw={(id) => (drawing = id)}
 					/>
 				{:else}
 					<OptionsBar
@@ -1611,6 +1783,7 @@ em { color: #b42318 }`;
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={() => (cssOpen = true)}
+						ondraw={(id) => (drawing = id)}
 					/>
 				{/if}
 			</div>
@@ -1690,8 +1863,10 @@ em { color: #b42318 }`;
 			onactivate={(i) => (activeRow = i)}
 			onlightbox={() => (lightboxOpen = true)}
 			{background}
+			{images}
 			onselect={selectBox}
 			onchange={updateBox}
+			onimagedrop={(box, file) => void handleImageDrop(box, file)}
 			onaction={describe}
 			onbounds={(show) => (ui = { ...ui, showBounds: show })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
@@ -1719,9 +1894,17 @@ em { color: #b42318 }`;
 			onstoppicking={() => (picking = false)}
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
 			onedit={(id) => (editingId = id)}
+			ondraw={(id) => (drawing = id)}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
-			modalOpen={helpOpen || cssOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null || magic !== null}
+			modalOpen={helpOpen ||
+				cssOpen ||
+				previewOpen ||
+				lightboxOpen ||
+				boxMenu !== null ||
+				editingId !== null ||
+				drawing !== null ||
+				magic !== null}
 			{selectedBoxes}
 			onalign={alignSelection}
 			onarrange={arrange}
@@ -1941,9 +2124,10 @@ em { color: #b42318 }`;
 			fill it.
 		</p>
 		<p>
-			<strong>Mode</strong> is Plain Text, Markdown, Image / Color or QR Code. Image / Color shows whatever its
-			source turns out to be — a picture if that is an address, a fill if it is a color, in hex, <code>rgb()</code>,
-			<code>hsl()</code> or by name — so a column of brand colors and a column of logos need no different setting up.
+			<strong>Content</strong> is where an area gets what it shows: a Data Field, Static Text, a Bitmap drawn
+			here, or an Image. A field then takes a <strong>Mode</strong> — Plain Text, Markdown, Bitmap, Image, Color
+			or QR Code. Color fills the area with what the cell says and ignores anything that is not one, in hex,
+			<code>rgb()</code>, <code>hsl()</code> or by name; Image shows a picture, and still accepts a color.
 		</p>
 		<p>
 			<code>&#123;&#123;date&#125;&#125;</code> anywhere in an area or a cell prints today's date, and
@@ -2143,6 +2327,7 @@ em { color: #b42318 }`;
 		{mapping}
 		{activeRow}
 		{background}
+		{images}
 		{printBackground}
 		excluded={excludedRows}
 		{excludedSheets}
@@ -2162,12 +2347,39 @@ em { color: #b42318 }`;
 	/>
 {/if}
 
+{#if imagesOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (imagesOpen = false)}></div>
+	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="images-title">
+		<h2 id="images-title">Images</h2>
+		<ImagesPanel
+			used={new Set(imageNames)}
+			onnotice={notify}
+			onchanged={() => (imagesVersion += 1)}
+		/>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button class="primary" onclick={() => (imagesOpen = false)}>Done</button>
+		</div>
+	</div>
+{/if}
+
+{#if drawingBox}
+	<BitmapEditor
+		box={drawingBox}
+		value={drawingValue}
+		ink={drawingBox.color ?? template.defaults.color}
+		onsave={saveDrawing}
+		oncancel={() => (drawing = null)}
+	/>
+{/if}
+
 {#if lightboxOpen && dataset.rows.length}
 	<Lightbox
 		{template}
 		{dataset}
 		{mapping}
 		{background}
+		{images}
 		index={activeRow}
 		onactivate={(i) => (activeRow = i)}
 		onclose={() => (lightboxOpen = false)}
@@ -2180,6 +2392,7 @@ em { color: #b42318 }`;
 		{dataset}
 		{mapping}
 		{background}
+		{images}
 		{printBackground}
 		excluded={excludedRows}
 		{excludedSheets}
@@ -2200,7 +2413,11 @@ em { color: #b42318 }`;
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		padding: 8px 12px;
+		/* 16px at the sides, which is where the editor's own buttons start: the
+		   undo column and the Area column are both inset that far from the
+		   stage's edge, and the row above them should not be on a different
+		   grid from the row below. */
+		padding: 8px 16px;
 		background: #fff;
 		border-bottom: 1px solid #ddd;
 		font-size: 12px;
@@ -2695,12 +2912,28 @@ em { color: #b42318 }`;
 
 		.toolbar {
 			gap: 6px;
-			padding: 6px 8px;
+			/* Tighter top and bottom on a phone; the sides hold their 16, because
+			   that is the line the editor's buttons are on. */
+			padding: 6px 16px;
 			position: relative;
 		}
 
 		.toolbar .label {
 			display: none;
+		}
+
+		/* With the words gone, a button drawn to fit them is a wide box round a
+		   15px glyph. Square, at the height the row already has — icon, 6px of
+		   padding either side, 1px of border — so the icons sit on a grid rather
+		   than at the middle of four different widths. `:has(.label)` is the
+		   condition itself: exactly the buttons that lost their words. Install
+		   keeps its own, because an offer nobody recognises needs the word. */
+		.toolbar button:has(.label) {
+			width: 29px;
+			height: 29px;
+			padding: 0;
+			display: grid;
+			place-items: center;
 		}
 
 		/* Phone order: what the app is on the left — Help first, because it is the

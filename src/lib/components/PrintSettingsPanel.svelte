@@ -1,12 +1,13 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import { safeImageUrl } from '$lib/assets';
-	import { IMPOSITION_COUNTS, resolveImposition } from '$lib/imposition';
+	import { IMPOSITION_COUNTS, foldsIntoAZine, resolveImposition } from '$lib/imposition';
 	import { PAGE_PRESETS, presetFor, presetSize } from '$lib/template';
 	import type {
 		BackgroundFit,
 		PageBackgroundImage,
 		PrintSettings,
+		SheetOrder,
 		SheetOrientation,
 		Template
 	} from '$lib/types';
@@ -110,6 +111,34 @@
 	const fit = $derived(
 		resolveImposition(template.page.w + bleed * 2, template.page.h + bleed * 2, template.print)
 	);
+
+	/**
+	 * What the chosen fold asks of whoever is at the printer — and, where the
+	 * count has no fold, that it has none. A zine is a physical object made
+	 * after the print dialog closes, and nothing else in the app is in a
+	 * position to say how.
+	 */
+	const zineHint = $derived.by(() => {
+		if (template.print.order !== 'zine') return undefined;
+		if (!foldsIntoAZine(template.print.count)) {
+			return {
+				label: 'Folds at 2-up or 8-up',
+				title:
+					'Only two up and eight up fold into a zine: two is a stapled booklet, eight the sheet that is folded and cut into a mini zine. Any other count prints in reading order.'
+			};
+		}
+		return template.print.count === 2
+			? {
+					label: 'Fold, nest, staple',
+					title:
+						'Each sheet comes out as its front and then its back: print double-sided, flipped on the long edge. Fold the stack in half, one sheet inside another, and staple the spine.'
+				}
+			: {
+					label: 'Fold three times, cut the middle',
+					title:
+						'Eight pages on one side of one sheet. Fold it in half three times, unfold, cut along the middle fold between the two centre panels, then fold it back and collapse it into a zine.'
+				};
+	});
 
 	function setBackground(image: PageBackgroundImage | undefined) {
 		patchPrint({ background: image });
@@ -244,6 +273,21 @@
 		</select>
 	</label>
 	{#if template.print.enabled}
+		<label class="field">
+			<span>Order</span>
+			<select
+				value={template.print.order}
+				title="Sequential fills each sheet in reading order, to cut apart. Zinemaker lays the pages out so that folding the sheet gives a booklet that reads 1, 2, 3"
+				disabled={pageFrozen}
+				onchange={(e) => patchPrint({ order: e.currentTarget.value as SheetOrder })}
+			>
+				<option value="sequential">Sequential</option>
+				<option value="zine">Zinemaker</option>
+			</select>
+		</label>
+		{#if zineHint}
+			<span class="field-label" title={zineHint.title}>{zineHint.label}</span>
+		{/if}
 		<label class="field">
 			<span>Sheet</span>
 			<select

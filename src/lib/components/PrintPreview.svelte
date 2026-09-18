@@ -9,7 +9,7 @@
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
 	import { mmToPx } from '$lib/layout';
-	import { resolveImposition } from '$lib/imposition';
+	import { planSheets, resolveImposition } from '$lib/imposition';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
 	interface Props {
@@ -18,6 +18,8 @@
 		mapping: Mapping;
 		activeRow: number;
 		background: string | null;
+		/** stored images by name, for the areas whose cells point at one */
+		images?: Record<string, string>;
 		/** the sheet's own background, resolved the same way as the card's */
 		printBackground: string | null;
 		/** row indices left out of the print; empty means every page goes */
@@ -40,6 +42,7 @@
 		mapping,
 		activeRow,
 		background,
+		images = {},
 		printBackground,
 		excluded,
 		excludedSheets,
@@ -180,13 +183,8 @@
 	const includedPages = $derived(
 		dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index))
 	);
-	const perSheet = $derived(imposed ? imposed.grid.rows * imposed.grid.cols : 1);
 	const sheetGroups = $derived(
-		imposed
-			? Array.from({ length: Math.ceil(includedPages.length / perSheet) }, (_, i) =>
-					includedPages.slice(i * perSheet, i * perSheet + perSheet)
-				)
-			: []
+		imposed ? planSheets(includedPages, imposed.grid, template.print.order) : []
 	);
 
 	const chosenSheets = $derived(sheetGroups.filter((_, i) => !excludedSheets.has(i)).length);
@@ -313,7 +311,15 @@
 					aria-label="Open card {i + 1} full screen"
 				>
 					<span class="scaler" style="transform:scale({thumbScale})">
-						<Card {template} {row} {mapping} pageNumber={i + 1} pageCount={dataset.rows.length} {background} />
+						<Card
+							{template}
+							{row}
+							{mapping}
+							pageNumber={i + 1}
+							pageCount={dataset.rows.length}
+							{background}
+							{images}
+						/>
 					</span>
 				</button>
 				<!-- As wide as the page above it, and set like the count in the
@@ -357,7 +363,7 @@
 				bind:clientWidth={sheetGridWidth}
 				style="--thumb:{sheetThumbWidth}px"
 			>
-				{#each sheetGroups as sheetPages, i (i)}
+				{#each sheetGroups as cells, i (i)}
 					{@const included = !excludedSheets.has(i)}
 					<figure class:dropped={!included}>
 						<button
@@ -371,8 +377,9 @@
 									{template}
 									{mapping}
 									{background}
+									{images}
 									{printBackground}
-									pages={sheetPages}
+									{cells}
 									pageCount={dataset.rows.length}
 									previewScale={sheetThumbScale}
 								/>
@@ -422,6 +429,7 @@
 			{dataset}
 			{mapping}
 			{background}
+			{images}
 			index={fullscreen}
 			onactivate={(i) => {
 				fullscreen = i;
@@ -436,6 +444,7 @@
 			{template}
 			{mapping}
 			{background}
+			{images}
 			{printBackground}
 			sheets={sheetGroups}
 			index={Math.min(sheetFullscreen, sheetGroups.length - 1)}

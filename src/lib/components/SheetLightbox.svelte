@@ -3,6 +3,7 @@
 	import PrintSheet from './PrintSheet.svelte';
 	import { swipe } from '$lib/gestures';
 	import { mmToPx } from '$lib/layout';
+	import type { PlacedPage } from '$lib/imposition';
 	import type { Mapping, Row, Template } from '$lib/types';
 
 	/**
@@ -22,10 +23,12 @@
 		template: Template;
 		mapping: Mapping;
 		background: string | null;
+		/** stored images by name, for the areas whose cells point at one */
+		images?: Record<string, string>;
 		/** the sheet's own background, resolved the same way as the card's */
 		printBackground: string | null;
-		/** every sheet of the run, each carrying the rows that land on it */
-		sheets: { row: Row; index: number }[][];
+		/** every sheet of the run, each carrying the cells that land on it */
+		sheets: PlacedPage<{ row: Row; index: number }>[][];
 		/** which sheet is shown, and what the arrows step through */
 		index: number;
 		/** total rows in the dataset, for "n / total" numbering on each card */
@@ -40,6 +43,7 @@
 		template,
 		mapping,
 		background,
+		images = {},
 		printBackground,
 		sheets,
 		index,
@@ -112,8 +116,9 @@
 				{template}
 				{mapping}
 				{background}
+				{images}
 				{printBackground}
-				pages={sheets[index] ?? []}
+				cells={sheets[index] ?? []}
 				{pageCount}
 				previewScale={scale}
 			/>

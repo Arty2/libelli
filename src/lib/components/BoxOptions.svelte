@@ -5,6 +5,7 @@
 	import { cssIdent } from '$lib/css';
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
 	import {
+		BLEND_MODES,
 		BORDER_STYLES,
 		DEFAULT_QR,
 		PAGE_NUMBER_POSITIONS,
@@ -14,11 +15,14 @@
 		normaliseSides,
 		presetFor,
 		presetSize,
-		sidesOf
+		shownAsMedia,
+		sidesOf,
+		takesADrawing
 	} from '$lib/template';
 	import type {
 		Align,
 		BackgroundFit,
+		BlendMode,
 		BorderStyle,
 		Box,
 		Centre,
@@ -50,6 +54,8 @@
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
+		/** open the drawing surface for the selected area */
+		ondraw?: (id: string) => void;
 	}
 
 	let {
@@ -68,7 +74,8 @@
 		onnotice,
 		onimporttemplate,
 		onexporttemplate,
-		oneditcss
+		oneditcss,
+		ondraw
 	}: Props = $props();
 
 	let fontInput = $state<HTMLInputElement | null>(null);
@@ -107,6 +114,23 @@
 	const padSides = $derived(sidesOf(selected?.padding));
 	const showPadSides = $derived(perSidePadding || typeof selected?.padding === 'object');
 
+	/** Title case, and Carbon's own words where CSS's are hyphenated. */
+	const BLEND_LABELS: Record<BlendMode, string> = {
+		multiply: 'Multiply',
+		screen: 'Screen',
+		overlay: 'Overlay',
+		darken: 'Darken',
+		lighten: 'Lighten',
+		difference: 'Difference',
+		exclusion: 'Exclusion',
+		'hard-light': 'Hard Light',
+		'soft-light': 'Soft Light',
+		hue: 'Hue',
+		saturation: 'Saturation',
+		color: 'Color',
+		luminosity: 'Luminosity'
+	};
+
 	const STYLE_LABELS: Record<BorderStyle, string> = {
 		solid: 'Solid',
 		dashed: 'Dashed',
@@ -134,8 +158,33 @@
 	 * typed in it is that box, and it still draws its fill, its border and its
 	 * size. Hide When Empty is what turns it back off again.
 	 */
-	type Source = 'field' | 'static';
-	const source = $derived.by<Source>(() => (selected?.slot ? 'field' : 'static'));
+	/**
+	 * What an area holds, as one question.
+	 *
+	 * Four answers rather than two: a column, words typed here, a drawing made
+	 * here, or a picture from somewhere. The last two used to be the *mode* of a
+	 * static area — "Image / Color" — which asked people to know that a drawing
+	 * and a paragraph are the same kind of thing with a different renderer. They
+	 * are not, to anyone placing them.
+	 *
+	 * Nothing about the format changes: this is derived from the slot, the mode
+	 * and which of `static`'s fields holds the value, and written back to the
+	 * same three.
+	 */
+	type Source = 'field' | 'static' | 'bitmap' | 'image';
+	const source = $derived.by<Source>(() => {
+		if (!selected) return 'static';
+		if (selected.slot) return 'field';
+		if (selected.mode === 'bitmap') return 'bitmap';
+		if (!shownAsMedia(selected.mode)) return 'static';
+		// A picture area written before `bitmap` was a mode of its own: what is
+		// in it says which it was. Which field is *there*, not which one has
+		// something in it — a bitmap nobody has drawn yet and an address nobody
+		// has typed yet are both empty, and they are not the same area.
+		return selected.static?.dataUrl !== undefined && selected.static?.url === undefined
+			? 'bitmap'
+			: 'image';
+	});
 
 	function setSource(next: Source) {
 		if (!selected) return;
@@ -146,9 +195,30 @@
 			patch({ slot: selected.slot ?? 'field' });
 			return;
 		}
-		// Static keeps whatever was typed before.
-		patch({ slot: null, static: { text: selected.static?.text ?? '' } });
+		if (next === 'static') {
+			// Static keeps whatever was typed before. The picture modes belong to
+			// the two below now, so words that arrive here arrive as words.
+			patch({
+				slot: null,
+				mode: shownAsMedia(selected.mode) ? 'plain' : selected.mode,
+				static: { text: selected.static?.text ?? '' }
+			});
+			return;
+		}
+		// Each picture kind keeps only its own field and drops the other's, so
+		// what is in the box and what the bar says about it cannot drift apart.
+		patch({
+			slot: null,
+			mode: next === 'bitmap' ? 'bitmap' : 'image',
+			static:
+				next === 'bitmap'
+					? { dataUrl: selected.static?.dataUrl }
+					: { url: selected.static?.url ?? '' }
+		});
 	}
+
+	/** Whether this area is one a drawing can be made in — see the pen, below. */
+	const drawable = $derived(!!selected && takesADrawing(selected.mode) && !selected.static?.url);
 
 	const VERTICALS: Array<{ value: VAlign; icon: string; label: string }> = [
 		{ value: 'top', icon: 'valign-top', label: 'Top' },
@@ -369,6 +439,8 @@
 				>
 					<option value="field">Data Field</option>
 					<option value="static">Static Text</option>
+					<option value="bitmap">Bitmap</option>
+					<option value="image">Image</option>
 				</select>
 			</label>
 			{#if selected.slot}
@@ -390,7 +462,7 @@
 						{/each}
 					</select>
 				</label>
-			{:else if selected.mode === 'image'}
+			{:else if source === 'image'}
 				<label class="field">
 					<span>Source</span>
 					<input
@@ -402,6 +474,19 @@
 						onchange={(e) => setStatic({ url: e.currentTarget.value.trim() || undefined })}
 					/>
 				</label>
+			{:else if source === 'bitmap'}
+				<!-- A drawing has no field to type into: the picture is the value, and
+				     the pen is how you change it. -->
+				<span class="field">
+					<span>Drawing</span>
+					<button
+						disabled={boxFrozen}
+						title="Draw a small picture for this area, saved in the template"
+						onclick={() => ondraw?.(selected.id)}
+					>
+						<Icon name="edit" size={14} /> {selected.static?.dataUrl ? 'Edit…' : 'Draw…'}
+					</button>
+				</span>
 			{:else}
 				<label class="field">
 					<span>Text</span>
@@ -416,28 +501,54 @@
 					/>
 				</label>
 			{/if}
-			<label class="field">
-				<span>Mode</span>
-				<select value={selected.mode} disabled={boxFrozen} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
-					<option value="plain">Plain Text</option>
-					<option value="markdown">Markdown</option>
-					<option value="image">Image / Color</option>
-					<option value="qr">QR Code</option>
-				</select>
-			</label>
-			{#if selected.mode === 'image' || selected.mode === 'qr'}
+			<!-- Only where there is a choice left to make. A bitmap and an image are
+			     already the mode they are, and saying "Mode: Image / Color" beside
+			     "Content: Bitmap" is the same fact twice. -->
+			{#if source === 'field' || source === 'static'}
+				<label class="field">
+					<span>Mode</span>
+					<select value={selected.mode} disabled={boxFrozen} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
+						<option value="plain">Plain Text</option>
+						<option value="markdown">Markdown</option>
+						<!-- A column can hold a drawing, an address or a color, so a
+						     field offers all three. Words typed into the template
+						     cannot be any of them: that is what the Content types
+						     Bitmap and Image are for. -->
+						{#if source === 'field'}
+							<option value="bitmap">Bitmap</option>
+							<option value="image">Image</option>
+							<option value="color">Color</option>
+						{/if}
+						<option value="qr">QR Code</option>
+					</select>
+				</label>
+			{/if}
+			{#if takesADrawing(selected.mode) || selected.mode === 'qr'}
 				<label class="field">
 					<span>Fit</span>
 					<select value={selected.fit ?? 'contain'} disabled={boxFrozen} onchange={(e) => patch({ fit: e.currentTarget.value as Box['fit'] })}>
 						<option value="contain">Fit</option>
 						<option value="cover">Cover</option>
 						<option value="fill">Stretch</option>
-						<!-- Images only. A tiled QR code is not a QR code. -->
-						{#if selected.mode === 'image'}
+						<!-- Pictures only. A tiled QR code is not a QR code. -->
+						{#if takesADrawing(selected.mode)}
 							<option value="repeat">Tile</option>
 						{/if}
 					</select>
 				</label>
+			{/if}
+			{#if drawable && source === 'field'}
+				<!-- Full screen, never in place: an area on the card is somewhere to
+				     show a drawing and nowhere to make one. A double-click on the
+				     area itself opens the same surface, as does the pen beside the
+				     page. -->
+				<button
+					disabled={boxFrozen}
+					title="Draw a small picture for this area. It is written into this row's cell, so every row can have its own"
+					onclick={() => ondraw?.(selected.id)}
+				>
+					<Icon name="edit" size={14} /> Draw…
+				</button>
 			{/if}
 			{#if selected.mode === 'qr'}
 				<label class="field">
@@ -644,6 +755,41 @@
 					/>
 				</label>
 			{/if}
+			<label class="field">
+				<span>Blend</span>
+				<select
+					value={selected.blend ?? ''}
+					title="How this area meets what is under it — the paper, its own background image, and any area it overlaps. Multiply is ink on paper. Prints only with background graphics on, like the paper colour"
+					disabled={boxFrozen}
+					onchange={(e) => patch({ blend: (e.currentTarget.value || undefined) as Box['blend'] })}
+				>
+					<option value="">Normal</option>
+					{#each BLEND_MODES as mode (mode)}
+						<option value={mode}>{BLEND_LABELS[mode]}</option>
+					{/each}
+				</select>
+			</label>
+
+			<label class="field">
+				<span>Opacity</span>
+				<input
+					class="n-3"
+					type="number"
+					step="5"
+					min="0"
+					max="100"
+					title="How much of what is under this area shows through it. Fades the fill, the border and the content together"
+					value={Math.round((selected.opacity ?? 1) * 100)}
+					disabled={boxFrozen}
+					onchange={(e) => {
+						const percent = Math.max(0, Math.min(100, numeric(e, 100)));
+						// Opaque is the absence of the field, not a stored 1 — the same
+						// rule every other "inherit or nothing" setting in here follows.
+						patch({ opacity: percent >= 100 ? undefined : percent / 100 });
+					}}
+				/>
+				<span class="unit">%</span>
+			</label>
 
 			<span class="field">
 				<span>Padding</span>
@@ -768,6 +914,16 @@
 						onchange={(e) => patch({ borderColor: e.currentTarget.value })}
 					/>
 				</label>
+				<button
+					class="square"
+					aria-pressed={!!selected.borderHand}
+					aria-label="Hand-drawn border"
+					title="Draw the border by hand: the same width, style and radius, wobbling. The line is the same on every card — it is drawn from this area's own name, not from chance"
+					disabled={boxFrozen}
+					onclick={() => patch({ borderHand: selected?.borderHand ? undefined : true })}
+				>
+					<Icon name="edit" size={14} />
+				</button>
 			{/if}
 
 			<label class="field">
@@ -859,6 +1015,20 @@
 				/>
 				Hide When Empty
 			</label>
+			<!-- Only where there is a fold to mirror across: on a run of identical
+			     pages this control would have nothing to do. -->
+			{#if template.facing}
+				<label class="check">
+					<input
+						type="checkbox"
+						checked={selected.mirror !== false}
+						title="Mirror this area onto left-hand pages, so it keeps its distance from the outer edge. Off pins it to the same millimetres on every page"
+						disabled={boxFrozen}
+						onchange={(e) => patch({ mirror: e.currentTarget.checked ? undefined : false })}
+					/>
+					Mirror
+				</label>
+			{/if}
 		</span>
 
 		<!-- How the box is turned, and the point it turns about. The pivot appears

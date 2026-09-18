@@ -3,7 +3,7 @@
 	import Icon from './Icon.svelte';
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
-	import type { Arrange } from '$lib/template';
+	import { takesADrawing, type Arrange } from '$lib/template';
 	import { hold, swipe } from '$lib/gestures';
 	import { GRID_MAJOR, GRID_MINOR, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
@@ -36,8 +36,12 @@
 		onlightbox: () => void;
 		/** the template's background image, resolved by the app */
 		background: string | null;
+		/** stored images by name, for the areas whose cells point at one */
+		images?: Record<string, string>;
 		onselect: (id: string | null, additive?: boolean) => void;
 		onchange: (box: Box) => void;
+		/** an image file dropped on an area, handed up for the app to store */
+		onimagedrop?: (box: Box, file: File) => void;
 		/** forwarded to the card: what a drag is about to do, for the undo label */
 		onaction?: (what: string) => void;
 		onbounds: (show: boolean) => void;
@@ -68,6 +72,8 @@
 		ondelete: () => void;
 		/** start or stop typing into an area */
 		onedit?: (id: string | null) => void;
+		/** open the drawing surface for an area */
+		ondraw?: (id: string) => void;
 		/** words typed into the card, forwarded to whoever owns them */
 		ontext?: (box: Box, value: string) => void;
 		/** bring every area that has wandered off the sheet back onto it */
@@ -99,8 +105,10 @@
 		onactivate,
 		onlightbox,
 		background,
+		images = {},
 		onselect,
 		onchange,
+		onimagedrop,
 		onaction,
 		onbounds,
 		ongrid,
@@ -124,6 +132,7 @@
 		onduplicate,
 		ondelete,
 		onedit,
+		ondraw,
 		ontext,
 		onrescue,
 		onstoppicking,
@@ -164,6 +173,19 @@
 	 * rather than as a locked area. The lock badge on the area, and the Locked
 	 * band over a locked page, are what say why.
 	 */
+	/**
+	 * The area a drawing could be made in, when exactly one is selected and it is
+	 * one that holds a picture of its own. A pen beside the page rather than only
+	 * in the bar: the bar scrolls sideways on a phone, and drawing is the one
+	 * thing you do *to* an area rather than *about* it.
+	 */
+	const drawTarget = $derived.by(() => {
+		if (template.locked || selectedBoxes.length !== 1) return null;
+		const box = selectedBoxes[0];
+		if (box.locked || !takesADrawing(box.mode) || box.static?.url) return null;
+		return box.id;
+	});
+
 	const padUsable = $derived(
 		selectedBoxes.length > 0 && !template.locked && !selectedBoxes.every((b) => b.locked)
 	);
@@ -177,6 +199,27 @@
 	const verticalTied = $derived(
 		selectedBoxes.length > 0 && selectedBoxes.every((b) => !!b.anchor)
 	);
+
+	/**
+	 * What a tied key does instead of nudging: hold it and the selection walks up
+	 * the tie, to the area this one is following.
+	 *
+	 * The key is the only place the tie is *in the way*, so it is where the way
+	 * out belongs — the Gap that the vertical keys cannot change lives on the
+	 * other area, and finding that area by eye on a page of a dozen is the whole
+	 * difficulty. One target only: with several tied areas selected they can be
+	 * following different things, and picking one of them would be a guess.
+	 */
+	const tieTarget = $derived.by(() => {
+		if (!verticalTied || selectedBoxes.length !== 1) return null;
+		const to = selectedBoxes[0].anchor?.to;
+		return (to && template.boxes.find((b) => b.id === to)) || null;
+	});
+
+	function followTie() {
+		if (!tieTarget) return;
+		onselect(tieTarget.id, false);
+	}
 
 	/** Paint order is array order, so "front" is last in the list, not a z-index. */
 	const ARRANGEMENTS: Array<{ value: Arrange; icon: string; label: string }> = [
@@ -484,7 +527,16 @@
 	 */
 	let repeat: ReturnType<typeof setTimeout> | null = null;
 
+	/**
+	 * Which key is being held down, so the pad can lean that way. The whole pad
+	 * tilts rather than the one key sinking: five keys that each go down on their
+	 * own read as five buttons, and this is one thing you push at a corner — the
+	 * way a real pad rocks on the pivot under its middle.
+	 */
+	let pushed = $state<'up' | 'down' | 'left' | 'right' | 'centre' | null>(null);
+
 	function startNudge(dx: number, dy: number) {
+		pushed = dy < 0 ? 'up' : dy > 0 ? 'down' : dx < 0 ? 'left' : 'right';
 		onnudge(dx, dy);
 		repeat = setTimeout(() => {
 			repeat = setInterval(() => onnudge(dx, dy), 90);
@@ -492,6 +544,7 @@
 	}
 
 	function stopNudge() {
+		pushed = null;
 		if (repeat === null) return;
 		clearTimeout(repeat);
 		clearInterval(repeat);
@@ -649,6 +702,7 @@
 				{scale}
 				{pageNumber}
 				{background}
+				{images}
 				interactive={true}
 				pageCount={rowCount}
 				{editingId}
@@ -656,9 +710,11 @@
 				{selectedIds}
 				{onselect}
 				{onchange}
+				{onimagedrop}
 				{onaction}
 				{onmenu}
 				{onedit}
+				{ondraw}
 				{ontext}
 			/>
 		</div>
@@ -817,6 +873,10 @@
 	     three that come and go belong under it rather than pushing it sideways
 	     every time one of them appears.
 
+	     Area wears `shapes` and the automagic layout wears `blog`: one adds a
+	     shape to the page, the other writes a page out of the columns, and a
+	     glyph of stacked rules is what that second one looks like.
+
 	     16px, not 14: these are Carbon's 32-grid glyphs, and `blog` in
 	     particular carries a bar, two rules and a square — below 16 the three
 	     merge into a smudge. The column moves together, because one button
@@ -829,8 +889,19 @@
 			disabled={!!template.locked}
 			title="Add an area to the page — press and hold to position every area from the columns instead"
 		>
-			<Icon name="blog" size={16} /><span class="sr-only">Area</span>
+			<Icon name="shapes" size={16} /><span class="sr-only">Area</span>
 		</button>
+		{#if drawTarget}
+			<!-- Under Area, because it is the same kind of thing: Area makes one,
+			     this draws in the one you have. -->
+			<button
+				class="square"
+				onclick={() => ondraw?.(drawTarget)}
+				title="Draw this area's picture"
+			>
+				<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
+			</button>
+		{/if}
 		{#if !template.boxes.length}
 			<!-- Only on an empty page, where it is the answer to "now what?" and
 			     there is nothing for it to destroy. Once there are areas it is the
@@ -844,7 +915,7 @@
 					? 'Position areas automagically — a card worked out from your headings and your data'
 					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
 			>
-				<Icon name="shapes" size={16} /><span class="sr-only">Position areas automagically</span>
+				<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
 			</button>
 		{/if}
 		{#if picking}
@@ -946,6 +1017,11 @@
 		<div
 			class="pad"
 			class:moving={!!padDrag}
+			class:push-up={pushed === 'up'}
+			class:push-down={pushed === 'down'}
+			class:push-left={pushed === 'left'}
+			class:push-right={pushed === 'right'}
+			class:push-centre={pushed === 'centre'}
 			role="group"
 			aria-label="Nudge the selected box"
 			style="right:{padAt.right}px;bottom:{padAt.bottom}px"
@@ -953,13 +1029,18 @@
 			onpointercancel={stopNudge}
 			onpointerleave={stopNudge}
 		>
+			<!-- Tied rather than disabled: a disabled button is dead to the
+			     pointer, and the hold that walks up the tie has to arrive
+			     somehow. The press itself is refused instead. -->
 			<button
 				class="up"
-				disabled={verticalTied}
+				class:tied={verticalTied}
+				aria-disabled={verticalTied}
 				title={verticalTied
-					? 'Tied to another area — its top follows that area\u2019s bottom. Change the Gap in the bar.'
+					? `Tied to another area \u2014 its top follows that area\u2019s bottom. Change the Gap in the bar${tieTarget ? ', or hold this to select that area' : ''}.`
 					: `Up ${padStep}mm`}
-				onpointerdown={() => startNudge(0, -padStep)}
+				use:hold={followTie}
+				onpointerdown={() => !verticalTied && startNudge(0, -padStep)}
 			>
 				<Icon name={verticalTied ? 'link' : 'caret-up'} size={verticalTied ? 15 : 30} />
 			</button>
@@ -970,7 +1051,10 @@
 			<button
 				class="step"
 				title="Step size — 1, 5 or 10mm. Press and hold to move the pad."
-				onpointerdown={padPickup}
+				onpointerdown={(e) => {
+					pushed = 'centre';
+					padPickup(e);
+				}}
 				onpointermove={padMove}
 				onpointerup={padDrop}
 				onpointercancel={padDrop}
@@ -982,11 +1066,13 @@
 			<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={30} /></button>
 			<button
 				class="down"
-				disabled={verticalTied}
+				class:tied={verticalTied}
+				aria-disabled={verticalTied}
 				title={verticalTied
-					? 'Tied to another area — its top follows that area\u2019s bottom. Change the Gap in the bar.'
+					? `Tied to another area \u2014 its top follows that area\u2019s bottom. Change the Gap in the bar${tieTarget ? ', or hold this to select that area' : ''}.`
 					: `Down ${padStep}mm`}
-				onpointerdown={() => startNudge(0, padStep)}
+				use:hold={followTie}
+				onpointerdown={() => !verticalTied && startNudge(0, padStep)}
 			>
 				<Icon name={verticalTied ? 'link' : 'caret-down'} size={verticalTied ? 15 : 30} />
 			</button>
@@ -1354,20 +1440,80 @@
 		grid-template-columns: repeat(3, var(--cell));
 		grid-template-rows: repeat(3, var(--cell));
 		gap: 0;
+		/* A drop shadow rather than a box shadow on each key: this one follows
+		   the painted shape, so the cross casts one shadow and the seams between
+		   its arms cast none. It is there all the time now — a thing that stands
+		   up off the page casts a shadow whether or not it is being moved. */
+		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.16));
+		/* Short, because a pad that takes a tenth of a second to answer a tap
+		   does not feel like a button. */
+		transition: transform 80ms ease-out;
 	}
 
-	/* Every cell carries a border on all four edges and colours only the ones on
-	   the perimeter. Transparent rather than absent, so each content box is inset
-	   by the same pixel on every side: a cell bordered on three edges and not the
-	   fourth centres its glyph half a pixel off, which is the whole thing this
-	   was asked to fix. The ground is the same under all five, so a transparent
-	   border between two of them is invisible. */
+	/* Pressed, the whole pad goes down at that edge — a perspective skew, so the
+	   pressed edge is both lower and *further away*: it shortens, and the shape
+	   goes trapezoid rather than parallelogram. That is the difference between a
+	   thing pushed into the page and a thing sheared across it. The perspective
+	   is short and the angle is wide, because a cross 96 pixels across has to
+	   say this at a glance; with a long perspective and a small angle it read as
+	   a rendering artefact. The axis is the one the press tips it about: from
+	   the side, the vertical axis. */
+	.pad.push-left {
+		transform: perspective(220px) rotateY(-14deg) translateX(-1px);
+	}
+
+	.pad.push-right {
+		transform: perspective(220px) rotateY(14deg) translateX(1px);
+	}
+
+	.pad.push-up {
+		transform: perspective(220px) rotateX(14deg) translateY(-1px);
+	}
+
+	.pad.push-down {
+		transform: perspective(220px) rotateX(-14deg) translateY(1px);
+	}
+
+	/* The middle is not a direction, so it goes straight down. */
+	.pad.push-centre {
+		transform: scale(0.97);
+	}
+
+	/* While it is being carried it follows the finger and nothing else: a pad
+	   skewed and moving at once reads as a bug in the drag. */
+	.pad.moving {
+		transform: none;
+	}
+
+	/* Every cell carries a border on the three edges that are on the perimeter of
+	   the cross and none at all on the edge facing its middle — the arms run into
+	   the centre without a seam, so the cross is one shape rather than five. The
+	   room that border took is given back as padding on the same edge, because a
+	   cell inset on three sides and not the fourth centres its glyph half a pixel
+	   off.
+
+	   The widths are uneven and the colours are lit from the top left, which is
+	   what makes the cross read as five keys standing up off the page rather
+	   than as an outline of one: 1px along the top and left, 2px along the
+	   bottom and right, and the shade is the same on every cell — so they are
+	   inset unevenly but *identically*, and the cross is still square with
+	   itself. The light is a gradient across the same diagonal. */
 	.pad button {
+		--pad-light: #fff;
+		--pad-edge: #b9bcc2;
+		--pad-shade: #8f949c;
+		/* One flat colour across the whole inside of the cross. It was a gradient
+		   per cell, which starts again at every cell: five separate sweeps of
+		   light on a shape that is meant to be one surface. The bevel on the
+		   perimeter is what lights it now, and it lights it once. */
+		--pad-face: #f1f3f5;
 		display: grid;
 		place-items: center;
 		box-sizing: border-box;
-		border: 1px solid transparent;
-		background: rgba(255, 255, 255, 0.92);
+		border-width: 1px 2px 2px 1px;
+		border-style: solid;
+		border-color: transparent;
+		background: var(--pad-face);
 		color: #333;
 		font: 600 12px ui-sans-serif, system-ui, sans-serif;
 		cursor: pointer;
@@ -1378,30 +1524,38 @@
 	/* The twelve segments of the cross. Each edge is drawn once, by the cell that
 	   owns it; the four re-entrant corners are where two of them meet at a point. */
 	.pad .up {
-		border-top-color: var(--border-control);
-		border-left-color: var(--border-control);
-		border-right-color: var(--border-control);
+		border-top-color: var(--pad-light);
+		border-left-color: var(--pad-light);
+		border-right-color: var(--pad-shade);
+		border-bottom-width: 0;
+		padding-bottom: 2px;
 		border-radius: var(--radius-button) var(--radius-button) 0 0;
 	}
 
 	.pad .left {
-		border-top-color: var(--border-control);
-		border-left-color: var(--border-control);
-		border-bottom-color: var(--border-control);
+		border-top-color: var(--pad-light);
+		border-left-color: var(--pad-light);
+		border-bottom-color: var(--pad-shade);
+		border-right-width: 0;
+		padding-right: 2px;
 		border-radius: var(--radius-button) 0 0 var(--radius-button);
 	}
 
 	.pad .right {
-		border-top-color: var(--border-control);
-		border-right-color: var(--border-control);
-		border-bottom-color: var(--border-control);
+		border-top-color: var(--pad-light);
+		border-right-color: var(--pad-shade);
+		border-bottom-color: var(--pad-shade);
+		border-left-width: 0;
+		padding-left: 1px;
 		border-radius: 0 var(--radius-button) var(--radius-button) 0;
 	}
 
 	.pad .down {
-		border-bottom-color: var(--border-control);
-		border-left-color: var(--border-control);
-		border-right-color: var(--border-control);
+		border-bottom-color: var(--pad-shade);
+		border-left-color: var(--pad-light);
+		border-right-color: var(--pad-shade);
+		border-top-width: 0;
+		padding-top: 1px;
 		border-radius: 0 0 var(--radius-button) var(--radius-button);
 	}
 
@@ -1433,16 +1587,33 @@
 		color: #767676;
 	}
 
+	/* A tied key keeps the pad's own face — fading the whole button left a hole
+	   in the cross, which reads as a missing key rather than as a key that will
+	   not move this way. Only the mark on it goes quiet. */
+	.pad button.tied {
+		cursor: default;
+		color: #767676;
+	}
+
+	.pad button.tied :global(svg) {
+		opacity: 0.5;
+	}
+
 	/* While it is being carried: the pad itself says so, because the finger is on
 	   the one button whose look would otherwise not change. Only the coloured
 	   edges change colour — the transparent ones stay transparent, or the cross
 	   would light up as five boxes again. */
+	/* Being carried: the same shadow, thrown further, so the pad reads as picked
+	   up rather than as merely recoloured. */
+	.pad.moving {
+		filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.3));
+	}
+
 	.pad.moving .up,
 	.pad.moving .left,
 	.pad.moving .right,
 	.pad.moving .down {
 		border-color: transparent;
-		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
 	}
 
 	.pad.moving .up {
@@ -1471,7 +1642,15 @@
 
 	.pad .up { grid-area: 1 / 2; }
 	.pad .left { grid-area: 2 / 1; }
-	.pad .step { grid-area: 2 / 2; }
+	/* The middle is the step and the grip the pad is carried by, and it is drawn
+	   as nothing at all: the same face as the arms, with the number on it. A well,
+	   a ring, a shadow and a flat disc were each tried under that number and each
+	   one drew a hole in a surface that is meant to be continuous. The digit is
+	   enough to say the middle is a key, and the cross stays one shape. */
+	.pad .step {
+		grid-area: 2 / 2;
+		background: var(--pad-face);
+	}
 	.pad .right { grid-area: 2 / 3; }
 	.pad .down { grid-area: 3 / 2; }
 
