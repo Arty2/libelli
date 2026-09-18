@@ -6,16 +6,19 @@
  * print convention beats consistency.
  */
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /**
- * `image` is really "image or color": it shows whatever its source resolves
- * to, which is a picture when that is a URL and a fill when it is a color. One
- * mode rather than two, because a column of brand colors and a column of logo
- * URLs are the same job — put what this row says in the background of this area
- * — and a template author should not have to know which the data holds.
+ * What an area draws, given what its cell or its template says.
+ *
+ * `bitmap` is a drawing made in the app and kept as base64 in the cell,
+ * `image` is a picture from somewhere — an address, or a name this browser is
+ * holding — and `color` is a fill. `image` also accepts a color, because it
+ * used to be the only mode for both and templates written then rely on it; a
+ * column of brand colors is better off saying `color`, which refuses anything
+ * that is not one.
  */
-export type BoxMode = 'plain' | 'markdown' | 'image' | 'qr';
+export type BoxMode = 'plain' | 'markdown' | 'image' | 'color' | 'bitmap' | 'qr';
 export type Overflow = 'clip' | 'grow';
 export type Align = 'left' | 'center' | 'right' | 'justify';
 /** vertical placement of a box's content within its own frame */
@@ -293,9 +296,9 @@ export interface Box extends TextStyle {
 	 */
 	borderHand?: boolean;
 	/**
-	 * How an image or QR fills its box: contain fits it, cover crops it, fill
-	 * stretches it, repeat tiles it at its own size. `repeat` is image-only —
-	 * a tiled QR code is not a QR code.
+	 * How a picture or QR fills its box: contain fits it, cover crops it, fill
+	 * stretches it, repeat tiles it at its own size. `repeat` is for pictures
+	 * only — a tiled QR code is not a QR code, and a color has nothing to fit.
 	 */
 	fit?: 'contain' | 'cover' | 'fill' | 'repeat';
 	/**

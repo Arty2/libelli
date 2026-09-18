@@ -3,7 +3,7 @@
 	import Icon from './Icon.svelte';
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
-	import type { Arrange } from '$lib/template';
+	import { takesADrawing, type Arrange } from '$lib/template';
 	import { hold, swipe } from '$lib/gestures';
 	import { GRID_MAJOR, GRID_MINOR, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
@@ -182,7 +182,7 @@
 	const drawTarget = $derived.by(() => {
 		if (template.locked || selectedBoxes.length !== 1) return null;
 		const box = selectedBoxes[0];
-		if (box.locked || box.mode !== 'image' || box.static?.url) return null;
+		if (box.locked || !takesADrawing(box.mode) || box.static?.url) return null;
 		return box.id;
 	});
 
@@ -899,7 +899,7 @@
 				onclick={() => ondraw?.(drawTarget)}
 				title="Draw this area's picture"
 			>
-				<Icon name="pen" size={16} /><span class="sr-only">Draw this area</span>
+				<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
 			</button>
 		{/if}
 		{#if !template.boxes.length}

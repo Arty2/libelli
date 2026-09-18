@@ -64,8 +64,8 @@ resize boxes directly, or type exact millimetres.
   **Static Text** is words typed into the template, the same on every card;
   **Bitmap** is a drawing made here, and **Image** is a picture from an address
   or from this browser. The first two then take a **Mode** — plain text,
-  Markdown, or a QR code, and a data field can also be *Image / Color*, since a
-  column can hold either. Words typed into the template cannot be a picture, so
+  Markdown, or a QR code, and a data field can also be **Bitmap**, **Image** or
+  **Color**, since a column can hold any of the three. Words typed into the template cannot be a picture, so
   Static Text does not offer that mode: Bitmap and Image are that answer, said
   where the question is asked. Nothing about the file format changes — the four
   are the slot, the mode and which field holds the value, read back as one
@@ -509,22 +509,24 @@ functional notation is rebuilt from the numbers it parsed to.
 
 ## Images, colors and QR codes
 
-Two box modes carry something other than text — reached as **Bitmap** or
-**Image** where the content is static, and as *Image / Color* where a column
-supplies it. Both are framed by the box's
+Three box modes carry something other than text, and the **Content** row picks
+between them: Bitmap and Image where the template holds the value, or any of the
+three as a **Mode** where a column supplies it. Both are framed by the box's
 declared height, and both take a **Fit**: *fit* puts the whole thing inside the
 box, *cover* fills the box and crops the overflow, *stretch* distorts it to the
 box exactly, and *tile* — images only, since a tiled QR is not a QR — repeats it
 at its own size.
 
-- **Image / Color** — one mode, not two: the source is resolved, and it shows a
-  picture when that turns out to be an address and a fill when it turns out to
-  be a color. A column of brand colors and a column of logo URLs are the same
-  job — put what this row says behind this area — and a template author should
-  not have to know which the data holds. Colors are read in hex, `rgb()`,
-  `hsl()` or by name, and they fill the area itself, so the fill reaches under
-  the padding and takes the corner radius with it. Pictures come from a data
-  URL, an external URL, or inline SVG held in the template.
+- **Bitmap, Image and Color** — three modes, one for each thing a cell can hold.
+  **Color** fills the area with what the cell says and refuses anything that is
+  not a color, so an address in a column of colors is ignored rather than
+  fetched; colors are read in hex, `rgb()`, `hsl()` or by name, and they fill the
+  area itself, so the fill reaches under the padding and takes the corner radius
+  with it. **Image** shows a picture — a data URL, an external URL, a name this
+  browser is holding, or inline SVG held in the template — and still accepts a
+  color, because it was the only mode for both and templates written then rely
+  on it. **Bitmap** is a drawing made in the app and written into the cell as
+  base64, so every row can carry its own and the picture travels with the table.
 
   Everything that can reach an `<img src>` from a cell goes through one guard
   that allows `http`, `https` and a base64 `data:` image and nothing else. A
@@ -552,7 +554,7 @@ at its own size.
   pictures it is missing, and dropping the files on again puts them back. An
   image uploaded as a page background can be used in a row without uploading it
   twice — they share one store, because an image is an image. Which store that is, and how to
-  empty it, is **Images…** in page setup — see below.
+  empty it, is **Images** in the toolbar — see below.
 - **Drawing one** — double-click an image area, press the **pen** beside the
   page, or press **Draw…** in the area bar, and the drawing surface opens
   **full screen**. The pen appears under **Area** whenever the one area you have
@@ -652,8 +654,10 @@ decoder, since a QR that does not scan looks exactly like one that does.
 Everything else this app keeps is small — a template is a page of JSON, a
 dataset is text. Pictures are not, and browser storage is a poor place for them:
 it is a bucket you cannot look into, shared with everything else the app saves,
-and the browser may empty it. **Images…**, beside the background controls in
-page setup, is the panel that takes them seriously.
+and the browser may empty it. **Images**, in the toolbar between Page
+Setup and Data, is the panel that takes them seriously — beside the two bars
+rather than inside one of them, because the pictures are the browser's and not
+the page's.
 
 - **What is stored** — every picture this app can see, what each weighs, where
   it is being kept, and whether the current table or template actually points at

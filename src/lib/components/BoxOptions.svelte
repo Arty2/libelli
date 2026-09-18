@@ -15,7 +15,9 @@
 		normaliseSides,
 		presetFor,
 		presetSize,
-		sidesOf
+		shownAsMedia,
+		sidesOf,
+		takesADrawing
 	} from '$lib/template';
 	import type {
 		Align,
@@ -54,8 +56,6 @@
 		oneditcss: () => void;
 		/** open the drawing surface for the selected area */
 		ondraw?: (id: string) => void;
-		/** open the panel listing every stored picture */
-		onmanageimages?: () => void;
 	}
 
 	let {
@@ -175,11 +175,15 @@
 	const source = $derived.by<Source>(() => {
 		if (!selected) return 'static';
 		if (selected.slot) return 'field';
-		if (selected.mode !== 'image') return 'static';
-		// Which field is *there*, not which one has something in it: a bitmap
-		// that has not been drawn yet and an address that has not been typed yet
-		// are both empty, and they are not the same area.
-		return selected.static?.url !== undefined ? 'image' : 'bitmap';
+		if (selected.mode === 'bitmap') return 'bitmap';
+		if (!shownAsMedia(selected.mode)) return 'static';
+		// A picture area written before `bitmap` was a mode of its own: what is
+		// in it says which it was. Which field is *there*, not which one has
+		// something in it — a bitmap nobody has drawn yet and an address nobody
+		// has typed yet are both empty, and they are not the same area.
+		return selected.static?.dataUrl !== undefined && selected.static?.url === undefined
+			? 'bitmap'
+			: 'image';
 	});
 
 	function setSource(next: Source) {
@@ -192,20 +196,20 @@
 			return;
 		}
 		if (next === 'static') {
-			// Static keeps whatever was typed before. A mode of image belongs to
+			// Static keeps whatever was typed before. The picture modes belong to
 			// the two below now, so words that arrive here arrive as words.
 			patch({
 				slot: null,
-				mode: selected.mode === 'image' ? 'plain' : selected.mode,
+				mode: shownAsMedia(selected.mode) ? 'plain' : selected.mode,
 				static: { text: selected.static?.text ?? '' }
 			});
 			return;
 		}
-		// Both picture kinds are `mode: image`; which field holds the value is
-		// what tells them apart, so each keeps only its own and drops the other's.
+		// Each picture kind keeps only its own field and drops the other's, so
+		// what is in the box and what the bar says about it cannot drift apart.
 		patch({
 			slot: null,
-			mode: 'image',
+			mode: next === 'bitmap' ? 'bitmap' : 'image',
 			static:
 				next === 'bitmap'
 					? { dataUrl: selected.static?.dataUrl }
@@ -214,7 +218,7 @@
 	}
 
 	/** Whether this area is one a drawing can be made in — see the pen, below. */
-	const drawable = $derived(!!selected && selected.mode === 'image' && !selected.static?.url);
+	const drawable = $derived(!!selected && takesADrawing(selected.mode) && !selected.static?.url);
 
 	const VERTICALS: Array<{ value: VAlign; icon: string; label: string }> = [
 		{ value: 'top', icon: 'valign-top', label: 'Top' },
@@ -480,7 +484,7 @@
 						title="Draw a small picture for this area, saved in the template"
 						onclick={() => ondraw?.(selected.id)}
 					>
-						<Icon name="pen" size={14} /> {selected.static?.dataUrl ? 'Edit…' : 'Draw…'}
+						<Icon name="edit" size={14} /> {selected.static?.dataUrl ? 'Edit…' : 'Draw…'}
 					</button>
 				</span>
 			{:else}
@@ -506,25 +510,28 @@
 					<select value={selected.mode} disabled={boxFrozen} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
 						<option value="plain">Plain Text</option>
 						<option value="markdown">Markdown</option>
-						<!-- A column can hold an address or a color, so a field still
-						     offers it. Words typed into the template cannot be either:
-						     that is what Bitmap and Image are for. -->
+						<!-- A column can hold a drawing, an address or a color, so a
+						     field offers all three. Words typed into the template
+						     cannot be any of them: that is what the Content types
+						     Bitmap and Image are for. -->
 						{#if source === 'field'}
-							<option value="image">Image / Color</option>
+							<option value="bitmap">Bitmap</option>
+							<option value="image">Image</option>
+							<option value="color">Color</option>
 						{/if}
 						<option value="qr">QR Code</option>
 					</select>
 				</label>
 			{/if}
-			{#if selected.mode === 'image' || selected.mode === 'qr'}
+			{#if takesADrawing(selected.mode) || selected.mode === 'qr'}
 				<label class="field">
 					<span>Fit</span>
 					<select value={selected.fit ?? 'contain'} disabled={boxFrozen} onchange={(e) => patch({ fit: e.currentTarget.value as Box['fit'] })}>
 						<option value="contain">Fit</option>
 						<option value="cover">Cover</option>
 						<option value="fill">Stretch</option>
-						<!-- Images only. A tiled QR code is not a QR code. -->
-						{#if selected.mode === 'image'}
+						<!-- Pictures only. A tiled QR code is not a QR code. -->
+						{#if takesADrawing(selected.mode)}
 							<option value="repeat">Tile</option>
 						{/if}
 					</select>
@@ -540,7 +547,7 @@
 					title="Draw a small picture for this area. It is written into this row's cell, so every row can have its own"
 					onclick={() => ondraw?.(selected.id)}
 				>
-					<Icon name="pen" size={14} /> Draw…
+					<Icon name="edit" size={14} /> Draw…
 				</button>
 			{/if}
 			{#if selected.mode === 'qr'}

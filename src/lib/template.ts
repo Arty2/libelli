@@ -8,6 +8,7 @@ import type {
 	BlendMode,
 	BorderStyle,
 	Box,
+	BoxMode,
 	Centre,
 	Defaults,
 	FontRef,
@@ -128,6 +129,16 @@ export function nextBoxId(existing: Box[] = []): string {
 	return id;
 }
 
+/** Every mode the format names. Anything else in a file is read as words. */
+export const BOX_MODES: BoxMode[] = ['plain', 'markdown', 'image', 'color', 'bitmap', 'qr'];
+
+/** The modes that draw something rather than set something: a picture or a fill. */
+export const shownAsMedia = (mode: BoxMode) =>
+	mode === 'image' || mode === 'color' || mode === 'bitmap';
+
+/** The modes a drawing can be made in — the two that hold a picture. */
+export const takesADrawing = (mode: BoxMode) => mode === 'image' || mode === 'bitmap';
+
 export function newBox(partial: Partial<Box> = {}): Box {
 	return {
 		id: partial.id ?? nextBoxId(),
@@ -136,7 +147,9 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		y: num(partial.y, 12),
 		w: num(partial.w, 60),
 		h: num(partial.h, 12),
-		mode: partial.mode ?? 'plain',
+		// A mode decides which renderer a cell reaches, so a word this format does
+		// not name is read as words rather than trusted.
+		mode: BOX_MODES.includes(partial.mode as BoxMode) ? (partial.mode as BoxMode) : 'plain',
 		overflow: partial.overflow ?? 'clip',
 		// Anything optional that is not named here is dropped on load: this list
 		// is the box format, so a new field has to be added in both places.

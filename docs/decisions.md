@@ -742,13 +742,26 @@ and nothing anchored below it hops about mid-sentence. The card cannot write the
 words itself: a bound area's text is a cell of the dataset and a static one's is
 a field of the template, and only `+page.svelte` knows which it is holding.
 
-**Image mode is image *or color*, and the color fills the box.** One mode
-rather than two, because a column of brand colors and a column of logo URLs are
-the same job and a template author should not have to know which the data holds.
+**A picture, a fill and a drawing are three modes, and `image` still answers to
+two of them.** They began as one mode — a column of brand colors and a column of
+logo URLs are the same job, and a template author should not have to know which
+the data holds. What that missed is that a *person* does know, and being told
+"Image / Color" when the column is plainly one of them is an answer to a question
+nobody asked. So `bitmap`, `image` and `color` are separate now: `color` refuses
+anything that is not a color, `bitmap` refuses anything that is not a picture,
+and `image` keeps answering to both because it was the only mode for both and
+every template written until now relies on that. The cost is one mode that is
+less strict than its name; the alternative was breaking files we cannot inspect,
+since whether a column holds colors is a fact about the data, not the template.
+The schema goes to 6, so an older build refuses a file naming the new modes
+rather than rendering base64 as a paragraph.
+
 A resolved color is emitted by `boxStyle` as the box's own `background`, so it
 reaches under the padding and takes the corner radius; a tile is a background
 too, because `<img>` cannot repeat. Everything else goes through `safeMediaUrl`,
-which is the only door between an untrusted cell and an `<img src>`.
+which is the only door between an untrusted cell and an `<img src>` — and a
+`color` cell never reaches it at all, which is the point of the strict mode: an
+address typed into a column of colors is not fetched, it is ignored.
 
 **Markdown links are inert in the editor.** A link on paper says where to go; it
 does not go there. Live in the editor, clicking a word to pick up the area it

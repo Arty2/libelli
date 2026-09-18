@@ -22,7 +22,7 @@
 	} from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
-	import { normaliseRotation, sidesOf } from '$lib/template';
+	import { normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -155,19 +155,30 @@
 		const written = box.slot ? contentOf(box) : (box.static?.dataUrl ?? box.static?.url ?? '');
 		const value = written.trim();
 		if (!value) return {};
+		// A fill and nothing else: a cell of this column is a color or it is a
+		// mistake, and an address in one would otherwise be fetched.
+		if (box.mode === 'color') {
+			const only = parseColor(value);
+			return only ? { color: only } : {};
+		}
 		// An image this browser is holding, named by the cell. Nothing when it
 		// is a name this browser has never seen — the same blank as an address
 		// that does not resolve, and the app says which names are missing.
 		const local = localImageName(value);
 		if (local) return images[local] ? { src: images[local] } : {};
-		const color = parseColor(value);
-		if (color) return { color };
+		// `image` still answers to a color, because it was the only mode for
+		// both and templates written then rely on it. `bitmap` does not: what
+		// goes in one of those cells is a drawing.
+		if (box.mode === 'image') {
+			const color = parseColor(value);
+			if (color) return { color };
+		}
 		const src = safeMediaUrl(value);
 		return src ? { src } : {};
 	}
 
 	const isEmpty = (box: Box) => {
-		if (box.mode === 'image') {
+		if (shownAsMedia(box.mode)) {
 			const media = mediaOf(box);
 			return !(media.svg || media.src || media.color);
 		}
@@ -379,7 +390,7 @@
 		// A color out of the data fills the area itself, not a panel inside it, so
 		// it reaches under the padding and takes the corner radius with it. After
 		// the declared fill, because the row is the more specific answer.
-		if (box.mode === 'image') {
+		if (shownAsMedia(box.mode)) {
 			const media = mediaOf(box);
 			if (media.color) parts.push(`background:${media.color}`);
 			// A tile is a background, not an element: `<img>` has no way to repeat.
@@ -468,7 +479,7 @@
 
 	$effect(() => {
 		for (const box of template.boxes) {
-			if (box.mode !== 'image' || box.fit !== 'repeat') continue;
+			if (!takesADrawing(box.mode) || box.fit !== 'repeat') continue;
 			const src = mediaOf(box).src;
 			if (!croppable(src) || tiles[src]) continue;
 			const held = tileOf(src);
@@ -1072,7 +1083,7 @@
 		// A picture is the one thing not edited in place: an area on a card is
 		// often a centimetre across, which is somewhere to show a drawing and
 		// nowhere to make one. The same double-click opens it full screen.
-		if (editable(box) && box.mode === 'image') {
+		if (editable(box) && takesADrawing(box.mode)) {
 			ondraw?.(box.id);
 			return;
 		}
@@ -1188,7 +1199,7 @@
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
 							{@html qrFor(box)}
 						</span>
-					{:else if box.mode === 'image'}
+					{:else if shownAsMedia(box.mode)}
 						{@const media = mediaOf(box)}
 						<!-- A color and a tile are both drawn by the box's own background,
 						     in boxStyle, so there is nothing to put in here for either. -->

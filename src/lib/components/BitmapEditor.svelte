@@ -577,10 +577,10 @@
 				aria-label="Draw"
 				onclick={() => (tool = 'pen')}
 			>
-				<!-- The ink itself, rather than a pencil: there is one colour here and
-				     it is the area's, so the button may as well be the swatch that
-				     says which. -->
-				<span class="ink" style="background:{ink}"></span>
+				<!-- A pen, drawn in the ink it puts down: the tool and the colour in
+				     one glyph, since there is only ever one colour here and it is the
+				     area's own. -->
+				<span class="ink" style="color:{ink}"><Icon name="pen" size={15} /></span>
 			</button>
 			<button
 				aria-pressed={tool === 'line'}
@@ -613,7 +613,10 @@
 				>
 					<span
 						class="nib"
-						style="width:{2 + size * 3}px;height:{2 + size * 3}px;background:{tool === 'eraser' ? '#767676' : ink}"
+						class:hollow={tool === 'eraser'}
+						style="width:{2 + size * 3}px;height:{2 + size * 3}px;{tool === 'eraser'
+							? ''
+							: `background:${ink}`}"
 					></span>
 				</button>
 			{/each}
@@ -803,22 +806,26 @@
 		font: 13px ui-sans-serif, system-ui, sans-serif;
 	}
 
-	/* The ink, at the size of a glyph so the row stays one height. A border
-	   against the button's own white, or an area set to white would be an empty
-	   square where the colour should be. */
+	/* The pen, in the ink. A shadow of the button's own white under it, so a
+	   pen drawn in white is still a pen rather than a hole in the button. */
 	.ink {
-		width: 15px;
-		height: 15px;
-		border-radius: 3px;
-		border: 1px solid rgba(0, 0, 0, 0.25);
-		box-sizing: border-box;
+		display: grid;
+		place-items: center;
+		filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.45));
 	}
 
 	/* The weight, drawn: 1, 2 and 4 pixels as squares that grow with them, in
-	   the ink they will actually put down — grey while the rubber is the tool,
-	   because what they will put down then is nothing. */
+	   the ink they will actually put down. */
 	.nib {
 		border-radius: 1px;
+	}
+
+	/* And an outline of one while the rubber is up, because what that puts down
+	   is nothing: a filled square would say the opposite of what the tool does. */
+	.nib.hollow {
+		border: 1px solid #767676;
+		box-sizing: border-box;
+		background: transparent;
 	}
 
 	.stage {

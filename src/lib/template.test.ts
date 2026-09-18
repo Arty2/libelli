@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	BOX_MODES,
 	DEFAULT_DEFAULTS,
 	arrangeBoxes,
 	autoMap,
@@ -11,6 +12,8 @@ import {
 	builtinTemplate,
 	newBox,
 	normaliseTemplate,
+	shownAsMedia,
+	takesADrawing,
 	usedSlots
 } from './template';
 
@@ -449,5 +452,24 @@ describe('newBox board size', () => {
 		expect(newBox({ pixels: { w: 40 } as never }).pixels).toBeUndefined();
 		expect(newBox({ pixels: 'big' as never }).pixels).toBeUndefined();
 		expect(newBox({}).pixels).toBeUndefined();
+	});
+});
+
+describe('newBox modes', () => {
+	it('keeps every mode the format names', () => {
+		for (const mode of BOX_MODES) expect(newBox({ mode }).mode).toBe(mode);
+	});
+
+	it('reads anything else as words', () => {
+		// A mode decides which renderer a cell reaches, so an unknown one must
+		// not fall through to whichever branch happens to be last.
+		expect(newBox({ mode: 'iframe' as never }).mode).toBe('plain');
+		expect(newBox({ mode: '' as never }).mode).toBe('plain');
+		expect(newBox({}).mode).toBe('plain');
+	});
+
+	it('knows which modes draw and which take a drawing', () => {
+		expect(BOX_MODES.filter(shownAsMedia)).toEqual(['image', 'color', 'bitmap']);
+		expect(BOX_MODES.filter(takesADrawing)).toEqual(['image', 'bitmap']);
 	});
 });

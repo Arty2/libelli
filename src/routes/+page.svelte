@@ -1669,6 +1669,16 @@ em { color: #b42318 }`;
 		>
 			<Icon name="document-configuration" size={15} /> <span class="label">Page Setup</span>
 		</button>
+		<!-- Every stored picture, beside the two bars rather than inside one of
+		     them: the pictures are the browser's, not the page's — a row's own
+		     photograph is in there too — and Page Setup was a place you had to
+		     already know to look. -->
+		<button
+			onclick={() => (imagesOpen = true)}
+			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
+		>
+			<Icon name="image" size={15} /> <span class="label">Images</span>
+		</button>
 		<button
 			class="data"
 			onclick={() => (dataOpen = !dataOpen)}
@@ -1745,7 +1755,6 @@ em { color: #b42318 }`;
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={() => (cssOpen = true)}
-						onmanageimages={() => (imagesOpen = true)}
 						ondraw={(id) => (drawing = id)}
 					/>
 				{:else}
@@ -1774,7 +1783,6 @@ em { color: #b42318 }`;
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={() => (cssOpen = true)}
-						onmanageimages={() => (imagesOpen = true)}
 						ondraw={(id) => (drawing = id)}
 					/>
 				{/if}
@@ -2116,9 +2124,10 @@ em { color: #b42318 }`;
 			fill it.
 		</p>
 		<p>
-			<strong>Mode</strong> is Plain Text, Markdown, Image / Color or QR Code. Image / Color shows whatever its
-			source turns out to be — a picture if that is an address, a fill if it is a color, in hex, <code>rgb()</code>,
-			<code>hsl()</code> or by name — so a column of brand colors and a column of logos need no different setting up.
+			<strong>Content</strong> is where an area gets what it shows: a Data Field, Static Text, a Bitmap drawn
+			here, or an Image. A field then takes a <strong>Mode</strong> — Plain Text, Markdown, Bitmap, Image, Color
+			or QR Code. Color fills the area with what the cell says and ignores anything that is not one, in hex,
+			<code>rgb()</code>, <code>hsl()</code> or by name; Image shows a picture, and still accepts a color.
 		</p>
 		<p>
 			<code>&#123;&#123;date&#125;&#125;</code> anywhere in an area or a cell prints today's date, and
