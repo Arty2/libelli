@@ -561,7 +561,8 @@ at its own size.
   nowhere to make one. The board sits above its tools, and the tools are one
   row: a pen in the area's own colour, a **line** — press where it starts, let
   go where it ends — a rubber, three nib widths, undo, redo and clear, the size
-  of the board, **rotate** and **crop**, **copy** and
+  of the board, a **light or dark checkerboard**, **rotate** and **crop**,
+  **copy** and
   **paste**, and then Cancel and Done — leaving is a drawing tool like the rest
   of them, and a row of its own under the board put the two most final buttons
   furthest from the hand that had been drawing.
@@ -619,7 +620,10 @@ at its own size.
   Unpainted pixels stay transparent, not white: the area's own fill and the
   paper show through, which is a thing you would otherwise discover on paper —
   and the checks behind the board are one to a pixel, so the pattern is also the
-  grid.
+  grid. They come in light and dark, because the ink is the area's own colour
+  and a drawing in white or a pale yellow is invisible on the light ones. A
+  checkerboard is there to say "nothing here"; it cannot do that by hiding what
+  is.
   And the area draws it *hard* — `image-rendering: pixelated` — so sixty-four
   pixels blown up to a centimetre or ten stay the pixels that were drawn rather
   than being smudged into a gradient by the browser. That applies to any picture

@@ -56,6 +56,13 @@
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
 	let tool = $state<'pen' | 'eraser' | 'line'>('pen');
+	/**
+	 * Which paper the transparent pixels show. An area's ink is its own colour,
+	 * and a drawing in white or a pale yellow is invisible on light checks — the
+	 * checkerboard is there to say "nothing here", and it cannot do that by
+	 * hiding what is.
+	 */
+	let checks = $state<'light' | 'dark'>('light');
 	/** brush width in pixels of the grid, not of the screen */
 	let nib = $state(1);
 	let weight = $state<number | null>(null);
@@ -550,6 +557,7 @@
 	     pattern is also the grid. -->
 	<div class="stage">
 		<canvas
+			class:dark={checks === 'dark'}
 			use:start
 			width={grid.w}
 			height={grid.h}
@@ -645,6 +653,17 @@
 				aria-label="Board height in pixels"
 				onchange={(e) => setSide('h', e.currentTarget.value)}
 			/>
+		</span>
+
+		<span class="segmented">
+			<button
+				aria-pressed={checks === 'dark'}
+				title="Show the transparent squares dark or light — a pale drawing needs the dark ones"
+				aria-label="Dark checkerboard"
+				onclick={() => (checks = checks === 'dark' ? 'light' : 'dark')}
+			>
+				<Icon name="contrast" size={15} />
+			</button>
 		</span>
 
 		<!-- The two that redraw the whole board rather than a pixel of it. Both
@@ -819,18 +838,28 @@
 		   different drawing from the one that will print. */
 		image-rendering: pixelated;
 		cursor: crosshair;
-		background-color: #fff;
+		--check-a: #fff;
+		--check-b: #e9edf3;
+		background-color: var(--check-a);
 		background-image:
-			linear-gradient(45deg, #e9edf3 25%, transparent 25%),
-			linear-gradient(-45deg, #e9edf3 25%, transparent 25%),
-			linear-gradient(45deg, transparent 75%, #e9edf3 75%),
-			linear-gradient(-45deg, transparent 75%, #e9edf3 75%);
+			linear-gradient(45deg, var(--check-b) 25%, transparent 25%),
+			linear-gradient(-45deg, var(--check-b) 25%, transparent 25%),
+			linear-gradient(45deg, transparent 75%, var(--check-b) 75%),
+			linear-gradient(-45deg, transparent 75%, var(--check-b) 75%);
 		/* A check per pixel of the board: the four gradients make squares of half
 		   the tile, so the tile is two pixels across. */
 		background-size: calc(var(--check) * 2) calc(var(--check) * 2);
 		background-position: 0 0, 0 var(--check), var(--check) calc(var(--check) * -1),
 			calc(var(--check) * -1) 0;
 		touch-action: none;
+	}
+
+	/* The other paper. Dark enough that white ink reads on it, and still two
+	   tones rather than one, because a flat ground would stop saying which
+	   pixels are transparent. */
+	canvas.dark {
+		--check-a: #3a4150;
+		--check-b: #2b313c;
 	}
 
 	/* The only two that carry words, so the only two that are not squares. */

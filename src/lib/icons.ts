@@ -97,6 +97,7 @@ export const ICONS: Record<string, string> = {
 	   segment on Carbon's 32 grid with a node at each end, which is what a line
 	   tool looks like everywhere it exists. */
 	'line': '<path d="M5.29 25.29 25.29 5.29 26.71 6.71 6.71 26.71z"/><path d="M3 23H9V29H3z"/><path d="M23 3H29V9H23z"/>',
+	'contrast': '<path d="M29.37,11.84a13.6,13.6,0,0,0-1.06-2.51A14.17,14.17,0,0,0,25.9,6.1a14,14,0,1,0,0,19.8,14.17,14.17,0,0,0,2.41-3.23,13.6,13.6,0,0,0,1.06-2.51,14,14,0,0,0,0-8.32ZM4,16A12,12,0,0,1,16,4V28A12,12,0,0,1,4,16Z"/>',
 
 	/* What + Area wears: a page with a block of words and a picture on it. */
 	'blog': '<path d="M4 24H14V26H4z"/><path d="M4 18H14V20H4z"/><path d="M26,14H6a2,2,0,0,1-2-2V6A2,2,0,0,1,6,4H26a2,2,0,0,1,2,2v6A2,2,0,0,1,26,14ZM6,6v6H26V6Z"/><path d="M26,28H20a2,2,0,0,1-2-2V20a2,2,0,0,1,2-2h6a2,2,0,0,1,2,2v6A2,2,0,0,1,26,28Zm-6-8v6h6V20Z"/>',

@@ -1008,14 +1008,13 @@ hang over the edge — and stops at one cell, which is where the middle button's
 outer edge meets the edge of the stage. That button is how the pad is picked up
 again; a pad you cannot reach is a control you have lost.
 
-**The round key sits on the same ground as the arms, with no line round it.**
-The middle of the pad is the step and the grip rather than a direction, so it is
-a circle — but a circle drawn *in* the cross rather than cut out of it, because a
-round cell would have left four notches of card showing where the arms come
-together. Three things were tried and dropped: a darker well under the key, a
-hairline round it, and a shadow under it — each one drew the same hole in a
-surface that is meant to be continuous. The key is flat and simply lighter than
-the face it sits on, and that tone is the whole of it.
+**The middle is drawn as nothing at all.** It is the step and the grip the pad is
+carried by rather than a direction, and every attempt to say so with a shape said
+the wrong thing: a circle in a darker well, then the same circle with a hairline,
+then with a shadow, then flat and a shade lighter. Each one drew a hole in a
+surface that is meant to be continuous. What is left is the face the arms have
+and the number on it — a digit in the middle of a cross is already a key, and the
+press does the rest.
 
 **The face is one flat colour.** It was a gradient, declared on each cell, which
 means it restarts at every cell: five separate sweeps of light across a shape
@@ -1023,18 +1022,20 @@ that is meant to be a single surface, with the seams landing exactly where the
 arms meet. Flat, lit once by the bevel on the perimeter — which is the only
 place the light needs to be said, because that is where the shape turns.
 
-**The whole pad shears; the keys do not sink one by one.** Pressing a key used to
-swap that key's bevel, which made it look redrawn rather than pushed — and five
-keys that each go down on their own read as five buttons that happen to touch.
-Now the whole pad skews toward the key being held: the edge under the finger
-drops and the opposite one comes up, which is what a thing pushed in at one side
-does. A skew rather than a 3D rotation because this is a drawn object rather than
-a photographed one — the shear reads at a glance at this size, where nine degrees
-of perspective read as a rendering artefact. Which pair is used follows the axis
-the press tips it about: a press from the side tips it about a vertical axis,
-which is `skewY`; from above or below, `skewX`. The middle key goes straight down
-instead, because it is not a direction, and a pad being carried does not skew at
-all — skewed and moving at once reads as a bug in the drag.
+**The whole pad goes down at the pressed edge, and nothing changes colour.**
+Pressing a key used to swap that key's bevel and darken its face, which made it
+look redrawn rather than pushed — and five keys that each go down on their own
+read as five buttons that happen to touch. The pad now takes a perspective skew
+toward the key being held: the pressed edge is both lower and *further away*, so
+it shortens and the cross goes trapezoid rather than parallelogram. That is the
+difference between a thing pushed into the page and a thing sheared across it —
+a plain `skew` was tried and is a parallelogram, which reads as the shape being
+distorted rather than tipped. The perspective is short (220px) and the angle wide
+(14 degrees) because a cross 96 pixels across has to say this at a glance; a long
+perspective and a small angle read as a rendering artefact. The axis is the one
+the press tips it about: from the side, the vertical one. The middle goes
+straight down instead, because it is not a direction, and a pad being carried
+does not skew at all — skewed and moving at once reads as a bug in the drag.
 
 **One shadow, thrown by the shape.** `filter: drop-shadow` on the pad rather
 than a `box-shadow` on each key, so the cross casts a single shadow and the

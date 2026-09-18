@@ -1450,27 +1450,28 @@
 		transition: transform 80ms ease-out;
 	}
 
-	/* Pressed, the whole pad skews the way you pressed it: the edge under your
-	   finger drops and the opposite one comes up, which is what a thing pushed
-	   in at one side does. A skew rather than a 3D rotation because this is a
-	   drawn object rather than a photographed one — the shear reads at a glance
-	   at this size, where nine degrees of perspective read as a rendering
-	   artefact. The pair is chosen by the axis the press tips it about: a press
-	   from the side tips it about a vertical axis, which is `skewY`. */
+	/* Pressed, the whole pad goes down at that edge — a perspective skew, so the
+	   pressed edge is both lower and *further away*: it shortens, and the shape
+	   goes trapezoid rather than parallelogram. That is the difference between a
+	   thing pushed into the page and a thing sheared across it. The perspective
+	   is short and the angle is wide, because a cross 96 pixels across has to
+	   say this at a glance; with a long perspective and a small angle it read as
+	   a rendering artefact. The axis is the one the press tips it about: from
+	   the side, the vertical axis. */
 	.pad.push-left {
-		transform: skewY(-5deg) translateX(-2px);
+		transform: perspective(220px) rotateY(-14deg) translateX(-1px);
 	}
 
 	.pad.push-right {
-		transform: skewY(5deg) translateX(2px);
+		transform: perspective(220px) rotateY(14deg) translateX(1px);
 	}
 
 	.pad.push-up {
-		transform: skewX(-5deg) translateY(-2px);
+		transform: perspective(220px) rotateX(14deg) translateY(-1px);
 	}
 
 	.pad.push-down {
-		transform: skewX(5deg) translateY(2px);
+		transform: perspective(220px) rotateX(-14deg) translateY(1px);
 	}
 
 	/* The middle is not a direction, so it goes straight down. */
@@ -1518,15 +1519,6 @@
 		cursor: pointer;
 		padding: 0;
 		touch-action: none;
-	}
-
-	/* Pressed: the face darkens, and that is all that changes on the key itself
-	   — the pad's own tilt says which one went down. Swapping the bevel here as
-	   well made the key look like it had been redrawn rather than pushed. The
-	   two an anchor has spoken for do not change, because they are not going to
-	   do anything either. */
-	.pad button:active:not(.tied):not(:disabled) {
-		background: #e4e7ea;
 	}
 
 	/* The twelve segments of the cross. Each edge is drawn once, by the cell that
@@ -1650,38 +1642,14 @@
 
 	.pad .up { grid-area: 1 / 2; }
 	.pad .left { grid-area: 2 / 1; }
-	/* The middle is round: it is not a direction — it is the step, and the grip
-	   the pad is carried by — so it should not read as a fifth arm. Drawn *in*
-	   the cross rather than cut out of it: the cell keeps the square ground the
-	   four arms meet at, and the circle is a key sitting on it, bevelled the
-	   same way as everything else here. A circular cell would have left four
-	   notches of card showing where the arms come together. */
+	/* The middle is the step and the grip the pad is carried by, and it is drawn
+	   as nothing at all: the same face as the arms, with the number on it. A well,
+	   a ring, a shadow and a flat disc were each tried under that number and each
+	   one drew a hole in a surface that is meant to be continuous. The digit is
+	   enough to say the middle is a key, and the cross stays one shape. */
 	.pad .step {
 		grid-area: 2 / 2;
-		position: relative;
-		z-index: 0;
-		/* The same face as the arms around it: the cross is one continuous
-		   surface with a round key drawn on it, and anything else under that key
-		   made the middle read as a hole. */
 		background: var(--pad-face);
-	}
-
-	.pad .step::before {
-		content: '';
-		position: absolute;
-		inset: 3px;
-		z-index: -1;
-		border-radius: 50%;
-		/* Flat, and lighter than the face it sits on. No line round it and no
-		   shadow under it: every version of either read as a hole cut in a
-		   surface that is meant to be continuous, so the one thing that says the
-		   key is there is that it is a different tone. */
-		background: #fff;
-	}
-
-	/* Pressed, the round key darkens; the pad's own movement says the rest. */
-	.pad .step:active::before {
-		background: #e8eaee;
 	}
 	.pad .right { grid-area: 2 / 3; }
 	.pad .down { grid-area: 3 / 2; }
