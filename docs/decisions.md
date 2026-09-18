@@ -305,16 +305,43 @@ only other tool is the rubber. The trade-off is that the ink is fixed at the
 moment of drawing: this is a PNG, not a mask, so changing the area's colour
 afterwards does not recolour what was drawn.
 
-**Low resolution is the feature.** Sixty-four pixels on the longest side is a
-kilobyte or two of base64 — a long cell, but one a spreadsheet can hold and a
-person can scroll past. Four times the side is sixteen times the pixels and a
-cell nobody can do anything with. The header says what the drawing is costing as
-it is drawn, so the limit is visible rather than a rule that bites later.
+**Low resolution is the feature.** A hundred and twenty-eight pixels on the
+longest side is a kilobyte or two of base64 — a long cell, but one a spreadsheet
+can hold and a person can scroll past. Twice the side is four times the pixels
+and a cell nobody can do anything with, so the ceiling is a number in
+`bitmap.ts` rather than a matter of taste. The header says what the drawing is
+costing as it is drawn, so the limit is visible rather than a rule that bites
+later.
 
-**The grid takes the area's proportions.** A banner is drawn on a banner and a
-stamp on a square. A fixed square grid would have meant drawing a wide title
-inside a square and watching `fit` letterbox it — designing against a shape that
-is not the shape it will print at.
+**The board takes the area's proportions unless it is given a size.** A banner
+is drawn on a banner and a stamp on a square: a fixed square board would have
+meant drawing a wide title inside a square and watching `fit` letterbox it —
+designing against a shape that is not the shape it will print at. A size typed
+in is for when that is exactly what you want, and it is stored on the box, not
+on the row: the board is a property of the area, so every row's picture is drawn
+on the same one. Absent is the proportions, the same rule every other optional
+field here follows.
+
+**A resize scales what is drawn, and is a step in the editor's own undo.** The
+alternative — refusing to resize once anything is drawn — would have made the
+size a decision you have to get right before you know what you are drawing.
+Undo carries the board with it, so stepping back off a resize puts the drawing
+back on the board it was made on; what the scaling dropped on the way down is
+gone, which is the honest cost of drawing at eight pixels and asking for sixteen
+back.
+
+**A tile is trimmed to its ink.** An area set to `repeat` tiles the picture at
+the picture's own size, so the transparent margin round a drawing would repeat
+as a gap in the pattern. For that one fit the board is a working surface and
+only the painted pixels are written out — and counted, so the weight in the
+header is the weight of what will actually go into the cell.
+
+**The zoom steps through whole numbers.** Whole screen pixels per pixel of the
+board, pinch and Ctrl+wheel included: a board at 7.5 screen pixels a side lands
+half its pixels on half a screen pixel, and a pixel editor that blurs its own
+edges is no use. It is also what lets the checkerboard behind the board be one
+check per pixel — a CSS gradient sized from the same number — so the pattern
+that says "nothing painted here" is also the grid.
 
 **Full screen, never in place.** Every other kind of area is edited where it
 sits, and this one cannot be: areas are frequently a centimetre across, which is
@@ -708,6 +735,15 @@ modes the format names — the same rule colors follow. It reaches the paper and
 whatever is stacked under the area and stops at the card, because the scaler
 above it is a transform and a transform is a stacking context: nothing on a card
 can blend with the editor around it.
+
+**Opacity fades the whole area, and opaque is the absence of the field.** One
+number on the box rather than alpha in each of its colors: fill, border and
+content go together, which is what "a wash over the picture" means and what
+three separate alphas would keep failing to line up. It is a plain CSS
+`opacity`, so it needs none of the blend mode's rules about background graphics
+— it fades ink as readily as paper. Storing it only when it is less than 1 keeps
+the format's one habit: a template full of ordinary areas says nothing about
+opacity at all.
 
 **A drag on a left-hand page is undone into the stored frame, not handled in
 two.** A mirrored box is drawn at its facing position, so a pointer going right

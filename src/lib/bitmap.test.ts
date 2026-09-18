@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_SIDE, bitmapGrid, line, pixelAt } from './bitmap';
+import { MAX_SIDE, MIN_SIDE, bitmapGrid, boardSize, clampSide, inkBounds, line, pixelAt } from './bitmap';
 
 describe('bitmapGrid', () => {
 	it('draws a square area on a square grid', () => {
@@ -7,8 +7,8 @@ describe('bitmapGrid', () => {
 	});
 
 	it('keeps the proportions of the area, longest side first', () => {
-		expect(bitmapGrid(60, 20)).toEqual({ w: 64, h: 21 });
-		expect(bitmapGrid(20, 60)).toEqual({ w: 21, h: 64 });
+		expect(bitmapGrid(60, 20)).toEqual({ w: 128, h: 43 });
+		expect(bitmapGrid(20, 60)).toEqual({ w: 43, h: 128 });
 	});
 
 	it('will not draw a sliver, however thin the area is', () => {
@@ -23,6 +23,56 @@ describe('bitmapGrid', () => {
 
 	it('answers a square for an area with no size yet', () => {
 		expect(bitmapGrid(0, 0)).toEqual({ w: MAX_SIDE, h: MAX_SIDE });
+	});
+});
+
+describe('clampSide', () => {
+	it('holds a side between the two limits', () => {
+		expect(clampSide(1)).toBe(MIN_SIDE);
+		expect(clampSide(900)).toBe(MAX_SIDE);
+		expect(clampSide(32.4)).toBe(32);
+	});
+
+	it('refuses anything that is not a measurement', () => {
+		expect(clampSide('wide')).toBeNull();
+		expect(clampSide(undefined)).toBeNull();
+		expect(clampSide(Infinity)).toBeNull();
+	});
+});
+
+describe('boardSize', () => {
+	it('takes the area\'s proportions when the box names no size', () => {
+		expect(boardSize({ w: 60, h: 20 })).toEqual({ w: 128, h: 43 });
+	});
+
+	it('takes the size the box names, held to the limits', () => {
+		expect(boardSize({ w: 60, h: 20, pixels: { w: 40, h: 40 } })).toEqual({ w: 40, h: 40 });
+		expect(boardSize({ w: 60, h: 20, pixels: { w: 4000, h: 1 } })).toEqual({ w: MAX_SIDE, h: MIN_SIDE });
+	});
+
+	it('falls back to the area when only half a size is given', () => {
+		expect(boardSize({ w: 40, h: 40, pixels: { w: 32, h: NaN } })).toEqual({ w: MAX_SIDE, h: MAX_SIDE });
+	});
+});
+
+describe('inkBounds', () => {
+	/** A canvas of `w` x `h` with the listed pixels painted opaque. */
+	const canvas = (w: number, h: number, on: Array<[number, number]>) => {
+		const data = new Uint8ClampedArray(w * h * 4);
+		for (const [x, y] of on) data[(y * w + x) * 4 + 3] = 255;
+		return { width: w, height: h, data };
+	};
+
+	it('is nothing at all for an untouched canvas', () => {
+		expect(inkBounds(canvas(8, 8, []))).toBeNull();
+	});
+
+	it('is the rectangle the ink occupies, ends included', () => {
+		expect(inkBounds(canvas(16, 16, [[3, 4], [6, 9]]))).toEqual({ x: 3, y: 4, w: 4, h: 6 });
+	});
+
+	it('is one pixel for one pixel', () => {
+		expect(inkBounds(canvas(16, 16, [[15, 0]]))).toEqual({ x: 15, y: 0, w: 1, h: 1 });
 	});
 });
 

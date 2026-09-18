@@ -1,6 +1,7 @@
 <script lang="ts">
+	import { tick, untrack } from 'svelte';
 	import Icon from './Icon.svelte';
-	import { bitmapGrid, line, pixelAt, type Grid } from '$lib/bitmap';
+	import { bitmapGrid, boardSize, clampSide, inkBounds, line, pixelAt, MAX_SIDE, MIN_SIDE, type Grid } from '$lib/bitmap';
 	import type { Box } from '$lib/types';
 
 	/**
@@ -8,9 +9,10 @@
 	 *
 	 * Full screen on purpose, and never in place: an area on the card is often a
 	 * centimetre across, which is somewhere to *show* a drawing and nowhere to
-	 * make one. The grid is the area's own proportions — see `bitmap.ts` — and
-	 * what comes out is a PNG data URL, which goes into the row's cell, so the
-	 * picture travels with the table rather than living beside it.
+	 * make one. The board is the area's own proportions unless it is given a size
+	 * — see `bitmap.ts` — and what comes out is a PNG data URL, which goes into
+	 * the row's cell, so the picture travels with the table rather than living
+	 * beside it.
 	 *
 	 * Nothing is written until Done. Cancel leaves the cell as it was, and the
 	 * whole drawing is one entry in the app's own undo, however many strokes it
@@ -28,13 +30,26 @@
 		 * be that colour rather than a second decision made in a second place.
 		 */
 		ink: string;
-		onsave: (dataUrl: string) => void;
+		/** The picture, and the board it was made on where that was set by hand. */
+		onsave: (dataUrl: string, pixels: Grid | undefined) => void;
 		oncancel: () => void;
 	}
 
 	let { box, value, ink, onsave, oncancel }: Props = $props();
 
-	const grid: Grid = $derived(bitmapGrid(box.w, box.h));
+	/**
+	 * An area set to repeat tiles its picture at the picture's own size, so the
+	 * transparent margin round a drawing would become a gap in the pattern. For
+	 * one of those the board is a working surface and only the drawn pixels are
+	 * the tile — trimmed on the way out, and counted that way while drawing, so
+	 * the weight in the header is the weight of what will actually be written.
+	 */
+	const tiled = untrack(() => box.fit === 'repeat');
+
+	// Read once: the box cannot change while this is up, and the board is the
+	// editor's own state from here on — Done is what writes it back.
+	let grid = $state<Grid>(untrack(() => boardSize(box)));
+	let custom = $state(untrack(() => Boolean(box.pixels)));
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
 	let tool = $state<'pen' | 'eraser'>('pen');
@@ -46,10 +61,17 @@
 	 * Whole canvases rather than a list of strokes: at this size it is nothing.
 	 * `history` is what has been done and `future` what has been undone — a new
 	 * stroke empties the second, because a drawing cannot be redone onto a
-	 * different one.
+	 * different one. The board is part of the entry, so resizing is a step like
+	 * any other and undo puts the drawing back on the board it was made on.
 	 */
-	let history = $state<ImageData[]>([]);
-	let future = $state<ImageData[]>([]);
+	interface Shot {
+		image: ImageData;
+		grid: Grid;
+		custom: boolean;
+	}
+
+	let history = $state<Shot[]>([]);
+	let future = $state<Shot[]>([]);
 	let drawing = $state(false);
 	let last: { x: number; y: number } | null = null;
 
@@ -57,7 +79,7 @@
 
 	/**
 	 * Whatever the area holds already, drawn in. An existing picture — one drawn
-	 * before, or dropped in as a file — is scaled onto the grid rather than
+	 * before, or dropped in as a file — is scaled onto the board rather than
 	 * refused, so opening this on an area is never destructive until a stroke is
 	 * made.
 	 */
@@ -66,6 +88,9 @@
 		const ctx = node.getContext('2d', { willReadFrequently: true });
 		if (!ctx) return;
 		ctx.imageSmoothingEnabled = false;
+		// Said from the start, so the cost of a drawing is not a surprise that
+		// only appears once the first stroke is down.
+		measure();
 		if (!value) return;
 		const image = new Image();
 		image.onload = () => {
@@ -77,33 +102,70 @@
 
 	const snapshot = () => context()?.getImageData(0, 0, grid.w, grid.h) ?? null;
 
-	function remember() {
-		const taken = snapshot();
-		if (!taken) return;
+	function shot(): Shot | null {
+		const image = snapshot();
+		return image ? { image, grid: { ...grid }, custom } : null;
+	}
+
+	/**
+	 * A remembered canvas back onto the current board. Scaled when the board has
+	 * been resized since, which is what lets undo still reach across a resize:
+	 * the drawing comes back at the size it is being drawn at now.
+	 */
+	function paste(data: ImageData) {
+		const ctx = context();
+		if (!ctx) return;
+		ctx.imageSmoothingEnabled = false;
+		ctx.clearRect(0, 0, grid.w, grid.h);
+		if (data.width === grid.w && data.height === grid.h) {
+			ctx.putImageData(data, 0, 0);
+			return;
+		}
+		const from = document.createElement('canvas');
+		from.width = data.width;
+		from.height = data.height;
+		from.getContext('2d')?.putImageData(data, 0, 0);
+		ctx.drawImage(from, 0, 0, grid.w, grid.h);
+	}
+
+	function remember(): Shot | null {
+		const taken = shot();
+		if (!taken) return null;
 		history = [...history.slice(-29), taken];
 		future = [];
+		return taken;
 	}
 
-	function undo() {
-		const ctx = context();
+	/** A remembered step, board and all. */
+	async function apply(step: Shot) {
+		const resized = step.grid.w !== grid.w || step.grid.h !== grid.h;
+		grid = { ...step.grid };
+		custom = step.custom;
+		if (resized) {
+			manualZoom = null;
+			// The canvas is cleared by its own resize, so the pixels go back after.
+			await tick();
+		}
+		paste(step.image);
+		measure();
+	}
+
+	async function undo() {
 		const previous = history.at(-1);
-		const current = snapshot();
-		if (!ctx || !previous || !current) return;
-		ctx.putImageData(previous, 0, 0);
+		const current = shot();
+		if (!previous || !current) return;
 		history = history.slice(0, -1);
 		future = [...future, current];
-		measure();
+		await apply(previous);
 	}
 
-	function redo() {
-		const ctx = context();
+	async function redo() {
 		const next = future.at(-1);
-		const current = snapshot();
-		if (!ctx || !next || !current) return;
-		ctx.putImageData(next, 0, 0);
+		const current = shot();
+		if (!next || !current) return;
 		future = future.slice(0, -1);
 		history = [...history, current];
-		measure();
+		await apply(next);
 	}
 
 	function clear() {
@@ -114,9 +176,51 @@
 		measure();
 	}
 
+	/**
+	 * A different board, with what has been drawn scaled onto it. Resizing is a
+	 * step like any other, so a board set too small is one undo away — though
+	 * what the scaling dropped on the way down is gone, which is the honest cost
+	 * of drawing at eight pixels and asking for sixteen back.
+	 */
+	async function setSize(next: Grid, byHand: boolean) {
+		if (next.w === grid.w && next.h === grid.h && byHand === custom) return;
+		const before = remember();
+		grid = next;
+		custom = byHand;
+		// The fit is worked out for the new board; a zoom set by hand for the old
+		// one is not an answer to the question the new one asks.
+		manualZoom = null;
+		await tick();
+		if (before) paste(before.image);
+		measure();
+	}
+
+	const setSide = (axis: 'w' | 'h', raw: unknown) => {
+		const side = clampSide(raw);
+		if (side !== null) setSize({ ...grid, [axis]: side }, true);
+	};
+
+	/** What goes into the cell: the board, or just the ink where this is a tile. */
+	function exported(): string | null {
+		if (!canvas) return null;
+		const whole = () => canvas!.toDataURL('image/png');
+		if (!tiled) return whole();
+		const data = snapshot();
+		const bounds = data && inkBounds(data);
+		if (!data || !bounds) return whole();
+		if (bounds.w === grid.w && bounds.h === grid.h) return whole();
+		const tile = document.createElement('canvas');
+		tile.width = bounds.w;
+		tile.height = bounds.h;
+		// Negative offsets: the same pixels, with everything outside the ink
+		// falling off the edges.
+		tile.getContext('2d')?.putImageData(data, -bounds.x, -bounds.y);
+		return tile.toDataURL('image/png');
+	}
+
 	/** What this drawing will cost the cell it is going into, as it is drawn. */
 	function measure() {
-		const data = canvas?.toDataURL('image/png');
+		const data = exported();
 		weight = data ? Math.round(data.length / 102.4) / 10 : null;
 	}
 
@@ -134,7 +238,7 @@
 	}
 
 	function down(event: PointerEvent) {
-		if (event.button !== 0 || !canvas) return;
+		if (event.button !== 0 || !canvas || pinch.size > 1) return;
 		event.preventDefault();
 		canvas.setPointerCapture(event.pointerId);
 		remember();
@@ -167,8 +271,8 @@
 	}
 
 	function done() {
-		const data = canvas?.toDataURL('image/png');
-		if (data) onsave(data);
+		const data = exported();
+		if (data) onsave(data, custom ? { ...grid } : undefined);
 	}
 
 	function onKeydown(event: KeyboardEvent) {
@@ -185,14 +289,17 @@
 	}
 
 	/**
-	 * How large the grid is drawn. Whole pixels of the screen per pixel of the
-	 * grid, so the drawing never lands on half a screen pixel and blur its own
-	 * edges — the one thing a pixel editor must not do.
+	 * How large the board is drawn. Whole screen pixels per pixel of the board,
+	 * so the drawing never lands on half a screen pixel and blurs its own edges
+	 * — the one thing a pixel editor must not do. That is also why a pinch steps
+	 * through whole numbers rather than scaling smoothly.
 	 */
 	let viewport = $state({ w: 1200, h: 800 });
-	const zoom = $derived(
-		Math.max(2, Math.floor(Math.min((viewport.w - 80) / grid.w, (viewport.h - 260) / grid.h)))
+	let manualZoom = $state<number | null>(null);
+	const fit = $derived(
+		Math.max(1, Math.floor(Math.min((viewport.w - 80) / grid.w, (viewport.h - 280) / grid.h)))
 	);
+	const zoom = $derived(Math.max(1, Math.min(48, manualZoom ?? fit)));
 
 	$effect(() => {
 		const read = () => (viewport = { w: window.innerWidth, h: window.innerHeight });
@@ -201,18 +308,76 @@
 		return () => window.removeEventListener('resize', read);
 	});
 
+	/** Two fingers on the board, tracked by id so a stray third does nothing. */
+	let pinch = new Map<number, { x: number; y: number }>();
+	let pinchStart: { spread: number; zoom: number } | null = null;
+
+	const spread = () => {
+		const [a, b] = [...pinch.values()];
+		return Math.hypot(a.x - b.x, a.y - b.y);
+	};
+
+	function pinchDown(event: PointerEvent) {
+		if (event.pointerType !== 'touch') return;
+		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
+		if (pinch.size !== 2) return;
+		// The first finger has already put a dot down. A pinch is not a stroke,
+		// so that dot goes back where it came from rather than needing an undo.
+		if (drawing) {
+			drawing = false;
+			last = null;
+			undo();
+		}
+		pinchStart = { spread: spread(), zoom };
+	}
+
+	function pinchMove(event: PointerEvent) {
+		if (!pinch.has(event.pointerId)) return;
+		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
+		if (pinch.size !== 2 || !pinchStart || pinchStart.spread === 0) return;
+		event.preventDefault();
+		manualZoom = Math.round(pinchStart.zoom * (spread() / pinchStart.spread));
+	}
+
+	function pinchUp(event: PointerEvent) {
+		pinch.delete(event.pointerId);
+		if (pinch.size < 2) pinchStart = null;
+	}
+
+	/**
+	 * A trackpad pinch and a Ctrl+wheel are the same event. `preventDefault` is
+	 * what stops the browser zooming the whole app around the drawing, and it
+	 * only works on a non-passive listener, so this is added by hand.
+	 */
+	let stage = $state<HTMLElement | null>(null);
+	$effect(() => {
+		const node = stage;
+		if (!node) return;
+		const onWheel = (event: WheelEvent) => {
+			if (!event.ctrlKey && !event.metaKey) return;
+			event.preventDefault();
+			manualZoom = Math.max(1, Math.min(48, zoom + (event.deltaY < 0 ? 1 : -1)));
+		};
+		node.addEventListener('wheel', onWheel, { passive: false });
+		return () => node.removeEventListener('wheel', onWheel);
+	});
 </script>
 
 <svelte:window onkeydown={onKeydown} />
 
 <div class="full" role="dialog" aria-modal="true" aria-label="Draw">
 	<header>
-		<span class="what">Drawing <strong>{grid.w} × {grid.h}</strong></span>
+		<span class="what">{grid.w} × {grid.h}</span>
 		<!-- Said out loud, because this is going into a cell of the table and a
 		     long cell is the cost of it travelling with the words. -->
 		{#if weight !== null}
-			<span class="weight" title="What this drawing adds to the cell it is written into">
-				{weight} KB in the cell
+			<span
+				class="weight"
+				title={tiled
+					? 'What this tile adds to the cell it is written into — the drawn pixels only, trimmed to the ink'
+					: 'What this drawing adds to the cell it is written into'}
+			>
+				/ {weight} KB
 			</span>
 		{/if}
 	</header>
@@ -270,17 +435,60 @@
 				<Icon name="trash" size={15} />
 			</button>
 		</span>
+
+		<!-- The board. Typing a side sets it by hand; the button gives it back to
+		     the area's proportions, which is what it has until anyone asks. -->
+		<span class="segmented board">
+			<button
+				aria-pressed={!custom}
+				title="Match the area's proportions"
+				aria-label="Match the area"
+				onclick={() => setSize(bitmapGrid(box.w, box.h), false)}
+			>
+				<Icon name="shapes" size={15} />
+			</button>
+			<input
+				type="number"
+				min={MIN_SIDE}
+				max={MAX_SIDE}
+				value={grid.w}
+				title="Board width, in pixels"
+				aria-label="Board width in pixels"
+				onchange={(e) => setSide('w', e.currentTarget.value)}
+			/>
+			<span class="by" aria-hidden="true">×</span>
+			<input
+				type="number"
+				min={MIN_SIDE}
+				max={MAX_SIDE}
+				value={grid.h}
+				title="Board height, in pixels"
+				aria-label="Board height in pixels"
+				onchange={(e) => setSide('h', e.currentTarget.value)}
+			/>
+		</span>
 	</div>
 
 	<!-- The checks show through where nothing has been drawn: an area's fill and
 	     the paper behind it will, and a white square instead of a transparent one
-	     is a thing you only find out about on paper. -->
-	<div class="stage">
+	     is a thing you only find out about on paper. One check to a pixel, so the
+	     pattern is also the grid. -->
+	<!-- The pinch is two fingers anywhere on the paper, which is why it is held
+	     here rather than on the canvas; the drawing itself is the canvas's. -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="stage"
+		bind:this={stage}
+		onpointerdown={pinchDown}
+		onpointermove={pinchMove}
+		onpointerup={pinchUp}
+		onpointercancel={pinchUp}
+	>
 		<canvas
 			use:start
 			width={grid.w}
 			height={grid.h}
-			style="width:{grid.w * zoom}px;height:{grid.h * zoom}px"
+			style="width:{grid.w * zoom}px;height:{grid.h * zoom}px;--check:{zoom}px"
 			onpointerdown={down}
 			onpointermove={move}
 			onpointerup={up}
@@ -315,7 +523,7 @@
 	header {
 		display: flex;
 		align-items: baseline;
-		gap: 14px;
+		gap: 6px;
 		color: #fff;
 		font: 15px ui-sans-serif, system-ui, sans-serif;
 	}
@@ -328,25 +536,27 @@
 	.tools {
 		display: flex;
 		align-items: center;
-		gap: 10px;
+		gap: 8px;
 		flex-wrap: wrap;
 		justify-content: center;
 		background: #fff;
 		border-radius: 8px;
-		padding: 6px 10px;
+		padding: 8px;
 	}
 
+	/* Square, all of them: every one holds a glyph of the same size, and a row of
+	   squares reads as a row of tools rather than as words of different lengths. */
 	.tools button {
 		font: 600 13px ui-sans-serif, system-ui, sans-serif;
 		background: #fff;
 		border: 1px solid #c9cdd4;
 		border-radius: 6px;
-		padding: 4px 9px;
+		padding: 0;
 		cursor: pointer;
 		display: grid;
 		place-items: center;
-		min-width: 30px;
-		min-height: 26px;
+		width: 30px;
+		height: 30px;
 	}
 
 	.tools button[aria-pressed='true'] {
@@ -363,6 +573,35 @@
 	.segmented {
 		display: flex;
 		gap: 4px;
+	}
+
+	.board {
+		align-items: center;
+	}
+
+	.board input {
+		font: 13px ui-sans-serif, system-ui, sans-serif;
+		width: 42px;
+		height: 30px;
+		box-sizing: border-box;
+		border: 1px solid #c9cdd4;
+		border-radius: 6px;
+		padding: 0 4px;
+		text-align: center;
+		/* The spin buttons are what made a three-digit field cut its own number
+		   off — the same bargain the options bar struck. Arrow keys still step. */
+		appearance: textfield;
+	}
+
+	.board input::-webkit-outer-spin-button,
+	.board input::-webkit-inner-spin-button {
+		appearance: none;
+		margin: 0;
+	}
+
+	.by {
+		color: #767676;
+		font: 13px ui-sans-serif, system-ui, sans-serif;
 	}
 
 	/* The ink, at the size of a glyph so the row stays one height. A border
@@ -387,6 +626,12 @@
 		background: #fff;
 		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 		line-height: 0;
+		max-width: calc(100vw - 32px);
+		max-height: 62vh;
+		overflow: auto;
+		/* A finger on the paper round the board scrolls it; a finger on the board
+		   itself draws. */
+		touch-action: pan-x pan-y;
 	}
 
 	canvas {
@@ -400,8 +645,11 @@
 			linear-gradient(-45deg, #e9edf3 25%, transparent 25%),
 			linear-gradient(45deg, transparent 75%, #e9edf3 75%),
 			linear-gradient(-45deg, transparent 75%, #e9edf3 75%);
-		background-size: 16px 16px;
-		background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+		/* A check per pixel of the board: the four gradients make squares of half
+		   the tile, so the tile is two pixels across. */
+		background-size: calc(var(--check) * 2) calc(var(--check) * 2);
+		background-position: 0 0, 0 var(--check), var(--check) calc(var(--check) * -1),
+			calc(var(--check) * -1) 0;
 		touch-action: none;
 	}
 

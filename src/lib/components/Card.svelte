@@ -417,6 +417,10 @@
 		// area, and stops at the card: the scaler above it is a transform, and a
 		// transform is a stacking context.
 		if (box.blend) parts.push(`mix-blend-mode:${box.blend}`);
+		// The whole area at once — fill, border and content together. Checked on
+		// the way into the template, and absent when it is opaque, so this is only
+		// ever a number between 0 and 1.
+		if (box.opacity !== undefined) parts.push(`opacity:${box.opacity}`);
 		// A CSS transform does not touch layout, so a rotated box still reports the
 		// height it would have had upright — which is what `measure()` reads and
 		// what anchored boxes below follow. That is the intended bargain: turning a

@@ -298,6 +298,20 @@ export interface Box extends TextStyle {
 	 * a tiled QR code is not a QR code.
 	 */
 	fit?: 'contain' | 'cover' | 'fill' | 'repeat';
+	/**
+	 * The board a drawing in this area is made on, in pixels. Absent takes the
+	 * area's own proportions — see `bitmap.ts`. It is only ever the size of the
+	 * drawing, never of the area: what is drawn is shown at the area's
+	 * millimetres like any other picture.
+	 */
+	pixels?: { w: number; h: number };
+	/**
+	 * How much of what is under this area shows through it, 0 to 1. Absent is
+	 * opaque. It fades the whole area — its fill, its border and its content
+	 * together — so a wash of text over a picture is one setting rather than
+	 * three colors with alpha in them.
+	 */
+	opacity?: number;
 	locked?: boolean;
 	/**
 	 * Whether this box mirrors onto the facing page, when the template has

@@ -199,6 +199,11 @@ resize boxes directly, or type exact millimetres.
   never blend with the editor around it. Like the paper colour, it prints only
   with the browser's **Background graphics** on — and it survives the PNG export,
   which was checked rather than assumed.
+- **Opacity** — how much of what is under an area shows through it, 0 to 100%.
+  It fades the whole area at once — its fill, its border and its content
+  together — so a wash of text over a picture is one setting rather than three
+  colors with alpha in them. 100% is the absence of the setting, which is what
+  every area has always been.
 - **A border drawn by hand** — the pencil beside the border color draws it
   wobbling, as a line rather than a rule. Width, style and radius all still
   mean what they meant: a dashed 1mm hand border is dashed, 1mm and hand-drawn,
@@ -538,23 +543,38 @@ at its own size.
 - **Drawing one** — double-click an image area, or press **Draw…** in the area
   bar, and the drawing surface opens **full screen**. Never in place: an area on
   a card is often a centimetre across, which is somewhere to show a drawing and
-  nowhere to make one. A pen, a rubber, three nib widths, eight colours and any
-  other, undo and clear; Escape or **Cancel** leaves the cell as it was, and
-  <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Z</kbd> steps back inside the surface. The
-  whole drawing is *one* entry in the app's own undo however many strokes it
-  took.
+  nowhere to make one. A pen in the area's own colour, a rubber, three nib
+  widths, undo, redo and clear, and the size of the board; Escape or **Cancel**
+  leaves the cell as it was, and <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Z</kbd> steps
+  back inside the surface. The whole drawing is *one* entry in the app's own
+  undo however many strokes it took.
 
-  The grid is the area's own proportions with the longest side at 64 pixels, so
-  a banner is drawn on a banner and a stamp on a square, and it is drawn at
-  whole screen pixels each — a pixel editor that blurs its own edges is no use.
+  The board is the area's own proportions with the longest side at 128 pixels,
+  so a banner is drawn on a banner and a stamp on a square — or type a width and
+  a height, 8 to 128 each way, and it is exactly that; the button beside them
+  gives it back to the area. Resizing scales what is already drawn and is a step
+  like any other, so a board set too small is one undo away — though what the
+  scaling dropped on the way down is gone. A board set by hand is remembered on
+  the area, so every row's picture is drawn on the same one.
+
+  It is drawn at whole screen pixels each — a pixel editor that blurs its own
+  edges is no use — which is also why a pinch, or <kbd>Ctrl</kbd> and the wheel,
+  steps the zoom through whole numbers rather than scaling smoothly.
+
   What comes out is a base64 PNG written **into the row's cell**, which is the
   point: the picture travels with the table, so a CSV carries the drawings with
   the words and a row's picture is as portable as its text. That is also why the
-  grid is small — the header says what the drawing is costing the cell as you
-  draw it, and a couple of hundred bytes is a long cell but a real one.
+  board is small — the header says what the drawing is costing the cell as you
+  draw it, and a couple of hundred bytes is a long cell but a real one. An area
+  set to **Repeat** is the one that comes out smaller than its board: a tile
+  repeats at its own size, so the drawing is trimmed to the pixels that were
+  actually painted and the transparent margin round it never becomes a gap in
+  the pattern.
 
   Unpainted pixels stay transparent, not white: the area's own fill and the
-  paper show through, which is a thing you would otherwise discover on paper.
+  paper show through, which is a thing you would otherwise discover on paper —
+  and the checks behind the board are one to a pixel, so the pattern is also the
+  grid.
   And the area draws it *hard* — `image-rendering: pixelated` — so sixty-four
   pixels blown up to a centimetre or ten stay the pixels that were drawn rather
   than being smudged into a gradient by the browser. That applies to any picture

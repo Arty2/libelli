@@ -1,4 +1,5 @@
 import { safeImageUrl } from './assets';
+import { clampSide } from './bitmap';
 import { parseColor } from './color';
 import defaultCard from './templates/default-card.json';
 import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
@@ -171,6 +172,8 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			borderRadius: partial.borderRadius,
 			borderHand: partial.borderHand ? true : undefined,
 			fit: BOX_FITS.includes(partial.fit as BoxFit) ? partial.fit : undefined,
+			pixels: normalisePixels(partial.pixels),
+			opacity: normaliseOpacity(partial.opacity),
 			locked: partial.locked,
 			// Only the opt-out is stored: following the fold is what a box does
 			// by default, so `true` is the absence of the field.
@@ -468,6 +471,29 @@ export function normaliseRotation(raw: unknown): number | undefined {
 	const wrapped = Math.round((((value % 360) + 540) % 360 - 180) * 10) / 10;
 	const degrees = wrapped === -180 ? 180 : wrapped;
 	return degrees === 0 ? undefined : degrees;
+}
+
+/**
+ * The board a drawing gets, if this box names one. Both sides or neither: half
+ * a size is not a size, and the fallback — the area's own proportions — is a
+ * better answer than one measurement paired with a guess.
+ */
+export function normalisePixels(raw: unknown): { w: number; h: number } | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const w = clampSide((raw as any).w);
+	const h = clampSide((raw as any).h);
+	return w !== null && h !== null ? { w, h } : undefined;
+}
+
+/**
+ * How much shows through, 0 to 1. Opaque is the absence of the field, so a
+ * template full of ordinary areas carries nothing about opacity at all; 0 is
+ * kept, because an area hidden on purpose is a thing people do.
+ */
+export function normaliseOpacity(raw: unknown): number | undefined {
+	const value = Number(raw);
+	if (!Number.isFinite(value) || value >= 1) return undefined;
+	return Math.max(0, Math.round(value * 100) / 100);
 }
 
 /** The pivot, in percent of the box. The middle is the default, so it is dropped. */

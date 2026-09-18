@@ -695,6 +695,27 @@
 				</select>
 			</label>
 
+			<label class="field">
+				<span>Opacity</span>
+				<input
+					class="n-3"
+					type="number"
+					step="5"
+					min="0"
+					max="100"
+					title="How much of what is under this area shows through it. Fades the fill, the border and the content together"
+					value={Math.round((selected.opacity ?? 1) * 100)}
+					disabled={boxFrozen}
+					onchange={(e) => {
+						const percent = Math.max(0, Math.min(100, numeric(e, 100)));
+						// Opaque is the absence of the field, not a stored 1 — the same
+						// rule every other "inherit or nothing" setting in here follows.
+						patch({ opacity: percent >= 100 ? undefined : percent / 100 });
+					}}
+				/>
+				<span class="unit">%</span>
+			</label>
+
 			<span class="field">
 				<span>Padding</span>
 				{#if showPadSides}

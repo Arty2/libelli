@@ -410,3 +410,39 @@ describe('newBox blending', () => {
 		expect(newBox({}).blend).toBeUndefined();
 	});
 });
+
+describe('newBox opacity', () => {
+	it('keeps a value between 0 and 1, to the nearest hundredth', () => {
+		expect(newBox({ opacity: 0.5 }).opacity).toBe(0.5);
+		expect(newBox({ opacity: 0.333 }).opacity).toBe(0.33);
+		expect(newBox({ opacity: 0 }).opacity).toBe(0);
+	});
+
+	it('drops opaque, because that is what an absent field means', () => {
+		expect(newBox({ opacity: 1 }).opacity).toBeUndefined();
+		expect(newBox({ opacity: 4 }).opacity).toBeUndefined();
+		expect(newBox({}).opacity).toBeUndefined();
+	});
+
+	it('refuses anything that is not a number, and never a fragment of CSS', () => {
+		expect(newBox({ opacity: '0.5;position:fixed' as never }).opacity).toBeUndefined();
+		expect(newBox({ opacity: 'half' as never }).opacity).toBeUndefined();
+	});
+
+	it('will not fade past invisible', () => {
+		expect(newBox({ opacity: -3 }).opacity).toBe(0);
+	});
+});
+
+describe('newBox board size', () => {
+	it('keeps a size, held to the limits a drawing has', () => {
+		expect(newBox({ pixels: { w: 128, h: 64 } }).pixels).toEqual({ w: 128, h: 64 });
+		expect(newBox({ pixels: { w: 9999, h: 1 } }).pixels).toEqual({ w: 128, h: 8 });
+	});
+
+	it('drops half a size rather than pairing it with a guess', () => {
+		expect(newBox({ pixels: { w: 40 } as never }).pixels).toBeUndefined();
+		expect(newBox({ pixels: 'big' as never }).pixels).toBeUndefined();
+		expect(newBox({}).pixels).toBeUndefined();
+	});
+});

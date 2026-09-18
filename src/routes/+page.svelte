@@ -605,19 +605,26 @@ em { color: #b42318 }`;
 	 * however many strokes it took — the editor's own undo goes no further than
 	 * the editor.
 	 */
-	function saveDrawing(dataUrl: string) {
+	function saveDrawing(dataUrl: string, pixels: { w: number; h: number } | undefined) {
 		const box = drawingBox;
 		drawing = null;
 		if (!box) return;
 		describe('Draw');
 		const column = box.slot ? mapping[box.slot] : undefined;
+		const current = $state.snapshot(box) as Box;
 		if (column && row) {
 			dataset = {
 				...dataset,
 				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: dataUrl } : r))
 			};
+			// The board belongs to the area, not to the row: every row's picture is
+			// drawn on the same one, so it is written back even when the drawing
+			// itself went into a cell.
+			if (JSON.stringify(pixels ?? null) !== JSON.stringify(box.pixels ?? null)) {
+				updateBox({ ...current, pixels });
+			}
 		} else {
-			updateBox({ ...$state.snapshot(box), static: { ...box.static, dataUrl } } as Box);
+			updateBox({ ...current, pixels, static: { ...box.static, dataUrl } });
 		}
 	}
 
