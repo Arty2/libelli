@@ -549,13 +549,22 @@ at its own size.
   back inside the surface. The whole drawing is *one* entry in the app's own
   undo however many strokes it took.
 
-  The board is the area's own proportions with the longest side at 128 pixels,
-  so a banner is drawn on a banner and a stamp on a square — or type a width and
-  a height, 8 to 128 each way, and it is exactly that; the button beside them
-  gives it back to the area. Resizing scales what is already drawn and is a step
-  like any other, so a board set too small is one undo away — though what the
-  scaling dropped on the way down is gone. A board set by hand is remembered on
-  the area, so every row's picture is drawn on the same one.
+  The board is **64 by 64 pixels' worth**, spent however you like: type a width
+  and the height moves to pay for it, so 64 × 64, 128 × 32 and 512 × 8 are all
+  the same board as far as the cell is concerned. What is fixed is the number of
+  pixels, not the shape — that is the only thing a cell cares about, and it
+  means a banner can be drawn on a banner without a square's worth of empty rows
+  going into the table with it. The board does not follow the area's
+  proportions: an area is millimetres on paper, a board is pixels in a cell, and
+  tying them together made a drawing's cost change whenever someone resized the
+  box it sat in.
+
+  Resizing scales what is already drawn, and it is a step in the editor's own
+  undo like any other — one <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Z</kbd> puts the
+  board *and* the detail back exactly as they were, so a board set too small
+  costs nothing. A board is remembered on the area, and it is where the next
+  drawing starts; a row that already holds a picture opens at that picture's own
+  size, because what is in the cell is the thing being edited.
 
   It is drawn at whole screen pixels each — a pixel editor that blurs its own
   edges is no use — which is also why a pinch, or <kbd>Ctrl</kbd> and the wheel,
@@ -565,11 +574,14 @@ at its own size.
   point: the picture travels with the table, so a CSV carries the drawings with
   the words and a row's picture is as portable as its text. That is also why the
   board is small — the header says what the drawing is costing the cell as you
-  draw it, and a couple of hundred bytes is a long cell but a real one. An area
-  set to **Repeat** is the one that comes out smaller than its board: a tile
-  repeats at its own size, so the drawing is trimmed to the pixels that were
-  actually painted and the transparent margin round it never becomes a gap in
-  the pattern.
+  draw it, and a couple of hundred bytes is a long cell but a real one.
+
+  An area set to **Repeat** tiles only the pixels that were painted: a tile
+  repeats at its own size, so the transparent margin round a drawing would
+  repeat as a gap in the pattern. The trimming happens as the card is drawn, not
+  as the drawing is saved, so the cell always keeps the whole board — setting an
+  area to repeat and back changes nothing in the table, and reopening the
+  drawing gets the drawing rather than its trimmings.
 
   Unpainted pixels stay transparent, not white: the area's own fill and the
   paper show through, which is a thing you would otherwise discover on paper —

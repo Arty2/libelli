@@ -435,9 +435,14 @@ describe('newBox opacity', () => {
 });
 
 describe('newBox board size', () => {
-	it('keeps a size, held to the limits a drawing has', () => {
-		expect(newBox({ pixels: { w: 128, h: 64 } }).pixels).toEqual({ w: 128, h: 64 });
-		expect(newBox({ pixels: { w: 9999, h: 1 } }).pixels).toEqual({ w: 128, h: 8 });
+	it('keeps a size the pixel budget can pay for', () => {
+		expect(newBox({ pixels: { w: 128, h: 32 } }).pixels).toEqual({ w: 128, h: 32 });
+		expect(newBox({ pixels: { w: 64, h: 64 } }).pixels).toEqual({ w: 64, h: 64 });
+	});
+
+	it('spends a template down to the budget rather than trusting it', () => {
+		expect(newBox({ pixels: { w: 128, h: 128 } }).pixels).toEqual({ w: 128, h: 32 });
+		expect(newBox({ pixels: { w: 9999, h: 9999 } }).pixels).toEqual({ w: 512, h: 8 });
 	});
 
 	it('drops half a size rather than pairing it with a guess', () => {

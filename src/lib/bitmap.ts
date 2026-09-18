@@ -6,21 +6,33 @@
  * as portable as its words — and a cell is not a file store: a PNG of a few
  * flat colours at these sizes is a kilobyte or two, which is a long cell but a
  * real one. The low resolution is the feature, not a limitation working its way
- * out; the ceiling is here so that it stays one.
+ * out.
+ *
+ * What is fixed is the *number* of pixels, not the shape: a board is 64 by 64
+ * worth of them, spent however you like — 64 x 64, 128 x 32, 256 x 16. That is
+ * the one thing the cell cares about, so it is the one thing held constant, and
+ * a banner can be drawn on a banner without a square's worth of empty rows
+ * going into the table with it.
  */
 
-/** The longest side any drawing gets, in pixels. */
-export const MAX_SIDE = 128;
+/** How many pixels a board gets: 64 x 64 of them, in any arrangement. */
+export const BUDGET = 64 * 64;
 
-/** No side shorter than this, however thin the area is drawn on the page. */
+/** Both sides of the board every drawing starts on. */
+export const DEFAULT_SIDE = 64;
+
+/** No side shorter than this: eight pixels is already barely something to draw on. */
 export const MIN_SIDE = 8;
+
+/** ...and so no side longer than the budget divided by that. */
+export const MAX_SIDE = BUDGET / MIN_SIDE;
 
 export interface Grid {
 	w: number;
 	h: number;
 }
 
-/** One side of a board, rounded and held between the two limits. */
+/** One side, rounded and held between the two limits, or null if it is not a number. */
 export function clampSide(value: unknown): number | null {
 	const n = Number(value);
 	if (!Number.isFinite(n)) return null;
@@ -28,31 +40,56 @@ export function clampSide(value: unknown): number | null {
 }
 
 /**
- * The grid for an area of `w` x `h` millimetres: the area's own proportions, so
- * a banner is drawn on a banner and a stamp on a square, with the longest side
- * held to `max`. Whole pixels, because half a pixel is not a thing to paint.
+ * The nearest board to the one asked for that the budget can pay for. The width
+ * is what is kept and the height is what gives — a side typed into the editor
+ * should be the side you typed, with the other one moving to make room, rather
+ * than both drifting away from what was asked for.
  */
-export function bitmapGrid(w: number, h: number, max = MAX_SIDE): Grid {
-	const longest = Math.max(w, h);
-	if (!(longest > 0)) return { w: max, h: max };
-	const scale = max / longest;
-	return {
-		w: Math.max(MIN_SIDE, Math.min(max, Math.round(w * scale))),
-		h: Math.max(MIN_SIDE, Math.min(max, Math.round(h * scale)))
-	};
+export function fitBoard(w: unknown, h: unknown): Grid {
+	const width = clampSide(w) ?? DEFAULT_SIDE;
+	const height = clampSide(h) ?? DEFAULT_SIDE;
+	if (width * height <= BUDGET) return { w: width, h: height };
+	const room = Math.floor(BUDGET / width);
+	// A width so great that even the shortest board overspends: the width is the
+	// side that has to give after all.
+	if (room < MIN_SIDE) return { w: Math.floor(BUDGET / MIN_SIDE), h: MIN_SIDE };
+	return { w: width, h: room };
+}
+
+/** Whether a board is the one every drawing starts on, and so need not be stored. */
+export const isDefaultBoard = (grid: Grid) => grid.w === DEFAULT_SIDE && grid.h === DEFAULT_SIDE;
+
+/**
+ * The board an area draws on: the one it was given, or the square every drawing
+ * starts on. It does not follow the area's proportions — an area is millimetres
+ * on paper and a board is pixels in a cell, and tying the second to the first
+ * meant a drawing's cost changed when someone resized the box it sits in.
+ */
+export function boardSize(box: { pixels?: Grid | null }): Grid {
+	const pixels = box.pixels;
+	if (!pixels) return { w: DEFAULT_SIDE, h: DEFAULT_SIDE };
+	return fitBoard(pixels.w, pixels.h);
 }
 
 /**
- * The board an area draws on: the size it was given, or the area's own
- * proportions where it was given none. Matching the area is the default
- * because a drawing made on the wrong shape is stretched on the page; a size
- * set by hand is for the times that is exactly what you want — a tile that
- * repeats, or a board wider than the slot it will be shown in.
+ * The board to open a picture on: its own size where the budget can pay for it,
+ * and the largest board of its shape where it cannot. A drawing made here comes
+ * back exactly as it was drawn — which is the whole point of preferring the
+ * picture's size to the area's — while a photograph dropped on the area is a
+ * million pixels and has to be resampled to be drawn on at all.
  */
-export function boardSize(box: { w: number; h: number; pixels?: Grid | null }): Grid {
-	const w = clampSide(box.pixels?.w);
-	const h = clampSide(box.pixels?.h);
-	return w !== null && h !== null ? { w, h } : bitmapGrid(box.w, box.h);
+export function boardFor(w: number, h: number): Grid {
+	const width = Math.round(w);
+	const height = Math.round(h);
+	if (!(width > 0) || !(height > 0)) return { w: DEFAULT_SIDE, h: DEFAULT_SIDE };
+	// A picture the budget can pay for keeps its own pixels; one smaller than the
+	// smallest board sits in the corner of that board rather than being blown up
+	// to fill it, because nearest-neighbour by 21.3 is not the picture any more.
+	if (width * height <= BUDGET) {
+		return fitBoard(Math.max(MIN_SIDE, width), Math.max(MIN_SIDE, height));
+	}
+	const scale = Math.sqrt(BUDGET / (width * height));
+	return fitBoard(Math.max(MIN_SIDE, Math.round(width * scale)), Math.round(height * scale));
 }
 
 /** A rectangle of the grid, in pixels. */
@@ -63,10 +100,11 @@ export interface Bounds extends Grid {
 
 /**
  * The rectangle the drawn pixels actually occupy, or `null` for an empty
- * canvas. A tile is trimmed to this before it is written out: an area set to
- * repeat tiles the picture at its own size, so a transparent margin round the
- * drawing becomes a gap in the pattern, and the board you drew on is a working
- * surface rather than the tile's size.
+ * canvas. This is what a tiled area repeats: it shows the picture at the
+ * picture's own size, so a transparent margin round a drawing would repeat as
+ * a gap in the pattern. Trimmed as it is drawn rather than as it is saved —
+ * the cell keeps the whole board, so changing an area to repeat and back
+ * changes nothing about what is in the table.
  */
 export function inkBounds(data: {
 	width: number;

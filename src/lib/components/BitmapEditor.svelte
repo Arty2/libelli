@@ -1,7 +1,18 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
 	import Icon from './Icon.svelte';
-	import { bitmapGrid, boardSize, clampSide, inkBounds, line, pixelAt, MAX_SIDE, MIN_SIDE, type Grid } from '$lib/bitmap';
+	import {
+		boardFor,
+		boardSize,
+		fitBoard,
+		isDefaultBoard,
+		line,
+		pixelAt,
+		BUDGET,
+		MAX_SIDE,
+		MIN_SIDE,
+		type Grid
+	} from '$lib/bitmap';
 	import type { Box } from '$lib/types';
 
 	/**
@@ -9,10 +20,10 @@
 	 *
 	 * Full screen on purpose, and never in place: an area on the card is often a
 	 * centimetre across, which is somewhere to *show* a drawing and nowhere to
-	 * make one. The board is the area's own proportions unless it is given a size
-	 * — see `bitmap.ts` — and what comes out is a PNG data URL, which goes into
-	 * the row's cell, so the picture travels with the table rather than living
-	 * beside it.
+	 * make one. The board is 64 by 64 pixels' worth, spent in whatever shape is
+	 * asked for — see `bitmap.ts` — and what comes out is a PNG data URL, which
+	 * goes into the row's cell, so the picture travels with the table rather than
+	 * living beside it.
 	 *
 	 * Nothing is written until Done. Cancel leaves the cell as it was, and the
 	 * whole drawing is one entry in the app's own undo, however many strokes it
@@ -30,26 +41,17 @@
 		 * be that colour rather than a second decision made in a second place.
 		 */
 		ink: string;
-		/** The picture, and the board it was made on where that was set by hand. */
+		/** The picture, and the board it was made on unless that is the usual one. */
 		onsave: (dataUrl: string, pixels: Grid | undefined) => void;
 		oncancel: () => void;
 	}
 
 	let { box, value, ink, onsave, oncancel }: Props = $props();
 
-	/**
-	 * An area set to repeat tiles its picture at the picture's own size, so the
-	 * transparent margin round a drawing would become a gap in the pattern. For
-	 * one of those the board is a working surface and only the drawn pixels are
-	 * the tile — trimmed on the way out, and counted that way while drawing, so
-	 * the weight in the header is the weight of what will actually be written.
-	 */
-	const tiled = untrack(() => box.fit === 'repeat');
-
 	// Read once: the box cannot change while this is up, and the board is the
-	// editor's own state from here on — Done is what writes it back.
+	// editor's own state from here on — Done is what writes it back. What the
+	// area holds already can move it again, once that has loaded.
 	let grid = $state<Grid>(untrack(() => boardSize(box)));
-	let custom = $state(untrack(() => Boolean(box.pixels)));
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
 	let tool = $state<'pen' | 'eraser'>('pen');
@@ -67,7 +69,6 @@
 	interface Shot {
 		image: ImageData;
 		grid: Grid;
-		custom: boolean;
 	}
 
 	let history = $state<Shot[]>([]);
@@ -93,8 +94,24 @@
 		measure();
 		if (!value) return;
 		const image = new Image();
-		image.onload = () => {
-			ctx.drawImage(image, 0, 0, grid.w, grid.h);
+		image.onload = async () => {
+			// The picture's own size wins over the board the area remembers: what
+			// is in the cell is the thing being edited, and opening it on another
+			// board would resample a picture nobody asked to resize. Only one too
+			// big for the budget — a photograph, not a drawing — is scaled.
+			const own = boardFor(image.naturalWidth, image.naturalHeight);
+			if (own.w !== grid.w || own.h !== grid.h) {
+				grid = own;
+				await tick();
+			}
+			const onto = context();
+			if (!onto) return;
+			onto.imageSmoothingEnabled = false;
+			if (image.naturalWidth <= grid.w && image.naturalHeight <= grid.h) {
+				onto.drawImage(image, 0, 0);
+			} else {
+				onto.drawImage(image, 0, 0, grid.w, grid.h);
+			}
 			measure();
 		};
 		image.src = value;
@@ -104,7 +121,7 @@
 
 	function shot(): Shot | null {
 		const image = snapshot();
-		return image ? { image, grid: { ...grid }, custom } : null;
+		return image ? { image, grid: { ...grid } } : null;
 	}
 
 	/**
@@ -140,7 +157,6 @@
 	async function apply(step: Shot) {
 		const resized = step.grid.w !== grid.w || step.grid.h !== grid.h;
 		grid = { ...step.grid };
-		custom = step.custom;
 		if (resized) {
 			manualZoom = null;
 			// The canvas is cleared by its own resize, so the pixels go back after.
@@ -182,11 +198,10 @@
 	 * what the scaling dropped on the way down is gone, which is the honest cost
 	 * of drawing at eight pixels and asking for sixteen back.
 	 */
-	async function setSize(next: Grid, byHand: boolean) {
-		if (next.w === grid.w && next.h === grid.h && byHand === custom) return;
+	async function setSize(next: Grid) {
+		if (next.w === grid.w && next.h === grid.h) return;
 		const before = remember();
 		grid = next;
-		custom = byHand;
 		// The fit is worked out for the new board; a zoom set by hand for the old
 		// one is not an answer to the question the new one asks.
 		manualZoom = null;
@@ -195,28 +210,23 @@
 		measure();
 	}
 
+	/**
+	 * A side, typed. `fitBoard` keeps the side it is given first, so the number
+	 * that was typed is the number that stays and the other one moves to pay for
+	 * it — a board is a fixed handful of pixels, not a fixed shape.
+	 */
 	const setSide = (axis: 'w' | 'h', raw: unknown) => {
-		const side = clampSide(raw);
-		if (side !== null) setSize({ ...grid, [axis]: side }, true);
+		const fitted = axis === 'w' ? fitBoard(raw, grid.h) : fitBoard(raw, grid.w);
+		setSize(axis === 'w' ? fitted : { w: fitted.h, h: fitted.w });
 	};
 
-	/** What goes into the cell: the board, or just the ink where this is a tile. */
-	function exported(): string | null {
-		if (!canvas) return null;
-		const whole = () => canvas!.toDataURL('image/png');
-		if (!tiled) return whole();
-		const data = snapshot();
-		const bounds = data && inkBounds(data);
-		if (!data || !bounds) return whole();
-		if (bounds.w === grid.w && bounds.h === grid.h) return whole();
-		const tile = document.createElement('canvas');
-		tile.width = bounds.w;
-		tile.height = bounds.h;
-		// Negative offsets: the same pixels, with everything outside the ink
-		// falling off the edges.
-		tile.getContext('2d')?.putImageData(data, -bounds.x, -bounds.y);
-		return tile.toDataURL('image/png');
-	}
+	/**
+	 * What goes into the cell: the whole board, always. An area set to repeat
+	 * shows only the drawn pixels, but that trimming happens as the card is
+	 * drawn — see `Card.svelte` — so the cell keeps what was drawn and changing
+	 * an area to repeat and back changes nothing about the table.
+	 */
+	const exported = () => canvas?.toDataURL('image/png') ?? null;
 
 	/** What this drawing will cost the cell it is going into, as it is drawn. */
 	function measure() {
@@ -272,7 +282,9 @@
 
 	function done() {
 		const data = exported();
-		if (data) onsave(data, custom ? { ...grid } : undefined);
+		// The usual board is the absence of the field, the same rule the rest of
+		// the format follows.
+		if (data) onsave(data, isDefaultBoard(grid) ? undefined : { ...grid });
 	}
 
 	function onKeydown(event: KeyboardEvent) {
@@ -308,7 +320,7 @@
 		return () => window.removeEventListener('resize', read);
 	});
 
-	/** Two fingers on the board, tracked by id so a stray third does nothing. */
+	/** Two fingers on the surface, tracked by id so a stray third does nothing. */
 	let pinch = new Map<number, { x: number; y: number }>();
 	let pinchStart: { spread: number; zoom: number } | null = null;
 
@@ -349,9 +361,9 @@
 	 * what stops the browser zooming the whole app around the drawing, and it
 	 * only works on a non-passive listener, so this is added by hand.
 	 */
-	let stage = $state<HTMLElement | null>(null);
+	let overlay = $state<HTMLElement | null>(null);
 	$effect(() => {
-		const node = stage;
+		const node = overlay;
 		if (!node) return;
 		const onWheel = (event: WheelEvent) => {
 			if (!event.ctrlKey && !event.metaKey) return;
@@ -365,18 +377,26 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="full" role="dialog" aria-modal="true" aria-label="Draw">
+<!-- The pinch and the wheel are held by the whole surface, not by the board: a
+     pinch that starts with a finger on the dark around it is still a pinch. -->
+<div
+	class="full"
+	role="dialog"
+	aria-modal="true"
+	aria-label="Draw"
+	tabindex="-1"
+	bind:this={overlay}
+	onpointerdown={pinchDown}
+	onpointermove={pinchMove}
+	onpointerup={pinchUp}
+	onpointercancel={pinchUp}
+>
 	<header>
 		<span class="what">{grid.w} × {grid.h}</span>
 		<!-- Said out loud, because this is going into a cell of the table and a
 		     long cell is the cost of it travelling with the words. -->
 		{#if weight !== null}
-			<span
-				class="weight"
-				title={tiled
-					? 'What this tile adds to the cell it is written into — the drawn pixels only, trimmed to the ink'
-					: 'What this drawing adds to the cell it is written into'}
-			>
+			<span class="weight" title="What this drawing adds to the cell it is written into">
 				/ {weight} KB
 			</span>
 		{/if}
@@ -436,17 +456,9 @@
 			</button>
 		</span>
 
-		<!-- The board. Typing a side sets it by hand; the button gives it back to
-		     the area's proportions, which is what it has until anyone asks. -->
-		<span class="segmented board">
-			<button
-				aria-pressed={!custom}
-				title="Match the area's proportions"
-				aria-label="Match the area"
-				onclick={() => setSize(bitmapGrid(box.w, box.h), false)}
-			>
-				<Icon name="shapes" size={15} />
-			</button>
+		<!-- The board: 64 by 64 pixels' worth, spent however you like. Type a side
+		     and the other one moves to pay for it. -->
+		<span class="segmented board" title="The board, in pixels — {BUDGET} of them to spend">
 			<input
 				type="number"
 				min={MIN_SIDE}
@@ -473,17 +485,7 @@
 	     the paper behind it will, and a white square instead of a transparent one
 	     is a thing you only find out about on paper. One check to a pixel, so the
 	     pattern is also the grid. -->
-	<!-- The pinch is two fingers anywhere on the paper, which is why it is held
-	     here rather than on the canvas; the drawing itself is the canvas's. -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="stage"
-		bind:this={stage}
-		onpointerdown={pinchDown}
-		onpointermove={pinchMove}
-		onpointerup={pinchUp}
-		onpointercancel={pinchUp}
-	>
+	<div class="stage">
 		<canvas
 			use:start
 			width={grid.w}

@@ -617,9 +617,10 @@ em { color: #b42318 }`;
 				...dataset,
 				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: dataUrl } : r))
 			};
-			// The board belongs to the area, not to the row: every row's picture is
-			// drawn on the same one, so it is written back even when the drawing
-			// itself went into a cell.
+			// The drawing goes in the cell, but the board is remembered on the
+			// area: it is where the next row's drawing starts. A row that already
+			// holds a picture of another size still opens at that size — what is
+			// in the cell wins over what the area remembers.
 			if (JSON.stringify(pixels ?? null) !== JSON.stringify(box.pixels ?? null)) {
 				updateBox({ ...current, pixels });
 			}

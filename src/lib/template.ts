@@ -1,5 +1,5 @@
 import { safeImageUrl } from './assets';
-import { clampSide } from './bitmap';
+import { clampSide, fitBoard } from './bitmap';
 import { parseColor } from './color';
 import defaultCard from './templates/default-card.json';
 import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
@@ -475,14 +475,16 @@ export function normaliseRotation(raw: unknown): number | undefined {
 
 /**
  * The board a drawing gets, if this box names one. Both sides or neither: half
- * a size is not a size, and the fallback — the area's own proportions — is a
- * better answer than one measurement paired with a guess.
+ * a size is not a size, and the board every drawing starts on is a better
+ * answer than one measurement paired with a guess. Held to the pixel budget
+ * here as well as in the editor, because a template is a file someone can hand
+ * you and a board of a million pixels is a cell nobody can open.
  */
 export function normalisePixels(raw: unknown): { w: number; h: number } | undefined {
 	if (!raw || typeof raw !== 'object') return undefined;
 	const w = clampSide((raw as any).w);
 	const h = clampSide((raw as any).h);
-	return w !== null && h !== null ? { w, h } : undefined;
+	return w !== null && h !== null ? fitBoard(w, h) : undefined;
 }
 
 /**

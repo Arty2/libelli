@@ -1,35 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_SIDE, MIN_SIDE, bitmapGrid, boardSize, clampSide, inkBounds, line, pixelAt } from './bitmap';
-
-describe('bitmapGrid', () => {
-	it('draws a square area on a square grid', () => {
-		expect(bitmapGrid(40, 40)).toEqual({ w: MAX_SIDE, h: MAX_SIDE });
-	});
-
-	it('keeps the proportions of the area, longest side first', () => {
-		expect(bitmapGrid(60, 20)).toEqual({ w: 128, h: 43 });
-		expect(bitmapGrid(20, 60)).toEqual({ w: 43, h: 128 });
-	});
-
-	it('will not draw a sliver, however thin the area is', () => {
-		// A 2mm strip on a 100mm area is one pixel of grid and nothing to draw on.
-		expect(bitmapGrid(100, 2).h).toBe(8);
-	});
-
-	it('never goes past the longest side it was given', () => {
-		const grid = bitmapGrid(500, 300, 32);
-		expect(Math.max(grid.w, grid.h)).toBe(32);
-	});
-
-	it('answers a square for an area with no size yet', () => {
-		expect(bitmapGrid(0, 0)).toEqual({ w: MAX_SIDE, h: MAX_SIDE });
-	});
-});
+import {
+	BUDGET,
+	DEFAULT_SIDE,
+	MAX_SIDE,
+	MIN_SIDE,
+	boardSize,
+	clampSide,
+	boardFor,
+	fitBoard,
+	inkBounds,
+	isDefaultBoard,
+	line,
+	pixelAt
+} from './bitmap';
 
 describe('clampSide', () => {
 	it('holds a side between the two limits', () => {
 		expect(clampSide(1)).toBe(MIN_SIDE);
-		expect(clampSide(900)).toBe(MAX_SIDE);
+		expect(clampSide(9000)).toBe(MAX_SIDE);
 		expect(clampSide(32.4)).toBe(32);
 	});
 
@@ -40,18 +28,73 @@ describe('clampSide', () => {
 	});
 });
 
+describe('fitBoard', () => {
+	it('leaves a board the budget can pay for alone', () => {
+		expect(fitBoard(64, 64)).toEqual({ w: 64, h: 64 });
+		expect(fitBoard(128, 32)).toEqual({ w: 128, h: 32 });
+		expect(fitBoard(16, 16)).toEqual({ w: 16, h: 16 });
+	});
+
+	it('spends the budget in any arrangement asked for', () => {
+		for (const w of [8, 16, 32, 64, 128, 256, 512]) {
+			const board = fitBoard(w, MAX_SIDE);
+			expect(board.w).toBe(w);
+			expect(board.w * board.h).toBeLessThanOrEqual(BUDGET);
+		}
+	});
+
+	it('takes the height down to pay for a wider board', () => {
+		// The width is what was typed, so the width is what is kept.
+		expect(fitBoard(128, 128)).toEqual({ w: 128, h: 32 });
+		expect(fitBoard(256, 64)).toEqual({ w: 256, h: 16 });
+	});
+
+	it('takes the width down only when even the shortest board overspends', () => {
+		expect(fitBoard(9000, 9000)).toEqual({ w: MAX_SIDE, h: MIN_SIDE });
+	});
+
+	it('falls back to the starting square rather than to nothing', () => {
+		expect(fitBoard(undefined, undefined)).toEqual({ w: DEFAULT_SIDE, h: DEFAULT_SIDE });
+		expect(fitBoard('wide', 32)).toEqual({ w: DEFAULT_SIDE, h: 32 });
+	});
+});
+
 describe('boardSize', () => {
-	it('takes the area\'s proportions when the box names no size', () => {
-		expect(boardSize({ w: 60, h: 20 })).toEqual({ w: 128, h: 43 });
+	it('is the starting square for a box that names no size', () => {
+		expect(boardSize({})).toEqual({ w: DEFAULT_SIDE, h: DEFAULT_SIDE });
 	});
 
-	it('takes the size the box names, held to the limits', () => {
-		expect(boardSize({ w: 60, h: 20, pixels: { w: 40, h: 40 } })).toEqual({ w: 40, h: 40 });
-		expect(boardSize({ w: 60, h: 20, pixels: { w: 4000, h: 1 } })).toEqual({ w: MAX_SIDE, h: MIN_SIDE });
+	it('is the size the box names, within the budget', () => {
+		expect(boardSize({ pixels: { w: 40, h: 40 } })).toEqual({ w: 40, h: 40 });
+		expect(boardSize({ pixels: { w: 200, h: 200 } })).toEqual({ w: 200, h: 20 });
 	});
 
-	it('falls back to the area when only half a size is given', () => {
-		expect(boardSize({ w: 40, h: 40, pixels: { w: 32, h: NaN } })).toEqual({ w: MAX_SIDE, h: MAX_SIDE });
+	it('knows the board it need not store', () => {
+		expect(isDefaultBoard({ w: 64, h: 64 })).toBe(true);
+		expect(isDefaultBoard({ w: 128, h: 32 })).toBe(false);
+	});
+});
+
+describe('boardFor', () => {
+	it('opens a picture at its own size when the budget can pay for it', () => {
+		expect(boardFor(40, 24)).toEqual({ w: 40, h: 24 });
+		expect(boardFor(128, 32)).toEqual({ w: 128, h: 32 });
+	});
+
+	it('brings a photograph down to the budget, keeping its shape', () => {
+		const board = boardFor(2000, 1000);
+		expect(board.w * board.h).toBeLessThanOrEqual(BUDGET);
+		// Twice as wide as it is tall, still.
+		expect(board.w / board.h).toBeCloseTo(2, 1);
+	});
+
+	it('will not open a picture on a sliver', () => {
+		expect(boardFor(400, 2).h).toBe(MIN_SIDE);
+		expect(boardFor(3, 3)).toEqual({ w: MIN_SIDE, h: MIN_SIDE });
+	});
+
+	it('answers the starting square for nothing at all', () => {
+		expect(boardFor(0, 0)).toEqual({ w: DEFAULT_SIDE, h: DEFAULT_SIDE });
 	});
 });
 

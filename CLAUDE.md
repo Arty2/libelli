@@ -36,7 +36,8 @@ src/lib/
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
   hand.ts         a border drawn by hand: seeded wobble -> SVG paths, in mm
-  bitmap.ts       the pixel grid a drawn area gets, and pointing at it
+  bitmap.ts       the pixel budget a drawn area gets, and pointing at it
+  tile.ts         a drawing cropped to its ink, for an area that repeats
   table.ts        column reorder, row sorting
   imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
   download.ts     hand the browser a file; the one copy both exports use
@@ -160,6 +161,8 @@ already have read the last version of. So: no bump until the PR exists, then
   and `color:` on the next was carrying the seam around for no benefit.
 - **Say the trade-off out loud.** If a choice is arguable, note it in the commit
   or in a comment rather than leaving the next reader to rediscover it.
+- **Watch a pull request only when asked.** Never start following CI, and never
+  keep a check-in running, off your own initiative.
 - **Never ship anything traceable to reference material.** Sample data and
   template names are invented; contact addresses use reserved `.example` domains.
 

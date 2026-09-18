@@ -289,7 +289,7 @@ bottom edge alone is an underline rather than three quarters of a box.
 off the line. If the ends wobbled too, the corners would not meet, and a gap
 where two strokes should join does not read as hand-drawn — it reads as broken.
 
-## `src/lib/bitmap.ts` and `src/lib/components/BitmapEditor.svelte`
+## `src/lib/bitmap.ts`, `src/lib/tile.ts` and `src/lib/components/BitmapEditor.svelte`
 
 **The drawing goes in the cell, as base64.** Not into this browser's store like
 a dropped file: a drawing made here has no existence anywhere else, and a
@@ -305,43 +305,58 @@ only other tool is the rubber. The trade-off is that the ink is fixed at the
 moment of drawing: this is a PNG, not a mask, so changing the area's colour
 afterwards does not recolour what was drawn.
 
-**Low resolution is the feature.** A hundred and twenty-eight pixels on the
-longest side is a kilobyte or two of base64 — a long cell, but one a spreadsheet
-can hold and a person can scroll past. Twice the side is four times the pixels
-and a cell nobody can do anything with, so the ceiling is a number in
-`bitmap.ts` rather than a matter of taste. The header says what the drawing is
-costing as it is drawn, so the limit is visible rather than a rule that bites
-later.
+**Low resolution is the feature, and it is a budget rather than a shape.** A
+board is 64 by 64 pixels' worth — 4096 of them — spent in any arrangement:
+64 x 64, 128 x 32, 512 x 8. What a cell cares about is how many pixels it is
+being asked to hold, not how they are arranged, so that is the one thing held
+constant; a kilobyte or two of base64 is a long cell but one a spreadsheet can
+hold and a person can scroll past. The header says what the drawing is costing
+as it is drawn, so the limit is visible rather than a rule that bites later.
 
-**The board takes the area's proportions unless it is given a size.** A banner
-is drawn on a banner and a stamp on a square: a fixed square board would have
-meant drawing a wide title inside a square and watching `fit` letterbox it —
-designing against a shape that is not the shape it will print at. A size typed
-in is for when that is exactly what you want, and it is stored on the box, not
-on the row: the board is a property of the area, so every row's picture is drawn
-on the same one. Absent is the proportions, the same rule every other optional
-field here follows.
+**The board does not follow the area.** It did at first — the area's own
+proportions, longest side pinned — and that tied a drawing's cost to the
+millimetres of the box it sat in: resizing an area on the page changed the size
+of every drawing made in it afterwards, for no reason the person resizing it
+would recognise. An area is millimetres on paper and a board is pixels in a
+cell. A board set by hand is stored on the box and is where the next drawing
+starts, and absent means the 64 x 64 square, the same "absent is the default"
+rule the rest of the format follows.
 
-**A resize scales what is drawn, and is a step in the editor's own undo.** The
-alternative — refusing to resize once anything is drawn — would have made the
-size a decision you have to get right before you know what you are drawing.
-Undo carries the board with it, so stepping back off a resize puts the drawing
-back on the board it was made on; what the scaling dropped on the way down is
-gone, which is the honest cost of drawing at eight pixels and asking for sixteen
-back.
+**A picture already in the cell opens at its own size.** The thing being edited
+is what is in the cell, and opening it on the board the area remembers would
+resample a picture nobody asked to resize. Only one too big for the budget — a
+photograph dropped on the area, not a drawing — is scaled down to fit, and one
+smaller than the smallest board sits in the corner of it rather than being blown
+up by a fraction.
 
-**A tile is trimmed to its ink.** An area set to `repeat` tiles the picture at
-the picture's own size, so the transparent margin round a drawing would repeat
-as a gap in the pattern. For that one fit the board is a working surface and
-only the painted pixels are written out — and counted, so the weight in the
-header is the weight of what will actually go into the cell.
+**A resize scales what is drawn; undo restores the board and the detail.**
+Refusing to resize once anything is drawn would make the size a decision you had
+to get right before you knew what you were drawing. Instead every resize is an
+entry in the editor's own stack, holding the pixels at the size they were drawn
+at, so stepping back off a resize is exact — the detail the scaling dropped on
+the way down comes back with the board it was drawn on. Forwards is still lossy,
+and that is the honest cost of drawing at eight pixels and asking for sixteen.
+
+**A tile is trimmed as it is drawn, not as it is saved.** An area set to
+`repeat` shows the picture at the picture's own size, so the transparent margin
+round a drawing would repeat as a gap in the pattern. The first version trimmed
+on the way out of the editor, which put the trimmings in the cell: reopening the
+drawing then stretched a four-pixel tile back across the board, and changing the
+fit back left a picture that had already lost its board. So the cell keeps the
+whole board and `tile.ts` crops to the ink as the card is drawn, cached by
+source. Only `data:` pictures are cropped — that is where drawings live, and it
+is also the only kind a canvas will read back, since anything from elsewhere
+taints it and refuses `toDataURL`. The cost is that the crop is asynchronous: a
+card drawn in the very first frame tiles the whole board until the crop lands.
 
 **The zoom steps through whole numbers.** Whole screen pixels per pixel of the
 board, pinch and Ctrl+wheel included: a board at 7.5 screen pixels a side lands
 half its pixels on half a screen pixel, and a pixel editor that blurs its own
 edges is no use. It is also what lets the checkerboard behind the board be one
 check per pixel — a CSS gradient sized from the same number — so the pattern
-that says "nothing painted here" is also the grid.
+that says "nothing painted here" is also the grid. The pinch is held by the
+whole surface rather than by the board, because a pinch that starts with a
+finger on the dark around it is still a pinch.
 
 **Full screen, never in place.** Every other kind of area is edited where it
 sits, and this one cannot be: areas are frequently a centimetre across, which is

@@ -21,6 +21,7 @@
 		snapToEdges
 	} from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
+	import { croppable, cropToInk, tileOf } from '$lib/tile';
 	import { normaliseRotation, sidesOf } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
@@ -384,7 +385,7 @@
 			// A tile is a background, not an element: `<img>` has no way to repeat.
 			else if (media.src && box.fit === 'repeat') {
 				parts.push(
-					`background-image:${cssUrl(media.src)}`,
+					`background-image:${cssUrl(tiles[media.src] ?? media.src)}`,
 					'background-repeat:repeat',
 					'background-size:auto'
 				);
@@ -456,6 +457,30 @@
 	 * and a data URL cannot — nothing in the bytes says which of the two it is.
 	 */
 	const drawnByHand = (src: string | undefined) => !!src?.startsWith('data:');
+
+	/**
+	 * What a tiled area actually repeats: the drawing trimmed to its ink — see
+	 * `tile.ts`. Worked out from the pixels, so it cannot be done while building
+	 * a style string; the map fills in as the crops resolve and the style is
+	 * rebuilt then, tiling the whole board in the meantime.
+	 */
+	let tiles = $state<Record<string, string>>({});
+
+	$effect(() => {
+		for (const box of template.boxes) {
+			if (box.mode !== 'image' || box.fit !== 'repeat') continue;
+			const src = mediaOf(box).src;
+			if (!croppable(src) || tiles[src]) continue;
+			const held = tileOf(src);
+			if (held) {
+				tiles = { ...tiles, [src]: held };
+				continue;
+			}
+			cropToInk(src).then((cropped) => {
+				if (cropped) tiles = { ...tiles, [src]: cropped };
+			});
+		}
+	});
 
 	const borderColorOf = (box: Box) => box.borderColor ?? box.color ?? template.defaults.color;
 
