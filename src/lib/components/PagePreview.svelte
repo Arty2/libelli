@@ -1445,43 +1445,43 @@
 		   its arms cast none. It is there all the time now — a thing that stands
 		   up off the page casts a shadow whether or not it is being moved. */
 		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.16));
-		/* The tilt below is a 3D rotation, so it needs the perspective in its own
-		   transform: the property of that name applies to a box's children, not
-		   to the box itself. Short, because a pad that takes a tenth of a second
-		   to answer a tap does not feel like a button. */
-		transform: perspective(340px);
+		/* Short, because a pad that takes a tenth of a second to answer a tap
+		   does not feel like a button. */
 		transition: transform 80ms ease-out;
 	}
 
-	/* Pressed, the whole pad leans the way you pressed it — rocking on the pivot
-	   under its middle, the way a real one does. This replaces the keys each
-	   sinking on their own: five keys that go down individually read as five
-	   buttons that happen to touch, and this is one thing you push at a corner. */
-	.pad.push-up {
-		transform: perspective(340px) rotateX(9deg);
-	}
-
-	.pad.push-down {
-		transform: perspective(340px) rotateX(-9deg);
-	}
-
+	/* Pressed, the whole pad skews the way you pressed it: the edge under your
+	   finger drops and the opposite one comes up, which is what a thing pushed
+	   in at one side does. A skew rather than a 3D rotation because this is a
+	   drawn object rather than a photographed one — the shear reads at a glance
+	   at this size, where nine degrees of perspective read as a rendering
+	   artefact. The pair is chosen by the axis the press tips it about: a press
+	   from the side tips it about a vertical axis, which is `skewY`. */
 	.pad.push-left {
-		transform: perspective(340px) rotateY(-9deg);
+		transform: skewY(-5deg) translateX(-2px);
 	}
 
 	.pad.push-right {
-		transform: perspective(340px) rotateY(9deg);
+		transform: skewY(5deg) translateX(2px);
+	}
+
+	.pad.push-up {
+		transform: skewX(-5deg) translateY(-2px);
+	}
+
+	.pad.push-down {
+		transform: skewX(5deg) translateY(2px);
 	}
 
 	/* The middle is not a direction, so it goes straight down. */
 	.pad.push-centre {
-		transform: perspective(340px) scale(0.97);
+		transform: scale(0.97);
 	}
 
 	/* While it is being carried it follows the finger and nothing else: a pad
-	   tilted and moving at once reads as a bug in the drag. */
+	   skewed and moving at once reads as a bug in the drag. */
 	.pad.moving {
-		transform: perspective(340px);
+		transform: none;
 	}
 
 	/* Every cell carries a border on the three edges that are on the perimeter of
@@ -1501,13 +1501,18 @@
 		--pad-light: #fff;
 		--pad-edge: #b9bcc2;
 		--pad-shade: #8f949c;
+		/* One flat colour across the whole inside of the cross. It was a gradient
+		   per cell, which starts again at every cell: five separate sweeps of
+		   light on a shape that is meant to be one surface. The bevel on the
+		   perimeter is what lights it now, and it lights it once. */
+		--pad-face: #f1f3f5;
 		display: grid;
 		place-items: center;
 		box-sizing: border-box;
 		border-width: 1px 2px 2px 1px;
 		border-style: solid;
 		border-color: transparent;
-		background: linear-gradient(145deg, #fff, #eceef1);
+		background: var(--pad-face);
 		color: #333;
 		font: 600 12px ui-sans-serif, system-ui, sans-serif;
 		cursor: pointer;
@@ -1521,7 +1526,7 @@
 	   two an anchor has spoken for do not change, because they are not going to
 	   do anything either. */
 	.pad button:active:not(.tied):not(:disabled) {
-		background: linear-gradient(145deg, #e4e7ea, #f6f7f8);
+		background: #e4e7ea;
 	}
 
 	/* The twelve segments of the cross. Each edge is drawn once, by the cell that
@@ -1656,10 +1661,9 @@
 		position: relative;
 		z-index: 0;
 		/* The same face as the arms around it: the cross is one continuous
-		   surface with a round key drawn on it, and a darker well under that key
-		   made the middle read as a hole. What keeps the ring visible against it
-		   is the key's own shadow rather than a change of ground. */
-		background: linear-gradient(145deg, #fff, #eceef1);
+		   surface with a round key drawn on it, and anything else under that key
+		   made the middle read as a hole. */
+		background: var(--pad-face);
 	}
 
 	.pad .step::before {
@@ -1668,19 +1672,16 @@
 		inset: 3px;
 		z-index: -1;
 		border-radius: 50%;
-		background: linear-gradient(145deg, #fff, #eef0f2);
-		/* No line round it at all: the cross is one surface, and a ring drawn on
-		   that surface made the middle read as a part cut out of it rather than
-		   as the grip sitting on it. What says the key is there is its own
-		   shadow and the light across its face. */
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+		/* Flat, and lighter than the face it sits on. No line round it and no
+		   shadow under it: every version of either read as a hole cut in a
+		   surface that is meant to be continuous, so the one thing that says the
+		   key is there is that it is a different tone. */
+		background: #fff;
 	}
 
-	/* Pressed, the round key darkens and its shadow goes; the pad's own movement
-	   is what says it went down. */
+	/* Pressed, the round key darkens; the pad's own movement says the rest. */
 	.pad .step:active::before {
-		background: linear-gradient(145deg, #e4e7ea, #f6f7f8);
-		box-shadow: none;
+		background: #e8eaee;
 	}
 	.pad .right { grid-area: 2 / 3; }
 	.pad .down { grid-area: 3 / 2; }

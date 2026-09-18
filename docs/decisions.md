@@ -1012,22 +1012,29 @@ again; a pad you cannot reach is a control you have lost.
 The middle of the pad is the step and the grip rather than a direction, so it is
 a circle — but a circle drawn *in* the cross rather than cut out of it, because a
 round cell would have left four notches of card showing where the arms come
-together. Two things were tried and dropped: a darker well under the key, which
-fixed the ring and made the middle read as a hole in a surface meant to be
-continuous, and then a hairline round the key, which drew the same hole in one
-line instead of a fill. What says the key is there is its own shadow and the
-light across its face, and nothing else.
+together. Three things were tried and dropped: a darker well under the key, a
+hairline round it, and a shadow under it — each one drew the same hole in a
+surface that is meant to be continuous. The key is flat and simply lighter than
+the face it sits on, and that tone is the whole of it.
 
-**The whole pad tilts; the keys do not sink one by one.** Pressing a key used to
+**The face is one flat colour.** It was a gradient, declared on each cell, which
+means it restarts at every cell: five separate sweeps of light across a shape
+that is meant to be a single surface, with the seams landing exactly where the
+arms meet. Flat, lit once by the bevel on the perimeter — which is the only
+place the light needs to be said, because that is where the shape turns.
+
+**The whole pad shears; the keys do not sink one by one.** Pressing a key used to
 swap that key's bevel, which made it look redrawn rather than pushed — and five
 keys that each go down on their own read as five buttons that happen to touch.
-Now the pad leans toward the key being held, a `rotateX`/`rotateY` of nine
-degrees on the pad itself with the perspective in its own transform (the
-property of that name applies to a box's children, not the box). It rocks on the
-pivot under its middle, the way a real pad does; the middle key goes straight
-down instead, because it is not a direction. While the pad is being carried it
-does not tilt at all — a pad tilted and moving at once reads as a bug in the
-drag.
+Now the whole pad skews toward the key being held: the edge under the finger
+drops and the opposite one comes up, which is what a thing pushed in at one side
+does. A skew rather than a 3D rotation because this is a drawn object rather than
+a photographed one — the shear reads at a glance at this size, where nine degrees
+of perspective read as a rendering artefact. Which pair is used follows the axis
+the press tips it about: a press from the side tips it about a vertical axis,
+which is `skewY`; from above or below, `skewX`. The middle key goes straight down
+instead, because it is not a direction, and a pad being carried does not skew at
+all — skewed and moving at once reads as a bug in the drag.
 
 **One shadow, thrown by the shape.** `filter: drop-shadow` on the pad rather
 than a `box-shadow` on each key, so the cross casts a single shadow and the
