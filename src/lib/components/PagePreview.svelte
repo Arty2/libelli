@@ -502,59 +502,17 @@
 
 	/** Two fingers on the page. Tracked by pointer id, so a stray third does nothing. */
 	let pinch = new Map<number, { x: number; y: number }>();
-	let pinchStart:
-		| {
-				spread: number;
-				scale: number;
-				/** the type sizes the pinch started from, keyed by box; null zooms the page instead */
-				sizes: Map<string, number> | null;
-				/** whether the undo entry has been named, which happens on the first change */
-				named: boolean;
-		  }
-		| null = null;
+	let pinchStart: { spread: number; scale: number } | null = null;
 
 	const spread = () => {
 		const [a, b] = [...pinch.values()];
 		return Math.hypot(a.x - b.x, a.y - b.y);
 	};
 
-	/**
-	 * What a pinch that lands on an area is about: its type.
-	 *
-	 * A pinch over the page is the gesture everyone already has for making the
-	 * words bigger, and the page has a zoom control, a wheel, two keys and the
-	 * lightbox for the other reading. So a pinch whose middle is over an area
-	 * sizes that area — the whole selection when it is part of one, the same
-	 * bargain dragging one of several makes — and a pinch over bare ground or
-	 * over a locked design still zooms the page, which is what keeps the gesture
-	 * from being lost on a phone.
-	 */
-	function sizesUnder(x: number, y: number): Map<string, number> | null {
-		if (template.locked) return null;
-		const el = document.elementFromPoint(x, y) as HTMLElement | null;
-		const id = el?.closest<HTMLElement>('[data-box-id]')?.dataset.boxId;
-		if (!id) return null;
-		const chosen = selectedIds.includes(id) ? selectedIds : [id];
-		const sizes = new Map<string, number>();
-		for (const box of template.boxes) {
-			// A box with no size of its own inherits the page's; the first pinch is
-			// what gives it one to change.
-			if (chosen.includes(box.id) && !box.locked) sizes.set(box.id, box.size ?? template.defaults.size);
-		}
-		return sizes.size ? sizes : null;
-	}
-
 	function onPinchDown(event: PointerEvent) {
 		if (event.pointerType !== 'touch') return;
 		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
-		if (pinch.size !== 2) return;
-		const [a, b] = [...pinch.values()];
-		pinchStart = {
-			spread: spread(),
-			scale,
-			sizes: sizesUnder((a.x + b.x) / 2, (a.y + b.y) / 2),
-			named: false
-		};
+		if (pinch.size === 2) pinchStart = { spread: spread(), scale };
 	}
 
 	function onPinchMove(event: PointerEvent) {
@@ -562,24 +520,7 @@
 		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
 		if (pinch.size !== 2 || !pinchStart || pinchStart.spread === 0) return;
 		event.preventDefault();
-		const by = spread() / pinchStart.spread;
-		if (!pinchStart.sizes) {
-			zoomTo(pinchStart.scale * by);
-			return;
-		}
-		for (const box of template.boxes) {
-			const from = pinchStart.sizes.get(box.id);
-			if (from === undefined) continue;
-			const size = Math.round(Math.max(1, from * by) * 10) / 10;
-			if (size === box.size) continue;
-			// Named on the first size that actually changes, and once only, so a
-			// pinch that never grew past a tenth of a point leaves no undo entry.
-			if (!pinchStart.named) {
-				pinchStart.named = true;
-				onaction?.('Resize the type');
-			}
-			onchange({ ...box, size });
-		}
+		zoomTo(pinchStart.scale * (spread() / pinchStart.spread));
 	}
 
 	function onPinchUp(event: PointerEvent) {
@@ -591,7 +532,7 @@
 	 * The pinch listens in the capture phase, on the way down to whatever was
 	 * touched, because an area swallows its own pointer events — without this a
 	 * pinch worked on the grey around the page and nowhere on the page itself,
-	 * which is exactly where the areas are.
+	 * which is most of what there is to pinch on a phone.
 	 */
 	$effect(() => {
 		if (!host) return;

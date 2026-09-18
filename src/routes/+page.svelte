@@ -2107,10 +2107,10 @@ em { color: #b42318 }`;
 
 		<h3>On a touchscreen</h3>
 		<p>
-			<strong>Pinch an area</strong> and its type grows or shrinks with your fingers — the whole selection, if it is
-			part of one. Pinch the ground around the page and the page zooms instead. A second finger never drags: an area
-			that was moving goes back where it was, so a pinch changes the size and nothing else. Every button answers a
-			press with a few milliseconds of vibration, where the device has it.
+			<strong>Pinch to zoom</strong> the page, anywhere over the stage — over the areas as well as the ground
+			around them. A second finger never drags: an area that was moving goes back where it was, so a pinch zooms
+			and leaves the card alone. Every button answers a press with a few milliseconds of vibration, where the
+			device has it.
 		</p>
 		<p>
 			The <strong>cross of arrows</strong> by the page nudges the selection; its middle button cycles the step, and
@@ -2146,7 +2146,7 @@ em { color: #b42318 }`;
 			<dt>Ctrl/Cmd + Shift + V</dt><dd>Paste that style onto the selection</dd>
 			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
 			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
-			<dt>Ctrl/Cmd + scroll</dt><dd>Zoom the page — as does a pinch on the ground around it</dd>
+			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page</dd>
 			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
 			<dt>Ctrl/Cmd + ;<span>Ctrl/Cmd + H</span></dt><dd>Bounds on or off</dd>

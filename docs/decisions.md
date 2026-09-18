@@ -587,10 +587,10 @@ offset was zero. `translate` is a used-value offset, so it moves nothing in
 layout, and the overflow it makes is what the card's own `overflow: hidden`
 crops. That crop is the cut.
 
-**A second finger cancels the drag and puts the area back.** A pinch over an area
-sizes its type (see `PagePreview.svelte`), and the finger that started the pinch
-had already picked up whatever it landed on — so a two-finger gesture scaled the
-type and walked the area across the card at once. The window listens in the
+**A second finger cancels the drag and puts the area back.** A pinch zooms the
+page from anywhere over the stage, areas included, and the finger that started it
+had already picked up whatever it landed on — so a two-finger gesture zoomed the
+page and walked an area across the card at once. The window listens in the
 capture phase for every touch, because a box stops its own pointerdown from
 propagating and the second finger may land anywhere at all. The area goes back to
 where the drag started rather than staying where it had got to: a pinch is not a
@@ -794,22 +794,19 @@ hang over the edge — and stops at one cell, which is where the middle button's
 outer edge meets the edge of the stage. That button is how the pad is picked up
 again; a pad you cannot reach is a control you have lost.
 
-**A pinch that lands on an area sizes its type; a pinch on the ground zooms the
-page.** Both readings of the gesture are right, and only one of them can be the
-default, so the answer is what is under the fingers: the page already has a zoom
-menu, a wheel, two keys and the full-screen view, and the areas had nothing at
-all on a phone. The midpoint at the moment the second finger lands decides it,
-and the whole selection is sized when the area under it is part of one — the same
-bargain dragging one of several makes. A locked design is never sized, and falls
-back to the zoom. The trade-off worth saying out loud: on a card whose areas
-cover most of the paper, pinch-to-zoom in the editor is mostly reachable in the
-margin around it, which is why the full-screen view now takes the pinch as a zoom
-outright.
+**A pinch zooms the page, wherever it lands.** It briefly sized the type of the
+area under it instead, on the reasoning that the page has a zoom menu, a wheel
+and two keys while the areas had nothing on a phone. That was one gesture with
+two meanings decided by what happened to be under two fingertips, and the wrong
+one is only ever discovered after it has resized something: a zoom is a look at
+the card, a type size is a change to it, and a gesture must not guess between a
+look and an edit. Type size is the Size field in the bar, and
+Ctrl/Cmd+Shift+scroll where there is a wheel.
 
 **The pinch listens in the capture phase.** An area swallows its own pointer
 events, so the bubbling listeners this used to have saw two fingers on the grey
-around the page and never saw them on the page itself — which is exactly where
-the areas are, and where a pinch now has something to do.
+around the page and never saw them on the page itself — which on a card that has
+been laid out is most of what there is to pinch.
 
 **The pad's tied keys are not dead.** An anchored area has no vertical freedom,
 and the two vertical keys used to say so by being `disabled` — honest, and

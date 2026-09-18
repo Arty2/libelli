@@ -711,7 +711,7 @@ of width.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>p</kbd> / <kbd>s</kbd> | Export, for the fingers that reach for those |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + arrows | Step the alignment — left, right, top, bottom |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + scroll | Size the type in the area under the pointer |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll | Zoom the page — as does a pinch on the ground around it |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll, pinch | Zoom the page |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> | Zoom the page in or out |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>0</kbd> | Fit the page (<kbd>⇧</kbd> for 100%) |
 | <kbd>←</kbd> / <kbd>→</kbd> | Step through the cards, with one open full screen |
@@ -741,16 +741,14 @@ rather than an accident.
 
 ### Touch gestures
 
-- **Pinch an area** and its type grows and shrinks with your fingers — the whole
-  selection when the area is part of one, the same bargain dragging one of
-  several makes. The pinch listens on the way down to whatever was touched, so
-  it works over the areas and not only in the gaps between them.
-- **Pinch the ground** around the page and the page zooms, as it always did. The
-  page has a zoom menu, a wheel and two keys; the areas had nothing, which is
-  why the gesture goes to them where they are under it.
+- **Pinch to zoom the page**, anywhere over the stage. The gesture listens on
+  the way down to whatever was touched, so it works over the areas and not only
+  in the gaps between them — which is most of the page on a card that has been
+  laid out. Type size is the **Size** field in the bar, or Ctrl/Cmd+Shift+scroll
+  with a mouse: a pinch is how a phone zooms, and it means that here too.
 - **A second finger is never a drag.** An area that was moving under one finger
-  goes back where it started the moment a second one lands, so a pinch changes
-  the size and nothing else.
+  goes back where it started the moment a second one lands, so a pinch zooms and
+  leaves the card alone.
 - **Full screen, a pinch zooms the card** — up to six times, with a drag to move
   around it and a flick to page the run once it is back at rest. That is the one
   screen where zooming means what a phone means by it: the card is already as
