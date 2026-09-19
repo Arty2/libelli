@@ -108,7 +108,29 @@ else
 	pass "no runtime dependencies" "no-runtime-dependencies"
 fi
 
-# ── 5. colour is spelled color where it is a name ────────────────────────────
+# ── 5. The security headers are still in vercel.json ────────────────────────
+# A generic edit to vercel.json — a redirect, a rewrite, a cache rule — is an
+# easy place to lose the headers block entirely rather than extend it, and
+# nothing else would notice: the app looks identical without them.
+#
+# Content-Security-Policy is in the list because it is the only copy that
+# matters for framing. This app ships no CSP of its own; that header carries
+# `frame-ancestors 'none'` and nothing else, which is X-Frame-Options in the
+# spelling browsers now honour. Lose it and X-Frame-Options is doing the whole
+# job alone. See docs/decisions.md § vercel.json.
+required_headers='Strict-Transport-Security X-Content-Type-Options Referrer-Policy X-Frame-Options Content-Security-Policy Permissions-Policy'
+missing=""
+for header in $required_headers; do
+	grep -q "\"$header\"" vercel.json 2>/dev/null || missing="$missing $header"
+done
+
+if [ -n "$missing" ]; then
+	fail "vercel.json is missing security headers" "$(echo "$missing" | xargs)" "security-headers-present"
+else
+	pass "security headers present in vercel.json" "security-headers-present"
+fi
+
+# ── 6. colour is spelled color where it is a name ────────────────────────────
 # Identifier, CSS property, custom property. Prose keeps its `u` — a comment
 # about a coloured glyph is a sentence, not a name — so this matches only the
 # positions where the word is naming the thing. See AGENTS.md § How we work.
@@ -120,7 +142,7 @@ else
 	pass "color spelled color wherever it is a name" "color-not-colour"
 fi
 
-# ── 6. VERSION and package.json agree ────────────────────────────────────────
+# ── 7. VERSION and package.json agree ────────────────────────────────────────
 # Two files hold the number and the help panel reads only one of them, so a
 # session that bumps package.json alone ships a build that misreports itself —
 # invisible until someone is trying to work out which version a bug is in.
@@ -139,7 +161,7 @@ else
 	pass "version $src_version in both places" "version-in-step"
 fi
 
-# ── 7. The instructions file stays short ─────────────────────────────────────
+# ── 8. The instructions file stays short ─────────────────────────────────────
 # AGENTS.md is read in full every session, and its own opening paragraph asks
 # for brevity. That request is worth nothing while the only thing enforcing it
 # is the sentence making it — so it is a budget: raise it deliberately, in the

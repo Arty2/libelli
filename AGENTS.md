@@ -146,9 +146,9 @@ A rule that only lives in prose gets broken by the first change that does not
 re-read it — including by whoever wrote it, who always has a good reason. So
 every rule above that *can* be checked is: `npm run gates` runs `scripts/gates.sh`
 first in CI and fails the build on injection sinks, `{@html}` outside its three
-renderers, a `fetch` outside `png.ts` and the worker, a runtime dependency,
-`colour` spelled as a name, a `VERSION` out of step with `package.json`, and
-this file over its line budget.
+renderers, a `fetch` outside `png.ts` and the worker, a runtime dependency, a
+security header gone missing from `vercel.json`, `colour` spelled as a name, a
+`VERSION` out of step with `package.json`, and this file over its line budget.
 
 Add the next rule there rather than as a paragraph here. Each run also appends
 one line to the gitignored `.claude/logs/gates.jsonl`, which is how "this gate

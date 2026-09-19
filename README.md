@@ -1183,9 +1183,10 @@ npm run build    # static output in ./build, deployable anywhere
 - **Gates** — `scripts/gates.sh` runs first in CI and fails the build on the
   rules a linter cannot see: no `innerHTML` or `eval` anywhere in `src/`,
   `{@html}` only in the three renderers that have earned it, `fetch` only in
-  `png.ts` and the service worker, no runtime dependencies, `color` never
-  spelled with a `u` where it names something, `VERSION` in step with
-  `package.json`, and `AGENTS.md` inside its line budget. A rule that only lives
+  `png.ts` and the service worker, no runtime dependencies, the security
+  headers still in `vercel.json`, `color` never spelled with a `u` where it
+  names something, `VERSION` in step with `package.json`, and `AGENTS.md`
+  inside its line budget. A rule that only lives
   in prose is broken by the first change that does not re-read it, so the ones
   that can execute do. Add the next one there rather than as a paragraph.
 - **Version** — `src/lib/version.ts` is the source of truth, kept in step with
@@ -1194,7 +1195,11 @@ npm run build    # static output in ./build, deployable anywhere
 - **Deploying** — `npm run build` writes a static site to `build/`; any static
   host serves it. `vercel.json` states the build command and output directory
   outright and turns the framework preset off, because Vercel reads this as a
-  plain Vite app and goes looking for `dist/`. Not the SvelteKit preset: that
+  plain Vite app and goes looking for `dist/`. It also sets the response
+  headers — HSTS, `nosniff`, `no-referrer`, a refusal to be framed, and a
+  `Permissions-Policy` that turns off the hardware this app has no use for.
+  Another host needs those configured its own way; `docs/decisions.md`
+  § `vercel.json` says what each is for and what was deliberately left out. Not the SvelteKit preset: that
   expects the Vercel adapter's `.vercel/output`, which would mean serverless
   functions this app has no use for.
 

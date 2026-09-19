@@ -2177,6 +2177,62 @@ is where the two groups meet in the middle and a centred mark would be under one
 of them, so it steps back into the flow beside the left-hand group. The controls
 win the row, because they are the ones you press.
 
+## `vercel.json`
+
+**Response headers, because a static host is the only place this app can have
+any.** There is no backend and no server code — every page is prerendered — so
+the deployment config is the one place a header can be set at all. Until now it
+set none, and an app that renders untrusted cell content had exactly the
+protections the browser gives by default.
+
+These are the cheap ones: the subset of `osseus`'s block that costs this app
+nothing to carry, chosen by reading what the app actually does rather than by
+pasting the list.
+
+- **`Strict-Transport-Security: max-age=63072000; includeSubDomains`**, and
+  deliberately **without `preload`**. Preloading is a submission to a list
+  baked into browsers and is slow and awkward to undo; that is a decision about
+  a whole domain, not about this app, and it should be made on purpose if it is
+  made at all. `includeSubDomains` is the one line here with reach beyond this
+  deployment — drop it if any sibling host under the same domain is still
+  served over plain HTTP.
+- **`X-Content-Type-Options: nosniff`** — the app hands the browser files it
+  built itself; none of them wants to be guessed at.
+- **`Referrer-Policy: no-referrer`**. The trade-off worth naming: a template can
+  name a background image at an http(s) address, and a host using referrer-based
+  hotlink protection will refuse a request that carries none. That is a rare
+  arrangement and the address is the user's own choice; leaking the page someone
+  is printing from to every image host is the worse default.
+- **`X-Frame-Options: DENY`** and **`Content-Security-Policy: frame-ancestors
+  'none'`** — the same protection twice, on purpose. The CSP directive is the
+  spelling browsers now honour and `X-Frame-Options` is what older ones read.
+  This is the *only* CSP directive set: a policy declaring nothing else
+  restricts nothing else, so it cannot interfere with the inline styles, stored
+  fonts or blob exports a real policy would have to be designed around.
+- **`Permissions-Policy`** turning off camera, microphone, geolocation,
+  payment, USB, MIDI and display capture. Read against the code first, which is
+  why two things are **not** in that list: `Lightbox.svelte` listens for
+  `DeviceOrientationEvent` to tilt a card, so `accelerometer` and `gyroscope`
+  stay allowed, and the table and the bitmap editor both use
+  `navigator.clipboard`. A policy that switches off a feature the app ships is
+  not a stricter policy, it is a bug with a security-shaped name.
+
+**Not taken here: a real Content-Security-Policy.** `default-src`, `script-src`
+and `style-src` are where a CSP actually earns its keep, and this app would
+need the policy designed around it rather than inherited — a template's own CSS
+becomes a `<style>` tag, every box writes an inline `style` attribute, fonts
+come from Google by family name, and `png.ts` builds exports through blob URLs.
+A header block that breaks the card is worse than an honest absence, so it is
+its own piece of work. `Cross-Origin-Opener-Policy` and
+`Cross-Origin-Embedder-Policy` are the same answer for a different reason: both
+are correct once an app talks only to its own origin, and this one deliberately
+fetches Google fonts and user-named images.
+
+`scripts/gates.sh` checks the headers are still in the file. Not because anyone
+would remove them on purpose — because adding a redirect or a cache rule to this
+file means editing the object that holds them, and the app looks exactly the
+same without them.
+
 ## `scripts/gates.sh`
 
 **The rules a linter cannot see, made to execute.** `AGENTS.md` is a list of
