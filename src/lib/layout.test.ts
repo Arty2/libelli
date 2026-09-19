@@ -5,7 +5,6 @@ import {
 	GRID_MINOR,
 	alignBoxes,
 	bleedFor,
-	bleedIsCut,
 	boxEdges,
 	facingPosition,
 	mirrorBox,
@@ -169,19 +168,8 @@ describe('bleed', () => {
 		expect(bleedFor(undefined)).toBe(0);
 	});
 
-	it('adds paper on every side, and a negative amount adds it too', () => {
+	it('is the paper on every side once it is on', () => {
 		expect(bleedFor({ enabled: true, amount: 3 })).toBe(3);
-		// The sign says what the band is, not which way it goes: the paper only
-		// ever grows, so nothing on the card is ever cut into by a bleed.
-		expect(bleedFor({ enabled: true, amount: -4 })).toBe(4);
-	});
-
-	it('is a cut only when it is positive', () => {
-		expect(bleedIsCut({ enabled: true, amount: 3 })).toBe(true);
-		expect(bleedIsCut({ enabled: true, amount: -3 })).toBe(false);
-		expect(bleedIsCut({ enabled: true, amount: 0 })).toBe(false);
-		expect(bleedIsCut({ enabled: false, amount: 3 })).toBe(false);
-		expect(bleedIsCut(undefined)).toBe(false);
 	});
 });
 

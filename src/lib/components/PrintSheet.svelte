@@ -2,7 +2,7 @@
 	import Card from './Card.svelte';
 	import { backgroundStyle } from '$lib/assets';
 	import { SHEET_MARK_GAP, SHEET_MARK_MAX, resolveImposition, type PlacedPage } from '$lib/imposition';
-	import { bleedFor, bleedIsCut } from '$lib/layout';
+	import { bleedFor } from '$lib/layout';
 	import type { Mapping, Row, Template } from '$lib/types';
 
 	/**
@@ -107,10 +107,7 @@
 	const markX = $derived(Math.min(SHEET_MARK_MAX, Math.max(0, padX - SHEET_MARK_GAP)));
 	const markY = $derived(Math.min(SHEET_MARK_MAX, Math.max(0, padY - SHEET_MARK_GAP)));
 	const showOuterMarks = $derived(
-		!!imposed &&
-			bleedIsCut(template.print.bleed) &&
-			template.print.bleed.cropMarks &&
-			Math.max(markX, markY) > 0
+		!!imposed && template.print.bleed.cropMarks && Math.max(markX, markY) > 0
 	);
 
 	const sheetBackgroundStyle = $derived(

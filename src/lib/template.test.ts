@@ -44,6 +44,13 @@ describe('normaliseTemplate', () => {
 		expect(() => normaliseTemplate({ schema: 99, boxes: [] })).toThrow(/newer version/);
 	});
 
+	it('will not take a bleed below zero, whatever the file says', () => {
+		// A bleed is paper outside the page: a distance, and the six places that
+		// turn it into geometry are entitled to assume it.
+		const t = normaliseTemplate({ schema: 5, bleed: { enabled: true, amount: -8 }, boxes: [] });
+		expect(t.bleed.amount).toBe(0);
+	});
+
 	it('gives a file that predates page numbers the default, switched off', () => {
 		expect(normaliseTemplate({ schema: 1, boxes: [] }).pageNumber).toEqual({
 			enabled: false,

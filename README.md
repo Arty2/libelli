@@ -267,16 +267,12 @@ resize boxes directly, or type exact millimetres.
   trim lines and run outward into the bleed, each stopping a millimetre short
   of the corner: a mark that meets the artwork cannot be told from a rule the
   design meant to have, and that corner is what the guillotine lines up on.
-  The amount may be **negative**, and the sign is not a direction: the paper
-  grows either way. A positive amount is the printer's bleed — that band is
-  waste, cut off at the trim, which is where the trim line and the crop marks
-  are drawn. A negative amount *keeps* it: the card simply comes out that much
-  bigger on every side, as a margin, with no cut line and no marks (the **Crop
-  Marks** tick goes away with them, since there is nothing to mark). Nothing on
-  the card moves either way — the coordinates are measured from the page's own
-  edge, and that edge has not moved, it has paper around it. It is the one way
-  to widen the paper *evenly*: changing the page size adds to the right and the
-  bottom only, and slides the whole design off centre.
+  The amount is a distance and cannot go below zero. If what you want is a
+  wider card rather than paper to cut off, a bleed gives you that too — the
+  paper grows evenly on all four sides and nothing on the card moves, which is
+  what changing the page size cannot do, since that adds to the right and the
+  bottom only. Leave **Crop Marks** unticked and nothing says the band was ever
+  meant to be cut.
 - **Print Settings** — several cards printed to one physical sheet: **Pages per
   Sheet** is 2, 4, 6 or 8, onto A5, A4, A3 or a sheet of your own size in
   millimetres (the two millimetre fields appear for **Custom** — a named size
@@ -314,9 +310,8 @@ resize boxes directly, or type exact millimetres.
   what makes that room. Which is why the tick only appears once **Sheet Bleed**
   is on, the way the card's **Crop Marks** appears under **Page Bleed**: without
   the room, it was a setting you could switch on and see nothing come of. The
-  sheet's bleed goes negative too, and means for the sheet what the page's means
-  for the card: the paper grows by that much all round and none of it is cut, so
-  the cards stay where they were with more sheet around them.
+  sheet's bleed cannot go below zero either, and with **Sheet Crop Marks**
+  unticked it is simply a wider sheet with the cards where they were.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper

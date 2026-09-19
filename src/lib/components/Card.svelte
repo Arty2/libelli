@@ -11,7 +11,6 @@
 		FREE_STEP,
 		GRID_MINOR,
 		bleedFor,
-		bleedIsCut,
 		boxEdges,
 		facingPosition,
 		mirrorBox,
@@ -281,9 +280,8 @@
 		return [
 			`width:${template.page.w + bleed * 2}mm`,
 			`height:${template.page.h + bleed * 2}mm`,
-			// The bleed is padding whichever kind it is: the page keeps its own
-			// millimetres and the band sits outside them. A cut one is trimmed off
-			// there, a kept one is margin, and nothing inside the page can tell.
+			// The bleed is padding: the page keeps its own millimetres and the paper
+			// to be trimmed off sits outside them.
 			`padding:${bleed}mm`,
 			// Handles live inside the scaled card, so a 14px handle is nine pixels
 			// under the finger at 62%. Everything screen-only is sized against this
@@ -1507,7 +1505,7 @@
 		{/if}
 	</div>
 
-	{#if bleedIsCut(template.bleed) && template.bleed.cropMarks}
+	{#if bleed > 0 && template.bleed.cropMarks}
 		<div class="crop-marks" aria-hidden="true">
 			{#each ['tl', 'tr', 'bl', 'br'] as corner (corner)}
 				<span class="mark {corner}" style="--bleed:{bleed}mm;--crop-gap:1mm"></span>

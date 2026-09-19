@@ -2,7 +2,7 @@
 	import Icon from './Icon.svelte';
 	import { safeImageUrl } from '$lib/assets';
 	import { IMPOSITION_COUNTS, foldsIntoAZine, resolveImposition } from '$lib/imposition';
-	import { bleedFor, bleedIsCut } from '$lib/layout';
+	import { bleedFor } from '$lib/layout';
 	import { PAGE_PRESETS, presetFor, presetSize } from '$lib/template';
 	import type {
 		BackgroundFit,
@@ -52,6 +52,16 @@
 		const value = Number((event.currentTarget as HTMLInputElement).value);
 		return Number.isFinite(value) ? value : fallback;
 	};
+
+	/**
+	 * A distance, taken from a field.
+	 *
+	 * `min` on a number input is advisory: it stops the stepper and fails a form
+	 * validation nobody here is running, and a typed `-8` still arrives at the
+	 * handler. Measured — it made a 132mm card with a 148mm page hanging over it.
+	 * The field is a boundary like any other, so it clamps.
+	 */
+	const distance = (event: Event, fallback: number) => Math.max(0, numeric(event, fallback));
 
 	/** The named size this sheet already is, or Custom when it is its own. */
 	const preset = $derived(presetFor(template.print.sheet.w, template.print.sheet.h) ?? '');
@@ -173,7 +183,7 @@
 			type="checkbox"
 			checked={template.bleed.enabled}
 			disabled={pageFrozen}
-			title="Paper around the page, and the gap between cards when several are printed to a sheet. A positive amount is cut off at the trim, and carries the crop marks; a negative one is kept, as a margin all round."
+			title="Also the gap between cards, and the crop marks between them, when several are printed to a sheet"
 			onchange={(e) => patchBleed({ enabled: e.currentTarget.checked })}
 		/>
 		Page Bleed
@@ -184,27 +194,23 @@
 				class="n-2"
 				type="number"
 				step="0.5"
-				title="Positive is cut off at the trim; negative is kept, and the card comes out that much bigger on every side. Nothing on the card moves either way."
+				min="0"
 				aria-label="Page bleed amount"
 				value={template.bleed.amount}
 				disabled={pageFrozen}
-				onchange={(e) => patchBleed({ amount: numeric(e, template.bleed.amount) })}
+				onchange={(e) => patchBleed({ amount: distance(e, template.bleed.amount) })}
 			/>
 			<span class="unit">mm</span>
 		</label>
-		<!-- Only a cut has marks. A kept bleed is margin, and a crop mark on it
-		     would say the margin is about to be taken off again. -->
-		{#if bleedIsCut(template.bleed)}
-			<label class="check">
-				<input
-					type="checkbox"
-					checked={template.bleed.cropMarks}
-					disabled={pageFrozen}
-					onchange={(e) => patchBleed({ cropMarks: e.currentTarget.checked })}
-				/>
-				Crop Marks
-			</label>
-		{/if}
+		<label class="check">
+			<input
+				type="checkbox"
+				checked={template.bleed.cropMarks}
+				disabled={pageFrozen}
+				onchange={(e) => patchBleed({ cropMarks: e.currentTarget.checked })}
+			/>
+			Crop Marks
+		</label>
 	{/if}
 
 	<!-- The sheet's own, beside the page's rather than further down the bar:
@@ -218,7 +224,7 @@
 				type="checkbox"
 				checked={template.print.bleed.enabled}
 				disabled={pageFrozen}
-				title="Paper around the sheet: positive is cut off, for a sheet whose background runs to its own edge. Negative keeps it, so the sheet comes out that much bigger with the cards where they were."
+				title="An outset on the paper around the sheet, for printing a sheet that runs to its own edge"
 				onchange={(e) => patchSheetBleed({ enabled: e.currentTarget.checked })}
 			/>
 			Sheet Bleed
@@ -229,31 +235,28 @@
 					class="n-2"
 					type="number"
 					step="0.5"
-					title="Positive is cut off; negative is kept, and the sheet comes out that much bigger on every side."
+					min="0"
 					aria-label="Sheet bleed amount"
 					value={template.print.bleed.amount}
 					disabled={pageFrozen}
-					onchange={(e) => patchSheetBleed({ amount: numeric(e, template.print.bleed.amount) })}
+					onchange={(e) => patchSheetBleed({ amount: distance(e, template.print.bleed.amount) })}
 				/>
 				<span class="unit">mm</span>
 			</label>
 			<!-- Under the sheet's bleed, the way Crop Marks sits under the page's.
 			     These marks say where to cut the sheet down to its own edge, which
 			     is a cut that only exists once there is bleed to cut into: outside
-			     this branch it was a tick you could set and nothing would print.
-			     A kept bleed is not a cut, so it has no marks either. -->
-			{#if bleedIsCut(template.print.bleed)}
-				<label class="check">
-					<input
-						type="checkbox"
-						checked={template.print.bleed.cropMarks}
-						disabled={pageFrozen}
-						title="Marks at the corners of the tiled block, for the cut that takes it off the sheet"
-						onchange={(e) => patchSheetBleed({ cropMarks: e.currentTarget.checked })}
-					/>
-					Sheet Crop Marks
-				</label>
-			{/if}
+			     this branch it was a tick you could set and nothing would print. -->
+			<label class="check">
+				<input
+					type="checkbox"
+					checked={template.print.bleed.cropMarks}
+					disabled={pageFrozen}
+					title="Marks at the corners of the tiled block, for the cut that takes it off the sheet"
+					onchange={(e) => patchSheetBleed({ cropMarks: e.currentTarget.checked })}
+				/>
+				Sheet Crop Marks
+			</label>
 		{/if}
 	{/if}
 </span>

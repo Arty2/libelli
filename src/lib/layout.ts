@@ -28,31 +28,16 @@ export const pxToMm = (px: number) => px / pxPerMm();
 /**
  * A bleed as geometry: the paper it puts on every side of the page.
  *
- * Never negative, because the paper only ever grows. The sign is not a
- * direction — it says what that band of paper *is*.
+ * The one place the setting becomes millimetres, for the card and for the
+ * sheet alike — six components were each writing `enabled ? amount : 0`, and
+ * six copies of a rule is six places for it to drift. The amount is a positive
+ * measurement, guaranteed by `normaliseBleed` rather than checked here.
  *
- * Positive is the printer's bleed: paper outside the page, for the artwork to
- * run into, cut away at the trim. Negative is the same band kept — a margin
- * added all round, no cut line and no crop marks, the card simply bigger. Both
- * leave everything on the card exactly where it was: coordinates are measured
- * from the page's own edge, and that edge has not moved, it has paper around
- * it. A negative bleed is the one way to widen the paper *evenly*, which
- * changing the page size cannot do — that adds to the right and the bottom
- * only, and slides the whole design off centre.
+ * There is no negative form. `docs/decisions.md` has the two that were tried.
  */
 export function bleedFor(bleed: { enabled: boolean; amount: number } | undefined): number {
-	return bleed?.enabled ? Math.abs(bleed.amount) : 0;
+	return bleed?.enabled ? bleed.amount : 0;
 }
-
-/**
- * Whether that band is waste. Only a positive bleed is cut, so only a positive
- * bleed draws a trim line or carries crop marks — a negative one has no cut to
- * mark, and marking one would say the margin is about to be taken off again.
- */
-export function bleedIsCut(bleed: { enabled: boolean; amount: number } | undefined): boolean {
-	return !!bleed?.enabled && bleed.amount > 0;
-}
-
 
 export interface LayoutInput {
 	boxes: Box[];

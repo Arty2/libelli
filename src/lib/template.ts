@@ -263,7 +263,11 @@ function normaliseQr(raw: any): QrSettings {
 function normaliseBleed(raw: any): Template['bleed'] {
 	return {
 		enabled: Boolean(raw?.enabled),
-		amount: num(raw?.amount, 3),
+		// A bleed is paper outside the page, so it is a distance and never below
+		// zero. Clamped here rather than guarded at each of the six places that
+		// turn it into geometry — and clamped rather than guessed at, which is
+		// what every other out-of-range number in this file does.
+		amount: Math.max(0, num(raw?.amount, 3)),
 		cropMarks: Boolean(raw?.cropMarks)
 	};
 }

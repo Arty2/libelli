@@ -5,7 +5,7 @@
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { hold, swipe } from '$lib/gestures';
-	import { GRID_MAJOR, GRID_MINOR, bleedFor, bleedIsCut, mmToPx, pxToMm } from '$lib/layout';
+	import { GRID_MAJOR, GRID_MINOR, bleedFor, mmToPx, pxToMm } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
@@ -835,7 +835,7 @@
 			</svg>
 		{/if}
 
-		{#if bounds && bleedIsCut(template.bleed)}
+		{#if bounds && bleed > 0}
 			<!-- Where the paper will be cut.
 
 			     Drawn here rather than inside the card, and after the grid, because
@@ -845,11 +845,7 @@
 
 			     Solid, and the same half-pixel hairline the grid uses. It used to be
 			     dashed and a whole pixel, which made it the loudest line on a page
-			     that already has dashed bounds on every box.
-
-			     Only for a bleed that is cut. A kept one is margin — the paper edge
-			     *is* the trim there, and a line inside it would mark a cut nobody is
-			     going to make. -->
+			     that already has dashed bounds on every box. -->
 			<!-- Sized in pixels rather than by `inset` alone. An `<svg>` is a replaced
 			     element: with `width: auto` it takes its intrinsic 300 × 150 and
 			     ignores the opposite offset, so the trim edge was drawn 300 × 150 at
