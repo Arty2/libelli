@@ -167,6 +167,36 @@ overwriting a different one to undo something you did to this one. It is also
 what makes deleting recoverable: the template comes back on screen, and the
 autosave writes it out again under the id it had.
 
+**The table library is the template library again, deliberately.** Same shape —
+a working copy under `dataset:current`, a document per table under an id, the
+list read out of the documents — because it is the same problem and a second
+arrangement would be a second set of failure modes to learn. What is *not*
+shared is the pairing: a table is never tied to a template. One design prints
+any number of tables and one table is printed by any number of designs, which is
+the whole premise of the app, so the two libraries are switched independently
+and neither knows the other exists.
+
+**The id is what says this browser has been here before.** Boot used to read
+`dataset:current` and treat an empty table as a first run, which was right when
+there was no other way to tell them apart. Now an id beside it means a table
+somebody emptied stays empty, and no id at all means a genuine first run and the
+sample rows. Anybody arriving from a build before the library takes the
+no-id path once, keeps their rows, and has an id from then on.
+
+**The table's name lives in the dataset, not beside it.** It has to travel with
+the document for the listing to read it, and it has to be in the undo snapshot
+for a rename to be undoable — one field in `Dataset` is both. The cost is that
+the tray rebuilds the dataset object on every structural edit and would drop the
+name each time, so `+page.svelte` carries it across at the single point all
+those edits arrive through rather than in each of the dozen places.
+
+**The swap remembers one table, and it is stored.** Not a stack and not a
+history: two is the case that actually happens — this year's list and last
+year's, the real one and the one being tried out — and a third press wanting a
+third table is what the picker is for. Stored rather than held in a variable
+because the pair you are working between is the last thing to lose to a reload,
+and it is one short string.
+
 ## `src/lib/types.ts`
 
 **A box's content source is read, not stored.** A bound box has a `slot` and
@@ -1389,6 +1419,41 @@ row numbers is frozen to the left edge, so it is always there; it wears the same
 mark an unsorted header wears, and it is only drawn while there is a sort to
 undo.
 
+**The row actions lost Duplicate and Copy gained its words.** Three icons in the
+smallest bar in the app asked the eye to tell a copy from a duplicate from a
+delete at 15px, and the first two are the same picture in most icon sets. Copy
+says **Copy to clipboard** because *where* is the only question it raises — this
+app has a clipboard for looks as well, and a Duplicate on the card — and
+duplicating rows went with the icon that stood for it: copy the rows and paste
+them back is the same act in two presses that each say what they do.
+
+**The tray is resized by the movement, not by the press.** The header is the
+only strip of the tray that is frozen in place and it is also almost entirely
+controls: names to type in, sort, move, delete, the tick that chooses every row.
+So the drag claims the *travel* rather than the press — under the slop it is the
+button underneath being pressed, past it the tray is being pulled open — and the
+click that would follow a real drag is swallowed, or letting go over a header's
+bin deletes a column.
+
+**And it is watched on the window.** The header is the tray's top edge, so a
+drag upwards is off it within a few pixels and a listener on the header itself
+sees the press and then nothing at all. Pointer capture is the other way to hold
+onto a gesture and is the wrong one here: it retargets the compatibility mouse
+events too, so the click a press on a column button is owed would be delivered
+to the header instead.
+
+**A table switch clears what the tray remembers about the rows.** The sort, the
+pre-sort order the row numbers are read from, and the ticks are all about *these*
+rows, and the next table's rows wear the same indices. Keyed on the table's id
+rather than on the dataset, because an ordinary edit replaces the dataset object
+too and must not drop the selection.
+
+**The picker's menu is fixed and measured.** The row it sits in scrolls
+sideways, so a menu positioned in that flow is clipped by the element it is
+anchored to. It stays a child of the field in the DOM — that is what lets the
+dismissal be a containment check rather than a full-screen backdrop — and opens
+upwards, because the row is at the bottom of the tray.
+
 ## Pull-to-refresh
 
 **A reload is the one accident this app cannot absorb, so the browser is not
@@ -1918,6 +1983,20 @@ the only way to reach them. Only the primary pointer button drags: a right-click
 that started one would collapse a multi-selection before the menu it opened could
 act on the rest.
 
+**A long press that carries on becomes the drag it always was.** On a touchscreen
+the same gesture opens the menu and picks the area up: the press starts the drag
+at pointerdown, the browser's long press puts the menu over it a moment later,
+and the finger has never gone up. So moving on takes the menu off — past the same
+slop `hold` gives up at, because under that nobody meant to move anything — and
+the area, which was already being dragged underneath, comes with it. Card does
+not know a menu is open; it says "this is a drag now" and the page acts on it.
+Where a browser cancels the pointer stream to show its own menu, the drag simply
+ends and the menu stays, which is what used to happen every time.
+
+**The menu is `user-select: none`.** It is pressed, never read: a press that
+travels across it used to paint a selection over the labels, and on a phone that
+is the grey smear and the magnifier instead of the area moving.
+
 **A lock is a button in the bar, and the badge on the area undoes it.** The
 button that *sets* a lock belongs with the rest of that subject's settings and is
 never disabled by the lock it sets; it says what pressing it will do — *Unlock* on
@@ -1999,6 +2078,16 @@ scrolled to, and deleting the whole table is not one row you can retype. Both
 questions are a count rather than a paragraph — a warning nobody reads is not a
 warning, and the second press the table used to ask for was only ever a way of
 not reading the first.
+
+**The CSS dialog cancels by putting one value back, and blurs first.** What is
+typed there is committed as the field loses the focus, so by the time a click
+reaches Cancel it is already in the template and on the card behind — Cancel is
+therefore an undo of one known value rather than a refusal to apply anything,
+which is also why Escape and the backdrop go the same way: with a Cancel on the
+row, the two ways out that are not Done have to mean what it means. The blur is
+explicit and comes first, or the commit lands *after* the restore: Escape closed
+the dialog, the textarea was unmounted, its change fired on the way out, and the
+CSS being cancelled was applied a moment after it had been put back.
 
 **The style clipboard names its keys rather than subtracting.** `STYLE_KEYS` in
 `boxops.ts` is written out in full: a copy defined as "everything except id, x, y

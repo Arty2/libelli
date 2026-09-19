@@ -60,6 +60,8 @@
 		/** whether there is any data to lay out; the button says so rather than hiding */
 		hasColumns: boolean;
 		onmenu: (id: string, x: number, y: number) => void;
+		/** the drag under an open menu has become a drag; see Card's own prop */
+		onmenuclose: () => void;
 		/** a dialog has the screen: the view keys are not the page's right now */
 		modalOpen: boolean;
 		/** everything currently chosen; the selection tools appear for two or more */
@@ -123,6 +125,7 @@
 		onmagiclayout,
 		hasColumns,
 		onmenu,
+		onmenuclose,
 		modalOpen,
 		selectedBoxes,
 		onalign,
@@ -799,6 +802,7 @@
 				{onimagedrop}
 				{onaction}
 				{onmenu}
+				{onmenuclose}
 				{onedit}
 				{ondraw}
 				{ontext}
