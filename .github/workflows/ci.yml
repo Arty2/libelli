@@ -31,6 +31,10 @@ jobs:
       # docs/decisions.md § scripts/gates.sh.
       - run: npm run gates
 
+      # After the gates and before the slower checks: a lint failure is usually
+      # dead code or a missing justification, and both are quick to read.
+      - run: npm run lint
+
       # Fastest signal first, so a broken unit fails in seconds rather than
       # after a build. One job rather than a matrix: this app targets browsers,
       # not several Node versions, so a matrix would triple the minutes for

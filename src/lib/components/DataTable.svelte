@@ -651,7 +651,6 @@
 					     itself picks it, because a row is a card and picking one is the
 					     commonest thing anybody does in here — it used to be a 20px tick
 					     in the gutter. The cell belongs to whoever is typing in it. -->
-					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<tr
 						class:active={i === activeRow}
 						class:chosen={selectedRows.has(i)}

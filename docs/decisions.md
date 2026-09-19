@@ -2233,11 +2233,55 @@ would remove them on purpose — because adding a redirect or a cache rule to th
 file means editing the object that holds them, and the app looks exactly the
 same without them.
 
+## `eslint.config.js`
+
+**The linter that four comments had been claiming for months.** Four
+`eslint-disable-next-line svelte/no-at-html-tags` comments sat in `Card.svelte`
+and `Icon.svelte` naming a rule from a plugin this repo did not have — no
+config, no script, nothing to run. They read as protection and were decoration.
+ESLint with `eslint-plugin-svelte` is now installed, scripted, and run in CI
+after the gates.
+
+It earned itself on the first run, and not mainly through the 85 findings:
+
+- **Two `{@html}` sites had no stated justification at all** — the fourth one in
+  `Card.svelte` and the `@page` rule in `PrintRoot.svelte` — and `Icon.svelte`'s
+  comment sat on the line before the `<svg>` tag rather than before the `{@html}`
+  two lines down, so it suppressed nothing. Every site now names its chokepoint,
+  and the rule is what checks that rather than the honour system. This is the
+  half `html-blocks-allowlisted` cannot do: the gate knows *which files* may use
+  `{@html}`, the linter knows *whether each use said why*.
+- **Thirty-one dead imports** in the two option bars, left when they were split
+  out of one shared component, plus a `$state` and the whole `$effect` that fed
+  it — `fontsLoading`, built for a "still loading" indicator that is not in the
+  markup. Removing it cascaded into three more dead names, which is what dead
+  code does.
+- **Three `svelte-ignore` comments** suppressing warnings Svelte no longer emits.
+
+**Where a rule is off, the reason sits beside it.** A rule switched off silently
+is worse than one never switched on, because the next reader cannot tell a
+decision from an accident. Three are off, each for a stated reason:
+`prefer-svelte-reactivity` because all ten of its findings here are plain
+non-reactive locals or copies assigned back whole — the same immutable habit
+`updateBox` and the history snapshots are built on; `no-unused-props` on the two
+option bars because `OptionsBar` spreads one shared prop bag into both, so each
+declaring the whole bag is what makes the spread typecheck; and
+`no-explicit-any` in `template.ts`, where JSON someone handed the app genuinely
+has no type yet. That last one is a deferral rather than a judgement — `unknown`
+plus real type guards is the better end state, and it is its own piece of work,
+not something to do in the commit that adds the linter.
+
+**No formatting rules, and none should be added.** This codebase is
+hand-formatted and there is no Prettier here. A linter that reflowed it would
+produce a diff nobody reads, and bury every finding above inside it. If a
+formatter is ever wanted, that is a separate decision with its own one-time
+commit.
+
 ## `scripts/gates.sh`
 
 **The rules a linter cannot see, made to execute.** `AGENTS.md` is a list of
 load-bearing rules — cell content is escaped at the leaves, colour goes through
-`color.ts`, the app fetches nothing, there are no runtime dependencies, `color`
+`color.ts`, no unlisted `fetch`, there are no runtime dependencies, `color`
 is spelled without a `u` where it names something. Every one of those was
 enforced by nothing but the paragraph stating it, and a rule enforced by a
 paragraph is broken by the first change that does not re-read it. Usually by

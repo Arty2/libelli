@@ -1281,6 +1281,7 @@
 						{#if media.svg || (media.src && box.fit !== 'repeat')}
 							<span class="media" style="height:{box.h}mm">
 								{#if media.svg}
+									<!-- eslint-disable-next-line svelte/no-at-html-tags -- safeSvg is the chokepoint; fitSvg only rewrites its width and height -->
 									{@html fitSvg(safeSvg(media.svg), box.fit)}
 								{:else}
 									<img

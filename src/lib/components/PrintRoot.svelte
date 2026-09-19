@@ -68,6 +68,7 @@
 	     printing several to a sheet is off, several tiled together when it is
 	     on — with margins zeroed so the browser cannot shrink the layout to
 	     fit its own printable area. -->
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -- two numbers into a @page rule; css.ts cannot build this one because it is not the card's CSS -->
 	{@html `<style>@page { size: ${sheetW}mm ${sheetH}mm; margin: 0 }</style>`}
 </svelte:head>
 

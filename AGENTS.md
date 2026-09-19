@@ -101,16 +101,15 @@ src/routes/app.css        the :root tokens and app-wide rules
   underneath it. `jsqr` is a dev dependency only — the tests decode generated
   codes with an independent decoder, because a QR that does not scan looks
   exactly like one that does.
-- **The app makes no request nobody asked for.** Three paths out, all
-  deliberate: `png.ts` inlines a font and the card's pictures for export, the
-  service worker fetches what it caches, and `fonts.ts` appends a `<link>` to
-  ask Google for a family. A template reaches the third — it names fonts, and it
-  may name an http(s) background — so the guard is on *what* it can name, never
-  on whether a request happens: `safeFamily` refuses anything but a family name,
-  `safeImageUrl` anything but http(s). It is also why a cell names a stored
-  image as `local:name` and not a bare file name: a bare one is a relative URL,
-  and a relative URL is a request. The gate sees only `fetch`, so a `<link>` or
-  an `<img>` is a request it cannot check for you.
+- **The app makes no request nobody asked for.** Three paths out: `png.ts`
+  inlines faces and pictures for export, the worker caches, and `fonts.ts`
+  appends a `<link>` for a Google family. A template reaches the last — it names
+  fonts and may name an http(s) background — so the guard is on *what* it can
+  name, never on whether a request happens (`safeFamily`, `safeImageUrl`). Same
+  reason a cell says `local:name`: a bare file name is a relative URL, and a
+  relative URL is a request. The gate sees only `fetch`; a `<link>` or an `<img>`
+  is one it cannot check for you. README § What leaves this machine is the
+  user-facing version.
 - **Escaping, color parsing and CSS scoping are chokepoints.** Cell content is
   untrusted: every leaf text node is HTML-escaped in `markdown.ts`; every color
   goes through `color.ts` before it can reach a `style` attribute, and one it
@@ -154,6 +153,11 @@ first in CI and fails the build on injection sinks, `{@html}` outside its three
 renderers, a `fetch` outside `png.ts` and the worker, a runtime dependency, a
 security header gone missing from `vercel.json`, `colour` spelled as a name, a
 `VERSION` out of step with `package.json`, and this file over its line budget.
+
+`npm run lint` is the other half and runs next in CI: ESLint knows what a
+linter can know, the gates cover what it cannot. Where a rule is off,
+`eslint.config.js` says why beside it — a rule switched off silently is worse
+than one never switched on.
 
 Add the next rule there rather than as a paragraph here. Each run also appends
 one line to the gitignored `.claude/logs/gates.jsonl`, which is how "this gate
@@ -217,10 +221,11 @@ already have read the last version of. So: no bump until the PR exists, then
 ```bash
 npm run dev      # http://localhost:5173
 npm run gates    # rules a linter can't enforce — see Rules that execute
+npm run lint     # eslint + eslint-plugin-svelte; no formatting rules, on purpose
 npm test         # vitest, pure-logic units
 npm run check    # svelte-check; keep it at zero errors and zero warnings
 npm run build    # static output in ./build
-npm run verify   # gates, units and types — the one to run while working
+npm run verify   # gates, lint, units and types — run this while working
 ```
 
 ## Svelte's own agent tooling

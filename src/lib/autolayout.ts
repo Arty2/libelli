@@ -351,7 +351,6 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 
 	const lengthOf = (column: string) => Math.max(1, columnStats(rows.map((r) => r[column] ?? '')).median);
 	const pick = (kind: FieldKind) => guesses.find((g) => g.kind === kind);
-	const all = (kind: FieldKind) => guesses.filter((g) => g.kind === kind);
 
 	const place = (partial: Partial<Box>): Box => {
 		const box = newBox({ id: nextId(), hideWhenEmpty: true, ...partial });

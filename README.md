@@ -369,7 +369,8 @@ resize boxes directly, or type exact millimetres.
 - **CSS** — page setup has a CSS button; what you write there is saved
   inside the template and travels with it. Selectors are scoped to the card, so
   nothing in a template can restyle the editor around it, and `@import` and any
-  `url()` pointing off this machine are stripped — the app fetches nothing.
+  `url()` pointing off this machine are stripped, so a template's CSS cannot
+  reach the network at all.
   Each area wears its own **Name** as an id, so `#Job-Title { … }` reaches that
   one area and nothing else; `.box` reaches all of them.
 
@@ -796,9 +797,8 @@ From it: **Print**, or **PNG** — one 300 dpi file per selected page, or with
 onto it — rendered here, with no library, by carrying the element into an SVG
 `foreignObject` and drawing that to a canvas. Every face is embedded: uploaded
 ones from this browser, and a Google family by fetching the stylesheet the
-page already loaded and the font files it points at. That fetch is the one
-exception to *the app fetches nothing*, and it is confined to the export,
-because a PNG in the wrong typeface is not the card. A request that is
+page already loaded and the font files it points at. That fetch is confined to
+the export, because a PNG in the wrong typeface is not the card. A request that is
 blocked or offline leaves that family in the fallback stack and the export
 says which.
 
@@ -1156,15 +1156,38 @@ rather than half-read.
 Data comes in as CSV or pasted TSV and goes out as printed pages; the dataset
 itself stays in the browser.
 
+## What leaves this machine
+
+Nothing you type, draw or import is ever uploaded: there is no backend, no
+account and no analytics. Three things do reach the network, all of them
+things you asked for by name:
+
+- **Google fonts.** Choosing a Google family — or opening a template that names
+  one — adds a stylesheet link to `fonts.googleapis.com` for that family. A
+  template you were handed can therefore cause a request the moment you open
+  it, which is worth knowing before you open one from a stranger. The name is
+  the only thing it controls: anything that is not a family name is refused
+  rather than cleaned up. Upload a font file instead and nothing is requested.
+- **A linked background image**, when a template names one. Only ever an
+  http(s) address, never `data:` or anything else, and only the one the
+  template names.
+- **The app's own files**, cached by the service worker so it works offline.
+
+That is the whole list. A template's CSS cannot add to it — `@import` and any
+remote `url()` are stripped before it reaches the page — and nothing in a cell
+can, because a cell that names a stored image says `local:name` rather than
+anything a browser would treat as a URL.
+
 ## Developer and testing
 
 ```bash
 npm install
 npm run dev      # http://localhost:5173
 npm run gates    # the project's own rules, checked — see below
+npm run lint     # eslint, with eslint-plugin-svelte
 npm test         # vitest — the pure logic, unit by unit
 npm run check    # svelte-check; kept at zero errors and zero warnings
-npm run verify   # gates, units and types together — the one to run while working
+npm run verify   # gates, lint, units and types — the one to run while working
 npm run build    # static output in ./build, deployable anywhere
 ```
 
@@ -1180,6 +1203,12 @@ npm run build    # static output in ./build, deployable anywhere
 - **Components are verified by driving them** — the pure logic has unit tests;
   layout, printing and the dialogs are checked in a real browser, where the
   geometry can be read back in millimetres and the PDF counted page by page.
+- **Linting** — ESLint with `eslint-plugin-svelte`, run in CI after the gates.
+  No formatting rules are configured and none should be: this codebase is
+  hand-formatted and there is no Prettier, so a linter that reflowed it would
+  bury every real finding. Where a rule is switched off, `eslint.config.js`
+  says why in the same place — a rule turned off silently is worse than one
+  that was never on.
 - **Gates** — `scripts/gates.sh` runs first in CI and fails the build on the
   rules a linter cannot see: no `innerHTML` or `eval` anywhere in `src/`,
   `{@html}` only in the three renderers that have earned it, `fetch` only in

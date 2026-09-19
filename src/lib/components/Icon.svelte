@@ -10,10 +10,11 @@
 	let { name, size = 16 }: Props = $props();
 </script>
 
-<!-- eslint-disable-next-line svelte/no-at-html-tags -- ICONS is a constant in this repo, never user input -->
+<!-- eslint-disable svelte/no-at-html-tags -- ICONS is a constant in this repo, never user input -->
 <svg viewBox="0 0 32 32" width={size} height={size} fill="currentColor" aria-hidden="true" focusable="false"
 	>{@html ICONS[name] ?? ''}</svg
 >
+<!-- eslint-enable svelte/no-at-html-tags -->
 
 <style>
 	svg {
