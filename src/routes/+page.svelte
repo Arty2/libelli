@@ -1684,6 +1684,7 @@ em { color: #b42318 }`;
 		     photograph is in there too — and Page Setup was a place you had to
 		     already know to look. -->
 		<button
+			class="images"
 			onclick={() => (imagesOpen = true)}
 			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
 		>
@@ -2972,7 +2973,7 @@ em { color: #b42318 }`;
 
 		/* Phone order: what the app is on the left — Help first, because it is the
 		   one button that is about the app rather than about the card, and Install
-		   behind it when there is one — then the mark, then the three that act on
+		   behind it when there is one — then the mark, then the four that act on
 		   what is on screen. Order, not markup: the source order is the one the
 		   wide bar reads in, and moving the brand out of it would leave the name
 		   announced in the middle of the controls.
@@ -2998,12 +2999,19 @@ em { color: #b42318 }`;
 			order: 4;
 		}
 
-		.toolbar .data {
+		/* Named and ordered like the rest: a button left out of this list keeps
+		   the initial `order: 0` and lands in front of Help, which is how Images
+		   came to open the phone row. */
+		.toolbar .images {
 			order: 5;
 		}
 
-		.toolbar .export {
+		.toolbar .data {
 			order: 6;
+		}
+
+		.toolbar .export {
+			order: 7;
 		}
 
 		.brand {
