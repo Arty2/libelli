@@ -25,6 +25,20 @@ export function pxPerMm(): number {
 export const mmToPx = (mm: number) => mm * pxPerMm();
 export const pxToMm = (px: number) => px / pxPerMm();
 
+/**
+ * A bleed as geometry: the paper it puts on every side of the page.
+ *
+ * The one place the setting becomes millimetres, for the card and for the
+ * sheet alike — six components were each writing `enabled ? amount : 0`, and
+ * six copies of a rule is six places for it to drift. The amount is a positive
+ * measurement, guaranteed by `normaliseBleed` rather than checked here.
+ *
+ * There is no negative form. `docs/decisions.md` has the two that were tried.
+ */
+export function bleedFor(bleed: { enabled: boolean; amount: number } | undefined): number {
+	return bleed?.enabled ? bleed.amount : 0;
+}
+
 export interface LayoutInput {
 	boxes: Box[];
 	/** rendered content height in mm, keyed by box id */

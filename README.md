@@ -94,7 +94,12 @@ resize boxes directly, or type exact millimetres.
   is the hub of the relationship the other marks are pointing at. Each swaps to the icon of
   the undoing while the pointer is on it, and for a moment after a tap, so
   pressing one holds no surprise: the link shows a broken link, and the buoy
-  shows a boat that has left it.
+  shows a boat that has left it. A chain lights at two strengths: the mark on
+  what follows the selected area directly, and the same mark at half strength on
+  everything hanging off *that*, to the end of the chain. Moving the area you
+  have picked moves all of them, so all of them are marked, and the end you are
+  holding is the one that stands out. Upwards it stays one hop: what this area
+  follows is a relationship it has, and what that one follows is not.
 - **Hide when empty** — a box whose column is blank collapses to nothing *and*
   drops out of the anchor chain, so a card with no subtitle has no dead band
   where the subtitle would have been. A box with no anchor stays pinned to its
@@ -187,12 +192,16 @@ resize boxes directly, or type exact millimetres.
   drag an area half off the page and it stays visible, with its handles where
   you can still reach them. What prints is another matter — the paper stops
   where the card does, and the print, the PNG and the contact sheet all clip
-  there. If an area ends up with no overlap with the sheet at all — dragged
-  clean off it, where zooming in or a small screen would leave it out of reach —
-  a button appears under *Area* to bring every such area back on, and each one
-  flashes as it lands, because a move you were not watching happen otherwise just
-  leaves the card looking different. Crossing the trim does not count: that is
-  what bleed is for.
+  there. So if an area is not wholly on the sheet — a corner of it hanging over
+  the edge, or the whole of it dragged clean off, where zooming in or a small
+  screen would leave it out of reach — a button appears under *Area* to bring it
+  back on. It moves **only the areas that are off**: everything already on the
+  paper is where somebody put it, and a rescue that rearranged the card to make
+  room would be a worse problem than the one it solved. Each rescued area flashes
+  as it lands, because a move you were not watching happen otherwise just leaves
+  the card looking different. Running into the bleed does not count: that is what
+  bleed is for. Neither does an anchored area's vertical position, which is the
+  *Gap* in the bar and not something this button can write.
 - **Surface** — a fill color, padding, a border and a corner radius, all in
   millimetres. A padding and a border each take one measurement all round, or
   one per edge behind the expander next to it; a border's style and the corner
@@ -258,6 +267,12 @@ resize boxes directly, or type exact millimetres.
   trim lines and run outward into the bleed, each stopping a millimetre short
   of the corner: a mark that meets the artwork cannot be told from a rule the
   design meant to have, and that corner is what the guillotine lines up on.
+  The amount is a distance and cannot go below zero. If what you want is a
+  wider card rather than paper to cut off, a bleed gives you that too — the
+  paper grows evenly on all four sides and nothing on the card moves, which is
+  what changing the page size cannot do, since that adds to the right and the
+  bottom only. Leave **Crop Marks** unticked and nothing says the band was ever
+  meant to be cut.
 - **Print Settings** — several cards printed to one physical sheet: **Pages per
   Sheet** is 2, 4, 6 or 8, onto A5, A4, A3 or a sheet of your own size in
   millimetres (the two millimetre fields appear for **Custom** — a named size
@@ -294,7 +309,9 @@ resize boxes directly, or type exact millimetres.
   sheet with no bleed to spare has nowhere to put them, and the sheet bleed is
   what makes that room. Which is why the tick only appears once **Sheet Bleed**
   is on, the way the card's **Crop Marks** appears under **Page Bleed**: without
-  the room, it was a setting you could switch on and see nothing come of.
+  the room, it was a setting you could switch on and see nothing come of. The
+  sheet's bleed cannot go below zero either, and with **Sheet Crop Marks**
+  unticked it is simply a wider sheet with the cards where they were.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
@@ -478,8 +495,8 @@ app carries no runtime dependencies and works offline. Everything outside the
 subset renders as literal text, and every leaf text node is escaped.
 
 Supported: `#`/`##`/`###` headings, `-` and `*` bullets with one level of
-nesting, `1.` and `1)` ordered lists, `**bold**`, `*italic*`, `` `code` ``,
-`[text](url)`, blank-line paragraphs, and `---`.
+nesting, `1.` and `1)` ordered lists, `**bold**`, `*italic*`, `~~strikethrough~~`,
+`` `code` ``, `[text](url)`, blank-line paragraphs, and `---`.
 
 - **Ordered lists renumber** — from the source order, so a list that restarts
   part-way through still prints as one sequence.
@@ -964,10 +981,35 @@ drawn at all when nothing it could move is selected, and an area whose top comes
 from an anchor shows the link on its two vertical keys rather than an arrow that
 would do nothing: the millimetres between the two areas are the **Gap** in the
 bar. Those two keys keep the pad's own face — a faded mark on them, not a faded
-key, which would read as a hole in the cross — and they are not dead: **hold
-one** and the selection walks up the tie, to the area this one is following.
-That is where the Gap you actually want is, and finding that area by eye on a
-full page is the hard part. Pinching zooms the page, as do the zoom keys above.
+key, which would read as a hole in the cross — and they are not dead: they carry
+the two ways out of the tie. **Hold one** and the selection walks up the tie, to
+the area this one is following: that is where the Gap you actually want is, and
+finding that area by eye on a full page is the hard part. **Tap one three times**
+in a row and the tie itself goes, leaving the area exactly where it was sitting —
+the resolved top is written back as its own, so nothing jumps. Three rather than
+one, because these keys are also where a finger goes to nudge; after the first
+tap the key wears the broken link, and the run lapses after a second and a half,
+so the second and third taps are a decision rather than an accident.
+
+### Touch gestures
+
+- **Pinch to zoom the page**, anywhere over the stage. The gesture listens on
+  the way down to whatever was touched, so it works over the areas and not only
+  in the gaps between them — which is most of the page on a card that has been
+  laid out. Type size is the **Size** field in the bar, or Ctrl/Cmd+Shift+scroll
+  with a mouse: a pinch is how a phone zooms, and it means that here too.
+- **A second finger is never a drag.** An area that was moving under one finger
+  goes back where it started the moment a second one lands, so a pinch zooms and
+  leaves the card alone.
+- **Full screen, a pinch zooms the card** — up to six times, with a drag to move
+  around it and a flick to page the run once it is back at rest. That is the one
+  screen where zooming means what a phone means by it: the card is already as
+  large as the window will take it, and the reason to pinch is to read the small
+  print.
+- **Buttons answer.** A press on any control gives a few milliseconds of
+  vibration where the device has it, and a press-and-hold gives a firmer one as
+  it fires — the only thing that says a gesture nobody can see is over. A hold
+  that finds nothing to do stays quiet.
 
 The arrow keys and the pad both move every area in the selection, not only a
 lone one.

@@ -4,6 +4,7 @@ import {
 	GRID_MAJOR,
 	GRID_MINOR,
 	alignBoxes,
+	bleedFor,
 	boxEdges,
 	facingPosition,
 	mirrorBox,
@@ -158,6 +159,17 @@ describe('alignBoxes', () => {
 			newBox({ id: 'b', x: 30, y: 40, w: 10, h: 10, anchor: { to: 'a', gap: 4 } })
 		];
 		expect(alignBoxes(anchored, ['a', 'b'], 'left')[1].anchor).toEqual({ to: 'a', gap: 4 });
+	});
+});
+
+describe('bleed', () => {
+	it('is nothing at all while it is off, whatever the amount says', () => {
+		expect(bleedFor({ enabled: false, amount: 3 })).toBe(0);
+		expect(bleedFor(undefined)).toBe(0);
+	});
+
+	it('is the paper on every side once it is on', () => {
+		expect(bleedFor({ enabled: true, amount: 3 })).toBe(3);
 	});
 });
 

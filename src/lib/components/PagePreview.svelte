@@ -5,7 +5,7 @@
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { hold, swipe } from '$lib/gestures';
-	import { GRID_MAJOR, GRID_MINOR, mmToPx } from '$lib/layout';
+	import { GRID_MAJOR, GRID_MINOR, bleedFor, mmToPx, pxToMm } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
@@ -24,7 +24,7 @@
 		pageNumber: number | null;
 		/** the area being typed into on the card itself, if any */
 		editingId?: string | null;
-		/** areas that are not wholly on the sheet, and so may be unreachable */
+		/** areas hanging off the sheet, in part or entirely, and so cut or unreachable */
 		strayIds?: string[];
 		/** whether every press on an area is currently adding to or dropping from the selection */
 		picking?: boolean;
@@ -76,7 +76,7 @@
 		ondraw?: (id: string) => void;
 		/** words typed into the card, forwarded to whoever owns them */
 		ontext?: (box: Box, value: string) => void;
-		/** bring every area that has wandered off the sheet back onto it */
+		/** bring the areas that are hanging off the sheet back onto it, and only those */
 		onrescue?: () => void;
 		/** areas to flash, so a move you did not watch happen is still visible */
 		flashIds?: string[];
@@ -217,9 +217,78 @@
 	});
 
 	function followTie() {
-		if (!tieTarget) return;
+		// `false` so a hold on a key with no tie to walk buzzes at nobody — these
+		// keys carry the action whether or not there is one to take.
+		if (!tieTarget) return false;
 		onselect(tieTarget.id, false);
 	}
+
+	/**
+	 * And the other way out: a run of taps on the same key breaks the tie and
+	 * leaves the area exactly where it is sitting.
+	 *
+	 * Three taps, not one, because these keys are also where a finger goes to
+	 * nudge and an accidental tap must not quietly undo a relationship the
+	 * design depends on. After the first the key wears the broken link, so the
+	 * second and third are a decision rather than something that happens to you,
+	 * and the run lapses on its own so the icon never lies about what the next
+	 * tap would do. Unlike the hold, this does not need a single selection:
+	 * following a tie means picking one area to go to, and breaking one means
+	 * breaking each of them.
+	 */
+	const UNTIE_TAPS = 3;
+	/** A run of taps, not three taps in a session: the count lapses after this. */
+	const UNTIE_WINDOW = 1500;
+	let tiedTaps = $state(0);
+	let tiedAt = 0;
+	let tiedLapse: ReturnType<typeof setTimeout> | null = null;
+
+	// A different tie is a different run of taps.
+	let tiedLast: string | null = null;
+	$effect(() => {
+		const to = selectedBoxes.length === 1 ? (selectedBoxes[0].anchor?.to ?? null) : null;
+		if (tiedLast === to) return;
+		tiedLast = to;
+		tiedTaps = 0;
+	});
+
+	/**
+	 * Where an area actually sits, read back off the page.
+	 *
+	 * An anchored area's top is resolved during layout, from the rendered bottom
+	 * of the area above it, and only the card knows the answer because only the
+	 * card measured it. Writing the box's stale `y` back instead would drop it up
+	 * the page at the moment the tie broke, which is the one thing breaking a tie
+	 * must not do.
+	 */
+	function renderedTop(id: string): number | null {
+		const el = host?.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`);
+		return el ? Math.round(pxToMm(el.offsetTop) * 100) / 100 : null;
+	}
+
+	function untie() {
+		const tied = selectedBoxes.filter((b) => b.anchor && !b.locked);
+		if (!tied.length) return;
+		onaction?.('Break the anchor');
+		for (const box of tied) onchange({ ...box, anchor: null, y: renderedTop(box.id) ?? box.y });
+	}
+
+	function tiedTap() {
+		const now = Date.now();
+		tiedTaps = now - tiedAt > UNTIE_WINDOW ? 1 : tiedTaps + 1;
+		tiedAt = now;
+		if (tiedLapse) clearTimeout(tiedLapse);
+		if (tiedTaps < UNTIE_TAPS) {
+			tiedLapse = setTimeout(() => (tiedTaps = 0), UNTIE_WINDOW);
+			return;
+		}
+		tiedTaps = 0;
+		untie();
+	}
+
+	const tiedTitle = $derived(
+		`Tied to another area \u2014 its top follows that area\u2019s bottom. Change the Gap in the bar${tieTarget ? ', or hold this to select that area' : ''}, or tap it ${UNTIE_TAPS} times to break the tie and leave this area where it is.`
+	);
 
 	/** Paint order is array order, so "front" is last in the list, not a z-index. */
 	const ARRANGEMENTS: Array<{ value: Arrange; icon: string; label: string }> = [
@@ -240,8 +309,9 @@
 		!!template.locked ||
 		(stackIndex >= 0 && ((where === 'front' || where === 'forward') ? atFront : atBack));
 
-	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
-	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
+	const bleed = $derived(bleedFor(template.bleed));
+	const outerW = $derived(template.page.w + bleed * 2);
+	const outerH = $derived(template.page.h + bleed * 2);
 
 
 	/**
@@ -307,7 +377,7 @@
 
 	const gridArt = $derived.by(() => {
 		if (!grid) return null;
-		const originMm = template.bleed.enabled ? template.bleed.amount : 0;
+		const originMm = bleed;
 		const w = mmToPx(outerW) * scale;
 		const h = mmToPx(outerH) * scale;
 		const at = (stepMm: number) => ({
@@ -468,6 +538,27 @@
 		pinch.delete(event.pointerId);
 		if (pinch.size < 2) pinchStart = null;
 	}
+
+	/**
+	 * The pinch listens in the capture phase, on the way down to whatever was
+	 * touched, because an area swallows its own pointer events — without this a
+	 * pinch worked on the grey around the page and nowhere on the page itself,
+	 * which is most of what there is to pinch on a phone.
+	 */
+	$effect(() => {
+		if (!host) return;
+		const node = host;
+		node.addEventListener('pointerdown', onPinchDown, true);
+		node.addEventListener('pointermove', onPinchMove, true);
+		node.addEventListener('pointerup', onPinchUp, true);
+		node.addEventListener('pointercancel', onPinchUp, true);
+		return () => {
+			node.removeEventListener('pointerdown', onPinchDown, true);
+			node.removeEventListener('pointermove', onPinchMove, true);
+			node.removeEventListener('pointerup', onPinchUp, true);
+			node.removeEventListener('pointercancel', onPinchUp, true);
+		};
+	});
 
 	/**
 	 * View keys live here because this is where `scale` is known. Photoshop's
@@ -655,17 +746,13 @@
 	bind:this={host}
 	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px"
 	onpointerdown={(e) => {
-		onPinchDown(e);
-			// Bare paper counts as empty space, not just the grey around the sheet:
-			// clicking away from everything is how every canvas editor deselects,
-			// and stopping at the page edge made it look broken. A box swallows its
-			// own pointerdown, so this only ever fires on ground nobody owns.
-			const el = e.target as HTMLElement;
-			if (e.target === e.currentTarget || /\b(sheet|card|trim|scaler|page|grid-overlay)\b/.test(el.className)) onselect(null);
+		// Bare paper counts as empty space, not just the grey around the sheet:
+		// clicking away from everything is how every canvas editor deselects, and
+		// stopping at the page edge made it look broken. A box swallows its own
+		// pointerdown, so this only ever fires on ground nobody owns.
+		const el = e.target as HTMLElement;
+		if (e.target === e.currentTarget || /\b(sheet|card|trim|scaler|page|grid-overlay)\b/.test(el.className)) onselect(null);
 	}}
-	onpointermove={onPinchMove}
-	onpointerup={onPinchUp}
-	onpointercancel={onPinchUp}
 	role="region"
 	aria-label="Card preview"
 	tabindex="-1"
@@ -748,7 +835,7 @@
 			</svg>
 		{/if}
 
-		{#if bounds && template.bleed.enabled && template.bleed.amount > 0}
+		{#if bounds && bleed > 0}
 			<!-- Where the paper will be cut.
 
 			     Drawn here rather than inside the card, and after the grid, because
@@ -766,7 +853,7 @@
 			<svg
 				class="trim-line"
 				aria-hidden="true"
-				style="left:{mmToPx(template.bleed.amount) * scale}px;top:{mmToPx(template.bleed.amount) *
+				style="left:{mmToPx(bleed) * scale}px;top:{mmToPx(bleed) *
 					scale}px;width:{mmToPx(template.page.w) * scale}px;height:{mmToPx(template.page.h) * scale}px"
 			><rect width="100%" height="100%" /></svg>
 		{/if}
@@ -936,12 +1023,14 @@
 			<!-- Only when there is something to rescue. The editor does not clip, so
 			     an area dragged off the sheet is still drawn — but only while the
 			     stage happens to be showing that much ground, and zoomed in or on a
-			     phone it is somewhere you cannot see and cannot reach. -->
+			     phone it is somewhere you cannot see and cannot reach. An area only
+			     half off is the same problem by halves: the half out there is not
+			     going to print, and nothing else on the page says so. -->
 			<button
 				class="square"
 				onclick={onrescue}
 				disabled={!!template.locked}
-				title="{strayIds.length} area{strayIds.length === 1 ? ' is' : 's are'} off the page — bring {strayIds.length === 1 ? 'it' : 'them'} back on"
+				title="{strayIds.length} area{strayIds.length === 1 ? ' is' : 's are'} not wholly on the page — bring {strayIds.length === 1 ? 'it' : 'them'} back on, and nothing else"
 			>
 				<Icon name="move" size={16} /><span class="sr-only">Bring stray areas back onto the page</span>
 			</button>
@@ -1036,13 +1125,15 @@
 				class="up"
 				class:tied={verticalTied}
 				aria-disabled={verticalTied}
-				title={verticalTied
-					? `Tied to another area \u2014 its top follows that area\u2019s bottom. Change the Gap in the bar${tieTarget ? ', or hold this to select that area' : ''}.`
-					: `Up ${padStep}mm`}
+				title={verticalTied ? tiedTitle : `Up ${padStep}mm`}
 				use:hold={followTie}
 				onpointerdown={() => !verticalTied && startNudge(0, -padStep)}
+				onclick={() => verticalTied && tiedTap()}
 			>
-				<Icon name={verticalTied ? 'link' : 'caret-up'} size={verticalTied ? 15 : 30} />
+				<Icon
+					name={verticalTied ? (tiedTaps ? 'unlink' : 'link') : 'caret-up'}
+					size={verticalTied ? 15 : 30}
+				/>
 			</button>
 			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
 			<!-- The middle button carries the second gesture, because the arrows
@@ -1068,13 +1159,15 @@
 				class="down"
 				class:tied={verticalTied}
 				aria-disabled={verticalTied}
-				title={verticalTied
-					? `Tied to another area \u2014 its top follows that area\u2019s bottom. Change the Gap in the bar${tieTarget ? ', or hold this to select that area' : ''}.`
-					: `Down ${padStep}mm`}
+				title={verticalTied ? tiedTitle : `Down ${padStep}mm`}
 				use:hold={followTie}
 				onpointerdown={() => !verticalTied && startNudge(0, padStep)}
+				onclick={() => verticalTied && tiedTap()}
 			>
-				<Icon name={verticalTied ? 'link' : 'caret-down'} size={verticalTied ? 15 : 30} />
+				<Icon
+					name={verticalTied ? (tiedTaps ? 'unlink' : 'link') : 'caret-down'}
+					size={verticalTied ? 15 : 30}
+				/>
 			</button>
 		</div>
 	{/if}

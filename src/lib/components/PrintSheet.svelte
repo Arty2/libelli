@@ -2,6 +2,7 @@
 	import Card from './Card.svelte';
 	import { backgroundStyle } from '$lib/assets';
 	import { SHEET_MARK_GAP, SHEET_MARK_MAX, resolveImposition, type PlacedPage } from '$lib/imposition';
+	import { bleedFor } from '$lib/layout';
 	import type { Mapping, Row, Template } from '$lib/types';
 
 	/**
@@ -52,7 +53,7 @@
 		previewScale = 1
 	}: Props = $props();
 
-	const bleed = $derived(template.bleed.enabled ? template.bleed.amount : 0);
+	const bleed = $derived(bleedFor(template.bleed));
 	const cardW = $derived(template.page.w + bleed * 2);
 	const cardH = $derived(template.page.h + bleed * 2);
 
@@ -68,7 +69,9 @@
 	const cellH = $derived(cardH * scale);
 
 	/** The sheet's own bleed outsets the paper; only imposition draws a sheet at all. */
-	const sheetBleed = $derived(imposed && template.print.bleed.enabled ? template.print.bleed.amount : 0);
+	const sheetBleed = $derived(
+		imposed ? bleedFor(template.print.bleed) : 0
+	);
 	/** What the sheet trims to, and what goes on the printer. */
 	const trimW = $derived(imposed?.sheetW ?? cardW);
 	const trimH = $derived(imposed?.sheetH ?? cardH);

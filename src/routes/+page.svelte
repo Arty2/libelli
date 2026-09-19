@@ -32,7 +32,7 @@
 		undo as undoStep,
 		undoLabel
 	} from '$lib/history';
-	import { alignBoxes, type AlignEdge } from '$lib/layout';
+	import { alignBoxes, bleedFor, type AlignEdge } from '$lib/layout';
 	import {
 		ALIGN_LABELS,
 		applyStyle,
@@ -54,6 +54,7 @@
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault } from '$lib/modal';
+	import { watchPresses } from '$lib/haptics';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
@@ -321,9 +322,13 @@ em { color: #b42318 }`;
 	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
 	const row = $derived(dataset.rows[activeRow] ?? null);
 	const slots = $derived(usedSlots(template));
-	/** Areas with no overlap with the sheet at all — see `strayBoxes`. */
+	/** Areas that are not wholly on the sheet, half off or all off — see `strayBoxes`. */
 	const strays = $derived(
-		strayBoxes(template.boxes, template.page, template.bleed.enabled ? template.bleed.amount : 0)
+		strayBoxes(
+			template.boxes,
+			template.page,
+			bleedFor(template.bleed)
+		)
 	);
 	/**
 	 * The column the selected area draws from, so the table can point at the cell
@@ -431,6 +436,16 @@ em { color: #b42318 }`;
 
 	$effect(() => {
 		for (const family of familiesInUse) ensureGoogleFont(family);
+	});
+
+	/**
+	 * A press on any control, anywhere in the app, answered with a few
+	 * milliseconds of vibration on a touchscreen. One listener on the document
+	 * rather than a rule every button has to remember — see haptics.ts.
+	 */
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+		return watchPresses(document);
 	});
 
 	/**
@@ -1153,23 +1168,35 @@ em { color: #b42318 }`;
 		updateBox({ ...$state.snapshot(box), static: { ...box.static, text: value } } as Box);
 	}
 
-	/** Bring every area that has wandered off the sheet back onto it. */
+	/**
+	 * Bring the areas that are hanging off the sheet back onto it.
+	 *
+	 * Only those areas. A card is a composition, and an area that is where it was
+	 * put is not part of this problem — nothing that is already on the paper
+	 * moves, however little room the ones coming back need.
+	 */
 	function rescueStrays() {
 		if (template.locked || !strays.length) return;
+		// A locked area is not this button's to move, and counting it would promise
+		// a rescue that `bringOnPage` refuses.
+		const movable = strays.filter((b) => !b.locked);
+		const boxes = bringOnPage(template.boxes, movable.map((b) => b.id), template.page);
+		if (boxes === template.boxes) {
+			notify('Every area hanging off the sheet is locked, so none of them moved.', 'warning');
+			return;
+		}
 		// Counted before the move. `strays` is derived from the template, so it is
 		// empty the instant the boxes land — the notice used to say "0 areas were
 		// off the sheet", which is true by the time you read it and useless.
-		const rescued = strays.length;
-		const boxes = bringOnPage(template.boxes, strays.map((b) => b.id), template.page);
-		if (boxes === template.boxes) return;
+		const rescued = movable.length;
 		describe(`Bring ${rescued} area${rescued === 1 ? '' : 's'} back on`);
-		const moved = strays.map((b) => b.id);
+		const moved = movable.map((b) => b.id);
 		template = { ...template, boxes };
 		flash(moved);
 		notify(
 			rescued === 1
-				? 'One area was off the sheet and is back on it. Ctrl/Cmd+Z puts it back.'
-				: `${rescued} areas were off the sheet and are back on it. Ctrl/Cmd+Z puts them back.`
+				? 'One area was hanging off the sheet and is wholly on it now. Ctrl/Cmd+Z puts it back.'
+				: `${rescued} areas were hanging off the sheet and are wholly on it now. Ctrl/Cmd+Z puts them back.`
 		);
 	}
 
@@ -2155,8 +2182,10 @@ em { color: #b42318 }`;
 		</p>
 		<p>
 			Stacking order is the column beside the page: areas paint in the order they are listed, so <em>Bring to Front</em>
-			is a move to the end of that list. If an area ends up entirely off the sheet, a button appears under
-			<em>Area</em> to bring it back.
+			is a move to the end of that list. If an area ends up off the sheet — all of it, or a corner of it — a
+			button appears under <em>Area</em> to bring that area back on, and only that area: everything already on
+			the paper stays where it was put. Crossing into the bleed does not count, because that is what bleed is
+			for.
 		</p>
 
 		<h3>Marks on an area</h3>
@@ -2168,7 +2197,8 @@ em { color: #b42318 }`;
 			three are buttons, and each undoes what it says: the link breaks this area's tie, the buoy casts off everything
 			moored to this one, the padlock unlocks the area. Neither anchor button moves anything. Each shows the icon of
 			its own undoing as you reach for it, so no two of them answer with the same mark. Selecting either end of an
-			anchor lights up the other. <strong>Bounds</strong> takes all of it away.
+			anchor lights up the other — filled on what follows this area directly, outlined further down the chain, so a
+			stack of tied areas says how far the tie reaches. <strong>Bounds</strong> takes all of it away.
 		</p>
 
 		<h3>Several at once</h3>
@@ -2201,7 +2231,8 @@ em { color: #b42318 }`;
 			<strong>Size</strong> has A6, A5, A4, A3 and a 4 × 6 inch postcard; picking one keeps the orientation you are
 			in, and <strong>⇄</strong> turns the page over. Neither moves anything on the card — coordinates are
 			measured from the trim edge, so trying a design the other way round costs nothing. Bleed is an outset on the
-			sheet, never an offset on the content.
+			sheet, never an offset on the content — so it is also how you widen a card evenly without moving anything on
+			it, with <strong>Crop Marks</strong> left unticked.
 		</p>
 		<p>
 			Page setup holds the type defaults — family, size, leading, spacing, color. An area that leaves those fields
@@ -2256,6 +2287,25 @@ em { color: #b42318 }`;
 			A dialog opens with nothing pressed. <strong>Enter</strong> moves onto the action it suggests, and a second
 			Enter presses it — so a stray Return arriving a beat late cannot delete a template or replace every row on its
 			own. <strong>Esc</strong> closes the dialog at any point.
+		</p>
+
+		<h3>On a touchscreen</h3>
+		<p>
+			<strong>Pinch to zoom</strong> the page, anywhere over the stage — over the areas as well as the ground
+			around them. A second finger never drags: an area that was moving goes back where it was, so a pinch zooms
+			and leaves the card alone. Every button answers a press with a few milliseconds of vibration, where the
+			device has it.
+		</p>
+		<p>
+			The <strong>cross of arrows</strong> by the page nudges the selection; its middle button cycles the step, and
+			holding it moves the pad out of the way. When the selection is <em>tied</em> to another area, the two vertical
+			arrows wear a link instead: <strong>hold</strong> one and you take hold of the area it hangs from, which is
+			the one that can still move up and down — or <strong>tap</strong> it three times to break the tie and leave the
+			area exactly where it sits.
+		</p>
+		<p>
+			A card opened <strong>full screen</strong> is the one place a pinch zooms the card itself, up to six times, with
+			a drag to move around it. Pinch back and it settles; a flick pages the run again.
 		</p>
 
 		<h3>Keys</h3>

@@ -10,6 +10,7 @@
 	import {
 		FREE_STEP,
 		GRID_MINOR,
+		bleedFor,
 		boxEdges,
 		facingPosition,
 		mirrorBox,
@@ -265,7 +266,7 @@
 	);
 	const layout = $derived(resolveLayout({ boxes: template.boxes, measured, hidden }));
 
-	const bleed = $derived(template.bleed.enabled ? template.bleed.amount : 0);
+	const bleed = $derived(bleedFor(template.bleed));
 	const customCss = $derived(scopeCss(template.css ?? '', '.trim'));
 
 	const VALIGN_TO_FLEX = { top: 'flex-start', middle: 'center', bottom: 'flex-end' } as const;
@@ -279,6 +280,8 @@
 		return [
 			`width:${template.page.w + bleed * 2}mm`,
 			`height:${template.page.h + bleed * 2}mm`,
+			// The bleed is padding: the page keeps its own millimetres and the paper
+			// to be trimmed off sits outside them.
 			`padding:${bleed}mm`,
 			// Handles live inside the scaled card, so a 14px handle is nine pixels
 			// under the finger at 62%. Everything screen-only is sized against this
@@ -629,11 +632,65 @@
 	const DOUBLE_TAP = 350;
 	let lastTap: { id: string; at: number } | null = null;
 
+	/**
+	 * Every finger currently down, anywhere.
+	 *
+	 * Two of them are a pinch — the page's zoom, or the type size of the area
+	 * under them — and a pinch must not also drag whatever the first finger
+	 * happened to land on: a two-finger gesture over an area would otherwise
+	 * scale the type and walk the area across the card at the same time. The
+	 * listeners are on the window and in the capture phase, because a box stops
+	 * its own pointerdown from propagating and the second finger may land
+	 * anywhere at all — on another area, on the paper, or off the card.
+	 */
+	let touching = new Set<number>();
+
+	$effect(() => {
+		if (!interactive) return;
+		const down = (event: PointerEvent) => {
+			if (event.pointerType !== 'touch') return;
+			touching.add(event.pointerId);
+			if (touching.size > 1) abandonDrag();
+		};
+		const up = (event: PointerEvent) => touching.delete(event.pointerId);
+		window.addEventListener('pointerdown', down, true);
+		window.addEventListener('pointerup', up, true);
+		window.addEventListener('pointercancel', up, true);
+		return () => {
+			window.removeEventListener('pointerdown', down, true);
+			window.removeEventListener('pointerup', up, true);
+			window.removeEventListener('pointercancel', up, true);
+			touching.clear();
+		};
+	});
+
+	/**
+	 * Give up on a drag and put back what it had already moved.
+	 *
+	 * Not the same as letting go: this is the drag being called off by something
+	 * else — a second finger — so the area goes back where it was rather than
+	 * staying wherever the first finger had got it to. Only when it had actually
+	 * moved something, so a pinch that begins with one finger resting on an area
+	 * writes nothing at all.
+	 */
+	function abandonDrag() {
+		if (!drag) return;
+		if (drag.named) {
+			onchange?.({ ...drag.origin });
+			for (const box of [...drag.others, ...drag.held]) onchange?.({ ...box });
+		}
+		drag = null;
+		guide = { x: null, y: null };
+	}
+
 	function startDrag(event: PointerEvent, box: Box, mode: DragMode) {
 		// Only the primary button drags. Without this a right-click starts one,
 		// and its non-additive select collapses a multi-selection to one box
 		// before the context menu it opened has a chance to act on the rest.
 		if (event.button !== 0 || !interactive) return;
+		// A second finger is a pinch, not a second drag — and not a selection
+		// either: the area under it is not being picked, it is being pinched.
+		if (event.pointerType === 'touch' && touching.size > 1) return;
 		event.preventDefault();
 		event.stopPropagation();
 		if (event.pointerType === 'touch' && mode === 'move') {
@@ -970,6 +1027,25 @@
 	const litFollowers = $derived(
 		new Set(template.boxes.filter((b) => b.anchor && selectedIds.includes(b.anchor.to)).map((b) => b.id))
 	);
+	/**
+	 * The rest of the chain, below the followers.
+	 *
+	 * An anchor is inherited: an area hanging off an area that hangs off the one
+	 * you picked moves when you move it, and so on down. The badges say so at two
+	 * strengths — the full mark on what follows this area directly, the same mark
+	 * at half strength further down — because the chain has to be visible without
+	 * its far end reading as loudly as the end you are holding. Upwards it stays
+	 * one hop: what this area follows is a relationship it has, and what *that*
+	 * one follows is not.
+	 */
+	const litKin = $derived(
+		new Set(
+			selectedIds
+				.flatMap((id) => dependentsOf(id).map((b) => b.id))
+				.filter((id) => !litFollowers.has(id) && !selectedIds.includes(id))
+		)
+	);
+
 	const litTargets = $derived(
 		new Set(
 			template.boxes
@@ -1111,7 +1187,6 @@
 
 <div
 	class="card"
-	class:bleeding={bleed > 0}
 	class:editing={interactive}
 	class:frozen={interactive && !!template.locked}
 	style={cardStyle()}
@@ -1290,6 +1365,7 @@
 						<button
 							class="badge action"
 							class:lit={litFollowers.has(box.id)}
+							class:lit-edge={litKin.has(box.id)}
 							disabled={!editable(box)}
 							title="Tied to another area — its top follows that area's bottom. Press to break the tie and leave this area where it is."
 							aria-label="Break this area's anchor"
@@ -1445,6 +1521,18 @@
 		box-sizing: border-box;
 		overflow: hidden;
 		color: #000;
+		/* What a drag corner measures, before the zoom is taken back off it. It is
+		   a token because the badges are sized from it: the marks on an area are
+		   one family, and a handle and a badge drifting apart is how a card ends
+		   up with two ideas of how big a small thing is. Restated for a coarse
+		   pointer below, where a handle is smaller so a finger can see past it. */
+		--handle: 14px;
+		/* Half again the drag corner. A badge is an indicator that is also a
+		   button — it breaks a tie, casts off, unlocks — and at the handle's own
+		   size it was the smallest target on the card while being the one that
+		   does something irreversible. Bigger than what it sits beside is also
+		   what stops it reading as a fourth handle. */
+		--badge: calc(var(--handle) * 1.5 * var(--ui-scale, 1));
 		/* Paper color is part of the artwork, not decoration the printer may
 		   drop — though the browser still asks for "background graphics". */
 		print-color-adjust: exact;
@@ -1614,7 +1702,7 @@
 	.handle,
 	.pivot,
 	.lever {
-		--mark: calc(14px * var(--ui-scale, 1));
+		--mark: calc(var(--handle) * var(--ui-scale, 1));
 		--reach: calc(8px * var(--ui-scale, 1));
 		position: absolute;
 		width: var(--mark);
@@ -1738,8 +1826,11 @@
 		   marks were 20px and 16px. A finger covers the thing it is dragging, so
 		   the less of it the mark takes up the better, and the target is the
 		   ::before, which costs no layout and does not have to be seen. */
+		.card {
+			--handle: 10px;
+		}
+
 		.handle {
-			--mark: calc(10px * var(--ui-scale, 1));
 			--reach: calc(19px * var(--ui-scale, 1));
 		}
 
@@ -1957,11 +2048,11 @@
 			left: 100%;
 			/* Half its own height up, so the middle of it lands on the bottom
 			   edge — the blade meeting the paper. */
-			margin: calc(-6.5px * var(--ui-scale, 1)) 0 0 calc(4px * var(--ui-scale, 1));
+			margin: calc(var(--badge) / -2) 0 0 calc(4px * var(--ui-scale, 1));
 			display: grid;
 			place-items: center;
-			width: calc(13px * var(--ui-scale, 1));
-			height: calc(13px * var(--ui-scale, 1));
+			width: var(--badge);
+			height: var(--badge);
 			box-sizing: border-box;
 			border-radius: var(--radius-button);
 			border: var(--line) solid #b42318;
@@ -2012,8 +2103,8 @@
 		.badge {
 			display: grid;
 			place-items: center;
-			width: calc(13px * var(--ui-scale, 1));
-			height: calc(13px * var(--ui-scale, 1));
+			width: var(--badge);
+			height: var(--badge);
 			/* Or the border is added to the width, and a badge drawn against the
 			   zoom would hold its size everywhere except its own edges. */
 			box-sizing: border-box;
@@ -2099,13 +2190,23 @@
 			background: #eaf1fe;
 		}
 
+		/* Further down the same chain — what hangs off what follows this area,
+		   and on to the end of it. The same blue as the mark above, at half its
+		   strength: all of them move when the selected area moves, so all of them
+		   are marked, but the end you are holding has to be the one that stands
+		   out. Weaker rather than a different color, because this is the same
+		   relationship at one remove and not another kind of tie. */
+		.badge.lit-edge {
+			color: rgba(37, 99, 235, 0.45);
+		}
+
 		/* Icon takes a px size, which is inside the card's transform like
 		   everything else here, so the glyph is overridden against the zoom too —
 		   otherwise the badge would hold its size and its contents would not. */
 		.badge :global(svg),
 		.overflow-mark :global(svg) {
-			width: calc(9px * var(--ui-scale, 1));
-			height: calc(9px * var(--ui-scale, 1));
+			width: calc(var(--badge) * 0.7);
+			height: calc(var(--badge) * 0.7);
 		}
 
 		.guide {

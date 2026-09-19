@@ -2,7 +2,8 @@
 	import Icon from './Icon.svelte';
 	import { safeImageUrl } from '$lib/assets';
 	import { IMPOSITION_COUNTS, foldsIntoAZine, resolveImposition } from '$lib/imposition';
-	import { PAGE_PRESETS, presetFor, presetSize } from '$lib/template';
+	import { bleedFor } from '$lib/layout';
+	import { MIN_PAPER, PAGE_PRESETS, presetFor, presetSize } from '$lib/template';
 	import type {
 		BackgroundFit,
 		PageBackgroundImage,
@@ -51,6 +52,33 @@
 		const value = Number((event.currentTarget as HTMLInputElement).value);
 		return Number.isFinite(value) ? value : fallback;
 	};
+
+	/**
+	 * A distance, taken from a field.
+	 *
+	 * `min` on a number input is advisory: it stops the stepper and fails a form
+	 * validation nobody here is running, and a typed `-8` still arrives at the
+	 * handler. Measured — it made a 132mm card with a 148mm page hanging over it.
+	 * The field is a boundary like any other, so it clamps.
+	 */
+	const distance = (event: Event, fallback: number) => floored(event, numeric(event, fallback), 0);
+
+	/**
+	 * A paper dimension, which has a floor of its own: a sheet measuring nothing
+	 * is not a sheet. Same reason as `distance` above — `min` is advisory, and
+	 * the field is a boundary.
+	 */
+	const paper = (event: Event, fallback: number) => floored(event, numeric(event, fallback), MIN_PAPER);
+
+	function floored(event: Event, value: number, floor: number): number {
+		const taken = Math.max(floor, value);
+		// The field shows what was taken, not what was typed. Svelte only rewrites
+		// a value when the state behind it changes, so a number that was refused
+		// while the state stayed put sat in the box looking accepted — measured: a
+		// typed -50 next to a 1mm card.
+		(event.currentTarget as HTMLInputElement).value = String(taken);
+		return taken;
+	}
 
 	/** The named size this sheet already is, or Custom when it is its own. */
 	const preset = $derived(presetFor(template.print.sheet.w, template.print.sheet.h) ?? '');
@@ -105,7 +133,7 @@
 		patchPrint({ orientation, sheet: swap ? { w: h, h: w } : { w, h } });
 	}
 
-	const bleed = $derived(template.bleed.enabled ? template.bleed.amount : 0);
+	const bleed = $derived(bleedFor(template.bleed));
 
 	/** How the requested count actually lands on the chosen sheet. */
 	const fit = $derived(
@@ -187,7 +215,7 @@
 				aria-label="Page bleed amount"
 				value={template.bleed.amount}
 				disabled={pageFrozen}
-				onchange={(e) => patchBleed({ amount: numeric(e, template.bleed.amount) })}
+				onchange={(e) => patchBleed({ amount: distance(e, template.bleed.amount) })}
 			/>
 			<span class="unit">mm</span>
 		</label>
@@ -228,7 +256,7 @@
 					aria-label="Sheet bleed amount"
 					value={template.print.bleed.amount}
 					disabled={pageFrozen}
-					onchange={(e) => patchSheetBleed({ amount: numeric(e, template.print.bleed.amount) })}
+					onchange={(e) => patchSheetBleed({ amount: distance(e, template.print.bleed.amount) })}
 				/>
 				<span class="unit">mm</span>
 			</label>
@@ -309,9 +337,10 @@
 					class="n-3"
 					type="number"
 					step="1"
+					min={MIN_PAPER}
 					value={template.print.sheet.w}
 					disabled={pageFrozen}
-					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, w: numeric(e, template.print.sheet.w) } })}
+					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, w: paper(e, template.print.sheet.w) } })}
 				/>
 				<span class="unit">mm</span>
 			</label>
@@ -321,9 +350,10 @@
 					class="n-3"
 					type="number"
 					step="1"
+					min={MIN_PAPER}
 					value={template.print.sheet.h}
 					disabled={pageFrozen}
-					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, h: numeric(e, template.print.sheet.h) } })}
+					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, h: paper(e, template.print.sheet.h) } })}
 				/>
 				<span class="unit">mm</span>
 			</label>

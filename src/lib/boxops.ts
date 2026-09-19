@@ -229,26 +229,33 @@ export function applyStyle(box: Box, style: BoxStyle): Box {
 // ---- areas that have wandered off the sheet ---------------------------------
 
 /**
- * Areas that are nowhere on the sheet at all.
+ * Areas that are not wholly on the sheet.
  *
  * The editor deliberately does not clip, so a box dragged past the edge is
  * still drawn and still grabbable — but only while the stage happens to be
  * showing that much ground. Zoomed in, or on a phone, a box a few centimetres
  * off the sheet is somewhere you cannot see and cannot reach, and the only
- * evidence it exists is that it is missing from the print.
+ * evidence it exists is that it is missing from the print. A box that is only
+ * half off is the same problem by halves: the half that is out there is not
+ * going to print, and nothing on the page says so.
  *
- * "Off the sheet" means *no overlap whatever* with the paper, bleed included —
- * not merely crossing the trim. A box that runs off the edge is what bleed is
- * for, and offering to drag every deliberate full-bleed panel back inside the
- * trim would be worse than saying nothing.
+ * The paper is the trim *plus the bleed*, so a box running off the edge of a
+ * card that has a bleed is doing what the bleed is for and is not stray. Past
+ * the bleed is over the edge of the paper, whatever a box's reason for being
+ * there.
+ *
+ * Only the axes `bringOnPage` can actually correct are tested, which is why an
+ * anchored box is judged on x alone: its top is read off another box during
+ * layout, the `y` here is the stale one it had before the tie, and flagging a
+ * box on a number nothing will write is a button that lights up and then does
+ * nothing when pressed. The Gap field in the bar is where that box's vertical
+ * position lives.
  */
 export function strayBoxes(boxes: Box[], page: PageSpec, bleed = 0): Box[] {
+	const off = (start: number, size: number, limit: number) =>
+		start < -bleed || start + size > limit + bleed;
 	return boxes.filter(
-		(box) =>
-			box.x + box.w <= -bleed ||
-			box.x >= page.w + bleed ||
-			box.y + box.h <= -bleed ||
-			box.y >= page.h + bleed
+		(box) => off(box.x, box.w, page.w) || (!box.anchor && off(box.y, box.h, page.h))
 	);
 }
 

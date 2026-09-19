@@ -230,21 +230,33 @@ describe('copyStyle and applyStyle', () => {
 const page: PageSpec = { w: 100, h: 100, unit: 'mm' };
 
 describe('strayBoxes', () => {
-	it('finds only the boxes with no overlap with the sheet at all', () => {
+	it('finds every box that is not wholly on the sheet, half off or all off', () => {
 		const boxes = [
 			box('on', { x: 10, y: 10, w: 30, h: 20 }),
-			// Crossing the trim is what bleed is for, not something to rescue.
-			box('bleeding', { x: -6, y: 10, w: 30, h: 20 }),
+			box('flush', { x: 0, y: 0, w: page.w, h: page.h }),
+			box('half-off-left', { x: -6, y: 10, w: 30, h: 20 }),
 			box('past-right', { x: 140, y: 10, w: 30, h: 20 }),
 			box('above', { x: 10, y: -40, w: 30, h: 20 })
 		];
-		expect(strayBoxes(boxes, page).map((b) => b.id)).toEqual(['past-right', 'above']);
+		expect(strayBoxes(boxes, page).map((b) => b.id)).toEqual([
+			'half-off-left',
+			'past-right',
+			'above'
+		]);
 	});
 
-	it('counts the bleed as paper, so a box on it is not stray', () => {
-		const boxes = [box('a', { x: -22, y: 10, w: 20, h: 20 })];
+	it('counts the bleed as paper, so a box that runs into it is not stray', () => {
+		const boxes = [box('a', { x: -4, y: 10, w: 20, h: 20 })];
 		expect(strayBoxes(boxes, page).map((b) => b.id)).toEqual(['a']);
 		expect(strayBoxes(boxes, page, 5)).toEqual([]);
+	});
+
+	it('judges an anchored box on x alone, because nothing will write its y', () => {
+		const anchored = { anchor: { to: 'b', gap: 4 } };
+		expect(strayBoxes([box('a', { x: 10, y: 400, w: 30, h: 20, ...anchored })], page)).toEqual([]);
+		expect(
+			strayBoxes([box('a', { x: 400, y: 400, w: 30, h: 20, ...anchored })], page).map((b) => b.id)
+		).toEqual(['a']);
 	});
 });
 

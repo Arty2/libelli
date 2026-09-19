@@ -6,9 +6,9 @@ import type { MarkdownStyle } from './types';
  * dependency-free and fully offline-capable.
  *
  * Supported: `#`/`##`/`###` headings, `-`/`*` bullets (one nesting level),
- * `1.` ordered lists, `**bold**`, `*italic*`, `` `code` ``, `[text](url)`,
- * `[text]{color}` for a colored run of words, blank-line paragraphs and `---`
- * rules. Everything else is literal text.
+ * `1.` ordered lists, `**bold**`, `*italic*`, `~~strikethrough~~`, `` `code` ``,
+ * `[text](url)`, `[text]{color}` for a colored run of words, blank-line
+ * paragraphs and `---` rules. Everything else is literal text.
  *
  * Every leaf text node is HTML-escaped before any markup is emitted, because
  * pasted spreadsheet content is full of `<`, `&` and stray angle brackets.
@@ -175,6 +175,10 @@ export function renderInline(text: string): string {
 	});
 	out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 	out = out.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+	// Before italic, so `~~*both*~~` closes in the right order. A single tilde is
+	// left alone: it is a real character in prices, ranges and file paths, and
+	// only the doubled pair is markup here.
+	out = out.replace(/~~([^~]+)~~/g, '<s>$1</s>');
 	out = out.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
 
 	const codeStyle = 'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.92em';

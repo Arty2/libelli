@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	BOX_MODES,
 	DEFAULT_DEFAULTS,
+	MIN_PAPER,
 	arrangeBoxes,
 	autoMap,
 	normaliseCentre,
@@ -42,6 +43,26 @@ describe('the built-in template', () => {
 describe('normaliseTemplate', () => {
 	it('refuses a schema from the future rather than half-reading it', () => {
 		expect(() => normaliseTemplate({ schema: 99, boxes: [] })).toThrow(/newer version/);
+	});
+
+	it('will not take a page or a sheet below the smallest paper there is', () => {
+		// A width of zero draws a card with no card in it and the design still
+		// inside, which is a design you cannot reach.
+		const t = normaliseTemplate({
+			schema: 5,
+			page: { w: 0, h: -50 },
+			print: { sheet: { w: 0, h: 297 } },
+			boxes: []
+		});
+		expect([t.page.w, t.page.h]).toEqual([MIN_PAPER, MIN_PAPER]);
+		expect(t.print.sheet).toEqual({ w: MIN_PAPER, h: 297 });
+	});
+
+	it('will not take a bleed below zero, whatever the file says', () => {
+		// A bleed is paper outside the page: a distance, and the six places that
+		// turn it into geometry are entitled to assume it.
+		const t = normaliseTemplate({ schema: 5, bleed: { enabled: true, amount: -8 }, boxes: [] });
+		expect(t.bleed.amount).toBe(0);
 	});
 
 	it('gives a file that predates page numbers the default, switched off', () => {

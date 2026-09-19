@@ -1,3 +1,5 @@
+import { HOLD_MS, vibrate } from './haptics';
+
 /**
  * Pointer gestures that more than one component needs.
  *
@@ -59,8 +61,13 @@ export const HOLD_SLOP = 8;
  * is no separate touch path. The click that follows a completed hold has to be
  * swallowed, or the tap action runs straight after the hold action — a file
  * picker opening on top of the rows just loaded.
+ *
+ * An action that returns `false` is saying it found nothing to do — a hold on a
+ * key whose second action is not available right now. Nothing buzzes for that:
+ * the vibration below is the only thing that says the hold fired, and saying so
+ * when nothing happened is worse than saying nothing.
  */
-export function hold(node: HTMLElement, action: () => void) {
+export function hold(node: HTMLElement, action: () => unknown) {
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	let fired = false;
 	let handler = action;
@@ -76,10 +83,14 @@ export function hold(node: HTMLElement, action: () => void) {
 		if (event.button !== 0) return;
 		fired = false;
 		from = { x: event.clientX, y: event.clientY };
+		const touch = event.pointerType === 'touch';
 		timer = setTimeout(() => {
 			timer = null;
 			fired = true;
-			handler();
+			// A hold fires with nothing let go of and nothing on screen to say so —
+			// the whole gesture is invisible until its action happens. On a phone
+			// this is the only thing that says the wait is over.
+			if (handler() !== false && touch) vibrate(HOLD_MS);
 		}, HOLD_DELAY);
 	};
 	// Moving off is how you change your mind, and on an element that is also a
@@ -103,7 +114,7 @@ export function hold(node: HTMLElement, action: () => void) {
 	node.addEventListener('pointercancel', cancel);
 	node.addEventListener('click', click, true);
 	return {
-		update: (next: () => void) => (handler = next),
+		update: (next: () => unknown) => (handler = next),
 		destroy: () => {
 			cancel();
 			node.removeEventListener('pointerdown', down);

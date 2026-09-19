@@ -8,7 +8,7 @@
 	import './options-bar.css';
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
-	import { mmToPx } from '$lib/layout';
+	import { bleedFor, mmToPx } from '$lib/layout';
 	import { planSheets, resolveImposition } from '$lib/imposition';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
@@ -65,14 +65,17 @@
 	/** How far through a run, so a long export is not a frozen button. */
 	let progress = $state<{ done: number; total: number } | null>(null);
 
-	const outerW = $derived(template.page.w + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
-	const outerH = $derived(template.page.h + (template.bleed.enabled ? template.bleed.amount * 2 : 0));
+	const bleed = $derived(bleedFor(template.bleed));
+	const outerW = $derived(template.page.w + bleed * 2);
+	const outerH = $derived(template.page.h + bleed * 2);
 
 	// What Print actually puts on paper: several cards tiled onto one physical
 	// sheet when it's on, otherwise one card per sheet as before — and the
 	// sheet's own bleed, where it has one, is part of the paper.
 	const imposed = $derived(resolveImposition(outerW, outerH, template.print));
-	const sheetBleed = $derived(imposed && template.print.bleed.enabled ? template.print.bleed.amount : 0);
+	const sheetBleed = $derived(
+		imposed ? bleedFor(template.print.bleed) : 0
+	);
 	const printSheetW = $derived((imposed?.sheetW ?? outerW) + sheetBleed * 2);
 	const printSheetH = $derived((imposed?.sheetH ?? outerH) + sheetBleed * 2);
 
