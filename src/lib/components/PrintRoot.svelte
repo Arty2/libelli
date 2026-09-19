@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PrintSheet from './PrintSheet.svelte';
-	import { resolveImposition } from '$lib/imposition';
+	import { planSheets, resolveImposition } from '$lib/imposition';
 	import { bleedFor } from '$lib/layout';
 	import type { Dataset, Mapping, Template } from '$lib/types';
 
@@ -9,6 +9,8 @@
 		dataset: Dataset;
 		mapping: Mapping;
 		background: string | null;
+		/** stored images by name, for the areas whose cells point at one */
+		images?: Record<string, string>;
 		/** the sheet's own background, resolved the same way as the card's */
 		printBackground: string | null;
 		/** row indices the preview left out */
@@ -17,8 +19,16 @@
 		excludedSheets: Set<number>;
 	}
 
-	let { template, dataset, mapping, background, printBackground, excluded, excludedSheets }: Props =
-		$props();
+	let {
+		template,
+		dataset,
+		mapping,
+		background,
+		images = {},
+		printBackground,
+		excluded,
+		excludedSheets
+	}: Props = $props();
 
 	// Filtered into a list up front, carrying each row's original index: a page
 	// keeps the number it has in the table however few of them are printed.
@@ -36,18 +46,20 @@
 	const sheetBleed = $derived(
 		imposed ? bleedFor(template.print.bleed, imposed.sheetW, imposed.sheetH) : 0
 	);
+	// The sheet says how wide it is now: with `auto` the fit decides which way
+	// round the paper goes, so the size @page names comes off the layout rather
+	// than off the settings.
 	const sheetW = $derived((imposed?.sheetW ?? cardW) + sheetBleed * 2);
 	const sheetH = $derived((imposed?.sheetH ?? cardH) + sheetBleed * 2);
-	const perSheet = $derived(imposed ? imposed.grid.rows * imposed.grid.cols : 1);
 
-	// Rows tile into sheets of `rows * cols` — the last sheet short of a full
-	// grid just leaves the remaining cells empty. Grouped before the sheet
-	// exclusions are applied, so a sheet's number here is the number the
-	// preview showed it under.
+	// Rows fill the sheet in the order the template asks for — reading order, or
+	// the fold's — and a cell the run does not reach is left empty. Grouped
+	// before the sheet exclusions are applied, so a sheet's number here is the
+	// number the preview showed it under.
 	const sheets = $derived(
-		Array.from({ length: Math.ceil(pages.length / perSheet) }, (_, i) =>
-			pages.slice(i * perSheet, i * perSheet + perSheet)
-		).filter((_, i) => !excludedSheets.has(i))
+		planSheets(pages, imposed?.grid ?? { rows: 1, cols: 1 }, template.print.order).filter(
+			(_, i) => !excludedSheets.has(i)
+		)
 	);
 </script>
 
@@ -60,8 +72,16 @@
 </svelte:head>
 
 <div class="print-root" aria-hidden="true" style="width:{sheetW}mm">
-	{#each sheets as sheetPages, sheetIndex (sheetIndex)}
-		<PrintSheet {template} {mapping} {background} {printBackground} pages={sheetPages} pageCount={dataset.rows.length} />
+	{#each sheets as cells, sheetIndex (sheetIndex)}
+		<PrintSheet
+			{template}
+			{mapping}
+			{background}
+			{images}
+			{printBackground}
+			{cells}
+			pageCount={dataset.rows.length}
+		/>
 	{/each}
 </div>
 

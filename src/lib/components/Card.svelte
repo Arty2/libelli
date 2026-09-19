@@ -1,14 +1,29 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
-	import { backgroundStyle, cssUrl, safeMediaUrl } from '$lib/assets';
+	import { backgroundStyle, cssUrl, localImageName, safeMediaUrl } from '$lib/assets';
 	import { parseColor } from '$lib/color';
 	import { applyPlaceholders } from '$lib/placeholders';
 	import { cssIdent, scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
+	import { handBorder, type HandStroke } from '$lib/hand';
 	import { hold } from '$lib/gestures';
-	import { FREE_STEP, GRID_MINOR, bleedFor, boxEdges, pxToMm, resolveLayout, snapTo, snapToEdges } from '$lib/layout';
+	import {
+		FREE_STEP,
+		GRID_MINOR,
+		bleedFor,
+		boxEdges,
+		facingPosition,
+		mirrorBox,
+		mirrors,
+		pageSide,
+		pxToMm,
+		resolveLayout,
+		snapTo,
+		snapToEdges
+	} from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
-	import { normaliseRotation, sidesOf } from '$lib/template';
+	import { croppable, cropToInk, tileOf } from '$lib/tile';
+	import { normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -45,8 +60,17 @@
 		 * component has to stay a pure function of its props.
 		 */
 		background?: string | null;
+		/**
+		 * Images this browser is holding, by the name a cell calls them —
+		 * `local:sketch.png` finds `images['sketch.png']`. Resolved by the app for
+		 * the same reason the background is: reading bytes out of storage is
+		 * asynchronous, and this component is a pure function of its props.
+		 */
+		images?: Record<string, string>;
 		/** `additive` is a modifier-click: add to or drop from the selection */
 		onselect?: (id: string | null, additive?: boolean) => void;
+		/** an image file dropped on an area, for the app to store and bind */
+		onimagedrop?: (box: Box, file: File) => void;
 		onchange?: (box: Box) => void;
 		/** right-click on a box, in viewport coordinates */
 		onmenu?: (id: string, x: number, y: number) => void;
@@ -54,6 +78,8 @@
 		onaction?: (what: string) => void;
 		/** start or stop typing into an area on the card itself */
 		onedit?: (id: string | null) => void;
+		/** open the drawing surface for an area; a picture is never edited in place */
+		ondraw?: (id: string) => void;
 		/**
 		 * Words typed into the card. The card cannot write them itself: a bound
 		 * area's text is a cell in the dataset and a static one's is a field in
@@ -74,22 +100,30 @@
 		selectedIds = [],
 		pageNumber = null,
 		background = null,
+		images = {},
 		pageCount = null,
 		editingId = null,
 		flashIds = [],
 		onselect,
 		onchange,
+		onimagedrop,
 		onmenu,
 		onaction,
 		onedit,
+		ondraw,
 		ontext
 	}: Props = $props();
 
 	let measured = $state<Record<string, number>>({});
 	/** boxes whose content is taller than the box will let it be */
 	let overflowing = $state<Record<string, boolean>>({});
-	/** the edge a live drag has latched onto, drawn as a guide until it lets go */
-	let guide = $state<{ x: number | null; y: number | null }>({ x: null, y: null });
+	/**
+	 * The edge a live drag has latched onto, drawn as a guide until it lets go.
+	 * `flip` records that the latch was measured against a mirrored box, so the
+	 * line is drawn where the eye sees the edge rather than where the template
+	 * stores it.
+	 */
+	let guide = $state<{ x: number | null; y: number | null; flip?: boolean }>({ x: null, y: null });
 
 	/**
 	 * What the area actually holds — a cell of the row, or its own words. This is
@@ -122,14 +156,30 @@
 		const written = box.slot ? contentOf(box) : (box.static?.dataUrl ?? box.static?.url ?? '');
 		const value = written.trim();
 		if (!value) return {};
-		const color = parseColor(value);
-		if (color) return { color };
+		// A fill and nothing else: a cell of this column is a color or it is a
+		// mistake, and an address in one would otherwise be fetched.
+		if (box.mode === 'color') {
+			const only = parseColor(value);
+			return only ? { color: only } : {};
+		}
+		// An image this browser is holding, named by the cell. Nothing when it
+		// is a name this browser has never seen — the same blank as an address
+		// that does not resolve, and the app says which names are missing.
+		const local = localImageName(value);
+		if (local) return images[local] ? { src: images[local] } : {};
+		// `image` still answers to a color, because it was the only mode for
+		// both and templates written then rely on it. `bitmap` does not: what
+		// goes in one of those cells is a drawing.
+		if (box.mode === 'image') {
+			const color = parseColor(value);
+			if (color) return { color };
+		}
 		const src = safeMediaUrl(value);
 		return src ? { src } : {};
 	}
 
 	const isEmpty = (box: Box) => {
-		if (box.mode === 'image') {
+		if (shownAsMedia(box.mode)) {
 			const media = mediaOf(box);
 			return !(media.svg || media.src || media.color);
 		}
@@ -285,9 +335,26 @@
 		};
 	}
 
+	/**
+	 * Whether this card is a left-hand page. Everything about facing pages hangs
+	 * off the page number the card was handed, so the editor shows the fold as
+	 * it pages through the rows without being told about it separately.
+	 */
+	const verso = $derived(template.facing === true && pageSide(pageNumber) === 'verso');
+
+	/**
+	 * A box where it is drawn, which on a left-hand page is its mirror. The
+	 * template still stores the right-hand page, so this is the only place the
+	 * two frames differ — and the drag below undoes it again before writing
+	 * anything back.
+	 */
+	const placed = (box: Box): Box => (verso && mirrors(box) ? mirrorBox(box, template.page.w) : box);
+
 	function boxStyle(box: Box): string {
+		const drawn = placed(box);
+		const align = drawn.align ?? template.defaults.align;
 		const parts = [
-			`left:${box.x}mm`,
+			`left:${drawn.x}mm`,
 			`top:${layout.tops[box.id] ?? box.y}mm`,
 			`width:${box.w}mm`,
 			`font-family:${fontStack(box.font ?? template.defaults.font, template.defaults.font)}`,
@@ -295,7 +362,7 @@
 			`font-weight:${box.weight ?? template.defaults.weight}`,
 			`line-height:${box.lineHeight ?? template.defaults.lineHeight}`,
 			`color:${box.color ?? template.defaults.color}`,
-			`text-align:${box.align ?? template.defaults.align}`,
+			`text-align:${align}`,
 			// Vertical placement needs the box to be a flex column. That stops the
 			// first child's top margin collapsing out of the box, which the
 			// `:first-child { margin-top: 0 }` rules below already neutralise; the
@@ -304,7 +371,7 @@
 		];
 		// Justified text without hyphenation opens rivers; the card is `lang="en"`
 		// so the browser has a dictionary to break with.
-		if ((box.align ?? template.defaults.align) === 'justify') parts.push('hyphens:auto');
+		if (align === 'justify') parts.push('hyphens:auto');
 		const letterSpacing = box.letterSpacing ?? template.defaults.letterSpacing;
 		if (letterSpacing) parts.push(`letter-spacing:${letterSpacing}mm`);
 		if (box.italic) parts.push('font-style:italic');
@@ -327,16 +394,19 @@
 		// A color out of the data fills the area itself, not a panel inside it, so
 		// it reaches under the padding and takes the corner radius with it. After
 		// the declared fill, because the row is the more specific answer.
-		if (box.mode === 'image') {
+		if (shownAsMedia(box.mode)) {
 			const media = mediaOf(box);
 			if (media.color) parts.push(`background:${media.color}`);
 			// A tile is a background, not an element: `<img>` has no way to repeat.
 			else if (media.src && box.fit === 'repeat') {
 				parts.push(
-					`background-image:${cssUrl(media.src)}`,
+					`background-image:${cssUrl(tiles[media.src] ?? media.src)}`,
 					'background-repeat:repeat',
 					'background-size:auto'
 				);
+				// A tiled drawing is drawn hard for the same reason a fitted one
+				// is — see `drawnByHand`.
+				if (drawnByHand(media.src)) parts.push('image-rendering:pixelated');
 			}
 		}
 		// `.box` is border-box, so a border eats into the width rather than adding
@@ -345,11 +415,28 @@
 			const { top, right, bottom, left } = sidesOf(box.borderWidth);
 			parts.push(
 				`border-width:${top}mm ${right}mm ${bottom}mm ${left}mm`,
-				`border-style:${box.borderStyle ?? 'solid'}`,
-				`border-color:${box.borderColor ?? box.color ?? template.defaults.color}`
+				// A hand-drawn border still keeps the room a CSS one would take —
+				// solid, and painted in nothing — so switching it on moves no text
+				// and changes no measurement. Only what is drawn in that room
+				// changes, and the SVG below draws it.
+				`border-style:${box.borderHand ? 'solid' : (box.borderStyle ?? 'solid')}`,
+				`border-color:${box.borderHand ? 'transparent' : borderColorOf(box)}`,
+				`--bw-t:${top}mm`,
+				`--bw-r:${right}mm`,
+				`--bw-b:${bottom}mm`,
+				`--bw-l:${left}mm`
 			);
 		}
 		if (box.borderRadius) parts.push(`border-radius:${box.borderRadius}mm`);
+		// One of thirteen words, checked on the way into the template — see
+		// `newBox`. Blending reaches the paper and whatever is stacked under this
+		// area, and stops at the card: the scaler above it is a transform, and a
+		// transform is a stacking context.
+		if (box.blend) parts.push(`mix-blend-mode:${box.blend}`);
+		// The whole area at once — fill, border and content together. Checked on
+		// the way into the template, and absent when it is opaque, so this is only
+		// ever a number between 0 and 1.
+		if (box.opacity !== undefined) parts.push(`opacity:${box.opacity}`);
 		// A CSS transform does not touch layout, so a rotated box still reports the
 		// height it would have had upright — which is what `measure()` reads and
 		// what anchored boxes below follow. That is the intended bargain: turning a
@@ -371,6 +458,66 @@
 		return parts.join(';');
 	}
 
+/**
+	 * Whether a picture should be drawn hard rather than smoothed.
+	 *
+	 * A drawing made here is the only thing that arrives as `data:` — the
+	 * surface writes a base64 PNG straight into the cell — and it is 64 pixels
+	 * on its longest side on purpose. Blown up to a centimetre or ten, a browser
+	 * would interpolate it into a smudge, which is not what was drawn. A
+	 * photograph comes from a folder or an address and keeps its smoothing.
+	 *
+	 * The honest edge of this: a cell someone pastes a base64 *photograph* into
+	 * is drawn hard as well. It is the same trade a name like `local:` avoids
+	 * and a data URL cannot — nothing in the bytes says which of the two it is.
+	 */
+	const drawnByHand = (src: string | undefined) => !!src?.startsWith('data:');
+
+	/**
+	 * What a tiled area actually repeats: the drawing trimmed to its ink — see
+	 * `tile.ts`. Worked out from the pixels, so it cannot be done while building
+	 * a style string; the map fills in as the crops resolve and the style is
+	 * rebuilt then, tiling the whole board in the meantime.
+	 */
+	let tiles = $state<Record<string, string>>({});
+
+	$effect(() => {
+		for (const box of template.boxes) {
+			if (!takesADrawing(box.mode) || box.fit !== 'repeat') continue;
+			const src = mediaOf(box).src;
+			if (!croppable(src) || tiles[src]) continue;
+			const held = tileOf(src);
+			if (held) {
+				tiles = { ...tiles, [src]: held };
+				continue;
+			}
+			cropToInk(src).then((cropped) => {
+				if (cropped) tiles = { ...tiles, [src]: cropped };
+			});
+		}
+	});
+
+	const borderColorOf = (box: Box) => box.borderColor ?? box.color ?? template.defaults.color;
+
+	/**
+	 * The strokes of a hand-drawn border, in the millimetres of the box's own
+	 * border box — its declared width, and the height the layout resolved, which
+	 * is the same number `measure` read off the element.
+	 *
+	 * Seeded with the box id, so the wobble is the same on every page of the run
+	 * and does not redraw itself as the words underneath it are typed.
+	 */
+	function handStrokes(box: Box): HandStroke[] {
+		if (!box.borderHand || !box.borderWidth) return [];
+		return handBorder({
+			w: box.w,
+			h: layout.heights[box.id] ?? box.h,
+			widths: sidesOf(box.borderWidth),
+			radius: box.borderRadius ?? 0,
+			style: box.borderStyle ?? 'solid',
+			seed: box.id
+		});
+	}
 	/**
 	 * The area's name, as the `id` its element wears.
 	 *
@@ -399,7 +546,11 @@
 
 	/** The page number rides on the template's own defaults, never on a box's. */
 	function pageNumberStyle(): string {
-		const { position, margin } = template.pageNumber;
+		const { margin } = template.pageNumber;
+		// Outer and inner are the whole reason a page number knows about the
+		// fold: resolved here to the edge this page actually has. Without facing
+		// pages there are only right-hand pages, so outer is the right edge.
+		const position = facingPosition(template.pageNumber.position, verso ? 'verso' : 'recto');
 		const [vertical, horizontal] = position.split('-');
 		const parts = [
 			vertical === 'top' ? `top:${margin}mm` : `bottom:${margin}mm`,
@@ -436,6 +587,36 @@
 	} | null = null;
 
 	const editable = (box: Box) => interactive && !box.locked && !template.locked;
+
+	// ---- an image dropped on an area ------------------------------------------
+
+	/** The area a file is being held over, so the drop has somewhere to land. */
+	let dropId = $state<string | null>(null);
+
+	/** The first image among what is being dragged, before it can be read. */
+	const draggingImage = (event: DragEvent) =>
+		Array.from(event.dataTransfer?.items ?? []).some(
+			(item) => item.kind === 'file' && item.type.startsWith('image/')
+		);
+
+	function dragOver(event: DragEvent, box: Box) {
+		if (!onimagedrop || !editable(box) || !draggingImage(event)) return;
+		// Without this the browser takes the drop itself and navigates to the
+		// file, which leaves the design behind.
+		event.preventDefault();
+		if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+		dropId = box.id;
+	}
+
+	function drop(event: DragEvent, box: Box) {
+		if (!onimagedrop || !editable(box)) return;
+		const file = Array.from(event.dataTransfer?.files ?? []).find((f) => f.type.startsWith('image/'));
+		dropId = null;
+		if (!file) return;
+		event.preventDefault();
+		event.stopPropagation();
+		onimagedrop(box, file);
+	}
 	const isSelected = (box: Box) => selectedIds.includes(box.id);
 	/** Handles belong to a single box: with several chosen, the bar does the work. */
 	const soleSelection = $derived(selectedIds.length === 1);
@@ -566,6 +747,24 @@
 	 */
 	const SNAP_TOLERANCE = 1.5;
 
+	/** Whether a drag on this box is happening against its mirror image. */
+	const mirroredDrag = (box: Box) => verso && mirrors(box);
+
+	/** The handle a mirrored box's opposite edge answers to. */
+	const MIRRORED_MODE: Record<DragMode, DragMode> = {
+		move: 'move',
+		n: 'n',
+		s: 's',
+		e: 'w',
+		w: 'e',
+		ne: 'nw',
+		nw: 'ne',
+		se: 'sw',
+		sw: 'se',
+		centre: 'centre',
+		rotate: 'rotate'
+	};
+
 	function moveDrag(event: PointerEvent) {
 		if (!drag) return;
 		const latch = !grid && bounds;
@@ -607,8 +806,16 @@
 		const turn = drag.mode === 'move' || drag.mode === 'rotate' ? 0 : ((origin.rotation ?? 0) * Math.PI) / 180;
 		const cos = Math.cos(turn);
 		const sin = Math.sin(turn);
-		const dx = screenX * cos + screenY * sin;
+		// On a left-hand page a mirrored box is drawn at its facing position, so
+		// a pointer that went right moved it *left* in the millimetres the
+		// template stores, and the handle it grabbed is the opposite edge of the
+		// stored box. Undoing both here keeps every case below in one frame — the
+		// one the template is written in. The pivot and the rotation handle are
+		// exempt: mirroring places a box, it does not flip what is inside it.
+		const flip = mirroredDrag(origin) && drag.mode !== 'centre' && drag.mode !== 'rotate';
+		const dx = (screenX * cos + screenY * sin) * (flip ? -1 : 1);
 		const dy = -screenX * sin + screenY * cos;
+		const mode = flip ? MIRRORED_MODE[drag.mode] : drag.mode;
 		const next: Box = { ...origin };
 
 		const setTop = (deltaY: number) => {
@@ -618,7 +825,7 @@
 			else next.y = place(origin.y + deltaY, 'y');
 		};
 
-		switch (drag.mode) {
+		switch (mode) {
 			case 'rotate': {
 				// The angle from the pivot to the pointer, against the angle it
 				// started at, so the box does not jump when the drag begins. Both
@@ -703,7 +910,7 @@
 				next.h = Math.max(3, size(origin.h - dy));
 				break;
 		}
-		guide = latched;
+		guide = { ...latched, flip };
 		onchange?.(next);
 
 		// Whatever snapping did to the box under the pointer is what the others
@@ -714,7 +921,7 @@
 				? (next.anchor?.gap ?? 0) - origin.anchor.gap
 				: next.y - origin.y;
 			for (const other of drag.others) {
-				const moved: Box = { ...other, x: round2(other.x + movedX) };
+				const moved: Box = { ...other, x: round2(other.x + alongX(other, origin, movedX)) };
 				if (movedY) {
 					if (other.anchor) moved.anchor = { ...other.anchor, gap: Math.max(0, round2(other.anchor.gap + movedY)) };
 					else moved.y = round2(other.y + movedY);
@@ -725,9 +932,21 @@
 
 		if (drag.mode === 'move' && drag.held.length) {
 			const movedX = next.x - origin.x;
-			if (movedX) for (const held of drag.held) onchange?.({ ...held, x: round2(held.x + movedX) });
+			if (movedX) {
+				for (const held of drag.held) onchange?.({ ...held, x: round2(held.x + alongX(held, origin, movedX)) });
+			}
 		}
 	}
+
+	/**
+	 * A sideways move of `movedX`, as the box being carried has to store it.
+	 *
+	 * A selection can mix areas that follow the fold with areas pinned in place,
+	 * and on a left-hand page those two run in opposite directions. Without this
+	 * the pinned ones walk the wrong way and the group comes apart as it moves.
+	 */
+	const alongX = (box: Box, dragged: Box, movedX: number) =>
+		mirroredDrag(box) === mirroredDrag(dragged) ? movedX : -movedX;
 
 	const round2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -814,8 +1033,8 @@
 	 *
 	 * An anchor is inherited: an area hanging off an area that hangs off the one
 	 * you picked moves when you move it, and so on down. The badges say so at two
-	 * strengths — a filled badge on what follows this area directly, and only the
-	 * line around it further down — because the chain has to be visible without
+	 * strengths — the full mark on what follows this area directly, the same mark
+	 * at half strength further down — because the chain has to be visible without
 	 * its far end reading as loudly as the end you are holding. Upwards it stays
 	 * one hop: what this area follows is a relationship it has, and what *that*
 	 * one follows is not.
@@ -938,6 +1157,13 @@
 		editable(box) && (box.mode === 'plain' || box.mode === 'markdown');
 
 	function beginEdit(box: Box) {
+		// A picture is the one thing not edited in place: an area on a card is
+		// often a centimetre across, which is somewhere to show a drawing and
+		// nowhere to make one. The same double-click opens it full screen.
+		if (editable(box) && takesADrawing(box.mode)) {
+			ondraw?.(box.id);
+			return;
+		}
 		if (!canEdit(box)) return;
 		onedit?.(box.id);
 	}
@@ -987,6 +1213,7 @@
 
 		{#each template.boxes as box (box.id)}
 			{@const empty = hidden.has(box.id)}
+			{@const strokes = handStrokes(box)}
 			<div
 				class="box"
 				class:outlined={bounds && !empty}
@@ -998,6 +1225,7 @@
 				class:grouped={!!box.group}
 				class:font-loading={interactive && waitingFor(box)}
 				class:flashing={flashIds.includes(box.id)}
+				class:dropping={dropId === box.id}
 				style={boxStyle(box)}
 				{...idFor(box)}
 				data-box-id={box.id}
@@ -1019,8 +1247,35 @@
 				onpointermove={moveDrag}
 				onpointerup={endDrag}
 				onpointercancel={endDrag}
+				ondragover={(e) => dragOver(e, box)}
+				ondragleave={() => (dropId = dropId === box.id ? null : dropId)}
+				ondrop={(e) => drop(e, box)}
 				role="presentation"
 			>
+				{#if strokes.length}
+					<!-- Drawn over the room the transparent CSS border is holding, so
+					     it covers exactly what that border would have painted. Sized
+					     in millimetres against a viewBox of the same numbers, which
+					     makes one user unit one millimetre and the stroke widths
+					     literal. -->
+					<svg
+						class="hand-border"
+						aria-hidden="true"
+						viewBox="0 0 {box.w} {layout.heights[box.id] ?? box.h}"
+						style="width:{box.w}mm;height:{layout.heights[box.id] ?? box.h}mm"
+						fill="none"
+						stroke={borderColorOf(box)}
+					>
+						{#each strokes as stroke, i (i)}
+							<path
+								d={stroke.d}
+								stroke-width={stroke.width}
+								stroke-dasharray={stroke.dash ?? 'none'}
+								stroke-linecap={stroke.cap ?? 'butt'}
+							/>
+						{/each}
+					</svg>
+				{/if}
 				<div class="content" class:being-edited={editingId === box.id}>
 					{#if placeholderFor(box)}
 						<span class="placeholder">{placeholderFor(box)}</span>
@@ -1032,7 +1287,7 @@
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
 							{@html qrFor(box)}
 						</span>
-					{:else if box.mode === 'image'}
+					{:else if shownAsMedia(box.mode)}
 						{@const media = mediaOf(box)}
 						<!-- A color and a tile are both drawn by the box's own background,
 						     in boxStyle, so there is nothing to put in here for either. -->
@@ -1041,7 +1296,13 @@
 								{#if media.svg}
 									{@html fitSvg(safeSvg(media.svg), box.fit)}
 								{:else}
-									<img src={media.src} alt="" style="object-fit:{box.fit ?? 'contain'}" />
+									<img
+									src={media.src}
+									alt=""
+									style="object-fit:{box.fit ?? 'contain'}{drawnByHand(media.src)
+										? ';image-rendering:pixelated'
+										: ''}"
+								/>
 								{/if}
 							</span>
 						{/if}
@@ -1104,42 +1365,53 @@
 				     buttons that would be refused anyway. The overflow mark below is
 				     not one of these: it is about what will print, which a lock does
 				     not change. -->
-				{#if bounds && !template.locked && (box.anchor || box.locked || isStatic(box) || anchorTargets.has(box.id))}
+				{#if bounds && !template.locked && box.anchor}
+					<!-- The tie sits at the *bottom* corner, on its own.
+					     Two reasons, and they agree. The column at the top corner is the
+					     one every other badge is in, and on a shallow area four of them
+					     are taller than the area itself; and the tie is the badge an area
+					     is most often carrying, so moving it halves that column in the
+					     common case. It stacks up from the bottom edge, clearing the
+					     shears when this area is also cutting its words off — two marks
+					     on one corner would otherwise land on top of each other. -->
+					<span class="badges foot" class:clears-cut={!empty && overflowing[box.id]}>
+						<button
+							class="badge action"
+							class:lit={litFollowers.has(box.id)}
+							class:lit-edge={litKin.has(box.id)}
+							disabled={!editable(box)}
+							title="Tied to another area — its top follows that area's bottom. Press to break the tie and leave this area where it is."
+							aria-label="Break this area's anchor"
+							onpointerdown={(e) => e.stopPropagation()}
+							onpointerenter={() => (hoveredBadge = `${box.id}:tied`)}
+							onpointerleave={() => (hoveredBadge = null)}
+							onclick={() => {
+								flashBadge(`${box.id}:tied`);
+								breakAnchor(box);
+							}}
+						>
+							<Icon name={badgeArmed(`${box.id}:tied`) ? 'unlink' : 'link'} size={11} />
+						</button>
+					</span>
+				{/if}
+
+				{#if bounds && !template.locked && (box.locked || isStatic(box) || anchorTargets.has(box.id))}
 					<!-- Why the box will not do what you might ask of it, stacked at its
-					     corner: the anchor above the lock when it carries both. All but
-					     the plug are buttons — the reason and the way out of it in the
-					     same 13 pixels — and each swaps to the icon of the undoing while
-					     the pointer is on it, so pressing one holds no surprise. Which is
-					     also why no two of them wear the same armed icon: the padlock
-					     opens the padlock, and the buoy casts off, which is a boat. -->
+					     corner. All but the plug are buttons — the reason and the way out
+					     of it in the same 13 pixels — and each swaps to the icon of the
+					     undoing while the pointer is on it, so pressing one holds no
+					     surprise. Which is also why no two of them wear the same armed
+					     icon: the padlock opens the padlock, and the buoy casts off,
+					     which is a boat. -->
 					<span class="badges">
 						{#if isStatic(box)}
 							<span class="badge" title="Static text — this says the same on every card, because it is not plugged into a column">
 								<Icon name="unplug" size={11} />
 							</span>
 						{/if}
-						{#if box.anchor}
-							<button
-								class="badge action"
-								class:lit={litFollowers.has(box.id)}
-								class:lit-edge={litKin.has(box.id)}
-								disabled={!editable(box)}
-								title="Tied to another area — its top follows that area's bottom. Press to break the tie and leave this area where it is."
-								aria-label="Break this area's anchor"
-								onpointerdown={(e) => e.stopPropagation()}
-								onpointerenter={() => (hoveredBadge = `${box.id}:tied`)}
-								onpointerleave={() => (hoveredBadge = null)}
-								onclick={() => {
-									flashBadge(`${box.id}:tied`);
-									breakAnchor(box);
-								}}
-							>
-								<Icon name={badgeArmed(`${box.id}:tied`) ? 'unlink' : 'link'} size={11} />
-							</button>
-						{/if}
 						{#if anchorTargets.has(box.id)}
 							<button
-								class="badge action"
+								class="badge action moored"
 								class:lit={litTargets.has(box.id)}
 								disabled={!!template.locked}
 								title="Other areas are moored to this one — moving it moves them too. Press to cast them off and leave them where they are."
@@ -1236,7 +1508,10 @@
 		{/if}
 
 		{#if guide.x !== null}
-			<span class="guide vertical" style="left:{guide.x}mm"></span>
+			<span
+				class="guide vertical"
+				style="left:{guide.flip ? template.page.w - guide.x : guide.x}mm"
+			></span>
 		{/if}
 		{#if guide.y !== null}
 			<span class="guide horizontal" style="top:{guide.y}mm"></span>
@@ -1297,6 +1572,22 @@
 		overflow-wrap: break-word;
 		display: flex;
 		flex-direction: column;
+	}
+
+	/* Out of flow, and anchored to the *border* box: an absolutely positioned
+	   child is placed against the padding box, so it is pushed back out by the
+	   border widths the box put in these properties. Out of flow also means it
+	   is not part of what `measure` reads, so a border cannot grow the box it
+	   is drawn around. */
+	.hand-border {
+		position: absolute;
+		top: calc(-1 * var(--bw-t, 0mm));
+		left: calc(-1 * var(--bw-l, 0mm));
+		pointer-events: none;
+		/* A wobble strays a fraction of a millimetre past the line it follows,
+		   which at the trim edge of the card is the difference between a drawn
+		   border and a clipped one. */
+		overflow: visible;
 	}
 
 	/* The one flex item in the box, so `justify-content` still places the content
@@ -1805,6 +2096,20 @@
 			pointer-events: none;
 		}
 
+		/* The tie, at the other end of the same edge: stacked up from the bottom
+		   rather than down from the top, so it stays put as the area grows. */
+		.badges.foot {
+			top: auto;
+			bottom: 0;
+			flex-direction: column-reverse;
+		}
+
+		/* The shears straddle the bottom edge — half of their 13 above it — so
+		   the tie clears them by their own half-height and a hair. */
+		.badges.foot.clears-cut {
+			bottom: calc(8px * var(--ui-scale, 1));
+		}
+
 		/* Quieter than the blue chrome around it. A badge is an annotation, not a
 		   control: it says why the box will not do what you asked, and it should
 		   not read as loudly as the thing you are dragging. */
@@ -1847,6 +2152,14 @@
 			.box.flashing {
 				animation: found 900ms ease-out;
 			}
+
+			/* Says where a held picture will land. Screen only, like every other
+			   mark on this card, and drawn against the zoom so it is the same
+			   weight at 50% as at 200%. */
+			.box.dropping {
+				box-shadow: 0 0 0 calc(2px * var(--ui-scale, 1)) rgba(37, 99, 235, 0.9);
+				background-color: rgba(37, 99, 235, 0.08);
+			}
 		}
 
 		@keyframes found {
@@ -1874,22 +2187,30 @@
 			cursor: help;
 		}
 
-		/* The other end of a tie that is selected. Blue and filled, because a
-		   badge is normally the quietest mark on the card and this one has to be
-		   found across it. */
+		/* The other end of a tie that is selected — the area this one follows, and
+		   the areas that follow it. The *mark* goes blue and nothing else does:
+		   these badges belong to areas you have not selected, and a filled badge
+		   on an unselected area reads as a second selection. A coloured glyph on
+		   the card's own quiet badge is enough to find it. */
 		.badge.lit {
-			border-color: #2563eb;
-			background: #eaf1fe;
 			color: #2563eb;
 		}
 
-		/* Further down the same chain: the line and the glyph take the color, and
-		   the fill does not. A filled badge is how the near end of a tie is found
-		   across a card, and a card where every badge below it is filled too has
-		   nothing left to find. */
+		/* The exception, on the selected area itself: what is moored to it is
+		   filled. That one is the hub of the relationship the other badges are
+		   only pointing at, and it is on the area you already have. */
+		.box.selected .badge.moored {
+			background: #eaf1fe;
+		}
+
+		/* Further down the same chain — what hangs off what follows this area,
+		   and on to the end of it. The same blue as the mark above, at half its
+		   strength: all of them move when the selected area moves, so all of them
+		   are marked, but the end you are holding has to be the one that stands
+		   out. Weaker rather than a different color, because this is the same
+		   relationship at one remove and not another kind of tie. */
 		.badge.lit-edge {
-			border-color: #2563eb;
-			color: #2563eb;
+			color: rgba(37, 99, 235, 0.45);
 		}
 
 		/* Icon takes a px size, which is inside the card's transform like

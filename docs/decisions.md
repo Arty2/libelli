@@ -35,6 +35,27 @@ card has silently disappeared. The fields carry the same floor as their `min`, s
 the limit is visible before it is hit rather than applied behind the number you
 typed.
 
+**A left-hand page is derived, never stored.** `mirrorBox` is a pure function of
+a box and the page width, applied as the card is drawn. The alternative — a
+second set of coordinates for the facing page, or two templates — would need
+every edit made twice and would drift the first time someone changed one side
+and not the other. The template holds one set of millimetres, measured on the
+right-hand page; `pageSide` reads the parity of the page number the card was
+handed, which is why the editor shows the fold as it pages through the rows
+without being told about it separately.
+
+**Mirroring places a box; it does not turn it over.** Rotation and the pivot are
+carried across untouched. A true mirror of the *appearance* would stand a
+signature or a corner flourish on its head, which no spread wants, and a box
+that means to be turned the other way on the other page can say so itself.
+
+**Only an alignment that was chosen mirrors.** An explicit `left` or `right`
+swaps, because that is an area deliberately pushed against an edge and the edge
+it wants is the outer one. An absent alignment stays absent and keeps inheriting
+the page default: that is body text, and body text reads the same way on both
+sides of a spread. The rule is one sentence and it is the difference between a
+mirrored margin and a mirrored paragraph.
+
 ## `src/lib/template.ts`
 
 **Stacking is array order**, not a z-index: `arrangeBoxes` moves boxes within the
@@ -212,6 +233,36 @@ plain CSS `transform`, so nothing about layout, anchors or measurement
 changes — only what ends up on paper. `PrintSettingsPanel.svelte` shows the
 percentage rather than staying silent about it.
 
+**A fold has one arrangement, and it outranks the fit.** `resolveImposition`
+picks the grid needing the least shrinkage — except in `zine` order, where the
+count names its grid outright: eight pages fold as two rows of four or they do
+not fold, and two as one row of two. A sheet where some other shape would fit
+better is then printed scaled down, which is the honest failure; folding a
+sheet whose pages are in the wrong cells is not a failure anyone can see until
+the paper is cut.
+
+**Only the folds people actually make.** Two up is a saddle stitch and eight up
+is the single-sheet mini zine. Four would be a quarto — a second fold, and its
+two sides only line up if you know which edge the printer flips on, which is a
+setting in someone else's dialog and not one this app can read. Six does not
+fold at all. So those two counts keep the sequential order they already had and
+`PrintSettingsPanel.svelte` says so, rather than offering a fold that comes out
+wrong on half the printers in the world.
+
+**Blank pages are part of the object, so they keep their places.** A booklet is
+a multiple of four pages because that is what a folded sheet makes. A run of
+five gets three `null` cells, sitting where the fold puts them rather than all
+at the end: shifting the remaining pages up to close the gaps would renumber
+everything after the first short sheet and break the nesting. `orderPages`
+returns cells, not pages, for exactly this reason.
+
+**Ordering is pure, and one function serves both renderings.** `planSheets` is
+what `PrintRoot.svelte` prints and what `PrintPreview.svelte` draws thumbnails
+of. The preview used to do its own slicing beside a comment promising it
+matched — a promise the next change to either would have quietly broken. A fold
+is much easier to get wrong than a slice, so the two now share the arithmetic
+rather than a comment about it.
+
 **The sheet's own background is a second, separate reference.** A card's
 background (`template.page.image`) and the sheet's (`template.print.background`)
 are stored, resolved and asked-for-when-missing exactly the same way, but as
@@ -219,6 +270,173 @@ two independent fields — the sheet's is `undefined` far more often (only
 imposition draws a sheet distinct from the card), and conflating them would
 mean turning imposition off could silently reach for a picture nobody chose
 for that context.
+
+## `src/lib/hand.ts`
+
+**The wobble is seeded, not random.** A border drawn from `Math.random` is a
+different border on every keystroke, every re-measure and every page of the
+run — which reads as a fault, not as a hand. The seed is the box's own id, so
+one area is always drawn the same way and no two areas are drawn alike. It is
+also what makes the module testable at all: the same input gives the same path
+string, every time.
+
+**The wobble is in millimetres, not in percent.** A pen strays by a fixed
+physical amount whatever it is drawing around, so a small box is not drawn more
+neatly than a large one, and the same border drawn on an A7 zine page and an A3
+poster is the same *hand*. It is the rule the rest of this codebase already
+follows, for once for a reason that is about ink rather than about geometry.
+
+**The CSS border stays, painted in nothing.** A hand border could have replaced
+the CSS one, and then switching it on would have changed the box's content
+height, moved every anchored box below it and re-measured the card. Instead the
+border keeps the room it always had — `solid`, `transparent` — and the SVG draws
+in that room. Nothing about layout, measurement or anchoring knows this feature
+exists.
+
+**Each corner belongs to the edge that arrives at it.** Not to a closed path
+around the whole box, which would have had to pick one width for a corner
+between a 2mm edge and a hairline. Drawing each side as its own stroke, corner
+included, is what a pen does when the sides are drawn one after another — and it
+falls out of that rule that an edge with no width takes its corner with it, so a
+bottom edge alone is an underline rather than three quarters of a box.
+
+**Ends are exact, middles stray.** Only the interior points of a run are pushed
+off the line. If the ends wobbled too, the corners would not meet, and a gap
+where two strokes should join does not read as hand-drawn — it reads as broken.
+
+## `src/lib/bitmap.ts`, `src/lib/tile.ts` and `src/lib/components/BitmapEditor.svelte`
+
+**The drawing goes in the cell, as base64.** Not into this browser's store like
+a dropped file: a drawing made here has no existence anywhere else, and a
+picture that lives beside the table would be lost the moment the CSV was handed
+to someone. In the cell it travels with the words, and a row's picture is
+exactly as portable as its text. The cost is a long cell, which is why the next
+decision is what it is.
+
+**One ink, and it is the area's own.** There is no palette here. An area is set
+to a colour in the bar, and a drawing made in it should be that colour rather
+than a second decision made in a second place — so the pen is that colour and the
+only other tool is the rubber. The trade-off is that the ink is fixed at the
+moment of drawing: this is a PNG, not a mask, so changing the area's colour
+afterwards does not recolour what was drawn.
+
+**Low resolution is the feature, and it is a budget rather than a shape.** A
+board is 64 by 64 pixels' worth — 4096 of them — spent in any arrangement:
+64 x 64, 128 x 32, 512 x 8. What a cell cares about is how many pixels it is
+being asked to hold, not how they are arranged, so that is the one thing held
+constant; a kilobyte or two of base64 is a long cell but one a spreadsheet can
+hold and a person can scroll past. The header says what the drawing is costing
+as it is drawn, so the limit is visible rather than a rule that bites later.
+
+**The board does not follow the area.** It did at first — the area's own
+proportions, longest side pinned — and that tied a drawing's cost to the
+millimetres of the box it sat in: resizing an area on the page changed the size
+of every drawing made in it afterwards, for no reason the person resizing it
+would recognise. An area is millimetres on paper and a board is pixels in a
+cell. A board set by hand is stored on the box and is where the next drawing
+starts, and absent means the 64 x 64 square, the same "absent is the default"
+rule the rest of the format follows.
+
+**A picture already in the cell opens at its own size.** The thing being edited
+is what is in the cell, and opening it on the board the area remembers would
+resample a picture nobody asked to resize. Only one too big for the budget — a
+photograph dropped on the area, not a drawing — is scaled down to fit, and one
+smaller than the smallest board sits in the corner of it rather than being blown
+up by a fraction.
+
+**A resize scales what is drawn; undo restores the board and the detail.**
+Refusing to resize once anything is drawn would make the size a decision you had
+to get right before you knew what you were drawing. Instead every resize is an
+entry in the editor's own stack, holding the pixels at the size they were drawn
+at, so stepping back off a resize is exact — the detail the scaling dropped on
+the way down comes back with the board it was drawn on. Forwards is still lossy,
+and that is the honest cost of drawing at eight pixels and asking for sixteen.
+
+**A tile is trimmed as it is drawn, not as it is saved.** An area set to
+`repeat` shows the picture at the picture's own size, so the transparent margin
+round a drawing would repeat as a gap in the pattern. The first version trimmed
+on the way out of the editor, which put the trimmings in the cell: reopening the
+drawing then stretched a four-pixel tile back across the board, and changing the
+fit back left a picture that had already lost its board. So the cell keeps the
+whole board and `tile.ts` crops to the ink as the card is drawn, cached by
+source. Only `data:` pictures are cropped — that is where drawings live, and it
+is also the only kind a canvas will read back, since anything from elsewhere
+taints it and refuses `toDataURL`. The cost is that the crop is asynchronous: a
+card drawn in the very first frame tiles the whole board until the crop lands.
+
+**Content is one question with four answers, and the format did not change.**
+A drawing used to be reached by setting a static area's *mode* to "Image /
+Color", which asked the person placing it to know that a paragraph and a drawing
+are the same kind of thing with a different renderer. They are not, to anyone
+placing them. **Data Field**, **Static Text**, **Bitmap** and **Image** are now
+the one question the bar asks first, derived from the slot, the mode and which
+of `static`'s fields holds the value — so no template written before this reads
+any differently, and none written after this carries anything new. Which field
+is *present* decides between the last two, not which one has something in it: a
+bitmap nobody has drawn yet and an address nobody has typed yet are both empty,
+and they are not the same area. Static Text no longer offers the image mode at
+all, because the two picture answers are that answer, said where the question is
+asked.
+
+**The line tool previews from the board, not from the last preview.** A line is
+drawn again on every pointer report while the drag is going on, so each one
+starts from a copy of the board taken when the drag began — otherwise dragging a
+line around leaves a fan of every line it passed through. The copy is the
+editor's own, not a history entry: the whole drag is one step in undo, the same
+as a stroke.
+
+**Rotate and crop are board transforms, not drawing.** Both could be done by
+hand with the pen and neither should have to be: a quarter turn resamples
+nothing (the same pixels, arranged the other way up, and the budget cannot
+notice because w x h is unchanged), and cropping to the ink is the same
+rectangle a tiled area repeats, made permanent. Each one is a single entry in
+the editor's own stack, board and all, so either is one undo away.
+
+**Copy and paste go through the system clipboard as a PNG.** Not an internal
+buffer: the point is to get a drawing out to another program and a picture in
+from one. A paste replaces the board and brings its own size, the same rule as
+opening the editor on a picture that is already in the cell, so the two ways a
+picture arrives behave alike. A browser that refuses the clipboard — Firefox
+wants a gesture it recognises, and a page without the permission gets nothing —
+is told out loud in the header, because a copy that did not happen looks exactly
+like one that did until you paste.
+
+**The board sits above its tools, and leaving is a tool.** Cancel and Done used
+to be a row of their own under the board, which put the two most final buttons
+furthest from the hand that had been drawing, and pushed the board up under the
+header. One toolbar, one place to look.
+
+**There is no pinch on the board.** It had one for a day. The fingers that would
+make a pinch are the fingers drawing on it, and a stroke that turns into a zoom
+halfway through is worse than no zoom at all — so the board fits the viewport by
+itself and Ctrl and the wheel step it from there. The pinch stays what it was
+everywhere else: the page editor's zoom.
+
+**The zoom steps through whole numbers.** Whole screen pixels per pixel of the
+board, pinch and Ctrl+wheel included: a board at 7.5 screen pixels a side lands
+half its pixels on half a screen pixel, and a pixel editor that blurs its own
+edges is no use. It is also what lets the checkerboard behind the board be one
+check per pixel — a CSS gradient sized from the same number — so the pattern
+that says "nothing painted here" is also the grid. The pinch is held by the
+whole surface rather than by the board, because a pinch that starts with a
+finger on the dark around it is still a pinch.
+
+**Full screen, never in place.** Every other kind of area is edited where it
+sits, and this one cannot be: areas are frequently a centimetre across, which is
+somewhere to show a drawing and nowhere to make one. The same double-click that
+opens words for typing opens this instead.
+
+**Nothing is written until Done, and it is one undo entry.** The editor keeps
+its own stack of whole canvases — at this size a canvas is nothing — so undo in
+there is strokes, and undo out here is the drawing. Mixing the two would have
+made a fifty-stroke drawing fifty steps of the app's history, and the app's
+undo is snapshots of the whole editable state.
+
+**A picture from off this machine opens blank.** Drawing a cross-origin image
+onto a canvas taints it, and a tainted canvas refuses `toDataURL` — so the
+surface would open on a photo, take a stroke, and fail to save at the very end.
+Opening blank is the honest version of that, and a `blob:` URL from this
+browser's own store is same-origin and draws in fine.
 
 ## `src/lib/history.ts`
 
@@ -539,13 +757,32 @@ and nothing anchored below it hops about mid-sentence. The card cannot write the
 words itself: a bound area's text is a cell of the dataset and a static one's is
 a field of the template, and only `+page.svelte` knows which it is holding.
 
-**Image mode is image *or color*, and the color fills the box.** One mode
-rather than two, because a column of brand colors and a column of logo URLs are
-the same job and a template author should not have to know which the data holds.
+**A picture, a fill and a drawing are three modes, and `image` still answers to
+two of them.** They began as one mode — a column of brand colors and a column of
+logo URLs are the same job, and a template author should not have to know which
+the data holds. What that missed is that a *person* does know, and being told
+"Image / Color" when the column is plainly one of them is an answer to a question
+nobody asked. So `bitmap`, `image` and `color` are separate now: `color` refuses
+anything that is not a color, `bitmap` refuses anything that is not a picture,
+and `image` keeps answering to both because it was the only mode for both and
+every template written until now relies on that. The cost is one mode that is
+less strict than its name; the alternative was breaking files we cannot inspect,
+since whether a column holds colors is a fact about the data, not the template.
+
+The schema stays at 5 and nothing migrates. Adding names to an enum is not a
+change to the shape of the file, and bumping the number would have made every
+template written from here on unreadable to a build that is only one release
+behind — a heavy price for a case that degrades quietly anyway: an older build
+reads an unknown mode as words, which is what it does with any word it does not
+recognise. Said out loud because it is arguable, and because the reverse — bump
+whenever the format learns anything — is the rule most projects would pick.
+
 A resolved color is emitted by `boxStyle` as the box's own `background`, so it
 reaches under the padding and takes the corner radius; a tile is a background
 too, because `<img>` cannot repeat. Everything else goes through `safeMediaUrl`,
-which is the only door between an untrusted cell and an `<img src>`.
+which is the only door between an untrusted cell and an `<img src>` — and a
+`color` cell never reaches it at all, which is the point of the strict mode: an
+address typed into a column of colors is not fetched, it is ignored.
 
 **Markdown links are inert in the editor.** A link on paper says where to go; it
 does not go there. Live in the editor, clicking a word to pick up the area it
@@ -598,13 +835,64 @@ move, so it must leave no move behind. Only when the drag had actually moved
 something, so a pinch that begins with a finger resting on an area writes
 nothing.
 
-**An anchor chain lights up at two strengths.** Selecting an area fills the badge
-of what follows it directly and outlines the badges further down — grandchildren,
-and on to the end of the chain. Moving the selected area moves all of them, so
-all of them are marked; but a card where every badge below the selection is
-filled has nothing left to find, and the near end is the one the eye wants.
+**The other end of a tie is lit by its mark alone.** A filled badge on an
+unselected area reads as a second selection, and the whole point of lighting the
+counterpart is to say *that one is related to the one you have*. The glyph goes
+blue and the badge keeps the card's quiet white. The exception is on the
+selected area itself, where what is moored to it is filled: that badge is the
+hub the others are pointing at, and it is on the area you already have.
+
+**An anchor chain lights at two strengths.** The mark above is the near end:
+what follows the selected area directly. Everything hanging off *that*, and on
+down the chain, takes the same blue at half strength. All of them move when the
+selected area moves, so all of them are marked — but the end you are holding has
+to be the one that stands out, and a weaker version of the same mark says "one
+step further away" where a second color would say "a different kind of tie".
 Upwards it stays one hop, as it always did: what this area follows is a
 relationship it has, and what that one follows is not.
+
+**The tie badge sits at the other end of the area from the rest.** Every badge
+used to stack at the top corner, and on a shallow area four of them are taller
+than the area they are about. The tie is the one an area carries most often, so
+moving it to the bottom corner halves that column in the common case — and it
+clears the shears by their own half-height when the area is cutting its words
+off, because two marks on one corner is worse than either alone.
+
+**A drawing is drawn hard.** An area whose picture is a `data:` URL renders
+with `image-rendering: pixelated`. The drawing surface is the only thing that
+writes one — it puts a base64 PNG straight into the cell — and it is 64 pixels
+on its longest side deliberately; a browser interpolating that up to a
+centimetre turns a drawing into a smudge. The honest edge, said out loud: a cell
+someone pastes a base64 *photograph* into is drawn hard too. Nothing in the
+bytes says which of the two it is, and the alternative — a per-area setting for
+something with one sensible answer — is worse than the edge case.
+
+**Blending is one word, checked on the way in.** `mix-blend-mode` is written
+straight into a style attribute, so `newBox` only lets through the thirteen
+modes the format names — the same rule colors follow. It reaches the paper and
+whatever is stacked under the area and stops at the card, because the scaler
+above it is a transform and a transform is a stacking context: nothing on a card
+can blend with the editor around it.
+
+**Opacity fades the whole area, and opaque is the absence of the field.** One
+number on the box rather than alpha in each of its colors: fill, border and
+content go together, which is what "a wash over the picture" means and what
+three separate alphas would keep failing to line up. It is a plain CSS
+`opacity`, so it needs none of the blend mode's rules about background graphics
+— it fades ink as readily as paper. Storing it only when it is less than 1 keeps
+the format's one habit: a template full of ordinary areas says nothing about
+opacity at all.
+
+**A drag on a left-hand page is undone into the stored frame, not handled in
+two.** A mirrored box is drawn at its facing position, so a pointer going right
+moves it left in the millimetres the template keeps, and the handle under the
+pointer is the opposite edge of the stored box. Rather than a mirrored twin of
+every case in `moveDrag`, the delta is negated and the handle swapped once, at
+the top — after which every case below is the code that was already there,
+working in the one frame the template is written in. The pivot and the rotation
+handle sit outside that, because mirroring places a box without flipping what is
+inside it. The latch guide carries a `flip` flag for the same reason: it is
+measured against stored edges and drawn where the eye sees them.
 
 ## `src/lib/components/PagePreview.svelte`
 
@@ -772,10 +1060,11 @@ in a plus. The grid is still 3 x 3; what changed is that the cells touch, share 
 ground, and carry a border only on the edges that are on the outside of the
 cross — twelve segments, each drawn once by the cell that owns it, with the four
 re-entrant corners where two of them meet at a point. The corner cells stay
-empty, so the card under them is still reachable. Every cell keeps a border on
-all four edges and colours only the perimeter ones: transparent rather than
-absent, because a cell bordered on three edges and not the fourth has an
-asymmetric content box and centres its glyph half a pixel off.
+empty, so the card under them is still reachable. The edge facing the middle
+carries no border at all, so the arms run into the centre without a seam; the
+room that border used to take is given back as padding on the same edge,
+because a cell inset on three sides and not the fourth centres its glyph half a
+pixel off.
 
 **And the arrowheads are centred, which needed saying in numbers.** Carbon's
 carets are drawn with the triangle 1/32 of the viewBox towards the point they
@@ -794,6 +1083,56 @@ hang over the edge — and stops at one cell, which is where the middle button's
 outer edge meets the edge of the stage. That button is how the pad is picked up
 again; a pad you cannot reach is a control you have lost.
 
+**The middle is drawn as nothing at all.** It is the step and the grip the pad is
+carried by rather than a direction, and every attempt to say so with a shape said
+the wrong thing: a circle in a darker well, then the same circle with a hairline,
+then with a shadow, then flat and a shade lighter. Each one drew a hole in a
+surface that is meant to be continuous. What is left is the face the arms have
+and the number on it — a digit in the middle of a cross is already a key, and the
+press does the rest.
+
+**The face is one flat colour.** It was a gradient, declared on each cell, which
+means it restarts at every cell: five separate sweeps of light across a shape
+that is meant to be a single surface, with the seams landing exactly where the
+arms meet. Flat, lit once by the bevel on the perimeter — which is the only
+place the light needs to be said, because that is where the shape turns.
+
+**The whole pad goes down at the pressed edge, and nothing changes colour.**
+Pressing a key used to swap that key's bevel and darken its face, which made it
+look redrawn rather than pushed — and five keys that each go down on their own
+read as five buttons that happen to touch. The pad now takes a perspective skew
+toward the key being held: the pressed edge is both lower and *further away*, so
+it shortens and the cross goes trapezoid rather than parallelogram. That is the
+difference between a thing pushed into the page and a thing sheared across it —
+a plain `skew` was tried and is a parallelogram, which reads as the shape being
+distorted rather than tipped. The perspective is short (220px) and the angle wide
+(14 degrees) because a cross 96 pixels across has to say this at a glance; a long
+perspective and a small angle read as a rendering artefact. The axis is the one
+the press tips it about: from the side, the vertical one. The middle goes
+straight down instead, because it is not a direction, and a pad being carried
+does not skew at all — skewed and moving at once reads as a bug in the drag.
+
+**One shadow, thrown by the shape.** `filter: drop-shadow` on the pad rather
+than a `box-shadow` on each key, so the cross casts a single shadow and the
+seams between its arms cast none — and it is there all the time now. A thing
+that stands up off the page casts a shadow whether or not it is being carried;
+being carried just throws it further.
+
+**The pad is drawn as a raised thing.** Lit from the top left, 1px along the top
+and left edges against 2px along the bottom and right, and the bevel inverts
+under a press. The uneven widths are the same on every cell, so the five content
+boxes are inset unevenly but identically and the cross is still square with
+itself — which is the same reason every cell carries a transparent border on all
+four edges. On a touch screen this is the one control with no cursor to say it
+is a control, and a flat outline was doing nothing to say so.
+
+**A tied key is not disabled, it is refused.** The two vertical keys of the pad
+can do nothing for an anchored area, but `disabled` makes a button dead to the
+pointer — and the hold that walks the selection up the tie has to arrive
+somehow. So the press is refused in the handler instead, and the key keeps the
+pad's own face with only its mark faded: a fully faded key reads as a hole in
+the cross rather than as a direction this area cannot go.
+
 **A pinch zooms the page, wherever it lands.** It briefly sized the type of the
 area under it instead, on the reasoning that the page has a zoom menu, a wheel
 and two keys while the areas had nothing on a phone. That was one gesture with
@@ -808,17 +1147,29 @@ events, so the bubbling listeners this used to have saw two fingers on the grey
 around the page and never saw them on the page itself — which on a card that has
 been laid out is most of what there is to pinch.
 
-**The pad's tied keys are not dead.** An anchored area has no vertical freedom,
-and the two vertical keys used to say so by being `disabled` — honest, and
-completely unhelpful on the one device with no other way in. They carry the two
-things you actually want at that moment: a **hold** moves the selection to the
-area this one hangs from, which is the area that can still go up and down, so the
-same key you were pressing moves it; **three taps in a run** break the tie and
-leave the area exactly where it sits. Three, not one, because the keys are also
-where a finger goes to nudge, and an accidental tap must not quietly undo a
-relationship the design depends on; after the first tap the key wears the broken
-link, and the run lapses after a second and a half so the icon never lies about
-what a second tap would do.
+**A run of taps on a tied key breaks the tie.** The hold walks the selection up
+to the area this one is following; the taps are the other way out, for when what
+you want is the tie gone rather than the area that holds it. Three taps, not one,
+because these keys are also where a finger goes to nudge and an accidental tap
+must not quietly undo a relationship the design depends on. After the first the
+key wears the broken link and the run lapses after a second and a half, so the
+icon never lies about what the next tap would do. The hold needs a single
+selection and the taps do not: going *to* an area means picking one, and breaking
+a tie means breaking each of them.
+
+**A tap on a tied key is silent, because the key says it is disabled.** These
+keys carry `aria-disabled` while they are tied — that is what they owe a screen
+reader about the nudge they will not do — and the press feedback in `haptics.ts`
+stays quiet for anything disabled, on the rule that a refusal must not feel like
+an action. So the run of taps is answered by the broken link appearing on the
+key and by nothing in the hand. Noted rather than fixed: the alternative is
+either a lie to assistive tech or a buzz on every genuinely dead button.
+
+**A hold that finds nothing to do does not buzz.** `hold` vibrates as it fires,
+because a hold is invisible until its action happens — but these keys carry the
+walk-up-the-tie whether or not there is a tie to walk, so an action returning
+`false` now means "nothing happened" and the buzz is skipped. A confirmation for
+something that did not occur is worse than no confirmation.
 
 **Where the freed area's top comes from.** Breaking a tie writes the *rendered*
 top back as the box's own `y` — that is what "leave it where it sits" means, and
@@ -1229,6 +1580,14 @@ at the bottom — and the real print was off-centre in the same way, which the
 first version of this shipped with. Padding cannot collapse. The sheet is
 `box-sizing: border-box` so it still measures exactly the paper it names.
 
+**A turned page turns its cell, not itself.** Half a mini zine prints upside
+down. The cell is the one rectangle already exactly the room a page has, so
+rotating it about its own middle lands it back on itself; the scaler inside
+turns about its top left corner, where a rotation would swing the page clean off
+the sheet. It also keeps the rotation off `Card.svelte`, which has a rotation of
+its own — the one a box can be given — and no business knowing which way up the
+paper wants it.
+
 **The sheet's bleed is not the card's.** The card's says where to cut one card
 out of the sheet; the sheet's says where to cut the sheet, so it outsets the
 paper (and `@page` with it) and its marks go at the corners of the tiled
@@ -1397,9 +1756,20 @@ behaviour (the family stays in the fallback stack and the export says which)
 is what actually happens.
 
 **The PNG export is the one thing that fetches.** `png.ts` inlines a Google face
-by fetching the stylesheet the page already loaded and the files it names.
-Deliberate, confined to that file, and best effort — a blocked request falls back
-to the system stack and is reported rather than hidden.
+by fetching the stylesheet the page already loaded and the files it names, and
+reads back the pictures on the card the same way. Deliberate, confined to that
+file, and best effort — a blocked request falls back to the system stack and is
+reported rather than hidden.
+
+**An SVG rendered through an `<img>` loads nothing at all.** Not a `blob:` URL,
+not an `https:` one, not even a same-origin file — and it fails silently, with
+no error and no broken-image mark. So every card with an uploaded background or
+a picture in an area exported as a blank where the picture was, and nothing said
+so; the fonts had been noticed and fixed years before the images, because a
+missing typeface is visible and a missing picture just looks like a card that
+was designed that way. `inlineImages` rewrites every `<img src>` and every
+`url()` in an inline style as data before the SVG is built. Each distinct
+address is fetched once per card however many areas share it.
 
 ## `src/lib/fonts.ts`
 
@@ -1430,6 +1800,62 @@ the component has to stay a pure function of its props.
 
 **`assets.ts` owns object-URL lifetime**: an object URL outlives the value that
 made it, so each is revoked when replaced.
+
+**A row's image is `local:name`, and deliberately not `file:`.** A page served
+over http cannot read a `file://` address: the browser refuses outright and no
+setting changes it, so a cell holding one would be a reference that renders
+nothing, for ever, with a name that promises otherwise. What a cell can carry is
+a *name*, and the bytes under it sit in the same store as the backgrounds — an
+image is an image, and one uploaded as a background can be put in a row without
+uploading it twice.
+
+**An address has to say what it is.** `safeImageUrl` used to parse against the
+page's own location, so `paper.jpg` became `https://this-app/paper.jpg` and was
+duly fetched — and *every* string in an image-bound cell is a relative address,
+so a column of prose in an image area was a column of requests to the app. It is
+parsed with no base now: an address that does not name http or https is not an
+address.
+
+**The prefix is load-bearing.** A bare `sketch.png` in a cell is
+indistinguishable from a relative URL, and a relative URL resolves against the
+app's own address — so the app would have gone to the network for it, which is
+the one thing this app does not do. `local:` cannot be mistaken for an address
+by anything, `safeMediaUrl` included.
+
+**Pictures can live outside the browser, and everything else cannot.** A
+template is a page of JSON and a dataset is text; a run of photographs is
+neither. Browser storage is a bucket nobody can look into, shared with
+everything else this origin keeps and emptied at the browser's discretion — so
+where the File System Access API exists, the bytes go into a folder the user
+picked and are ordinary files from then on. It is Chromium's API only, so this
+is an offer with a fallback rather than a change of architecture: the IndexedDB
+path is untouched and is what runs in Firefox and Safari.
+
+**The folder is read first and written alone.** Read first, so a run made before
+a folder was chosen keeps rendering and a name put in the folder afterwards wins
+from then on. Written alone — a name written to the folder deletes the copy in
+IndexedDB — because two copies under one name resolve to whichever was looked at
+first, which is a bug waiting for someone to edit the wrong one.
+
+**A handle survives a restart; the permission does not.** A directory handle is
+structured-cloneable, so it goes in IndexedDB like everything else, but the
+browser asks to be let in again once per visit and will only ask during a press.
+So `imageFolder` reports `ready: false` rather than silently failing, the panel
+carries the button that asks, and until it is pressed pictures come from browser
+storage — which is the same fallback as having no folder at all.
+
+**The panel exists because storage that cannot be seen cannot be managed.** The
+list is what is stored, what it weighs, where it is, and whether anything
+currently points at it. That last one is the question — *which of these can I
+delete* — and nothing else in the app could answer it.
+
+**The folder is listed by extension.** It is an ordinary folder that may hold
+anything, and a panel offering to delete a file this app never wrote would be a
+trap.
+
+**Names are resolved in one pass, keyed on the names.** Not on the rows: typing
+in a cell full of words must not send the whole run back to IndexedDB. A run of
+forty cards sharing one logo reads it once and holds one object URL for it.
 
 ## `src/lib/components/PageOptions.svelte`
 

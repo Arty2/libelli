@@ -1,11 +1,14 @@
 import { safeImageUrl } from './assets';
+import { clampSide, fitBoard } from './bitmap';
 import { parseColor } from './color';
 import defaultCard from './templates/default-card.json';
-import { IMPOSITION_COUNTS } from './imposition';
+import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
 import type {
 	BackgroundFit,
+	BlendMode,
 	BorderStyle,
 	Box,
+	BoxMode,
 	Centre,
 	Defaults,
 	FontRef,
@@ -57,6 +60,7 @@ export const SHEET_ORIENTATIONS: SheetOrientation[] = ['auto', 'portrait', 'land
 export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
 	enabled: false,
 	count: 4,
+	order: 'sequential',
 	sheet: { w: 210, h: 297 },
 	orientation: 'auto',
 	bleed: { enabled: false, amount: 3, cropMarks: false }
@@ -76,6 +80,16 @@ export const PAGE_NUMBER_POSITIONS: PageNumberPosition[] = [
 	'bottom-center',
 	'bottom-right'
 ];
+
+/** The two that follow the fold, offered beside the six fixed ones. */
+export const FACING_PAGE_NUMBER_POSITIONS: PageNumberPosition[] = [
+	'top-outer',
+	'top-inner',
+	'bottom-outer',
+	'bottom-inner'
+];
+
+const ALL_PAGE_NUMBER_POSITIONS = [...PAGE_NUMBER_POSITIONS, ...FACING_PAGE_NUMBER_POSITIONS];
 
 export function builtinTemplate(): Template {
 	return normaliseTemplate(BUILTIN_TEMPLATE_JSON);
@@ -115,6 +129,16 @@ export function nextBoxId(existing: Box[] = []): string {
 	return id;
 }
 
+/** Every mode the format names. Anything else in a file is read as words. */
+export const BOX_MODES: BoxMode[] = ['plain', 'markdown', 'image', 'color', 'bitmap', 'qr'];
+
+/** The modes that draw something rather than set something: a picture or a fill. */
+export const shownAsMedia = (mode: BoxMode) =>
+	mode === 'image' || mode === 'color' || mode === 'bitmap';
+
+/** The modes a drawing can be made in — the two that hold a picture. */
+export const takesADrawing = (mode: BoxMode) => mode === 'image' || mode === 'bitmap';
+
 export function newBox(partial: Partial<Box> = {}): Box {
 	return {
 		id: partial.id ?? nextBoxId(),
@@ -123,7 +147,9 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		y: num(partial.y, 12),
 		w: num(partial.w, 60),
 		h: num(partial.h, 12),
-		mode: partial.mode ?? 'plain',
+		// A mode decides which renderer a cell reaches, so a word this format does
+		// not name is read as words rather than trusted.
+		mode: BOX_MODES.includes(partial.mode as BoxMode) ? (partial.mode as BoxMode) : 'plain',
 		overflow: partial.overflow ?? 'clip',
 		// Anything optional that is not named here is dropped on load: this list
 		// is the box format, so a new field has to be added in both places.
@@ -149,13 +175,22 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
 			background: color(partial.background),
+			// A blend mode is written straight into a style attribute, so nothing
+			// but one of these thirteen words may reach it.
+			blend: BLEND_MODES.includes(partial.blend as BlendMode) ? partial.blend : undefined,
 			padding: normaliseSides(partial.padding),
 			borderWidth: normaliseSides(partial.borderWidth),
 			borderStyle: BORDER_STYLES.includes(partial.borderStyle as BorderStyle) ? partial.borderStyle : undefined,
 			borderColor: color(partial.borderColor),
 			borderRadius: partial.borderRadius,
+			borderHand: partial.borderHand ? true : undefined,
 			fit: BOX_FITS.includes(partial.fit as BoxFit) ? partial.fit : undefined,
+			pixels: normalisePixels(partial.pixels),
+			opacity: normaliseOpacity(partial.opacity),
 			locked: partial.locked,
+			// Only the opt-out is stored: following the fold is what a box does
+			// by default, so `true` is the absence of the field.
+			mirror: partial.mirror === false ? false : undefined,
 			group: typeof partial.group === 'string' && partial.group.trim() ? partial.group : undefined
 		})
 	};
@@ -209,6 +244,7 @@ export function normaliseTemplate(raw: unknown): Template {
 		slots,
 		boxes,
 		...stripUndefined({
+			facing: t.facing ? true : undefined,
 			css: typeof t.css === 'string' && t.css.trim() ? t.css : undefined,
 			locked: t.locked ? true : undefined
 		})
@@ -244,6 +280,7 @@ function normalisePrintSettings(raw: any): PrintSettings {
 	return {
 		enabled: Boolean(raw?.enabled),
 		count,
+		order: SHEET_ORDERS.includes(raw?.order) ? raw.order : DEFAULT_PRINT_SETTINGS.order,
 		sheet: {
 			w: num(raw?.sheet?.w, DEFAULT_PRINT_SETTINGS.sheet.w),
 			h: num(raw?.sheet?.h, DEFAULT_PRINT_SETTINGS.sheet.h)
@@ -273,7 +310,7 @@ function normaliseBackgroundImage(raw: any): PageBackgroundImage | undefined {
 }
 
 function normalisePageNumber(raw: any): PageNumberSpec {
-	const position: PageNumberPosition = PAGE_NUMBER_POSITIONS.includes(raw?.position)
+	const position: PageNumberPosition = ALL_PAGE_NUMBER_POSITIONS.includes(raw?.position)
 		? raw.position
 		: DEFAULT_PAGE_NUMBER.position;
 	return {
@@ -298,6 +335,22 @@ function normaliseFonts(raw: any): FontRef[] {
 }
 
 export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'double'];
+
+export const BLEND_MODES: BlendMode[] = [
+	'multiply',
+	'screen',
+	'overlay',
+	'darken',
+	'lighten',
+	'difference',
+	'exclusion',
+	'hard-light',
+	'soft-light',
+	'hue',
+	'saturation',
+	'color',
+	'luminosity'
+];
 
 export type BoxFit = NonNullable<Box['fit']>;
 export const BOX_FITS: BoxFit[] = ['contain', 'cover', 'fill', 'repeat'];
@@ -431,6 +484,31 @@ export function normaliseRotation(raw: unknown): number | undefined {
 	const wrapped = Math.round((((value % 360) + 540) % 360 - 180) * 10) / 10;
 	const degrees = wrapped === -180 ? 180 : wrapped;
 	return degrees === 0 ? undefined : degrees;
+}
+
+/**
+ * The board a drawing gets, if this box names one. Both sides or neither: half
+ * a size is not a size, and the board every drawing starts on is a better
+ * answer than one measurement paired with a guess. Held to the pixel budget
+ * here as well as in the editor, because a template is a file someone can hand
+ * you and a board of a million pixels is a cell nobody can open.
+ */
+export function normalisePixels(raw: unknown): { w: number; h: number } | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const w = clampSide((raw as any).w);
+	const h = clampSide((raw as any).h);
+	return w !== null && h !== null ? fitBoard(w, h) : undefined;
+}
+
+/**
+ * How much shows through, 0 to 1. Opaque is the absence of the field, so a
+ * template full of ordinary areas carries nothing about opacity at all; 0 is
+ * kept, because an area hidden on purpose is a thing people do.
+ */
+export function normaliseOpacity(raw: unknown): number | undefined {
+	const value = Number(raw);
+	if (!Number.isFinite(value) || value >= 1) return undefined;
+	return Math.max(0, Math.round(value * 100) / 100);
 }
 
 /** The pivot, in percent of the box. The middle is the default, so it is dropped. */

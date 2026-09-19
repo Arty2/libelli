@@ -40,6 +40,8 @@
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
+		/** open the drawing surface for the selected area */
+		ondraw?: (id: string) => void;
 	}
 
 	let { section, ...rest }: Props = $props();

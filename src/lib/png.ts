@@ -18,6 +18,11 @@ import type { StoredFont } from './fonts';
  *   a PNG in the wrong typeface is not the card. It is best effort — a blocked
  *   or offline request leaves that family in the fallback stack, and
  *   `missingFonts` names it.
+ * - **The pictures.** Same reason, and it is easy to miss: an SVG rasterised
+ *   through an `<img>` loads no external resource of any kind, so an address
+ *   that renders perfectly well on the card — an uploaded image's `blob:` URL,
+ *   a linked one's `https:` — draws nothing at all here, silently. Every
+ *   picture is fetched and inlined as data before the SVG is built.
  */
 
 export interface PngResult {
@@ -74,22 +79,24 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 };
 
 /**
- * How long a font fetch gets before the export gives up on it.
+ * How long a fetch — a font, or a picture on the card — gets before the export
+ * gives up on it.
  *
  * Every fetch here is already wrapped in a try/catch that falls back to the
- * system stack, which covers a request that is refused — but not one that
+ * system stack or to leaving the address alone, which covers a request that is
+ * refused — but not one that
  * simply never answers. A captive portal, a filtering proxy or a flaky
  * connection leaves the promise pending forever, and with it the export: the
  * button sits on "Exporting 1/4…" with no way out but a reload, which costs the
  * undo history. Ten seconds is long enough for a slow connection to deliver a
  * font file and short enough that nobody thinks the app has died.
  */
-const FONT_FETCH_TIMEOUT = 10_000;
+const FETCH_TIMEOUT = 10_000;
 
 /** `AbortSignal.timeout` where there is one; no timeout is better than no fetch. */
 const deadline = () =>
 	typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
-		? { signal: AbortSignal.timeout(FONT_FETCH_TIMEOUT) }
+		? { signal: AbortSignal.timeout(FETCH_TIMEOUT) }
 		: {};
 
 async function fetchAsDataUrl(url: string): Promise<string | null> {
@@ -145,6 +152,72 @@ async function fetchedFaces(): Promise<{ css: string; families: Set<string> }> {
 }
 
 /**
+ * Every `url(…)` in a style attribute, quotes optional. Card geometry, fills
+ * and backgrounds are all written as inline styles, so this is the only place
+ * on a card a picture can hide that is not an `<img>`.
+ */
+const CSS_URL = /url\(\s*(["']?)([^"')]+)\1\s*\)/g;
+
+/** One picture, as data. Null leaves the address alone — a blank, not a failure. */
+async function imageAsDataUrl(url: string): Promise<string | null> {
+	try {
+		// A blob: URL is this document's own bytes and needs no CORS mode; a
+		// remote one does, and is simply left alone when it is refused.
+		const response = await fetch(url, url.startsWith('blob:') ? {} : { mode: 'cors', ...deadline() });
+		if (!response.ok) return null;
+		const blob = await response.blob();
+		return `data:${blob.type || 'image/png'};base64,${bytesToBase64(await blob.arrayBuffer())}`;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Rewrite every picture on the clone as data, in place.
+ *
+ * Each distinct address is fetched once however many areas share it — a run of
+ * cards exported one after another is the common case, and the same logo on
+ * every one of them should not be read out of storage forty times.
+ */
+async function inlineImages(clone: HTMLElement): Promise<void> {
+	const seen = new Map<string, Promise<string | null>>();
+	const asData = (url: string) => {
+		const already = seen.get(url);
+		if (already) return already;
+		const job = imageAsDataUrl(url);
+		seen.set(url, job);
+		return job;
+	};
+	const wanted = (url: string) => url && !url.startsWith('data:');
+	const jobs: Promise<unknown>[] = [];
+
+	for (const img of clone.querySelectorAll('img')) {
+		const src = img.getAttribute('src') ?? '';
+		if (!wanted(src)) continue;
+		jobs.push(asData(src).then((data) => data && img.setAttribute('src', data)));
+	}
+
+	// The clone itself carries the card's own background, and `querySelectorAll`
+	// never returns the element it was called on.
+	for (const element of [clone, ...clone.querySelectorAll<HTMLElement>('[style*="url("]')]) {
+		const style = element.getAttribute('style') ?? '';
+		const urls = [...style.matchAll(CSS_URL)].map((m) => m[2]).filter(wanted);
+		if (!urls.length) continue;
+		jobs.push(
+			Promise.all(urls.map(asData)).then((datas) => {
+				let next = style;
+				urls.forEach((url, i) => {
+					if (datas[i]) next = next.split(url).join(datas[i] as string);
+				});
+				element.setAttribute('style', next);
+			})
+		);
+	}
+
+	await Promise.all(jobs);
+}
+
+/**
  * Snapshot one rendered card. `node` is measured at its own size, not at
  * whatever the preview is scaling it to, so a thumbnail exports full size.
  */
@@ -164,6 +237,7 @@ export async function elementToPng(
 	clone.style.margin = '0';
 	clone.style.transform = 'none';
 
+	await inlineImages(clone);
 	const stored = await storedFaces();
 	const fetched = await fetchedFaces();
 	const embedded = new Set([...stored.families, ...fetched.families]);

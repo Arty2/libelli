@@ -26,7 +26,7 @@ src/lib/
   css.ts          scopes the template's own CSS to the card; strips @import and remote url()
   parse.ts        CSV / TSV parsing (quoted fields, embedded newlines, delimiter sniffing)
   markdown.ts     hand-written Markdown subset -> HTML, escaping at the leaves
-  layout.ts       mm geometry, anchor resolution, grid and sibling-edge snapping
+  layout.ts       mm geometry, anchors, snapping, and the left/right page mirror
   autolayout.ts   reads the columns, writes a first draft of a card
   boxops.ts       box and selection transforms: duplicate, delete, group, lock, nudge
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
@@ -35,12 +35,15 @@ src/lib/
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
+  hand.ts         a border drawn by hand: seeded wobble -> SVG paths, in mm
+  bitmap.ts       the pixel budget a drawn area gets, and pointing at it
+  tile.ts         a drawing cropped to its ink, for an area that repeats
   table.ts        column reorder, row sorting
-  imposition.ts   grid math for tiling several cards onto one physical sheet
+  imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
   download.ts     hand the browser a file; the one copy both exports use
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
-  assets.ts       background images: bytes in IndexedDB, object-URL lifetime, url() safety
+  assets.ts       images — page backgrounds and a row's own; bytes in a folder or IndexedDB
   history.ts      undo/redo snapshots
   storage.ts      localStorage + IndexedDB, the template library, the legacy-key migration
   onboarding.ts   the starter template and sample rows a first run lands on
@@ -59,6 +62,8 @@ src/lib/
     PrintSettingsPanel.svelte  Per Sheet, orientation, sheet background — shared with the print screen
     PrintSheet.svelte  one physical sheet — used off-screen by PrintRoot and, scaled down, as PrintPreview's sheet thumbnails
     SheetLightbox.svelte  one sheet full screen; Lightbox's opposite number, on a different ground
+    BitmapEditor.svelte  the drawing surface, full screen; writes a base64 PNG into the row
+    ImagesPanel.svelte  what is stored, what it weighs, and the folder to keep it in instead
     PrintPreview, PrintRoot, Lightbox, BoxMenu, SelectionTools, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   app state and wiring                             (~40k)
@@ -73,14 +78,21 @@ src/routes/app.css        the :root tokens and app-wide rules
   percent.
 - **One layout engine.** The editor and the printed page render through the same
   DOM and the same CSS; never add a second layout path for print.
+- **A template stores the right-hand page.** With facing pages on, a left-hand
+  page is `mirrorBox` applied as the card is drawn — never a second set of
+  coordinates. Anything that writes geometry back (dragging, nudging, the
+  fields in the bar) works in the stored frame, so a mirrored drag is undone
+  before it is written, not stored mirrored.
 - **No runtime dependencies.** The Markdown renderer, the CSV parser and the QR
   encoder are hand-written, so the app works offline and nothing can rot
   underneath it. `jsqr` is a dev dependency only — the tests decode generated
   codes with an independent decoder, because a QR that does not scan looks
   exactly like one that does.
 - **The app fetches nothing.** The single deliberate exception is `png.ts`,
-  which inlines a web font for export. A template is a file someone can hand
-  you, and it must not be able to change that.
+  which inlines a web font and the card's own pictures for export. A template is
+  a file someone can hand you, and it must not be able to change that. It is
+  also why a cell names a stored image as `local:name` rather than as a bare
+  file name: a bare one is a relative URL, and a relative URL is a request.
 - **Escaping, color parsing and CSS scoping are chokepoints.** Cell content is
   untrusted: every leaf text node is HTML-escaped in `markdown.ts`; every color
   goes through `color.ts` before it can reach a `style` attribute, and one it
@@ -95,8 +107,11 @@ src/routes/app.css        the :root tokens and app-wide rules
   "no border" are all an absent key, so `updateBox` strips undefined values:
   structured clone, unlike JSON, keeps an undefined-valued key.
 - **Big things are referenced, never embedded.** A template names a font family
-  and a background image; the bytes live in IndexedDB under that name. That is
-  what keeps a template small enough to paste into a message.
+  and a background image; the bytes live under that name in the folder the user
+  chose, or in IndexedDB where there is none. That is what keeps a template small
+  enough to paste into a message. The one exception is a drawing, which is base64
+  in the cell on purpose: it has no existence anywhere else, so it travels with
+  the table.
 - **`css.ts` also builds the `<style>` tag.** A literal `<style>…</style>` pair
   written in a `.svelte` file gets picked up by the Svelte toolchain as that
   component's own stylesheet.
@@ -146,6 +161,8 @@ already have read the last version of. So: no bump until the PR exists, then
   and `color:` on the next was carrying the seam around for no benefit.
 - **Say the trade-off out loud.** If a choice is arguable, note it in the commit
   or in a comment rather than leaving the next reader to rediscover it.
+- **Watch a pull request only when asked.** Never start following CI, and never
+  keep a check-in running, off your own initiative.
 - **Never ship anything traceable to reference material.** Sample data and
   template names are invented; contact addresses use reserved `.example` domains.
 

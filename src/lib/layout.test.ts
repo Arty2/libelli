@@ -7,6 +7,10 @@ import {
 	alignBoxes,
 	bleedFor,
 	boxEdges,
+	facingPosition,
+	mirrorBox,
+	mirrors,
+	pageSide,
 	resolveLayout,
 	snapTo,
 	snapToEdges
@@ -176,5 +180,83 @@ describe('bleed', () => {
 		expect(page.w + eaten * 2).toBeCloseTo(MIN_PAPER);
 		// The narrow side is what runs out first; the other keeps what is left.
 		expect(page.h + eaten * 2).toBeGreaterThan(MIN_PAPER);
+	});
+});
+
+
+describe('pageSide', () => {
+	it('makes page one a right-hand page and page two its facing left', () => {
+		expect(pageSide(1)).toBe('recto');
+		expect(pageSide(2)).toBe('verso');
+		expect(pageSide(11)).toBe('recto');
+	});
+
+	it('treats a card with no number at all as a right-hand page', () => {
+		expect(pageSide(null)).toBe('recto');
+	});
+});
+
+describe('mirrorBox', () => {
+	const page = 148;
+
+	it('keeps the box the same distance from the outer trim edge', () => {
+		const box = newBox({ id: 'a', x: 14, y: 20, w: 60, h: 10 });
+		// 14mm from the left edge becomes 14mm from the right one.
+		expect(mirrorBox(box, page).x).toBe(148 - 60 - 14);
+	});
+
+	it('leaves the size, the height and the vertical placement alone', () => {
+		const box = newBox({ id: 'a', x: 14, y: 20, w: 60, h: 10, anchor: null });
+		const mirrored = mirrorBox(box, page);
+		expect(mirrored.w).toBe(60);
+		expect(mirrored.y).toBe(20);
+		expect(mirrored.h).toBe(10);
+	});
+
+	it('mirrors back onto itself, so nothing drifts on a second page', () => {
+		const box = newBox({ id: 'a', x: 14.5, y: 20, w: 60, h: 10 });
+		expect(mirrorBox(mirrorBox(box, page), page).x).toBe(14.5);
+	});
+
+	it('swaps an alignment that was chosen, so the text keeps hugging the outer edge', () => {
+		expect(mirrorBox(newBox({ id: 'a', align: 'left' }), page).align).toBe('right');
+		expect(mirrorBox(newBox({ id: 'a', align: 'right' }), page).align).toBe('left');
+	});
+
+	it('leaves an inherited alignment inherited — body text reads the same on both pages', () => {
+		expect(mirrorBox(newBox({ id: 'a' }), page).align).toBeUndefined();
+		expect(mirrorBox(newBox({ id: 'a', align: 'justify' }), page).align).toBe('justify');
+		expect(mirrorBox(newBox({ id: 'a', align: 'center' }), page).align).toBe('center');
+	});
+
+	it('does not turn the box over: rotation and pivot are placement-proof', () => {
+		const box = newBox({ id: 'a', x: 10, w: 20, rotation: 12, centre: { x: 20, y: 80 } });
+		const mirrored = mirrorBox(box, page);
+		expect(mirrored.rotation).toBe(12);
+		expect(mirrored.centre).toEqual({ x: 20, y: 80 });
+	});
+});
+
+describe('mirrors', () => {
+	it('follows the fold unless the box has said otherwise', () => {
+		expect(mirrors(newBox({ id: 'a' }))).toBe(true);
+		expect(mirrors(newBox({ id: 'a', mirror: false }))).toBe(false);
+	});
+});
+
+describe('facingPosition', () => {
+	it('puts an outer page number on the right of a right-hand page', () => {
+		expect(facingPosition('bottom-outer', 'recto')).toBe('bottom-right');
+		expect(facingPosition('bottom-outer', 'verso')).toBe('bottom-left');
+	});
+
+	it('puts an inner page number against the fold', () => {
+		expect(facingPosition('top-inner', 'recto')).toBe('top-left');
+		expect(facingPosition('top-inner', 'verso')).toBe('top-right');
+	});
+
+	it('leaves a position that already names a side alone', () => {
+		expect(facingPosition('bottom-left', 'verso')).toBe('bottom-left');
+		expect(facingPosition('top-center', 'verso')).toBe('top-center');
 	});
 });

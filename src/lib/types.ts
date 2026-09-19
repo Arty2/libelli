@@ -9,19 +9,44 @@
 export const SCHEMA_VERSION = 5;
 
 /**
- * `image` is really "image or color": it shows whatever its source resolves
- * to, which is a picture when that is a URL and a fill when it is a color. One
- * mode rather than two, because a column of brand colors and a column of logo
- * URLs are the same job — put what this row says in the background of this area
- * — and a template author should not have to know which the data holds.
+ * What an area draws, given what its cell or its template says.
+ *
+ * `bitmap` is a drawing made in the app and kept as base64 in the cell,
+ * `image` is a picture from somewhere — an address, or a name this browser is
+ * holding — and `color` is a fill. `image` also accepts a color, because it
+ * used to be the only mode for both and templates written then rely on it; a
+ * column of brand colors is better off saying `color`, which refuses anything
+ * that is not one.
  */
-export type BoxMode = 'plain' | 'markdown' | 'image' | 'qr';
+export type BoxMode = 'plain' | 'markdown' | 'image' | 'color' | 'bitmap' | 'qr';
 export type Overflow = 'clip' | 'grow';
 export type Align = 'left' | 'center' | 'right' | 'justify';
 /** vertical placement of a box's content within its own frame */
 export type VAlign = 'top' | 'middle' | 'bottom';
 export type TextCase = 'none' | 'smallcaps' | 'uppercase';
 export type BorderStyle = 'solid' | 'dashed' | 'dotted' | 'double';
+
+/**
+ * How an area's ink meets what is under it — the paper, its background image,
+ * and any area it overlaps. A subset of CSS's sixteen: the ones that do
+ * something a printed page can show. `multiply` is ink on paper and the reason
+ * this exists; `difference` and `exclusion` are the photocopier-zine ones.
+ * Absent is `normal`, which is how everything has always drawn.
+ */
+export type BlendMode =
+	| 'multiply'
+	| 'screen'
+	| 'overlay'
+	| 'darken'
+	| 'lighten'
+	| 'difference'
+	| 'exclusion'
+	| 'hard-light'
+	| 'soft-light'
+	| 'hue'
+	| 'saturation'
+	| 'color'
+	| 'luminosity';
 
 /** mm on each edge, in CSS order */
 export interface Sides {
@@ -37,13 +62,26 @@ export interface Sides {
  */
 export type SideValue = number | Sides;
 
+/**
+ * `outer` and `inner` are the two that know about the fold: on a right-hand
+ * page outer is the right edge, on a left-hand page it is the left one. A
+ * template without facing pages has only right-hand pages, so they still mean
+ * something definite there rather than needing to be hidden.
+ */
 export type PageNumberPosition =
 	| 'top-left'
 	| 'top-center'
 	| 'top-right'
 	| 'bottom-left'
 	| 'bottom-center'
-	| 'bottom-right';
+	| 'bottom-right'
+	| 'top-outer'
+	| 'top-inner'
+	| 'bottom-outer'
+	| 'bottom-inner';
+
+/** Which side of the fold a page falls on. Page 1 is a right-hand page. */
+export type PageSide = 'recto' | 'verso';
 
 /** how a background image fills the sheet */
 export type BackgroundFit = 'cover' | 'contain' | 'repeat';
@@ -81,6 +119,8 @@ export interface BleedSpec {
 
 export type Orientation = 'portrait' | 'landscape';
 
+export type SheetOrder = 'sequential' | 'zine';
+
 /**
  * A sheet's orientation, plus the one the fit works out for itself.
  *
@@ -109,6 +149,13 @@ export interface PrintSettings {
 	enabled: boolean;
 	/** virtual pages per physical sheet */
 	count: 2 | 4 | 6 | 8;
+	/**
+	 * Which page lands in which cell: `sequential` fills the sheet in reading
+	 * order, for a stack of cards to cut apart; `zine` lays the pages out so
+	 * that folding the printed sheet gives a booklet in reading order — see
+	 * `imposition.ts` for the two folds it knows.
+	 */
+	order: SheetOrder;
 	sheet: {
 		w: number;
 		h: number;
@@ -227,6 +274,12 @@ export interface Box extends TextStyle {
 	static?: StaticContent;
 	/** fill behind the box's content; absent means the paper shows through */
 	background?: string;
+	/**
+	 * How this whole area blends with what is under it. Absent draws it over
+	 * the top, as everything did before this existed. Prints only where the
+	 * browser is printing background graphics, like the paper colour.
+	 */
+	blend?: BlendMode;
 	/** mm between the border and the content. A number is every edge, an object is per edge. */
 	padding?: SideValue;
 	/** mm; 0 or absent is no border. A number is every edge, an object is per edge. */
@@ -237,12 +290,40 @@ export interface Box extends TextStyle {
 	/** mm, applied to the whole box */
 	borderRadius?: number;
 	/**
-	 * How an image or QR fills its box: contain fits it, cover crops it, fill
-	 * stretches it, repeat tiles it at its own size. `repeat` is image-only —
-	 * a tiled QR code is not a QR code.
+	 * Draw the border by hand: the same width, style and radius, wobbling. The
+	 * CSS border still holds the room it always did and is simply painted in
+	 * nothing, so turning this on moves no text and changes no measurement.
+	 */
+	borderHand?: boolean;
+	/**
+	 * How a picture or QR fills its box: contain fits it, cover crops it, fill
+	 * stretches it, repeat tiles it at its own size. `repeat` is for pictures
+	 * only — a tiled QR code is not a QR code, and a color has nothing to fit.
 	 */
 	fit?: 'contain' | 'cover' | 'fill' | 'repeat';
+	/**
+	 * The board a drawing in this area is made on, in pixels. Absent takes the
+	 * area's own proportions — see `bitmap.ts`. It is only ever the size of the
+	 * drawing, never of the area: what is drawn is shown at the area's
+	 * millimetres like any other picture.
+	 */
+	pixels?: { w: number; h: number };
+	/**
+	 * How much of what is under this area shows through it, 0 to 1. Absent is
+	 * opaque. It fades the whole area — its fill, its border and its content
+	 * together — so a wash of text over a picture is one setting rather than
+	 * three colors with alpha in them.
+	 */
+	opacity?: number;
 	locked?: boolean;
+	/**
+	 * Whether this box mirrors onto the facing page, when the template has
+	 * left and right pages at all. Absent follows the page, which mirrors;
+	 * `false` pins the box to the same millimetres on every page — a logo that
+	 * belongs in one corner of the sheet rather than in the outer corner of the
+	 * spread.
+	 */
+	mirror?: boolean;
 	/**
 	 * Boxes sharing a group id are selected, moved, locked and deleted together.
 	 * A plain string rather than a container: the boxes stay a flat list, so
@@ -262,6 +343,14 @@ export interface Template {
 	defaults: Defaults;
 	slots: string[];
 	boxes: Box[];
+	/**
+	 * Left and right pages. Off is a run of identical pages — the card case,
+	 * and what every template without this field is. On, an odd page is a
+	 * right-hand page and an even one its facing left-hand page: boxes mirror
+	 * across the fold unless they opt out, and `outer`/`inner` page numbers
+	 * know which edge they are on.
+	 */
+	facing?: boolean;
 	/** author's own CSS, scoped to the card at render time */
 	css?: string;
 	/** freezes the whole design: no dragging, no resizing, no option changes */
