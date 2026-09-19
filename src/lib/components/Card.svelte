@@ -11,6 +11,7 @@
 		FREE_STEP,
 		GRID_MINOR,
 		bleedFor,
+		bleedIsCut,
 		boxEdges,
 		facingPosition,
 		mirrorBox,
@@ -266,7 +267,7 @@
 	);
 	const layout = $derived(resolveLayout({ boxes: template.boxes, measured, hidden }));
 
-	const bleed = $derived(bleedFor(template.bleed, template.page.w, template.page.h));
+	const bleed = $derived(bleedFor(template.bleed));
 	const customCss = $derived(scopeCss(template.css ?? '', '.trim'));
 
 	const VALIGN_TO_FLEX = { top: 'flex-start', middle: 'center', bottom: 'flex-end' } as const;
@@ -280,10 +281,10 @@
 		return [
 			`width:${template.page.w + bleed * 2}mm`,
 			`height:${template.page.h + bleed * 2}mm`,
-			// Only a positive bleed is padding. A negative one is the trim hanging
-			// over the paper on every side, which `.trim` does with a translate —
-			// padding cannot go that way.
-			`padding:${Math.max(0, bleed)}mm`,
+			// The bleed is padding whichever kind it is: the page keeps its own
+			// millimetres and the band sits outside them. A cut one is trimmed off
+			// there, a kept one is margin, and nothing inside the page can tell.
+			`padding:${bleed}mm`,
 			// Handles live inside the scaled card, so a 14px handle is nine pixels
 			// under the finger at 62%. Everything screen-only is sized against this
 			// so a target stays the size it was drawn at, whatever the zoom.
@@ -1188,24 +1189,12 @@
 
 <div
 	class="card"
-	class:bleeding={bleed > 0}
 	class:editing={interactive}
 	class:frozen={interactive && !!template.locked}
 	style={cardStyle()}
 	lang="en"
 >
-	<!-- A negative bleed hangs the trim over the paper on every side. Drawn with
-	     `translate` rather than a negative margin: a negative top margin collapses
-	     straight out of the card and pulls the card itself up the page instead of
-	     moving the trim inside it. The overflow it makes is what the card's own
-	     `overflow: hidden` crops, which is the cut. -->
-	<div
-		class="trim"
-		style="width:{template.page.w}mm;height:{template.page.h}mm;translate:{Math.min(
-			0,
-			bleed
-		)}mm {Math.min(0, bleed)}mm"
-	>
+	<div class="trim" style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
 			{@html styleTag(customCss)}
@@ -1518,7 +1507,7 @@
 		{/if}
 	</div>
 
-	{#if bleed > 0 && template.bleed.cropMarks}
+	{#if bleedIsCut(template.bleed) && template.bleed.cropMarks}
 		<div class="crop-marks" aria-hidden="true">
 			{#each ['tl', 'tr', 'bl', 'br'] as corner (corner)}
 				<span class="mark {corner}" style="--bleed:{bleed}mm;--crop-gap:1mm"></span>

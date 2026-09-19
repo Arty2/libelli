@@ -3,9 +3,9 @@ import {
 	FREE_STEP,
 	GRID_MAJOR,
 	GRID_MINOR,
-	MIN_PAPER,
 	alignBoxes,
 	bleedFor,
+	bleedIsCut,
 	boxEdges,
 	facingPosition,
 	mirrorBox,
@@ -165,24 +165,25 @@ describe('alignBoxes', () => {
 
 describe('bleed', () => {
 	it('is nothing at all while it is off, whatever the amount says', () => {
-		expect(bleedFor({ enabled: false, amount: 3 }, 148, 210)).toBe(0);
-		expect(bleedFor(undefined, 148, 210)).toBe(0);
+		expect(bleedFor({ enabled: false, amount: 3 })).toBe(0);
+		expect(bleedFor(undefined)).toBe(0);
 	});
 
-	it('outsets the paper on both sides, and insets it when negative', () => {
-		expect(bleedFor({ enabled: true, amount: 3 }, 148, 210)).toBe(3);
-		expect(bleedFor({ enabled: true, amount: -4 }, 148, 210)).toBe(-4);
+	it('adds paper on every side, and a negative amount adds it too', () => {
+		expect(bleedFor({ enabled: true, amount: 3 })).toBe(3);
+		// The sign says what the band is, not which way it goes: the paper only
+		// ever grows, so nothing on the card is ever cut into by a bleed.
+		expect(bleedFor({ enabled: true, amount: -4 })).toBe(4);
 	});
 
-	it('will not let a negative bleed eat the paper', () => {
-		const page = { w: 50, h: 90 };
-		const eaten = bleedFor({ enabled: true, amount: -999 }, page.w, page.h);
-		expect(page.w + eaten * 2).toBeCloseTo(MIN_PAPER);
-		// The narrow side is what runs out first; the other keeps what is left.
-		expect(page.h + eaten * 2).toBeGreaterThan(MIN_PAPER);
+	it('is a cut only when it is positive', () => {
+		expect(bleedIsCut({ enabled: true, amount: 3 })).toBe(true);
+		expect(bleedIsCut({ enabled: true, amount: -3 })).toBe(false);
+		expect(bleedIsCut({ enabled: true, amount: 0 })).toBe(false);
+		expect(bleedIsCut({ enabled: false, amount: 3 })).toBe(false);
+		expect(bleedIsCut(undefined)).toBe(false);
 	});
 });
-
 
 describe('pageSide', () => {
 	it('makes page one a right-hand page and page two its facing left', () => {

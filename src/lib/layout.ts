@@ -26,33 +26,33 @@ export const mmToPx = (mm: number) => mm * pxPerMm();
 export const pxToMm = (px: number) => px / pxPerMm();
 
 /**
- * The smallest paper this app will draw, in mm. A bleed cuts inwards as well as
- * outwards now, and a page whose width has been eaten entirely is a card that
- * has silently disappeared — so the cut stops here rather than at nothing.
+ * A bleed as geometry: the paper it puts on every side of the page.
+ *
+ * Never negative, because the paper only ever grows. The sign is not a
+ * direction — it says what that band of paper *is*.
+ *
+ * Positive is the printer's bleed: paper outside the page, for the artwork to
+ * run into, cut away at the trim. Negative is the same band kept — a margin
+ * added all round, no cut line and no crop marks, the card simply bigger. Both
+ * leave everything on the card exactly where it was: coordinates are measured
+ * from the page's own edge, and that edge has not moved, it has paper around
+ * it. A negative bleed is the one way to widen the paper *evenly*, which
+ * changing the page size cannot do — that adds to the right and the bottom
+ * only, and slides the whole design off centre.
  */
-export const MIN_PAPER = 1;
+export function bleedFor(bleed: { enabled: boolean; amount: number } | undefined): number {
+	return bleed?.enabled ? Math.abs(bleed.amount) : 0;
+}
 
 /**
- * A bleed as geometry: what to add on every side of a trim box.
- *
- * Positive is the printer's bleed — paper outside the cut. Negative is the same
- * decision the other way: the paper stops short of the trim, so the artwork
- * runs off it and what would have been the margin is cropped away. Both are the
- * same sum, `size + amount * 2`, which is why one number does both and why
- * nothing inside the page moves either way — coordinates are measured from the
- * trim edge, never from the paper.
- *
- * Clamped against the trim it applies to: half of it, less `MIN_PAPER`, is all
- * a negative bleed can eat before the paper stops existing.
+ * Whether that band is waste. Only a positive bleed is cut, so only a positive
+ * bleed draws a trim line or carries crop marks — a negative one has no cut to
+ * mark, and marking one would say the margin is about to be taken off again.
  */
-export function bleedFor(
-	bleed: { enabled: boolean; amount: number } | undefined,
-	w: number,
-	h: number
-): number {
-	if (!bleed?.enabled) return 0;
-	return Math.max(bleed.amount, -(Math.min(w, h) - MIN_PAPER) / 2);
+export function bleedIsCut(bleed: { enabled: boolean; amount: number } | undefined): boolean {
+	return !!bleed?.enabled && bleed.amount > 0;
 }
+
 
 export interface LayoutInput {
 	boxes: Box[];

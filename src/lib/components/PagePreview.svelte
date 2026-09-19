@@ -5,7 +5,7 @@
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { hold, swipe } from '$lib/gestures';
-	import { GRID_MAJOR, GRID_MINOR, bleedFor, mmToPx, pxToMm } from '$lib/layout';
+	import { GRID_MAJOR, GRID_MINOR, bleedFor, bleedIsCut, mmToPx, pxToMm } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
@@ -309,7 +309,7 @@
 		!!template.locked ||
 		(stackIndex >= 0 && ((where === 'front' || where === 'forward') ? atFront : atBack));
 
-	const bleed = $derived(bleedFor(template.bleed, template.page.w, template.page.h));
+	const bleed = $derived(bleedFor(template.bleed));
 	const outerW = $derived(template.page.w + bleed * 2);
 	const outerH = $derived(template.page.h + bleed * 2);
 
@@ -835,7 +835,7 @@
 			</svg>
 		{/if}
 
-		{#if bounds && bleed !== 0}
+		{#if bounds && bleedIsCut(template.bleed)}
 			<!-- Where the paper will be cut.
 
 			     Drawn here rather than inside the card, and after the grid, because
@@ -847,9 +847,9 @@
 			     dashed and a whole pixel, which made it the loudest line on a page
 			     that already has dashed bounds on every box.
 
-			     A negative bleed puts this line *outside* the paper, which is right:
-			     it is still where the artwork is cut, and the strip between it and
-			     the sheet is what that cut is taking away. -->
+			     Only for a bleed that is cut. A kept one is margin — the paper edge
+			     *is* the trim there, and a line inside it would mark a cut nobody is
+			     going to make. -->
 			<!-- Sized in pixels rather than by `inset` alone. An `<svg>` is a replaced
 			     element: with `width: auto` it takes its intrinsic 300 × 150 and
 			     ignores the opposite offset, so the trim edge was drawn 300 × 150 at

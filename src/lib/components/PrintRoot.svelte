@@ -36,7 +36,7 @@
 		dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index))
 	);
 
-	const bleed = $derived(bleedFor(template.bleed, template.page.w, template.page.h));
+	const bleed = $derived(bleedFor(template.bleed));
 	const cardW = $derived(template.page.w + bleed * 2);
 	const cardH = $derived(template.page.h + bleed * 2);
 
@@ -44,7 +44,7 @@
 	// PrintSheet.svelte works this same geometry out again for its own layout.
 	const imposed = $derived(resolveImposition(cardW, cardH, template.print));
 	const sheetBleed = $derived(
-		imposed ? bleedFor(template.print.bleed, imposed.sheetW, imposed.sheetH) : 0
+		imposed ? bleedFor(template.print.bleed) : 0
 	);
 	// The sheet says how wide it is now: with `auto` the fit decides which way
 	// round the paper goes, so the size @page names comes off the layout rather

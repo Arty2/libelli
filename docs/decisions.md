@@ -20,20 +20,27 @@ that number would otherwise reach the field and the exported template.
 **Sibling edges come from `resolveLayout`**, so a box snaps to where a grown box
 actually ends, not to where its declared geometry says it starts.
 
-**A bleed is one number and one sum, `size + amount * 2`, and it goes both
-ways.** `bleedFor` is the only place that turns the setting into geometry, for
-the card and for the sheet alike — six components were each writing
-`enabled ? amount : 0` and each would have had to learn the negative case
-separately. Positive is the printer's bleed, paper outside the cut. Negative is
-the same decision run the other way: the paper stops short of the trim, the
-artwork runs off it, and the strip between is cut away rather than kept. Nothing
-inside the page moves either way, because coordinates are measured from the trim
-edge and never from the paper — which is exactly why one sum can serve both. The
-clamp is the only asymmetry: a negative bleed may eat half the *narrower* side
-less `MIN_PAPER`, because past that there is no paper left to print on and the
-card has silently disappeared. The fields carry the same floor as their `min`, so
-the limit is visible before it is hit rather than applied behind the number you
-typed.
+**A bleed's sign says what the paper *is*, not which way it goes.** `bleedFor`
+is the only place that turns the setting into geometry, for the card and for the
+sheet alike — six components were each writing `enabled ? amount : 0`, and a
+second reading of the number would otherwise have had to be learned at each of
+them. It returns an absolute outset, because the paper only ever grows;
+`bleedIsCut` answers the other half, and the two together are the whole of it.
+Positive is the printer's bleed: waste outside the page, cut at the trim, which
+is where the trim line and the crop marks go. Negative is the same band kept — a
+margin, no cut, no marks. Nothing inside the page moves either way, because
+coordinates are measured from the page's own edge and that edge has not moved;
+it has paper around it.
+
+An earlier revision read the negative case as the mirror image — the paper
+stopping short of the trim and the artwork cropped into. It is the tidier
+symmetry and it is the wrong feature: a bleed setting that silently cuts the
+design is a destructive edit hiding in a print option, and the thing people
+actually want from the other end of that field is the page a little bigger
+without the layout moving. Which is also the one thing changing the page size
+cannot do: that adds to the right and the bottom only, and slides the design off
+centre. With the cropping reading gone, so is the clamp that kept the paper from
+vanishing — there is nothing left to clamp.
 
 **A left-hand page is derived, never stored.** `mirrorBox` is a pure function of
 a box and the page width, applied as the card is drawn. The alternative — a
@@ -814,15 +821,11 @@ the one whose press cannot be taken back by letting go. And a mark the same size
 as the handle beside it reads as another handle; a larger one reads as something
 else, which it is.
 
-**A negative bleed is a `translate` on `.trim`, not a negative margin.** The
-positive case is padding on the card, which is what insets the trim inside the
-paper. The negative case is the trim hanging over the paper on all four sides,
-and padding cannot go that way. A negative margin can, but a negative *top*
-margin collapses straight out of the card and pulls the card itself up the page
-instead of moving the trim inside it — measured: the x offset was right and the y
-offset was zero. `translate` is a used-value offset, so it moves nothing in
-layout, and the overflow it makes is what the card's own `overflow: hidden`
-crops. That crop is the cut.
+**A bleed is padding on the card, whichever kind it is.** The page keeps its own
+millimetres in `.trim` and the band sits outside them as padding — cut off there
+if it is waste, kept as margin if it is not, and nothing inside the page can tell
+the difference. One expression, no branch, and no way for the two readings to
+drift apart in the renderer.
 
 **A second finger cancels the drag and puts the area back.** A pinch zooms the
 page from anywhere over the stage, areas included, and the finger that started it
@@ -1628,14 +1631,11 @@ something the print or the export does not deliver. It was pulled out of
 `PrintRoot.svelte`, which used to inline this per-sheet markup directly —
 splitting it was what let the preview reuse it at all.
 
-**A negative sheet bleed is padding the sheet cannot have.** The block is
-centred with padding, deliberately — a top margin on the first child collapses
-out of the sheet and takes the sheet with it. A sheet bleed that goes inwards
-makes that padding negative, which padding cannot be, so what padding cannot
-express is moved onto the block as a `translate`: a used-value offset, so the
-sheet still measures exactly the paper it names and the overhang is symmetrical.
-The sheet clips it, because the paper is what goes on the printer and what hangs
-over it is cut, not carried onto a page of its own.
+**The sheet's bleed is padding too, and stays positive.** The block is centred
+with padding, deliberately — a top margin on the first child collapses out of the
+sheet and takes the sheet with it. Both kinds of sheet bleed add to that padding,
+because both add paper: the cards keep their places and the sheet grows around
+them. Only the marks differ, and they are gated on the cut.
 
 ## `src/lib/components/PrintPreview.svelte`
 

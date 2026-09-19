@@ -65,7 +65,7 @@
 	/** How far through a run, so a long export is not a frozen button. */
 	let progress = $state<{ done: number; total: number } | null>(null);
 
-	const bleed = $derived(bleedFor(template.bleed, template.page.w, template.page.h));
+	const bleed = $derived(bleedFor(template.bleed));
 	const outerW = $derived(template.page.w + bleed * 2);
 	const outerH = $derived(template.page.h + bleed * 2);
 
@@ -74,7 +74,7 @@
 	// sheet's own bleed, where it has one, is part of the paper.
 	const imposed = $derived(resolveImposition(outerW, outerH, template.print));
 	const sheetBleed = $derived(
-		imposed ? bleedFor(template.print.bleed, imposed.sheetW, imposed.sheetH) : 0
+		imposed ? bleedFor(template.print.bleed) : 0
 	);
 	const printSheetW = $derived((imposed?.sheetW ?? outerW) + sheetBleed * 2);
 	const printSheetH = $derived((imposed?.sheetH ?? outerH) + sheetBleed * 2);

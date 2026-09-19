@@ -23,7 +23,7 @@
 
 	let viewport = $state({ w: 1200, h: 800 });
 
-	const bleed = $derived(bleedFor(template.bleed, template.page.w, template.page.h));
+	const bleed = $derived(bleedFor(template.bleed));
 	const outerW = $derived(template.page.w + bleed * 2);
 	const outerH = $derived(template.page.h + bleed * 2);
 	const scale = $derived.by(() => {

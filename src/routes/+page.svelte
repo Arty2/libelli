@@ -327,7 +327,7 @@ em { color: #b42318 }`;
 		strayBoxes(
 			template.boxes,
 			template.page,
-			bleedFor(template.bleed, template.page.w, template.page.h)
+			bleedFor(template.bleed)
 		)
 	);
 	/**
@@ -2231,8 +2231,9 @@ em { color: #b42318 }`;
 			<strong>Size</strong> has A6, A5, A4, A3 and a 4 × 6 inch postcard; picking one keeps the orientation you are
 			in, and <strong>⇄</strong> turns the page over. Neither moves anything on the card — coordinates are
 			measured from the trim edge, so trying a design the other way round costs nothing. Bleed is an outset on the
-			sheet, never an offset on the content — and a <em>negative</em> bleed is the same outset run the other way: the
-			paper stops short of the trim and the artwork is cut into rather than around.
+			sheet, never an offset on the content. The sign says what that paper <em>is</em>, not which way it goes: a
+			positive amount is cut off at the trim, a negative one is kept as a margin all round and the card comes out
+			that much bigger. Nothing on it moves either way.
 		</p>
 		<p>
 			Page setup holds the type defaults — family, size, leading, spacing, color. An area that leaves those fields

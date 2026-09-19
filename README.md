@@ -267,14 +267,16 @@ resize boxes directly, or type exact millimetres.
   trim lines and run outward into the bleed, each stopping a millimetre short
   of the corner: a mark that meets the artwork cannot be told from a rule the
   design meant to have, and that corner is what the guillotine lines up on.
-  The amount may be **negative**, which is the same outset run the other way:
-  the paper stops short of the trim, so the artwork runs off it and the strip
-  between the trim line and the sheet is cut away rather than kept. Nothing on
-  the card moves either way — the coordinates are still measured from the trim
-  edge — and the trim line is still drawn where the cut is, outside the paper
-  rather than inside it. The field will not take it further than the paper can
-  survive: a millimetre of sheet is the floor, and the field's own minimum says
-  so.
+  The amount may be **negative**, and the sign is not a direction: the paper
+  grows either way. A positive amount is the printer's bleed — that band is
+  waste, cut off at the trim, which is where the trim line and the crop marks
+  are drawn. A negative amount *keeps* it: the card simply comes out that much
+  bigger on every side, as a margin, with no cut line and no marks (the **Crop
+  Marks** tick goes away with them, since there is nothing to mark). Nothing on
+  the card moves either way — the coordinates are measured from the page's own
+  edge, and that edge has not moved, it has paper around it. It is the one way
+  to widen the paper *evenly*: changing the page size adds to the right and the
+  bottom only, and slides the whole design off centre.
 - **Print Settings** — several cards printed to one physical sheet: **Pages per
   Sheet** is 2, 4, 6 or 8, onto A5, A4, A3 or a sheet of your own size in
   millimetres (the two millimetre fields appear for **Custom** — a named size
@@ -313,8 +315,8 @@ resize boxes directly, or type exact millimetres.
   is on, the way the card's **Crop Marks** appears under **Page Bleed**: without
   the room, it was a setting you could switch on and see nothing come of. The
   sheet's bleed goes negative too, and means for the sheet what the page's means
-  for the card: the paper is trimmed inside the tiled block, and whatever hangs
-  over it is cut.
+  for the card: the paper grows by that much all round and none of it is cut, so
+  the cards stay where they were with more sheet around them.
 - **Background image** — *Upload…* takes a file from this machine, *URL…* takes
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper

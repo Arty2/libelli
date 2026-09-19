@@ -2,7 +2,7 @@
 	import Card from './Card.svelte';
 	import { backgroundStyle } from '$lib/assets';
 	import { SHEET_MARK_GAP, SHEET_MARK_MAX, resolveImposition, type PlacedPage } from '$lib/imposition';
-	import { bleedFor } from '$lib/layout';
+	import { bleedFor, bleedIsCut } from '$lib/layout';
 	import type { Mapping, Row, Template } from '$lib/types';
 
 	/**
@@ -53,7 +53,7 @@
 		previewScale = 1
 	}: Props = $props();
 
-	const bleed = $derived(bleedFor(template.bleed, template.page.w, template.page.h));
+	const bleed = $derived(bleedFor(template.bleed));
 	const cardW = $derived(template.page.w + bleed * 2);
 	const cardH = $derived(template.page.h + bleed * 2);
 
@@ -70,7 +70,7 @@
 
 	/** The sheet's own bleed outsets the paper; only imposition draws a sheet at all. */
 	const sheetBleed = $derived(
-		imposed ? bleedFor(template.print.bleed, imposed.sheetW, imposed.sheetH) : 0
+		imposed ? bleedFor(template.print.bleed) : 0
 	);
 	/** What the sheet trims to, and what goes on the printer. */
 	const trimW = $derived(imposed?.sheetW ?? cardW);
@@ -88,14 +88,6 @@
 	 */
 	const padX = $derived(sheetBleed + (imposed?.marginX ?? 0));
 	const padY = $derived(sheetBleed + (imposed?.marginY ?? 0));
-	/**
-	 * A negative sheet bleed can take the block past the paper on every side,
-	 * and padding cannot go that way. What padding cannot express is moved onto
-	 * the block as a `translate` — a used-value offset, so the sheet still
-	 * measures exactly the paper it names and the cut is symmetrical.
-	 */
-	const shiftX = $derived(Math.min(0, padX));
-	const shiftY = $derived(Math.min(0, padY));
 
 	/**
 	 * Marks for the block's outer edge — the cut that takes the tiled block off
@@ -115,7 +107,10 @@
 	const markX = $derived(Math.min(SHEET_MARK_MAX, Math.max(0, padX - SHEET_MARK_GAP)));
 	const markY = $derived(Math.min(SHEET_MARK_MAX, Math.max(0, padY - SHEET_MARK_GAP)));
 	const showOuterMarks = $derived(
-		!!imposed && template.print.bleed.cropMarks && Math.max(markX, markY) > 0
+		!!imposed &&
+			bleedIsCut(template.print.bleed) &&
+			template.print.bleed.cropMarks &&
+			Math.max(markX, markY) > 0
 	);
 
 	const sheetBackgroundStyle = $derived(
@@ -126,14 +121,11 @@
 <!-- Sized to the paper so nothing can spill sideways into an extra page. -->
 <div
 	class="print-sheet"
-	style="width:{paperW}mm;height:{paperH}mm;padding:{Math.max(0, padY)}mm {Math.max(
-		0,
-		padX
-	)}mm;--preview-scale:{previewScale};{sheetBackgroundStyle}"
+	style="width:{paperW}mm;height:{paperH}mm;padding:{padY}mm {padX}mm;--preview-scale:{previewScale};{sheetBackgroundStyle}"
 >
 	<div
 		class="print-grid"
-		style="width:{blockW}mm;height:{blockH}mm;grid-template-columns:repeat({grid.cols},{cellW}mm);grid-template-rows:repeat({grid.rows},{cellH}mm);translate:{shiftX}mm {shiftY}mm"
+		style="width:{blockW}mm;height:{blockH}mm;grid-template-columns:repeat({grid.cols},{cellW}mm);grid-template-rows:repeat({grid.rows},{cellH}mm)"
 	>
 		{#each cells as cell, position (position)}
 			<!-- Turned on the cell rather than on the card, because the cell is the
@@ -180,10 +172,6 @@
 <style>
 	.print-sheet {
 		position: relative;
-		/* A negative sheet bleed leaves the block hanging over the paper; the
-		   paper is what goes on the printer, so what hangs over it is cut, not
-		   carried onto a page of its own. */
-		overflow: hidden;
 		/* The padding is the sheet's bleed plus the room the block is centred
 		   in; the sheet still has to measure exactly the paper it names. */
 		box-sizing: border-box;
