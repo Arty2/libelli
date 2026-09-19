@@ -3,7 +3,7 @@
 	import { safeImageUrl } from '$lib/assets';
 	import { IMPOSITION_COUNTS, foldsIntoAZine, resolveImposition } from '$lib/imposition';
 	import { bleedFor } from '$lib/layout';
-	import { PAGE_PRESETS, presetFor, presetSize } from '$lib/template';
+	import { MIN_PAPER, PAGE_PRESETS, presetFor, presetSize } from '$lib/template';
 	import type {
 		BackgroundFit,
 		PageBackgroundImage,
@@ -61,7 +61,24 @@
 	 * handler. Measured — it made a 132mm card with a 148mm page hanging over it.
 	 * The field is a boundary like any other, so it clamps.
 	 */
-	const distance = (event: Event, fallback: number) => Math.max(0, numeric(event, fallback));
+	const distance = (event: Event, fallback: number) => floored(event, numeric(event, fallback), 0);
+
+	/**
+	 * A paper dimension, which has a floor of its own: a sheet measuring nothing
+	 * is not a sheet. Same reason as `distance` above — `min` is advisory, and
+	 * the field is a boundary.
+	 */
+	const paper = (event: Event, fallback: number) => floored(event, numeric(event, fallback), MIN_PAPER);
+
+	function floored(event: Event, value: number, floor: number): number {
+		const taken = Math.max(floor, value);
+		// The field shows what was taken, not what was typed. Svelte only rewrites
+		// a value when the state behind it changes, so a number that was refused
+		// while the state stayed put sat in the box looking accepted — measured: a
+		// typed -50 next to a 1mm card.
+		(event.currentTarget as HTMLInputElement).value = String(taken);
+		return taken;
+	}
 
 	/** The named size this sheet already is, or Custom when it is its own. */
 	const preset = $derived(presetFor(template.print.sheet.w, template.print.sheet.h) ?? '');
@@ -320,9 +337,10 @@
 					class="n-3"
 					type="number"
 					step="1"
+					min={MIN_PAPER}
 					value={template.print.sheet.w}
 					disabled={pageFrozen}
-					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, w: numeric(e, template.print.sheet.w) } })}
+					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, w: paper(e, template.print.sheet.w) } })}
 				/>
 				<span class="unit">mm</span>
 			</label>
@@ -332,9 +350,10 @@
 					class="n-3"
 					type="number"
 					step="1"
+					min={MIN_PAPER}
 					value={template.print.sheet.h}
 					disabled={pageFrozen}
-					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, h: numeric(e, template.print.sheet.h) } })}
+					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, h: paper(e, template.print.sheet.h) } })}
 				/>
 				<span class="unit">mm</span>
 			</label>

@@ -7,6 +7,7 @@
 	import {
 		BORDER_STYLES,
 		DEFAULT_QR,
+		MIN_PAPER,
 		FACING_PAGE_NUMBER_POSITIONS,
 		PAGE_NUMBER_POSITIONS,
 		PAGE_PRESETS,
@@ -210,6 +211,25 @@
 		return Number.isFinite(value) ? value : fallback;
 	};
 
+	/**
+	 * A paper dimension, taken from a field.
+	 *
+	 * `min` on a number input is advisory: it stops the stepper and fails a form
+	 * validation nobody here is running, and a typed `0` still arrives at the
+	 * handler. Measured — it drew a card 0mm wide with the whole design inside
+	 * it and no way to reach any of it. A field is a boundary like a file is, so
+	 * it carries the same floor `normaliseTemplate` does.
+	 */
+	const paper = (event: Event, fallback: number) => {
+		const taken = Math.max(MIN_PAPER, numeric(event, fallback));
+		// The field shows what was taken, not what was typed. Svelte only rewrites
+		// a value when the state behind it changes, so a number that was refused
+		// while the state stayed put sat in the box looking accepted — measured: a
+		// typed -50 next to a 1mm card.
+		(event.currentTarget as HTMLInputElement).value = String(taken);
+		return taken;
+	};
+
 	/** The named size this sheet already is, or Custom when it is its own. */
 	const preset = $derived(presetFor(template.page.w, template.page.h) ?? '');
 
@@ -383,10 +403,11 @@
 					class="n-3"
 					type="number"
 					step="1"
+					min={MIN_PAPER}
 					placeholder="148"
 					value={template.page.w}
 					disabled={pageFrozen}
-					onchange={(e) => patchTemplate({ page: { ...template.page, w: numeric(e, template.page.w) } })}
+					onchange={(e) => patchTemplate({ page: { ...template.page, w: paper(e, template.page.w) } })}
 				/>
 				<span class="unit">mm</span>
 			</label>
@@ -396,10 +417,11 @@
 					class="n-3"
 					type="number"
 					step="1"
+					min={MIN_PAPER}
 					placeholder="210"
 					value={template.page.h}
 					disabled={pageFrozen}
-					onchange={(e) => patchTemplate({ page: { ...template.page, h: numeric(e, template.page.h) } })}
+					onchange={(e) => patchTemplate({ page: { ...template.page, h: paper(e, template.page.h) } })}
 				/>
 				<span class="unit">mm</span>
 			</label>

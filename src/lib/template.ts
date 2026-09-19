@@ -57,6 +57,17 @@ export const SHEET_ORIENTATIONS: SheetOrientation[] = ['auto', 'portrait', 'land
  * goes is `auto`'s to answer: the count and the card decide it, and they are
  * both about to change.
  */
+/**
+ * The smallest paper this app will draw, in mm.
+ *
+ * A page or a sheet is a physical thing and cannot measure nothing: a width of
+ * zero renders a card with no card in it, and the design inside is still there
+ * and completely unreachable — measured, before this floor existed. One
+ * millimetre rather than some considered minimum, because the point is only
+ * that paper exists; anything above it is the designer's business.
+ */
+export const MIN_PAPER = 1;
+
 export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
 	enabled: false,
 	count: 4,
@@ -226,8 +237,8 @@ export function normaliseTemplate(raw: unknown): Template {
 		schema: SCHEMA_VERSION,
 		name: typeof t.name === 'string' && t.name.trim() ? t.name.trim() : 'Untitled card',
 		page: {
-			w: num(t.page?.w, 148),
-			h: num(t.page?.h, 210),
+			w: paper(t.page?.w, 148),
+			h: paper(t.page?.h, 210),
 			unit: 'mm',
 			background: parseColor(t.page?.background) ?? '#ffffff',
 			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image) })
@@ -286,8 +297,8 @@ function normalisePrintSettings(raw: any): PrintSettings {
 		count,
 		order: SHEET_ORDERS.includes(raw?.order) ? raw.order : DEFAULT_PRINT_SETTINGS.order,
 		sheet: {
-			w: num(raw?.sheet?.w, DEFAULT_PRINT_SETTINGS.sheet.w),
-			h: num(raw?.sheet?.h, DEFAULT_PRINT_SETTINGS.sheet.h)
+			w: paper(raw?.sheet?.w, DEFAULT_PRINT_SETTINGS.sheet.w),
+			h: paper(raw?.sheet?.h, DEFAULT_PRINT_SETTINGS.sheet.h)
 		},
 		orientation,
 		bleed: normaliseBleed(raw?.bleed),
@@ -532,6 +543,11 @@ export function sidesOf(width: SideValue | undefined): Sides {
 /** A recognised color, or nothing at all — never the string it was handed. */
 const color = (raw: unknown): string | undefined =>
 	parseColor(typeof raw === 'string' ? raw : undefined) ?? undefined;
+
+/** A paper dimension: a number, and never smaller than paper can be. */
+function paper(value: unknown, fallback: number): number {
+	return Math.max(MIN_PAPER, num(value, fallback));
+}
 
 function num(value: unknown, fallback: number): number {
 	const n = Number(value);

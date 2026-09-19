@@ -88,6 +88,18 @@ only appears where there is nothing to overwrite.
 collapses four equal edges back to one, so a template never grows structure it
 did not ask for; `sidesOf` reads either shape back out as four edges.
 
+**A measurement has a floor, and the field is a boundary too.** A page, a
+sheet and a bleed are physical distances: paper cannot measure below
+`MIN_PAPER`, and a bleed cannot go below nothing. Both are clamped in
+`normaliseTemplate`, which is where a file arrives — and again in the handler
+behind each field, which is where a person arrives. `min` on a number input
+looked like it covered the second one and does not: it stops the stepper and
+fails a form validation nobody here runs, while a typed value goes straight to
+the handler. Measured both ways before the clamp existed — a `-8` bleed drew a
+132mm card with a 148mm page hanging over it, and a `0` width drew a card with
+no card in it and the whole design still inside, unreachable. Neither threw;
+that is what makes it worth writing down.
+
 ## `src/lib/autolayout.ts`
 
 **It guesses about columns, never about words.** Nothing in here reads a cell to
