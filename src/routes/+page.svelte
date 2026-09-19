@@ -68,23 +68,34 @@
 		type Arrange
 	} from '$lib/template';
 	import {
+		UNTITLED_TABLE,
+		deleteDatasetDoc,
 		deleteTemplateDoc,
+		listDatasets,
 		listTemplates,
 		loadDataset,
+		loadDatasetDoc,
+		loadDatasetId,
+		loadPreviousDatasetId,
 		loadMapping,
 		loadTemplate,
 		loadTemplateDoc,
 		loadTemplateId,
 		loadUi,
 		migrateLegacyStorage,
+		nextDatasetId,
 		nextTemplateId,
 		saveDataset,
+		saveDatasetDoc,
+		saveDatasetId,
+		savePreviousDatasetId,
 		saveMapping,
 		saveTemplate,
 		saveTemplateDoc,
 		saveTemplateId,
 		storageAvailable,
 		saveUi,
+		type DatasetEntry,
 		type TemplateEntry
 	} from '$lib/storage';
 	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
@@ -147,6 +158,19 @@
 	let excludedSheets = $state<Set<number>>(new Set());
 	let helpOpen = $state(false);
 	let cssOpen = $state(false);
+	/**
+	 * The CSS as it stood when the dialog opened, so Cancel has something to put
+	 * back.
+	 *
+	 * The textarea commits on `change`, which fires as the focus leaves it — so
+	 * by the time a click reaches Cancel the edit is already in the template and
+	 * on the card behind. Cancel is therefore an undo of one known value rather
+	 * than a refusal to apply anything, which is also why Escape and the
+	 * backdrop go the same way: with a Cancel button on the row, the two other
+	 * ways out of the dialog that are not Done have to mean what it means.
+	 */
+	let cssBefore: string | undefined;
+	let cssField = $state<HTMLTextAreaElement | null>(null);
 	// Page setup is a panel, not a mode: it opens on wide screens and stays out of
 	// the way on a phone, where it would eat the preview it is there to serve.
 	let pageSetupOpen = $state(true);
@@ -201,13 +225,79 @@
 	let templateId = $state('');
 	let library = $state<TemplateEntry[]>([]);
 
-	/** The order the picker lists them in, and the order `listTemplates` returns. */
-	const byName = (a: TemplateEntry, b: TemplateEntry) =>
+	/** The order both pickers list in, and the order the two listings return. */
+	const byName = (a: { id: string; name: string }, b: { id: string; name: string }) =>
 		a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
 
 	async function refreshLibrary() {
 		library = await listTemplates();
 	}
+
+	/**
+	 * The saved tables, which one is open, and which one the swap goes back to.
+	 *
+	 * The same arrangement as the template library above and for the same
+	 * reasons — see `storage.ts` — with one addition: a table nobody has named
+	 * is listed as “Untitled table”, so `tableName` is what the picker's field
+	 * shows and the empty string is what the dataset actually holds.
+	 */
+	let datasetId = $state('');
+	let tables = $state<DatasetEntry[]>([]);
+	/** '' until a second table has been opened; the swap button says so. */
+	let previousTable = $state('');
+	/** Deleting a table asks, for the same reason deleting a template does. */
+	let deletingTable = $state(false);
+	const tableName = $derived(dataset.name?.trim() || UNTITLED_TABLE);
+
+	async function refreshTables() {
+		tables = await listDatasets();
+	}
+	/**
+	 * The tray under the page, rather than beside it, and how much of the window
+	 * it is taking.
+	 *
+	 * `stacked` is the same breakpoint the stylesheet uses, read through
+	 * `matchMedia` so the two cannot drift apart by a pixel. `trayShare` is a
+	 * fraction of the working area rather than a height in px, so turning the
+	 * phone over keeps the proportion the hand chose instead of the number. It
+	 * is null until something drags it, which leaves the CSS default in charge —
+	 * and it is not stored: where the tray sits is where this session put it,
+	 * and a phone that opens on a table filling the screen has hidden the card
+	 * the app is for.
+	 */
+	let stacked = $state(false);
+	let mainEl = $state<HTMLElement | null>(null);
+	let asideEl = $state<HTMLElement | null>(null);
+	let trayShare = $state<number | null>(null);
+	let trayFrom: { y: number; share: number } | null = null;
+
+	/** Below this the tray is a row of buttons and no table, which is not a tray. */
+	const TRAY_MIN = 0.2;
+
+	$effect(() => {
+		const query = window.matchMedia('(max-width: 900px)');
+		const sync = () => (stacked = query.matches);
+		sync();
+		query.addEventListener('change', sync);
+		return () => query.removeEventListener('change', sync);
+	});
+
+	function dragTray(phase: 'start' | 'move' | 'end', clientY: number) {
+		const height = mainEl?.getBoundingClientRect().height ?? 0;
+		if (!height || !asideEl) return;
+		if (phase === 'start') {
+			// Measured rather than read off `trayShare`, which is null until the
+			// first drag and stale after a resize.
+			trayFrom = { y: clientY, share: asideEl.getBoundingClientRect().height / height };
+			return;
+		}
+		if (!trayFrom) return;
+		// The finger is on the tray's top edge, so up is taller: the share it
+		// takes is what it had plus however far the edge has been pulled.
+		trayShare = Math.min(1, Math.max(TRAY_MIN, trayFrom.share + (trayFrom.y - clientY) / height));
+		if (phase === 'end') trayFrom = null;
+	}
+
 	let printing = $state(false);
 	let mappingPrompt = $state(false);
 	let missingFonts = $state<FontRef[]>([]);
@@ -267,6 +357,7 @@
 		dataset: Dataset;
 		mapping: Mapping;
 		templateId: string;
+		datasetId: string;
 	}
 	/** Give a dialog its first focus so Esc/Tab work without a mouse trip. */
 	const focusOnOpen = (node: HTMLElement) => node.focus();
@@ -291,11 +382,32 @@ hr { }
 h1 { letter-spacing: 0.4mm }
 em { color: #b42318 }`;
 
+	function openCss() {
+		cssBefore = template.css;
+		cssOpen = true;
+	}
+
+	/** Put back what was there when the dialog opened, and close it. */
+	function cancelCss() {
+		// First, because the field commits on `change` and `change` fires as the
+		// focus leaves it. Blurring here puts that commit *before* the restore;
+		// without it, Escape closed the dialog, the textarea was unmounted, its
+		// change landed on the way out, and the CSS being cancelled was applied
+		// a moment after it had been put back.
+		cssField?.blur();
+		cssOpen = false;
+		if (template.css === cssBefore) return;
+		// Through stripUndefined for the usual reason: a template with no CSS has
+		// no `css` key, not a key holding undefined.
+		template = stripUndefined({ ...$state.snapshot(template), css: cssBefore }) as Template;
+	}
+
 	const snapshot = (): Snapshot => ({
 		template: $state.snapshot(template),
 		dataset: $state.snapshot(dataset),
 		mapping: $state.snapshot(mapping),
-		templateId
+		templateId,
+		datasetId
 	});
 	// Raw state: the history is replaced wholesale on every step, and its entries
 	// are plain snapshots that must stay plain — a deep state proxy over them
@@ -306,7 +418,8 @@ em { color: #b42318 }`;
 			template: starterTemplate(),
 			dataset: { columns: [], rows: [] },
 			mapping: {},
-			templateId: ''
+			templateId: '',
+			datasetId: ''
 		})
 	);
 	const undoable = $derived(canUndo(history));
@@ -364,15 +477,36 @@ em { color: #b42318 }`;
 			}
 		}
 
+		/**
+		 * The working copy is the authority for what is on screen; which table it
+		 * *is* comes from the id beside it.
+		 *
+		 * An id is the thing that says this browser has been here before, which is
+		 * what makes an empty table readable: with one, an empty table is a table
+		 * somebody emptied and it stays empty; without one, an empty table is a
+		 * first run and gets the samples. Before there was more than one table
+		 * there was no id, so anybody arriving from an older build takes the
+		 * second path once and has an id from then on — with their rows, because
+		 * the rows are what that path keeps.
+		 */
+		const storedDatasetId = loadDatasetId();
 		const storedDataset = await loadDataset();
-		if (storedDataset?.columns?.length) {
+		if (storedDatasetId) {
+			dataset = storedDataset ?? (await loadDatasetDoc(storedDatasetId)) ?? { columns: [], rows: [] };
+			datasetId = storedDatasetId;
+		} else if (storedDataset?.columns?.length) {
 			dataset = storedDataset;
+			datasetId = nextDatasetId();
 		} else {
 			// Onboarding: a first-time visitor lands on the starter card and a few
 			// rows of sample data rather than on an empty page.
 			dataset = sampleDataset();
 			firstRun = true;
+			datasetId = nextDatasetId();
 		}
+		saveDatasetId(datasetId);
+		previousTable = loadPreviousDatasetId();
+		void refreshTables();
 
 		// The working copy above is the authority for what is on screen; the
 		// library is where it is also kept under a name you can come back to. An
@@ -672,6 +806,12 @@ em { color: #b42318 }`;
 			// recoverable rather than merely reversible on screen.
 			void refreshLibrary();
 		}
+		if (next.datasetId && next.datasetId !== datasetId) {
+			rememberTable(datasetId);
+			datasetId = next.datasetId;
+			saveDatasetId(datasetId);
+			void refreshTables();
+		}
 		if (activeRow >= dataset.rows.length) activeRow = Math.max(0, dataset.rows.length - 1);
 		// A snapshot can be from before a box existed, or after it was deleted.
 		selectedIds = selectedIds.filter((id) => template.boxes.some((b) => b.id === id));
@@ -771,11 +911,27 @@ em { color: #b42318 }`;
 		library = [...rest, { id, name }].sort(byName);
 	});
 
+	// The working copy and the library entry, on one debounce — the same
+	// arrangement the template above is saved under, and for the same reason.
 	$effect(() => {
 		if (!ready) return;
 		const saved = $state.snapshot(dataset);
-		const timer = setTimeout(() => void saveDataset(saved).then(reportSave), 300);
+		const id = datasetId;
+		const timer = setTimeout(() => {
+			void saveDataset(saved).then(reportSave);
+			if (id) void saveDatasetDoc(id, saved);
+		}, 300);
 		return () => clearTimeout(timer);
+	});
+
+	/** Keep the picker's label in step with the name field — see the template's. */
+	$effect(() => {
+		const name = tableName;
+		const id = datasetId;
+		if (!ready || !id) return;
+		if (tables.some((entry) => entry.id === id && entry.name === name)) return;
+		const rest = tables.filter((entry) => entry.id !== id);
+		tables = [...rest, { id, name }].sort(byName);
 	});
 
 	$effect(() => {
@@ -1076,6 +1232,142 @@ em { color: #b42318 }`;
 		);
 	}
 
+	// ---- the table library ---------------------------------------------------
+
+	/**
+	 * Put the working table into the library now rather than on the next tick of
+	 * the autosave — see `flushTemplate` for why.
+	 */
+	async function flushDataset() {
+		if (!datasetId) return;
+		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
+	}
+
+	/**
+	 * The table being left behind is the one the swap comes back to. Takes '' to
+	 * say there is no pair any more, which is what deleting one end of it means.
+	 */
+	function rememberTable(id: string) {
+		if (id === previousTable) return;
+		previousTable = id;
+		savePreviousDatasetId(id);
+	}
+
+	/**
+	 * Open a saved table. Undoable like everything else that replaces what is on
+	 * screen: one snapshot is template, data and mapping together, so Ctrl/Cmd+Z
+	 * comes back to the table you were on.
+	 *
+	 * The design is untouched, which is the whole point of keeping the two
+	 * libraries apart — but the bindings cannot be: they name columns, and the
+	 * new table may not have them. Bindings that still point at a column that
+	 * exists are kept, because the usual reason to have two tables is that they
+	 * have the same columns; when none survives, the columns are guessed at
+	 * afresh rather than left pointing at nothing.
+	 */
+	async function switchDataset(id: string) {
+		if (id === datasetId) return;
+		settleProvisional();
+		await flushDataset();
+		const doc = await loadDatasetDoc(id);
+		if (!doc) {
+			notify('That table is no longer in this browser.', 'warning');
+			await refreshTables();
+			return;
+		}
+		const name = doc.name?.trim() || UNTITLED_TABLE;
+		describe(`Open “${name}”`);
+		// Not when there is nothing to come back to: deleting a table switches
+		// away from an id that no longer exists, and the pair it leaves behind is
+		// still a perfectly good pair.
+		if (datasetId) rememberTable(datasetId);
+		datasetId = id;
+		saveDatasetId(id);
+		dataset = doc;
+		activeRow = 0;
+		const kept = Object.fromEntries(
+			Object.entries(mapping).filter(([, column]) => doc.columns.includes(column))
+		);
+		mapping = Object.keys(kept).length ? kept : autoMap(usedSlots(template), doc.columns);
+		notify(`“${name}” opened — ${doc.rows.length} row${doc.rows.length === 1 ? '' : 's'}. Your design is untouched.`);
+	}
+
+	/** A name nothing else in the library is already using. */
+	function freeTableName(wanted: string): string {
+		const taken = new Set(tables.filter((e) => e.id !== datasetId).map((e) => e.name));
+		if (!taken.has(wanted)) return wanted;
+		let n = 2;
+		while (taken.has(`${wanted} ${n}`)) n++;
+		return `${wanted} ${n}`;
+	}
+
+	/**
+	 * A new, empty table. Empty rather than seeded with the sample rows: the
+	 * sample is what a first run lands on, and somebody who has pressed New has
+	 * a list in mind.
+	 */
+	async function newDataset() {
+		settleProvisional();
+		await flushDataset();
+		describe('New table');
+		rememberTable(datasetId);
+		datasetId = nextDatasetId();
+		saveDatasetId(datasetId);
+		dataset = { columns: [], rows: [], name: freeTableName('New table') };
+		activeRow = 0;
+		mapping = {};
+		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
+		await refreshTables();
+		notify(`“${dataset.name}” started. Your design is untouched — press Paste or Import under the table to fill it.`);
+	}
+
+	/** Back to the table before this one, and from there back again. */
+	function swapDataset() {
+		if (!previousTable || previousTable === datasetId) return;
+		void switchDataset(previousTable);
+	}
+
+	/**
+	 * Delete the open table and fall back to whatever is next in the library.
+	 *
+	 * Undo brings the rows back on screen and the autosave writes them out again
+	 * under the same id, so this is recoverable in practice — the same bargain
+	 * deleting a template makes, and it asks first for the same reason.
+	 */
+	async function deleteDataset() {
+		deletingTable = false;
+		const gone = datasetId;
+		const name = tableName;
+		await deleteDatasetDoc(gone);
+		if (previousTable === gone) rememberTable('');
+		const rest = tables.filter((entry) => entry.id !== gone);
+		describe(`Delete “${name}”`);
+		if (rest.length) {
+			datasetId = '';
+			await switchDataset(rest[0].id);
+		} else {
+			datasetId = nextDatasetId();
+			saveDatasetId(datasetId);
+			dataset = { columns: [], rows: [] };
+			activeRow = 0;
+			mapping = {};
+			await saveDatasetDoc(datasetId, $state.snapshot(dataset));
+		}
+		await refreshTables();
+		notify(
+			rest.length
+				? `“${name}” deleted. Ctrl/Cmd+Z brings the rows back.`
+				: `“${name}” deleted — that was the last one, so this is a new empty table. Ctrl/Cmd+Z brings the rows back.`
+		);
+	}
+
+	/** Renaming is typing: the name is part of the table, so it saves with it. */
+	function renameDataset(name: string) {
+		const wanted = name.trim();
+		describe('Rename the table');
+		dataset = wanted ? { ...dataset, name: wanted } : { columns: dataset.columns, rows: dataset.rows };
+	}
+
 	/**
 	 * Selecting one box selects the whole group it belongs to: that is what a
 	 * group is for. A modifier-click adds or drops that whole set.
@@ -1342,11 +1634,12 @@ em { color: #b42318 }`;
 			redo();
 			return;
 		}
-		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu || resetting || deleting || magic)) {
+		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu || resetting || deleting || deletingTable || magic)) {
 			helpOpen = false;
-			cssOpen = false;
+			if (cssOpen) cancelCss();
 			resetting = false;
 			deleting = false;
+			deletingTable = false;
 			magic = null;
 			boxMenu = null;
 			return;
@@ -1684,6 +1977,7 @@ em { color: #b42318 }`;
 		     photograph is in there too — and Page Setup was a place you had to
 		     already know to look. -->
 		<button
+			class="images"
 			onclick={() => (imagesOpen = true)}
 			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
 		>
@@ -1764,7 +2058,7 @@ em { color: #b42318 }`;
 						onnotice={notify}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
-						oneditcss={() => (cssOpen = true)}
+						oneditcss={openCss}
 						ondraw={(id) => (drawing = id)}
 					/>
 				{:else}
@@ -1792,7 +2086,7 @@ em { color: #b42318 }`;
 						onmenu={(open) => (barMenuOpen = open)}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
-						oneditcss={() => (cssOpen = true)}
+						oneditcss={openCss}
 						ondraw={(id) => (drawing = id)}
 					/>
 				{/if}
@@ -1857,7 +2151,11 @@ em { color: #b42318 }`;
 		</div>
 	{/if}
 
-	<main class:no-data={!dataOpen}>
+	<main
+		bind:this={mainEl}
+		class:no-data={!dataOpen}
+		style={stacked && trayShare !== null ? `--tray-h:${(trayShare * 100).toFixed(2)}%` : ''}
+	>
 		<PagePreview
 			{template}
 			{row}
@@ -1897,6 +2195,7 @@ em { color: #b42318 }`;
 			onmagiclayout={openMagic}
 			hasColumns={dataset.columns.length > 0}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
+			onmenuclose={() => (boxMenu = null)}
 			{editingId}
 			strayIds={strays.map((b) => b.id)}
 			{picking}
@@ -1912,6 +2211,7 @@ em { color: #b42318 }`;
 				previewOpen ||
 				lightboxOpen ||
 				boxMenu !== null ||
+				deletingTable ||
 				editingId !== null ||
 				drawing !== null ||
 				magic !== null}
@@ -1925,9 +2225,19 @@ em { color: #b42318 }`;
 		/>
 
 		{#if dataOpen}
-		<aside>
+		<aside bind:this={asideEl}>
 			<DataTable
 				{dataset}
+				{tables}
+				tableId={datasetId}
+				{previousTable}
+				onselecttable={(id) => void switchDataset(id)}
+				onnewtable={() => void newDataset()}
+				ondeletetable={() => (deletingTable = true)}
+				onswaptable={swapDataset}
+				onrenametable={renameDataset}
+				trayDraggable={stacked}
+				ontraydrag={dragTray}
 				columnWidths={ui.columnWidths}
 				oncolumnwidths={(widths) => {
 					// Kept to the columns that exist, so an imported table does not
@@ -1950,7 +2260,12 @@ em { color: #b42318 }`;
 					);
 				}}
 				onchange={(next) => {
-					dataset = next;
+					// Every structural edit in the tray builds a fresh dataset, and most
+					// of them have no reason to think about what the table is called.
+					// Carried across here, where all of them arrive, rather than in each
+					// of them — the one thing that does mean to change it is the rename,
+					// which does not come through here.
+					dataset = next.name === undefined && dataset.name ? { ...next, name: dataset.name } : next;
 					if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), next.columns);
 				}}
 			/>
@@ -1972,7 +2287,7 @@ em { color: #b42318 }`;
 </div>
 
 {#if cssOpen}
-	<div class="modal-backdrop" role="presentation" onclick={() => (cssOpen = false)}></div>
+	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
 	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title">
 		<h2 id="css-title">CSS</h2>
 		<!-- The placeholder is the documentation. It used to be two lines of
@@ -1981,6 +2296,7 @@ em { color: #b42318 }`;
 		     placeholder is where they will look for them. The prose that was here
 		     is in the README, where prose belongs. -->
 		<textarea
+			bind:this={cssField}
 			class="code"
 			rows="14"
 			spellcheck="false"
@@ -1991,6 +2307,7 @@ em { color: #b42318 }`;
 		></textarea>
 		<div class="modal-actions">
 			<span class="spacer"></span>
+			<button onclick={cancelCss}>Cancel</button>
 			<button class="primary" onclick={() => (cssOpen = false)}>Done</button>
 		</div>
 	</div>
@@ -2034,6 +2351,26 @@ em { color: #b42318 }`;
 			<span class="spacer"></span>
 			<button onclick={() => (deleting = false)}>Cancel</button>
 			<button class="danger-solid" data-default onclick={() => void deleteTemplate()}>Delete Template</button>
+		</div>
+	</div>
+{/if}
+
+<!-- Deleting the table takes the stored copy, exactly as deleting a template
+     does — and asks for the same reason: undo brings the rows back on screen and
+     the autosave writes them out again, which is not a sentence anybody should
+     have to know. -->
+{#if deletingTable}
+	<div class="modal-backdrop" role="presentation" onclick={() => (deletingTable = false)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="delete-table-title" use:armDefault>
+		<h2 id="delete-table-title">Delete “{tableName}”?</h2>
+		<p>
+			{dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'} in this browser. Your design is not
+			touched.
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (deletingTable = false)}>Cancel</button>
+			<button class="danger-solid" data-default onclick={() => void deleteDataset()}>Delete Table</button>
 		</div>
 	</div>
 {/if}
@@ -2241,9 +2578,16 @@ em { color: #b42318 }`;
 			Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column.
 			Drag the right edge of a header to set that column's width, or double-click that edge to hand it back the
 			default; the widths stay in this browser and follow a column through a rename.
-			Clicking a row previews it; the tick in the gutter chooses several, and duplicate and delete for those appear at
-			the head of the buttons below. The row numbers travel with their rows through a sort, and a column header sorts
-			A-Z, then Z-A, then back to the order the rows arrived in.
+			Clicking a row previews it; the tick in the gutter chooses several, and <strong>Copy to clipboard</strong> and
+			delete for those appear at the head of the buttons below. The row numbers travel with their rows through a
+			sort, and a column header sorts A-Z, then Z-A, then back to the order the rows arrived in.
+		</p>
+		<p>
+			<strong>Table</strong> at the left of that row names the table you are in; the caret opens the rest, with
+			<strong>New table…</strong> and <strong>Delete this table…</strong> under a rule at the bottom. The
+			<strong>⇄</strong> beside it goes back to the table you were on before, and back again — the two you are
+			working between, one press apart. A design and a table are kept apart on purpose: switching either leaves the
+			other exactly where it was, and bindings that still name a column that exists are kept across the switch.
 		</p>
 		<p>
 			<strong>Paste</strong> takes a block of cells off a spreadsheet with no header row and lands it in the columns
@@ -2270,7 +2614,8 @@ em { color: #b42318 }`;
 		<p>
 			A dialog opens with nothing pressed. <strong>Enter</strong> moves onto the action it suggests, and a second
 			Enter presses it — so a stray Return arriving a beat late cannot delete a template or replace every row on its
-			own. <strong>Esc</strong> closes the dialog at any point.
+			own. <strong>Esc</strong> closes the dialog at any point — in the CSS dialog, which has a
+			<strong>Cancel</strong>, closing that way cancels, and the CSS that was there when it opened comes back.
 		</p>
 
 		<h3>On a touchscreen</h3>
@@ -2286,6 +2631,12 @@ em { color: #b42318 }`;
 			arrows wear a link instead: <strong>hold</strong> one and you take hold of the area it hangs from, which is
 			the one that can still move up and down — or <strong>tap</strong> it three times to break the tie and leave the
 			area exactly where it sits.
+		</p>
+		<p>
+			<strong>Press and hold an area</strong> for its menu — and if the finger carries on, the menu goes and the
+			area moves with it: it was being dragged under the menu the whole time. Under the page, the data tray opens
+			at about half the screen and is <strong>dragged taller by the table's header</strong>; a press that goes
+			nowhere still presses the button underneath it.
 		</p>
 		<p>
 			A card opened <strong>full screen</strong> is the one place a pinch zooms the card itself, up to six times, with
@@ -2929,9 +3280,15 @@ em { color: #b42318 }`;
 		   hidden` here and `min-width: 0` on the aside stop the table's natural
 		   width from stretching the grid and dragging the page off-centre. The
 		   table keeps its own horizontal scrollbar. */
+		/* The tray opens at a little under half the working area and is dragged
+		   from there by its own header — `--tray-h` is what that drag writes, and
+		   46.5% is the 1.15fr : 1fr this used to be, kept to the pixel so nothing
+		   moves for anybody who never drags it. The first track is `minmax(0,
+		   1fr)`, so a tray pulled all the way up takes the whole of `main` and
+		   stops at the toolbar. */
 		main {
 			grid-template-columns: 1fr;
-			grid-template-rows: minmax(0, 1.15fr) minmax(0, 1fr);
+			grid-template-rows: minmax(0, 1fr) var(--tray-h, 46.5%);
 			overflow: hidden;
 		}
 
@@ -2972,7 +3329,7 @@ em { color: #b42318 }`;
 
 		/* Phone order: what the app is on the left — Help first, because it is the
 		   one button that is about the app rather than about the card, and Install
-		   behind it when there is one — then the mark, then the three that act on
+		   behind it when there is one — then the mark, then the four that act on
 		   what is on screen. Order, not markup: the source order is the one the
 		   wide bar reads in, and moving the brand out of it would leave the name
 		   announced in the middle of the controls.
@@ -2998,12 +3355,19 @@ em { color: #b42318 }`;
 			order: 4;
 		}
 
-		.toolbar .data {
+		/* Named and ordered like the rest: a button left out of this list keeps
+		   the initial `order: 0` and lands in front of Help, which is how Images
+		   came to open the phone row. */
+		.toolbar .images {
 			order: 5;
 		}
 
-		.toolbar .export {
+		.toolbar .data {
 			order: 6;
+		}
+
+		.toolbar .export {
+			order: 7;
 		}
 
 		.brand {

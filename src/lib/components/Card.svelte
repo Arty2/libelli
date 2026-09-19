@@ -6,7 +6,7 @@
 	import { cssIdent, scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
-	import { hold } from '$lib/gestures';
+	import { HOLD_SLOP, hold } from '$lib/gestures';
 	import {
 		FREE_STEP,
 		GRID_MINOR,
@@ -74,6 +74,17 @@
 		onchange?: (box: Box) => void;
 		/** right-click on a box, in viewport coordinates */
 		onmenu?: (id: string, x: number, y: number) => void;
+		/**
+		 * The drag has gone far enough to be a drag, so anything the press before
+		 * it opened is in the way.
+		 *
+		 * A finger has one gesture for both: the long press that opens the menu
+		 * is the beginning of the press-and-drag that moves the area, and the
+		 * pointer never went up in between. The drag is already running by then —
+		 * it started at pointerdown, under the menu — so all that is needed is to
+		 * take the menu off it.
+		 */
+		onmenuclose?: () => void;
 		/** what a drag is about to do, so undo can name it afterwards */
 		onaction?: (what: string) => void;
 		/** start or stop typing into an area on the card itself */
@@ -108,6 +119,7 @@
 		onchange,
 		onimagedrop,
 		onmenu,
+		onmenuclose,
 		onaction,
 		onedit,
 		ondraw,
@@ -788,6 +800,11 @@
 			drag.named = true;
 			onaction?.(DRAG_LABELS[drag.mode]);
 		}
+		// Past the slop, this is a drag rather than a hand that will not keep
+		// still, so a menu the same press opened gets out of the way. The same
+		// threshold `hold` gives up at, for the same reason: below it, nobody
+		// meant to move anything.
+		if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > HOLD_SLOP) onmenuclose?.();
 
 		const origin = drag.origin;
 		// The handles turn with the box, so a pointer delta arrives in screen space

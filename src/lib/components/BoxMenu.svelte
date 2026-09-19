@@ -173,11 +173,16 @@
 		position: fixed;
 		inset: 0;
 		z-index: 70;
+		user-select: none;
 	}
 
 	.menu {
 		position: fixed;
 		z-index: 71;
+		/* A menu is pressed, never read: a press-and-drag that starts on an item
+		   used to paint a selection across the labels, and on a phone that is the
+		   grey smear and the magnifier rather than the area moving underneath. */
+		user-select: none;
 		min-width: 11.5rem;
 		padding: 4px;
 		background: #fff;
