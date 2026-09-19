@@ -4,7 +4,7 @@
 	import { download } from '$lib/download';
 	import { hold } from '$lib/gestures';
 	import { armDefault } from '$lib/modal';
-	import { parseTable, toCsv, toTsv } from '$lib/parse';
+	import { parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
 	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
 	import type { Dataset, Row } from '$lib/types';
 
@@ -447,6 +447,13 @@
 	}
 
 	function commitImport(parsed: Dataset, mode: 'replace' | 'append') {
+		// The one place the emptiness policy is decided, for the paste and the
+		// file import alike — see `wouldEmptyTable`. A mis-click in a file picker
+		// should not cost you the table.
+		if (wouldEmptyTable(dataset, parsed, mode)) {
+			onnotice('Nothing readable as rows in there — the table is unchanged.', 'warning');
+			return;
+		}
 		const rows = dataset.columns.length ? realign(parsed) : parsed.rows;
 		const columns = dataset.columns.length ? dataset.columns : parsed.columns;
 		if (mode === 'append') {
@@ -644,7 +651,6 @@
 					     itself picks it, because a row is a card and picking one is the
 					     commonest thing anybody does in here — it used to be a 20px tick
 					     in the gutter. The cell belongs to whoever is typing in it. -->
-					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<tr
 						class:active={i === activeRow}
 						class:chosen={selectedRows.has(i)}

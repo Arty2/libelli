@@ -112,6 +112,31 @@ export interface ParseOptions {
 	header?: boolean;
 }
 
+/**
+ * Whether applying `parsed` over `current` would leave the table with no rows
+ * at all.
+ *
+ * The parsing above reports what a file holds, including "nothing", and has no
+ * opinion about whether nothing is an acceptable answer — that is a policy, and
+ * a policy belongs at the one place the destructive decision is made rather
+ * than in each parser. It lives here, next to what it guards, because both the
+ * paste and the file import route through it: they had drifted apart otherwise,
+ * the paste refusing an unreadable block while an import of the same text
+ * replaced every row with nothing and reported "0 rows loaded", which is a
+ * report and not a way back.
+ *
+ * Only the replacing case, and only when there is something to lose. A file of
+ * headers and no data rows is a legitimate way to set up the columns of a blank
+ * table, and appending nothing takes nothing away.
+ */
+export function wouldEmptyTable(
+	current: Dataset,
+	parsed: Dataset,
+	mode: 'replace' | 'append'
+): boolean {
+	return mode === 'replace' && parsed.rows.length === 0 && current.rows.length > 0;
+}
+
 export function parseTable(text: string, options: ParseOptions = {}): Dataset {
 	const delimiter = options.delimiter ?? sniffDelimiter(text);
 	const grid = parseDelimited(text, delimiter);

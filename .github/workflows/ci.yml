@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # So the suite can be asked for by hand without pushing a commit to ask with.
+  workflow_dispatch:
 
 # A force-push supersedes the run it interrupts, and finishing that run buys
 # nothing. This is where the minutes actually go on a branch under review.
@@ -23,6 +25,15 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # First, and not because it is quick — because it is the only step that
+      # checks the rules AGENTS.md states and nothing else executes. See
+      # docs/decisions.md § scripts/gates.sh.
+      - run: npm run gates
+
+      # After the gates and before the slower checks: a lint failure is usually
+      # dead code or a missing justification, and both are quick to read.
+      - run: npm run lint
 
       # Fastest signal first, so a broken unit fails in seconds rather than
       # after a build. One job rather than a matrix: this app targets browsers,

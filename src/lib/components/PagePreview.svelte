@@ -740,7 +740,6 @@
 	is a tool that is not to hand.
 -->
 <div class="stage">
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
 	class="viewport"
 	bind:this={host}

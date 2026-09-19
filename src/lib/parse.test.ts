@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { normaliseHeaders, parseDelimited, parseTable, sniffDelimiter, toCsv, toTsv } from './parse';
+import {
+	normaliseHeaders,
+	parseDelimited,
+	parseTable,
+	sniffDelimiter,
+	toCsv,
+	toTsv,
+	wouldEmptyTable
+} from './parse';
 
 describe('parseDelimited', () => {
 	it('keeps quoted delimiters and embedded newlines inside one field', () => {
@@ -84,5 +92,33 @@ describe('toTsv', () => {
 		expect(lines[0]).toBe('title\tbody');
 		expect(lines[1]).toBe('Ferns\t"Water\tthem"');
 		expect(toTsv(dataset)).toContain('Moss\t"Two\nlines"');
+	});
+});
+
+describe('wouldEmptyTable', () => {
+	const populated = { columns: ['title'], rows: [{ title: 'Ferns' }] };
+	const blank = { columns: [], rows: [] };
+	const headerOnly = { columns: ['title'], rows: [] };
+
+	it('refuses a replacement that would leave a populated table with no rows', () => {
+		// The mis-click this exists for: a file picker filtered to .csv, and a
+		// file that holds no records. It used to replace every row with nothing
+		// and report "0 rows loaded".
+		expect(wouldEmptyTable(populated, blank, 'replace')).toBe(true);
+		expect(wouldEmptyTable(populated, headerOnly, 'replace')).toBe(true);
+	});
+
+	it('allows a header-only file to set up the columns of a blank table', () => {
+		// Nothing to lose, and naming the columns before there are rows to put in
+		// them is a legitimate way to start.
+		expect(wouldEmptyTable(blank, headerOnly, 'replace')).toBe(false);
+	});
+
+	it('allows an append of nothing, which takes nothing away', () => {
+		expect(wouldEmptyTable(populated, blank, 'append')).toBe(false);
+	});
+
+	it('allows any import that actually brings rows', () => {
+		expect(wouldEmptyTable(populated, populated, 'replace')).toBe(false);
 	});
 });

@@ -1,35 +1,27 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import './options-bar.css';
-	import { safeImageUrl } from '$lib/assets';
 	import { cssIdent } from '$lib/css';
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
 	import {
 		BLEND_MODES,
 		BORDER_STYLES,
 		DEFAULT_QR,
-		PAGE_NUMBER_POSITIONS,
-		PAGE_PRESETS,
 		normaliseCentre,
 		normaliseRotation,
 		normaliseSides,
-		presetFor,
-		presetSize,
 		shownAsMedia,
 		sidesOf,
 		takesADrawing
 	} from '$lib/template';
 	import type {
 		Align,
-		BackgroundFit,
 		BlendMode,
 		BorderStyle,
 		Box,
 		Centre,
 		Dataset,
 		Mapping,
-		PageBackgroundImage,
-		PageNumberPosition,
 		QrSettings,
 		Sides,
 		Template,
@@ -68,13 +60,8 @@
 		onmappingchange,
 		onduplicate,
 		ondelete,
-		onresettemplate,
 		onuploadfont,
-		onuploadbackground,
 		onnotice,
-		onimporttemplate,
-		onexporttemplate,
-		oneditcss,
 		ondraw
 	}: Props = $props();
 

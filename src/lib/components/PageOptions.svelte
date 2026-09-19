@@ -5,34 +5,22 @@
 	import { safeImageUrl } from '$lib/assets';
 	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
 	import {
-		BORDER_STYLES,
-		DEFAULT_QR,
 		MIN_PAPER,
 		FACING_PAGE_NUMBER_POSITIONS,
 		PAGE_NUMBER_POSITIONS,
 		PAGE_PRESETS,
-		normaliseCentre,
-		normaliseRotation,
-		normaliseSides,
 		presetFor,
 		presetSize,
-		sidesOf
 	} from '$lib/template';
 	import type { TemplateEntry } from '$lib/storage';
 	import type {
-		Align,
 		BackgroundFit,
-		BorderStyle,
 		Box,
-		Centre,
 		Dataset,
 		Mapping,
 		PageBackgroundImage,
 		PageNumberPosition,
-		QrSettings,
-		Sides,
 		Template,
-		VAlign
 	} from '$lib/types';
 
 	interface Props {
@@ -74,21 +62,13 @@
 
 	let {
 		template,
-		dataset,
-		mapping,
-		selected,
-		onboxchange,
 		ontemplatechange,
-		onmappingchange,
-		onduplicate,
-		ondelete,
 		onresettemplate,
 		library,
 		templateId,
 		onselecttemplate,
 		onnewtemplate,
 		ondeletetemplate,
-		onuploadfont,
 		onuploadbackground,
 		onuploadprintbackground,
 		onnotice,
@@ -164,19 +144,6 @@
 		'bottom-outer': 'Bottom Outer',
 		'bottom-inner': 'Bottom Inner'
 	};
-
-	/**
-	 * What a box gets its content from. Read off the box rather than stored
-	 * beside it: a bound box has a field, and anything else carries its own
-	 * content in the template. Storing this as well would only give it something
-	 * to disagree with.
-	 *
-	 * There is no third "decorative" source any more: a static box with nothing
-	 * typed in it is that box, and it still draws its fill, its border and its
-	 * size. Hide When Empty is what turns it back off again.
-	 */
-	type Source = 'field' | 'static';
-	const source = $derived.by<Source>(() => (selected?.slot ? 'field' : 'static'));
 
 	/**
 	 * The six fixed corners, and the four that follow the fold once the template
@@ -318,7 +285,6 @@
 						<Icon name="caret-down" size={12} />
 					</button>
 					{#if pickerOpen}
-						<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 						<ul class="picker-menu" role="menu">
 							{#each library as entry (entry.id)}
 								<li role="none">

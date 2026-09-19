@@ -1,11 +1,11 @@
 # Decisions
 
-The why behind the code, filed under the module it concerns. `CLAUDE.md` carries
+The why behind the code, filed under the module it concerns. `AGENTS.md` carries
 the handful of rules that apply everywhere; this is everything else — read the
 section for the file you are about to change, not the whole thing.
 
 `PLAN.md` holds the original decisions and is a historical document: where its
-file layout disagrees with the tree in `CLAUDE.md`, the tree is right.
+file layout disagrees with the tree in `AGENTS.md`, the tree is right.
 
 ## `src/lib/layout.ts`
 
@@ -1208,6 +1208,27 @@ column now adds the row that makes it usable, and the line has a second form for
 the no-columns case that points at the `+` that is actually there. A later column
 adds a cell to the rows that exist, as it always did.
 
+**An import that would empty the table is refused, once, for both callers.**
+`parseTable` reads a file with no records as zero rows, which is the right
+reading of the file. `commitImport` then applied it: picking the wrong file in a
+picker filtered to `.csv` replaced every row with nothing, reported "0 rows
+loaded" and left undo as the only way back — a report, not a way back, and only
+if you noticed in time. The paste path had its own guard against unreadable
+text and the file path had none, so the two had quietly drifted into
+disagreeing.
+
+The fix is not in the parser. A parser says what a file holds; whether
+"nothing" is an acceptable answer is a policy, and a policy belongs at the one
+place the destructive decision is made — otherwise each caller invents its own
+and they drift apart again. `wouldEmptyTable` in `parse.ts` names the policy and
+`commitImport` is the single place that asks it, so the paste and the file
+import now answer the same way.
+
+It refuses only what it must. A file of headers and no rows is a legitimate way
+to name the columns of a blank table, and appending nothing takes nothing away;
+only replacing rows that exist with none of them is refused. That line is where
+the unit tests sit, because it is the part that will be got wrong again.
+
 **Copy is Paste's opposite number, and it writes tabs.** The tray could take a
 block of cells off a spreadsheet and could write a CSV file, and had no way to
 put cells *back* on the clipboard — so getting forty edited rows into a sheet
@@ -2155,6 +2176,188 @@ buttons' to set. The exception is 320px with an Install button in the row: that
 is where the two groups meet in the middle and a centred mark would be under one
 of them, so it steps back into the flow beside the left-hand group. The controls
 win the row, because they are the ones you press.
+
+## `vercel.json`
+
+**Response headers, because a static host is the only place this app can have
+any.** There is no backend and no server code — every page is prerendered — so
+the deployment config is the one place a header can be set at all. Until now it
+set none, and an app that renders untrusted cell content had exactly the
+protections the browser gives by default.
+
+These are the cheap ones: the subset of `osseus`'s block that costs this app
+nothing to carry, chosen by reading what the app actually does rather than by
+pasting the list.
+
+- **`Strict-Transport-Security: max-age=63072000; includeSubDomains`**, and
+  deliberately **without `preload`**. Preloading is a submission to a list
+  baked into browsers and is slow and awkward to undo; that is a decision about
+  a whole domain, not about this app, and it should be made on purpose if it is
+  made at all. `includeSubDomains` is the one line here with reach beyond this
+  deployment — drop it if any sibling host under the same domain is still
+  served over plain HTTP.
+- **`X-Content-Type-Options: nosniff`** — the app hands the browser files it
+  built itself; none of them wants to be guessed at.
+- **`Referrer-Policy: no-referrer`**. The trade-off worth naming: a template can
+  name a background image at an http(s) address, and a host using referrer-based
+  hotlink protection will refuse a request that carries none. That is a rare
+  arrangement and the address is the user's own choice; leaking the page someone
+  is printing from to every image host is the worse default.
+- **`X-Frame-Options: DENY`** and **`Content-Security-Policy: frame-ancestors
+  'none'`** — the same protection twice, on purpose. The CSP directive is the
+  spelling browsers now honour and `X-Frame-Options` is what older ones read.
+  This is the *only* CSP directive set: a policy declaring nothing else
+  restricts nothing else, so it cannot interfere with the inline styles, stored
+  fonts or blob exports a real policy would have to be designed around.
+- **`Permissions-Policy`** turning off camera, microphone, geolocation,
+  payment, USB, MIDI and display capture. Read against the code first, which is
+  why two things are **not** in that list: `Lightbox.svelte` listens for
+  `DeviceOrientationEvent` to tilt a card, so `accelerometer` and `gyroscope`
+  stay allowed, and the table and the bitmap editor both use
+  `navigator.clipboard`. A policy that switches off a feature the app ships is
+  not a stricter policy, it is a bug with a security-shaped name.
+
+**Not taken here: a real Content-Security-Policy.** `default-src`, `script-src`
+and `style-src` are where a CSP actually earns its keep, and this app would
+need the policy designed around it rather than inherited — a template's own CSS
+becomes a `<style>` tag, every box writes an inline `style` attribute, fonts
+come from Google by family name, and `png.ts` builds exports through blob URLs.
+A header block that breaks the card is worse than an honest absence, so it is
+its own piece of work. `Cross-Origin-Opener-Policy` and
+`Cross-Origin-Embedder-Policy` are the same answer for a different reason: both
+are correct once an app talks only to its own origin, and this one deliberately
+fetches Google fonts and user-named images.
+
+`scripts/gates.sh` checks the headers are still in the file. Not because anyone
+would remove them on purpose — because adding a redirect or a cache rule to this
+file means editing the object that holds them, and the app looks exactly the
+same without them.
+
+## `eslint.config.js`
+
+**The linter that four comments had been claiming for months.** Four
+`eslint-disable-next-line svelte/no-at-html-tags` comments sat in `Card.svelte`
+and `Icon.svelte` naming a rule from a plugin this repo did not have — no
+config, no script, nothing to run. They read as protection and were decoration.
+ESLint with `eslint-plugin-svelte` is now installed, scripted, and run in CI
+after the gates.
+
+It earned itself on the first run, and not mainly through the 85 findings:
+
+- **Two `{@html}` sites had no stated justification at all** — the fourth one in
+  `Card.svelte` and the `@page` rule in `PrintRoot.svelte` — and `Icon.svelte`'s
+  comment sat on the line before the `<svg>` tag rather than before the `{@html}`
+  two lines down, so it suppressed nothing. Every site now names its chokepoint,
+  and the rule is what checks that rather than the honour system. This is the
+  half `html-blocks-allowlisted` cannot do: the gate knows *which files* may use
+  `{@html}`, the linter knows *whether each use said why*.
+- **Thirty-one dead imports** in the two option bars, left when they were split
+  out of one shared component, plus a `$state` and the whole `$effect` that fed
+  it — `fontsLoading`, built for a "still loading" indicator that is not in the
+  markup. Removing it cascaded into three more dead names, which is what dead
+  code does.
+- **Three `svelte-ignore` comments** suppressing warnings Svelte no longer emits.
+
+**Where a rule is off, the reason sits beside it.** A rule switched off silently
+is worse than one never switched on, because the next reader cannot tell a
+decision from an accident. Three are off, each for a stated reason:
+`prefer-svelte-reactivity` because all ten of its findings here are plain
+non-reactive locals or copies assigned back whole — the same immutable habit
+`updateBox` and the history snapshots are built on; `no-unused-props` on the two
+option bars because `OptionsBar` spreads one shared prop bag into both, so each
+declaring the whole bag is what makes the spread typecheck; and
+`no-explicit-any` in `template.ts`, where JSON someone handed the app genuinely
+has no type yet. That last one is a deferral rather than a judgement — `unknown`
+plus real type guards is the better end state, and it is its own piece of work,
+not something to do in the commit that adds the linter.
+
+**No formatting rules, and none should be added.** This codebase is
+hand-formatted and there is no Prettier here. A linter that reflowed it would
+produce a diff nobody reads, and bury every finding above inside it. If a
+formatter is ever wanted, that is a separate decision with its own one-time
+commit.
+
+## `scripts/gates.sh`
+
+**The rules a linter cannot see, made to execute.** `AGENTS.md` is a list of
+load-bearing rules — cell content is escaped at the leaves, colour goes through
+`color.ts`, no unlisted `fetch`, there are no runtime dependencies, `color`
+is spelled without a `u` where it names something. Every one of those was
+enforced by nothing but the paragraph stating it, and a rule enforced by a
+paragraph is broken by the first change that does not re-read it. Usually by
+someone with a good reason; often by whoever wrote the rule.
+
+So the checkable ones are checked, first in CI, before the tests and the build.
+The gate list is in the script and mirrored in one paragraph of `AGENTS.md`;
+the script is the copy that counts.
+
+Three conventions for adding one, each learned by getting it wrong:
+
+- **A check that cannot run must fail, not pass.** The version gate reports
+  failure when it cannot read either file, and the line-budget gate fails when
+  `AGENTS.md` is unreadable rather than reporting "ok" on a file it never
+  opened. A gate that passes because it could not do its job is the one outcome
+  worse than having no gate, because it also stops anyone looking.
+- **Make the threshold overridable.** `AGENTS_MAX=10 npm run gates` exercises
+  the failure path without editing the script, which is how the failure path
+  gets exercised at all.
+- **Allow-list rather than ban, where the rule has real exceptions.**
+  `{@html}` is legitimate in three files and a mistake in any fourth; banning it
+  outright would have meant three suppression comments and a gate nobody
+  believed. The list is the decision, written down where adding to it is a
+  commit.
+
+**The threshold on `AGENTS.md` is a budget, not a request.** The file opens by
+asking to be kept short, which is worth nothing on its own: the session that
+added this very section grew it by 45% in one sitting, every addition
+individually defensible. A budget makes that growth a decision — raise the
+number deliberately, in the commit that earns it, or move the detail into this
+file, where nobody pays for it on every turn.
+
+**The first review of these gates found two of them not doing their job**,
+which is worth recording because it is the argument for reviewing them at all —
+and because both faults were the same one the gates exist to catch.
+
+`color-not-colour` could not fail. Its pattern required a non-letter before
+`colour` and allowed no `?`, so `fillColour: string` and `borderColour?: string`
+both slipped past — every way anyone would actually introduce the mistake. It
+reported "ok" for a week guarding nothing, and a green check is worse than a
+missing one, because it stops anyone looking.
+
+`app-fetches-nothing` was named for a claim broader than it checked. It greps
+for `fetch` and `XMLHttpRequest`; it cannot see `fonts.ts` appending a `<link>`
+to `fonts.googleapis.com`, which `ensureTemplateFonts` does for every family a
+template names, on import. So an imported template does reach the network, the
+gate was green, and `AGENTS.md` said in as many words that a template "must not
+be able to" — the protection was documented, gated, and absent. Renamed to
+`no-unlisted-fetch`, which is what it actually enforces, and the rule in
+`AGENTS.md` rewritten to describe the three real paths out and where the guard
+actually is: `safeFamily` and `safeImageUrl` restrict what a template can
+*name*, which is the control that exists. The gate's comment now says what it
+cannot see, because a gate implying wider cover than it has is the more
+dangerous shape.
+
+Nothing was removed. Each of the others guards a rule whose breach has a
+consequence — injection, an unnoticed network call, a dependency that can rot,
+a lost security header, a shipped version that misreports itself, an
+instructions file nobody finishes reading — and none duplicates another or
+anything a type-checker already does. `color-not-colour` is the one guarding
+taste rather than consequence, and is therefore the first to watch in the log:
+if it never fires, it goes.
+
+**Every run appends one line to `.claude/logs/gates.jsonl`** — timestamp,
+commit, and a pass or fail per named check. It is gitignored and deliberately
+goes nowhere: not a CI artifact, not aggregated across machines. The moment it
+became infrastructure it would need a retention policy and a review of its own,
+for a signal that is only useful to whoever is at the keyboard deciding whether
+a rule still earns its keep. Two questions make it worth keeping at all —
+which gate has never once fired, and which keeps firing. The first is a
+candidate to retire; the second is a candidate to fix properly, in the app or
+in a test, rather than to keep catching.
+
+```bash
+jq -c '.checks[]' .claude/logs/gates.jsonl | sort | uniq -c
+```
 
 ## Testing
 

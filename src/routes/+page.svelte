@@ -20,7 +20,7 @@
 		uploadBackgroundImage
 	} from '$lib/assets';
 	import { download, slugify } from '$lib/download';
-	import { ensureGoogleFont, ensureTemplateFonts, fontReady, uploadLocalFont } from '$lib/fonts';
+	import { ensureGoogleFont, ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
 	import {
 		canRedo,
 		canUndo,
@@ -28,7 +28,6 @@
 		record,
 		redo as redoStep,
 		redoLabel,
-		reset as resetHistory,
 		undo as undoStep,
 		undoLabel
 	} from '$lib/history';
@@ -448,24 +447,6 @@ em { color: #b42318 }`;
 		return watchPresses(document);
 	});
 
-	/**
-	 * Which of them are still arriving, so an area can say so rather than sitting
-	 * in the fallback face looking finished. document.fonts answers for both the
-	 * Google stylesheets and the local FontFaces, and `loadingdone` is the only
-	 * event that fires per batch as they land.
-	 */
-	let fontsLoading = $state<string[]>([]);
-
-	$effect(() => {
-		const families = familiesInUse;
-		if (typeof document === 'undefined' || !document.fonts) return;
-		const read = () => (fontsLoading = families.filter((f) => !fontReady(f)));
-		read();
-		document.fonts.addEventListener('loadingdone', read);
-		document.fonts.ready.then(read).catch(() => {});
-		return () => document.fonts.removeEventListener('loadingdone', read);
-	});
-
 	// No reactive reads, so this runs once and its return value is the cleanup.
 	$effect(() => watchInstall((available) => (installable = available)));
 
@@ -539,6 +520,8 @@ em { color: #b42318 }`;
 
 	$effect(() => {
 		const wanted = imageNames;
+		// A bare read, so $effect tracks it and a bump re-runs this.
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		imagesVersion;
 		let stale = false;
 		void (async () => {
@@ -1310,7 +1293,7 @@ em { color: #b42318 }`;
 
 	async function pasteTextAsBox() {
 		if (template.locked || !navigator.clipboard?.readText) return;
-		let text = '';
+		let text: string;
 		try {
 			text = await navigator.clipboard.readText();
 		} catch {
@@ -2241,8 +2224,9 @@ em { color: #b42318 }`;
 		</p>
 		<p>
 			<strong>CSS</strong> holds styles saved inside the template. Selectors are scoped to the card, and
-			<code>@import</code> and any <code>url()</code> pointing off this machine are stripped: the app fetches nothing,
-			and a template you were handed must not be able to change that.
+			<code>@import</code> and any <code>url()</code> pointing off this machine are stripped, so a template's
+			CSS cannot reach the network. What a template <em>can</em> ask for is a Google font by family name and a
+			background image by address — both only as names it is allowed to write, never as arbitrary requests.
 		</p>
 
 		<h3>Locking</h3>

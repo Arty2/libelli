@@ -136,7 +136,7 @@
 			>
 				{#if cell.page}
 					<!-- The card itself always renders at its own millimetres — see
-					     CLAUDE.md — and is only ever shrunk visually, by scaling this
+					     AGENTS.md — and is only ever shrunk visually, by scaling this
 					     wrapper down to the cell it has to fit. -->
 					<div class="print-page-scale" style="width:{cardW}mm;height:{cardH}mm;transform:scale({scale})">
 						<Card
