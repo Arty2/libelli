@@ -2270,6 +2270,37 @@ individually defensible. A budget makes that growth a decision — raise the
 number deliberately, in the commit that earns it, or move the detail into this
 file, where nobody pays for it on every turn.
 
+**The first review of these gates found two of them not doing their job**,
+which is worth recording because it is the argument for reviewing them at all —
+and because both faults were the same one the gates exist to catch.
+
+`color-not-colour` could not fail. Its pattern required a non-letter before
+`colour` and allowed no `?`, so `fillColour: string` and `borderColour?: string`
+both slipped past — every way anyone would actually introduce the mistake. It
+reported "ok" for a week guarding nothing, and a green check is worse than a
+missing one, because it stops anyone looking.
+
+`app-fetches-nothing` was named for a claim broader than it checked. It greps
+for `fetch` and `XMLHttpRequest`; it cannot see `fonts.ts` appending a `<link>`
+to `fonts.googleapis.com`, which `ensureTemplateFonts` does for every family a
+template names, on import. So an imported template does reach the network, the
+gate was green, and `AGENTS.md` said in as many words that a template "must not
+be able to" — the protection was documented, gated, and absent. Renamed to
+`no-unlisted-fetch`, which is what it actually enforces, and the rule in
+`AGENTS.md` rewritten to describe the three real paths out and where the guard
+actually is: `safeFamily` and `safeImageUrl` restrict what a template can
+*name*, which is the control that exists. The gate's comment now says what it
+cannot see, because a gate implying wider cover than it has is the more
+dangerous shape.
+
+Nothing was removed. Each of the others guards a rule whose breach has a
+consequence — injection, an unnoticed network call, a dependency that can rot,
+a lost security header, a shipped version that misreports itself, an
+instructions file nobody finishes reading — and none duplicates another or
+anything a type-checker already does. `color-not-colour` is the one guarding
+taste rather than consequence, and is therefore the first to watch in the log:
+if it never fires, it goes.
+
 **Every run appends one line to `.claude/logs/gates.jsonl`** — timestamp,
 commit, and a pass or fail per named check. It is gitignored and deliberately
 goes nowhere: not a CI artifact, not aggregated across machines. The moment it

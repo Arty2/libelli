@@ -101,11 +101,16 @@ src/routes/app.css        the :root tokens and app-wide rules
   underneath it. `jsqr` is a dev dependency only — the tests decode generated
   codes with an independent decoder, because a QR that does not scan looks
   exactly like one that does.
-- **The app fetches nothing.** The single deliberate exception is `png.ts`,
-  which inlines a web font and the card's own pictures for export. A template is
-  a file someone can hand you, and it must not be able to change that. It is
-  also why a cell names a stored image as `local:name` rather than as a bare
-  file name: a bare one is a relative URL, and a relative URL is a request.
+- **The app makes no request nobody asked for.** Three paths out, all
+  deliberate: `png.ts` inlines a font and the card's pictures for export, the
+  service worker fetches what it caches, and `fonts.ts` appends a `<link>` to
+  ask Google for a family. A template reaches the third — it names fonts, and it
+  may name an http(s) background — so the guard is on *what* it can name, never
+  on whether a request happens: `safeFamily` refuses anything but a family name,
+  `safeImageUrl` anything but http(s). It is also why a cell names a stored
+  image as `local:name` and not a bare file name: a bare one is a relative URL,
+  and a relative URL is a request. The gate sees only `fetch`, so a `<link>` or
+  an `<img>` is a request it cannot check for you.
 - **Escaping, color parsing and CSS scoping are chokepoints.** Cell content is
   untrusted: every leaf text node is HTML-escaped in `markdown.ts`; every color
   goes through `color.ts` before it can reach a `style` attribute, and one it

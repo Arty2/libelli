@@ -77,19 +77,25 @@ else
 	pass "{@html} only in the three allow-listed renderers" "html-blocks-allowlisted"
 fi
 
-# ── 3. The app fetches nothing ───────────────────────────────────────────────
-# A template is a file someone can hand you, and it must not be able to turn
-# into a request. Two files are allowed to: png.ts inlines a web font and the
-# card's own pictures for export, and the service worker is a cache and does
-# nothing else. Anywhere else, a fetch is the rule breaking.
+# ── 3. No new fetch outside the two files that have one ─────────────────────
+# png.ts inlines a web font and the card's own pictures for export; the service
+# worker is a cache. Anywhere else, a fetch is the rule breaking.
+#
+# Named for what it checks, which is narrower than "the app fetches nothing".
+# It sees `fetch` and `XMLHttpRequest` and nothing else: fonts.ts reaches Google
+# by appending a <link>, and a template may name an http(s) background that
+# becomes an <img> — both are requests this grep cannot see, and both are
+# deliberate. What guards those is `safeFamily` and `safeImageUrl` restricting
+# what a template can name, not this gate. A gate that claimed to cover them
+# would be the more dangerous thing, because nobody would look again.
 net=$(grep -rnE '\bfetch\(|XMLHttpRequest|importScripts\(' src 2>/dev/null |
 	grep -v '^src/lib/png\.ts:' |
 	grep -v '^src/service-worker\.ts:')
 
 if [ -n "$net" ]; then
-	fail "network call outside png.ts and the service worker" "$net" "app-fetches-nothing"
+	fail "fetch outside png.ts and the service worker" "$net" "no-unlisted-fetch"
 else
-	pass "no network calls outside png.ts and the service worker" "app-fetches-nothing"
+	pass "no fetch outside png.ts and the service worker" "no-unlisted-fetch"
 fi
 
 # ── 4. No runtime dependencies ───────────────────────────────────────────────
@@ -134,7 +140,15 @@ fi
 # Identifier, CSS property, custom property. Prose keeps its `u` — a comment
 # about a coloured glyph is a sentence, not a name — so this matches only the
 # positions where the word is naming the thing. See AGENTS.md § How we work.
-colour=$(grep -rnE '(^|[^A-Za-z])[Cc]olour[A-Za-z0-9_]*[[:space:]]*[:=(]' src 2>/dev/null)
+#
+# The `?` is not decoration and the pattern is deliberately not anchored to a
+# word boundary. Both were wrong when this was written: requiring a non-letter
+# before `colour` meant `fillColour:` did not match, and no optional `?` meant
+# `borderColour?: string` did not either — which is to say it matched none of
+# the ways anyone would actually introduce the mistake. It passed green
+# guarding nothing. A gate that cannot fail is worth less than no gate,
+# because it also stops anyone looking.
+colour=$(grep -rnE '[Cc]olour[A-Za-z0-9_]*[[:space:]]*\??[[:space:]]*[:=(]' src 2>/dev/null)
 
 if [ -n "$colour" ]; then
 	fail "colour spelled with a u where it names something" "$colour" "color-not-colour"
