@@ -7,6 +7,6 @@
  * Keep this in step with `version` in package.json.
  *
  * One bump per session while the work is still its own; once that session has
- * a pull request open, every further push takes a patch — see CLAUDE.md.
+ * a pull request open, every further push takes a patch — see AGENTS.md.
  */
-export const VERSION = '0.13.4';
+export const VERSION = '0.14.0';

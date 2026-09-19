@@ -1,11 +1,11 @@
 # Decisions
 
-The why behind the code, filed under the module it concerns. `CLAUDE.md` carries
+The why behind the code, filed under the module it concerns. `AGENTS.md` carries
 the handful of rules that apply everywhere; this is everything else — read the
 section for the file you are about to change, not the whole thing.
 
 `PLAN.md` holds the original decisions and is a historical document: where its
-file layout disagrees with the tree in `CLAUDE.md`, the tree is right.
+file layout disagrees with the tree in `AGENTS.md`, the tree is right.
 
 ## `src/lib/layout.ts`
 
@@ -1208,6 +1208,27 @@ column now adds the row that makes it usable, and the line has a second form for
 the no-columns case that points at the `+` that is actually there. A later column
 adds a cell to the rows that exist, as it always did.
 
+**An import that would empty the table is refused, once, for both callers.**
+`parseTable` reads a file with no records as zero rows, which is the right
+reading of the file. `commitImport` then applied it: picking the wrong file in a
+picker filtered to `.csv` replaced every row with nothing, reported "0 rows
+loaded" and left undo as the only way back — a report, not a way back, and only
+if you noticed in time. The paste path had its own guard against unreadable
+text and the file path had none, so the two had quietly drifted into
+disagreeing.
+
+The fix is not in the parser. A parser says what a file holds; whether
+"nothing" is an acceptable answer is a policy, and a policy belongs at the one
+place the destructive decision is made — otherwise each caller invents its own
+and they drift apart again. `wouldEmptyTable` in `parse.ts` names the policy and
+`commitImport` is the single place that asks it, so the paste and the file
+import now answer the same way.
+
+It refuses only what it must. A file of headers and no rows is a legitimate way
+to name the columns of a blank table, and appending nothing takes nothing away;
+only replacing rows that exist with none of them is refused. That line is where
+the unit tests sit, because it is the part that will be got wrong again.
+
 **Copy is Paste's opposite number, and it writes tabs.** The tray could take a
 block of cells off a spreadsheet and could write a CSV file, and had no way to
 put cells *back* on the clipboard — so getting forty edited rows into a sheet
@@ -2155,6 +2176,57 @@ buttons' to set. The exception is 320px with an Install button in the row: that
 is where the two groups meet in the middle and a centred mark would be under one
 of them, so it steps back into the flow beside the left-hand group. The controls
 win the row, because they are the ones you press.
+
+## `scripts/gates.sh`
+
+**The rules a linter cannot see, made to execute.** `AGENTS.md` is a list of
+load-bearing rules — cell content is escaped at the leaves, colour goes through
+`color.ts`, the app fetches nothing, there are no runtime dependencies, `color`
+is spelled without a `u` where it names something. Every one of those was
+enforced by nothing but the paragraph stating it, and a rule enforced by a
+paragraph is broken by the first change that does not re-read it. Usually by
+someone with a good reason; often by whoever wrote the rule.
+
+So the checkable ones are checked, first in CI, before the tests and the build.
+The gate list is in the script and mirrored in one paragraph of `AGENTS.md`;
+the script is the copy that counts.
+
+Three conventions for adding one, each learned by getting it wrong:
+
+- **A check that cannot run must fail, not pass.** The version gate reports
+  failure when it cannot read either file, and the line-budget gate fails when
+  `AGENTS.md` is unreadable rather than reporting "ok" on a file it never
+  opened. A gate that passes because it could not do its job is the one outcome
+  worse than having no gate, because it also stops anyone looking.
+- **Make the threshold overridable.** `AGENTS_MAX=10 npm run gates` exercises
+  the failure path without editing the script, which is how the failure path
+  gets exercised at all.
+- **Allow-list rather than ban, where the rule has real exceptions.**
+  `{@html}` is legitimate in three files and a mistake in any fourth; banning it
+  outright would have meant three suppression comments and a gate nobody
+  believed. The list is the decision, written down where adding to it is a
+  commit.
+
+**The threshold on `AGENTS.md` is a budget, not a request.** The file opens by
+asking to be kept short, which is worth nothing on its own: the session that
+added this very section grew it by 45% in one sitting, every addition
+individually defensible. A budget makes that growth a decision — raise the
+number deliberately, in the commit that earns it, or move the detail into this
+file, where nobody pays for it on every turn.
+
+**Every run appends one line to `.claude/logs/gates.jsonl`** — timestamp,
+commit, and a pass or fail per named check. It is gitignored and deliberately
+goes nowhere: not a CI artifact, not aggregated across machines. The moment it
+became infrastructure it would need a retention policy and a review of its own,
+for a signal that is only useful to whoever is at the keyboard deciding whether
+a rule still earns its keep. Two questions make it worth keeping at all —
+which gate has never once fired, and which keeps firing. The first is a
+candidate to retire; the second is a candidate to fix properly, in the app or
+in a test, rather than to keep catching.
+
+```bash
+jq -c '.checks[]' .claude/logs/gates.jsonl | sort | uniq -c
+```
 
 ## Testing
 

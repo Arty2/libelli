@@ -448,7 +448,10 @@ a notice can appear.
   and *hold* the button instead of clicking it, and the four sample cards come
   back: they walk through the app, and they are somewhere to start when a blank
   table is not. Your rows are replaced, the template is untouched, and
-  Ctrl/Cmd+Z undoes it.
+  Ctrl/Cmd+Z undoes it. A file holding no rows is **refused rather than
+  applied** — picking the wrong one in a file picker should not cost you the
+  table — though a file of headers and no rows will still set up the columns of
+  a table that is already empty.
 - **Add a column** — the `+` in the header. On an empty table it brings the first
   row with it: the `+` that adds rows lives under the row numbers, so until there
   is a column there is nowhere for it to be, and a column with no row under it is
@@ -1158,8 +1161,10 @@ itself stays in the browser.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
+npm run gates    # the project's own rules, checked — see below
 npm test         # vitest — the pure logic, unit by unit
 npm run check    # svelte-check; kept at zero errors and zero warnings
+npm run verify   # gates, units and types together — the one to run while working
 npm run build    # static output in ./build, deployable anywhere
 ```
 
@@ -1175,8 +1180,16 @@ npm run build    # static output in ./build, deployable anywhere
 - **Components are verified by driving them** — the pure logic has unit tests;
   layout, printing and the dialogs are checked in a real browser, where the
   geometry can be read back in millimetres and the PDF counted page by page.
+- **Gates** — `scripts/gates.sh` runs first in CI and fails the build on the
+  rules a linter cannot see: no `innerHTML` or `eval` anywhere in `src/`,
+  `{@html}` only in the three renderers that have earned it, `fetch` only in
+  `png.ts` and the service worker, no runtime dependencies, `color` never
+  spelled with a `u` where it names something, `VERSION` in step with
+  `package.json`, and `AGENTS.md` inside its line budget. A rule that only lives
+  in prose is broken by the first change that does not re-read it, so the ones
+  that can execute do. Add the next one there rather than as a paragraph.
 - **Version** — `src/lib/version.ts` is the source of truth, kept in step with
-  `package.json`. A fix is a patch (0.1.0 → 0.1.1), a feature is a minor
+  `package.json` (and the gate above fails the build if they drift apart). A fix is a patch (0.1.0 → 0.1.1), a feature is a minor
   (0.1.1 → 0.2.0), and the leading zero never moves.
 - **Deploying** — `npm run build` writes a static site to `build/`; any static
   host serves it. `vercel.json` states the build command and output directory
@@ -1185,8 +1198,10 @@ npm run build    # static output in ./build, deployable anywhere
   expects the Vercel adapter's `.vercel/output`, which would mean serverless
   functions this app has no use for.
 
-`CLAUDE.md` covers the load-bearing decisions and how the code is meant to be
-worked on; `PLAN.md` is the plan it was built from.
+`AGENTS.md` covers the load-bearing decisions and how the code is meant to be
+worked on — `CLAUDE.md` is a one-line import of it, so any agent reads the same
+rules. `docs/decisions.md` holds the why behind each module, and `PLAN.md` is
+the plan it was built from.
 
 ## Credit
 

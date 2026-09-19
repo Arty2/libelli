@@ -24,7 +24,7 @@ import type { Box, Defaults, Mapping, PageSpec, Row } from './types';
  * anchored to the one above it: when the guess is off, the card corrects itself
  * on the first render, and the error moves things down the page rather than
  * over them. That is what lets this be a page of arithmetic instead of a second
- * layout engine, which `CLAUDE.md` forbids for good reasons.
+ * layout engine, which `AGENTS.md` forbids for good reasons.
  */
 
 /**

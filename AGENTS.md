@@ -1,12 +1,17 @@
-# CLAUDE.md
+# AGENTS.md
 
-Notes for whoever — human or model — picks this up next.
+Notes for whoever — human or agent, Claude or otherwise — picks this up next.
+`CLAUDE.md` is a one-line import of this file plus the two Claude Code-specific
+notes; edit this file, not that one.
 
 `README.md` explains the app to a user and describes most of its behaviour in
 detail. `PLAN.md` holds the original decisions and is historical. `docs/decisions.md`
 holds the why behind each module. **This file is only what you need before
 touching anything**; it is kept short on purpose, because it is read in full
-every session.
+every session — and because a bloated instructions file trains whoever reads it
+to skim, which defeats the point of writing one. Push detail into
+`docs/decisions.md` rather than growing this file; `npm run gates` holds it to a
+line budget so that stays a number rather than a hope.
 
 ## What this is
 
@@ -78,6 +83,14 @@ src/routes/app.css        the :root tokens and app-wide rules
   percent.
 - **One layout engine.** The editor and the printed page render through the same
   DOM and the same CSS; never add a second layout path for print.
+- **Evergreen browsers, Baseline *Widely* available.** No polyfills, no legacy
+  target. A new CSS or JS feature has to be
+  [Widely available](https://web.dev/baseline), not merely *Newly* — and weigh
+  the failure mode, not just the support table: a feature that degrades costs
+  little, one invalid at computed-value time takes the whole declaration with it
+  and can leave a page unreadable. One standing exception, taken knowingly:
+  `field-sizing: content` in `DataTable.svelte`, which falls back to a fixed
+  scrollable field. Anything failing worse than that waits.
 - **A template stores the right-hand page.** With facing pages on, a left-hand
   page is `mirrorBox` applied as the card is drawn — never a second set of
   coordinates. Anything that writes geometry back (dragging, nudging, the
@@ -99,7 +112,13 @@ src/routes/app.css        the :root tokens and app-wide rules
   does not recognise is dropped rather than guessed at; a template's custom CSS
   goes through `css.ts`, which scopes every selector to the card and strips
   `@import` and any non-`data:` `url()`. Tests assert that each renderer *routes*
-  through these, not just that the guards work — keep it that way.
+  through these, not just that the guards work — keep it that way, and see
+  **Rules that execute** for the gate that holds the chokepoints to three files.
+- **A parser reports; the caller decides.** `parse.ts` says what a file holds,
+  including "nothing"; whether nothing is acceptable is a policy, and it belongs
+  at the one place the destructive decision is made. Two callers each inventing
+  their own emptiness rule is how a paste came to refuse an unreadable file
+  while an import of that same file quietly emptied the table.
 - **Undo is snapshots, not a command log.** One entry is the whole editable state
   (template + data + mapping), recorded on a debounce. An inverse operation
   cannot drift out of step with the operation it undoes.
@@ -120,6 +139,22 @@ Everything else — why anchors resolve after measurement, why stacking is array
 order, why the worker never skips waiting, and so on — is in `docs/decisions.md`,
 filed under the module it concerns. Read the section for the file you are about
 to change.
+
+## Rules that execute
+
+A rule that only lives in prose gets broken by the first change that does not
+re-read it — including by whoever wrote it, who always has a good reason. So
+every rule above that *can* be checked is: `npm run gates` runs `scripts/gates.sh`
+first in CI and fails the build on injection sinks, `{@html}` outside its three
+renderers, a `fetch` outside `png.ts` and the worker, a runtime dependency,
+`colour` spelled as a name, a `VERSION` out of step with `package.json`, and
+this file over its line budget.
+
+Add the next rule there rather than as a paragraph here. Each run also appends
+one line to the gitignored `.claude/logs/gates.jsonl`, which is how "this gate
+has never once fired" becomes answerable instead of anecdotal.
+`docs/decisions.md` § `scripts/gates.sh` has the conventions for writing one and
+what the log is for.
 
 ## Versioning
 
@@ -148,17 +183,25 @@ already have read the last version of. So: no bump until the PR exists, then
   driven in headless Chromium — geometry read back in mm, PDFs counted page by
   page, dialogs opened and dismissed. Say what was actually checked, and say it
   plainly; if something was not checked, say that too.
+- **Read what the build emitted, not the config you wrote.** A config option
+  that is silently dropped looks exactly like one that works. After a change to
+  anything the toolchain rewrites — the service worker's precache list, the
+  prerendered HTML, the static output — open the file in `build/` and check the
+  change is actually in it.
 - **Tests cover the pure logic**; components are verified by driving them.
 - **Small commits with real messages.** What changed, why that shape, and what
   was verified. No model names in anything that lands in the repo.
 - **Comments explain the why.** Not what the line does — why it is that way, and
   what breaks otherwise. Delete a comment that only restates the code.
 - **British spelling in prose and in identifiers** (`normalise`, `centre`,
-  `recognise`) — with one standing exception: **colour is spelled `color`**,
-  everywhere, from the CSS property to the module name to the label in the bar.
-  The web platform spells it that way, `Box.color` and `TextStyle.color` are the
-  format's own field names, and a codebase that said `parseColour` on one line
-  and `color:` on the next was carrying the seam around for no benefit.
+  `recognise`) — with one standing exception: **colour is spelled `color`**
+  wherever it is the name of the thing — the CSS property, the custom property,
+  the module, every identifier, and the label on the control in the bar. The web
+  platform spells it that way, `Box.color` and `TextStyle.color` are the format's
+  own field names, and a codebase that said `parseColour` on one line and
+  `color:` on the next was carrying the seam around for no benefit. Ordinary
+  prose keeps its `u` — a tooltip reading "the paper colour" is a sentence, not
+  a name — and that is where the gate draws the line.
 - **Say the trade-off out loud.** If a choice is arguable, note it in the commit
   or in a comment rather than leaving the next reader to rediscover it.
 - **Watch a pull request only when asked.** Never start following CI, and never
@@ -168,10 +211,27 @@ already have read the last version of. So: no bump until the PR exists, then
 
 ```bash
 npm run dev      # http://localhost:5173
+npm run gates    # rules a linter can't enforce — see Rules that execute
 npm test         # vitest, pure-logic units
 npm run check    # svelte-check; keep it at zero errors and zero warnings
 npm run build    # static output in ./build
+npm run verify   # gates, units and types — the one to run while working
 ```
+
+## Svelte's own agent tooling
+
+The Svelte team ships skills, a sub-agent and an MCP server for agents working
+in Svelte (`npx sv add ai-tools`, `svelte.dev/docs/ai`), kept current with the
+framework's releases — which prose in this file cannot be. Prefer it over
+anything written here about Svelte itself, and don't vendor a copy of their
+files: a copy of someone else's maintained file is stale the day after it is
+taken. Take the skills, which are lazy-loaded; treat the MCP server as opt-in,
+since its tool definitions cost context every session. `sv add` merges into
+`.claude/settings.json`, which this repo already owns — read the diff and keep
+the allowlist and the `SessionStart` hook.
+
+What stays here is this project's own taste, which no skill knows about:
+Svelte 5 runes, no legacy stores, and everything above.
 
 ## Credits
 

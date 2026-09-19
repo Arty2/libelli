@@ -1,14 +1,16 @@
 {
 	"name": "libelli",
 	"private": true,
-	"version": "0.13.4",
+	"version": "0.14.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"test": "vitest run --config vitest.config.ts"
+		"gates": "bash scripts/gates.sh",
+		"test": "vitest run --config vitest.config.ts",
+		"verify": "npm run gates && npm test && npm run check"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",
