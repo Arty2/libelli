@@ -149,6 +149,13 @@ record kept beside them would be a second copy of the same truth, and the first
 write that lands in one and not the other has the picker naming templates that
 are not there. `listTemplates` reads the documents, which is also the repair.
 
+**Deleting is inside both pickers.** It is about *which* template or *which*
+table — the same question the names above it answer — and a bare Delete in the
+row of buttons beside Reset was two red words offering different amounts of
+loss: one puts the starter card back under the same name, the other takes the
+template out of the browser. The row keeps what acts on the template you have
+open; the list holds what acts on the library.
+
 **The mapping moved from name to id.** A library makes two templates called
 "Untitled card" ordinary rather than freakish, and they would otherwise share one
 mapping. The name is still read as a fallback, because that is what mappings were
@@ -1419,13 +1426,22 @@ row numbers is frozen to the left edge, so it is always there; it wears the same
 mark an unsorted header wears, and it is only drawn while there is a sort to
 undo.
 
-**The row actions lost Duplicate and Copy gained its words.** Three icons in the
-smallest bar in the app asked the eye to tell a copy from a duplicate from a
-delete at 15px, and the first two are the same picture in most icon sets. Copy
-says **Copy to clipboard** because *where* is the only question it raises — this
-app has a clipboard for looks as well, and a Duplicate on the card — and
-duplicating rows went with the icon that stood for it: copy the rows and paste
-them back is the same act in two presses that each say what they do.
+**Three glyphs for three kinds of copy.** `copy` is a look lifted off one area
+and put on another — the style clipboard, which never leaves the app.
+`copy-to-clipboard` is rows leaving for a spreadsheet, and the glyph says so: a
+clipboard with something coming out of it. `replicate` is "make another one
+right here". They were one mark until two of them landed in the same menu, and
+the word beside the row action is now just **Copy**, because the picture
+carries the rest. The tray's **Paste** wears `task-add` rather than a document
+leaving a clipboard: it is a block of cells arriving from a spreadsheet, not the
+style clipboard's paste.
+
+**The row actions lost Duplicate.** Three icons in the smallest bar in the app
+asked the eye to tell a copy from a duplicate from a delete at 15px, and the
+first two are the same picture in most icon sets. Duplicating rows went with the
+icon that stood for it: copy the rows and paste them back is the same act in two
+presses that each say what they do. Copy kept its word and took a glyph that
+answers *where* on its own — see the three copies above.
 
 **The tray is resized by the movement, not by the press.** The header is the
 only strip of the tray that is frozen in place and it is also almost entirely

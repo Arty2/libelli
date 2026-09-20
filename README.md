@@ -386,12 +386,14 @@ resize boxes directly, or type exact millimetres.
 
 **Several templates, one browser.** The **Template** field in page setup names the
 loaded template; the caret beside it opens every template this browser has saved,
-with **New template…** under a rule at the bottom. Renaming is typing in the
-field — the template keeps its identity, so two of them may share a name without
-sharing anything else. **Delete** sits next to **Reset** and takes the loaded
-template only: Reset puts the starter card back under the same name, Delete
-removes the template and opens the next one — or a new empty template, when it
-was the last one, so the card a first run lands on can be deleted like any other.
+with **New template…** and **Delete this template…** under a rule at the bottom.
+Renaming is typing in the field — the template keeps its identity, so two of them
+may share a name without sharing anything else. Deleting is in that list rather
+than in the row of buttons beside it because it is about *which* template, like
+the names above it; it takes the loaded template only, and **Reset** — which is
+in the row — puts the starter card back under the same name instead. Delete
+removes the template and opens the next one, or a new empty template when it was
+the last one, so the card a first run lands on can be deleted like any other.
 Both ask first, and both are one Ctrl/Cmd+Z away — an undone delete is written
 back out under the id it had.
 
@@ -452,14 +454,14 @@ a notice can appear.
   same columns is. Only when the table has no columns at all is the first line
   read as a header, because there is then nothing else to name them with. Two
   buttons rather than a mode and a Load — **Replace Rows** and **Add Rows**.
-- **Copy to clipboard** — Paste's opposite number: the chosen rows onto the
-  clipboard as tab-separated text, header included, ready to paste straight into
-  a spreadsheet (tabs rather than commas, so it lands in cells instead of
-  arriving as one long column). It sits with **Delete** in the group that appears
-  when rows are chosen, because "these ones" means the same thing for both; the
-  tick in the header's corner is how you say *all of them*. It says where it is
-  copying *to* because this app has a clipboard for looks as well, and it is the
-  one row action that carries words rather than an icon.
+- **Copy** — Paste's opposite number: the chosen rows onto the clipboard as
+  tab-separated text, header included, ready to paste straight into a spreadsheet
+  (tabs rather than commas, so it lands in cells instead of arriving as one long
+  column). It sits with **Delete** in the group that appears when rows are
+  chosen, because "these ones" means the same thing for both; the tick in the
+  header's corner is how you say *all of them*. Its mark is a clipboard with
+  something leaving it — this app has a clipboard for looks as well, and a
+  Duplicate on the card, and the glyph is what tells the three apart.
 - **Import CSV** — the same parser against a whole file, header and all. Press
   and *hold* the button instead of clicking it, and the four sample cards come
   back: they walk through the app, and they are somewhere to start when a blank
@@ -1117,8 +1119,8 @@ Each bar opens with a two-line head — what this is and what it is called, then
 the buttons that act on it — and runs in groups after that, outward from the
 thing itself.
 
-- **Page** — head: the template's name and the library behind its caret, then
-  import, export, reset, delete, lock ·
+- **Page** — head: the template's name and the library behind its caret, which
+  also holds New and Delete, then import, export, reset, lock ·
   sheet size (a preset or your own, a button to turn it over, and left and
   right pages), bleed, crop marks · type defaults (font, size, leading,
   spacing, color) · surface (paper color, background image and fit) · page

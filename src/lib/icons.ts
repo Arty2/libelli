@@ -24,10 +24,13 @@ export const ICONS: Record<string, string> = {
 	'trash': '<path d="M12 12H14V24H12z"/><path d="M18 12H20V24H18z"/><path d="M4,6V8H6V28a2,2,0,0,0,2,2H24a2,2,0,0,0,2-2V8h2V6ZM8,28V8H24V28Z"/><path d="M12 2H20V4H12z"/>',
 	'close': '<path d="M17.4141 16 24 9.4141 22.5859 8 16 14.5859 9.4143 8 8 9.4141 14.5859 16 8 22.5859 9.4143 24 16 17.4141 22.5859 24 24 22.5859 17.4141 16z"/>',
 	'copy': '<path d="M28,10V28H10V10H28m0-2H10a2,2,0,0,0-2,2V28a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V10a2,2,0,0,0-2-2Z"/><path d="M4,18H2V4A2,2,0,0,1,4,2H18V4H4Z"/>',
-	// `copy` is "put a copy somewhere else" — the clipboard, the style clipboard —
-	// and `replicate` is "make another one right here". They were the same glyph
-	// until the two landed in one menu: BoxMenu carried Copy Style and Duplicate
-	// wearing it, and the data tray now carries Copy and Duplicate side by side.
+	// Three ways of saying copy, because the app means three different things by
+	// it. `copy` is a look lifted off one area and put on another — the style
+	// clipboard, which never leaves the app. `copy-to-clipboard` is rows leaving
+	// for a spreadsheet, and says where they are going, which is the only
+	// question that button raises. `replicate` is "make another one right here".
+	// They were one glyph until two of them landed in the same menu.
+	'copy-to-clipboard': '<path d="M7,7h3v3h12v-3h3v11h2V7c-.0032-1.1033-.8967-1.9968-2-2h-3v-1c-.0032-1.1033-.8967-1.9968-2-2h-8c-1.1033.0032-1.9968.8967-2,2v1h-3c-1.1033.0032-1.9968.8967-2,2v21c.0032,1.1032.8967,1.9968,2,2h9v-2H7V7ZM12,4h8v4h-8v-4ZM30,24h-8.172l2.586-2.586-1.414-1.414-5,5,5,5,1.414-1.414-2.586-2.586h8.172v-2ZM12,13h-2v2h2v-2ZM22,13h-8v2h8v-2ZM12,18h-2v2h2v-2ZM10,25h2v-2h-2v2ZM14,20h4v-2h-4v2Z"/>',
 	'replicate': '<path d="M28,8h2V4a2.0021,2.0021,0,0,0-2-2H24V4h4Z"/><path d="M17 2H21V4H17z"/><path d="M28 11H30V15H28z"/><path d="M28,18v4H24V10a2.0023,2.0023,0,0,0-2-2H10V4h4V2H10A2.0023,2.0023,0,0,0,8,4V8H4a2.0023,2.0023,0,0,0-2,2V28a2.0023,2.0023,0,0,0,2,2H22a2.0023,2.0023,0,0,0,2-2V24h4a2.0023,2.0023,0,0,0,2-2V18ZM22,28H4V10H22Z"/>',
 	'add': '<path d="M17 15 17 8 15 8 15 15 8 15 8 17 15 17 15 24 17 24 17 17 24 17 24 15z"/>',
 	'code': '<path d="M31 16 24 23 22.59 21.59 28.17 16 22.59 10.41 24 9 31 16z"/><path d="M1 16 8 9 9.41 10.41 3.83 16 9.41 21.59 8 23 1 16z"/><path d="M5.91 15H26.080000000000002V17H5.91z" transform="rotate(-75 15.996 16)"/>',
@@ -81,6 +84,10 @@ export const ICONS: Record<string, string> = {
 	'move': '<path d="M25 11 23.59 12.41 26.17 15 17 15 17 5.83 19.59 8.41 21 7 16 2 11 7 12.41 8.41 15 5.83 15 15 5.83 15 8.41 12.41 7 11 2 16 7 21 8.41 19.59 5.83 17 15 17 15 26.17 12.41 23.59 11 25 16 30 21 25 19.59 23.59 17 26.17 17 17 26.17 17 23.59 19.59 25 21 30 16 25 11z"/>',
 	'checkbox': '<path d="M26,4H6A2,2,0,0,0,4,6V26a2,2,0,0,0,2,2H26a2,2,0,0,0,2-2V6A2,2,0,0,0,26,4ZM6,26V6H26V26Z"/>',
 	'checkbox-checked': '<path d="M26,4H6A2,2,0,0,0,4,6V26a2,2,0,0,0,2,2H26a2,2,0,0,0,2-2V6A2,2,0,0,0,26,4ZM6,26V6H26V26Z"/><path d="M14 21.5 9 16.54 10.59 15 14 18.35 21.41 11 23 12.58 14 21.5z"/>',
+	// The tray's Paste, which is not the style clipboard's paste: a block of
+	// cells arriving from a spreadsheet, so a list with something being added to
+	// it rather than a document leaving a clipboard.
+	'task-add': '<path d="M31 24 27 24 27 20 25 20 25 24 21 24 21 26 25 26 25 30 27 30 27 26 31 26 31 24z"/><path d="M25,5H22V4a2.0058,2.0058,0,0,0-2-2H12a2.0058,2.0058,0,0,0-2,2V5H7A2.0058,2.0058,0,0,0,5,7V28a2.0058,2.0058,0,0,0,2,2H17V28H7V7h3v3H22V7h3v9h2V7A2.0058,2.0058,0,0,0,25,5ZM20,8H12V4h8Z"/>',
 	'paste': '<path d="M26,20H17.83l2.58-2.59L19,16l-5,5,5,5,1.41-1.41L17.83,22H26v8h2V22A2,2,0,0,0,26,20Z"/><path d="M23.71,9.29l-7-7A1,1,0,0,0,16,2H6A2,2,0,0,0,4,4V28a2,2,0,0,0,2,2h8V28H6V4h8v6a2,2,0,0,0,2,2h6v2h2V10A1,1,0,0,0,23.71,9.29ZM16,4.41,21.59,10H16Z"/>',
 	/* A square, a triangle and the corner of a third: what a page of areas that
 	   nobody placed by hand wears. */
@@ -107,7 +114,6 @@ export const ICONS: Record<string, string> = {
 	'document-download': '<path d="M30 25 28.586 23.586 26 26.172 26 18 24 18 24 26.172 21.414 23.586 20 25 25 30 30 25z"/><path d="M18,28H8V4h8v6a2.0058,2.0058,0,0,0,2,2h6v3l2,0V10a.9092.9092,0,0,0-.3-.7l-7-7A.9087.9087,0,0,0,18,2H8A2.0058,2.0058,0,0,0,6,4V28a2.0058,2.0058,0,0,0,2,2H18ZM18,4.4,23.6,10H18Z"/>',
 	'table-shortcut': '<path d="M5 18 5 20 10.586 20 3 27.586 4.414 29 12 21.414 12 27 14 27 14 18 5 18z"/><path d="M27,3H5A2,2,0,0,0,3,5V15H5V11H15v4h2V11H27v7H17v2H27v7H17v2H27a2,2,0,0,0,2-2V5A2,2,0,0,0,27,3Zm0,6H5V5H27Z"/>',
 	'table-built': '<path d="M28,8H24V4a2.0025,2.0025,0,0,0-2-2H4A2.0025,2.0025,0,0,0,2,4V22a2.0025,2.0025,0,0,0,2,2H8v4a2.0025,2.0025,0,0,0,2,2H28a2.0025,2.0025,0,0,0,2-2V10A2.0025,2.0025,0,0,0,28,8ZM22,22H14V17h8Zm0-7H14V10h8ZM12,15H4V10h8ZM22,4V8H4V4ZM4,22V17h8v5Zm24,6H10V24H22a2.0025,2.0025,0,0,0,2-2V10h4Z"/>',
-	'report-growth': '<path d="M25,30H7c-1.103,0-2-.8975-2-2V7c0-1.103.897-2,2-2h3v-1c0-1.103.897-2,2-2h8c1.1025,0,2,.897,2,2v1h3c1.1025,0,2,.897,2,2v21c0,1.1025-.8975,2-2,2ZM7,7v21h18V7h-3v3h-12v-3h-3ZM12,8h8v-4h-8v4ZM12.707,23.707l-1.4141-1.4141,6.293-6.293h-4.5859v-2h8v8h-2v-4.5859l-6.293,6.293Z"/>',
 	'group-objects': '<path d="M19,13V9H9V19h4v4H23V13Zm-8-2h6v6H11ZM21,21H15V19h4V15h2Z"/><path d="M30,8V2H24V4H8V2H2V8H4V24H2v6H8V28H24v2h6V24H28V8ZM26,4h2V6H26ZM4,4H6V6H4ZM6,28H4V26H6Zm22,0H26V26h2Zm-2-4H24v2H8V24H6V8H8V6H24V8h2Z"/>',
 	'ungroup-objects': '<path d="M30,14V10H26v2H20V6h2V2H18V4H6V2H2V6H4V18H2v4H6V20h6v6H10v4h4V28H26v2h4V26H28V14ZM6,6H18V18H6ZM26,26H14V20h4v2h4V18H20V14h6Z"/>',
 	/* Cast off: the boat that has left the buoy above it. */

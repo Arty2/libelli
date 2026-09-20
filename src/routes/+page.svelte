@@ -2538,10 +2538,10 @@ em { color: #b42318 }`;
 		<h3>Templates</h3>
 		<p>
 			The <strong>Template</strong> field names the one you are working on; the caret beside it lists every
-			template saved in this browser, with <em>New template…</em> under a rule. Renaming is typing in the field.
-			<strong>Delete</strong> takes the loaded template and opens the next one — or a new empty template, if it was
-			the last — where <strong>Reset</strong> puts the starter card back under the same name. Both ask first, and
-			both are one Ctrl/Cmd+Z away. The list lives
+			template saved in this browser, with <em>New template…</em> and <em>Delete this template…</em> under a rule.
+			Renaming is typing in the field. Deleting takes the loaded template and opens the next one — or a new empty
+			template, if it was the last — where <strong>Reset</strong>, in the row of buttons below, puts the starter
+			card back under the same name. Both ask first, and both are one Ctrl/Cmd+Z away. The list lives
 			in this browser only; <strong>Export</strong> is how a template leaves, and an import joins the list rather
 			than replacing what is open.
 		</p>
@@ -2578,8 +2578,8 @@ em { color: #b42318 }`;
 			Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column.
 			Drag the right edge of a header to set that column's width, or double-click that edge to hand it back the
 			default; the widths stay in this browser and follow a column through a rename.
-			Clicking a row previews it; the tick in the gutter chooses several, and <strong>Copy to clipboard</strong> and
-			delete for those appear at the head of the buttons below. The row numbers travel with their rows through a
+			Clicking a row previews it; the tick in the gutter chooses several, and <strong>Copy</strong> and delete for
+			those appear at the head of the buttons below. The row numbers travel with their rows through a
 			sort, and a column header sorts A-Z, then Z-A, then back to the order the rows arrived in.
 		</p>
 		<p>

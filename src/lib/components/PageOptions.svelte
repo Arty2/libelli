@@ -301,8 +301,11 @@
 									</button>
 								</li>
 							{/each}
-							<!-- The rule is the point of building this by hand: below it is a
-							     thing to do, not a template to open. -->
+							<!-- The rule is the point of building this by hand: below it are
+							     things to do, not templates to open. Deleting is one of them
+							     because it is about *which* template, like the names above it,
+							     and because a bare Delete in the row of buttons beside Reset was
+							     two red words offering different amounts of loss. -->
 							<li role="separator"><hr /></li>
 							<li role="none">
 								<button
@@ -315,6 +318,21 @@
 								>
 									<span class="tick" aria-hidden="true"></span>
 									<Icon name="add" size={12} /> New template…
+								</button>
+							</li>
+							<li role="none">
+								<button
+									class="danger"
+									role="menuitem"
+									disabled={pageFrozen}
+									title="Delete this template from this browser. Your rows are not touched."
+									onclick={() => {
+										pickerOpen = false;
+										ondeletetemplate();
+									}}
+								>
+									<span class="tick" aria-hidden="true"></span>
+									<Icon name="trash" size={12} /> Delete this template…
 								</button>
 							</li>
 						</ul>
@@ -330,12 +348,6 @@
 					disabled={pageFrozen}
 					title="Back to the starter card. Your rows are not touched."
 				><Icon name="reset" size={14} /> Reset</button>
-				<button
-					class="danger-outline"
-					onclick={ondeletetemplate}
-					disabled={pageFrozen}
-					title="Delete this template from this browser. Your rows are not touched."
-				><Icon name="trash" size={14} /> Delete</button>
 				<!-- Never disabled by the lock it sets, or there would be no way out of it. -->
 				<button
 					aria-pressed={pageFrozen}

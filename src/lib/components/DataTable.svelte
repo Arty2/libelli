@@ -976,12 +976,12 @@
 
 			     Two things in one order: out of the app, gone.
 
-			     Copy says where it is copying *to*, because that is the whole
-			     question a copy button raises here — this app has a clipboard for
-			     looks and a Duplicate on the card, and neither of them is this.
-			     It is the one labelled button among the row actions for the same
-			     reason: a pair of scissors is guessable, two overlapping squares
-			     could be either of three things.
+			     Copy is one word and the glyph does the rest: a clipboard with
+			     something leaving it, which is the only question a copy button
+			     raises here — this app has a clipboard for looks as well, and a
+			     Duplicate on the card, and neither of them is this. It carries
+			     the word because two overlapping squares could be any of the
+			     three.
 
 			     Duplicating rows is gone with the icon that stood for it: it was a
 			     third mark to tell apart in the smallest bar in the app, and
@@ -991,7 +991,7 @@
 			<button
 				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
 				onclick={copyTsv}
-			><Icon name="copy" size={15} /> Copy to clipboard</button>
+			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
 			<button
 				class="icon danger"
 				title="Delete the chosen rows"
@@ -1001,7 +1001,7 @@
 			<span class="rule"></span>
 		{/if}
 		<button title="Paste a block of cells straight off a spreadsheet" onclick={() => (pasteOpen = true)}>
-			<Icon name="report-growth" size={15} /> Paste
+			<Icon name="task-add" size={15} /> Paste
 		</button>
 		<button
 			use:hold={onloadsample}
@@ -1490,8 +1490,17 @@
 		align-items: center;
 		gap: 4px;
 		flex: none;
-		font-size: 11px;
 		color: #555;
+	}
+
+	/* Set the way every field label in the bars above is set — uppercased in the
+	   stylesheet rather than in the markup, so what a screen reader announces
+	   stays in sentence case. */
+	.picker > span {
+		font-size: 10px;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		white-space: nowrap;
 	}
 
 	.picker input {
