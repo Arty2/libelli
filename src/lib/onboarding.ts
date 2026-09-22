@@ -17,6 +17,11 @@ import type { Dataset, Template } from './types';
 
 export const SAMPLE_CSV = sampleCsv;
 
-export const sampleDataset = (): Dataset => parseTable(SAMPLE_CSV);
+/**
+ * Named, because a first run now lands in a table picker and “Untitled table”
+ * is a worse answer to “what am I looking at” than the four cards themselves
+ * give.
+ */
+export const sampleDataset = (): Dataset => ({ ...parseTable(SAMPLE_CSV), name: 'Sample cards' });
 
 export const starterTemplate = (): Template => builtinTemplate();

@@ -391,8 +391,21 @@
 	border-top: 1px solid #e2e2e2;
 }
 
+/* The one destructive item in the list, wearing what destructive wears
+   everywhere else here. It is in the menu rather than in the row of buttons
+   beside it because it is about *which* template, like the names above it, and
+   because a bare Delete in a row that also holds Reset was two red words
+   offering different amounts of loss. */
+.options .picker-menu button.danger {
+	color: #b42318;
+}
+
+.options .picker-menu button.danger:hover:not(:disabled) {
+	background: #fdf3f2;
+}
+
 /* Kept together so a wrap moves the whole set to the next line rather than
-   stranding Delete on its own at the far left. */
+   stranding the last of them on its own at the far left. */
 .options .actions {
 	display: inline-flex;
 	align-items: center;

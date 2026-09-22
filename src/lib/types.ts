@@ -361,6 +361,13 @@ export interface Template {
 export interface Dataset {
 	columns: string[];
 	rows: Row[];
+	/**
+	 * What this table is called in the picker. Optional, because every table
+	 * stored before there was more than one has no name and is not going to
+	 * grow one by being read — see `UNTITLED_TABLE` for what it is called until
+	 * somebody types one.
+	 */
+	name?: string;
 }
 
 export type Row = Record<string, string>;

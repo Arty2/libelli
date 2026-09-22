@@ -200,8 +200,11 @@ export const saveTemplateId = (id: string) => local.set('template:id', id);
  * were made, with a random tail because two templates can be created in the
  * same millisecond by holding a button down.
  */
-export const nextTemplateId = (): string =>
-	`t_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+export const nextTemplateId = (): string => mintId('t');
+
+/** The shape both libraries mint their ids in; see `nextTemplateId` for why. */
+const mintId = (prefix: string): string =>
+	`${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 const templateDocKey = (id: string) => `${KEY_TEMPLATE_PREFIX}${id}`;
 
@@ -226,6 +229,69 @@ export async function listTemplates(): Promise<TemplateEntry[]> {
 		const doc = await loadTemplateDoc(id);
 		if (!doc) continue;
 		const name = typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : 'Untitled card';
+		entries.push({ id, name });
+	}
+	return entries.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+}
+
+// ---- the table library -----------------------------------------------------
+
+/**
+ * Tables are kept the way templates are, and for the same reasons: a working
+ * copy under `dataset:current` that boot reads first, and a document per table
+ * under an id that survives renaming. A browser that has only ever had one
+ * table keeps exactly the table it had, and that table joins the library the
+ * first time anything asks for the list.
+ *
+ * A table and a template are deliberately not paired off. The whole point of
+ * this app is that one design prints any number of tables and one table can be
+ * printed by any number of designs, so the two libraries are switched
+ * independently and neither knows the other exists.
+ */
+export const KEY_DATASET_PREFIX = 'dataset:doc:';
+
+export interface DatasetEntry {
+	id: string;
+	name: string;
+}
+
+/** What a table with no name of its own is called, everywhere it is listed. */
+export const UNTITLED_TABLE = 'Untitled table';
+
+export const loadDatasetId = (): string => local.get<string>('dataset:id', '');
+export const saveDatasetId = (id: string) => local.set('dataset:id', id);
+
+/**
+ * The table that was open before this one — what the swap goes back to.
+ *
+ * Stored rather than kept in a variable: the pair you are working between is
+ * the last thing you want to lose to a reload, and it is one short string.
+ */
+export const loadPreviousDatasetId = (): string => local.get<string>('dataset:previous', '');
+export const savePreviousDatasetId = (id: string) => local.set('dataset:previous', id);
+
+export const nextDatasetId = (): string => mintId('d');
+
+const datasetDocKey = (id: string) => `${KEY_DATASET_PREFIX}${id}`;
+
+export const saveDatasetDoc = (id: string, d: Dataset) => idbSet(STORE_KV, datasetDocKey(id), d);
+export const loadDatasetDoc = (id: string) => idbGet<Dataset>(STORE_KV, datasetDocKey(id));
+export const deleteDatasetDoc = (id: string) => idbDelete(STORE_KV, datasetDocKey(id));
+
+/**
+ * Every saved table, by id and name, in name order. Read out of the documents
+ * themselves — see `KEY_TEMPLATE_PREFIX` for why there is no index beside them.
+ */
+export async function listDatasets(): Promise<DatasetEntry[]> {
+	const keys = await idbKeys(STORE_KV);
+	const ids = keys
+		.filter((key) => key.startsWith(KEY_DATASET_PREFIX))
+		.map((key) => key.slice(KEY_DATASET_PREFIX.length));
+	const entries: DatasetEntry[] = [];
+	for (const id of ids) {
+		const doc = await loadDatasetDoc(id);
+		if (!doc) continue;
+		const name = typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : UNTITLED_TABLE;
 		entries.push({ id, name });
 	}
 	return entries.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));

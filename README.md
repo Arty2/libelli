@@ -44,9 +44,11 @@ cannot drift apart.
 
 Nothing leaves the browser, because there is nowhere for it to go. Small
 settings — the column mapping, keyed by template name, and UI state — live in
-`localStorage`; the dataset, the template and any uploaded font bytes live in
+`localStorage`; the tables, the templates and any uploaded font bytes live in
 IndexedDB, which is where base64 fonts have to go once they blow past
-localStorage's ~5MB. Pictures can live in a [folder of your
+localStorage's ~5MB. Each library is the working copy plus one document per
+saved table or template, kept under an id rather than a name so renaming one
+costs nothing. Pictures can live in a [folder of your
 own](#where-the-pictures-live) instead, where the browser offers one.
 [Undo](#undo-and-redo) keeps its snapshots in memory.
 
@@ -372,18 +374,26 @@ resize boxes directly, or type exact millimetres.
   `url()` pointing off this machine are stripped, so a template's CSS cannot
   reach the network at all.
   Each area wears its own **Name** as an id, so `#Job-Title { … }` reaches that
-  one area and nothing else; `.box` reaches all of them.
+  one area and nothing else; `.box` reaches all of them. The dialog has a
+  **Cancel** beside its **Done**, and Cancel puts back the CSS that was there
+  when it opened — <kbd>Esc</kbd> and a click on the ground behind do the same,
+  because with a Cancel on the row the other two ways out that are not Done have
+  to mean what it means. What you type is applied as the field loses the focus,
+  so the card behind the dialog shows it before you decide; Cancel takes it off
+  again.
 
 ## Templates, and laying one out
 
 **Several templates, one browser.** The **Template** field in page setup names the
 loaded template; the caret beside it opens every template this browser has saved,
-with **New template…** under a rule at the bottom. Renaming is typing in the
-field — the template keeps its identity, so two of them may share a name without
-sharing anything else. **Delete** sits next to **Reset** and takes the loaded
-template only: Reset puts the starter card back under the same name, Delete
-removes the template and opens the next one — or a new empty template, when it
-was the last one, so the card a first run lands on can be deleted like any other.
+with **New template…** and **Delete this template…** under a rule at the bottom.
+Renaming is typing in the field — the template keeps its identity, so two of them
+may share a name without sharing anything else. Deleting is in that list rather
+than in the row of buttons beside it because it is about *which* template, like
+the names above it; it takes the loaded template only, and **Reset** — which is
+in the row — puts the starter card back under the same name instead. Delete
+removes the template and opens the next one, or a new empty template when it was
+the last one, so the card a first run lands on can be deleted like any other.
 Both ask first, and both are one Ctrl/Cmd+Z away — an undone delete is written
 back out under the id it had.
 
@@ -424,7 +434,12 @@ library is loaded to do it.
 
 The dataset is one row per card, one column per field. It sits beside the page
 on a wide screen and under it on a phone, and **Data** in the toolbar folds it
-away when the page needs the room. Clicking anywhere on a row that is not the
+away when the page needs the room. Stacked under the page it opens at a little
+under half the screen and is **dragged taller by its own header** — pull the
+header up and the table fills everything down from the toolbar, pull it back
+down to see the card again. The header is almost entirely controls, so it is the
+*movement* that resizes rather than the press: a press that goes nowhere is
+still the button underneath it being pressed. Clicking anywhere on a row that is not the
 text itself previews it and chooses it; the tick in the gutter chooses several
 without moving the preview off the card you are looking at, and the tick in the
 corner of the header chooses every row or drops every row — it shows a dash while
@@ -442,9 +457,11 @@ a notice can appear.
 - **Copy** — Paste's opposite number: the chosen rows onto the clipboard as
   tab-separated text, header included, ready to paste straight into a spreadsheet
   (tabs rather than commas, so it lands in cells instead of arriving as one long
-  column). It sits with **Duplicate** and **Delete** in the group that appears
-  when rows are chosen, because "these ones" means the same thing for all three;
-  the tick in the header's corner is how you say *all of them*.
+  column). It sits with **Delete** in the group that appears when rows are
+  chosen, because "these ones" means the same thing for both; the tick in the
+  header's corner is how you say *all of them*. Its mark is a clipboard with
+  something leaving it — this app has a clipboard for looks as well, and a
+  Duplicate on the card, and the glyph is what tells the three apart.
 - **Import CSV** — the same parser against a whole file, header and all. Press
   and *hold* the button instead of clicking it, and the four sample cards come
   back: they walk through the app, and they are somewhere to start when a blank
@@ -481,10 +498,27 @@ a notice can appear.
 - **Add** — the pale row and column at the end of the table are placeholders:
   type into one and it becomes real. There is no separate button, because the
   place you would click is the place you were already typing.
-- **Duplicate and delete** — choose one or more rows and the two icons appear at
-  the head of the buttons under the table, before a rule. Immediate, with a line
-  saying what went; undo covers it, and a confirmation you dismiss without
-  reading protects nobody.
+- **Delete rows** — choose one or more rows and the bin appears at the head of
+  the buttons under the table, before a rule. Immediate, with a line saying what
+  went; undo covers it, and a confirmation you dismiss without reading protects
+  nobody. There is no Duplicate beside it any more: copying the rows and pasting
+  them back is the same act in two presses that say what they do, and the icon
+  was a third mark to tell apart in the smallest bar in the app.
+- **More than one table** — the **Table** field at the left of the same row of
+  buttons names the table you are in; the caret beside it opens the rest, and
+  **New table…** and **Delete this table…** are below a rule at the bottom of
+  that list. A design and a table are kept apart on purpose — one design prints
+  any number of tables, and one table can be printed by any number of designs —
+  so switching either leaves the other exactly where it was. Bindings that still
+  name a column that exists are kept across the switch, which is the usual case
+  when two tables are the same list twice; when none of them survives, the
+  columns are guessed at afresh.
+- **Swapping between two** — the ⇄ beside the picker goes back to the table you
+  were on before this one, and pressing it again comes back. Two is the case
+  that actually happens — this year's list and last year's, the real one and the
+  one you are trying something on — and reaching the second through a menu every
+  time is the whole cost of having split them up. The pair survives a reload.
+  Switching is undoable like everything else that replaces what is on screen.
 - **Deleting a column asks** — it is a field of every card at once, it takes
   cells under a header you may not have scrolled to, and any area bound to it
   goes blank on every card. Undo still covers it; the question is only so that a
@@ -909,8 +943,15 @@ outlined and named; a second <kbd>Enter</kbd> presses it, and nothing intercepts
 that second press — by then it is an ordinary Return on an ordinary button. The
 point is a stray Return arriving a beat late after something else was dismissed:
 it used to land on a focused button and delete a template or replace every row.
-<kbd>Esc</kbd> still closes the dialog at any point, and a textarea inside one
-still takes <kbd>Enter</kbd> as a newline.
+<kbd>Esc</kbd> still closes the dialog at any point — in the CSS dialog, which
+has a Cancel, closing that way cancels — and a textarea inside one still takes
+<kbd>Enter</kbd> as a newline.
+
+The right-click menu cannot be selected as text, and on a touchscreen it gets
+out of the way of the gesture that opened it: the long press that opens it is
+the beginning of the press-and-drag that moves the area, so carrying on and
+dragging takes the menu off and moves the area, which was under your finger the
+whole time.
 
 The right-click menu carries no key hints. The two items that had them were the
 only two that did, so the column of grey chords read as a property of those items
@@ -1009,6 +1050,15 @@ so the second and third taps are a decision rather than an accident.
   screen where zooming means what a phone means by it: the card is already as
   large as the window will take it, and the reason to pinch is to read the small
   print.
+- **Press and hold an area, then carry on dragging.** The long press opens the
+  area's menu; if the finger moves on from there, the menu goes and the area
+  moves with it. It is one gesture rather than two, and the drag was running
+  under the menu the whole time — the press that opened it is the press that
+  picked the area up.
+- **Drag the table's header to size the tray.** Stacked under the page it opens
+  at a little under half the screen; pull the header up to fill the screen with
+  it, pull it back down to see the card. A press that goes nowhere is still the
+  header button underneath being pressed.
 - **Buttons answer.** A press on any control gives a few milliseconds of
   vibration where the device has it, and a press-and-hold gives a firmer one as
   it fires — the only thing that says a gesture nobody can see is over. A hold
@@ -1069,8 +1119,8 @@ Each bar opens with a two-line head — what this is and what it is called, then
 the buttons that act on it — and runs in groups after that, outward from the
 thing itself.
 
-- **Page** — head: the template's name and the library behind its caret, then
-  import, export, reset, delete, lock ·
+- **Page** — head: the template's name and the library behind its caret, which
+  also holds New and Delete, then import, export, reset, lock ·
   sheet size (a preset or your own, a button to turn it over, and left and
   right pages), bleed, crop marks · type defaults (font, size, leading,
   spacing, color) · surface (paper color, background image and fit) · page
@@ -1119,12 +1169,16 @@ thing itself.
   surface: flick left or right anywhere across them, including over the count
   and over an arrow that has greyed out at the end of the run, and the card
   steps. Up and down still scroll.
+- **The table's own row** — under the table, and read the same way the bars
+  above it are: what this is and what it is called first — the **Table** picker
+  and the swap beside it — then, behind a rule, what acts on the rows you have
+  chosen, then what acts on the whole table.
 - **The window toolbar** holds only what is about the whole app: the mark, then
-  Help, Page Setup, Data and Export — the two panels in the order they sit on
-  screen, settings above the page and the table beside it. On a phone the
+  Help, Page Setup, Images, Data and Export — the two panels in the order they
+  sit on screen, settings above the page and the table beside it. On a phone the
   buttons drop their words and keep their icons, and the row is read from the
   outside in: Help and, where the browser offers it, Install on the left, the
-  mark in the middle, the three that act on what is on screen at the right.
+  mark in the middle, the four that act on what is on screen at the right.
 
 Every number says its unit: mm for geometry, bleed, spacing and gaps, pt for
 type size, modules for a QR padding.
@@ -1154,7 +1208,9 @@ A template claiming a schema newer than the app understands is refused outright
 rather than half-read.
 
 Data comes in as CSV or pasted TSV and goes out as printed pages; the dataset
-itself stays in the browser.
+itself stays in the browser. **Export CSV** takes the table you are in, not the
+library — a table is a file's worth of rows, and there is nothing a bundle of
+all of them would open in.
 
 ## What leaves this machine
 

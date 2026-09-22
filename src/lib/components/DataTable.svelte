@@ -6,10 +6,30 @@
 	import { armDefault } from '$lib/modal';
 	import { parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
 	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
+	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
 	import type { Dataset, Row } from '$lib/types';
 
 	interface Props {
 		dataset: Dataset;
+		/** every table stored in this browser, for the picker */
+		tables: DatasetEntry[];
+		/** which of them is open */
+		tableId: string;
+		/** the one the swap goes back to, or '' while there is no pair yet */
+		previousTable: string;
+		onselecttable: (id: string) => void;
+		onnewtable: () => void;
+		ondeletetable: () => void;
+		/** back to the table before this one — the two you are working between */
+		onswaptable: () => void;
+		onrenametable: (name: string) => void;
+		/**
+		 * The tray is dragged taller by its own header, stacked under the page on
+		 * a phone. Off when the tray is beside the page, where its height is the
+		 * window's and there is nothing to drag.
+		 */
+		trayDraggable: boolean;
+		ontraydrag: (phase: 'start' | 'move' | 'end', clientY: number) => void;
 		/** column widths in px, keyed by column name; owned by the app's UI state */
 		columnWidths: Record<string, number>;
 		oncolumnwidths: (widths: Record<string, number>) => void;
@@ -32,6 +52,16 @@
 
 	let {
 		dataset,
+		tables,
+		tableId,
+		previousTable,
+		onselecttable,
+		onnewtable,
+		ondeletetable,
+		onswaptable,
+		onrenametable,
+		trayDraggable,
+		ontraydrag,
 		columnWidths,
 		oncolumnwidths,
 		activeRow,
@@ -64,6 +94,141 @@
 			rowEls[index]?.scrollIntoView({ block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
 		});
 	});
+
+	/**
+	 * The table picker: the same control the page bar gives templates, because
+	 * it is the same job — a name you can type in, with the library behind a
+	 * caret. See `PageOptions` for why it is built by hand rather than being a
+	 * `<datalist>`.
+	 *
+	 * Its menu is `position: fixed` and measured, not absolutely positioned:
+	 * this bar scrolls sideways, so a menu inside its flow would be clipped by
+	 * the very element it is anchored to. It still lives inside the field in the
+	 * DOM, which is what lets the dismissal below be a containment check.
+	 */
+	let pickerOpen = $state(false);
+	let pickerEl = $state<HTMLElement | null>(null);
+	let pickerAt = $state({ left: 0, bottom: 0 });
+
+	const tableName = $derived(dataset.name ?? '');
+
+	function togglePicker() {
+		if (pickerOpen) {
+			pickerOpen = false;
+			return;
+		}
+		const box = pickerEl?.getBoundingClientRect();
+		// Upwards: this bar is at the bottom of the tray, so a menu hanging below
+		// it would be off the screen.
+		if (box) pickerAt = { left: box.left, bottom: window.innerHeight - box.top + 4 };
+		pickerOpen = true;
+	}
+
+	function onWindowPointer(event: PointerEvent) {
+		if (!pickerOpen || pickerEl?.contains(event.target as Node)) return;
+		pickerOpen = false;
+	}
+
+	/**
+	 * A table switch is a different set of rows wearing the same indices, so
+	 * everything this component remembers about *these* rows has to go: the
+	 * sort, the pre-sort order the row numbers are read from, and the ticks.
+	 * Keyed on the id rather than on the dataset, because an ordinary edit
+	 * replaces the dataset too and must not clear the selection.
+	 */
+	let shown = '';
+
+	$effect(() => {
+		if (tableId === shown) return;
+		shown = tableId;
+		sortedBy = null;
+		unsorted = null;
+		selectedRows = new Set();
+	});
+
+	/**
+	 * Drag the header to change how much of the screen the tray takes.
+	 *
+	 * Only where the tray is stacked under the page — beside it, its height is
+	 * the window's and there is nothing to drag.
+	 *
+	 * The header is almost entirely controls: column names to type in, sort and
+	 * move and delete, the tick that chooses every row. So this does not claim
+	 * the press, it claims the *movement* — a press that goes nowhere is the
+	 * button underneath being pressed, and a press that travels upwards is the
+	 * tray being pulled open. Vertical rather than any direction, because the
+	 * header scrolls sideways with the table; and the click that would follow a
+	 * drag is swallowed, or letting go over a header's Delete deletes a column.
+	 *
+	 * The grip is not the resize handles, which are a drag of their own.
+	 *
+	 * The geometry belongs to the page, not to this component: all that is sent
+	 * is where the pointer is.
+	 */
+	const TRAY_SLOP = 6;
+
+	let traying: { id: number; x: number; y: number; on: boolean } | null = null;
+
+	/**
+	 * The rest of the gesture is watched on the window, not on the header.
+	 *
+	 * The header is the top edge of the tray, so a drag upwards — the one this
+	 * is for — is off it before it has travelled six pixels, and a listener on
+	 * the header itself sees the press and then nothing at all. Pointer capture
+	 * is the other way to hold onto it and is the wrong one here: it retargets
+	 * the compatibility mouse events too, so the click that a press on a column
+	 * button is owed would be delivered to the header instead.
+	 */
+	function watchTray(on: boolean) {
+		const method = on ? window.addEventListener : window.removeEventListener;
+		method('pointermove', moveTrayDrag);
+		method('pointerup', endTrayDrag);
+		method('pointercancel', endTrayDrag);
+	}
+
+	$effect(() => () => watchTray(false));
+
+	function startTrayDrag(event: PointerEvent) {
+		if (!trayDraggable || event.button !== 0) return;
+		if ((event.target as HTMLElement).closest('.resize')) return;
+		traying = { id: event.pointerId, x: event.clientX, y: event.clientY, on: false };
+		watchTray(true);
+	}
+
+	function moveTrayDrag(event: PointerEvent) {
+		if (traying?.id !== event.pointerId) return;
+		const dy = traying.y - event.clientY;
+		if (!traying.on) {
+			if (Math.abs(dy) < TRAY_SLOP || Math.abs(dy) < Math.abs(event.clientX - traying.x)) return;
+			traying.on = true;
+			ontraydrag('start', traying.y);
+		}
+		// A drag that began inside the column-name field would otherwise paint a
+		// selection across it on the way up — the grey smear, and on a phone the
+		// magnifier with it.
+		window.getSelection()?.removeAllRanges();
+		ontraydrag('move', event.clientY);
+	}
+
+	function endTrayDrag(event: PointerEvent) {
+		if (traying?.id !== event.pointerId) return;
+		const dragged = traying.on;
+		traying = null;
+		watchTray(false);
+		if (!dragged) return;
+		trayClick = true;
+		ontraydrag('end', event.clientY);
+	}
+
+	/** The press that resized the tray is not also a press on what it started on. */
+	function swallowClick(event: MouseEvent) {
+		if (!trayClick) return;
+		trayClick = false;
+		event.preventDefault();
+		event.stopPropagation();
+	}
+
+	let trayClick = false;
 
 	let pasteOpen = $state(false);
 	/** Emptying the table asks once — see the dialog for why once is enough. */
@@ -165,7 +330,12 @@
 
 	function onKeydown(event: KeyboardEvent) {
 		if (event.key !== 'Escape') return;
-		if (clearing) {
+		if (pickerOpen) {
+			// Stopped here, or the page's own Escape reads it as a second dismissal
+			// and closes something behind this.
+			event.stopPropagation();
+			pickerOpen = false;
+		} else if (clearing) {
 			event.stopPropagation();
 			clearing = false;
 		} else if (confirmColumn !== null) {
@@ -404,26 +574,6 @@
 		onnotice(`Deleted ${gone.size} row${gone.size === 1 ? '' : 's'}. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`);
 	}
 
-	function duplicateChosen() {
-		if (!chosenRows.length) return;
-		const rows: Row[] = [];
-		const added: Row[] = [];
-		dataset.rows.forEach((row, i) => {
-			rows.push(row);
-			if (!selectedRows.has(i)) return;
-			const copy = { ...row };
-			added.push(copy);
-			rows.push(copy);
-		});
-		// A copy is a new row, so it goes at the end of the arrival order — it did
-		// not exist when the others arrived, and giving it the original's number
-		// would put two rows on screen wearing the same one.
-		if (unsorted) unsorted = [...unsorted, ...added];
-		selectedRows = new Set();
-		onchange({ ...dataset, rows });
-		onnotice(`Duplicated ${added.length} row${added.length === 1 ? '' : 's'}.`);
-	}
-
 	/**
 	 * A paste is data, not a file.
 	 *
@@ -528,7 +678,7 @@
 	}
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} onpointerdown={onWindowPointer} />
 
 <section class="data" aria-label="Card data">
 	<div class="scroll">
@@ -544,7 +694,14 @@
 				<!-- No width: this is the column that takes up the slack. -->
 				<col />
 			</colgroup>
-			<thead>
+			<!-- The tray's own top edge, and the one strip of it that is not a
+			     control: on a phone the Data button opens the tray half way, and
+			     this is how it is pulled up to fill the screen. -->
+			<thead
+				class:draggable={trayDraggable}
+				onpointerdown={startTrayDrag}
+				onclickcapture={swallowClick}
+			>
 				<tr>
 					<!-- Unsorting is the third press on the header that did the sorting,
 					     and it is also here whenever a sort is on. The third press means
@@ -726,29 +883,115 @@
 	<!-- One line, always: this bar wrapping was costing the table a row of its
 	     own height every time the tray narrowed. -->
 	<div class="actions">
+		<!-- What table this is, in front of everything that acts on it. One
+		     design prints any number of tables, so this is not the template
+		     picker's second half: the two are switched independently, and
+		     switching either leaves the other exactly where it was. -->
+		<label class="picker" bind:this={pickerEl}>
+			<span>Table</span>
+			<input
+				value={tableName}
+				placeholder={UNTITLED_TABLE}
+				aria-label="Table name"
+				onchange={(e) => onrenametable(e.currentTarget.value)}
+			/>
+			<button
+				class="caret"
+				aria-haspopup="menu"
+				aria-expanded={pickerOpen}
+				title="{tables.length} table{tables.length === 1 ? '' : 's'} in this browser"
+				aria-label="Saved tables"
+				onclick={togglePicker}
+			>
+				<Icon name="caret-down" size={12} />
+			</button>
+			{#if pickerOpen}
+				<ul class="picker-menu" role="menu" style="left:clamp(8px, {pickerAt.left}px, 100vw - 13rem);bottom:{pickerAt.bottom}px">
+					{#each tables as entry (entry.id)}
+						<li role="none">
+							<button
+								role="menuitemradio"
+								aria-checked={entry.id === tableId}
+								onclick={() => {
+									pickerOpen = false;
+									if (entry.id !== tableId) onselecttable(entry.id);
+								}}
+							>
+								<span class="mark" aria-hidden="true">{entry.id === tableId ? '•' : ''}</span>
+								{entry.name}
+							</button>
+						</li>
+					{/each}
+					<!-- Below the rule is a thing to do, not a table to open. -->
+					<li role="separator"><hr /></li>
+					<li role="none">
+						<button
+							role="menuitem"
+							onclick={() => {
+								pickerOpen = false;
+								onnewtable();
+							}}
+						>
+							<span class="mark" aria-hidden="true"></span>
+							<Icon name="add" size={12} /> New table…
+						</button>
+					</li>
+					<li role="none">
+						<button
+							class="danger"
+							role="menuitem"
+							title="Delete this table from this browser. Your design is not touched."
+							onclick={() => {
+								pickerOpen = false;
+								ondeletetable();
+							}}
+						>
+							<span class="mark" aria-hidden="true"></span>
+							<Icon name="trash" size={12} /> Delete this table…
+						</button>
+					</li>
+				</ul>
+			{/if}
+		</label>
+		<!-- The pair you are working between, one press apart. Two tables is the
+		     case that actually happens — this year's list and last year's, the
+		     real one and the one you are trying something on — and reaching the
+		     second through a menu each time is the whole cost of having split
+		     them up. -->
+		<button
+			class="icon"
+			disabled={!previousTable}
+			title={previousTable
+				? `Back to “${tables.find((t) => t.id === previousTable)?.name ?? UNTITLED_TABLE}”`
+				: 'Nothing to swap back to yet — this is the only table you have opened'}
+			aria-label="Swap to the previous table"
+			onclick={onswaptable}
+		><Icon name="arrows-horizontal" size={15} /></button>
+		<span class="rule"></span>
 		{#if chosenRows.length}
 			<!-- What you can do to the rows you have chosen, in front of the things
 			     that act on the whole table, with a rule between the two. It appears
 			     only when there is a selection, so the bar is its usual length the
 			     rest of the time.
 
-			     Three things in one order: out of the app, into the table, gone.
-			     Copy sat beside Paste until it turned out to be a row action like
-			     the other two — "these ones" is the chosen rows for all three, and
-			     the tick in the header's corner is how you say "all of them". -->
+			     Two things in one order: out of the app, gone.
+
+			     Copy is one word and the glyph does the rest: a clipboard with
+			     something leaving it, which is the only question a copy button
+			     raises here — this app has a clipboard for looks as well, and a
+			     Duplicate on the card, and neither of them is this. It carries
+			     the word because two overlapping squares could be any of the
+			     three.
+
+			     Duplicating rows is gone with the icon that stood for it: it was a
+			     third mark to tell apart in the smallest bar in the app, and
+			     copying the rows and pasting them back is the same act in two
+			     presses that say what they do. -->
 			<span class="chosen-count">{chosenRows.length}</span>
 			<button
-				class="icon"
 				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
-				aria-label="Copy the chosen rows"
 				onclick={copyTsv}
-			><Icon name="copy" size={15} /></button>
-			<button
-				class="icon"
-				title="Duplicate the chosen rows"
-				aria-label="Duplicate the chosen rows"
-				onclick={duplicateChosen}
-			><Icon name="replicate" size={15} /></button>
+			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
 			<button
 				class="icon danger"
 				title="Delete the chosen rows"
@@ -758,7 +1001,7 @@
 			<span class="rule"></span>
 		{/if}
 		<button title="Paste a block of cells straight off a spreadsheet" onclick={() => (pasteOpen = true)}>
-			<Icon name="report-growth" size={15} /> Paste
+			<Icon name="task-add" size={15} /> Paste
 		</button>
 		<button
 			use:hold={onloadsample}
@@ -908,6 +1151,15 @@
 
 	thead th {
 		border-top-width: 1px;
+	}
+
+	/* Where the tray is dragged taller from. `touch-action: none` because the
+	   gesture would otherwise be the browser's own scroll, and there is no way
+	   to have both — what is given up is dragging the rows by the one strip of
+	   the table that is frozen in place anyway. Not on the resize grips, which
+	   are a drag of their own and set their own. */
+	thead.draggable th {
+		touch-action: none;
 	}
 
 	thead th {
@@ -1227,6 +1479,119 @@
 	.actions .icon.danger {
 		border-color: #b42318;
 		color: #b42318;
+	}
+
+	/* The field is a value with a line under it, and the caret sits against that
+	   line rather than carrying a frame of its own — the same shape the page
+	   bar's Template field has, so the two read as the same control. */
+	.picker {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		flex: none;
+		color: #555;
+	}
+
+	/* Set the way every field label in the bars above is set — uppercased in the
+	   stylesheet rather than in the markup, so what a screen reader announces
+	   stays in sentence case. */
+	.picker > span {
+		font-size: 10px;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		white-space: nowrap;
+	}
+
+	.picker input {
+		width: 7.5rem;
+		min-width: 0;
+		padding: 3px 2px;
+		border: none;
+		border-bottom: 1px solid var(--border-control);
+		background: none;
+		font: 12px ui-sans-serif, system-ui, sans-serif;
+		color: #111;
+	}
+
+	.picker input:focus {
+		outline: none;
+		border-bottom-color: #2563eb;
+	}
+
+	.picker .caret {
+		border: none;
+		background: none;
+		padding: 2px;
+		margin-left: -2px;
+		color: #555;
+		border-radius: 3px;
+	}
+
+	.picker .caret:hover {
+		background: #eaeaea;
+		color: #111;
+	}
+
+	/* Fixed, and placed from a measurement: the bar it sits in scrolls sideways,
+	   so a menu in its flow would be clipped by its own container. */
+	.picker-menu {
+		position: fixed;
+		z-index: 30;
+		min-width: 12rem;
+		max-width: min(20rem, calc(100vw - 16px));
+		max-height: 60dvh;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		margin: 0;
+		padding: 4px;
+		list-style: none;
+		background: #fff;
+		border: 1px solid #d5d5d5;
+		border-radius: 6px;
+		box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+	}
+
+	.picker-menu button {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		width: 100%;
+		border: none;
+		background: none;
+		padding: 5px 8px;
+		border-radius: 4px;
+		font: 12px ui-sans-serif, system-ui, sans-serif;
+		text-align: left;
+		/* A long name wraps rather than widening the menu past its cap. */
+		overflow-wrap: anywhere;
+	}
+
+	.picker-menu button:hover:not(:disabled) {
+		background: #f0f0f0;
+	}
+
+	.picker-menu button.danger {
+		color: #b42318;
+	}
+
+	.picker-menu button.danger:hover:not(:disabled) {
+		background: #fdf3f2;
+	}
+
+	/* A fixed gutter for the mark, so the names line up whether or not one of
+	   them is the open table. Not `.tick`, which is this table's row checkbox
+	   and would lend the menu a column of empty boxes. */
+	.picker-menu .mark {
+		flex: none;
+		width: 0.7rem;
+		color: #1a5fb4;
+	}
+
+	.picker-menu hr {
+		margin: 4px 2px;
+		border: none;
+		border-top: 1px solid #e2e2e2;
 	}
 
 	.actions .rule {
