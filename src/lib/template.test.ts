@@ -30,7 +30,7 @@ describe('the built-in template', () => {
 	it('loads with its boxes, anchors and bleed intact', () => {
 		expect(template.name).toBe('A5 Starter Card');
 		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff' });
-		expect(template.boxes.map((b) => b.id)).toEqual(['b_accent', 'b_title', 'b_subtitle', 'b_body', 'b_sketch', 'b_category', 'b_qr']);
+		expect(template.boxes.map((b) => b.id)).toEqual(['b_accent', 'b_title', 'b_subtitle', 'b_body', 'b_sketch', 'b_category', 'b_date', 'b_qr']);
 		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 8 });
 		expect(template.boxes.find((b) => b.id === 'b_category')?.anchor).toBeNull();
 		expect(template.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });

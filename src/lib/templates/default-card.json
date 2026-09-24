@@ -18,6 +18,14 @@
   },
   "fonts": [
     {
+      "family": "Newsreader",
+      "source": "google"
+    },
+    {
+      "family": "Fraunces",
+      "source": "google"
+    },
+    {
       "family": "Patrick Hand",
       "source": "google"
     },
@@ -27,9 +35,9 @@
     }
   ],
   "defaults": {
-    "font": "Patrick Hand",
-    "size": 12.5,
-    "lineHeight": 1.5,
+    "font": "Newsreader",
+    "size": 12,
+    "lineHeight": 1.45,
     "weight": 400,
     "color": "#000000",
     "align": "left",
@@ -63,12 +71,14 @@
       "y": 13,
       "w": 96,
       "h": 16,
-      "size": 30,
+      "size": 28,
       "lineHeight": 1.05,
       "mode": "plain",
       "overflow": "grow",
       "hideWhenEmpty": true,
-      "mirror": false
+      "mirror": false,
+      "font": "Fraunces",
+      "weight": 600
     },
     {
       "id": "b_subtitle",
@@ -77,9 +87,8 @@
       "y": 31,
       "w": 96,
       "h": 8,
-      "size": 15,
-      "lineHeight": 1.2,
-      "italic": true,
+      "size": 16,
+      "lineHeight": 1.15,
       "color": "#555555",
       "mode": "plain",
       "overflow": "grow",
@@ -88,7 +97,8 @@
         "gap": 2
       },
       "hideWhenEmpty": true,
-      "mirror": false
+      "mirror": false,
+      "font": "Patrick Hand"
     },
     {
       "id": "b_body",
@@ -97,8 +107,6 @@
       "y": 44,
       "w": 124,
       "h": 150,
-      "size": 12.5,
-      "lineHeight": 1.5,
       "mode": "markdown",
       "overflow": "grow",
       "anchor": {
@@ -129,6 +137,10 @@
           "markerGap": 4,
           "itemSpacing": 1.5
         }
+      },
+      "paragraph": {
+        "mode": "indent",
+        "amount": 1
       }
     },
     {
@@ -172,6 +184,25 @@
       "mode": "plain",
       "overflow": "clip",
       "anchor": null
+    },
+    {
+      "id": "b_date",
+      "slot": null,
+      "x": 50,
+      "y": 196,
+      "w": 40,
+      "h": 7,
+      "font": "Space Mono",
+      "size": 7.5,
+      "lineHeight": 1.2,
+      "color": "#777777",
+      "valign": "middle",
+      "mode": "plain",
+      "overflow": "clip",
+      "anchor": null,
+      "static": {
+        "text": "{{date:YYYY-MM-DD}}"
+      }
     },
     {
       "id": "b_qr",

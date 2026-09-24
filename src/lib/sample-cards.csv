@@ -8,7 +8,7 @@ Go ahead and change *This is a card* in the table. The title changes as you type
 ## Import & Export
 
 - **In:** paste cells straight out of Excel, Sheets or Numbers — no header row, no clean-up — or bring a whole file with **Import CSV…**.
-- **Out:** **Export…** prints the cards or saves each one as a PNG. **Export CSV** saves the words, and **Export** in Page Setup saves just the design, small enough to send in a message.
+- **Out:** **Export…** prints the cards or saves each one as a PNG. **Export CSV** saves the words, and **Export** in the template menu saves just the design, small enough to send in a message.
 
 No account, no upload, no server: nothing leaves this browser. Install libelli from your browser and it works offline, or scan the corner to open it on your phone. Want this tour back? Press and hold **Import CSV…**.",Start here,https://libelli.vercel.app,,
 Cells can do more than words,"Markdown, colour, and the art of leaving things out","## Formatting without a toolbar
@@ -16,6 +16,10 @@ Cells can do more than words,"Markdown, colour, and the art of leaving things ou
 Any cell can carry **bold**, *italic*, ~~strikethrough~~, `code`, lists and [links](https://heracl.es/libelli). Want a few words in colour? Write `[this]{red}` and you get [this]{red}. Hex, `rgb()` and names like [green]{green} or [purple]{purple} all work, and `red` prints as a printer's red rather than your screen's.
 
 That band down the edge is a column too. Type `orange` into this row's `accent` cell and watch it change.
+
+## One cell, many columns
+
+Put a column's name in double braces, like `{{column}}`, and it's replaced by whatever this row holds there — in a cell, or in an area's own text. This card is called *{{title}}*, and nobody had to type that twice.
 
 ## Notice what's missing
 
@@ -26,14 +30,16 @@ Drag any area, or grab a corner to resize it. Make this title absurdly long and 
 
 ## Style is per area
 
-That sticker is a drawing stored in the row itself, turned a few degrees, with a border drawn by hand. Double-click it to draw your own, or select anything and the bar above shows how it's made.
+That sticker is a drawing stored in the row itself, turned a few degrees, with a border drawn by hand. Double-click it to draw your own.
+
+Even the paragraphs have a style: these are told apart by an indent rather than a gap, measured in lines of leading. Select anything and the bar above shows how it's made.
 
 ## Keep more than one design
 
 The caret beside **Template** holds every design you save. Start a new one and the button with three shapes reads your columns and lays out a first draft for you.",The design,https://heracl.es/libelli,,"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADDUlEQVR4AeyUXY4bMQyDt71B7n/IHKHF90CAEOS/2M7OYFyAsEaiZJHr9O/Pw/8dAx7+AH7OCzgv4OEOnJ/Awx/A+U/w/ATu9hN4vV7/HLP73+YFSPSs4Nh/CwMQ74u/3+8/+o415XvPyxvgAhEOesX18C5rAMKBRJSEl/Lqa51fMQAhoLWM6pE7K1JzOSO2GoAQoEs9Vi6ezkE4KHGyWuS2vrcZ4EJ8iVLeOcQlcb39zOjBNgN6Lo8ciSuJd34Px/mleJsBowtKfGlR8j0ceCPYZkBpicwYF5bVmdXDgTeKrQZkYlwIy/p3xofj6OE4vxVvNYDLWRgQCy5auchRnlP8GgfeJ9huQGkpRIFSXXnnENegnpHz1wzwJbO/rIQ6rxXT0+LE+tcMyETGZfhGBCDOwJwM4tZ6xfFzmQFc3IJfHGP1xnwUG+v6hqd45PzYAC2sc+TSyGVGzPHdK4p+QM8ohgzgEiG7iIV7kPV6TjM8l8XZLvRm3FKuy4DsIgZymYNcC8yqcZhXq9MvOI8+4LmeuGkAl/kgLhE83xPHWVkPnBpiz6e7aE7VABYRceYi5gDNmj21C2drVqteNUDNMxfNCufuCO214uwyABGgdSGciNgjMTHPt2p+kt+JqgEs4pdHcfHbuTFmFsjyyjFP8bfOqgEswdKA+BPQC7y3JrRW8xmr4qYBuggRPRCfEz6nwwWqrtN534q7DehZKBPnfbW6m+A8798RLzPAl3Yx2dKtetazK7fMAC1YEieDSnX6vSY++Z1YYkBtWWoAES6Q7ytgiQESEgVKOPVYI5fBed6fcVfkpg0oLel5F7Vi6ZUzpg3QMhKJcBDz+u45NQuuz+J7NZYZwKLAF3Qhnh+N49zR/hp/2oBMJDlQu7hVm+1vzVd92gAGsayD3GrsegVLDFgtVvMwVXHvOcq7tAGIcRN2vILLG4AJO3ELA3a+glsY8PgXgAG7XsF5Abh7F/grWLXz7V4AJoDHGrBKuObc7gVo8VXnMWCVk3edc17AXf9yq/Y+L2CVk781Z/be/wAAAP//rmHpYAAAAAZJREFUAwAzBxSfH61zJAAAAABJRU5ErkJggg=="
 Take it with you,"On paper, as a picture, or as a booklet","## Print it
 
-Hit **Export…** or Ctrl/Cmd+P for a preview of every sheet. Turn on background graphics so the colours make it onto the paper.
+Hit **Export…** or Ctrl/Cmd+P for a preview of every sheet. Turn on background graphics so the colours make it onto the paper. The date in the footer fills itself in on the day you print.
 
 ## Or fold it into a zine
 

@@ -9,4 +9,4 @@
  * One bump per session while the work is still its own; once that session has
  * a pull request open, every further push takes a patch — see AGENTS.md.
  */
-export const VERSION = '0.16.0';
+export const VERSION = '0.17.0';

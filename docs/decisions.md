@@ -657,7 +657,7 @@ writes state only when a number actually moved.
 **Only a clipped box can be cut.** A growing box is a `min-height`, so it is
 always as tall as its lines, and yet it used to wear the shears whenever
 `scrollHeight` beat its height. A face whose ascent and descent outrun a tight
-line height — Patrick Hand at 1.05, the starter title — hangs its last line's
+line height — Patrick Hand at 1.05, as the starter title once was — hangs its last line's
 inline box a few pixels below the line, and `scrollHeight` counts that. It only
 showed on two-line titles, where the 16mm minimum had no slack left to hide it,
 which is why it went unseen until the tour had one.
@@ -1419,6 +1419,18 @@ selected and read back. The starter template has facing pages on, so the four
 rows are exactly one 2-up zine, and card 4 says how to fold it; the title,
 subtitle and sticker opt out of the mirror so a left-hand page does not push its
 title to the right.
+
+The template also carries the two things a row cannot: an area of its own
+text, `{{date:YYYY-MM-DD}}`, in the footer, and a paragraph indent on the body.
+Card 2 shows `{{title}}` filled in inside a cell and `{{column}}` left as
+written, which is the literal form for free — no column is called `column`,
+and an unrecognised name is never eaten. A date cannot be shown that way,
+since `{{date…}}` is always replaced, so the card points at the footer
+instead of spelling it out.
+
+Four families, each with a job: Fraunces for titles, Newsreader to read,
+Patrick Hand only for the handwritten subtitle, Space Mono for the kicker and
+the date. The hand face everywhere made every card look like a sticky note.
 
 They stay inside what `markdown.ts` actually supports, and the QR URLs are
 decoded by an independent decoder in the verification pass, because a QR that
