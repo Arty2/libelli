@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareCells, indexAfterSort, moveColumn, sortRows } from './table';
+import { compareCells, countText, dropTarget, indexAfterSort, moveColumn, sortRows } from './table';
 import type { Dataset } from './types';
 
 const data = (): Dataset => ({
@@ -70,5 +70,23 @@ describe('indexAfterSort', () => {
 		const after = sortRows(before, 'title', 'asc');
 		expect(indexAfterSort(before, after, 0)).toBe(1); // Ferns moves to the middle
 		expect(indexAfterSort(before, after, 1)).toBe(0);
+	});
+});
+
+describe('countText', () => {
+	it('counts code points and runs of non-space', () => {
+		expect(countText('')).toEqual({ characters: 0, words: 0 });
+		expect(countText('  two  words\n')).toEqual({ characters: 13, words: 2 });
+		expect(countText('é🙂')).toEqual({ characters: 2, words: 1 });
+	});
+});
+
+describe('dropTarget', () => {
+	it('reads the gap a column is dropped into as its new index', () => {
+		expect(dropTarget(0, 0)).toBe(0);
+		expect(dropTarget(0, 1)).toBe(0);
+		expect(dropTarget(0, 3)).toBe(2);
+		expect(dropTarget(2, 0)).toBe(0);
+		expect(dropTarget(2, 2)).toBe(2);
 	});
 });

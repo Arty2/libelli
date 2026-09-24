@@ -1,5 +1,5 @@
 import { parseColor } from './color';
-import type { MarkdownStyle } from './types';
+import type { MarkdownStyle, ParagraphStyle } from './types';
 
 /**
  * A deliberately small Markdown subset, written by hand so the app stays
@@ -18,6 +18,9 @@ export interface MarkdownOptions {
 	/** base font size in points; heading sizes are multipliers of it */
 	size: number;
 	md?: MarkdownStyle;
+	/** the area's paragraph style, with the leading its amount is counted in */
+	paragraph?: ParagraphStyle;
+	lineHeight?: number;
 }
 
 interface ListItem {
@@ -201,6 +204,9 @@ const mm = (v: number) => `${round(v)}mm`;
 
 export function renderMarkdown(src: string, options: MarkdownOptions): string {
 	const md = mergeStyle(options.md);
+	const para = options.paragraph;
+	// In em of the area's own size: a line of leading is `lineHeight` em.
+	const lines = para ? `${round(para.amount * (options.lineHeight ?? 1))}em` : '';
 	const blocks = parseBlocks(src ?? '');
 	const html: string[] = [];
 
@@ -220,7 +226,17 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 				break;
 			}
 			case 'paragraph': {
-				const style = `margin:0 0 ${mm(md.paragraph.spaceAfter ?? 0)}`;
+				// The area's paragraph style, when it has one, is the spacing
+				// between paragraphs; `md.paragraph` is what it is otherwise. An
+				// indent goes on a paragraph that follows another — the first one
+				// under a heading or at the top is flush, as in any book.
+				const follows = blocks[index - 1]?.type === 'paragraph';
+				const style =
+					para?.mode === 'space'
+						? `margin:0 0 ${lines}`
+						: para?.mode === 'indent'
+							? `margin:0${follows ? `;text-indent:${lines}` : ''}`
+							: `margin:0 0 ${mm(md.paragraph.spaceAfter ?? 0)}`;
 				html.push(`<p style="${style}">${block.lines.map(renderInline).join('<br />')}</p>`);
 				break;
 			}

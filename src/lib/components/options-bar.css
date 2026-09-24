@@ -307,9 +307,9 @@
 	gap: 8px;
 }
 
-/* The template name and the library behind it. The menu is positioned against
-   this, so it has to establish the containing block; `overflow` stays visible
-   here even though the bar scrolls on a phone — see the media query below. */
+/* The template name and the library behind it. The menu is `position: fixed`
+   and placed from a measurement — see PageOptions — so nothing here has to
+   make room for it. */
 .options .field.picker {
 	position: relative;
 }
@@ -318,9 +318,11 @@
    the field is a value with a line under it, and a bordered button beside it
    would read as a second control rather than as this one's handle. */
 .options .field.picker .caret {
+	display: grid;
+	place-items: center;
 	border: none;
 	background: none;
-	padding: 2px;
+	padding: 0;
 	margin-left: -2px;
 	color: #555;
 	cursor: pointer;
@@ -333,11 +335,9 @@
 }
 
 .options .picker-menu {
-	position: absolute;
+	position: fixed;
 	z-index: 30;
-	top: calc(100% + 4px);
-	left: 0;
-	min-width: max(100%, 12rem);
+	min-width: 12rem;
 	max-width: 20rem;
 	max-height: 60dvh;
 	overflow-y: auto;
@@ -381,8 +381,14 @@
    is the loaded template. */
 .options .picker-menu .tick {
 	flex: none;
-	width: 0.7rem;
+	display: inline-grid;
+	place-items: center;
+	width: 1rem;
 	color: #1a5fb4;
+}
+
+.options .picker-menu button.danger .tick {
+	color: inherit;
 }
 
 .options .picker-menu hr {
@@ -422,15 +428,6 @@
 		overscroll-behavior: contain;
 		gap: 6px 8px;
 		padding: 6px 8px;
-	}
-
-	/* The bar scrolls at this width, which would cut the picker's menu off at
-	   whatever the 26dvh cap left of it. While the menu is open the bar gives up
-	   its cap instead: it is a moment, the menu is the thing being looked at,
-	   and a list you can only see three of is not a list. */
-	.options.menu-open {
-		max-height: none;
-		overflow: visible;
 	}
 
 	/* On a phone the bar is one column of wrapped controls anyway, so the head's

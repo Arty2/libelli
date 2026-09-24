@@ -100,3 +100,17 @@ describe('inline', () => {
 		expect(render('> quote')).toContain('&gt; quote');
 	});
 });
+
+describe('renderMarkdown paragraph style', () => {
+	const two = 'One\n\nTwo';
+
+	it('spaces paragraphs by lines of the leading', () => {
+		const html = renderMarkdown(two, { size: 10, lineHeight: 1.5, paragraph: { mode: 'space', amount: 1 } });
+		expect(html).toContain('<p style="margin:0 0 1.5em">One</p>');
+	});
+
+	it('indents only a paragraph that follows another', () => {
+		const html = renderMarkdown(two, { size: 10, lineHeight: 1.2, paragraph: { mode: 'indent', amount: 2 } });
+		expect(html).toBe('<p style="margin:0">One</p><p style="margin:0;text-indent:2.4em">Two</p>');
+	});
+});

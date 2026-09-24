@@ -189,6 +189,18 @@ export interface FontRef {
 	ref?: string;
 }
 
+/**
+ * How one paragraph is told from the next: a space after it, or the first line
+ * of the next one indented — the two conventions print has. The amount is in
+ * lines of the area's own leading, so it keeps its proportion when the type
+ * size or the leading changes.
+ */
+export interface ParagraphStyle {
+	mode: 'space' | 'indent';
+	/** in lines: 1 is one line of the area's leading */
+	amount: number;
+}
+
 export interface TextStyle {
 	font?: string;
 	/** points */
@@ -201,11 +213,14 @@ export interface TextStyle {
 	italic?: boolean;
 	/** mm */
 	letterSpacing?: number;
+	/** absent inherits the page's; absent there too is each renderer's own */
+	paragraph?: ParagraphStyle;
 }
 
 export type Defaults = Required<
 	Pick<TextStyle, 'font' | 'size' | 'lineHeight' | 'weight' | 'color' | 'align' | 'letterSpacing'>
->;
+> &
+	Pick<TextStyle, 'paragraph'>;
 
 /** Markdown block metrics. `size` values are multipliers of the box size; every spacing is mm. */
 export interface MarkdownStyle {
@@ -368,6 +383,12 @@ export interface Dataset {
 	 * somebody types one.
 	 */
 	name?: string;
+	/**
+	 * Read-only: no cell, column or row can change, from the table or from the
+	 * card. Sorting still reorders it and rows can still be chosen, because
+	 * neither changes what any card says. Absent is unlocked.
+	 */
+	locked?: boolean;
 }
 
 export type Row = Record<string, string>;
@@ -388,6 +409,18 @@ export interface UiState {
 	 */
 	columnWidths: Record<string, number>;
 	zoom: 'fit' | number;
+	/**
+	 * Which of the bars and the table were open, so a reload comes back to the
+	 * screen it left. Absent until something is toggled, which is what lets a
+	 * first visit on a phone still start with everything folded away.
+	 */
+	panels?: { page: boolean; data: boolean; images: boolean };
+	/**
+	 * The table's width beside the page, in px, where the two sit side by
+	 * side. Absent is the stylesheet's own share; a phone stacks them and
+	 * ignores this.
+	 */
+	trayWidth?: number;
 }
 
 export type GridStyle = 'lines' | 'dots';

@@ -45,8 +45,7 @@ export type FieldKind =
 	| 'date'
 	| 'image'
 	| 'link'
-	| 'code'
-	| 'skip';
+	| 'code';
 
 /** A column, what it was taken for, and how much of that was a guess. */
 export interface FieldGuess {
@@ -60,6 +59,14 @@ export interface FieldGuess {
 	sure: boolean;
 	/** the first non-empty cell, for the dialog to show beside the choice */
 	sample: string;
+	/**
+	 * Whether the column gets an area at all. A switch beside the kind rather
+	 * than one more kind: leaving a column out is not a thing a column *is*,
+	 * and folding it into the same menu meant that putting one back asked you
+	 * to guess again what it had been taken for. Absent counts as included,
+	 * which is what every guess made before this existed was.
+	 */
+	include?: boolean;
 }
 
 export const FIELD_KINDS: FieldKind[] = [
@@ -71,8 +78,7 @@ export const FIELD_KINDS: FieldKind[] = [
 	'date',
 	'image',
 	'link',
-	'code',
-	'skip'
+	'code'
 ];
 
 export const KIND_LABELS: Record<FieldKind, string> = {
@@ -84,8 +90,7 @@ export const KIND_LABELS: Record<FieldKind, string> = {
 	date: 'Date',
 	image: 'Picture',
 	link: 'QR code',
-	code: 'Code',
-	skip: 'Leave out'
+	code: 'Code'
 };
 
 // ---- reading a column ------------------------------------------------------
@@ -194,7 +199,9 @@ export function classifyColumn(column: string, values: string[]): FieldGuess {
 	const shape = shapeKind(values);
 	const named = nameKind(column);
 
-	if (stats.filled === 0) return { column, kind: 'skip', sure: false, sample };
+	// Nothing in it to print, so it starts left out — as a small line, which is
+	// what it becomes if it is let back in and then filled.
+	if (stats.filled === 0) return { column, kind: 'label', sure: false, sample, include: false };
 
 	// Prose is the one thing that overrules a shape: a column of long text is a
 	// body even where every cell happens to parse as something else.
@@ -229,7 +236,7 @@ export function guessRoles(columns: string[], rows: Row[]): FieldGuess[] {
 	const only = (kind: FieldKind, keep: (g: FieldGuess) => boolean) => {
 		let kept = false;
 		for (const guess of guesses) {
-			if (guess.kind !== kind) continue;
+			if (guess.kind !== kind || guess.include === false) continue;
 			if (!kept && keep(guess)) {
 				kept = true;
 				continue;
@@ -263,7 +270,9 @@ export function guessRoles(columns: string[], rows: Row[]): FieldGuess[] {
 	// No column said it was the title, so the first line-length column becomes
 	// one. A card with no heading at all reads as a paragraph on a page.
 	if (!hasTitle) {
-		const candidate = guesses.find((g) => g.kind === 'label' || g.kind === 'subtitle');
+		const candidate = guesses.find(
+			(g) => g.include !== false && (g.kind === 'label' || g.kind === 'subtitle')
+		);
 		if (candidate) {
 			candidate.kind = 'title';
 			candidate.sure = false;
@@ -338,7 +347,9 @@ export interface AutoLayoutResult {
 export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	const { page, defaults, columns, rows } = input;
 	const nextId = input.nextId ?? autoId();
-	const guesses = (input.roles ?? guessRoles(columns, rows)).filter((g) => columns.includes(g.column));
+	const guesses = (input.roles ?? guessRoles(columns, rows)).filter(
+		(g) => columns.includes(g.column) && g.include !== false
+	);
 
 	const margin = clamp(Math.round(Math.min(page.w, page.h) * 0.08), 6, 14);
 	const contentW = Math.max(10, page.w - margin * 2);
@@ -541,7 +552,7 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	// own, and one line of its address is at least a box pointing at the column.
 	const placed = new Set(boxes.map((b) => b.slot));
 	for (const field of guesses) {
-		if (field.kind === 'skip' || placed.has(field.column) || left.includes(field.column)) continue;
+		if (placed.has(field.column) || left.includes(field.column)) continue;
 		const box = stack(
 			{
 				slot: field.column,

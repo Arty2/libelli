@@ -79,7 +79,7 @@ describe('classifyColumn', () => {
 	});
 
 	it('leaves an empty column out', () => {
-		expect(classifyColumn('Spare', ['', '']).kind).toBe('skip');
+		expect(classifyColumn('Spare', ['', '']).include).toBe(false);
 	});
 });
 
@@ -216,11 +216,22 @@ describe('autoLayout', () => {
 	it('takes the roles it is given over the ones it would guess', () => {
 		const roles: FieldGuess[] = [
 			{ column: 'title', kind: 'body', sure: true, sample: 'Start here' },
-			{ column: 'body', kind: 'skip', sure: true, sample: '' }
+			{ column: 'body', kind: 'body', sure: true, sample: '', include: false }
 		];
 		const { boxes } = autoLayout({ page, defaults, columns, rows: sample, roles });
 		expect(boxes.find((b) => b.slot === 'title')?.mode).toBe('markdown');
 		expect(boxes.some((b) => b.slot === 'body')).toBe(false);
+	});
+
+	it('keeps every area the same distance from both sides of the paper', () => {
+		for (const size of [page, { ...page, w: page.h, h: page.w }, { ...page, w: 90, h: 55 }]) {
+			const { boxes } = autoLayout({ page: size, defaults, columns, rows: sample });
+			const lefts = boxes.map((b) => b.x);
+			const rights = boxes.map((b) => size.w - (b.x + b.w));
+			expect(Math.min(...lefts)).toBeCloseTo(Math.min(...rights), 5);
+			// And the same distance from the top and the bottom as from the sides.
+			expect(Math.min(...boxes.map((b) => b.y))).toBeCloseTo(Math.min(...lefts), 5);
+		}
 	});
 
 	it('has nothing to lay out when there are no columns', () => {

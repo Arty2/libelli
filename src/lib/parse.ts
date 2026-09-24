@@ -95,14 +95,40 @@ export function sniffDelimiter(text: string): string {
 	return best;
 }
 
-/** Make headers non-empty and unique so they can safely key a row object. */
+/**
+ * A column's name, in the one shape a column name may have: no spaces, spaces
+ * become dashes, and nothing but letters, digits, dashes and underscores.
+ *
+ * Because a column name is also a word in a card — `{{title}}` is written into
+ * a cell or an area and filled from the column of that name — and a name with a
+ * space or a brace in it is one nobody can write between two pairs of braces.
+ * Letters are any script's letters, not ASCII's: a column called `τίτλος` is as
+ * writable as `title`, and stripping it to nothing would be the opposite of the
+ * point. Empty after all that is empty; the caller names it.
+ */
+export function columnName(raw: string): string {
+	return raw
+		.normalize('NFC')
+		.trim()
+		.replace(/\s+/gu, '-')
+		.replace(/[^\p{L}\p{N}_-]/gu, '')
+		.replace(/-{2,}/g, '-')
+		.replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Headers made into column names, non-empty and unique, so they can safely key
+ * a row object — and be written as `{{name}}`. A duplicate takes a number after
+ * a dash, the same shape a typed name is given.
+ */
 export function normaliseHeaders(raw: string[]): string[] {
-	const seen = new Map<string, number>();
+	const taken = new Set<string>();
 	return raw.map((h, idx) => {
-		const base = h.trim() || `Column ${idx + 1}`;
-		const n = seen.get(base) ?? 0;
-		seen.set(base, n + 1);
-		return n === 0 ? base : `${base} (${n + 1})`;
+		const base = columnName(h) || `Column-${idx + 1}`;
+		let name = base;
+		for (let n = 2; taken.has(name); n++) name = `${base}-${n}`;
+		taken.add(name);
+		return name;
 	});
 }
 
@@ -146,7 +172,7 @@ export function parseTable(text: string, options: ParseOptions = {}): Dataset {
 	const width = grid.reduce((m, r) => Math.max(m, r.length), 0);
 	const columns = useHeader
 		? normaliseHeaders(pad(grid[0], width))
-		: Array.from({ length: width }, (_, i) => `Column ${i + 1}`);
+		: Array.from({ length: width }, (_, i) => `Column-${i + 1}`);
 
 	const body = useHeader ? grid.slice(1) : grid;
 	const rows: Row[] = body.map((cells) => {

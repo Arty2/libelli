@@ -120,14 +120,15 @@ export function toggleGroup(boxes: Box[], ids: string[]): { boxes: Box[]; groupe
 /**
  * Move a box by whole millimetres. An anchored box moves its gap rather than
  * its y — the same rule dragging follows — so a nudge cannot quietly break an
- * anchor chain. Returns null when there is nothing to move.
+ * anchor chain. The gap may go below zero, overlapping the area it follows,
+ * as it may when dragged. Returns null when there is nothing to move.
  */
 export function nudgeBox(box: Box, dx: number, dy: number): Box | null {
 	if (box.locked) return null;
 	const round = (v: number) => Math.round(v * 100) / 100;
 	const next: Box = { ...box, x: round(box.x + dx) };
 	if (dy) {
-		if (box.anchor) next.anchor = { ...box.anchor, gap: Math.max(0, round(box.anchor.gap + dy)) };
+		if (box.anchor) next.anchor = { ...box.anchor, gap: round(box.anchor.gap + dy) };
 		else next.y = round(box.y + dy);
 	}
 	return next;

@@ -1311,8 +1311,14 @@
 		cursor: default;
 	}
 
+	/* As wide as the card and no wider. A block fills its parent, so the
+	   scaler was the sheet's width *before* the transform — and scaled up, that
+	   width scaled with it, so every zoom above 100% hung an empty band off the
+	   sheet's right edge and gave the stage a scrollbar with nothing in view to
+	   scroll to. Sized to its content, it scales to exactly the sheet. */
 	.scaler {
 		transform-origin: top left;
+		width: max-content;
 	}
 
 	/* Grey, and as thin as a screen will draw: the grid is there to be measured

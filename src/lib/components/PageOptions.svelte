@@ -3,9 +3,12 @@
 	import PrintSettingsPanel from './PrintSettingsPanel.svelte';
 	import './options-bar.css';
 	import { safeImageUrl } from '$lib/assets';
-	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
+	import { fontChoices } from '$lib/fonts';
 	import {
+		MAX_PARAGRAPH,
+		MIN_LEADING,
 		MIN_PAPER,
+		MIN_SIZE,
 		FACING_PAGE_NUMBER_POSITIONS,
 		PAGE_NUMBER_POSITIONS,
 		PAGE_PRESETS,
@@ -17,6 +20,7 @@
 		BackgroundFit,
 		Box,
 		Dataset,
+		FontRef,
 		Mapping,
 		PageBackgroundImage,
 		PageNumberPosition,
@@ -46,13 +50,8 @@
 		onuploadprintbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
-		/**
-		 * The library menu has opened or closed. It matters outside this bar
-		 * because on a narrow screen the bar gives up its height cap while the
-		 * menu is up — see options-bar.css — and whoever is reserving room for
-		 * the bar must not take that transient height for a permanent one.
-		 */
-		onmenu?: (open: boolean) => void;
+		/** fonts this browser knows that the template is not carrying */
+		editorFonts: FontRef[];
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
@@ -62,6 +61,7 @@
 
 	let {
 		template,
+		editorFonts,
 		ontemplatechange,
 		onresettemplate,
 		library,
@@ -72,7 +72,6 @@
 		onuploadbackground,
 		onuploadprintbackground,
 		onnotice,
-		onmenu,
 		onimporttemplate,
 		onexporttemplate,
 		oneditcss
@@ -92,15 +91,32 @@
 	 * own, and it earns it by having an action at the bottom of the list.
 	 */
 	let pickerOpen = $state(false);
-
-	$effect(() => {
-		onmenu?.(pickerOpen);
-	});
-
-	// No dependencies, so this cleanup runs once, on destroy: a bar that is
-	// unmounted with its menu still up must not leave the flag set behind it.
-	$effect(() => () => onmenu?.(false));
 	let pickerEl = $state<HTMLElement | null>(null);
+	/**
+	 * Where the menu hangs. `position: fixed`, measured as it opens, rather
+	 * than absolutely inside the bar: on a phone the bar scrolls, so a menu in
+	 * its flow was either clipped by it or — the old way out — the bar gave up
+	 * its height cap while the menu was up, and the whole row grew and shrank
+	 * under the page every time the picker opened. Fixed, the menu is over the
+	 * page and the bar never changes height for it.
+	 */
+	let pickerAt = $state({ left: 0, top: 0 });
+
+	function togglePicker() {
+		if (pickerOpen) {
+			pickerOpen = false;
+			return;
+		}
+		const box = pickerEl?.getBoundingClientRect();
+		if (box) pickerAt = { left: box.left, top: box.bottom + 4 };
+		pickerOpen = true;
+	}
+
+	/** Close the menu, then do the thing it offered. */
+	const fromMenu = (action: () => void) => () => {
+		pickerOpen = false;
+		action();
+	};
 
 	/**
 	 * Close on a press anywhere else, or on Escape.
@@ -123,11 +139,11 @@
 		pickerOpen = false;
 	}
 
-	const familyOptions = $derived(
-		Array.from(new Set([...template.fonts.map((f) => f.family), ...CURATED_GOOGLE_FONTS])).sort((a, b) =>
-			a.localeCompare(b)
-		)
-	);
+	/**
+	 * The families this template is set in, then under a rule everything else
+	 * this browser knows — see `fontChoices`.
+	 */
+	const families = $derived(fontChoices(template, editorFonts));
 
 	/** A locked design is read-only everywhere; a locked box only locks itself. */
 	const pageFrozen = $derived(!!template.locked);
@@ -166,10 +182,13 @@
 	 */
 	function setDefaultFont(family: string) {
 		const declared = template.fonts.some((f) => f.family.toLowerCase() === family.toLowerCase());
+		// An uploaded face the editor is holding comes back with its file
+		// reference, not as a Google name that would be asked for and missed.
+		const known = editorFonts.find((f) => f.family.toLowerCase() === family.toLowerCase());
 		ontemplatechange({
 			...template,
 			defaults: { ...template.defaults, font: family },
-			fonts: declared ? template.fonts : [...template.fonts, { family, source: 'google' }]
+			fonts: declared ? template.fonts : [...template.fonts, known ?? { family, source: 'google' }]
 		});
 	}
 
@@ -196,6 +215,28 @@
 		(event.currentTarget as HTMLInputElement).value = String(taken);
 		return taken;
 	};
+
+	/** A number held to a floor, written back into the field when it was refused. */
+	const floored = (event: Event, floor: number, fallback: number) => {
+		const taken = Math.max(floor, numeric(event, fallback));
+		(event.currentTarget as HTMLInputElement).value = String(taken);
+		return taken;
+	};
+
+	/**
+	 * The page's paragraph style — what every area with none of its own sets
+	 * its paragraphs by. None is the absence of the field, which is what every
+	 * template written before this had, and each renderer's own spacing.
+	 */
+	function setParagraph(mode: string, amount?: number) {
+		const { paragraph: _was, ...rest } = template.defaults;
+		if (mode !== 'space' && mode !== 'indent') {
+			patchTemplate({ defaults: rest });
+			return;
+		}
+		const value = Math.max(0, Math.min(MAX_PARAGRAPH, amount ?? template.defaults.paragraph?.amount ?? 1));
+		patchTemplate({ defaults: { ...rest, paragraph: { mode, amount: value } } });
+	}
 
 	/** The named size this sheet already is, or Custom when it is its own. */
 	const preset = $derived(presetFor(template.page.w, template.page.h) ?? '');
@@ -257,14 +298,12 @@
 -->
 	<!-- Ordered outwards from the thing itself: what it is, how big the sheet is,
 	     what it is made of, then what is printed on top and what you can do to it. -->
-	<div class="options" class:menu-open={pickerOpen} aria-label="Page setup">
-		<!-- What this is and what it is called on one line, and what you can do to
-		     the whole template on the next. The same shape the area bar uses, and
-		     for the same reason: these four used to sit at the far end of a bar
-		     that wraps to four rows on a laptop. -->
+	<div class="options" aria-label="Page setup">
+		<!-- What this is called, with everything that acts on the template as a
+		     whole behind the caret, and the lock beside it — outside the menu,
+		     because it is a state you need to see, not an errand. -->
 		<span class="head">
 			<span class="head-row">
-				<span class="context">Page</span>
 				<label class="field picker" bind:this={pickerEl}>
 					<span>Template</span>
 					<input
@@ -278,46 +317,64 @@
 						class="caret"
 						aria-haspopup="menu"
 						aria-expanded={pickerOpen}
-						title="{library.length} saved template{library.length === 1 ? '' : 's'} in this browser"
+						title="{library.length} saved template{library.length === 1 ? '' : 's'} in this browser, and what you can do to this one"
 						aria-label="Saved templates"
-						onclick={() => (pickerOpen = !pickerOpen)}
+						onclick={togglePicker}
 					>
-						<Icon name="caret-down" size={12} />
+						<Icon name="caret-down" size={18} />
 					</button>
 					{#if pickerOpen}
-						<ul class="picker-menu" role="menu">
+						<ul class="picker-menu" role="menu" style="left:clamp(8px, {pickerAt.left}px, 100vw - 13rem);top:{pickerAt.top}px">
 							{#each library as entry (entry.id)}
 								<li role="none">
 									<button
 										role="menuitemradio"
 										aria-checked={entry.id === templateId}
-										onclick={() => {
-											pickerOpen = false;
+										onclick={fromMenu(() => {
 											if (entry.id !== templateId) onselecttemplate(entry.id);
-										}}
+										})}
 									>
-										<span class="tick" aria-hidden="true">{entry.id === templateId ? '•' : ''}</span>
+										<span class="tick" aria-hidden="true">
+											{#if entry.id === templateId}<Icon name="checkmark" size={16} />{/if}
+										</span>
 										{entry.name}
 									</button>
 								</li>
 							{/each}
 							<!-- The rule is the point of building this by hand: below it are
-							     things to do, not templates to open. Deleting is one of them
-							     because it is about *which* template, like the names above it,
-							     and because a bare Delete in the row of buttons beside Reset was
-							     two red words offering different amounts of loss. -->
+							     things to do, not templates to open. -->
 							<li role="separator"><hr /></li>
 							<li role="none">
+								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onnewtemplate)}>
+									<span class="tick" aria-hidden="true"><Icon name="add" size={14} /></span>
+									New template…
+								</button>
+							</li>
+							<li role="none">
+								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onimporttemplate)}>
+									<span class="tick" aria-hidden="true"><Icon name="document-import" size={14} /></span>
+									Import…
+								</button>
+							</li>
+							<li role="none">
+								<button role="menuitem" onclick={fromMenu(onexporttemplate)}>
+									<span class="tick" aria-hidden="true"><Icon name="document-download" size={14} /></span>
+									Export
+								</button>
+							</li>
+							<li role="separator"><hr /></li>
+							<!-- The two that lose something, together and in red: one puts the
+							     starter card back, the other takes this template away. -->
+							<li role="none">
 								<button
+									class="danger"
 									role="menuitem"
 									disabled={pageFrozen}
-									onclick={() => {
-										pickerOpen = false;
-										onnewtemplate();
-									}}
+									title="Back to the starter card. Your rows are not touched."
+									onclick={fromMenu(onresettemplate)}
 								>
-									<span class="tick" aria-hidden="true"></span>
-									<Icon name="add" size={12} /> New template…
+									<span class="tick" aria-hidden="true"><Icon name="reset" size={14} /></span>
+									Reset…
 								</button>
 							</li>
 							<li role="none">
@@ -326,28 +383,15 @@
 									role="menuitem"
 									disabled={pageFrozen}
 									title="Delete this template from this browser. Your rows are not touched."
-									onclick={() => {
-										pickerOpen = false;
-										ondeletetemplate();
-									}}
+									onclick={fromMenu(ondeletetemplate)}
 								>
-									<span class="tick" aria-hidden="true"></span>
-									<Icon name="trash" size={12} /> Delete this template…
+									<span class="tick" aria-hidden="true"><Icon name="trash" size={14} /></span>
+									Delete this template…
 								</button>
 							</li>
 						</ul>
 					{/if}
 				</label>
-			</span>
-			<span class="head-row actions">
-				<button onclick={onimporttemplate} disabled={pageFrozen}><Icon name="document-import" size={14} /> Import…</button>
-				<button onclick={onexporttemplate}><Icon name="document-download" size={14} /> Export</button>
-				<button
-					class="danger-outline"
-					onclick={onresettemplate}
-					disabled={pageFrozen}
-					title="Back to the starter card. Your rows are not touched."
-				><Icon name="reset" size={14} /> Reset</button>
 				<!-- Never disabled by the lock it sets, or there would be no way out of it. -->
 				<button
 					aria-pressed={pageFrozen}
@@ -440,7 +484,13 @@
 					disabled={pageFrozen}
 					onchange={(e) => setDefaultFont(e.currentTarget.value)}
 				>
-					{#each familyOptions as family (family)}
+					{#each families.used as family (family)}
+						<option value={family}>{family}</option>
+					{/each}
+					<!-- In this template above the rule, the rest of this browser's
+					     fonts below it. -->
+					<hr />
+					{#each families.others as family (family)}
 						<option value={family}>{family}</option>
 					{/each}
 				</select>
@@ -456,7 +506,7 @@
 					value={template.defaults.size}
 					disabled={pageFrozen}
 					onchange={(e) =>
-						patchTemplate({ defaults: { ...template.defaults, size: numeric(e, template.defaults.size) } })}
+						patchTemplate({ defaults: { ...template.defaults, size: floored(e, MIN_SIZE, template.defaults.size) } })}
 				/>
 				<span class="unit">pt</span>
 			</label>
@@ -483,7 +533,7 @@
 					disabled={pageFrozen}
 					onchange={(e) =>
 						patchTemplate({
-							defaults: { ...template.defaults, lineHeight: numeric(e, template.defaults.lineHeight) }
+							defaults: { ...template.defaults, lineHeight: floored(e, MIN_LEADING, template.defaults.lineHeight) }
 						})}
 				/>
 			</label>
@@ -503,6 +553,36 @@
 				/>
 				<span class="unit">mm</span>
 			</label>
+			<label class="field">
+				<span>Paragraph</span>
+				<select
+					value={template.defaults.paragraph?.mode ?? ''}
+					title="Space after each paragraph, or the first line of the next indented — for every area that sets none of its own. Every line of plain text is a paragraph"
+					disabled={pageFrozen}
+					onchange={(e) => setParagraph(e.currentTarget.value)}
+				>
+					<option value="">None</option>
+					<option value="space">Space After</option>
+					<option value="indent">Indent</option>
+				</select>
+			</label>
+			{#if template.defaults.paragraph}
+				<label class="field">
+					<span class="sr-only">Paragraph amount</span>
+					<input
+						class="n-2"
+						type="number"
+						step="0.25"
+						min="0"
+						max={MAX_PARAGRAPH}
+						title="In lines of the leading"
+						value={template.defaults.paragraph.amount}
+						disabled={pageFrozen}
+						onchange={(e) => setParagraph(template.defaults.paragraph!.mode, numeric(e, template.defaults.paragraph!.amount))}
+					/>
+					<span class="unit">lines</span>
+				</label>
+			{/if}
 		</span>
 
 		<span class="group" role="group" aria-label="Page surface">
@@ -600,7 +680,7 @@
 					value={template.pageNumber.margin}
 						disabled={pageFrozen}
 						onchange={(e) =>
-							patchTemplate({ pageNumber: { ...template.pageNumber, margin: numeric(e, template.pageNumber.margin) } })}
+							patchTemplate({ pageNumber: { ...template.pageNumber, margin: floored(e, 0, template.pageNumber.margin) } })}
 					/>
 					<span class="unit">mm</span>
 				</label>

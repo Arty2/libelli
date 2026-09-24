@@ -84,9 +84,16 @@ resize boxes directly, or type exact millimetres.
   the status bar names the area that already has it.
 - **`grow` / `clip`** — a grow box keeps its top edge and lengthens downward; a
   clip box keeps its height and hard-cuts what does not fit.
+- **Sizes grow from the aligned edge** — typing a new **W** into the bar keeps a
+  right-aligned area's right edge where it was, and a centred one's middle; a
+  new **H** does the same for a bottom- or middle-aligned area, unless it is
+  anchored, whose top is not its own to move. No area is ever less than 1mm
+  either way, and type sizes, leading, radii and paddings are held to floors of
+  their own, so a stray 0 or minus sign cannot make something unreachable.
 - **Anchors** — a box can take its top edge from the *rendered* bottom of another
-  box, plus a gap. Drag an anchored box vertically and the gap changes rather
-  than the link breaking. Both ends of the tie are marked and both marks are
+  box, plus a gap. The gap may be **negative**, tucking an area up under the one
+  it follows so the two overlap. Drag an anchored box vertically and the gap
+  changes rather than the link breaking. Both ends of the tie are marked and both marks are
   buttons: the **link** on the follower breaks its own tie, the **buoy** on the
   followed area casts off everything moored to it, and neither moves anything —
   the released box keeps the place it was sitting in. Selecting either end lights
@@ -138,15 +145,21 @@ resize boxes directly, or type exact millimetres.
   every card and travels with the design rather than with the data. An area with
   nothing typed into it is still an area — it keeps its fill, its border and its
   size, and **Hide When Empty** is what takes it away again. *+ Area* beside the
-  page adds one, starting as static text. An area with **nothing to draw from**
-  — because there are no rows at all, or because its name is bound to no column,
-  or to one that has since been renamed or deleted — draws its own name in grey
-  italics instead, and does not hide: a design whose areas have all collapsed to
-  nothing is a design you cannot click on. An area bound to a column that does
-  exist and is simply blank on this card still hides, because that is what it
-  will do on paper. The placeholder is the editor's doing only: it never reaches
-  paper, the lightbox or a PNG. An area carrying its own words wears a
-  plug pulled out of its socket, because it is not plugged into the data.
+  page adds one, starting as static text. An **empty area** draws its own name
+  in italics, in the accent blue, in the face and size it will print in — so an
+  empty area still shows where it is and how big its words will be. It is part
+  of the bounds: turning **Bounds** off takes it away with them, and it never
+  reaches paper, the lightbox or a PNG. An area set to hide when empty hides on
+  a card whose column is simply blank, because that is what it will do on
+  paper; one with **nothing to draw from** at all — no rows, or a name bound to
+  no column or to one since renamed or deleted — stays put instead, because a
+  design whose areas have all collapsed to nothing is a design you cannot click
+  on. An area carrying its own words wears a plug pulled out of its socket,
+  because it is not plugged into the data.
+- **Grown past its height** — an area set to **Grow** whose words need more room
+  than it was given keeps a sparse dashed line where its bottom edge was set, in
+  the bounds' own color and weight, so you can see how far the content has
+  pushed it. A clipped area draws the red cut line instead.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with
   one selected, and a text box lies over the content inheriting the face, size,
   color and alignment it will print in. A bound area writes through to the cell;
@@ -154,13 +167,27 @@ resize boxes directly, or type exact millimetres.
   <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Enter</kbd> leaves, and a plain
   <kbd>Enter</kbd> is a line break. Selecting an area also points the data table
   at the cells that fill it.
-- **Placeholders** — `{{date}}` anywhere in an area or a cell prints today's
-  date, and `{{date:YYYY-MM-DD}}` prints it in a format of your own: `YYYY`,
-  `YY`, `MM`, `DD` for the numbers, `MMMM`, `MMM`, `dddd`, `ddd` for the names.
-  Deliberately not a template language — no conditionals, no field references —
-  and anything in braces it does not recognise is left exactly as written, so a
-  cell that happens to contain them is not eaten. No time of day: a card is
-  printed once and read for months.
+- **Placeholders** — a column's name in double braces prints that column of
+  the card's row: an area's own words can say `**{{title}}**, {{artist}}`, and
+  so can a cell, quoting another cell of its own row. Markdown around them works
+  in a Markdown area. `{{Artist Name}}` finds the column `Artist-Name`, and case
+  does not matter. Substitution happens **once**: what a placeholder is replaced
+  with is never read for placeholders itself, so a cell that names itself, or
+  two that name each other, print what they hold rather than looping.
+  `{{date}}` prints today's date, and `{{date:YYYY-MM-DD}}` prints it in a
+  format of your own: `YYYY`, `YY`, `MM`, `DD` for the numbers, `MMMM`, `MMM`,
+  `dddd`, `ddd` for the names. A column called `date` wins over the date; a
+  format after the colon only ever means the date. Deliberately small — no
+  conditionals, no loops — and anything in braces it does not recognise is left
+  exactly as written. No time of day: a card is printed once and read for
+  months.
+- **Paragraphs** — **Paragraph** in the area bar, with a page-wide default in
+  page setup: **Space After** each paragraph, or the next one's first line
+  **Indented**, by an amount in lines of the area's own leading, so it keeps its
+  proportion when the type changes. In plain text every line is a paragraph —
+  Return starts a new one, as in a word processor; in Markdown it replaces the
+  space after a paragraph. An indent skips the first paragraph after a heading
+  or at the top, as in any book.
 - **The style clipboard** — **Copy Style** and **Paste Style** in the right-click
   menu, or <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>c</kbd> and
   <kbd>v</kbd>, carry type, fill, border, padding, radius and fit from one area
@@ -386,16 +413,17 @@ resize boxes directly, or type exact millimetres.
 
 **Several templates, one browser.** The **Template** field in page setup names the
 loaded template; the caret beside it opens every template this browser has saved,
-with **New template…** and **Delete this template…** under a rule at the bottom.
-Renaming is typing in the field — the template keeps its identity, so two of them
-may share a name without sharing anything else. Deleting is in that list rather
-than in the row of buttons beside it because it is about *which* template, like
-the names above it; it takes the loaded template only, and **Reset** — which is
-in the row — puts the starter card back under the same name instead. Delete
-removes the template and opens the next one, or a new empty template when it was
-the last one, so the card a first run lands on can be deleted like any other.
-Both ask first, and both are one Ctrl/Cmd+Z away — an undone delete is written
-back out under the id it had.
+the open one ticked, with everything that acts on the template as a whole under a
+rule: **New template…**, **Import…**, **Export**, and in red **Reset…** and
+**Delete this template…**. **Lock** stays outside the menu, beside the field,
+because it is a state you need to see rather than an errand. Renaming is typing
+in the field — the template keeps its identity, so two of them may share a name
+without sharing anything else. Reset puts the starter card back under the same
+name; Delete removes the template and opens the next one, or a new empty
+template when it was the last one, so the card a first run lands on can be
+deleted like any other. Both ask first, and both are one Ctrl/Cmd+Z away — an
+undone delete is written back out under the id it had. The menu opens over the
+page rather than inside the bar, so the bar never changes height for it.
 
 The library lives in this browser and travels nowhere. **Export** is still how a
 template leaves; an **Import** joins the library rather than replacing what is
@@ -412,7 +440,10 @@ should not sit one mis-tap away from one you have built.
 Either way it shows you what it thinks first: one line per column, the kind it
 took the column for, and a sample cell to check it against. That list is nearly
 the whole of the dialog — no paragraph explaining it, because the rows say it
-better. Change anything it has read wrongly, or set a column to **Leave out**.
+better. Change anything it has read wrongly, or untick a column to leave it off
+the card — the tick is apart from the kind, so ticking it again keeps what it
+was taken for. An empty column starts unticked. Every area it places sits the
+same distance from both sides of the paper, and from the top and the bottom.
 Columns it reached by length alone are marked *guess*. Where the template already
 has areas, a line above the buttons says how many are about to be replaced.
 
@@ -434,7 +465,9 @@ library is loaded to do it.
 
 The dataset is one row per card, one column per field. It sits beside the page
 on a wide screen and under it on a phone, and **Data** in the toolbar folds it
-away when the page needs the room. Stacked under the page it opens at a little
+away when the page needs the room. Whether it, Page Setup and Images were open
+is remembered, so a reload comes back to the screen it left; a first visit on a
+phone starts with all of them folded away. Stacked under the page it opens at a little
 under half the screen and is **dragged taller by its own header** — pull the
 header up and the table fills everything down from the toolbar, pull it back
 down to see the card again. The header is almost entirely controls, so it is the
@@ -475,9 +508,29 @@ a notice can appear.
   is a column there is nowhere for it to be, and a column with no row under it is
   a table you cannot type in.
 - **Rename in place** — type in a column header; the cells and any slot bound to
-  that column follow the rename.
-- **Reorder** — ‹ › in a header move a column left or right. Row objects are
-  keyed by name, so this changes the view and nothing else.
+  that column follow the rename. A column name has **no spaces and no special
+  characters** — spaces become dashes and the rest is dropped as you commit it,
+  and headers imported from a file or a paste are cleaned the same way — because
+  a column name is also something written between braces: `{{Artist-Name}}`.
+  Letters of any script are letters.
+- **Reorder** — drag a header sideways and drop it where the blue edge shows.
+  The ‹ › and the bin appear in a header only while it is pointed at or has the
+  focus, so the name has the room the rest of the time; the sort stays, because
+  it also says how the rows are sorted. Row objects are keyed by name, so
+  moving a column changes the view and nothing else.
+- **Columns nothing prints** — a small broken link in front of a header marks a
+  column no area is bound to and no area's words or printed cells name as
+  `{{column}}`: data no card will show.
+- **Counting** — while a cell is being typed in, its characters and words are
+  counted in its bottom corner.
+- **A cell full size** — press and hold a cell for a dialog with the whole of it
+  and the same count. It edits a copy: **Done** (or Ctrl/Cmd+Enter) keeps it,
+  **Cancel** and Esc do not.
+- **Lock** — the padlock under the table freezes it: no typing, no new, moved,
+  renamed or deleted rows and columns, no paste or import — and nothing typed,
+  dropped or drawn on the card reaches a cell either. Sorting and choosing rows
+  still work, because neither changes what any card says. It is saved with the
+  table and undoable.
 - **Column widths** — drag the right edge of a header, or double-click that edge
   for the default. The widths are a view preference of this browser's, not part
   of the data or the template: they follow a column through a rename and go with
@@ -498,16 +551,17 @@ a notice can appear.
 - **Add** — the pale row and column at the end of the table are placeholders:
   type into one and it becomes real. There is no separate button, because the
   place you would click is the place you were already typing.
-- **Delete rows** — choose one or more rows and the bin appears at the head of
-  the buttons under the table, before a rule. Immediate, with a line saying what
+- **Delete rows** — choose one or more rows and **Delete** appears at the head
+  of the buttons under the table, beside Copy and before a rule. Immediate, with a line saying what
   went; undo covers it, and a confirmation you dismiss without reading protects
   nobody. There is no Duplicate beside it any more: copying the rows and pasting
   them back is the same act in two presses that say what they do, and the icon
   was a third mark to tell apart in the smallest bar in the app.
-- **More than one table** — the **Table** field at the left of the same row of
-  buttons names the table you are in; the caret beside it opens the rest, and
-  **New table…** and **Delete this table…** are below a rule at the bottom of
-  that list. A design and a table are kept apart on purpose — one design prints
+- **More than one table** — the **Table** field at the right-hand end of the same
+  row of buttons names the table you are in; the caret beside it opens the rest,
+  the open one ticked, and **New table…** and **Delete this table…** are below a
+  rule at the bottom of that list — which is the only way to delete one; there
+  is no separate button to empty the table. A design and a table are kept apart on purpose — one design prints
   any number of tables, and one table can be printed by any number of designs —
   so switching either leaves the other exactly where it was. Bindings that still
   name a column that exists are kept across the switch, which is the usual case
@@ -522,9 +576,10 @@ a notice can appear.
 - **Deleting a column asks** — it is a field of every card at once, it takes
   cells under a header you may not have scrolled to, and any area bound to it
   goes blank on every card. Undo still covers it; the question is only so that a
-  mis-aimed click on a 22px icon is not the whole of the decision. The red bin at
-  the end of the toolbar empties the whole table and asks once, saying a count
-  rather than a paragraph.
+  mis-aimed click on a 22px icon is not the whole of the decision.
+- **How wide the table is** — beside the page, drag the table's left edge to
+  share the width between the two; double-click it to go back to the default.
+  The split is kept for next time.
 
 ## Markdown and color
 
@@ -710,27 +765,27 @@ Everything else this app keeps is small — a template is a page of JSON, a
 dataset is text. Pictures are not, and browser storage is a poor place for them:
 it is a bucket you cannot look into, shared with everything else the app saves,
 and the browser may empty it. **Images**, in the toolbar between Page
-Setup and Data, is the panel that takes them seriously — beside the two bars
-rather than inside one of them, because the pictures are the browser's and not
-the page's.
+Setup and Data, opens a bar of its own in the same row as the other two — a bar
+rather than a dialog, so the card that uses the pictures stays in view.
 
-- **What is stored** — every picture this app can see, what each weighs, where
-  it is being kept, and whether the current table or template actually points at
-  one. That last column is the whole point: *which of these forty can I delete*
-  is not a question browser storage can answer. Deleting is one press, and it
-  says so if something was using it.
-- **A folder of your own** — press **Choose a folder…** and pictures are written
+- **What is stored** — every picture this app can see, as a chip with its
+  weight, and a dashed chip marked *unused* where neither the current table nor
+  the template points at it. That is the whole point: *which of these forty can
+  I delete* is not a question browser storage can answer. Deleting is one press
+  on the chip, and it says so if something was using it. Hover a chip for where
+  it is kept.
+- **A folder of your own** — press **Choose Folder…** and pictures are written
   there as ordinary files from then on: replace one from a photo editor and the
   card follows, back them up with the rest of your work, and clear them out with
   your file manager rather than through this app. The folder is remembered
   between visits, but a browser asks to be let into it once per visit — the
-  panel says so, with the button to do it — and until then pictures come from
-  browser storage as before. **Forget it** lets go of the folder; nothing in it
+  bar says so, with the button to do it — and until then pictures come from
+  browser storage as before. **Forget** lets go of the folder; nothing in it
   is deleted.
 - **Where that works** — the File System Access API is Chromium's: Chrome, Edge,
   Opera and Arc have it; Firefox and Safari do not. Everywhere else the app keeps
-  pictures in IndexedDB exactly as it always did, and the panel says which of
-  the two is in force rather than hiding a button that would not work.
+  pictures in IndexedDB exactly as it always did, and the bar says which of the
+  two is in force.
 - **Both at once** — a picture is looked for in the folder first and in this
   browser second, so a run made before you chose a folder keeps rendering, and
   a name put in the folder afterwards is what that name means from then on. New
@@ -744,9 +799,20 @@ they travel with the table. See **Drawing one**, above.
 
 Pick a curated Google family, type any other family name, or upload a file.
 
-- **Google families** — injected as a stylesheet link. Bold and italic cuts are
-  requested first; single-weight families reject that request, so the app
-  retries plain and lets the browser synthesise.
+- **A template carries only what it uses** — the families its page default and
+  its areas are set in, and no others. A family you stop using is not
+  forgotten: it moves to this browser's own list, and every font menu shows the
+  template's families first and, under a rule, everything else this browser
+  knows — fonts you have named or uploaded before, and the curated list.
+- **Google families** — injected as a stylesheet link. Every weight is asked for
+  first, for a variable family; then regular and bold with their italics; then
+  the family as it comes — Google refuses a request for a weight a family has
+  not got, so each attempt either brings in exactly what exists or falls
+  through to the next.
+- **Only real weights** — the Weight menu lists the weights the family actually
+  has in this browser, read off the faces its stylesheet or file declared. A
+  family nothing has declared yet — a system face, or one still arriving —
+  offers the usual list.
 - **Local files** — `.woff2`, `.woff`, `.otf`, `.ttf`, registered with
   `FontFace` and kept in IndexedDB, so they are still there next visit.
 - **Never substituted** — open a template that names a font this browser has
@@ -1120,14 +1186,14 @@ the buttons that act on it — and runs in groups after that, outward from the
 thing itself.
 
 - **Page** — head: the template's name and the library behind its caret, which
-  also holds New and Delete, then import, export, reset, lock ·
+  also holds new, import, export, reset and delete, then lock ·
   sheet size (a preset or your own, a button to turn it over, and left and
   right pages), bleed, crop marks · type defaults (font, size, leading,
-  spacing, color) · surface (paper color, background image and fit) · page
+  spacing, paragraph) · surface (paper color, background image and fit) · page
   number, whether to print the total, and its margin · CSS
 - **Area** — head: the field's name, then duplicate, delete, lock · content
   (data field or static text, column, mode, fit, QR settings) · type (font,
-  size, weight, color) · setting (leading, spacing, case) · alignment,
+  size, weight, color) · setting (leading, spacing, paragraph, case) · alignment,
   horizontal and vertical · surface (fill, padding, border width, style, hand and
   color, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
   when empty, and mirror where the template has left and right pages) ·
@@ -1169,10 +1235,11 @@ thing itself.
   surface: flick left or right anywhere across them, including over the count
   and over an arrow that has greyed out at the end of the run, and the card
   steps. Up and down still scroll.
-- **The table's own row** — under the table, and read the same way the bars
-  above it are: what this is and what it is called first — the **Table** picker
-  and the swap beside it — then, behind a rule, what acts on the rows you have
-  chosen, then what acts on the whole table.
+- **The table's own row** — under the table: what acts on the rows you have
+  chosen, behind a rule, then what acts on the whole table and its lock, and at
+  the far end the **Table** picker and the swap beside it.
+- **Images** — the third bar, in the same row: where pictures are kept, the
+  folder buttons, and a chip for every picture.
 - **The window toolbar** holds only what is about the whole app: the mark, then
   Help, Page Setup, Images, Data and Export — the two panels in the order they
   sit on screen, settings above the page and the table beside it. On a phone the
@@ -1188,11 +1255,11 @@ type size, modules for a QR padding.
 A template travels as JSON and carries no data with it — that is the point of
 keeping the column mapping outside it.
 
-- **Export** — in page setup: fonts referenced by family name, and a background image
+- **Export** — in the template menu in page setup: fonts referenced by family name, and a background image
   by file name or address. Small, diffable, git-friendly — no picture and no font
   bytes are ever folded into it. Its CSS, page numbers, locks, whether it has
   left and right pages and how its sheets are ordered all travel with it.
-- **Import** — next to that export, so it cannot be mistaken for *Import CSV*
+- **Import** — beside that export, so it cannot be mistaken for *Import CSV*
   under the table. Any font or background image the
   template names but this browser does not have is asked for by name rather than
   substituted. A linked background is only ever an http(s) address; a template

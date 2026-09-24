@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
 	BOX_MODES,
 	DEFAULT_DEFAULTS,
+	MAX_PARAGRAPH,
+	MIN_BOX,
+	MIN_LEADING,
 	MIN_PAPER,
+	MIN_SIZE,
+	normaliseParagraph,
 	arrangeBoxes,
 	autoMap,
 	normaliseCentre,
@@ -492,5 +497,31 @@ describe('newBox modes', () => {
 	it('knows which modes draw and which take a drawing', () => {
 		expect(BOX_MODES.filter(shownAsMedia)).toEqual(['image', 'color', 'bitmap']);
 		expect(BOX_MODES.filter(takesADrawing)).toEqual(['image', 'bitmap']);
+	});
+});
+
+describe('box floors', () => {
+	it('holds an area to a size that can still be clicked', () => {
+		const box = newBox({ w: 0, h: -5 });
+		expect(box.w).toBe(MIN_BOX);
+		expect(box.h).toBe(MIN_BOX);
+	});
+
+	it('floors type size and leading, and keeps weight inside the scale', () => {
+		const box = newBox({ size: 0, lineHeight: 0, weight: 2000 });
+		expect(box.size).toBe(MIN_SIZE);
+		expect(box.lineHeight).toBe(MIN_LEADING);
+		expect(box.weight).toBe(900);
+	});
+
+	it('lets an anchor gap go negative, but not stop being a number', () => {
+		expect(newBox({ anchor: { to: 'a', gap: -3 } }).anchor).toEqual({ to: 'a', gap: -3 });
+		expect(newBox({ anchor: { to: 'a', gap: 'x' as unknown as number } }).anchor).toEqual({ to: 'a', gap: 0 });
+	});
+
+	it('keeps a paragraph style it can read and drops one it cannot', () => {
+		expect(newBox({ paragraph: { mode: 'indent', amount: 1.5 } }).paragraph).toEqual({ mode: 'indent', amount: 1.5 });
+		expect(normaliseParagraph({ mode: 'space', amount: 99 })).toEqual({ mode: 'space', amount: MAX_PARAGRAPH });
+		expect(normaliseParagraph({ mode: 'tab', amount: 1 })).toBeUndefined();
 	});
 });

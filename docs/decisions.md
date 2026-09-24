@@ -102,6 +102,13 @@ that is what makes it worth writing down.
 
 ## `src/lib/autolayout.ts`
 
+**Leaving a column out is a switch, not a kind.** It was the last entry in the
+kind menu, which made it a thing a column *is* — and putting one back meant
+choosing again what it had been taken for. `include` sits beside the kind, the
+kind survives being switched off, and an empty column arrives switched off as a
+small line. Arbitration ignores what is switched off, so a left-out column can
+never be the title.
+
 **It guesses about columns, never about words.** Nothing in here reads a cell to
 decide what a card should *say*; it reads cells to find out how long they are and
 what shape they have. That line is what keeps this a layout aid rather than a
@@ -531,6 +538,26 @@ would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
 
+**An empty area's name is part of the bounds.** It used to appear only where an
+area had nothing to draw from at all, in grey. It now stands in whenever an area
+is empty, in the accent and the area's own type, because an empty area is
+otherwise an outline of unknown purpose — and it goes with the bounds, because
+it is the same kind of furniture and turning the bounds off is how you look at
+what prints. Hiding is a separate question: an area set to hide when empty
+still hides on a row whose column is blank, and still stays put where it has no
+column at all, whatever the bounds are doing.
+
+**Paragraph style is in lines, and in em.** An amount in lines of the area's own
+leading keeps its proportion when the size or the leading changes, which a
+millimetre figure does not; it is written as `amount × leading` em rather than
+in `lh`, which only recently became widely available and would take the whole
+declaration with it where it is not.
+
+**A grown area remembers its height as a line, not a number.** The dashed
+original bottom edge is drawn in the bounds' own color and weight but sparse, so
+it reads as the same outline, remembered, rather than as a second warning beside
+the red cut line a clipped area gets.
+
 **An area with nothing to draw from draws its own name.** Set to *Hide When
 Empty*, such an area collapses to no height and no visibility, and a sheet of
 those cannot be clicked, selected, moved or renamed: the design is still there
@@ -951,6 +978,12 @@ measured against stored edges and drawn where the eye sees them.
 
 ## `src/lib/components/PagePreview.svelte`
 
+**The scaler is `width: max-content`.** A block fills its parent, so the element
+carrying `transform: scale()` was the sheet's width before the transform, and
+scaled up that width scaled with it: every zoom above 100% hung an invisible
+band off the sheet's right edge and gave the stage a scrollbar with nothing to
+scroll to. Sized to the card, it scales to exactly the sheet.
+
 **The pager's swipe lives on a chip, not on the row.** The row spans the whole
 stage so the count stays centred under the sheet rather than on whatever is left
 between the two bottom corners, which means it cannot be hit-testable: every
@@ -1235,6 +1268,40 @@ than plumbing the resolved layout up through two components. The cost is a
 rounding of a few hundredths of a millimetre, from going through pixels and back.
 
 ## `src/lib/components/DataTable.svelte`
+
+**A column name is a word you can write between braces.** Spaces become dashes
+and anything but letters, digits, `-` and `_` is dropped — on a typed rename, a
+new column, and every header a file or a paste brings in — because since
+`{{column}}` a header is also something written inside an area's words, and
+`{{Year (est.)}}` is not something anybody can be expected to get right twice.
+Letters are Unicode letters: a Greek header is as writable as an English one.
+Stored tables are not rewritten on load — that would silently break the
+mappings that name their columns — and `findColumn` reads an old spaced name
+through the same shaping, so nothing already working stops.
+
+**Columns are carried by a pointer gesture, not HTML drag and drop.** A drag
+that starts in a header's name field would, under native DnD, either never start
+(the field wants the press) or take the text selection with it; and native DnD
+has no touch path. So the header claims the *movement*, as the tray grip does:
+a press that stays put is the field or a button, a press that travels sideways
+is the column being carried, and the click that follows a carry is swallowed.
+The tray grip claims vertical movement and this horizontal, and whichever moved
+first keeps the gesture.
+
+**The lock is the table's, and the card honours it.** `Dataset.locked` travels
+with the table and its snapshots. The card writes into cells three ways — typing
+in an area, dropping a picture, finishing a drawing — and each goes through
+`refuseLockedTable` on the page, because a lock that only the table's own fields
+respected would be a fence with three gaps in it. Sorting is left free: it
+reorders what prints but changes no card's words, and a locked table you cannot
+even sort to read is a table you unlock to read.
+
+**The cell field fills its cell with `height: 1px` on the `td`.** A percentage
+height inside a table cell resolves only against a definite height; the table
+stretches every cell to the row anyway, so the 1px is never drawn, and without
+it the field stopped short of its cell and left a band that looked like the
+target and was not. With the field the full height, its resize grip had nothing
+to do except make one cell disagree with its row, so it is gone.
 
 **The first column brings a row with it.** The button that adds a row is drawn
 under the row numbers, which only exist once there is a column — so a table with
@@ -1889,6 +1956,23 @@ address is fetched once per card however many areas share it.
 
 ## `src/lib/fonts.ts`
 
+**A template names only the families it is set in.** Every family in a template
+is a request the next browser makes, and for an uploaded face a banner asking
+for a file nobody on the card uses. `pruneFonts` runs on every template change
+in the page, in the same tick as the change that made a family unused, so the
+cut lands in the same undo entry and what is saved, undone and exported is
+always the same list. What is cut goes to the editor's own list in
+localStorage, so it stays in the menus under the rule — a family is a thing this
+browser knows, not a thing this card needs.
+
+**The weight menu reads the faces.** Google refuses a css2 request for a weight
+a family lacks, so asking for every weight, then regular and bold, then the
+family bare, leaves `document.fonts` holding exactly the cuts that exist; the
+menu lists those. The cost is up to two refused requests for a family with one
+cut, which is the price of not shipping a metadata table that would rot. A
+family nothing has declared (a system face) gets the old fixed list rather than
+nothing.
+
 **A font is asked for when it is chosen, not when the app starts.** Requesting a
 family only at boot and on import meant choosing one from a dropdown wrote the
 name into the template and stopped there: nothing fetched the face, the box fell
@@ -1975,6 +2059,14 @@ forty cards sharing one logo reads it once and holds one object URL for it.
 
 ## `src/lib/components/PageOptions.svelte`
 
+**Everything that acts on the template as a whole is in the picker's menu;
+Lock is not.** Import, Export and Reset were a row of buttons under the name,
+which is a second line of chrome in a bar that already wraps. They are errands —
+done once and gone — so they belong with New and Delete behind the caret. Lock
+is a state, and a state has to be visible without opening anything, so it stays
+beside the field. The two that lose something, Reset and Delete, sit together in
+red under their own rule.
+
 **The template picker is built by hand rather than being an `<input list>` and a
 `<datalist>`**, which is the native shape of exactly this control. A datalist
 holds values, not commands, so it cannot carry a rule or a New Template row; it
@@ -2036,16 +2128,13 @@ two; it buys a page that does not move when you pick something up. The floor is
 dropped on a resize, because both bars wrap and neither height survives a change
 of width.
 
-**A transient height is not a floor.** The reserved row above took its floor
-from the tallest bar it had seen, which on a narrow screen included a height the
-bar only ever stands at for a moment: `.options.menu-open` gives up the 26dvh
-cap while the template switcher is up, so the menu is not clipped by the bar's
-own scroller. Opening that switcher once left a band of empty grey under the bar
-for the rest of the session. The bar now says when its menu is open and the floor
-declines to move while it is — and reads that flag *untracked*, because the flag
-going false at the end of a menu would otherwise re-run the floor with the
-measured height still holding the uncapped number, taking the very value the
-guard exists to refuse. Only a fresh measurement raises the floor.
+**A menu is not a height.** The template switcher used to hang absolutely inside
+the bar, and on a phone the bar scrolls — so while the menu was up the bar gave
+up its 26dvh cap, grew to hold it, and the row above had to refuse that height as
+a floor (read untracked, or the flag going false re-ran the floor with the tall
+number still in it). The menu is `position: fixed` now, placed from a
+measurement as it opens, which is how the table's picker was already built: the
+bar never changes height for it, so the guard and the flag are gone.
 
 **The right-click menu carries no key hints.** The two items that had them were
 the only two that did, so the column of grey chords read as a property of those
@@ -2139,11 +2228,21 @@ move, and when every stray is locked it says so rather than doing nothing.
 
 ## `src/lib/placeholders.ts`
 
-**`{{date}}` is not a template language, and must not become one.** No
-conditionals, no loops, no field references: a card that can compute is a card
-whose output depends on something other than the row it was given. Anything
-unrecognised is returned exactly as written, which is what stops a cell that
-happens to contain braces being eaten. No time of day either — a card is printed
+**A column by name, once, and nothing more.** `{{title}}` fills from the row the
+card is drawing, in an area's own words and in a cell alike — a card still
+depends on nothing but its row, which was the reason this refused field
+references before; the row is exactly what it now reads. There are still no
+conditionals and no loops, and substitution is a single `replace`: the value a
+placeholder becomes is never scanned again. That one pass is the whole of the
+guard against recursion — a cell naming itself, or two naming each other,
+cannot loop because there is no second pass to loop in — and it is simpler to
+trust than a depth limit, which would print a half-expanded chain. A column
+called `date` beats the date, because naming a column that is a choice; a format
+after the colon only means the date. Names are matched as written, then in
+column-name shape (`columnName` in parse.ts), then ignoring case, so a template
+written against `Artist Name` keeps working after the header is normalised.
+Anything unrecognised is returned exactly as written, which is what stops a
+cell that happens to contain braces being eaten. No time of day either — a card is printed
 once and read for months, and a timestamp on paper is stale before the ink dries.
 
 Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
