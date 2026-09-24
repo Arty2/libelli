@@ -769,7 +769,7 @@ the sheet.
 
 - **Sequential** is the card case and the default: the run is poured into the
   grid in reading order, sheet after sheet, to be cut apart.
-- **Zinemaker** arranges the pages so that *folding* the printed paper gives a
+- **Zine** arranges the pages so that *folding* the printed paper gives a
   booklet that reads 1, 2, 3. Two folds are known, and they are the two people
   actually make:
   - **8-up** is the mini zine — eight pages on one side of one sheet, which is

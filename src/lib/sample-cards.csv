@@ -5,10 +5,12 @@ This is libelli. It turns every row of a spreadsheet into a printed card, and th
 
 Go ahead and change *This is a card* in the table. The title changes as you type, because it isn't a copy of the cell — it *is* the cell.
 
-- **Bring your own rows.** Copy cells straight out of Excel, Sheets or Numbers and paste them in. No header row, no clean-up.
-- **It stays here.** No account, no upload, no server. Your data never leaves this browser.
+## Import & Export
 
-Point your phone at the corner and libelli opens there too.",Start here,https://libelli.vercel.app,,
+- **In:** paste cells straight out of Excel, Sheets or Numbers — no header row, no clean-up — or bring a whole file with **Import CSV…**.
+- **Out:** **Export…** prints the cards or saves each one as a PNG. **Export CSV** saves the words, and **Export** in Page Setup saves just the design, small enough to send in a message.
+
+No account, no upload, no server: nothing leaves this browser. Install libelli from your browser and it works offline, or scan the corner to open it on your phone. Want this tour back? Press and hold **Import CSV…**.",Start here,https://libelli.vercel.app,,
 Cells can do more than words,"Markdown, colour, and the art of leaving things out","## Formatting without a toolbar
 
 Any cell can carry **bold**, *italic*, ~~strikethrough~~, `code`, lists and [links](https://heracl.es/libelli). Want a few words in colour? Write `[this]{red}` and you get [this]{red}. Hex, `rgb()` and names like [green]{green} or [purple]{purple} all work, and `red` prints as a printer's red rather than your screen's.
@@ -28,21 +30,15 @@ That sticker is a drawing stored in the row itself, turned a few degrees, with a
 
 ## Keep more than one design
 
-The caret beside **Template** holds every design you save. Start a new one and the button with three shapes reads your columns and lays out a first draft for you.",The design,https://heracl.es/libelli,,"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAClklEQVR4AeyZUY4bMQxDt71B7n/IHKHF+yBAKB7LyiSd1NEChGWLomWO9iu/f778rw348gH46QnoCfhyBy77F7jdbn8cV32HSwzg4fHBo7PIecf+EgPe8ZBnNduAFecYz4iVun/Jif2xX7n/cAIQEEZCyo3WEd/P7vf7L98Tj844d4zu0pnzFCvHqrO4Dg2YFUSB0Z56x4jjD/bYua5B7LlqfFT/YIATaayKUWNoAs/53mM47AFxRLUf+NIYaT4YIPKzKxc6XIcGgJ95TA74mWsRe+4V8YMBfkls5pkL0QNeO9KNZ9QAr3smdl30osaDARCciADg/AzQBJkGHJDxsjw9A/GONIcGUBQLEAPkziDqutYs57xZTI/AOTPdQwMQoBAQC4g7dH7V6r0Qex/0DvwsxlMDREYEaO8rl1bh9R5XdeB7vWJ6BdrP1iUDJICooLNPWdUXa6WnkgEI4zog/iTQE6j2tGwA4iBegOMVxPq4r2jBjfX0COL50X7JgCjIxcKR8Og86jzL8Tr1wernK3fBTw1wIS4BFFaABlANGuBoDxcov7qiCcRf0Zga4AIurAtmK7WC82Y6Mad6VtfIYtfJaqcGZBfFPJcJMUdTIJ7HPRwQz6XLGnNn9lMDvBEuzhAboV6IuWyvOtbIzfogr5pRvXKsUwMgZAJwHPAFPz8TS4+1orPCTw3gQoRWAf+dWO0D3kofSwasCP2vnO0NyD5MG5A5tHu+J2D3L5y9rycgc2j3fE/A7l84e19PQObQ7vmegN2/cPa+noDMod3zPQG7feHqe3oCqo7txu8J2O2LVt/TE1B1bDd+T8BuX7T6np6AqmOv5PP7HXilZlWrJ6Dq2G78noDdvmj1PT0BVcc+jX+2n78AAAD//+3PTtMAAAAGSURBVAMAKgNon7Y/9RcAAAAASUVORK5CYII="
+The caret beside **Template** holds every design you save. Start a new one and the button with three shapes reads your columns and lays out a first draft for you.",The design,https://heracl.es/libelli,,"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADDUlEQVR4AeyUXY4bMQyDt71B7n/IHKHF90CAEOS/2M7OYFyAsEaiZJHr9O/Pw/8dAx7+AH7OCzgv4OEOnJ/Awx/A+U/w/ATu9hN4vV7/HLP73+YFSPSs4Nh/CwMQ74u/3+8/+o415XvPyxvgAhEOesX18C5rAMKBRJSEl/Lqa51fMQAhoLWM6pE7K1JzOSO2GoAQoEs9Vi6ezkE4KHGyWuS2vrcZ4EJ8iVLeOcQlcb39zOjBNgN6Lo8ciSuJd34Px/mleJsBowtKfGlR8j0ceCPYZkBpicwYF5bVmdXDgTeKrQZkYlwIy/p3xofj6OE4vxVvNYDLWRgQCy5auchRnlP8GgfeJ9huQGkpRIFSXXnnENegnpHz1wzwJbO/rIQ6rxXT0+LE+tcMyETGZfhGBCDOwJwM4tZ6xfFzmQFc3IJfHGP1xnwUG+v6hqd45PzYAC2sc+TSyGVGzPHdK4p+QM8ohgzgEiG7iIV7kPV6TjM8l8XZLvRm3FKuy4DsIgZymYNcC8yqcZhXq9MvOI8+4LmeuGkAl/kgLhE83xPHWVkPnBpiz6e7aE7VABYRceYi5gDNmj21C2drVqteNUDNMxfNCufuCO214uwyABGgdSGciNgjMTHPt2p+kt+JqgEs4pdHcfHbuTFmFsjyyjFP8bfOqgEswdKA+BPQC7y3JrRW8xmr4qYBuggRPRCfEz6nwwWqrtN534q7DehZKBPnfbW6m+A8798RLzPAl3Yx2dKtetazK7fMAC1YEieDSnX6vSY++Z1YYkBtWWoAES6Q7ytgiQESEgVKOPVYI5fBed6fcVfkpg0oLel5F7Vi6ZUzpg3QMhKJcBDz+u45NQuuz+J7NZYZwKLAF3Qhnh+N49zR/hp/2oBMJDlQu7hVm+1vzVd92gAGsayD3GrsegVLDFgtVvMwVXHvOcq7tAGIcRN2vILLG4AJO3ELA3a+glsY8PgXgAG7XsF5Abh7F/grWLXz7V4AJoDHGrBKuObc7gVo8VXnMWCVk3edc17AXf9yq/Y+L2CVk781Z/be/wAAAP//rmHpYAAAAAZJREFUAwAzBxSfH61zJAAAAABJRU5ErkJggg=="
 Take it with you,"On paper, as a picture, or as a booklet","## Print it
 
-Hit **Print** or Ctrl/Cmd+P for a preview of every sheet. Turn on background graphics so the colours make it onto the paper.
+Hit **Export…** or Ctrl/Cmd+P for a preview of every sheet. Turn on background graphics so the colours make it onto the paper.
 
 ## Or fold it into a zine
 
 These four cards make exactly one booklet. They already have left and right pages, which is why the page numbers sit on the outside edge.
 
-1. In the print preview, set **Pages per Sheet** to **2-up** and **Order** to **Zinemaker**.
+1. In the preview, set **Pages per Sheet** to **2-up** and **Order** to **Zine**.
 2. Print double-sided, flipping on the long edge.
-3. Fold it in half. Congratulations, you made a zine.
-
-## And the rest
-
-**PNG** saves a card as an image. **Export** saves just the design, small enough to send in a message. **Install** gives libelli its own window, and it works offline.
-
-Want this tour back? Press and hold **Import CSV…**.",The output,https://github.com/Arty2/libelli,,
+3. Fold it in half. Congratulations, you made a zine.",The output,https://github.com/Arty2/libelli,,

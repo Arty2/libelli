@@ -305,12 +305,12 @@
 			<span>Order</span>
 			<select
 				value={template.print.order}
-				title="Sequential fills each sheet in reading order, to cut apart. Zinemaker lays the pages out so that folding the sheet gives a booklet that reads 1, 2, 3"
+				title="Sequential fills each sheet in reading order, to cut apart. Zine lays the pages out so that folding the sheet gives a booklet that reads 1, 2, 3"
 				disabled={pageFrozen}
 				onchange={(e) => patchPrint({ order: e.currentTarget.value as SheetOrder })}
 			>
 				<option value="sequential">Sequential</option>
-				<option value="zine">Zinemaker</option>
+				<option value="zine">Zine</option>
 			</select>
 		</label>
 		{#if zineHint}
