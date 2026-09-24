@@ -627,6 +627,20 @@ boxes that did not need it. A `MutationObserver` on the box's subtree catches
 the content change itself. It settles rather than looping, because `read()`
 writes state only when a number actually moved.
 
+**Only a clipped box can be cut.** A growing box is a `min-height`, so it is
+always as tall as its lines, and yet it used to wear the shears whenever
+`scrollHeight` beat its height. A face whose ascent and descent outrun a tight
+line height — Patrick Hand at 1.05, the starter title — hangs its last line's
+inline box a few pixels below the line, and `scrollHeight` counts that. It only
+showed on two-line titles, where the 16mm minimum had no slack left to hide it,
+which is why it went unseen until the tour had one.
+
+**A picture is framed inside the padding.** `.media` took the box's whole `h`
+as its height, while `.box` is border-box and spends padding and border out of
+that same `h`; a padded picture was pushed out of the bottom, cropped and
+flagged as cut. `frameHeight` is the arithmetic, in `template.ts` so a test can
+hold it.
+
 **Anchoring shows at both ends, and moves at both ends.** A box that hangs off
 another wears a link; the box it hangs from wears a harbour buoy. Until now only one
 end was visible, and the box being followed gave no sign that moving it would
@@ -1322,13 +1336,28 @@ the seam was along its top.
 
 **The sample rows are the tour.** A first run lands on four cards that explain
 the app rather than on invented filler, because they are the first thing anyone
-sees and they are rendered by the very machinery they describe: a row is a card,
-a column is a field, the Markdown subset is on the page in front of you. Card 2
-leaves its `link` cell empty on purpose, so its QR disappears and the card can
-point at the gap — one row teaching `hideWhenEmpty` by not having it. They stay
-inside what `markdown.ts` actually supports, and the QR URLs are decoded by an
-independent decoder in the verification pass, because a QR that does not scan
-looks exactly like one that does.
+sees and they are rendered by the very machinery they describe. Each card is one
+subject — the row, the cell, the design, the way out — and says what to *do*,
+not what the interface looks like: anything a click finds unaided is left for
+the click. The voice is conversational on purpose; a tour that reads like a
+manual gets skimmed like one.
+
+The rows carry the features by being them rather than describing them. Card 2
+leaves its `link` empty so its QR disappears, and is the only row with an
+`accent` — a Color area bound to a column — so color, inline and per area, is
+one page's subject instead of decoration on all four. Card 3 is the only row
+with a `sketch`, a 64 x 64 Bitmap drawing stored in the cell, shown in an area
+that is rotated, padded and hand-bordered: the styles are on the page to be
+selected and read back. The starter template has facing pages on, so the four
+rows are exactly one 2-up zine, and card 4 says how to fold it; the title,
+subtitle and sticker opt out of the mirror so a left-hand page does not push its
+title to the right.
+
+They stay inside what `markdown.ts` actually supports, and the QR URLs are
+decoded by an independent decoder in the verification pass, because a QR that
+does not scan looks exactly like one that does. Every card is checked to end
+above its footer in the real faces, since the body grows and a growing box
+never shows the shears.
 
 **Press and hold Import to bring them back.** The actions bar is deliberately one
 line, so a fifth button would cost the table a row of its own height every time

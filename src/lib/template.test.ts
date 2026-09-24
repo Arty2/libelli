@@ -11,6 +11,7 @@ import {
 	normaliseRotation,
 	sidesOf,
 	builtinTemplate,
+	frameHeight,
 	newBox,
 	normaliseTemplate,
 	shownAsMedia,
@@ -22,9 +23,9 @@ describe('the built-in template', () => {
 	const template = builtinTemplate();
 
 	it('loads with its boxes, anchors and bleed intact', () => {
-		expect(template.name).toBe('A5 Instruction Card');
+		expect(template.name).toBe('A5 Starter Card');
 		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff' });
-		expect(template.boxes.map((b) => b.id)).toEqual(['b_title', 'b_subtitle', 'b_body', 'b_category', 'b_qr']);
+		expect(template.boxes.map((b) => b.id)).toEqual(['b_accent', 'b_title', 'b_subtitle', 'b_body', 'b_sketch', 'b_category', 'b_qr']);
 		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 8 });
 		expect(template.boxes.find((b) => b.id === 'b_category')?.anchor).toBeNull();
 		expect(template.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });
@@ -366,6 +367,13 @@ describe('sidesOf', () => {
 		const sides = { top: 1, right: 0, bottom: 0.5, left: 0 };
 		expect(sidesOf(sides)).toEqual(sides);
 		expect(sidesOf(undefined)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+	});
+
+	it('frames a picture inside the padding and the border, not over them', () => {
+		expect(frameHeight({ h: 26 })).toBe(26);
+		expect(frameHeight({ h: 26, padding: 2, borderWidth: 0.5 })).toBe(21);
+		expect(frameHeight({ h: 26, padding: { top: 1, right: 0, bottom: 3, left: 0 } })).toBe(22);
+		expect(frameHeight({ h: 4, padding: 3 })).toBe(0);
 	});
 });
 

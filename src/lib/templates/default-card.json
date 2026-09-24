@@ -1,6 +1,6 @@
 {
-  "schema": 2,
-  "name": "A5 Instruction Card",
+  "schema": 5,
+  "name": "A5 Starter Card",
   "page": {
     "w": 148,
     "h": 210,
@@ -12,8 +12,8 @@
     "cropMarks": false
   },
   "pageNumber": {
-    "enabled": false,
-    "position": "bottom-right",
+    "enabled": true,
+    "position": "bottom-outer",
     "margin": 8
   },
   "fonts": [
@@ -40,38 +40,55 @@
     "subtitle",
     "body",
     "category",
-    "link"
+    "link",
+    "accent",
+    "sketch"
   ],
   "boxes": [
+    {
+      "id": "b_accent",
+      "slot": "accent",
+      "x": 141,
+      "y": 0,
+      "w": 7,
+      "h": 210,
+      "mode": "color",
+      "overflow": "clip",
+      "hideWhenEmpty": true
+    },
     {
       "id": "b_title",
       "slot": "title",
       "x": 12,
       "y": 13,
-      "w": 124,
+      "w": 96,
       "h": 16,
       "size": 30,
       "lineHeight": 1.05,
       "mode": "plain",
       "overflow": "grow",
-      "hideWhenEmpty": true
+      "hideWhenEmpty": true,
+      "mirror": false
     },
     {
       "id": "b_subtitle",
       "slot": "subtitle",
       "x": 12,
       "y": 31,
-      "w": 124,
+      "w": 96,
       "h": 8,
       "size": 15,
       "lineHeight": 1.2,
+      "italic": true,
+      "color": "#555555",
       "mode": "plain",
       "overflow": "grow",
       "anchor": {
         "to": "b_title",
         "gap": 2
       },
-      "hideWhenEmpty": true
+      "hideWhenEmpty": true,
+      "mirror": false
     },
     {
       "id": "b_body",
@@ -115,17 +132,43 @@
       }
     },
     {
+      "id": "b_sketch",
+      "slot": "sketch",
+      "x": 110,
+      "y": 11,
+      "w": 26,
+      "h": 26,
+      "mode": "bitmap",
+      "overflow": "clip",
+      "fit": "contain",
+      "hideWhenEmpty": true,
+      "rotation": -7,
+      "padding": 2,
+      "borderWidth": 0.5,
+      "borderStyle": "solid",
+      "borderRadius": 2,
+      "borderHand": true,
+      "color": "#111111",
+      "mirror": false
+    },
+    {
       "id": "b_category",
       "slot": "category",
       "x": 12,
-      "y": 199,
-      "w": 60,
-      "h": 6,
+      "y": 196,
+      "w": 34,
+      "h": 7,
       "font": "Space Mono",
-      "size": 10,
+      "size": 8,
       "lineHeight": 1.2,
-      "color": "#555555",
-      "valign": "bottom",
+      "weight": 700,
+      "textCase": "uppercase",
+      "letterSpacing": 0.5,
+      "align": "center",
+      "valign": "middle",
+      "background": "#ecece6",
+      "borderRadius": 3.5,
+      "color": "#333333",
       "mode": "plain",
       "overflow": "clip",
       "anchor": null
@@ -133,10 +176,10 @@
     {
       "id": "b_qr",
       "slot": "link",
-      "x": 118,
-      "y": 188,
-      "w": 18,
-      "h": 18,
+      "x": 112,
+      "y": 186,
+      "w": 20,
+      "h": 20,
       "mode": "qr",
       "overflow": "clip",
       "anchor": null,
@@ -148,5 +191,6 @@
         "margin": 1
       }
     }
-  ]
+  ],
+  "facing": true
 }

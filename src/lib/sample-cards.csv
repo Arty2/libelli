@@ -1,52 +1,48 @@
-title,subtitle,body,category,link
-Start here,One row below is one card,"## A row is a card [1]{blue}
+title,subtitle,body,category,link,accent,sketch
+This is a card,Every row in the table becomes one of these,"## Here's the deal
 
-The table underneath holds the words. This page holds the design. libelli prints **one card per row** — four rows, four cards.
+This is libelli. It turns every row of a spreadsheet into a printed card, and that's the whole trick. The table holds the words, this page holds the design, and you never have to line the two up by hand again.
 
-- Page through them with the arrows under the sheet.
-- Nothing here is uploaded. It all stays in this browser.
+Go ahead and change *This is a card* in the table. The title changes as you type, because it isn't a copy of the cell — it *is* the cell.
 
-## Try it
+- **Bring your own rows.** Copy cells straight out of Excel, Sheets or Numbers and paste them in. No header row, no clean-up.
+- **It stays here.** No account, no upload, no server. Your data never leaves this browser.
 
-- Change *Start here* in the table. This title changes as you type.
-- Scan the code in the corner to open libelli on your phone.
+Point your phone at the corner and libelli opens there too.",Start here,https://libelli.vercel.app,,
+Cells can do more than words,"Markdown, colour, and the art of leaving things out","## Formatting without a toolbar
 
-These four cards are the tour. Read them, then type over them — they are only sample rows, and nothing here is precious.",Basics,https://libelli.vercel.app
-The table below,"Change a cell, watch the card","## Columns are fields [2]{blue}
+Any cell can carry **bold**, *italic*, ~~strikethrough~~, `code`, lists and [links](https://heracl.es/libelli). Want a few words in colour? Write `[this]{red}` and you get [this]{red}. Hex, `rgb()` and names like [green]{green} or [purple]{purple} all work, and `red` prints as a printer's red rather than your screen's.
 
-The header of each column is its name. A box on the page asks for a field *by that name*, so renaming a column carries the design with it instead of breaking it.
+That band down the edge is a column too. Type `orange` into this row's `accent` cell and watch it change.
 
-- Click a header to rename it. The card keeps rendering.
-- Click `+` to add a row, and you have another card.
+## Notice what's missing
 
-## The empty cell
+This row has no link, so **there's no QR code in the corner**. An area set to *Hide When Empty* doesn't leave a hole behind; it just gets out of the way.",The data,,#2b6cb0,
+Nothing on this page is stuck,"Drag it, restyle it, or start over from your own columns","## Everything moves
 
-This row's `link` cell is blank, which is why **the code in the corner is missing here** and present on the other three. A box set to Hide When Empty takes its space with it rather than leaving a hole.
+Drag any area, or grab a corner to resize it. Make this title absurdly long and the text below moves down, because it's anchored to the title rather than pinned in place. Run out of room and the area's corner turns red, so you find out before the printer does.
 
-- Compare this footer with card 1's.",Data,
-The card above,Drag anything. Nothing is stuck.,"## Move things [3]{blue}
+## Style is per area
 
-Every box is dragged in millimetres from the trim edge, so the page size can change underneath a design without moving anything on it.
+That sticker is a drawing stored in the row itself, turned a few degrees, with a border drawn by hand. Double-click it to draw your own, or select anything and the bar above shows how it's made.
 
-- Drag a box. Grab a corner to resize it.
-- Grid and Bounds, bottom left, decide what it snaps to.
+## Keep more than one design
 
-## What the marks mean
+The caret beside **Template** holds every design you save. Start a new one and the button with three shapes reads your columns and lays out a first draft for you.",The design,https://heracl.es/libelli,,"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAClklEQVR4AeyZUY4bMQxDt71B7n/IHKHF+yBAKB7LyiSd1NEChGWLomWO9iu/f778rw348gH46QnoCfhyBy77F7jdbn8cV32HSwzg4fHBo7PIecf+EgPe8ZBnNduAFecYz4iVun/Jif2xX7n/cAIQEEZCyo3WEd/P7vf7L98Tj844d4zu0pnzFCvHqrO4Dg2YFUSB0Z56x4jjD/bYua5B7LlqfFT/YIATaayKUWNoAs/53mM47AFxRLUf+NIYaT4YIPKzKxc6XIcGgJ95TA74mWsRe+4V8YMBfkls5pkL0QNeO9KNZ9QAr3smdl30osaDARCciADg/AzQBJkGHJDxsjw9A/GONIcGUBQLEAPkziDqutYs57xZTI/AOTPdQwMQoBAQC4g7dH7V6r0Qex/0DvwsxlMDREYEaO8rl1bh9R5XdeB7vWJ6BdrP1iUDJICooLNPWdUXa6WnkgEI4zog/iTQE6j2tGwA4iBegOMVxPq4r2jBjfX0COL50X7JgCjIxcKR8Og86jzL8Tr1wernK3fBTw1wIS4BFFaABlANGuBoDxcov7qiCcRf0Zga4AIurAtmK7WC82Y6Mad6VtfIYtfJaqcGZBfFPJcJMUdTIJ7HPRwQz6XLGnNn9lMDvBEuzhAboV6IuWyvOtbIzfogr5pRvXKsUwMgZAJwHPAFPz8TS4+1orPCTw3gQoRWAf+dWO0D3kofSwasCP2vnO0NyD5MG5A5tHu+J2D3L5y9rycgc2j3fE/A7l84e19PQObQ7vmegN2/cPa+noDMod3zPQG7feHqe3oCqo7txu8J2O2LVt/TE1B1bDd+T8BuX7T6np6AqmOv5PP7HXilZlWrJ6Dq2G78noDdvmj1PT0BVcc+jX+2n78AAAD//+3PTtMAAAAGSURBVAMAKgNon7Y/9RcAAAAASUVORK5CYII="
+Take it with you,"On paper, as a picture, or as a booklet","## Print it
 
-- [⚠]{red} A red corner means the words are longer than the box, and the rest is being cut off.
-- [⚠]{blue} A box can take its top from the box above instead of its own position — which is why this text moves down when a title runs to two lines.
+Hit **Print** or Ctrl/Cmd+P for a preview of every sheet. Turn on background graphics so the colours make it onto the paper.
 
-Try it: make this card's title very long, and watch everything below it give way.",Layout,https://heracl.es/libelli
-Getting it out,"Paper, picture, or the template","## To paper [4]{blue}
+## Or fold it into a zine
 
-1. Press **Print**, or Ctrl/Cmd+P.
-2. Check the preview — it shows every card, and you can untick any you do not want.
-3. Set your printer to the same paper size as the page, and turn on background graphics.
+These four cards make exactly one booklet. They already have left and right pages, which is why the page numbers sit on the outside edge.
 
-## Other ways out
+1. In the print preview, set **Pages per Sheet** to **2-up** and **Order** to **Zinemaker**.
+2. Print double-sided, flipping on the long edge.
+3. Fold it in half. Congratulations, you made a zine.
 
-- **PNG** saves one card as a picture, at print resolution.
-- **Export** saves the design as a small file you can send to someone. It carries the layout, not the data.
-- **Export CSV** saves the words on their own.
+## And the rest
 
-Press and hold *Import CSV…* to bring these four cards back at any time. Scan the corner for the source code.",Output,https://github.com/Arty2/libelli
+**PNG** saves a card as an image. **Export** saves just the design, small enough to send in a message. **Install** gives libelli its own window, and it works offline.
+
+Want this tour back? Press and hold **Import CSV…**.",The output,https://github.com/Arty2/libelli,,

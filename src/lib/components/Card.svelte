@@ -23,7 +23,7 @@
 	} from '$lib/layout';
 	import { renderMarkdown } from '$lib/markdown';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
-	import { normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
+	import { frameHeight, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -319,8 +319,15 @@
 			// handles and badges are absolutely positioned children that stick out
 			// past the edge, and they would otherwise read as overflow on every box
 			// the moment it was selected.
+			//
+			// Only a clipped box can cut anything off. A growing one is a
+			// min-height, so it is always as tall as its lines — but a face whose
+			// ascent and descent outrun a tight line height (Patrick Hand at 1.1)
+			// hangs its last line's inline box a few pixels past them, and
+			// scrollHeight counts that, which flagged every two-line title as cut.
 			const content = node.querySelector<HTMLElement>('.content');
-			const spills = !!content && content.scrollHeight > node.clientHeight + 1;
+			const clipped = template.boxes.find((b) => b.id === id)?.overflow === 'clip';
+			const spills = clipped && !!content && content.scrollHeight > node.clientHeight + 1;
 			if ((overflowing[id] ?? false) !== spills) overflowing = { ...overflowing, [id]: spills };
 		};
 		read();
@@ -1287,7 +1294,7 @@
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf -->
 						{@html renderMarkdown(contentOf(box), { size: box.size ?? template.defaults.size, md: box.md })}
 					{:else if box.mode === 'qr'}
-						<span class="media" style="height:{box.h}mm">
+						<span class="media" style="height:{frameHeight(box)}mm">
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
 							{@html qrFor(box)}
 						</span>
@@ -1296,7 +1303,7 @@
 						<!-- A color and a tile are both drawn by the box's own background,
 						     in boxStyle, so there is nothing to put in here for either. -->
 						{#if media.svg || (media.src && box.fit !== 'repeat')}
-							<span class="media" style="height:{box.h}mm">
+							<span class="media" style="height:{frameHeight(box)}mm">
 								{#if media.svg}
 									<!-- eslint-disable-next-line svelte/no-at-html-tags -- safeSvg is the chokepoint; fitSvg only rewrites its width and height -->
 									{@html fitSvg(safeSvg(media.svg), box.fit)}
