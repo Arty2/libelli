@@ -1,4 +1,4 @@
-import type { Dataset, Mapping, Template, UiState } from './types';
+import type { Dataset, FontRef, Mapping, Template, UiState } from './types';
 
 /**
  * Client-side persistence. Nothing here ever leaves the browser.
@@ -110,6 +110,23 @@ export const loadUi = (): UiState => {
 	return { ...UI_DEFAULTS, ...(showOutlines === undefined ? {} : { showBounds: showOutlines }), ...rest };
 };
 export const saveUi = (ui: UiState) => local.set('ui', ui);
+
+/**
+ * The editor's own fonts: families this browser has been given — a file
+ * uploaded, a Google name typed in — that no template currently carries. A
+ * template keeps only the families it is set in (see `pruneFonts`); the rest
+ * live here, so a face dropped from one card is still in the menu for the
+ * next. Names and references only; the bytes of an upload are in IndexedDB.
+ */
+export const loadEditorFonts = (): FontRef[] => {
+	const stored = local.get<unknown>('fonts', []);
+	if (!Array.isArray(stored)) return [];
+	return stored.filter(
+		(f): f is FontRef =>
+			!!f && typeof f.family === 'string' && ['google', 'local', 'system'].includes(f.source)
+	);
+};
+export const saveEditorFonts = (fonts: FontRef[]) => local.set('fonts', fonts);
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 

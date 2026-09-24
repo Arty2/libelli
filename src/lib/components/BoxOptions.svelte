@@ -2,11 +2,15 @@
 	import Icon from './Icon.svelte';
 	import './options-bar.css';
 	import { cssIdent } from '$lib/css';
-	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
+	import { availableWeights, fontChoices } from '$lib/fonts';
 	import {
 		BLEND_MODES,
 		BORDER_STYLES,
 		DEFAULT_QR,
+		MAX_PARAGRAPH,
+		MIN_BOX,
+		MIN_LEADING,
+		MIN_SIZE,
 		normaliseCentre,
 		normaliseRotation,
 		normaliseSides,
@@ -21,6 +25,7 @@
 		Box,
 		Centre,
 		Dataset,
+		FontRef,
 		Mapping,
 		QrSettings,
 		Sides,
@@ -43,6 +48,8 @@
 		onuploadbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
+		/** fonts this browser knows that the template is not carrying */
+		editorFonts: FontRef[];
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
@@ -52,6 +59,7 @@
 
 	let {
 		template,
+		editorFonts,
 		dataset,
 		mapping,
 		selected,
@@ -82,11 +90,11 @@
 	/** the same question for padding; the two expand independently */
 	let perSidePadding = $state(false);
 
-	const familyOptions = $derived(
-		Array.from(new Set([...template.fonts.map((f) => f.family), ...CURATED_GOOGLE_FONTS])).sort((a, b) =>
-			a.localeCompare(b)
-		)
-	);
+	/**
+	 * The families this template is set in, then under a rule everything else
+	 * this browser knows — see `fontChoices`.
+	 */
+	const families = $derived(fontChoices(template, editorFonts));
 
 	const anchorOptions = $derived(template.boxes.filter((b) => b.id !== selected?.id));
 
@@ -236,12 +244,59 @@
 	 * global type settings: a box that names no size takes the template's, so
 	 * changing the template moves every box that never overrode it.
 	 */
-	const inherited = (event: Event): number | undefined => {
-		const raw = (event.currentTarget as HTMLInputElement).value.trim();
+	const inherited = (event: Event, floor = -Infinity): number | undefined => {
+		const field = event.currentTarget as HTMLInputElement;
+		const raw = field.value.trim();
 		if (!raw) return undefined;
 		const value = Number(raw);
-		return Number.isFinite(value) ? value : undefined;
+		if (!Number.isFinite(value)) return undefined;
+		// The field shows what was taken — see `paper` in the page bar for why a
+		// refused number has to be written back by hand.
+		const taken = Math.max(floor, value);
+		if (taken !== value) field.value = String(taken);
+		return taken;
 	};
+
+	/**
+	 * A new width or height, grown from the edge the area is aligned to.
+	 *
+	 * Right-aligned words sit against the right edge, so a box made narrower
+	 * from the left keeps them where they were; a bottom-aligned area the same
+	 * downwards. Centred grows both ways. An anchored area's top is not its own
+	 * to move, so its height grows downwards whatever it is aligned to.
+	 */
+	function resize(axis: 'w' | 'h', event: Event) {
+		if (!selected) return;
+		const field = event.currentTarget as HTMLInputElement;
+		const was = selected[axis];
+		const size = Math.max(MIN_BOX, numeric(event, was));
+		field.value = String(size);
+		if (size === was) return;
+		const shift = was - size;
+		const round = (n: number) => Math.round(n * 100) / 100;
+		if (axis === 'w') {
+			const align = selected.align ?? template.defaults.align;
+			const by = align === 'right' ? shift : align === 'center' ? shift / 2 : 0;
+			patch({ w: size, x: round(selected.x + by) });
+		} else {
+			const valign = selected.valign ?? 'top';
+			const by = selected.anchor ? 0 : valign === 'bottom' ? shift : valign === 'middle' ? shift / 2 : 0;
+			patch({ h: size, y: round(selected.y + by) });
+		}
+	}
+
+	/** The page's paragraph style, said in the words the select uses. */
+	const PARAGRAPH_LABELS = { space: 'Space After', indent: 'Indent' } as const;
+
+	function setParagraph(mode: string, amount?: number) {
+		if (mode !== 'space' && mode !== 'indent') {
+			patch({ paragraph: undefined });
+			return;
+		}
+		const inheritedAmount = template.defaults.paragraph?.amount ?? 1;
+		const value = Math.max(0, Math.min(MAX_PARAGRAPH, amount ?? selected?.paragraph?.amount ?? inheritedAmount));
+		patch({ paragraph: { mode, amount: value } });
+	}
 
 	function setFont(value: string) {
 		if (value === '') {
@@ -271,8 +326,47 @@
 
 	function registerFamily(family: string) {
 		if (template.fonts.some((f) => f.family.toLowerCase() === family.toLowerCase())) return;
-		patchTemplate({ fonts: [...template.fonts, { family, source: 'google' }] });
+		// An uploaded face the editor is holding keeps its file reference.
+		const known = editorFonts.find((f) => f.family.toLowerCase() === family.toLowerCase());
+		patchTemplate({ fonts: [...template.fonts, known ?? { family, source: 'google' }] });
 	}
+
+	/**
+	 * Bumped whenever the document's fonts change, so the weight menu reads
+	 * the faces again: a Google stylesheet declares its cuts a moment after
+	 * the family is chosen, and the first reading is of nothing.
+	 */
+	let facesVersion = $state(0);
+
+	$effect(() => {
+		if (typeof document === 'undefined' || !document.fonts) return;
+		const bump = () => (facesVersion += 1);
+		document.fonts.addEventListener('loadingdone', bump);
+		// A stylesheet adds its faces without loading any of them, so a
+		// finished request is watched for too.
+		const observer = new MutationObserver(bump);
+		observer.observe(document.head, { childList: true });
+		const late = setTimeout(bump, 1500);
+		return () => {
+			document.fonts.removeEventListener('loadingdone', bump);
+			observer.disconnect();
+			clearTimeout(late);
+		};
+	});
+
+	/**
+	 * The weights this area's family actually has — see `availableWeights`.
+	 * The one it is set to stays in the list even if the family lacks it, so
+	 * the menu never shows a blank for a template that asks for more.
+	 */
+	const weights = $derived.by(() => {
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		facesVersion;
+		const real = availableWeights(selected?.font ?? template.defaults.font);
+		return selected?.weight !== undefined && !real.includes(selected.weight)
+			? [...real, selected.weight].sort((a, b) => a - b)
+			: real;
+	});
 
 	/**
 	 * Rename the area — and refuse the rename if the name is taken.
@@ -563,7 +657,7 @@
 						title="Blank border in modules; scanners need at least two"
 						value={selected.qr?.margin ?? DEFAULT_QR.margin}
 						disabled={boxFrozen}
-						onchange={(e) => setQr({ margin: numeric(e, DEFAULT_QR.margin) })}
+						onchange={(e) => setQr({ margin: Math.max(0, Math.min(8, Math.round(numeric(e, DEFAULT_QR.margin)))) })}
 					/>
 					<span class="unit">modules</span>
 				</label>
@@ -599,9 +693,16 @@
 				<span>Font</span>
 				<select value={selected.font ?? ''} disabled={boxFrozen} onchange={(e) => setFont(e.currentTarget.value)}>
 					<option value="">Default — {template.defaults.font}</option>
-					{#each familyOptions as family (family)}
+					{#each families.used as family (family)}
 						<option value={family}>{family}</option>
 					{/each}
+					<!-- In this template above the rule, the rest of this browser's
+					     fonts below it. -->
+					<hr />
+					{#each families.others as family (family)}
+						<option value={family}>{family}</option>
+					{/each}
+					<hr />
 					<option value="__custom">Other Family…</option>
 					<option value="__upload">Upload a Font File…</option>
 				</select>
@@ -617,7 +718,7 @@
 					title="Blank inherits the page's {template.defaults.size}pt"
 					value={selected.size ?? ''}
 					disabled={boxFrozen}
-					onchange={(e) => patch({ size: inherited(e) })}
+					onchange={(e) => patch({ size: inherited(e, MIN_SIZE) })}
 				/>
 				<span class="unit">pt</span>
 			</label>
@@ -629,7 +730,7 @@
 					onchange={(e) => patch({ weight: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
 				>
 					<option value="">Default — {template.defaults.weight}</option>
-					{#each [300, 400, 500, 600, 700, 800] as weight (weight)}
+					{#each weights as weight (weight)}
 						<option value={String(weight)}>{weight}</option>
 					{/each}
 				</select>
@@ -661,7 +762,7 @@
 					title="Blank inherits the page's {template.defaults.lineHeight}"
 					value={selected.lineHeight ?? ''}
 					disabled={boxFrozen}
-					onchange={(e) => patch({ lineHeight: inherited(e) })}
+					onchange={(e) => patch({ lineHeight: inherited(e, MIN_LEADING) })}
 				/>
 			</label>
 			<label class="field">
@@ -678,6 +779,37 @@
 				/>
 				<span class="unit">mm</span>
 			</label>
+			<!-- How one paragraph is told from the next, in lines of this leading. -->
+			<label class="field">
+				<span>Paragraph</span>
+				<select
+					value={selected.paragraph?.mode ?? ''}
+					title="Space after each paragraph, or the first line of the next indented. Every line of plain text is a paragraph"
+					disabled={boxFrozen}
+					onchange={(e) => setParagraph(e.currentTarget.value)}
+				>
+					<option value="">Default — {template.defaults.paragraph ? PARAGRAPH_LABELS[template.defaults.paragraph.mode] : 'None'}</option>
+					<option value="space">Space After</option>
+					<option value="indent">Indent</option>
+				</select>
+			</label>
+			{#if selected.paragraph}
+				<label class="field">
+					<span class="sr-only">Paragraph amount</span>
+					<input
+						class="n-2"
+						type="number"
+						step="0.25"
+						min="0"
+						max={MAX_PARAGRAPH}
+						title="In lines of this area's leading"
+						value={selected.paragraph.amount}
+						disabled={boxFrozen}
+						onchange={(e) => setParagraph(selected.paragraph!.mode, numeric(e, selected.paragraph!.amount))}
+					/>
+					<span class="unit">lines</span>
+				</label>
+			{/if}
 			<label class="field">
 				<span>Case</span>
 				<select value={selected.textCase ?? 'none'} disabled={boxFrozen} onchange={(e) => patch({ textCase: e.currentTarget.value as Box['textCase'] })}>
@@ -923,7 +1055,7 @@
 					title="Corner radius, for the whole box"
 					value={selected.borderRadius ?? 0}
 					disabled={boxFrozen}
-					onchange={(e) => patch({ borderRadius: numeric(e, 0) || undefined })}
+					onchange={(e) => patch({ borderRadius: Math.max(0, numeric(e, 0)) || undefined })}
 				/>
 				<span class="unit">mm</span>
 			</label>
@@ -961,11 +1093,13 @@
 			{#if selected.anchor}
 				<label class="field">
 					<span>Gap</span>
+					<!-- No floor: a negative gap tucks this area up under the one it
+					     follows, overlapping it, which is a layout people want. -->
 					<input
 						class="n-3"
 						type="number"
 						step="0.5"
-						min="0"
+						title="Between that area's bottom and this one's top; below 0 overlaps it"
 						value={selected.anchor.gap}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ anchor: { to: selected.anchor!.to, gap: numeric(e, selected.anchor!.gap) } })}
@@ -979,11 +1113,11 @@
 		     push past them, and whether an empty one shows at all. -->
 		<span class="group" role="group" aria-label="Size">
 			<label class="field"><span>W</span>
-				<input class="n-4" type="number" step="0.5" value={selected.w} disabled={boxFrozen} onchange={(e) => patch({ w: numeric(e, selected.w) })} />
+				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.w} disabled={boxFrozen} onchange={(e) => resize('w', e)} />
 				<span class="unit">mm</span>
 			</label>
 			<label class="field"><span>H</span>
-				<input class="n-4" type="number" step="0.5" value={selected.h} disabled={boxFrozen} onchange={(e) => patch({ h: numeric(e, selected.h) })} />
+				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.h} disabled={boxFrozen} onchange={(e) => resize('h', e)} />
 				<span class="unit">mm</span>
 			</label>
 			<label class="field">

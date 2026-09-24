@@ -60,3 +60,27 @@ export function indexAfterSort(dataset: Dataset, sorted: Dataset, index: number)
 	const moved = sorted.rows.indexOf(row);
 	return moved === -1 ? 0 : moved;
 }
+
+/**
+ * Characters and words in a cell, for the count shown while one is edited.
+ *
+ * Characters are code points rather than UTF-16 units, so an emoji or a
+ * letter outside the basic plane counts once — which is what anybody holding a
+ * character limit means by it. Words are runs of anything that is not space.
+ */
+export function countText(text: string): { characters: number; words: number } {
+	const trimmed = text.trim();
+	return {
+		characters: [...text].length,
+		words: trimmed ? trimmed.split(/\s+/u).length : 0
+	};
+}
+
+/**
+ * Where a column lands when it is dropped in front of the column at `before`
+ * — `before` being 0 to the column count, the gap it is dropped into. The
+ * gap either side of the column being dragged is where it already is.
+ */
+export function dropTarget(from: number, before: number): number {
+	return before > from ? before - 1 : before;
+}

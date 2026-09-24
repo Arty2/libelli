@@ -4,6 +4,7 @@ import { parseColor } from './color';
 import defaultCard from './templates/default-card.json';
 import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
 import type {
+	Anchor,
 	BackgroundFit,
 	BlendMode,
 	BorderStyle,
@@ -16,6 +17,7 @@ import type {
 	PageBackgroundImage,
 	PageNumberPosition,
 	PageNumberSpec,
+	ParagraphStyle,
 	PrintSettings,
 	QrSettings,
 	SheetOrientation,
@@ -67,6 +69,56 @@ export const SHEET_ORIENTATIONS: SheetOrientation[] = ['auto', 'portrait', 'land
  * that paper exists; anything above it is the designer's business.
  */
 export const MIN_PAPER = 1;
+
+/**
+ * The smallest an area may be, in mm, either way. A box of 0 or less has no
+ * inside to click and no edge to drag, and a negative one draws nowhere at
+ * all — the same trap the paper's own floor exists for, one level down.
+ */
+export const MIN_BOX = 1;
+
+/** The smallest type size, in points, and the tightest leading, as a multiple. */
+export const MIN_SIZE = 1;
+export const MIN_LEADING = 0.5;
+
+/** How far apart paragraphs may be set, in lines — past this it is a layout, not a style. */
+export const MAX_PARAGRAPH = 10;
+
+/** A number at or above `floor`, or the fallback when it is not a number at all. */
+export const atLeast = (value: unknown, floor: number, fallback: number) => Math.max(floor, num(value, fallback));
+
+/** An optional number held to a floor; absent, or not a number, stays absent. */
+function optionalAtLeast(value: unknown, floor: number): number | undefined {
+	if (value === undefined || value === null || value === '') return undefined;
+	const n = Number(value);
+	return Number.isFinite(n) ? Math.max(floor, n) : undefined;
+}
+
+/**
+ * A paragraph style, or nothing. An amount of 0 is kept — paragraphs set
+ * tight on purpose is a style — but one that is not a number is not.
+ */
+export function normaliseParagraph(raw: unknown): ParagraphStyle | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const { mode, amount } = raw as Record<string, unknown>;
+	if (mode !== 'space' && mode !== 'indent') return undefined;
+	const n = Number(amount);
+	if (!Number.isFinite(n)) return undefined;
+	return { mode, amount: Math.round(Math.max(0, Math.min(MAX_PARAGRAPH, n)) * 100) / 100 };
+}
+
+/**
+ * An anchor with a gap that is a number. The gap may be negative — an area
+ * tucked up under the one it follows, overlapping it, is a layout people ask
+ * for — so it is only checked for being a number at all.
+ */
+function normaliseAnchor(raw: unknown): Anchor | null | undefined {
+	if (raw === null) return null;
+	if (!raw || typeof raw !== 'object') return undefined;
+	const { to, gap } = raw as Record<string, unknown>;
+	if (typeof to !== 'string' || !to) return undefined;
+	return { to, gap: num(gap, 0) };
+}
 
 export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
 	enabled: false,
@@ -156,8 +208,8 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		slot: partial.slot ?? null,
 		x: num(partial.x, 12),
 		y: num(partial.y, 12),
-		w: num(partial.w, 60),
-		h: num(partial.h, 12),
+		w: atLeast(partial.w, MIN_BOX, 60),
+		h: atLeast(partial.h, MIN_BOX, 12),
 		// A mode decides which renderer a cell reaches, so a word this format does
 		// not name is read as words rather than trusted.
 		mode: BOX_MODES.includes(partial.mode as BoxMode) ? (partial.mode as BoxMode) : 'plain',
@@ -166,9 +218,10 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		// is the box format, so a new field has to be added in both places.
 		...stripUndefined({
 			font: partial.font,
-			size: partial.size,
-			weight: partial.weight,
-			lineHeight: partial.lineHeight,
+			size: optionalAtLeast(partial.size, MIN_SIZE),
+			weight: partial.weight === undefined ? undefined : Math.max(100, Math.min(900, num(partial.weight, 400))),
+			lineHeight: optionalAtLeast(partial.lineHeight, MIN_LEADING),
+			paragraph: normaliseParagraph(partial.paragraph),
 			// Every color on a box goes through the parser before it can reach a
 			// style attribute; one that is not recognised is dropped rather than
 			// guessed at, the same rule the markdown renderer follows.
@@ -180,7 +233,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			textCase: partial.textCase,
 			md: partial.md,
 			qr: partial.mode === 'qr' ? normaliseQr(partial.qr) : partial.qr,
-			anchor: partial.anchor,
+			anchor: normaliseAnchor(partial.anchor),
 			rotation: normaliseRotation(partial.rotation),
 			centre: normaliseCentre(partial.centre),
 			hideWhenEmpty: partial.hideWhenEmpty,
@@ -193,7 +246,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			borderWidth: normaliseSides(partial.borderWidth),
 			borderStyle: BORDER_STYLES.includes(partial.borderStyle as BorderStyle) ? partial.borderStyle : undefined,
 			borderColor: color(partial.borderColor),
-			borderRadius: partial.borderRadius,
+			borderRadius: optionalAtLeast(partial.borderRadius, 0),
 			borderHand: partial.borderHand ? true : undefined,
 			fit: BOX_FITS.includes(partial.fit as BoxFit) ? partial.fit : undefined,
 			pixels: normalisePixels(partial.pixels),
@@ -247,11 +300,14 @@ export function normaliseTemplate(raw: unknown): Template {
 		print: normalisePrintSettings(t.print),
 		pageNumber: normalisePageNumber(t.pageNumber),
 		fonts: normaliseFonts(t.fonts),
-		defaults: {
+		defaults: stripUndefined({
 			...DEFAULT_DEFAULTS,
 			...stripUndefined(t.defaults ?? {}),
-			color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color
-		},
+			color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color,
+			size: atLeast(t.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
+			lineHeight: atLeast(t.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
+			paragraph: normaliseParagraph(t.defaults?.paragraph)
+		}) as Defaults,
 		slots,
 		boxes,
 		...stripUndefined({

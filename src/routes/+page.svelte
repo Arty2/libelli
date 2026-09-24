@@ -20,7 +20,7 @@
 		uploadBackgroundImage
 	} from '$lib/assets';
 	import { download, slugify } from '$lib/download';
-	import { ensureGoogleFont, ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
+	import { ensureGoogleFont, ensureTemplateFonts, mergeFonts, pruneFonts, uploadLocalFont } from '$lib/fonts';
 	import {
 		canRedo,
 		canUndo,
@@ -54,6 +54,7 @@
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault } from '$lib/modal';
 	import { watchPresses } from '$lib/haptics';
+	import { referencedColumns } from '$lib/placeholders';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
@@ -82,6 +83,8 @@
 		loadTemplateDoc,
 		loadTemplateId,
 		loadUi,
+		loadEditorFonts,
+		saveEditorFonts,
 		migrateLegacyStorage,
 		nextDatasetId,
 		nextTemplateId,
@@ -109,25 +112,11 @@
 	 */
 	let barFloor = $state(0);
 	let barHeight = $state(0);
-	/**
-	 * The page bar's library menu is open.
-	 *
-	 * On a narrow screen the bar gives up its height cap while a menu is up, so
-	 * the menu is not clipped by the bar's own scroller — a moment, and not a
-	 * height the bar ever needs to stand at. Taken as a floor it stayed: opening
-	 * the template switcher once left a band of empty grey under the bar for the
-	 * rest of the session, which is the bug this guard is for.
-	 */
-	let barMenuOpen = $state(false);
-
+	// The library menu used to make the bar taller on a phone while it was up,
+	// and this had to refuse that height as a floor. The menu is `fixed` now —
+	// see PageOptions — so every height the bar reports is one it stands at.
 	$effect(() => {
-		const height = barHeight;
-		// Read untracked on purpose: only a fresh measurement may raise the floor.
-		// Tracked, the flag going false at the end of a menu re-ran this while
-		// `barHeight` still held the uncapped height, and the floor took the very
-		// number the guard above exists to refuse.
-		if (untrack(() => barMenuOpen)) return;
-		if (height > barFloor) barFloor = height;
+		if (barHeight > barFloor) barFloor = barHeight;
 	});
 
 	let ui = $state<UiState>({ showBounds: true, showGrid: false, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
@@ -273,6 +262,42 @@
 
 	/** Below this the tray is a row of buttons and no table, which is not a tray. */
 	const TRAY_MIN = 0.2;
+
+	/**
+	 * Beside the page, the table's width is dragged from its left edge, and
+	 * kept — unlike the stacked tray's height, a desk does not turn over, and
+	 * the split somebody chose for their screen is the one they want back.
+	 * Neither side may be squeezed out of use: the table keeps room for a
+	 * column and its gutter, the page keeps room for a card.
+	 */
+	const TRAY_MIN_PX = 280;
+	const STAGE_MIN_PX = 320;
+	let trayResizing: { x: number; width: number } | null = $state(null);
+
+	function setTrayWidth(width: number) {
+		const room = mainEl?.getBoundingClientRect().width ?? window.innerWidth;
+		const clamped = Math.round(Math.max(TRAY_MIN_PX, Math.min(room - STAGE_MIN_PX, width)));
+		if (clamped !== ui.trayWidth) ui = { ...ui, trayWidth: clamped };
+	}
+
+	function startTrayResize(event: PointerEvent) {
+		if (event.button !== 0 || !asideEl) return;
+		event.preventDefault();
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		trayResizing = { x: event.clientX, width: asideEl.getBoundingClientRect().width };
+	}
+
+	function moveTrayResize(event: PointerEvent) {
+		if (!trayResizing) return;
+		// The edge is on the table's left, so moving left widens it.
+		setTrayWidth(trayResizing.width + (trayResizing.x - event.clientX));
+	}
+
+	function endTrayResize(event: PointerEvent) {
+		if (!trayResizing) return;
+		(event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+		trayResizing = null;
+	}
 
 	$effect(() => {
 		const query = window.matchMedia('(max-width: 900px)');
@@ -449,6 +474,29 @@ em { color: #b42318 }`;
 	 */
 	const selectedColumn = $derived(selected?.slot ? (mapping[selected.slot] ?? null) : null);
 
+	/**
+	 * The columns something on the card prints: bound to an area, named as
+	 * `{{column}}` in an area's own words, or named in a cell of a column that
+	 * is itself printed. One level and no further, because that is how far
+	 * substitution goes — see placeholders.ts — so a column named only from a
+	 * column nobody prints is still a column nobody prints.
+	 */
+	const usedColumns = $derived.by(() => {
+		const columns = dataset.columns;
+		const used = new Set<string>();
+		for (const box of template.boxes) {
+			const bound = box.slot ? mapping[box.slot] : undefined;
+			if (bound && columns.includes(bound)) used.add(bound);
+			for (const named of referencedColumns(box.static?.text ?? '', columns)) used.add(named);
+		}
+		for (const column of [...used]) {
+			for (const r of dataset.rows) {
+				for (const named of referencedColumns(r[column] ?? '', columns)) used.add(named);
+			}
+		}
+		return used;
+	});
+
 	// ---- boot ---------------------------------------------------------------
 
 	$effect(() => {
@@ -519,7 +567,12 @@ em { color: #b42318 }`;
 		const storedMapping = loadMapping(templateId, template.name);
 		mapping = Object.keys(storedMapping).length ? storedMapping : autoMap(usedSlots(template), dataset.columns);
 		ui = loadUi();
-		if (typeof window !== 'undefined' && window.innerWidth <= 900) {
+		if (ui.panels) {
+			// Whatever was open when the tab was last closed — see UiState.
+			pageSetupOpen = ui.panels.page;
+			dataOpen = ui.panels.data;
+			imagesOpen = ui.panels.images;
+		} else if (typeof window !== 'undefined' && window.innerWidth <= 900) {
 			pageSetupOpen = false;
 			dataOpen = false;
 		}
@@ -569,6 +622,33 @@ em { color: #b42318 }`;
 
 	$effect(() => {
 		for (const family of familiesInUse) ensureGoogleFont(family);
+	});
+
+	/**
+	 * Fonts this browser knows that no template is carrying — see storage.ts.
+	 * Read at once rather than at boot: it is a handful of names in
+	 * localStorage, and the font menus want it on their first render.
+	 */
+	let editorFonts = $state<FontRef[]>(loadEditorFonts());
+
+	/**
+	 * A template carries the families it is set in and no others.
+	 *
+	 * Checked on every change rather than at export, so what is saved, undone
+	 * and exported is always the same list. What is cut is handed to the
+	 * editor, not thrown away: a family chosen and then changed back is still
+	 * in the menu, under the rule. In the same tick as the change that made a
+	 * family unused, so the two land in one undo entry.
+	 */
+	$effect(() => {
+		if (!ready) return;
+		const { template: pruned, dropped } = pruneFonts(template);
+		if (!dropped.length) return;
+		untrack(() => {
+			editorFonts = mergeFonts(editorFonts, dropped);
+			saveEditorFonts($state.snapshot(editorFonts));
+			template = pruned;
+		});
 	});
 
 	/**
@@ -686,6 +766,7 @@ em { color: #b42318 }`;
 	 * it keeps the reference itself and the picture is the same on every card.
 	 */
 	async function handleImageDrop(box: Box, file: File) {
+		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
 		const name = await storeLocalImage(file);
 		const reference = localImageRef(name);
 		const column = box.slot ? mapping[box.slot] : undefined;
@@ -704,6 +785,20 @@ em { color: #b42318 }`;
 			updateBox({ ...next, static: { ...box.static, url: reference } });
 			notify(`${name} is on this area, the same on every card, and stays in this browser.`);
 		}
+	}
+
+	/**
+	 * A locked table is locked from the card too.
+	 *
+	 * The card writes into a cell three ways — typing in an area, dropping a
+	 * picture on one, finishing a drawing — and the table's own lock would be a
+	 * fence with three gaps in it if only the table's fields honoured it. Said
+	 * rather than silent, because a keystroke that goes nowhere looks broken.
+	 */
+	function refuseLockedTable(): boolean {
+		if (!dataset.locked) return false;
+		notify('The table is locked — unlock it under the table to change its cells.', 'warning');
+		return true;
 	}
 
 	/** the area whose picture is being drawn, if any — full screen, never in place */
@@ -745,6 +840,7 @@ em { color: #b42318 }`;
 		const column = box.slot ? mapping[box.slot] : undefined;
 		const current = $state.snapshot(box) as Box;
 		if (column && row) {
+			if (refuseLockedTable()) return;
 			dataset = {
 				...dataset,
 				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: dataUrl } : r))
@@ -944,6 +1040,21 @@ em { color: #b42318 }`;
 		saveUi($state.snapshot(ui));
 	});
 
+	/**
+	 * The open bars and the table, carried into the stored UI so a reload
+	 * opens on the same screen. Written only when they differ, or every save of
+	 * `ui` would re-run this and write it straight back.
+	 */
+	$effect(() => {
+		if (!ready) return;
+		const panels = { page: pageSetupOpen, data: dataOpen, images: imagesOpen };
+		untrack(() => {
+			const was = ui.panels;
+			if (was && was.page === panels.page && was.data === panels.data && was.images === panels.images) return;
+			ui = { ...ui, panels };
+		});
+	});
+
 	// ---- template editing ---------------------------------------------------
 
 	/**
@@ -1007,7 +1118,7 @@ em { color: #b42318 }`;
 	 * It guesses from headings and cell shapes and it will sometimes be wrong,
 	 * and a page of boxes that silently decided your Reference column was the
 	 * title is worse than being asked. So the guess is shown first: one line per
-	 * column, the kind it was taken for, and Leave Out for the ones you do not
+	 * column, the kind it was taken for, and a tick to take off the ones you do not
 	 * want on the card at all.
 	 */
 	let magic = $state<FieldGuess[] | null>(null);
@@ -1050,7 +1161,7 @@ em { color: #b42318 }`;
 		template = { ...current, slots, boxes };
 		mapping = { ...bound };
 		selectedIds = [];
-		const skipped = roles.filter((role) => role.kind === 'skip').map((role) => role.column);
+		const skipped = roles.filter((role) => role.include === false).map((role) => role.column);
 		const notes = [
 			`${boxes.length} area${boxes.length === 1 ? '' : 's'} laid out from ${dataset.columns.length} column${dataset.columns.length === 1 ? '' : 's'}.`,
 			skipped.length ? `Left out: ${skipped.join(', ')}.` : '',
@@ -1431,7 +1542,7 @@ em { color: #b42318 }`;
 	function setBoxText(box: Box, value: string) {
 		if (box.slot) {
 			const column = mapping[box.slot];
-			if (!column || !row) return;
+			if (!column || !row || refuseLockedTable()) return;
 			describe('Edit the text');
 			dataset = {
 				...dataset,
@@ -1817,6 +1928,8 @@ em { color: #b42318 }`;
 	async function handleFontUpload(file: File, family?: string) {
 		try {
 			const ref = await uploadLocalFont(file, family);
+			editorFonts = mergeFonts(editorFonts, [ref]);
+			saveEditorFonts($state.snapshot(editorFonts));
 			const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== ref.family.toLowerCase());
 			template = { ...template, fonts: [...fonts, ref] };
 			missingFonts = missingFonts.filter((f) => (f.ref ?? f.family) !== (ref.ref ?? ref.family));
@@ -1960,25 +2073,35 @@ em { color: #b42318 }`;
 				// Not a plain toggle any more: the two bars share one row, so this
 				// says "show me the page" — which, with an area selected, means
 				// letting go of the area rather than stacking a second bar on top.
-				const showing = pageSetupOpen && !selected;
+				const showing = pageSetupOpen && !selected && !imagesOpen;
 				pageSetupOpen = !showing;
+				// The images bar shares the row, so asking for the page is also
+				// letting go of the pictures.
+				imagesOpen = false;
 				if (!showing) selectBox(null);
 			}}
-			aria-pressed={pageSetupOpen && !selected}
-			aria-expanded={pageSetupOpen && !selected}
+			aria-pressed={pageSetupOpen && !selected && !imagesOpen}
+			aria-expanded={pageSetupOpen && !selected && !imagesOpen}
 			title={selected && pageSetupOpen
 				? 'Page setup — the area bar has the row; this takes it back'
 				: 'Show or hide the page setup'}
 		>
 			<Icon name="document-configuration" size={15} /> <span class="label">Page Setup</span>
 		</button>
-		<!-- Every stored picture, beside the two bars rather than inside one of
-		     them: the pictures are the browser's, not the page's — a row's own
-		     photograph is in there too — and Page Setup was a place you had to
-		     already know to look. -->
+		<!-- Every stored picture, as a bar of its own in the same row as the
+		     other two: the pictures are the browser's, not the page's — a row's
+		     own photograph is in there too — and a dialog over the card hid the
+		     card that uses them. Like Page Setup, asking for it lets go of a
+		     selected area, since the area bar would otherwise have the row. -->
 		<button
 			class="images"
-			onclick={() => (imagesOpen = true)}
+			aria-pressed={imagesOpen && !selected}
+			aria-expanded={imagesOpen && !selected}
+			onclick={() => {
+				const showing = imagesOpen && !selected;
+				imagesOpen = !showing;
+				if (!showing) selectBox(null);
+			}}
 			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
 		>
 			<Icon name="image" size={15} /> <span class="label">Images</span>
@@ -2027,7 +2150,7 @@ em { color: #b42318 }`;
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if (pageSetupOpen && !selected) || selected}
+	{#if selected || imagesOpen || pageSetupOpen}
 		<div class="bar-row" class:box={!!selected} style="min-height:{barFloor}px">
 			<div class="bar-fit" bind:clientHeight={barHeight}>
 				{#if selected}
@@ -2049,6 +2172,7 @@ em { color: #b42318 }`;
 						onresettemplate={() => (resetting = true)}
 						{library}
 						{templateId}
+						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
 						ondeletetemplate={() => (deleting = true)}
@@ -2060,6 +2184,12 @@ em { color: #b42318 }`;
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
 						ondraw={(id) => (drawing = id)}
+					/>
+				{:else if imagesOpen}
+					<ImagesPanel
+						used={new Set(imageNames)}
+						onnotice={notify}
+						onchanged={() => (imagesVersion += 1)}
 					/>
 				{:else}
 					<OptionsBar
@@ -2076,6 +2206,7 @@ em { color: #b42318 }`;
 						onresettemplate={() => (resetting = true)}
 						{library}
 						{templateId}
+						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
 						ondeletetemplate={() => (deleting = true)}
@@ -2083,7 +2214,6 @@ em { color: #b42318 }`;
 						onuploadbackground={(file) => void handleBackgroundUpload(file)}
 						onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 						onnotice={notify}
-						onmenu={(open) => (barMenuOpen = open)}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
@@ -2154,7 +2284,13 @@ em { color: #b42318 }`;
 	<main
 		bind:this={mainEl}
 		class:no-data={!dataOpen}
-		style={stacked && trayShare !== null ? `--tray-h:${(trayShare * 100).toFixed(2)}%` : ''}
+		style={stacked
+			? trayShare !== null
+				? `--tray-h:${(trayShare * 100).toFixed(2)}%`
+				: ''
+			: ui.trayWidth
+				? `--tray-w:${ui.trayWidth}px`
+				: ''}
 	>
 		<PagePreview
 			{template}
@@ -2226,6 +2362,39 @@ em { color: #b42318 }`;
 
 		{#if dataOpen}
 		<aside bind:this={asideEl}>
+			{#if !stacked}
+				<!-- The edge between the page and the table, dragged to share the
+				     width between them. A separator in the ARIA sense, so the arrow
+				     keys move it too; a double-click hands the split back to the
+				     stylesheet. Stacked on a phone the table's own header is the
+				     grip instead, so this is not drawn there. -->
+				<!-- A focusable separator is a widget in ARIA — it has a value and
+				     the arrow keys change it — which the compiler's list of
+				     interactive roles does not know. -->
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+				<div
+					class="tray-grip"
+					class:on={trayResizing !== null}
+					role="separator"
+					aria-orientation="vertical"
+					aria-label="Table width"
+					aria-valuenow={ui.trayWidth}
+					aria-valuemin={TRAY_MIN_PX}
+					tabindex="0"
+					title="Drag to share the width between the page and the table — double-click to reset"
+					onpointerdown={startTrayResize}
+					onpointermove={moveTrayResize}
+					onpointerup={endTrayResize}
+					onpointercancel={endTrayResize}
+					ondblclick={() => (ui = { ...ui, trayWidth: undefined })}
+					onkeydown={(e) => {
+						if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+						e.preventDefault();
+						const now = asideEl?.getBoundingClientRect().width ?? 0;
+						setTrayWidth(now + (e.key === 'ArrowLeft' ? 24 : -24));
+					}}
+				></div>
+			{/if}
 			<DataTable
 				{dataset}
 				{tables}
@@ -2233,6 +2402,11 @@ em { color: #b42318 }`;
 				{previousTable}
 				onselecttable={(id) => void switchDataset(id)}
 				onnewtable={() => void newDataset()}
+				{usedColumns}
+				onlock={(locked) => {
+					describe(locked ? 'Lock the table' : 'Unlock the table');
+					dataset = stripUndefined({ ...$state.snapshot(dataset), locked: locked || undefined }) as Dataset;
+				}}
 				ondeletetable={() => (deletingTable = true)}
 				onswaptable={swapDataset}
 				onrenametable={renameDataset}
@@ -2265,7 +2439,10 @@ em { color: #b42318 }`;
 					// Carried across here, where all of them arrive, rather than in each
 					// of them — the one thing that does mean to change it is the rename,
 					// which does not come through here.
-					dataset = next.name === undefined && dataset.name ? { ...next, name: dataset.name } : next;
+					// The lock the same way: it is the table's, and no edit in the
+					// tray means to change it — there is a button for that.
+					const named = next.name === undefined && dataset.name ? { ...next, name: dataset.name } : next;
+					dataset = dataset.locked ? { ...named, locked: true } : named;
 					if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), next.columns);
 				}}
 			/>
@@ -2378,18 +2555,31 @@ em { color: #b42318 }`;
 <!-- What the auto layout thinks each column is, before it acts on any of it.
      The guessing is the whole feature, so it is shown rather than described:
      the list *is* the explanation, which is why there is no paragraph over it —
-     every row can be corrected, and a column set to Leave Out gets no area. -->
+     every row can be corrected, and a column unticked gets no area. -->
 {#if magic}
 	<div class="modal-backdrop" role="presentation" onclick={() => (magic = null)}></div>
 	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title" use:armDefault>
 		<h2 id="magic-title">Position Areas Automagically</h2>
 		<ul class="magic-list">
 			{#each magic as guess, index (guess.column)}
-				<li>
+				<li class:left-out={guess.include === false}>
+					<!-- In or out, apart from what it is: letting a column back in
+					     keeps whatever it was taken for. -->
+					<input
+						type="checkbox"
+						aria-label="Give {guess.column} an area"
+						title={guess.include === false ? 'Left out — tick to give it an area' : 'Untick to leave it off the card'}
+						checked={guess.include !== false}
+						onchange={(e) => {
+							const include = e.currentTarget.checked;
+							magic = magic!.map((one, i) => (i === index ? { ...one, include } : one));
+						}}
+					/>
 					<span class="magic-column" title={guess.column}>{guess.column}</span>
 					<span class="magic-sample" title={guess.sample}>{guess.sample.slice(0, 60) || '—'}</span>
 					<select
 						aria-label="What {guess.column} is"
+						disabled={guess.include === false}
 						value={guess.kind}
 						onchange={(e) => {
 							const kind = e.currentTarget.value as FieldGuess['kind'];
@@ -2732,22 +2922,6 @@ em { color: #b42318 }`;
 	/>
 {/if}
 
-{#if imagesOpen}
-	<div class="modal-backdrop" role="presentation" onclick={() => (imagesOpen = false)}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="images-title">
-		<h2 id="images-title">Images</h2>
-		<ImagesPanel
-			used={new Set(imageNames)}
-			onnotice={notify}
-			onchanged={() => (imagesVersion += 1)}
-		/>
-		<div class="modal-actions">
-			<span class="spacer"></span>
-			<button class="primary" onclick={() => (imagesOpen = false)}>Done</button>
-		</div>
-	</div>
-{/if}
-
 {#if drawingBox}
 	<BitmapEditor
 		box={drawingBox}
@@ -2845,8 +3019,45 @@ em { color: #b42318 }`;
 	main {
 		flex: 1;
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(360px, 40%);
+		/* `--tray-w` is the width the table's edge was dragged to; until then
+		   it is the share this always was. */
+		grid-template-columns: minmax(0, 1fr) var(--tray-w, minmax(360px, 40%));
 		min-height: 0;
+	}
+
+	/* Straddles the table's left edge; wider than it looks, because a 1px
+	   target is not a target. Lit while hovered, focused or held. */
+	.tray-grip {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: -4px;
+		width: 8px;
+		z-index: 5;
+		cursor: col-resize;
+		touch-action: none;
+	}
+
+	.tray-grip::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 3px;
+		width: 2px;
+		background: #2563eb;
+		opacity: 0;
+		transition: opacity 0.12s;
+	}
+
+	.tray-grip:hover::after,
+	.tray-grip:focus-visible::after,
+	.tray-grip.on::after {
+		opacity: 1;
+	}
+
+	.tray-grip:focus-visible {
+		outline: none;
 	}
 
 	main.no-data {
@@ -3180,9 +3391,16 @@ em { color: #b42318 }`;
 
 	.magic-list li {
 		display: grid;
-		grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr) 8.5rem auto;
+		grid-template-columns: auto minmax(4.5rem, auto) minmax(0, 1fr) 8.5rem auto;
 		align-items: center;
 		gap: 10px;
+	}
+
+	/* Out, but still listed: greyed, so the tick is the thing that reads. */
+	.magic-list li.left-out .magic-column,
+	.magic-list li.left-out .magic-sample {
+		color: #aaa;
+		text-decoration: line-through;
 	}
 
 	.magic-column {
@@ -3254,7 +3472,7 @@ em { color: #b42318 }`;
 		/* The sample is the first thing to go: it is there to check a guess, and
 		   on a phone the name and the control are what have to fit. */
 		.magic-list li {
-			grid-template-columns: minmax(0, 1fr) 8.5rem auto;
+			grid-template-columns: auto minmax(0, 1fr) 8.5rem auto;
 		}
 
 		.magic-sample {

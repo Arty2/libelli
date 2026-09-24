@@ -42,16 +42,30 @@ export interface StoredFont {
 const loadedGoogle = new Set<string>();
 const loadedLocal = new Set<string>();
 
-const googleHref = (family: string, weights: boolean) => {
+/**
+ * The three requests a family is tried with, richest first. Google refuses a
+ * request for any weight a family has not got, so each one either brings in
+ * exactly what the family has or fails outright — which is what lets the
+ * weight menu read the family's real weights back off `document.fonts`.
+ */
+const GOOGLE_VARIANTS = [
+	// Every weight, for a variable family — most of the modern ones.
+	':ital,wght@0,100..900;1,100..900',
+	// Regular and bold with their italics, for a static family that has them.
+	':ital,wght@0,400;0,700;1,400;1,700',
+	// Whatever the family is, for one with a single cut (Patrick Hand).
+	''
+];
+
+const googleHref = (family: string, variant: string) => {
 	const name = family.trim().replace(/\s+/g, '+');
-	const variants = weights ? ':ital,wght@0,400;0,700;1,400;1,700' : '';
-	return `https://fonts.googleapis.com/css2?family=${name}${variants}&display=swap`;
+	return `https://fonts.googleapis.com/css2?family=${name}${variant}&display=swap`;
 };
 
 /**
- * Ask Google for the bold and italic cuts first; single-weight families (Patrick
- * Hand among them) reject that request, so retry plain and let the browser
- * synthesise. Never silently substitute a different family.
+ * Ask Google for every weight first, then regular and bold, then the family
+ * as it comes — each refusal falls through to the next. Never silently
+ * substitute a different family.
  */
 export function ensureGoogleFont(family: string): void {
 	if (typeof document === 'undefined') return;
@@ -61,23 +75,118 @@ export function ensureGoogleFont(family: string): void {
 	if (!key || loadedGoogle.has(key)) return;
 	loadedGoogle.add(key);
 
-	const link = document.createElement('link');
-	link.rel = 'stylesheet';
-	link.dataset.fontFamily = name;
-	link.href = googleHref(name, true);
-	link.onerror = () => {
-		const fallback = document.createElement('link');
-		fallback.rel = 'stylesheet';
-		fallback.dataset.fontFamily = name;
-		fallback.href = googleHref(name, false);
-		// Both cuts refused: forget the family so choosing it again can retry.
-		// It was being marked loaded before anything had loaded, so a family
-		// that failed once could never be asked for again in that session.
-		fallback.onerror = () => loadedGoogle.delete(key);
-		document.head.appendChild(fallback);
-		link.remove();
+	const attempt = (index: number, previous?: HTMLLinkElement) => {
+		previous?.remove();
+		if (index >= GOOGLE_VARIANTS.length) {
+			// Every request refused: forget the family so choosing it again can
+			// retry. It was being marked loaded before anything had loaded, so a
+			// family that failed once could never be asked for again.
+			loadedGoogle.delete(key);
+			return;
+		}
+		const link = document.createElement('link');
+		link.rel = 'stylesheet';
+		link.dataset.fontFamily = name;
+		link.href = googleHref(name, GOOGLE_VARIANTS[index]);
+		link.onerror = () => attempt(index + 1, link);
+		document.head.appendChild(link);
 	};
-	document.head.appendChild(link);
+	attempt(0);
+}
+
+/** The weights the scale names, and what the menu offers when it cannot tell. */
+export const ALL_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900];
+const UNKNOWN_WEIGHTS = [300, 400, 500, 600, 700, 800];
+
+/**
+ * The weights a declared face covers: `400`, `bold`, or a variable range like
+ * `100 900`, which covers every step of the scale inside it.
+ */
+export function weightsOf(descriptor: string): number[] {
+	const words = descriptor.trim().toLowerCase().split(/\s+/);
+	const read = (word: string) => (word === 'bold' ? 700 : word === 'normal' ? 400 : Number(word));
+	const [low, high = low] = words.map(read);
+	if (!Number.isFinite(low) || !Number.isFinite(high)) return [];
+	return ALL_WEIGHTS.filter((w) => w >= Math.min(low, high) && w <= Math.max(low, high));
+}
+
+/**
+ * The weights a family actually has in this browser, read off the faces
+ * `document.fonts` holds for it — a Google stylesheet declares one per cut,
+ * whether or not it has been drawn with yet, and an uploaded file is one face.
+ * A family nothing has declared (a system face, or one still arriving) gives
+ * the old fixed list, since there is nothing to read; offering nothing would
+ * be worse than offering what might be synthesised.
+ */
+export function availableWeights(family: string | undefined): number[] {
+	const name = safeFamily(family).toLowerCase();
+	if (!name || typeof document === 'undefined' || !document.fonts) return UNKNOWN_WEIGHTS;
+	const found = new Set<number>();
+	document.fonts.forEach((face) => {
+		if (face.family.replace(/^["']|["']$/g, '').toLowerCase() !== name) return;
+		for (const w of weightsOf(face.weight)) found.add(w);
+	});
+	return found.size ? [...found].sort((a, b) => a - b) : UNKNOWN_WEIGHTS;
+}
+
+/** Every family a template draws with: the page's, and any area's own. */
+export function familiesUsed(template: Pick<Template, 'defaults' | 'boxes'>): Set<string> {
+	const used = new Set<string>();
+	for (const family of [template.defaults.font, ...template.boxes.map((b) => b.font)]) {
+		if (family) used.add(family.toLowerCase());
+	}
+	return used;
+}
+
+/**
+ * A template's font list cut down to the families it uses, and what was cut.
+ *
+ * A template is a file that is handed around, and every family it names is a
+ * request the next browser makes and — for a file upload — a banner asking for
+ * a font nobody on the card is set in. The families that go are not forgotten:
+ * they become the editor's, in this browser, and are offered under the rule
+ * in every font menu. Returns the same template when there is nothing to cut.
+ */
+export function pruneFonts<T extends Pick<Template, 'defaults' | 'boxes' | 'fonts'>>(
+	template: T
+): { template: T; dropped: FontRef[] } {
+	const used = familiesUsed(template);
+	const dropped = template.fonts.filter((f) => !used.has(f.family.toLowerCase()));
+	if (!dropped.length) return { template, dropped };
+	return { template: { ...template, fonts: template.fonts.filter((f) => used.has(f.family.toLowerCase())) }, dropped };
+}
+
+/**
+ * What a font menu offers, in two runs: the families this template uses, then
+ * under a rule everything else this browser knows — fonts uploaded or named
+ * here before, and the curated list.
+ */
+export function fontChoices(
+	template: Pick<Template, 'defaults' | 'boxes' | 'fonts'>,
+	editorFonts: FontRef[]
+): { used: string[]; others: string[] } {
+	const byName = (a: string, b: string) => a.localeCompare(b);
+	const used = familiesUsed(template);
+	const spelled = new Map<string, string>();
+	for (const family of [...template.fonts.map((f) => f.family), template.defaults.font, ...template.boxes.map((b) => b.font)]) {
+		if (family && used.has(family.toLowerCase()) && !spelled.has(family.toLowerCase())) spelled.set(family.toLowerCase(), family);
+	}
+	const others = new Map<string, string>();
+	for (const family of [...editorFonts.map((f) => f.family), ...CURATED_GOOGLE_FONTS]) {
+		const key = family.toLowerCase();
+		if (!used.has(key) && !others.has(key)) others.set(key, family);
+	}
+	return { used: [...spelled.values()].sort(byName), others: [...others.values()].sort(byName) };
+}
+
+/**
+ * Add fonts to the editor's own list, one entry per family. A later entry
+ * wins, so a family uploaded as a file replaces the Google name it shadowed.
+ */
+export function mergeFonts(list: FontRef[], added: FontRef[]): FontRef[] {
+	const out = new Map(list.map((f) => [f.family.toLowerCase(), f]));
+	for (const font of added) out.set(font.family.toLowerCase(), font);
+	return [...out.values()];
 }
 
 /**

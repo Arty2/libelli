@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	columnName,
 	normaliseHeaders,
 	parseDelimited,
 	parseTable,
@@ -46,7 +47,24 @@ describe('sniffDelimiter', () => {
 
 describe('normaliseHeaders', () => {
 	it('names blank columns and disambiguates duplicates', () => {
-		expect(normaliseHeaders(['title', '', 'title'])).toEqual(['title', 'Column 2', 'title (2)']);
+		expect(normaliseHeaders(['title', '', 'title'])).toEqual(['title', 'Column-2', 'title-2']);
+	});
+
+	it('makes every header a name that can be written between braces', () => {
+		expect(normaliseHeaders(['Artist Name', ' Year (est.) ', 'τίτλος', '#!'])).toEqual([
+			'Artist-Name',
+			'Year-est',
+			'τίτλος',
+			'Column-4'
+		]);
+	});
+});
+
+describe('columnName', () => {
+	it('turns spaces into single dashes and drops everything else', () => {
+		expect(columnName('  a  b -- c ')).toBe('a-b-c');
+		expect(columnName('{{x}}')).toBe('x');
+		expect(columnName('under_score')).toBe('under_score');
 	});
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyPlaceholders, formatDate } from './placeholders';
+import { applyPlaceholders, findColumn, formatDate, referencedColumns } from './placeholders';
 
 // Midday, so no timezone the test could run in can push it onto another day.
 const DAY = new Date(2026, 8, 7, 12, 0, 0); // Monday 7 September 2026
@@ -41,5 +41,44 @@ describe('applyPlaceholders', () => {
 	it('does not touch text with no placeholder in it', () => {
 		const text = 'Nothing to do here';
 		expect(applyPlaceholders(text, { now: DAY })).toBe(text);
+	});
+
+	it('fills a column from the row, Markdown around it and all', () => {
+		const row = { title: 'Ferns', artist: 'A. Green' };
+		expect(applyPlaceholders('**{{title}}**, {{ artist }}', { row })).toBe('**Ferns**, A. Green');
+	});
+
+	it('finds a column written with spaces or in another case', () => {
+		const row = { 'Artist-Name': 'Wren' };
+		expect(applyPlaceholders('{{Artist Name}} / {{artist-name}}', { row })).toBe('Wren / Wren');
+	});
+
+	it('substitutes once, so a cell that names itself or its neighbour cannot loop', () => {
+		const row = { a: '{{b}}', b: '{{a}}', self: 'x {{self}}' };
+		expect(applyPlaceholders('{{a}}', { row })).toBe('{{b}}');
+		expect(applyPlaceholders(row.self, { row })).toBe('x x {{self}}');
+	});
+
+	it('lets a column called date win, but a format always means the date', () => {
+		const row = { date: 'Spring' };
+		expect(applyPlaceholders('{{date}}', { row, now: DAY })).toBe('Spring');
+		expect(applyPlaceholders('{{date:YYYY}}', { row, now: DAY })).toBe('2026');
+	});
+});
+
+describe('findColumn and referencedColumns', () => {
+	const columns = ['title', 'Artist-Name'];
+
+	it('resolves a written name to the column it means', () => {
+		expect(findColumn('Title', columns)).toBe('title');
+		expect(findColumn('artist name', columns)).toBe('Artist-Name');
+		expect(findColumn('nope', columns)).toBeUndefined();
+	});
+
+	it('lists only the columns a text actually reaches', () => {
+		expect(referencedColumns('{{title}} {{date}} {{nope}} {{Artist Name}}', columns)).toEqual([
+			'title',
+			'Artist-Name'
+		]);
 	});
 });

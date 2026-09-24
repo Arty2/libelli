@@ -17,6 +17,7 @@
 		mirrors,
 		pageSide,
 		pxToMm,
+		mmToPx,
 		resolveLayout,
 		snapTo,
 		snapToEdges
@@ -151,8 +152,14 @@
 		return box.static?.text ?? '';
 	};
 
-	/** The same text as it is drawn, with `{{date}}` and its like filled in. */
-	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box));
+	/**
+	 * The same text as it is drawn, with `{{date}}` and any `{{column}}` of this
+	 * row filled in — in a cell and in an area's own words alike, once.
+	 */
+	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row });
+
+	/** The area's paragraph style, or the page's when it names none of its own. */
+	const paragraphOf = (box: Box) => box.paragraph ?? template.defaults.paragraph;
 
 	/**
 	 * What an image area resolves to: a picture, a fill, or nothing at all.
@@ -260,19 +267,31 @@
 	};
 
 	/**
-	 * An area's name, drawn in it while it has nothing of its own to draw. The
-	 * editor's doing only: `interactive` is false in every renderer that reaches
-	 * paper, a lightbox or a PNG, so a placeholder cannot be printed or
-	 * exported — and `hidden` below falls straight back to its old behaviour
-	 * there, since nothing is standing in for anything.
+	 * An area's name, drawn in it while it has nothing of its own to draw — in
+	 * its own face and size, so it shows how big what lands in it will be, and
+	 * in the accent, so it cannot be taken for content.
+	 *
+	 * Part of the bounds: it is screen furniture of the same kind, and turning
+	 * the bounds off to see the card as it prints has to take this with them.
+	 * The editor's doing only: `interactive` is false in every renderer that
+	 * reaches paper, a lightbox or a PNG, so a placeholder cannot be printed.
+	 *
+	 * An area set to hide when empty is not given one on a row that has its
+	 * column — it is hidden there, which is what that row prints — only where
+	 * it has nothing to draw from at all; see `unsourced`.
 	 */
 	const placeholderFor = (box: Box): string =>
-		interactive && unsourced(box) && isEmpty(box) ? (box.slot || 'Area') : '';
+		interactive && bounds && isEmpty(box) && (!box.hideWhenEmpty || unsourced(box)) ? box.slot || 'Area' : '';
 
+	/**
+	 * An area that hides when empty stays put where it has nothing to draw from
+	 * at all, in the editor — collapsed, it could not be clicked, selected or
+	 * moved, and it would be empty on every card there is. Bounds or no bounds.
+	 */
 	const hidden = $derived(
 		new Set(
 			template.boxes
-				.filter((b) => b.hideWhenEmpty && isEmpty(b) && !placeholderFor(b))
+				.filter((b) => b.hideWhenEmpty && isEmpty(b) && !(interactive && unsourced(b)))
 				.map((b) => b.id)
 		)
 	);
@@ -640,6 +659,33 @@
 	const soleSelection = $derived(selectedIds.length === 1);
 
 	/**
+	 * A finger, rather than a mouse — the handles' reach is wider for one, so
+	 * how short an area has to be before its marks collide depends on it.
+	 */
+	let coarse = $state(false);
+
+	$effect(() => {
+		const query = window.matchMedia('(pointer: coarse)');
+		const sync = () => (coarse = query.matches);
+		sync();
+		query.addEventListener('change', sync);
+		return () => query.removeEventListener('change', sync);
+	});
+
+	/**
+	 * Too short, on screen, for the pivot to sit clear of the top and bottom
+	 * handles: the reach of the N and S handles and the pivot's own reach
+	 * overlap across the whole height. There the resize handles win — see the
+	 * `.cramped` rule. In screen pixels, from the same numbers as the CSS: a
+	 * handle's half-mark plus reach, and the pivot's, each side of the middle.
+	 */
+	const cramped = (box: Box): boolean => {
+		const heightPx = mmToPx(layout.heights[box.id] ?? box.h) * scale;
+		const clearance = coarse ? 5 + 19 + 5.5 + 20 : 7 + 8 + 7.5 + 8;
+		return heightPx < clearance * 2;
+	};
+
+	/**
 	 * A second tap on the same area, soon enough, opens it for typing.
 	 *
 	 * `dblclick` covers a mouse and does not cover a finger: the box is
@@ -843,8 +889,10 @@
 
 		const setTop = (deltaY: number) => {
 			// An anchored box has no independent top: move its gap instead, so the
-			// relationship the template author set up survives being dragged.
-			if (origin.anchor) next.anchor = { ...origin.anchor, gap: Math.max(0, size(origin.anchor.gap + deltaY)) };
+			// relationship the template author set up survives being dragged. No
+			// floor under it — dragged up past the area it follows, it overlaps
+			// that area, with a negative gap, rather than stopping dead.
+			if (origin.anchor) next.anchor = { ...origin.anchor, gap: size(origin.anchor.gap + deltaY) };
 			else next.y = place(origin.y + deltaY, 'y');
 		};
 
@@ -946,7 +994,7 @@
 			for (const other of drag.others) {
 				const moved: Box = { ...other, x: round2(other.x + alongX(other, origin, movedX)) };
 				if (movedY) {
-					if (other.anchor) moved.anchor = { ...other.anchor, gap: Math.max(0, round2(other.anchor.gap + movedY)) };
+					if (other.anchor) moved.anchor = { ...other.anchor, gap: round2(other.anchor.gap + movedY) };
 					else moved.y = round2(other.y + movedY);
 				}
 				onchange?.(moved);
@@ -1234,6 +1282,7 @@
 				class:locked={!!box.locked}
 				class:no-padding={!box.padding}
 				class:grouped={!!box.group}
+				class:cramped={interactive && isSelected(box) && cramped(box)}
 				class:font-loading={interactive && waitingFor(box)}
 				class:flashing={flashIds.includes(box.id)}
 				class:dropping={dropId === box.id}
@@ -1292,7 +1341,12 @@
 						<span class="placeholder">{placeholderFor(box)}</span>
 					{:else if box.mode === 'markdown'}
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf -->
-						{@html renderMarkdown(contentOf(box), { size: box.size ?? template.defaults.size, md: box.md })}
+						{@html renderMarkdown(contentOf(box), {
+							size: box.size ?? template.defaults.size,
+							md: box.md,
+							paragraph: paragraphOf(box),
+							lineHeight: box.lineHeight ?? template.defaults.lineHeight
+						})}
 					{:else if box.mode === 'qr'}
 						<span class="media" style="height:{frameHeight(box)}mm">
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
@@ -1318,6 +1372,21 @@
 								{/if}
 							</span>
 						{/if}
+					{:else if paragraphOf(box)}
+						<!-- With a paragraph style, every line of plain text is a
+						     paragraph — Return starts a new one, as in any word
+						     processor — so each is a block the style can space or
+						     indent. An empty line keeps its height. -->
+						{@const para = paragraphOf(box)!}
+						{@const step = `${Math.round(para.amount * (box.lineHeight ?? template.defaults.lineHeight) * 1000) / 1000}em`}
+						<span class="paras">
+							{#each contentOf(box).split('\n') as line, i (i)}
+								<span
+									class="para"
+									style={para.mode === 'space' ? `margin-bottom:${step}` : i > 0 ? `text-indent:${step}` : ''}
+								>{line || '\u00a0'}</span>
+							{/each}
+						</span>
 					{:else}
 						<span class="plain">{contentOf(box)}</span>
 					{/if}
@@ -1354,6 +1423,15 @@
 						<svg class="chrome pad" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 					{/if}
 					<svg class="chrome selection" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+				{/if}
+
+				{#if bounds && !empty && box.overflow === 'grow' && (layout.heights[box.id] ?? box.h) > box.h + 0.05}
+					<!-- The height the area was given, where its content has grown it
+					     past that: a sparse dash in the bound's own color and weight,
+					     so it reads as the same outline, remembered. -->
+					<svg class="chrome original-edge" aria-hidden="true" style="top:{box.h}mm">
+						<line x1="0" y1="0" x2="100%" y2="0" />
+					</svg>
 				{/if}
 
 				{#if bounds && !empty && overflowing[box.id]}
@@ -1628,6 +1706,20 @@
 		white-space: pre-wrap;
 	}
 
+	/* The last paragraph's space would only push the area's own bottom down. */
+	.paras {
+		display: block;
+	}
+
+	.para {
+		display: block;
+		white-space: pre-wrap;
+	}
+
+	.para:last-child {
+		margin-bottom: 0 !important;
+	}
+
 	.page-number {
 		position: absolute;
 	}
@@ -1673,14 +1765,16 @@
 		visibility: hidden;
 	}
 
-	/* The area's own name, standing in for a row that is not there. Grey and
-	   italic, so it cannot be mistaken for content whatever color the area sets;
-	   everything else about it — face, size, alignment — is the area's own, so
-	   it shows where the area is and how big what lands in it will be. Drawn
-	   only where `interactive` is set, so nothing on paper reaches this rule. */
+	/* The area's own name, standing in for content it has not got. Italic and
+	   in the accent, so it cannot be mistaken for content whatever color the
+	   area sets; everything else about it — face, size, weight, alignment — is
+	   the area's own, so it shows where the area is and how big what lands in
+	   it will be. Drawn only where `interactive` is set, so nothing on paper
+	   reaches this rule. */
 	.placeholder {
-		color: #b0b0b0;
+		color: #2563eb;
 		font-style: italic;
+		opacity: 0.7;
 	}
 
 	/* Media has no flow height of its own, so the box's declared height is the
@@ -1841,6 +1935,17 @@
 	   the one you mean there is always the pivot — the lever has its knob. */
 	.pivot {
 		z-index: 5;
+	}
+
+	/* Except on an area too short for the pivot to clear the top and bottom
+	   handles, where the order above turns round and resizing wins. On a
+	   shallow line of type the pivot's reach covered the middle of both edges,
+	   so grabbing the edge to make the area taller moved the pivot instead —
+	   and a short area is exactly the one you most often want taller. Turning
+	   still has the lever, whose knob sits out to the side clear of the N and S
+	   handles, and the pivot can still be placed exactly from the bar. */
+	.box.cramped .handle {
+		z-index: 6;
 	}
 
 	/* Fingers are not mice: the marks stay small enough to see past, and the
@@ -2050,6 +2155,19 @@
 		.pad rect {
 			stroke: rgba(8, 145, 178, 0.8);
 			stroke-dasharray: calc(var(--line) * 2) calc(var(--line) * 2);
+		}
+
+		/* Where a grown area's bottom was set. Zero high and positioned by the
+		   declared height, so it sits exactly on that edge whatever the zoom. */
+		.original-edge {
+			inset: auto 0;
+			height: 0;
+		}
+
+		.original-edge line {
+			stroke: var(--bounds-color, rgba(37, 99, 235, 0.45));
+			stroke-width: var(--line);
+			stroke-dasharray: var(--line) calc(var(--line) * 6);
 		}
 
 		/* The line the words are cut on: dashed, the way a cut line is drawn on

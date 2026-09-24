@@ -4,8 +4,8 @@
 	import { download } from '$lib/download';
 	import { hold } from '$lib/gestures';
 	import { armDefault } from '$lib/modal';
-	import { parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
-	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
+	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
+	import { countText, dropTarget, indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
 	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
 	import type { Dataset, Row } from '$lib/types';
 
@@ -19,6 +19,14 @@
 		previousTable: string;
 		onselecttable: (id: string) => void;
 		onnewtable: () => void;
+		/**
+		 * Columns something on the card draws from — bound to an area, or named
+		 * as `{{column}}` in an area's words or a cell it shows. A column not in
+		 * here is marked, because it is data no card will print.
+		 */
+		usedColumns: Set<string>;
+		/** lock or unlock the whole table; the page owns the dataset */
+		onlock: (locked: boolean) => void;
 		ondeletetable: () => void;
 		/** back to the table before this one — the two you are working between */
 		onswaptable: () => void;
@@ -57,6 +65,8 @@
 		previousTable,
 		onselecttable,
 		onnewtable,
+		usedColumns,
+		onlock,
 		ondeletetable,
 		onswaptable,
 		onrenametable,
@@ -108,9 +118,52 @@
 	 */
 	let pickerOpen = $state(false);
 	let pickerEl = $state<HTMLElement | null>(null);
-	let pickerAt = $state({ left: 0, bottom: 0 });
+	let pickerAt = $state({ right: 0, bottom: 0 });
 
 	const tableName = $derived(dataset.name ?? '');
+
+	/** Read-only, from here and from the card — see `Dataset.locked`. */
+	const locked = $derived(!!dataset.locked);
+
+	/**
+	 * The cell being typed in, for the count under it. Held by position rather
+	 * than read off `document.activeElement`, so the count is part of the
+	 * render and follows the value as it is typed.
+	 */
+	let editing = $state<{ row: number; column: string } | null>(null);
+
+	const countLabel = (value: string) => {
+		const { characters, words } = countText(value);
+		return `${characters} character${characters === 1 ? '' : 's'} · ${words} word${words === 1 ? '' : 's'}`;
+	};
+
+	/**
+	 * A cell opened full size: press and hold it. A cell of a long body of
+	 * Markdown is a keyhole at the height a table row can spare, so the whole
+	 * thing gets a dialog of its own. It edits a draft — Cancel means cancel —
+	 * and Ctrl/Cmd+Enter is Done, because Return is a newline in here.
+	 */
+	let bigCell = $state<{ row: number; column: string; draft: string } | null>(null);
+
+	function openBigCell(rowIndex: number, column: string) {
+		const value = dataset.rows[rowIndex]?.[column];
+		if (value === undefined) return false;
+		// The small field under the press still has the focus, and would keep
+		// the count and the outline lit behind the dialog.
+		(document.activeElement as HTMLElement | null)?.blur();
+		bigCell = { row: rowIndex, column, draft: value };
+		onactivate(rowIndex);
+	}
+
+	function closeBigCell(keep: boolean) {
+		const open = bigCell;
+		bigCell = null;
+		if (!keep || !open || locked) return;
+		if ((dataset.rows[open.row]?.[open.column] ?? '') === open.draft) return;
+		setCell(open.row, open.column, open.draft);
+	}
+
+	const focusOnOpen = (node: HTMLElement) => node.focus();
 
 	function togglePicker() {
 		if (pickerOpen) {
@@ -120,7 +173,9 @@
 		const box = pickerEl?.getBoundingClientRect();
 		// Upwards: this bar is at the bottom of the tray, so a menu hanging below
 		// it would be off the screen.
-		if (box) pickerAt = { left: box.left, bottom: window.innerHeight - box.top + 4 };
+		// Hung from its right edge, since the picker sits at the right-hand end
+		// of the bar and a menu reaching rightwards from it would leave the window.
+		if (box) pickerAt = { right: window.innerWidth - box.right, bottom: window.innerHeight - box.top + 4 };
 		pickerOpen = true;
 	}
 
@@ -230,9 +285,82 @@
 
 	let trayClick = false;
 
+	/**
+	 * Drag a header sideways to move its column.
+	 *
+	 * The same claim-the-movement arrangement as the tray grip above, turned on
+	 * its side: a press that goes nowhere is the name field or the button under
+	 * it, and a press that travels sideways is the column being carried. Not
+	 * HTML drag and drop, which cannot be started from inside a text field
+	 * without the field losing its text selection to the drag, and which has no
+	 * touch path at all.
+	 *
+	 * `before` is the gap the column would land in, 0 to the column count, so
+	 * the mark can be drawn on the edge the pointer is nearest.
+	 */
+	let carrying = $state<{ id: number; from: number; x: number; y: number; on: boolean; before: number } | null>(null);
+	let headEls = $state<Array<HTMLElement | null>>([]);
+
+	function watchCarry(on: boolean) {
+		const method = on ? window.addEventListener : window.removeEventListener;
+		method('pointermove', moveCarry);
+		method('pointerup', endCarry);
+		method('pointercancel', endCarry);
+	}
+
+	$effect(() => () => watchCarry(false));
+
+	function startCarry(event: PointerEvent, index: number) {
+		if (locked || event.button !== 0 || dataset.columns.length < 2) return;
+		const target = event.target as HTMLElement;
+		if (target.closest('.resize, button')) return;
+		carrying = { id: event.pointerId, from: index, x: event.clientX, y: event.clientY, on: false, before: index };
+		watchCarry(true);
+	}
+
+	function moveCarry(event: PointerEvent) {
+		if (!carrying || carrying.id !== event.pointerId) return;
+		if (!carrying.on) {
+			const dx = Math.abs(event.clientX - carrying.x);
+			if (dx < TRAY_SLOP || dx < Math.abs(event.clientY - carrying.y)) return;
+			// Whichever gesture moved first has it: a tray already being pulled
+			// is not also a column being carried.
+			if (traying?.on) {
+				carrying = null;
+				watchCarry(false);
+				return;
+			}
+			traying = null;
+			watchTray(false);
+			carrying.on = true;
+			(document.activeElement as HTMLElement | null)?.blur();
+		}
+		window.getSelection()?.removeAllRanges();
+		let before = dataset.columns.length;
+		for (let i = 0; i < headEls.length; i++) {
+			const box = headEls[i]?.getBoundingClientRect();
+			if (box && event.clientX < box.left + box.width / 2) {
+				before = i;
+				break;
+			}
+		}
+		carrying.before = before;
+	}
+
+	function endCarry(event: PointerEvent) {
+		if (!carrying || carrying.id !== event.pointerId) return;
+		const { on, from, before } = carrying;
+		carrying = null;
+		watchCarry(false);
+		if (!on || event.type === 'pointercancel') return;
+		// The press that carried the column is not also a press on the name
+		// field or the button it was let go over.
+		trayClick = true;
+		const to = dropTarget(from, before);
+		if (to !== from) onchange(moveColumn(dataset, from, to));
+	}
+
 	let pasteOpen = $state(false);
-	/** Emptying the table asks once — see the dialog for why once is enough. */
-	let clearing = $state(false);
 	/**
 	 * A column deletion asks too. A row is one card; a column is a field of every
 	 * card at once, and it takes the binding of any area that was drawing from it
@@ -335,9 +463,9 @@
 			// and closes something behind this.
 			event.stopPropagation();
 			pickerOpen = false;
-		} else if (clearing) {
+		} else if (bigCell) {
 			event.stopPropagation();
-			clearing = false;
+			closeBigCell(false);
 		} else if (confirmColumn !== null) {
 			event.stopPropagation();
 			confirmColumn = null;
@@ -347,20 +475,10 @@
 		}
 	}
 
-	function clearData() {
-		clearing = false;
-		const rows = dataset.rows.length;
-		onchange({ columns: [], rows: [] });
-		onactivate(0);
-		sortedBy = null;
-		unsorted = null;
-		selectedRows = new Set();
-		onnotice(`Deleted every row and column — ${rows} row${rows === 1 ? '' : 's'} gone. Ctrl/Cmd+Z brings them back.`);
-	}
-
 	const emptyRow = (columns: string[]): Row => Object.fromEntries(columns.map((c) => [c, '']));
 
 	function setCell(rowIndex: number, column: string, value: string) {
+		if (locked) return;
 		const before = dataset.rows[rowIndex];
 		const after = { ...before, [column]: value };
 		// The label a row wears comes from finding it in `unsorted`, and rows are
@@ -386,9 +504,14 @@
 		return at === -1 ? index + 1 : at + 1;
 	}
 
-	function renameColumn(index: number, name: string) {
+	function renameColumn(index: number, name: string, field?: HTMLInputElement) {
 		const from = dataset.columns[index];
-		const to = name.trim() || from;
+		// A column name is also a word written between braces — see columnName.
+		const to = columnName(name) || from;
+		// The field shows what was taken, not what was typed: Svelte will not
+		// rewrite a value whose state did not change, so a name reduced to the
+		// one it already had would sit in the header looking accepted.
+		if (field) field.value = to;
 		if (to === from) return;
 		if (dataset.columns.includes(to)) {
 			onnotice(`There is already a column called “${to}”.`, 'warning');
@@ -410,6 +533,7 @@
 	}
 
 	function shiftColumn(index: number, by: number) {
+		if (locked) return;
 		const target = index + by;
 		if (target < 0 || target >= dataset.columns.length) return;
 		onchange(moveColumn(dataset, index, target));
@@ -458,7 +582,8 @@
 	 * no name it still generates one, which is what an import path wants.
 	 */
 	function addColumn(name?: string) {
-		const wanted = name?.trim();
+		if (locked) return;
+		const wanted = name === undefined ? undefined : columnName(name) || undefined;
 		if (wanted && dataset.columns.includes(wanted)) {
 			onnotice(`There is already a column called \u201c${wanted}\u201d.`, 'warning');
 			return;
@@ -466,8 +591,8 @@
 		let column = wanted ?? '';
 		if (!column) {
 			let n = dataset.columns.length + 1;
-			while (dataset.columns.includes(`Column ${n}`)) n++;
-			column = `Column ${n}`;
+			while (dataset.columns.includes(`Column-${n}`)) n++;
+			column = `Column-${n}`;
 		}
 		const columns = [...dataset.columns, column];
 		// The first column brings a row with it. A column with nothing under it
@@ -516,6 +641,7 @@
 
 	/** The trailing placeholder row calls this with whatever was typed into it. */
 	function addRow(column?: string, value = '') {
+		if (locked) return;
 		const row = emptyRow(dataset.columns);
 		if (column) row[column] = value;
 		// Appended to the arrival order too, so it takes the next number rather
@@ -563,6 +689,7 @@
 	}
 
 	function deleteChosen() {
+		if (locked) return;
 		const gone = new Set(chosenRows);
 		if (!gone.size) return;
 		const rows = dataset.rows.filter((_, i) => !gone.has(i));
@@ -597,6 +724,10 @@
 	}
 
 	function commitImport(parsed: Dataset, mode: 'replace' | 'append') {
+		if (locked) {
+			onnotice('The table is locked — unlock it to paste or import into it.', 'warning');
+			return;
+		}
 		// The one place the emptiness policy is decided, for the paste and the
 		// file import alike — see `wouldEmptyTable`. A mis-click in a file picker
 		// should not cost you the table.
@@ -737,14 +868,34 @@
 						{/if}
 					</th>
 					{#each dataset.columns as column, i (column)}
-						<th scope="col" aria-sort={sortedBy?.column === column ? (sortedBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+						<th
+							scope="col"
+							bind:this={headEls[i]}
+							class:carried={carrying?.on && carrying.from === i}
+							class:drop-before={carrying?.on && carrying.before === i}
+							class:drop-after={carrying?.on && i === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
+							aria-sort={sortedBy?.column === column ? (sortedBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+							onpointerdown={(e) => startCarry(e, i)}
+						>
 							<span class="column-head">
+							<!-- Data nothing on the card prints: no area is bound to it and
+							     nothing names it as {{column}}. Worth saying, because it is
+							     either a column still to be placed or one that can go. -->
+							{#if !usedColumns.has(column)}
+								<span
+									class="unused"
+									role="img"
+									title="No area uses “{column}” — bind one to it, or write {`{{${column}}}`} in one"
+									aria-label="Not used on the card"
+								><Icon name="unlink" size={12} /></span>
+							{/if}
 							<input
 								class="column-name"
 								value={column}
+								readonly={locked}
 								aria-label="Rename column {column}"
-								title="Rename this column"
-								onchange={(e) => renameColumn(i, e.currentTarget.value)}
+								title={locked ? column : 'Rename this column — drag it sideways to move it'}
+								onchange={(e) => renameColumn(i, e.currentTarget.value, e.currentTarget)}
 							/>
 							<span class="column-tools">
 								<!-- Three states on the one control: A-Z, Z-A, and the order the
@@ -769,9 +920,16 @@
 										size={14}
 									/>
 								</button>
-								<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
-								<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
-								<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
+								<!-- Only on hover or while the header has the focus: three
+								     buttons in every header, always, were the name's room. The
+								     keyboard still reaches them, since a focused name shows them. -->
+								{#if !locked}
+									<span class="column-move">
+										<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
+										<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
+										<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
+									</span>
+								{/if}
 							</span>
 							</span>
 							<!-- The right edge of the header is the grip, which is where
@@ -796,9 +954,11 @@
 						     column and naming it are two things, and the header is
 						     already editable in place. -->
 						<th class="ghost" scope="col">
-							<button class="icon add" title="Add a column" aria-label="Add a column" onclick={() => addColumn()}>
-								<Icon name="add" size={16} />
-							</button>
+							{#if !locked}
+								<button class="icon add" title="Add a column" aria-label="Add a column" onclick={() => addColumn()}>
+									<Icon name="add" size={16} />
+								</button>
+							{/if}
 						</th>
 				</tr>
 			</thead>
@@ -835,14 +995,25 @@
 						</td>
 						{#each dataset.columns as column (column)}
 							<td class:bound={!!selectedColumn && column === selectedColumn}>
+								<!-- Press and hold for the whole cell in a dialog of its own. -->
 								<textarea
 									rows="1"
 									aria-label="{column}, row {rowLabel(row, i)}"
+									title={locked ? undefined : 'Press and hold to open this cell full size'}
 									value={row[column] ?? ''}
-									onfocus={() => onactivate(i)}
+									readonly={locked}
+									use:hold={() => openBigCell(i, column)}
+									onfocus={() => {
+										editing = { row: i, column };
+										onactivate(i);
+									}}
+									onblur={() => (editing = null)}
 									onclick={(e) => e.stopPropagation()}
 									oninput={(e) => setCell(i, column, e.currentTarget.value)}
 								></textarea>
+								{#if editing?.row === i && editing.column === column}
+									<span class="count" aria-live="polite">{countLabel(row[column] ?? '')}</span>
+								{/if}
 							</td>
 						{/each}
 						<td></td>
@@ -865,7 +1036,7 @@
 						</td>
 					</tr>
 				{/if}
-				{#if dataset.columns.length}
+				{#if dataset.columns.length && !locked}
 					<!-- One button under the last row, centred on the gutter it sits in. -->
 					<tr class="ghost-row">
 						<td class="gutter">
@@ -883,16 +1054,63 @@
 	<!-- One line, always: this bar wrapping was costing the table a row of its
 	     own height every time the tray narrowed. -->
 	<div class="actions">
-		<!-- What table this is, in front of everything that acts on it. One
+		{#if chosenRows.length}
+			<!-- What you can do to the rows you have chosen, in front of the things
+			     that act on the whole table, with a rule between the two. It appears
+			     only when there is a selection, so the bar is its usual length the
+			     rest of the time.
+
+			     Copy is one word and the glyph does the rest: a clipboard with
+			     something leaving it. Delete is a word too, rather than a bare bin
+			     in red: it is the one button here that takes rows away, and it
+			     should read as a button that does, not as a mark beside a count. -->
+			<span class="chosen-count">{chosenRows.length}</span>
+			<button
+				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
+				onclick={copyTsv}
+			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
+			<button
+				class="danger"
+				title="Delete the chosen rows"
+				disabled={locked}
+				onclick={deleteChosen}
+			><Icon name="trash" size={15} /> Delete</button>
+			<span class="rule"></span>
+		{/if}
+		<button disabled={locked} title="Paste a block of cells straight off a spreadsheet" onclick={() => (pasteOpen = true)}>
+			<Icon name="task-add" size={15} /> Paste
+		</button>
+		<button
+			use:hold={() => (locked ? false : onloadsample())}
+			disabled={locked}
+			title="Import a CSV file — press and hold to load the sample cards instead"
+			onclick={() => fileInput?.click()}><Icon name="table-shortcut" size={15} /> Import CSV…</button
+		>
+		<button onclick={exportCsv} disabled={!dataset.columns.length}>
+			<Icon name="table-built" size={15} /> Export CSV
+		</button>
+		<!-- The same button the page bar has for the design, and never disabled
+		     by the lock it sets, or there would be no way out of it. -->
+		<button
+			aria-pressed={locked}
+			title={locked ? 'Unlock the table' : 'Lock the table — no typing, no new rows or columns, no paste or import'}
+			onclick={() => onlock(!locked)}
+		>
+			<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
+			{locked ? 'Unlock' : 'Lock'}
+		</button>
+		<span class="spacer"></span>
+		<!-- What table this is, at the far end of the bar: the buttons act on it,
+		     and it is the one control here that is a name rather than an act. One
 		     design prints any number of tables, so this is not the template
-		     picker's second half: the two are switched independently, and
-		     switching either leaves the other exactly where it was. -->
+		     picker's second half: the two are switched independently. -->
 		<label class="picker" bind:this={pickerEl}>
 			<span>Table</span>
 			<input
 				value={tableName}
 				placeholder={UNTITLED_TABLE}
 				aria-label="Table name"
+				readonly={locked}
 				onchange={(e) => onrenametable(e.currentTarget.value)}
 			/>
 			<button
@@ -903,10 +1121,14 @@
 				aria-label="Saved tables"
 				onclick={togglePicker}
 			>
-				<Icon name="caret-down" size={12} />
+				<Icon name="caret-down" size={18} />
 			</button>
 			{#if pickerOpen}
-				<ul class="picker-menu" role="menu" style="left:clamp(8px, {pickerAt.left}px, 100vw - 13rem);bottom:{pickerAt.bottom}px">
+				<ul
+					class="picker-menu"
+					role="menu"
+					style="right:clamp(8px, {pickerAt.right}px, 100vw - 13rem);bottom:{pickerAt.bottom}px"
+				>
 					{#each tables as entry (entry.id)}
 						<li role="none">
 							<button
@@ -917,7 +1139,9 @@
 									if (entry.id !== tableId) onselecttable(entry.id);
 								}}
 							>
-								<span class="mark" aria-hidden="true">{entry.id === tableId ? '•' : ''}</span>
+								<span class="mark" aria-hidden="true">
+									{#if entry.id === tableId}<Icon name="checkmark" size={16} />{/if}
+								</span>
 								{entry.name}
 							</button>
 						</li>
@@ -932,22 +1156,23 @@
 								onnewtable();
 							}}
 						>
-							<span class="mark" aria-hidden="true"></span>
-							<Icon name="add" size={12} /> New table…
+							<span class="mark" aria-hidden="true"><Icon name="add" size={14} /></span>
+							New table…
 						</button>
 					</li>
 					<li role="none">
 						<button
 							class="danger"
 							role="menuitem"
+							disabled={locked}
 							title="Delete this table from this browser. Your design is not touched."
 							onclick={() => {
 								pickerOpen = false;
 								ondeletetable();
 							}}
 						>
-							<span class="mark" aria-hidden="true"></span>
-							<Icon name="trash" size={12} /> Delete this table…
+							<span class="mark" aria-hidden="true"><Icon name="trash" size={14} /></span>
+							Delete this table…
 						</button>
 					</li>
 				</ul>
@@ -967,59 +1192,6 @@
 			aria-label="Swap to the previous table"
 			onclick={onswaptable}
 		><Icon name="arrows-horizontal" size={15} /></button>
-		<span class="rule"></span>
-		{#if chosenRows.length}
-			<!-- What you can do to the rows you have chosen, in front of the things
-			     that act on the whole table, with a rule between the two. It appears
-			     only when there is a selection, so the bar is its usual length the
-			     rest of the time.
-
-			     Two things in one order: out of the app, gone.
-
-			     Copy is one word and the glyph does the rest: a clipboard with
-			     something leaving it, which is the only question a copy button
-			     raises here — this app has a clipboard for looks as well, and a
-			     Duplicate on the card, and neither of them is this. It carries
-			     the word because two overlapping squares could be any of the
-			     three.
-
-			     Duplicating rows is gone with the icon that stood for it: it was a
-			     third mark to tell apart in the smallest bar in the app, and
-			     copying the rows and pasting them back is the same act in two
-			     presses that say what they do. -->
-			<span class="chosen-count">{chosenRows.length}</span>
-			<button
-				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
-				onclick={copyTsv}
-			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
-			<button
-				class="icon danger"
-				title="Delete the chosen rows"
-				aria-label="Delete the chosen rows"
-				onclick={deleteChosen}
-			><Icon name="trash" size={15} /></button>
-			<span class="rule"></span>
-		{/if}
-		<button title="Paste a block of cells straight off a spreadsheet" onclick={() => (pasteOpen = true)}>
-			<Icon name="task-add" size={15} /> Paste
-		</button>
-		<button
-			use:hold={onloadsample}
-			title="Import a CSV file — press and hold to load the sample cards instead"
-			onclick={() => fileInput?.click()}><Icon name="table-shortcut" size={15} /> Import CSV…</button
-		>
-		<button onclick={exportCsv} disabled={!dataset.columns.length}>
-			<Icon name="table-built" size={15} /> Export CSV
-		</button>
-		<span class="spacer"></span>
-		<button
-			class="danger"
-			title="Delete every row and column"
-			disabled={!dataset.columns.length && !dataset.rows.length}
-			onclick={() => (clearing = true)}
-		>
-			<Icon name="trash" size={15} /> Delete
-		</button>
 		<input
 			bind:this={fileInput}
 			type="file"
@@ -1030,21 +1202,29 @@
 	</div>
 </section>
 
-<!-- One question, and it is a count rather than a paragraph. It used to ask
-     twice and explain undo both times; a warning nobody reads is not a warning,
-     and the second press was only ever a way of not reading the first. -->
-{#if clearing}
-	<div class="modal-backdrop" role="presentation" onclick={() => (clearing = false)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete all data?" use:armDefault>
-		<h2>Delete all data?</h2>
-		<p>
-			{dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'}, {dataset.columns.length}
-			column{dataset.columns.length === 1 ? '' : 's'}.
-		</p>
+{#if bigCell}
+	{@const open = bigCell}
+	<div class="modal-backdrop" role="presentation" onclick={() => closeBigCell(false)}></div>
+	<div class="modal cell-editor" role="dialog" aria-modal="true" aria-labelledby="cell-editor-title">
+		<h2 id="cell-editor-title">{open.column}, row {rowLabel(dataset.rows[open.row], open.row)}</h2>
+		<textarea
+			value={open.draft}
+			rows="14"
+			readonly={locked}
+			use:focusOnOpen
+			oninput={(e) => (bigCell = { ...open, draft: e.currentTarget.value })}
+			onkeydown={(e) => {
+				if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+					e.preventDefault();
+					closeBigCell(true);
+				}
+			}}
+		></textarea>
 		<div class="modal-actions">
+			<span class="count-line">{countLabel(open.draft)}</span>
 			<span class="spacer"></span>
-			<button onclick={() => (clearing = false)}>Cancel</button>
-			<button class="danger-solid" data-default onclick={clearData}>Delete All Data</button>
+			<button onclick={() => closeBigCell(false)}>Cancel</button>
+			<button class="primary" title="Ctrl/Cmd+Enter" onclick={() => closeBigCell(true)}>Done</button>
 		</div>
 	</div>
 {/if}
@@ -1209,11 +1389,49 @@
 		background: #fff;
 	}
 
-	.column-tools {
+	.column-tools,
+	.column-move {
 		display: inline-flex;
 		flex: none;
 		gap: 1px;
+	}
+
+	.column-tools {
 		opacity: 0.35;
+	}
+
+	/* Moving and deleting only when the header is being pointed at or has the
+	   focus; the sort stays, because it is also where the sort order is shown. */
+	.column-move {
+		display: none;
+	}
+
+	th:hover .column-move,
+	th:focus-within .column-move {
+		display: inline-flex;
+	}
+
+	/* No area prints this column. Quiet, because it is a fact about the data
+	   and not a fault: a column held back for later is a legitimate thing. */
+	.unused {
+		display: inline-grid;
+		place-items: center;
+		flex: none;
+		color: #b26a00;
+		cursor: help;
+	}
+
+	/* A column being carried, and the gap it would land in. */
+	th.carried {
+		opacity: 0.45;
+	}
+
+	th.drop-before {
+		box-shadow: inset 3px 0 0 #2563eb;
+	}
+
+	th.drop-after {
+		box-shadow: inset -3px 0 0 #2563eb;
 	}
 
 	/* The grip straddles the rule between two columns, which is where the
@@ -1279,12 +1497,46 @@
 		height: 100%;
 		border: none;
 		background: transparent;
-		resize: vertical;
+		/* No grip: the field is the cell, and the cell's height is the row's.
+		   A handle that sized one field inside a row sized by another was a
+		   control that could only ever make the two disagree. */
+		resize: none;
 		font: 12px/1.45 ui-sans-serif, system-ui, sans-serif;
 		padding: 5px 6px;
 		box-sizing: border-box;
 		field-sizing: content;
 		max-height: 6.5rem;
+	}
+
+	/* `height: 1px` gives the cell a definite height for the field's `100%`
+	   to resolve against — the table stretches every cell to the row's
+	   tallest anyway, so the 1px is never what is drawn. Without it the
+	   percentage resolved to auto and the field stopped a line or three short
+	   of the cell around it, which is the band of dead white this removes. */
+	tbody td {
+		height: 1px;
+		position: relative;
+	}
+
+	td textarea:read-only {
+		cursor: default;
+	}
+
+	/* Characters and words, under the cell being typed in. Over the field's own
+	   bottom edge rather than below it, so the row does not grow by a line the
+	   moment a cell is entered. */
+	.count {
+		position: absolute;
+		right: 3px;
+		bottom: 2px;
+		z-index: 2;
+		padding: 0 4px;
+		border-radius: 3px;
+		background: rgba(255, 255, 255, 0.92);
+		font: 10px/1.5 ui-sans-serif, system-ui, sans-serif;
+		color: #767676;
+		pointer-events: none;
+		font-variant-numeric: tabular-nums;
 	}
 
 	td textarea:focus {
@@ -1476,10 +1728,6 @@
 		padding: 0;
 	}
 
-	.actions .icon.danger {
-		border-color: #b42318;
-		color: #b42318;
-	}
 
 	/* The field is a value with a line under it, and the caret sits against that
 	   line rather than carrying a frame of its own — the same shape the page
@@ -1520,9 +1768,11 @@
 	}
 
 	.picker .caret {
+		display: grid;
+		place-items: center;
 		border: none;
 		background: none;
-		padding: 2px;
+		padding: 0;
 		margin-left: -2px;
 		color: #555;
 		border-radius: 3px;
@@ -1584,8 +1834,14 @@
 	   and would lend the menu a column of empty boxes. */
 	.picker-menu .mark {
 		flex: none;
-		width: 0.7rem;
+		display: inline-grid;
+		place-items: center;
+		width: 1rem;
 		color: #1a5fb4;
+	}
+
+	.picker-menu button.danger .mark {
+		color: inherit;
 	}
 
 	.picker-menu hr {
@@ -1647,6 +1903,12 @@
 		flex: 1;
 	}
 
+	.actions button[aria-pressed='true'] {
+		border-color: #2563eb;
+		color: #2563eb;
+		background: #eaf1fe;
+	}
+
 	button.primary {
 		background: #111;
 		border-color: #111;
@@ -1704,6 +1966,17 @@
 		border: 1px solid #ccc;
 		border-radius: var(--radius-input);
 		resize: vertical;
+	}
+
+	.cell-editor textarea {
+		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+		min-height: 40dvh;
+	}
+
+	.count-line {
+		font-size: 12px;
+		color: #767676;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.modal-actions {
