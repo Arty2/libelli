@@ -481,7 +481,8 @@ text itself previews it and chooses it; the tick in the gutter chooses several
 without moving the preview off the card you are looking at, and the tick in the
 corner of the header chooses every row or drops every row — it shows a dash while
 some but not all of them are chosen, which is what the next press will change.
-Whatever the table has to say goes to the app's status bar, so there is one place
+Whatever the table has to say goes to the app's status bar — tap it to read a
+long notice whole, in a dialog — so there is one place
 a notice can appear.
 
 - **Paste** — a modal that takes a block of cells off a spreadsheet. Tabs, commas and
@@ -499,8 +500,10 @@ a notice can appear.
   header's corner is how you say *all of them*. Its mark is a clipboard with
   something leaving it — this app has a clipboard for looks as well, and a
   Duplicate on the card, and the glyph is what tells the three apart.
-- **Import CSV** — the same parser against a whole file, header and all. Press
-  and *hold* the button instead of clicking it, and the four sample cards come
+- **Import CSV** — in the **Table** menu, with **Export CSV** beside it; Paste
+  keeps its button in the bar, since it is the one done over and over. The same
+  parser against a whole file, header and all. Press and *hold* the menu item
+  instead of clicking it, and the four sample cards come
   back: they walk through the app, and they are somewhere to start when a blank
   table is not. Your rows are replaced, the template is untouched, and
   Ctrl/Cmd+Z undoes it. A file holding no rows is **refused rather than
@@ -1091,19 +1094,11 @@ exactly the corner you may have reached for it to nudge — press and hold that
 middle chip and the pad comes with your finger. It can be pushed off the edge of
 the stage to get that corner back, as far as the middle chip: the arm you are
 not using goes out of sight, the chip you pick it up by never does. It is not
-drawn at all when nothing it could move is selected, and an area whose top comes
-from an anchor shows the link on its two vertical keys rather than an arrow that
-would do nothing: the millimetres between the two areas are the **Gap** in the
-bar. Those two keys keep the pad's own face — a faded mark on them, not a faded
-key, which would read as a hole in the cross — and they are not dead: they carry
-the two ways out of the tie. **Hold one** and the selection walks up the tie, to
-the area this one is following: that is where the Gap you actually want is, and
-finding that area by eye on a full page is the hard part. **Tap one three times**
-in a row and the tie itself goes, leaving the area exactly where it was sitting —
-the resolved top is written back as its own, so nothing jumps. Three rather than
-one, because these keys are also where a finger goes to nudge; after the first
-tap the key wears the broken link, and the run lapses after a second and a half,
-so the second and third taps are a decision rather than an accident.
+drawn at all when nothing it could move is selected. On an area whose top comes
+from an anchor, the two vertical keys change the **Gap** instead — the
+millimetres between it and the area it follows — and say so with a stop bar and
+a triangle rather than an arrow: the bar is the edge of that area, so up is
+towards it and down is away. They repeat on a hold like the arrows do.
 
 ### Touch gestures
 

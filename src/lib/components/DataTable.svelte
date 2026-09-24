@@ -845,7 +845,10 @@
 					<th class="gutter" scope="col">
 						<!-- Where the row ticks are, and wearing the same mark, because it
 						     is the same act reaching every row at once. Only while there
-						     are rows: a tick over an empty table chooses nothing. -->
+						     are rows: a tick over an empty table chooses nothing. Laid out
+						     in the same row the rows' own ticks are, so it sits in the
+						     same column as theirs rather than centred on its own. -->
+						<span class="gutter-line">
 						{#if dataset.rows.length}
 							<button
 								class="tick"
@@ -866,6 +869,7 @@
 						{:else if !dataset.rows.length}
 							<span class="sr-only">Row</span>
 						{/if}
+						</span>
 					</th>
 					{#each dataset.columns as column, i (column)}
 						<th
@@ -975,6 +979,7 @@
 						onclick={() => pickRow(i)}
 					>
 						<td class="gutter">
+							<span class="gutter-line">
 							<button
 								class="tick"
 								role="checkbox"
@@ -992,6 +997,7 @@
 							     sorting carries it along, so you can see where a row came
 							     from and find it again after unsorting. -->
 							<span class="number">{rowLabel(row, i)}</span>
+							</span>
 						</td>
 						{#each dataset.columns as column (column)}
 							<td class:bound={!!selectedColumn && column === selectedColumn}>
@@ -1080,15 +1086,6 @@
 		<button disabled={locked} title="Paste a block of cells straight off a spreadsheet" onclick={() => (pasteOpen = true)}>
 			<Icon name="task-add" size={15} /> Paste
 		</button>
-		<button
-			use:hold={() => (locked ? false : onloadsample())}
-			disabled={locked}
-			title="Import a CSV file — press and hold to load the sample cards instead"
-			onclick={() => fileInput?.click()}><Icon name="table-shortcut" size={15} /> Import CSV…</button
-		>
-		<button onclick={exportCsv} disabled={!dataset.columns.length}>
-			<Icon name="table-built" size={15} /> Export CSV
-		</button>
 		<!-- The same button the page bar has for the design, and never disabled
 		     by the lock it sets, or there would be no way out of it. -->
 		<button
@@ -1160,6 +1157,42 @@
 							New table…
 						</button>
 					</li>
+					<!-- Files in and out, with the table they act on rather than in
+					     the bar: they are errands, done once, and Paste — the one done
+					     over and over — keeps its button. -->
+					<li role="none">
+						<button
+							role="menuitem"
+							disabled={locked}
+							title="Replace the rows with a CSV file — press and hold to load the sample cards instead"
+							use:hold={() => {
+								if (locked) return false;
+								pickerOpen = false;
+								onloadsample();
+							}}
+							onclick={() => {
+								pickerOpen = false;
+								fileInput?.click();
+							}}
+						>
+							<span class="mark" aria-hidden="true"><Icon name="table-shortcut" size={14} /></span>
+							Import CSV…
+						</button>
+					</li>
+					<li role="none">
+						<button
+							role="menuitem"
+							disabled={!dataset.columns.length}
+							onclick={() => {
+								pickerOpen = false;
+								exportCsv();
+							}}
+						>
+							<span class="mark" aria-hidden="true"><Icon name="table-built" size={14} /></span>
+							Export CSV
+						</button>
+					</li>
+					<li role="separator"><hr /></li>
 					<li role="none">
 						<button
 							class="danger"
@@ -1591,10 +1624,22 @@
 		color: #1d4ed8;
 	}
 
+	/* The tick and what follows it — the row's number, or in the header the
+	   unsort mark — as one flex row, centred on each other vertically and
+	   starting at the same x in every row, header included. As inline boxes they
+	   sat on a baseline, so the number's line box and the tick's nudge decided
+	   where each landed, and the header's lone tick was centred in the cell
+	   while the rows' ticks sat left of their numbers. */
+	.gutter-line {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
 	.gutter .number {
 		min-width: 1.2em;
-		display: inline-block;
 		text-align: right;
+		line-height: 1;
 	}
 
 	/* A square, not a radio: several rows can be chosen at once, and the
@@ -1602,9 +1647,8 @@
 	.tick {
 		width: 11px;
 		height: 11px;
-		margin-right: 4px;
+		flex: none;
 		padding: 0;
-		vertical-align: -1px;
 		border: 1px solid #bbb;
 		border-radius: var(--radius-input);
 		background: #fff;

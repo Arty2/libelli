@@ -1214,12 +1214,15 @@ itself — which is the same reason every cell carries a transparent border on a
 four edges. On a touch screen this is the one control with no cursor to say it
 is a control, and a flat outline was doing nothing to say so.
 
-**A tied key is not disabled, it is refused.** The two vertical keys of the pad
-can do nothing for an anchored area, but `disabled` makes a button dead to the
-pointer — and the hold that walks the selection up the tie has to arrive
-somehow. So the press is refused in the handler instead, and the key keeps the
-pad's own face with only its mark faded: a fully faded key reads as a hole in
-the cross rather than as a direction this area cannot go.
+**A tied key moves the gap.** The pad's vertical keys used to refuse an
+anchored area, wearing a chain, and carried two gestures instead: a hold that
+walked the selection up the tie, and three taps that broke it. Neither was a
+thing anybody would guess, and the one thing the keys could plainly do —
+change the Gap, which is what `nudgeBox` already does to an anchored area for
+the arrow keys on a keyboard — they did not. They do now, with the ordinary
+press-and-repeat, and wear Carbon's stop-and-triangle turned to point along the
+key: the bar is the followed area's edge, so the mark says towards and away
+rather than up and down. Breaking a tie is the badge on the area's corner.
 
 **A pinch zooms the page, wherever it lands.** It briefly sized the type of the
 area under it instead, on the reasoning that the page has a zoom menu, a wheel

@@ -353,6 +353,9 @@
 	 */
 	let statusTone = $state<'info' | 'warning'>('info');
 
+	/** The status line, whole, in a dialog — it is one ellipsised row otherwise. */
+	let statusOpen = $state(false);
+
 	function notify(text: string, tone: 'info' | 'warning' = 'info') {
 		status = text;
 		statusTone = tone;
@@ -1745,8 +1748,9 @@ em { color: #b42318 }`;
 			redo();
 			return;
 		}
-		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu || resetting || deleting || deletingTable || magic)) {
+		if (event.key === 'Escape' && (helpOpen || statusOpen || cssOpen || boxMenu || resetting || deleting || deletingTable || magic)) {
 			helpOpen = false;
+			statusOpen = false;
 			if (cssOpen) cancelCss();
 			resetting = false;
 			deleting = false;
@@ -2086,7 +2090,7 @@ em { color: #b42318 }`;
 				? 'Page setup — the area bar has the row; this takes it back'
 				: 'Show or hide the page setup'}
 		>
-			<Icon name="document-configuration" size={15} /> <span class="label">Page Setup</span>
+			<Icon name="document-blank" size={15} /> <span class="label">Page Setup</span>
 		</button>
 		<!-- Every stored picture, as a bar of its own in the same row as the
 		     other two: the pictures are the browser's, not the page's — a row's
@@ -2343,6 +2347,7 @@ em { color: #b42318 }`;
 			ontext={setBoxText}
 			onrescue={rescueStrays}
 			modalOpen={helpOpen ||
+				statusOpen ||
 				cssOpen ||
 				previewOpen ||
 				lightboxOpen ||
@@ -2451,10 +2456,14 @@ em { color: #b42318 }`;
 	</main>
 
 	<footer class="status-bar">
-		<!-- `title` because the line is one ellipsised row: a long notice was
-		     otherwise cut off with no way to read the rest of it. -->
-		<span class="status" class:warning={statusTone === 'warning'} role="status" title={status}>
-			{#if statusTone === 'warning'}<Icon name="warning" size={12} />{/if}{status}
+		<!-- One ellipsised row, so a long notice is cut off; a tap opens the
+		     whole of it. A button inside the live region rather than the region
+		     itself, so what a screen reader announces is still the notice. The
+		     `title` stays for a mouse that only wants a glance. -->
+		<span class="status" class:warning={statusTone === 'warning'} role="status">
+			<button class="status-text" title={status} disabled={!status} onclick={() => (statusOpen = true)}>
+				{#if statusTone === 'warning'}<Icon name="warning" size={12} />{/if}<span>{status}</span>
+			</button>
 		</span>
 		{#if updateReady}
 			<button class="reload" onclick={applyUpdate}>Update</button>
@@ -2462,6 +2471,20 @@ em { color: #b42318 }`;
 		<span class="version">v{VERSION}</span>
 	</footer>
 </div>
+
+{#if statusOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (statusOpen = false)}></div>
+	<div class="modal narrow" role="dialog" aria-modal="true" aria-label="Notice" use:armDefault>
+		<p class="status-full" class:warning={statusTone === 'warning'}>
+			{#if statusTone === 'warning'}<Icon name="warning" size={14} />{/if}
+			<span>{status}</span>
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button class="primary" data-default onclick={() => (statusOpen = false)}>OK</button>
+		</div>
+	</div>
+{/if}
 
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
@@ -3118,9 +3141,52 @@ em { color: #b42318 }`;
 		white-space: nowrap;
 	}
 
+	/* The notice as a button, dressed as the line of text it is: it only has
+	   to say, on hover, that there is more of it to read. */
+	.status-text {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+		max-width: 100%;
+		padding: 0;
+		border: none;
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.status-text:disabled {
+		cursor: default;
+	}
+
+	.status-text > span {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.status-text:hover:not(:disabled) > span {
+		text-decoration: underline dotted;
+		text-underline-offset: 2px;
+	}
+
+	.status-full {
+		display: flex;
+		align-items: flex-start;
+		gap: 6px;
+		margin: 0 0 4px;
+		font-size: 13px;
+		line-height: 1.5;
+		color: #222;
+	}
+
 	/* Something went wrong reads differently from something happened. The same
 	   mark the canvas uses for a box that is clipping what will print. */
-	.status.warning {
+	.status.warning,
+	.status-full.warning {
 		color: #b42318;
 	}
 
