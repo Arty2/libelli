@@ -199,7 +199,11 @@ resize boxes directly, or type exact millimetres.
   the short arm to its right is the lever, and swinging that turns the area. The
   arm runs rightward rather than downward because an area is usually wider than
   it is tall: pointing down, the knob sat over the bottom resize handles, and
-  grabbing the bottom edge of a shallow area turned it instead. Holding
+  grabbing the bottom edge of a shallow area turned it instead. On an area too
+  short for the pivot to sit clear of the top and bottom handles, the **resize
+  handles take priority** over the pivot and the lever — a shallow line of type is
+  the area you most often want taller; turn it with the knob, which sits out to
+  the side, and place its pivot from the bar. Holding
   <kbd>⇧</kbd> while you swing snaps to 15°. Both are drawn whether or not there
   is any rotation yet, because the lever is the rotation control and has to be
   there before there is a rotation to show; the **X** and **Y** in the bar place

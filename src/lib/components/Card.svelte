@@ -17,6 +17,7 @@
 		mirrors,
 		pageSide,
 		pxToMm,
+		mmToPx,
 		resolveLayout,
 		snapTo,
 		snapToEdges
@@ -651,6 +652,33 @@
 	const soleSelection = $derived(selectedIds.length === 1);
 
 	/**
+	 * A finger, rather than a mouse — the handles' reach is wider for one, so
+	 * how short an area has to be before its marks collide depends on it.
+	 */
+	let coarse = $state(false);
+
+	$effect(() => {
+		const query = window.matchMedia('(pointer: coarse)');
+		const sync = () => (coarse = query.matches);
+		sync();
+		query.addEventListener('change', sync);
+		return () => query.removeEventListener('change', sync);
+	});
+
+	/**
+	 * Too short, on screen, for the pivot to sit clear of the top and bottom
+	 * handles: the reach of the N and S handles and the pivot's own reach
+	 * overlap across the whole height. There the resize handles win — see the
+	 * `.cramped` rule. In screen pixels, from the same numbers as the CSS: a
+	 * handle's half-mark plus reach, and the pivot's, each side of the middle.
+	 */
+	const cramped = (box: Box): boolean => {
+		const heightPx = mmToPx(layout.heights[box.id] ?? box.h) * scale;
+		const clearance = coarse ? 5 + 19 + 5.5 + 20 : 7 + 8 + 7.5 + 8;
+		return heightPx < clearance * 2;
+	};
+
+	/**
 	 * A second tap on the same area, soon enough, opens it for typing.
 	 *
 	 * `dblclick` covers a mouse and does not cover a finger: the box is
@@ -1247,6 +1275,7 @@
 				class:locked={!!box.locked}
 				class:no-padding={!box.padding}
 				class:grouped={!!box.group}
+				class:cramped={interactive && isSelected(box) && cramped(box)}
 				class:font-loading={interactive && waitingFor(box)}
 				class:flashing={flashIds.includes(box.id)}
 				class:dropping={dropId === box.id}
@@ -1899,6 +1928,17 @@
 	   the one you mean there is always the pivot — the lever has its knob. */
 	.pivot {
 		z-index: 5;
+	}
+
+	/* Except on an area too short for the pivot to clear the top and bottom
+	   handles, where the order above turns round and resizing wins. On a
+	   shallow line of type the pivot's reach covered the middle of both edges,
+	   so grabbing the edge to make the area taller moved the pivot instead —
+	   and a short area is exactly the one you most often want taller. Turning
+	   still has the lever, whose knob sits out to the side clear of the N and S
+	   handles, and the pivot can still be placed exactly from the bar. */
+	.box.cramped .handle {
+		z-index: 6;
 	}
 
 	/* Fingers are not mice: the marks stay small enough to see past, and the
