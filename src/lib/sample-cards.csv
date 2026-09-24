@@ -7,10 +7,10 @@ Go ahead and change *This is a card* in the table. The title changes as you type
 
 ## Import & Export
 
-- **In:** paste cells straight out of Excel, Sheets or Numbers — no header row, no clean-up — or bring a whole file with **Import CSV…**.
+- **In:** paste cells straight out of Excel, Sheets or Numbers — no header row, no clean-up — or bring a whole file with **Import CSV…**
 - **Out:** **Export…** prints the cards or saves each one as a PNG. **Export CSV** saves the words, and **Export** in the template menu saves just the design, small enough to send in a message.
 
-No account, no upload, no server: nothing leaves this browser. Install libelli from your browser and it works offline, or scan the corner to open it on your phone. Want this tour back? Press and hold **Import CSV…**.",Start here,https://libelli.vercel.app,,
+No account, no upload, no server: nothing leaves this browser. Install libelli from your browser and it works offline, or scan the corner to open it on your phone. Want this tour back? Press and hold **Import CSV…**",Start here,https://libelli.vercel.app,,
 Cells can do more than words,"Markdown, colour, and the art of leaving things out","## Formatting without a toolbar
 
 Any cell can carry **bold**, *italic*, ~~strikethrough~~, `code`, lists and [links](https://heracl.es/libelli). Want a few words in colour? Write `[this]{red}` and you get [this]{red}. Hex, `rgb()` and names like [green]{green} or [purple]{purple} all work, and `red` prints as a printer's red rather than your screen's.

@@ -1421,16 +1421,19 @@ subtitle and sticker opt out of the mirror so a left-hand page does not push its
 title to the right.
 
 The template also carries the two things a row cannot: an area of its own
-text, `{{date:YYYY-MM-DD}}`, in the footer, and a paragraph indent on the body.
+text, `{{date:YYYY-MM-DD}}`, centred in the footer so it holds still
+while the rest of the footer mirrors, and a paragraph indent on the body.
 Card 2 shows `{{title}}` filled in inside a cell and `{{column}}` left as
 written, which is the literal form for free — no column is called `column`,
 and an unrecognised name is never eaten. A date cannot be shown that way,
 since `{{date…}}` is always replaced, so the card points at the footer
 instead of spelling it out.
 
-Four families, each with a job: Fraunces for titles, Newsreader to read,
-Patrick Hand only for the handwritten subtitle, Space Mono for the kicker and
-the date. The hand face everywhere made every card look like a sticky note.
+Three families, each with a job: Fraunces, large and light, for titles;
+Instrument Sans for everything that is read, subtitles and the date included;
+and Patrick Hand for the kicker pill alone. The hand face on titles and body
+made every card look like a sticky note — as one small label it is the
+personality, and the rest can be set like a book.
 
 They stay inside what `markdown.ts` actually supports, and the QR URLs are
 decoded by an independent decoder in the verification pass, because a QR that
