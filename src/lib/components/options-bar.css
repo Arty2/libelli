@@ -301,17 +301,6 @@
 	border-right-color: #cfdcf3;
 }
 
-/* The page bar's head is one line — the template and its lock — and has a
-   line of its own, ruled off from the settings under it in the bar's own
-   border grey. A title line rather than one more group in the wrap, so the
-   name of what you are setting up is always the first thing, on its own. */
-.options .head.page-head {
-	flex: 1 0 100%;
-	padding: 0 0 8px;
-	border-right: none;
-	border-bottom: 1px solid #ddd;
-}
-
 .options .head-row {
 	display: inline-flex;
 	align-items: center;
@@ -439,6 +428,18 @@
 		overscroll-behavior: contain;
 		gap: 6px 8px;
 		padding: 6px 8px;
+	}
+
+	/* The page bar's head — the template and its lock — on a line of its own,
+	   ruled off from the settings under it in the bar's border grey. Only
+	   here: on a phone the bar wraps to a column of short rows whatever
+	   happens, and the name of what you are setting up is worth a line. On a
+	   desk the same line cost the whole bar a row, pushing the page down for
+	   a rule, so there the head wraps in with the groups like the area bar's. */
+	.options .head.page-head {
+		flex: 1 0 100%;
+		padding: 0 0 6px;
+		border-bottom: 1px solid #ddd;
 	}
 
 	/* On a phone the bar is one column of wrapped controls anyway, so the head's

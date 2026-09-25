@@ -1190,8 +1190,10 @@ instead of the full-screen look.
 
 Each bar opens with a head — what this is and what it is called, then the
 buttons that act on it — and runs in groups after that, outward from the thing
-itself. The page bar's head is a line of its own, the template and its lock,
-ruled off from the settings under it by a hairline in the bar's border grey.
+itself. On a phone the page bar's head — the template and its lock — is a line
+of its own, ruled off from the settings under it in the bar's border grey; on a
+wider screen it shares the first row with them, so the bar takes no more height
+than it has to.
 
 - **Page** — head: the template's name and the library behind its caret, which
   also holds new, import, export, reset and delete, then lock ·

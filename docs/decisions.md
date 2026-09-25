@@ -1305,12 +1305,19 @@ respected would be a fence with three gaps in it. Sorting is left free: it
 reorders what prints but changes no card's words, and a locked table you cannot
 even sort to read is a table you unlock to read.
 
-**The cell field fills its cell with `height: 1px` on the `td`.** A percentage
-height inside a table cell resolves only against a definite height; the table
-stretches every cell to the row anyway, so the 1px is never drawn, and without
-it the field stopped short of its cell and left a band that looked like the
-target and was not. With the field the full height, its resize grip had nothing
-to do except make one cell disagree with its row, so it is gone.
+**The cell field fills its cell with `height: 1px` on the `td` — where
+`field-sizing` exists.** A percentage height inside a table cell resolves only
+against a definite height; the table stretches every cell to the row anyway, so
+the 1px is never drawn, and without it the field stopped short of its cell. But
+that trick is only safe where the fields' own content sets the row's height.
+Applied everywhere, a browser without `field-sizing` (Safari, so every iPhone)
+resolved the 100% against the declared 1px and collapsed the field to its own
+padding, text cut off inside it. So it is inside `@supports (field-sizing:
+content)`, and elsewhere a field is a fixed three lines that scroll — the
+fallback AGENTS.md already names. The field is `display: block` in both, since
+an inline one sits on a baseline with a descender's gap of cell under it. With
+the field the full height, its resize grip had nothing to do except make one
+cell disagree with its row, so it is gone.
 
 **The first column brings a row with it.** The button that adds a row is drawn
 under the row numbers, which only exist once there is a column — so a table with
@@ -2078,12 +2085,12 @@ forty cards sharing one logo reads it once and holds one object URL for it.
 
 ## `src/lib/components/PageOptions.svelte`
 
-**The page bar's head is a line of its own.** With Import, Export and Reset in
-the menu, the head is the template's name and its lock and nothing else, and
-wrapped in with the groups it was one more group — the name of the thing being
-set up could land mid-row. A full-width first line, ruled off in the bar's own
-border grey, keeps it first and alone; the cost is one line of height, which the
-row's floor absorbs anyway.
+**The page bar's head is a line of its own on a phone only.** With Import,
+Export and Reset in the menu the head is the template's name and its lock, and
+on a phone, where the bar wraps to a column of short rows anyway, it takes a
+full-width first line ruled off in the bar's border grey. On a desk the same
+line cost the bar a whole row and pushed the page down for the sake of a rule,
+so there the head wraps in with the groups.
 
 **Everything that acts on the template as a whole is in the picker's menu;
 Lock is not.** Import, Export and Reset were a row of buttons under the name,

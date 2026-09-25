@@ -1537,10 +1537,22 @@
 
 	   The old `min-width` is gone with it: the colgroup owns the widths now, and
 	   a field that refused to go under 9rem was a floor under every column. */
+	/* A block, not the inline-block a textarea is by default: inline, it sat
+	   on the line's baseline with a descender's worth of cell under it, so the
+	   field never reached the bottom of its own cell.
+
+	   The fixed height is the fallback, for a browser without
+	   `field-sizing` (Safari, so every browser on an iPhone): three lines and
+	   a scroll, which is the one standing exception AGENTS.md names. It used to
+	   be `height: 100%` everywhere, and there that percentage resolved against
+	   the cell's declared `height: 1px` below rather than the row's real
+	   height — a field collapsed to its own padding, with the text inside it
+	   cut off where nobody could see it. */
 	td textarea {
+		display: block;
 		width: 100%;
 		min-width: 0;
-		height: 100%;
+		height: 4.5rem;
 		border: none;
 		background: transparent;
 		/* No grip: the field is the cell, and the cell's height is the row's.
@@ -1550,18 +1562,30 @@
 		font: 12px/1.45 ui-sans-serif, system-ui, sans-serif;
 		padding: 5px 6px;
 		box-sizing: border-box;
-		field-sizing: content;
 		max-height: 6.5rem;
 	}
 
-	/* `height: 1px` gives the cell a definite height for the field's `100%`
-	   to resolve against — the table stretches every cell to the row's
-	   tallest anyway, so the 1px is never what is drawn. Without it the
-	   percentage resolved to auto and the field stopped a line or three short
-	   of the cell around it, which is the band of dead white this removes. */
 	tbody td {
-		height: 1px;
 		position: relative;
+	}
+
+	/* Where the field can size itself to its words, it does, and fills the
+	   row: `height: 1px` gives the cell a definite height for the field's
+	   `100%` to resolve against — the table stretches every cell to the row's
+	   tallest anyway, so the 1px is never what is drawn. Without it the
+	   percentage resolved to auto and the field stopped short of the cell
+	   around it, a band of dead white that looked like the target and was
+	   not. Only here, because only here is the row's height coming from the
+	   fields' own content rather than from the fixed fallback above. */
+	@supports (field-sizing: content) {
+		td textarea {
+			height: 100%;
+			field-sizing: content;
+		}
+
+		tbody td {
+			height: 1px;
+		}
 	}
 
 	td textarea:read-only {
