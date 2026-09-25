@@ -192,7 +192,10 @@ already have read the last version of. So: no bump until the PR exists, then
 - **Verify in a real browser, not just in tests.** Every feature here has been
   driven in headless Chromium — geometry read back in mm, PDFs counted page by
   page, dialogs opened and dismissed. Say what was actually checked, and say it
-  plainly; if something was not checked, say that too.
+  plainly; if something was not checked, say that too. Scripts and screenshots
+  from that driving go in a scratch directory outside the repository, never in
+  it: read `git status` before any `git add -A`, and commit nothing you did not
+  write on purpose.
 - **Read what the build emitted, not the config you wrote.** A config option
   that is silently dropped looks exactly like one that works. After a change to
   anything the toolchain rewrites — the service worker's precache list, the
