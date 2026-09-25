@@ -5,6 +5,10 @@ node_modules
 .vercel
 *.local
 
+# Screenshots a verification script leaves at the root: nothing the app ships
+# is a PNG at the top level, and three were committed by accident.
+/*.png
+
 # Local-only self-improvement log — one line per `npm run gates` run. See
 # AGENTS.md § Rules that execute. Never make this a CI artifact or upload it
 # anywhere: the whole point is that it stays on the machine that produced it.
