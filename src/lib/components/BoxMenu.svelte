@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { SHORTCUTS } from '$lib/keys';
 	import type { AlignEdge } from '$lib/layout';
 	import type { Box, Template } from '$lib/types';
 
@@ -146,10 +147,10 @@
 	     and it wants to be pressed four times in a row rather than reopened from
 	     a menu between each press. -->
 	<button role="menuitem" onclick={() => run(oncopystyle)}>
-		<Icon name="copy" size={15} /> Copy Style
+		<Icon name="copy" size={15} /> Copy Style<span class="shortcut">{SHORTCUTS.copyStyle}</span>
 	</button>
 	<button role="menuitem" disabled={frozen || !hasStyle} onclick={() => run(onpastestyle)}>
-		<Icon name="paste" size={15} /> Paste Style{plural}
+		<Icon name="paste" size={15} /> Paste Style{plural}<span class="shortcut">{SHORTCUTS.pasteStyle}</span>
 	</button>
 
 	<hr />
@@ -161,10 +162,10 @@
 		</button>
 	{/if}
 	<button role="menuitem" disabled={frozen} onclick={() => run(onduplicate)}>
-		<Icon name="replicate" size={15} /> Duplicate{plural}
+		<Icon name="replicate" size={15} /> Duplicate{plural}<span class="shortcut">{SHORTCUTS.duplicate}</span>
 	</button>
 	<button class="danger" role="menuitem" disabled={frozen || (!many && !!box.locked)} onclick={() => run(ondelete)}>
-		<Icon name="trash" size={15} /> Delete{plural}
+		<Icon name="trash" size={15} /> Delete{plural}<span class="shortcut">{SHORTCUTS.delete}</span>
 	</button>
 </div>
 
@@ -243,6 +244,14 @@
 		grid-template-columns: repeat(6, 1fr);
 		gap: 1px;
 		padding: 2px;
+	}
+
+	/* The key, at the far end of the item, the way every menu says one. */
+	.shortcut {
+		margin-left: auto;
+		padding-left: 16px;
+		color: #767676;
+		font-size: 11px;
 	}
 
 	.align-row button {

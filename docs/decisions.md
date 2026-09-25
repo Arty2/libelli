@@ -2403,6 +2403,33 @@ used to keep everything, so going back found it — and static words carried int
 an image or a data field stayed in the template, read by anything that looks at
 an area's words. Undo is the way back, as for every other destructive edit.
 
+## Rows, files and keys
+
+**A row is dragged by its number.** The number is the one part of a row that
+is not a field or a tick, so it is the grip: pointer events, captured, and a
+finger holds before it carries, as a column does, so a swipe over the numbers
+still scrolls. A chosen row carries every chosen row, in their own order —
+`moveRowsTo` in table.ts, tested — and the choice follows its rows rather than
+ticking the row that was dragged. The drop line is drawn on every cell of the
+row it lands before, over the fields, as the column's is.
+
+**Several PNGs are one ZIP.** A run of fifty was fifty downloads, which a
+browser either asks about each time or stops allowing after a few. `zip.ts`
+writes stored entries — a PNG is already compressed, and storing needs no
+deflate, so no dependency — with a CRC-32 each and a central directory; the
+tests check the structure and the standard CRC check value, and the file was
+opened with Python's `zipfile` to be sure. No ZIP64: it refuses past 4 GB. The
+cost is that nothing is saved until the end, so a failure part-way saves none.
+
+**One table of shortcut labels.** A title that named its key by hand drifted:
+Redo's said Ctrl+Shift+Z, the A/B toggle. `SHORTCUTS` and `withKey` in keys.ts
+are where a tooltip gets a key from, and the right-click menu prints them too.
+
+**The unsaved dot is about the file.** Templates autosave in this browser, so
+"unsaved" would never be true in that sense; what can be lost is the file. A
+CRC of the template as last exported — or as first held here — is kept per
+template, and the dot shows while the design differs from it.
+
 ## `src/lib/components/MenuSelect.svelte`
 
 **One menu, drawn like the template picker.** The zoom and both font menus were

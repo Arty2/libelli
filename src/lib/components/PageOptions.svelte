@@ -51,6 +51,8 @@
 		/** every saved template, and which of them is loaded */
 		library: TemplateEntry[];
 		templateId: string;
+		/** the design has changed since it was last exported to a file */
+		unsaved?: boolean;
 		onselecttemplate: (id: string) => void;
 		onnewtemplate: () => void;
 		ondeletetemplate: () => void;
@@ -76,6 +78,7 @@
 		onresettemplate,
 		library,
 		templateId,
+		unsaved = false,
 		onselecttemplate,
 		onnewtemplate,
 		ondeletetemplate,
@@ -380,6 +383,17 @@
 						disabled={pageFrozen}
 						onchange={(e) => patchTemplate({ name: e.currentTarget.value })}
 					/>
+					<!-- A dot, the way an editor marks a file with changes not yet
+					     written out: this browser keeps the design either way, but the
+					     exported file is what outlives it. -->
+					{#if unsaved}
+						<span
+							class="unsaved"
+							role="img"
+							aria-label="Changed since last exported"
+							title="Changed since it was last exported — Export in this menu writes the file"
+						></span>
+					{/if}
 					<button
 						class="caret"
 						aria-haspopup="menu"

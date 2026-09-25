@@ -109,3 +109,22 @@ export function moveRows<T>(rows: T[], chosen: number[], by: -1 | 1): { rows: T[
 	}
 	return moved ? { rows: next, chosen: [...taken].sort((a, b) => a - b) } : { rows, chosen: order.sort((a, b) => a - b) };
 }
+
+/**
+ * The given rows taken out and put back, in their own order, into the gap
+ * before row `before` — 0 to `rows.length`, counted in the table as it was.
+ * What a row dragged by its number does, and a chosen set dragged by any one
+ * of theirs. Returns the rows and where the moved ones now are; the same rows
+ * object when the drop changes nothing.
+ */
+export function moveRowsTo<T>(rows: T[], indices: number[], before: number): { rows: T[]; chosen: number[] } {
+	const moving = [...new Set(indices)].filter((i) => i >= 0 && i < rows.length).sort((a, b) => a - b);
+	if (!moving.length) return { rows, chosen: [] };
+	const taken = new Set(moving);
+	const kept = rows.filter((_, i) => !taken.has(i));
+	// The gap, counted again among the rows that stay.
+	const at = Math.max(0, Math.min(kept.length, before - moving.filter((i) => i < before).length));
+	const next = [...kept.slice(0, at), ...moving.map((i) => rows[i]), ...kept.slice(at)];
+	const chosen = moving.map((_, k) => at + k);
+	return next.every((row, i) => row === rows[i]) ? { rows, chosen: moving } : { rows: next, chosen };
+}

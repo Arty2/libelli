@@ -617,8 +617,12 @@ a notice can appear.
   height last. With rows chosen the bar says how many — *3 rows* — and says
   nothing for one, whose tick already says it.
 - **Moving rows** — with rows chosen, the up and down chevrons before **Copy**
-  move them a row at a time, as a block; row order is print order. A sort
-  that was on is dropped, since the rows are no longer in it.
+  move them a row at a time, as a block; row order is print order. Or **drag a
+  row by its number** to anywhere in the table — a blue line shows where it will
+  land — and if it is one of the chosen rows, all of them go, in their own
+  order. With a finger, hold the number a moment first, as for a column. Either
+  way a sort that was on is dropped, since the rows are no longer in it, and
+  what was chosen stays chosen.
 - **Which area it feeds** — entering a cell flashes the areas on the card that
   print it, in the bounds' blue, for a moment.
 - **A cell full size** — press **Edit**, press and hold a cell, press the
@@ -1031,7 +1035,10 @@ run. Choosing which pages go is at the left of that screen and **Print** and
 **PNG** are at the right, because the two are not one row of three equal things.
 From it: **Print**, or **PNG** — one 300 dpi file per selected page, or with
 **Pages per Sheet** on, one per sheet instead, each carrying every card tiled
-onto it — rendered here, with no library, by carrying the element into an SVG
+onto it. More than one file comes as **one ZIP** of them, named in print order,
+rather than as a download apiece that a browser asks about each time; the ZIP
+is written here too, stored rather than compressed, since a PNG already is. All
+rendered here, with no library, by carrying the element into an SVG
 `foreignObject` and drawing that to a canvas. Every face is embedded: uploaded
 ones from this browser, and a Google family by fetching the stylesheet the
 page already loaded and the font files it points at. That fetch is confined to
@@ -1179,6 +1186,10 @@ the window as both bars wrap differently at different widths.
 
 ## Keyboard shortcuts
 
+Every button that has a key says so in its tooltip, and the right-click menu
+lists them against its items — from one table in `keys.ts`, so a tooltip cannot
+name a key the app does not listen for.
+
 | Keys | Action |
 | --- | --- |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>z</kbd> | Undo |
@@ -1325,8 +1336,10 @@ of its own, ruled off from the settings under it in the bar's border grey; on a
 wider screen it shares the first row with them, so the bar takes no more height
 than it has to.
 
-- **Page** — head: the lock, then the template's name and the library behind
-  its caret, which also holds new, import, export, reset and delete ·
+- **Page** — head: the lock, then the template's name — with a blue **dot**
+  beside it when the design has changed since it was last exported to a file
+  (or since it was created or imported) — and the library behind its caret,
+  which also holds new, import, export, reset and delete ·
   sheet size (a preset or your own, a button to turn it over, and left and
   right pages), margin (one number all round, or one per edge — top, bottom and
   left and right, or inner and outer with left and right pages), bleed, crop marks · type defaults (font, size, leading,

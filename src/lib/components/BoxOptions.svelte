@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import ColorField from './ColorField.svelte';
+	import { withKey } from '$lib/keys';
 	import './options-bar.css';
 	import { cssIdent } from '$lib/css';
 	import { parseColor } from '$lib/color';
@@ -560,8 +561,8 @@
 						/>
 					</label>
 				{/if}
-				<button onclick={onduplicate} disabled={pageFrozen}><Icon name="replicate" size={14} /> Duplicate</button>
-				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen}>
+				<button onclick={onduplicate} disabled={pageFrozen} title={withKey('Duplicate this area', 'duplicate')}><Icon name="replicate" size={14} /> Duplicate</button>
+				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen} title={withKey('Delete this area', 'delete')}>
 					<Icon name="trash" size={14} /> Delete
 				</button>
 			</span>

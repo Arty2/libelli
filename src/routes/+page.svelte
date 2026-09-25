@@ -48,7 +48,7 @@
 		toggleSelection,
 		type BoxStyle
 	} from '$lib/boxops';
-	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport } from '$lib/keys';
+	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport, withKey } from '$lib/keys';
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
@@ -100,8 +100,11 @@
 		storageAvailable,
 		saveUi,
 		type DatasetEntry,
-		type TemplateEntry
+		type TemplateEntry,
+		loadSavedSig,
+		saveSavedSig
 	} from '$lib/storage';
+	import { crc32 } from '$lib/zip';
 	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
@@ -1081,6 +1084,36 @@
 		// change off", and only this chord may put it back.
 		toggledOff = true;
 	}
+
+	// ---- changed since it was last written out --------------------------------
+
+	/**
+	 * Whether the design differs from the file it was last exported to — or,
+	 * for one never exported, from how it was when this browser first held it
+	 * (created, imported, or opened before this mark existed). Autosave keeps
+	 * the working copy in this browser either way; the mark is about the file,
+	 * which is what survives the browser. A CRC of the export, not the export,
+	 * is what is remembered: one number per template.
+	 */
+	const templateSig = $derived(String(crc32(new TextEncoder().encode(JSON.stringify(template)))));
+	let savedSig = $state('');
+
+	$effect(() => {
+		if (!ready) return;
+		const id = templateId;
+		untrack(() => {
+			const stored = loadSavedSig(id);
+			if (stored) savedSig = stored;
+			else markSaved();
+		});
+	});
+
+	function markSaved() {
+		savedSig = templateSig;
+		saveSavedSig(templateId, templateSig);
+	}
+
+	const unsaved = $derived(ready && !!savedSig && savedSig !== templateSig);
 
 	// ---- autosave -----------------------------------------------------------
 
@@ -2098,6 +2131,7 @@
 
 	function doExportTemplate() {
 		download(`${slugify(template.name)}.json`, exportTemplate($state.snapshot(template)));
+		markSaved();
 		notify('Template exported — fonts referenced by name.');
 	}
 
@@ -2270,7 +2304,7 @@
 				<Icon name="package" size={15} /> Install
 			</button>
 		{/if}
-		<button class="help" onclick={() => (helpOpen = true)} title="How this works, and the keys">
+		<button class="help" onclick={() => (helpOpen = true)} title={withKey("How this works, and the keys", "help")}>
 			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
 		<button
@@ -2325,7 +2359,7 @@
 			class="primary export"
 			onclick={requestPrint}
 			disabled={!dataset.rows.length}
-			title="Open every card as a page to print or save"
+			title={withKey('Open every card as a page to print or save', 'export')}
 		>
 			<Icon name="document-multiple" size={15} /> <span class="label">Export…</span>
 		</button>
@@ -2375,6 +2409,7 @@
 					onresettemplate={() => {}}
 					{library}
 					{templateId}
+					{unsaved}
 					{editorFonts}
 					onselecttemplate={() => {}}
 					onnewtemplate={() => {}}
@@ -2408,6 +2443,7 @@
 						onresettemplate={() => (resetting = true)}
 						{library}
 						{templateId}
+						{unsaved}
 						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
@@ -2448,6 +2484,7 @@
 						onresettemplate={() => (resetting = true)}
 						{library}
 						{templateId}
+						{unsaved}
 						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}

@@ -29,6 +29,7 @@
 		/** fonts this browser knows that the template is not carrying */
 		editorFonts: FontRef[];
 		templateId: string;
+		unsaved?: boolean;
 		onselecttemplate: (id: string) => void;
 		onnewtemplate: () => void;
 		ondeletetemplate: () => void;

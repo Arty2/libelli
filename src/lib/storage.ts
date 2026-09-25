@@ -114,6 +114,15 @@ export const loadUi = (): UiState => {
 export const saveUi = (ui: UiState) => local.set('ui', ui);
 
 /**
+ * A fingerprint of each template as it was last exported (or first seen, or
+ * imported), so the page bar can mark one that has changed since. Templates
+ * autosave in this browser, so "saved" here means "written out to a file":
+ * the file is what survives this browser, and what the mark is about.
+ */
+export const loadSavedSig = (id: string): string => local.get<string>(`template:saved:${id}`, '');
+export const saveSavedSig = (id: string, sig: string) => local.set(`template:saved:${id}`, sig);
+
+/**
  * The editor's own fonts: families this browser has been given — a file
  * uploaded, a Google name typed in — that no template currently carries. A
  * template keeps only the families it is set in (see `pruneFonts`); the rest

@@ -46,7 +46,7 @@ src/lib/
   tile.ts         a drawing cropped to its ink, for an area that repeats
   table.ts        column reorder, row sorting
   imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
-  download.ts     hand the browser a file; the one copy both exports use
+  download.ts     hand the browser a file; zip.ts packs several into one
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
   assets.ts       images — page backgrounds and a row's own; bytes in a folder or IndexedDB

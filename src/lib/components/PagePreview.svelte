@@ -2,6 +2,7 @@
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
 	import { isDark } from '$lib/color';
+	import { SHORTCUTS, withKey } from '$lib/keys';
 	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
@@ -890,7 +891,7 @@
 					<button
 						class="step"
 						disabled={activeRow <= 0}
-						title="Previous card"
+						title={withKey('Previous card', 'cards')}
 						aria-label="Previous card"
 						onclick={() => onactivate(Math.max(0, activeRow - 1))}
 					><Icon name="caret-left" size={18} /></button>
@@ -904,7 +905,7 @@
 					<button
 						class="step"
 						disabled={activeRow >= rowCount - 1}
-						title="Next card"
+						title={withKey('Next card', 'cards')}
 						aria-label="Next card"
 						onclick={() => onactivate(Math.min(rowCount - 1, activeRow + 1))}
 					><Icon name="caret-right" size={18} /></button>
@@ -918,10 +919,10 @@
 	     toggles are along the bottom. -->
 	<div class="rail">
 		<div class="corner">
-			<button class="square" onclick={onundo} disabled={!undoable} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
+			<button class="square" onclick={onundo} disabled={!undoable} title={withKey('Undo', 'undo')} aria-label="Undo">
 				<Icon name="undo" size={16} />
 			</button>
-			<button class="square" onclick={onredo} disabled={!redoable} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
+			<button class="square" onclick={onredo} disabled={!redoable} title={withKey('Redo', 'redo')} aria-label="Redo">
 				<Icon name="redo" size={16} />
 			</button>
 		</div>
@@ -1056,7 +1057,7 @@
 		     which of the two it is currently drawing. -->
 		<label
 			use:hold={() => ongridstyle(gridStyle === 'dots' ? 'lines' : 'dots')}
-			title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it (Ctrl/Cmd+' or Ctrl/Cmd+#). Press and hold for {gridStyle ===
+			title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it ({SHORTCUTS.grid}). Press and hold for {gridStyle ===
 			'dots'
 				? 'ruled lines'
 				: 'a dot grid'}."
@@ -1070,7 +1071,7 @@
 			<span class="wide">{gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
 			<span class="narrow" aria-hidden="true">#</span>
 		</label>
-		<label title="The page margins, drawn and snapped to — screen only, never printed (Ctrl/Cmd+; or |)">
+		<label title={withKey('The page margins, drawn and snapped to — screen only, never printed', 'guides')}>
 			<input
 				type="checkbox"
 				aria-label="Guides"
@@ -1080,7 +1081,7 @@
 			<span class="wide">Guides</span>
 			<span class="narrow" aria-hidden="true">|</span>
 		</label>
-		<label title="Each area's dashed bounds, its badges and the trim edge — screen only, never printed (Ctrl/Cmd+H)">
+		<label title={withKey("Each area's dashed bounds, its badges and the trim edge — screen only, never printed", 'boxes')}>
 			<input
 				type="checkbox"
 				aria-label="Boxes"
@@ -1099,6 +1100,7 @@
 	<div class="corner right">
 		<MenuSelect
 			label="Zoom"
+			title={withKey('Zoom', 'zoom')}
 			bare
 			value={typeof zoom === 'number' ? String(zoom) : zoom}
 			items={zoomItems}

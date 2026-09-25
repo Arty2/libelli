@@ -7,7 +7,7 @@
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { armDefault } from '$lib/modal';
 	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
-	import { countText, dropTarget, indexAfterSort, moveColumn, moveRows, sortRows, type SortDirection } from '$lib/table';
+	import { countText, dropTarget, indexAfterSort, moveColumn, moveRows, moveRowsTo, sortRows, type SortDirection } from '$lib/table';
 	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
 	import type { Dataset, Row, RowHeight } from '$lib/types';
 
@@ -851,7 +851,93 @@
 	 * the set without moving the preview. Anywhere on the row counts except the
 	 * cell itself, which is a text box and belongs to whoever is typing in it.
 	 */
+	/**
+	 * A row carried by its number to another place in the table — which is
+	 * another place in the print order. A row among the chosen carries all of
+	 * them, as a block in their own order; any other carries itself. With a
+	 * mouse the carry starts once the pointer has travelled; with a finger it
+	 * waits for the same hold a column does, so a swipe over the numbers still
+	 * scrolls the table. A drop drops a sort, as the up and down buttons do.
+	 */
+	let rowDrag = $state<{
+		id: number;
+		from: number;
+		x: number;
+		y: number;
+		on: boolean;
+		lifted: boolean;
+		before: number;
+	} | null>(null);
+	let rowLiftTimer: ReturnType<typeof setTimeout> | null = null;
+	/** A carry that happened eats the click that ends it, or it would pick the row. */
+	let rowDragged = false;
+
+	function startRowDrag(event: PointerEvent, index: number) {
+		if (locked || event.button !== 0 || dataset.rows.length < 2) return;
+		const touch = event.pointerType === 'touch';
+		rowDrag = { id: event.pointerId, from: index, x: event.clientX, y: event.clientY, on: false, lifted: !touch, before: index };
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		if (touch) {
+			rowLiftTimer = setTimeout(() => {
+				rowLiftTimer = null;
+				if (!rowDrag || rowDrag.lifted) return;
+				rowDrag.lifted = true;
+				vibrate(HOLD_MS);
+			}, LIFT_MS);
+		}
+	}
+
+	function moveRowDrag(event: PointerEvent) {
+		if (!rowDrag || rowDrag.id !== event.pointerId) return;
+		if (!rowDrag.lifted) {
+			if (Math.hypot(event.clientX - rowDrag.x, event.clientY - rowDrag.y) < TRAY_SLOP) return;
+			// Moved before the hold: not a carry.
+			if (rowLiftTimer) clearTimeout(rowLiftTimer);
+			rowDrag = null;
+			return;
+		}
+		if (!rowDrag.on) {
+			if (Math.abs(event.clientY - rowDrag.y) < TRAY_SLOP) return;
+			rowDrag.on = true;
+			(document.activeElement as HTMLElement | null)?.blur();
+		}
+		window.getSelection()?.removeAllRanges();
+		let before = dataset.rows.length;
+		for (let i = 0; i < dataset.rows.length; i++) {
+			const box = rowEls[i]?.getBoundingClientRect();
+			if (box && event.clientY < box.top + box.height / 2) {
+				before = i;
+				break;
+			}
+		}
+		rowDrag.before = before;
+	}
+
+	function endRowDrag(event: PointerEvent) {
+		if (!rowDrag || rowDrag.id !== event.pointerId) return;
+		if (rowLiftTimer) clearTimeout(rowLiftTimer);
+		const { on, from, before } = rowDrag;
+		rowDrag = null;
+		if (!on || event.type === 'pointercancel') return;
+		rowDragged = true;
+		setTimeout(() => (rowDragged = false), 0);
+		const moving = selectedRows.has(from) ? chosenRows : [from];
+		const { rows } = moveRowsTo(dataset.rows, moving, before);
+		if (rows === dataset.rows) return;
+		const active = dataset.rows[activeRow];
+		// The choice follows its rows to where they went, and is not widened:
+		// carrying an unchosen row does not tick it.
+		const picked = new Set(chosenRows.map((i) => dataset.rows[i]));
+		sortedBy = null;
+		unsorted = null;
+		selectedRows = new Set(rows.flatMap((row, i) => (picked.has(row) ? [i] : [])));
+		onchange({ ...dataset, rows });
+		const at = rows.indexOf(active);
+		if (at !== -1 && at !== activeRow) onactivate(at);
+	}
+
 	function pickRow(index: number) {
+		if (rowDragged) return;
 		selectedRows = new Set([index]);
 		onactivate(index);
 	}
@@ -1198,6 +1284,9 @@
 						class:expanded={expanded.has(i)}
 						class:active={i === activeRow}
 						class:chosen={selectedRows.has(i)}
+						class:carried={rowDrag?.on && (rowDrag.from === i || (selectedRows.has(rowDrag.from) && selectedRows.has(i)))}
+						class:row-drop-before={rowDrag?.on && rowDrag.before === i}
+						class:row-drop-after={rowDrag?.on && i === dataset.rows.length - 1 && rowDrag.before === dataset.rows.length}
 						bind:this={rowEls[i]}
 						onclick={() => pickRow(i)}
 					>
@@ -1222,10 +1311,19 @@
 							<!-- Double-click for this one row at full height, and again to
 							     put it back: a look at one long row without switching the
 							     whole table to Full. -->
+							<!-- Also the grip a row is carried by: drag it up or down to move
+							     the row, or all the chosen rows if it is one of them. -->
 							<span
 								class="number"
+								class:grip={!locked}
 								role="presentation"
-								title={expanded.has(i) ? 'Double-click to put this row back' : 'Double-click to show this whole row'}
+								title={locked
+									? undefined
+									: `Drag to move this row${selectedRows.has(i) && selectedRows.size > 1 ? ' and the other chosen rows' : ''}. ${expanded.has(i) ? 'Double-click to put this row back' : 'Double-click to show this whole row'}`}
+								onpointerdown={(e) => startRowDrag(e, i)}
+								onpointermove={moveRowDrag}
+								onpointerup={endRowDrag}
+								onpointercancel={endRowDrag}
 								ondblclick={(e) => {
 									e.stopPropagation();
 									toggleExpanded(i);
@@ -2151,6 +2249,39 @@
 	   centred in the same line, is middle-aligned with the number. */
 	tbody .gutter-line {
 		height: var(--cell-line);
+	}
+
+	/* The row's grip. `touch-action: none` so a held finger can carry it; the
+	   rest of the row still scrolls. */
+	.gutter .number.grip {
+		cursor: grab;
+		touch-action: none;
+	}
+
+	/* The rows being carried, and the gap they will land in: a line across the
+	   whole row, drawn over the fields as the column's drop line is. */
+	tr.carried td {
+		opacity: 0.55;
+	}
+
+	tr.row-drop-before > td::before,
+	tr.row-drop-after > td::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: #2563eb;
+		pointer-events: none;
+		z-index: 3;
+	}
+
+	tr.row-drop-before > td::before {
+		top: -1px;
+	}
+
+	tr.row-drop-after > td::before {
+		bottom: -1px;
 	}
 
 	.gutter .number {

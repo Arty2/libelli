@@ -454,3 +454,13 @@
 		padding-right: 0;
 	}
 }
+
+/* Changed since last exported: a small filled dot beside the template's name,
+   in the accent, as an editor marks a file with changes not yet written. */
+.options .unsaved {
+	flex: none;
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: #2563eb;
+}

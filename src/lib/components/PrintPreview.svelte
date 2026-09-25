@@ -6,6 +6,8 @@
 	import PrintSheet from './PrintSheet.svelte';
 	import SheetLightbox from './SheetLightbox.svelte';
 	import './options-bar.css';
+	import { zipStore, type ZipEntry } from '$lib/zip';
+	import { withKey } from '$lib/keys';
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
 	import { bleedFor, mmToPx } from '$lib/layout';
@@ -81,7 +83,7 @@
 
 	/**
 	 * One file per selected page — or, with several cards to a sheet, one file
-	 * per sheet — at 300 dpi. Everything is already rendered here at full size
+	 * per sheet — at 300 dpi; more than one of them comes as a single ZIP. Everything is already rendered here at full size
 	 * behind a thumbnail's transform, so the export reads the same DOM the
 	 * preview is showing rather than building a second one.
 	 */
@@ -105,18 +107,25 @@
 				: Array.from(container.querySelectorAll<HTMLElement>('figure:not(.dropped) .card'));
 			const stem = imposed ? `${slugify(template.name)}-sheet` : slugify(template.name);
 			progress = { done: 0, total: elements.length };
+			// Gathered rather than handed over one by one: a run of fifty was fifty
+			// downloads, which a browser asks about each time or stops allowing.
+			// One is still one PNG; more are one ZIP of them.
+			const files: ZipEntry[] = [];
 			for (const [i, element] of elements.entries()) {
 				const { blob, missingFonts } = await elementToPng(element, families, ratioForDpi(300));
 				for (const family of missingFonts) missing.add(family);
 				// Padded to the width of the run, so a directory listing comes back
 				// in print order rather than as 1, 10, 2 — see `pageFilename`.
-				downloadBlob(pageFilename(stem, i + 1, elements.length, 'png'), blob);
+				const name = pageFilename(stem, i + 1, elements.length, 'png');
+				if (elements.length === 1) downloadBlob(name, blob);
+				else files.push({ name, data: new Uint8Array(await blob.arrayBuffer()) });
 				written += 1;
 				progress = { done: written, total: elements.length };
 			}
+			if (files.length) downloadBlob(`${stem}.zip`, new Blob([zipStore(files)], { type: 'application/zip' }));
 			const noun = imposed ? 'sheet' : 'page';
 			onnotice(
-				`${written} PNG${written === 1 ? '' : 's'} exported at 300 dpi, one per ${noun}.` +
+				`${written} PNG${written === 1 ? '' : 's'} exported at 300 dpi, one per ${noun}${files.length ? `, in ${stem}.zip` : ''}.` +
 					(missing.size
 						? ` ${[...missing].join(', ')} could not be embedded — upload the font file to export it as itself.`
 						: '')
@@ -125,10 +134,9 @@
 			const reason = error instanceof Error ? error.message : 'That could not be exported.';
 			// Which file it died on matters: the ones already saved are real, and
 			// saying nothing about them reads as though the whole run was lost.
-			onnotice(
-				written ? `${reason} ${written} PNG${written === 1 ? '' : 's'} had already been saved.` : reason,
-				'warning'
-			);
+			// Nothing is saved until the end now — a single PNG, or the archive
+			// of several — so a failure part-way has no half-run to report.
+			onnotice(reason, 'warning');
 		} finally {
 			exporting = false;
 			progress = null;
@@ -288,7 +296,7 @@
 						PNG
 					{/if}
 				</button>
-				<button class="primary" onclick={onprint} disabled={goingOut === 0}>
+				<button class="primary" onclick={onprint} disabled={goingOut === 0} title={withKey('Print the pages that are going', 'export')}>
 					<Icon name="print" size={15} />
 					Print
 				</button>

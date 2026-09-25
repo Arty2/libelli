@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport } from './keys';
+import { ALIGN_KEYS, NUDGES, SHORTCUTS, isAlignChord, nudgeStep, wantsExport, withKey } from './keys';
 
 const chord = (over: Partial<KeyboardEvent> = {}) =>
 	({ key: '', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...over }) as KeyboardEvent;
@@ -67,5 +67,12 @@ describe('the arrow tables', () => {
 		expect(ALIGN_KEYS.ArrowLeft).toEqual(['h', -1]);
 		expect(NUDGES.ArrowDown).toEqual([0, 1]);
 		expect(ALIGN_KEYS.ArrowDown).toEqual(['v', 1]);
+	});
+});
+
+describe('withKey', () => {
+	it('puts the shortcut after the title, in brackets', () => {
+		expect(withKey('Redo', 'redo')).toBe('Redo (Ctrl/Cmd+Y)');
+		expect(SHORTCUTS.undo).toBe('Ctrl/Cmd+Z');
 	});
 });
