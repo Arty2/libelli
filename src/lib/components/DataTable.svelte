@@ -175,6 +175,36 @@
 		};
 	}
 
+	/**
+	 * Mark a cell whose words run past what its field shows.
+	 *
+	 * A textarea has no `text-overflow` of its own — that works on a single
+	 * line of an ordinary box, and a field of wrapped lines just stops at its
+	 * edge, which looks exactly like a cell that has nothing more in it. So
+	 * the field is measured instead: taller inside than it is drawn, and its
+	 * cell carries `data-more`, which the stylesheet turns into an ellipsis in
+	 * the corner. Measured again when the value changes from anywhere — typing,
+	 * undo, a paste — and whenever the field's own size does, which is what a
+	 * change of row height or column width is.
+	 */
+	function overflowMark(node: HTMLTextAreaElement, _value: string) {
+		const check = () => {
+			const cell = node.parentElement;
+			if (cell) cell.toggleAttribute('data-more', node.scrollHeight > node.clientHeight + 1);
+		};
+		const observer = new ResizeObserver(check);
+		observer.observe(node);
+		node.addEventListener('input', check);
+		check();
+		return {
+			update: () => requestAnimationFrame(check),
+			destroy: () => {
+				observer.disconnect();
+				node.removeEventListener('input', check);
+			}
+		};
+	}
+
 	/** Read-only, from here and from the card — see `Dataset.locked`. */
 	const locked = $derived(!!dataset.locked);
 
@@ -1068,6 +1098,7 @@
 									readonly={locked}
 									use:hold={() => openBigCell(i, column)}
 									use:autosize={rowHeight === 'full'}
+									use:overflowMark={row[column] ?? ''}
 									onfocus={() => {
 										editing = { row: i, column };
 										onactivate(i);
@@ -1633,7 +1664,7 @@
 		display: block;
 		width: 100%;
 		min-width: 0;
-		height: 4.5rem;
+		height: calc(var(--cell-line) * 3 + 7px);
 		border: none;
 		background: transparent;
 		/* No grip: the field is the cell, and the cell's height is the row's.
@@ -1641,9 +1672,12 @@
 		   control that could only ever make the two disagree. */
 		resize: none;
 		font: 12px/1.45 ui-sans-serif, system-ui, sans-serif;
-		padding: 5px 6px;
+		/* No bottom padding, and a height of whole lines plus a sliver: a cell
+		   that holds more than it shows then stops on a line's edge, rather
+		   than showing the tops of the next line's letters in its padding. */
+		padding: 5px 6px 0;
 		box-sizing: border-box;
-		max-height: 6.5rem;
+		max-height: calc(var(--cell-line) * 5 + 7px);
 	}
 
 	tbody td {
@@ -1667,6 +1701,30 @@
 		tbody td {
 			height: 1px;
 		}
+	}
+
+	/* More in the cell than it shows: an ellipsis in the bottom corner, on the
+	   cell's own background so it covers the words it sits over. Gone while
+	   the cell is being typed in — the field scrolls then, and the count has
+	   that corner. */
+	td:global([data-more])::after {
+		content: '…';
+		position: absolute;
+		right: 0;
+		/* On the last line the field shows: its line box ends the sliver of
+		   height above the cell's bottom edge. */
+		bottom: 2px;
+		padding: 0 6px 0 1.5em;
+		/* Fading in from the left, so the words under it trail off into the
+		   mark rather than being cut by a box. */
+		background: linear-gradient(to right, transparent, var(--cell-bg) 1.2em);
+		color: #555;
+		font: 12px/var(--cell-line) ui-sans-serif, system-ui, sans-serif;
+		pointer-events: none;
+	}
+
+	td:global([data-more]):focus-within::after {
+		display: none;
 	}
 
 	td textarea:read-only {
@@ -1703,22 +1761,28 @@
 	   row is as tall as its longest cell; where there is no `field-sizing`
 	   the `autosize` action does that measuring by hand. Medium is the
 	   stylesheet as it stands above. */
-	/* Short is the first line and a little under it — no bottom padding, so
-	   the second line of a longer cell stays inside the half-leading below
-	   the edge instead of showing the tops of its letters. */
+	/* Short is the first line and the same sliver under it as medium. */
 	.data.rows-short td textarea,
 	.data.rows-short td textarea:focus {
 		height: calc(var(--cell-line) + 7px);
 		max-height: calc(var(--cell-line) + 7px);
-		padding-bottom: 0;
 	}
 
 	.data.rows-full td textarea,
 	.data.rows-full td textarea:focus {
 		max-height: none;
+		/* Nothing is ever cut off here, so the bottom padding comes back. */
+		padding-bottom: 5px;
+	}
+
+	/* Each cell's ground as a custom property as well as a background, so the
+	   overflow mark can fade into whatever the cell is painted. */
+	tbody td {
+		--cell-bg: #fff;
 	}
 
 	tr.active td {
+		--cell-bg: #eff5ff;
 		background: #eff5ff;
 	}
 
@@ -1833,10 +1897,12 @@
 	/* Which cells fill the area selected on the page. Quiet — it is an answer to
 	   "where does this come from", not a selection of its own. */
 	td.bound {
+		--cell-bg: #fbf7e8;
 		background: #fbf7e8;
 	}
 
 	tr.active td.bound {
+		--cell-bg: #eaf0ea;
 		background: #eaf0ea;
 	}
 

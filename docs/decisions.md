@@ -1278,6 +1278,16 @@ down a field's padding does — so the number lands on the cells' first baseline
 and the tick, centred in that line, is middle-aligned with it. `--cell-line` is
 the one place that measurement lives; the row-height modes are counted in it.
 
+**Overflow is measured, because a textarea cannot say it.** `text-overflow`
+works on one line of an ordinary box; a field of wrapped lines just stops at its
+edge, which looks exactly like a cell with nothing more in it. So each field is
+measured — taller inside than drawn — and its cell carries `data-more`, drawn
+as an ellipsis fading in from the left on the cell's own ground (`--cell-bg`,
+kept beside each background the cell can have). For the mark to sit on a line
+rather than across one, a capped field is a whole number of lines plus a sliver
+with no bottom padding, so what it cuts off is a line boundary and not the tops
+of the next line's letters.
+
 **Row height is a view, cycled on one button.** Short, medium, full: a view you
 flip through to find what suits the table, so three presses on one control
 rather than a menu, kept in the UI state beside the column widths. Short does

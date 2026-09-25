@@ -547,8 +547,10 @@ a notice can appear.
 - **Cells fill their row** — a row is as tall as its tallest cell, and every
   field in it is that tall, so the target you click is the cell you can see.
 - **Row height** — the button left of the **Table** picker cycles three heights:
-  **Short**, one line per row; **Medium**, a few lines, which is where a table
-  starts; and **Full**, every row as tall as its longest cell. It is kept for
+  **Short**, one line per row; **Medium**, up to five lines, which is where a
+  table starts; and **Full**, every row as tall as its longest cell. A cell
+  holding more than its row shows ends its last visible line in an ellipsis,
+  the words fading into it; it goes while the cell is being typed in. It is kept for
   next time. Whatever the height, a row's number sits on the same baseline as
   the first line of its cells, with its tick centred beside it.
 - **Sort** — the arrow in a header is a three-way toggle: A-Z, Z-A, then back to
