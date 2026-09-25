@@ -315,7 +315,7 @@
 				// An unbound one says what it is waiting for.
 				(box.slot && mapping[box.slot]) ||
 				box.slot ||
-				(pictureKind(box) === 'drawing' ? 'Bitmap' : pictureKind(box) === 'picture' ? 'Image' : 'Area')
+				(pictureKind(box) ? 'Image' : 'Area')
 			: '';
 
 	/**
@@ -1117,15 +1117,14 @@
 	const isStatic = (box: Box) => !box.slot && (box.mode === 'plain' || box.mode === 'markdown');
 
 	/**
-	 * What kind of picture an area holds, for the mark at its corner: a drawing
-	 * made here, or a picture from somewhere. The same reading the bar's
-	 * Content menu makes — an `image` area written before `bitmap` was its own
-	 * mode, holding only a drawing, is a drawing.
+	 * What an image area holds, for the mark at its corner: a drawing made
+	 * here — a data URL, in the cell or the template — or a picture from
+	 * somewhere, which is also what an empty one is waiting for.
 	 */
 	const pictureKind = (box: Box): 'drawing' | 'picture' | null => {
-		if (box.mode === 'bitmap') return 'drawing';
 		if (box.mode !== 'image') return null;
-		return !box.slot && box.static?.dataUrl !== undefined && box.static?.url === undefined ? 'drawing' : 'picture';
+		const written = box.slot ? contentOf(box) : (box.static?.dataUrl ?? box.static?.url ?? '');
+		return written.trim().startsWith('data:image/') ? 'drawing' : 'picture';
 	};
 
 	/**
@@ -1581,7 +1580,7 @@
 							<button
 								class="badge action"
 								disabled={!editable(box)}
-								title={box.slot ? 'A bitmap, from this row\'s cell — press to draw' : 'A bitmap, the same on every card — press to draw'}
+								title={box.slot ? 'An image drawn here, from this row\'s cell — press to draw on it' : 'An image drawn here, the same on every card — press to draw on it'}
 								aria-label="Draw in this area"
 								onpointerdown={(e) => e.stopPropagation()}
 								onclick={() => ondraw?.(box.id)}
@@ -1589,7 +1588,7 @@
 								<Icon name="edit" size={11} />
 							</button>
 						{:else if pictureKind(box) === 'picture'}
-							<span class="badge" title={box.slot ? 'An image, from this row\'s cell' : 'An image, the same on every card'}>
+							<span class="badge" title={box.slot ? 'An image, from this row\'s cell — double-click to draw instead' : 'An image, the same on every card — double-click to draw instead'}>
 								<Icon name="image" size={11} />
 							</span>
 						{/if}

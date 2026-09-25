@@ -61,17 +61,16 @@ resize boxes directly, or type exact millimetres.
 
 - **Millimetres, from the trim edge** — changing the page size or switching bleed
   on moves nothing, because no coordinate was ever expressed in pixels.
-- **Content** — what an area holds, as one question with four answers.
+- **Content** — what an area holds, as one question with three answers.
   **Data Field** takes it from a column, so every card says something different;
   **Static Text** is words typed into the template, the same on every card;
-  **Bitmap** is a drawing made here, and **Image** is a picture from an address
-  or from this browser. The first two then take a **Mode** — plain text,
-  Markdown, or a QR code, and a data field can also be **Bitmap**, **Image** or
-  **Color**, since a column can hold any of the three. Words typed into the template cannot be a picture, so
-  Static Text does not offer that mode: Bitmap and Image are that answer, said
-  where the question is asked. Nothing about the file format changes — the four
-  are the slot, the mode and which field holds the value, read back as one
-  choice.
+  **Image** is a picture, the same on every card — an address or a color typed
+  into its **Source**, a picture dropped onto it, or one drawn with **Draw…**.
+  Whichever was put in last is what it shows, and switching the Content away and
+  back loses nothing. The first two then take a **Mode** — plain text, Markdown,
+  or a QR code, and a data field can also be **Image** or **Color**, since a
+  column can hold either. Nothing about the file format changes — the three are
+  the slot and the mode, read back as one choice.
 - **Slots** — a box renders the column its slot is bound to. The bar calls it the
   area's **Name**; *slot* is what the file format calls it. The mapping lives
   outside the template, so the same template works against another spreadsheet.
@@ -157,10 +156,10 @@ resize boxes directly, or type exact millimetres.
   no column or to one since renamed or deleted — stays put instead, because a
   design whose areas have all collapsed to nothing is a design you cannot click
   on. An area carrying its own words wears a plug pulled out of its socket,
-  because it is not plugged into the data. An empty bitmap area reads *Bitmap*
-  and an empty image area *Image*, and both wear a mark at the corner the way
-  static text does: a pencil for a bitmap — press it to draw — and a picture
-  for an image.
+  because it is not plugged into the data. An empty image area reads *Image*,
+  and an image area wears a mark at the corner the way static text does: a
+  pencil when it holds a drawing — press it to draw on it — and a picture
+  otherwise.
 - **Grown past its height** — an area set to **Grow** whose words need more room
   than it was given keeps a thin dashed line where a clip would have cut, in the
   bounds' own color and rhythm, so you can see how far the content has pushed
@@ -659,24 +658,26 @@ functional notation is rebuilt from the numbers it parsed to.
 
 ## Images, colors and QR codes
 
-Three box modes carry something other than text, and the **Content** row picks
-between them: Bitmap and Image where the template holds the value, or any of the
-three as a **Mode** where a column supplies it. Both are framed by the box's
+Three box modes carry something other than text: **Image** is a Content type of
+its own where the template holds the picture, and Image, Color or QR is a
+**Mode** where a column supplies the value. Both are framed by the box's
 declared height, and both take a **Fit**: *fit* puts the whole thing inside the
 box, *cover* fills the box and crops the overflow, *stretch* distorts it to the
 box exactly, and *tile* — images only, since a tiled QR is not a QR — repeats it
 at its own size.
 
-- **Bitmap, Image and Color** — three modes, one for each thing a cell can hold.
+- **Image and Color** — two modes, one for each thing a cell can hold.
   **Color** fills the area with what the cell says and refuses anything that is
   not a color, so an address in a column of colors is ignored rather than
   fetched; colors are read in hex, `rgb()`, `hsl()` or by name, and they fill the
   area itself, so the fill reaches under the padding and takes the corner radius
-  with it. **Image** shows a picture — a data URL, an external URL, a name this
-  browser is holding, or inline SVG held in the template — and still accepts a
-  color, because it was the only mode for both and templates written then rely
-  on it. **Bitmap** is a drawing made in the app and written into the cell as
-  base64, so every row can carry its own and the picture travels with the table.
+  with it. **Image** shows a picture — a drawing made in the app, an external
+  URL, a name this browser is holding, or inline SVG held in the template — and
+  still accepts a color, because it was the only mode for both and templates
+  written then rely on it. A drawing is written into the cell as base64, so
+  every row can carry its own and the picture travels with the table. There
+  used to be a separate **Bitmap** mode for drawings; a template that says
+  `bitmap` opens as Image, drawing and all.
 
   Everything that can reach an `<img src>` from a cell goes through one guard
   that allows `http`, `https` and a base64 `data:` image and nothing else. A

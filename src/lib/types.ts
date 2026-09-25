@@ -11,14 +11,19 @@ export const SCHEMA_VERSION = 5;
 /**
  * What an area draws, given what its cell or its template says.
  *
- * `bitmap` is a drawing made in the app and kept as base64 in the cell,
- * `image` is a picture from somewhere — an address, or a name this browser is
- * holding — and `color` is a fill. `image` also accepts a color, because it
- * used to be the only mode for both and templates written then rely on it; a
- * column of brand colors is better off saying `color`, which refuses anything
- * that is not one.
+ * `image` is a picture, whichever way it was made: a drawing made in the app
+ * and kept as base64 in the cell or the template, an address, or a name this
+ * browser is holding — what the value is says which, and the renderer reads
+ * it. `color` is a fill. `image` also accepts a color, because it used to be
+ * the only mode for both and templates written then rely on it; a column of
+ * brand colors is better off saying `color`, which refuses anything that is
+ * not one.
+ *
+ * There was a `bitmap` mode beside `image` for drawings. It was the same
+ * picture with a different way in, and switching between the two dropped
+ * whichever the area held; a template that says `bitmap` is read as `image`.
  */
-export type BoxMode = 'plain' | 'markdown' | 'image' | 'color' | 'bitmap' | 'qr';
+export type BoxMode = 'plain' | 'markdown' | 'image' | 'color' | 'qr';
 export type Overflow = 'clip' | 'grow';
 export type Align = 'left' | 'center' | 'right' | 'justify';
 /** vertical placement of a box's content within its own frame */

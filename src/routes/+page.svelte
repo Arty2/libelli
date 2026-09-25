@@ -815,7 +815,10 @@ em { color: #b42318 }`;
 			};
 			notify(`${name} is in ${column} for this row, and stays in this browser.`);
 		} else {
-			updateBox({ ...next, static: { ...box.static, url: reference } });
+			// The picture dropped is what the area shows now: a drawing it held
+			// would otherwise win over it — see `setPictureAddress`.
+			const { dataUrl: _drawn, ...kept } = box.static ?? {};
+			updateBox({ ...next, static: { ...kept, url: reference } });
 			notify(`${name} is on this area, the same on every card, and stays in this browser.`);
 		}
 	}
@@ -886,7 +889,10 @@ em { color: #b42318 }`;
 				updateBox({ ...current, pixels });
 			}
 		} else {
-			updateBox({ ...current, pixels, static: { ...box.static, dataUrl } });
+			// The drawing replaces an address the area was showing, the same
+			// "last one in is shown" the bar's Source field follows.
+			const { url: _address, ...kept } = box.static ?? {};
+			updateBox({ ...current, pixels, static: { ...kept, dataUrl } });
 		}
 	}
 

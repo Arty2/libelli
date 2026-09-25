@@ -2151,6 +2151,22 @@ trap.
 in a cell full of words must not send the whole run back to IndexedDB. A run of
 forty cards sharing one logo reads it once and holds one object URL for it.
 
+## Bitmap and Image are one mode
+
+A drawing made here and a picture brought from somewhere were two modes and two
+Content types, and they were the same thing with two ways in: the renderer
+already decided what to draw by what the value is — a data URL, an address, a
+stored name — and drew a drawing in an image area, hard-edged, without being
+told. Keeping them apart bought two bugs. Image areas took a drawing (the
+double-click and the pen counted both), so Image looked like Bitmap; and a
+switch between them kept one of `static.dataUrl` and `static.url` and dropped
+the other, so a drawing vanished on the way through Image and back. Now there
+is `image`, `newBox` reads `bitmap` as it, the bar offers the Source field and
+Draw… together, and the last thing put in wins: typing an address, dropping a
+picture or finishing a drawing clears the other. Switching Content away and
+back keeps everything the area held. What `bitmap` refused that `image`
+accepts is a color in a drawing's column, which is harmless.
+
 ## `src/lib/components/MenuSelect.svelte`
 
 **One menu, drawn like the template picker.** The zoom and both font menus were

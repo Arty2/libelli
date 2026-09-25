@@ -1293,25 +1293,6 @@
 			<span class="rule"></span>
 		{/if}
 		<span class="spacer"></span>
-		<!-- How tall a row may be: one line, a few, or all of its longest cell.
-		     The label says the height the rows are at; the title, the next. -->
-		<button
-			class="row-height"
-			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
-			aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
-			onclick={() => onrowheight(nextRowHeight)}
-		>
-			<svg class="rows-glyph" viewBox="0 0 16 16" aria-hidden="true">
-				{#if rowHeight === 'short'}
-					<path d="M2 3h12M2 6h12M2 9h12M2 12h12" />
-				{:else if rowHeight === 'medium'}
-					<path d="M2 3h12M2 8h12M2 13h12" />
-				{:else}
-					<path d="M2 2h12M2 14h12" />
-				{/if}
-			</svg>
-			<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
-		</button>
 		<!-- What table this is, at the far end of the bar: the buttons act on it,
 		     and it is the one control here that is a name rather than an act. One
 		     design prints any number of tables, so this is not the template
@@ -1465,6 +1446,27 @@
 			aria-label="Swap to the previous table"
 			onclick={onswaptable}
 		><Icon name="arrows-horizontal" size={15} /></button>
+		<!-- How tall a row may be: one line, a few, or all of its longest cell.
+		     Beside the lock, with the other things that are about how this
+		     table is held rather than which table it is. The label says the
+		     height the rows are at; the title, the next. -->
+		<button
+			class="row-height"
+			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
+			aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
+			onclick={() => onrowheight(nextRowHeight)}
+		>
+			<svg class="rows-glyph" viewBox="0 0 16 16" aria-hidden="true">
+				{#if rowHeight === 'short'}
+					<path d="M2 3h12M2 6h12M2 9h12M2 12h12" />
+				{:else if rowHeight === 'medium'}
+					<path d="M2 3h12M2 8h12M2 13h12" />
+				{:else}
+					<path d="M2 2h12M2 14h12" />
+				{/if}
+			</svg>
+			<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
+		</button>
 		<!-- Last in the bar, after the picker: the state of the table named
 		     just before it, and the one thing here that is not an errand — the
 		     same reason the page bar keeps its Lock outside its menu. Never

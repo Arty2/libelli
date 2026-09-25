@@ -495,8 +495,8 @@ describe('newBox modes', () => {
 	});
 
 	it('knows which modes draw and which take a drawing', () => {
-		expect(BOX_MODES.filter(shownAsMedia)).toEqual(['image', 'color', 'bitmap']);
-		expect(BOX_MODES.filter(takesADrawing)).toEqual(['image', 'bitmap']);
+		expect(BOX_MODES.filter(shownAsMedia)).toEqual(['image', 'color']);
+		expect(BOX_MODES.filter(takesADrawing)).toEqual(['image']);
 	});
 });
 
@@ -523,5 +523,13 @@ describe('box floors', () => {
 		expect(newBox({ paragraph: { mode: 'indent', amount: 1.5 } }).paragraph).toEqual({ mode: 'indent', amount: 1.5 });
 		expect(normaliseParagraph({ mode: 'space', amount: 99 })).toEqual({ mode: 'space', amount: MAX_PARAGRAPH });
 		expect(normaliseParagraph({ mode: 'tab', amount: 1 })).toBeUndefined();
+	});
+});
+
+describe('bitmap areas', () => {
+	it('are read as image areas, keeping the drawing', () => {
+		const box = newBox({ mode: 'bitmap' as never, static: { dataUrl: 'data:image/png;base64,AAAA' } });
+		expect(box.mode).toBe('image');
+		expect(box.static?.dataUrl).toBe('data:image/png;base64,AAAA');
 	});
 });

@@ -193,14 +193,19 @@ export function nextBoxId(existing: Box[] = []): string {
 }
 
 /** Every mode the format names. Anything else in a file is read as words. */
-export const BOX_MODES: BoxMode[] = ['plain', 'markdown', 'image', 'color', 'bitmap', 'qr'];
+export const BOX_MODES: BoxMode[] = ['plain', 'markdown', 'image', 'color', 'qr'];
 
 /** The modes that draw something rather than set something: a picture or a fill. */
-export const shownAsMedia = (mode: BoxMode) =>
-	mode === 'image' || mode === 'color' || mode === 'bitmap';
+export const shownAsMedia = (mode: BoxMode) => mode === 'image' || mode === 'color';
 
-/** The modes a drawing can be made in — the two that hold a picture. */
-export const takesADrawing = (mode: BoxMode) => mode === 'image' || mode === 'bitmap';
+/** The mode a drawing can be made in — the one that holds a picture. */
+export const takesADrawing = (mode: BoxMode) => mode === 'image';
+
+/** A mode as a file spells it: `bitmap`, from before drawings were images, is one. */
+function readMode(raw: unknown): BoxMode {
+	if (raw === 'bitmap') return 'image';
+	return BOX_MODES.includes(raw as BoxMode) ? (raw as BoxMode) : 'plain';
+}
 
 export function newBox(partial: Partial<Box> = {}): Box {
 	return {
@@ -212,7 +217,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		h: atLeast(partial.h, MIN_BOX, 12),
 		// A mode decides which renderer a cell reaches, so a word this format does
 		// not name is read as words rather than trusted.
-		mode: BOX_MODES.includes(partial.mode as BoxMode) ? (partial.mode as BoxMode) : 'plain',
+		mode: readMode(partial.mode),
 		overflow: partial.overflow ?? 'clip',
 		// Anything optional that is not named here is dropped on load: this list
 		// is the box format, so a new field has to be added in both places.
