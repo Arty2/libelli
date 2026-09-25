@@ -7,6 +7,9 @@ import {
 	MIN_LEADING,
 	MIN_PAPER,
 	MIN_SIZE,
+	DEFAULT_MARGIN,
+	marginsOf,
+	normaliseMargin,
 	normaliseParagraph,
 	arrangeBoxes,
 	autoMap,
@@ -18,6 +21,7 @@ import {
 	builtinTemplate,
 	newBox,
 	normaliseTemplate,
+	blankTemplate,
 	shownAsMedia,
 	takesADrawing,
 	usedSlots
@@ -531,5 +535,24 @@ describe('bitmap areas', () => {
 		const box = newBox({ mode: 'bitmap' as never, static: { dataUrl: 'data:image/png;base64,AAAA' } });
 		expect(box.mode).toBe('image');
 		expect(box.static?.dataUrl).toBe('data:image/png;base64,AAAA');
+	});
+});
+
+describe('page margins', () => {
+	it('defaults to the same margin all round, and keeps 0 as a real answer', () => {
+		expect(marginsOf({ w: 148, h: 210, unit: 'mm' })).toEqual({ top: DEFAULT_MARGIN, right: DEFAULT_MARGIN, bottom: DEFAULT_MARGIN, left: DEFAULT_MARGIN });
+		expect(normaliseMargin(0)).toBe(0);
+		expect(normaliseMargin(-4)).toBe(0);
+		expect(normaliseMargin('x')).toBeUndefined();
+	});
+
+	it('collapses four equal edges to one number and keeps uneven ones', () => {
+		expect(normaliseMargin({ top: 8, right: 8, bottom: 8, left: 8 })).toBe(8);
+		expect(normaliseMargin({ top: 20, right: 8, bottom: 15, left: 12 })).toEqual({ top: 20, right: 8, bottom: 15, left: 12 });
+	});
+
+	it('survives a round trip through a template file', () => {
+		const t = normaliseTemplate({ ...blankTemplate(), page: { w: 148, h: 210, unit: 'mm', margin: { top: 20, right: 8, bottom: 15, left: 12 } } });
+		expect(t.page.margin).toEqual({ top: 20, right: 8, bottom: 15, left: 12 });
 	});
 });

@@ -113,6 +113,14 @@ export interface PageSpec {
 	/** paper color; printed only when the browser's background graphics are on */
 	background?: string;
 	image?: PageBackgroundImage;
+	/**
+	 * mm inside the trim edge where the page's working area starts: drawn as a
+	 * guide with the grid, snapped to, and what Position Automagically lays out
+	 * inside. One number is every edge; an object is per edge, in the stored
+	 * right-hand page's frame — so with facing pages its `left` is the inner
+	 * edge and its `right` the outer. Absent is `DEFAULT_MARGIN` all round.
+	 */
+	margin?: SideValue;
 }
 
 export interface BleedSpec {

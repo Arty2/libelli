@@ -25,7 +25,7 @@
 	import { flagUnknown, renderMarkdown } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
-	import { normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
+	import { marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -847,6 +847,16 @@
 	 */
 	const SNAP_TOLERANCE = 1.5;
 
+	/**
+	 * The page margins, as stored — the right-hand page's frame, which is the
+	 * frame every drag is worked in — and as drawn, which on a left-hand page
+	 * swaps the inner and outer edges over.
+	 */
+	const margins = $derived(marginsOf(template.page));
+	const drawnMargins = $derived(
+		verso ? { ...margins, left: margins.right, right: margins.left } : margins
+	);
+
 	/** Whether a drag on this box is happening against its mirror image. */
 	const mirroredDrag = (box: Box) => verso && mirrors(box);
 
@@ -871,8 +881,22 @@
 		const edges = latch ? boxEdges(template.boxes, layout, drag.id) : { x: [], y: [] };
 		const latched = { x: null as number | null, y: null as number | null };
 
+		// With the grid on, the margins are guides too, and they win over a grid
+		// line within reach: a page whose margin is not a whole number of grid
+		// steps would otherwise have an edge nothing could be placed against.
+		const marginEdges = {
+			x: [margins.left, template.page.w - margins.right],
+			y: [margins.top, template.page.h - margins.bottom]
+		};
 		const place = (value: number, axis: 'x' | 'y'): number => {
-			if (grid) return snapTo(value, GRID_MINOR);
+			if (grid) {
+				const hit = snapToEdges(value, marginEdges[axis], SNAP_TOLERANCE);
+				if (hit !== null) {
+					latched[axis] = hit;
+					return hit;
+				}
+				return snapTo(value, GRID_MINOR);
+			}
 			const hit = latch ? snapToEdges(value, edges[axis], SNAP_TOLERANCE) : null;
 			if (hit === null) return snapTo(value, FREE_STEP);
 			latched[axis] = hit;
@@ -1017,6 +1041,28 @@
 				next.h = Math.max(3, size(origin.h - dy));
 				break;
 		}
+		// The far edges against the margins too, with the grid on: a move whose
+		// right or bottom edge comes within reach of the margin puts it there,
+		// and so does a handle dragging that edge. Only the edge being moved —
+		// a box is never stretched to reach a guide it was not heading for.
+		if (grid) {
+			const nearTo = (a: number, b: number) => Math.abs(a - b) < SNAP_TOLERANCE;
+			const [, right] = marginEdges.x;
+			const [, bottom] = marginEdges.y;
+			const east = mode === 'move' || mode === 'e' || mode === 'ne' || mode === 'se';
+			const south = !origin.anchor && (mode === 'move' || mode === 's' || mode === 'se' || mode === 'sw');
+			if (east && latched.x === null && nearTo(next.x + next.w, right)) {
+				if (mode === 'move') next.x = round2(right - next.w);
+				else next.w = round2(right - next.x);
+				latched.x = right;
+			}
+			if (south && latched.y === null && nearTo(next.y + next.h, bottom)) {
+				if (mode === 'move') next.y = round2(bottom - next.h);
+				else next.h = round2(bottom - next.y);
+				latched.y = bottom;
+			}
+		}
+
 		// With Shift, a handle resizes from the edge the words are aligned to,
 		// the way a typed W or H does in the bar: the size is whatever the
 		// handle made it, and the box is then placed so its right edge stays
@@ -1678,6 +1724,18 @@
 			</div>
 		{/each}
 
+		{#if interactive && grid}
+			<!-- The page margins, as a guide: with the grid, because it is the same
+			     kind of thing — lines to place against, and to snap to — and a
+			     page's frame drawn while nothing is being lined up is clutter. -->
+			{@const m = drawnMargins}
+			<div
+				class="margin-guide"
+				aria-hidden="true"
+				style="top:{m.top}mm;right:{m.right}mm;bottom:{m.bottom}mm;left:{m.left}mm"
+			></div>
+		{/if}
+
 		{#if template.pageNumber.enabled && pageNumber != null}
 			<!-- Three elements rather than one string, so a template's own CSS can
 			     reach each part: `.page-number .of::before { content: ' of ' }` is
@@ -1864,6 +1922,17 @@
 	   the area's own, so it shows where the area is and how big what lands in
 	   it will be. Drawn only where `interactive` is set, so nothing on paper
 	   reaches this rule. */
+	/* The page margins. Dashed like the bounds and the same weight, in a colour
+	   of their own — the one layout software has long drawn margins in — so a
+	   margin is never taken for an area. Screen only: drawn only where
+	   `interactive` is set. */
+	.margin-guide {
+		position: absolute;
+		pointer-events: none;
+		z-index: 1;
+		outline: var(--line) dashed rgba(192, 38, 211, 0.55);
+	}
+
 	/* The area a picture carried out of the Images bar would land in. Set by
 	   ImagesPanel as an attribute, so the card's own class handling cannot
 	   take it off mid-drag. */

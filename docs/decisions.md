@@ -102,13 +102,14 @@ that is what makes it worth writing down.
 
 ## `src/lib/autolayout.ts`
 
-**Every edge on the grid, even where that makes the margins uneven.** A
-generated card that sat off the 5mm grid jumped the first time an area was
-nudged or dragged, and did not line up with the lines turned on to line things
-up. Sizes round up so text keeps its measured room, far edges round inwards so
-nothing crosses the margin, and gaps are whole steps (the subtitle sits tight
-under the title, at 0). Equal side margins and grid edges only coexist where
-the page is a whole number of steps wide; on A5 the grid wins by 3mm.
+**Inside the page margins; grid steps within them.** For one release every
+generated edge was on the 5mm grid, which on a page that is not a whole number
+of steps wide made the side margins uneven (10 and 13mm on A5). Even margins
+won: the layout now reads the page's own margin (`marginsOf`), places the
+frame there, and keeps whole grid steps only for heights and the gaps between
+areas, so the stack lines up with the grid down the page. A body that fills to
+the footer rounds its height down; where the bottom margin is not a grid line,
+the gap above the footer takes the difference.
 
 **Leaving a column out is a switch, not a kind.** It was the last entry in the
 kind menu, which made it a thing a column *is* — and putting one back meant
@@ -2182,6 +2183,21 @@ Draw… together, and the last thing put in wins: typing an address, dropping a
 picture or finishing a drawing clears the other. Switching Content away and
 back keeps everything the area held. What `bitmap` refused that `image`
 accepts is a color in a drawing's column, which is harmless.
+
+## Page margins
+
+**A margin is a page setting, drawn with the grid and snapped to.** It is
+`page.margin`, a `SideValue` like an area's padding — one number or four —
+except that 0 is kept, since a page worked to its trim is a real choice.
+Absent is `DEFAULT_MARGIN` all round. It is stored in the right-hand page's
+frame like everything else, so with facing pages its `left` is the inner edge
+and its `right` the outer, which is what the bar calls them; a left-hand page
+draws them swapped. The guide shows and hides with the Grid toggle, because it
+is the same kind of line — something to place against — and with the grid on a
+margin within reach beats the nearest grid line: a margin that is not a whole
+number of steps would otherwise be an edge nothing could land on. Far edges
+snap only when they are the edges being moved, so a box is never stretched to
+reach a guide it was not heading for.
 
 ## `src/lib/components/MenuSelect.svelte`
 

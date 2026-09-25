@@ -10,6 +10,8 @@
 		MIN_LEADING,
 		MIN_PAPER,
 		MIN_SIZE,
+		marginsOf,
+		normaliseMargin,
 		FACING_PAGE_NUMBER_POSITIONS,
 		PAGE_NUMBER_POSITIONS,
 		PAGE_PRESETS,
@@ -239,6 +241,35 @@
 		patchTemplate({ defaults: { ...rest, paragraph: { mode, amount: value } } });
 	}
 
+	/**
+	 * The page margins: one number all round, which is what a page usually
+	 * has, or one per edge behind the caret — the same shape as an area's
+	 * padding. With left and right pages the side edges are named for the
+	 * fold: the stored page is a right-hand one, so its left edge is the inner
+	 * and its right the outer, and a left-hand page mirrors them.
+	 */
+	const margins = $derived(marginsOf(template.page));
+	let perSideMargin = $state(false);
+	const showMarginSides = $derived(perSideMargin || typeof template.page.margin === 'object');
+	const MARGIN_EDGES = $derived<Array<{ key: 'top' | 'right' | 'bottom' | 'left'; label: string; name: string }>>(
+		template.facing
+			? [
+					{ key: 'top', label: 'T', name: 'Top' },
+					{ key: 'right', label: 'O', name: 'Outer' },
+					{ key: 'bottom', label: 'B', name: 'Bottom' },
+					{ key: 'left', label: 'I', name: 'Inner' }
+				]
+			: [
+					{ key: 'top', label: 'T', name: 'Top' },
+					{ key: 'right', label: 'R', name: 'Right' },
+					{ key: 'bottom', label: 'B', name: 'Bottom' },
+					{ key: 'left', label: 'L', name: 'Left' }
+				]
+	);
+
+	const setMargin = (value: unknown) =>
+		patchTemplate({ page: { ...template.page, margin: normaliseMargin(value) } });
+
 	/** The named size this sheet already is, or Custom when it is its own. */
 	const preset = $derived(presetFor(template.page.w, template.page.h) ?? '');
 
@@ -467,6 +498,56 @@
 				/>
 				Left &amp; Right
 			</label>
+			<!-- The frame the page is worked inside: drawn as a guide with the grid,
+			     snapped to, and where Position Automagically lays out. -->
+			<span class="field">
+				<span>Margin</span>
+				{#if showMarginSides}
+					{#each MARGIN_EDGES as edge (edge.key)}
+						<label class="field tight">
+							<span class="edge" title={edge.name}>{edge.label}</span>
+							<input
+								class="n-2"
+								type="number"
+								step="0.5"
+								min="0"
+								aria-label="{edge.name} margin"
+								value={margins[edge.key]}
+								disabled={pageFrozen}
+								onchange={(e) => setMargin({ ...margins, [edge.key]: floored(e, 0, margins[edge.key]) })}
+							/>
+						</label>
+					{/each}
+				{:else}
+					<input
+						class="n-2"
+						type="number"
+						step="0.5"
+						min="0"
+						aria-label="Margin"
+						title="The page margin, every edge — drawn with the grid, snapped to, and where Position Automagically lays out"
+						value={margins.top}
+						disabled={pageFrozen}
+						onchange={(e) => setMargin(floored(e, 0, margins.top))}
+					/>
+				{/if}
+				<span class="unit">mm</span>
+				<button
+					class="square"
+					aria-pressed={showMarginSides}
+					title={showMarginSides ? 'One margin all round' : 'A margin per edge'}
+					aria-label="Per-edge margins"
+					disabled={pageFrozen}
+					onclick={() => {
+						// Back to one number from the top edge, rather than silently
+						// throwing three uneven values away.
+						if (showMarginSides && typeof template.page.margin === 'object') setMargin(margins.top);
+						perSideMargin = !showMarginSides;
+					}}
+				>
+					<Icon name={showMarginSides ? 'caret-up' : 'caret-down'} size={14} />
+				</button>
+			</span>
 		</span>
 
 		<PrintSettingsPanel

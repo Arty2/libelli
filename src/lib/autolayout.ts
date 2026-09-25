@@ -1,6 +1,6 @@
 import { parseColor } from './color';
 import { GRID_MINOR } from './layout';
-import { newBox } from './template';
+import { marginsOf, newBox } from './template';
 import type { Box, Defaults, Mapping, PageSpec, Row } from './types';
 
 /**
@@ -353,27 +353,25 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	);
 
 	/*
-	 * Every edge on the grid. The editor's grid is what a hand-placed area
-	 * snaps to, so a generated card that sits off it is a card whose areas all
-	 * jump the first time one is nudged — and one that does not line up with
-	 * the lines you turn on to line things up. Sizes round up, so text keeps
-	 * the room it was measured for; the far edges round inwards, so nothing
-	 * crosses the margin.
-	 *
-	 * The trade-off: the two side margins can only be equal where the page is a
-	 * whole number of grid steps wide. On A5, 148mm, the left edge is at 10 and
-	 * the right at 135 — 10mm and 13mm. The grid wins; the difference is under
-	 * one step.
+	 * Inside the page's own margins — the ones page setup sets and the guides
+	 * draw — so a generated card sits in the same frame a hand-placed one snaps
+	 * to, the same distance from every edge unless the margins say otherwise.
+	 * Within that frame, heights and the gaps between areas are whole grid
+	 * steps, so the stack lines up with the grid down the page; the widths run
+	 * margin to margin whatever that comes to, because a page need not be a
+	 * whole number of steps wide and equal margins matter more than a right
+	 * edge on a grid line.
 	 */
 	const G = GRID_MINOR;
 	const up = (v: number) => Math.ceil(v / G - 1e-9) * G;
 	const down = (v: number) => Math.floor(v / G + 1e-9) * G;
-	const onGrid = (v: number) => Math.round(v / G) * G;
-	const margin = Math.max(G, onGrid(clamp(Math.min(page.w, page.h) * 0.08, 6, 14)));
-	const rightEdge = Math.max(margin + 2 * G, down(page.w - margin));
-	const bottomEdge = Math.max(margin + 2 * G, down(page.h - margin));
+	const frame = marginsOf(page);
+	const margin = frame.left;
+	const top = frame.top;
+	const rightEdge = Math.max(margin + 2 * G, page.w - frame.right);
+	const bottomEdge = Math.max(top + 2 * G, page.h - frame.bottom);
 	const contentW = rightEdge - margin;
-	const contentH = bottomEdge - margin;
+	const contentH = bottomEdge - top;
 	const gap = G;
 
 	const boxes: Box[] = [];
@@ -461,18 +459,18 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	 * read. Kept walking down the page so a generated card that loses its
 	 * anchors is untidy rather than a pile at the top margin.
 	 */
-	let cursor = margin;
+	let cursor = top;
 
 	/** Anchor to whatever came before, or sit at the top margin when first. */
 	const stack = (partial: Partial<Box>, before: number): Box => {
-		const top = previous ? cursor + before : margin;
+		const at = previous ? cursor + before : top;
 		const box = place({
 			...partial,
-			y: round(top),
+			y: round(at),
 			...(previous ? { anchor: { to: previous.id, gap: before } } : { anchor: null })
 		});
 		previous = box;
-		cursor = top + box.h;
+		cursor = at + box.h;
 		return box;
 	};
 
@@ -540,7 +538,10 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 		// the page — it grows, so the floor only has to be a sane starting height.
 		const height = Math.max(
 			up(textHeight(size, defaults.lineHeight, 3)),
-			footTop - gap - (previous ? cursor + gap : margin)
+			// Whole steps, rounded down: where the footer sits off the grid — on a
+			// bottom margin that is not a grid line — the gap above it takes the
+			// difference, not the body's height.
+			down(footTop - gap - (previous ? cursor + gap : top))
 		);
 		stack(
 			{

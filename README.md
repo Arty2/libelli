@@ -456,11 +456,11 @@ took the column for, and a sample cell to check it against. That list is nearly
 the whole of the dialog — no paragraph explaining it, because the rows say it
 better. Change anything it has read wrongly, or untick a column to leave it off
 the card — the tick is apart from the kind, so ticking it again keeps what it
-was taken for. An empty column starts unticked. Every edge of every area it
-places is on the 5mm grid, the one hand-placed areas snap to, so nothing jumps
-the first time it is nudged; the margins are as even as the page allows, and
-exactly even where the page is a whole number of grid steps wide (on A5, 148mm,
-they come out 10mm and 13mm).
+was taken for. An empty column starts unticked. It lays out inside the page's
+**Margin**, so the card is the same distance from every edge unless you set the
+margins otherwise; within that, heights and the gaps between areas are whole
+5mm grid steps, so the stack lines up with the grid down the page, and the
+widths run margin to margin.
 Columns it reached by length alone are marked *guess*. Where the template already
 has areas, a line above the buttons says how many are about to be replaced.
 
@@ -1183,8 +1183,11 @@ towards it and down is away. They repeat on a hold like the arrows do.
 The arrow keys and the pad both move every area in the selection, not only a
 lone one.
 
-Dragging snaps in this order: switch **Grid** on and everything snaps to the 5mm
-subgrid of a 10mm grid; otherwise a box latches onto the edges and centres of
+Dragging snaps in this order: switch **Grid** on and the page **margins** show
+as a dashed guide in magenta, and an edge that comes within reach of one lands
+on it — the left and top edges, and the right and bottom when those are the
+edges being moved — ahead of the 5mm subgrid of a 10mm grid, which takes
+everything else; otherwise a box latches onto the edges and centres of
 its neighbours as it passes them, and a guide shows what it caught. There is no
 key to hold for free movement — switch **Grid** and **Bounds** both off and
 nothing latches, because a box should never snap to a guide you cannot see.
@@ -1241,7 +1244,8 @@ than it has to.
 - **Page** — head: the template's name and the library behind its caret, which
   also holds new, import, export, reset and delete, then lock ·
   sheet size (a preset or your own, a button to turn it over, and left and
-  right pages), bleed, crop marks · type defaults (font, size, leading,
+  right pages), margin (one number all round, or one per edge — top, bottom and
+  left and right, or inner and outer with left and right pages), bleed, crop marks · type defaults (font, size, leading,
   spacing, paragraph) · surface (paper color, background image and fit) · page
   number, whether to print the total, and its margin · CSS
 - **Area** — head: the field's name, then duplicate, delete, lock · content

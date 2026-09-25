@@ -17,6 +17,7 @@ import type {
 	PageBackgroundImage,
 	PageNumberPosition,
 	PageNumberSpec,
+	PageSpec,
 	ParagraphStyle,
 	PrintSettings,
 	QrSettings,
@@ -76,6 +77,31 @@ export const MIN_PAPER = 1;
  * all — the same trap the paper's own floor exists for, one level down.
  */
 export const MIN_BOX = 1;
+
+/** The page margin a template without one of its own has, in mm, every edge. */
+export const DEFAULT_MARGIN = 10;
+
+/**
+ * A page margin as read from a file: a number of mm, or four. Unlike a
+ * border, 0 is a real answer — a page worked to its trim edge — so it is kept,
+ * and only something that is not a margin at all falls back to the default.
+ */
+export function normaliseMargin(raw: unknown): SideValue | undefined {
+	if (typeof raw === 'number') return Number.isFinite(raw) ? Math.max(0, raw) : undefined;
+	if (!raw || typeof raw !== 'object') return undefined;
+	const side = (value: unknown) => Math.max(0, num(value, DEFAULT_MARGIN));
+	const sides: Sides = {
+		top: side((raw as any).top),
+		right: side((raw as any).right),
+		bottom: side((raw as any).bottom),
+		left: side((raw as any).left)
+	};
+	const { top, right, bottom, left } = sides;
+	return top === right && right === bottom && bottom === left ? top : sides;
+}
+
+/** The page's margin on each edge, whatever shape it is stored in. */
+export const marginsOf = (page: PageSpec): Sides => sidesOf(page.margin ?? DEFAULT_MARGIN);
 
 /** The smallest type size, in points, and the tightest leading, as a multiple. */
 export const MIN_SIZE = 1;
@@ -299,7 +325,7 @@ export function normaliseTemplate(raw: unknown): Template {
 			h: paper(t.page?.h, 210),
 			unit: 'mm',
 			background: parseColor(t.page?.background) ?? '#ffffff',
-			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image) })
+			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image), margin: normaliseMargin(t.page?.margin) })
 		},
 		bleed: normaliseBleed(t.bleed),
 		print: normalisePrintSettings(t.print),
