@@ -2402,6 +2402,7 @@
 		padding: 18px;
 		color: #767676;
 		text-align: center;
+		user-select: none;
 	}
 
 	.actions {

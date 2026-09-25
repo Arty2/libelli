@@ -2245,10 +2245,13 @@
 		text-underline-offset: 2px;
 	}
 
+	/* Editor chrome standing in for a value: selecting it would copy a column
+	   name that is not on the card. */
 	.placeholder {
 		color: #2563eb;
 		font-style: italic;
 		opacity: 0.7;
+		user-select: none;
 	}
 
 	/* Media has no flow height of its own, so the box's declared height is the

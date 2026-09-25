@@ -305,9 +305,7 @@
 		{#if busy}
 			<p class="empty">…</p>
 		{:else if !images.length && !missing.length}
-			<p class="empty">
-				None stored yet. <strong>Upload…</strong> below, or drop a picture file onto an area or the page.
-			</p>
+			<p class="empty">Nothing here yet.</p>
 		{:else}
 			<!-- One picture a line: what it looks like, what it is called, how big
 			     it is in pixels and in bytes, and whether anything uses it. The
@@ -496,10 +494,12 @@
 		padding: 6px;
 	}
 
+	/* A placeholder, not content: a drag across the list should not light it up. */
 	.empty {
 		margin: 12px 6px;
 		color: #767676;
 		line-height: 1.5;
+		user-select: none;
 	}
 
 	/* The table's toolbar, as the table draws it. */
@@ -618,8 +618,7 @@
 	}
 
 	.size,
-	.total,
-	.empty {
+	.total {
 		color: #767676;
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;

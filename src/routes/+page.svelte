@@ -3297,9 +3297,12 @@
 	   this was 13px of text. Width follows the intrinsic ratio; the width and
 	   height attributes on the tag hold the box before the file arrives, so the
 	   buttons do not shuffle sideways on load. */
+	/* The mark and the version are labels, not text anyone copies; a
+	   double-click near them should not paint them blue. */
 	.brand {
 		height: 29px;
 		width: auto;
+		user-select: none;
 	}
 
 	.spacer {
@@ -3683,6 +3686,7 @@
 		font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
 		color: #767676;
 		vertical-align: 2px;
+		user-select: none;
 	}
 
 	/* The dialog takes the focus as it opens, so its first Enter has somewhere to
