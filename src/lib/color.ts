@@ -145,38 +145,63 @@ export function parseColor(raw: string | undefined | null): string | null {
 	return parseFunctional(value);
 }
 
+/** A color as its four channels: 0-255 each, alpha 0-1. */
+export interface Rgba {
+	r: number;
+	g: number;
+	b: number;
+	a: number;
+}
+
+/**
+ * Any color this module accepts, as its channels — for the color fields,
+ * which show a swatch and an opacity, and for `isDark`. Null for what
+ * `parseColor` refuses, and for anything it accepts without a fixed value.
+ */
+export function toRgba(raw: string | undefined | null): Rgba | null {
+	const value = parseColor(raw);
+	if (!value) return null;
+	let hex = /^#([0-9a-f]{3,8})$/.exec(value)?.[1];
+	if (hex) {
+		if (hex.length <= 4) hex = [...hex].map((c) => c + c).join('');
+		const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex!.slice(i, i + 2), 16));
+		const a = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1;
+		return { r, g, b, a: round(a) };
+	}
+	const parts = /^(rgba?|hsla?)\(([^)]*)\)$/.exec(value);
+	if (!parts) return null;
+	const n = parts[2].split(',').map((p) => parseFloat(p));
+	const a = n.length > 3 ? n[3] : 1;
+	if (parts[1].startsWith('rgb')) return { r: n[0], g: n[1], b: n[2], a };
+	// hsl -> rgb, the CSS Color 4 formula.
+	const [h, s, l] = [n[0], n[1] / 100, n[2] / 100];
+	const f = (k: number) => {
+		const t = (k + h / 30) % 12;
+		return Math.round(255 * (l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(t - 3, 9 - t, 1))));
+	};
+	return { r: f(0), g: f(8), b: f(4), a };
+}
+
+/**
+ * A color back out of its channels: a six-digit hex when it is opaque — what
+ * a template has always held — and `rgba()` when it is not.
+ */
+export function fromRgba({ r, g, b, a }: Rgba): string {
+	const c = (v: number) => Math.round(Math.max(0, Math.min(255, v)));
+	if (a >= 1) return `#${[r, g, b].map((v) => c(v).toString(16).padStart(2, '0')).join('')}`;
+	return `rgba(${c(r)}, ${c(g)}, ${c(b)}, ${round(Math.max(0, a))})`;
+}
+
 /**
  * Whether a color reads as dark — relative luminance under the point where
  * black and white contrast equally with it. For screen furniture that has to
  * stand out against the paper, such as the grid. A color this module cannot
- * read, or a transparent one, is taken as light: the paper behind it is.
+ * read, or a mostly transparent one, is taken as light: the paper behind it is.
  */
 export function isDark(raw: string | undefined | null): boolean {
-	const value = parseColor(raw);
-	if (!value) return false;
-	let rgb: number[];
-	let hex = /^#([0-9a-f]{3,8})$/.exec(value)?.[1];
-	if (hex) {
-		if (hex.length <= 4) hex = [...hex].map((c) => c + c).join('');
-		if (hex.length === 8 && parseInt(hex.slice(6, 8), 16) < 128) return false;
-		rgb = [0, 2, 4].map((i) => parseInt(hex!.slice(i, i + 2), 16));
-	} else {
-		const parts = /^(rgba?|hsla?)\(([^)]*)\)$/.exec(value);
-		if (!parts) return false;
-		const n = parts[2].split(',').map((p) => parseFloat(p));
-		if (n.length > 3 && n[3] < 0.5) return false;
-		if (parts[1].startsWith('rgb')) rgb = n.slice(0, 3);
-		else {
-			// hsl -> rgb, the CSS Color 4 formula.
-			const [h, s, l] = [n[0], n[1] / 100, n[2] / 100];
-			const f = (k: number) => {
-				const t = (k + h / 30) % 12;
-				return 255 * (l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(t - 3, 9 - t, 1)));
-			};
-			rgb = [f(0), f(8), f(4)];
-		}
-	}
-	const [r, g, b] = rgb.map((c) => {
+	const rgba = toRgba(raw);
+	if (!rgba || rgba.a < 0.5) return false;
+	const [r, g, b] = [rgba.r, rgba.g, rgba.b].map((c) => {
 		const v = c / 255;
 		return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
 	});

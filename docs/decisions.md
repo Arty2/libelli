@@ -2336,11 +2336,15 @@ line left as a border; it has no SVG cousin yet.
 
 ## Lists and the baseline
 
-`TextStyle.list` is a marker (`bullet`, `disc`, `dash`), an indent and an item
-spacing, each optional and each merged over the page's on its own, so an area
-can change its indent and keep the page's marker. It overrides `md.list` in
-the renderer rather than replacing that object, which templates written by
-hand may still carry.
+`TextStyle.list` is a marker (`bullet`, `disc`, `dash`, `emdash`, `none`), an
+indent and an item spacing, each optional and each merged over the page's on
+its own, so an area can change its indent and keep the page's marker. They are
+type units — the indent in em, the spacing in lines of the leading — as a
+paragraph's are: a space in lines, an indent in em. They were mm for a round,
+which was the one pair of type settings that did not scale with the type. Left
+blank, `md.list` (mm) still sets the list, so a template that never named one
+renders as it did. No migration: both arrived in the same unreleased run of
+work that changed their unit.
 
 The marker is a text node in the item, so it is set in the area's face; a
 face without the glyph falls back through the area's stack like any missing
@@ -2358,6 +2362,46 @@ box's style rather than handed down in em, because a custom property holding
 twice as far as the paragraph under it. It moves `.content`'s children with
 `position: relative` — not `.content`, whose edge is where a clipped area
 cuts — so nothing is measured differently and nothing anchored below moves.
+
+## What an area paints, and what it does not
+
+**The fill and border are a surface layer, not the box's own.** Opacity on the
+box faded everything hung off it — bounds, handles, badges, the selection —
+because an element's opacity reaches all its children. So the fill, a color or
+tile out of the data, the border and the radius are painted by a `.surface`
+child spanning the border box, and opacity is a custom property (`--ink`) that
+the surface, a hand-drawn border and `.content` read. The box keeps the
+border's room, transparent, so no measurement changes. The trade-off: the
+parts fade one by one rather than as a group, so text at 50% over a fill at
+50% lets the fill show through the letters, where one group opacity would not.
+The alternative — moving every piece of chrome out of the box into a sibling —
+was the larger change for a difference only visible under a loupe.
+
+**Every color field has an alpha.** `<input type="color">` has none (its
+`alpha` attribute is not Baseline), so `ColorField` puts an opacity in percent
+beside the platform's swatch, reading and writing through `toRgba`/`fromRgba`
+in color.ts. Opaque colors are still stored as six-digit hex, so nothing
+already saved changes form.
+
+**The grid is under the areas.** It was a sibling drawn over the scaled card,
+so it crossed every area's words. It is handed to the card now as an
+`underlay` snippet and drawn inside it, before the trim — still in screen
+pixels, by a viewBox of the sheet's on-screen size in an element of its
+pre-zoom size, which the card's transform scales back. The margin guide is the
+trim's first child, so it paints over the grid and under every area, as a
+solid line. The trim edge stays outside the card, over everything.
+
+**One object URL per picture, until the picture changes.** Every resolve used
+to revoke and re-mint the URL for a name, and the card and the Images bar each
+resolve: a picture carried out of the bar a second time dragged a
+broken-image icon, its URL revoked by the card's resolve after the first drop.
+The cache now keeps a URL while the picture's version — a file's size and time,
+or a stored copy's length — is unchanged, and writes and deletes here forget it.
+
+**Switching an area's Content drops what the new choice does not show.** It
+used to keep everything, so going back found it — and static words carried into
+an image or a data field stayed in the template, read by anything that looks at
+an area's words. Undo is the way back, as for every other destructive edit.
 
 ## `src/lib/components/MenuSelect.svelte`
 

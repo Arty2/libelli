@@ -64,10 +64,12 @@ resize boxes directly, or type exact millimetres.
 - **Content** — what an area holds, as one question with three answers.
   **Data Field** takes it from a column, so every card says something different;
   **Static Text** is words typed into the template, the same on every card;
-  **Image** is a picture, the same on every card — an address or a color typed
-  into its **Source**, a picture dropped onto it, or one drawn with **Draw…**.
-  Whichever was put in last is what it shows, and switching the Content away and
-  back loses nothing. The first two then take a **Mode** — plain text, Markdown,
+  **Image** is a picture, the same on every card — **Upload…** one from this
+  device, give it an address with **URL…**, draw one with **Draw…**, pick a
+  **color** to fill it instead, or drop a picture onto it. Whichever was put in
+  last is what it shows. Switching the Content keeps only what the new choice
+  shows — static words do not ride along into an image or a data field — and
+  undo brings back what a switch dropped. The first two then take a **Mode** — plain text, Markdown,
   or a QR code, and a data field can also be **Image** or **Color**, since a
   column can hold either. Nothing about the file format changes — the three are
   the slot and the mode, read back as one choice.
@@ -219,21 +221,23 @@ resize boxes directly, or type exact millimetres.
   months.
 - **Paragraphs** — **Paragraph** in the area bar, with a page-wide default in
   page setup: **Space After** each paragraph, or the next one's first line
-  **Indented**, by an amount in lines of the area's own leading, so it keeps its
-  proportion when the type changes. In plain text every line is a paragraph —
+  **Indented** — a space in lines of the area's own leading, an indent in em of
+  its type size, so either keeps its proportion when the type changes. In plain text every line is a paragraph —
   Return starts a new one, as in a word processor; in Markdown it replaces the
   space after a paragraph. An indent goes on every paragraph but the area's
   first — a heading or a list before it included, since on a card most
   paragraphs follow one, and the book rule of indenting only a paragraph after
   another meant it hardly ever showed.
 - **Lists** — **List** picks a Markdown bullet list's marker, **• Bullet**,
-  **● Disc**, **– Dash** or **— Em Dash**, each set in the area's own font
-  like the words beside it (a font without the glyph falls back as for any
+  **● Disc**, **– Dash**, **— Em Dash** or **None**, each set in the area's own
+  font like the words beside it (a font without the glyph falls back as for any
   missing character); **List Indent** is the space from the area's edge to
-  the markers, and **List Spacing** the space between one item and the next,
-  both in mm. All three are in page setup and, for a Markdown area, in the area
-  bar, where each on its own overrides the page's.
-- **Baseline** — raises an area's text by a share of its size, in em, or lowers
+  the markers, in em, and **List Spacing** the space between one item and the
+  next, in lines of the leading — the units the paragraph settings use. All
+  three are a group of their own in page setup and, for a Markdown area, in the
+  area bar, where each on its own overrides the page's; left blank, a list is
+  set as it always was.
+- **Baseline** — just after Leading: raises an area's text by a share of its size, in em, or lowers
   it below 0: for a face that sits high or low on its line. Page setup's
   applies only to areas in the page's font — it corrects a face, and would be
   wrong for any other — and an area's own applies whatever it is set in. It
@@ -306,10 +310,13 @@ resize boxes directly, or type exact millimetres.
   with the browser's **Background graphics** on — and it survives the PNG export,
   which was checked rather than assumed.
 - **Opacity** — how much of what is under an area shows through it, 0 to 100%.
-  It fades the whole area at once — its fill, its border and its content
-  together — so a wash of text over a picture is one setting rather than three
-  colors with alpha in them. 100% is the absence of the setting, which is what
-  every area has always been.
+  It fades what the area paints — its fill, its border and its content, the
+  placeholder included — and never its bounds, its handles or its badges, which
+  are how it is edited. 100% is the absence of the setting, which is what every
+  area has always been.
+- **Colors with alpha** — every color field is a swatch and an opacity in
+  percent beside it: text, paper, fill, border and a QR's background alike.
+  Opaque, a color is stored as the hex it always was; otherwise as `rgba()`.
 - **A border drawn by hand** — the pencil beside the border color draws it
   wobbling, as a line rather than a rule. Width, style and radius all still
   mean what they meant: a dashed 1mm hand border is dashed, 1mm and hand-drawn,
@@ -1259,7 +1266,7 @@ The arrow keys and the pad both move every area in the selection, not only a
 lone one.
 
 Dragging snaps in this order: with **Guides** on the page **margins** show as a
-dashed guide in magenta, and an edge that comes within reach of one lands on it
+solid guide in magenta — over the grid and under every area — and an edge that comes within reach of one lands on it
 — the left and top edges, and the right and bottom when those are the edges
 being moved; then, with **Grid** on, the 5mm subgrid of a 10mm grid takes
 everything else; otherwise a box latches onto the edges and centres of its
@@ -1382,8 +1389,13 @@ than it has to.
 - **The table's own row** — under the table: what acts on the rows you have
   chosen, then at the far end the **Table** picker — whose menu holds paste,
   import, export, new and delete — the swap beside it, and last the lock.
-- **Images** — the third bar, in the same row: where pictures are kept, Upload
-  and the folder buttons, and a line for every picture.
+- **Images** — the third bar, in the same row: *Images*, how many and how much
+  they weigh, then **Upload…** and **Choose Folder…**, and a line for every
+  picture. Carry one onto an area to put it there, or onto the **page** between
+  areas for a new image area of its own, centred where it was let go, 40mm
+  across and in the picture's proportions; a picture file dragged in from
+  outside does the same. Every **Upload…** that takes a picture wears Carbon's
+  *image reference*, and every **URL…** its *copy link*.
 - **The window toolbar** holds only what is about the whole app: the mark, then
   Help, Page Setup, Images, Data and Export — the two panels in the order they
   sit on screen, settings above the page and the table beside it. On a phone the

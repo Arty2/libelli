@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
 	import { backgroundStyle, cssUrl, localImageName, safeMediaUrl } from '$lib/assets';
 	import { parseColor } from '$lib/color';
@@ -97,6 +98,8 @@
 		ondraw?: (id: string) => void;
 		/** open the cell a Data Field area prints, full size in the table */
 		oneditcell?: (id: string) => void;
+		/** drawn over the paper and under everything else — the stage's grid */
+		underlay?: Snippet;
 		/**
 		 * Words typed into the card. The card cannot write them itself: a bound
 		 * area's text is a cell in the dataset and a static one's is a field in
@@ -131,6 +134,7 @@
 		onedit,
 		ondraw,
 		oneditcell,
+		underlay,
 		ontext
 	}: Props = $props();
 
@@ -442,6 +446,50 @@
 	 */
 	const placed = (box: Box): Box => (verso && mirrors(box) ? mirrorBox(box, template.page.w) : box);
 
+	/**
+	 * What an area paints under its content — the fill, a fill out of the data,
+	 * a tiled picture, and the border — on a layer of its own over the box's
+	 * border box. It used to be the box's own background and border, which put
+	 * it on the one element whose opacity also fades everything hung off it;
+	 * on its own layer it takes the area's opacity alone. The box keeps the
+	 * border's room, transparent, so nothing measures differently.
+	 */
+	function surfaceStyle(box: Box): string {
+		const parts: string[] = [];
+		if (box.background) parts.push(`background:${box.background}`);
+		// A color out of the data fills the area itself, not a panel inside it, so
+		// it reaches under the padding and takes the corner radius with it. After
+		// the declared fill, because the row is the more specific answer.
+		if (shownAsMedia(box.mode)) {
+			const media = mediaOf(box);
+			if (media.color) parts.push(`background:${media.color}`);
+			// A tile is a background, not an element: `<img>` has no way to repeat.
+			else if (media.src && box.fit === 'repeat') {
+				parts.push(
+					`background-image:${cssUrl(tiles[media.src] ?? media.src)}`,
+					'background-repeat:repeat',
+					'background-size:auto',
+					// From inside the border, as the box's own background was: the
+					// surface spans the border box, the tile starts at the padding.
+					'background-origin:padding-box'
+				);
+				// A tiled drawing is drawn hard for the same reason a fitted one
+				// is — see `drawnByHand`.
+				if (drawnByHand(media.src)) parts.push('image-rendering:pixelated');
+			}
+		}
+		if (box.borderWidth && !box.borderHand) {
+			const { top, right, bottom, left } = sidesOf(box.borderWidth);
+			parts.push(
+				`border-width:${top}mm ${right}mm ${bottom}mm ${left}mm`,
+				`border-style:${box.borderStyle ?? 'solid'}`,
+				`border-color:${borderColorOf(box)}`
+			);
+		}
+		if (box.borderRadius) parts.push(`border-radius:${box.borderRadius}mm`);
+		return parts.join(';');
+	}
+
 	function boxStyle(box: Box): string {
 		const drawn = placed(box);
 		const align = drawn.align ?? template.defaults.align;
@@ -487,25 +535,6 @@
 		if (box.padding) {
 			parts.push(`padding:${pad.top}mm ${pad.right}mm ${pad.bottom}mm ${pad.left}mm`);
 		}
-		if (box.background) parts.push(`background:${box.background}`);
-		// A color out of the data fills the area itself, not a panel inside it, so
-		// it reaches under the padding and takes the corner radius with it. After
-		// the declared fill, because the row is the more specific answer.
-		if (shownAsMedia(box.mode)) {
-			const media = mediaOf(box);
-			if (media.color) parts.push(`background:${media.color}`);
-			// A tile is a background, not an element: `<img>` has no way to repeat.
-			else if (media.src && box.fit === 'repeat') {
-				parts.push(
-					`background-image:${cssUrl(tiles[media.src] ?? media.src)}`,
-					'background-repeat:repeat',
-					'background-size:auto'
-				);
-				// A tiled drawing is drawn hard for the same reason a fitted one
-				// is — see `drawnByHand`.
-				if (drawnByHand(media.src)) parts.push('image-rendering:pixelated');
-			}
-		}
 		// `.box` is border-box, so a border eats into the width rather than adding
 		// to it: the box still occupies exactly the millimetres it was given.
 		if (box.borderWidth) {
@@ -516,8 +545,10 @@
 				// solid, and painted in nothing — so switching it on moves no text
 				// and changes no measurement. Only what is drawn in that room
 				// changes, and the SVG below draws it.
-				`border-style:${box.borderHand ? 'solid' : (box.borderStyle ?? 'solid')}`,
-				`border-color:${box.borderHand ? 'transparent' : borderColorOf(box)}`,
+				// Always solid and clear here: the room is the box's, the paint is
+				// the surface's — see `surfaceStyle`.
+				'border-style:solid',
+				'border-color:transparent',
 				`--bw-t:${top}mm`,
 				`--bw-r:${right}mm`,
 				`--bw-b:${bottom}mm`,
@@ -530,10 +561,10 @@
 		// area, and stops at the card: the scaler above it is a transform, and a
 		// transform is a stacking context.
 		if (box.blend) parts.push(`mix-blend-mode:${box.blend}`);
-		// The whole area at once — fill, border and content together. Checked on
-		// the way into the template, and absent when it is opaque, so this is only
-		// ever a number between 0 and 1.
-		if (box.opacity !== undefined) parts.push(`opacity:${box.opacity}`);
+		// Opacity is not here: on the box it faded the handles, the badges and the
+		// selection with it. It is a custom property the painted parts read —
+		// the surface, a hand-drawn border and the content — and nothing else.
+		if (box.opacity !== undefined) parts.push(`--ink:${box.opacity}`);
 		// A CSS transform does not touch layout, so a rotated box still reports the
 		// height it would have had upright — which is what `measure()` reads and
 		// what anchored boxes below follow. That is the intended bargain: turning a
@@ -1549,10 +1580,27 @@
 	style={cardStyle()}
 	lang="en"
 >
+	{#if underlay}
+		<div class="underlay" aria-hidden="true">{@render underlay()}</div>
+	{/if}
 	<div class="trim" bind:this={trimEl} style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
 			{@html styleTag(customCss)}
+		{/if}
+
+		{#if interactive && guides}
+			<!-- The page margins, as a guide, on a toggle of their own beside the
+			     grid's: lines to place against and to snap to, which a page may
+			     want without a grid over the whole of it. First in the trim, so
+			     every area paints over it — and over the grid, which is under the
+			     trim altogether. -->
+			{@const m = drawnMargins}
+			<div
+				class="margin-guide"
+				aria-hidden="true"
+				style="top:{m.top}mm;right:{m.right}mm;bottom:{m.bottom}mm;left:{m.left}mm"
+			></div>
 		{/if}
 
 		{#each template.boxes as box (box.id)}
@@ -1597,6 +1645,9 @@
 				ondrop={(e) => drop(e, box)}
 				role="presentation"
 			>
+				{#if surfaceStyle(box)}
+					<div class="surface" aria-hidden="true" style={surfaceStyle(box)}></div>
+				{/if}
 				{#if strokes.length}
 					<!-- Drawn over the room the transparent CSS border is holding, so
 					     it covers exactly what that border would have painted. Sized
@@ -1668,7 +1719,8 @@
 						     processor — so each is a block the style can space or
 						     indent. An empty line keeps its height. -->
 						{@const para = paragraphOf(box)!}
-						{@const step = `${Math.round(para.amount * (box.lineHeight ?? template.defaults.lineHeight) * 1000) / 1000}em`}
+						<!-- A space in lines of the leading, an indent in em. -->
+						{@const step = `${Math.round(para.amount * (para.mode === 'space' ? (box.lineHeight ?? template.defaults.lineHeight) : 1) * 1000) / 1000}em`}
 						<span class="paras">
 							{#each shownTextOf(box).split('\n') as line, i (i)}
 								<span
@@ -1933,17 +1985,6 @@
 			</div>
 		{/each}
 
-		{#if interactive && guides}
-			<!-- The page margins, as a guide, on a toggle of their own beside the
-			     grid's: lines to place against and to snap to, which a page may
-			     want without a grid over the whole of it. -->
-			{@const m = drawnMargins}
-			<div
-				class="margin-guide"
-				aria-hidden="true"
-				style="top:{m.top}mm;right:{m.right}mm;bottom:{m.bottom}mm;left:{m.left}mm"
-			></div>
-		{/if}
 
 		{#if template.pageNumber.enabled && pageNumber != null}
 			<!-- Three elements rather than one string, so a template's own CSS can
@@ -2035,7 +2076,21 @@
 	   border widths the box put in these properties. Out of flow also means it
 	   is not part of what `measure` reads, so a border cannot grow the box it
 	   is drawn around. */
+	/* Over the whole border box — the box's border is its room, not its paint —
+	   and under everything else in the area. */
+	.surface {
+		position: absolute;
+		top: calc(-1 * var(--bw-t, 0mm));
+		right: calc(-1 * var(--bw-r, 0mm));
+		bottom: calc(-1 * var(--bw-b, 0mm));
+		left: calc(-1 * var(--bw-l, 0mm));
+		box-sizing: border-box;
+		pointer-events: none;
+		opacity: var(--ink, 1);
+	}
+
 	.hand-border {
+		opacity: var(--ink, 1);
 		position: absolute;
 		top: calc(-1 * var(--bw-t, 0mm));
 		left: calc(-1 * var(--bw-l, 0mm));
@@ -2049,9 +2104,13 @@
 	/* The one flex item in the box, so `justify-content` still places the content
 	   vertically, and so the content can be measured without the handles and
 	   badges that hang off the box's edges. */
+	/* Positioned, so it paints over the surface before it rather than under
+	   it — an absolutely placed layer otherwise paints over in-flow content. */
 	.content {
+		position: relative;
 		width: 100%;
 		min-width: 0;
+		opacity: var(--ink, 1);
 	}
 
 	/* A clipped box cuts its content at its own edge, but must not cut the
@@ -2146,15 +2205,27 @@
 	   the area's own, so it shows where the area is and how big what lands in
 	   it will be. Drawn only where `interactive` is set, so nothing on paper
 	   reaches this rule. */
-	/* The page margins. Dashed like the bounds and the same weight, in a colour
-	   of their own — the one layout software has long drawn margins in — so a
-	   margin is never taken for an area. Screen only: drawn only where
+	/* The page margins. The bounds' weight, solid, in a colour of their own —
+	   the one layout software has long drawn margins in — so a margin is never
+	   taken for an area. Screen only: drawn only where
 	   `interactive` is set. */
 	.margin-guide {
 		position: absolute;
 		pointer-events: none;
-		z-index: 1;
-		outline: var(--line) dashed rgba(192, 38, 211, 0.55);
+		/* Solid, and an inset shadow rather than an outline: an outline is
+		   rounded to whole pixels of the zoomed card, and doubled at 200%. */
+		box-shadow: inset 0 0 0 var(--line) rgba(192, 38, 211, 0.55);
+	}
+
+	/* The stage's grid, under the trim and everything in it. Positioned from
+	   the card's own corner, bleed included, which is where the grid is
+	   measured from. */
+	.underlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		pointer-events: none;
+		line-height: 0;
 	}
 
 	/* The area a picture carried out of the Images bar would land in. Set by

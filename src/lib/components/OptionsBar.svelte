@@ -42,6 +42,7 @@
 		oneditcss: () => void;
 		/** open the drawing surface for the selected area */
 		ondraw?: (id: string) => void;
+		onuploadimage?: (id: string, file: File) => void;
 	}
 
 	let { section, ...rest }: Props = $props();

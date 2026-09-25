@@ -204,29 +204,29 @@ export interface FontRef {
 
 /**
  * How one paragraph is told from the next: a space after it, or the first line
- * of the next one indented — the two conventions print has. The amount is in
- * lines of the area's own leading, so it keeps its proportion when the type
- * size or the leading changes.
+ * of the next one indented — the two conventions print has. A space is in
+ * lines of the area's own leading, an indent in em of its size, so either
+ * keeps its proportion when the type size or the leading changes.
  */
 export interface ParagraphStyle {
 	mode: 'space' | 'indent';
-	/** in lines: 1 is one line of the area's leading */
+	/** lines of the leading for a space; em of the type size for an indent */
 	amount: number;
 }
 
-/** What a Markdown bullet list is marked with: `•`, `●`, `–` or `—`. */
-export type ListMarker = 'bullet' | 'disc' | 'dash' | 'emdash';
+/** What a Markdown bullet list is marked with: `•`, `●`, `–`, `—`, or nothing. */
+export type ListMarker = 'bullet' | 'disc' | 'dash' | 'emdash' | 'none';
 
 /**
  * How a Markdown list is set. Each field on its own: an area can take the
- * page's marker and change only its indent. Both lengths are mm, like every
- * other space in the format.
+ * page's marker and change only its indent. In type units, like a paragraph
+ * style, so a list keeps its proportions when the type changes size.
  */
 export interface ListStyle {
 	marker?: ListMarker;
-	/** mm from the area's edge to the marker */
+	/** em of the area's size, from its edge to the marker */
 	indent?: number;
-	/** mm between one item and the next */
+	/** lines of the area's leading between one item and the next */
 	spacing?: number;
 }
 

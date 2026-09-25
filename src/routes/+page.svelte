@@ -827,6 +827,59 @@
 		placeImage(box, name);
 	}
 
+	/**
+	 * A picture let go over the page but not over an area: a new image area
+	 * for it, centred where it was let go, 40mm across and as tall as the
+	 * picture's own proportions make that. Static, on every card — a picture
+	 * carried from the bar is one picture, not a column.
+	 */
+	async function placeImageOnPage(name: string, clientX: number, clientY: number, file?: Blob) {
+		if (template.locked) {
+			notify('The design is locked — unlock it to add an area.', 'warning');
+			return;
+		}
+		const trim = document.querySelector<HTMLElement>('.viewport .trim');
+		if (!trim) return;
+		const rect = trim.getBoundingClientRect();
+		const { w: pageW, h: pageH } = template.page;
+		const at = { x: ((clientX - rect.left) / rect.width) * pageW, y: ((clientY - rect.top) / rect.height) * pageH };
+		// The picture's proportions, read off the picture itself: a square box
+		// round a banner is a box the first thing anyone does is resize.
+		// A file just dropped in is not resolved yet, so it is read from itself.
+		let aspect = 0.75;
+		const url = file ? URL.createObjectURL(file) : (images[name] ?? (await resolveLocalImages([name])).urls[name]);
+		if (url) {
+			const probe = new Image();
+			probe.src = url;
+			try {
+				await probe.decode();
+				if (probe.naturalWidth) aspect = probe.naturalHeight / probe.naturalWidth;
+			} catch {
+				// Undecodable here: the default proportions will do, and the area says so.
+			}
+			if (file) URL.revokeObjectURL(url);
+		}
+		const w = Math.min(40, pageW);
+		const h = Math.min(Math.round(w * aspect * 10) / 10, pageH);
+		const clamp = (v: number, size: number, max: number) => Math.round(Math.max(0, Math.min(max - size, v - size / 2)) * 10) / 10;
+		settleProvisional();
+		describe('Place an image');
+		const box = newBox({
+			id: nextBoxId(template.boxes),
+			x: clamp(at.x, w, pageW),
+			y: clamp(at.y, h, pageH),
+			w,
+			h,
+			mode: 'image',
+			fit: 'contain',
+			static: { url: localImageRef(name) }
+		});
+		template = { ...template, boxes: [...template.boxes, box] };
+		selectedIds = [box.id];
+		flash([box.id]);
+		notify(`${name} is on the card in an area of its own, the same on every card.`);
+	}
+
 	function placeImage(box: Box, name: string) {
 		const reference = localImageRef(name);
 		const column = box.slot ? mapping[box.slot] : undefined;
@@ -2367,11 +2420,16 @@
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
 						ondraw={(id) => (drawing = id)}
+						onuploadimage={(id, file) => {
+							const box = template.boxes.find((b) => b.id === id);
+							if (box) void handleImageDrop(box, file);
+						}}
 					/>
 				{:else if imagesOpen}
 					<ImagesPanel
 						used={new Set(imageNames)}
 						onplace={placeStoredImage}
+						onplacepage={(name, x, y) => void placeImageOnPage(name, x, y)}
 						onnotice={notify}
 						onchanged={() => (imagesVersion += 1)}
 					/>
@@ -2402,6 +2460,10 @@
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
 						ondraw={(id) => (drawing = id)}
+						onuploadimage={(id, file) => {
+							const box = template.boxes.find((b) => b.id === id);
+							if (box) void handleImageDrop(box, file);
+						}}
 					/>
 				{/if}
 			</div>
@@ -2496,6 +2558,7 @@
 			onselect={selectBox}
 			onchange={updateBox}
 			onimagedrop={(box, file) => void handleImageDrop(box, file)}
+			onimagepagedrop={(file, x, y) => void (async () => placeImageOnPage(await storeLocalImage(file), x, y, file))()}
 			onaction={describe}
 			onbounds={(show) => (ui = { ...ui, showBounds: show })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}

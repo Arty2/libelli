@@ -33,9 +33,11 @@
 		onchanged: () => void;
 		/** a picture carried out of the bar and let go over an area */
 		onplace: (boxId: string, name: string) => void;
+		/** …or over the page but no area: a new area for it, where it was let go */
+		onplacepage: (name: string, clientX: number, clientY: number) => void;
 	}
 
-	let { used, onnotice, onchanged, onplace }: Props = $props();
+	let { used, onnotice, onchanged, onplace, onplacepage }: Props = $props();
 
 	const available = folderAvailable();
 	let folder = $state<FolderState | null>(null);
@@ -132,7 +134,9 @@
 		const area = aim(event.clientX, event.clientY);
 		aim(-1, -1);
 		if (area?.dataset.boxId) onplace(area.dataset.boxId, name);
-		else onnotice('Let go over an area on the page to put the picture in it.');
+		else if (document.elementFromPoint(event.clientX, event.clientY)?.closest('.viewport .sheet'))
+			onplacepage(name, event.clientX, event.clientY);
+		else onnotice('Let go over the page to put the picture on it — over an area to put it in that one.');
 	}
 
 	$effect(() => {
@@ -204,24 +208,28 @@
 	anything uses it; the explanations are in the README and in the titles.
 -->
 <div class="options images-bar" aria-label="Images">
+	<!-- One line: what this is, how many and how heavy, then the ways in. The
+	     folder is named only once there is one — "in this browser" was a label
+	     on the case nobody had chosen. -->
 	<span class="head">
 		<span class="head-row">
 			<span class="context">Images</span>
-			<span class="where" title={available ? '' : 'Choosing a folder needs a Chromium browser'}>
-				{#if folder?.ready}
-					<Icon name="folder" size={12} /> {folder.name}
-				{:else if folder}
-					{folder.name} — not opened
-				{:else}
-					In this browser
-				{/if}
-			</span>
-		</span>
-		<span class="head-row">
+			{#if images.length}
+				<span class="total">{images.length} · {weigh(total)}</span>
+			{/if}
+			{#if folder}
+				<span class="where">
+					{#if folder.ready}
+						<Icon name="folder" size={12} /> {folder.name}
+					{:else}
+						{folder.name} — not opened
+					{/if}
+				</span>
+			{/if}
 			<!-- Every browser, a phone included: the folder below is Chromium's,
 			     and this is the way in that is not. -->
 			<button title="Add pictures from this device" onclick={() => fileInput?.click()}>
-				<Icon name="add" size={14} /> Upload…
+				<Icon name="image-reference" size={14} /> Upload…
 			</button>
 			{#if available}
 				{#if folder && !folder.ready}
@@ -298,7 +306,6 @@
 				</li>
 			{/each}
 		</ul>
-		<span class="total">{images.length} · {weigh(total)}</span>
 	{/if}
 </div>
 

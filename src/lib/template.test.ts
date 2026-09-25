@@ -35,7 +35,7 @@ describe('the built-in template', () => {
 	const template = builtinTemplate();
 
 	it('loads with its boxes, anchors and bleed intact', () => {
-		expect(template.name).toBe('A5 Instruction Card');
+		expect(template.name).toBe('A5 Starter Template');
 		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff' });
 		expect(template.boxes.map((b) => b.id)).toEqual(['b_title', 'b_subtitle', 'b_body', 'b_category', 'b_qr']);
 		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 8 });

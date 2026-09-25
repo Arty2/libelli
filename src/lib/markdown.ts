@@ -32,7 +32,13 @@ export interface MarkdownOptions {
  * so a dash is that font's dash; a face without the glyph falls back through
  * the area's stack as any missing character does.
  */
-export const LIST_GLYPHS: Record<ListMarker, string> = { bullet: '•', disc: '●', dash: '–', emdash: '—' };
+export const LIST_GLYPHS: Record<ListMarker, string | null> = {
+	bullet: '•',
+	disc: '●',
+	dash: '–',
+	emdash: '—',
+	none: null
+};
 
 interface ListItem {
 	text: string;
@@ -216,12 +222,20 @@ const mm = (v: number) => `${round(v)}mm`;
 export function renderMarkdown(src: string, options: MarkdownOptions): string {
 	const md = mergeStyle(options.md);
 	const list = options.list;
-	if (list?.indent !== undefined) md.list = { ...md.list, indent: list.indent };
-	if (list?.spacing !== undefined) md.list = { ...md.list, itemSpacing: list.spacing };
-	const bullet = LIST_GLYPHS[list?.marker ?? 'bullet'];
+	const leading = options.lineHeight ?? 1;
+	// An area's list style is in type units, as its paragraphs are: the indent
+	// in em of its size, the spacing in lines of its leading. `md.list` is mm,
+	// and stays what a list is set by where neither page nor area names one.
+	const look: ListLook = {
+		indent: list?.indent !== undefined ? `${round(list.indent)}em` : mm(md.list.indent ?? 0),
+		item: list?.spacing !== undefined ? `${round(list.spacing * leading)}em` : mm(md.list.itemSpacing ?? 0),
+		gap: mm(md.list.markerGap ?? 0),
+		bullet: LIST_GLYPHS[list?.marker ?? 'bullet']
+	};
 	const para = options.paragraph;
-	// In em of the area's own size: a line of leading is `lineHeight` em.
-	const lines = para ? `${round(para.amount * (options.lineHeight ?? 1))}em` : '';
+	// Space after is in lines of the leading — a line is `lineHeight` em — and
+	// an indent is in em, the unit an indent is measured in everywhere else.
+	const amount = para ? `${round(para.amount * (para.mode === 'space' ? leading : 1))}em` : '';
 	const blocks = parseBlocks(src ?? '');
 	const html: string[] = [];
 
@@ -250,9 +264,9 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 				const follows = index > 0;
 				const style =
 					para?.mode === 'space'
-						? `margin:0 0 ${lines}`
+						? `margin:0 0 ${amount}`
 						: para?.mode === 'indent'
-							? `margin:0${follows ? `;text-indent:${lines}` : ''}`
+							? `margin:0${follows ? `;text-indent:${amount}` : ''}`
 							: `margin:0 0 ${mm(md.paragraph.spaceAfter ?? 0)}`;
 				html.push(`<p style="${style}">${block.lines.map(renderInline).join('<br />')}</p>`);
 				break;
@@ -268,7 +282,7 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 				break;
 			}
 			case 'list':
-				html.push(renderList(block, md, true, bullet));
+				html.push(renderList(block, md, true, look));
 				break;
 		}
 	});
@@ -276,32 +290,41 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 	return html.join('');
 }
 
-function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, bullet: string): string {
-	const cfg = md.list;
+/** How a list is set, already in CSS lengths; `bullet` null is no marker. */
+interface ListLook {
+	indent: string;
+	item: string;
+	gap: string;
+	bullet: string | null;
+}
+
+function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, look: ListLook): string {
 	const tag = list.ordered ? 'ol' : 'ul';
 	const style = [
 		'list-style:none',
-		`margin:0 0 ${mm(top ? (cfg.spaceAfter ?? md.paragraph.spaceAfter ?? 0) : 0)}`,
-		`padding:0 0 0 ${mm(cfg.indent ?? 0)}`
+		`margin:0 0 ${mm(top ? (md.list.spaceAfter ?? md.paragraph.spaceAfter ?? 0) : 0)}`,
+		`padding:0 0 0 ${look.indent}`
 	].join(';');
 
 	const items = list.items
 		.map((item, i) => {
 			// Ordered lists are renumbered from source order; a source that restarts
 			// its numbering part-way through is a bug, not intent.
-			const marker = list.ordered ? `${i + 1}.` : bullet;
+			const marker = list.ordered ? `${i + 1}.` : look.bullet;
 			const itemStyle = [
 				'display:flex',
 				'align-items:baseline',
-				`gap:${mm(cfg.markerGap ?? 0)}`,
-				`margin:0 0 ${mm(i === list.items.length - 1 ? 0 : (cfg.itemSpacing ?? 0))}`
+				// No marker, no gap for one: the item starts at the indent.
+				`gap:${marker === null ? '0' : look.gap}`,
+				`margin:0 0 ${i === list.items.length - 1 ? '0' : look.item}`
 			].join(';');
 			const inner = [`<span style="flex:1;min-width:0">${renderInline(item.text)}`];
 			if (item.children) {
-				inner.push(`<div style="margin-top:${mm(cfg.itemSpacing ?? 0)}">${renderList(item.children, md, false, bullet)}</div>`);
+				inner.push(`<div style="margin-top:${look.item}">${renderList(item.children, md, false, look)}</div>`);
 			}
 			inner.push('</span>');
-			return `<li style="${itemStyle}"><span style="flex:none;white-space:nowrap">${escapeHtml(marker)}</span>${inner.join('')}</li>`;
+			const mark = marker === null ? '' : `<span style="flex:none;white-space:nowrap">${escapeHtml(marker)}</span>`;
+			return `<li style="${itemStyle}">${mark}${inner.join('')}</li>`;
 		})
 		.join('');
 

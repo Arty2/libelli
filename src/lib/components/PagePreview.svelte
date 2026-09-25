@@ -46,6 +46,8 @@
 		onchange: (box: Box) => void;
 		/** an image file dropped on an area, handed up for the app to store */
 		onimagedrop?: (box: Box, file: File) => void;
+		/** a picture file let go over the page but no area */
+		onimagepagedrop?: (file: File, clientX: number, clientY: number) => void;
 		/** forwarded to the card: what a drag is about to do, for the undo label */
 		onaction?: (what: string) => void;
 		onbounds: (show: boolean) => void;
@@ -118,6 +120,7 @@
 		onselect,
 		onchange,
 		onimagedrop,
+		onimagepagedrop,
 		onaction,
 		onbounds,
 		ongrid,
@@ -710,6 +713,38 @@
 	page the moment it was too big to fit. A tool you have to scroll back to find
 	is a tool that is not to hand.
 -->
+<!-- The grid, handed to the card to draw under its areas: the areas and the
+     page margins sit on top of it, as they sit on the paper. Inside the card's
+     transform, but in screen pixels all the same — the viewBox is the sheet's
+     size on screen and the element the sheet's size before the zoom, so the
+     transform scales one back to the other and a 0.5 hairline is half a screen
+     pixel at any zoom. Editor furniture: only the stage passes it, so it never
+     reaches a print or a contact sheet thumbnail. -->
+{#snippet gridLayer()}
+	{#if gridArt}
+		<svg
+			class="grid-overlay"
+			class:on-dark={isDark(template.page.background)}
+			aria-hidden="true"
+			viewBox="0 0 {gridArt.w} {gridArt.h}"
+			style="width:{gridArt.w / scale}px;height:{gridArt.h / scale}px"
+		>
+			<path
+				class="minor"
+				class:dot={gridArt.dots}
+				d={gridArt.minorPath}
+				stroke-width={gridArt.dots ? 1.1 : GRID_HAIRLINE}
+			/>
+			<path
+				class="major"
+				class:dot={gridArt.dots}
+				d={gridArt.majorPath}
+				stroke-width={gridArt.dots ? 2 : GRID_HAIRLINE}
+			/>
+		</svg>
+	{/if}
+{/snippet}
+
 <div class="stage">
 <div
 	class="viewport"
@@ -728,7 +763,26 @@
 	tabindex="-1"
 >
 	<div class="page">
-	<div class="sheet" style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) * scale}px">
+	<!-- A picture file dropped on the page itself, rather than on an area,
+	     becomes an area of its own there. An area's own drop stops the event
+	     before it reaches this, so this only ever sees the ground between them. -->
+	<div
+		class="sheet"
+		style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) * scale}px"
+		role="presentation"
+		ondragover={(e) => {
+			if (!onimagepagedrop || template.locked || !e.dataTransfer?.types.includes('Files')) return;
+			e.preventDefault();
+			e.dataTransfer.dropEffect = 'copy';
+		}}
+		ondrop={(e) => {
+			if (!onimagepagedrop || template.locked) return;
+			const file = Array.from(e.dataTransfer?.files ?? []).find((f) => f.type.startsWith('image/'));
+			if (!file) return;
+			e.preventDefault();
+			onimagepagedrop(file, e.clientX, e.clientY);
+		}}
+	>
 		<div class="scaler" style="transform:scale({scale})">
 			<Card
 				{template}
@@ -757,46 +811,18 @@
 				{ondraw}
 				{oneditcell}
 				{ontext}
+				underlay={gridArt ? gridLayer : undefined}
 			/>
 		</div>
 
-		{#if gridArt}
-			<!-- Drawn over the card, never inside it: this is editor furniture and
-			     must not appear in a print or a contact sheet thumbnail.
-
-			     An SVG rather than a background, and sitting outside the card's
-			     transform so its hairlines are already in screen pixels — see
-			     `gridArt` above for why the gradients had to go. -->
-			<svg
-				class="grid-overlay"
-				class:on-dark={isDark(template.page.background)}
-				aria-hidden="true"
-				width={gridArt.w}
-				height={gridArt.h}
-				style="width:{gridArt.w}px;height:{gridArt.h}px"
-			>
-				<path
-					class="minor"
-					class:dot={gridArt.dots}
-					d={gridArt.minorPath}
-					stroke-width={gridArt.dots ? 1.1 : GRID_HAIRLINE}
-				/>
-				<path
-					class="major"
-					class:dot={gridArt.dots}
-					d={gridArt.majorPath}
-					stroke-width={gridArt.dots ? 2 : GRID_HAIRLINE}
-				/>
-			</svg>
-		{/if}
 
 		{#if bounds && bleed > 0}
 			<!-- Where the paper will be cut.
 
-			     Drawn here rather than inside the card, and after the grid, because
-			     it has to sit above it: the grid overlay is a sibling of the scaled
-			     card, so nothing inside the card can paint over it, and a trim edge
-			     hidden under a gridline is a trim edge you cannot follow.
+			     Drawn here rather than inside the card, over everything the card
+			     draws — the grid included, which is inside the card now, under its
+			     areas: a trim edge hidden under a gridline or an area is a trim edge
+			     you cannot follow.
 
 			     Solid, and the same half-pixel hairline the grid uses. It used to be
 			     dashed and a whole pixel, which made it the loudest line on a page
