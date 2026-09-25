@@ -90,6 +90,7 @@ resize boxes directly, or type exact millimetres.
   anchored, whose top is not its own to move. No area is ever less than 1mm
   either way, and type sizes, leading, radii and paddings are held to floors of
   their own, so a stray 0 or minus sign cannot make something unreachable.
+  Hold **Shift** while dragging a resize handle for the same thing on the card.
 - **Anchors** — a box can take its top edge from the *rendered* bottom of another
   box, plus a gap. The gap may be **negative**, tucking an area up under the one
   it follows so the two overlap. Drag an anchored box vertically and the gap
@@ -145,8 +146,9 @@ resize boxes directly, or type exact millimetres.
   every card and travels with the design rather than with the data. An area with
   nothing typed into it is still an area — it keeps its fill, its border and its
   size, and **Hide When Empty** is what takes it away again. *+ Area* beside the
-  page adds one, starting as static text. An **empty area** draws its own name
-  in italics, in the accent blue, in the face and size it will print in — so an
+  page adds one, starting as static text. An **empty area** draws its name —
+  for an area bound to a column, the column's name, since that is what will be
+  in it — in italics, in the accent blue, in the face and size it will print in — so an
   empty area still shows where it is and how big its words will be. It is part
   of the bounds: turning **Bounds** off takes it away with them, and it never
   reaches paper, the lightbox or a PNG. An area set to hide when empty hides on
@@ -173,7 +175,12 @@ resize boxes directly, or type exact millimetres.
   in a Markdown area. `{{Artist Name}}` finds the column `Artist-Name`, and case
   does not matter. Substitution happens **once**: what a placeholder is replaced
   with is never read for placeholders itself, so a cell that names itself, or
-  two that name each other, print what they hold rather than looping.
+  two that name each other, print what they hold rather than looping. Type
+  `{{` in any field that takes text — a cell, the area's Text, the card
+  itself — and the columns are offered; arrows move, Enter or Tab takes one,
+  Esc leaves what you typed. A placeholder that names no column is
+  **underlined in wavy red** on the card while the bounds are on, since it
+  would otherwise print as the literal braces.
   `{{date}}` prints today's date, and `{{date:YYYY-MM-DD}}` prints it in a
   format of your own: `YYYY`, `YY`, `MM`, `DD` for the numbers, `MMMM`, `MMM`,
   `dddd`, `ddd` for the names. A column called `date` wins over the date; a
@@ -502,8 +509,8 @@ a notice can appear.
   Duplicate on the card, and the glyph is what tells the three apart.
 - **Import CSV** — in the **Table** menu too, with **Export CSV** beside it, so
   the bar under the table holds only what acts on chosen rows, the picker and
-  the lock. The same parser against a whole file, header and all. Press and *hold* the menu item
-  instead of clicking it, and the four sample cards come
+  the lock. The same parser against a whole file, header and all. **Load sample
+  cards**, in the same menu, puts the four sample cards
   back: they walk through the app, and they are somewhere to start when a blank
   table is not. Your rows are replaced, the template is untouched, and
   Ctrl/Cmd+Z undoes it. A file holding no rows is **refused rather than
@@ -521,23 +528,28 @@ a notice can appear.
   a column name is also something written between braces: `{{Artist-Name}}`.
   Letters of any script are letters.
 - **Reorder** — drag a header sideways and drop it where the blue edge shows.
+  With a finger, hold the header still for a moment first — it lifts, with a
+  buzz — and then drag; a sideways swipe that has not lifted anything scrolls
+  the table instead.
   The ‹ › and the bin appear in a header only while it is pointed at or has the
   focus, so the name has the room the rest of the time; the sort stays, because
   it also says how the rows are sorted. Row objects are keyed by name, so
   moving a column changes the view and nothing else.
 - **Columns nothing prints** — a small broken link in front of a header marks a
   column no area is bound to and no area's words or printed cells name as
-  `{{column}}`: data no card will show.
+  `{{column}}`: data no card will show. Press it to put the column on the card:
+  a new area, named after the column and bound to it, where a new area goes.
 - **Counting** — while a cell is being typed in, its characters and words are
   counted in its bottom corner.
-- **A cell full size** — press and hold a cell for a dialog with the whole of it
-  and the same count. It edits a copy: **Done** (or Ctrl/Cmd+Enter) keeps it,
+- **A cell full size** — press and hold a cell, or press the ellipsis on a cell
+  that holds more than it shows, for a dialog with the whole of it and the
+  same count. It edits a copy: **Done** (or Ctrl/Cmd+Enter) keeps it,
   **Cancel** and Esc do not.
 - **Lock** — the padlock at the right-hand end of the bar under the table, after
   the picker, freezes it: no typing, no new, moved,
   renamed or deleted rows and columns, no paste or import — and nothing typed,
-  dropped or drawn on the card reaches a cell either. Sorting and choosing rows
-  still work, because neither changes what any card says. It is saved with the
+  dropped or drawn on the card reaches a cell either. Nor does sorting, since
+  row order is print order; choosing rows still works. It is saved with the
   table and undoable.
 - **Column widths** — drag the right edge of a header, or double-click that edge
   for the default. The widths are a view preference of this browser's, not part
@@ -551,8 +563,10 @@ a notice can appear.
   table starts; and **Full**, every row as tall as its longest cell. A cell
   holding more than its row shows ends its last visible line in an ellipsis,
   the words fading into it; it goes while the cell is being typed in. It is kept for
-  next time. Whatever the height, a row's number sits on the same baseline as
-  the first line of its cells, with its tick centred beside it.
+  next time. **Double-click a row number** to show just that row whole, and
+  again to put it back. On a phone the button keeps its drawing and drops the
+  word. Whatever the height, a row's number sits on the same baseline as the
+  first line of its cells, with its tick centred beside it.
 - **Sort** — the arrow in a header is a three-way toggle: A-Z, Z-A, then back to
   the order the rows arrived in. Numbers sort by value rather than by digit,
   case is ignored, and blanks stay at the bottom either way. This reorders the
@@ -594,7 +608,10 @@ a notice can appear.
   mis-aimed click on a 22px icon is not the whole of the decision.
 - **How wide the table is** — beside the page, drag the table's left edge to
   share the width between the two; double-click it to go back to the default.
-  The split is kept for next time.
+  The split is kept for next time as a share of the window, so a smaller
+  window gets the same proportion rather than the same pixels. On a phone the
+  tray's dragged height is kept too, though it opens no taller than three
+  quarters of the screen, so the card is always there to see.
 
 ## Markdown and color
 
@@ -787,15 +804,17 @@ rather than a dialog, so the card that uses the pictures stays in view.
   the folder below is Chromium's, and dropping a file onto an area is not
   something a phone can do. They go wherever pictures go — the folder when
   there is one, this browser otherwise.
-- **What is stored** — one line per picture: a thumbnail, its name, its size in
-  pixels and in bytes, and *unused* where neither the current table nor the
-  template points at it. That is the whole point: *which of these forty can I
+- **What is stored** — one line per picture, unused ones first: a thumbnail,
+  its name, its size in pixels and in bytes, and *unused* where neither the
+  current table nor the template points at it. With eight or more, a box to
+  find one by name appears. That is the whole point: *which of these forty can I
   delete* is not a question browser storage can answer. Deleting is one press,
   and it says so if something was using it. Hover a line for where it is kept.
 - **Onto the card** — drag a thumbnail out of the bar and let go over an area:
   the picture goes where a dropped file would, into this row's cell when the
-  area is bound to a column and onto the area otherwise. It works with a finger
-  as well as a mouse.
+  area is bound to a column and onto the area otherwise. The area under the
+  pointer is outlined while you carry it. It works with a finger as well as a
+  mouse.
 - **A folder of your own** — press **Choose Folder…** and pictures are written
   there as ordinary files from then on: replace one from a photo editor and the
   card follows, back them up with the rest of your work, and clear them out with
@@ -830,7 +849,8 @@ Pick a curated Google family, type any other family name, or upload a file.
   first, for a variable family; then regular and bold with their italics; then
   the family as it comes — Google refuses a request for a weight a family has
   not got, so each attempt either brings in exactly what exists or falls
-  through to the next.
+  through to the next. Which one answered is remembered per family, so the
+  next visit asks once.
 - **Only real weights** — the Weight menu lists the weights the family actually
   has in this browser, read off the faces its stylesheet or file declared. A
   family nothing has declared yet — a system face, or one still arriving —

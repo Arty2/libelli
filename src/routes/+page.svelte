@@ -249,10 +249,11 @@
 	 * `matchMedia` so the two cannot drift apart by a pixel. `trayShare` is a
 	 * fraction of the working area rather than a height in px, so turning the
 	 * phone over keeps the proportion the hand chose instead of the number. It
-	 * is null until something drags it, which leaves the CSS default in charge —
-	 * and it is not stored: where the tray sits is where this session put it,
-	 * and a phone that opens on a table filling the screen has hidden the card
-	 * the app is for.
+	 * is null until something drags it, which leaves the CSS default in charge.
+	 * It is kept for next time, as the desk's width is — but brought back no
+	 * taller than `TRAY_RESTORE_MAX`, because a phone that opens on a table
+	 * filling the screen has hidden the card the app is for. Pulled taller in
+	 * the session, it goes as tall as it is pulled.
 	 */
 	let stacked = $state(false);
 	let mainEl = $state<HTMLElement | null>(null);
@@ -262,13 +263,16 @@
 
 	/** Below this the tray is a row of buttons and no table, which is not a tray. */
 	const TRAY_MIN = 0.2;
+	const TRAY_RESTORE_MAX = 0.75;
 
 	/**
 	 * Beside the page, the table's width is dragged from its left edge, and
-	 * kept — unlike the stacked tray's height, a desk does not turn over, and
-	 * the split somebody chose for their screen is the one they want back.
-	 * Neither side may be squeezed out of use: the table keeps room for a
-	 * column and its gutter, the page keeps room for a card.
+	 * kept as a share of the working area rather than as pixels — the same
+	 * split on a smaller window, instead of a table that was a third of a big
+	 * screen taking most of a laptop's. Neither side may be squeezed out of
+	 * use: the table keeps room for a column and its gutter, the page room for
+	 * a card, and the stylesheet holds both limits again at whatever width
+	 * the window is now (`--tray-w` is a clamp).
 	 */
 	const TRAY_MIN_PX = 280;
 	const STAGE_MIN_PX = 320;
@@ -276,8 +280,10 @@
 
 	function setTrayWidth(width: number) {
 		const room = mainEl?.getBoundingClientRect().width ?? window.innerWidth;
-		const clamped = Math.round(Math.max(TRAY_MIN_PX, Math.min(room - STAGE_MIN_PX, width)));
-		if (clamped !== ui.trayWidth) ui = { ...ui, trayWidth: clamped };
+		if (!room) return;
+		const clamped = Math.max(TRAY_MIN_PX, Math.min(room - STAGE_MIN_PX, width));
+		const share = Math.round((clamped / room) * 10000) / 10000;
+		if (share !== ui.trayWidthShare) ui = { ...ui, trayWidthShare: share };
 	}
 
 	function startTrayResize(event: PointerEvent) {
@@ -320,7 +326,10 @@
 		// The finger is on the tray's top edge, so up is taller: the share it
 		// takes is what it had plus however far the edge has been pulled.
 		trayShare = Math.min(1, Math.max(TRAY_MIN, trayFrom.share + (trayFrom.y - clientY) / height));
-		if (phase === 'end') trayFrom = null;
+		if (phase === 'end') {
+			trayFrom = null;
+			ui = { ...ui, trayHeightShare: Math.round(trayShare * 10000) / 10000 };
+		}
 	}
 
 	let printing = $state(false);
@@ -570,6 +579,7 @@ em { color: #b42318 }`;
 		const storedMapping = loadMapping(templateId, template.name);
 		mapping = Object.keys(storedMapping).length ? storedMapping : autoMap(usedSlots(template), dataset.columns);
 		ui = loadUi();
+		if (ui.trayHeightShare) trayShare = Math.max(TRAY_MIN, Math.min(TRAY_RESTORE_MAX, ui.trayHeightShare));
 		if (ui.panels) {
 			// Whatever was open when the tab was last closed — see UiState.
 			pageSetupOpen = ui.panels.page;
@@ -1131,6 +1141,36 @@ em { color: #b42318 }`;
 		// After the bar has rendered for the new selection, or there is no field
 		// to put the cursor in yet.
 		void tick().then(() => boxBar?.focusText());
+	}
+
+	/**
+	 * An area for a column nothing prints yet, from the mark on its header.
+	 *
+	 * Named after the column — the area's name is its CSS id and the slot the
+	 * mapping keys on, and the column's own name is the obvious one — with a
+	 * number after it if an area already has that name. Placed where a new
+	 * area goes, selected, and one undo away.
+	 */
+	function placeColumn(column: string) {
+		if (template.locked) {
+			notify('The design is locked — unlock it to add an area.', 'warning');
+			return;
+		}
+		settleProvisional();
+		const taken = new Set(template.boxes.map((b) => b.slot).filter(Boolean));
+		let slot = column;
+		for (let n = 2; taken.has(slot); n++) slot = `${column}-${n}`;
+		describe('Place a column');
+		const box = newBox({ id: nextBoxId(template.boxes), slot, x: 14, y: 60, w: 80, h: 12, mode: 'plain' });
+		template = {
+			...template,
+			slots: template.slots.includes(slot) ? template.slots : [...template.slots, slot],
+			boxes: [...template.boxes, box]
+		};
+		mapping = { ...mapping, [slot]: column };
+		selectedIds = [box.id];
+		flash([box.id]);
+		notify(`${column} is on the card — drag the new area where it belongs.`);
 	}
 
 	// ---- positioning the areas from the columns -----------------------------
@@ -2313,8 +2353,8 @@ em { color: #b42318 }`;
 			? trayShare !== null
 				? `--tray-h:${(trayShare * 100).toFixed(2)}%`
 				: ''
-			: ui.trayWidth
-				? `--tray-w:${ui.trayWidth}px`
+			: ui.trayWidthShare
+				? `--tray-w:clamp(${TRAY_MIN_PX}px, ${(ui.trayWidthShare * 100).toFixed(2)}%, calc(100% - ${STAGE_MIN_PX}px))`
 				: ''}
 	>
 		<PagePreview
@@ -2404,15 +2444,16 @@ em { color: #b42318 }`;
 					role="separator"
 					aria-orientation="vertical"
 					aria-label="Table width"
-					aria-valuenow={ui.trayWidth}
-					aria-valuemin={TRAY_MIN_PX}
+					aria-valuenow={ui.trayWidthShare ? Math.round(ui.trayWidthShare * 100) : undefined}
+					aria-valuemin={0}
+					aria-valuemax={100}
 					tabindex="0"
 					title="Drag to share the width between the page and the table — double-click to reset"
 					onpointerdown={startTrayResize}
 					onpointermove={moveTrayResize}
 					onpointerup={endTrayResize}
 					onpointercancel={endTrayResize}
-					ondblclick={() => (ui = { ...ui, trayWidth: undefined })}
+					ondblclick={() => (ui = { ...ui, trayWidthShare: undefined })}
 					onkeydown={(e) => {
 						if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
 						e.preventDefault();
@@ -2429,6 +2470,7 @@ em { color: #b42318 }`;
 				onselecttable={(id) => void switchDataset(id)}
 				onnewtable={() => void newDataset()}
 				{usedColumns}
+				onplacecolumn={placeColumn}
 				onlock={(locked) => {
 					describe(locked ? 'Lock the table' : 'Unlock the table');
 					dataset = stripUndefined({ ...$state.snapshot(dataset), locked: locked || undefined }) as Dataset;

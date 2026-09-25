@@ -97,19 +97,40 @@
 		carry = { id: event.pointerId, name, x: event.clientX, y: event.clientY, on: false };
 	}
 
+	/**
+	 * The area the picture would land in, marked while it is carried — the
+	 * same promise a file dragged in from outside gets. An attribute rather
+	 * than a class, because the card renders its areas' classes itself and
+	 * would take a foreign one off again; the card's stylesheet draws it.
+	 */
+	let target: HTMLElement | null = null;
+
+	function aim(x: number, y: number): HTMLElement | null {
+		const area = document.elementFromPoint(x, y)?.closest<HTMLElement>('.trim [data-box-id]') ?? null;
+		if (area === target) return area;
+		target?.removeAttribute('data-image-target');
+		area?.setAttribute('data-image-target', '');
+		target = area;
+		return area;
+	}
+
 	function moveCarry(event: PointerEvent) {
 		if (!carry || carry.id !== event.pointerId) return;
 		if (!carry.on && Math.hypot(event.clientX - carry.x, event.clientY - carry.y) < CARRY_SLOP) return;
 		carry = { ...carry, x: event.clientX, y: event.clientY, on: true };
+		aim(event.clientX, event.clientY);
 	}
 
 	function endCarry(event: PointerEvent) {
 		if (!carry || carry.id !== event.pointerId) return;
 		const { on, name } = carry;
 		carry = null;
-		if (!on || event.type === 'pointercancel') return;
-		const under = document.elementFromPoint(event.clientX, event.clientY);
-		const area = under?.closest<HTMLElement>('.trim [data-box-id]');
+		if (!on || event.type === 'pointercancel') {
+			aim(-1, -1);
+			return;
+		}
+		const area = aim(event.clientX, event.clientY);
+		aim(-1, -1);
 		if (area?.dataset.boxId) onplace(area.dataset.boxId, name);
 		else onnotice('Let go over an area on the page to put the picture in it.');
 	}
@@ -119,6 +140,22 @@
 	});
 
 	const total = $derived(images.reduce((sum, image) => sum + image.bytes, 0));
+
+	/**
+	 * Unused first, then by name: the list is mostly consulted to clear out
+	 * what nothing points at, so that is what should be at the top. A filter
+	 * appears once there are enough pictures to need one.
+	 */
+	const FILTER_FROM = 8;
+	let filter = $state('');
+	const shown = $derived(
+		images
+			.filter((image) => !filter.trim() || image.name.toLowerCase().includes(filter.trim().toLowerCase()))
+			.sort(
+				(a, b) =>
+					Number(used.has(a.name)) - Number(used.has(b.name)) || a.name.localeCompare(b.name)
+			)
+	);
 
 	/** Kilobytes under a megabyte, one decimal above it; nobody wants 1483 KB. */
 	const weigh = (bytes: number) =>
@@ -209,8 +246,14 @@
 		<!-- One picture a line: what it looks like, what it is called, how big
 		     it is in pixels and in bytes, and whether anything uses it. The
 		     thumbnail is also the handle it is carried onto an area by. -->
+		{#if images.length >= FILTER_FROM}
+			<label class="field">
+				<span class="sr-only">Find a picture</span>
+				<input class="w-5" type="search" placeholder="Find…" bind:value={filter} />
+			</label>
+		{/if}
 		<ul class="images">
-			{#each images as image (image.where + image.name)}
+			{#each shown as image (image.where + image.name)}
 				<li class:unused={!used.has(image.name)} title="{image.name} — {image.where === 'folder' ? 'in the folder' : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}">
 					<span
 						class="thumb"

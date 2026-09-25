@@ -30,7 +30,24 @@ export interface PlaceholderContext {
 	now?: Date;
 	/** the row the card is drawing; its columns are the names `{{…}}` can use */
 	row?: Row | null;
+	/**
+	 * Wrap a placeholder that names nothing in `UNKNOWN_OPEN`/`UNKNOWN_CLOSE`
+	 * instead of leaving it bare, so the editor can draw it as a mistake. The
+	 * editor's doing only — never set for anything that reaches paper.
+	 */
+	markUnknown?: boolean;
 }
+
+/**
+ * Private-use characters around a placeholder nothing answers to. Chosen from
+ * the Private Use Area so no text anybody types means them, and outside the
+ * two control characters the Markdown renderer keeps for itself; escaping
+ * passes them through, so they arrive in the rendered HTML where `flagUnknown`
+ * in markdown.ts turns them into a mark.
+ */
+export const UNKNOWN_OPEN = '\uE010';
+export const UNKNOWN_CLOSE = '\uE011';
+const UNKNOWN_CHARS = /[\uE010\uE011]/g;
 
 const MONTHS = [
 	'January',
@@ -123,6 +140,8 @@ export function referencedColumns(text: string, columns: readonly string[]): str
 
 export function applyPlaceholders(text: string, context: PlaceholderContext = {}): string {
 	if (!text || !text.includes('{{')) return text;
+	// A cell cannot smuggle a mark in: the characters are the editor's.
+	if (context.markUnknown) text = text.replace(UNKNOWN_CHARS, '');
 	const row = context.row ?? null;
 	const columns = row ? Object.keys(row) : [];
 	let now: Date | undefined;
@@ -133,9 +152,38 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 			const column = findColumn(name, columns);
 			if (column) return String(row[column] ?? '');
 		}
-		if (name.toLowerCase() !== 'date') return whole;
+		if (name.toLowerCase() !== 'date') {
+			return context.markUnknown ? `${UNKNOWN_OPEN}${whole.slice(2, -2)}${UNKNOWN_CLOSE}` : whole;
+		}
 		now ??= context.now ?? new Date();
 		const wanted = format?.trim();
 		return formatDate(now, wanted || DEFAULT_DATE_FORMAT);
 	});
+}
+
+/**
+ * The placeholder being typed at the caret, if one is: an opened `{{` with no
+ * `}}` after it yet on the way to the caret, and what has been typed since.
+ * `start` is where the `{{` begins, so a choice can replace from there.
+ */
+export function openPlaceholder(text: string, caret: number): { start: number; query: string } | null {
+	const before = text.slice(0, caret);
+	const start = before.lastIndexOf('{{');
+	if (start === -1) return null;
+	const query = before.slice(start + 2);
+	// Closed already, or run across a line or another brace: not one being typed.
+	if (/[{}\n]/.test(query) || query.length > 40) return null;
+	return { start, query };
+}
+
+/**
+ * What to offer for a query: the columns, then `date`, those starting with
+ * what was typed ahead of those merely containing it, ignoring case.
+ */
+export function placeholderChoices(query: string, columns: readonly string[]): string[] {
+	const q = query.trim().toLowerCase();
+	const names = [...columns, ...(columns.some((c) => c.toLowerCase() === 'date') ? [] : ['date'])];
+	const starts = names.filter((n) => n.toLowerCase().startsWith(q));
+	const within = names.filter((n) => !n.toLowerCase().startsWith(q) && n.toLowerCase().includes(q));
+	return [...starts, ...within];
 }

@@ -105,8 +105,10 @@ const UI_DEFAULTS: UiState = { showBounds: true, showGrid: false, gridStyle: 'li
 // `showOutlines` is what this toggle was called before it was renamed to Bounds;
 // read it once so nobody's preference is silently flipped back on by a rename.
 export const loadUi = (): UiState => {
-	const stored = local.get<Partial<UiState> & { showOutlines?: boolean }>('ui', {});
-	const { showOutlines, ...rest } = stored;
+	const stored = local.get<Partial<UiState> & { showOutlines?: boolean; trayWidth?: number }>('ui', {});
+	// `trayWidth` was px, in 0.16.0; the width is a share now, and a stale
+	// number carried along in every save would only be something to misread.
+	const { showOutlines, trayWidth: _px, ...rest } = stored;
 	return { ...UI_DEFAULTS, ...(showOutlines === undefined ? {} : { showBounds: showOutlines }), ...rest };
 };
 export const saveUi = (ui: UiState) => local.set('ui', ui);

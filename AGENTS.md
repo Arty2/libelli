@@ -36,6 +36,7 @@ src/lib/
   boxops.ts       box and selection transforms: duplicate, delete, group, lock, nudge
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
   gestures.ts     swipe and press-and-hold, shared by the components that need them
+  complete.ts     the column names `{{` offers, in any field that holds text
   modal.ts        the two-Enter rule every dialog with a default action shares
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts

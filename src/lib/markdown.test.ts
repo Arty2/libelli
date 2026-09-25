@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, renderInline, renderMarkdown } from './markdown';
+import { escapeHtml, flagUnknown, renderInline, renderMarkdown } from './markdown';
+import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
 
 const render = (src: string) => renderMarkdown(src, { size: 12.5 });
 
@@ -112,5 +113,19 @@ describe('renderMarkdown paragraph style', () => {
 	it('indents only a paragraph that follows another', () => {
 		const html = renderMarkdown(two, { size: 10, lineHeight: 1.2, paragraph: { mode: 'indent', amount: 2 } });
 		expect(html).toBe('<p style="margin:0">One</p><p style="margin:0;text-indent:2.4em">Two</p>');
+	});
+});
+
+describe('flagUnknown', () => {
+	const mark = (name: string) => `${UNKNOWN_OPEN}${name}${UNKNOWN_CLOSE}`;
+
+	it('underlines an unknown placeholder in text, escaped as it was', () => {
+		const html = renderMarkdown(`Hi **${mark('a<b')}**`, { size: 10 });
+		expect(flagUnknown(html)).toBe('<p style="margin:0 0 3mm">Hi <strong><span class="unknown-placeholder">{{a&lt;b}}</span></strong></p>');
+	});
+
+	it('never writes a span into an attribute', () => {
+		const html = `<a href="https://x.example/${mark('q')}">t</a>`;
+		expect(flagUnknown(html)).toBe('<a href="https://x.example/{{q}}">t</a>');
 	});
 });

@@ -385,8 +385,8 @@ export interface Dataset {
 	name?: string;
 	/**
 	 * Read-only: no cell, column or row can change, from the table or from the
-	 * card. Sorting still reorders it and rows can still be chosen, because
-	 * neither changes what any card says. Absent is unlocked.
+	 * card, and it cannot be sorted, since row order is print order. Rows can
+	 * still be chosen. Absent is unlocked.
 	 */
 	locked?: boolean;
 }
@@ -416,11 +416,13 @@ export interface UiState {
 	 */
 	panels?: { page: boolean; data: boolean; images: boolean };
 	/**
-	 * The table's width beside the page, in px, where the two sit side by
-	 * side. Absent is the stylesheet's own share; a phone stacks them and
-	 * ignores this.
+	 * The table's width beside the page, as a share of the working area, 0 to
+	 * 1. Absent is the stylesheet's own share. (A `trayWidth` in px written by
+	 * 0.16.0 is simply not read.)
 	 */
-	trayWidth?: number;
+	trayWidthShare?: number;
+	/** The stacked tray's height on a phone, as a share of the working area. */
+	trayHeightShare?: number;
 	/** How tall a table row may be; absent is `medium`, the height it always was. */
 	rowHeight?: RowHeight;
 }

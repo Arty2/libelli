@@ -1,4 +1,4 @@
-import { STORE_FONTS, idbGet, idbKeys, idbSet } from './storage';
+import { STORE_FONTS, idbGet, idbKeys, idbSet, local } from './storage';
 import type { FontRef, Template } from './types';
 
 /**
@@ -75,6 +75,13 @@ export function ensureGoogleFont(family: string): void {
 	if (!key || loadedGoogle.has(key)) return;
 	loadedGoogle.add(key);
 
+	// Start from the request that worked for this family last time, so a
+	// single-cut family is not refused twice on every visit.
+	const known = googleVariants()[key];
+	const first = typeof known === 'number' && known >= 0 && known < GOOGLE_VARIANTS.length ? known : 0;
+
+	// Once only, and the remembered one is not asked for twice on the way down.
+	let restarted = false;
 	const attempt = (index: number, previous?: HTMLLinkElement) => {
 		previous?.remove();
 		if (index >= GOOGLE_VARIANTS.length) {
@@ -82,16 +89,43 @@ export function ensureGoogleFont(family: string): void {
 			// retry. It was being marked loaded before anything had loaded, so a
 			// family that failed once could never be asked for again.
 			loadedGoogle.delete(key);
+			// And forget what was remembered for it, which is evidently stale.
+			if (key in googleVariants()) rememberVariant(key, undefined);
 			return;
 		}
 		const link = document.createElement('link');
 		link.rel = 'stylesheet';
 		link.dataset.fontFamily = name;
 		link.href = googleHref(name, GOOGLE_VARIANTS[index]);
-		link.onerror = () => attempt(index + 1, link);
+		link.onload = () => {
+			if (known !== index) rememberVariant(key, index);
+		};
+		// A remembered request that is refused now — the family changed on
+		// Google's side — starts again from the richest, not from the next.
+		link.onerror = () => {
+			if (index === first && first > 0 && !restarted) {
+				restarted = true;
+				attempt(0, link);
+			} else attempt(index + 1 === first && restarted ? index + 2 : index + 1, link);
+		};
 		document.head.appendChild(link);
 	};
-	attempt(0);
+	attempt(first);
+}
+
+/**
+ * Which of `GOOGLE_VARIANTS` answered for each family, by lower-cased name.
+ * In localStorage with the rest of this browser's small settings: it is a
+ * fact about Google's catalogue as seen from here, not about any template.
+ */
+const VARIANTS_KEY = 'font-variants';
+const googleVariants = (): Record<string, number> => local.get<Record<string, number>>(VARIANTS_KEY, {});
+
+function rememberVariant(key: string, index: number | undefined) {
+	const next = { ...googleVariants() };
+	if (index === undefined) delete next[key];
+	else next[key] = index;
+	local.set(VARIANTS_KEY, next);
 }
 
 /** The weights the scale names, and what the menu offers when it cannot tell. */

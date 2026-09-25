@@ -2,7 +2,7 @@
 	import Icon from './Icon.svelte';
 	import { backgroundStyle, cssUrl, localImageName, safeMediaUrl } from '$lib/assets';
 	import { parseColor } from '$lib/color';
-	import { applyPlaceholders } from '$lib/placeholders';
+	import { UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders } from '$lib/placeholders';
 	import { cssIdent, scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
@@ -22,7 +22,8 @@
 		snapTo,
 		snapToEdges
 	} from '$lib/layout';
-	import { renderMarkdown } from '$lib/markdown';
+	import { flagUnknown, renderMarkdown } from '$lib/markdown';
+	import { completePlaceholders } from '$lib/complete';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
 	import { normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
@@ -158,6 +159,33 @@
 	 */
 	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row });
 
+	/**
+	 * The text as the editor draws it: `contentOf`, except that a `{{name}}`
+	 * nothing answers to is marked so it can be underlined — a typo in a
+	 * column name otherwise prints as the literal braces, and is found on
+	 * paper. Only for words drawn as words, and only with the bounds on, with
+	 * the rest of the screen furniture; never in anything that is printed,
+	 * measured for emptiness, or encoded into a QR.
+	 */
+	const shownTextOf = (box: Box): string =>
+		applyPlaceholders(rawContentOf(box), { row, markUnknown: interactive && bounds });
+
+	/** Text split around the marks, for plain text, which Svelte escapes itself. */
+	function segments(text: string): Array<{ text: string; unknown: boolean }> {
+		if (!text.includes(UNKNOWN_OPEN)) return [{ text, unknown: false }];
+		const out: Array<{ text: string; unknown: boolean }> = [];
+		for (const part of text.split(UNKNOWN_OPEN)) {
+			const end = part.indexOf(UNKNOWN_CLOSE);
+			if (end === -1) {
+				if (part) out.push({ text: part, unknown: false });
+				continue;
+			}
+			out.push({ text: `{{${part.slice(0, end)}}}`, unknown: true });
+			if (end + 1 < part.length) out.push({ text: part.slice(end + 1), unknown: false });
+		}
+		return out;
+	}
+
 	/** The area's paragraph style, or the page's when it names none of its own. */
 	const paragraphOf = (box: Box) => box.paragraph ?? template.defaults.paragraph;
 
@@ -281,7 +309,11 @@
 	 * it has nothing to draw from at all; see `unsourced`.
 	 */
 	const placeholderFor = (box: Box): string =>
-		interactive && bounds && isEmpty(box) && (!box.hideWhenEmpty || unsourced(box)) ? box.slot || 'Area' : '';
+		interactive && bounds && isEmpty(box) && (!box.hideWhenEmpty || unsourced(box))
+			? // The column a bound area draws from, since that is what will be in
+				// it — the area's own name is often a generic word like "field".
+				(box.slot && mapping[box.slot]) || box.slot || 'Area'
+			: '';
 
 	/**
 	 * An area that hides when empty stays put where it has nothing to draw from
@@ -651,6 +683,9 @@
 	/** Handles belong to a single box: with several chosen, the bar does the work. */
 	const soleSelection = $derived(selectedIds.length === 1);
 
+	/** The eight handles, as against moving, turning and the pivot. */
+	const RESIZE_MODES = new Set(['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']);
+
 	/**
 	 * A finger, rather than a mouse — the handles' reach is wider for one, so
 	 * how short an area has to be before its marks collide depends on it.
@@ -764,7 +799,12 @@
 		// Selecting comes first and is never refused: a lock stops a box moving,
 		// not being picked — otherwise the only control that could unlock it
 		// could never be reached.
-		onselect?.(box.id, event.shiftKey || event.metaKey || event.ctrlKey);
+		// Only a press on the area itself adds to a selection. The handles, the
+		// lever and the pivot exist only on a sole selection, and Shift on them
+		// is a modifier of their own — resizing from the aligned edge, turning
+		// in 15° steps — which used to toggle the area out of the selection on
+		// the same press.
+		onselect?.(box.id, mode === 'move' && (event.shiftKey || event.metaKey || event.ctrlKey));
 		if (!editable(box)) return;
 		drag = {
 			id: box.id,
@@ -973,6 +1013,25 @@
 				setTop(dy);
 				next.h = Math.max(3, size(origin.h - dy));
 				break;
+		}
+		// With Shift, a handle resizes from the edge the words are aligned to,
+		// the way a typed W or H does in the bar: the size is whatever the
+		// handle made it, and the box is then placed so its right edge stays
+		// put for right-aligned text, its middle for centred, its bottom for
+		// bottom-aligned. An anchored area's top is its anchor's to decide, so
+		// it only ever does this sideways. In the stored frame, as everything
+		// written back is — see `placed`.
+		if (event.shiftKey && RESIZE_MODES.has(mode)) {
+			if (next.w !== origin.w) {
+				const align = origin.align ?? template.defaults.align;
+				const shift = origin.w - next.w;
+				next.x = round2(origin.x + (align === 'right' ? shift : align === 'center' ? shift / 2 : 0));
+			}
+			if (next.h !== origin.h && !origin.anchor) {
+				const valign = origin.valign ?? 'top';
+				const shift = origin.h - next.h;
+				next.y = round2(origin.y + (valign === 'bottom' ? shift : valign === 'middle' ? shift / 2 : 0));
+			}
 		}
 		guide = { ...latched, flip };
 		onchange?.(next);
@@ -1250,6 +1309,11 @@
 	}
 </script>
 
+<!-- Plain text with any unknown `{{name}}` in it marked — see `shownTextOf`.
+     Written on one line: the text is `white-space: pre-wrap`, and a newline
+     between these tags would be drawn. -->
+{#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.unknown}<span class="unknown-placeholder" title="No column called this in the table">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
+
 <div
 	class="card"
 	class:editing={interactive}
@@ -1333,13 +1397,13 @@
 					{#if placeholderFor(box)}
 						<span class="placeholder">{placeholderFor(box)}</span>
 					{:else if box.mode === 'markdown'}
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf -->
-						{@html renderMarkdown(contentOf(box), {
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf; flagUnknown writes a fixed span around text it has already escaped -->
+						{@html flagUnknown(renderMarkdown(shownTextOf(box), {
 							size: box.size ?? template.defaults.size,
 							md: box.md,
 							paragraph: paragraphOf(box),
 							lineHeight: box.lineHeight ?? template.defaults.lineHeight
-						})}
+						}))}
 					{:else if box.mode === 'qr'}
 						<span class="media" style="height:{box.h}mm">
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
@@ -1373,15 +1437,15 @@
 						{@const para = paragraphOf(box)!}
 						{@const step = `${Math.round(para.amount * (box.lineHeight ?? template.defaults.lineHeight) * 1000) / 1000}em`}
 						<span class="paras">
-							{#each contentOf(box).split('\n') as line, i (i)}
+							{#each shownTextOf(box).split('\n') as line, i (i)}
 								<span
 									class="para"
 									style={para.mode === 'space' ? `margin-bottom:${step}` : i > 0 ? `text-indent:${step}` : ''}
-								>{line || '\u00a0'}</span>
+								>{#if line}{@render marked(line)}{:else}&nbsp;{/if}</span>
 							{/each}
 						</span>
 					{:else}
-						<span class="plain">{contentOf(box)}</span>
+						<span class="plain">{@render marked(shownTextOf(box))}</span>
 					{/if}
 				</div>
 
@@ -1393,6 +1457,7 @@
 						class="inline-editor"
 						spellcheck="false"
 						use:focusOnMount
+						use:completePlaceholders={row ? Object.keys(row) : []}
 						value={rawContentOf(box)}
 						oninput={(e) => ontext?.(box, e.currentTarget.value)}
 						onkeydown={onEditorKeydown}
@@ -1764,6 +1829,23 @@
 	   the area's own, so it shows where the area is and how big what lands in
 	   it will be. Drawn only where `interactive` is set, so nothing on paper
 	   reaches this rule. */
+	/* The area a picture carried out of the Images bar would land in. Set by
+	   ImagesPanel as an attribute, so the card's own class handling cannot
+	   take it off mid-drag. */
+	.box:global([data-image-target]) {
+		outline: calc(2px * var(--ui-scale, 1)) solid #2563eb;
+		outline-offset: calc(1px * var(--ui-scale, 1));
+		background-color: rgba(37, 99, 235, 0.08);
+	}
+
+	/* A `{{name}}` no column answers to, in the editor: underlined in the
+	   wavy red a spelling mistake wears, which is what it usually is. */
+	.content :global(.unknown-placeholder) {
+		text-decoration: underline wavy #d92d20;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 2px;
+	}
+
 	.placeholder {
 		color: #2563eb;
 		font-style: italic;

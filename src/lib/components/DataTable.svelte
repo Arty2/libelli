@@ -3,6 +3,8 @@
 	import Icon from './Icon.svelte';
 	import { download } from '$lib/download';
 	import { hold } from '$lib/gestures';
+	import { completePlaceholders } from '$lib/complete';
+	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { armDefault } from '$lib/modal';
 	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
 	import { countText, dropTarget, indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
@@ -25,6 +27,8 @@
 		 * here is marked, because it is data no card will print.
 		 */
 		usedColumns: Set<string>;
+		/** put an area bound to this column on the card */
+		onplacecolumn: (column: string) => void;
 		/** lock or unlock the whole table; the page owns the dataset */
 		onlock: (locked: boolean) => void;
 		ondeletetable: () => void;
@@ -69,6 +73,7 @@
 		onselecttable,
 		onnewtable,
 		usedColumns,
+		onplacecolumn,
 		onlock,
 		ondeletetable,
 		onswaptable,
@@ -205,6 +210,21 @@
 		};
 	}
 
+	/**
+	 * Rows shown at full height on their own, by index, whatever the table's
+	 * row height is. A look rather than a setting, so it is not stored, and a
+	 * different table or a sort clears it — the indices would point at other
+	 * rows.
+	 */
+	let expanded = $state<Set<number>>(new Set());
+
+	function toggleExpanded(index: number) {
+		const next = new Set(expanded);
+		if (next.has(index)) next.delete(index);
+		else next.add(index);
+		expanded = next;
+	}
+
 	/** Read-only, from here and from the card — see `Dataset.locked`. */
 	const locked = $derived(!!dataset.locked);
 
@@ -282,6 +302,7 @@
 		sortedBy = null;
 		unsorted = null;
 		selectedRows = new Set();
+		expanded = new Set();
 	});
 
 	/**
@@ -380,8 +401,29 @@
 	 *
 	 * `before` is the gap the column would land in, 0 to the column count, so
 	 * the mark can be drawn on the edge the pointer is nearest.
+	 *
+	 * A finger has to lift the column first: hold still on the header for a
+	 * moment, feel the buzz, then carry. A sideways swipe on a header is how a
+	 * phone scrolls a wide table, and reading every such swipe as a move
+	 * rearranged columns nobody meant to touch. Until the lift, a sideways
+	 * finger scrolls the table by hand — the header claims touches for itself
+	 * (`touch-action: none`), so the browser's own pan is not there to do it.
+	 * A mouse carries straight away, as before: nobody scrolls with a drag.
 	 */
-	let carrying = $state<{ id: number; from: number; x: number; y: number; on: boolean; before: number } | null>(null);
+	const LIFT_MS = 350;
+	let carrying = $state<{
+		id: number;
+		from: number;
+		x: number;
+		y: number;
+		on: boolean;
+		before: number;
+		touch: boolean;
+		lifted: boolean;
+		scroll: number;
+	} | null>(null);
+	let liftTimer: ReturnType<typeof setTimeout> | null = null;
+	let scrollEl = $state<HTMLElement | null>(null);
 	let headEls = $state<Array<HTMLElement | null>>([]);
 
 	function watchCarry(on: boolean) {
@@ -397,12 +439,46 @@
 		if (locked || event.button !== 0 || dataset.columns.length < 2) return;
 		const target = event.target as HTMLElement;
 		if (target.closest('.resize, button')) return;
-		carrying = { id: event.pointerId, from: index, x: event.clientX, y: event.clientY, on: false, before: index };
+		const touch = event.pointerType === 'touch';
+		carrying = {
+			id: event.pointerId,
+			from: index,
+			x: event.clientX,
+			y: event.clientY,
+			on: false,
+			before: index,
+			touch,
+			lifted: !touch,
+			scroll: scrollEl?.scrollLeft ?? 0
+		};
+		if (touch) {
+			liftTimer = setTimeout(() => {
+				liftTimer = null;
+				if (!carrying || carrying.lifted) return;
+				carrying.lifted = true;
+				vibrate(HOLD_MS);
+			}, LIFT_MS);
+		}
 		watchCarry(true);
+	}
+
+	function stopLift() {
+		if (liftTimer) clearTimeout(liftTimer);
+		liftTimer = null;
 	}
 
 	function moveCarry(event: PointerEvent) {
 		if (!carrying || carrying.id !== event.pointerId) return;
+		if (!carrying.lifted) {
+			// A finger that moves before the lift is not carrying anything:
+			// sideways it scrolls the table, and up or down it is the tray's.
+			const dx = event.clientX - carrying.x;
+			const dy = event.clientY - carrying.y;
+			if (Math.hypot(dx, dy) < TRAY_SLOP) return;
+			stopLift();
+			if (Math.abs(dx) > Math.abs(dy) && scrollEl) scrollEl.scrollLeft = carrying.scroll - dx;
+			return;
+		}
 		if (!carrying.on) {
 			const dx = Math.abs(event.clientX - carrying.x);
 			if (dx < TRAY_SLOP || dx < Math.abs(event.clientY - carrying.y)) return;
@@ -432,6 +508,7 @@
 
 	function endCarry(event: PointerEvent) {
 		if (!carrying || carrying.id !== event.pointerId) return;
+		stopLift();
 		const { on, from, before } = carrying;
 		carrying = null;
 		watchCarry(false);
@@ -631,6 +708,9 @@
 	 * in. Pressing the same header a third time is the way out now.
 	 */
 	function sortBy(column: string) {
+		// Sorting reorders the rows, and row order is print order: a locked
+		// table is one whose cards do not change, their order included.
+		if (locked) return;
 		if (sortedBy?.column === column && sortedBy.direction === 'desc') {
 			clearSort();
 			return;
@@ -642,18 +722,20 @@
 		if (!sortedBy) unsorted = dataset.rows;
 		sortedBy = { column, direction };
 		selectedRows = new Set();
+		expanded = new Set();
 		onchange(sorted);
 		onactivate(previewed);
 	}
 
 	/** Back to the order the rows arrived in, wherever the sorting took them. */
 	function clearSort() {
-		if (!unsorted) return;
+		if (!unsorted || locked) return;
 		const restored = { ...dataset, rows: unsorted };
 		const previewed = indexAfterSort(dataset, restored, activeRow);
 		sortedBy = null;
 		unsorted = null;
 		selectedRows = new Set();
+		expanded = new Set();
 		onchange(restored);
 		onactivate(previewed);
 		onnotice('Back to the order the rows came in.');
@@ -900,7 +982,7 @@
 	class:rows-full={rowHeight === 'full'}
 	aria-label="Card data"
 >
-	<div class="scroll">
+	<div class="scroll" bind:this={scrollEl}>
 		<table style="min-width:{tableWidth}px">
 			<!-- Widths belong to the columns, not to the cells: one place to set
 			     them, and `table-layout: fixed` above means they are obeyed rather
@@ -952,6 +1034,7 @@
 								class="icon unsort"
 								title="Sorted by “{sortedBy.column}” — press to put the rows back in the order they arrived in"
 								aria-label="Clear the sorting"
+								disabled={locked}
 								onclick={clearSort}
 							><Icon name="activity" size={14} /></button>
 						{:else if !dataset.rows.length}
@@ -964,6 +1047,7 @@
 							scope="col"
 							bind:this={headEls[i]}
 							class:carried={carrying?.on && carrying.from === i}
+							class:lifted={!!carrying?.touch && carrying.lifted && !carrying.on && carrying.from === i}
 							class:drop-before={carrying?.on && carrying.before === i}
 							class:drop-after={carrying?.on && i === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
 							aria-sort={sortedBy?.column === column ? (sortedBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
@@ -974,12 +1058,14 @@
 							     nothing names it as {{column}}. Worth saying, because it is
 							     either a column still to be placed or one that can go. -->
 							{#if !usedColumns.has(column)}
-								<span
-									class="unused"
-									role="img"
-									title="No area uses “{column}” — bind one to it, or write {`{{${column}}}`} in one"
-									aria-label="Not used on the card"
-								><Icon name="unlink" size={12} /></span>
+								<!-- And the way to put it there: one press adds an area bound
+								     to the column, where a new area goes. -->
+								<button
+									class="icon unused"
+									title="No area uses “{column}” — press to place it on the card, or write {`{{${column}}}`} in an area"
+									aria-label="Place {column} on the card"
+									onclick={() => onplacecolumn(column)}
+								><Icon name="unlink" size={12} /></button>
 							{/if}
 							<input
 								class="column-name"
@@ -1001,6 +1087,7 @@
 											: 'Back to the order the rows came in'
 										: `Sort rows by ${column}, A to Z`}
 									aria-label="Sort rows by {column}"
+									disabled={locked}
 									onclick={() => sortBy(column)}
 								>
 									<Icon
@@ -1061,6 +1148,7 @@
 					     commonest thing anybody does in here — it used to be a 20px tick
 					     in the gutter. The cell belongs to whoever is typing in it. -->
 					<tr
+						class:expanded={expanded.has(i)}
 						class:active={i === activeRow}
 						class:chosen={selectedRows.has(i)}
 						bind:this={rowEls[i]}
@@ -1084,7 +1172,18 @@
 							<!-- The number the row arrived with, not where it is sitting:
 							     sorting carries it along, so you can see where a row came
 							     from and find it again after unsorting. -->
-							<span class="number">{rowLabel(row, i)}</span>
+							<!-- Double-click for this one row at full height, and again to
+							     put it back: a look at one long row without switching the
+							     whole table to Full. -->
+							<span
+								class="number"
+								role="presentation"
+								title={expanded.has(i) ? 'Double-click to put this row back' : 'Double-click to show this whole row'}
+								ondblclick={(e) => {
+									e.stopPropagation();
+									toggleExpanded(i);
+								}}
+							>{rowLabel(row, i)}</span>
 							</span>
 						</td>
 						{#each dataset.columns as column (column)}
@@ -1097,8 +1196,9 @@
 									value={row[column] ?? ''}
 									readonly={locked}
 									use:hold={() => openBigCell(i, column)}
-									use:autosize={rowHeight === 'full'}
+									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
+									use:completePlaceholders={dataset.columns}
 									onfocus={() => {
 										editing = { row: i, column };
 										onactivate(i);
@@ -1110,6 +1210,21 @@
 								{#if editing?.row === i && editing.column === column}
 									<span class="count" aria-live="polite">{countLabel(row[column] ?? '')}</span>
 								{/if}
+								<!-- Drawn only when the cell holds more than it shows (see
+								     `overflowMark`), and a way into the rest: the same full-size
+								     editor a press and hold opens, for anybody who never learnt
+								     the hold. Out of the tab order — the field before it is where
+								     the keyboard is, and it can scroll. -->
+								<button
+									class="more"
+									tabindex="-1"
+									title="Show all of this cell"
+									aria-label="Show all of {column}, row {rowLabel(row, i)}"
+									onclick={(e) => {
+										e.stopPropagation();
+										openBigCell(i, column);
+									}}
+								>…</button>
 							</td>
 						{/each}
 						<td></td>
@@ -1191,7 +1306,7 @@
 					<path d="M2 2h12M2 14h12" />
 				{/if}
 			</svg>
-			{ROW_HEIGHT_LABELS[rowHeight]}
+			<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
 		</button>
 		<!-- What table this is, at the far end of the bar: the buttons act on it,
 		     and it is the one control here that is a name rather than an act. One
@@ -1274,12 +1389,7 @@
 						<button
 							role="menuitem"
 							disabled={locked}
-							title="Replace the rows with a CSV file — press and hold to load the sample cards instead"
-							use:hold={() => {
-								if (locked) return false;
-								pickerOpen = false;
-								onloadsample();
-							}}
+							title="Replace the rows with a CSV file"
 							onclick={() => {
 								pickerOpen = false;
 								fileInput?.click();
@@ -1300,6 +1410,22 @@
 						>
 							<span class="mark" aria-hidden="true"><Icon name="table-built" size={14} /></span>
 							Export CSV
+						</button>
+					</li>
+					<!-- It used to be a press and hold on Import, which nobody finds in
+					     a menu; an item of its own says what it does. -->
+					<li role="none">
+						<button
+							role="menuitem"
+							disabled={locked}
+							title="Replace the rows with the four sample cards that walk through the app. Ctrl/Cmd+Z undoes it"
+							onclick={() => {
+								pickerOpen = false;
+								onloadsample();
+							}}
+						>
+							<span class="mark" aria-hidden="true"><Icon name="document-multiple" size={14} /></span>
+							Load sample cards
 						</button>
 					</li>
 					<li role="separator"><hr /></li>
@@ -1367,6 +1493,7 @@
 			rows="14"
 			readonly={locked}
 			use:focusOnOpen
+			use:completePlaceholders={dataset.columns}
 			oninput={(e) => (bigCell = { ...open, draft: e.currentTarget.value })}
 			onkeydown={(e) => {
 				if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -1571,17 +1698,33 @@
 
 	/* No area prints this column. Quiet, because it is a fact about the data
 	   and not a fault: a column held back for later is a legitimate thing. */
-	.unused {
-		display: inline-grid;
-		place-items: center;
+	.icon.unused {
+		width: 18px;
+		height: 18px;
 		flex: none;
 		color: #b26a00;
-		cursor: help;
+	}
+
+	.icon.unused:hover {
+		color: #1d4ed8;
+		background: #eaf1fe;
 	}
 
 	/* A column being carried, and the gap it would land in. */
 	th.carried {
 		opacity: 0.45;
+	}
+
+	/* Held long enough to be lifted: raised off the row, ready to go. */
+	th.lifted {
+		background: #eaf1fe;
+		box-shadow: inset 0 -2px 0 #2563eb;
+	}
+
+	/* The header claims a touch for itself, so a finger can lift a column
+	   from it; a sideways swipe that is not a lift is scrolled by hand. */
+	thead th {
+		touch-action: none;
 	}
 
 	th.drop-before {
@@ -1707,23 +1850,38 @@
 	   cell's own background so it covers the words it sits over. Gone while
 	   the cell is being typed in — the field scrolls then, and the count has
 	   that corner. */
-	td:global([data-more])::after {
-		content: '…';
+	.more {
+		display: none;
 		position: absolute;
 		right: 0;
 		/* On the last line the field shows: its line box ends the sliver of
 		   height above the cell's bottom edge. */
 		bottom: 2px;
+		height: var(--cell-line);
 		padding: 0 6px 0 1.5em;
+		border: none;
+		border-radius: 0;
 		/* Fading in from the left, so the words under it trail off into the
 		   mark rather than being cut by a box. */
 		background: linear-gradient(to right, transparent, var(--cell-bg) 1.2em);
 		color: #555;
 		font: 12px/var(--cell-line) ui-sans-serif, system-ui, sans-serif;
-		pointer-events: none;
+		cursor: pointer;
+		z-index: 1;
 	}
 
-	td:global([data-more]):focus-within::after {
+	.more:hover {
+		color: #1d4ed8;
+	}
+
+	td:global([data-more]) .more {
+		display: block;
+	}
+
+	/* Gone while the field is being typed in — not on `:focus-within`, which
+	   the mark itself sets the moment it is pressed, and would hide it before
+	   the click that pressed it could land. */
+	td:global([data-more]):has(textarea:focus) .more {
 		display: none;
 	}
 
@@ -1761,6 +1919,14 @@
 	   row is as tall as its longest cell; where there is no `field-sizing`
 	   the `autosize` action does that measuring by hand. Medium is the
 	   stylesheet as it stands above. */
+	/* An expanded row in a short table takes its content's height, where the
+	   field can size itself; elsewhere `autosize` writes the height inline. */
+	@supports (field-sizing: content) {
+		.data.rows-short tr.expanded td textarea {
+			height: 100%;
+		}
+	}
+
 	/* Short is the first line and the same sliver under it as medium. */
 	.data.rows-short td textarea,
 	.data.rows-short td textarea:focus {
@@ -1769,7 +1935,9 @@
 	}
 
 	.data.rows-full td textarea,
-	.data.rows-full td textarea:focus {
+	.data.rows-full td textarea:focus,
+	.data tr.expanded td textarea,
+	.data tr.expanded td textarea:focus {
 		max-height: none;
 		/* Nothing is ever cut off here, so the bottom padding comes back. */
 		padding-bottom: 5px;
@@ -2163,6 +2331,14 @@
 
 	/* Rules drawn at the spacing the rows are at: four close, three apart,
 	   two at the extremes. Stroked in the text color, like Carbon's marks. */
+	/* On a phone the bar is short of width, and the rules drawn at the rows'
+	   own spacing already say which height it is; the title says it in words. */
+	@media (max-width: 900px) {
+		.row-height .label {
+			display: none;
+		}
+	}
+
 	.rows-glyph {
 		width: 15px;
 		height: 15px;

@@ -1324,9 +1324,23 @@ first keeps the gesture.
 with the table and its snapshots. The card writes into cells three ways — typing
 in an area, dropping a picture, finishing a drawing — and each goes through
 `refuseLockedTable` on the page, because a lock that only the table's own fields
-respected would be a fence with three gaps in it. Sorting is left free: it
-reorders what prints but changes no card's words, and a locked table you cannot
-even sort to read is a table you unlock to read.
+respected would be a fence with three gaps in it. Sorting is locked too:
+it was left free at first, on the grounds that it changes no card's words, but
+row order is print order, and a lock that still lets the run be reordered is
+not a lock anybody can rely on before printing.
+
+**A finger lifts a column before it carries it.** The header claims touches
+(`touch-action: none`) so a column can be carried at all, which took the
+browser's own sideways pan with it — and every sideways swipe on a header
+became a reorder. Now a touch has to hold still for 350ms, with a buzz, before
+it carries; a swipe before that scrolls the table by hand. A mouse still
+carries at once: nobody scrolls by dragging a header with one.
+
+**The overflow mark is a button.** It opens the full-size editor, the one
+action a hold gave, for anyone who never learnt the hold. It hides while the
+field is focused through `:has(textarea:focus)` rather than `:focus-within`,
+which the mark itself sets the instant it is pressed — hiding it before its own
+click could land.
 
 **The cell field fills its cell with `height: 1px` on the `td` — where
 `field-sizing` exists.** A percentage height inside a table cell resolves only
@@ -2004,6 +2018,12 @@ always the same list. What is cut goes to the editor's own list in
 localStorage, so it stays in the menus under the rule — a family is a thing this
 browser knows, not a thing this card needs.
 
+**Which request answered is remembered.** Walking all-weights, then
+regular-and-bold, then bare cost a single-cut family two refused requests on
+every visit. The index that loaded is kept per family in localStorage and tried
+first; if it is refused now, the walk restarts once from the richest, and a
+family nothing answers for is forgotten.
+
 **The weight menu reads the faces.** Google refuses a css2 request for a weight
 a family lacks, so asking for every weight, then regular and bold, then the
 family bare, leaves `document.fonts` holding exactly the cuts that exist; the
@@ -2304,6 +2324,25 @@ once and read for months, and a timestamp on paper is stale before the ink dries
 Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
 mode; `rawContentOf` beside it is what the inline editor shows, because typing
 over a substituted date would mean typing over yesterday's.
+
+## `src/lib/complete.ts`
+
+**One action for four fields.** The column list that `{{` opens is needed in a
+table cell, the full-size cell dialog, the area's Text in the bar and the
+editor laid over the card — four elements in three components, each with
+handlers of its own. An action attaches to any of them, builds its list with
+`textContent` only (column names are cell data), positions it `fixed` so no
+scroller clips it, and writes a choice back with `input` and `change` events so
+each field's own handler sees it as typed. Its keys stop propagating only while
+the list is open, so Escape closes the list and not the dialog behind it.
+
+**Unknown names are marked in the render, by sentinels.** `applyPlaceholders`
+can wrap a `{{name}}` nothing answers to in two Private Use characters, and
+`flagUnknown` in markdown.ts turns those into a span — in text between tags
+only, after the leaf has been escaped, and never inside an attribute. Plain
+text splits on the same characters and lets Svelte escape each piece. Only the
+editor asks for the marks, and only with the bounds on: nothing printed,
+measured for emptiness or encoded in a QR ever carries them.
 
 ## `src/lib/modal.ts`
 

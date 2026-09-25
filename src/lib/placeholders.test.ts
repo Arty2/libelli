@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { applyPlaceholders, findColumn, formatDate, referencedColumns } from './placeholders';
+import {
+	UNKNOWN_CLOSE,
+	UNKNOWN_OPEN,
+	applyPlaceholders,
+	findColumn,
+	formatDate,
+	openPlaceholder,
+	placeholderChoices,
+	referencedColumns
+} from './placeholders';
 
 // Midday, so no timezone the test could run in can push it onto another day.
 const DAY = new Date(2026, 8, 7, 12, 0, 0); // Monday 7 September 2026
@@ -80,5 +89,34 @@ describe('findColumn and referencedColumns', () => {
 			'title',
 			'Artist-Name'
 		]);
+	});
+});
+
+describe('marking a placeholder that names nothing', () => {
+	it('wraps an unknown name, and only when asked', () => {
+		const row = { title: 'Ferns' };
+		expect(applyPlaceholders('{{title}} {{nope}}', { row, markUnknown: true })).toBe(
+			`Ferns ${UNKNOWN_OPEN}nope${UNKNOWN_CLOSE}`
+		);
+		expect(applyPlaceholders('{{nope}}', { row })).toBe('{{nope}}');
+	});
+
+	it('does not let a cell carry the marks in itself', () => {
+		const text = `${UNKNOWN_OPEN}x${UNKNOWN_CLOSE} {{nope}}`;
+		expect(applyPlaceholders(text, { row: {}, markUnknown: true })).toBe(`x ${UNKNOWN_OPEN}nope${UNKNOWN_CLOSE}`);
+	});
+});
+
+describe('typing a placeholder', () => {
+	it('finds the one open at the caret', () => {
+		expect(openPlaceholder('Hi {{ti', 7)).toEqual({ start: 3, query: 'ti' });
+		expect(openPlaceholder('Hi {{title}} x', 14)).toBeNull();
+		expect(openPlaceholder('no braces', 5)).toBeNull();
+		expect(openPlaceholder('{{a\nb', 5)).toBeNull();
+	});
+
+	it('offers columns that start with it first, then ones that contain it, and the date', () => {
+		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual(['title', 'subtitle', 'date']);
+		expect(placeholderChoices('', ['a'])).toEqual(['a', 'date']);
 	});
 });

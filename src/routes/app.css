@@ -69,3 +69,36 @@ html, body {
 	clip: rect(0 0 0 0);
 	white-space: nowrap;
 }
+
+/* The column names `{{` offers — see complete.ts. Appended to the body, so
+   styled here rather than in any one of the components whose fields use it,
+   and fixed, so no scroller or dialog clips it. */
+.placeholder-complete {
+	position: fixed;
+	z-index: 90;
+	min-width: 10rem;
+	max-width: min(20rem, calc(100vw - 16px));
+	margin: 0;
+	padding: 4px;
+	list-style: none;
+	background: #fff;
+	border: 1px solid #d5d5d5;
+	border-radius: 6px;
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+	font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.placeholder-complete li {
+	padding: 4px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.placeholder-complete li[aria-selected='true'],
+.placeholder-complete li:hover {
+	background: #eaf1fe;
+	color: #1d4ed8;
+}

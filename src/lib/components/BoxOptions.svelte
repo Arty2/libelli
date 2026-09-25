@@ -2,6 +2,7 @@
 	import Icon from './Icon.svelte';
 	import './options-bar.css';
 	import { cssIdent } from '$lib/css';
+	import { completePlaceholders } from '$lib/complete';
 	import { availableWeights, fontChoices } from '$lib/fonts';
 	import {
 		BLEND_MODES,
@@ -573,6 +574,7 @@
 					<span>Text</span>
 					<input
 						bind:this={textInput}
+						use:completePlaceholders={dataset.columns}
 						class="w-8"
 						value={selected.static?.text ?? ''}
 						placeholder="Text — the same on every card"
