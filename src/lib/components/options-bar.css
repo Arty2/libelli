@@ -45,7 +45,7 @@
    is excluded: `MM` and `PT` are not how anyone writes a unit, and the point of
    setting them small and grey was that they read as an annotation rather than
    as a second label. */
-.options .field > span:not(.unit) {
+.options .field > span:not(.unit):not(.menu-select) {
 	font-size: 10px;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;

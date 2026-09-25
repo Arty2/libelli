@@ -3,7 +3,8 @@
 	import './options-bar.css';
 	import { cssIdent } from '$lib/css';
 	import { completePlaceholders } from '$lib/complete';
-	import { availableWeights, fontChoices } from '$lib/fonts';
+	import { availableWeights, fontChoices, previewFamilies } from '$lib/fonts';
+	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
 	import {
 		BLEND_MODES,
 		BORDER_STYLES,
@@ -96,6 +97,21 @@
 	 * this browser knows — see `fontChoices`.
 	 */
 	const families = $derived(fontChoices(template, editorFonts));
+
+	/**
+	 * The font menu: the page default, the template's families, under a rule
+	 * this browser's others, and under another the two ways to name a family
+	 * that is in neither list. Each name in its own face.
+	 */
+	const fontItems = $derived.by((): MenuItem[] => [
+		{ value: '', label: `Default — ${template.defaults.font}`, family: template.defaults.font },
+		...families.used.map((family) => ({ value: family, label: family, family })),
+		{ rule: true },
+		...families.others.map((family) => ({ value: family, label: family, family })),
+		{ rule: true },
+		{ value: '__custom', label: 'Other Family…' },
+		{ value: '__upload', label: 'Upload a Font File…' }
+	]);
 
 	const anchorOptions = $derived(template.boxes.filter((b) => b.id !== selected?.id));
 
@@ -691,24 +707,18 @@
 		</span>
 
 		<span class="group" role="group" aria-label="Type">
-			<label class="field">
+			<span class="field">
 				<span>Font</span>
-				<select value={selected.font ?? ''} disabled={boxFrozen} onchange={(e) => setFont(e.currentTarget.value)}>
-					<option value="">Default — {template.defaults.font}</option>
-					{#each families.used as family (family)}
-						<option value={family}>{family}</option>
-					{/each}
-					<!-- In this template above the rule, the rest of this browser's
-					     fonts below it. -->
-					<hr />
-					{#each families.others as family (family)}
-						<option value={family}>{family}</option>
-					{/each}
-					<hr />
-					<option value="__custom">Other Family…</option>
-					<option value="__upload">Upload a Font File…</option>
-				</select>
-			</label>
+				<MenuSelect
+					label="Font"
+					value={selected.font ?? ''}
+					items={fontItems}
+					disabled={boxFrozen}
+					showFamily
+					onopen={() => previewFamilies([...families.used, ...families.others], editorFonts, template.fonts)}
+					onselect={setFont}
+				/>
+			</span>
 			<label class="field">
 				<span>Size</span>
 				<input

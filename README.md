@@ -157,11 +157,15 @@ resize boxes directly, or type exact millimetres.
   no column or to one since renamed or deleted — stays put instead, because a
   design whose areas have all collapsed to nothing is a design you cannot click
   on. An area carrying its own words wears a plug pulled out of its socket,
-  because it is not plugged into the data.
+  because it is not plugged into the data. An empty bitmap area reads *Bitmap*
+  and an empty image area *Image*, and both wear a mark at the corner the way
+  static text does: a pencil for a bitmap — press it to draw — and a picture
+  for an image.
 - **Grown past its height** — an area set to **Grow** whose words need more room
-  than it was given keeps a sparse dashed line where its bottom edge was set, in
-  the bounds' own color and weight, so you can see how far the content has
-  pushed it. A clipped area draws the red cut line instead.
+  than it was given keeps a thin dashed line where a clip would have cut, in the
+  bounds' own color and rhythm, so you can see how far the content has pushed
+  it — and no shears, because nothing is cut. A clipped area draws the red cut
+  line and the shears instead.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with
   one selected, and a text box lies over the content inheriting the face, size,
   color and alignment it will print in. A bound area writes through to the cell;
@@ -561,7 +565,8 @@ a notice can appear.
   width you get and one long cell cannot shove every other column sideways.
 - **Cells fill their row** — a row is as tall as its tallest cell, and every
   field in it is that tall, so the target you click is the cell you can see.
-- **Row height** — the button left of the **Table** picker cycles three heights:
+- **Row height** — the button left of the **Table** picker, the same width in
+  every mode, cycles three heights:
   **Short**, one line per row; **Medium**, up to five lines, which is where a
   table starts; and **Full**, every row as tall as its longest cell. A cell
   holding more than its row shows ends its last visible line in an ellipsis,
@@ -1266,10 +1271,14 @@ than it has to.
   area bounds at the left (screen only, never printed), zoom at the right;
   between them, under the sheet, which card of how many you are looking at.
   **Fit** in the zoom menu says the percentage fitting *would* give you, not the
-  one you are at. **Actual** under it shows the paper at its own size — the
-  browser's millimetres, which match a ruler on most screens at their default
-  zoom but not every one, since a browser cannot tell how dense a screen really
-  is — and the other steps follow under a rule. On a phone the two left-hand toggles keep their row and lose
+  one you are at. **Actual** under it shows the paper at its real size on this
+  screen. No browser says how big an inch of glass is, so it is worked out from
+  what the screen does report — its size and pixel ratio, which name the panel
+  for every Mac (in any of its scaled modes), iPad and iPhone the app knows,
+  and the commonest monitor for grids several share (marked as an estimate).
+  A screen it does not know gets the browser's own millimetre. Hover it to see
+  which it was. The other steps follow under a rule. The menu is drawn like the
+  template picker's, as are the font menus. On a phone the two left-hand toggles keep their row and lose
   their words — a **#** for the grid and a **B** for the bounds, beside ticks
   that already say whether they are on — rather than stacking into a two-line
   panel that grew up over the sheet. What a screen reader is told does not
@@ -1334,6 +1343,9 @@ things you asked for by name:
   it, which is worth knowing before you open one from a stranger. The name is
   the only thing it controls: anything that is not a family name is refused
   rather than cleaned up. Upload a font file instead and nothing is requested.
+  Opening a font menu asks for every Google family it lists too, so each name
+  can be drawn in its own face — the first time, a stylesheet and the few
+  kilobytes of each face its name needs.
 - **A linked background image**, when a template names one. Only ever an
   http(s) address, never `data:` or anything else, and only the one the
   template names.

@@ -3,7 +3,8 @@
 	import PrintSettingsPanel from './PrintSettingsPanel.svelte';
 	import './options-bar.css';
 	import { safeImageUrl } from '$lib/assets';
-	import { fontChoices } from '$lib/fonts';
+	import { fontChoices, previewFamilies } from '$lib/fonts';
+	import MenuSelect from './MenuSelect.svelte';
 	import {
 		MAX_PARAGRAPH,
 		MIN_LEADING,
@@ -477,24 +478,24 @@
 		/>
 
 		<span class="group" role="group" aria-label="Type defaults">
-			<label class="field">
+			<span class="field">
 				<span>Font</span>
-				<select
+				<!-- The template's families, then under a rule this browser's others,
+				     each name in its own face. -->
+				<MenuSelect
+					label="Font"
 					value={template.defaults.font}
+					items={[
+						...families.used.map((family) => ({ value: family, label: family, family })),
+						{ rule: true as const },
+						...families.others.map((family) => ({ value: family, label: family, family }))
+					]}
 					disabled={pageFrozen}
-					onchange={(e) => setDefaultFont(e.currentTarget.value)}
-				>
-					{#each families.used as family (family)}
-						<option value={family}>{family}</option>
-					{/each}
-					<!-- In this template above the rule, the rest of this browser's
-					     fonts below it. -->
-					<hr />
-					{#each families.others as family (family)}
-						<option value={family}>{family}</option>
-					{/each}
-				</select>
-			</label>
+					showFamily
+					onopen={() => previewFamilies([...families.used, ...families.others], editorFonts, template.fonts)}
+					onselect={setDefaultFont}
+				/>
+			</span>
 			<label class="field">
 				<span>Size</span>
 				<input

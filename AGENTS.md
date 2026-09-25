@@ -70,7 +70,7 @@ src/lib/
     SheetLightbox.svelte  one sheet full screen; Lightbox's opposite number, on a different ground
     BitmapEditor.svelte  the drawing surface, full screen; writes a base64 PNG into the row
     ImagesPanel.svelte  what is stored, what it weighs, and the folder to keep it in instead
-    PrintPreview, PrintRoot, Lightbox, BoxMenu, SelectionTools, Icon
+    PrintPreview, PrintRoot, Lightbox, BoxMenu, SelectionTools, MenuSelect, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   app state and wiring                             (~40k)
 src/routes/app.css        the :root tokens and app-wide rules

@@ -329,3 +329,19 @@ export function fontStack(family: string | undefined, fallback: string): string 
 	if (!name) return SYSTEM_FONT_STACK;
 	return `"${name}", ${SYSTEM_FONT_STACK}`;
 }
+
+/**
+ * Ask for every family a font menu lists, so each name can be drawn in its
+ * own face. Called when a font menu opens — somebody choosing a font, which is
+ * when the faces are wanted — and never before. An uploaded face is already in
+ * this browser, so only the Google names are requested, through the same
+ * `ensureGoogleFont` a choice makes; a family asked for once is not asked for
+ * again. The cost, said plainly: the first opening fetches the curated
+ * families' stylesheets and the few kilobytes of each face its name needs.
+ */
+export function previewFamilies(families: string[], editorFonts: FontRef[], declared: FontRef[] = []) {
+	const local = new Set(
+		[...editorFonts, ...declared].filter((f) => f.source !== 'google').map((f) => f.family.toLowerCase())
+	);
+	for (const family of families) if (!local.has(family.toLowerCase())) ensureGoogleFont(family);
+}

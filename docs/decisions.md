@@ -978,6 +978,20 @@ measured against stored edges and drawn where the eye sees them.
 
 ## `src/lib/components/PagePreview.svelte`
 
+**Actual is measured, not assumed.** CSS's millimetre is a 96th of an inch per
+3.78 pixels, right for almost no screen sold this decade: a 13-inch MacBook at
+its default scaling holds about 128 CSS pixels to the inch, so "100%" drew an
+A5 card at three quarters of its size. No browser reports a screen's density,
+but `actualScale` in layout.ts can name most panels from what a page can read.
+On phones, iPads and Windows the device-pixel grid (size × ratio) is the panel.
+On a Mac it is not — a scaled mode renders into a larger framebuffer and
+shrinks it onto the glass, so a 13-inch Air at 1440 × 900 reports the same
+grid as a 15-inch Pro at native — so Macs are matched by their "looks like"
+sizes instead, every one of which shares the panel's width in inches. Grids
+several monitor sizes share take the commonest and say it is an estimate; an
+unknown screen gets CSS's millimetre and says so. A calibration against a
+ruler would be exact everywhere and was not asked for.
+
 **The scaler is `width: max-content`.** A block fills its parent, so the element
 carrying `transform: scale()` was the sheet's width before the transform, and
 scaled up that width scaled with it: every zoom above 100% hung an invisible
@@ -2136,6 +2150,24 @@ trap.
 **Names are resolved in one pass, keyed on the names.** Not on the rows: typing
 in a cell full of words must not send the whole run back to IndexedDB. A run of
 forty cards sharing one logo reads it once and holds one object URL for it.
+
+## `src/lib/components/MenuSelect.svelte`
+
+**One menu, drawn like the template picker.** The zoom and both font menus were
+native selects: they could not look like the picker beside them, and no styling
+reaches inside a native list on every platform to set a font's name in its
+face. This is the picker's shape — value on a line, caret against it, a fixed,
+measured menu with a tick and rules — as a component, with the arrow keys,
+Home, End and Escape a list is owed. It opens down where there is room and up
+where there is more, and from the trigger's right edge when the trigger is in
+the right half of the window: the zoom's menu, hung rightwards, ran under the
+table.
+
+**Previews are fetched when a font menu opens.** Drawing each family's name in
+its face needs the face, so opening the menu asks for every Google family it
+lists, through the same `ensureGoogleFont` a choice uses — a request made
+because somebody is choosing a font, which is the rule's line. Uploaded faces
+are already here and are never requested.
 
 ## `src/lib/components/PageOptions.svelte`
 

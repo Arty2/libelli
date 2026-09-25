@@ -312,7 +312,10 @@
 		interactive && bounds && isEmpty(box) && (!box.hideWhenEmpty || unsourced(box))
 			? // The column a bound area draws from, since that is what will be in
 				// it — the area's own name is often a generic word like "field".
-				(box.slot && mapping[box.slot]) || box.slot || 'Area'
+				// An unbound one says what it is waiting for.
+				(box.slot && mapping[box.slot]) ||
+				box.slot ||
+				(pictureKind(box) === 'drawing' ? 'Bitmap' : pictureKind(box) === 'picture' ? 'Image' : 'Area')
 			: '';
 
 	/**
@@ -1114,6 +1117,18 @@
 	const isStatic = (box: Box) => !box.slot && (box.mode === 'plain' || box.mode === 'markdown');
 
 	/**
+	 * What kind of picture an area holds, for the mark at its corner: a drawing
+	 * made here, or a picture from somewhere. The same reading the bar's
+	 * Content menu makes — an `image` area written before `bitmap` was its own
+	 * mode, holding only a drawing, is a drawing.
+	 */
+	const pictureKind = (box: Box): 'drawing' | 'picture' | null => {
+		if (box.mode === 'bitmap') return 'drawing';
+		if (box.mode !== 'image') return null;
+		return !box.slot && box.static?.dataUrl !== undefined && box.static?.url === undefined ? 'drawing' : 'picture';
+	};
+
+	/**
 	 * Boxes other areas hang from. Anchoring is a relationship, and until now only
 	 * one end of it was visible: the box that follows said so, and the box being
 	 * followed gave no sign that moving it would take anything with it.
@@ -1492,7 +1507,9 @@
 					</svg>
 				{/if}
 
-				{#if bounds && !empty && overflowing[box.id]}
+				<!-- The cut is a clipped area's alone: a growing one is never cut —
+				     it has the dashed line above where a clip would fall instead. -->
+				{#if bounds && !empty && box.overflow === 'clip' && overflowing[box.id]}
 					<!-- Where the words are actually severed, drawn as the cut it is: a
 					     dashed red line along the bottom edge, with the shears straddling
 					     it at the end of the stroke. The other three edges keep the plain
@@ -1522,7 +1539,7 @@
 					     common case. It stacks up from the bottom edge, clearing the
 					     shears when this area is also cutting its words off — two marks
 					     on one corner would otherwise land on top of each other. -->
-					<span class="badges foot" class:clears-cut={!empty && overflowing[box.id]}>
+					<span class="badges foot" class:clears-cut={!empty && box.overflow === 'clip' && overflowing[box.id]}>
 						<button
 							class="badge action"
 							class:lit={litFollowers.has(box.id)}
@@ -1543,7 +1560,7 @@
 					</span>
 				{/if}
 
-				{#if bounds && !template.locked && (box.locked || isStatic(box) || anchorTargets.has(box.id))}
+				{#if bounds && !template.locked && (box.locked || isStatic(box) || pictureKind(box) || anchorTargets.has(box.id))}
 					<!-- Why the box will not do what you might ask of it, stacked at its
 					     corner. All but the plug are buttons — the reason and the way out
 					     of it in the same 13 pixels — and each swaps to the icon of the
@@ -1555,6 +1572,25 @@
 						{#if isStatic(box)}
 							<span class="badge" title="Static text — this says the same on every card, because it is not plugged into a column">
 								<Icon name="unplug" size={11} />
+							</span>
+						{/if}
+						<!-- What a picture area holds, beside the static text's plug. The
+						     pencil is also the way into the drawing — the same as a
+						     double-click, for anybody who has not found that. -->
+						{#if pictureKind(box) === 'drawing'}
+							<button
+								class="badge action"
+								disabled={!editable(box)}
+								title={box.slot ? 'A bitmap, from this row\'s cell — press to draw' : 'A bitmap, the same on every card — press to draw'}
+								aria-label="Draw in this area"
+								onpointerdown={(e) => e.stopPropagation()}
+								onclick={() => ondraw?.(box.id)}
+							>
+								<Icon name="edit" size={11} />
+							</button>
+						{:else if pictureKind(box) === 'picture'}
+							<span class="badge" title={box.slot ? 'An image, from this row\'s cell' : 'An image, the same on every card'}>
+								<Icon name="image" size={11} />
 							</span>
 						{/if}
 						{#if anchorTargets.has(box.id)}
@@ -2239,10 +2275,14 @@
 			height: 0;
 		}
 
+		/* Where a clip would have cut, on an area that grows instead: thin and
+		   dashed in the bounds' own rhythm, so it reads as the outline the area
+		   was given — not the red cut, and with no shears, because nothing here
+		   is cut. */
 		.original-edge line {
 			stroke: var(--bounds-color, rgba(37, 99, 235, 0.45));
 			stroke-width: var(--line);
-			stroke-dasharray: var(--line) calc(var(--line) * 6);
+			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
 		/* The line the words are cut on: dashed, the way a cut line is drawn on

@@ -1999,7 +1999,17 @@
 
 	/* Sized and coloured like the sort control in a column header, because it is
 	   the same act — it just reaches every column at once. */
+	/* Out of the flow, over where the row numbers sit below it: in the flow, a
+	   22px button in a row of 11px ticks made the header taller the moment a
+	   sort came on, and the corner tick dropped by half the difference. The
+	   corner is sticky, so it is the button's containing block. */
 	.unsort {
+		position: absolute;
+		top: 50%;
+		right: 1px;
+		width: 18px;
+		height: 18px;
+		transform: translateY(-50%);
 		color: #1d4ed8;
 	}
 
@@ -2345,6 +2355,14 @@
 		.row-height .label {
 			display: none;
 		}
+	}
+
+	/* As wide in every mode as in its widest, so pressing it does not shift
+	   the picker beside it: the word sits in a box that fits "Medium". */
+	.row-height .label {
+		display: inline-block;
+		width: 4.1em;
+		text-align: left;
 	}
 
 	.rows-glyph {

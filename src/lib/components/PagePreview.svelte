@@ -1,11 +1,12 @@
 <script lang="ts">
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
+	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { hold, swipe } from '$lib/gestures';
-	import { GRID_MAJOR, GRID_MINOR, bleedFor, mmToPx } from '$lib/layout';
+	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
@@ -19,7 +20,7 @@
 		/** ruled lines, or a dot at every intersection */
 		gridStyle: GridStyle;
 		selectedIds: string[];
-		zoom: 'fit' | number;
+		zoom: 'fit' | 'actual' | number;
 		/** 1-based position of the previewed row, for the page number */
 		pageNumber: number | null;
 		/** the area being typed into on the card itself, if any */
@@ -48,7 +49,7 @@
 		ongrid: (show: boolean) => void;
 		/** press and hold the Grid toggle: the same grid, drawn the other way */
 		ongridstyle: (style: GridStyle) => void;
-		onzoom: (zoom: 'fit' | number) => void;
+		onzoom: (zoom: 'fit' | 'actual' | number) => void;
 		onnudge: (dx: number, dy: number) => void;
 		undoable: boolean;
 		redoable: boolean;
@@ -258,7 +259,44 @@
 		return Math.max(0.15, Math.min(fit, 2));
 	});
 
-	const scale = $derived(typeof zoom === 'number' ? zoom : fitScale);
+	/**
+	 * The zoom at which the paper is its real size here — see `actualScale`.
+	 * Read again whenever the window changes, because moving it to another
+	 * screen, or zooming the browser, changes what the screen reports.
+	 */
+	let actual = $state(actualScale({ width: 0, height: 0, ratio: 1 }));
+
+	$effect(() => {
+		const read = () =>
+			(actual = actualScale({ width: screen.width, height: screen.height, ratio: window.devicePixelRatio || 1 }));
+		read();
+		window.addEventListener('resize', read);
+		return () => window.removeEventListener('resize', read);
+	});
+
+	const scale = $derived(typeof zoom === 'number' ? zoom : zoom === 'actual' ? actual.scale : fitScale);
+
+	/**
+	 * The zoom menu. Actual is the paper at its real size on this screen,
+	 * worked out from what the screen reports about itself; a screen the app
+	 * does not know gets the browser's own millimetre, and the title says
+	 * which it was.
+	 */
+	const zoomItems = $derived.by((): MenuItem[] => [
+		{ value: 'fit', label: `Fit — ${Math.round(fitScale * 100)}%` },
+		{
+			value: 'actual',
+			label: `Actual — ${Math.round(actual.scale * 100)}%`,
+			title: actual.panel
+				? `The paper at its real size, measured for a ${actual.panel}${actual.estimate ? ' — the commonest screen of this resolution, so it may be off' : ''}`
+				: 'This screen is not one the app knows, so this is the browser’s own millimetre, which may not match a ruler'
+		},
+		{ rule: true },
+		...(typeof zoom === 'number' && !ZOOM_STEPS.includes(zoom)
+			? [{ value: String(zoom), label: `${Math.round(zoom * 100)}%` }]
+			: []),
+		...ZOOM_STEPS.map((step) => ({ value: String(step), label: `${step * 100}%` }))
+	]);
 
 	/**
 	 * The grid, as geometry rather than as a background.
@@ -506,7 +544,7 @@
 				return;
 			case '0':
 				event.preventDefault();
-				if (event.shiftKey) onzoom(1);
+				if (event.shiftKey) onzoom('actual');
 				else onzoom('fit');
 				return;
 			// Two keys each: the punctuation is what they are named after on a
@@ -998,31 +1036,18 @@
 		</label>
 	</div>
 
-	<label class="corner right">
-		<span class="sr-only">Zoom</span>
-		<select
-			value={zoom === 'fit' ? 'fit' : String(zoom)}
-			onchange={(e) => onzoom(e.currentTarget.value === 'fit' ? 'fit' : Number(e.currentTarget.value))}
-		>
-			<option value="fit">Fit — {Math.round(fitScale * 100)}%</option>
-			<!-- The paper at its own size: the card is laid out in millimetres, so
-			     a scale of 1 is those millimetres as the browser draws them. That
-			     is CSS's millimetre, a 96th of an inch per 3.78 pixels — true to a
-			     ruler on most screens at their default zoom, not on all of them,
-			     since no browser will say how dense a screen really is. -->
-			<option value="1" title="The paper at its own size, in the browser's millimetres">Actual — 100%</option>
-			<hr />
-			<!-- A pinch or a Ctrl+= lands between the steps, and a select with no
-			     matching option shows nothing at all. The odd value gets an option
-			     of its own so the control always says where the page is. -->
-			{#if typeof zoom === 'number' && zoom !== 1 && !ZOOM_STEPS.includes(zoom)}
-				<option value={String(zoom)}>{Math.round(zoom * 100)}%</option>
-			{/if}
-			{#each ZOOM_STEPS.filter((step) => step !== 1) as step (step)}
-				<option value={String(step)}>{step * 100}%</option>
-			{/each}
-		</select>
-	</label>
+	<!-- Zoom, as the same kind of menu the template picker opens: Fit and the
+	     paper's real size first, then under a rule the steps. A pinch or a
+	     Ctrl+= lands between the steps, and gets an entry of its own so the
+	     control always says where the page is. -->
+	<div class="corner right">
+		<MenuSelect
+			label="Zoom"
+			value={typeof zoom === 'number' ? String(zoom) : zoom}
+			items={zoomItems}
+			onselect={(value) => onzoom(value === 'fit' || value === 'actual' ? value : Number(value))}
+		/>
+	</div>
 
 	{#if padUsable}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
@@ -1409,13 +1434,6 @@
 		justify-content: center;
 	}
 
-	.corner select {
-		font: 500 11px ui-sans-serif, system-ui, sans-serif;
-		color: #555;
-		border: none;
-		background: transparent;
-		padding: 3px 4px;
-	}
 
 	.corner input {
 		margin: 0;

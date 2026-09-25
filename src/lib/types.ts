@@ -408,7 +408,8 @@ export interface UiState {
 	 * renamed column, and is dropped for a column that no longer exists.
 	 */
 	columnWidths: Record<string, number>;
-	zoom: 'fit' | number;
+	/** `actual` is the paper's real size on this screen — see `actualScale` */
+	zoom: 'fit' | 'actual' | number;
 	/**
 	 * Which of the bars and the table were open, so a reload comes back to the
 	 * screen it left. Absent until something is toggled, which is what lets a
