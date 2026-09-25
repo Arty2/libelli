@@ -2612,20 +2612,22 @@
 		flex: 1;
 	}
 
-	/* On a phone the bar is short of width, and the icon already says which
-	   height it is; the title says it in words. */
-	@media (max-width: 900px) {
-		.row-height .label {
-			display: none;
-		}
-	}
-
 	/* As wide in every mode as in its widest, so pressing it does not shift
 	   what is beside it: the word sits in a box that fits "Short". */
 	.row-height .label {
 		display: inline-block;
 		width: 2.9em;
 		text-align: left;
+	}
+
+	/* On a phone the bar is short of width, and the icon already says which
+	   height it is; the title says it in words. After the rule above, not
+	   before it: the two are equally specific, so the later one wins, and
+	   written first this one never did — the word showed on every phone. */
+	@media (max-width: 900px) {
+		.row-height .label {
+			display: none;
+		}
 	}
 
 	.actions button[aria-pressed='true'] {
