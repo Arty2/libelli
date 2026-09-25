@@ -40,9 +40,15 @@
 		onopen?: () => void;
 		/** show the current value in its own family, as the list does */
 		showFamily?: boolean;
+		/**
+		 * No rule under the value: for a control that already sits on a chip of
+		 * its own — the zoom, in the stage's corner — where a line under the
+		 * value would be a second edge. The rule is the menu's once it opens.
+		 */
+		bare?: boolean;
 	}
 
-	let { items, value, onselect, label, title, disabled = false, onopen, showFamily = false }: Props = $props();
+	let { items, value, onselect, label, title, disabled = false, onopen, showFamily = false, bare = false }: Props = $props();
 
 	let open = $state(false);
 	let root = $state<HTMLElement | null>(null);
@@ -138,6 +144,7 @@
 	<button
 		bind:this={trigger}
 		class="trigger"
+		class:bare
 		type="button"
 		aria-haspopup="menu"
 		aria-expanded={open}
@@ -217,6 +224,11 @@
 
 	.trigger:hover:not(:disabled) {
 		border-bottom-color: var(--border-control-hover);
+	}
+
+	.trigger.bare,
+	.trigger.bare:hover:not(:disabled) {
+		border-bottom-color: transparent;
 	}
 
 	.trigger:disabled {

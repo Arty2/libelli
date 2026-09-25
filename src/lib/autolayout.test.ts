@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { GRID_MINOR } from './layout';
 import {
 	autoLayout,
 	charsPerLine,
@@ -223,14 +224,18 @@ describe('autoLayout', () => {
 		expect(boxes.some((b) => b.slot === 'body')).toBe(false);
 	});
 
-	it('keeps every area the same distance from both sides of the paper', () => {
-		for (const size of [page, { ...page, w: page.h, h: page.w }, { ...page, w: 90, h: 55 }]) {
+	it('puts every edge on the grid, with the margins as even as the page allows', () => {
+		for (const size of [page, { ...page, w: page.h, h: page.w }, { ...page, w: 90, h: 55 }, { ...page, w: 150, h: 200 }]) {
 			const { boxes } = autoLayout({ page: size, defaults, columns, rows: sample });
-			const lefts = boxes.map((b) => b.x);
-			const rights = boxes.map((b) => size.w - (b.x + b.w));
-			expect(Math.min(...lefts)).toBeCloseTo(Math.min(...rights), 5);
-			// And the same distance from the top and the bottom as from the sides.
-			expect(Math.min(...boxes.map((b) => b.y))).toBeCloseTo(Math.min(...lefts), 5);
+			for (const b of boxes) {
+				for (const v of [b.x, b.y, b.w, b.h]) expect(v % GRID_MINOR).toBeCloseTo(0, 6);
+			}
+			const leftMargin = Math.min(...boxes.map((b) => b.x));
+			const rightMargin = Math.min(...boxes.map((b) => size.w - (b.x + b.w)));
+			expect(rightMargin).toBeGreaterThanOrEqual(leftMargin);
+			expect(rightMargin - leftMargin).toBeLessThan(GRID_MINOR);
+			// Where the page is whole grid steps wide, the two are equal.
+			if (size.w % GRID_MINOR === 0) expect(rightMargin).toBe(leftMargin);
 		}
 	});
 

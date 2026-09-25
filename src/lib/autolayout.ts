@@ -1,4 +1,5 @@
 import { parseColor } from './color';
+import { GRID_MINOR } from './layout';
 import { newBox } from './template';
 import type { Box, Defaults, Mapping, PageSpec, Row } from './types';
 
@@ -351,10 +352,29 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 		(g) => columns.includes(g.column) && g.include !== false
 	);
 
-	const margin = clamp(Math.round(Math.min(page.w, page.h) * 0.08), 6, 14);
-	const contentW = Math.max(10, page.w - margin * 2);
-	const contentH = Math.max(10, page.h - margin * 2);
-	const gap = round(margin * 0.45);
+	/*
+	 * Every edge on the grid. The editor's grid is what a hand-placed area
+	 * snaps to, so a generated card that sits off it is a card whose areas all
+	 * jump the first time one is nudged — and one that does not line up with
+	 * the lines you turn on to line things up. Sizes round up, so text keeps
+	 * the room it was measured for; the far edges round inwards, so nothing
+	 * crosses the margin.
+	 *
+	 * The trade-off: the two side margins can only be equal where the page is a
+	 * whole number of grid steps wide. On A5, 148mm, the left edge is at 10 and
+	 * the right at 135 — 10mm and 13mm. The grid wins; the difference is under
+	 * one step.
+	 */
+	const G = GRID_MINOR;
+	const up = (v: number) => Math.ceil(v / G - 1e-9) * G;
+	const down = (v: number) => Math.floor(v / G + 1e-9) * G;
+	const onGrid = (v: number) => Math.round(v / G) * G;
+	const margin = Math.max(G, onGrid(clamp(Math.min(page.w, page.h) * 0.08, 6, 14)));
+	const rightEdge = Math.max(margin + 2 * G, down(page.w - margin));
+	const bottomEdge = Math.max(margin + 2 * G, down(page.h - margin));
+	const contentW = rightEdge - margin;
+	const contentH = bottomEdge - margin;
+	const gap = G;
 
 	const boxes: Box[] = [];
 	const mapping: Mapping = {};
@@ -373,10 +393,10 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	// ---- the foot, measured first so the middle knows where it ends ----------
 
 	const smallSize = round(clamp(contentW * 0.075, 6, 9.5), 1);
-	const smallH = round(textHeight(smallSize, 1.2), 1);
+	const smallH = up(textHeight(smallSize, 1.2));
 
 	const linkField = pick('link');
-	const qrSide = linkField ? round(clamp(contentW * 0.16, 14, 26)) : 0;
+	const qrSide = linkField ? up(clamp(contentW * 0.16, 14, 26)) : 0;
 
 	// Whatever is short and not already spoken for, in column order. Capped by
 	// the room a foot may take rather than by a count: a quarter of the card is
@@ -386,9 +406,9 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	const footCapacity = Math.max(1, Math.floor((contentH * 0.25) / smallH));
 	const footLines = footFields.slice(0, footCapacity);
 	const footH = Math.max(footLines.length * smallH, qrSide);
-	const footTop = round(page.h - margin - footH);
+	const footTop = bottomEdge - footH;
 	// The foot's left column stops short of the QR rather than running under it.
-	const footW = round(qrSide ? contentW - qrSide - gap : contentW);
+	const footW = qrSide ? contentW - qrSide - gap : contentW;
 
 	footLines.forEach((field, index) => {
 		place({
@@ -409,8 +429,8 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	if (linkField) {
 		place({
 			slot: linkField.column,
-			x: round(page.w - margin - qrSide),
-			y: round(page.h - margin - qrSide),
+			x: rightEdge - qrSide,
+			y: bottomEdge - qrSide,
 			w: qrSide,
 			h: qrSide,
 			mode: 'qr',
@@ -463,7 +483,7 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 				slot: titleField.column,
 				x: margin,
 				w: contentW,
-				h: round(textHeight(size, 1.1)),
+				h: up(textHeight(size, 1.1)),
 				size,
 				lineHeight: 1.1,
 				weight: 700,
@@ -482,13 +502,15 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 				slot: subtitleField.column,
 				x: margin,
 				w: contentW,
-				h: round(textHeight(size, 1.25)),
+				h: up(textHeight(size, 1.25)),
 				size,
 				lineHeight: 1.25,
 				mode: 'plain',
 				overflow: 'grow'
 			},
-			round(gap * 0.4)
+			// Tight under the title: a subtitle belongs to it. Zero rather than
+			// a fraction of a step, which would put everything below off the grid.
+			0
 		);
 	}
 
@@ -497,7 +519,7 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	if (imageField) {
 		// Wide rather than tall: a picture that takes half the card leaves the
 		// body nowhere to go, and a card is usually read for its words.
-		const height = round(clamp(contentW * 0.6, 20, contentH * 0.4));
+		const height = Math.max(G, down(clamp(contentW * 0.6, 20, contentH * 0.4)));
 		stack(
 			{
 				slot: imageField.column,
@@ -517,8 +539,8 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 		// Down to the foot, or three lines' worth when the head has already eaten
 		// the page — it grows, so the floor only has to be a sane starting height.
 		const height = Math.max(
-			round(textHeight(size, defaults.lineHeight, 3)),
-			round(footTop - gap - (previous ? cursor + gap : margin))
+			up(textHeight(size, defaults.lineHeight, 3)),
+			footTop - gap - (previous ? cursor + gap : margin)
 		);
 		stack(
 			{
@@ -565,13 +587,13 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 				mode: 'plain',
 				overflow: 'grow'
 			},
-			round(gap * 0.5)
+			0
 		);
 		// These follow a body that has already reached the foot, so their declared
 		// tops are the one place in this pass that can walk off the bottom of the
 		// page. The anchor still puts them under the body where they belong; this
 		// only keeps the fallback somewhere you can see it.
-		box.y = Math.min(box.y, round(page.h - margin - box.h));
+		box.y = Math.min(box.y, bottomEdge - box.h);
 		placed.add(field.column);
 	}
 

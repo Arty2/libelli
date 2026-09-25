@@ -237,7 +237,7 @@
 	 * What Fit *would* be, whether or not that is what the page is at.
 	 *
 	 * Its own value rather than a branch inside `scale`, because the zoom menu
-	 * has to be able to say "Fit — 43%" while sitting at 200%. Reading the
+	 * has to be able to say "43% — Fit" while sitting at 200%. Reading the
 	 * current scale there meant the Fit line renamed itself to whatever you had
 	 * just zoomed to, and so never once told you what it would do.
 	 */
@@ -283,10 +283,10 @@
 	 * which it was.
 	 */
 	const zoomItems = $derived.by((): MenuItem[] => [
-		{ value: 'fit', label: `Fit — ${Math.round(fitScale * 100)}%` },
+		{ value: 'fit', label: `${Math.round(fitScale * 100)}% — Fit` },
 		{
 			value: 'actual',
-			label: `Actual — ${Math.round(actual.scale * 100)}%`,
+			label: `${Math.round(actual.scale * 100)}% — Actual`,
 			title: actual.panel
 				? `The paper at its real size, measured for a ${actual.panel}${actual.estimate ? ' — the commonest screen of this resolution, so it may be off' : ''}`
 				: 'This screen is not one the app knows, so this is the browser’s own millimetre, which may not match a ruler'
@@ -1043,6 +1043,7 @@
 	<div class="corner right">
 		<MenuSelect
 			label="Zoom"
+			bare
 			value={typeof zoom === 'number' ? String(zoom) : zoom}
 			items={zoomItems}
 			onselect={(value) => onzoom(value === 'fit' || value === 'actual' ? value : Number(value))}

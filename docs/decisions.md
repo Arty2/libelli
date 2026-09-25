@@ -102,6 +102,14 @@ that is what makes it worth writing down.
 
 ## `src/lib/autolayout.ts`
 
+**Every edge on the grid, even where that makes the margins uneven.** A
+generated card that sat off the 5mm grid jumped the first time an area was
+nudged or dragged, and did not line up with the lines turned on to line things
+up. Sizes round up so text keeps its measured room, far edges round inwards so
+nothing crosses the margin, and gaps are whole steps (the subtitle sits tight
+under the title, at 0). Equal side margins and grid edges only coexist where
+the page is a whole number of steps wide; on A5 the grid wins by 3mm.
+
 **Leaving a column out is a switch, not a kind.** It was the last entry in the
 kind menu, which made it a thing a column *is* — and putting one back meant
 choosing again what it had been taken for. `include` sits beside the kind, the
@@ -1350,6 +1358,14 @@ became a reorder. Now a touch has to hold still for 350ms, with a buzz, before
 it carries; a swipe before that scrolls the table by hand. A mouse still
 carries at once: nobody scrolls by dragging a header with one.
 
+**The cell editor edits the cell, not a copy.** It had Cancel and Done over a
+draft, which made it the one place in the table where typing did not show on
+the card until confirmed. Now it writes through like the small field, undo
+covers it the same way, and closing is all that is left to do — an × and Esc.
+While the small field has the focus, the bar under the table is about that
+cell: its count, where the in-cell count used to sit over the words, and an
+Edit button for anyone who never learnt the press and hold.
+
 **A cell opened whole takes the table's room, not the screen's.** It was a
 modal over everything, the third layer after the page and the table, and it
 hid the card whose words were being edited. Laid over the table inside its own
@@ -2262,6 +2278,14 @@ size. The trade-off is a band of the bar's own colour under the shorter of the
 two; it buys a page that does not move when you pick something up. The floor is
 dropped on a resize, because both bars wrap and neither height survives a change
 of width.
+
+**The page bar stands at the area bar's height before any area is picked.**
+The row was floored at the tallest bar it had held, so the page stopped jumping
+on the second selection but not the first. An invisible area bar — a bound
+Markdown field, the kind with the most fields — is kept in the row, `inert` and
+`visibility: hidden`, laid out at the row's width so it wraps as the real one
+would, and its height is part of the floor. It costs one extra bar's worth of
+components mounted and never seen.
 
 **A menu is not a height.** The template switcher used to hang absolutely inside
 the bar, and on a phone the bar scrolls — so while the menu was up the bar gave

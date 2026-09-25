@@ -456,8 +456,11 @@ took the column for, and a sample cell to check it against. That list is nearly
 the whole of the dialog — no paragraph explaining it, because the rows say it
 better. Change anything it has read wrongly, or untick a column to leave it off
 the card — the tick is apart from the kind, so ticking it again keeps what it
-was taken for. An empty column starts unticked. Every area it places sits the
-same distance from both sides of the paper, and from the top and the bottom.
+was taken for. An empty column starts unticked. Every edge of every area it
+places is on the 5mm grid, the one hand-placed areas snap to, so nothing jumps
+the first time it is nudged; the margins are as even as the page allows, and
+exactly even where the page is a whole number of grid steps wide (on A5, 148mm,
+they come out 10mm and 13mm).
 Columns it reached by length alone are marked *guess*. Where the template already
 has areas, a line above the buttons says how many are about to be replaced.
 
@@ -512,8 +515,8 @@ a notice can appear.
   Duplicate on the card, and the glyph is what tells the three apart.
 - **Import CSV** — in the **Table** menu too, with **Export CSV** beside it, so
   the bar under the table holds only what acts on chosen rows, the picker and
-  the lock. The same parser against a whole file, header and all. **Load sample
-  cards**, in the same menu, puts the four sample cards
+  the lock. The same parser against a whole file, header and all. **Load
+  Onboarding**, in the same menu, puts the four onboarding cards
   back: they walk through the app, and they are somewhere to start when a blank
   table is not. Your rows are replaced, the template is untouched, and
   Ctrl/Cmd+Z undoes it. A file holding no rows is **refused rather than
@@ -542,15 +545,17 @@ a notice can appear.
   column no area is bound to and no area's words or printed cells name as
   `{{column}}`: data no card will show. Press it to put the column on the card:
   a new area, named after the column and bound to it, where a new area goes.
-- **Counting** — while a cell is being typed in, its characters and words are
-  counted in its bottom corner.
+- **Counting** — while a cell is being typed in, the bar under the table is
+  about that cell: its characters and words, and **Edit**, which opens it full
+  size. The row actions come back when the cell is left.
 - **Which area it feeds** — entering a cell flashes the areas on the card that
   print it, in the bounds' blue, for a moment.
-- **A cell full size** — press and hold a cell, or press the ellipsis on a cell
-  that holds more than it shows, and the whole of it opens in the table's own
-  space — over the rows, with the card still in view beside or above it — with
-  the same count. It edits a copy: **Done** (or Ctrl/Cmd+Enter) keeps it,
-  **Cancel** and Esc do not.
+- **A cell full size** — press **Edit**, press and hold a cell, or press the
+  ellipsis on a cell that holds more than it shows, and the whole of it opens
+  in the table's own space — over the rows, with the card still in view beside
+  or above it — with the same count. It edits the cell itself, live, so the
+  card follows as you type and undo reaches every change; the **×** at the top
+  right, Esc or Ctrl/Cmd+Enter put the table back.
 - **Lock** — the padlock at the right-hand end of the bar under the table, after
   the picker, freezes it: no typing, no new, moved,
   renamed or deleted rows and columns, no paste or import — and nothing typed,
@@ -1083,11 +1088,13 @@ letting go of the area. They used to stack, which meant every selection added a
 whole toolbar to the top of the window — the stage lost that much height, the
 fitted scale changed with it, and the page jumped and resized under the pointer.
 
-The row also never shrinks: it is floored at the tallest bar it has held at this
-window size, so swapping one bar for the other does not move the page either. The
-cost is a band of the bar's own colour under the shorter of the two; the floor is
-dropped on a resize, because both bars wrap and neither height survives a change
-of width.
+The row also stands at the area bar's height from the start, on a desk and on a
+phone: an unseen area bar is kept in the row just to be measured, so the page bar
+already takes the room the area bar will need and selecting an area moves
+nothing — the page stays where it is and the fitted zoom does not change. It
+never shrinks below the tallest bar it has held at this window size either. The
+cost is a band of the bar's own colour under the page bar; the floor follows
+the window as both bars wrap differently at different widths.
 
 ## Keyboard shortcuts
 
@@ -1271,8 +1278,9 @@ than it has to.
 - **View** — in the bottom corners of the page itself, not the toolbar: grid and
   area bounds at the left (screen only, never printed), zoom at the right;
   between them, under the sheet, which card of how many you are looking at.
-  **Fit** in the zoom menu says the percentage fitting *would* give you, not the
-  one you are at. **Actual** under it shows the paper at its real size on this
+  The zoom menu puts the number first — *66% — Fit*, *133% — Actual* — and its
+  field sits on the corner's chip with no rule under it. **Fit** says the
+  percentage fitting *would* give you, not the one you are at. **Actual** under it shows the paper at its real size on this
   screen. No browser says how big an inch of glass is, so it is worked out from
   what the screen does report — its size and pixel ratio, which name the panel
   for every Mac (in any of its scaled modes), iPad and iPhone the app knows,

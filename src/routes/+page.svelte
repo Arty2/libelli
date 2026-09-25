@@ -112,6 +112,17 @@
 	 */
 	let barFloor = $state(0);
 	let barHeight = $state(0);
+	/**
+	 * How tall the area bar would be at this width, measured off an invisible
+	 * one kept in the same row. The row is floored at the tallest bar it has
+	 * held, but that floor was only ever learnt by selecting something, so the
+	 * first selection still pushed the page down — the jump the floor exists to
+	 * stop. Measuring the area bar before it is needed lets the page bar stand
+	 * at its height from the start, on a desk and on a phone alike.
+	 */
+	let probeHeight = $state(0);
+	/** A representative area for the probe: a bound Markdown field shows the most fields. */
+	const probeBox = newBox({ id: '__bar-probe', slot: 'field', mode: 'markdown', x: 0, y: 0, w: 60, h: 12 });
 	// The library menu used to make the bar taller on a phone while it was up,
 	// and this had to refuse that height as a floor. The menu is `fixed` now —
 	// see PageOptions — so every height the bar reports is one it stands at.
@@ -1966,7 +1977,7 @@ em { color: #b42318 }`;
 		// sample's columns, so the cards render rather than coming up blank.
 		mapping = autoMap(usedSlots(template), dataset.columns);
 		activeRow = 0;
-		notify('Sample cards loaded. Ctrl/Cmd+Z puts your own rows back.');
+		notify('Onboarding loaded. Ctrl/Cmd+Z puts your own rows back.');
 	}
 
 	/**
@@ -2240,7 +2251,37 @@ em { color: #b42318 }`;
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
 	{#if selected || imagesOpen || pageSetupOpen}
-		<div class="bar-row" class:box={!!selected} style="min-height:{barFloor}px">
+		<div class="bar-row" class:box={!!selected} style="min-height:{Math.max(barFloor, probeHeight)}px">
+			<!-- Never seen and never reached — `inert` takes it out of the focus
+			     order and the accessibility tree — only measured. -->
+			<div class="bar-probe" aria-hidden="true" inert bind:clientHeight={probeHeight}>
+				<OptionsBar
+					section="box"
+					{template}
+					{dataset}
+					{mapping}
+					selected={probeBox}
+					onboxchange={() => {}}
+					ontemplatechange={() => {}}
+					onmappingchange={() => {}}
+					onduplicate={() => {}}
+					ondelete={() => {}}
+					onresettemplate={() => {}}
+					{library}
+					{templateId}
+					{editorFonts}
+					onselecttemplate={() => {}}
+					onnewtemplate={() => {}}
+					ondeletetemplate={() => {}}
+					onuploadfont={() => {}}
+					onuploadbackground={() => {}}
+					onuploadprintbackground={() => {}}
+					onnotice={() => {}}
+					onimporttemplate={() => {}}
+					onexporttemplate={() => {}}
+					oneditcss={() => {}}
+				/>
+			</div>
 			<div class="bar-fit" bind:clientHeight={barHeight}>
 				{#if selected}
 					<!-- No menu here, and the guard above is only ever set by the page
@@ -3101,8 +3142,20 @@ em { color: #b42318 }`;
 	   it, so the band left over when the shorter bar is in it reads as part of
 	   the bar rather than as a gap above the stage. */
 	.bar-row {
+		position: relative;
 		background: #f7f7f7;
 		border-bottom: 1px solid #ddd;
+	}
+
+	/* Laid out at the row's width so it wraps as the real one would, and out of
+	   sight and out of the way. */
+	.bar-probe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		visibility: hidden;
+		pointer-events: none;
 	}
 
 	.bar-row.box {

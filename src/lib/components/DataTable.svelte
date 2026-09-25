@@ -244,29 +244,27 @@
 	};
 
 	/**
-	 * A cell opened full size: press and hold it. A cell of a long body of
+	 * A cell opened full size — press and hold it, or press Edit in the bar
+	 * under the table while it is being typed in. A cell of a long body of
 	 * Markdown is a keyhole at the height a table row can spare, so the whole
-	 * thing gets a dialog of its own. It edits a draft — Cancel means cancel —
-	 * and Ctrl/Cmd+Enter is Done, because Return is a newline in here.
+	 * of it gets the table's room. It edits the cell itself, live, as the small
+	 * field does: the card follows each keystroke, undo reaches every change,
+	 * and there is nothing to confirm — the × or Escape puts the table back.
 	 */
-	let bigCell = $state<{ row: number; column: string; draft: string } | null>(null);
+	let bigCell = $state<{ row: number; column: string } | null>(null);
 
 	function openBigCell(rowIndex: number, column: string) {
 		const value = dataset.rows[rowIndex]?.[column];
 		if (value === undefined) return false;
 		// The small field under the press still has the focus, and would keep
-		// the count and the outline lit behind the dialog.
+		// the outline lit behind the editor.
 		(document.activeElement as HTMLElement | null)?.blur();
-		bigCell = { row: rowIndex, column, draft: value };
+		bigCell = { row: rowIndex, column };
 		onactivate(rowIndex);
 	}
 
-	function closeBigCell(keep: boolean) {
-		const open = bigCell;
+	function closeBigCell() {
 		bigCell = null;
-		if (!keep || !open || locked) return;
-		if ((dataset.rows[open.row]?.[open.column] ?? '') === open.draft) return;
-		setCell(open.row, open.column, open.draft);
 	}
 
 	const focusOnOpen = (node: HTMLElement) => node.focus();
@@ -628,7 +626,7 @@
 			pickerOpen = false;
 		} else if (bigCell) {
 			event.stopPropagation();
-			closeBigCell(false);
+			closeBigCell();
 		} else if (confirmColumn !== null) {
 			event.stopPropagation();
 			confirmColumn = null;
@@ -1211,9 +1209,6 @@
 									onclick={(e) => e.stopPropagation()}
 									oninput={(e) => setCell(i, column, e.currentTarget.value)}
 								></textarea>
-								{#if editing?.row === i && editing.column === column}
-									<span class="count" aria-live="polite">{countLabel(row[column] ?? '')}</span>
-								{/if}
 								<!-- Drawn only when the cell holds more than it shows (see
 								     `overflowMark`), and a way into the rest: the same full-size
 								     editor a press and hold opens, for anybody who never learnt
@@ -1269,7 +1264,21 @@
 	<!-- One line, always: this bar wrapping was costing the table a row of its
 	     own height every time the tray narrowed. -->
 	<div class="actions">
-		{#if chosenRows.length}
+		{#if editing && dataset.rows[editing.row]}
+			<!-- While a cell is being typed in, the bar is about that cell: how
+			     long it is, and the way into the whole of it — the button a press
+			     and hold is the shortcut for. The row actions come back when the
+			     cell is left. Mousedown is held off the Edit button, or the field
+			     would lose its focus, and with it this bar, before the click. -->
+			{@const cell = editing}
+			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[cell.row]?.[cell.column] ?? '')}</span>
+			<button
+				title="Open this cell in the table's full room — the same as pressing and holding it"
+				onmousedown={(e) => e.preventDefault()}
+				onclick={() => openBigCell(cell.row, cell.column)}
+			><Icon name="task-edit" size={15} /> Edit</button>
+			<span class="rule"></span>
+		{:else if chosenRows.length}
 			<!-- What you can do to the rows you have chosen, in front of the things
 			     that act on the whole table, with a rule between the two. It appears
 			     only when there is a selection, so the bar is its usual length the
@@ -1403,14 +1412,14 @@
 						<button
 							role="menuitem"
 							disabled={locked}
-							title="Replace the rows with the four sample cards that walk through the app. Ctrl/Cmd+Z undoes it"
+							title="Replace the rows with the four onboarding cards that walk through the app. Ctrl/Cmd+Z undoes it"
 							onclick={() => {
 								pickerOpen = false;
 								onloadsample();
 							}}
 						>
 							<span class="mark" aria-hidden="true"><Icon name="document-multiple" size={14} /></span>
-							Load sample cards
+							Load Onboarding
 						</button>
 					</li>
 					<li role="separator"><hr /></li>
@@ -1494,27 +1503,28 @@
 	     Cancel. -->
 	{#if bigCell}
 		{@const open = bigCell}
+		{@const text = dataset.rows[open.row]?.[open.column] ?? ''}
 		<div class="cell-editor" role="dialog" aria-labelledby="cell-editor-title">
-			<h2 id="cell-editor-title">{open.column}, row {rowLabel(dataset.rows[open.row], open.row)}</h2>
+			<div class="cell-editor-head">
+				<h2 id="cell-editor-title">{open.column}, row {rowLabel(dataset.rows[open.row], open.row)}</h2>
+				<span class="count-line">{countLabel(text)}</span>
+				<button class="icon close" title="Back to the table (Esc)" aria-label="Close" onclick={closeBigCell}>
+					<Icon name="close" size={18} />
+				</button>
+			</div>
 			<textarea
-				value={open.draft}
+				value={text}
 				readonly={locked}
 				use:focusOnOpen
 				use:completePlaceholders={dataset.columns}
-				oninput={(e) => (bigCell = { ...open, draft: e.currentTarget.value })}
+				oninput={(e) => setCell(open.row, open.column, e.currentTarget.value)}
 				onkeydown={(e) => {
 					if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
 						e.preventDefault();
-						closeBigCell(true);
+						closeBigCell();
 					}
 				}}
 			></textarea>
-			<div class="modal-actions">
-				<span class="count-line">{countLabel(open.draft)}</span>
-				<span class="spacer"></span>
-				<button onclick={() => closeBigCell(false)}>Cancel</button>
-				<button class="primary" title="Ctrl/Cmd+Enter" onclick={() => closeBigCell(true)}>Done</button>
-			</div>
 		</div>
 	{/if}
 </section>
@@ -1899,22 +1909,6 @@
 		cursor: default;
 	}
 
-	/* Characters and words, under the cell being typed in. Over the field's own
-	   bottom edge rather than below it, so the row does not grow by a line the
-	   moment a cell is entered. */
-	.count {
-		position: absolute;
-		right: 3px;
-		bottom: 2px;
-		z-index: 2;
-		padding: 0 4px;
-		border-radius: 3px;
-		background: rgba(255, 255, 255, 0.92);
-		font: 10px/1.5 ui-sans-serif, system-ui, sans-serif;
-		color: #767676;
-		pointer-events: none;
-		font-variant-numeric: tabular-nums;
-	}
 
 	td textarea:focus {
 		outline: 2px solid #2563eb;
@@ -2452,10 +2446,38 @@
 		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
 	}
 
+	.cell-editor-head {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
 	.cell-editor h2 {
 		margin: 0;
 		font-size: 13px;
 		font-weight: 600;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.cell-editor-head .count-line {
+		flex: 1;
+	}
+
+	.cell-editor .close {
+		flex: none;
+		width: 28px;
+		height: 28px;
+	}
+
+	/* The count of the cell being typed in, where the row actions were. */
+	.actions .cell-count {
+		font: 12px ui-sans-serif, system-ui, sans-serif;
+		color: #555;
+		white-space: nowrap;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.cell-editor textarea {
@@ -2470,9 +2492,7 @@
 		resize: none;
 	}
 
-	.cell-editor .modal-actions {
-		margin-top: 0;
-	}
+
 
 	.count-line {
 		font-size: 12px;
