@@ -96,9 +96,9 @@ resize boxes directly, or type exact millimetres.
   changes rather than the link breaking. Both ends of the tie are marked and both marks are
   buttons: the **link** on the follower breaks its own tie, the **buoy** on the
   followed area casts off everything moored to it, and neither moves anything —
-  the released box keeps the place it was sitting in. The link hangs off the
-  follower's **top-left** corner, the edge that is tied; the buoy is in the
-  column at the followed area's top right. **Point at either** and a dotted
+  the released box keeps the place it was sitting in. Both hang off an area's
+  **top-left** corner, in a column of their own: the link, and under it the
+  buoy — an area in the middle of a chain wears both. **Point at either** and a dotted
   thread draws itself between the two — an inverted S, leaving each badge
   downwards before it crosses — sagging a little and walking from the
   one under the pointer to the other end — wherever on the card that is. It
@@ -175,6 +175,10 @@ resize boxes directly, or type exact millimetres.
   area are the same switch the other way — press them and it grows to fit.
 - **A selected area** draws only its selection, not its dashed bound as well
   under it, which doubled every edge.
+- **The anchor corner** — of a selected area's eight handles, the one at the
+  corner its words are set from is square: top-left for text aligned left and
+  to the top, bottom-right for right and bottom. Centred on either axis, no
+  corner is, and every handle is rounded.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with
   one selected, and a text box lies over the content inheriting the face, size,
   color and alignment it will print in. A bound area writes through to the cell;

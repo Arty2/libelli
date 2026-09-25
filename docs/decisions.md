@@ -962,12 +962,19 @@ step further away" where a second color would say "a different kind of tie".
 Upwards it stays one hop, as it always did: what this area follows is a
 relationship it has, and what that one follows is not.
 
-**The tie badge sits on its own, off the top-left corner.** Every badge used to
-stack at the top right, and on a shallow area four of them are taller than the
-area they are about. The tie is the one an area carries most often, so moving
-it halves that column in the common case. It went to the bottom corner first,
-and on an area shorter than the badge that stacked it up over the top line; the
-top-left is the tied edge's own end and has nothing else on it.
+**The anchor's badges sit off the top-left corner, in a column of their own.**
+Every badge used to stack at the top right, and on a shallow area four of them
+are taller than the area they are about. The tie and the buoy are the ones
+areas most often carry, and they are one relationship, so they moved together
+— the tie above the buoy where an area has both. The tie went to the bottom
+corner first, and on an area shorter than the badge that stacked it up over
+the top line. Consecutive shallow areas in a chain can still bring one area's
+buoy down to the next one's tie; the same was true of the right-hand column.
+
+**The corner the words hang from has a square handle.** Left and top alignment
+make it the top-left, right and bottom the bottom-right; a centred alignment
+on either axis has no such corner and every handle stays rounded. It is worked
+out as drawn, so on a mirrored left-hand page it is the mirrored corner.
 
 **Pointing at a tie draws its thread.** The link and the buoy are at two
 corners of two areas, often with others between, and the lit glyph on the far

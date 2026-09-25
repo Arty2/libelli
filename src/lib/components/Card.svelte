@@ -1160,6 +1160,21 @@
 
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
+	/**
+	 * The corner the area's words are set from — top-left for text aligned left
+	 * and to the top, bottom-right for right and bottom — whose handle is drawn
+	 * square: the point the content hangs from, told apart from the others.
+	 * None where either alignment is centred: then no corner is the anchor.
+	 * As drawn, so on a mirrored left-hand page it is the mirrored corner.
+	 */
+	function anchorCorner(box: Box): DragMode | null {
+		const align = placed(box).align ?? template.defaults.align;
+		const valign = box.valign ?? 'top';
+		const x = align === 'right' ? 'e' : align === 'left' || align === 'justify' ? 'w' : null;
+		const y = valign === 'bottom' ? 's' : valign === 'top' ? 'n' : null;
+		return x && y ? ((y + x) as DragMode) : null;
+	}
+
 	const DRAG_LABELS: Record<DragMode, string> = {
 		move: 'Move',
 		rotate: 'Turn',
@@ -1339,12 +1354,12 @@
 
 	/** Whether the column of badges hangs off this box's right-hand edge. */
 	const hasBadges = (box: Box) =>
-		bounds && !template.locked && !!(box.locked || isStatic(box) || pictureKind(box) || anchorTargets.has(box.id));
+		bounds && !template.locked && !!(box.locked || isStatic(box) || pictureKind(box));
 
 	/** How many badges that column holds — the shears step down below them. */
 	const badgeCount = (box: Box) =>
 		hasBadges(box)
-			? [box.locked, isStatic(box), pictureKind(box), anchorTargets.has(box.id)].filter(Boolean).length
+			? [box.locked, isStatic(box), pictureKind(box)].filter(Boolean).length
 			: 0;
 
 	/** Cast off: every box moored to this one keeps its place and loses the tie. */
@@ -1697,14 +1712,16 @@
 				     buttons that would be refused anyway. The overflow mark below is
 				     not one of these: it is about what will print, which a lock does
 				     not change. -->
-				{#if bounds && !template.locked && box.anchor}
-					<!-- The tie sits at the top-left corner, on its own, outside the
-					     left edge. Off the right-hand column because on a shallow area
-					     four badges are taller than the area itself, and the tie is the
-					     badge an area most often carries; at the top because the top is
-					     the edge that is tied — and it used to sit at the bottom, where
-					     on an area shorter than the badge it rose over the top line. -->
+				{#if bounds && !template.locked && (box.anchor || anchorTargets.has(box.id))}
+					<!-- The anchor's two ends, in a column of their own off the top-left
+					     corner: the tie on an area that follows another, and under it the
+					     buoy on one that others follow — a middle link in a chain wears
+					     both. Off the right-hand column because on a shallow area four
+					     badges are taller than the area itself, and these are the badges
+					     areas most often carry; together because they are one
+					     relationship, and the thread between them runs from this side. -->
 					<span class="badges tie">
+						{#if box.anchor}
 						<button
 							class="badge action"
 							class:lit={litFollowers.has(box.id)}
@@ -1730,6 +1747,33 @@
 						>
 							<Icon name={badgeArmed(`${box.id}:tied`) ? 'unlink' : 'link'} size={11} />
 						</button>
+						{/if}
+						{#if anchorTargets.has(box.id)}
+							<button
+								class="badge action moored"
+								class:lit={litTargets.has(box.id)}
+								disabled={!!template.locked}
+								title="Other areas are moored to this one — moving it moves them too. Press to cast them off and leave them where they are."
+								aria-label="Cast off the areas anchored to this one"
+								onpointerdown={(e) => e.stopPropagation()}
+								data-moor={box.id}
+								onpointerenter={(e) => {
+									hoveredBadge = `${box.id}:moored`;
+									showThreads(e.currentTarget, box);
+								}}
+								onpointerleave={() => {
+									hoveredBadge = null;
+									threads = [];
+								}}
+								onclick={() => {
+									threads = [];
+									flashBadge(`${box.id}:moored`);
+									releaseDependents(box);
+								}}
+							>
+								<Icon name={badgeArmed(`${box.id}:moored`) ? 'sailboat' : 'harbor'} size={11} />
+							</button>
+						{/if}
 					</span>
 				{/if}
 
@@ -1765,32 +1809,6 @@
 							<span class="badge" title={box.slot ? 'An image, from this row\'s cell — double-click to draw instead' : 'An image, the same on every card — double-click to draw instead'}>
 								<Icon name="image" size={11} />
 							</span>
-						{/if}
-						{#if anchorTargets.has(box.id)}
-							<button
-								class="badge action moored"
-								class:lit={litTargets.has(box.id)}
-								disabled={!!template.locked}
-								title="Other areas are moored to this one — moving it moves them too. Press to cast them off and leave them where they are."
-								aria-label="Cast off the areas anchored to this one"
-								onpointerdown={(e) => e.stopPropagation()}
-								data-moor={box.id}
-								onpointerenter={(e) => {
-									hoveredBadge = `${box.id}:moored`;
-									showThreads(e.currentTarget, box);
-								}}
-								onpointerleave={() => {
-									hoveredBadge = null;
-									threads = [];
-								}}
-								onclick={() => {
-									threads = [];
-									flashBadge(`${box.id}:moored`);
-									releaseDependents(box);
-								}}
-							>
-								<Icon name={badgeArmed(`${box.id}:moored`) ? 'sailboat' : 'harbor'} size={11} />
-							</button>
 						{/if}
 						{#if box.locked}
 							<button
@@ -1850,6 +1868,7 @@
 						{#each HANDLES as handle (handle)}
 							<span
 								class="handle h-{handle}"
+								class:square={handle === anchorCorner(box)}
 								onpointerdown={(e) => startDrag(e, box, handle)}
 								onpointermove={moveDrag}
 								onpointerup={endDrag}
@@ -2314,6 +2333,11 @@
 		}
 	}
 
+	/* The anchor corner's handle: square-cornered, the rest rounded. */
+	.handle.square {
+		border-radius: 0;
+	}
+
 	.h-nw { top: calc(var(--mark) / -2); left: calc(var(--mark) / -2); cursor: nwse-resize; }
 	.h-n { top: calc(var(--mark) / -2); left: calc(50% - var(--mark) / 2); cursor: ns-resize; }
 	.h-ne { top: calc(var(--mark) / -2); right: calc(var(--mark) / -2); cursor: nesw-resize; }
@@ -2608,8 +2632,8 @@
 			pointer-events: none;
 		}
 
-		/* The tie, on its own at the top-left: the mirror of the column above,
-		   hanging off the left edge at the top. */
+		/* The anchor's column at the top-left — the tie, then the buoy: the
+		   mirror of the column above, hanging off the left edge at the top. */
 		.badges.tie {
 			left: auto;
 			right: 100%;
