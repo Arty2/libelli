@@ -1,5 +1,6 @@
 import { parseColor } from './color';
-import type { MarkdownStyle } from './types';
+import type { ListMarker, ListStyle, MarkdownStyle, ParagraphStyle } from './types';
+import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
 
 /**
  * A deliberately small Markdown subset, written by hand so the app stays
@@ -18,7 +19,26 @@ export interface MarkdownOptions {
 	/** base font size in points; heading sizes are multipliers of it */
 	size: number;
 	md?: MarkdownStyle;
+	/** the area's paragraph style, with the leading its amount is counted in */
+	paragraph?: ParagraphStyle;
+	lineHeight?: number;
+	/** the area's list style, over the page's; each field over `md.list` */
+	list?: ListStyle;
 }
+
+/**
+ * The glyph each bullet marker names. Set in the area's own face like the
+ * words beside it — the marker is text in the item, not a list-style image —
+ * so a dash is that font's dash; a face without the glyph falls back through
+ * the area's stack as any missing character does.
+ */
+export const LIST_GLYPHS: Record<ListMarker, string | null> = {
+	bullet: '•',
+	disc: '●',
+	dash: '–',
+	emdash: '—',
+	none: null
+};
 
 interface ListItem {
 	text: string;
@@ -40,7 +60,7 @@ const RULE = /^\s*(-{3,}|\*{3,}|_{3,})\s*$/;
 const BULLET = /^([ \t]*)([-*])\s+(.*)$/;
 const ORDERED = /^([ \t]*)(\d+)[.)]\s+(.*)$/;
 
-const DEFAULT_MD: Required<MarkdownStyle> = {
+export const DEFAULT_MD: Required<MarkdownStyle> = {
 	h1: { size: 1.5, spaceBefore: 6, spaceAfter: 1.5, weight: 700 },
 	h2: { size: 1.35, spaceBefore: 6, spaceAfter: 1.5, weight: 700 },
 	h3: { size: 1.15, spaceBefore: 4, spaceAfter: 1, weight: 700 },
@@ -201,6 +221,21 @@ const mm = (v: number) => `${round(v)}mm`;
 
 export function renderMarkdown(src: string, options: MarkdownOptions): string {
 	const md = mergeStyle(options.md);
+	const list = options.list;
+	const leading = options.lineHeight ?? 1;
+	// An area's list style is in type units, as its paragraphs are: the indent
+	// in em of its size, the spacing in lines of its leading. `md.list` is mm,
+	// and stays what a list is set by where neither page nor area names one.
+	const look: ListLook = {
+		indent: list?.indent !== undefined ? `${round(list.indent)}em` : mm(md.list.indent ?? 0),
+		item: list?.spacing !== undefined ? `${round(list.spacing * leading)}em` : mm(md.list.itemSpacing ?? 0),
+		gap: mm(md.list.markerGap ?? 0),
+		bullet: LIST_GLYPHS[list?.marker ?? 'bullet']
+	};
+	const para = options.paragraph;
+	// Space after is in lines of the leading — a line is `lineHeight` em — and
+	// an indent is in em, the unit an indent is measured in everywhere else.
+	const amount = para ? `${round(para.amount * (para.mode === 'space' ? leading : 1))}em` : '';
 	const blocks = parseBlocks(src ?? '');
 	const html: string[] = [];
 
@@ -220,7 +255,19 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 				break;
 			}
 			case 'paragraph': {
-				const style = `margin:0 0 ${mm(md.paragraph.spaceAfter ?? 0)}`;
+				// The area's paragraph style, when it has one, is the spacing
+				// between paragraphs; `md.paragraph` is what it is otherwise. An
+				// indent goes on every paragraph but the area's first. It was only
+				// on one following another paragraph, the book convention — but on
+				// a card, where most paragraphs follow a heading or a list, that
+				// meant it hardly ever showed and read as not working.
+				const follows = index > 0;
+				const style =
+					para?.mode === 'space'
+						? `margin:0 0 ${amount}`
+						: para?.mode === 'indent'
+							? `margin:0${follows ? `;text-indent:${amount}` : ''}`
+							: `margin:0 0 ${mm(md.paragraph.spaceAfter ?? 0)}`;
 				html.push(`<p style="${style}">${block.lines.map(renderInline).join('<br />')}</p>`);
 				break;
 			}
@@ -235,7 +282,7 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 				break;
 			}
 			case 'list':
-				html.push(renderList(block, md, true));
+				html.push(renderList(block, md, true, look));
 				break;
 		}
 	});
@@ -243,32 +290,41 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 	return html.join('');
 }
 
-function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean): string {
-	const cfg = md.list;
+/** How a list is set, already in CSS lengths; `bullet` null is no marker. */
+interface ListLook {
+	indent: string;
+	item: string;
+	gap: string;
+	bullet: string | null;
+}
+
+function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, look: ListLook): string {
 	const tag = list.ordered ? 'ol' : 'ul';
 	const style = [
 		'list-style:none',
-		`margin:0 0 ${mm(top ? (cfg.spaceAfter ?? md.paragraph.spaceAfter ?? 0) : 0)}`,
-		`padding:0 0 0 ${mm(cfg.indent ?? 0)}`
+		`margin:0 0 ${mm(top ? (md.list.spaceAfter ?? md.paragraph.spaceAfter ?? 0) : 0)}`,
+		`padding:0 0 0 ${look.indent}`
 	].join(';');
 
 	const items = list.items
 		.map((item, i) => {
 			// Ordered lists are renumbered from source order; a source that restarts
 			// its numbering part-way through is a bug, not intent.
-			const marker = list.ordered ? `${i + 1}.` : '•';
+			const marker = list.ordered ? `${i + 1}.` : look.bullet;
 			const itemStyle = [
 				'display:flex',
 				'align-items:baseline',
-				`gap:${mm(cfg.markerGap ?? 0)}`,
-				`margin:0 0 ${mm(i === list.items.length - 1 ? 0 : (cfg.itemSpacing ?? 0))}`
+				// No marker, no gap for one: the item starts at the indent.
+				`gap:${marker === null ? '0' : look.gap}`,
+				`margin:0 0 ${i === list.items.length - 1 ? '0' : look.item}`
 			].join(';');
 			const inner = [`<span style="flex:1;min-width:0">${renderInline(item.text)}`];
 			if (item.children) {
-				inner.push(`<div style="margin-top:${mm(cfg.itemSpacing ?? 0)}">${renderList(item.children, md, false)}</div>`);
+				inner.push(`<div style="margin-top:${look.item}">${renderList(item.children, md, false, look)}</div>`);
 			}
 			inner.push('</span>');
-			return `<li style="${itemStyle}"><span style="flex:none;white-space:nowrap">${escapeHtml(marker)}</span>${inner.join('')}</li>`;
+			const mark = marker === null ? '' : `<span style="flex:none;white-space:nowrap">${escapeHtml(marker)}</span>`;
+			return `<li style="${itemStyle}">${mark}${inner.join('')}</li>`;
 		})
 		.join('');
 
@@ -284,4 +340,26 @@ function mergeStyle(md: MarkdownStyle | undefined): Required<MarkdownStyle> {
 		list: { ...DEFAULT_MD.list, ...md?.list },
 		rule: { ...DEFAULT_MD.rule, ...md?.rule }
 	};
+}
+
+/**
+ * Turn the editor's marks around an unknown `{{name}}` (see `markUnknown` in
+ * placeholders.ts) into a span it can underline, in rendered HTML.
+ *
+ * Here, beside the escaping, because this writes markup: only into text
+ * between tags, where the name has already been escaped at its leaf, and never
+ * into an attribute — a mark that ended up inside a link's address is put back
+ * as the braces it was, rather than a span being written into the middle of
+ * an `href`.
+ */
+const MARKED = new RegExp(`${UNKNOWN_OPEN}([^${UNKNOWN_OPEN}${UNKNOWN_CLOSE}<>]*)${UNKNOWN_CLOSE}`, 'g');
+const STRAY = new RegExp(`[${UNKNOWN_OPEN}${UNKNOWN_CLOSE}]`, 'g');
+
+export function flagUnknown(html: string): string {
+	if (!html.includes(UNKNOWN_OPEN)) return html;
+	return html
+		.replace(/(^|>)([^<]*)/g, (_whole, gt: string, text: string) =>
+			gt + text.replace(MARKED, '<span class="unknown-placeholder">{{$1}}</span>')
+		)
+		.replace(STRAY, (mark) => (mark === UNKNOWN_OPEN ? '{{' : '}}'));
 }

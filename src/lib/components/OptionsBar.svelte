@@ -10,7 +10,7 @@
 	import BoxOptions from './BoxOptions.svelte';
 	import PageOptions from './PageOptions.svelte';
 	import type { TemplateEntry } from '$lib/storage';
-	import type { Box, Dataset, Mapping, Template } from '$lib/types';
+	import type { Box, Dataset, FontRef, Mapping, Template } from '$lib/types';
 
 	interface Props {
 		/** which half of the editor this instance is: the two never share a row */
@@ -26,6 +26,8 @@
 		ondelete: () => void;
 		onresettemplate: () => void;
 		library: TemplateEntry[];
+		/** fonts this browser knows that the template is not carrying */
+		editorFonts: FontRef[];
 		templateId: string;
 		onselecttemplate: (id: string) => void;
 		onnewtemplate: () => void;
@@ -35,13 +37,12 @@
 		onuploadprintbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
-		/** the page bar's library menu opened or closed; the box bar has no menu */
-		onmenu?: (open: boolean) => void;
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
 		/** open the drawing surface for the selected area */
 		ondraw?: (id: string) => void;
+		onuploadimage?: (id: string, file: File) => void;
 	}
 
 	let { section, ...rest }: Props = $props();

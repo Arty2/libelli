@@ -167,8 +167,8 @@ describe('nudgeBox', () => {
 		expect(next.y).toBe(10);
 	});
 
-	it('will not push a gap below zero, but grows it freely', () => {
-		expect(nudgeBox(box('a', { anchor: { to: 'b', gap: 1 } }), 0, -5)!.anchor!.gap).toBe(0);
+	it('moves a gap freely either way, below zero included', () => {
+		expect(nudgeBox(box('a', { anchor: { to: 'b', gap: 1 } }), 0, -5)!.anchor!.gap).toBe(-4);
 		expect(nudgeBox(box('a', { anchor: { to: 'b', gap: 1 } }), 0, 5)!.anchor!.gap).toBe(6);
 	});
 

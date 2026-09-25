@@ -2,7 +2,19 @@ import { describe, expect, it } from 'vitest';
 import {
 	BOX_MODES,
 	DEFAULT_DEFAULTS,
+	MAX_PARAGRAPH,
+	MIN_BOX,
+	MIN_LEADING,
 	MIN_PAPER,
+	MIN_SIZE,
+	DEFAULT_MARGIN,
+	marginsOf,
+	normaliseMargin,
+	normaliseParagraph,
+	normaliseList,
+	normaliseBaseline,
+	baselineOf,
+	listOf,
 	arrangeBoxes,
 	autoMap,
 	normaliseCentre,
@@ -13,6 +25,7 @@ import {
 	builtinTemplate,
 	newBox,
 	normaliseTemplate,
+	blankTemplate,
 	shownAsMedia,
 	takesADrawing,
 	usedSlots
@@ -22,7 +35,7 @@ describe('the built-in template', () => {
 	const template = builtinTemplate();
 
 	it('loads with its boxes, anchors and bleed intact', () => {
-		expect(template.name).toBe('A5 Instruction Card');
+		expect(template.name).toBe('A5 Starter Template');
 		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff' });
 		expect(template.boxes.map((b) => b.id)).toEqual(['b_title', 'b_subtitle', 'b_body', 'b_category', 'b_qr']);
 		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 8 });
@@ -230,8 +243,8 @@ describe('normaliseTemplate', () => {
 				{ id: 'b', slot: 'link', x: 0, y: 0, w: 20, h: 20, mode: 'qr', qr: { level: 'X', margin: 99 } }
 			]
 		});
-		expect(t.boxes[0].qr).toEqual({ level: 'M', margin: 2 });
-		expect(t.boxes[1].qr).toEqual({ level: 'M', margin: 8 });
+		expect(t.boxes[0].qr).toEqual({ level: 'M' });
+		expect(t.boxes[1].qr).toEqual({ level: 'M' });
 	});
 
 	it('rejects anything that is not a template', () => {
@@ -490,7 +503,101 @@ describe('newBox modes', () => {
 	});
 
 	it('knows which modes draw and which take a drawing', () => {
-		expect(BOX_MODES.filter(shownAsMedia)).toEqual(['image', 'color', 'bitmap']);
-		expect(BOX_MODES.filter(takesADrawing)).toEqual(['image', 'bitmap']);
+		expect(BOX_MODES.filter(shownAsMedia)).toEqual(['image', 'color']);
+		expect(BOX_MODES.filter(takesADrawing)).toEqual(['image']);
+	});
+});
+
+describe('box floors', () => {
+	it('holds an area to a size that can still be clicked', () => {
+		const box = newBox({ w: 0, h: -5 });
+		expect(box.w).toBe(MIN_BOX);
+		expect(box.h).toBe(MIN_BOX);
+	});
+
+	it('floors type size and leading, and keeps weight inside the scale', () => {
+		const box = newBox({ size: 0, lineHeight: 0, weight: 2000 });
+		expect(box.size).toBe(MIN_SIZE);
+		expect(box.lineHeight).toBe(MIN_LEADING);
+		expect(box.weight).toBe(900);
+	});
+
+	it('lets an anchor gap go negative, but not stop being a number', () => {
+		expect(newBox({ anchor: { to: 'a', gap: -3 } }).anchor).toEqual({ to: 'a', gap: -3 });
+		expect(newBox({ anchor: { to: 'a', gap: 'x' as unknown as number } }).anchor).toEqual({ to: 'a', gap: 0 });
+	});
+
+	it('keeps a paragraph style it can read and drops one it cannot', () => {
+		expect(newBox({ paragraph: { mode: 'indent', amount: 1.5 } }).paragraph).toEqual({ mode: 'indent', amount: 1.5 });
+		expect(normaliseParagraph({ mode: 'space', amount: 99 })).toEqual({ mode: 'space', amount: MAX_PARAGRAPH });
+		expect(normaliseParagraph({ mode: 'tab', amount: 1 })).toBeUndefined();
+	});
+});
+
+describe('bitmap areas', () => {
+	it('are read as image areas, keeping the drawing', () => {
+		const box = newBox({ mode: 'bitmap' as never, static: { dataUrl: 'data:image/png;base64,AAAA' } });
+		expect(box.mode).toBe('image');
+		expect(box.static?.dataUrl).toBe('data:image/png;base64,AAAA');
+	});
+});
+
+describe('page margins', () => {
+	it('defaults to the same margin all round, and keeps 0 as a real answer', () => {
+		expect(marginsOf({ w: 148, h: 210, unit: 'mm' })).toEqual({ top: DEFAULT_MARGIN, right: DEFAULT_MARGIN, bottom: DEFAULT_MARGIN, left: DEFAULT_MARGIN });
+		expect(normaliseMargin(0)).toBe(0);
+		expect(normaliseMargin(-4)).toBe(0);
+		expect(normaliseMargin('x')).toBeUndefined();
+	});
+
+	it('collapses four equal edges to one number and keeps uneven ones', () => {
+		expect(normaliseMargin({ top: 8, right: 8, bottom: 8, left: 8 })).toBe(8);
+		expect(normaliseMargin({ top: 20, right: 8, bottom: 15, left: 12 })).toEqual({ top: 20, right: 8, bottom: 15, left: 12 });
+	});
+
+	it('survives a round trip through a template file', () => {
+		const t = normaliseTemplate({ ...blankTemplate(), page: { w: 148, h: 210, unit: 'mm', margin: { top: 20, right: 8, bottom: 15, left: 12 } } });
+		expect(t.page.margin).toEqual({ top: 20, right: 8, bottom: 15, left: 12 });
+	});
+});
+
+describe('list style and baseline', () => {
+	it('keeps only the list fields that make sense', () => {
+		expect(normaliseList({ marker: 'dash', indent: '4', spacing: -2 })).toEqual({ marker: 'dash', indent: 4, spacing: 0 });
+		expect(normaliseList({ marker: 'star', indent: 'x' })).toBeUndefined();
+		expect(normaliseList(null)).toBeUndefined();
+	});
+
+	it('clamps a baseline either way and drops zero', () => {
+		expect(normaliseBaseline('-0.05')).toBe(-0.05);
+		expect(normaliseBaseline(3)).toBe(1);
+		expect(normaliseBaseline(0)).toBeUndefined();
+		expect(normaliseBaseline('')).toBeUndefined();
+	});
+
+	it("gives the page's baseline only to areas in the page's face", () => {
+		const defaults = { ...DEFAULT_DEFAULTS, baseline: 0.1 };
+		expect(baselineOf({}, defaults)).toBe(0.1);
+		expect(baselineOf({ font: defaults.font }, defaults)).toBe(0.1);
+		expect(baselineOf({ font: 'Other Face' }, defaults)).toBe(0);
+		expect(baselineOf({ font: 'Other Face', baseline: -0.2 }, defaults)).toBe(-0.2);
+	});
+
+	it('merges an area list over the page list field by field', () => {
+		const defaults = { ...DEFAULT_DEFAULTS, list: { marker: 'disc' as const, indent: 3 } };
+		expect(listOf({ list: { indent: 9 } }, defaults)).toEqual({ marker: 'disc', indent: 9 });
+		expect(listOf({}, DEFAULT_DEFAULTS)).toBeUndefined();
+	});
+
+	it('survives a load on the page and on an area', () => {
+		const t = builtinTemplate();
+		const raw = JSON.parse(JSON.stringify({ ...t, defaults: { ...t.defaults, list: { marker: 'dash' }, baseline: 0.04 } }));
+		raw.boxes[0].list = { spacing: 2 };
+		raw.boxes[0].baseline = -0.1;
+		const back = normaliseTemplate(raw);
+		expect(back.defaults.list).toEqual({ marker: 'dash' });
+		expect(back.defaults.baseline).toBe(0.04);
+		expect(back.boxes[0].list).toEqual({ spacing: 2 });
+		expect(back.boxes[0].baseline).toBe(-0.1);
 	});
 });

@@ -1,11 +1,14 @@
 <script lang="ts">
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
+	import { isDark } from '$lib/color';
+	import { SHORTCUTS, withKey } from '$lib/keys';
+	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { hold, swipe } from '$lib/gestures';
-	import { GRID_MAJOR, GRID_MINOR, bleedFor, mmToPx, pxToMm } from '$lib/layout';
+	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
@@ -16,10 +19,12 @@
 		/** families still arriving, passed through so an area can pulse while it waits */
 		loadingFonts?: string[];
 		grid: boolean;
+		/** the page margins, drawn and snapped to */
+		guides: boolean;
 		/** ruled lines, or a dot at every intersection */
 		gridStyle: GridStyle;
 		selectedIds: string[];
-		zoom: 'fit' | number;
+		zoom: 'fit' | 'actual' | number;
 		/** 1-based position of the previewed row, for the page number */
 		pageNumber: number | null;
 		/** the area being typed into on the card itself, if any */
@@ -42,13 +47,16 @@
 		onchange: (box: Box) => void;
 		/** an image file dropped on an area, handed up for the app to store */
 		onimagedrop?: (box: Box, file: File) => void;
+		/** a picture file let go over the page but no area */
+		onimagepagedrop?: (file: File, clientX: number, clientY: number) => void;
 		/** forwarded to the card: what a drag is about to do, for the undo label */
 		onaction?: (what: string) => void;
 		onbounds: (show: boolean) => void;
 		ongrid: (show: boolean) => void;
+		onguides: (show: boolean) => void;
 		/** press and hold the Grid toggle: the same grid, drawn the other way */
 		ongridstyle: (style: GridStyle) => void;
-		onzoom: (zoom: 'fit' | number) => void;
+		onzoom: (zoom: 'fit' | 'actual' | number) => void;
 		onnudge: (dx: number, dy: number) => void;
 		undoable: boolean;
 		redoable: boolean;
@@ -76,6 +84,7 @@
 		onedit?: (id: string | null) => void;
 		/** open the drawing surface for an area */
 		ondraw?: (id: string) => void;
+		oneditcell?: (id: string) => void;
 		/** words typed into the card, forwarded to whoever owns them */
 		ontext?: (box: Box, value: string) => void;
 		/** bring the areas that are hanging off the sheet back onto it, and only those */
@@ -95,6 +104,7 @@
 		bounds,
 		loadingFonts = [],
 		grid,
+		guides,
 		gridStyle,
 		selectedIds,
 		zoom,
@@ -111,10 +121,12 @@
 		onselect,
 		onchange,
 		onimagedrop,
+		onimagepagedrop,
 		onaction,
 		onbounds,
 		ongrid,
 		ongridstyle,
+		onguides,
 		onzoom,
 		onnudge,
 		undoable,
@@ -136,6 +148,7 @@
 		ondelete,
 		onedit,
 		ondraw,
+		oneditcell,
 		ontext,
 		onrescue,
 		onstoppicking,
@@ -194,103 +207,18 @@
 	);
 
 	/**
-	 * An anchored area has no vertical freedom to give the pad: its top is read
-	 * off another area's bottom, and the millimetres between them are the Gap
-	 * field in the bar. The two vertical keys say so with the same link the area
-	 * wears at its corner, rather than looking pressable and doing nothing.
+	 * An anchored area's top is read off another area's bottom, so up and down
+	 * on the pad move the Gap between them rather than a Y it does not have —
+	 * which is what a nudge does to an anchored area anyway (see `nudgeBox`).
+	 * The two keys say so by changing their mark: a stop bar and a triangle,
+	 * the bar being the edge of the area this one hangs from, so the key reads
+	 * "towards it" and "away from it". It used to be a chain on keys that
+	 * refused the press, with a hold to walk up the tie and three taps to break
+	 * it — two gestures nobody was taught, standing in for the one thing the
+	 * keys could simply do.
 	 */
 	const verticalTied = $derived(
 		selectedBoxes.length > 0 && selectedBoxes.every((b) => !!b.anchor)
-	);
-
-	/**
-	 * What a tied key does instead of nudging: hold it and the selection walks up
-	 * the tie, to the area this one is following.
-	 *
-	 * The key is the only place the tie is *in the way*, so it is where the way
-	 * out belongs — the Gap that the vertical keys cannot change lives on the
-	 * other area, and finding that area by eye on a page of a dozen is the whole
-	 * difficulty. One target only: with several tied areas selected they can be
-	 * following different things, and picking one of them would be a guess.
-	 */
-	const tieTarget = $derived.by(() => {
-		if (!verticalTied || selectedBoxes.length !== 1) return null;
-		const to = selectedBoxes[0].anchor?.to;
-		return (to && template.boxes.find((b) => b.id === to)) || null;
-	});
-
-	function followTie() {
-		// `false` so a hold on a key with no tie to walk buzzes at nobody — these
-		// keys carry the action whether or not there is one to take.
-		if (!tieTarget) return false;
-		onselect(tieTarget.id, false);
-	}
-
-	/**
-	 * And the other way out: a run of taps on the same key breaks the tie and
-	 * leaves the area exactly where it is sitting.
-	 *
-	 * Three taps, not one, because these keys are also where a finger goes to
-	 * nudge and an accidental tap must not quietly undo a relationship the
-	 * design depends on. After the first the key wears the broken link, so the
-	 * second and third are a decision rather than something that happens to you,
-	 * and the run lapses on its own so the icon never lies about what the next
-	 * tap would do. Unlike the hold, this does not need a single selection:
-	 * following a tie means picking one area to go to, and breaking one means
-	 * breaking each of them.
-	 */
-	const UNTIE_TAPS = 3;
-	/** A run of taps, not three taps in a session: the count lapses after this. */
-	const UNTIE_WINDOW = 1500;
-	let tiedTaps = $state(0);
-	let tiedAt = 0;
-	let tiedLapse: ReturnType<typeof setTimeout> | null = null;
-
-	// A different tie is a different run of taps.
-	let tiedLast: string | null = null;
-	$effect(() => {
-		const to = selectedBoxes.length === 1 ? (selectedBoxes[0].anchor?.to ?? null) : null;
-		if (tiedLast === to) return;
-		tiedLast = to;
-		tiedTaps = 0;
-	});
-
-	/**
-	 * Where an area actually sits, read back off the page.
-	 *
-	 * An anchored area's top is resolved during layout, from the rendered bottom
-	 * of the area above it, and only the card knows the answer because only the
-	 * card measured it. Writing the box's stale `y` back instead would drop it up
-	 * the page at the moment the tie broke, which is the one thing breaking a tie
-	 * must not do.
-	 */
-	function renderedTop(id: string): number | null {
-		const el = host?.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`);
-		return el ? Math.round(pxToMm(el.offsetTop) * 100) / 100 : null;
-	}
-
-	function untie() {
-		const tied = selectedBoxes.filter((b) => b.anchor && !b.locked);
-		if (!tied.length) return;
-		onaction?.('Break the anchor');
-		for (const box of tied) onchange({ ...box, anchor: null, y: renderedTop(box.id) ?? box.y });
-	}
-
-	function tiedTap() {
-		const now = Date.now();
-		tiedTaps = now - tiedAt > UNTIE_WINDOW ? 1 : tiedTaps + 1;
-		tiedAt = now;
-		if (tiedLapse) clearTimeout(tiedLapse);
-		if (tiedTaps < UNTIE_TAPS) {
-			tiedLapse = setTimeout(() => (tiedTaps = 0), UNTIE_WINDOW);
-			return;
-		}
-		tiedTaps = 0;
-		untie();
-	}
-
-	const tiedTitle = $derived(
-		`Tied to another area \u2014 its top follows that area\u2019s bottom. Change the Gap in the bar${tieTarget ? ', or hold this to select that area' : ''}, or tap it ${UNTIE_TAPS} times to break the tie and leave this area where it is.`
 	);
 
 	/** Paint order is array order, so "front" is last in the list, not a z-index. */
@@ -321,7 +249,7 @@
 	 * What Fit *would* be, whether or not that is what the page is at.
 	 *
 	 * Its own value rather than a branch inside `scale`, because the zoom menu
-	 * has to be able to say "Fit — 43%" while sitting at 200%. Reading the
+	 * has to be able to say "43% — Fit" while sitting at 200%. Reading the
 	 * current scale there meant the Fit line renamed itself to whatever you had
 	 * just zoomed to, and so never once told you what it would do.
 	 */
@@ -331,19 +259,51 @@
 		// stage is the whole screen, so every millimetre of padding is a
 		// millimetre of card you cannot see.
 		const pad = hostSize.w < 560 ? 16 : 48;
-		// The lock band shares the page's column, so its height comes off the
-		// sheet. The pager does not any more — it is fixed to the stage and its
-		// band is real bottom padding on the viewport, which `contentRect` has
-		// already taken out of `hostSize.h`.
-		const under = lockHeight ? lockHeight + PAGE_GAP : 0;
-		const fit = Math.min(
-			(hostSize.w - pad) / mmToPx(outerW),
-			(hostSize.h - pad - under) / mmToPx(outerH)
-		);
+		// Neither the lock band nor the pager is in the page's column: both are
+		// fixed to the stage, and their bands are real padding on the viewport,
+		// which `contentRect` has already taken out of `hostSize.h`.
+		const fit = Math.min((hostSize.w - pad) / mmToPx(outerW), (hostSize.h - pad) / mmToPx(outerH));
 		return Math.max(0.15, Math.min(fit, 2));
 	});
 
-	const scale = $derived(typeof zoom === 'number' ? zoom : fitScale);
+	/**
+	 * The zoom at which the paper is its real size here — see `actualScale`.
+	 * Read again whenever the window changes, because moving it to another
+	 * screen, or zooming the browser, changes what the screen reports.
+	 */
+	let actual = $state(actualScale({ width: 0, height: 0, ratio: 1 }));
+
+	$effect(() => {
+		const read = () =>
+			(actual = actualScale({ width: screen.width, height: screen.height, ratio: window.devicePixelRatio || 1 }));
+		read();
+		window.addEventListener('resize', read);
+		return () => window.removeEventListener('resize', read);
+	});
+
+	const scale = $derived(typeof zoom === 'number' ? zoom : zoom === 'actual' ? actual.scale : fitScale);
+
+	/**
+	 * The zoom menu. Actual is the paper at its real size on this screen,
+	 * worked out from what the screen reports about itself; a screen the app
+	 * does not know gets the browser's own millimetre, and the title says
+	 * which it was.
+	 */
+	const zoomItems = $derived.by((): MenuItem[] => [
+		{ value: 'fit', label: `${Math.round(fitScale * 100)}% — Fit` },
+		{
+			value: 'actual',
+			label: `${Math.round(actual.scale * 100)}% — Actual`,
+			title: actual.panel
+				? `The paper at its real size, measured for a ${actual.panel}${actual.estimate ? ' — the commonest screen of this resolution, so it may be off' : ''}`
+				: 'This screen is not one the app knows, so this is the browser’s own millimetre, which may not match a ruler'
+		},
+		{ rule: true },
+		...(typeof zoom === 'number' && !ZOOM_STEPS.includes(zoom)
+			? [{ value: String(zoom), label: `${Math.round(zoom * 100)}%` }]
+			: []),
+		...ZOOM_STEPS.map((step) => ({ value: String(step), label: `${step * 100}%` }))
+	]);
 
 	/**
 	 * The grid, as geometry rather than as a background.
@@ -576,6 +536,13 @@
 		// and zooming the page you cannot see behind Help is not what Ctrl+0 was
 		// asked for.
 		if (modalOpen) return;
+		// Inkscape's key for its guides, bare, as it has it there: nothing else
+		// on the stage is typed with a pipe.
+		if (event.key === '|' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+			event.preventDefault();
+			onguides(!guides);
+			return;
+		}
 		if (!event.ctrlKey && !event.metaKey) return;
 
 		switch (event.key) {
@@ -591,18 +558,23 @@
 				return;
 			case '0':
 				event.preventDefault();
-				if (event.shiftKey) onzoom(1);
+				if (event.shiftKey) onzoom('actual');
 				else onzoom('fit');
 				return;
 			// Two keys each: the punctuation is what they are named after on a
 			// keyboard that has it, and the letters are what still works on one
 			// that does not.
+			// Photoshop's: Ctrl+H for its extras, which is what the boxes' bounds
+			// are here, and Ctrl+; for its guides.
 			case 'h':
 			case 'H':
+				event.preventDefault();
+				onbounds(!bounds);
+				return;
 			case ';':
 			case ':':
 				event.preventDefault();
-				onbounds(!bounds);
+				onguides(!guides);
 				return;
 			case "'":
 			case '"':
@@ -742,11 +714,43 @@
 	page the moment it was too big to fit. A tool you have to scroll back to find
 	is a tool that is not to hand.
 -->
+<!-- The grid, handed to the card to draw under its areas: the areas and the
+     page margins sit on top of it, as they sit on the paper. Inside the card's
+     transform, but in screen pixels all the same — the viewBox is the sheet's
+     size on screen and the element the sheet's size before the zoom, so the
+     transform scales one back to the other and a 0.5 hairline is half a screen
+     pixel at any zoom. Editor furniture: only the stage passes it, so it never
+     reaches a print or a contact sheet thumbnail. -->
+{#snippet gridLayer()}
+	{#if gridArt}
+		<svg
+			class="grid-overlay"
+			class:on-dark={isDark(template.page.background)}
+			aria-hidden="true"
+			viewBox="0 0 {gridArt.w} {gridArt.h}"
+			style="width:{gridArt.w / scale}px;height:{gridArt.h / scale}px"
+		>
+			<path
+				class="minor"
+				class:dot={gridArt.dots}
+				d={gridArt.minorPath}
+				stroke-width={gridArt.dots ? 1.1 : GRID_HAIRLINE}
+			/>
+			<path
+				class="major"
+				class:dot={gridArt.dots}
+				d={gridArt.majorPath}
+				stroke-width={gridArt.dots ? 2 : GRID_HAIRLINE}
+			/>
+		</svg>
+	{/if}
+{/snippet}
+
 <div class="stage">
 <div
 	class="viewport"
 	bind:this={host}
-	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px"
+	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px;--lock-band:{lockHeight && zoom === 'fit' ? lockHeight + PAGE_GAP : 0}px"
 	onpointerdown={(e) => {
 		// Bare paper counts as empty space, not just the grey around the sheet:
 		// clicking away from everything is how every canvas editor deselects, and
@@ -760,26 +764,26 @@
 	tabindex="-1"
 >
 	<div class="page">
-	<!-- `unlocking` keeps the band up for the moment after it is pressed: the
-	     lock is gone by then, so without it the band would vanish on the same
-	     frame and the open padlock it answers with would never be seen. -->
-	{#if (template.locked || unlocking) && bounds}
-		<!-- An indicator, not a control: the button that sets this lives in page
-		     setup, where the rest of the page's settings are. Screen furniture, so
-		     the Bounds toggle takes it away with the rest — and part of the column
-		     rather than hung off the sheet, so it can never be scrolled off the
-		     top of the stage on a phone. -->
-		<button
-			class="page-lock"
-			bind:clientHeight={lockHeight}
-			title="The design is locked — press to unlock it"
-			onclick={unlock}
-		>
-			<Icon name={unlocking ? 'unlocked' : 'locked'} size={13} />
-			<span>{unlocking ? 'Unlocked' : 'Locked'}</span>
-		</button>
-	{/if}
-	<div class="sheet" style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) * scale}px">
+	<!-- A picture file dropped on the page itself, rather than on an area,
+	     becomes an area of its own there. An area's own drop stops the event
+	     before it reaches this, so this only ever sees the ground between them. -->
+	<div
+		class="sheet"
+		style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) * scale}px"
+		role="presentation"
+		ondragover={(e) => {
+			if (!onimagepagedrop || template.locked || !e.dataTransfer?.types.includes('Files')) return;
+			e.preventDefault();
+			e.dataTransfer.dropEffect = 'copy';
+		}}
+		ondrop={(e) => {
+			if (!onimagepagedrop || template.locked) return;
+			const file = Array.from(e.dataTransfer?.files ?? []).find((f) => f.type.startsWith('image/'));
+			if (!file) return;
+			e.preventDefault();
+			onimagepagedrop(file, e.clientX, e.clientY);
+		}}
+	>
 		<div class="scaler" style="transform:scale({scale})">
 			<Card
 				{template}
@@ -788,6 +792,7 @@
 				{bounds}
 				{loadingFonts}
 				{grid}
+				{guides}
 				{scale}
 				{pageNumber}
 				{background}
@@ -805,46 +810,20 @@
 				{onmenuclose}
 				{onedit}
 				{ondraw}
+				{oneditcell}
 				{ontext}
+				underlay={gridArt ? gridLayer : undefined}
 			/>
 		</div>
 
-		{#if gridArt}
-			<!-- Drawn over the card, never inside it: this is editor furniture and
-			     must not appear in a print or a contact sheet thumbnail.
-
-			     An SVG rather than a background, and sitting outside the card's
-			     transform so its hairlines are already in screen pixels — see
-			     `gridArt` above for why the gradients had to go. -->
-			<svg
-				class="grid-overlay"
-				aria-hidden="true"
-				width={gridArt.w}
-				height={gridArt.h}
-				style="width:{gridArt.w}px;height:{gridArt.h}px"
-			>
-				<path
-					class="minor"
-					class:dot={gridArt.dots}
-					d={gridArt.minorPath}
-					stroke-width={gridArt.dots ? 1.1 : GRID_HAIRLINE}
-				/>
-				<path
-					class="major"
-					class:dot={gridArt.dots}
-					d={gridArt.majorPath}
-					stroke-width={gridArt.dots ? 2 : GRID_HAIRLINE}
-				/>
-			</svg>
-		{/if}
 
 		{#if bounds && bleed > 0}
 			<!-- Where the paper will be cut.
 
-			     Drawn here rather than inside the card, and after the grid, because
-			     it has to sit above it: the grid overlay is a sibling of the scaled
-			     card, so nothing inside the card can paint over it, and a trim edge
-			     hidden under a gridline is a trim edge you cannot follow.
+			     Drawn here rather than inside the card, over everything the card
+			     draws — the grid included, which is inside the card now, under its
+			     areas: a trim edge hidden under a gridline or an area is a trim edge
+			     you cannot follow.
 
 			     Solid, and the same half-pixel hairline the grid uses. It used to be
 			     dashed and a whole pixel, which made it the loudest line on a page
@@ -874,6 +853,27 @@
 	     Outside the viewport, so it stays under the sheet at every zoom; the
 	     band it occupies is bottom padding on the viewport, which is what keeps
 	     the page clear of it. -->
+	<!-- `unlocking` keeps the band up for the moment after it is pressed: the
+	     lock is gone by then, so without it the band would vanish on the same
+	     frame and the open padlock it answers with would never be seen. -->
+	{#if (template.locked || unlocking) && bounds}
+		<!-- An indicator, not a control: the button that sets this lives in page
+		     setup, where the rest of the page's settings are. Screen furniture, so
+		     the Boxes toggle takes it away with the rest. Pinned to the stage, as
+		     the pager is, rather than in the scrolling column: in the column it
+		     was a band's height more to scroll at every zoom but Fit, and a page
+		     that fitted grew a scrollbar the moment it was locked. At Fit the
+		     viewport keeps a band clear for it, so it covers nothing there. -->
+		<button
+			class="page-lock"
+			bind:clientHeight={lockHeight}
+			title="The design is locked — press to unlock it"
+			onclick={unlock}
+		>
+			<Icon name={unlocking ? 'unlocked' : 'locked'} size={13} />
+			<span>{unlocking ? 'Unlocked' : 'Locked'}</span>
+		</button>
+	{/if}
 	{#if rowCount > 0}
 		<div class="pager" role="group" aria-label="Card" bind:clientHeight={pagerHeight}>
 			<!-- The swipe lives on this inner chip rather than on the row, because
@@ -891,7 +891,7 @@
 					<button
 						class="step"
 						disabled={activeRow <= 0}
-						title="Previous card"
+						title={withKey('Previous card', 'cards')}
 						aria-label="Previous card"
 						onclick={() => onactivate(Math.max(0, activeRow - 1))}
 					><Icon name="caret-left" size={18} /></button>
@@ -905,7 +905,7 @@
 					<button
 						class="step"
 						disabled={activeRow >= rowCount - 1}
-						title="Next card"
+						title={withKey('Next card', 'cards')}
 						aria-label="Next card"
 						onclick={() => onactivate(Math.min(rowCount - 1, activeRow + 1))}
 					><Icon name="caret-right" size={18} /></button>
@@ -919,10 +919,10 @@
 	     toggles are along the bottom. -->
 	<div class="rail">
 		<div class="corner">
-			<button class="square" onclick={onundo} disabled={!undoable} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
+			<button class="square" onclick={onundo} disabled={!undoable} title={withKey('Undo', 'undo')} aria-label="Undo">
 				<Icon name="undo" size={16} />
 			</button>
-			<button class="square" onclick={onredo} disabled={!redoable} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
+			<button class="square" onclick={onredo} disabled={!redoable} title={withKey('Redo', 'redo')} aria-label="Redo">
 				<Icon name="redo" size={16} />
 			</button>
 		</div>
@@ -1043,11 +1043,11 @@
 	<!-- View state sits on the page it affects, one control per bottom corner,
 	     rather than in the toolbar among the actions. On a phone the two words
 	     side by side reach far enough into the band that the pager's first arrow,
-	     centred in the same band, lands on top of "Bounds". They used to stack
+	     centred in the same band, lands on top of "Boxes". They used to stack
 	     into a column for that, which grew a two-line panel up over the sheet;
-	     now the words go instead and the ticks keep their row — a # for the grid
-	     and a B for the bounds, beside checkboxes that already say whether they
-	     are on. The full word stays the accessible name either way, so nothing
+	     now the words go instead and the ticks keep their row — a # for the
+	     grid, a | for the guides and a B for the boxes, beside checkboxes that
+	     already say whether they are on. The full word stays the accessible name either way, so nothing
 	     read aloud is reduced to a single letter. -->
 	<div class="corner left">
 		<!-- Press and hold swaps the ruling for a dot at every intersection: the
@@ -1057,7 +1057,7 @@
 		     which of the two it is currently drawing. -->
 		<label
 			use:hold={() => ongridstyle(gridStyle === 'dots' ? 'lines' : 'dots')}
-			title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it (Ctrl/Cmd+' or Ctrl/Cmd+#). Press and hold for {gridStyle ===
+			title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it ({SHORTCUTS.grid}). Press and hold for {gridStyle ===
 			'dots'
 				? 'ruled lines'
 				: 'a dot grid'}."
@@ -1071,36 +1071,42 @@
 			<span class="wide">{gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
 			<span class="narrow" aria-hidden="true">#</span>
 		</label>
-		<label title="Dashed box bounds and the trim edge — screen only, never printed (Ctrl/Cmd+; or Ctrl/Cmd+H)">
+		<label title={withKey('The page margins, drawn and snapped to — screen only, never printed', 'guides')}>
 			<input
 				type="checkbox"
-				aria-label="Bounds"
+				aria-label="Guides"
+				checked={guides}
+				onchange={(e) => onguides(e.currentTarget.checked)}
+			/>
+			<span class="wide">Guides</span>
+			<span class="narrow" aria-hidden="true">|</span>
+		</label>
+		<label title={withKey("Each area's dashed bounds, its badges and the trim edge — screen only, never printed", 'boxes')}>
+			<input
+				type="checkbox"
+				aria-label="Boxes"
 				checked={bounds}
 				onchange={(e) => onbounds(e.currentTarget.checked)}
 			/>
-			<span class="wide">Bounds</span>
+			<span class="wide">Boxes</span>
 			<span class="narrow" aria-hidden="true">B</span>
 		</label>
 	</div>
 
-	<label class="corner right">
-		<span class="sr-only">Zoom</span>
-		<select
-			value={zoom === 'fit' ? 'fit' : String(zoom)}
-			onchange={(e) => onzoom(e.currentTarget.value === 'fit' ? 'fit' : Number(e.currentTarget.value))}
-		>
-			<option value="fit">Fit — {Math.round(fitScale * 100)}%</option>
-			<!-- A pinch or a Ctrl+= lands between the steps, and a select with no
-			     matching option shows nothing at all. The odd value gets an option
-			     of its own so the control always says where the page is. -->
-			{#if typeof zoom === 'number' && !ZOOM_STEPS.includes(zoom)}
-				<option value={String(zoom)}>{Math.round(zoom * 100)}%</option>
-			{/if}
-			{#each ZOOM_STEPS as step (step)}
-				<option value={String(step)}>{step * 100}%</option>
-			{/each}
-		</select>
-	</label>
+	<!-- Zoom, as the same kind of menu the template picker opens: Fit and the
+	     paper's real size first, then under a rule the steps. A pinch or a
+	     Ctrl+= lands between the steps, and gets an entry of its own so the
+	     control always says where the page is. -->
+	<div class="corner right">
+		<MenuSelect
+			label="Zoom"
+			title={withKey('Zoom', 'zoom')}
+			bare
+			value={typeof zoom === 'number' ? String(zoom) : zoom}
+			items={zoomItems}
+			onselect={(value) => onzoom(value === 'fit' || value === 'actual' ? value : Number(value))}
+		/>
+	</div>
 
 	{#if padUsable}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
@@ -1121,22 +1127,15 @@
 			onpointercancel={stopNudge}
 			onpointerleave={stopNudge}
 		>
-			<!-- Tied rather than disabled: a disabled button is dead to the
-			     pointer, and the hold that walks up the tie has to arrive
-			     somehow. The press itself is refused instead. -->
+			<!-- On an anchored area the vertical keys change the Gap — see
+			     `verticalTied`. -->
 			<button
 				class="up"
 				class:tied={verticalTied}
-				aria-disabled={verticalTied}
-				title={verticalTied ? tiedTitle : `Up ${padStep}mm`}
-				use:hold={followTie}
-				onpointerdown={() => !verticalTied && startNudge(0, -padStep)}
-				onclick={() => verticalTied && tiedTap()}
+				title={verticalTied ? `Gap ${padStep}mm smaller — closer to the area this one follows` : `Up ${padStep}mm`}
+				onpointerdown={() => startNudge(0, -padStep)}
 			>
-				<Icon
-					name={verticalTied ? (tiedTaps ? 'unlink' : 'link') : 'caret-up'}
-					size={verticalTied ? 15 : 30}
-				/>
+				<Icon name={verticalTied ? 'skip-back-filled' : 'caret-up'} size={verticalTied ? 16 : 30} />
 			</button>
 			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
 			<!-- The middle button carries the second gesture, because the arrows
@@ -1161,16 +1160,10 @@
 			<button
 				class="down"
 				class:tied={verticalTied}
-				aria-disabled={verticalTied}
-				title={verticalTied ? tiedTitle : `Down ${padStep}mm`}
-				use:hold={followTie}
-				onpointerdown={() => !verticalTied && startNudge(0, padStep)}
-				onclick={() => verticalTied && tiedTap()}
+				title={verticalTied ? `Gap ${padStep}mm larger — further from the area this one follows` : `Down ${padStep}mm`}
+				onpointerdown={() => startNudge(0, padStep)}
 			>
-				<Icon
-					name={verticalTied ? (tiedTaps ? 'unlink' : 'link') : 'caret-down'}
-					size={verticalTied ? 15 : 30}
-				/>
+				<Icon name={verticalTied ? 'skip-back-filled' : 'caret-down'} size={verticalTied ? 16 : 30} />
 			</button>
 		</div>
 	{/if}
@@ -1209,7 +1202,7 @@
 		   the fitted scale, because the page is centred in what is left: taking it
 		   off the scale alone would have centred the sheet across the band and
 		   parked half of it under the count. */
-		padding: 24px 24px calc(24px + var(--pager-band, 0px));
+		padding: calc(24px + var(--lock-band, 0px)) 24px calc(24px + var(--pager-band, 0px));
 	}
 
 	.viewport:focus-visible {
@@ -1241,6 +1234,9 @@
 		left: 0;
 		right: 0;
 		bottom: 10px;
+		/* The bottom row's one height — see .corner — so the arrows and the
+		   count centre on the same line as the two chips either side. */
+		height: var(--chip-row);
 		display: flex;
 		justify-content: center;
 		align-items: center;
@@ -1253,10 +1249,13 @@
 		pointer-events: none;
 	}
 
+	/* Close about the count, so the triangles stay clear of the chips in the
+	   two corners: on a narrow phone the arrows sat under the # | B on one
+	   side and the zoom on the other. */
 	.pager .controls {
 		display: flex;
 		align-items: center;
-		gap: 10px;
+		gap: 2px;
 		pointer-events: auto;
 		/* A flick across the pager is the gesture; without this the browser reads
 		   the first few pixels of it as a pan, takes the pointer away with a
@@ -1277,7 +1276,7 @@
 	   border, because it still has to read as the count first. */
 	.pager .count {
 		font: 500 12px ui-sans-serif, system-ui, sans-serif;
-		min-width: 3.5rem;
+		min-width: 2.75rem;
 		text-align: center;
 		border: none;
 		background: none;
@@ -1311,8 +1310,14 @@
 		cursor: default;
 	}
 
+	/* As wide as the card and no wider. A block fills its parent, so the
+	   scaler was the sheet's width *before* the transform — and scaled up, that
+	   width scaled with it, so every zoom above 100% hung an empty band off the
+	   sheet's right edge and gave the stage a scrollbar with nothing in view to
+	   scroll to. Sized to its content, it scales to exactly the sheet. */
 	.scaler {
 		transform-origin: top left;
+		width: max-content;
 	}
 
 	/* Grey, and as thin as a screen will draw: the grid is there to be measured
@@ -1335,22 +1340,35 @@
 		stroke-linecap: round;
 	}
 
+	/* Black on a light paper, white on a dark one: grey at these strengths all
+	   but vanished on a navy or black card, which is where a grid is needed as
+	   much as anywhere. The strengths are the same either way; only the ink
+	   turns over. A background image is not looked at — the paper color is the
+	   only thing known without decoding it. */
+	.grid-overlay {
+		--grid-ink: 0, 0, 0;
+	}
+
+	.grid-overlay.on-dark {
+		--grid-ink: 255, 255, 255;
+	}
+
 	.grid-overlay .minor {
-		stroke: rgba(0, 0, 0, 0.11);
+		stroke: rgba(var(--grid-ink), 0.11);
 	}
 
 	.grid-overlay .major {
-		stroke: rgba(0, 0, 0, 0.3);
+		stroke: rgba(var(--grid-ink), 0.3);
 	}
 
 	/* Dots carry less ink than rules at the same value, so both weights come up
 	   to stay legible against the paper they are drawn on. */
 	.grid-overlay .minor.dot {
-		stroke: rgba(0, 0, 0, 0.22);
+		stroke: rgba(var(--grid-ink), 0.22);
 	}
 
 	.grid-overlay .major.dot {
-		stroke: rgba(0, 0, 0, 0.42);
+		stroke: rgba(var(--grid-ink), 0.42);
 	}
 
 	/* The same half-pixel hairline as the grid, and solid rather than dashed:
@@ -1374,6 +1392,11 @@
 	}
 
 	.page-lock {
+		position: absolute;
+		top: 10px;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 2;
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
@@ -1393,6 +1416,10 @@
 	.page-lock:hover {
 		border-color: #555;
 		color: #111;
+	}
+
+	.stage {
+		--chip-row: 30px;
 	}
 
 	.corner {
@@ -1422,6 +1449,16 @@
 	.corner.right {
 		right: 12px;
 		padding: 2px 3px;
+	}
+
+	/* The two bottom chips, one height: the view toggles were 23px beside a
+	   29px zoom, and the pager between them centred on neither. */
+	.corner.left,
+	.corner.right:not(.top) {
+		box-sizing: border-box;
+		height: var(--chip-row);
+		padding-top: 0;
+		padding-bottom: 0;
 	}
 
 	/* One column down the left edge: undo and redo always, the selection tools
@@ -1494,13 +1531,6 @@
 		justify-content: center;
 	}
 
-	.corner select {
-		font: 500 11px ui-sans-serif, system-ui, sans-serif;
-		color: #555;
-		border: none;
-		background: transparent;
-		padding: 3px 4px;
-	}
 
 	.corner input {
 		margin: 0;
@@ -1657,13 +1687,12 @@
 
 	/* Each arrowhead pulled back onto the centre of its own cell, along the axis
 	   it points down — see `--arrow-centre`. Only while it is an arrowhead: a
-	   tied direction wears the link instead, which is centred as drawn, and that
-	   is also the only state in which these are disabled. */
-	.pad .up:not(:disabled) :global(svg) {
+	   tied direction wears the gap mark instead, which is centred as drawn. */
+	.pad .up:not(.tied) :global(svg) {
 		transform: translateY(var(--arrow-centre));
 	}
 
-	.pad .down:not(:disabled) :global(svg) {
+	.pad .down:not(.tied) :global(svg) {
 		transform: translateY(calc(-1 * var(--arrow-centre)));
 	}
 
@@ -1675,24 +1704,15 @@
 		transform: translateX(calc(-1 * var(--arrow-centre)));
 	}
 
-	/* A direction an anchor has spoken for. Not merely dimmed: it carries the
-	   same link the area wears at its corner, so the refusal names its reason. */
-	.pad button:disabled {
-		opacity: 0.55;
-		cursor: default;
-		color: #767676;
+	/* The gap marks, turned to point along the key: the bar is the edge of the
+	   area this one follows, so up is "towards it" — the icon points left as
+	   drawn, a quarter turn clockwise points it up. Down is the reverse. */
+	.pad .up.tied :global(svg) {
+		transform: rotate(90deg);
 	}
 
-	/* A tied key keeps the pad's own face — fading the whole button left a hole
-	   in the cross, which reads as a missing key rather than as a key that will
-	   not move this way. Only the mark on it goes quiet. */
-	.pad button.tied {
-		cursor: default;
-		color: #767676;
-	}
-
-	.pad button.tied :global(svg) {
-		opacity: 0.5;
+	.pad .down.tied :global(svg) {
+		transform: rotate(-90deg);
 	}
 
 	/* While it is being carried: the pad itself says so, because the finger is on
@@ -1786,6 +1806,19 @@
 			font-weight: 700;
 			width: 0.75em;
 			text-align: center;
+		}
+	}
+
+	/* Tighter again where the corners are closest: the count's floor comes
+	   off, so the three are as narrow as "1 / 4" and two triangles. */
+	@media (max-width: 400px) {
+		.pager .count {
+			min-width: 0;
+			padding: 2px;
+		}
+
+		.pager .step {
+			padding: 0;
 		}
 	}
 </style>

@@ -421,10 +421,10 @@
 			<button
 				disabled={pageFrozen}
 				title="A file from this machine; the picture stays in this browser, the template only names it"
-				onclick={() => imageInput?.click()}>Upload…</button
+				onclick={() => imageInput?.click()}><Icon name="image-reference" size={14} /> Upload…</button
 			>
 			<button disabled={pageFrozen} title="An http(s) address the template will carry as written" onclick={linkBackground}
-				>URL…</button
+				><Icon name="copy-link" size={14} /> URL…</button
 			>
 		{/if}
 	{/if}

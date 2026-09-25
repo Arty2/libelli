@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fontStack } from './fonts';
+import { fontChoices, fontStack, mergeFonts, pruneFonts, weightsOf } from './fonts';
 
 describe('fontStack', () => {
 	it('quotes the family and keeps the system stack behind it', () => {
@@ -41,5 +41,46 @@ describe('fontStack', () => {
 		for (const real of ['Patrick Hand', 'Space Mono', 'PT Sans', "Amatic SC", 'Source Sans 3', 'Libre Baskerville']) {
 			expect(fontStack(real, 'Inter')).toBe(`"${real}", ${fontStack(undefined, '')}`);
 		}
+	});
+});
+
+describe('the fonts a template carries', () => {
+	const template = {
+		defaults: { font: 'Inter' },
+		boxes: [{ font: 'Lora' }, {}],
+		fonts: [
+			{ family: 'Inter', source: 'google' },
+			{ family: 'Lora', source: 'google' },
+			{ family: 'Old Face', source: 'local', ref: 'font:old-face' }
+		]
+	} as unknown as Parameters<typeof pruneFonts>[0];
+
+	it('keeps only the families something is set in, and says what it cut', () => {
+		const { template: pruned, dropped } = pruneFonts(template);
+		expect(pruned.fonts.map((f) => f.family)).toEqual(['Inter', 'Lora']);
+		expect(dropped).toEqual([{ family: 'Old Face', source: 'local', ref: 'font:old-face' }]);
+		expect(pruneFonts(pruned).template).toBe(pruned);
+	});
+
+	it('offers the used families first and everything else after', () => {
+		const { used, others } = fontChoices(template, [{ family: 'Old Face', source: 'local' }]);
+		expect(used).toEqual(['Inter', 'Lora']);
+		expect(others).toContain('Old Face');
+		expect(others).toContain('Karla');
+		expect(others).not.toContain('Inter');
+	});
+
+	it('keeps one entry per family in the editor list, the later winning', () => {
+		const merged = mergeFonts([{ family: 'X', source: 'google' }], [{ family: 'x', source: 'local', ref: 'r' }]);
+		expect(merged).toEqual([{ family: 'x', source: 'local', ref: 'r' }]);
+	});
+});
+
+describe('weightsOf', () => {
+	it('reads single weights, keywords and variable ranges', () => {
+		expect(weightsOf('400')).toEqual([400]);
+		expect(weightsOf('bold')).toEqual([700]);
+		expect(weightsOf('300 600')).toEqual([300, 400, 500, 600]);
+		expect(weightsOf('nonsense')).toEqual([]);
 	});
 });

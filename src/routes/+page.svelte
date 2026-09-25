@@ -20,7 +20,7 @@
 		uploadBackgroundImage
 	} from '$lib/assets';
 	import { download, slugify } from '$lib/download';
-	import { ensureGoogleFont, ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
+	import { ensureGoogleFont, ensureTemplateFonts, mergeFonts, pruneFonts, uploadLocalFont } from '$lib/fonts';
 	import {
 		canRedo,
 		canUndo,
@@ -48,12 +48,14 @@
 		toggleSelection,
 		type BoxStyle
 	} from '$lib/boxops';
-	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport } from '$lib/keys';
+	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport, withKey } from '$lib/keys';
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
-	import { armDefault } from '$lib/modal';
+	import { armDefault, dragByTitle } from '$lib/modal';
+	import { cssIdent } from '$lib/css';
 	import { watchPresses } from '$lib/haptics';
+	import { formatDate, referencedColumns } from '$lib/placeholders';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
@@ -82,6 +84,8 @@
 		loadTemplateDoc,
 		loadTemplateId,
 		loadUi,
+		loadEditorFonts,
+		saveEditorFonts,
 		migrateLegacyStorage,
 		nextDatasetId,
 		nextTemplateId,
@@ -110,27 +114,24 @@
 	let barFloor = $state(0);
 	let barHeight = $state(0);
 	/**
-	 * The page bar's library menu is open.
-	 *
-	 * On a narrow screen the bar gives up its height cap while a menu is up, so
-	 * the menu is not clipped by the bar's own scroller — a moment, and not a
-	 * height the bar ever needs to stand at. Taken as a floor it stayed: opening
-	 * the template switcher once left a band of empty grey under the bar for the
-	 * rest of the session, which is the bug this guard is for.
+	 * How tall the area bar would be at this width, measured off an invisible
+	 * one kept in the same row. The row is floored at the tallest bar it has
+	 * held, but that floor was only ever learnt by selecting something, so the
+	 * first selection still pushed the page down — the jump the floor exists to
+	 * stop. Measuring the area bar before it is needed lets the page bar stand
+	 * at its height from the start, on a desk and on a phone alike.
 	 */
-	let barMenuOpen = $state(false);
-
+	let probeHeight = $state(0);
+	/** A representative area for the probe: a bound Markdown field shows the most fields. */
+	const probeBox = newBox({ id: '__bar-probe', slot: 'field', mode: 'markdown', x: 0, y: 0, w: 60, h: 12 });
+	// The library menu used to make the bar taller on a phone while it was up,
+	// and this had to refuse that height as a floor. The menu is `fixed` now —
+	// see PageOptions — so every height the bar reports is one it stands at.
 	$effect(() => {
-		const height = barHeight;
-		// Read untracked on purpose: only a fresh measurement may raise the floor.
-		// Tracked, the flag going false at the end of a menu re-ran this while
-		// `barHeight` still held the uncapped height, and the floor took the very
-		// number the guard above exists to refuse.
-		if (untrack(() => barMenuOpen)) return;
-		if (height > barFloor) barFloor = height;
+		if (barHeight > barFloor) barFloor = barHeight;
 	});
 
-	let ui = $state<UiState>({ showBounds: true, showGrid: false, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
+	let ui = $state<UiState>({ showBounds: true, showGrid: false, showGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
 	let activeRow = $state(0);
 	let selectedIds = $state<string[]>([]);
 	let ready = $state(false);
@@ -260,10 +261,11 @@
 	 * `matchMedia` so the two cannot drift apart by a pixel. `trayShare` is a
 	 * fraction of the working area rather than a height in px, so turning the
 	 * phone over keeps the proportion the hand chose instead of the number. It
-	 * is null until something drags it, which leaves the CSS default in charge —
-	 * and it is not stored: where the tray sits is where this session put it,
-	 * and a phone that opens on a table filling the screen has hidden the card
-	 * the app is for.
+	 * is null until something drags it, which leaves the CSS default in charge.
+	 * It is kept for next time, as the desk's width is — but brought back no
+	 * taller than `TRAY_RESTORE_MAX`, because a phone that opens on a table
+	 * filling the screen has hidden the card the app is for. Pulled taller in
+	 * the session, it goes as tall as it is pulled.
 	 */
 	let stacked = $state(false);
 	let mainEl = $state<HTMLElement | null>(null);
@@ -273,6 +275,47 @@
 
 	/** Below this the tray is a row of buttons and no table, which is not a tray. */
 	const TRAY_MIN = 0.2;
+	const TRAY_RESTORE_MAX = 0.75;
+
+	/**
+	 * Beside the page, the table's width is dragged from its left edge, and
+	 * kept as a share of the working area rather than as pixels — the same
+	 * split on a smaller window, instead of a table that was a third of a big
+	 * screen taking most of a laptop's. Neither side may be squeezed out of
+	 * use: the table keeps room for a column and its gutter, the page room for
+	 * a card, and the stylesheet holds both limits again at whatever width
+	 * the window is now (`--tray-w` is a clamp).
+	 */
+	const TRAY_MIN_PX = 280;
+	const STAGE_MIN_PX = 320;
+	let trayResizing: { x: number; width: number } | null = $state(null);
+
+	function setTrayWidth(width: number) {
+		const room = mainEl?.getBoundingClientRect().width ?? window.innerWidth;
+		if (!room) return;
+		const clamped = Math.max(TRAY_MIN_PX, Math.min(room - STAGE_MIN_PX, width));
+		const share = Math.round((clamped / room) * 10000) / 10000;
+		if (share !== ui.trayWidthShare) ui = { ...ui, trayWidthShare: share };
+	}
+
+	function startTrayResize(event: PointerEvent) {
+		if (event.button !== 0 || !asideEl) return;
+		event.preventDefault();
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		trayResizing = { x: event.clientX, width: asideEl.getBoundingClientRect().width };
+	}
+
+	function moveTrayResize(event: PointerEvent) {
+		if (!trayResizing) return;
+		// The edge is on the table's left, so moving left widens it.
+		setTrayWidth(trayResizing.width + (trayResizing.x - event.clientX));
+	}
+
+	function endTrayResize(event: PointerEvent) {
+		if (!trayResizing) return;
+		(event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+		trayResizing = null;
+	}
 
 	$effect(() => {
 		const query = window.matchMedia('(max-width: 900px)');
@@ -295,7 +338,10 @@
 		// The finger is on the tray's top edge, so up is taller: the share it
 		// takes is what it had plus however far the edge has been pulled.
 		trayShare = Math.min(1, Math.max(TRAY_MIN, trayFrom.share + (trayFrom.y - clientY) / height));
-		if (phase === 'end') trayFrom = null;
+		if (phase === 'end') {
+			trayFrom = null;
+			ui = { ...ui, trayHeightShare: Math.round(trayShare * 10000) / 10000 };
+		}
 	}
 
 	let printing = $state(false);
@@ -327,6 +373,9 @@
 	 * gets the warning mark and a color; everything else reads as before.
 	 */
 	let statusTone = $state<'info' | 'warning'>('info');
+
+	/** The status line, whole, in a dialog — it is one ellipsised row otherwise. */
+	let statusOpen = $state(false);
 
 	function notify(text: string, tone: 'info' | 'warning' = 'info') {
 		status = text;
@@ -371,16 +420,31 @@
 	 * and the total. Scoping happens in css.ts, which anchors everything to the
 	 * card, strips `@import` and refuses any `url()` that is not a `data:` one.
 	 */
-	const CSS_PLACEHOLDER = `.box { }              /* every area */
-h1, h2, h3 { }        /* Markdown headings */
-p, ul, li { }         /* Markdown blocks */
-em, strong, code { }
-hr { }
-.page-number { }      /* the number on the card */
-.page-number .of::before { content: ' of ' }
-
-h1 { letter-spacing: 0.4mm }
-em { color: #b42318 }`;
+	/**
+	 * The placeholder is the documentation — see the dialog below — so it names
+	 * what this template actually has: each area's id, as `cssIdent` writes it,
+	 * and the classes every area carries (see Card's `idFor`).
+	 */
+	const cssPlaceholder = $derived.by(() => {
+		const ids = [...new Set(template.boxes.map((b) => cssIdent(b.slot ?? '')).filter(Boolean))];
+		return [
+			'.box { }              /* every area */',
+			...ids.map((id) => `#${id} { }`),
+			'',
+			'.content-field { }    /* by what fills it: a column, */',
+			'.content-static { }   /* its own words, */',
+			'.content-image { }    /* or a picture */',
+			'.mode-plain { }       /* by mode: also .mode-markdown, */',
+			'.mode-qr { }          /* .mode-image, .mode-color */',
+			'',
+			'h1, h2, h3 { }        /* Markdown headings */',
+			'p, ul, li { }         /* Markdown blocks */',
+			'em, strong, code { }',
+			'hr { }',
+			'.page-number { }      /* the number on the card */',
+			".page-number .of::before { content: ' of ' }"
+		].join('\n');
+	});
 
 	function openCss() {
 		cssBefore = template.css;
@@ -448,6 +512,29 @@ em { color: #b42318 }`;
 	 * answer, and highlighting all of them would light up the whole row.
 	 */
 	const selectedColumn = $derived(selected?.slot ? (mapping[selected.slot] ?? null) : null);
+
+	/**
+	 * The columns something on the card prints: bound to an area, named as
+	 * `{{column}}` in an area's own words, or named in a cell of a column that
+	 * is itself printed. One level and no further, because that is how far
+	 * substitution goes — see placeholders.ts — so a column named only from a
+	 * column nobody prints is still a column nobody prints.
+	 */
+	const usedColumns = $derived.by(() => {
+		const columns = dataset.columns;
+		const used = new Set<string>();
+		for (const box of template.boxes) {
+			const bound = box.slot ? mapping[box.slot] : undefined;
+			if (bound && columns.includes(bound)) used.add(bound);
+			for (const named of referencedColumns(box.static?.text ?? '', columns)) used.add(named);
+		}
+		for (const column of [...used]) {
+			for (const r of dataset.rows) {
+				for (const named of referencedColumns(r[column] ?? '', columns)) used.add(named);
+			}
+		}
+		return used;
+	});
 
 	// ---- boot ---------------------------------------------------------------
 
@@ -519,7 +606,13 @@ em { color: #b42318 }`;
 		const storedMapping = loadMapping(templateId, template.name);
 		mapping = Object.keys(storedMapping).length ? storedMapping : autoMap(usedSlots(template), dataset.columns);
 		ui = loadUi();
-		if (typeof window !== 'undefined' && window.innerWidth <= 900) {
+		if (ui.trayHeightShare) trayShare = Math.max(TRAY_MIN, Math.min(TRAY_RESTORE_MAX, ui.trayHeightShare));
+		if (ui.panels) {
+			// Whatever was open when the tab was last closed — see UiState.
+			pageSetupOpen = ui.panels.page;
+			dataOpen = ui.panels.data;
+			imagesOpen = ui.panels.images && !ui.panels.data;
+		} else if (typeof window !== 'undefined' && window.innerWidth <= 900) {
 			pageSetupOpen = false;
 			dataOpen = false;
 		}
@@ -569,6 +662,33 @@ em { color: #b42318 }`;
 
 	$effect(() => {
 		for (const family of familiesInUse) ensureGoogleFont(family);
+	});
+
+	/**
+	 * Fonts this browser knows that no template is carrying — see storage.ts.
+	 * Read at once rather than at boot: it is a handful of names in
+	 * localStorage, and the font menus want it on their first render.
+	 */
+	let editorFonts = $state<FontRef[]>(loadEditorFonts());
+
+	/**
+	 * A template carries the families it is set in and no others.
+	 *
+	 * Checked on every change rather than at export, so what is saved, undone
+	 * and exported is always the same list. What is cut is handed to the
+	 * editor, not thrown away: a family chosen and then changed back is still
+	 * in the menu, under the rule. In the same tick as the change that made a
+	 * family unused, so the two land in one undo entry.
+	 */
+	$effect(() => {
+		if (!ready) return;
+		const { template: pruned, dropped } = pruneFonts(template);
+		if (!dropped.length) return;
+		untrack(() => {
+			editorFonts = mergeFonts(editorFonts, dropped);
+			saveEditorFonts($state.snapshot(editorFonts));
+			template = pruned;
+		});
 	});
 
 	/**
@@ -652,6 +772,9 @@ em { color: #b42318 }`;
 		return [...names].sort();
 	});
 
+	/** Names the template or the table point at that this browser does not hold. */
+	let missingImages = $state<string[]>([]);
+
 	$effect(() => {
 		const wanted = imageNames;
 		// A bare read, so $effect tracks it and a bump re-runs this.
@@ -662,14 +785,9 @@ em { color: #b42318 }`;
 			const { urls, missing } = await resolveLocalImages(wanted);
 			if (stale) return;
 			images = urls;
-			if (missing.length) {
-				notify(
-					`${missing.length === 1 ? 'An image' : `${missing.length} images`} named here ` +
-						`${missing.length === 1 ? 'is' : 'are'} not in this browser: ${missing.join(', ')}. ` +
-						'Drop the file onto the area again to put it back.',
-					'warning'
-				);
-			}
+			// Listed in the Images tray as placeholders, each with a way to put
+			// the file back — rather than said once in the status line and lost.
+			missingImages = missing;
 		})();
 		return () => {
 			stale = true;
@@ -686,7 +804,81 @@ em { color: #b42318 }`;
 	 * it keeps the reference itself and the picture is the same on every card.
 	 */
 	async function handleImageDrop(box: Box, file: File) {
-		const name = await storeLocalImage(file);
+		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
+		placeImage(box, await storeLocalImage(file));
+	}
+
+	/**
+	 * A picture this browser already holds, carried from the Images bar onto
+	 * an area. The same placing as a file dropped from outside — into the row's
+	 * cell when the area is bound, onto the area otherwise — minus the storing,
+	 * which already happened when it was uploaded.
+	 */
+	function placeStoredImage(boxId: string, name: string) {
+		const box = template.boxes.find((b) => b.id === boxId);
+		if (!box) return;
+		if (template.locked || box.locked) {
+			notify('That area is locked — unlock it to put a picture in it.', 'warning');
+			return;
+		}
+		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
+		placeImage(box, name);
+	}
+
+	/**
+	 * A picture let go over the page but not over an area: a new image area
+	 * for it, centred where it was let go, 40mm across and as tall as the
+	 * picture's own proportions make that. Static, on every card — a picture
+	 * carried from the bar is one picture, not a column.
+	 */
+	async function placeImageOnPage(name: string, clientX: number, clientY: number, file?: Blob) {
+		if (template.locked) {
+			notify('The design is locked — unlock it to add an area.', 'warning');
+			return;
+		}
+		const trim = document.querySelector<HTMLElement>('.viewport .trim');
+		if (!trim) return;
+		const rect = trim.getBoundingClientRect();
+		const { w: pageW, h: pageH } = template.page;
+		const at = { x: ((clientX - rect.left) / rect.width) * pageW, y: ((clientY - rect.top) / rect.height) * pageH };
+		// The picture's proportions, read off the picture itself: a square box
+		// round a banner is a box the first thing anyone does is resize.
+		// A file just dropped in is not resolved yet, so it is read from itself.
+		let aspect = 0.75;
+		const url = file ? URL.createObjectURL(file) : (images[name] ?? (await resolveLocalImages([name])).urls[name]);
+		if (url) {
+			const probe = new Image();
+			probe.src = url;
+			try {
+				await probe.decode();
+				if (probe.naturalWidth) aspect = probe.naturalHeight / probe.naturalWidth;
+			} catch {
+				// Undecodable here: the default proportions will do, and the area says so.
+			}
+			if (file) URL.revokeObjectURL(url);
+		}
+		const w = Math.min(40, pageW);
+		const h = Math.min(Math.round(w * aspect * 10) / 10, pageH);
+		const clamp = (v: number, size: number, max: number) => Math.round(Math.max(0, Math.min(max - size, v - size / 2)) * 10) / 10;
+		settleProvisional();
+		describe('Place an image');
+		const box = newBox({
+			id: nextBoxId(template.boxes),
+			x: clamp(at.x, w, pageW),
+			y: clamp(at.y, h, pageH),
+			w,
+			h,
+			mode: 'image',
+			fit: 'contain',
+			static: { url: localImageRef(name) }
+		});
+		template = { ...template, boxes: [...template.boxes, box] };
+		selectedIds = [box.id];
+		flash([box.id]);
+		notify(`${name} is on the card in an area of its own, the same on every card.`);
+	}
+
+	function placeImage(box: Box, name: string) {
 		const reference = localImageRef(name);
 		const column = box.slot ? mapping[box.slot] : undefined;
 		describe('Drop image');
@@ -701,9 +893,26 @@ em { color: #b42318 }`;
 			};
 			notify(`${name} is in ${column} for this row, and stays in this browser.`);
 		} else {
-			updateBox({ ...next, static: { ...box.static, url: reference } });
+			// The picture dropped is what the area shows now: a drawing it held
+			// would otherwise win over it — see `setPictureAddress`.
+			const { dataUrl: _drawn, ...kept } = box.static ?? {};
+			updateBox({ ...next, static: { ...kept, url: reference } });
 			notify(`${name} is on this area, the same on every card, and stays in this browser.`);
 		}
+	}
+
+	/**
+	 * A locked table is locked from the card too.
+	 *
+	 * The card writes into a cell three ways — typing in an area, dropping a
+	 * picture on one, finishing a drawing — and the table's own lock would be a
+	 * fence with three gaps in it if only the table's fields honoured it. Said
+	 * rather than silent, because a keystroke that goes nowhere looks broken.
+	 */
+	function refuseLockedTable(): boolean {
+		if (!dataset.locked) return false;
+		notify('The table is locked — unlock it under the table to change its cells.', 'warning');
+		return true;
 	}
 
 	/** the area whose picture is being drawn, if any — full screen, never in place */
@@ -745,6 +954,7 @@ em { color: #b42318 }`;
 		const column = box.slot ? mapping[box.slot] : undefined;
 		const current = $state.snapshot(box) as Box;
 		if (column && row) {
+			if (refuseLockedTable()) return;
 			dataset = {
 				...dataset,
 				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: dataUrl } : r))
@@ -757,7 +967,10 @@ em { color: #b42318 }`;
 				updateBox({ ...current, pixels });
 			}
 		} else {
-			updateBox({ ...current, pixels, static: { ...box.static, dataUrl } });
+			// The drawing replaces an address the area was showing, the same
+			// "last one in is shown" the bar's Source field follows.
+			const { url: _address, ...kept } = box.static ?? {};
+			updateBox({ ...current, pixels, static: { ...kept, dataUrl } });
 		}
 	}
 
@@ -944,6 +1157,21 @@ em { color: #b42318 }`;
 		saveUi($state.snapshot(ui));
 	});
 
+	/**
+	 * The open bars and the table, carried into the stored UI so a reload
+	 * opens on the same screen. Written only when they differ, or every save of
+	 * `ui` would re-run this and write it straight back.
+	 */
+	$effect(() => {
+		if (!ready) return;
+		const panels = { page: pageSetupOpen, data: dataOpen, images: imagesOpen };
+		untrack(() => {
+			const was = ui.panels;
+			if (was && was.page === panels.page && was.data === panels.data && was.images === panels.images) return;
+			ui = { ...ui, panels };
+		});
+	});
+
 	// ---- template editing ---------------------------------------------------
 
 	/**
@@ -999,6 +1227,55 @@ em { color: #b42318 }`;
 		void tick().then(() => boxBar?.focusText());
 	}
 
+	/**
+	 * An area for a column nothing prints yet, from the mark on its header.
+	 *
+	 * Named after the column — the area's name is its CSS id and the slot the
+	 * mapping keys on, and the column's own name is the obvious one — with a
+	 * number after it if an area already has that name. Placed where a new
+	 * area goes, selected, and one undo away.
+	 */
+	function placeColumn(column: string) {
+		if (template.locked) {
+			notify('The design is locked — unlock it to add an area.', 'warning');
+			return;
+		}
+		settleProvisional();
+		const taken = new Set(template.boxes.map((b) => b.slot).filter(Boolean));
+		let slot = column;
+		for (let n = 2; taken.has(slot); n++) slot = `${column}-${n}`;
+		describe('Place a column');
+		const box = newBox({ id: nextBoxId(template.boxes), slot, x: 14, y: 60, w: 80, h: 12, mode: 'plain' });
+		template = {
+			...template,
+			slots: template.slots.includes(slot) ? template.slots : [...template.slots, slot],
+			boxes: [...template.boxes, box]
+		};
+		mapping = { ...mapping, [slot]: column };
+		selectedIds = [box.id];
+		flash([box.id]);
+		notify(`${column} is on the card — drag the new area where it belongs.`);
+	}
+
+	/**
+	 * Entering a cell flashes the areas on the card that print it — bound to
+	 * its column, or naming it as `{{column}}` in their own words — in the
+	 * bounds' blue, briefly. The table and the card are side by side, and
+	 * which area a cell feeds is the question typing into it always raises.
+	 * The same flash a rescued area gets, so it reads as "here", not as a
+	 * selection.
+	 */
+	function flashColumn(column: string) {
+		const ids = template.boxes
+			.filter(
+				(b) =>
+					(b.slot && mapping[b.slot] === column) ||
+					referencedColumns(b.static?.text ?? '', dataset.columns).includes(column)
+			)
+			.map((b) => b.id);
+		if (ids.length) flash(ids);
+	}
+
 	// ---- positioning the areas from the columns -----------------------------
 
 	/**
@@ -1007,7 +1284,7 @@ em { color: #b42318 }`;
 	 * It guesses from headings and cell shapes and it will sometimes be wrong,
 	 * and a page of boxes that silently decided your Reference column was the
 	 * title is worse than being asked. So the guess is shown first: one line per
-	 * column, the kind it was taken for, and Leave Out for the ones you do not
+	 * column, the kind it was taken for, and a tick to take off the ones you do not
 	 * want on the card at all.
 	 */
 	let magic = $state<FieldGuess[] | null>(null);
@@ -1050,7 +1327,7 @@ em { color: #b42318 }`;
 		template = { ...current, slots, boxes };
 		mapping = { ...bound };
 		selectedIds = [];
-		const skipped = roles.filter((role) => role.kind === 'skip').map((role) => role.column);
+		const skipped = roles.filter((role) => role.include === false).map((role) => role.column);
 		const notes = [
 			`${boxes.length} area${boxes.length === 1 ? '' : 's'} laid out from ${dataset.columns.length} column${dataset.columns.length === 1 ? '' : 's'}.`,
 			skipped.length ? `Left out: ${skipped.join(', ')}.` : '',
@@ -1431,7 +1708,7 @@ em { color: #b42318 }`;
 	function setBoxText(box: Box, value: string) {
 		if (box.slot) {
 			const column = mapping[box.slot];
-			if (!column || !row) return;
+			if (!column || !row || refuseLockedTable()) return;
 			describe('Edit the text');
 			dataset = {
 				...dataset,
@@ -1634,8 +1911,9 @@ em { color: #b42318 }`;
 			redo();
 			return;
 		}
-		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu || resetting || deleting || deletingTable || magic)) {
+		if (event.key === 'Escape' && (helpOpen || statusOpen || cssOpen || boxMenu || resetting || deleting || deletingTable || magic)) {
 			helpOpen = false;
+			statusOpen = false;
 			if (cssOpen) cancelCss();
 			resetting = false;
 			deleting = false;
@@ -1750,23 +2028,60 @@ em { color: #b42318 }`;
 	// ---- import / export ----------------------------------------------------
 
 	/**
-	 * The sample cards back, from a press and hold on Import. Data only: it hangs
-	 * off an import-data button and that is what it does — silently replacing a
-	 * template someone has built would be a far worse surprise than a card that
-	 * does not quite fit.
-	 *
-	 * No confirmation. A snapshot is template, data and mapping together, so
-	 * Ctrl/Cmd+Z brings their rows straight back, and the rule here is that
-	 * destructive things are undoable and only ask when undo cannot reach them.
+	 * The edit badge on a Data Field area: that area's cell for this row, full
+	 * size in the table. The table is opened for it if it was folded away; a
+	 * locked table says so rather than opening an editor it would refuse.
 	 */
-	function loadSample() {
-		describe('Load the sample cards');
-		dataset = sampleDataset();
-		// Remapped the way a first run maps: their template's slots against the
+	let cellRequest = $state<{ row: number; column: string } | null>(null);
+
+	function editCell(id: string) {
+		const box = template.boxes.find((b) => b.id === id);
+		const column = box?.slot ? mapping[box.slot] : undefined;
+		if (!box || box.locked || !column || !row) return;
+		if (refuseLockedTable()) return;
+		dataOpen = true;
+		cellRequest = { row: activeRow, column };
+	}
+
+	/**
+	 * Getting Started: the table of cards that walk through the app.
+	 *
+	 * It used to pour those rows into whatever table was open — undoable, but a
+	 * table someone had been working in was the wrong place to put them, and one
+	 * edited from the sample itself was overwritten without a word. So it opens
+	 * a table already holding them untouched, if there is one, and otherwise
+	 * starts a new one. Nothing anyone has typed is ever replaced by it.
+	 */
+	async function gettingStarted() {
+		const sample = sampleDataset();
+		const untouched = (d: Dataset) =>
+			JSON.stringify([d.columns, d.rows]) === JSON.stringify([sample.columns, sample.rows]);
+		if (untouched(dataset)) {
+			notify(`This is the Getting Started table, as it came.`);
+			return;
+		}
+		for (const entry of tables) {
+			if (entry.id === datasetId) continue;
+			const doc = await loadDatasetDoc(entry.id);
+			if (doc && untouched(doc)) {
+				await switchDataset(entry.id);
+				return;
+			}
+		}
+		settleProvisional();
+		await flushDataset();
+		describe('Getting Started');
+		rememberTable(datasetId);
+		datasetId = nextDatasetId();
+		saveDatasetId(datasetId);
+		dataset = { ...sample, name: freeTableName(sample.name ?? 'Getting Started') };
+		activeRow = 0;
+		// Mapped the way a first run maps: this template's slots against the
 		// sample's columns, so the cards render rather than coming up blank.
 		mapping = autoMap(usedSlots(template), dataset.columns);
-		activeRow = 0;
-		notify('Sample cards loaded. Ctrl/Cmd+Z puts your own rows back.');
+		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
+		await refreshTables();
+		notify(`“${dataset.name}” started, with the cards that walk through the app. Your other tables are untouched.`);
 	}
 
 	/**
@@ -1780,7 +2095,9 @@ em { color: #b42318 }`;
 	}
 
 	function doExportTemplate() {
-		download(`${slugify(template.name)}.json`, exportTemplate($state.snapshot(template)));
+		// Dated, so a folder of exports says which is which and the newest sorts
+		// last: `name_2026-09-25.json`, in the underscore `pageFilename` uses.
+		download(`${slugify(template.name)}_${formatDate(new Date(), 'YYYY-MM-DD')}.json`, exportTemplate($state.snapshot(template)));
 		notify('Template exported — fonts referenced by name.');
 	}
 
@@ -1817,6 +2134,8 @@ em { color: #b42318 }`;
 	async function handleFontUpload(file: File, family?: string) {
 		try {
 			const ref = await uploadLocalFont(file, family);
+			editorFonts = mergeFonts(editorFonts, [ref]);
+			saveEditorFonts($state.snapshot(editorFonts));
 			const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== ref.family.toLowerCase());
 			template = { ...template, fonts: [...fonts, ref] };
 			missingFonts = missingFonts.filter((f) => (f.ref ?? f.family) !== (ref.ref ?? ref.family));
@@ -1951,7 +2270,7 @@ em { color: #b42318 }`;
 				<Icon name="package" size={15} /> Install
 			</button>
 		{/if}
-		<button class="help" onclick={() => (helpOpen = true)} title="How this works, and the keys">
+		<button class="help" onclick={() => (helpOpen = true)} title={withKey("How this works, and the keys", "help")}>
 			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
 		<button
@@ -1970,22 +2289,30 @@ em { color: #b42318 }`;
 				? 'Page setup — the area bar has the row; this takes it back'
 				: 'Show or hide the page setup'}
 		>
-			<Icon name="document-configuration" size={15} /> <span class="label">Page Setup</span>
+			<Icon name="document-blank" size={15} /> <span class="label">Page Setup</span>
 		</button>
-		<!-- Every stored picture, beside the two bars rather than inside one of
-		     them: the pictures are the browser's, not the page's — a row's own
-		     photograph is in there too — and Page Setup was a place you had to
-		     already know to look. -->
+		<!-- Every stored picture, in a tray of its own in the table's place: the
+		     pictures are the browser's, not the page's — a row's own photograph
+		     is in there too. Images and Data share that room, one at a time, so
+		     opening either closes the other. -->
 		<button
 			class="images"
-			onclick={() => (imagesOpen = true)}
+			aria-pressed={imagesOpen}
+			aria-expanded={imagesOpen}
+			onclick={() => {
+				imagesOpen = !imagesOpen;
+				if (imagesOpen) dataOpen = false;
+			}}
 			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
 		>
 			<Icon name="image" size={15} /> <span class="label">Images</span>
 		</button>
 		<button
 			class="data"
-			onclick={() => (dataOpen = !dataOpen)}
+			onclick={() => {
+				dataOpen = !dataOpen;
+				if (dataOpen) imagesOpen = false;
+			}}
 			aria-pressed={dataOpen}
 			aria-expanded={dataOpen}
 			title="Show or hide the table"
@@ -1996,7 +2323,7 @@ em { color: #b42318 }`;
 			class="primary export"
 			onclick={requestPrint}
 			disabled={!dataset.rows.length}
-			title="Open every card as a page to print or save"
+			title={withKey('Open every card as a page to print or save', 'export')}
 		>
 			<Icon name="document-multiple" size={15} /> <span class="label">Export…</span>
 		</button>
@@ -2027,8 +2354,38 @@ em { color: #b42318 }`;
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if (pageSetupOpen && !selected) || selected}
-		<div class="bar-row" class:box={!!selected} style="min-height:{barFloor}px">
+	{#if selected || pageSetupOpen}
+		<div class="bar-row" class:box={!!selected} style="min-height:{Math.max(barFloor, probeHeight)}px">
+			<!-- Never seen and never reached — `inert` takes it out of the focus
+			     order and the accessibility tree — only measured. -->
+			<div class="bar-probe" aria-hidden="true" inert bind:clientHeight={probeHeight}>
+				<OptionsBar
+					section="box"
+					{template}
+					{dataset}
+					{mapping}
+					selected={probeBox}
+					onboxchange={() => {}}
+					ontemplatechange={() => {}}
+					onmappingchange={() => {}}
+					onduplicate={() => {}}
+					ondelete={() => {}}
+					onresettemplate={() => {}}
+					{library}
+					{templateId}
+					{editorFonts}
+					onselecttemplate={() => {}}
+					onnewtemplate={() => {}}
+					ondeletetemplate={() => {}}
+					onuploadfont={() => {}}
+					onuploadbackground={() => {}}
+					onuploadprintbackground={() => {}}
+					onnotice={() => {}}
+					onimporttemplate={() => {}}
+					onexporttemplate={() => {}}
+					oneditcss={() => {}}
+				/>
+			</div>
 			<div class="bar-fit" bind:clientHeight={barHeight}>
 				{#if selected}
 					<!-- No menu here, and the guard above is only ever set by the page
@@ -2049,6 +2406,7 @@ em { color: #b42318 }`;
 						onresettemplate={() => (resetting = true)}
 						{library}
 						{templateId}
+						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
 						ondeletetemplate={() => (deleting = true)}
@@ -2060,6 +2418,10 @@ em { color: #b42318 }`;
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
 						ondraw={(id) => (drawing = id)}
+						onuploadimage={(id, file) => {
+							const box = template.boxes.find((b) => b.id === id);
+							if (box) void handleImageDrop(box, file);
+						}}
 					/>
 				{:else}
 					<OptionsBar
@@ -2076,6 +2438,7 @@ em { color: #b42318 }`;
 						onresettemplate={() => (resetting = true)}
 						{library}
 						{templateId}
+						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
 						ondeletetemplate={() => (deleting = true)}
@@ -2083,11 +2446,14 @@ em { color: #b42318 }`;
 						onuploadbackground={(file) => void handleBackgroundUpload(file)}
 						onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 						onnotice={notify}
-						onmenu={(open) => (barMenuOpen = open)}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
 						ondraw={(id) => (drawing = id)}
+						onuploadimage={(id, file) => {
+							const box = template.boxes.find((b) => b.id === id);
+							if (box) void handleImageDrop(box, file);
+						}}
 					/>
 				{/if}
 			</div>
@@ -2153,8 +2519,14 @@ em { color: #b42318 }`;
 
 	<main
 		bind:this={mainEl}
-		class:no-data={!dataOpen}
-		style={stacked && trayShare !== null ? `--tray-h:${(trayShare * 100).toFixed(2)}%` : ''}
+		class:no-data={!dataOpen && !imagesOpen}
+		style={stacked
+			? trayShare !== null
+				? `--tray-h:${(trayShare * 100).toFixed(2)}%`
+				: ''
+			: ui.trayWidthShare
+				? `--tray-w:clamp(${TRAY_MIN_PX}px, ${(ui.trayWidthShare * 100).toFixed(2)}%, calc(100% - ${STAGE_MIN_PX}px))`
+				: ''}
 	>
 		<PagePreview
 			{template}
@@ -2162,6 +2534,7 @@ em { color: #b42318 }`;
 			{mapping}
 			bounds={ui.showBounds}
 			grid={ui.showGrid}
+			guides={ui.showGuides}
 			gridStyle={ui.gridStyle}
 			{selectedIds}
 			zoom={ui.zoom}
@@ -2175,9 +2548,11 @@ em { color: #b42318 }`;
 			onselect={selectBox}
 			onchange={updateBox}
 			onimagedrop={(box, file) => void handleImageDrop(box, file)}
+			onimagepagedrop={(file, x, y) => void (async () => placeImageOnPage(await storeLocalImage(file), x, y, file))()}
 			onaction={describe}
 			onbounds={(show) => (ui = { ...ui, showBounds: show })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
+			onguides={(show) => (ui = { ...ui, showGuides: show })}
 			ongridstyle={(gridStyle) => {
 				// A hold on a checkbox is a gesture nobody was taught, so it says what
 				// it did — and it turns the grid on if it was off, because changing
@@ -2204,9 +2579,11 @@ em { color: #b42318 }`;
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
 			onedit={(id) => (editingId = id)}
 			ondraw={(id) => (drawing = id)}
+			oneditcell={editCell}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
 			modalOpen={helpOpen ||
+				statusOpen ||
 				cssOpen ||
 				previewOpen ||
 				lightboxOpen ||
@@ -2224,8 +2601,53 @@ em { color: #b42318 }`;
 			ondelete={deleteBox}
 		/>
 
-		{#if dataOpen}
+		{#if dataOpen || imagesOpen}
 		<aside bind:this={asideEl}>
+			{#if !stacked}
+				<!-- The edge between the page and the table, dragged to share the
+				     width between them. A separator in the ARIA sense, so the arrow
+				     keys move it too; a double-click hands the split back to the
+				     stylesheet. Stacked on a phone the table's own header is the
+				     grip instead, so this is not drawn there. -->
+				<!-- A focusable separator is a widget in ARIA — it has a value and
+				     the arrow keys change it — which the compiler's list of
+				     interactive roles does not know. -->
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+				<div
+					class="tray-grip"
+					class:on={trayResizing !== null}
+					role="separator"
+					aria-orientation="vertical"
+					aria-label="Table width"
+					aria-valuenow={ui.trayWidthShare ? Math.round(ui.trayWidthShare * 100) : undefined}
+					aria-valuemin={0}
+					aria-valuemax={100}
+					tabindex="0"
+					title="Drag to share the width between the page and the table — double-click to reset"
+					onpointerdown={startTrayResize}
+					onpointermove={moveTrayResize}
+					onpointerup={endTrayResize}
+					onpointercancel={endTrayResize}
+					ondblclick={() => (ui = { ...ui, trayWidthShare: undefined })}
+					onkeydown={(e) => {
+						if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+						e.preventDefault();
+						const now = asideEl?.getBoundingClientRect().width ?? 0;
+						setTrayWidth(now + (e.key === 'ArrowLeft' ? 24 : -24));
+					}}
+				></div>
+			{/if}
+			{#if imagesOpen}
+				<ImagesPanel
+					used={new Set(imageNames)}
+					missing={missingImages}
+					onplace={placeStoredImage}
+					onplacepage={(name, x, y) => void placeImageOnPage(name, x, y)}
+					onnotice={notify}
+					onchanged={() => (imagesVersion += 1)}
+					ontraydrag={stacked ? dragTray : undefined}
+				/>
+			{:else}
 			<DataTable
 				{dataset}
 				{tables}
@@ -2233,12 +2655,21 @@ em { color: #b42318 }`;
 				{previousTable}
 				onselecttable={(id) => void switchDataset(id)}
 				onnewtable={() => void newDataset()}
+				{usedColumns}
+				onplacecolumn={placeColumn}
+				oncellfocus={flashColumn}
+				onlock={(locked) => {
+					describe(locked ? 'Lock the table' : 'Unlock the table');
+					dataset = stripUndefined({ ...$state.snapshot(dataset), locked: locked || undefined }) as Dataset;
+				}}
 				ondeletetable={() => (deletingTable = true)}
 				onswaptable={swapDataset}
 				onrenametable={renameDataset}
 				trayDraggable={stacked}
 				ontraydrag={dragTray}
 				columnWidths={ui.columnWidths}
+				rowHeight={ui.rowHeight ?? 'medium'}
+				onrowheight={(rowHeight) => (ui = { ...ui, rowHeight })}
 				oncolumnwidths={(widths) => {
 					// Kept to the columns that exist, so an imported table does not
 					// carry the last one's widths around in this browser forever.
@@ -2251,7 +2682,8 @@ em { color: #b42318 }`;
 				{selectedColumn}
 				onactivate={(i) => (activeRow = i)}
 				onnotice={notify}
-				onloadsample={loadSample}
+				ongettingstarted={() => void gettingStarted()}
+				openRequest={cellRequest}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
 					// follows it, so the card keeps rendering what it rendered before.
@@ -2265,19 +2697,27 @@ em { color: #b42318 }`;
 					// Carried across here, where all of them arrive, rather than in each
 					// of them — the one thing that does mean to change it is the rename,
 					// which does not come through here.
-					dataset = next.name === undefined && dataset.name ? { ...next, name: dataset.name } : next;
+					// The lock the same way: it is the table's, and no edit in the
+					// tray means to change it — there is a button for that.
+					const named = next.name === undefined && dataset.name ? { ...next, name: dataset.name } : next;
+					dataset = dataset.locked ? { ...named, locked: true } : named;
 					if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), next.columns);
 				}}
 			/>
+			{/if}
 		</aside>
 		{/if}
 	</main>
 
 	<footer class="status-bar">
-		<!-- `title` because the line is one ellipsised row: a long notice was
-		     otherwise cut off with no way to read the rest of it. -->
-		<span class="status" class:warning={statusTone === 'warning'} role="status" title={status}>
-			{#if statusTone === 'warning'}<Icon name="warning" size={12} />{/if}{status}
+		<!-- One ellipsised row, so a long notice is cut off; a tap opens the
+		     whole of it. A button inside the live region rather than the region
+		     itself, so what a screen reader announces is still the notice. The
+		     `title` stays for a mouse that only wants a glance. -->
+		<span class="status" class:warning={statusTone === 'warning'} role="status">
+			<button class="status-text" title={status} disabled={!status} onclick={() => (statusOpen = true)}>
+				{#if statusTone === 'warning'}<Icon name="warning" size={12} />{/if}<span>{status}</span>
+			</button>
 		</span>
 		{#if updateReady}
 			<button class="reload" onclick={applyUpdate}>Update</button>
@@ -2286,10 +2726,25 @@ em { color: #b42318 }`;
 	</footer>
 </div>
 
+{#if statusOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (statusOpen = false)}></div>
+	<div class="modal narrow" role="dialog" aria-modal="true" aria-label="Notice" use:armDefault>
+		<p class="status-full" class:warning={statusTone === 'warning'}>
+			{#if statusTone === 'warning'}<Icon name="warning" size={14} />{/if}
+			<span>{status}</span>
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button class="primary" data-default onclick={() => (statusOpen = false)}>OK</button>
+		</div>
+	</div>
+{/if}
+
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title">
-		<h2 id="css-title">CSS</h2>
+	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
+		<!-- Dragged by its title, so the card it is styling can be seen beside it. -->
+		<h2 id="css-title" class="drag-title" data-drag-handle>CSS</h2>
 		<!-- The placeholder is the documentation. It used to be two lines of
 		     example and two paragraphs of prose above and below it; what an author
 		     actually needs is the names of the things they can reach, and a
@@ -2301,7 +2756,7 @@ em { color: #b42318 }`;
 			rows="14"
 			spellcheck="false"
 			use:focusOnOpen
-			placeholder={CSS_PLACEHOLDER}
+			placeholder={cssPlaceholder}
 			value={template.css ?? ''}
 			onchange={(e) => (template = { ...template, css: e.currentTarget.value.trim() || undefined })}
 		></textarea>
@@ -2378,18 +2833,31 @@ em { color: #b42318 }`;
 <!-- What the auto layout thinks each column is, before it acts on any of it.
      The guessing is the whole feature, so it is shown rather than described:
      the list *is* the explanation, which is why there is no paragraph over it —
-     every row can be corrected, and a column set to Leave Out gets no area. -->
+     every row can be corrected, and a column unticked gets no area. -->
 {#if magic}
 	<div class="modal-backdrop" role="presentation" onclick={() => (magic = null)}></div>
 	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title" use:armDefault>
 		<h2 id="magic-title">Position Areas Automagically</h2>
 		<ul class="magic-list">
 			{#each magic as guess, index (guess.column)}
-				<li>
+				<li class:left-out={guess.include === false}>
+					<!-- In or out, apart from what it is: letting a column back in
+					     keeps whatever it was taken for. -->
+					<input
+						type="checkbox"
+						aria-label="Give {guess.column} an area"
+						title={guess.include === false ? 'Left out — tick to give it an area' : 'Untick to leave it off the card'}
+						checked={guess.include !== false}
+						onchange={(e) => {
+							const include = e.currentTarget.checked;
+							magic = magic!.map((one, i) => (i === index ? { ...one, include } : one));
+						}}
+					/>
 					<span class="magic-column" title={guess.column}>{guess.column}</span>
 					<span class="magic-sample" title={guess.sample}>{guess.sample.slice(0, 60) || '—'}</span>
 					<select
 						aria-label="What {guess.column} is"
+						disabled={guess.include === false}
 						value={guess.kind}
 						onchange={(e) => {
 							const kind = e.currentTarget.value as FieldGuess['kind'];
@@ -2584,7 +3052,7 @@ em { color: #b42318 }`;
 		</p>
 		<p>
 			<strong>Table</strong> at the left of that row names the table you are in; the caret opens the rest, with
-			<strong>New table…</strong> and <strong>Delete this table…</strong> under a rule at the bottom. The
+			<strong>New table…</strong> and <strong>Delete…</strong> under a rule at the bottom. The
 			<strong>⇄</strong> beside it goes back to the table you were on before, and back again — the two you are
 			working between, one press apart. A design and a table are kept apart on purpose: switching either leaves the
 			other exactly where it was, and bindings that still name a column that exists are kept across the switch.
@@ -2732,22 +3200,6 @@ em { color: #b42318 }`;
 	/>
 {/if}
 
-{#if imagesOpen}
-	<div class="modal-backdrop" role="presentation" onclick={() => (imagesOpen = false)}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="images-title">
-		<h2 id="images-title">Images</h2>
-		<ImagesPanel
-			used={new Set(imageNames)}
-			onnotice={notify}
-			onchanged={() => (imagesVersion += 1)}
-		/>
-		<div class="modal-actions">
-			<span class="spacer"></span>
-			<button class="primary" onclick={() => (imagesOpen = false)}>Done</button>
-		</div>
-	</div>
-{/if}
-
 {#if drawingBox}
 	<BitmapEditor
 		box={drawingBox}
@@ -2813,8 +3265,20 @@ em { color: #b42318 }`;
 	   it, so the band left over when the shorter bar is in it reads as part of
 	   the bar rather than as a gap above the stage. */
 	.bar-row {
+		position: relative;
 		background: #f7f7f7;
 		border-bottom: 1px solid #ddd;
+	}
+
+	/* Laid out at the row's width so it wraps as the real one would, and out of
+	   sight and out of the way. */
+	.bar-probe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		visibility: hidden;
+		pointer-events: none;
 	}
 
 	.bar-row.box {
@@ -2833,9 +3297,12 @@ em { color: #b42318 }`;
 	   this was 13px of text. Width follows the intrinsic ratio; the width and
 	   height attributes on the tag hold the box before the file arrives, so the
 	   buttons do not shuffle sideways on load. */
+	/* The mark and the version are labels, not text anyone copies; a
+	   double-click near them should not paint them blue. */
 	.brand {
 		height: 29px;
 		width: auto;
+		user-select: none;
 	}
 
 	.spacer {
@@ -2845,8 +3312,45 @@ em { color: #b42318 }`;
 	main {
 		flex: 1;
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(360px, 40%);
+		/* `--tray-w` is the width the table's edge was dragged to; until then
+		   it is the share this always was. */
+		grid-template-columns: minmax(0, 1fr) var(--tray-w, minmax(360px, 40%));
 		min-height: 0;
+	}
+
+	/* Straddles the table's left edge; wider than it looks, because a 1px
+	   target is not a target. Lit while hovered, focused or held. */
+	.tray-grip {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: -4px;
+		width: 8px;
+		z-index: 5;
+		cursor: col-resize;
+		touch-action: none;
+	}
+
+	.tray-grip::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 3px;
+		width: 2px;
+		background: #2563eb;
+		opacity: 0;
+		transition: opacity 0.12s;
+	}
+
+	.tray-grip:hover::after,
+	.tray-grip:focus-visible::after,
+	.tray-grip.on::after {
+		opacity: 1;
+	}
+
+	.tray-grip:focus-visible {
+		outline: none;
 	}
 
 	main.no-data {
@@ -2907,9 +3411,52 @@ em { color: #b42318 }`;
 		white-space: nowrap;
 	}
 
+	/* The notice as a button, dressed as the line of text it is: it only has
+	   to say, on hover, that there is more of it to read. */
+	.status-text {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+		max-width: 100%;
+		padding: 0;
+		border: none;
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.status-text:disabled {
+		cursor: default;
+	}
+
+	.status-text > span {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.status-text:hover:not(:disabled) > span {
+		text-decoration: underline dotted;
+		text-underline-offset: 2px;
+	}
+
+	.status-full {
+		display: flex;
+		align-items: flex-start;
+		gap: 6px;
+		margin: 0 0 4px;
+		font-size: 13px;
+		line-height: 1.5;
+		color: #222;
+	}
+
 	/* Something went wrong reads differently from something happened. The same
 	   mark the canvas uses for a box that is clipping what will print. */
-	.status.warning {
+	.status.warning,
+	.status-full.warning {
 		color: #b42318;
 	}
 
@@ -3008,6 +3555,13 @@ em { color: #b42318 }`;
 	.modal h2 {
 		margin: 0 0 6px;
 		font-size: 16px;
+	}
+
+	/* A dialog's title is where it is moved from — see `dragByTitle`. */
+	.drag-title {
+		cursor: move;
+		user-select: none;
+		touch-action: none;
 	}
 
 	/* Sticky against the modal's own padding, so the rule under it spans the
@@ -3132,6 +3686,7 @@ em { color: #b42318 }`;
 		font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
 		color: #767676;
 		vertical-align: 2px;
+		user-select: none;
 	}
 
 	/* The dialog takes the focus as it opens, so its first Enter has somewhere to
@@ -3180,9 +3735,16 @@ em { color: #b42318 }`;
 
 	.magic-list li {
 		display: grid;
-		grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr) 8.5rem auto;
+		grid-template-columns: auto minmax(4.5rem, auto) minmax(0, 1fr) 8.5rem auto;
 		align-items: center;
 		gap: 10px;
+	}
+
+	/* Out, but still listed: greyed, so the tick is the thing that reads. */
+	.magic-list li.left-out .magic-column,
+	.magic-list li.left-out .magic-sample {
+		color: #aaa;
+		text-decoration: line-through;
 	}
 
 	.magic-column {
@@ -3254,7 +3816,7 @@ em { color: #b42318 }`;
 		/* The sample is the first thing to go: it is there to check a guess, and
 		   on a phone the name and the control are what have to fit. */
 		.magic-list li {
-			grid-template-columns: minmax(0, 1fr) 8.5rem auto;
+			grid-template-columns: auto minmax(0, 1fr) 8.5rem auto;
 		}
 
 		.magic-sample {

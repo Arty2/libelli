@@ -3,7 +3,7 @@ import { pageFilename, slugify } from './download';
 
 describe('slugify', () => {
 	it('makes a filename stem out of a human name', () => {
-		expect(slugify('A5 Instruction Card')).toBe('a5-instruction-card');
+		expect(slugify('A5 Starter Template')).toBe('a5-starter-template');
 	});
 
 	it('collapses a run of punctuation rather than leaving a row of hyphens', () => {

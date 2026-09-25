@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { withKey } from '$lib/keys';
 	import type { AlignEdge } from '$lib/layout';
 	import type { Box } from '$lib/types';
 
@@ -63,10 +64,10 @@
 	>
 		<Icon name="locked" size={16} />
 	</button>
-	<button title="Duplicate" aria-label="Duplicate" disabled={frozen} onclick={onduplicate}>
+	<button title={withKey('Duplicate', 'duplicate')} aria-label="Duplicate" disabled={frozen} onclick={onduplicate}>
 		<Icon name="replicate" size={16} />
 	</button>
-	<button class="danger" title="Delete" aria-label="Delete" disabled={frozen || allLocked} onclick={ondelete}>
+	<button class="danger" title={withKey('Delete', 'delete')} aria-label="Delete" disabled={frozen || allLocked} onclick={ondelete}>
 		<Icon name="trash" size={16} />
 	</button>
 </div>

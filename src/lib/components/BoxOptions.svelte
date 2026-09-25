@@ -1,12 +1,29 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import ColorField from './ColorField.svelte';
+	import { withKey } from '$lib/keys';
 	import './options-bar.css';
 	import { cssIdent } from '$lib/css';
-	import { CURATED_GOOGLE_FONTS } from '$lib/fonts';
+	import { parseColor } from '$lib/color';
+	import { safeImageUrl } from '$lib/assets';
+	import { completePlaceholders } from '$lib/complete';
+	import { availableWeights, fontChoices, previewFamilies } from '$lib/fonts';
+	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
 	import {
 		BLEND_MODES,
 		BORDER_STYLES,
 		DEFAULT_QR,
+		MAX_PARAGRAPH,
+		MAX_BASELINE,
+		MAX_LIST,
+		LIST_MARKER_LABELS,
+		LIST_MARKERS,
+		baselineOf,
+		normaliseBaseline,
+		normaliseList,
+		MIN_BOX,
+		MIN_LEADING,
+		MIN_SIZE,
 		normaliseCentre,
 		normaliseRotation,
 		normaliseSides,
@@ -21,6 +38,7 @@
 		Box,
 		Centre,
 		Dataset,
+		FontRef,
 		Mapping,
 		QrSettings,
 		Sides,
@@ -43,15 +61,20 @@
 		onuploadbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
+		/** fonts this browser knows that the template is not carrying */
+		editorFonts: FontRef[];
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
 		/** open the drawing surface for the selected area */
 		ondraw?: (id: string) => void;
+		/** a picture file chosen for an image area: stored, then shown in it */
+		onuploadimage?: (id: string, file: File) => void;
 	}
 
 	let {
 		template,
+		editorFonts,
 		dataset,
 		mapping,
 		selected,
@@ -62,7 +85,8 @@
 		ondelete,
 		onuploadfont,
 		onnotice,
-		ondraw
+		ondraw,
+		onuploadimage
 	}: Props = $props();
 
 	let fontInput = $state<HTMLInputElement | null>(null);
@@ -82,11 +106,26 @@
 	/** the same question for padding; the two expand independently */
 	let perSidePadding = $state(false);
 
-	const familyOptions = $derived(
-		Array.from(new Set([...template.fonts.map((f) => f.family), ...CURATED_GOOGLE_FONTS])).sort((a, b) =>
-			a.localeCompare(b)
-		)
-	);
+	/**
+	 * The families this template is set in, then under a rule everything else
+	 * this browser knows — see `fontChoices`.
+	 */
+	const families = $derived(fontChoices(template, editorFonts));
+
+	/**
+	 * The font menu: the page default, the template's families, under a rule
+	 * this browser's others, and under another the two ways to name a family
+	 * that is in neither list. Each name in its own face.
+	 */
+	const fontItems = $derived.by((): MenuItem[] => [
+		{ value: '', label: `Default: ${template.defaults.font}` },
+		...families.used.map((family) => ({ value: family, label: family, family })),
+		{ rule: true },
+		...families.others.map((family) => ({ value: family, label: family, family })),
+		{ rule: true },
+		{ value: '__custom', label: 'Other Family…' },
+		{ value: '__upload', label: 'Upload a Font File…' }
+	]);
 
 	const anchorOptions = $derived(template.boxes.filter((b) => b.id !== selected?.id));
 
@@ -146,66 +185,84 @@
 	 * size. Hide When Empty is what turns it back off again.
 	 */
 	/**
-	 * What an area holds, as one question.
+	 * What an area holds, as one question with three answers: a column, words
+	 * typed here, or a picture — drawn here or brought from somewhere, which is
+	 * two ways of filling one thing, not two things. They were two Content
+	 * types, Bitmap and Image, and switching between them threw away whichever
+	 * the area held.
 	 *
-	 * Four answers rather than two: a column, words typed here, a drawing made
-	 * here, or a picture from somewhere. The last two used to be the *mode* of a
-	 * static area — "Image / Color" — which asked people to know that a drawing
-	 * and a paragraph are the same kind of thing with a different renderer. They
-	 * are not, to anyone placing them.
-	 *
-	 * Nothing about the format changes: this is derived from the slot, the mode
-	 * and which of `static`'s fields holds the value, and written back to the
-	 * same three.
+	 * Nothing about the format changes: this is derived from the slot and the
+	 * mode, and written back to the same two.
 	 */
-	type Source = 'field' | 'static' | 'bitmap' | 'image';
+	type Source = 'field' | 'static' | 'image';
 	const source = $derived.by<Source>(() => {
 		if (!selected) return 'static';
 		if (selected.slot) return 'field';
-		if (selected.mode === 'bitmap') return 'bitmap';
-		if (!shownAsMedia(selected.mode)) return 'static';
-		// A picture area written before `bitmap` was a mode of its own: what is
-		// in it says which it was. Which field is *there*, not which one has
-		// something in it — a bitmap nobody has drawn yet and an address nobody
-		// has typed yet are both empty, and they are not the same area.
-		return selected.static?.dataUrl !== undefined && selected.static?.url === undefined
-			? 'bitmap'
-			: 'image';
+		return shownAsMedia(selected.mode) ? 'image' : 'static';
 	});
 
+	/**
+	 * Each source keeps only what it shows. Everything used to be kept across a
+	 * switch, so going back found it again — but a template written into
+	 * static text was still in the area as a Data Field or an Image, carried
+	 * into the template and read by anything that looks at an area's words.
+	 * What is dropped is one undo away, which is the app's answer to losing
+	 * something by a switch.
+	 */
 	function setSource(next: Source) {
 		if (!selected) return;
+		const { text, ...media } = selected.static ?? {};
 		if (next === 'field') {
-			// The words are kept rather than dropped: going to a column and back
-			// used to lose whatever had been typed, so the comment below was only
-			// true in one direction.
-			patch({ slot: selected.slot ?? 'field' });
+			patch({ slot: selected.slot ?? 'field', static: undefined });
 			return;
 		}
 		if (next === 'static') {
-			// Static keeps whatever was typed before. The picture modes belong to
-			// the two below now, so words that arrive here arrive as words.
 			patch({
 				slot: null,
 				mode: shownAsMedia(selected.mode) ? 'plain' : selected.mode,
-				static: { text: selected.static?.text ?? '' }
+				static: { text: text ?? '' }
 			});
 			return;
 		}
-		// Each picture kind keeps only its own field and drops the other's, so
-		// what is in the box and what the bar says about it cannot drift apart.
-		patch({
-			slot: null,
-			mode: next === 'bitmap' ? 'bitmap' : 'image',
-			static:
-				next === 'bitmap'
-					? { dataUrl: selected.static?.dataUrl }
-					: { url: selected.static?.url ?? '' }
-		});
+		patch({ slot: null, mode: 'image', static: Object.keys(media).length ? media : undefined });
 	}
 
+	/**
+	 * An address typed for the picture. It replaces a drawing the area was
+	 * showing — the last thing put in is what is shown — and clearing the field
+	 * leaves a drawing, if there is one, to show again.
+	 */
+	function setPictureAddress(value: string) {
+		const url = value.trim() || undefined;
+		const { dataUrl, ...rest } = selected?.static ?? {};
+		patch({ static: stripEmpty({ ...rest, url, dataUrl: url ? undefined : dataUrl }) });
+	}
+
+	/** The color an image area shows, when what it holds is a color. */
+	const pictureColor = $derived(
+		selected && !selected.slot && selected.static?.url ? parseColor(selected.static.url) : null
+	);
+
+	let pictureInput = $state<HTMLInputElement | null>(null);
+
+	/** An address, asked for the way the page's background asks for one. */
+	function linkPicture() {
+		const was = selected?.static?.url && !pictureColor ? selected.static.url : 'https://';
+		const url = window.prompt('Address of the picture', was);
+		if (url === null) return;
+		const safe = safeImageUrl(url);
+		if (!safe) {
+			onnotice('A picture address has to be an http or https address.', 'warning');
+			return;
+		}
+		setPictureAddress(safe);
+	}
+
+	const stripEmpty = <T extends object>(value: T): T =>
+		Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
+
 	/** Whether this area is one a drawing can be made in — see the pen, below. */
-	const drawable = $derived(!!selected && takesADrawing(selected.mode) && !selected.static?.url);
+	const drawable = $derived(!!selected && takesADrawing(selected.mode));
 
 	const VERTICALS: Array<{ value: VAlign; icon: string; label: string }> = [
 		{ value: 'top', icon: 'valign-top', label: 'Top' },
@@ -236,12 +293,74 @@
 	 * global type settings: a box that names no size takes the template's, so
 	 * changing the template moves every box that never overrode it.
 	 */
-	const inherited = (event: Event): number | undefined => {
-		const raw = (event.currentTarget as HTMLInputElement).value.trim();
+	const inherited = (event: Event, floor = -Infinity): number | undefined => {
+		const field = event.currentTarget as HTMLInputElement;
+		const raw = field.value.trim();
 		if (!raw) return undefined;
 		const value = Number(raw);
-		return Number.isFinite(value) ? value : undefined;
+		if (!Number.isFinite(value)) return undefined;
+		// The field shows what was taken — see `paper` in the page bar for why a
+		// refused number has to be written back by hand.
+		const taken = Math.max(floor, value);
+		if (taken !== value) field.value = String(taken);
+		return taken;
 	};
+
+	/**
+	 * A new width or height, grown from the edge the area is aligned to.
+	 *
+	 * Right-aligned words sit against the right edge, so a box made narrower
+	 * from the left keeps them where they were; a bottom-aligned area the same
+	 * downwards. Centred grows both ways. An anchored area's top is not its own
+	 * to move, so its height grows downwards whatever it is aligned to.
+	 */
+	function resize(axis: 'w' | 'h', event: Event) {
+		if (!selected) return;
+		const field = event.currentTarget as HTMLInputElement;
+		const was = selected[axis];
+		const size = Math.max(MIN_BOX, numeric(event, was));
+		field.value = String(size);
+		if (size === was) return;
+		const shift = was - size;
+		const round = (n: number) => Math.round(n * 100) / 100;
+		if (axis === 'w') {
+			const align = selected.align ?? template.defaults.align;
+			const by = align === 'right' ? shift : align === 'center' ? shift / 2 : 0;
+			patch({ w: size, x: round(selected.x + by) });
+		} else {
+			const valign = selected.valign ?? 'top';
+			const by = selected.anchor ? 0 : valign === 'bottom' ? shift : valign === 'middle' ? shift / 2 : 0;
+			patch({ h: size, y: round(selected.y + by) });
+		}
+	}
+
+	/** The page's paragraph style, said in the words the select uses. */
+	const PARAGRAPH_LABELS = { space: 'Space After', indent: 'Indent' } as const;
+
+	function setParagraph(mode: string, amount?: number) {
+		if (mode !== 'space' && mode !== 'indent') {
+			patch({ paragraph: undefined });
+			return;
+		}
+		const inheritedAmount = template.defaults.paragraph?.amount ?? 1;
+		const value = Math.max(0, Math.min(MAX_PARAGRAPH, amount ?? selected?.paragraph?.amount ?? inheritedAmount));
+		patch({ paragraph: { mode, amount: value } });
+	}
+
+	/** An area with its own content rather than a column's, and nothing in it. */
+	const emptyStatic = $derived(
+		!!selected &&
+			!selected.slot &&
+			!(selected.static?.text?.trim() || selected.static?.dataUrl || selected.static?.url || selected.static?.svg)
+	);
+
+	/** The area's own list style, field by field; a blank field takes the page's. */
+	function setList(change: Record<string, unknown>) {
+		patch({ list: normaliseList({ ...selected?.list, ...change }) });
+	}
+
+	/** Whether the page's baseline reaches this area — only in the page's own face. */
+	const pageBaselineApplies = $derived((selected?.font ?? template.defaults.font) === template.defaults.font);
 
 	function setFont(value: string) {
 		if (value === '') {
@@ -271,8 +390,47 @@
 
 	function registerFamily(family: string) {
 		if (template.fonts.some((f) => f.family.toLowerCase() === family.toLowerCase())) return;
-		patchTemplate({ fonts: [...template.fonts, { family, source: 'google' }] });
+		// An uploaded face the editor is holding keeps its file reference.
+		const known = editorFonts.find((f) => f.family.toLowerCase() === family.toLowerCase());
+		patchTemplate({ fonts: [...template.fonts, known ?? { family, source: 'google' }] });
 	}
+
+	/**
+	 * Bumped whenever the document's fonts change, so the weight menu reads
+	 * the faces again: a Google stylesheet declares its cuts a moment after
+	 * the family is chosen, and the first reading is of nothing.
+	 */
+	let facesVersion = $state(0);
+
+	$effect(() => {
+		if (typeof document === 'undefined' || !document.fonts) return;
+		const bump = () => (facesVersion += 1);
+		document.fonts.addEventListener('loadingdone', bump);
+		// A stylesheet adds its faces without loading any of them, so a
+		// finished request is watched for too.
+		const observer = new MutationObserver(bump);
+		observer.observe(document.head, { childList: true });
+		const late = setTimeout(bump, 1500);
+		return () => {
+			document.fonts.removeEventListener('loadingdone', bump);
+			observer.disconnect();
+			clearTimeout(late);
+		};
+	});
+
+	/**
+	 * The weights this area's family actually has — see `availableWeights`.
+	 * The one it is set to stays in the list even if the family lacks it, so
+	 * the menu never shows a blank for a template that asks for more.
+	 */
+	const weights = $derived.by(() => {
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		facesVersion;
+		const real = availableWeights(selected?.font ?? template.defaults.font);
+		return selected?.weight !== undefined && !real.includes(selected.weight)
+			? [...real, selected.weight].sort((a, b) => a - b)
+			: real;
+	});
 
 	/**
 	 * Rename the area — and refuse the rename if the name is taken.
@@ -375,12 +533,22 @@
 	<!-- Same idea: what the box holds, how its type is set, where that type sits,
 	     what the box looks like, where it is, and only then what you can do to it. -->
 	<div class="options box-options" aria-label="Area settings">
-		<!-- What this is and what it is called on one line, and the three things
-		     you can do to it on the next. They used to be at opposite ends of a bar
-		     that wraps to five rows on a laptop, so acting on the area you had just
-		     selected meant finding the far end of it. -->
+		<!-- The lock, what this is and what it is called, and the two things you
+		     do to it, on one line. Lock first, as in the page bar and under the
+		     table: it is the state of the thing named beside it, not an errand,
+		     and it is the one control the others wait on. -->
 		<span class="head">
 			<span class="head-row">
+				<button
+					class="lock-toggle"
+					aria-pressed={!!selected.locked}
+					title={selected.locked ? 'Unlock this area' : 'Lock this area — no dragging, no resizing, no option changes'}
+					disabled={pageFrozen}
+					onclick={() => patch({ locked: selected.locked ? undefined : true })}
+				>
+					<Icon name={selected.locked ? 'unlocked' : 'locked'} size={14} />
+					{selected.locked ? 'Unlock' : 'Lock'}
+				</button>
 				<span class="context">Area</span>
 				{#if source === 'field'}
 					<label class="field">
@@ -394,23 +562,9 @@
 						/>
 					</label>
 				{/if}
-			</span>
-			<!-- The two things you do to an area, then the switch that stops you
-			     doing either: Lock is a state, not an action, so it sits after them
-			     and says what pressing it will do rather than what it is. -->
-			<span class="head-row actions">
-				<button onclick={onduplicate} disabled={pageFrozen}><Icon name="replicate" size={14} /> Duplicate</button>
-				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen}>
+				<button onclick={onduplicate} disabled={pageFrozen} title={withKey('Duplicate this area', 'duplicate')}><Icon name="replicate" size={14} /> Duplicate</button>
+				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen} title={withKey('Delete this area', 'delete')}>
 					<Icon name="trash" size={14} /> Delete
-				</button>
-				<button
-					aria-pressed={!!selected.locked}
-					title={selected.locked ? 'Unlock this area' : 'Lock this area — no dragging, no resizing, no option changes'}
-					disabled={pageFrozen}
-					onclick={() => patch({ locked: selected.locked ? undefined : true })}
-				>
-					<Icon name={selected.locked ? 'unlocked' : 'locked'} size={14} />
-					{selected.locked ? 'Unlock' : 'Lock'}
 				</button>
 			</span>
 		</span>
@@ -426,7 +580,6 @@
 				>
 					<option value="field">Data Field</option>
 					<option value="static">Static Text</option>
-					<option value="bitmap">Bitmap</option>
 					<option value="image">Image</option>
 				</select>
 			</label>
@@ -450,35 +603,59 @@
 					</select>
 				</label>
 			{:else if source === 'image'}
-				<label class="field">
-					<span>Source</span>
-					<input
-						class="w-8"
-						value={selected.static?.url ?? ''}
-						placeholder="https://… or a color"
-						title="What this area shows on every card, saved in the template: an image address, or a color — a hex, an rgb() or hsl(), or a color name"
-						disabled={boxFrozen}
-						onchange={(e) => setStatic({ url: e.currentTarget.value.trim() || undefined })}
-					/>
-				</label>
-			{:else if source === 'bitmap'}
-				<!-- A drawing has no field to type into: the picture is the value, and
-				     the pen is how you change it. -->
+				<!-- The ways to fill a picture, as buttons: a file, an address, a
+				     drawing — and a color, for an area that is a fill. Whichever was
+				     put in last is what the area shows. There was one text field for
+				     the address and the color both, which nobody guessed took a color. -->
+				<button
+					disabled={boxFrozen}
+					title="A picture from this device — kept in this browser (or your images folder), the template only names it"
+					onclick={() => pictureInput?.click()}
+				>
+					<Icon name="image-reference" size={14} /> Upload…
+				</button>
+				<button
+					disabled={boxFrozen}
+					title={selected.static?.url && !pictureColor ? `Now: ${selected.static.url}` : 'An http(s) address the template will carry as written'}
+					onclick={linkPicture}
+				>
+					<Icon name="copy-link" size={14} /> URL…
+				</button>
+				<button
+					disabled={boxFrozen}
+					title="Draw a small picture for this area, saved in the template — over the one it shows, where the browser allows"
+					onclick={() => ondraw?.(selected.id)}
+				>
+					<Icon name="edit" size={14} /> {selected.static?.dataUrl ? 'Edit…' : 'Draw…'}
+				</button>
 				<span class="field">
-					<span>Drawing</span>
-					<button
+					<span class="sr-only">Color</span>
+					<ColorField
+						value={pictureColor ?? undefined}
+						fallback="#ffffff"
+						label="Area color"
+						title="Fill the area with a color instead of a picture"
 						disabled={boxFrozen}
-						title="Draw a small picture for this area, saved in the template"
-						onclick={() => ondraw?.(selected.id)}
-					>
-						<Icon name="edit" size={14} /> {selected.static?.dataUrl ? 'Edit…' : 'Draw…'}
-					</button>
+						onchange={(v) => setPictureAddress(v)}
+					/>
 				</span>
+				<input
+					bind:this={pictureInput}
+					type="file"
+					accept="image/*"
+					hidden
+					onchange={(e) => {
+						const file = e.currentTarget.files?.[0];
+						e.currentTarget.value = '';
+						if (file) onuploadimage?.(selected.id, file);
+					}}
+				/>
 			{:else}
 				<label class="field">
 					<span>Text</span>
 					<input
 						bind:this={textInput}
+						use:completePlaceholders={dataset.columns}
 						class="w-8"
 						value={selected.static?.text ?? ''}
 						placeholder="Text — the same on every card"
@@ -497,12 +674,11 @@
 					<select value={selected.mode} disabled={boxFrozen} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
 						<option value="plain">Plain Text</option>
 						<option value="markdown">Markdown</option>
-						<!-- A column can hold a drawing, an address or a color, so a
-						     field offers all three. Words typed into the template
-						     cannot be any of them: that is what the Content types
-						     Bitmap and Image are for. -->
+						<!-- A column can hold a picture — a drawing, an address, a
+						     stored name — or a color, so a field offers both. Words
+						     typed into the template cannot be either: that is what
+						     the Image content type is for. -->
 						{#if source === 'field'}
-							<option value="bitmap">Bitmap</option>
 							<option value="image">Image</option>
 							<option value="color">Color</option>
 						{/if}
@@ -553,21 +729,6 @@
 					</select>
 				</label>
 				<label class="field">
-					<span>Padding</span>
-					<input
-						class="n-2"
-						type="number"
-						min="0"
-						max="8"
-						step="1"
-						title="Blank border in modules; scanners need at least two"
-						value={selected.qr?.margin ?? DEFAULT_QR.margin}
-						disabled={boxFrozen}
-						onchange={(e) => setQr({ margin: numeric(e, DEFAULT_QR.margin) })}
-					/>
-					<span class="unit">modules</span>
-				</label>
-				<label class="field">
 					<span>Background</span>
 					<select
 						value={selected.qr?.background ? 'opaque' : 'transparent'}
@@ -580,32 +741,33 @@
 					</select>
 				</label>
 				{#if selected.qr?.background}
-					<label class="field">
+					<span class="field">
 						<span class="sr-only">QR Background Color</span>
-						<input
-							class="color"
-							type="color"
+						<ColorField
 							value={selected.qr.background}
+							fallback="#ffffff"
+							label="QR background color"
 							disabled={boxFrozen}
-							onchange={(e) => setQr({ background: e.currentTarget.value })}
+							onchange={(v) => setQr({ background: v })}
 						/>
-					</label>
+					</span>
 				{/if}
 			{/if}
 		</span>
 
 		<span class="group" role="group" aria-label="Type">
-			<label class="field">
+			<span class="field">
 				<span>Font</span>
-				<select value={selected.font ?? ''} disabled={boxFrozen} onchange={(e) => setFont(e.currentTarget.value)}>
-					<option value="">Default — {template.defaults.font}</option>
-					{#each familyOptions as family (family)}
-						<option value={family}>{family}</option>
-					{/each}
-					<option value="__custom">Other Family…</option>
-					<option value="__upload">Upload a Font File…</option>
-				</select>
-			</label>
+				<MenuSelect
+					label="Font"
+					value={selected.font ?? ''}
+					items={fontItems}
+					disabled={boxFrozen}
+					showFamily
+					onopen={() => previewFamilies([...families.used, ...families.others], editorFonts, template.fonts)}
+					onselect={setFont}
+				/>
+			</span>
 			<label class="field">
 				<span>Size</span>
 				<input
@@ -617,7 +779,7 @@
 					title="Blank inherits the page's {template.defaults.size}pt"
 					value={selected.size ?? ''}
 					disabled={boxFrozen}
-					onchange={(e) => patch({ size: inherited(e) })}
+					onchange={(e) => patch({ size: inherited(e, MIN_SIZE) })}
 				/>
 				<span class="unit">pt</span>
 			</label>
@@ -628,22 +790,22 @@
 					disabled={boxFrozen}
 					onchange={(e) => patch({ weight: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
 				>
-					<option value="">Default — {template.defaults.weight}</option>
-					{#each [300, 400, 500, 600, 700, 800] as weight (weight)}
+					<option value="">Default: {template.defaults.weight}</option>
+					{#each weights as weight (weight)}
 						<option value={String(weight)}>{weight}</option>
 					{/each}
 				</select>
 			</label>
-			<label class="field">
+			<span class="field">
 				<span>Color</span>
-				<input
-					class="color"
-					type="color"
-					value={selected.color ?? template.defaults.color}
+				<ColorField
+					value={selected.color}
+					fallback={template.defaults.color}
+					label="Text color"
 					disabled={boxFrozen}
-					onchange={(e) => patch({ color: e.currentTarget.value })}
+					onchange={(v) => patch({ color: v })}
 				/>
-			</label>
+			</span>
 		</span>
 
 		<!-- The face, its size, its weight and its color are one choice; how the
@@ -661,9 +823,29 @@
 					title="Blank inherits the page's {template.defaults.lineHeight}"
 					value={selected.lineHeight ?? ''}
 					disabled={boxFrozen}
-					onchange={(e) => patch({ lineHeight: inherited(e) })}
+					onchange={(e) => patch({ lineHeight: inherited(e, MIN_LEADING) })}
 				/>
 			</label>
+			{#if selected.mode === 'plain' || selected.mode === 'markdown'}
+				<label class="field">
+					<span>Baseline</span>
+					<input
+						class="n-3"
+						type="number"
+						step="0.01"
+						min={-MAX_BASELINE}
+						max={MAX_BASELINE}
+						placeholder={String(baselineOf({ font: selected.font }, template.defaults))}
+						title={pageBaselineApplies
+							? 'Raise the text by this much of its size, or lower it below 0. Blank takes the page\'s'
+							: 'Raise the text by this much of its size, or lower it below 0. The page\'s is for its own font, so an area in another starts at 0'}
+						value={selected.baseline ?? ''}
+						disabled={boxFrozen}
+						onchange={(e) => patch({ baseline: normaliseBaseline(e.currentTarget.value) })}
+					/>
+					<span class="unit">em</span>
+				</label>
+			{/if}
 			<label class="field">
 				<span>Spacing</span>
 				<input
@@ -678,6 +860,38 @@
 				/>
 				<span class="unit">mm</span>
 			</label>
+			<!-- How one paragraph is told from the next: a space in lines of this
+		     leading, or an indent in em. -->
+			<label class="field">
+				<span>Paragraph</span>
+				<select
+					value={selected.paragraph?.mode ?? ''}
+					title="Space after each paragraph, or the first line of the next indented. Every line of plain text is a paragraph"
+					disabled={boxFrozen}
+					onchange={(e) => setParagraph(e.currentTarget.value)}
+				>
+					<option value="">Default: {template.defaults.paragraph ? PARAGRAPH_LABELS[template.defaults.paragraph.mode] : 'Continuous'}</option>
+					<option value="space">Space After</option>
+					<option value="indent">Indent</option>
+				</select>
+			</label>
+			{#if selected.paragraph}
+				<label class="field">
+					<span class="sr-only">Paragraph amount</span>
+					<input
+						class="n-2"
+						type="number"
+						step="0.25"
+						min="0"
+						max={MAX_PARAGRAPH}
+						title={selected.paragraph.mode === 'space' ? "In lines of this area's leading" : 'In em of the type size'}
+						value={selected.paragraph.amount}
+						disabled={boxFrozen}
+						onchange={(e) => setParagraph(selected.paragraph!.mode, numeric(e, selected.paragraph!.amount))}
+					/>
+					<span class="unit">{selected.paragraph.mode === 'space' ? 'lines' : 'em'}</span>
+				</label>
+			{/if}
 			<label class="field">
 				<span>Case</span>
 				<select value={selected.textCase ?? 'none'} disabled={boxFrozen} onchange={(e) => patch({ textCase: e.currentTarget.value as Box['textCase'] })}>
@@ -687,6 +901,58 @@
 				</select>
 			</label>
 		</span>
+
+		{#if selected.mode === 'markdown'}
+			<!-- A Markdown area's lists, a group of their own as in page setup. -->
+			<span class="group" role="group" aria-label="Lists">
+				<label class="field">
+					<span>List</span>
+					<select
+						value={selected.list?.marker ?? ''}
+						title="What each item of a list is marked with"
+						disabled={boxFrozen}
+						onchange={(e) => setList({ marker: e.currentTarget.value || undefined })}
+					>
+						<option value="">Default: {LIST_MARKER_LABELS[template.defaults.list?.marker ?? 'bullet']}</option>
+						{#each LIST_MARKERS as marker (marker)}
+							<option value={marker}>{LIST_MARKER_LABELS[marker]}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="field">
+					<span>List Indent</span>
+					<input
+						class="n-2"
+						type="number"
+						step="0.25"
+						min="0"
+						max={MAX_LIST}
+						placeholder={template.defaults.list?.indent !== undefined ? String(template.defaults.list.indent) : 'auto'}
+						title="From the area's edge to a list's markers, in em of the type size; blank takes the page's"
+						value={selected.list?.indent ?? ''}
+						disabled={boxFrozen}
+						onchange={(e) => setList({ indent: e.currentTarget.value })}
+					/>
+					<span class="unit">em</span>
+				</label>
+				<label class="field">
+					<span>List Spacing</span>
+					<input
+						class="n-2"
+						type="number"
+						step="0.25"
+						min="0"
+						max={MAX_LIST}
+						placeholder={template.defaults.list?.spacing !== undefined ? String(template.defaults.list.spacing) : 'auto'}
+						title="Between one list item and the next, in lines of this area's leading; blank takes the page's"
+						value={selected.list?.spacing ?? ''}
+						disabled={boxFrozen}
+						onchange={(e) => setList({ spacing: e.currentTarget.value })}
+					/>
+					<span class="unit">lines</span>
+				</label>
+			</span>
+		{/if}
 
 		<span class="group" role="group" aria-label="Alignment">
 			<span class="segmented" role="group" aria-label="Horizontal alignment">
@@ -731,16 +997,16 @@
 				</select>
 			</label>
 			{#if selected.background}
-				<label class="field">
+				<span class="field">
 					<span class="sr-only">Fill Color</span>
-					<input
-						class="color"
-						type="color"
+					<ColorField
 						value={selected.background}
+						fallback="#ffffff"
+						label="Fill color"
 						disabled={boxFrozen}
-						onchange={(e) => patch({ background: e.currentTarget.value })}
+						onchange={(v) => patch({ background: v })}
 					/>
-				</label>
+				</span>
 			{/if}
 			<label class="field">
 				<span>Blend</span>
@@ -890,17 +1156,17 @@
 						{/each}
 					</select>
 				</label>
-				<label class="field">
+				<span class="field">
 					<span class="sr-only">Border Color</span>
-					<input
-						class="color"
-						type="color"
+					<ColorField
+						value={selected.borderColor}
+						fallback={selected.color ?? template.defaults.color}
+						label="Border color"
 						title="Border color; follows the text color until you set one"
-						value={selected.borderColor ?? selected.color ?? template.defaults.color}
 						disabled={boxFrozen}
-						onchange={(e) => patch({ borderColor: e.currentTarget.value })}
+						onchange={(v) => patch({ borderColor: v })}
 					/>
-				</label>
+				</span>
 				<button
 					class="square"
 					aria-pressed={!!selected.borderHand}
@@ -923,7 +1189,7 @@
 					title="Corner radius, for the whole box"
 					value={selected.borderRadius ?? 0}
 					disabled={boxFrozen}
-					onchange={(e) => patch({ borderRadius: numeric(e, 0) || undefined })}
+					onchange={(e) => patch({ borderRadius: Math.max(0, numeric(e, 0)) || undefined })}
 				/>
 				<span class="unit">mm</span>
 			</label>
@@ -961,11 +1227,13 @@
 			{#if selected.anchor}
 				<label class="field">
 					<span>Gap</span>
+					<!-- No floor: a negative gap tucks this area up under the one it
+					     follows, overlapping it, which is a layout people want. -->
 					<input
 						class="n-3"
 						type="number"
 						step="0.5"
-						min="0"
+						title="Between that area's bottom and this one's top; below 0 overlaps it"
 						value={selected.anchor.gap}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ anchor: { to: selected.anchor!.to, gap: numeric(e, selected.anchor!.gap) } })}
@@ -979,11 +1247,11 @@
 		     push past them, and whether an empty one shows at all. -->
 		<span class="group" role="group" aria-label="Size">
 			<label class="field"><span>W</span>
-				<input class="n-4" type="number" step="0.5" value={selected.w} disabled={boxFrozen} onchange={(e) => patch({ w: numeric(e, selected.w) })} />
+				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.w} disabled={boxFrozen} onchange={(e) => resize('w', e)} />
 				<span class="unit">mm</span>
 			</label>
 			<label class="field"><span>H</span>
-				<input class="n-4" type="number" step="0.5" value={selected.h} disabled={boxFrozen} onchange={(e) => patch({ h: numeric(e, selected.h) })} />
+				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.h} disabled={boxFrozen} onchange={(e) => resize('h', e)} />
 				<span class="unit">mm</span>
 			</label>
 			<label class="field">
@@ -994,10 +1262,17 @@
 				</select>
 			</label>
 			<label class="check">
+				<!-- Off, not hidden, for an area holding its own words and none of
+				     them: it is empty on every card, and the editor keeps it drawn
+				     with its placeholder so it can still be selected — the setting is
+				     kept, and says it does not apply. -->
 				<input
 					type="checkbox"
 					checked={!!selected.hideWhenEmpty}
-					disabled={boxFrozen}
+					disabled={boxFrozen || emptyStatic}
+					title={emptyStatic
+						? 'Does not apply to an area holding its own words and none of them — it stays in view so it can be selected'
+						: undefined}
 					onchange={(e) => patch({ hideWhenEmpty: e.currentTarget.checked })}
 				/>
 				Hide When Empty

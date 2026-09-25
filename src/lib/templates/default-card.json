@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "name": "A5 Instruction Card",
+  "name": "A5 Starter Template",
   "page": {
     "w": 148,
     "h": 210,
@@ -143,9 +143,9 @@
       "hideWhenEmpty": true,
       "fit": "contain",
       "color": "#000000",
+      "padding": 1,
       "qr": {
-        "level": "M",
-        "margin": 1
+        "level": "M"
       }
     }
   ]
