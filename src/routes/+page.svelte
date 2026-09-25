@@ -55,7 +55,7 @@
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { cssIdent } from '$lib/css';
 	import { watchPresses } from '$lib/haptics';
-	import { referencedColumns } from '$lib/placeholders';
+	import { formatDate, referencedColumns } from '$lib/placeholders';
 	import { VERSION } from '$lib/version';
 	import {
 		autoMap,
@@ -100,11 +100,8 @@
 		storageAvailable,
 		saveUi,
 		type DatasetEntry,
-		type TemplateEntry,
-		loadSavedSig,
-		saveSavedSig
+		type TemplateEntry
 	} from '$lib/storage';
-	import { crc32 } from '$lib/zip';
 	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
@@ -614,7 +611,7 @@
 			// Whatever was open when the tab was last closed — see UiState.
 			pageSetupOpen = ui.panels.page;
 			dataOpen = ui.panels.data;
-			imagesOpen = ui.panels.images;
+			imagesOpen = ui.panels.images && !ui.panels.data;
 		} else if (typeof window !== 'undefined' && window.innerWidth <= 900) {
 			pageSetupOpen = false;
 			dataOpen = false;
@@ -1084,36 +1081,6 @@
 		// change off", and only this chord may put it back.
 		toggledOff = true;
 	}
-
-	// ---- changed since it was last written out --------------------------------
-
-	/**
-	 * Whether the design differs from the file it was last exported to — or,
-	 * for one never exported, from how it was when this browser first held it
-	 * (created, imported, or opened before this mark existed). Autosave keeps
-	 * the working copy in this browser either way; the mark is about the file,
-	 * which is what survives the browser. A CRC of the export, not the export,
-	 * is what is remembered: one number per template.
-	 */
-	const templateSig = $derived(String(crc32(new TextEncoder().encode(JSON.stringify(template)))));
-	let savedSig = $state('');
-
-	$effect(() => {
-		if (!ready) return;
-		const id = templateId;
-		untrack(() => {
-			const stored = loadSavedSig(id);
-			if (stored) savedSig = stored;
-			else markSaved();
-		});
-	});
-
-	function markSaved() {
-		savedSig = templateSig;
-		saveSavedSig(templateId, templateSig);
-	}
-
-	const unsaved = $derived(ready && !!savedSig && savedSig !== templateSig);
 
 	// ---- autosave -----------------------------------------------------------
 
@@ -2130,8 +2097,9 @@
 	}
 
 	function doExportTemplate() {
-		download(`${slugify(template.name)}.json`, exportTemplate($state.snapshot(template)));
-		markSaved();
+		// Dated, so a folder of exports says which is which and the newest sorts
+		// last: `name_2026-09-25.json`, in the underscore `pageFilename` uses.
+		download(`${slugify(template.name)}_${formatDate(new Date(), 'YYYY-MM-DD')}.json`, exportTemplate($state.snapshot(template)));
 		notify('Template exported — fonts referenced by name.');
 	}
 
@@ -2313,34 +2281,29 @@
 				// Not a plain toggle any more: the two bars share one row, so this
 				// says "show me the page" — which, with an area selected, means
 				// letting go of the area rather than stacking a second bar on top.
-				const showing = pageSetupOpen && !selected && !imagesOpen;
+				const showing = pageSetupOpen && !selected;
 				pageSetupOpen = !showing;
-				// The images bar shares the row, so asking for the page is also
-				// letting go of the pictures.
-				imagesOpen = false;
 				if (!showing) selectBox(null);
 			}}
-			aria-pressed={pageSetupOpen && !selected && !imagesOpen}
-			aria-expanded={pageSetupOpen && !selected && !imagesOpen}
+			aria-pressed={pageSetupOpen && !selected}
+			aria-expanded={pageSetupOpen && !selected}
 			title={selected && pageSetupOpen
 				? 'Page setup — the area bar has the row; this takes it back'
 				: 'Show or hide the page setup'}
 		>
 			<Icon name="document-blank" size={15} /> <span class="label">Page Setup</span>
 		</button>
-		<!-- Every stored picture, as a bar of its own in the same row as the
-		     other two: the pictures are the browser's, not the page's — a row's
-		     own photograph is in there too — and a dialog over the card hid the
-		     card that uses them. Like Page Setup, asking for it lets go of a
-		     selected area, since the area bar would otherwise have the row. -->
+		<!-- Every stored picture, in a tray of its own in the table's place: the
+		     pictures are the browser's, not the page's — a row's own photograph
+		     is in there too. Images and Data share that room, one at a time, so
+		     opening either closes the other. -->
 		<button
 			class="images"
-			aria-pressed={imagesOpen && !selected}
-			aria-expanded={imagesOpen && !selected}
+			aria-pressed={imagesOpen}
+			aria-expanded={imagesOpen}
 			onclick={() => {
-				const showing = imagesOpen && !selected;
-				imagesOpen = !showing;
-				if (!showing) selectBox(null);
+				imagesOpen = !imagesOpen;
+				if (imagesOpen) dataOpen = false;
 			}}
 			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
 		>
@@ -2348,7 +2311,10 @@
 		</button>
 		<button
 			class="data"
-			onclick={() => (dataOpen = !dataOpen)}
+			onclick={() => {
+				dataOpen = !dataOpen;
+				if (dataOpen) imagesOpen = false;
+			}}
 			aria-pressed={dataOpen}
 			aria-expanded={dataOpen}
 			title="Show or hide the table"
@@ -2390,7 +2356,7 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if selected || imagesOpen || pageSetupOpen}
+	{#if selected || pageSetupOpen}
 		<div class="bar-row" class:box={!!selected} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
@@ -2409,7 +2375,6 @@
 					onresettemplate={() => {}}
 					{library}
 					{templateId}
-					{unsaved}
 					{editorFonts}
 					onselecttemplate={() => {}}
 					onnewtemplate={() => {}}
@@ -2443,7 +2408,6 @@
 						onresettemplate={() => (resetting = true)}
 						{library}
 						{templateId}
-						{unsaved}
 						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
@@ -2461,14 +2425,6 @@
 							if (box) void handleImageDrop(box, file);
 						}}
 					/>
-				{:else if imagesOpen}
-					<ImagesPanel
-						used={new Set(imageNames)}
-						onplace={placeStoredImage}
-						onplacepage={(name, x, y) => void placeImageOnPage(name, x, y)}
-						onnotice={notify}
-						onchanged={() => (imagesVersion += 1)}
-					/>
 				{:else}
 					<OptionsBar
 						section="page"
@@ -2484,7 +2440,6 @@
 						onresettemplate={() => (resetting = true)}
 						{library}
 						{templateId}
-						{unsaved}
 						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
@@ -2566,7 +2521,7 @@
 
 	<main
 		bind:this={mainEl}
-		class:no-data={!dataOpen}
+		class:no-data={!dataOpen && !imagesOpen}
 		style={stacked
 			? trayShare !== null
 				? `--tray-h:${(trayShare * 100).toFixed(2)}%`
@@ -2648,7 +2603,7 @@
 			ondelete={deleteBox}
 		/>
 
-		{#if dataOpen}
+		{#if dataOpen || imagesOpen}
 		<aside bind:this={asideEl}>
 			{#if !stacked}
 				<!-- The edge between the page and the table, dragged to share the
@@ -2684,6 +2639,16 @@
 					}}
 				></div>
 			{/if}
+			{#if imagesOpen}
+				<ImagesPanel
+					used={new Set(imageNames)}
+					onplace={placeStoredImage}
+					onplacepage={(name, x, y) => void placeImageOnPage(name, x, y)}
+					onnotice={notify}
+					onchanged={() => (imagesVersion += 1)}
+					ontraydrag={stacked ? dragTray : undefined}
+				/>
+			{:else}
 			<DataTable
 				{dataset}
 				{tables}
@@ -2740,6 +2705,7 @@
 					if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), next.columns);
 				}}
 			/>
+			{/if}
 		</aside>
 		{/if}
 	</main>
@@ -3087,7 +3053,7 @@
 		</p>
 		<p>
 			<strong>Table</strong> at the left of that row names the table you are in; the caret opens the rest, with
-			<strong>New table…</strong> and <strong>Delete this table…</strong> under a rule at the bottom. The
+			<strong>New table…</strong> and <strong>Delete…</strong> under a rule at the bottom. The
 			<strong>⇄</strong> beside it goes back to the table you were on before, and back again — the two you are
 			working between, one press apart. A design and a table are kept apart on purpose: switching either leaves the
 			other exactly where it was, and bindings that still name a column that exists are kept across the switch.

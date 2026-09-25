@@ -149,7 +149,7 @@
 	 * setting you look up.
 	 */
 	const ROW_HEIGHTS: RowHeight[] = ['short', 'medium', 'full'];
-	const ROW_HEIGHT_LABELS: Record<RowHeight, string> = { short: 'Short', medium: 'Medium', full: 'Full' };
+	const ROW_HEIGHT_LABELS: Record<RowHeight, string> = { short: 'Short', medium: 'Long', full: 'Full' };
 	/** Carbon's: the ruled table for one line a row, fit to screen, fit to height. */
 	const ROW_HEIGHT_ICONS: Record<RowHeight, string> = { short: 'table', medium: 'fit-to-screen', full: 'fit-to-height' };
 	const nextRowHeight = $derived(ROW_HEIGHTS[(ROW_HEIGHTS.indexOf(rowHeight) + 1) % ROW_HEIGHTS.length]);
@@ -1335,7 +1335,17 @@
 							<!-- The drop line runs down the whole column, not just its
 							     header, so it says which gap the column lands in however
 							     far down the table the eye is. -->
+							<!-- A press on the cell below a short field is a press on the
+							     field: the cell is the target, whatever its words fill. -->
 							<td
+								onclick={(e) => {
+									if (e.target !== e.currentTarget) return;
+									// As a press on the field itself: that does not pick the row.
+									e.stopPropagation();
+									const field = e.currentTarget.querySelector('textarea');
+									field?.focus();
+									field?.setSelectionRange(field.value.length, field.value.length);
+								}}
 								class:bound={!!selectedColumn && column === selectedColumn}
 								class:drop-before={carrying?.on && carrying.before === c}
 								class:drop-after={carrying?.on && c === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
@@ -1425,172 +1435,201 @@
 			<span class="spacer"></span>
 			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
 		{:else}
-		<!-- First in the bar: the state of the table named beside it, and the
-		     one thing here that is not an errand — the same reason the page bar
-		     keeps its Lock outside its menu. Never disabled by the lock it sets,
-		     or there would be no way out of it. -->
+		<!-- How tall a row may be: one line, a few, or all of its longest cell.
+		     First in the bar and always there: it is about how the table is
+		     read whatever else is going on. The label says the height the rows
+		     are at; the title, the next. -->
 		<button
-			aria-pressed={locked}
-			title={locked ? 'Unlock the table' : 'Lock the table — no typing, no new rows or columns, no paste or import'}
-			onclick={() => onlock(!locked)}
+			class="row-height"
+			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
+			aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
+			onclick={() => onrowheight(nextRowHeight)}
 		>
-			<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
-			{locked ? 'Unlock' : 'Lock'}
+			<Icon name={ROW_HEIGHT_ICONS[rowHeight]} size={15} />
+			<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
 		</button>
-		<!-- What table this is, beside its lock: the buttons act on it, and it
-		     is the one control here that is a name rather than an act. One
-		     design prints any number of tables, so this is not the template
-		     picker's second half: the two are switched independently. -->
-		<label class="picker" bind:this={pickerEl}>
-			<span>Table</span>
-			<input
-				value={tableName}
-				placeholder={UNTITLED_TABLE}
-				aria-label="Table name"
-				readonly={locked}
-				onchange={(e) => onrenametable(e.currentTarget.value)}
-			/>
+		{#if editing && dataset.rows[editing.row]}
+			<!-- Beside the row height while a cell is typed in: the way into the
+			     whole of it. Mousedown is held off, or the field would lose its
+			     focus, and with it this button, before the click. -->
 			<button
-				class="caret"
-				aria-haspopup="menu"
-				aria-expanded={pickerOpen}
-				title="{tables.length} table{tables.length === 1 ? '' : 's'} in this browser"
-				aria-label="Saved tables"
-				onclick={togglePicker}
+				title="Open this cell in the table's full room — the same as pressing and holding it"
+				disabled={locked}
+				onmousedown={(e) => e.preventDefault()}
+				onclick={() => editing && openBigCell(editing.row, editing.column)}
+			><Icon name="task-edit" size={15} /> Edit</button>
+		{/if}
+		<!-- Which table, and its lock, gone while rows are chosen: the row
+		     actions take the bar then, and the two together ran out of room on a
+		     narrow tray. -->
+		{#if !chosenRows.length || editing}
+			<!-- The state of the table named beside it, and the one thing here that
+			     is not an errand — the same reason the page bar keeps its Lock outside
+			     its menu. Never disabled by the lock it sets, or there would be no
+			     way out of it. -->
+			<button
+				aria-pressed={locked}
+				title={locked ? 'Unlock the table' : 'Lock the table — no typing, no new rows or columns, no paste or import'}
+				onclick={() => onlock(!locked)}
 			>
-				<Icon name="caret-down" size={18} />
+				<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
+				{locked ? 'Unlock' : 'Lock'}
 			</button>
-			{#if pickerOpen}
-				<ul
-					class="picker-menu"
-					role="menu"
-					style="left:clamp(8px, {pickerAt.left}px, 100vw - 13rem);bottom:{pickerAt.bottom}px"
+			<!-- What table this is, beside its lock: the buttons act on it, and it
+			     is the one control here that is a name rather than an act. One
+			     design prints any number of tables, so this is not the template
+			     picker's second half: the two are switched independently. -->
+			<label class="picker" bind:this={pickerEl}>
+				<span>Table</span>
+				<input
+					value={tableName}
+					placeholder={UNTITLED_TABLE}
+					aria-label="Table name"
+					readonly={locked}
+					onchange={(e) => onrenametable(e.currentTarget.value)}
+				/>
+				<button
+					class="caret"
+					aria-haspopup="menu"
+					aria-expanded={pickerOpen}
+					title="{tables.length} table{tables.length === 1 ? '' : 's'} in this browser"
+					aria-label="Saved tables"
+					onclick={togglePicker}
 				>
-					{#each tablesActiveFirst as entry (entry.id)}
+					<Icon name="caret-down" size={18} />
+				</button>
+				{#if pickerOpen}
+					<ul
+						class="picker-menu"
+						role="menu"
+						style="left:clamp(8px, {pickerAt.left}px, 100vw - 13rem);bottom:{pickerAt.bottom}px"
+					>
+						{#each tablesActiveFirst as entry (entry.id)}
+							<li role="none">
+								<button
+									role="menuitemradio"
+									aria-checked={entry.id === tableId}
+									onclick={() => {
+										pickerOpen = false;
+										if (entry.id !== tableId) onselecttable(entry.id);
+									}}
+								>
+									<span class="mark" aria-hidden="true">
+										{#if entry.id === tableId}<Icon name="checkmark" size={16} />{/if}
+									</span>
+									{entry.name}
+								</button>
+							</li>
+						{/each}
+						<!-- Below the rule, tables to start rather than open: an empty one,
+						     or the one that walks through the app. -->
+						<li role="separator"><hr /></li>
 						<li role="none">
 							<button
-								role="menuitemradio"
-								aria-checked={entry.id === tableId}
+								role="menuitem"
 								onclick={() => {
 									pickerOpen = false;
-									if (entry.id !== tableId) onselecttable(entry.id);
+									onnewtable();
 								}}
 							>
-								<span class="mark" aria-hidden="true">
-									{#if entry.id === tableId}<Icon name="checkmark" size={16} />{/if}
-								</span>
-								{entry.name}
+								<span class="mark" aria-hidden="true"><Icon name="add" size={14} /></span>
+								New table…
 							</button>
 						</li>
-					{/each}
-					<!-- Below the rule, tables to start rather than open: an empty one,
-					     or the one that walks through the app. -->
-					<li role="separator"><hr /></li>
-					<li role="none">
-						<button
-							role="menuitem"
-							onclick={() => {
-								pickerOpen = false;
-								onnewtable();
-							}}
-						>
-							<span class="mark" aria-hidden="true"><Icon name="add" size={14} /></span>
-							New table…
-						</button>
-					</li>
-					<!-- Never over the open table's rows: it opens a table that already
-					     holds the cards untouched, or starts one — so it is not the
-					     lock's business, and a lock does not disable it. -->
-					<li role="none">
-						<button
-							role="menuitem"
-							title="The cards that walk through the app, in a table of their own — your tables are untouched"
-							onclick={() => {
-								pickerOpen = false;
-								ongettingstarted();
-							}}
-						>
-							<span class="mark" aria-hidden="true"><Icon name="information-square" size={14} /></span>
-							Getting Started
-						</button>
-					</li>
-					<!-- And below the next, what can be done to the open table: rows in,
-					     rows out, and the table gone. -->
-					<li role="separator"><hr /></li>
-					<li role="none">
-						<button
-							role="menuitem"
-							disabled={locked}
-							title="Paste a block of cells straight off a spreadsheet"
-							onclick={() => {
-								pickerOpen = false;
-								pasteOpen = true;
-							}}
-						>
-							<span class="mark" aria-hidden="true"><Icon name="task-add" size={14} /></span>
-							Paste…
-						</button>
-					</li>
-					<li role="none">
-						<button
-							role="menuitem"
-							disabled={locked}
-							title="Replace the rows with a CSV file"
-							onclick={() => {
-								pickerOpen = false;
-								fileInput?.click();
-							}}
-						>
-							<span class="mark" aria-hidden="true"><Icon name="table-shortcut" size={14} /></span>
-							Import…
-						</button>
-					</li>
-					<li role="none">
-						<button
-							role="menuitem"
-							disabled={!dataset.columns.length}
-							title="Save the rows as a CSV file"
-							onclick={() => {
-								pickerOpen = false;
-								exportCsv();
-							}}
-						>
-							<span class="mark" aria-hidden="true"><Icon name="table-built" size={14} /></span>
-							Export
-						</button>
-					</li>
-					<li role="none">
-						<button
-							class="danger"
-							role="menuitem"
-							disabled={locked}
-							title="Delete this table from this browser. Your design is not touched."
-							onclick={() => {
-								pickerOpen = false;
-								ondeletetable();
-							}}
-						>
-							<span class="mark" aria-hidden="true"><Icon name="trash" size={14} /></span>
-							Delete Table…
-						</button>
-					</li>
-				</ul>
-			{/if}
-		</label>
-		<!-- The pair you are working between, one press apart. Two tables is the
-		     case that actually happens — this year's list and last year's, the
-		     real one and the one you are trying something on — and reaching the
-		     second through a menu each time is the whole cost of having split
-		     them up. -->
-		<button
-			class="icon"
-			disabled={!previousTable}
-			title={previousTable
-				? `Back to “${tables.find((t) => t.id === previousTable)?.name ?? UNTITLED_TABLE}”`
-				: 'Nothing to swap back to yet — this is the only table you have opened'}
-			aria-label="Swap to the previous table"
-			onclick={onswaptable}
-		><Icon name="arrows-horizontal" size={15} /></button>
+						<!-- Never over the open table's rows: it opens a table that already
+						     holds the cards untouched, or starts one — so it is not the
+						     lock's business, and a lock does not disable it. -->
+						<li role="none">
+							<button
+								role="menuitem"
+								title="The cards that walk through the app, in a table of their own — your tables are untouched"
+								onclick={() => {
+									pickerOpen = false;
+									ongettingstarted();
+								}}
+							>
+								<span class="mark" aria-hidden="true"><Icon name="information-square" size={14} /></span>
+								Getting Started
+							</button>
+						</li>
+						<!-- And below the next, what can be done to the open table: rows in,
+						     rows out, and the table gone. -->
+						<li role="separator"><hr /></li>
+						<li role="none">
+							<button
+								role="menuitem"
+								disabled={locked}
+								title="Paste a block of cells straight off a spreadsheet"
+								onclick={() => {
+									pickerOpen = false;
+									pasteOpen = true;
+								}}
+							>
+								<span class="mark" aria-hidden="true"><Icon name="task-add" size={14} /></span>
+								Paste…
+							</button>
+						</li>
+						<li role="none">
+							<button
+								role="menuitem"
+								disabled={locked}
+								title="Replace the rows with a CSV file"
+								onclick={() => {
+									pickerOpen = false;
+									fileInput?.click();
+								}}
+							>
+								<span class="mark" aria-hidden="true"><Icon name="table-shortcut" size={14} /></span>
+								Import…
+							</button>
+						</li>
+						<li role="none">
+							<button
+								role="menuitem"
+								disabled={!dataset.columns.length}
+								title="Save the rows as a CSV file"
+								onclick={() => {
+									pickerOpen = false;
+									exportCsv();
+								}}
+							>
+								<span class="mark" aria-hidden="true"><Icon name="table-built" size={14} /></span>
+								Export
+							</button>
+						</li>
+						<li role="none">
+							<button
+								class="danger"
+								role="menuitem"
+								disabled={locked}
+								title="Delete this table from this browser. Your design is not touched."
+								onclick={() => {
+									pickerOpen = false;
+									ondeletetable();
+								}}
+							>
+								<span class="mark" aria-hidden="true"><Icon name="trash" size={14} /></span>
+								Delete…
+							</button>
+						</li>
+					</ul>
+				{/if}
+			</label>
+			<!-- The pair you are working between, one press apart. Two tables is the
+			     case that actually happens — this year's list and last year's, the
+			     real one and the one you are trying something on — and reaching the
+			     second through a menu each time is the whole cost of having split
+			     them up. -->
+			<button
+				class="icon"
+				disabled={!previousTable}
+				title={previousTable
+					? `Back to “${tables.find((t) => t.id === previousTable)?.name ?? UNTITLED_TABLE}”`
+					: 'Nothing to swap back to yet — this is the only table you have opened'}
+				aria-label="Swap to the previous table"
+				onclick={onswaptable}
+			><Icon name="arrows-horizontal" size={15} /></button>
+		{/if}
 		<span class="spacer"></span>
 		{#if editing && dataset.rows[editing.row]}
 			<!-- While a cell is being typed in, the bar is about that cell: how
@@ -1600,12 +1639,6 @@
 			     would lose its focus, and with it this bar, before the click. -->
 			{@const cell = editing}
 			<span class="rule"></span>
-			<button
-				title="Open this cell in the table's full room — the same as pressing and holding it"
-				disabled={locked}
-				onmousedown={(e) => e.preventDefault()}
-				onclick={() => openBigCell(cell.row, cell.column)}
-			><Icon name="task-edit" size={15} /> Edit</button>
 			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[cell.row]?.[cell.column] ?? '')}</span>
 		{:else if chosenRows.length}
 			<!-- What you can do to the rows you have chosen, at the far end of the
@@ -1647,22 +1680,6 @@
 				disabled={locked}
 				onclick={deleteChosen}
 			><Icon name="trash" size={15} /> Delete</button>
-		{/if}
-		{#if !chosenRows.length || editing}
-			<!-- How tall a row may be: one line, a few, or all of its longest cell.
-			     At the far end of the bar, and gone while rows are chosen: the row
-			     actions take that end then, and a bar holding both ran out of room
-			     on a narrow tray. The label says the height the rows are at; the
-			     title, the next. -->
-			<button
-				class="row-height"
-				title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
-				aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
-				onclick={() => onrowheight(nextRowHeight)}
-			>
-				<Icon name={ROW_HEIGHT_ICONS[rowHeight]} size={15} />
-				<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
-			</button>
 		{/if}
 		{/if}
 		<input
@@ -2057,22 +2074,18 @@
 		position: relative;
 	}
 
-	/* Where the field can size itself to its words, it does, and fills the
-	   row: `height: 1px` gives the cell a definite height for the field's
-	   `100%` to resolve against — the table stretches every cell to the row's
-	   tallest anyway, so the 1px is never what is drawn. Without it the
-	   percentage resolved to auto and the field stopped short of the cell
-	   around it, a band of dead white that looked like the target and was
-	   not. Only here, because only here is the row's height coming from the
-	   fields' own content rather than from the fixed fallback above. */
+	/* Where the field can size itself to its words, it does — and only that:
+	   its height is its content's, capped by the row height below. It used to
+	   fill the row as well, by a `height: 100%` against a cell of `height: 1px`,
+	   which Chromium resolves against the row as drawn and Firefox resolves
+	   against the 1px: in a Firefox that has `field-sizing`, every Long and
+	   Full cell collapsed to its padding, the words out of sight and the rows
+	   never growing. The band under a short field is still the cell's target:
+	   a press on it focuses the field (see the cell's `onclick`). */
 	@supports (field-sizing: content) {
 		td textarea {
-			height: 100%;
+			height: auto;
 			field-sizing: content;
-		}
-
-		tbody td {
-			height: 1px;
 		}
 	}
 
@@ -2143,7 +2156,7 @@
 	   field can size itself; elsewhere `autosize` writes the height inline. */
 	@supports (field-sizing: content) {
 		.data.rows-short tr.expanded td textarea {
-			height: 100%;
+			height: auto;
 		}
 	}
 
@@ -2608,10 +2621,10 @@
 	}
 
 	/* As wide in every mode as in its widest, so pressing it does not shift
-	   the picker beside it: the word sits in a box that fits "Medium". */
+	   what is beside it: the word sits in a box that fits "Short". */
 	.row-height .label {
 		display: inline-block;
-		width: 4.1em;
+		width: 2.9em;
 		text-align: left;
 	}
 

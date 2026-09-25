@@ -2425,10 +2425,23 @@ cost is that nothing is saved until the end, so a failure part-way saves none.
 Redo's said Ctrl+Shift+Z, the A/B toggle. `SHORTCUTS` and `withKey` in keys.ts
 are where a tooltip gets a key from, and the right-click menu prints them too.
 
-**The unsaved dot is about the file.** Templates autosave in this browser, so
-"unsaved" would never be true in that sense; what can be lost is the file. A
-CRC of the template as last exported — or as first held here — is kept per
-template, and the dot shows while the design differs from it.
+**No unsaved dot.** There was one for a release — a mark beside the template's
+name while the design differed from its last export — and it was taken out
+again: templates autosave in this browser, so it was a mark about a file most
+people never write, on a field they look at all the time. Exports are dated in
+their filename instead, which says the same thing where it is looked for.
+
+**Images is a tray, not a bar.** It was a third bar in the options row, where a
+list of pictures had nine rows' height at most and the page bar had to give it
+the row. It takes the table's room now, one of the two at a time, at the same
+width or height, and the options row is page setup and the area bar only.
+
+**A cell's field is as tall as its words, and the cell is the target.** It
+filled the row by `height: 100%` against a cell of `height: 1px`, which
+Chromium resolves against the row as drawn and Firefox — once it has
+`field-sizing` — against the 1px: every Long and Full cell collapsed to its
+padding there. The field sizes to its content now, and a press on the band
+under it focuses it.
 
 ## `src/lib/components/MenuSelect.svelte`
 

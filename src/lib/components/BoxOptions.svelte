@@ -869,7 +869,7 @@
 					disabled={boxFrozen}
 					onchange={(e) => setParagraph(e.currentTarget.value)}
 				>
-					<option value="">Default: {template.defaults.paragraph ? PARAGRAPH_LABELS[template.defaults.paragraph.mode] : 'None'}</option>
+					<option value="">Default: {template.defaults.paragraph ? PARAGRAPH_LABELS[template.defaults.paragraph.mode] : 'Continuous'}</option>
 					<option value="space">Space After</option>
 					<option value="indent">Indent</option>
 				</select>

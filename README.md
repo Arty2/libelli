@@ -221,7 +221,7 @@ resize boxes directly, or type exact millimetres.
   months.
 - **Paragraphs** — **Paragraph** in the area bar, with a page-wide default in
   page setup: **Space After** each paragraph, or the next one's first line
-  **Indented** — a space in lines of the area's own leading, an indent in em of
+  **Indented** — or **Continuous**, neither, which is where a template starts. A space in lines of the area's own leading, an indent in em of
   its type size, so either keeps its proportion when the type changes. In plain text every line is a paragraph —
   Return starts a new one, as in a word processor; in Markdown it replaces the
   space after a paragraph. An indent goes on every paragraph but the area's
@@ -490,8 +490,11 @@ resize boxes directly, or type exact millimetres.
 **Several templates, one browser.** The **Template** field in page setup names the
 loaded template; the caret beside it opens every template this browser has saved,
 the open one ticked, with everything that acts on the template as a whole under a
-rule: **New template…**, **Import…**, **Export**, and in red **Reset…** and
-**Delete this template…**. **Lock** stays outside the menu, beside the field,
+rule: **New Template…**, **Import…**, **Export**, and in red **Reset…** and
+**Delete…** (whose dialog still says **Delete Template**, so the button you
+confirm with names what goes). An export is named for the template and the
+day — `a5-starter-template_2026-09-25.json` — so a folder of them sorts by
+date. **Lock** stays outside the menu, beside the field,
 because it is a state you need to see rather than an errand. Renaming is typing
 in the field — the template keeps its identity, so two of them may share a name
 without sharing anything else. Reset puts the starter card back under the same
@@ -610,12 +613,12 @@ a notice can appear.
   column no area is bound to and no area's words or printed cells name as
   `{{column}}`: data no card will show. Press it to put the column on the card:
   a new area, named after the column and bound to it, where a new area goes.
-- **Counting** — while a cell is being typed in, the bar under the table is
-  about that cell: **Edit**, which opens it full size, then its characters and
-  words. The row actions come back when the cell is left. Both sit toward the
-  right of the bar, after the lock and the table at the left, with the row
-  height last. With rows chosen the bar says how many — *3 rows* — and says
-  nothing for one, whose tick already says it.
+- **Counting** — while a cell is being typed in, **Edit** appears just right of
+  the row height, and opens it full size; its characters and words are at the
+  right-hand end. With rows chosen the lock, the table and the swap step aside
+  for the row actions — the count, *3 rows* (nothing for one, whose tick says
+  it), the up and down chevrons, **Copy** and **Delete** — and come back when
+  the choice is cleared.
 - **Moving rows** — with rows chosen, the up and down chevrons before **Copy**
   move them a row at a time, as a block; row order is print order. Or **drag a
   row by its number** to anywhere in the table — a blue line shows where it will
@@ -635,8 +638,8 @@ a notice can appear.
   right, Esc or Ctrl/Cmd+Enter put the table back. The words are set at twice
   the table's size, for reading at length. On a locked table none of
   the three opens it: the full-size editor is a way to type.
-- **Lock** — the padlock at the left-hand end of the bar under the table, before
-  the picker, freezes it: no typing, no new, moved,
+- **Lock** — the padlock in the bar under the table, after the row height and
+  before the picker, freezes it: no typing, no new, moved,
   renamed or deleted rows and columns, no paste or import — and nothing typed,
   dropped or drawn on the card reaches a cell either. Nor does sorting, since
   row order is print order; choosing rows still works. It is saved with the
@@ -646,12 +649,12 @@ a notice can appear.
   of the data or the template: they follow a column through a rename and go with
   it when it is deleted. The table lays out `fixed`, so a width you set is the
   width you get and one long cell cannot shove every other column sideways.
-- **Cells fill their row** — a row is as tall as its tallest cell, and every
-  field in it is that tall, so the target you click is the cell you can see.
-- **Row height** — the button at the right-hand end of the bar, hidden while
-  rows are chosen (their actions take that end), the same width in
-  every mode, cycles three heights:
-  **Short**, one line per row; **Medium**, up to five lines, which is where a
+- **Cells fill their row** — a row is as tall as its tallest cell, and a press
+  anywhere in a cell, the band under a short field included, is a press on its
+  field, so the target you click is the cell you can see.
+- **Row height** — the button at the left-hand end of the bar, always there and
+  the same width in every mode, cycles three heights:
+  **Short**, one line per row; **Long**, up to five lines, which is where a
   table starts; and **Full**, every row as tall as its longest cell — Carbon's
   *table*, *fit to screen* and *fit to height*. A cell holding more than its
   row shows ends its last visible line in **[...]**, the words fading into it,
@@ -1336,10 +1339,8 @@ of its own, ruled off from the settings under it in the bar's border grey; on a
 wider screen it shares the first row with them, so the bar takes no more height
 than it has to.
 
-- **Page** — head: the lock, then the template's name — with a blue **dot**
-  beside it when the design has changed since it was last exported to a file
-  (or since it was created or imported) — and the library behind its caret,
-  which also holds new, import, export, reset and delete ·
+- **Page** — head: the lock, then the template's name and the library behind
+  its caret, which also holds new, import, export, reset and delete ·
   sheet size (a preset or your own, a button to turn it over, and left and
   right pages), margin (one number all round, or one per edge — top, bottom and
   left and right, or inner and outer with left and right pages), bleed, crop marks · type defaults (font, size, leading,
@@ -1402,9 +1403,13 @@ than it has to.
 - **The table's own row** — under the table: what acts on the rows you have
   chosen, then at the far end the **Table** picker — whose menu holds paste,
   import, export, new and delete — the swap beside it, and last the lock.
-- **Images** — the third bar, in the same row: *Images*, how many and how much
-  they weigh, then **Upload…** and **Choose Folder…**, and a line for every
-  picture. Carry one onto an area to put it there, or onto the **page** between
+- **Images** — a tray in the table's place, at the table's width on a wide
+  screen and its height on a phone, and only one of the two open at a time:
+  **Images** and **Data** in the window toolbar each close the other. At its
+  head *Images*, how many and how much they weigh; a line for every picture,
+  filling the height; and at its foot, where the table keeps its toolbar,
+  **Upload…** and **Choose Folder…**. On a phone its head is the grip that
+  shares the height with the page, as the table's header row is. Carry one onto an area to put it there, or onto the **page** between
   areas for a new image area of its own, centred where it was let go, 40mm
   across and in the picture's proportions; a picture file dragged in from
   outside does the same. Every **Upload…** that takes a picture wears Carbon's

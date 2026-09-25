@@ -51,8 +51,6 @@
 		/** every saved template, and which of them is loaded */
 		library: TemplateEntry[];
 		templateId: string;
-		/** the design has changed since it was last exported to a file */
-		unsaved?: boolean;
 		onselecttemplate: (id: string) => void;
 		onnewtemplate: () => void;
 		ondeletetemplate: () => void;
@@ -78,7 +76,6 @@
 		onresettemplate,
 		library,
 		templateId,
-		unsaved = false,
 		onselecttemplate,
 		onnewtemplate,
 		ondeletetemplate,
@@ -383,17 +380,6 @@
 						disabled={pageFrozen}
 						onchange={(e) => patchTemplate({ name: e.currentTarget.value })}
 					/>
-					<!-- A dot, the way an editor marks a file with changes not yet
-					     written out: this browser keeps the design either way, but the
-					     exported file is what outlives it. -->
-					{#if unsaved}
-						<span
-							class="unsaved"
-							role="img"
-							aria-label="Changed since last exported"
-							title="Changed since it was last exported — Export in this menu writes the file"
-						></span>
-					{/if}
 					<button
 						class="caret"
 						aria-haspopup="menu"
@@ -428,7 +414,7 @@
 							<li role="none">
 								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onnewtemplate)}>
 									<span class="tick" aria-hidden="true"><Icon name="add" size={14} /></span>
-									New template…
+									New Template…
 								</button>
 							</li>
 							<li role="none">
@@ -467,7 +453,7 @@
 									onclick={fromMenu(ondeletetemplate)}
 								>
 									<span class="tick" aria-hidden="true"><Icon name="trash" size={14} /></span>
-									Delete this template…
+									Delete…
 								</button>
 							</li>
 						</ul>
@@ -698,7 +684,7 @@
 					disabled={pageFrozen}
 					onchange={(e) => setParagraph(e.currentTarget.value)}
 				>
-					<option value="">None</option>
+					<option value="">Continuous</option>
 					<option value="space">Space After</option>
 					<option value="indent">Indent</option>
 				</select>

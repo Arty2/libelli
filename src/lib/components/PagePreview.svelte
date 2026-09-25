@@ -1234,6 +1234,9 @@
 		left: 0;
 		right: 0;
 		bottom: 10px;
+		/* The bottom row's one height — see .corner — so the arrows and the
+		   count centre on the same line as the two chips either side. */
+		height: var(--chip-row);
 		display: flex;
 		justify-content: center;
 		align-items: center;
@@ -1412,6 +1415,10 @@
 		color: #111;
 	}
 
+	.stage {
+		--chip-row: 30px;
+	}
+
 	.corner {
 		position: absolute;
 		bottom: 10px;
@@ -1439,6 +1446,16 @@
 	.corner.right {
 		right: 12px;
 		padding: 2px 3px;
+	}
+
+	/* The two bottom chips, one height: the view toggles were 23px beside a
+	   29px zoom, and the pager between them centred on neither. */
+	.corner.left,
+	.corner.right:not(.top) {
+		box-sizing: border-box;
+		height: var(--chip-row);
+		padding-top: 0;
+		padding-bottom: 0;
 	}
 
 	/* One column down the left edge: undo and redo always, the selection tools

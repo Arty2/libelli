@@ -1,6 +1,5 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
-	import './options-bar.css';
 	import {
 		chooseImageFolder,
 		deleteImage,
@@ -35,9 +34,32 @@
 		onplace: (boxId: string, name: string) => void;
 		/** …or over the page but no area: a new area for it, where it was let go */
 		onplacepage: (name: string, clientX: number, clientY: number) => void;
+		/** the tray's height pulled by its head, on a phone — the table's own gesture */
+		ontraydrag?: (phase: 'start' | 'move' | 'end', clientY: number) => void;
 	}
 
-	let { used, onnotice, onchanged, onplace, onplacepage }: Props = $props();
+	let { used, onnotice, onchanged, onplace, onplacepage, ontraydrag }: Props = $props();
+
+	/** The head, pulled: the same hand-off the table's header row makes. */
+	let traying: number | null = null;
+
+	function startTrayDrag(event: PointerEvent) {
+		if (!ontraydrag || event.button !== 0) return;
+		if ((event.target as HTMLElement).closest('input, button, label')) return;
+		traying = event.pointerId;
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		ontraydrag('start', event.clientY);
+	}
+
+	function moveTrayDrag(event: PointerEvent) {
+		if (traying === event.pointerId) ontraydrag?.('move', event.clientY);
+	}
+
+	function endTrayDrag(event: PointerEvent) {
+		if (traying !== event.pointerId) return;
+		traying = null;
+		ontraydrag?.('end', event.clientY);
+	}
 
 	const available = folderAvailable();
 	let folder = $state<FolderState | null>(null);
@@ -76,7 +98,7 @@
 		await refresh();
 		onchanged();
 		onnotice(
-			`${names.length === 1 ? names[0] : `${names.length} pictures`} added. Drag ${names.length === 1 ? 'it' : 'one'} onto an area to use ${names.length === 1 ? 'it' : 'it there'}.`
+			`${names.length === 1 ? names[0] : `${names.length} pictures`} added. Drag ${names.length === 1 ? 'it' : 'one'} onto an area to put it there, or onto the page for an area of its own.`
 		);
 	}
 
@@ -202,112 +224,126 @@
 </script>
 
 <!--
-	A bar in the options row, not a dialog: the pictures are looked at beside
-	the card that uses them, and a dialog over the card hid exactly that. Words
-	only where they are a control or a fact — a folder's name, a weight, whether
-	anything uses it; the explanations are in the README and in the titles.
+	A tray in the table's place, not a bar and not a dialog: the pictures are
+	looked at beside the card that uses them, and a list of them wants the
+	height a bar in the options row could never give it. One tray at a time —
+	this or the table — in the same room, at the same width or height. What
+	is stored and what it weighs at the top, the ways in at the foot, where
+	the table keeps its own.
 -->
-<div class="options images-bar" aria-label="Images">
-	<!-- One line: what this is, how many and how heavy, then the ways in. The
-	     folder is named only once there is one — "in this browser" was a label
-	     on the case nobody had chosen. -->
-	<span class="head">
-		<span class="head-row">
-			<span class="context">Images</span>
-			{#if images.length}
-				<span class="total">{images.length} · {weigh(total)}</span>
-			{/if}
-			{#if folder}
-				<span class="where">
-					{#if folder.ready}
-						<Icon name="folder" size={12} /> {folder.name}
-					{:else}
-						{folder.name} — not opened
-					{/if}
-				</span>
-			{/if}
-			<!-- Every browser, a phone included: the folder below is Chromium's,
-			     and this is the way in that is not. -->
-			<button title="Add pictures from this device" onclick={() => fileInput?.click()}>
-				<Icon name="image-reference" size={14} /> Upload…
-			</button>
-			{#if available}
-				{#if folder && !folder.ready}
-					<button class="primary" onclick={reopen}>Open {folder.name}</button>
+<section class="images-tray" aria-label="Images">
+	<!-- The head is also the tray's grip on a phone, as the table's header
+	     row is: pulled up or down, it shares the height with the page. -->
+	<div
+		class="tray-head"
+		role="presentation"
+		class:grip={!!ontraydrag}
+		onpointerdown={startTrayDrag}
+		onpointermove={moveTrayDrag}
+		onpointerup={endTrayDrag}
+		onpointercancel={endTrayDrag}
+	>
+		<span class="context">Images</span>
+		{#if images.length}
+			<span class="total">{images.length} · {weigh(total)}</span>
+		{/if}
+		{#if folder}
+			<span class="where">
+				{#if folder.ready}
+					<Icon name="folder" size={12} /> {folder.name}
+				{:else}
+					{folder.name} — not opened
 				{/if}
-				<button
-					title="Keep pictures as ordinary files in a folder of your own, rather than in this browser's storage"
-					onclick={choose}>{folder ? 'Another Folder…' : 'Choose Folder…'}</button
-				>
-				{#if folder}
-					<button title="Stop reading the folder. Nothing in it is deleted" onclick={forget}>Forget</button>
-				{/if}
-			{/if}
-		</span>
-	</span>
-
-	{#if busy}
-		<span class="empty">…</span>
-	{:else if !images.length}
-		<span class="empty">None stored</span>
-	{:else}
-		<!-- One picture a line: what it looks like, what it is called, how big
-		     it is in pixels and in bytes, and whether anything uses it. The
-		     thumbnail is also the handle it is carried onto an area by. -->
+			</span>
+		{/if}
 		{#if images.length >= FILTER_FROM}
-			<label class="field">
+			<label class="find">
 				<span class="sr-only">Find a picture</span>
-				<input class="w-5" type="search" placeholder="Find…" bind:value={filter} />
+				<input type="search" placeholder="Find…" bind:value={filter} />
 			</label>
 		{/if}
-		<ul class="images">
-			{#each shown as image (image.where + image.name)}
-				<li class:unused={!used.has(image.name)} title="{image.name} — {image.where === 'folder' ? 'in the folder' : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}">
-					<span
-						class="thumb"
-						class:carrying={carry?.on && carry.name === image.name}
-						role="button"
-						tabindex="-1"
-						aria-label="Drag {image.name} onto an area"
-						title="Drag onto an area on the page"
-						onpointerdown={(e) => startCarry(e, image.name)}
-						onpointermove={moveCarry}
-						onpointerup={endCarry}
-						onpointercancel={endCarry}
-					>
-						{#if urls[image.name]}
-							<img
-								src={urls[image.name]}
-								alt=""
-								draggable="false"
-								onload={(e) => {
-									const img = e.currentTarget as HTMLImageElement;
-									sizes = { ...sizes, [image.name]: { w: img.naturalWidth, h: img.naturalHeight } };
-								}}
-							/>
-						{/if}
-					</span>
-					<span class="name">{image.name}</span>
-					<span class="size">{[
-						sizes[image.name] ? `${sizes[image.name].w} × ${sizes[image.name].h} px` : '',
-						weigh(image.bytes)
-					]
-						.filter(Boolean)
-						.join(' · ')}</span>
-					{#if !used.has(image.name)}<span class="tag">unused</span>{/if}
-					<button
-						class="square"
-						title="Delete {image.name}"
-						aria-label="Delete {image.name}"
-						onclick={() => void remove(image)}
-					>
-						<Icon name="trash" size={12} />
-					</button>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-</div>
+	</div>
+
+	<div class="list">
+		{#if busy}
+			<p class="empty">…</p>
+		{:else if !images.length}
+			<p class="empty">
+				None stored yet. <strong>Upload…</strong> below, or drop a picture file onto an area or the page.
+			</p>
+		{:else}
+			<!-- One picture a line: what it looks like, what it is called, how big
+			     it is in pixels and in bytes, and whether anything uses it. The
+			     thumbnail is also the handle it is carried onto an area by. -->
+			<ul class="images">
+				{#each shown as image (image.where + image.name)}
+					<li class:unused={!used.has(image.name)} title="{image.name} — {image.where === 'folder' ? 'in the folder' : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}">
+						<span
+							class="thumb"
+							class:carrying={carry?.on && carry.name === image.name}
+							role="button"
+							tabindex="-1"
+							aria-label="Drag {image.name} onto an area"
+							title="Drag onto an area, or onto the page for an area of its own"
+							onpointerdown={(e) => startCarry(e, image.name)}
+							onpointermove={moveCarry}
+							onpointerup={endCarry}
+							onpointercancel={endCarry}
+						>
+							{#if urls[image.name]}
+								<img
+									src={urls[image.name]}
+									alt=""
+									draggable="false"
+									onload={(e) => {
+										const img = e.currentTarget as HTMLImageElement;
+										sizes = { ...sizes, [image.name]: { w: img.naturalWidth, h: img.naturalHeight } };
+									}}
+								/>
+							{/if}
+						</span>
+						<span class="name">{image.name}</span>
+						<span class="size">{[
+							sizes[image.name] ? `${sizes[image.name].w} × ${sizes[image.name].h} px` : '',
+							weigh(image.bytes)
+						]
+							.filter(Boolean)
+							.join(' · ')}</span>
+						{#if !used.has(image.name)}<span class="tag">unused</span>{/if}
+						<button
+							class="square"
+							title="Delete {image.name}"
+							aria-label="Delete {image.name}"
+							onclick={() => void remove(image)}
+						>
+							<Icon name="trash" size={12} />
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</div>
+
+	<!-- The ways in, where the table keeps its toolbar. Upload is every
+	     browser's, a phone included; the folder is Chromium's. -->
+	<div class="actions">
+		<button title="Add pictures from this device" onclick={() => fileInput?.click()}>
+			<Icon name="image-reference" size={15} /> Upload…
+		</button>
+		{#if available}
+			{#if folder && !folder.ready}
+				<button class="primary" onclick={reopen}>Open {folder.name}</button>
+			{/if}
+			<button
+				title="Keep pictures as ordinary files in a folder of your own, rather than in this browser's storage"
+				onclick={choose}><Icon name="folder" size={15} /> {folder ? 'Another Folder…' : 'Choose Folder…'}</button
+			>
+			{#if folder}
+				<button title="Stop reading the folder. Nothing in it is deleted" onclick={forget}>Forget</button>
+			{/if}
+		{/if}
+	</div>
+</section>
 
 <input bind:this={fileInput} type="file" accept="image/*" multiple hidden onchange={upload} />
 
@@ -318,6 +354,106 @@
 {/if}
 
 <style>
+	/* The table's room: a column of head, list and foot, the list taking what
+	   the other two leave and scrolling in it. */
+	.images-tray {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		min-height: 0;
+		background: #fff;
+		font: 12px ui-sans-serif, system-ui, sans-serif;
+		color: #111;
+	}
+
+	.tray-head {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 10px;
+		border-bottom: 1px solid #eee;
+		background: #fafafa;
+		min-height: 20px;
+	}
+
+	.tray-head.grip {
+		touch-action: none;
+	}
+
+	.context {
+		font: 700 11px ui-sans-serif, system-ui, sans-serif;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: #555;
+	}
+
+	.find {
+		margin-left: auto;
+	}
+
+	.find input {
+		width: 9rem;
+		font: inherit;
+		padding: 3px 6px;
+		border: 1px solid #d5d5d5;
+		border-radius: var(--radius-input);
+	}
+
+	.list {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		padding: 6px;
+	}
+
+	.empty {
+		margin: 12px 6px;
+		color: #767676;
+		line-height: 1.5;
+	}
+
+	/* The table's toolbar, as the table draws it. */
+	.actions {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 8px;
+		border-top: 1px solid #eee;
+	}
+
+	.actions button {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		font: 12px ui-sans-serif, system-ui, sans-serif;
+		padding: 5px 10px;
+		border: 1px solid #ccc;
+		border-radius: var(--radius-button);
+		background: #fff;
+		color: #111;
+		cursor: pointer;
+	}
+
+	.actions button:hover {
+		border-color: #999;
+	}
+
+	.actions button.primary {
+		background: #111;
+		border-color: #111;
+		color: #fff;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
 	.where {
 		display: inline-flex;
 		align-items: center;
@@ -336,18 +472,14 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		flex: 1 1 20rem;
 		min-width: 0;
-		max-height: 9.5rem;
-		overflow-y: auto;
-		overscroll-behavior: contain;
 	}
 
 	.images li {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		padding: 2px 2px 2px 2px;
+		gap: 10px;
+		padding: 4px;
 		border: 1px solid transparent;
 		border-radius: var(--radius-button);
 	}
@@ -367,8 +499,8 @@
 		flex: none;
 		display: grid;
 		place-items: center;
-		width: 36px;
-		height: 28px;
+		width: 48px;
+		height: 36px;
 		border: 1px solid #ddd;
 		border-radius: 2px;
 		background:
@@ -424,12 +556,6 @@
 	.images li :global(button.square:hover) {
 		color: #b42318;
 		background: #fdf3f2;
-	}
-
-	.images-bar :global(button.primary) {
-		background: #111;
-		border-color: #111;
-		color: #fff;
 	}
 
 	.ghost {
