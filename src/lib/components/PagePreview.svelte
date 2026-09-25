@@ -81,6 +81,7 @@
 		onedit?: (id: string | null) => void;
 		/** open the drawing surface for an area */
 		ondraw?: (id: string) => void;
+		oneditcell?: (id: string) => void;
 		/** words typed into the card, forwarded to whoever owns them */
 		ontext?: (box: Box, value: string) => void;
 		/** bring the areas that are hanging off the sheet back onto it, and only those */
@@ -143,6 +144,7 @@
 		ondelete,
 		onedit,
 		ondraw,
+		oneditcell,
 		ontext,
 		onrescue,
 		onstoppicking,
@@ -753,6 +755,7 @@
 				{onmenuclose}
 				{onedit}
 				{ondraw}
+				{oneditcell}
 				{ontext}
 			/>
 		</div>

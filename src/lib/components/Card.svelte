@@ -95,6 +95,8 @@
 		onedit?: (id: string | null) => void;
 		/** open the drawing surface for an area; a picture is never edited in place */
 		ondraw?: (id: string) => void;
+		/** open the cell a Data Field area prints, full size in the table */
+		oneditcell?: (id: string) => void;
 		/**
 		 * Words typed into the card. The card cannot write them itself: a bound
 		 * area's text is a cell in the dataset and a static one's is a field in
@@ -128,6 +130,7 @@
 		onaction,
 		onedit,
 		ondraw,
+		oneditcell,
 		ontext
 	}: Props = $props();
 
@@ -632,6 +635,15 @@
 	 * it — but duplicating one still can, deliberately: a copy that kept the name
 	 * kept the binding with it, and a template that styles `#Job-Title` means
 	 * both of them.
+	 */
+	/*
+	 * Besides the id, every area carries two classes a template's CSS can
+	 * reach: where its content comes from — `content-field`, `content-static`
+	 * or `content-image`, the three the bar's Content offers — and its mode,
+	 * `mode-plain`, `mode-markdown`, `mode-image`, `mode-color` or `mode-qr`.
+	 * Prefixed, because a bare `.plain` or `.image` would collide with the
+	 * card's own classes inside the area. They are on paper as on screen:
+	 * one layout engine, one set of hooks.
 	 */
 	const idFor = (box: Box) => {
 		const ident = cssIdent(box.slot ?? '');
@@ -1366,12 +1378,21 @@
 
 	/** Whether the column of badges hangs off this box's right-hand edge. */
 	const hasBadges = (box: Box) =>
-		bounds && !template.locked && !!(box.locked || isStatic(box) || pictureKind(box));
+		bounds && !template.locked && !!(box.locked || isStatic(box) || pictureKind(box) || editsCell(box));
+
+	/**
+	 * A selected area whose words come out of a cell carries the way into that
+	 * cell, full size — the same editor Edit opens under the table, and the
+	 * same icon, for an area whose words are not the design's to type into
+	 * in place. Words, not pictures: a picture's cell has the pencil.
+	 */
+	const editsCell = (box: Box) =>
+		interactive && isSelected(box) && !!box.slot && !!mapping[box.slot] && !!row && !pictureKind(box) && !shownAsMedia(box.mode);
 
 	/** How many badges that column holds — the shears step down below them. */
 	const badgeCount = (box: Box) =>
 		hasBadges(box)
-			? [box.locked, isStatic(box), pictureKind(box)].filter(Boolean).length
+			? [box.locked, isStatic(box), pictureKind(box), editsCell(box)].filter(Boolean).length
 			: 0;
 
 	/** Cast off: every box moored to this one keeps its place and loses the tie. */
@@ -1538,7 +1559,7 @@
 			{@const empty = hidden.has(box.id)}
 			{@const strokes = handStrokes(box)}
 			<div
-				class="box"
+				class="box content-{box.slot ? 'field' : shownAsMedia(box.mode) ? 'image' : 'static'} mode-{box.mode}"
 				class:outlined={bounds && !empty}
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
@@ -1796,19 +1817,33 @@
 
 				{#if hasBadges(box)}
 					<!-- Why the box will not do what you might ask of it, stacked at its
-					     corner. All but the plug are buttons — the reason and the way out
+					     corner. All but the static-text mark are buttons — the reason and the way out
 					     of it in the same 13 pixels — and each swaps to the icon of the
 					     undoing while the pointer is on it, so pressing one holds no
 					     surprise. Which is also why no two of them wear the same armed
 					     icon: the padlock opens the padlock, and the buoy casts off,
 					     which is a boat. -->
 					<span class="badges">
+						{#if editsCell(box)}
+							<button
+								class="badge action"
+								disabled={!!box.locked}
+								title={box.locked
+									? 'This area is locked — unlock it to edit the cell it prints'
+									: `Edit “${mapping[box.slot!]}” for this row, full size in the table`}
+								aria-label="Edit this area's cell"
+								onpointerdown={(e) => e.stopPropagation()}
+								onclick={() => oneditcell?.(box.id)}
+							>
+								<Icon name="task-edit" size={11} />
+							</button>
+						{/if}
 						{#if isStatic(box)}
 							<span class="badge" title="Static text — this says the same on every card, because it is not plugged into a column">
-								<Icon name="unplug" size={11} />
+								<Icon name="text-creation" size={11} />
 							</span>
 						{/if}
-						<!-- What a picture area holds, beside the static text's plug. The
+						<!-- What a picture area holds, beside the static text's mark. The
 						     pencil is also the way into the drawing — the same as a
 						     double-click, for anybody who has not found that. -->
 						{#if pictureKind(box) === 'drawing'}
@@ -2642,7 +2677,11 @@
 			display: flex;
 			flex-direction: column;
 			gap: calc(2px * var(--ui-scale, 1));
-			z-index: 3;
+			/* Above every handle, the pivot and the lever: the top corner handles'
+			   reach extends past the box to where the first badge sits, and took
+			   the press meant for it. The column itself passes clicks through, so
+			   this only ever gives the badges themselves priority. */
+			z-index: 7;
 			/* The column is click-through so a drag started beside the box still
 			   reaches it; the badges themselves are not, or their title — the only
 			   thing that says what they mean — could never be hovered. */

@@ -57,6 +57,12 @@
 		onchange: (dataset: Dataset) => void;
 		/** so bindings can follow a renamed column instead of pointing at a ghost */
 		onrenamecolumn: (from: string, to: string) => void;
+		/**
+		 * A cell to open full size, asked for from outside — the edit badge on
+		 * a Data Field area. A new object each time, so asking twice for the
+		 * same cell opens it twice.
+		 */
+		openRequest?: { row: number; column: string } | null;
 		/** open the Getting Started table, or start one */
 		ongettingstarted: () => void;
 		/**
@@ -93,6 +99,7 @@
 		onchange,
 		onrenamecolumn,
 		ongettingstarted,
+		openRequest = null,
 		onnotice
 	}: Props = $props();
 
@@ -143,6 +150,8 @@
 	 */
 	const ROW_HEIGHTS: RowHeight[] = ['short', 'medium', 'full'];
 	const ROW_HEIGHT_LABELS: Record<RowHeight, string> = { short: 'Short', medium: 'Medium', full: 'Full' };
+	/** Carbon's: the ruled table for one line a row, fit to screen, fit to height. */
+	const ROW_HEIGHT_ICONS: Record<RowHeight, string> = { short: 'table', medium: 'fit-to-screen', full: 'fit-to-height' };
 	const nextRowHeight = $derived(ROW_HEIGHTS[(ROW_HEIGHTS.indexOf(rowHeight) + 1) % ROW_HEIGHTS.length]);
 
 	/**
@@ -252,6 +261,8 @@
 	 * and there is nothing to confirm — the × or Escape puts the table back.
 	 */
 	let bigCell = $state<{ row: number; column: string } | null>(null);
+	/** The bar's height: the full-size editor stops above it, so the bar stays. */
+	let barHeight = $state(0);
 
 	function openBigCell(rowIndex: number, column: string) {
 		const value = dataset.rows[rowIndex]?.[column];
@@ -262,6 +273,16 @@
 		bigCell = { row: rowIndex, column };
 		onactivate(rowIndex);
 	}
+
+	// Only the request is tracked: a dataset or a lock changing under an open
+	// request must not open the cell again.
+	$effect(() => {
+		const ask = openRequest;
+		if (!ask) return;
+		untrack(() => {
+			if (!locked && dataset.columns.includes(ask.column)) openBigCell(ask.row, ask.column);
+		});
+	});
 
 	function closeBigCell() {
 		bigCell = null;
@@ -1256,7 +1277,7 @@
 										e.stopPropagation();
 										openBigCell(i, column);
 									}}
-								>…</button>
+								>[...]</button>
 							</td>
 						{/each}
 						<td></td>
@@ -1296,7 +1317,16 @@
 
 	<!-- One line, always: this bar wrapping was costing the table a row of its
 	     own height every time the tray narrowed. -->
-	<div class="actions">
+	<div class="actions" bind:offsetHeight={barHeight}>
+		{#if bigCell}
+			<!-- With a cell open full size the bar is about that cell, as it is
+			     while one is typed in: which row it is at the start, where the
+			     table's name usually is, and its count at the end, where the count
+			     always is. The editor above keeps the column's name and the ×. -->
+			<span class="big-row">Row {rowLabel(dataset.rows[bigCell.row], bigCell.row)}</span>
+			<span class="spacer"></span>
+			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
+		{:else}
 		<!-- First in the bar: the state of the table named beside it, and the
 		     one thing here that is not an errand — the same reason the page bar
 		     keeps its Lock outside its menu. Never disabled by the lock it sets,
@@ -1472,13 +1502,13 @@
 			     would lose its focus, and with it this bar, before the click. -->
 			{@const cell = editing}
 			<span class="rule"></span>
-			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[cell.row]?.[cell.column] ?? '')}</span>
 			<button
 				title="Open this cell in the table's full room — the same as pressing and holding it"
 				disabled={locked}
 				onmousedown={(e) => e.preventDefault()}
 				onclick={() => openBigCell(cell.row, cell.column)}
 			><Icon name="task-edit" size={15} /> Edit</button>
+			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[cell.row]?.[cell.column] ?? '')}</span>
 		{:else if chosenRows.length}
 			<!-- What you can do to the rows you have chosen, at the far end of the
 			     bar after the things that act on the whole table, with a rule
@@ -1491,7 +1521,8 @@
 			     in red: it is the one button here that takes rows away, and it
 			     should read as a button that does, not as a mark beside a count. -->
 			<span class="rule"></span>
-			<span class="chosen-count">{chosenRows.length}</span>
+			<!-- "3 rows"; one row says nothing — the tick beside it already does. -->
+			{#if chosenRows.length > 1}<span class="chosen-count">{chosenRows.length} rows</span>{/if}
 			<!-- Up and down first: they are about where the rows are, before what
 			     is done with them. Icon-only, the pair reads as one control. -->
 			<button
@@ -1500,14 +1531,14 @@
 				aria-label="Move the chosen rows up"
 				disabled={locked || chosenRows[0] === 0}
 				onclick={() => moveChosen(-1)}
-			><Icon name="chevron-sort-up" size={20} /></button>
+			><span class="nudge-up"><Icon name="chevron-sort-up" size={20} /></span></button>
 			<button
 				class="icon"
 				title="Move the chosen rows down — later in print order"
 				aria-label="Move the chosen rows down"
 				disabled={locked || chosenRows[chosenRows.length - 1] === dataset.rows.length - 1}
 				onclick={() => moveChosen(1)}
-			><Icon name="chevron-sort-down" size={20} /></button>
+			><span class="nudge-down"><Icon name="chevron-sort-down" size={20} /></span></button>
 			<button
 				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
 				onclick={copyTsv}
@@ -1531,17 +1562,10 @@
 				aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
 				onclick={() => onrowheight(nextRowHeight)}
 			>
-				<svg class="rows-glyph" viewBox="0 0 16 16" aria-hidden="true">
-					{#if rowHeight === 'short'}
-						<path d="M2 3h12M2 6h12M2 9h12M2 12h12" />
-					{:else if rowHeight === 'medium'}
-						<path d="M2 3h12M2 8h12M2 13h12" />
-					{:else}
-						<path d="M2 2h12M2 14h12" />
-					{/if}
-				</svg>
+				<Icon name={ROW_HEIGHT_ICONS[rowHeight]} size={15} />
 				<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
 			</button>
+		{/if}
 		{/if}
 		<input
 			bind:this={fileInput}
@@ -1559,10 +1583,10 @@
 	{#if bigCell}
 		{@const open = bigCell}
 		{@const text = dataset.rows[open.row]?.[open.column] ?? ''}
-		<div class="cell-editor" role="dialog" aria-labelledby="cell-editor-title">
+		<div class="cell-editor" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
 			<div class="cell-editor-head">
-				<h2 id="cell-editor-title">{open.column}, row {rowLabel(dataset.rows[open.row], open.row)}</h2>
-				<span class="count-line">{countLabel(text)}</span>
+				<h2 id="cell-editor-title">{open.column}</h2>
+				<span class="spacer"></span>
 				<button class="icon close" title="Back to the table (Esc)" aria-label="Close" onclick={closeBigCell}>
 					<Icon name="close" size={18} />
 				</button>
@@ -1918,6 +1942,17 @@
 		padding: 5px 6px 0;
 		box-sizing: border-box;
 		max-height: calc(var(--cell-line) * 5 + 7px);
+		/* No scrollbar at rest: the [...] mark already says there is more,
+		   and a bar down every long cell was a second, louder way of saying it.
+		   Hidden by not scrolling rather than by styling the bar away —
+		   `scrollbar-width` is only newly Baseline — and back the moment the
+		   cell is typed in, where the caret has to be able to reach the end. A
+		   wheel over a resting cell now scrolls the table, as it should. */
+		overflow: hidden;
+	}
+
+	td textarea:focus {
+		overflow: auto;
 	}
 
 	tbody td {
@@ -1943,7 +1978,7 @@
 		}
 	}
 
-	/* More in the cell than it shows: an ellipsis in the bottom corner, on the
+	/* More in the cell than it shows: a [...] in the bottom corner, on the
 	   cell's own background so it covers the words it sits over. Gone while
 	   the cell is being typed in — the field scrolls then, and the count has
 	   that corner. */
@@ -2244,9 +2279,10 @@
 	   of what the two buttons beside it are about to act on, and at 11px it read
 	   as a footnote to them rather than as their subject. */
 	.actions .chosen-count {
-		font: 600 15px ui-sans-serif, system-ui, sans-serif;
+		font: 600 13px ui-sans-serif, system-ui, sans-serif;
 		color: #1d4ed8;
 		padding: 0 2px;
+		white-space: nowrap;
 	}
 
 	.actions .icon {
@@ -2432,10 +2468,8 @@
 		flex: 1;
 	}
 
-	/* Rules drawn at the spacing the rows are at: four close, three apart,
-	   two at the extremes. Stroked in the text color, like Carbon's marks. */
-	/* On a phone the bar is short of width, and the rules drawn at the rows'
-	   own spacing already say which height it is; the title says it in words. */
+	/* On a phone the bar is short of width, and the icon already says which
+	   height it is; the title says it in words. */
 	@media (max-width: 900px) {
 		.row-height .label {
 			display: none;
@@ -2448,14 +2482,6 @@
 		display: inline-block;
 		width: 4.1em;
 		text-align: left;
-	}
-
-	.rows-glyph {
-		width: 15px;
-		height: 15px;
-		fill: none;
-		stroke: currentColor;
-		stroke-width: 1.5;
 	}
 
 	.actions button[aria-pressed='true'] {
@@ -2551,8 +2577,27 @@
 		white-space: nowrap;
 	}
 
-	.cell-editor-head .count-line {
-		flex: 1;
+	/* Where the table's name usually is, while a cell is open full size. */
+	.actions .big-row {
+		font: 600 12px ui-sans-serif, system-ui, sans-serif;
+		color: #333;
+		white-space: nowrap;
+	}
+
+	/* Carbon's two halves of chevron--sort each sit in their own half of the
+	   box, so alone in a button the up one rode high and the down one low.
+	   Moved by a quarter of the glyph to the middle. */
+	.nudge-up,
+	.nudge-down {
+		display: grid;
+	}
+
+	.nudge-up {
+		transform: translateY(25%);
+	}
+
+	.nudge-down {
+		transform: translateY(-25%);
 	}
 
 	.cell-editor .close {
@@ -2588,12 +2633,6 @@
 		resize: none;
 	}
 
-
-	.count-line {
-		font-size: 12px;
-		color: #767676;
-		font-variant-numeric: tabular-nums;
-	}
 
 	.modal-actions {
 		display: flex;

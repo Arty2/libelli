@@ -476,30 +476,31 @@ wants a gesture it recognises, and a page without the permission gets nothing �
 is told out loud in the header, because a copy that did not happen looks exactly
 like one that did until you paste.
 
-**The board sits above its tools, and leaving is a tool.** Cancel and Done used
-to be a row of their own under the board, which put the two most final buttons
-furthest from the hand that had been drawing, and pushed the board up under the
-header. One toolbar, one place to look.
+**The board sits above its tools, its size above it.** The tools are two rows:
+what you draw with — tool, nib, undo, the checkerboard — and what you do to the
+whole board, ending in Delete (the old Clear, in words and red like every
+Delete here), Cancel and Done. The size moved out of the toolbar to sit over
+the board it sizes, which is where the eye already is when it is changed.
 
-**There is no pinch on the board.** It had one for a day. The fingers that would
-make a pinch are the fingers drawing on it, and a stroke that turns into a zoom
-halfway through is worse than no zoom at all — so the board fits the viewport by
-itself and Ctrl and the wheel step it from there. The pinch stays what it was
-everywhere else: the page editor's zoom.
+**The board is always fitted, and there is no zoom.** It had a pinch for a day
+— the fingers that would make one are the fingers drawing — and then
+Ctrl+wheel. With the board always drawn as large as its room, measured off the
+stage itself, a zoom in could only push part of it out of view behind a
+scrollbar, so the one zoom there is is the fit. It steps through whole numbers:
+whole screen pixels per pixel of the board, because a board at 7.5 screen
+pixels a side lands half its pixels on half a screen pixel, and a pixel editor
+that blurs its own edges is no use. It is also what lets the checkerboard be one
+check per pixel, so the pattern that says "nothing painted here" is also the
+grid.
 
-**The zoom steps through whole numbers.** Whole screen pixels per pixel of the
-board, pinch and Ctrl+wheel included: a board at 7.5 screen pixels a side lands
-half its pixels on half a screen pixel, and a pixel editor that blurs its own
-edges is no use. It is also what lets the checkerboard behind the board be one
-check per pixel — a CSS gradient sized from the same number — so the pattern
-that says "nothing painted here" is also the grid. The pinch is held by the
-whole surface rather than by the board, because a pinch that starts with a
-finger on the dark around it is still a pinch.
-
-**Full screen, never in place.** Every other kind of area is edited where it
-sits, and this one cannot be: areas are frequently a centimetre across, which is
+**A dialog, never in place.** Every other kind of area is edited where it sits,
+and this one cannot be: areas are frequently a centimetre across, which is
 somewhere to show a drawing and nowhere to make one. The same double-click that
-opens words for typing opens this instead.
+opens words for typing opens this instead. It was a full-screen surface of its
+own; it is a dialog now, the CSS editor's shape, so the card it is drawing for
+stays in view round it — and like that editor it is dragged by its title
+(`dragByTitle` in modal.ts), clamped so a strip of the title always stays on
+screen to drag it back by.
 
 **Nothing is written until Done, and it is one undo entry.** The editor keeps
 its own stack of whole canvases — at this size a canvas is nothing — so undo in
@@ -965,6 +966,17 @@ step further away" where a second color would say "a different kind of tie".
 Upwards it stays one hop, as it always did: what this area follows is a
 relationship it has, and what that one follows is not.
 
+**The badges are above the handles.** The top corner handles reach past the box
+to where the first badge in the right-hand column sits, and a press meant for
+the badge went to the handle. The column is click-through, so raising it over
+every handle gives the badges — and only them — the press.
+
+**Every area carries its content and its mode as classes** —
+`content-field|static|image` and `mode-*` — beside its id, for a template's CSS.
+Prefixed, because the card already uses `.plain` and the like inside an area,
+and a bare `.image` on the box would have been restyled by the card's own
+rules. The CSS editor's placeholder lists them with this template's own ids.
+
 **The anchor's badges sit off the top-left corner, in a column of their own.**
 Every badge used to stack at the top right, and on a shallow area four of them
 are taller than the area they are about. The tie and the buoy are the ones
@@ -1374,6 +1386,20 @@ the wrong table to put them in most of the times it was pressed.
 as a block, each past its unchosen neighbour, holding at the ends. After a move
 the rows are in an order the table owns, so a sort still claiming to be on
 would be lying about it, and the numbers the rows wear go back to their places.
+
+**A resting cell does not scroll.** Its field is `overflow: hidden` until it
+has the focus, which is what took the scrollbar off every long cell: the [...]
+mark already says there is more. Not `scrollbar-width: none`, which is only
+newly Baseline; hiding the overflow is the old, universal way, and a wheel over
+a resting cell now scrolls the table, as it should.
+
+**The full-size editor leaves the bar.** It covers the rows and stops at the
+bar's measured height; the bar, while it is open, says which row it is at the
+left and the count at the right — where both sit in every other state — so the
+editor's own head is only the column's name and the ×. A Data Field area's
+edit badge opens it from the card, through an `openRequest` the page hands the
+table; only the request is tracked, so a dataset changing under an old request
+does not open the cell again.
 
 **A lock closes the full-size editor too.** Edit, the press and hold and the
 ellipsis all open it, and it is a way to type: on a locked table all three are

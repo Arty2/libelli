@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
 	import Icon from './Icon.svelte';
+	import { dragByTitle } from '$lib/modal';
 	import {
 		boardFor,
 		boardSize,
@@ -176,7 +177,6 @@
 		const resized = step.grid.w !== grid.w || step.grid.h !== grid.h;
 		grid = { ...step.grid };
 		if (resized) {
-			manualZoom = null;
 			// The canvas is cleared by its own resize, so the pixels go back after.
 			await tick();
 		}
@@ -220,9 +220,6 @@
 		if (next.w === grid.w && next.h === grid.h) return;
 		const before = remember();
 		grid = next;
-		// The fit is worked out for the new board; a zoom set by hand for the old
-		// one is not an answer to the question the new one asks.
-		manualZoom = null;
 		await tick();
 		if (before) restore(before.image);
 		measure();
@@ -248,7 +245,6 @@
 		const before = remember();
 		if (!before) return;
 		grid = { w: grid.h, h: grid.w };
-		manualZoom = null;
 		await tick();
 		const ctx = context();
 		if (!ctx) return;
@@ -286,7 +282,6 @@
 			return;
 		}
 		grid = next;
-		manualZoom = null;
 		await tick();
 		const ctx = context();
 		if (!ctx) return;
@@ -352,7 +347,6 @@
 			const own = boardFor(image.naturalWidth, image.naturalHeight);
 			if (own.w !== grid.w || own.h !== grid.h) {
 				grid = own;
-				manualZoom = null;
 				await tick();
 			}
 			const ctx = context();
@@ -490,72 +484,71 @@
 	}
 
 	/**
-	 * How large the board is drawn. Whole screen pixels per pixel of the board,
-	 * so the drawing never lands on half a screen pixel and blurs its own edges
-	 * — the one thing a pixel editor must not do. That is also why the zoom steps
-	 * through whole numbers rather than scaling smoothly.
+	 * How large the board is drawn: as large as the room the dialog gives it,
+	 * always, so there is never a scrollbar round the board. Whole screen
+	 * pixels per pixel of the board, so the drawing never lands on half a
+	 * screen pixel and blurs its own edges — the one thing a pixel editor must
+	 * not do. That is why it steps through whole numbers rather than scaling
+	 * smoothly. There was a Ctrl+wheel zoom as well; with the board always
+	 * filling its room, a zoom in could only ever push part of it out of view.
 	 */
-	let viewport = $state({ w: 1200, h: 800 });
-	let manualZoom = $state<number | null>(null);
-	const fit = $derived(
-		Math.max(1, Math.floor(Math.min((viewport.w - 80) / grid.w, (viewport.h - 280) / grid.h)))
+	let room = $state({ w: 0, h: 0 });
+	const zoom = $derived(
+		Math.max(1, Math.min(48, Math.floor(Math.min(room.w / grid.w, room.h / grid.h)) || 1))
 	);
-	const zoom = $derived(Math.max(1, Math.min(48, manualZoom ?? fit)));
-
-	$effect(() => {
-		const read = () => (viewport = { w: window.innerWidth, h: window.innerHeight });
-		read();
-		window.addEventListener('resize', read);
-		return () => window.removeEventListener('resize', read);
-	});
-
-	/**
-	 * Ctrl and the wheel, which is also how a trackpad reports a zoom. There is
-	 * no two-finger pinch on the board: the fingers that would make it are the
-	 * ones drawing on it, and a stroke that turns into a zoom halfway through is
-	 * worse than no zoom at all. A pinch is the page editor's, behind this.
-	 * `preventDefault` is what stops the browser zooming the whole app around the
-	 * drawing, and it only works on a non-passive listener, so this is added by
-	 * hand rather than as an `onwheel` attribute.
-	 */
-	let overlay = $state<HTMLElement | null>(null);
-	$effect(() => {
-		const node = overlay;
-		if (!node) return;
-		const onWheel = (event: WheelEvent) => {
-			if (!event.ctrlKey && !event.metaKey) return;
-			event.preventDefault();
-			manualZoom = Math.max(1, Math.min(48, zoom + (event.deltaY < 0 ? 1 : -1)));
-		};
-		node.addEventListener('wheel', onWheel, { passive: false });
-		return () => node.removeEventListener('wheel', onWheel);
-	});
 </script>
 
 <svelte:window onkeydown={onKeydown} />
 
-<!-- The wheel is held by the whole surface rather than by the board, so a zoom
-     works wherever the pointer is. -->
-<div class="full" role="dialog" aria-modal="true" aria-label="Draw" bind:this={overlay}>
-	<header>
-		<span class="what">{grid.w} × {grid.h}</span>
+<!-- A dialog over the app, like the CSS editor, rather than a screen of its
+     own: the card it is drawing for stays in view round it, and it can be
+     dragged aside by its title to see the part it covers. -->
+<div class="backdrop" role="presentation"></div>
+<div class="drawer" role="dialog" aria-modal="true" aria-labelledby="draw-title" use:dragByTitle>
+	<header data-drag-handle>
+		<h2 id="draw-title">Draw</h2>
 		<!-- Said out loud, because this is going into a cell of the table and a
 		     long cell is the cost of it travelling with the words. -->
 		{#if weight !== null}
-			<span class="weight" title="What this drawing adds to the cell it is written into">
-				/ {weight} KB
-			</span>
+			<span class="weight" title="What this drawing adds to the cell it is written into">{weight} KB</span>
 		{/if}
 		{#if said}
 			<span class="said" role="status">{said}</span>
 		{/if}
 	</header>
 
+	<!-- The board's size, over the board it sizes: 64 by 64 pixels' worth,
+	     spent however you like. Type a side and the other one moves to pay for
+	     it. -->
+	<div class="board" title="The board, in pixels — {BUDGET} of them to spend">
+		<input
+			type="number"
+			min={MIN_SIDE}
+			max={MAX_SIDE}
+			value={grid.w}
+			title="Board width, in pixels"
+			aria-label="Board width in pixels"
+			onchange={(e) => setSide('w', e.currentTarget.value)}
+		/>
+		<span class="by" aria-hidden="true">×</span>
+		<input
+			type="number"
+			min={MIN_SIDE}
+			max={MAX_SIDE}
+			value={grid.h}
+			title="Board height, in pixels"
+			aria-label="Board height in pixels"
+			onchange={(e) => setSide('h', e.currentTarget.value)}
+		/>
+		<span class="by">pixels</span>
+	</div>
+
 	<!-- The checks show through where nothing has been drawn: an area's fill and
 	     the paper behind it will, and a white square instead of a transparent one
 	     is a thing you only find out about on paper. One check to a pixel, so the
-	     pattern is also the grid. -->
-	<div class="stage">
+	     pattern is also the grid. The stage is measured, and the board drawn as
+	     large as fits in it. -->
+	<div class="stage" bind:clientWidth={room.w} bind:clientHeight={room.h}>
 		<canvas
 			class:dark={checks === 'dark'}
 			use:start
@@ -569,6 +562,9 @@
 		></canvas>
 	</div>
 
+	<!-- Two rows. What you draw with — the tool, the nib, undo, and the paper
+	     to see it on — and under it what you do to the whole board, with the
+	     three ways out at the far end: Delete, then Cancel and Done. -->
 	<div class="tools" role="toolbar" aria-label="Drawing tools">
 		<span class="segmented">
 			<button
@@ -629,33 +625,6 @@
 			<button onclick={redo} disabled={!future.length} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
 				<Icon name="redo" size={15} />
 			</button>
-			<button onclick={clear} title="Clear the whole drawing" aria-label="Clear">
-				<Icon name="trash" size={15} />
-			</button>
-		</span>
-
-		<!-- The board: 64 by 64 pixels' worth, spent however you like. Type a side
-		     and the other one moves to pay for it. -->
-		<span class="segmented board" title="The board, in pixels — {BUDGET} of them to spend">
-			<input
-				type="number"
-				min={MIN_SIDE}
-				max={MAX_SIDE}
-				value={grid.w}
-				title="Board width, in pixels"
-				aria-label="Board width in pixels"
-				onchange={(e) => setSide('w', e.currentTarget.value)}
-			/>
-			<span class="by" aria-hidden="true">×</span>
-			<input
-				type="number"
-				min={MIN_SIDE}
-				max={MAX_SIDE}
-				value={grid.h}
-				title="Board height, in pixels"
-				aria-label="Board height in pixels"
-				onchange={(e) => setSide('h', e.currentTarget.value)}
-			/>
 		</span>
 
 		<span class="segmented">
@@ -668,7 +637,9 @@
 				<Icon name="contrast" size={15} />
 			</button>
 		</span>
+	</div>
 
+	<div class="tools second" role="toolbar" aria-label="Board">
 		<!-- The two that redraw the whole board rather than a pixel of it. Both
 		     are one undo away, board and all. -->
 		<span class="segmented">
@@ -693,29 +664,49 @@
 			</button>
 		</span>
 
-		<!-- Leaving is a drawing tool like the rest of them: a row of its own
-		     under the board put the two most final buttons furthest from the
-		     hand that had been drawing. -->
+		<span class="spacer"></span>
+
+		<!-- Delete in words and in red, as every Delete in the app is: it empties
+		     the board, which undo still reaches. Then the two ways out. -->
 		<span class="segmented done">
+			<button class="danger" onclick={clear} title="Clear the whole drawing — undo brings it back">
+				<Icon name="trash" size={15} /> Delete
+			</button>
 			<button onclick={oncancel} title="Leave the cell as it was (Esc)">Cancel</button>
 			<button class="primary" onclick={done} title="Write this drawing into the area">Done</button>
 		</span>
 	</div>
-
 </div>
 
 <style>
-	.full {
+	.backdrop {
 		position: fixed;
 		inset: 0;
 		z-index: 70;
-		background: rgba(26, 36, 54, 0.94);
+		background: rgba(0, 0, 0, 0.35);
+	}
+
+	/* The CSS editor's shape: a white dialog centred over the app, moved by its
+	   title. As large as the window allows, because the board is drawn as large
+	   as fits in it. */
+	.drawer {
+		position: fixed;
+		z-index: 71;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		width: min(760px, calc(100vw - 32px));
+		height: min(820px, calc(100dvh - 32px));
+		box-sizing: border-box;
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 14px;
-		/* The stage takes the pointer for drawing; a downward drag read as
+		gap: 10px;
+		padding: 16px 18px;
+		background: #fff;
+		border-radius: 10px;
+		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+		font: 13px ui-sans-serif, system-ui, sans-serif;
+		/* The board takes the pointer for drawing; a downward drag read as
 		   pull-to-refresh would take the undo history with it. */
 		touch-action: none;
 		user-select: none;
@@ -725,14 +716,24 @@
 	header {
 		display: flex;
 		align-items: baseline;
-		gap: 6px;
-		color: #fff;
-		font: 15px ui-sans-serif, system-ui, sans-serif;
+		gap: 8px;
+		cursor: move;
+	}
+
+	header h2 {
+		margin: 0;
+		font-size: 16px;
 	}
 
 	.weight {
-		color: #b8c4d8;
-		font-size: 13px;
+		color: #767676;
+		font-size: 12px;
+	}
+
+	.board {
+		display: flex;
+		align-items: center;
+		gap: 4px;
 	}
 
 	.tools {
@@ -740,10 +741,10 @@
 		align-items: center;
 		gap: 8px;
 		flex-wrap: wrap;
-		justify-content: center;
-		background: #fff;
-		border-radius: 8px;
-		padding: 8px;
+	}
+
+	.spacer {
+		flex: 1;
 	}
 
 	/* Square, all of them: every one holds a glyph of the same size, and a row of
@@ -775,10 +776,6 @@
 	.segmented {
 		display: flex;
 		gap: 4px;
-	}
-
-	.board {
-		align-items: center;
 	}
 
 	.board input {
@@ -828,16 +825,22 @@
 		background: transparent;
 	}
 
+	/* The room the board is fitted to: whatever the dialog has left once the
+	   header, the size and the tools are placed. Never scrolls — the zoom is
+	   worked out from this box's own size so the board always fits. */
 	.stage {
-		background: #fff;
-		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+		flex: 1;
+		min-height: 0;
+		display: grid;
+		place-items: center;
+		overflow: hidden;
 		line-height: 0;
-		max-width: calc(100vw - 32px);
-		max-height: 66vh;
-		overflow: auto;
-		/* A finger on the paper round the board scrolls it; a finger on the board
-		   itself draws. */
-		touch-action: pan-x pan-y;
+		background: #f3f4f6;
+		border-radius: 6px;
+	}
+
+	.stage canvas {
+		box-shadow: 0 0 0 1px #c9cdd4;
 	}
 
 	canvas {
@@ -882,10 +885,23 @@
 	}
 
 	.said {
-		color: #fff;
-		font-size: 13px;
-		background: rgba(255, 255, 255, 0.16);
+		color: #333;
+		font-size: 12px;
+		background: #eef2f7;
 		border-radius: 999px;
 		padding: 1px 10px;
+	}
+
+	/* Red in words, as every Delete in the app is. */
+	.tools .done button.danger {
+		display: inline-flex;
+		gap: 5px;
+		align-items: center;
+		color: #b42318;
+		border-color: #e4a9a3;
+	}
+
+	.tools .done button.danger:hover {
+		background: #fdecea;
 	}
 </style>

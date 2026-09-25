@@ -165,8 +165,12 @@ resize boxes directly, or type exact millimetres.
   no column or to one since renamed or deleted, or an area holding its own
   words with none in it — stays put instead, with its placeholder, because a
   design whose areas have all collapsed to nothing is a design you cannot click
-  on. An area carrying its own words wears a plug pulled out of its socket,
-  because it is not plugged into the data. An empty image area reads *Image*,
+  on. An area carrying its own words wears Carbon's *text creation* mark,
+  because its words are written here rather than coming from the data. A
+  selected area whose words come out of a column wears a **pencil-and-page**
+  badge at the top right, the same icon as **Edit** under the table: press it
+  and that cell opens full size in the table, the table opening if it was
+  folded away. A locked area, or a locked table, refuses it. An empty image area reads *Image*,
   and an image area wears a mark at the corner the way static text does: a
   pencil when it holds a drawing — press it to draw on it — and a picture
   otherwise.
@@ -461,7 +465,12 @@ resize boxes directly, or type exact millimetres.
   `url()` pointing off this machine are stripped, so a template's CSS cannot
   reach the network at all.
   Each area wears its own **Name** as an id, so `#Job-Title { … }` reaches that
-  one area and nothing else; `.box` reaches all of them. The dialog has a
+  one area and nothing else; `.box` reaches all of them. Every area also wears
+  two classes: where its content comes from — `.content-field`,
+  `.content-static` or `.content-image` — and its mode — `.mode-plain`,
+  `.mode-markdown`, `.mode-image`, `.mode-color` or `.mode-qr`. The empty
+  field's placeholder lists this template's own ids and these classes. The
+  dialog can be dragged by its title, to see the card it is styling. The dialog has a
   **Cancel** beside its **Done**, and Cancel puts back the CSS that was there
   when it opened — <kbd>Esc</kbd> and a click on the ground behind do the same,
   because with a Cancel on the row the other two ways out that are not Done have
@@ -595,19 +604,22 @@ a notice can appear.
   `{{column}}`: data no card will show. Press it to put the column on the card:
   a new area, named after the column and bound to it, where a new area goes.
 - **Counting** — while a cell is being typed in, the bar under the table is
-  about that cell: its characters and words, and **Edit**, which opens it full
-  size. The row actions come back when the cell is left. Both sit toward the
+  about that cell: **Edit**, which opens it full size, then its characters and
+  words. The row actions come back when the cell is left. Both sit toward the
   right of the bar, after the lock and the table at the left, with the row
-  height last.
+  height last. With rows chosen the bar says how many — *3 rows* — and says
+  nothing for one, whose tick already says it.
 - **Moving rows** — with rows chosen, the up and down chevrons before **Copy**
   move them a row at a time, as a block; row order is print order. A sort
   that was on is dropped, since the rows are no longer in it.
 - **Which area it feeds** — entering a cell flashes the areas on the card that
   print it, in the bounds' blue, for a moment.
-- **A cell full size** — press **Edit**, press and hold a cell, or press the
-  ellipsis on a cell that holds more than it shows, and the whole of it opens
-  in the table's own space — over the rows, with the card still in view beside
-  or above it — with the same count. It edits the cell itself, live, so the
+- **A cell full size** — press **Edit**, press and hold a cell, press the
+  **[...]** on a cell that holds more than it shows, or press the edit badge on
+  a Data Field area, and the whole of it opens in the table's own space — over
+  the rows, with the card still in view beside or above it. Its column's name
+  and the **×** are at the top; the bar under it stays, saying **Row 2** at
+  the left and the count where the count always is. It edits the cell itself, live, so the
   card follows as you type and undo reaches every change; the **×** at the top
   right, Esc or Ctrl/Cmd+Enter put the table back. The words are set at twice
   the table's size, for reading at length. On a locked table none of
@@ -629,12 +641,13 @@ a notice can appear.
   rows are chosen (their actions take that end), the same width in
   every mode, cycles three heights:
   **Short**, one line per row; **Medium**, up to five lines, which is where a
-  table starts; and **Full**, every row as tall as its longest cell. A cell
-  holding more than its row shows ends its last visible line in an ellipsis,
-  the words fading into it; it goes while the cell is being typed in. It is kept for
-  next time. **Double-click a row number** to show just that row whole, and
-  again to put it back. On a phone the button keeps its drawing and drops the
-  word. Whatever the height, a row's number sits on the same baseline as the
+  table starts; and **Full**, every row as tall as its longest cell — Carbon's
+  *table*, *fit to screen* and *fit to height*. A cell holding more than its
+  row shows ends its last visible line in **[...]**, the words fading into it,
+  and has no scrollbar of its own; it scrolls again, and the mark goes, while
+  the cell is being typed in. It is kept for next time. **Double-click a row
+  number** to show just that row whole, and again to put it back. On a phone
+  the button keeps its icon and drops the word. Whatever the height, a row's number sits on the same baseline as the
   first line of its cells, with its tick centred beside it.
 - **Sort** — the arrow in a header is a three-way toggle: A-Z, Z-A, then back to
   the order the rows arrived in. Numbers sort by value rather than by digit,
@@ -770,18 +783,19 @@ at its own size.
   twice — they share one store, because an image is an image. Which store that is, and how to
   empty it, is **Images** in the toolbar — see below.
 - **Drawing one** — double-click an image area, press the **pen** beside the
-  page, or press **Draw…** in the area bar, and the drawing surface opens
-  **full screen**. The pen appears under **Area** whenever the one area you have
-  selected is one a drawing can go in, which is the same rule the bar follows. Never in place: an area on
-  a card is often a centimetre across, which is somewhere to show a drawing and
-  nowhere to make one. The board sits above its tools, and the tools are one
-  row: a pen in the area's own colour, a **line** — press where it starts, let
-  go where it ends — a rubber, three nib widths, undo, redo and clear, the size
-  of the board, a **light or dark checkerboard**, **rotate** and **crop**,
-  **copy** and
-  **paste**, and then Cancel and Done — leaving is a drawing tool like the rest
-  of them, and a row of its own under the board put the two most final buttons
-  furthest from the hand that had been drawing.
+  page, or press **Draw…** in the area bar, and the drawing surface opens in a
+  **dialog**, like the CSS editor's — the card stays in view round it, and the
+  dialog can be **dragged by its title** to see what it covers. The pen appears
+  under **Area** whenever the one area you have selected is one a drawing can go
+  in, which is the same rule the bar follows. Never in place: an area on a card
+  is often a centimetre across, which is somewhere to show a drawing and nowhere
+  to make one. The board's size sits above it, and the board is always drawn as
+  large as the dialog has room for, so there is never a scrollbar round it.
+  Under it the tools are two rows: a pen in the area's own colour, a **line** —
+  press where it starts, let go where it ends — a rubber, three nib widths, undo
+  and redo, and a **light or dark checkerboard**; then **rotate** and **crop**,
+  **copy** and **paste**, and at the far end **Delete** (in red, as everywhere),
+  **Cancel** and **Done**.
 
   **Rotate** turns the drawing a quarter turn clockwise, board and all — the
   budget does not notice, because the same pixels are arranged the other way up.
@@ -815,9 +829,8 @@ at its own size.
   size, because what is in the cell is the thing being edited.
 
   It is drawn at whole screen pixels each — a pixel editor that blurs its own
-  edges is no use — which is also why <kbd>Ctrl</kbd> and the wheel step the
-  zoom through whole numbers rather than scaling smoothly. There is no
-  two-finger pinch on the board: the fingers that would make one are the fingers
+  edges is no use — so the fit steps through whole numbers rather than scaling
+  smoothly. There is no zoom beyond the fit, and no two-finger pinch on the board: the fingers that would make one are the fingers
   drawing on it. A pinch is the page editor's, and stays that.
 
   What comes out is a base64 PNG written **into the row's cell**, which is the
@@ -1305,14 +1318,14 @@ of its own, ruled off from the settings under it in the bar's border grey; on a
 wider screen it shares the first row with them, so the bar takes no more height
 than it has to.
 
-- **Page** — head: the template's name and the library behind its caret, which
-  also holds new, import, export, reset and delete, then lock ·
+- **Page** — head: the lock, then the template's name and the library behind
+  its caret, which also holds new, import, export, reset and delete ·
   sheet size (a preset or your own, a button to turn it over, and left and
   right pages), margin (one number all round, or one per edge — top, bottom and
   left and right, or inner and outer with left and right pages), bleed, crop marks · type defaults (font, size, leading,
   spacing, paragraph, baseline, list marker, indent and spacing) · surface (paper color, background image and fit) · page
   number, whether to print the total, and its margin · CSS
-- **Area** — head: the field's name, then duplicate, delete, lock · content
+- **Area** — head, on one line: lock, the field's name, duplicate, delete · content
   (data field or static text, column, mode, fit, QR settings) · type (font,
   size, weight, color) · setting (leading, spacing, paragraph, baseline, and
   for Markdown the list marker, indent and spacing, case) · alignment,

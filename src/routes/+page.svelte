@@ -52,7 +52,8 @@
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
 	import { sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
-	import { armDefault } from '$lib/modal';
+	import { armDefault, dragByTitle } from '$lib/modal';
+	import { cssIdent } from '$lib/css';
 	import { watchPresses } from '$lib/haptics';
 	import { referencedColumns } from '$lib/placeholders';
 	import { VERSION } from '$lib/version';
@@ -419,16 +420,31 @@
 	 * and the total. Scoping happens in css.ts, which anchors everything to the
 	 * card, strips `@import` and refuses any `url()` that is not a `data:` one.
 	 */
-	const CSS_PLACEHOLDER = `.box { }              /* every area */
-h1, h2, h3 { }        /* Markdown headings */
-p, ul, li { }         /* Markdown blocks */
-em, strong, code { }
-hr { }
-.page-number { }      /* the number on the card */
-.page-number .of::before { content: ' of ' }
-
-h1 { letter-spacing: 0.4mm }
-em { color: #b42318 }`;
+	/**
+	 * The placeholder is the documentation — see the dialog below — so it names
+	 * what this template actually has: each area's id, as `cssIdent` writes it,
+	 * and the classes every area carries (see Card's `idFor`).
+	 */
+	const cssPlaceholder = $derived.by(() => {
+		const ids = [...new Set(template.boxes.map((b) => cssIdent(b.slot ?? '')).filter(Boolean))];
+		return [
+			'.box { }              /* every area */',
+			...ids.map((id) => `#${id} { }`),
+			'',
+			'.content-field { }    /* by what fills it: a column, */',
+			'.content-static { }   /* its own words, */',
+			'.content-image { }    /* or a picture */',
+			'.mode-plain { }       /* by mode: also .mode-markdown, */',
+			'.mode-qr { }          /* .mode-image, .mode-color */',
+			'',
+			'h1, h2, h3 { }        /* Markdown headings */',
+			'p, ul, li { }         /* Markdown blocks */',
+			'em, strong, code { }',
+			'hr { }',
+			'.page-number { }      /* the number on the card */',
+			".page-number .of::before { content: ' of ' }"
+		].join('\n');
+	});
 
 	function openCss() {
 		cssBefore = template.css;
@@ -1961,6 +1977,22 @@ em { color: #b42318 }`;
 	// ---- import / export ----------------------------------------------------
 
 	/**
+	 * The edit badge on a Data Field area: that area's cell for this row, full
+	 * size in the table. The table is opened for it if it was folded away; a
+	 * locked table says so rather than opening an editor it would refuse.
+	 */
+	let cellRequest = $state<{ row: number; column: string } | null>(null);
+
+	function editCell(id: string) {
+		const box = template.boxes.find((b) => b.id === id);
+		const column = box?.slot ? mapping[box.slot] : undefined;
+		if (!box || box.locked || !column || !row) return;
+		if (refuseLockedTable()) return;
+		dataOpen = true;
+		cellRequest = { row: activeRow, column };
+	}
+
+	/**
 	 * Getting Started: the table of cards that walk through the app.
 	 *
 	 * It used to pour those rows into whatever table was open — undoable, but a
@@ -2494,6 +2526,7 @@ em { color: #b42318 }`;
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
 			onedit={(id) => (editingId = id)}
 			ondraw={(id) => (drawing = id)}
+			oneditcell={editCell}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
 			modalOpen={helpOpen ||
@@ -2586,6 +2619,7 @@ em { color: #b42318 }`;
 				onactivate={(i) => (activeRow = i)}
 				onnotice={notify}
 				ongettingstarted={() => void gettingStarted()}
+				openRequest={cellRequest}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
 					// follows it, so the card keeps rendering what it rendered before.
@@ -2643,8 +2677,9 @@ em { color: #b42318 }`;
 
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title">
-		<h2 id="css-title">CSS</h2>
+	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
+		<!-- Dragged by its title, so the card it is styling can be seen beside it. -->
+		<h2 id="css-title" class="drag-title" data-drag-handle>CSS</h2>
 		<!-- The placeholder is the documentation. It used to be two lines of
 		     example and two paragraphs of prose above and below it; what an author
 		     actually needs is the names of the things they can reach, and a
@@ -2656,7 +2691,7 @@ em { color: #b42318 }`;
 			rows="14"
 			spellcheck="false"
 			use:focusOnOpen
-			placeholder={CSS_PLACEHOLDER}
+			placeholder={cssPlaceholder}
 			value={template.css ?? ''}
 			onchange={(e) => (template = { ...template, css: e.currentTarget.value.trim() || undefined })}
 		></textarea>
@@ -3452,6 +3487,13 @@ em { color: #b42318 }`;
 	.modal h2 {
 		margin: 0 0 6px;
 		font-size: 16px;
+	}
+
+	/* A dialog's title is where it is moved from — see `dragByTitle`. */
+	.drag-title {
+		cursor: move;
+		user-select: none;
+		touch-action: none;
 	}
 
 	/* Sticky against the modal's own padding, so the rule under it spans the

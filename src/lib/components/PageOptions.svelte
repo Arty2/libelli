@@ -355,11 +355,22 @@
 	<!-- Ordered outwards from the thing itself: what it is, how big the sheet is,
 	     what it is made of, then what is printed on top and what you can do to it. -->
 	<div class="options" aria-label="Page setup">
-		<!-- What this is called, with everything that acts on the template as a
-		     whole behind the caret, and the lock beside it — outside the menu,
+		<!-- The lock, then what this is called, with everything that acts on the
+		     template as a whole behind the caret — the lock outside the menu,
 		     because it is a state you need to see, not an errand. -->
 		<span class="head page-head">
 			<span class="head-row">
+				<!-- First, before the name, as under the table and in the area bar.
+				     Never disabled by the lock it sets, or there would be no way out
+				     of it. -->
+				<button
+					aria-pressed={pageFrozen}
+					title={pageFrozen ? 'Unlock the design' : 'Lock the design — no dragging, no option changes'}
+					onclick={() => patchTemplate({ locked: pageFrozen ? undefined : true })}
+				>
+					<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
+					{pageFrozen ? 'Unlock' : 'Lock'}
+				</button>
 				<label class="field picker" bind:this={pickerEl}>
 					<span>Template</span>
 					<input
@@ -448,15 +459,6 @@
 						</ul>
 					{/if}
 				</label>
-				<!-- Never disabled by the lock it sets, or there would be no way out of it. -->
-				<button
-					aria-pressed={pageFrozen}
-					title={pageFrozen ? 'Unlock the design' : 'Lock the design — no dragging, no option changes'}
-					onclick={() => patchTemplate({ locked: pageFrozen ? undefined : true })}
-				>
-					<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
-					{pageFrozen ? 'Unlock' : 'Lock'}
-				</button>
 			</span>
 		</span>
 

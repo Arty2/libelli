@@ -504,12 +504,21 @@
 	<!-- Same idea: what the box holds, how its type is set, where that type sits,
 	     what the box looks like, where it is, and only then what you can do to it. -->
 	<div class="options box-options" aria-label="Area settings">
-		<!-- What this is and what it is called on one line, and the three things
-		     you can do to it on the next. They used to be at opposite ends of a bar
-		     that wraps to five rows on a laptop, so acting on the area you had just
-		     selected meant finding the far end of it. -->
+		<!-- The lock, what this is and what it is called, and the two things you
+		     do to it, on one line. Lock first, as in the page bar and under the
+		     table: it is the state of the thing named beside it, not an errand,
+		     and it is the one control the others wait on. -->
 		<span class="head">
 			<span class="head-row">
+				<button
+					aria-pressed={!!selected.locked}
+					title={selected.locked ? 'Unlock this area' : 'Lock this area — no dragging, no resizing, no option changes'}
+					disabled={pageFrozen}
+					onclick={() => patch({ locked: selected.locked ? undefined : true })}
+				>
+					<Icon name={selected.locked ? 'unlocked' : 'locked'} size={14} />
+					{selected.locked ? 'Unlock' : 'Lock'}
+				</button>
 				<span class="context">Area</span>
 				{#if source === 'field'}
 					<label class="field">
@@ -523,23 +532,9 @@
 						/>
 					</label>
 				{/if}
-			</span>
-			<!-- The two things you do to an area, then the switch that stops you
-			     doing either: Lock is a state, not an action, so it sits after them
-			     and says what pressing it will do rather than what it is. -->
-			<span class="head-row actions">
 				<button onclick={onduplicate} disabled={pageFrozen}><Icon name="replicate" size={14} /> Duplicate</button>
 				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen}>
 					<Icon name="trash" size={14} /> Delete
-				</button>
-				<button
-					aria-pressed={!!selected.locked}
-					title={selected.locked ? 'Unlock this area' : 'Lock this area — no dragging, no resizing, no option changes'}
-					disabled={pageFrozen}
-					onclick={() => patch({ locked: selected.locked ? undefined : true })}
-				>
-					<Icon name={selected.locked ? 'unlocked' : 'locked'} size={14} />
-					{selected.locked ? 'Unlock' : 'Lock'}
 				</button>
 			</span>
 		</span>
