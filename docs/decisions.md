@@ -1336,6 +1336,17 @@ became a reorder. Now a touch has to hold still for 350ms, with a buzz, before
 it carries; a swipe before that scrolls the table by hand. A mouse still
 carries at once: nobody scrolls by dragging a header with one.
 
+**A cell opened whole takes the table's room, not the screen's.** It was a
+modal over everything, the third layer after the page and the table, and it
+hid the card whose words were being edited. Laid over the table inside its own
+section, it has exactly the room the table had and leaves the card in view — so
+the flash below, and the card itself, can be watched while typing.
+
+**Entering a cell flashes what it feeds.** The same short blue flash a rescued
+area gets, on every area bound to the cell's column or naming it as
+`{{column}}`: a pointer from the cell to the card, not a selection, so it
+changes nothing about what is selected.
+
 **The overflow mark is a button.** It opens the full-size editor, the one
 action a hold gave, for anyone who never learnt the hold. It hides while the
 field is focused through `:has(textarea:focus)` rather than `:focus-within`,

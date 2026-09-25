@@ -29,6 +29,8 @@
 		usedColumns: Set<string>;
 		/** put an area bound to this column on the card */
 		onplacecolumn: (column: string) => void;
+		/** a cell of this column has just been entered, so the card can point at it */
+		oncellfocus: (column: string) => void;
 		/** lock or unlock the whole table; the page owns the dataset */
 		onlock: (locked: boolean) => void;
 		ondeletetable: () => void;
@@ -74,6 +76,7 @@
 		onnewtable,
 		usedColumns,
 		onplacecolumn,
+		oncellfocus,
 		onlock,
 		ondeletetable,
 		onswaptable,
@@ -1202,6 +1205,7 @@
 									onfocus={() => {
 										editing = { row: i, column };
 										onactivate(i);
+										oncellfocus(column);
 									}}
 									onblur={() => (editing = null)}
 									onclick={(e) => e.stopPropagation()}
@@ -1481,35 +1485,37 @@
 			onchange={importFile}
 		/>
 	</div>
-</section>
-
-{#if bigCell}
-	{@const open = bigCell}
-	<div class="modal-backdrop" role="presentation" onclick={() => closeBigCell(false)}></div>
-	<div class="modal cell-editor" role="dialog" aria-modal="true" aria-labelledby="cell-editor-title">
-		<h2 id="cell-editor-title">{open.column}, row {rowLabel(dataset.rows[open.row], open.row)}</h2>
-		<textarea
-			value={open.draft}
-			rows="14"
-			readonly={locked}
-			use:focusOnOpen
-			use:completePlaceholders={dataset.columns}
-			oninput={(e) => (bigCell = { ...open, draft: e.currentTarget.value })}
-			onkeydown={(e) => {
-				if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-					e.preventDefault();
-					closeBigCell(true);
-				}
-			}}
-		></textarea>
-		<div class="modal-actions">
-			<span class="count-line">{countLabel(open.draft)}</span>
-			<span class="spacer"></span>
-			<button onclick={() => closeBigCell(false)}>Cancel</button>
-			<button class="primary" title="Ctrl/Cmd+Enter" onclick={() => closeBigCell(true)}>Done</button>
+	<!-- A cell opened whole, over the table rather than over the app: it is
+	     the table's business, and a third dialog on top of the page and the
+	     table hid the card the words are for. It takes exactly the table's
+	     room — the rows and the bar under them — and gives it back on Done or
+	     Cancel. -->
+	{#if bigCell}
+		{@const open = bigCell}
+		<div class="cell-editor" role="dialog" aria-labelledby="cell-editor-title">
+			<h2 id="cell-editor-title">{open.column}, row {rowLabel(dataset.rows[open.row], open.row)}</h2>
+			<textarea
+				value={open.draft}
+				readonly={locked}
+				use:focusOnOpen
+				use:completePlaceholders={dataset.columns}
+				oninput={(e) => (bigCell = { ...open, draft: e.currentTarget.value })}
+				onkeydown={(e) => {
+					if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+						e.preventDefault();
+						closeBigCell(true);
+					}
+				}}
+			></textarea>
+			<div class="modal-actions">
+				<span class="count-line">{countLabel(open.draft)}</span>
+				<span class="spacer"></span>
+				<button onclick={() => closeBigCell(false)}>Cancel</button>
+				<button class="primary" title="Ctrl/Cmd+Enter" onclick={() => closeBigCell(true)}>Done</button>
+			</div>
 		</div>
-	</div>
-{/if}
+	{/if}
+</section>
 
 {#if confirmColumn !== null && dataset.columns[confirmColumn]}
 	{@const column = dataset.columns[confirmColumn]}
@@ -1552,6 +1558,8 @@
 
 <style>
 	.data {
+		/* The cell editor is laid over the table inside this. */
+		position: relative;
 		/* One line of a cell's text: its size times its leading. The gutter
 		   and the row-height modes are measured in it. */
 		--cell-line: calc(12px * 1.45);
@@ -2412,9 +2420,38 @@
 		resize: vertical;
 	}
 
-	.cell-editor textarea {
+	.cell-editor {
+		position: absolute;
+		inset: 0;
+		z-index: 6;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 12px;
+		background: #fff;
 		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
-		min-height: 40dvh;
+	}
+
+	.cell-editor h2 {
+		margin: 0;
+		font-size: 13px;
+		font-weight: 600;
+	}
+
+	.cell-editor textarea {
+		flex: 1;
+		min-height: 0;
+		width: 100%;
+		box-sizing: border-box;
+		padding: 8px;
+		border: 1px solid #ccc;
+		border-radius: var(--radius-input);
+		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+		resize: none;
+	}
+
+	.cell-editor .modal-actions {
+		margin-top: 0;
 	}
 
 	.count-line {

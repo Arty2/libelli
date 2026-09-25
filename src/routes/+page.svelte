@@ -1173,6 +1173,25 @@ em { color: #b42318 }`;
 		notify(`${column} is on the card — drag the new area where it belongs.`);
 	}
 
+	/**
+	 * Entering a cell flashes the areas on the card that print it — bound to
+	 * its column, or naming it as `{{column}}` in their own words — in the
+	 * bounds' blue, briefly. The table and the card are side by side, and
+	 * which area a cell feeds is the question typing into it always raises.
+	 * The same flash a rescued area gets, so it reads as "here", not as a
+	 * selection.
+	 */
+	function flashColumn(column: string) {
+		const ids = template.boxes
+			.filter(
+				(b) =>
+					(b.slot && mapping[b.slot] === column) ||
+					referencedColumns(b.static?.text ?? '', dataset.columns).includes(column)
+			)
+			.map((b) => b.id);
+		if (ids.length) flash(ids);
+	}
+
 	// ---- positioning the areas from the columns -----------------------------
 
 	/**
@@ -2471,6 +2490,7 @@ em { color: #b42318 }`;
 				onnewtable={() => void newDataset()}
 				{usedColumns}
 				onplacecolumn={placeColumn}
+				oncellfocus={flashColumn}
 				onlock={(locked) => {
 					describe(locked ? 'Lock the table' : 'Unlock the table');
 					dataset = stripUndefined({ ...$state.snapshot(dataset), locked: locked || undefined }) as Dataset;

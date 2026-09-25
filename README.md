@@ -541,9 +541,12 @@ a notice can appear.
   a new area, named after the column and bound to it, where a new area goes.
 - **Counting** — while a cell is being typed in, its characters and words are
   counted in its bottom corner.
+- **Which area it feeds** — entering a cell flashes the areas on the card that
+  print it, in the bounds' blue, for a moment.
 - **A cell full size** — press and hold a cell, or press the ellipsis on a cell
-  that holds more than it shows, for a dialog with the whole of it and the
-  same count. It edits a copy: **Done** (or Ctrl/Cmd+Enter) keeps it,
+  that holds more than it shows, and the whole of it opens in the table's own
+  space — over the rows, with the card still in view beside or above it — with
+  the same count. It edits a copy: **Done** (or Ctrl/Cmd+Enter) keeps it,
   **Cancel** and Esc do not.
 - **Lock** — the padlock at the right-hand end of the bar under the table, after
   the picker, freezes it: no typing, no new, moved,
