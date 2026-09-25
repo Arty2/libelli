@@ -318,6 +318,13 @@
 		patch({ paragraph: { mode, amount: value } });
 	}
 
+	/** An area with its own content rather than a column's, and nothing in it. */
+	const emptyStatic = $derived(
+		!!selected &&
+			!selected.slot &&
+			!(selected.static?.text?.trim() || selected.static?.dataUrl || selected.static?.url || selected.static?.svg)
+	);
+
 	/** The area's own list style, field by field; a blank field takes the page's. */
 	function setList(change: Record<string, unknown>) {
 		patch({ list: normaliseList({ ...selected?.list, ...change }) });
@@ -1199,10 +1206,17 @@
 				</select>
 			</label>
 			<label class="check">
+				<!-- Off, not hidden, for an area holding its own words and none of
+				     them: it is empty on every card, and the editor keeps it drawn
+				     with its placeholder so it can still be selected — the setting is
+				     kept, and says it does not apply. -->
 				<input
 					type="checkbox"
 					checked={!!selected.hideWhenEmpty}
-					disabled={boxFrozen}
+					disabled={boxFrozen || emptyStatic}
+					title={emptyStatic
+						? 'Does not apply to an area holding its own words and none of them — it stays in view so it can be selected'
+						: undefined}
 					onchange={(e) => patch({ hideWhenEmpty: e.currentTarget.checked })}
 				/>
 				Hide When Empty

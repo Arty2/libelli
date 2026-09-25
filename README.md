@@ -100,8 +100,11 @@ resize boxes directly, or type exact millimetres.
   **top-left** corner, in a column of their own: the link, and under it the
   buoy — an area in the middle of a chain wears both. **Point at either** and a dotted
   thread draws itself between the two — an inverted S, leaving each badge
-  downwards before it crosses — sagging a little and walking from the
-  one under the pointer to the other end — wherever on the card that is. It
+  downwards before it crosses, and bowed out to the left when the two are one
+  above the other so it is never a straight rule — sagging a little, its dots
+  always walking from the link to the buoy, the way the tie runs, wherever on
+  the card they are. Pointing at a buoy threads it to what follows *that*
+  area, never to what it follows itself. It
   is still while you have asked for less motion. Selecting either end lights
   the *mark* on the other — the glyph only, never a fill, because those badges
   are on areas you have not selected and a filled badge reads as a second
@@ -159,7 +162,8 @@ resize boxes directly, or type exact millimetres.
   reaches paper, the lightbox or a PNG. An area set to hide when empty hides on
   a card whose column is simply blank, because that is what it will do on
   paper; one with **nothing to draw from** at all — no rows, or a name bound to
-  no column or to one since renamed or deleted — stays put instead, because a
+  no column or to one since renamed or deleted, or an area holding its own
+  words with none in it — stays put instead, with its placeholder, because a
   design whose areas have all collapsed to nothing is a design you cannot click
   on. An area carrying its own words wears a plug pulled out of its socket,
   because it is not plugged into the data. An empty image area reads *Image*,
@@ -171,7 +175,8 @@ resize boxes directly, or type exact millimetres.
   the bounds' own color, with more than twice their gap between dashes so it is
   not taken for an edge, and in the selection's blue while the area is
   selected. Beside it are the shears in a faint blue, the cut *offered*: press
-  them and the area is clipped at that height. The red shears on a clipped
+  them and the area is clipped at that height. Under the pointer both pairs
+  shut, which is what pressing them does. The red shears on a clipped
   area are the same switch the other way — press them and it grows to fit.
 - **A selected area** draws only its selection, not its dashed bound as well
   under it, which doubled every edge.

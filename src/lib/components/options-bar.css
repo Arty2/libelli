@@ -134,6 +134,11 @@
 	white-space: nowrap;
 }
 
+/* A checkbox that does not apply greys its words with it. */
+.options .check:has(input:disabled) {
+	color: #999;
+}
+
 /* A field is a line under a value, not a box around it.
 
    Thirty controls in a row, each in its own white well with its own grey

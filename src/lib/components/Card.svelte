@@ -309,7 +309,11 @@
 	 */
 	const unsourced = (box: Box): boolean => {
 		if (dataless) return true;
-		if (!box.slot || !row) return false;
+		// An area holding its own words draws from nothing that varies: empty
+		// here, it is empty on every card, and hiding it only made it the one
+		// area that could not be clicked to type into.
+		if (!box.slot) return true;
+		if (!row) return false;
 		const column = mapping[box.slot];
 		return !column || !(column in row);
 	};
@@ -1319,36 +1323,44 @@
 	let trimEl = $state<HTMLElement | null>(null);
 	let threads = $state<string[]>([]);
 
-	function showThreads(from: HTMLElement, box: Box) {
+	function showThreads(box: Box, kind: 'tied' | 'moored') {
 		if (!trimEl) return;
-		const ends =
-			box.anchor
-				? [trimEl.querySelector<HTMLElement>(`[data-moor="${CSS.escape(box.anchor.to)}"]`) ??
-						trimEl.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(box.anchor.to)}"]`)]
-				: template.boxes
-						.filter((b) => b.anchor?.to === box.id)
-						.map(
-							(b) =>
-								trimEl!.querySelector<HTMLElement>(`[data-tie="${CSS.escape(b.id)}"]`) ??
-								trimEl!.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(b.id)}"]`)
-						);
-		const origin = trimEl.getBoundingClientRect();
-		const at = (el: HTMLElement) => {
-			const r = el.getBoundingClientRect();
+		const el = trimEl;
+		const badge = (attr: 'tie' | 'moor', id: string) =>
+			el.querySelector<HTMLElement>(`[data-${attr}="${CSS.escape(id)}"]`) ??
+			el.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`);
+		// By the badge pointed at, not by what the area happens to be: an area in
+		// the middle of a chain wears both, and pointing at its buoy used to draw
+		// the thread up to its own parent instead of down to what follows it.
+		// Every pair is tie first, buoy second, whichever end is pointed at: the
+		// dots always walk from the area that follows to the one it is tied to.
+		const pairs: Array<[HTMLElement | null, HTMLElement | null]> =
+			kind === 'tied'
+				? box.anchor
+					? [[badge('tie', box.id), badge('moor', box.anchor.to)]]
+					: []
+				: template.boxes.filter((b) => b.anchor?.to === box.id).map((b) => [badge('tie', b.id), badge('moor', box.id)]);
+		const origin = el.getBoundingClientRect();
+		const at = (node: HTMLElement) => {
+			const r = node.getBoundingClientRect();
 			return { x: (r.left + r.width / 2 - origin.left) / scale, y: (r.top + r.height / 2 - origin.top) / scale };
 		};
-		const a = at(from);
-		threads = ends
-			.filter((el): el is HTMLElement => !!el)
-			.map((el) => {
-				const b = at(el);
-				// An inverted S: leaving each badge upright rather than level, so
-				// it turns across the middle the other way from a lying-down S, and
-				// sagging a little under its own weight the longer it is — a
-				// thread, not a connector in a diagram.
+		threads = pairs
+			.filter((pair): pair is [HTMLElement, HTMLElement] => !!pair[0] && !!pair[1])
+			.map(([tie, buoy]) => {
+				const a = at(tie);
+				const b = at(buoy);
+				// An inverted S: leaving each badge upright rather than level, and
+				// sagging a little under its own weight the longer it is — a thread,
+				// not a connector in a diagram. Bowed out to the left, away from the
+				// areas, by as much as the two ends are short of being side by side:
+				// two badges one straight above the other had upright handles on one
+				// line, and the curve came out a straight dotted rule.
 				const mid = (a.y + b.y) / 2;
-				const sag = Math.hypot(b.x - a.x, b.y - a.y) * 0.15;
-				return `M${a.x} ${a.y}C${a.x} ${mid + sag} ${b.x} ${mid + sag} ${b.x} ${b.y}`;
+				const span = Math.hypot(b.x - a.x, b.y - a.y);
+				const sag = span * 0.15;
+				const bow = Math.max(0, span * 0.45 - Math.abs(b.x - a.x));
+				return `M${a.x} ${a.y}C${a.x - bow} ${mid + sag} ${b.x - bow} ${mid + sag} ${b.x} ${b.y}`;
 			});
 	}
 
@@ -1495,12 +1507,17 @@
 			: 'This area has grown past the height it was given. Press to cut it at that height instead.'}
 		aria-label={cutting ? 'Let this area grow to fit' : 'Cut this area at its height'}
 		onpointerdown={(e) => e.stopPropagation()}
+		onpointerenter={() => (hoveredBadge = `${box.id}:cut`)}
+		onpointerleave={() => (hoveredBadge = null)}
 		onclick={() => {
+			flashBadge(`${box.id}:cut`);
 			onaction?.(cutting ? 'Let the area grow' : 'Cut the area at its height');
 			onchange?.({ ...box, overflow: cutting ? 'grow' : 'clip' });
 		}}
 	>
-		<Icon name="cut" size={11} />
+		<!-- Shut while the pointer is on them, like the other badges that are
+		     buttons: the act of pressing — a cut made, or one let go of. -->
+		<Icon name={badgeArmed(`${box.id}:cut`) && editable(box) ? 'cut-closed' : 'cut'} size={11} />
 	</button>
 {/snippet}
 
@@ -1731,9 +1748,9 @@
 							aria-label="Break this area's anchor"
 							onpointerdown={(e) => e.stopPropagation()}
 							data-tie={box.id}
-							onpointerenter={(e) => {
+							onpointerenter={() => {
 								hoveredBadge = `${box.id}:tied`;
-								showThreads(e.currentTarget, box);
+								showThreads(box, 'tied');
 							}}
 							onpointerleave={() => {
 								hoveredBadge = null;
@@ -1757,9 +1774,9 @@
 								aria-label="Cast off the areas anchored to this one"
 								onpointerdown={(e) => e.stopPropagation()}
 								data-moor={box.id}
-								onpointerenter={(e) => {
+								onpointerenter={() => {
 									hoveredBadge = `${box.id}:moored`;
-									showThreads(e.currentTarget, box);
+									showThreads(box, 'moored');
 								}}
 								onpointerleave={() => {
 									hoveredBadge = null;
@@ -2759,8 +2776,8 @@
 
 		/* Over the whole trim and out past it, since a badge hangs outside its
 		   area and an area can hang off the page. Dotted — round caps on dashes
-		   of nothing — and walking from the badge under the pointer toward the
-		   other end. */
+		   of nothing — and walking from the tie toward the buoy, the way the
+		   relationship runs, whichever of the two is pointed at. */
 		.threads {
 			inset: 0;
 			width: 100%;

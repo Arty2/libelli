@@ -582,11 +582,14 @@ The line is between an area with *nothing* to draw from and one whose cell is
 merely blank. Nothing means either there is no row at all — an empty table, or
 one just cleared — or the area is bound to a column the data has not got: an
 unmapped slot, or one still pointing at a column that has been renamed or
-deleted. Either way it will be empty on every card there is, so hiding it shows
+deleted — or it is not bound at all and holds its own words, and none of them.
+Either way it will be empty on every card there is, so hiding it shows
 nobody what this row prints. The second half of that matters as much as the
 first: clearing the table and adding a column back gives you one empty row, at
 which point "no row at all" no longer holds and every area would have collapsed
-again one click after being rescued.
+again one click after being rescued. The area bar says as much: for an empty area holding its
+own words, Hide When Empty is shown disabled, still ticked if it was, because
+the setting is kept but does not apply there.
 
 An area bound to a column that *does* exist and happens to be blank here is left
 alone — hiding is exactly what it was asked to do, and the editor has to show
@@ -979,7 +982,13 @@ out as drawn, so on a mirrored left-hand page it is the mirrored corner.
 **Pointing at a tie draws its thread.** The link and the buoy are at two
 corners of two areas, often with others between, and the lit glyph on the far
 one was a thing to hunt for. Hovering either draws a dotted S between the two
-badges, sagging with its length and walking from the pointer's end. The S is
+badges, sagging with its length. The dots walk from the tie to the buoy
+whichever is pointed at — the direction the relationship runs — and which
+threads are drawn is decided by the badge pointed at, not by the area: a middle
+link wears both, and its buoy used to thread up to its own parent. Where the
+two ends are nearly one above the other the curve is bowed out to the left by
+what they lack of being side by side, or its upright handles fell on one line
+and it drew as a straight dotted rule. The S is
 the inverted one: it leaves each badge vertically, down, rather than level,
 which read as a thread hanging between two pins rather than a wire routed
 between two ports. It is
