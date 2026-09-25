@@ -7,7 +7,7 @@
 	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
 	import { countText, dropTarget, indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
 	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
-	import type { Dataset, Row } from '$lib/types';
+	import type { Dataset, Row, RowHeight } from '$lib/types';
 
 	interface Props {
 		dataset: Dataset;
@@ -40,6 +40,9 @@
 		ontraydrag: (phase: 'start' | 'move' | 'end', clientY: number) => void;
 		/** column widths in px, keyed by column name; owned by the app's UI state */
 		columnWidths: Record<string, number>;
+		/** how tall a row may be; owned by the app's UI state, like the widths */
+		rowHeight: RowHeight;
+		onrowheight: (next: RowHeight) => void;
 		oncolumnwidths: (widths: Record<string, number>) => void;
 		activeRow: number;
 		/** the column the selected area draws from, so its cells can be pointed at */
@@ -74,6 +77,8 @@
 		ontraydrag,
 		columnWidths,
 		oncolumnwidths,
+		rowHeight,
+		onrowheight,
 		activeRow,
 		selectedColumn = null,
 		onactivate,
@@ -121,6 +126,54 @@
 	let pickerAt = $state({ right: 0, bottom: 0 });
 
 	const tableName = $derived(dataset.name ?? '');
+
+	/**
+	 * Row height, cycled by one button: short, medium, and as tall as the
+	 * longest cell. Three states on one control rather than a menu, because it
+	 * is a view you flip through to find the one that suits the table, not a
+	 * setting you look up.
+	 */
+	const ROW_HEIGHTS: RowHeight[] = ['short', 'medium', 'full'];
+	const ROW_HEIGHT_LABELS: Record<RowHeight, string> = { short: 'Short', medium: 'Medium', full: 'Full' };
+	const nextRowHeight = $derived(ROW_HEIGHTS[(ROW_HEIGHTS.indexOf(rowHeight) + 1) % ROW_HEIGHTS.length]);
+
+	/**
+	 * Full height by hand, for a browser with no `field-sizing` (Safari): the
+	 * field is set to the height its words scroll to, whenever they change or
+	 * its width does. Elsewhere this does nothing — the stylesheet has it.
+	 */
+	const sizesItself = typeof CSS !== 'undefined' && CSS.supports('field-sizing', 'content');
+
+	function autosize(node: HTMLTextAreaElement, on: boolean) {
+		let active = on && !sizesItself;
+		const fit = () => {
+			if (!active) return;
+			node.style.height = 'auto';
+			node.style.height = `${node.scrollHeight}px`;
+		};
+		const observer = new ResizeObserver(() => requestAnimationFrame(fit));
+		const start = () => {
+			node.addEventListener('input', fit);
+			observer.observe(node.closest('td') ?? node);
+			fit();
+		};
+		const stop = () => {
+			node.removeEventListener('input', fit);
+			observer.disconnect();
+			node.style.height = '';
+		};
+		if (active) start();
+		return {
+			update(next: boolean) {
+				const wanted = next && !sizesItself;
+				if (wanted === active) return fit();
+				active = wanted;
+				if (active) start();
+				else stop();
+			},
+			destroy: stop
+		};
+	}
 
 	/** Read-only, from here and from the card — see `Dataset.locked`. */
 	const locked = $derived(!!dataset.locked);
@@ -811,7 +864,12 @@
 
 <svelte:window onkeydown={onKeydown} onpointerdown={onWindowPointer} />
 
-<section class="data" aria-label="Card data">
+<section
+	class="data"
+	class:rows-short={rowHeight === 'short'}
+	class:rows-full={rowHeight === 'full'}
+	aria-label="Card data"
+>
 	<div class="scroll">
 		<table style="min-width:{tableWidth}px">
 			<!-- Widths belong to the columns, not to the cells: one place to set
@@ -1009,6 +1067,7 @@
 									value={row[column] ?? ''}
 									readonly={locked}
 									use:hold={() => openBigCell(i, column)}
+									use:autosize={rowHeight === 'full'}
 									onfocus={() => {
 										editing = { row: i, column };
 										onactivate(i);
@@ -1084,6 +1143,25 @@
 			<span class="rule"></span>
 		{/if}
 		<span class="spacer"></span>
+		<!-- How tall a row may be: one line, a few, or all of its longest cell.
+		     The label says the height the rows are at; the title, the next. -->
+		<button
+			class="row-height"
+			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
+			aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
+			onclick={() => onrowheight(nextRowHeight)}
+		>
+			<svg class="rows-glyph" viewBox="0 0 16 16" aria-hidden="true">
+				{#if rowHeight === 'short'}
+					<path d="M2 3h12M2 6h12M2 9h12M2 12h12" />
+				{:else if rowHeight === 'medium'}
+					<path d="M2 3h12M2 8h12M2 13h12" />
+				{:else}
+					<path d="M2 2h12M2 14h12" />
+				{/if}
+			</svg>
+			{ROW_HEIGHT_LABELS[rowHeight]}
+		</button>
 		<!-- What table this is, at the far end of the bar: the buttons act on it,
 		     and it is the one control here that is a name rather than an act. One
 		     design prints any number of tables, so this is not the template
@@ -1316,6 +1394,9 @@
 
 <style>
 	.data {
+		/* One line of a cell's text: its size times its leading. The gutter
+		   and the row-height modes are measured in it. */
+		--cell-line: calc(12px * 1.45);
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
@@ -1616,6 +1697,27 @@
 		position: relative;
 	}
 
+	/* Row height, from the toggle under the table — see `rowHeight`. Short is
+	   one line and padding, and stays one line while typed in: a row that
+	   grew on focus would move every row under it. Full lifts the cap, so a
+	   row is as tall as its longest cell; where there is no `field-sizing`
+	   the `autosize` action does that measuring by hand. Medium is the
+	   stylesheet as it stands above. */
+	/* Short is the first line and a little under it — no bottom padding, so
+	   the second line of a longer cell stays inside the half-leading below
+	   the edge instead of showing the tops of its letters. */
+	.data.rows-short td textarea,
+	.data.rows-short td textarea:focus {
+		height: calc(var(--cell-line) + 7px);
+		max-height: calc(var(--cell-line) + 7px);
+		padding-bottom: 0;
+	}
+
+	.data.rows-full td textarea,
+	.data.rows-full td textarea:focus {
+		max-height: none;
+	}
+
 	tr.active td {
 		background: #eff5ff;
 	}
@@ -1673,10 +1775,19 @@
 		gap: 4px;
 	}
 
+	/* In a row, the line is exactly one line of a cell's text — the same size,
+	   the same leading, starting the same 5px down as a field's padding — so
+	   the number set in it lands on the cells' first baseline, and the tick,
+	   centred in the same line, is middle-aligned with the number. */
+	tbody .gutter-line {
+		height: var(--cell-line);
+	}
+
 	.gutter .number {
 		min-width: 1.2em;
 		text-align: right;
-		line-height: 1;
+		font-size: 12px;
+		line-height: var(--cell-line);
 	}
 
 	/* A square, not a radio: several rows can be chosen at once, and the
@@ -1982,6 +2093,16 @@
 
 	.actions .spacer {
 		flex: 1;
+	}
+
+	/* Rules drawn at the spacing the rows are at: four close, three apart,
+	   two at the extremes. Stroked in the text color, like Carbon's marks. */
+	.rows-glyph {
+		width: 15px;
+		height: 15px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.5;
 	}
 
 	.actions button[aria-pressed='true'] {

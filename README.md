@@ -546,6 +546,11 @@ a notice can appear.
   width you get and one long cell cannot shove every other column sideways.
 - **Cells fill their row** — a row is as tall as its tallest cell, and every
   field in it is that tall, so the target you click is the cell you can see.
+- **Row height** — the button left of the **Table** picker cycles three heights:
+  **Short**, one line per row; **Medium**, a few lines, which is where a table
+  starts; and **Full**, every row as tall as its longest cell. It is kept for
+  next time. Whatever the height, a row's number sits on the same baseline as
+  the first line of its cells, with its tick centred beside it.
 - **Sort** — the arrow in a header is a three-way toggle: A-Z, Z-A, then back to
   the order the rows arrived in. Numbers sort by value rather than by digit,
   case is ignored, and blanks stay at the bottom either way. This reorders the

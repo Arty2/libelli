@@ -1272,6 +1272,19 @@ rounding of a few hundredths of a millimetre, from going through pixels and back
 
 ## `src/lib/components/DataTable.svelte`
 
+**The gutter is set in the cells' own line.** Each row's number and tick sit in a
+box exactly one line of cell text tall — 12px at 1.45, starting the same 5px
+down a field's padding does — so the number lands on the cells' first baseline
+and the tick, centred in that line, is middle-aligned with it. `--cell-line` is
+the one place that measurement lives; the row-height modes are counted in it.
+
+**Row height is a view, cycled on one button.** Short, medium, full: a view you
+flip through to find what suits the table, so three presses on one control
+rather than a menu, kept in the UI state beside the column widths. Short does
+not grow on focus, because a row that did would shove every row under it; full
+lifts the cap, and where there is no `field-sizing` an `autosize` action sets
+each field to its scroll height instead.
+
 **The bar under the table is the picker and the lock.** Paste, Import and
 Export are errands done with a table, so they sit in its menu with New and
 Delete; what is left in the bar is what acts on chosen rows, the name of the

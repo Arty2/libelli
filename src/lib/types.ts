@@ -421,6 +421,11 @@ export interface UiState {
 	 * ignores this.
 	 */
 	trayWidth?: number;
+	/** How tall a table row may be; absent is `medium`, the height it always was. */
+	rowHeight?: RowHeight;
 }
+
+/** One line, a few lines, or as tall as the row's longest cell. */
+export type RowHeight = 'short' | 'medium' | 'full';
 
 export type GridStyle = 'lines' | 'dots';

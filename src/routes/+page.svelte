@@ -2439,6 +2439,8 @@ em { color: #b42318 }`;
 				trayDraggable={stacked}
 				ontraydrag={dragTray}
 				columnWidths={ui.columnWidths}
+				rowHeight={ui.rowHeight ?? 'medium'}
+				onrowheight={(rowHeight) => (ui = { ...ui, rowHeight })}
 				oncolumnwidths={(widths) => {
 					// Kept to the columns that exist, so an imported table does not
 					// carry the last one's widths around in this browser forever.
