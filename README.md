@@ -99,7 +99,8 @@ resize boxes directly, or type exact millimetres.
   the released box keeps the place it was sitting in. The link hangs off the
   follower's **top-left** corner, the edge that is tied; the buoy is in the
   column at the followed area's top right. **Point at either** and a dotted
-  thread draws itself between the two, sagging a little and walking from the
+  thread draws itself between the two — an inverted S, leaving each badge
+  downwards before it crosses — sagging a little and walking from the
   one under the pointer to the other end — wherever on the card that is. It
   is still while you have asked for less motion. Selecting either end lights
   the *mark* on the other — the glyph only, never a fill, because those badges
@@ -186,8 +187,11 @@ resize boxes directly, or type exact millimetres.
   so can a cell, quoting another cell of its own row. Markdown around them works
   in a Markdown area. `{{Artist Name}}` finds the column `Artist-Name`, and case
   does not matter. Substitution happens **once**: what a placeholder is replaced
-  with is never read for placeholders itself, so a cell that names itself, or
-  two that name each other, print what they hold rather than looping. Type
+  with is never read for placeholders itself, so two cells that name each
+  other print what they hold rather than looping. A cell that names **its own
+  column** is not filled in at all: it is left as written and, on the card,
+  underlined in wavy red like a name nothing answers to, because it is the
+  same mistake. Type
   `{{` in any field that takes text — a cell, the area's Text, the card
   itself — and the columns are offered; arrows move, Enter or Tab takes one,
   Esc leaves what you typed. A placeholder that names no column is
@@ -210,7 +214,9 @@ resize boxes directly, or type exact millimetres.
   paragraphs follow one, and the book rule of indenting only a paragraph after
   another meant it hardly ever showed.
 - **Lists** — **List** picks a Markdown bullet list's marker, **• Bullet**,
-  **● Disc** or **– Dash**; **List Indent** is the space from the area's edge to
+  **● Disc**, **– Dash** or **— Em Dash**, each set in the area's own font
+  like the words beside it (a font without the glyph falls back as for any
+  missing character); **List Indent** is the space from the area's edge to
   the markers, and **List Spacing** the space between one item and the next,
   both in mm. All three are in page setup and, for a Markdown area, in the area
   bar, where each on its own overrides the page's.
@@ -251,7 +257,8 @@ resize boxes directly, or type exact millimetres.
 - **Overflow** — a box whose content is taller than the box will let it be draws
   the cut: a dashed red line along its bottom edge, where the words are actually
   severed, with a pair of shears astride that line at the right-hand end —
-  out past the column of badges when the area has one. A clipped card looks
+  in line with the badges above it, and below the last of them when the
+  area is shallower than their column. A clipped card looks
   fine on screen right up until it is printed, and the line says where; the
   shears are also the way out, and a press lets the area grow.
 - **Past the edge** — the editor does not cut anything off at the card's edge:
@@ -417,7 +424,8 @@ resize boxes directly, or type exact millimetres.
   button that unlocks it could never be reached. A page lock covers every box
   and the page settings as well. A padlock appears on a locked area, and it is a
   button: pressing it unlocks that area, the way the two anchor badges beside it
-  undo what they say. A locked
+  undo what they say. Words can still be typed into an area on a locked page,
+  and a drawing opened and drawn on: those are content, not the design. A locked
   *page* says **Locked** in a band above the sheet and greys every bound on the
   card, because nothing on it can be moved and so nothing on it is worth
   coloring for a reason. It also takes the per-area badges away: every one of
@@ -542,13 +550,14 @@ a notice can appear.
   header's corner is how you say *all of them*. Its mark is a clipboard with
   something leaving it — this app has a clipboard for looks as well, and a
   Duplicate on the card, and the glyph is what tells the three apart.
-- **Import CSV** — in the **Table** menu too, with **Export CSV** beside it, so
+- **Import…** — in the **Table** menu too, with **Export** beside it, so
   the bar under the table holds only what acts on chosen rows, the picker and
-  the lock. The same parser against a whole file, header and all. **Load
-  Onboarding**, in the same menu, puts the four onboarding cards
-  back: they walk through the app, and they are somewhere to start when a blank
-  table is not. Your rows are replaced, the template is untouched, and
-  Ctrl/Cmd+Z undoes it. A file holding no rows is **refused rather than
+  the lock. The same parser against a whole file, header and all. **Getting
+  Started**, in the same menu under **New table…**, opens the four cards that
+  walk through the app: the table that holds them untouched if there is one,
+  and otherwise a new table of them — never over the rows you are in, so a
+  Getting Started table you have edited is kept and a fresh one is made
+  beside it. A file holding no rows is **refused rather than
   applied** — picking the wrong one in a file picker should not cost you the
   table — though a file of headers and no rows will still set up the columns of
   a table that is already empty.
@@ -562,7 +571,9 @@ a notice can appear.
   and headers imported from a file or a paste are cleaned the same way — because
   a column name is also something written between braces: `{{Artist-Name}}`.
   Letters of any script are letters.
-- **Reorder** — drag a header sideways and drop it where the blue edge shows.
+- **Reorder** — drag a header sideways and drop it where the blue line shows —
+  drawn down the whole height of the table, not only the header, so the gap it
+  lands in is plain wherever you are looking.
   With a finger, hold the header still for a moment first — it lifts, with a
   buzz — and then drag; a sideways swipe that has not lifted anything scrolls
   the table instead.
@@ -576,8 +587,12 @@ a notice can appear.
   a new area, named after the column and bound to it, where a new area goes.
 - **Counting** — while a cell is being typed in, the bar under the table is
   about that cell: its characters and words, and **Edit**, which opens it full
-  size. The row actions come back when the cell is left. Both sit at the far
-  right of the bar; the lock, the table and the row height are at the left.
+  size. The row actions come back when the cell is left. Both sit toward the
+  right of the bar, after the lock and the table at the left, with the row
+  height last.
+- **Moving rows** — with rows chosen, the up and down chevrons before **Copy**
+  move them a row at a time, as a block; row order is print order. A sort
+  that was on is dropped, since the rows are no longer in it.
 - **Which area it feeds** — entering a cell flashes the areas on the card that
   print it, in the bounds' blue, for a moment.
 - **A cell full size** — press **Edit**, press and hold a cell, or press the
@@ -585,7 +600,8 @@ a notice can appear.
   in the table's own space — over the rows, with the card still in view beside
   or above it — with the same count. It edits the cell itself, live, so the
   card follows as you type and undo reaches every change; the **×** at the top
-  right, Esc or Ctrl/Cmd+Enter put the table back. On a locked table none of
+  right, Esc or Ctrl/Cmd+Enter put the table back. The words are set at twice
+  the table's size, for reading at length. On a locked table none of
   the three opens it: the full-size editor is a way to type.
 - **Lock** — the padlock at the left-hand end of the bar under the table, before
   the picker, freezes it: no typing, no new, moved,
@@ -600,7 +616,8 @@ a notice can appear.
   width you get and one long cell cannot shove every other column sideways.
 - **Cells fill their row** — a row is as tall as its tallest cell, and every
   field in it is that tall, so the target you click is the cell you can see.
-- **Row height** — the button right of the **Table** picker, the same width in
+- **Row height** — the button at the right-hand end of the bar, hidden while
+  rows are chosen (their actions take that end), the same width in
   every mode, cycles three heights:
   **Short**, one line per row; **Medium**, up to five lines, which is where a
   table starts; and **Full**, every row as tall as its longest cell. A cell
@@ -629,10 +646,11 @@ a notice can appear.
   nobody. There is no Duplicate beside it any more: copying the rows and pasting
   them back is the same act in two presses that say what they do, and the icon
   was a third mark to tell apart in the smallest bar in the app.
-- **More than one table** — the **Table** field at the right-hand end of the same
-  row of buttons names the table you are in; the caret beside it opens the rest,
-  the open one ticked, and **New table…** and **Delete this table…** are below a
-  rule at the bottom of that list — which is the only way to delete one; there
+- **More than one table** — the **Table** field beside the lock names the table
+  you are in; the caret beside it opens the rest, the open one first and
+  ticked. Under a rule, **New table…** and **Getting Started**; under another,
+  **Paste…**, **Import…**, **Export** and **Delete Table…** — which is the only
+  way to delete one; there
   is no separate button to empty the table. A design and a table are kept apart on purpose — one design prints
   any number of tables, and one table can be printed by any number of designs —
   so switching either leaves the other exactly where it was. Bindings that still
@@ -1227,7 +1245,9 @@ neighbours as it passes them, and a guide shows what it caught. There is no key
 to hold for free movement — switch **Grid**, **Guides** and **Boxes** off and
 nothing latches, because a box should never snap to a guide you cannot see.
 
-Press and *hold* the **Grid** box and the ruling becomes a **dot grid**: the same
+The grid is drawn in black on a light paper and in white on a dark one, at
+the same strengths, so it can be seen on a navy or black card as well as on
+white. Press and *hold* the **Grid** box and the ruling becomes a **dot grid**: the same
 millimetres and the same snapping, marked with a dot at each intersection instead
 of a line through the card. The word beside the box says which it is drawing. Both
 are placed as geometry rather than as a tiled background, so every line is where
@@ -1328,7 +1348,7 @@ than it has to.
   A screen it does not know gets the browser's own millimetre. Hover it to see
   which it was. The other steps follow under a rule. The menu is drawn like the
   template picker's, as are the font menus. On a phone the two left-hand toggles keep their row and lose
-  their words — a **#** for the grid, a **||** for the guides and a **B** for
+  their words — a **#** for the grid, a **|** for the guides and a **B** for
   the boxes, beside ticks
   that already say whether they are on — rather than stacking into a two-line
   panel that grew up over the sheet. What a screen reader is told does not

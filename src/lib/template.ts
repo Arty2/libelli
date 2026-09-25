@@ -135,10 +135,15 @@ export function normaliseParagraph(raw: unknown): ParagraphStyle | undefined {
 	return { mode, amount: Math.round(Math.max(0, Math.min(MAX_PARAGRAPH, n)) * 100) / 100 };
 }
 
-export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'dash'];
+export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'dash', 'emdash'];
 
 /** Said with the glyph, since the glyph is the choice. */
-export const LIST_MARKER_LABELS: Record<ListMarker, string> = { bullet: '• Bullet', disc: '● Disc', dash: '– Dash' };
+export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
+	bullet: '• Bullet',
+	disc: '● Disc',
+	dash: '– Dash',
+	emdash: '— Em Dash'
+};
 
 /** How far a list may be indented, or its items spaced, in mm. */
 export const MAX_LIST = 50;

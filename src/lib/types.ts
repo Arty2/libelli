@@ -214,8 +214,8 @@ export interface ParagraphStyle {
 	amount: number;
 }
 
-/** What a Markdown bullet list is marked with: `•`, `●` or `–`. */
-export type ListMarker = 'bullet' | 'disc' | 'dash';
+/** What a Markdown bullet list is marked with: `•`, `●`, `–` or `—`. */
+export type ListMarker = 'bullet' | 'disc' | 'dash' | 'emdash';
 
 /**
  * How a Markdown list is set. Each field on its own: an area can take the

@@ -68,6 +68,14 @@ describe('applyPlaceholders', () => {
 		expect(applyPlaceholders(row.self, { row })).toBe('x x {{self}}');
 	});
 
+	it('leaves a cell quoting its own column as written, and marks it', () => {
+		const row = { title: 'A {{title}} and {{other}}', other: 'B' };
+		expect(applyPlaceholders(row.title, { row, self: 'title' })).toBe('A {{title}} and B');
+		expect(applyPlaceholders(row.title, { row, self: 'title', markUnknown: true })).toBe(
+			`A ${UNKNOWN_OPEN}title${UNKNOWN_CLOSE} and B`
+		);
+	});
+
 	it('lets a column called date win, but a format always means the date', () => {
 		const row = { date: 'Spring' };
 		expect(applyPlaceholders('{{date}}', { row, now: DAY })).toBe('Spring');

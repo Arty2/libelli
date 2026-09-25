@@ -1961,23 +1961,44 @@ em { color: #b42318 }`;
 	// ---- import / export ----------------------------------------------------
 
 	/**
-	 * The sample cards back, from a press and hold on Import. Data only: it hangs
-	 * off an import-data button and that is what it does — silently replacing a
-	 * template someone has built would be a far worse surprise than a card that
-	 * does not quite fit.
+	 * Getting Started: the table of cards that walk through the app.
 	 *
-	 * No confirmation. A snapshot is template, data and mapping together, so
-	 * Ctrl/Cmd+Z brings their rows straight back, and the rule here is that
-	 * destructive things are undoable and only ask when undo cannot reach them.
+	 * It used to pour those rows into whatever table was open — undoable, but a
+	 * table someone had been working in was the wrong place to put them, and one
+	 * edited from the sample itself was overwritten without a word. So it opens
+	 * a table already holding them untouched, if there is one, and otherwise
+	 * starts a new one. Nothing anyone has typed is ever replaced by it.
 	 */
-	function loadSample() {
-		describe('Load the sample cards');
-		dataset = sampleDataset();
-		// Remapped the way a first run maps: their template's slots against the
+	async function gettingStarted() {
+		const sample = sampleDataset();
+		const untouched = (d: Dataset) =>
+			JSON.stringify([d.columns, d.rows]) === JSON.stringify([sample.columns, sample.rows]);
+		if (untouched(dataset)) {
+			notify(`This is the Getting Started table, as it came.`);
+			return;
+		}
+		for (const entry of tables) {
+			if (entry.id === datasetId) continue;
+			const doc = await loadDatasetDoc(entry.id);
+			if (doc && untouched(doc)) {
+				await switchDataset(entry.id);
+				return;
+			}
+		}
+		settleProvisional();
+		await flushDataset();
+		describe('Getting Started');
+		rememberTable(datasetId);
+		datasetId = nextDatasetId();
+		saveDatasetId(datasetId);
+		dataset = { ...sample, name: freeTableName(sample.name ?? 'Getting Started') };
+		activeRow = 0;
+		// Mapped the way a first run maps: this template's slots against the
 		// sample's columns, so the cards render rather than coming up blank.
 		mapping = autoMap(usedSlots(template), dataset.columns);
-		activeRow = 0;
-		notify('Onboarding loaded. Ctrl/Cmd+Z puts your own rows back.');
+		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
+		await refreshTables();
+		notify(`“${dataset.name}” started, with the cards that walk through the app. Your other tables are untouched.`);
 	}
 
 	/**
@@ -2564,7 +2585,7 @@ em { color: #b42318 }`;
 				{selectedColumn}
 				onactivate={(i) => (activeRow = i)}
 				onnotice={notify}
-				onloadsample={loadSample}
+				ongettingstarted={() => void gettingStarted()}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
 					// follows it, so the card keeps rendering what it rendered before.

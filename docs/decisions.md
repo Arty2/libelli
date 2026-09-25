@@ -824,8 +824,11 @@ say nothing.
 on an area that has grown, a faint blue pair beside the trim line — its given
 height, drawn sparser than a bound so it is not read as an edge — clips it back
 at that height. The cut and the offer are the same glyph in the two states a
-toggle is drawn in, and both sit a column further out when the area has
-badges, which on a shallow area came down over them.
+toggle is drawn in. They hang in line with the badge column, and step down
+below its last badge where the edge they mark is higher than the column is
+long — `max()` of the edge and the column's length, which is known in CSS
+from the badge count. A second column out past the badges was tried first; it
+stopped the overlap and put the one mark out of line with all the others.
 
 **A selected area has one outline.** The selection is drawn and the dashed
 bound is not: two lines on every edge said nothing the one did not. The trim
@@ -969,7 +972,10 @@ top-left is the tied edge's own end and has nothing else on it.
 **Pointing at a tie draws its thread.** The link and the buoy are at two
 corners of two areas, often with others between, and the lit glyph on the far
 one was a thing to hunt for. Hovering either draws a dotted S between the two
-badges, sagging with its length and walking from the pointer's end. It is
+badges, sagging with its length and walking from the pointer's end. The S is
+the inverted one: it leaves each badge vertically, down, rather than level,
+which read as a thread hanging between two pins rather than a wire routed
+between two ports. It is
 measured off the badges as drawn — `getBoundingClientRect`, divided back by the
 zoom — because a badge is a fixed number of screen pixels off a box that may be
 turned, mirrored and grown, and the DOM already knows where all of that put it.
@@ -1056,7 +1062,7 @@ meant for the page still scrolls it.
 side by side reach far enough into the bottom band that the pager's first arrow,
 centred in the same band, lands on top of "Bounds". They used to stack into a
 column for that, which halved the width by growing a two-line panel up over the
-sheet. Now the words go instead — a `#` for the grid, a `||` for the guides, a
+sheet. Now the words go instead — a `#` for the grid, a `|` for the guides, a
 `B` for the boxes (the toggle once called Bounds, renamed when Guides arrived
 beside it, since both draw bounds of a kind and only one of them is areas') —
 beside ticks that already say whether they are on, which is the part doing the
@@ -1341,6 +1347,17 @@ is held — at the left; what you are doing to the rows you have chosen, or the
 cell you are in, at the far right after a rule, where it can come and go
 without moving anything else. The cell's count is the one thing in the bar
 that gives way, ellipsised before it pushes Edit off the end.
+
+**Getting Started never lands on the open table.** It pours the sample into a
+new table, or opens one that already holds it untouched (compared by columns
+and rows), so an edited copy is never overwritten and pressing it twice does
+not make two. Its rows used to replace the open table's, undoable, which was
+the wrong table to put them in most of the times it was pressed.
+
+**Moving rows drops the sort.** `moveRows` in table.ts moves the chosen rows
+as a block, each past its unchosen neighbour, holding at the ends. After a move
+the rows are in an order the table owns, so a sort still claiming to be on
+would be lying about it, and the numbers the rows wear go back to their places.
 
 **A lock closes the full-size editor too.** Edit, the press and hold and the
 ellipsis all open it, and it is a way to type: on a locked table all three are
@@ -2282,6 +2299,14 @@ spacing, each optional and each merged over the page's on its own, so an area
 can change its indent and keep the page's marker. It overrides `md.list` in
 the renderer rather than replacing that object, which templates written by
 hand may still carry.
+
+The marker is a text node in the item, so it is set in the area's face; a
+face without the glyph falls back through the area's stack like any missing
+character — which in practice is `●` in a handwriting face.
+
+A cell that quotes its own column (`self` in `applyPlaceholders`) is not
+filled in: once was always the limit, and once only printed the braces back.
+It is marked in the editor as an unknown name is, since it is the same mistake.
 
 `TextStyle.baseline` is em of the area's size, either sign. The page's is a
 correction for the page's face, so an area in another face never inherits it

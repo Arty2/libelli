@@ -144,3 +144,42 @@ export function parseColor(raw: string | undefined | null): string | null {
 	if (CSS_KEYWORDS[value]) return CSS_KEYWORDS[value];
 	return parseFunctional(value);
 }
+
+/**
+ * Whether a color reads as dark — relative luminance under the point where
+ * black and white contrast equally with it. For screen furniture that has to
+ * stand out against the paper, such as the grid. A color this module cannot
+ * read, or a transparent one, is taken as light: the paper behind it is.
+ */
+export function isDark(raw: string | undefined | null): boolean {
+	const value = parseColor(raw);
+	if (!value) return false;
+	let rgb: number[];
+	let hex = /^#([0-9a-f]{3,8})$/.exec(value)?.[1];
+	if (hex) {
+		if (hex.length <= 4) hex = [...hex].map((c) => c + c).join('');
+		if (hex.length === 8 && parseInt(hex.slice(6, 8), 16) < 128) return false;
+		rgb = [0, 2, 4].map((i) => parseInt(hex!.slice(i, i + 2), 16));
+	} else {
+		const parts = /^(rgba?|hsla?)\(([^)]*)\)$/.exec(value);
+		if (!parts) return false;
+		const n = parts[2].split(',').map((p) => parseFloat(p));
+		if (n.length > 3 && n[3] < 0.5) return false;
+		if (parts[1].startsWith('rgb')) rgb = n.slice(0, 3);
+		else {
+			// hsl -> rgb, the CSS Color 4 formula.
+			const [h, s, l] = [n[0], n[1] / 100, n[2] / 100];
+			const f = (k: number) => {
+				const t = (k + h / 30) % 12;
+				return 255 * (l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(t - 3, 9 - t, 1)));
+			};
+			rgb = [f(0), f(8), f(4)];
+		}
+	}
+	const [r, g, b] = rgb.map((c) => {
+		const v = c / 255;
+		return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+	});
+	// Equal contrast against black and white falls at a luminance of about 0.18.
+	return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.18;
+}

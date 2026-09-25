@@ -7,7 +7,7 @@
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { armDefault } from '$lib/modal';
 	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
-	import { countText, dropTarget, indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
+	import { countText, dropTarget, indexAfterSort, moveColumn, moveRows, sortRows, type SortDirection } from '$lib/table';
 	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
 	import type { Dataset, Row, RowHeight } from '$lib/types';
 
@@ -57,8 +57,8 @@
 		onchange: (dataset: Dataset) => void;
 		/** so bindings can follow a renamed column instead of pointing at a ghost */
 		onrenamecolumn: (from: string, to: string) => void;
-		/** press and hold Import: put the sample cards back */
-		onloadsample: () => void;
+		/** open the Getting Started table, or start one */
+		ongettingstarted: () => void;
 		/**
 		 * Say something. The table used to have a line of its own under the
 		 * buttons, which meant the app had two places a notice could appear and
@@ -92,7 +92,7 @@
 		onactivate,
 		onchange,
 		onrenamecolumn,
-		onloadsample,
+		ongettingstarted,
 		onnotice
 	}: Props = $props();
 
@@ -268,6 +268,12 @@
 	}
 
 	const focusOnOpen = (node: HTMLElement) => node.focus();
+
+	/** The open table at the top of its menu, the rest in the library's order. */
+	const tablesActiveFirst = $derived([
+		...tables.filter((t) => t.id === tableId),
+		...tables.filter((t) => t.id !== tableId)
+	]);
 
 	function togglePicker() {
 		if (pickerOpen) {
@@ -854,6 +860,25 @@
 		selectedRows = allChosen ? new Set() : new Set(dataset.rows.map((_, i) => i));
 	}
 
+	/**
+	 * The chosen rows a step up or down — which is a step in print order, since
+	 * row order is print order. A moved row makes the order the table's own, so
+	 * a sort that was on is dropped rather than left claiming an order the rows
+	 * are no longer in; the numbers the rows wear go back to their places.
+	 */
+	function moveChosen(by: -1 | 1) {
+		if (locked || !chosenRows.length) return;
+		const { rows, chosen } = moveRows(dataset.rows, chosenRows, by);
+		if (rows === dataset.rows) return;
+		const active = dataset.rows[activeRow];
+		sortedBy = null;
+		unsorted = null;
+		selectedRows = new Set(chosen);
+		onchange({ ...dataset, rows });
+		const at = rows.indexOf(active);
+		if (at !== -1 && at !== activeRow) onactivate(at);
+	}
+
 	function deleteChosen() {
 		if (locked) return;
 		const gone = new Set(chosenRows);
@@ -1187,8 +1212,15 @@
 							>{rowLabel(row, i)}</span>
 							</span>
 						</td>
-						{#each dataset.columns as column (column)}
-							<td class:bound={!!selectedColumn && column === selectedColumn}>
+						{#each dataset.columns as column, c (column)}
+							<!-- The drop line runs down the whole column, not just its
+							     header, so it says which gap the column lands in however
+							     far down the table the eye is. -->
+							<td
+								class:bound={!!selectedColumn && column === selectedColumn}
+								class:drop-before={carrying?.on && carrying.before === c}
+								class:drop-after={carrying?.on && c === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
+							>
 								<!-- Press and hold for the whole cell in a dialog of its own. -->
 								<textarea
 									rows="1"
@@ -1306,7 +1338,7 @@
 					role="menu"
 					style="left:clamp(8px, {pickerAt.left}px, 100vw - 13rem);bottom:{pickerAt.bottom}px"
 				>
-					{#each tables as entry (entry.id)}
+					{#each tablesActiveFirst as entry (entry.id)}
 						<li role="none">
 							<button
 								role="menuitemradio"
@@ -1323,7 +1355,8 @@
 							</button>
 						</li>
 					{/each}
-					<!-- Below the rule is a thing to do, not a table to open. -->
+					<!-- Below the rule, tables to start rather than open: an empty one,
+					     or the one that walks through the app. -->
 					<li role="separator"><hr /></li>
 					<li role="none">
 						<button
@@ -1337,9 +1370,25 @@
 							New table…
 						</button>
 					</li>
-					<!-- Rows in and out, with the table they act on rather than as a
-					     row of buttons in a bar that also has to hold a selection's
-					     worth of row actions. -->
+					<!-- Never over the open table's rows: it opens a table that already
+					     holds the cards untouched, or starts one — so it is not the
+					     lock's business, and a lock does not disable it. -->
+					<li role="none">
+						<button
+							role="menuitem"
+							title="The cards that walk through the app, in a table of their own — your tables are untouched"
+							onclick={() => {
+								pickerOpen = false;
+								ongettingstarted();
+							}}
+						>
+							<span class="mark" aria-hidden="true"><Icon name="information-square" size={14} /></span>
+							Getting Started
+						</button>
+					</li>
+					<!-- And below the next, what can be done to the open table: rows in,
+					     rows out, and the table gone. -->
+					<li role="separator"><hr /></li>
 					<li role="none">
 						<button
 							role="menuitem"
@@ -1365,39 +1414,23 @@
 							}}
 						>
 							<span class="mark" aria-hidden="true"><Icon name="table-shortcut" size={14} /></span>
-							Import CSV…
+							Import…
 						</button>
 					</li>
 					<li role="none">
 						<button
 							role="menuitem"
 							disabled={!dataset.columns.length}
+							title="Save the rows as a CSV file"
 							onclick={() => {
 								pickerOpen = false;
 								exportCsv();
 							}}
 						>
 							<span class="mark" aria-hidden="true"><Icon name="table-built" size={14} /></span>
-							Export CSV
+							Export
 						</button>
 					</li>
-					<!-- It used to be a press and hold on Import, which nobody finds in
-					     a menu; an item of its own says what it does. -->
-					<li role="none">
-						<button
-							role="menuitem"
-							disabled={locked}
-							title="Replace the rows with the four onboarding cards that walk through the app. Ctrl/Cmd+Z undoes it"
-							onclick={() => {
-								pickerOpen = false;
-								onloadsample();
-							}}
-						>
-							<span class="mark" aria-hidden="true"><Icon name="document-multiple" size={14} /></span>
-							Load Onboarding
-						</button>
-					</li>
-					<li role="separator"><hr /></li>
 					<li role="none">
 						<button
 							class="danger"
@@ -1410,7 +1443,7 @@
 							}}
 						>
 							<span class="mark" aria-hidden="true"><Icon name="trash" size={14} /></span>
-							Delete this table…
+							Delete Table…
 						</button>
 					</li>
 				</ul>
@@ -1430,27 +1463,6 @@
 			aria-label="Swap to the previous table"
 			onclick={onswaptable}
 		><Icon name="arrows-horizontal" size={15} /></button>
-		<!-- How tall a row may be: one line, a few, or all of its longest cell.
-		     Beside the lock, with the other things that are about how this
-		     table is held rather than which table it is. The label says the
-		     height the rows are at; the title, the next. -->
-		<button
-			class="row-height"
-			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
-			aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
-			onclick={() => onrowheight(nextRowHeight)}
-		>
-			<svg class="rows-glyph" viewBox="0 0 16 16" aria-hidden="true">
-				{#if rowHeight === 'short'}
-					<path d="M2 3h12M2 6h12M2 9h12M2 12h12" />
-				{:else if rowHeight === 'medium'}
-					<path d="M2 3h12M2 8h12M2 13h12" />
-				{:else}
-					<path d="M2 2h12M2 14h12" />
-				{/if}
-			</svg>
-			<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
-		</button>
 		<span class="spacer"></span>
 		{#if editing && dataset.rows[editing.row]}
 			<!-- While a cell is being typed in, the bar is about that cell: how
@@ -1480,6 +1492,22 @@
 			     should read as a button that does, not as a mark beside a count. -->
 			<span class="rule"></span>
 			<span class="chosen-count">{chosenRows.length}</span>
+			<!-- Up and down first: they are about where the rows are, before what
+			     is done with them. Icon-only, the pair reads as one control. -->
+			<button
+				class="icon"
+				title="Move the chosen rows up — earlier in print order"
+				aria-label="Move the chosen rows up"
+				disabled={locked || chosenRows[0] === 0}
+				onclick={() => moveChosen(-1)}
+			><Icon name="chevron-sort-up" size={20} /></button>
+			<button
+				class="icon"
+				title="Move the chosen rows down — later in print order"
+				aria-label="Move the chosen rows down"
+				disabled={locked || chosenRows[chosenRows.length - 1] === dataset.rows.length - 1}
+				onclick={() => moveChosen(1)}
+			><Icon name="chevron-sort-down" size={20} /></button>
 			<button
 				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
 				onclick={copyTsv}
@@ -1490,6 +1518,30 @@
 				disabled={locked}
 				onclick={deleteChosen}
 			><Icon name="trash" size={15} /> Delete</button>
+		{/if}
+		{#if !chosenRows.length || editing}
+			<!-- How tall a row may be: one line, a few, or all of its longest cell.
+			     At the far end of the bar, and gone while rows are chosen: the row
+			     actions take that end then, and a bar holding both ran out of room
+			     on a narrow tray. The label says the height the rows are at; the
+			     title, the next. -->
+			<button
+				class="row-height"
+				title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
+				aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
+				onclick={() => onrowheight(nextRowHeight)}
+			>
+				<svg class="rows-glyph" viewBox="0 0 16 16" aria-hidden="true">
+					{#if rowHeight === 'short'}
+						<path d="M2 3h12M2 6h12M2 9h12M2 12h12" />
+					{:else if rowHeight === 'medium'}
+						<path d="M2 3h12M2 8h12M2 13h12" />
+					{:else}
+						<path d="M2 2h12M2 14h12" />
+					{/if}
+				</svg>
+				<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
+			</button>
 		{/if}
 		<input
 			bind:this={fileInput}
@@ -1756,6 +1808,28 @@
 
 	th.drop-after {
 		box-shadow: inset -3px 0 0 #2563eb;
+	}
+
+	/* A cell's field fills it and would cover an inset shadow, so the body's
+	   share of the line is drawn over the field instead. */
+	td.drop-before::after,
+	td.drop-after::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 3px;
+		background: #2563eb;
+		pointer-events: none;
+		z-index: 2;
+	}
+
+	td.drop-before::after {
+		left: 0;
+	}
+
+	td.drop-after::after {
+		right: 0;
 	}
 
 	/* The grip straddles the rule between two columns, which is where the
@@ -2508,10 +2582,11 @@
 		padding: 8px;
 		border: 1px solid #ccc;
 		border-radius: var(--radius-input);
-		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+		/* Twice the table's: this is where a long cell is read and written at
+		   length, with the whole tray to do it in. */
+		font: 26px/1.5 ui-sans-serif, system-ui, sans-serif;
 		resize: none;
 	}
-
 
 
 	.count-line {

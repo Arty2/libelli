@@ -36,6 +36,13 @@ export interface PlaceholderContext {
 	 * editor's doing only — never set for anything that reaches paper.
 	 */
 	markUnknown?: boolean;
+	/**
+	 * The column the text itself came out of, when it is a cell. A placeholder
+	 * naming it is a cell quoting itself: it is not filled in — once was always
+	 * the limit, and once only ever printed the braces back — and it is marked
+	 * like a name nothing answers to, because it is the same mistake.
+	 */
+	self?: string;
 }
 
 /**
@@ -150,7 +157,8 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 	return text.replace(PLACEHOLDER, (whole, name: string, format?: string) => {
 		if (format === undefined && row) {
 			const column = findColumn(name, columns);
-			if (column) return String(row[column] ?? '');
+			if (column && column !== context.self) return String(row[column] ?? '');
+			if (column) return context.markUnknown ? `${UNKNOWN_OPEN}${whole.slice(2, -2)}${UNKNOWN_CLOSE}` : whole;
 		}
 		if (name.toLowerCase() !== 'date') {
 			return context.markUnknown ? `${UNKNOWN_OPEN}${whole.slice(2, -2)}${UNKNOWN_CLOSE}` : whole;

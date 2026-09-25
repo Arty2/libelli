@@ -160,7 +160,10 @@
 	 * The same text as it is drawn, with `{{date}}` and any `{{column}}` of this
 	 * row filled in — in a cell and in an area's own words alike, once.
 	 */
-	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row });
+	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, self: selfOf(box) });
+
+	/** The column a bound area's words come out of — the one they may not quote. */
+	const selfOf = (box: Box): string | undefined => (box.slot ? mapping[box.slot] : undefined);
 
 	/**
 	 * The text as the editor draws it: `contentOf`, except that a `{{name}}`
@@ -171,7 +174,7 @@
 	 * measured for emptiness, or encoded into a QR.
 	 */
 	const shownTextOf = (box: Box): string =>
-		applyPlaceholders(rawContentOf(box), { row, markUnknown: interactive && bounds });
+		applyPlaceholders(rawContentOf(box), { row, self: selfOf(box), markUnknown: interactive && bounds });
 
 	/** Text split around the marks, for plain text, which Svelte escapes itself. */
 	function segments(text: string): Array<{ text: string; unknown: boolean }> {
@@ -1324,18 +1327,25 @@
 			.filter((el): el is HTMLElement => !!el)
 			.map((el) => {
 				const b = at(el);
-				// An S: level at both ends, turning across the middle, and sagging
-				// a little under its own weight the longer it is — a thread, not a
-				// connector in a diagram.
-				const mid = (a.x + b.x) / 2;
+				// An inverted S: leaving each badge upright rather than level, so
+				// it turns across the middle the other way from a lying-down S, and
+				// sagging a little under its own weight the longer it is — a
+				// thread, not a connector in a diagram.
+				const mid = (a.y + b.y) / 2;
 				const sag = Math.hypot(b.x - a.x, b.y - a.y) * 0.15;
-				return `M${a.x} ${a.y}C${mid} ${a.y + sag} ${mid} ${b.y + sag} ${b.x} ${b.y}`;
+				return `M${a.x} ${a.y}C${a.x} ${mid + sag} ${b.x} ${mid + sag} ${b.x} ${b.y}`;
 			});
 	}
 
 	/** Whether the column of badges hangs off this box's right-hand edge. */
 	const hasBadges = (box: Box) =>
 		bounds && !template.locked && !!(box.locked || isStatic(box) || pictureKind(box) || anchorTargets.has(box.id));
+
+	/** How many badges that column holds — the shears step down below them. */
+	const badgeCount = (box: Box) =>
+		hasBadges(box)
+			? [box.locked, isStatic(box), pictureKind(box), anchorTargets.has(box.id)].filter(Boolean).length
+			: 0;
 
 	/** Cast off: every box moored to this one keeps its place and loses the tie. */
 	function releaseDependents(box: Box) {
@@ -1422,8 +1432,9 @@
 	function beginEdit(box: Box) {
 		// A picture is the one thing not edited in place: an area on a card is
 		// often a centimetre across, which is somewhere to show a drawing and
-		// nowhere to make one. The same double-click opens it full screen.
-		if (editable(box) && takesADrawing(box.mode)) {
+		// nowhere to make one. The same double-click opens it full screen —
+		// on a locked page too, like typing: a drawing is content, not layout.
+		if (interactive && !box.locked && takesADrawing(box.mode)) {
 			ondraw?.(box.id);
 			return;
 		}
@@ -1452,7 +1463,7 @@
 <!-- Plain text with any unknown `{{name}}` in it marked — see `shownTextOf`.
      Written on one line: the text is `white-space: pre-wrap`, and a newline
      between these tags would be drawn. -->
-{#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.unknown}<span class="unknown-placeholder" title="No column called this in the table">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
+{#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.unknown}<span class="unknown-placeholder" title="No column called this in the table — or the cell naming its own column">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
 
 <!-- The shears, which are also the switch between cutting and growing. Red and
      astride the cut on an area that is cutting its words off, where pressing
@@ -1462,8 +1473,7 @@
 	<button
 		class="overflow-mark"
 		class:offered={!cutting}
-		class:beside={hasBadges(box)}
-		style={cutting ? '' : `top:${box.h}mm`}
+		style="--edge:{cutting ? '100%' : `${box.h}mm`};--stack:{badgeCount(box)}"
 		disabled={!editable(box)}
 		title={cutting
 			? 'The content does not fit — this area is cutting off what will print. Press to let it grow instead.'
@@ -2556,10 +2566,15 @@
 			color: rgba(37, 99, 235, 0.6);
 		}
 
-		/* Out past the badge column where there is one: on a shallow area the
-		   column is taller than the area, and the shears landed under it. */
-		.overflow-mark.beside {
-			margin-left: calc(var(--badge) + 8px * var(--ui-scale, 1));
+		/* In line with the badges above them, and below the last of them where
+		   the edge they mark is higher than the column is long: on a shallow
+		   area the shears landed on the badges. They were moved a column further
+		   out for that, which put them out of line with every other mark. */
+		.overflow-mark {
+			top: max(
+				var(--edge, 100%),
+				calc(var(--stack, 0) * (var(--badge) + 2px * var(--ui-scale, 1)) + var(--badge) / 2)
+			);
 		}
 
 		.overflow-mark:hover:not(:disabled) {

@@ -84,3 +84,28 @@ export function countText(text: string): { characters: number; words: number } {
 export function dropTarget(from: number, before: number): number {
 	return before > from ? before - 1 : before;
 }
+
+/**
+ * The chosen rows one step up or down, as a block: each moves past the
+ * unchosen row beside it, and one already at the end — or held there by a
+ * chosen row that could not move — stays, so a run of rows keeps its shape
+ * against the edge rather than folding over itself. Returns the rows and where
+ * the chosen ones now are; the same rows object when nothing could move.
+ */
+export function moveRows<T>(rows: T[], chosen: number[], by: -1 | 1): { rows: T[]; chosen: number[] } {
+	const next = [...rows];
+	const taken = new Set<number>();
+	const order = [...new Set(chosen)].filter((i) => i >= 0 && i < rows.length).sort((a, b) => (by < 0 ? a - b : b - a));
+	let moved = false;
+	for (const i of order) {
+		const to = i + by;
+		if (to < 0 || to >= next.length || taken.has(to)) {
+			taken.add(i);
+			continue;
+		}
+		[next[i], next[to]] = [next[to], next[i]];
+		taken.add(to);
+		moved = true;
+	}
+	return moved ? { rows: next, chosen: [...taken].sort((a, b) => a - b) } : { rows, chosen: order.sort((a, b) => a - b) };
+}

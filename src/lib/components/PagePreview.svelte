@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
+	import { isDark } from '$lib/color';
 	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
@@ -765,6 +766,7 @@
 			     `gridArt` above for why the gradients had to go. -->
 			<svg
 				class="grid-overlay"
+				class:on-dark={isDark(template.page.background)}
 				aria-hidden="true"
 				width={gridArt.w}
 				height={gridArt.h}
@@ -1014,7 +1016,7 @@
 	     centred in the same band, lands on top of "Boxes". They used to stack
 	     into a column for that, which grew a two-line panel up over the sheet;
 	     now the words go instead and the ticks keep their row — a # for the
-	     grid, a || for the guides and a B for the boxes, beside checkboxes that
+	     grid, a | for the guides and a B for the boxes, beside checkboxes that
 	     already say whether they are on. The full word stays the accessible name either way, so nothing
 	     read aloud is reduced to a single letter. -->
 	<div class="corner left">
@@ -1047,7 +1049,7 @@
 				onchange={(e) => onguides(e.currentTarget.checked)}
 			/>
 			<span class="wide">Guides</span>
-			<span class="narrow" aria-hidden="true">||</span>
+			<span class="narrow" aria-hidden="true">|</span>
 		</label>
 		<label title="Each area's dashed bounds, its badges and the trim edge — screen only, never printed (Ctrl/Cmd+H)">
 			<input
@@ -1301,22 +1303,35 @@
 		stroke-linecap: round;
 	}
 
+	/* Black on a light paper, white on a dark one: grey at these strengths all
+	   but vanished on a navy or black card, which is where a grid is needed as
+	   much as anywhere. The strengths are the same either way; only the ink
+	   turns over. A background image is not looked at — the paper color is the
+	   only thing known without decoding it. */
+	.grid-overlay {
+		--grid-ink: 0, 0, 0;
+	}
+
+	.grid-overlay.on-dark {
+		--grid-ink: 255, 255, 255;
+	}
+
 	.grid-overlay .minor {
-		stroke: rgba(0, 0, 0, 0.11);
+		stroke: rgba(var(--grid-ink), 0.11);
 	}
 
 	.grid-overlay .major {
-		stroke: rgba(0, 0, 0, 0.3);
+		stroke: rgba(var(--grid-ink), 0.3);
 	}
 
 	/* Dots carry less ink than rules at the same value, so both weights come up
 	   to stay legible against the paper they are drawn on. */
 	.grid-overlay .minor.dot {
-		stroke: rgba(0, 0, 0, 0.22);
+		stroke: rgba(var(--grid-ink), 0.22);
 	}
 
 	.grid-overlay .major.dot {
-		stroke: rgba(0, 0, 0, 0.42);
+		stroke: rgba(var(--grid-ink), 0.42);
 	}
 
 	/* The same half-pixel hairline as the grid, and solid rather than dashed:

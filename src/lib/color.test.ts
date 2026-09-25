@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAMED_COLORS, parseColor } from './color';
+import { NAMED_COLORS, isDark, parseColor } from './color';
 
 describe('parseColor', () => {
 	it('accepts hex in every CSS length', () => {
@@ -44,5 +44,24 @@ describe('parseColor', () => {
 		expect(parseColor('#12345')).toBeNull();
 		expect(parseColor('')).toBeNull();
 		expect(parseColor(undefined)).toBeNull();
+	});
+});
+
+describe('isDark', () => {
+	it('tells dark papers from light ones in every notation', () => {
+		expect(isDark('#ffffff')).toBe(false);
+		expect(isDark('#fff8e7')).toBe(false);
+		expect(isDark('#1a1a2e')).toBe(true);
+		expect(isDark('#000')).toBe(true);
+		expect(isDark('rgb(20, 40, 60)')).toBe(true);
+		expect(isDark('hsl(220, 50%, 15%)')).toBe(true);
+		expect(isDark('hsl(60, 100%, 90%)')).toBe(false);
+		expect(isDark('navy')).toBe(true);
+	});
+
+	it('takes what it cannot read, or cannot see, as light', () => {
+		expect(isDark('not a color')).toBe(false);
+		expect(isDark('rgba(0, 0, 0, 0.1)')).toBe(false);
+		expect(isDark(undefined)).toBe(false);
 	});
 });

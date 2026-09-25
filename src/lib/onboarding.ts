@@ -22,6 +22,6 @@ export const SAMPLE_CSV = sampleCsv;
  * is a worse answer to “what am I looking at” than the four cards themselves
  * give.
  */
-export const sampleDataset = (): Dataset => ({ ...parseTable(SAMPLE_CSV), name: 'Onboarding' });
+export const sampleDataset = (): Dataset => ({ ...parseTable(SAMPLE_CSV), name: 'Getting Started' });
 
 export const starterTemplate = (): Template => builtinTemplate();

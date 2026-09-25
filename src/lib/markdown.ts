@@ -26,8 +26,13 @@ export interface MarkdownOptions {
 	list?: ListStyle;
 }
 
-/** The glyph each bullet marker names. */
-export const LIST_GLYPHS: Record<ListMarker, string> = { bullet: '•', disc: '●', dash: '–' };
+/**
+ * The glyph each bullet marker names. Set in the area's own face like the
+ * words beside it — the marker is text in the item, not a list-style image —
+ * so a dash is that font's dash; a face without the glyph falls back through
+ * the area's stack as any missing character does.
+ */
+export const LIST_GLYPHS: Record<ListMarker, string> = { bullet: '•', disc: '●', dash: '–', emdash: '—' };
 
 interface ListItem {
 	text: string;
