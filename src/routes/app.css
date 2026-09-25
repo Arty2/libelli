@@ -105,9 +105,11 @@ html, body {
 
 /* Every Lock button — the page's, an area's, the table's — one width, the
    width of "Unlock": it said Lock at 68px and Unlock at 82, so pressing it
-   shoved everything after it along the bar, and the three were three sizes. */
+   shoved everything after it along the bar, and the three were three sizes.
+   Its padlock and word start at the left, as every other button's do, so
+   the icon does not step sideways when the word changes. */
 .lock-toggle {
 	box-sizing: border-box;
 	width: 84px;
-	justify-content: center;
+	justify-content: flex-start;
 }
