@@ -1249,10 +1249,13 @@
 		pointer-events: none;
 	}
 
+	/* Close about the count, so the triangles stay clear of the chips in the
+	   two corners: on a narrow phone the arrows sat under the # | B on one
+	   side and the zoom on the other. */
 	.pager .controls {
 		display: flex;
 		align-items: center;
-		gap: 10px;
+		gap: 2px;
 		pointer-events: auto;
 		/* A flick across the pager is the gesture; without this the browser reads
 		   the first few pixels of it as a pan, takes the pointer away with a
@@ -1273,7 +1276,7 @@
 	   border, because it still has to read as the count first. */
 	.pager .count {
 		font: 500 12px ui-sans-serif, system-ui, sans-serif;
-		min-width: 3.5rem;
+		min-width: 2.75rem;
 		text-align: center;
 		border: none;
 		background: none;
@@ -1803,6 +1806,19 @@
 			font-weight: 700;
 			width: 0.75em;
 			text-align: center;
+		}
+	}
+
+	/* Tighter again where the corners are closest: the count's floor comes
+	   off, so the three are as narrow as "1 / 4" and two triangles. */
+	@media (max-width: 400px) {
+		.pager .count {
+			min-width: 0;
+			padding: 2px;
+		}
+
+		.pager .step {
+			padding: 0;
 		}
 	}
 </style>
