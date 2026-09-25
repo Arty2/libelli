@@ -770,7 +770,27 @@ em { color: #b42318 }`;
 	 */
 	async function handleImageDrop(box: Box, file: File) {
 		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
-		const name = await storeLocalImage(file);
+		placeImage(box, await storeLocalImage(file));
+	}
+
+	/**
+	 * A picture this browser already holds, carried from the Images bar onto
+	 * an area. The same placing as a file dropped from outside — into the row's
+	 * cell when the area is bound, onto the area otherwise — minus the storing,
+	 * which already happened when it was uploaded.
+	 */
+	function placeStoredImage(boxId: string, name: string) {
+		const box = template.boxes.find((b) => b.id === boxId);
+		if (!box) return;
+		if (template.locked || box.locked) {
+			notify('That area is locked — unlock it to put a picture in it.', 'warning');
+			return;
+		}
+		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
+		placeImage(box, name);
+	}
+
+	function placeImage(box: Box, name: string) {
 		const reference = localImageRef(name);
 		const column = box.slot ? mapping[box.slot] : undefined;
 		describe('Drop image');
@@ -2192,6 +2212,7 @@ em { color: #b42318 }`;
 				{:else if imagesOpen}
 					<ImagesPanel
 						used={new Set(imageNames)}
+						onplace={placeStoredImage}
 						onnotice={notify}
 						onchanged={() => (imagesVersion += 1)}
 					/>

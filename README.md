@@ -485,7 +485,7 @@ Whatever the table has to say goes to the app's status bar — tap it to read a
 long notice whole, in a dialog — so there is one place
 a notice can appear.
 
-- **Paste** — a modal that takes a block of cells off a spreadsheet. Tabs, commas and
+- **Paste** — in the **Table** menu: a modal that takes a block of cells off a spreadsheet. Tabs, commas and
   semicolons are told apart by sniffing, and quoted fields with embedded
   newlines survive. **No header row needed**: the cells land in the columns you
   already have, matched left to right, which is what a block copied out of those
@@ -500,9 +500,9 @@ a notice can appear.
   header's corner is how you say *all of them*. Its mark is a clipboard with
   something leaving it — this app has a clipboard for looks as well, and a
   Duplicate on the card, and the glyph is what tells the three apart.
-- **Import CSV** — in the **Table** menu, with **Export CSV** beside it; Paste
-  keeps its button in the bar, since it is the one done over and over. The same
-  parser against a whole file, header and all. Press and *hold* the menu item
+- **Import CSV** — in the **Table** menu too, with **Export CSV** beside it, so
+  the bar under the table holds only what acts on chosen rows, the picker and
+  the lock. The same parser against a whole file, header and all. Press and *hold* the menu item
   instead of clicking it, and the four sample cards come
   back: they walk through the app, and they are somewhere to start when a blank
   table is not. Your rows are replaced, the template is untouched, and
@@ -533,7 +533,8 @@ a notice can appear.
 - **A cell full size** — press and hold a cell for a dialog with the whole of it
   and the same count. It edits a copy: **Done** (or Ctrl/Cmd+Enter) keeps it,
   **Cancel** and Esc do not.
-- **Lock** — the padlock under the table freezes it: no typing, no new, moved,
+- **Lock** — the padlock at the right-hand end of the bar under the table, after
+  the picker, freezes it: no typing, no new, moved,
   renamed or deleted rows and columns, no paste or import — and nothing typed,
   dropped or drawn on the card reaches a cell either. Sorting and choosing rows
   still work, because neither changes what any card says. It is saved with the
@@ -775,12 +776,19 @@ and the browser may empty it. **Images**, in the toolbar between Page
 Setup and Data, opens a bar of its own in the same row as the other two — a bar
 rather than a dialog, so the card that uses the pictures stays in view.
 
-- **What is stored** — every picture this app can see, as a chip with its
-  weight, and a dashed chip marked *unused* where neither the current table nor
-  the template points at it. That is the whole point: *which of these forty can
-  I delete* is not a question browser storage can answer. Deleting is one press
-  on the chip, and it says so if something was using it. Hover a chip for where
-  it is kept.
+- **Upload…** — pictures from this device, in every browser and on a phone:
+  the folder below is Chromium's, and dropping a file onto an area is not
+  something a phone can do. They go wherever pictures go — the folder when
+  there is one, this browser otherwise.
+- **What is stored** — one line per picture: a thumbnail, its name, its size in
+  pixels and in bytes, and *unused* where neither the current table nor the
+  template points at it. That is the whole point: *which of these forty can I
+  delete* is not a question browser storage can answer. Deleting is one press,
+  and it says so if something was using it. Hover a line for where it is kept.
+- **Onto the card** — drag a thumbnail out of the bar and let go over an area:
+  the picture goes where a dropped file would, into this row's cell when the
+  area is bound to a column and onto the area otherwise. It works with a finger
+  as well as a mouse.
 - **A folder of your own** — press **Choose Folder…** and pictures are written
   there as ordinary files from then on: replace one from a photo editor and the
   card follows, back them up with the rest of your work, and clear them out with
@@ -1180,9 +1188,10 @@ instead of the full-screen look.
 
 ## Settings
 
-Each bar opens with a two-line head — what this is and what it is called, then
-the buttons that act on it — and runs in groups after that, outward from the
-thing itself.
+Each bar opens with a head — what this is and what it is called, then the
+buttons that act on it — and runs in groups after that, outward from the thing
+itself. The page bar's head is a line of its own, the template and its lock,
+ruled off from the settings under it by a hairline in the bar's border grey.
 
 - **Page** — head: the template's name and the library behind its caret, which
   also holds new, import, export, reset and delete, then lock ·
@@ -1235,10 +1244,10 @@ thing itself.
   and over an arrow that has greyed out at the end of the run, and the card
   steps. Up and down still scroll.
 - **The table's own row** — under the table: what acts on the rows you have
-  chosen, behind a rule, then what acts on the whole table and its lock, and at
-  the far end the **Table** picker and the swap beside it.
-- **Images** — the third bar, in the same row: where pictures are kept, the
-  folder buttons, and a chip for every picture.
+  chosen, then at the far end the **Table** picker — whose menu holds paste,
+  import, export, new and delete — the swap beside it, and last the lock.
+- **Images** — the third bar, in the same row: where pictures are kept, Upload
+  and the folder buttons, and a line for every picture.
 - **The window toolbar** holds only what is about the whole app: the mark, then
   Help, Page Setup, Images, Data and Export — the two panels in the order they
   sit on screen, settings above the page and the table beside it. On a phone the

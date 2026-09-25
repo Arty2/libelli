@@ -1272,6 +1272,12 @@ rounding of a few hundredths of a millimetre, from going through pixels and back
 
 ## `src/lib/components/DataTable.svelte`
 
+**The bar under the table is the picker and the lock.** Paste, Import and
+Export are errands done with a table, so they sit in its menu with New and
+Delete; what is left in the bar is what acts on chosen rows, the name of the
+table, and its lock — last, after the name it qualifies, the same reason the
+page bar keeps its Lock outside its menu.
+
 **A column name is a word you can write between braces.** Spaces become dashes
 and anything but letters, digits, `-` and `_` is dropped — on a typed rename, a
 new column, and every header a file or a paste brings in — because since
@@ -1994,6 +2000,16 @@ nobody asked for.
 
 ## `src/lib/assets.ts` and `src/lib/fonts.ts`
 
+**The Images bar uploads, and carries by pointer.** Without the folder —
+Firefox, Safari, every phone — the only way in was dropping a file on an area,
+which a phone cannot do. So the bar has an Upload that writes where every
+picture is written. A stored picture reaches an area by being dragged out of
+the bar with pointer events rather than HTML drag and drop, which a touchscreen
+does not have; where it is let go, `elementFromPoint` and the card's
+`data-box-id` say which area, and the page places it by the same rule as a
+dropped file. Pixel sizes are read off the thumbnails as they load rather than
+stored, since the bytes are what is kept and they already say it.
+
 **Big things are referenced, never embedded.** A template names a font family and
 a background image; the bytes live in IndexedDB, keyed by that name, and a file
 the browser has never been given is asked for rather than substituted. That is
@@ -2061,6 +2077,13 @@ in a cell full of words must not send the whole run back to IndexedDB. A run of
 forty cards sharing one logo reads it once and holds one object URL for it.
 
 ## `src/lib/components/PageOptions.svelte`
+
+**The page bar's head is a line of its own.** With Import, Export and Reset in
+the menu, the head is the template's name and its lock and nothing else, and
+wrapped in with the groups it was one more group — the name of the thing being
+set up could land mid-row. A full-width first line, ruled off in the bar's own
+border grey, keeps it first and alone; the cost is one line of height, which the
+row's floor absorbs anyway.
 
 **Everything that acts on the template as a whole is in the picker's menu;
 Lock is not.** Import, Export and Reset were a row of buttons under the name,

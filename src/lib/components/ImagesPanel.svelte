@@ -9,6 +9,8 @@
 		imageFolder,
 		listImages,
 		reopenImageFolder,
+		resolveLocalImages,
+		storeLocalImage,
 		type FolderState,
 		type ImageRecord
 	} from '$lib/assets';
@@ -29,20 +31,87 @@
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
 		/** the pictures changed: whoever resolved them should do it again */
 		onchanged: () => void;
+		/** a picture carried out of the bar and let go over an area */
+		onplace: (boxId: string, name: string) => void;
 	}
 
-	let { used, onnotice, onchanged }: Props = $props();
+	let { used, onnotice, onchanged, onplace }: Props = $props();
 
 	const available = folderAvailable();
 	let folder = $state<FolderState | null>(null);
 	let images = $state<ImageRecord[]>([]);
 	let busy = $state(true);
 
+	/** Object URLs for the thumbnails, by name — the same cache the card reads. */
+	let urls = $state<Record<string, string>>({});
+	/** Pixel sizes, read off each thumbnail as it loads. */
+	let sizes = $state<Record<string, { w: number; h: number }>>({});
+
 	async function refresh() {
 		busy = true;
 		folder = await imageFolder();
 		images = await listImages();
+		urls = (await resolveLocalImages(images.map((image) => image.name))).urls;
 		busy = false;
+	}
+
+	/**
+	 * Pictures in from a file picker. The folder is Chromium's alone, and
+	 * until this there was no way to put a picture into this browser from a
+	 * phone except dropping a file on an area — which a phone cannot do. Where
+	 * they go is where every picture goes: the folder when there is one, this
+	 * browser otherwise.
+	 */
+	let fileInput = $state<HTMLInputElement | null>(null);
+
+	async function upload(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const files = [...(input.files ?? [])].filter((file) => file.type.startsWith('image/'));
+		input.value = '';
+		if (!files.length) return;
+		const names: string[] = [];
+		for (const file of files) names.push(await storeLocalImage(file));
+		await refresh();
+		onchanged();
+		onnotice(
+			`${names.length === 1 ? names[0] : `${names.length} pictures`} added. Drag ${names.length === 1 ? 'it' : 'one'} onto an area to use ${names.length === 1 ? 'it' : 'it there'}.`
+		);
+	}
+
+	/**
+	 * Carrying a picture onto an area.
+	 *
+	 * Pointer events rather than HTML drag and drop, which a touchscreen does
+	 * not do — and a phone is where this bar is the only way to put a picture
+	 * on a card. The thumbnail is the grip: a press that travels is a carry,
+	 * and where it is let go the element under the finger says which area, by
+	 * the same `data-box-id` the card puts on every area.
+	 */
+	const CARRY_SLOP = 6;
+	let carry = $state<{ id: number; name: string; x: number; y: number; on: boolean } | null>(null);
+
+	function startCarry(event: PointerEvent, name: string) {
+		if (event.button !== 0) return;
+		event.preventDefault();
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		carry = { id: event.pointerId, name, x: event.clientX, y: event.clientY, on: false };
+	}
+
+	function moveCarry(event: PointerEvent) {
+		if (!carry || carry.id !== event.pointerId) return;
+		if (!carry.on && Math.hypot(event.clientX - carry.x, event.clientY - carry.y) < CARRY_SLOP) return;
+		carry = { ...carry, x: event.clientX, y: event.clientY, on: true };
+	}
+
+	function endCarry(event: PointerEvent) {
+		if (!carry || carry.id !== event.pointerId) return;
+		const { on, name } = carry;
+		carry = null;
+		if (!on || event.type === 'pointercancel') return;
+		const under = document.elementFromPoint(event.clientX, event.clientY);
+		const area = under?.closest<HTMLElement>('.trim [data-box-id]');
+		if (area?.dataset.boxId) onplace(area.dataset.boxId, name);
+		else onnotice('Let go over an area on the page to put the picture in it.');
 	}
 
 	$effect(() => {
@@ -111,8 +180,13 @@
 				{/if}
 			</span>
 		</span>
-		{#if available}
-			<span class="head-row">
+		<span class="head-row">
+			<!-- Every browser, a phone included: the folder below is Chromium's,
+			     and this is the way in that is not. -->
+			<button title="Add pictures from this device" onclick={() => fileInput?.click()}>
+				<Icon name="add" size={14} /> Upload…
+			</button>
+			{#if available}
 				{#if folder && !folder.ready}
 					<button class="primary" onclick={reopen}>Open {folder.name}</button>
 				{/if}
@@ -123,8 +197,8 @@
 				{#if folder}
 					<button title="Stop reading the folder. Nothing in it is deleted" onclick={forget}>Forget</button>
 				{/if}
-			</span>
-		{/if}
+			{/if}
+		</span>
 	</span>
 
 	{#if busy}
@@ -132,14 +206,43 @@
 	{:else if !images.length}
 		<span class="empty">None stored</span>
 	{:else}
-		<span class="total">{images.length} · {weigh(total)}</span>
+		<!-- One picture a line: what it looks like, what it is called, how big
+		     it is in pixels and in bytes, and whether anything uses it. The
+		     thumbnail is also the handle it is carried onto an area by. -->
 		<ul class="images">
 			{#each images as image (image.where + image.name)}
-				<!-- Whether anything currently points at it, because "which of these
-				     forty can I delete" is the only question this bar is for. -->
 				<li class:unused={!used.has(image.name)} title="{image.name} — {image.where === 'folder' ? 'in the folder' : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}">
+					<span
+						class="thumb"
+						class:carrying={carry?.on && carry.name === image.name}
+						role="button"
+						tabindex="-1"
+						aria-label="Drag {image.name} onto an area"
+						title="Drag onto an area on the page"
+						onpointerdown={(e) => startCarry(e, image.name)}
+						onpointermove={moveCarry}
+						onpointerup={endCarry}
+						onpointercancel={endCarry}
+					>
+						{#if urls[image.name]}
+							<img
+								src={urls[image.name]}
+								alt=""
+								draggable="false"
+								onload={(e) => {
+									const img = e.currentTarget as HTMLImageElement;
+									sizes = { ...sizes, [image.name]: { w: img.naturalWidth, h: img.naturalHeight } };
+								}}
+							/>
+						{/if}
+					</span>
 					<span class="name">{image.name}</span>
-					<span class="size">{weigh(image.bytes)}</span>
+					<span class="size">{[
+						sizes[image.name] ? `${sizes[image.name].w} × ${sizes[image.name].h} px` : '',
+						weigh(image.bytes)
+					]
+						.filter(Boolean)
+						.join(' · ')}</span>
 					{#if !used.has(image.name)}<span class="tag">unused</span>{/if}
 					<button
 						class="square"
@@ -152,8 +255,17 @@
 				</li>
 			{/each}
 		</ul>
+		<span class="total">{images.length} · {weigh(total)}</span>
 	{/if}
 </div>
+
+<input bind:this={fileInput} type="file" accept="image/*" multiple hidden onchange={upload} />
+
+{#if carry?.on && urls[carry.name]}
+	<!-- What is being carried, under the finger — on a phone the finger is
+	     over the very thing it is carrying, so it sits above and to the side. -->
+	<img class="ghost" src={urls[carry.name]} alt="" style="left:{carry.x}px;top:{carry.y}px" />
+{/if}
 
 <style>
 	.where {
@@ -169,31 +281,65 @@
 
 	.images {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
+		flex-direction: column;
+		gap: 2px;
 		list-style: none;
 		margin: 0;
 		padding: 0;
 		flex: 1 1 20rem;
 		min-width: 0;
+		max-height: 9.5rem;
+		overflow-y: auto;
+		overscroll-behavior: contain;
 	}
 
 	.images li {
-		display: inline-flex;
+		display: flex;
 		align-items: center;
-		gap: 6px;
-		padding: 2px 2px 2px 8px;
-		border: 1px solid #ddd;
-		border-radius: 999px;
-		background: #fff;
-		max-width: 18rem;
+		gap: 8px;
+		padding: 2px 2px 2px 2px;
+		border: 1px solid transparent;
+		border-radius: var(--radius-button);
 	}
 
-	.images li.unused {
-		border-style: dashed;
+	.images li:hover {
+		border-color: #ddd;
+		background: #fff;
+	}
+
+	.images li.unused .name {
+		color: #767676;
+	}
+
+	/* The grip. `touch-action: none` because a carry is a drag, and the
+	   browser would otherwise take the first few pixels of it as a scroll. */
+	.thumb {
+		flex: none;
+		display: grid;
+		place-items: center;
+		width: 36px;
+		height: 28px;
+		border: 1px solid #ddd;
+		border-radius: 2px;
+		background:
+			repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 0 0 / 8px 8px;
+		overflow: hidden;
+		cursor: grab;
+		touch-action: none;
+	}
+
+	.thumb.carrying {
+		opacity: 0.4;
+	}
+
+	.thumb img {
+		max-width: 100%;
+		max-height: 100%;
+		pointer-events: none;
 	}
 
 	.name {
+		flex: 1;
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -205,6 +351,7 @@
 	.empty {
 		color: #767676;
 		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
 	}
 
 	.tag {
@@ -216,12 +363,12 @@
 
 	.images li :global(button.square) {
 		border: none;
-		border-radius: 999px;
 		width: 22px;
 		height: 22px;
 		padding: 0;
 		justify-content: center;
 		color: #767676;
+		background: none;
 	}
 
 	.images li :global(button.square:hover) {
@@ -233,5 +380,20 @@
 		background: #111;
 		border-color: #111;
 		color: #fff;
+	}
+
+	.ghost {
+		position: fixed;
+		z-index: 60;
+		width: 56px;
+		height: 56px;
+		object-fit: contain;
+		margin: -64px 0 0 8px;
+		pointer-events: none;
+		border: 1px solid #2563eb;
+		border-radius: 3px;
+		background: #fff;
+		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+		opacity: 0.9;
 	}
 </style>

@@ -302,7 +302,7 @@
 		<!-- What this is called, with everything that acts on the template as a
 		     whole behind the caret, and the lock beside it — outside the menu,
 		     because it is a state you need to see, not an errand. -->
-		<span class="head">
+		<span class="head page-head">
 			<span class="head-row">
 				<label class="field picker" bind:this={pickerEl}>
 					<span>Template</span>

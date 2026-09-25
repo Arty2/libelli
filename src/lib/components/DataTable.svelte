@@ -1083,19 +1083,6 @@
 			><Icon name="trash" size={15} /> Delete</button>
 			<span class="rule"></span>
 		{/if}
-		<button disabled={locked} title="Paste a block of cells straight off a spreadsheet" onclick={() => (pasteOpen = true)}>
-			<Icon name="task-add" size={15} /> Paste
-		</button>
-		<!-- The same button the page bar has for the design, and never disabled
-		     by the lock it sets, or there would be no way out of it. -->
-		<button
-			aria-pressed={locked}
-			title={locked ? 'Unlock the table' : 'Lock the table — no typing, no new rows or columns, no paste or import'}
-			onclick={() => onlock(!locked)}
-		>
-			<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
-			{locked ? 'Unlock' : 'Lock'}
-		</button>
 		<span class="spacer"></span>
 		<!-- What table this is, at the far end of the bar: the buttons act on it,
 		     and it is the one control here that is a name rather than an act. One
@@ -1157,9 +1144,23 @@
 							New table…
 						</button>
 					</li>
-					<!-- Files in and out, with the table they act on rather than in
-					     the bar: they are errands, done once, and Paste — the one done
-					     over and over — keeps its button. -->
+					<!-- Rows in and out, with the table they act on rather than as a
+					     row of buttons in a bar that also has to hold a selection's
+					     worth of row actions. -->
+					<li role="none">
+						<button
+							role="menuitem"
+							disabled={locked}
+							title="Paste a block of cells straight off a spreadsheet"
+							onclick={() => {
+								pickerOpen = false;
+								pasteOpen = true;
+							}}
+						>
+							<span class="mark" aria-hidden="true"><Icon name="task-add" size={14} /></span>
+							Paste…
+						</button>
+					</li>
 					<li role="none">
 						<button
 							role="menuitem"
@@ -1225,6 +1226,18 @@
 			aria-label="Swap to the previous table"
 			onclick={onswaptable}
 		><Icon name="arrows-horizontal" size={15} /></button>
+		<!-- Last in the bar, after the picker: the state of the table named
+		     just before it, and the one thing here that is not an errand — the
+		     same reason the page bar keeps its Lock outside its menu. Never
+		     disabled by the lock it sets, or there would be no way out of it. -->
+		<button
+			aria-pressed={locked}
+			title={locked ? 'Unlock the table' : 'Lock the table — no typing, no new rows or columns, no paste or import'}
+			onclick={() => onlock(!locked)}
+		>
+			<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
+			{locked ? 'Unlock' : 'Lock'}
+		</button>
 		<input
 			bind:this={fileInput}
 			type="file"
