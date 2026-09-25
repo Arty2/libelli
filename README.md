@@ -1413,7 +1413,11 @@ than it has to.
   areas for a new image area of its own, centred where it was let go, 40mm
   across and in the picture's proportions; a picture file dragged in from
   outside does the same. Every **Upload…** that takes a picture wears Carbon's
-  *image reference*, and every **URL…** its *copy link*.
+  *image reference*, and every **URL…** its *copy link*. Deleting a picture
+  asks first — **Delete Image**, Escape to keep it — because undo keeps the
+  template and the table, not the bytes. A name something points at that this
+  browser has no picture for stays in the list as a dashed, red *missing* line,
+  with **Find…** to put a file back under that very name.
 - **The window toolbar** holds only what is about the whole app: the mark, then
   Help, Page Setup, Images, Data and Export — the two panels in the order they
   sit on screen, settings above the page and the table beside it. On a phone the

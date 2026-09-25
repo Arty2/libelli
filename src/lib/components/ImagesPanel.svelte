@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { armDefault } from '$lib/modal';
 	import {
 		chooseImageFolder,
 		deleteImage,
@@ -27,6 +28,8 @@
 	interface Props {
 		/** names the current table and template actually point at */
 		used: Set<string>;
+		/** names pointed at that this browser does not hold: listed, to be put back */
+		missing?: string[];
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
 		/** the pictures changed: whoever resolved them should do it again */
 		onchanged: () => void;
@@ -38,7 +41,41 @@
 		ontraydrag?: (phase: 'start' | 'move' | 'end', clientY: number) => void;
 	}
 
-	let { used, onnotice, onchanged, onplace, onplacepage, ontraydrag }: Props = $props();
+	let { used, missing = [], onnotice, onchanged, onplace, onplacepage, ontraydrag }: Props = $props();
+
+	/**
+	 * A picture the design points at and this browser does not hold — a table
+	 * brought from elsewhere, a folder not opened, a picture deleted. It stays
+	 * in the list as a placeholder with a way to put the file back, under the
+	 * name that is pointed at: the file's own name on this device rarely is it.
+	 */
+	let replaceInput = $state<HTMLInputElement | null>(null);
+	let replacing = $state<string | null>(null);
+
+	function findFor(name: string) {
+		replacing = name;
+		replaceInput?.click();
+	}
+
+	async function putBack(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		const name = replacing;
+		replacing = null;
+		if (!file || !name) return;
+		await storeLocalImage(file, name);
+		await refresh();
+		onchanged();
+		onnotice(`${name} is back, from ${file.name}.`);
+	}
+
+	/**
+	 * Deleting asks, and says why: a picture's bytes are not in the app's undo
+	 * — a snapshot is template and table, and the picture is neither — so this
+	 * is the one delete in the app that undo cannot reach.
+	 */
+	let confirming = $state<ImageRecord | null>(null);
 
 	/** The head, pulled: the same hand-off the table's header row makes. */
 	let traying: number | null = null;
@@ -267,7 +304,7 @@
 	<div class="list">
 		{#if busy}
 			<p class="empty">…</p>
-		{:else if !images.length}
+		{:else if !images.length && !missing.length}
 			<p class="empty">
 				None stored yet. <strong>Upload…</strong> below, or drop a picture file onto an area or the page.
 			</p>
@@ -314,9 +351,19 @@
 							class="square"
 							title="Delete {image.name}"
 							aria-label="Delete {image.name}"
-							onclick={() => void remove(image)}
+							onclick={() => (confirming = image)}
 						>
 							<Icon name="trash" size={12} />
+						</button>
+					</li>
+				{/each}
+				{#each missing as name (name)}
+					<li class="missing" title="{name} — pointed at, but not in this browser">
+						<span class="thumb empty-thumb" aria-hidden="true"><Icon name="image" size={16} /></span>
+						<span class="name">{name}</span>
+						<span class="tag missing-tag">missing</span>
+						<button class="find" title="Choose the file to use for {name}" onclick={() => findFor(name)}>
+							<Icon name="image-reference" size={13} /> Find…
 						</button>
 					</li>
 				{/each}
@@ -346,6 +393,48 @@
 </section>
 
 <input bind:this={fileInput} type="file" accept="image/*" multiple hidden onchange={upload} />
+<input bind:this={replaceInput} type="file" accept="image/*" hidden onchange={putBack} />
+
+{#if confirming}
+	{@const image = confirming}
+	<div class="confirm-backdrop" role="presentation" onclick={() => (confirming = null)}></div>
+	<!-- Keys stop here: the page's own shortcuts listen on the window, and a
+	     Delete or an arrow meant for this dialog would act on the card behind. -->
+	<div
+		class="confirm"
+		role="alertdialog"
+		aria-modal="true"
+		aria-labelledby="delete-image-title"
+		tabindex="-1"
+		use:armDefault
+		onkeydown={(e) => {
+			e.stopPropagation();
+			if (e.key === 'Escape') confirming = null;
+		}}
+	>
+		<h2 id="delete-image-title">Delete “{image.name}”?</h2>
+		<p>
+			It is removed from {image.where === 'folder' ? 'the folder' : 'this browser'}, and this cannot be undone.
+			{#if used.has(image.name)}
+				Something on this card or in this table uses it, and will draw nothing until it is put back.
+			{/if}
+		</p>
+		<div class="confirm-actions">
+			<button onclick={() => (confirming = null)}>Cancel</button>
+			<button
+				class="danger-solid"
+				data-default
+				onclick={() => {
+					// Taken before the dialog is closed: `image` reads `confirming`,
+					// which closing it empties.
+					const doomed = image;
+					confirming = null;
+					void remove(doomed);
+				}}>Delete Image</button
+			>
+		</div>
+	</div>
+{/if}
 
 {#if carry?.on && urls[carry.name]}
 	<!-- What is being carried, under the finger — on a phone the finger is
@@ -556,6 +645,89 @@
 	.images li :global(button.square:hover) {
 		color: #b42318;
 		background: #fdf3f2;
+	}
+
+	/* Pointed at, not held: a dashed frame where the thumbnail would be. */
+	.empty-thumb {
+		border-style: dashed;
+		background: #fafafa;
+		color: #b3b3b3;
+		cursor: default;
+	}
+
+	.missing .name {
+		color: #767676;
+	}
+
+	.missing-tag {
+		color: #b42318;
+	}
+
+	.find {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		font: 11px ui-sans-serif, system-ui, sans-serif;
+		padding: 2px 8px;
+		border: 1px solid #ccc;
+		border-radius: var(--radius-button);
+		background: #fff;
+		cursor: pointer;
+	}
+
+	/* The app's confirm dialog, drawn here since this tray owns it. */
+	.confirm-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
+		background: rgba(0, 0, 0, 0.35);
+	}
+
+	.confirm {
+		position: fixed;
+		z-index: 41;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		box-sizing: border-box;
+		width: min(420px, calc(100vw - 32px));
+		padding: 20px 22px;
+		background: #fff;
+		border-radius: 10px;
+		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+	}
+
+	.confirm h2 {
+		margin: 0 0 6px;
+		font-size: 16px;
+		overflow-wrap: anywhere;
+	}
+
+	.confirm p {
+		margin: 0 0 14px;
+		color: #333;
+	}
+
+	.confirm-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+	}
+
+	.confirm-actions button {
+		font: 13px ui-sans-serif, system-ui, sans-serif;
+		padding: 6px 12px;
+		border: 1px solid #ccc;
+		border-radius: var(--radius-button);
+		background: #fff;
+		cursor: pointer;
+	}
+
+	.confirm-actions .danger-solid {
+		background: #b42318;
+		border-color: #b42318;
+		color: #fff;
 	}
 
 	.ghost {

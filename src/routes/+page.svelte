@@ -772,6 +772,9 @@
 		return [...names].sort();
 	});
 
+	/** Names the template or the table point at that this browser does not hold. */
+	let missingImages = $state<string[]>([]);
+
 	$effect(() => {
 		const wanted = imageNames;
 		// A bare read, so $effect tracks it and a bump re-runs this.
@@ -782,14 +785,9 @@
 			const { urls, missing } = await resolveLocalImages(wanted);
 			if (stale) return;
 			images = urls;
-			if (missing.length) {
-				notify(
-					`${missing.length === 1 ? 'An image' : `${missing.length} images`} named here ` +
-						`${missing.length === 1 ? 'is' : 'are'} not in this browser: ${missing.join(', ')}. ` +
-						'Drop the file onto the area again to put it back.',
-					'warning'
-				);
-			}
+			// Listed in the Images tray as placeholders, each with a way to put
+			// the file back — rather than said once in the status line and lost.
+			missingImages = missing;
 		})();
 		return () => {
 			stale = true;
@@ -2642,6 +2640,7 @@
 			{#if imagesOpen}
 				<ImagesPanel
 					used={new Set(imageNames)}
+					missing={missingImages}
 					onplace={placeStoredImage}
 					onplacepage={(name, x, y) => void placeImageOnPage(name, x, y)}
 					onnotice={notify}

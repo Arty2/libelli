@@ -199,8 +199,10 @@ export const localImageRef = (name: string) => `${LOCAL_IMAGE}${name.trim()}`;
  * Into the chosen folder where there is one, and into this browser otherwise.
  * See `imageFolder` below for why that choice exists.
  */
-export async function storeLocalImage(file: File): Promise<string> {
-	const name = file.name.trim() || 'image';
+export async function storeLocalImage(file: File, as?: string): Promise<string> {
+	// `as` puts a file back under the name something already points at, which
+	// is rarely the name the file happens to have on this device.
+	const name = as?.trim() || file.name.trim() || 'image';
 	await writeImage(name, file);
 	return name;
 }

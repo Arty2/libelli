@@ -2207,6 +2207,15 @@ does not have; where it is let go, `elementFromPoint` and the card's
 dropped file. Pixel sizes are read off the thumbnails as they load rather than
 stored, since the bytes are what is kept and they already say it.
 
+**Deleting a picture asks; a missing one is listed.** Undo is snapshots of the
+template, the table and the mapping — the bytes of a picture are in neither, so
+a deleted one cannot be brought back by it, and a destructive step nothing can
+undo gets a dialog. A name the rows or the page point at with no bytes behind it
+used to be announced once in the status line, which said what was wrong and
+then went away; it is now a line in the Images list, where the fix is: **Find…**
+stores the chosen file under the referenced name (`storeLocalImage`'s `as`), so
+nothing that points at it has to change.
+
 **Big things are referenced, never embedded.** A template names a font family and
 a background image; the bytes live in IndexedDB, keyed by that name, and a file
 the browser has never been given is asked for rather than substituted. That is
