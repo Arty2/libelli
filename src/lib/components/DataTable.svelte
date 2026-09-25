@@ -2637,10 +2637,19 @@
 			display: none;
 		}
 
-		/* And the field a little narrower again: at 390px wide, a cell open with
-		   its Edit showing was 7px past the edge. */
+		/* The name takes whatever the bar has left: the lock and the picker
+		   step aside while a cell is typed in or rows are chosen, so when the
+		   picker is here it has the bar to itself. Grown far ahead of the
+		   spacer, which would otherwise take half of what is left. */
+		.picker {
+			flex: 100 1 auto;
+			min-width: 0;
+		}
+
 		.picker input {
-			width: 5.5rem;
+			flex: 1;
+			width: auto;
+			min-width: 4rem;
 		}
 	}
 
