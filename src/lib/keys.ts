@@ -54,3 +54,30 @@ export function nudgeStep(event: Pick<KeyboardEvent, 'shiftKey' | 'altKey'>): nu
 export function isAlignChord(event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>): boolean {
 	return (event.metaKey || event.ctrlKey) && event.shiftKey;
 }
+
+/**
+ * Every shortcut as a tooltip says it, in one place. A key named in a title
+ * by hand drifted from the key actually listened for — Redo's title said
+ * Ctrl+Shift+Z, which is the A/B toggle, while Redo is Ctrl+Y — so a title
+ * that names a key takes it from here, and the README's table is the other
+ * copy to keep in step.
+ */
+export const SHORTCUTS = {
+	undo: 'Ctrl/Cmd+Z',
+	redo: 'Ctrl/Cmd+Y',
+	duplicate: 'Ctrl/Cmd+D',
+	delete: 'Delete',
+	copyStyle: 'Ctrl/Cmd+Shift+C',
+	pasteStyle: 'Ctrl/Cmd+Shift+V',
+	export: 'Ctrl/Cmd+P',
+	help: '?',
+	grid: "Ctrl/Cmd+' or Ctrl/Cmd+#",
+	guides: 'Ctrl/Cmd+; or |',
+	boxes: 'Ctrl/Cmd+H',
+	zoom: 'Ctrl/Cmd + and −, Ctrl/Cmd+0 to fit',
+	cards: 'arrows or PageUp/PageDown, with nothing selected',
+	type: 'Enter'
+} as const;
+
+/** A title with its shortcut after it, in brackets, the way every tooltip says one. */
+export const withKey = (title: string, key: keyof typeof SHORTCUTS) => `${title} (${SHORTCUTS[key]})`;

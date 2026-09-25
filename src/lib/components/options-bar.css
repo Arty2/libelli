@@ -45,7 +45,7 @@
    is excluded: `MM` and `PT` are not how anyone writes a unit, and the point of
    setting them small and grey was that they read as an annotation rather than
    as a second label. */
-.options .field > span:not(.unit) {
+.options .field > span:not(.unit):not(.menu-select) {
 	font-size: 10px;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
@@ -132,6 +132,11 @@
 	gap: 4px;
 	color: #555;
 	white-space: nowrap;
+}
+
+/* A checkbox that does not apply greys its words with it. */
+.options .check:has(input:disabled) {
+	color: #999;
 }
 
 /* A field is a line under a value, not a box around it.
@@ -428,6 +433,18 @@
 		overscroll-behavior: contain;
 		gap: 6px 8px;
 		padding: 6px 8px;
+	}
+
+	/* The page bar's head — the template and its lock — on a line of its own,
+	   ruled off from the settings under it in the bar's border grey. Only
+	   here: on a phone the bar wraps to a column of short rows whatever
+	   happens, and the name of what you are setting up is worth a line. On a
+	   desk the same line cost the whole bar a row, pushing the page down for
+	   a rule, so there the head wraps in with the groups like the area bar's. */
+	.options .head.page-head {
+		flex: 1 0 100%;
+		padding: 0 0 6px;
+		border-bottom: 1px solid #ddd;
 	}
 
 	/* On a phone the bar is one column of wrapped controls anyway, so the head's

@@ -278,3 +278,108 @@ export function alignBoxes(boxes: Box[], ids: string[], edge: AlignEdge): Box[] 
 		return horizontal ? { ...box, x: value } : { ...box, y: value };
 	});
 }
+
+// ---- the paper at its real size ---------------------------------------------
+
+/**
+ * What a screen tells a page about itself: its size in CSS pixels, and how
+ * many device pixels make one of those.
+ */
+export interface ScreenFacts {
+	width: number;
+	height: number;
+	ratio: number;
+}
+
+/**
+ * Screens this can put a real size to.
+ *
+ * No browser reports how big an inch of glass is, and CSS's own millimetre
+ * assumes 96 pixels to the inch, which is right for almost nothing sold this
+ * decade. What a page can read is the screen's size in CSS pixels and the
+ * pixel ratio, and for most screens those name the panel:
+ *
+ * - `grid` is the device-pixel grid, the CSS size times the ratio. On a phone,
+ *   an iPad or Windows that is the panel itself, so it names the model — and
+ *   it survives browser zoom and display scaling, which change the size and
+ *   the ratio together.
+ * - `looks` is for a Mac. macOS draws a scaled mode ("looks like 1440 × 900")
+ *   into a bigger framebuffer and shrinks it onto the glass, so the grid a
+ *   page sees is not the panel's and two Macs can report the same one. The
+ *   "looks like" sizes a panel offers are its own, so they are listed instead.
+ *
+ * Either way the answer is the panel's long side in inches; every mode of one
+ * panel shares it. `estimate` marks a grid that more than one common size of
+ * screen reports, where the commonest is taken — the zoom menu says so.
+ */
+interface Panel {
+	name: string;
+	/** long side of the glass, in inches */
+	inches: number;
+	grid?: [number, number];
+	looks?: Array<[number, number]>;
+	ratio?: [number, number];
+	estimate?: boolean;
+}
+
+const inch = (px: number, ppi: number) => px / ppi;
+
+const PANELS: Panel[] = [
+	{ name: '13-inch MacBook', inches: inch(2560, 227), looks: [[1024, 640], [1280, 800], [1440, 900], [1680, 1050]] },
+	{ name: '13-inch MacBook Air', inches: inch(2560, 224), looks: [[1024, 665], [1280, 832], [1470, 956], [1710, 1112]] },
+	{ name: '15-inch MacBook Air', inches: inch(2880, 224), looks: [[1440, 932], [1710, 1107], [1920, 1243]] },
+	{ name: '14-inch MacBook Pro', inches: inch(3024, 254), looks: [[1147, 745], [1352, 878], [1512, 982], [1800, 1169]] },
+	{ name: '16-inch MacBook Pro', inches: inch(3456, 254), looks: [[1312, 848], [1496, 967], [1728, 1117], [2056, 1329]] },
+	{ name: '15-inch MacBook Pro', inches: inch(2880, 220), looks: [[1680, 1050], [1920, 1200]] },
+	{ name: '27-inch iMac or Studio Display', inches: inch(5120, 218), looks: [[2048, 1152], [2304, 1296], [2560, 1440], [2880, 1620], [3200, 1800]], ratio: [2, 2] },
+	{ name: '24-inch iMac', inches: inch(4480, 218), looks: [[2240, 1260]], ratio: [2, 2] },
+	{ name: '12.9-inch iPad Pro', inches: inch(2732, 264), grid: [2732, 2048] },
+	{ name: '11-inch iPad Pro', inches: inch(2388, 264), grid: [2388, 1668] },
+	{ name: '10.9-inch iPad', inches: inch(2360, 264), grid: [2360, 1640] },
+	{ name: 'iPad mini', inches: inch(2266, 326), grid: [2266, 1488] },
+	{ name: '6.1-inch iPhone', inches: inch(2556, 460), grid: [2556, 1179] },
+	{ name: '6.7-inch iPhone', inches: inch(2796, 460), grid: [2796, 1290] },
+	{ name: '6.1-inch iPhone', inches: inch(2532, 460), grid: [2532, 1170] },
+	{ name: '6.7-inch iPhone', inches: inch(2778, 458), grid: [2778, 1284] },
+	{ name: '5.8-inch iPhone', inches: inch(2436, 458), grid: [2436, 1125] },
+	{ name: '6.1-inch iPhone', inches: inch(1792, 326), grid: [1792, 828] },
+	{ name: '4.7-inch iPhone', inches: inch(1334, 326), grid: [1334, 750] },
+	// Grids shared by screens of several sizes: the commonest, marked. A 1080p
+	// grid drawn at a ratio of 1 is nearly always a desk monitor; drawn larger,
+	// a laptop scaling its panel up.
+	{ name: '24-inch monitor', inches: inch(1920, 92), grid: [1920, 1080], ratio: [0, 1], estimate: true },
+	{ name: '15.6-inch laptop', inches: inch(1920, 141), grid: [1920, 1080], ratio: [1.1, 4], estimate: true },
+	{ name: '27-inch monitor', inches: inch(2560, 109), grid: [2560, 1440], ratio: [0, 1], estimate: true },
+	{ name: '27-inch 4K monitor', inches: inch(3840, 163), grid: [3840, 2160], estimate: true },
+	{ name: '34-inch ultrawide', inches: inch(3440, 110), grid: [3440, 1440], estimate: true }
+];
+
+/** How far a measured size may be off a listed one — fractional ratios round. */
+const SLOP = 4;
+
+const near = (a: number, b: number) => Math.abs(a - b) <= SLOP;
+
+/**
+ * The zoom at which the card is its real size on this screen, and what it was
+ * worked out from. A screen nothing here recognises gets CSS's own millimetre,
+ * a scale of 1, and says it is a guess.
+ */
+export function actualScale(screen: ScreenFacts): { scale: number; panel: string | null; estimate: boolean } {
+	const cssLong = Math.max(screen.width, screen.height);
+	const cssShort = Math.min(screen.width, screen.height);
+	const ratio = screen.ratio || 1;
+	const gridLong = cssLong * ratio;
+	const gridShort = cssShort * ratio;
+	const fits = (p: Panel) => !p.ratio || (ratio >= p.ratio[0] && ratio <= p.ratio[1]);
+	// "Looks like" first: on a Mac the grid is a framebuffer and could match
+	// another panel's native one by coincidence.
+	const panel =
+		PANELS.find((p) => fits(p) && p.looks?.some(([w, h]) => near(w, cssLong) && near(h, cssShort) && ratio >= 2)) ??
+		PANELS.find((p) => fits(p) && p.grid && near(p.grid[0], gridLong) && near(p.grid[1], gridShort));
+	if (!panel || !cssLong) return { scale: 1, panel: null, estimate: true };
+	// The glass's long side holds `cssLong` CSS pixels, so an inch of it holds
+	// cssLong / inches of them; the card's millimetres assume 96. A dense
+	// screen at a small scaling therefore wants a zoom above 100%.
+	const scale = Math.round((cssLong / panel.inches / 96) * 1000) / 1000;
+	return { scale, panel: panel.name, estimate: !!panel.estimate };
+}

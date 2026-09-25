@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	FREE_STEP,
+	actualScale,
 	GRID_MAJOR,
 	GRID_MINOR,
 	alignBoxes,
@@ -247,5 +248,41 @@ describe('facingPosition', () => {
 	it('leaves a position that already names a side alone', () => {
 		expect(facingPosition('bottom-left', 'verso')).toBe('bottom-left');
 		expect(facingPosition('top-center', 'verso')).toBe('top-center');
+	});
+});
+
+describe('actualScale', () => {
+	it('puts a real size to a Mac in whatever mode it is scaled to', () => {
+		// A 13-inch MacBook at its default "looks like 1440 × 900": the glass
+		// is 2560 px at 227 ppi, 11.28in holding 1440 CSS px — 128 to the
+		// inch against CSS's 96, so the card has to be drawn a third larger.
+		const standard = actualScale({ width: 1440, height: 900, ratio: 2 });
+		expect(standard.panel).toBe('13-inch MacBook');
+		expect(standard.scale).toBeCloseTo(1440 / (2560 / 227) / 96, 3);
+		expect(standard.scale).toBeGreaterThan(1.3);
+		// "More space" is the same glass holding more pixels: a larger zoom.
+		expect(actualScale({ width: 1680, height: 1050, ratio: 2 }).scale).toBeGreaterThan(standard.scale);
+		// Turned on its side, the same answer.
+		expect(actualScale({ width: 900, height: 1440, ratio: 2 }).scale).toBe(standard.scale);
+	});
+
+	it('reads a phone by its device pixels', () => {
+		const phone = actualScale({ width: 393, height: 852, ratio: 3 });
+		expect(phone.panel).toBe('6.1-inch iPhone');
+		expect(phone.estimate).toBe(false);
+	});
+
+	it('draws a coarse desk monitor a little smaller than nominal', () => {
+		// 92 CSS px to the inch on a 24-inch 1080p monitor, against 96.
+		expect(actualScale({ width: 1920, height: 1080, ratio: 1 }).scale).toBeCloseTo(92 / 96, 3);
+	});
+
+	it('tells a desk monitor from a laptop on the same grid by the ratio, and marks both as estimates', () => {
+		expect(actualScale({ width: 1920, height: 1080, ratio: 1 })).toMatchObject({ panel: '24-inch monitor', estimate: true });
+		expect(actualScale({ width: 1280, height: 720, ratio: 1.5 })).toMatchObject({ panel: '15.6-inch laptop', estimate: true });
+	});
+
+	it("falls back to CSS's own millimetre for a screen it does not know", () => {
+		expect(actualScale({ width: 1111, height: 777, ratio: 1 })).toEqual({ scale: 1, panel: null, estimate: true });
 	});
 });

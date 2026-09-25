@@ -98,18 +98,21 @@ export const loadMapping = (id: string, templateName: string): Mapping => {
 };
 export const saveMapping = (id: string, mapping: Mapping) => local.set(mappingKey(id), mapping);
 
-const UI_DEFAULTS: UiState = { showBounds: true, showGrid: false, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' };
+const UI_DEFAULTS: UiState = { showBounds: true, showGrid: false, showGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' };
 
 // Merged, not returned raw: a settings blob written by an older build is missing
 // whatever was added since, and an undefined toggle renders as neither on nor off.
 // `showOutlines` is what this toggle was called before it was renamed to Bounds;
 // read it once so nobody's preference is silently flipped back on by a rename.
 export const loadUi = (): UiState => {
-	const stored = local.get<Partial<UiState> & { showOutlines?: boolean }>('ui', {});
-	const { showOutlines, ...rest } = stored;
+	const stored = local.get<Partial<UiState> & { showOutlines?: boolean; trayWidth?: number }>('ui', {});
+	// `trayWidth` was px, in 0.16.0; the width is a share now, and a stale
+	// number carried along in every save would only be something to misread.
+	const { showOutlines, trayWidth: _px, ...rest } = stored;
 	return { ...UI_DEFAULTS, ...(showOutlines === undefined ? {} : { showBounds: showOutlines }), ...rest };
 };
 export const saveUi = (ui: UiState) => local.set('ui', ui);
+
 
 /**
  * The editor's own fonts: families this browser has been given — a file

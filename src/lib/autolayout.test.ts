@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { GRID_MINOR } from './layout';
+import { DEFAULT_MARGIN } from './template';
 import {
 	autoLayout,
 	charsPerLine,
@@ -223,15 +225,31 @@ describe('autoLayout', () => {
 		expect(boxes.some((b) => b.slot === 'body')).toBe(false);
 	});
 
-	it('keeps every area the same distance from both sides of the paper', () => {
+	it('lays out inside the page margins, the same all round by default', () => {
 		for (const size of [page, { ...page, w: page.h, h: page.w }, { ...page, w: 90, h: 55 }]) {
 			const { boxes } = autoLayout({ page: size, defaults, columns, rows: sample });
 			const lefts = boxes.map((b) => b.x);
 			const rights = boxes.map((b) => size.w - (b.x + b.w));
-			expect(Math.min(...lefts)).toBeCloseTo(Math.min(...rights), 5);
-			// And the same distance from the top and the bottom as from the sides.
-			expect(Math.min(...boxes.map((b) => b.y))).toBeCloseTo(Math.min(...lefts), 5);
+			expect(Math.min(...lefts)).toBeCloseTo(DEFAULT_MARGIN, 6);
+			expect(Math.min(...rights)).toBeCloseTo(DEFAULT_MARGIN, 6);
+			expect(Math.min(...boxes.map((b) => b.y))).toBeCloseTo(DEFAULT_MARGIN, 6);
+			// Heights in whole grid steps, and the stack from the top margin down
+			// on the grid. The footer sits on the bottom margin instead, which is
+			// only a grid line where the page's height allows.
+			for (const b of boxes) expect(b.h % GRID_MINOR).toBeCloseTo(0, 6);
+			const bottom = size.h - DEFAULT_MARGIN;
+			for (const b of boxes.filter((b) => (b.anchor || b.y === DEFAULT_MARGIN) && b.y + b.h < bottom - 1e-6)) {
+				expect(b.y % GRID_MINOR).toBeCloseTo(0, 6);
+			}
 		}
+	});
+
+	it('follows margins the page sets, edge by edge', () => {
+		const framed = { ...page, margin: { top: 20, right: 8, bottom: 15, left: 12 } };
+		const { boxes } = autoLayout({ page: framed, defaults, columns, rows: sample });
+		expect(Math.min(...boxes.map((b) => b.x))).toBe(12);
+		expect(Math.min(...boxes.map((b) => framed.w - (b.x + b.w)))).toBeCloseTo(8, 6);
+		expect(Math.min(...boxes.map((b) => b.y))).toBe(20);
 	});
 
 	it('has nothing to lay out when there are no columns', () => {

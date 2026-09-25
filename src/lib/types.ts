@@ -11,14 +11,19 @@ export const SCHEMA_VERSION = 5;
 /**
  * What an area draws, given what its cell or its template says.
  *
- * `bitmap` is a drawing made in the app and kept as base64 in the cell,
- * `image` is a picture from somewhere — an address, or a name this browser is
- * holding — and `color` is a fill. `image` also accepts a color, because it
- * used to be the only mode for both and templates written then rely on it; a
- * column of brand colors is better off saying `color`, which refuses anything
- * that is not one.
+ * `image` is a picture, whichever way it was made: a drawing made in the app
+ * and kept as base64 in the cell or the template, an address, or a name this
+ * browser is holding — what the value is says which, and the renderer reads
+ * it. `color` is a fill. `image` also accepts a color, because it used to be
+ * the only mode for both and templates written then rely on it; a column of
+ * brand colors is better off saying `color`, which refuses anything that is
+ * not one.
+ *
+ * There was a `bitmap` mode beside `image` for drawings. It was the same
+ * picture with a different way in, and switching between the two dropped
+ * whichever the area held; a template that says `bitmap` is read as `image`.
  */
-export type BoxMode = 'plain' | 'markdown' | 'image' | 'color' | 'bitmap' | 'qr';
+export type BoxMode = 'plain' | 'markdown' | 'image' | 'color' | 'qr';
 export type Overflow = 'clip' | 'grow';
 export type Align = 'left' | 'center' | 'right' | 'justify';
 /** vertical placement of a box's content within its own frame */
@@ -108,6 +113,14 @@ export interface PageSpec {
 	/** paper color; printed only when the browser's background graphics are on */
 	background?: string;
 	image?: PageBackgroundImage;
+	/**
+	 * mm inside the trim edge where the page's working area starts: drawn as a
+	 * guide with the grid, snapped to, and what Position Automagically lays out
+	 * inside. One number is every edge; an object is per edge, in the stored
+	 * right-hand page's frame — so with facing pages its `left` is the inner
+	 * edge and its `right` the outer. Absent is `DEFAULT_MARGIN` all round.
+	 */
+	margin?: SideValue;
 }
 
 export interface BleedSpec {
@@ -191,14 +204,30 @@ export interface FontRef {
 
 /**
  * How one paragraph is told from the next: a space after it, or the first line
- * of the next one indented — the two conventions print has. The amount is in
- * lines of the area's own leading, so it keeps its proportion when the type
- * size or the leading changes.
+ * of the next one indented — the two conventions print has. A space is in
+ * lines of the area's own leading, an indent in em of its size, so either
+ * keeps its proportion when the type size or the leading changes.
  */
 export interface ParagraphStyle {
 	mode: 'space' | 'indent';
-	/** in lines: 1 is one line of the area's leading */
+	/** lines of the leading for a space; em of the type size for an indent */
 	amount: number;
+}
+
+/** What a Markdown bullet list is marked with: `•`, `●`, `–`, `—`, or nothing. */
+export type ListMarker = 'bullet' | 'disc' | 'dash' | 'emdash' | 'none';
+
+/**
+ * How a Markdown list is set. Each field on its own: an area can take the
+ * page's marker and change only its indent. In type units, like a paragraph
+ * style, so a list keeps its proportions when the type changes size.
+ */
+export interface ListStyle {
+	marker?: ListMarker;
+	/** em of the area's size, from its edge to the marker */
+	indent?: number;
+	/** lines of the area's leading between one item and the next */
+	spacing?: number;
 }
 
 export interface TextStyle {
@@ -215,12 +244,21 @@ export interface TextStyle {
 	letterSpacing?: number;
 	/** absent inherits the page's; absent there too is each renderer's own */
 	paragraph?: ParagraphStyle;
+	/** absent inherits the page's, field by field; Markdown areas only */
+	list?: ListStyle;
+	/**
+	 * Em of the area's size to raise the text by, below 0 to lower it: a face
+	 * that sits high or low on its line is set straight here. The page's
+	 * applies only to areas in the page's face — it corrects a font, and a
+	 * correction for one face is wrong for any other.
+	 */
+	baseline?: number;
 }
 
 export type Defaults = Required<
 	Pick<TextStyle, 'font' | 'size' | 'lineHeight' | 'weight' | 'color' | 'align' | 'letterSpacing'>
 > &
-	Pick<TextStyle, 'paragraph'>;
+	Pick<TextStyle, 'paragraph' | 'list' | 'baseline'>;
 
 /** Markdown block metrics. `size` values are multipliers of the box size; every spacing is mm. */
 export interface MarkdownStyle {
@@ -236,8 +274,9 @@ export interface MarkdownStyle {
 export interface QrSettings {
 	/** error correction: L 7%, M 15%, Q 25%, H 30% of the code recoverable */
 	level: 'L' | 'M' | 'Q' | 'H';
-	/** quiet zone in modules — the white border a scanner needs */
-	margin: number;
+	// No quiet zone of its own: the white border a scanner needs is the area's
+	// padding, like the space round anything else. A `margin` in an older
+	// file is dropped when it is read.
 	/** absent means transparent: the paper (or the box background) shows through */
 	background?: string;
 }
@@ -385,8 +424,8 @@ export interface Dataset {
 	name?: string;
 	/**
 	 * Read-only: no cell, column or row can change, from the table or from the
-	 * card. Sorting still reorders it and rows can still be chosen, because
-	 * neither changes what any card says. Absent is unlocked.
+	 * card, and it cannot be sorted, since row order is print order. Rows can
+	 * still be chosen. Absent is unlocked.
 	 */
 	locked?: boolean;
 }
@@ -400,6 +439,8 @@ export interface UiState {
 	/** dashed box bounds and the trim edge; screen furniture, never printed */
 	showBounds: boolean;
 	showGrid: boolean;
+	/** the page margins, drawn and snapped to; screen furniture, never printed */
+	showGuides: boolean;
 	/** how the grid draws itself: ruled lines, or a dot at every intersection */
 	gridStyle: GridStyle;
 	/**
@@ -408,7 +449,8 @@ export interface UiState {
 	 * renamed column, and is dropped for a column that no longer exists.
 	 */
 	columnWidths: Record<string, number>;
-	zoom: 'fit' | number;
+	/** `actual` is the paper's real size on this screen — see `actualScale` */
+	zoom: 'fit' | 'actual' | number;
 	/**
 	 * Which of the bars and the table were open, so a reload comes back to the
 	 * screen it left. Absent until something is toggled, which is what lets a
@@ -416,11 +458,18 @@ export interface UiState {
 	 */
 	panels?: { page: boolean; data: boolean; images: boolean };
 	/**
-	 * The table's width beside the page, in px, where the two sit side by
-	 * side. Absent is the stylesheet's own share; a phone stacks them and
-	 * ignores this.
+	 * The table's width beside the page, as a share of the working area, 0 to
+	 * 1. Absent is the stylesheet's own share. (A `trayWidth` in px written by
+	 * 0.16.0 is simply not read.)
 	 */
-	trayWidth?: number;
+	trayWidthShare?: number;
+	/** The stacked tray's height on a phone, as a share of the working area. */
+	trayHeightShare?: number;
+	/** How tall a table row may be; absent is `medium`, the height it always was. */
+	rowHeight?: RowHeight;
 }
+
+/** One line, a few lines, or as tall as the row's longest cell. */
+export type RowHeight = 'short' | 'medium' | 'full';
 
 export type GridStyle = 'lines' | 'dots';

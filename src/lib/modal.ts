@@ -63,3 +63,73 @@ export function armDefault(node: HTMLElement) {
 		destroy: () => node.removeEventListener('keydown', onKeydown)
 	};
 }
+
+/**
+ * How far a dialog may be dragged: anywhere, so long as a strip of its title
+ * stays on the screen to drag it back by. `rect` is the dialog as it sits
+ * with no offset; the answer is the offset clamped to keep `keep` pixels of
+ * its top edge inside the window on every side.
+ */
+export function clampDrag(
+	offset: { x: number; y: number },
+	rect: { left: number; top: number; width: number },
+	view: { width: number; height: number },
+	keep = 48
+): { x: number; y: number } {
+	const minX = keep - (rect.left + rect.width);
+	const maxX = view.width - keep - rect.left;
+	const minY = -rect.top;
+	const maxY = view.height - keep - rect.top;
+	return {
+		x: Math.min(maxX, Math.max(minX, offset.x)),
+		y: Math.min(maxY, Math.max(minY, offset.y))
+	};
+}
+
+/**
+ * A dialog moved by its title. Applied to the dialog; the element marked
+ * `data-drag-handle` inside it is what is grabbed, so a press on a field or
+ * a button is never a drag. The move is the `translate` property rather than
+ * the `transform` the dialogs centre themselves with, so the two add up and
+ * neither has to know the other's numbers. Nothing is remembered: a dialog
+ * opens centred every time, which is where anyone would look for it.
+ */
+export function dragByTitle(node: HTMLElement) {
+	let offset = { x: 0, y: 0 };
+	let start: { x: number; y: number; from: { x: number; y: number }; rect: DOMRect } | null = null;
+
+	const onDown = (event: PointerEvent) => {
+		const handle = (event.target as HTMLElement | null)?.closest('[data-drag-handle]');
+		if (!handle || !node.contains(handle) || event.button !== 0) return;
+		if ((event.target as HTMLElement).closest('button, input, select, textarea, a')) return;
+		event.preventDefault();
+		const now = node.getBoundingClientRect();
+		// The rect as it would sit with no offset, so the clamp is against home.
+		const rect = new DOMRect(now.left - offset.x, now.top - offset.y, now.width, now.height);
+		start = { x: event.clientX, y: event.clientY, from: offset, rect };
+		(handle as HTMLElement).setPointerCapture(event.pointerId);
+	};
+	const onMove = (event: PointerEvent) => {
+		if (!start) return;
+		offset = clampDrag(
+			{ x: start.from.x + event.clientX - start.x, y: start.from.y + event.clientY - start.y },
+			start.rect,
+			{ width: window.innerWidth, height: window.innerHeight }
+		);
+		node.style.translate = `${offset.x}px ${offset.y}px`;
+	};
+	const onUp = () => (start = null);
+
+	node.addEventListener('pointerdown', onDown);
+	node.addEventListener('pointermove', onMove);
+	node.addEventListener('pointerup', onUp);
+	node.addEventListener('pointercancel', onUp);
+	return {
+		destroy() {
+			node.removeEventListener('pointerdown', onDown);
+			node.removeEventListener('pointermove', onMove);
+			node.removeEventListener('pointerup', onUp);
+			node.removeEventListener('pointercancel', onUp);
+		}
+	};
+}

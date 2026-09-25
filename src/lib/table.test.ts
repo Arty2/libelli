@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareCells, countText, dropTarget, indexAfterSort, moveColumn, sortRows } from './table';
+import { compareCells, countText, dropTarget, indexAfterSort, moveColumn, moveRows, moveRowsTo, sortRows } from './table';
 import type { Dataset } from './types';
 
 const data = (): Dataset => ({
@@ -88,5 +88,46 @@ describe('dropTarget', () => {
 		expect(dropTarget(0, 3)).toBe(2);
 		expect(dropTarget(2, 0)).toBe(0);
 		expect(dropTarget(2, 2)).toBe(2);
+	});
+});
+
+describe('moveRows', () => {
+	const rows = ['a', 'b', 'c', 'd', 'e'];
+
+	it('moves a block up and down by one', () => {
+		expect(moveRows(rows, [1, 2], -1)).toEqual({ rows: ['b', 'c', 'a', 'd', 'e'], chosen: [0, 1] });
+		expect(moveRows(rows, [1, 2], 1)).toEqual({ rows: ['a', 'd', 'b', 'c', 'e'], chosen: [2, 3] });
+	});
+
+	it('holds rows at the edge and keeps a run in shape against it', () => {
+		expect(moveRows(rows, [0, 1, 3], -1)).toEqual({ rows: ['a', 'b', 'd', 'c', 'e'], chosen: [0, 1, 2] });
+		const still = moveRows(rows, [3, 4], 1);
+		expect(still.rows).toBe(rows);
+		expect(still.chosen).toEqual([3, 4]);
+	});
+
+	it('moves scattered rows each past its neighbour', () => {
+		expect(moveRows(rows, [0, 2, 4], 1).rows).toEqual(['b', 'a', 'd', 'c', 'e']);
+	});
+});
+
+describe('moveRowsTo', () => {
+	const rows = ['a', 'b', 'c', 'd', 'e'];
+
+	it('moves one row into a gap above or below it', () => {
+		expect(moveRowsTo(rows, [3], 1)).toEqual({ rows: ['a', 'd', 'b', 'c', 'e'], chosen: [1] });
+		expect(moveRowsTo(rows, [0], 5)).toEqual({ rows: ['b', 'c', 'd', 'e', 'a'], chosen: [4] });
+	});
+
+	it('moves a scattered set together, in their own order', () => {
+		expect(moveRowsTo(rows, [4, 1], 0)).toEqual({ rows: ['b', 'e', 'a', 'c', 'd'], chosen: [0, 1] });
+		expect(moveRowsTo(rows, [0, 2], 4)).toEqual({ rows: ['b', 'd', 'a', 'c', 'e'], chosen: [2, 3] });
+	});
+
+	it('gives the same rows back for a drop where they already are', () => {
+		const same = moveRowsTo(rows, [2], 3);
+		expect(same.rows).toBe(rows);
+		expect(same.chosen).toEqual([2]);
+		expect(moveRowsTo(rows, [2], 2).rows).toBe(rows);
 	});
 });

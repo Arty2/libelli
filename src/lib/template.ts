@@ -13,10 +13,13 @@ import type {
 	Centre,
 	Defaults,
 	FontRef,
+	ListMarker,
+	ListStyle,
 	Mapping,
 	PageBackgroundImage,
 	PageNumberPosition,
 	PageNumberSpec,
+	PageSpec,
 	ParagraphStyle,
 	PrintSettings,
 	QrSettings,
@@ -77,6 +80,31 @@ export const MIN_PAPER = 1;
  */
 export const MIN_BOX = 1;
 
+/** The page margin a template without one of its own has, in mm, every edge. */
+export const DEFAULT_MARGIN = 10;
+
+/**
+ * A page margin as read from a file: a number of mm, or four. Unlike a
+ * border, 0 is a real answer — a page worked to its trim edge — so it is kept,
+ * and only something that is not a margin at all falls back to the default.
+ */
+export function normaliseMargin(raw: unknown): SideValue | undefined {
+	if (typeof raw === 'number') return Number.isFinite(raw) ? Math.max(0, raw) : undefined;
+	if (!raw || typeof raw !== 'object') return undefined;
+	const side = (value: unknown) => Math.max(0, num(value, DEFAULT_MARGIN));
+	const sides: Sides = {
+		top: side((raw as any).top),
+		right: side((raw as any).right),
+		bottom: side((raw as any).bottom),
+		left: side((raw as any).left)
+	};
+	const { top, right, bottom, left } = sides;
+	return top === right && right === bottom && bottom === left ? top : sides;
+}
+
+/** The page's margin on each edge, whatever shape it is stored in. */
+export const marginsOf = (page: PageSpec): Sides => sidesOf(page.margin ?? DEFAULT_MARGIN);
+
 /** The smallest type size, in points, and the tightest leading, as a multiple. */
 export const MIN_SIZE = 1;
 export const MIN_LEADING = 0.5;
@@ -106,6 +134,64 @@ export function normaliseParagraph(raw: unknown): ParagraphStyle | undefined {
 	if (!Number.isFinite(n)) return undefined;
 	return { mode, amount: Math.round(Math.max(0, Math.min(MAX_PARAGRAPH, n)) * 100) / 100 };
 }
+
+export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'dash', 'emdash', 'none'];
+
+/** Said with the glyph, since the glyph is the choice. */
+export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
+	bullet: '• Bullet',
+	disc: '● Disc',
+	dash: '– Dash',
+	emdash: '— Em Dash',
+	none: 'None'
+};
+
+/** How far a list may be indented (em) or its items spaced (lines). */
+export const MAX_LIST = 10;
+
+/** How far the baseline may move, in em: past a line either way is no correction. */
+export const MAX_BASELINE = 1;
+
+/** A list style with only the fields that make sense; none of them, nothing. */
+export function normaliseList(raw: unknown): ListStyle | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const { marker, indent, spacing } = raw as Record<string, unknown>;
+	const length = (v: unknown) => {
+		if (v === undefined || v === null || v === '') return undefined;
+		const n = Number(v);
+		return Number.isFinite(n) ? Math.round(Math.max(0, Math.min(MAX_LIST, n)) * 100) / 100 : undefined;
+	};
+	const list = stripUndefined({
+		marker: LIST_MARKERS.includes(marker as ListMarker) ? (marker as ListMarker) : undefined,
+		indent: length(indent),
+		spacing: length(spacing)
+	});
+	return Object.keys(list).length ? list : undefined;
+}
+
+/** A baseline shift in em, negative allowed; zero is no shift and is dropped. */
+export function normaliseBaseline(raw: unknown): number | undefined {
+	if (raw === undefined || raw === null || raw === '') return undefined;
+	const n = Number(raw);
+	if (!Number.isFinite(n)) return undefined;
+	const v = Math.round(Math.max(-MAX_BASELINE, Math.min(MAX_BASELINE, n)) * 1000) / 1000;
+	return v === 0 ? undefined : v;
+}
+
+/**
+ * The baseline shift an area is set with. Its own, when it has one; the
+ * page's only when the area is in the page's face, because the page's is a
+ * correction for that face — carried onto another it would move text that
+ * sat right to begin with.
+ */
+export function baselineOf(box: Pick<Box, 'font' | 'baseline'>, defaults: Defaults): number {
+	if (box.baseline !== undefined) return box.baseline;
+	return (box.font ?? defaults.font) === defaults.font ? (defaults.baseline ?? 0) : 0;
+}
+
+/** An area's list style: its own fields over the page's, field by field. */
+export const listOf = (box: Pick<Box, 'list'>, defaults: Defaults): ListStyle | undefined =>
+	box.list || defaults.list ? { ...defaults.list, ...box.list } : undefined;
 
 /**
  * An anchor with a gap that is a number. The gap may be negative — an area
@@ -193,14 +279,19 @@ export function nextBoxId(existing: Box[] = []): string {
 }
 
 /** Every mode the format names. Anything else in a file is read as words. */
-export const BOX_MODES: BoxMode[] = ['plain', 'markdown', 'image', 'color', 'bitmap', 'qr'];
+export const BOX_MODES: BoxMode[] = ['plain', 'markdown', 'image', 'color', 'qr'];
 
 /** The modes that draw something rather than set something: a picture or a fill. */
-export const shownAsMedia = (mode: BoxMode) =>
-	mode === 'image' || mode === 'color' || mode === 'bitmap';
+export const shownAsMedia = (mode: BoxMode) => mode === 'image' || mode === 'color';
 
-/** The modes a drawing can be made in — the two that hold a picture. */
-export const takesADrawing = (mode: BoxMode) => mode === 'image' || mode === 'bitmap';
+/** The mode a drawing can be made in — the one that holds a picture. */
+export const takesADrawing = (mode: BoxMode) => mode === 'image';
+
+/** A mode as a file spells it: `bitmap`, from before drawings were images, is one. */
+function readMode(raw: unknown): BoxMode {
+	if (raw === 'bitmap') return 'image';
+	return BOX_MODES.includes(raw as BoxMode) ? (raw as BoxMode) : 'plain';
+}
 
 export function newBox(partial: Partial<Box> = {}): Box {
 	return {
@@ -212,7 +303,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		h: atLeast(partial.h, MIN_BOX, 12),
 		// A mode decides which renderer a cell reaches, so a word this format does
 		// not name is read as words rather than trusted.
-		mode: BOX_MODES.includes(partial.mode as BoxMode) ? (partial.mode as BoxMode) : 'plain',
+		mode: readMode(partial.mode),
 		overflow: partial.overflow ?? 'clip',
 		// Anything optional that is not named here is dropped on load: this list
 		// is the box format, so a new field has to be added in both places.
@@ -222,6 +313,8 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			weight: partial.weight === undefined ? undefined : Math.max(100, Math.min(900, num(partial.weight, 400))),
 			lineHeight: optionalAtLeast(partial.lineHeight, MIN_LEADING),
 			paragraph: normaliseParagraph(partial.paragraph),
+			list: normaliseList(partial.list),
+			baseline: normaliseBaseline(partial.baseline),
 			// Every color on a box goes through the parser before it can reach a
 			// style attribute; one that is not recognised is dropped rather than
 			// guessed at, the same rule the markdown renderer follows.
@@ -294,7 +387,7 @@ export function normaliseTemplate(raw: unknown): Template {
 			h: paper(t.page?.h, 210),
 			unit: 'mm',
 			background: parseColor(t.page?.background) ?? '#ffffff',
-			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image) })
+			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image), margin: normaliseMargin(t.page?.margin) })
 		},
 		bleed: normaliseBleed(t.bleed),
 		print: normalisePrintSettings(t.print),
@@ -306,7 +399,9 @@ export function normaliseTemplate(raw: unknown): Template {
 			color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color,
 			size: atLeast(t.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
 			lineHeight: atLeast(t.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
-			paragraph: normaliseParagraph(t.defaults?.paragraph)
+			paragraph: normaliseParagraph(t.defaults?.paragraph),
+			list: normaliseList(t.defaults?.list),
+			baseline: normaliseBaseline(t.defaults?.baseline)
 		}) as Defaults,
 		slots,
 		boxes,
@@ -318,13 +413,12 @@ export function normaliseTemplate(raw: unknown): Template {
 	};
 }
 
-export const DEFAULT_QR: QrSettings = { level: 'M', margin: 2 };
+export const DEFAULT_QR: QrSettings = { level: 'M' };
 
 function normaliseQr(raw: any): QrSettings {
 	const level = ['L', 'M', 'Q', 'H'].includes(raw?.level) ? raw.level : DEFAULT_QR.level;
-	const margin = Math.max(0, Math.min(8, num(raw?.margin, DEFAULT_QR.margin)));
 	const background = parseColor(raw?.background);
-	return { level, margin, ...(background ? { background } : {}) };
+	return { level, ...(background ? { background } : {}) };
 }
 
 function normaliseBleed(raw: any): Template['bleed'] {

@@ -1,8 +1,9 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
 	import { backgroundStyle, cssUrl, localImageName, safeMediaUrl } from '$lib/assets';
 	import { parseColor } from '$lib/color';
-	import { applyPlaceholders } from '$lib/placeholders';
+	import { UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders } from '$lib/placeholders';
 	import { cssIdent, scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
@@ -22,9 +23,10 @@
 		snapTo,
 		snapToEdges
 	} from '$lib/layout';
-	import { renderMarkdown } from '$lib/markdown';
+	import { flagUnknown, renderMarkdown } from '$lib/markdown';
+	import { completePlaceholders } from '$lib/complete';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
-	import { frameHeight, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
+	import { baselineOf, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -38,6 +40,8 @@
 		loadingFonts?: string[];
 		/** snap drags to the 5mm subgrid rather than to sibling edges */
 		grid?: boolean;
+		/** draw the page margins, and snap to them */
+		guides?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
 		scale?: number;
 		interactive?: boolean;
@@ -92,6 +96,10 @@
 		onedit?: (id: string | null) => void;
 		/** open the drawing surface for an area; a picture is never edited in place */
 		ondraw?: (id: string) => void;
+		/** open the cell a Data Field area prints, full size in the table */
+		oneditcell?: (id: string) => void;
+		/** drawn over the paper and under everything else — the stage's grid */
+		underlay?: Snippet;
 		/**
 		 * Words typed into the card. The card cannot write them itself: a bound
 		 * area's text is a cell in the dataset and a static one's is a field in
@@ -107,6 +115,7 @@
 		bounds = false,
 		loadingFonts = [],
 		grid = false,
+		guides = false,
 		scale = 1,
 		interactive = false,
 		selectedIds = [],
@@ -124,6 +133,8 @@
 		onaction,
 		onedit,
 		ondraw,
+		oneditcell,
+		underlay,
 		ontext
 	}: Props = $props();
 
@@ -156,7 +167,37 @@
 	 * The same text as it is drawn, with `{{date}}` and any `{{column}}` of this
 	 * row filled in — in a cell and in an area's own words alike, once.
 	 */
-	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row });
+	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, self: selfOf(box) });
+
+	/** The column a bound area's words come out of — the one they may not quote. */
+	const selfOf = (box: Box): string | undefined => (box.slot ? mapping[box.slot] : undefined);
+
+	/**
+	 * The text as the editor draws it: `contentOf`, except that a `{{name}}`
+	 * nothing answers to is marked so it can be underlined — a typo in a
+	 * column name otherwise prints as the literal braces, and is found on
+	 * paper. Only for words drawn as words, and only with the bounds on, with
+	 * the rest of the screen furniture; never in anything that is printed,
+	 * measured for emptiness, or encoded into a QR.
+	 */
+	const shownTextOf = (box: Box): string =>
+		applyPlaceholders(rawContentOf(box), { row, self: selfOf(box), markUnknown: interactive && bounds });
+
+	/** Text split around the marks, for plain text, which Svelte escapes itself. */
+	function segments(text: string): Array<{ text: string; unknown: boolean }> {
+		if (!text.includes(UNKNOWN_OPEN)) return [{ text, unknown: false }];
+		const out: Array<{ text: string; unknown: boolean }> = [];
+		for (const part of text.split(UNKNOWN_OPEN)) {
+			const end = part.indexOf(UNKNOWN_CLOSE);
+			if (end === -1) {
+				if (part) out.push({ text: part, unknown: false });
+				continue;
+			}
+			out.push({ text: `{{${part.slice(0, end)}}}`, unknown: true });
+			if (end + 1 < part.length) out.push({ text: part.slice(end + 1), unknown: false });
+		}
+		return out;
+	}
 
 	/** The area's paragraph style, or the page's when it names none of its own. */
 	const paragraphOf = (box: Box) => box.paragraph ?? template.defaults.paragraph;
@@ -217,7 +258,10 @@
 			return fitSvg(
 				qrSvg(value, {
 					level: box.qr?.level ?? 'M',
-					margin: box.qr?.margin ?? 2,
+					// No quiet zone of the code's own: the area's padding is the space
+					// round it, the same control every other area uses, and the old
+					// setting beside it was a second way to say one thing.
+					margin: 0,
 					color: box.color ?? template.defaults.color,
 					background: box.qr?.background
 				}),
@@ -227,6 +271,13 @@
 			return '';
 		}
 	}
+
+	/**
+	 * How tall a picture or a code is drawn: the area's declared height, less
+	 * its padding and border. It was the whole height, so padding pushed the
+	 * picture down and out of the bottom of the area instead of framing it.
+	 */
+	const mediaHeight = (box: Box): string => `${frameHeight(box)}mm`;
 
 	/**
 	 * `object-fit` does nothing to an inline SVG, so the equivalent goes on the
@@ -261,7 +312,11 @@
 	 */
 	const unsourced = (box: Box): boolean => {
 		if (dataless) return true;
-		if (!box.slot || !row) return false;
+		// An area holding its own words draws from nothing that varies: empty
+		// here, it is empty on every card, and hiding it only made it the one
+		// area that could not be clicked to type into.
+		if (!box.slot) return true;
+		if (!row) return false;
 		const column = mapping[box.slot];
 		return !column || !(column in row);
 	};
@@ -281,7 +336,14 @@
 	 * it has nothing to draw from at all; see `unsourced`.
 	 */
 	const placeholderFor = (box: Box): string =>
-		interactive && bounds && isEmpty(box) && (!box.hideWhenEmpty || unsourced(box)) ? box.slot || 'Area' : '';
+		interactive && bounds && isEmpty(box) && (!box.hideWhenEmpty || unsourced(box))
+			? // The column a bound area draws from, since that is what will be in
+				// it — the area's own name is often a generic word like "field".
+				// An unbound one says what it is waiting for.
+				(box.slot && mapping[box.slot]) ||
+				box.slot ||
+				(pictureKind(box) ? 'Image' : 'Area')
+			: '';
 
 	/**
 	 * An area that hides when empty stays put where it has nothing to draw from
@@ -387,6 +449,50 @@
 	 */
 	const placed = (box: Box): Box => (verso && mirrors(box) ? mirrorBox(box, template.page.w) : box);
 
+	/**
+	 * What an area paints under its content — the fill, a fill out of the data,
+	 * a tiled picture, and the border — on a layer of its own over the box's
+	 * border box. It used to be the box's own background and border, which put
+	 * it on the one element whose opacity also fades everything hung off it;
+	 * on its own layer it takes the area's opacity alone. The box keeps the
+	 * border's room, transparent, so nothing measures differently.
+	 */
+	function surfaceStyle(box: Box): string {
+		const parts: string[] = [];
+		if (box.background) parts.push(`background:${box.background}`);
+		// A color out of the data fills the area itself, not a panel inside it, so
+		// it reaches under the padding and takes the corner radius with it. After
+		// the declared fill, because the row is the more specific answer.
+		if (shownAsMedia(box.mode)) {
+			const media = mediaOf(box);
+			if (media.color) parts.push(`background:${media.color}`);
+			// A tile is a background, not an element: `<img>` has no way to repeat.
+			else if (media.src && box.fit === 'repeat') {
+				parts.push(
+					`background-image:${cssUrl(tiles[media.src] ?? media.src)}`,
+					'background-repeat:repeat',
+					'background-size:auto',
+					// From inside the border, as the box's own background was: the
+					// surface spans the border box, the tile starts at the padding.
+					'background-origin:padding-box'
+				);
+				// A tiled drawing is drawn hard for the same reason a fitted one
+				// is — see `drawnByHand`.
+				if (drawnByHand(media.src)) parts.push('image-rendering:pixelated');
+			}
+		}
+		if (box.borderWidth && !box.borderHand) {
+			const { top, right, bottom, left } = sidesOf(box.borderWidth);
+			parts.push(
+				`border-width:${top}mm ${right}mm ${bottom}mm ${left}mm`,
+				`border-style:${box.borderStyle ?? 'solid'}`,
+				`border-color:${borderColorOf(box)}`
+			);
+		}
+		if (box.borderRadius) parts.push(`border-radius:${box.borderRadius}mm`);
+		return parts.join(';');
+	}
+
 	function boxStyle(box: Box): string {
 		const drawn = placed(box);
 		const align = drawn.align ?? template.defaults.align;
@@ -414,6 +520,11 @@
 		if (box.italic) parts.push('font-style:italic');
 		if (box.textCase === 'uppercase') parts.push('text-transform:uppercase');
 		if (box.textCase === 'smallcaps') parts.push('font-variant-caps:small-caps');
+		// In points, worked out here: a custom property holding `em` resolves at
+		// each element that uses it, so a heading twice the size would have
+		// moved twice as far as the paragraph under it.
+		const baseline = baselineOf(box, template.defaults);
+		if (baseline) parts.push(`--baseline:${Math.round(-baseline * (box.size ?? template.defaults.size) * 1000) / 1000}pt`);
 		// Emitted whether or not there is any, because the selected-box padding
 		// guide reads these back and a missing custom property would fall to 0 and
 		// draw the guide exactly on top of the bounds.
@@ -427,25 +538,6 @@
 		if (box.padding) {
 			parts.push(`padding:${pad.top}mm ${pad.right}mm ${pad.bottom}mm ${pad.left}mm`);
 		}
-		if (box.background) parts.push(`background:${box.background}`);
-		// A color out of the data fills the area itself, not a panel inside it, so
-		// it reaches under the padding and takes the corner radius with it. After
-		// the declared fill, because the row is the more specific answer.
-		if (shownAsMedia(box.mode)) {
-			const media = mediaOf(box);
-			if (media.color) parts.push(`background:${media.color}`);
-			// A tile is a background, not an element: `<img>` has no way to repeat.
-			else if (media.src && box.fit === 'repeat') {
-				parts.push(
-					`background-image:${cssUrl(tiles[media.src] ?? media.src)}`,
-					'background-repeat:repeat',
-					'background-size:auto'
-				);
-				// A tiled drawing is drawn hard for the same reason a fitted one
-				// is — see `drawnByHand`.
-				if (drawnByHand(media.src)) parts.push('image-rendering:pixelated');
-			}
-		}
 		// `.box` is border-box, so a border eats into the width rather than adding
 		// to it: the box still occupies exactly the millimetres it was given.
 		if (box.borderWidth) {
@@ -456,8 +548,10 @@
 				// solid, and painted in nothing — so switching it on moves no text
 				// and changes no measurement. Only what is drawn in that room
 				// changes, and the SVG below draws it.
-				`border-style:${box.borderHand ? 'solid' : (box.borderStyle ?? 'solid')}`,
-				`border-color:${box.borderHand ? 'transparent' : borderColorOf(box)}`,
+				// Always solid and clear here: the room is the box's, the paint is
+				// the surface's — see `surfaceStyle`.
+				'border-style:solid',
+				'border-color:transparent',
 				`--bw-t:${top}mm`,
 				`--bw-r:${right}mm`,
 				`--bw-b:${bottom}mm`,
@@ -470,10 +564,10 @@
 		// area, and stops at the card: the scaler above it is a transform, and a
 		// transform is a stacking context.
 		if (box.blend) parts.push(`mix-blend-mode:${box.blend}`);
-		// The whole area at once — fill, border and content together. Checked on
-		// the way into the template, and absent when it is opaque, so this is only
-		// ever a number between 0 and 1.
-		if (box.opacity !== undefined) parts.push(`opacity:${box.opacity}`);
+		// Opacity is not here: on the box it faded the handles, the badges and the
+		// selection with it. It is a custom property the painted parts read —
+		// the surface, a hand-drawn border and the content — and nothing else.
+		if (box.opacity !== undefined) parts.push(`--ink:${box.opacity}`);
 		// A CSS transform does not touch layout, so a rotated box still reports the
 		// height it would have had upright — which is what `measure()` reads and
 		// what anchored boxes below follow. That is the intended bargain: turning a
@@ -576,6 +670,15 @@
 	 * kept the binding with it, and a template that styles `#Job-Title` means
 	 * both of them.
 	 */
+	/*
+	 * Besides the id, every area carries two classes a template's CSS can
+	 * reach: where its content comes from — `content-field`, `content-static`
+	 * or `content-image`, the three the bar's Content offers — and its mode,
+	 * `mode-plain`, `mode-markdown`, `mode-image`, `mode-color` or `mode-qr`.
+	 * Prefixed, because a bare `.plain` or `.image` would collide with the
+	 * card's own classes inside the area. They are on paper as on screen:
+	 * one layout engine, one set of hooks.
+	 */
 	const idFor = (box: Box) => {
 		const ident = cssIdent(box.slot ?? '');
 		return ident ? { id: ident } : {};
@@ -657,6 +760,9 @@
 	const isSelected = (box: Box) => selectedIds.includes(box.id);
 	/** Handles belong to a single box: with several chosen, the bar does the work. */
 	const soleSelection = $derived(selectedIds.length === 1);
+
+	/** The eight handles, as against moving, turning and the pivot. */
+	const RESIZE_MODES = new Set(['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']);
 
 	/**
 	 * A finger, rather than a mouse — the handles' reach is wider for one, so
@@ -771,7 +877,12 @@
 		// Selecting comes first and is never refused: a lock stops a box moving,
 		// not being picked — otherwise the only control that could unlock it
 		// could never be reached.
-		onselect?.(box.id, event.shiftKey || event.metaKey || event.ctrlKey);
+		// Only a press on the area itself adds to a selection. The handles, the
+		// lever and the pivot exist only on a sole selection, and Shift on them
+		// is a modifier of their own — resizing from the aligned edge, turning
+		// in 15° steps — which used to toggle the area out of the selection on
+		// the same press.
+		onselect?.(box.id, mode === 'move' && (event.shiftKey || event.metaKey || event.ctrlKey));
 		if (!editable(box)) return;
 		drag = {
 			id: box.id,
@@ -799,17 +910,27 @@
 	}
 
 	/**
-	 * Snapping, strongest first: an enabled grid wins over everything else, and
-	 * otherwise a box latches onto a sibling's edge when it comes within
-	 * `SNAP_TOLERANCE`. Sibling edges come from the resolved layout, so a box
-	 * snaps to where a grown box really ends.
+	 * Snapping, strongest first: the page margins when the guides are on, then
+	 * an enabled grid, and otherwise a box latches onto a sibling's edge when it
+	 * comes within `SNAP_TOLERANCE`. Sibling edges come from the resolved
+	 * layout, so a box snaps to where a grown box really ends.
 	 *
-	 * There is no modifier to hold: the two toggles under the page are the whole
-	 * control. Grid off and Bounds off is free movement, because a box cannot
+	 * There is no modifier to hold: the toggles under the page are the whole
+	 * control. Grid, Guides and Boxes all off is free movement, because a box cannot
 	 * latch onto a guide that is not being drawn — a snap to an invisible edge is
 	 * indistinguishable from a bug.
 	 */
 	const SNAP_TOLERANCE = 1.5;
+
+	/**
+	 * The page margins, as stored — the right-hand page's frame, which is the
+	 * frame every drag is worked in — and as drawn, which on a left-hand page
+	 * swaps the inner and outer edges over.
+	 */
+	const margins = $derived(marginsOf(template.page));
+	const drawnMargins = $derived(
+		verso ? { ...margins, left: margins.right, right: margins.left } : margins
+	);
 
 	/** Whether a drag on this box is happening against its mirror image. */
 	const mirroredDrag = (box: Box) => verso && mirrors(box);
@@ -835,7 +956,21 @@
 		const edges = latch ? boxEdges(template.boxes, layout, drag.id) : { x: [], y: [] };
 		const latched = { x: null as number | null, y: null as number | null };
 
+		// With the guides on, the margins win over a grid line or a sibling's
+		// edge within reach: a page whose margin is not a whole number of grid
+		// steps would otherwise have an edge nothing could be placed against.
+		const marginEdges = {
+			x: [margins.left, template.page.w - margins.right],
+			y: [margins.top, template.page.h - margins.bottom]
+		};
 		const place = (value: number, axis: 'x' | 'y'): number => {
+			if (guides) {
+				const hit = snapToEdges(value, marginEdges[axis], SNAP_TOLERANCE);
+				if (hit !== null) {
+					latched[axis] = hit;
+					return hit;
+				}
+			}
 			if (grid) return snapTo(value, GRID_MINOR);
 			const hit = latch ? snapToEdges(value, edges[axis], SNAP_TOLERANCE) : null;
 			if (hit === null) return snapTo(value, FREE_STEP);
@@ -981,6 +1116,47 @@
 				next.h = Math.max(3, size(origin.h - dy));
 				break;
 		}
+		// The far edges against the margins too, with the guides on: a move whose
+		// right or bottom edge comes within reach of the margin puts it there,
+		// and so does a handle dragging that edge. Only the edge being moved —
+		// a box is never stretched to reach a guide it was not heading for.
+		if (guides) {
+			const nearTo = (a: number, b: number) => Math.abs(a - b) < SNAP_TOLERANCE;
+			const [, right] = marginEdges.x;
+			const [, bottom] = marginEdges.y;
+			const east = mode === 'move' || mode === 'e' || mode === 'ne' || mode === 'se';
+			const south = !origin.anchor && (mode === 'move' || mode === 's' || mode === 'se' || mode === 'sw');
+			if (east && latched.x === null && nearTo(next.x + next.w, right)) {
+				if (mode === 'move') next.x = round2(right - next.w);
+				else next.w = round2(right - next.x);
+				latched.x = right;
+			}
+			if (south && latched.y === null && nearTo(next.y + next.h, bottom)) {
+				if (mode === 'move') next.y = round2(bottom - next.h);
+				else next.h = round2(bottom - next.y);
+				latched.y = bottom;
+			}
+		}
+
+		// With Shift, a handle resizes from the edge the words are aligned to,
+		// the way a typed W or H does in the bar: the size is whatever the
+		// handle made it, and the box is then placed so its right edge stays
+		// put for right-aligned text, its middle for centred, its bottom for
+		// bottom-aligned. An anchored area's top is its anchor's to decide, so
+		// it only ever does this sideways. In the stored frame, as everything
+		// written back is — see `placed`.
+		if (event.shiftKey && RESIZE_MODES.has(mode)) {
+			if (next.w !== origin.w) {
+				const align = origin.align ?? template.defaults.align;
+				const shift = origin.w - next.w;
+				next.x = round2(origin.x + (align === 'right' ? shift : align === 'center' ? shift / 2 : 0));
+			}
+			if (next.h !== origin.h && !origin.anchor) {
+				const valign = origin.valign ?? 'top';
+				const shift = origin.h - next.h;
+				next.y = round2(origin.y + (valign === 'bottom' ? shift : valign === 'middle' ? shift / 2 : 0));
+			}
+		}
 		guide = { ...latched, flip };
 		onchange?.(next);
 
@@ -1034,6 +1210,21 @@
 
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
+	/**
+	 * The corner the area's words are set from — top-left for text aligned left
+	 * and to the top, bottom-right for right and bottom — whose handle is drawn
+	 * square: the point the content hangs from, told apart from the others.
+	 * None where either alignment is centred: then no corner is the anchor.
+	 * As drawn, so on a mirrored left-hand page it is the mirrored corner.
+	 */
+	function anchorCorner(box: Box): DragMode | null {
+		const align = placed(box).align ?? template.defaults.align;
+		const valign = box.valign ?? 'top';
+		const x = align === 'right' ? 'e' : align === 'left' || align === 'justify' ? 'w' : null;
+		const y = valign === 'bottom' ? 's' : valign === 'top' ? 'n' : null;
+		return x && y ? ((y + x) as DragMode) : null;
+	}
+
 	const DRAG_LABELS: Record<DragMode, string> = {
 		move: 'Move',
 		rotate: 'Turn',
@@ -1060,6 +1251,17 @@
 	 * clutter rather than information.
 	 */
 	const isStatic = (box: Box) => !box.slot && (box.mode === 'plain' || box.mode === 'markdown');
+
+	/**
+	 * What an image area holds, for the mark at its corner: a drawing made
+	 * here — a data URL, in the cell or the template — or a picture from
+	 * somewhere, which is also what an empty one is waiting for.
+	 */
+	const pictureKind = (box: Box): 'drawing' | 'picture' | null => {
+		if (box.mode !== 'image') return null;
+		const written = box.slot ? contentOf(box) : (box.static?.dataUrl ?? box.static?.url ?? '');
+		return written.trim().startsWith('data:image/') ? 'drawing' : 'picture';
+	};
 
 	/**
 	 * Boxes other areas hang from. Anchoring is a relationship, and until now only
@@ -1152,6 +1354,81 @@
 		flashTimer = setTimeout(() => (flashedBadge = null), 900);
 	}
 
+	/**
+	 * The threads a hovered tie or mooring badge draws to its other end — the
+	 * badge on the area it is tied to, or on each area moored to it. They stand
+	 * in for an arrow nobody would read: pointing at a tie shows what it ties,
+	 * wherever on the card that is.
+	 *
+	 * Measured off the badges as drawn rather than worked out from the boxes'
+	 * millimetres: a badge is a fixed number of screen pixels off a box that
+	 * may be turned, mirrored and grown, and the DOM already knows where all of
+	 * that put it. Divided back by the zoom into the trim's own pixels, so the
+	 * overlay sits inside the card's transform like everything else on it.
+	 */
+	let trimEl = $state<HTMLElement | null>(null);
+	let threads = $state<string[]>([]);
+
+	function showThreads(box: Box, kind: 'tied' | 'moored') {
+		if (!trimEl) return;
+		const el = trimEl;
+		const badge = (attr: 'tie' | 'moor', id: string) =>
+			el.querySelector<HTMLElement>(`[data-${attr}="${CSS.escape(id)}"]`) ??
+			el.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`);
+		// By the badge pointed at, not by what the area happens to be: an area in
+		// the middle of a chain wears both, and pointing at its buoy used to draw
+		// the thread up to its own parent instead of down to what follows it.
+		// Every pair is tie first, buoy second, whichever end is pointed at: the
+		// dots always walk from the area that follows to the one it is tied to.
+		const pairs: Array<[HTMLElement | null, HTMLElement | null]> =
+			kind === 'tied'
+				? box.anchor
+					? [[badge('tie', box.id), badge('moor', box.anchor.to)]]
+					: []
+				: template.boxes.filter((b) => b.anchor?.to === box.id).map((b) => [badge('tie', b.id), badge('moor', box.id)]);
+		const origin = el.getBoundingClientRect();
+		const at = (node: HTMLElement) => {
+			const r = node.getBoundingClientRect();
+			return { x: (r.left + r.width / 2 - origin.left) / scale, y: (r.top + r.height / 2 - origin.top) / scale };
+		};
+		threads = pairs
+			.filter((pair): pair is [HTMLElement, HTMLElement] => !!pair[0] && !!pair[1])
+			.map(([tie, buoy]) => {
+				const a = at(tie);
+				const b = at(buoy);
+				// An inverted S: leaving each badge upright rather than level, and
+				// sagging a little under its own weight the longer it is — a thread,
+				// not a connector in a diagram. Bowed out to the left, away from the
+				// areas, by as much as the two ends are short of being side by side:
+				// two badges one straight above the other had upright handles on one
+				// line, and the curve came out a straight dotted rule.
+				const mid = (a.y + b.y) / 2;
+				const span = Math.hypot(b.x - a.x, b.y - a.y);
+				const sag = span * 0.15;
+				const bow = Math.max(0, span * 0.45 - Math.abs(b.x - a.x));
+				return `M${a.x} ${a.y}C${a.x - bow} ${mid + sag} ${b.x - bow} ${mid + sag} ${b.x} ${b.y}`;
+			});
+	}
+
+	/** Whether the column of badges hangs off this box's right-hand edge. */
+	const hasBadges = (box: Box) =>
+		bounds && !template.locked && !!(box.locked || isStatic(box) || pictureKind(box) || editsCell(box));
+
+	/**
+	 * A selected area whose words come out of a cell carries the way into that
+	 * cell, full size — the same editor Edit opens under the table, and the
+	 * same icon, for an area whose words are not the design's to type into
+	 * in place. Words, not pictures: a picture's cell has the pencil.
+	 */
+	const editsCell = (box: Box) =>
+		interactive && isSelected(box) && !!box.slot && !!mapping[box.slot] && !!row && !pictureKind(box) && !shownAsMedia(box.mode);
+
+	/** How many badges that column holds — the shears step down below them. */
+	const badgeCount = (box: Box) =>
+		hasBadges(box)
+			? [box.locked, isStatic(box), pictureKind(box), editsCell(box)].filter(Boolean).length
+			: 0;
+
 	/** Cast off: every box moored to this one keeps its place and loses the tie. */
 	function releaseDependents(box: Box) {
 		const moored = dependentsOf(box.id).filter((b) => b.anchor?.to === box.id && !b.locked);
@@ -1224,14 +1501,22 @@
 	 * would hand back markup nobody asked for. It inherits everything from the
 	 * box it sits in, so what you type is set the way it will print.
 	 */
+	/**
+	 * Not `editable`: a locked page is a locked *design* — nothing moves,
+	 * nothing is restyled — and the words in an area are the content the design
+	 * holds, which a lock on the layout was never meant to freeze. An area's own
+	 * lock still refuses it; a locked table still refuses a typed cell, where
+	 * the page writes it.
+	 */
 	const canEdit = (box: Box) =>
-		editable(box) && (box.mode === 'plain' || box.mode === 'markdown');
+		interactive && !box.locked && (box.mode === 'plain' || box.mode === 'markdown');
 
 	function beginEdit(box: Box) {
 		// A picture is the one thing not edited in place: an area on a card is
 		// often a centimetre across, which is somewhere to show a drawing and
-		// nowhere to make one. The same double-click opens it full screen.
-		if (editable(box) && takesADrawing(box.mode)) {
+		// nowhere to make one. The same double-click opens it full screen —
+		// on a locked page too, like typing: a drawing is content, not layout.
+		if (interactive && !box.locked && takesADrawing(box.mode)) {
 			ondraw?.(box.id);
 			return;
 		}
@@ -1257,6 +1542,40 @@
 	}
 </script>
 
+<!-- Plain text with any unknown `{{name}}` in it marked — see `shownTextOf`.
+     Written on one line: the text is `white-space: pre-wrap`, and a newline
+     between these tags would be drawn. -->
+{#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.unknown}<span class="unknown-placeholder" title="No column called this in the table — or the cell naming its own column">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
+
+<!-- The shears, which are also the switch between cutting and growing. Red and
+     astride the cut on an area that is cutting its words off, where pressing
+     lets it grow; blue and faint beside the trim line on one that has grown,
+     where pressing cuts it back to the height it was given. -->
+{#snippet shears(box: Box, cutting: boolean)}
+	<button
+		class="overflow-mark"
+		class:offered={!cutting}
+		style="--edge:{cutting ? '100%' : `${box.h}mm`};--stack:{badgeCount(box)}"
+		disabled={!editable(box)}
+		title={cutting
+			? 'The content does not fit — this area is cutting off what will print. Press to let it grow instead.'
+			: 'This area has grown past the height it was given. Press to cut it at that height instead.'}
+		aria-label={cutting ? 'Let this area grow to fit' : 'Cut this area at its height'}
+		onpointerdown={(e) => e.stopPropagation()}
+		onpointerenter={() => (hoveredBadge = `${box.id}:cut`)}
+		onpointerleave={() => (hoveredBadge = null)}
+		onclick={() => {
+			flashBadge(`${box.id}:cut`);
+			onaction?.(cutting ? 'Let the area grow' : 'Cut the area at its height');
+			onchange?.({ ...box, overflow: cutting ? 'grow' : 'clip' });
+		}}
+	>
+		<!-- Shut while the pointer is on them, like the other badges that are
+		     buttons: the act of pressing — a cut made, or one let go of. -->
+		<Icon name={badgeArmed(`${box.id}:cut`) && editable(box) ? 'cut-closed' : 'cut'} size={11} />
+	</button>
+{/snippet}
+
 <div
 	class="card"
 	class:editing={interactive}
@@ -1264,17 +1583,34 @@
 	style={cardStyle()}
 	lang="en"
 >
-	<div class="trim" style="width:{template.page.w}mm;height:{template.page.h}mm">
+	{#if underlay}
+		<div class="underlay" aria-hidden="true">{@render underlay()}</div>
+	{/if}
+	<div class="trim" bind:this={trimEl} style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
 			{@html styleTag(customCss)}
+		{/if}
+
+		{#if interactive && guides}
+			<!-- The page margins, as a guide, on a toggle of their own beside the
+			     grid's: lines to place against and to snap to, which a page may
+			     want without a grid over the whole of it. First in the trim, so
+			     every area paints over it — and over the grid, which is under the
+			     trim altogether. -->
+			{@const m = drawnMargins}
+			<div
+				class="margin-guide"
+				aria-hidden="true"
+				style="top:{m.top}mm;right:{m.right}mm;bottom:{m.bottom}mm;left:{m.left}mm"
+			></div>
 		{/if}
 
 		{#each template.boxes as box (box.id)}
 			{@const empty = hidden.has(box.id)}
 			{@const strokes = handStrokes(box)}
 			<div
-				class="box"
+				class="box content-{box.slot ? 'field' : shownAsMedia(box.mode) ? 'image' : 'static'} mode-{box.mode}"
 				class:outlined={bounds && !empty}
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
@@ -1312,6 +1648,9 @@
 				ondrop={(e) => drop(e, box)}
 				role="presentation"
 			>
+				{#if surfaceStyle(box)}
+					<div class="surface" aria-hidden="true" style={surfaceStyle(box)}></div>
+				{/if}
 				{#if strokes.length}
 					<!-- Drawn over the room the transparent CSS border is holding, so
 					     it covers exactly what that border would have painted. Sized
@@ -1336,19 +1675,24 @@
 						{/each}
 					</svg>
 				{/if}
-				<div class="content" class:being-edited={editingId === box.id}>
+				<div
+					class="content"
+					class:being-edited={editingId === box.id}
+					class:shifted={!!baselineOf(box, template.defaults) && (box.mode === 'plain' || box.mode === 'markdown')}
+				>
 					{#if placeholderFor(box)}
 						<span class="placeholder">{placeholderFor(box)}</span>
 					{:else if box.mode === 'markdown'}
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf -->
-						{@html renderMarkdown(contentOf(box), {
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf; flagUnknown writes a fixed span around text it has already escaped -->
+						{@html flagUnknown(renderMarkdown(shownTextOf(box), {
 							size: box.size ?? template.defaults.size,
 							md: box.md,
 							paragraph: paragraphOf(box),
-							lineHeight: box.lineHeight ?? template.defaults.lineHeight
-						})}
+							lineHeight: box.lineHeight ?? template.defaults.lineHeight,
+							list: listOf(box, template.defaults)
+						}))}
 					{:else if box.mode === 'qr'}
-						<span class="media" style="height:{frameHeight(box)}mm">
+						<span class="media" style="height:{mediaHeight(box)}">
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
 							{@html qrFor(box)}
 						</span>
@@ -1357,7 +1701,7 @@
 						<!-- A color and a tile are both drawn by the box's own background,
 						     in boxStyle, so there is nothing to put in here for either. -->
 						{#if media.svg || (media.src && box.fit !== 'repeat')}
-							<span class="media" style="height:{frameHeight(box)}mm">
+							<span class="media" style="height:{mediaHeight(box)}">
 								{#if media.svg}
 									<!-- eslint-disable-next-line svelte/no-at-html-tags -- safeSvg is the chokepoint; fitSvg only rewrites its width and height -->
 									{@html fitSvg(safeSvg(media.svg), box.fit)}
@@ -1378,17 +1722,18 @@
 						     processor — so each is a block the style can space or
 						     indent. An empty line keeps its height. -->
 						{@const para = paragraphOf(box)!}
-						{@const step = `${Math.round(para.amount * (box.lineHeight ?? template.defaults.lineHeight) * 1000) / 1000}em`}
+						<!-- A space in lines of the leading, an indent in em. -->
+						{@const step = `${Math.round(para.amount * (para.mode === 'space' ? (box.lineHeight ?? template.defaults.lineHeight) : 1) * 1000) / 1000}em`}
 						<span class="paras">
-							{#each contentOf(box).split('\n') as line, i (i)}
+							{#each shownTextOf(box).split('\n') as line, i (i)}
 								<span
 									class="para"
 									style={para.mode === 'space' ? `margin-bottom:${step}` : i > 0 ? `text-indent:${step}` : ''}
-								>{line || '\u00a0'}</span>
+								>{#if line}{@render marked(line)}{:else}&nbsp;{/if}</span>
 							{/each}
 						</span>
 					{:else}
-						<span class="plain">{contentOf(box)}</span>
+						<span class="plain">{@render marked(shownTextOf(box))}</span>
 					{/if}
 				</div>
 
@@ -1400,6 +1745,7 @@
 						class="inline-editor"
 						spellcheck="false"
 						use:focusOnMount
+						use:completePlaceholders={row ? Object.keys(row) : []}
 						value={rawContentOf(box)}
 						oninput={(e) => ontext?.(box, e.currentTarget.value)}
 						onkeydown={onEditorKeydown}
@@ -1414,7 +1760,9 @@
 				     1.33px inside a 75% card was drawn at 1px and one asked for at
 				     0.5px inside a 200% card was drawn at 2px. An SVG stroke is not
 				     rounded, so var(--line) lands exactly whatever the zoom. -->
-				{#if bounds && !empty}
+				<!-- Not on a selected area: the selection is its outline, and a dashed
+				     bound drawn under a solid one doubled every edge. -->
+				{#if bounds && !empty && !(interactive && isSelected(box))}
 					<svg class="chrome bounds" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 				{/if}
 				{#if interactive && isSelected(box)}
@@ -1426,15 +1774,19 @@
 				{/if}
 
 				{#if bounds && !empty && box.overflow === 'grow' && (layout.heights[box.id] ?? box.h) > box.h + 0.05}
-					<!-- The height the area was given, where its content has grown it
-					     past that: a sparse dash in the bound's own color and weight,
-					     so it reads as the same outline, remembered. -->
+					<!-- The trim line: the height the area was given, where its content
+					     has grown it past that. Sparser than the bound, so it is not
+					     taken for one, and with the shears beside it in blue — the cut
+					     this area *could* make, offered rather than made. -->
 					<svg class="chrome original-edge" aria-hidden="true" style="top:{box.h}mm">
 						<line x1="0" y1="0" x2="100%" y2="0" />
 					</svg>
+					{@render shears(box, false)}
 				{/if}
 
-				{#if bounds && !empty && overflowing[box.id]}
+				<!-- The cut is a clipped area's alone: a growing one is never cut —
+				     it has the trim line above instead. -->
+				{#if bounds && !empty && box.overflow === 'clip' && overflowing[box.id]}
 					<!-- Where the words are actually severed, drawn as the cut it is: a
 					     dashed red line along the bottom edge, with the shears straddling
 					     it at the end of the stroke. The other three edges keep the plain
@@ -1443,9 +1795,7 @@
 					<svg class="chrome cut-line" aria-hidden="true">
 						<line x1="0" y1="100%" x2="100%" y2="100%" />
 					</svg>
-					<span class="overflow-mark" title="The content does not fit — this area is cutting off what will print">
-						<Icon name="cut" size={11} />
-					</span>
+					{@render shears(box, true)}
 				{/if}
 
 				<!-- Every badge here says why *this* area will not do what you might
@@ -1455,16 +1805,16 @@
 				     buttons that would be refused anyway. The overflow mark below is
 				     not one of these: it is about what will print, which a lock does
 				     not change. -->
-				{#if bounds && !template.locked && box.anchor}
-					<!-- The tie sits at the *bottom* corner, on its own.
-					     Two reasons, and they agree. The column at the top corner is the
-					     one every other badge is in, and on a shallow area four of them
-					     are taller than the area itself; and the tie is the badge an area
-					     is most often carrying, so moving it halves that column in the
-					     common case. It stacks up from the bottom edge, clearing the
-					     shears when this area is also cutting its words off — two marks
-					     on one corner would otherwise land on top of each other. -->
-					<span class="badges foot" class:clears-cut={!empty && overflowing[box.id]}>
+				{#if bounds && !template.locked && (box.anchor || anchorTargets.has(box.id))}
+					<!-- The anchor's two ends, in a column of their own off the top-left
+					     corner: the tie on an area that follows another, and under it the
+					     buoy on one that others follow — a middle link in a chain wears
+					     both. Off the right-hand column because on a shallow area four
+					     badges are taller than the area itself, and these are the badges
+					     areas most often carry; together because they are one
+					     relationship, and the thread between them runs from this side. -->
+					<span class="badges tie">
+						{#if box.anchor}
 						<button
 							class="badge action"
 							class:lit={litFollowers.has(box.id)}
@@ -1473,31 +1823,23 @@
 							title="Tied to another area — its top follows that area's bottom. Press to break the tie and leave this area where it is."
 							aria-label="Break this area's anchor"
 							onpointerdown={(e) => e.stopPropagation()}
-							onpointerenter={() => (hoveredBadge = `${box.id}:tied`)}
-							onpointerleave={() => (hoveredBadge = null)}
+							data-tie={box.id}
+							onpointerenter={() => {
+								hoveredBadge = `${box.id}:tied`;
+								showThreads(box, 'tied');
+							}}
+							onpointerleave={() => {
+								hoveredBadge = null;
+								threads = [];
+							}}
 							onclick={() => {
+								threads = [];
 								flashBadge(`${box.id}:tied`);
 								breakAnchor(box);
 							}}
 						>
 							<Icon name={badgeArmed(`${box.id}:tied`) ? 'unlink' : 'link'} size={11} />
 						</button>
-					</span>
-				{/if}
-
-				{#if bounds && !template.locked && (box.locked || isStatic(box) || anchorTargets.has(box.id))}
-					<!-- Why the box will not do what you might ask of it, stacked at its
-					     corner. All but the plug are buttons — the reason and the way out
-					     of it in the same 13 pixels — and each swaps to the icon of the
-					     undoing while the pointer is on it, so pressing one holds no
-					     surprise. Which is also why no two of them wear the same armed
-					     icon: the padlock opens the padlock, and the buoy casts off,
-					     which is a boat. -->
-					<span class="badges">
-						{#if isStatic(box)}
-							<span class="badge" title="Static text — this says the same on every card, because it is not plugged into a column">
-								<Icon name="unplug" size={11} />
-							</span>
 						{/if}
 						{#if anchorTargets.has(box.id)}
 							<button
@@ -1507,15 +1849,73 @@
 								title="Other areas are moored to this one — moving it moves them too. Press to cast them off and leave them where they are."
 								aria-label="Cast off the areas anchored to this one"
 								onpointerdown={(e) => e.stopPropagation()}
-								onpointerenter={() => (hoveredBadge = `${box.id}:moored`)}
-								onpointerleave={() => (hoveredBadge = null)}
+								data-moor={box.id}
+								onpointerenter={() => {
+									hoveredBadge = `${box.id}:moored`;
+									showThreads(box, 'moored');
+								}}
+								onpointerleave={() => {
+									hoveredBadge = null;
+									threads = [];
+								}}
 								onclick={() => {
+									threads = [];
 									flashBadge(`${box.id}:moored`);
 									releaseDependents(box);
 								}}
 							>
 								<Icon name={badgeArmed(`${box.id}:moored`) ? 'sailboat' : 'harbor'} size={11} />
 							</button>
+						{/if}
+					</span>
+				{/if}
+
+				{#if hasBadges(box)}
+					<!-- Why the box will not do what you might ask of it, stacked at its
+					     corner. All but the static-text mark are buttons — the reason and the way out
+					     of it in the same 13 pixels — and each swaps to the icon of the
+					     undoing while the pointer is on it, so pressing one holds no
+					     surprise. Which is also why no two of them wear the same armed
+					     icon: the padlock opens the padlock, and the buoy casts off,
+					     which is a boat. -->
+					<span class="badges">
+						{#if editsCell(box)}
+							<button
+								class="badge action"
+								disabled={!!box.locked}
+								title={box.locked
+									? 'This area is locked — unlock it to edit the cell it prints'
+									: `Edit “${mapping[box.slot!]}” for this row, full size in the table`}
+								aria-label="Edit this area's cell"
+								onpointerdown={(e) => e.stopPropagation()}
+								onclick={() => oneditcell?.(box.id)}
+							>
+								<Icon name="task-edit" size={11} />
+							</button>
+						{/if}
+						{#if isStatic(box)}
+							<span class="badge" title="Static text — this says the same on every card, because it is not plugged into a column">
+								<Icon name="text-creation" size={11} />
+							</span>
+						{/if}
+						<!-- What a picture area holds, beside the static text's mark. The
+						     pencil is also the way into the drawing — the same as a
+						     double-click, for anybody who has not found that. -->
+						{#if pictureKind(box) === 'drawing'}
+							<button
+								class="badge action"
+								disabled={!editable(box)}
+								title={box.slot ? 'An image drawn here, from this row\'s cell — press to draw on it' : 'An image drawn here, the same on every card — press to draw on it'}
+								aria-label="Draw in this area"
+								onpointerdown={(e) => e.stopPropagation()}
+								onclick={() => ondraw?.(box.id)}
+							>
+								<Icon name="edit" size={11} />
+							</button>
+						{:else if pictureKind(box) === 'picture'}
+							<span class="badge" title={box.slot ? 'An image, from this row\'s cell — double-click to draw instead' : 'An image, the same on every card — double-click to draw instead'}>
+								<Icon name="image" size={11} />
+							</span>
 						{/if}
 						{#if box.locked}
 							<button
@@ -1558,7 +1958,9 @@
 							onpointerup={endDrag}
 							onpointercancel={endDrag}
 							role="presentation"
-						></span>
+						><svg class="pivot-mark" viewBox="0 0 15 15" aria-hidden="true"
+								><path d="M0 7.5H15M7.5 0V15" /><circle cx="7.5" cy="7.5" r="4" /></svg
+							></span>
 						<span
 							class="lever"
 							use:hold={() => resetRotation(box)}
@@ -1573,6 +1975,7 @@
 						{#each HANDLES as handle (handle)}
 							<span
 								class="handle h-{handle}"
+								class:square={handle === anchorCorner(box)}
 								onpointerdown={(e) => startDrag(e, box, handle)}
 								onpointermove={moveDrag}
 								onpointerup={endDrag}
@@ -1585,6 +1988,7 @@
 			</div>
 		{/each}
 
+
 		{#if template.pageNumber.enabled && pageNumber != null}
 			<!-- Three elements rather than one string, so a template's own CSS can
 			     reach each part: `.page-number .of::before { content: ' of ' }` is
@@ -1595,6 +1999,12 @@
 					<span class="of" aria-hidden="true"></span><span class="of-total">{pageCount}</span>
 				{/if}
 			</div>
+		{/if}
+
+		{#if threads.length}
+			<svg class="chrome threads" aria-hidden="true">
+				{#each threads as d, i (i)}<path {d} />{/each}
+			</svg>
 		{/if}
 
 		{#if guide.x !== null}
@@ -1669,7 +2079,21 @@
 	   border widths the box put in these properties. Out of flow also means it
 	   is not part of what `measure` reads, so a border cannot grow the box it
 	   is drawn around. */
+	/* Over the whole border box — the box's border is its room, not its paint —
+	   and under everything else in the area. */
+	.surface {
+		position: absolute;
+		top: calc(-1 * var(--bw-t, 0mm));
+		right: calc(-1 * var(--bw-r, 0mm));
+		bottom: calc(-1 * var(--bw-b, 0mm));
+		left: calc(-1 * var(--bw-l, 0mm));
+		box-sizing: border-box;
+		pointer-events: none;
+		opacity: var(--ink, 1);
+	}
+
 	.hand-border {
+		opacity: var(--ink, 1);
 		position: absolute;
 		top: calc(-1 * var(--bw-t, 0mm));
 		left: calc(-1 * var(--bw-l, 0mm));
@@ -1683,9 +2107,13 @@
 	/* The one flex item in the box, so `justify-content` still places the content
 	   vertically, and so the content can be measured without the handles and
 	   badges that hang off the box's edges. */
+	/* Positioned, so it paints over the surface before it rather than under
+	   it — an absolutely placed layer otherwise paints over in-flow content. */
 	.content {
+		position: relative;
 		width: 100%;
 		min-width: 0;
+		opacity: var(--ink, 1);
 	}
 
 	/* A clipped box cuts its content at its own edge, but must not cut the
@@ -1699,6 +2127,15 @@
 	.box.clipped > .content {
 		overflow: hidden;
 		min-height: 0;
+	}
+
+	/* Moved on the children, not on .content: a clipped area clips at
+	   .content's edge, and moving .content would have moved the cut with it.
+	   Relative, so nothing is measured differently — the area is as tall as
+	   it was and whatever is anchored under it stays where it was. */
+	.content.shifted > :global(*) {
+		position: relative;
+		top: var(--baseline, 0);
 	}
 
 	.plain {
@@ -1771,10 +2208,53 @@
 	   the area's own, so it shows where the area is and how big what lands in
 	   it will be. Drawn only where `interactive` is set, so nothing on paper
 	   reaches this rule. */
+	/* The page margins. The bounds' weight, solid, in a colour of their own —
+	   the one layout software has long drawn margins in — so a margin is never
+	   taken for an area. Screen only: drawn only where
+	   `interactive` is set. */
+	.margin-guide {
+		position: absolute;
+		pointer-events: none;
+		/* Solid, and an inset shadow rather than an outline: an outline is
+		   rounded to whole pixels of the zoomed card, and doubled at 200%. */
+		box-shadow: inset 0 0 0 var(--line) rgba(192, 38, 211, 0.55);
+	}
+
+	/* The stage's grid, under the trim and everything in it. Positioned from
+	   the card's own corner, bleed included, which is where the grid is
+	   measured from. */
+	.underlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		pointer-events: none;
+		line-height: 0;
+	}
+
+	/* The area a picture carried out of the Images bar would land in. Set by
+	   ImagesPanel as an attribute, so the card's own class handling cannot
+	   take it off mid-drag. */
+	.box:global([data-image-target]) {
+		outline: calc(2px * var(--ui-scale, 1)) solid #2563eb;
+		outline-offset: calc(1px * var(--ui-scale, 1));
+		background-color: rgba(37, 99, 235, 0.08);
+	}
+
+	/* A `{{name}}` no column answers to, in the editor: underlined in the
+	   wavy red a spelling mistake wears, which is what it usually is. */
+	.content :global(.unknown-placeholder) {
+		text-decoration: underline wavy #d92d20;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 2px;
+	}
+
+	/* Editor chrome standing in for a value: selecting it would copy a column
+	   name that is not on the card. */
 	.placeholder {
 		color: #2563eb;
 		font-style: italic;
 		opacity: 0.7;
+		user-select: none;
 	}
 
 	/* Media has no flow height of its own, so the box's declared height is the
@@ -1831,7 +2311,11 @@
 		   is that the outline is all there is to see, so it carries the weight on
 		   a dark background image where a white square used to stand out. */
 		background: transparent;
-		border: calc(1px * var(--ui-scale, 1)) solid #2563eb;
+		/* An inset shadow, not a border: a border is rounded to whole pixels of
+		   the card's zoomed frame, so at 200% a half-pixel border came out two
+		   screen pixels thick. A shadow keeps the fraction. */
+		border: none;
+		box-shadow: inset 0 0 0 var(--line, 1px) #2563eb;
 		border-radius: var(--radius-button);
 		box-sizing: border-box;
 		z-index: 3;
@@ -1857,32 +2341,10 @@
 	   turns about; turning is the lever. */
 	.pivot {
 		--mark: calc(15px * var(--ui-scale, 1));
-		/* The ring sits inside the arms, so the cross reads through it. */
-		--ring: calc(4.5px * var(--ui-scale, 1));
 		margin: calc(var(--mark) / -2) 0 0 calc(var(--mark) / -2);
 		border: none;
 		border-radius: 0;
 		box-shadow: none;
-		/* Two crossed bars, as background gradients. A gradient honours a
-		   sub-pixel width where a border is rounded to whole device pixels, so the
-		   arms come out the same weight as every other line on the card at any
-		   zoom, straight off --line — and it costs no element, which matters
-		   because ::before is the hit target. */
-		background-image:
-			linear-gradient(#2563eb, #2563eb),
-			linear-gradient(#2563eb, #2563eb),
-			radial-gradient(
-				circle at center,
-				transparent calc(var(--ring) - var(--line)),
-				#2563eb calc(var(--ring) - var(--line)) var(--ring),
-				transparent var(--ring)
-			);
-		background-size:
-			100% var(--line),
-			var(--line) 100%,
-			100% 100%;
-		background-position: center;
-		background-repeat: no-repeat;
 		cursor: move;
 	}
 
@@ -1910,17 +2372,38 @@
 		cursor: grabbing;
 	}
 
+	/* Drawn as one SVG scaled whole with the mark, rather than as gradients.
+	   Gradients with hard stops a fraction of a pixel apart — the arms and the
+	   ring were each one --line wide, in the card's own zoomed pixels — are
+	   rounded differently at every zoom, so the ring came out a different
+	   thickness and shape at 50% than at 200%. A viewBox is 15 units across
+	   whatever the zoom, and a stroke of one unit is one screen pixel. */
+	.pivot-mark {
+		display: block;
+		width: 100%;
+		height: 100%;
+		overflow: visible;
+		pointer-events: none;
+		fill: none;
+		stroke: #2563eb;
+		stroke-width: 1;
+	}
+
 	/* The arm is drawn, not grabbed. It runs from the knob back to the pivot, so
 	   leaving it hit-testable put a lever-shaped hole over the pivot and the point
 	   the box turns about could never be picked up. */
 	.lever::after {
 		content: '';
 		position: absolute;
-		top: calc(50% - var(--line, 1px) / 2);
+		top: calc(50% - 1.5 * var(--line, 1px));
 		right: 100%;
-		height: var(--line, 1px);
+		/* A gradient in a taller box, not a box one --line high: a box's edges
+		   are snapped to whole pixels of the card's own zoomed frame, so at 200%
+		   a half-pixel box painted two screen pixels thick. A gradient keeps the
+		   fraction. */
+		height: calc(3 * var(--line, 1px));
 		width: var(--arm);
-		background: #2563eb;
+		background: linear-gradient(#2563eb, #2563eb) center / 100% var(--line, 1px) no-repeat;
 		pointer-events: none;
 	}
 
@@ -1977,6 +2460,11 @@
 			--mark: calc(10px * var(--ui-scale, 1));
 			--reach: calc(19px * var(--ui-scale, 1));
 		}
+	}
+
+	/* The anchor corner's handle: square-cornered, the rest rounded. */
+	.handle.square {
+		border-radius: 0;
 	}
 
 	.h-nw { top: calc(var(--mark) / -2); left: calc(var(--mark) / -2); cursor: nwse-resize; }
@@ -2146,10 +2634,13 @@
 
 		/* Positioned by the padding the box was given, so the guide moves with it
 		   without anything having to convert millimetres to pixels. */
+		/* Sized by subtraction, not by `auto`: for an SVG, auto is not "whatever
+		   the insets leave" but the default replaced size of 300 × 150 pixels,
+		   which drew this guide as a rectangle far bigger than the area. */
 		.pad {
 			inset: var(--pad-t, 0) var(--pad-r, 0) var(--pad-b, 0) var(--pad-l, 0);
-			width: auto;
-			height: auto;
+			width: calc(100% - var(--pad-l, 0mm) - var(--pad-r, 0mm));
+			height: calc(100% - var(--pad-t, 0mm) - var(--pad-b, 0mm));
 		}
 
 		.pad rect {
@@ -2159,15 +2650,27 @@
 
 		/* Where a grown area's bottom was set. Zero high and positioned by the
 		   declared height, so it sits exactly on that edge whatever the zoom. */
+		/* One line's weight tall, not 0: an SVG with a zero height is not drawn
+		   at all — the spec disables rendering for it — which is how this line
+		   was in the page and never on the screen. */
 		.original-edge {
 			inset: auto 0;
-			height: 0;
+			height: var(--line);
 		}
 
+		/* Where a clip would have cut, on an area that grows instead: thin, in the
+		   bounds' own color, but with more than twice the gap between dashes —
+		   the outline the area was given, and plainly not one of its edges. */
 		.original-edge line {
 			stroke: var(--bounds-color, rgba(37, 99, 235, 0.45));
 			stroke-width: var(--line);
-			stroke-dasharray: var(--line) calc(var(--line) * 6);
+			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 7);
+		}
+
+		/* On a selected area the bound is not drawn — the selection is — but the
+		   trim line still is, in the selection's blue so it belongs to it. */
+		.box.selected .original-edge line {
+			stroke: #2563eb;
 		}
 
 		/* The line the words are cut on: dashed, the way a cut line is drawn on
@@ -2198,14 +2701,46 @@
 			height: var(--badge);
 			box-sizing: border-box;
 			border-radius: var(--radius-button);
-			border: var(--line) solid #b42318;
+			border: none;
+			box-shadow: inset 0 0 0 var(--line) #b42318;
 			background: transparent;
 			color: #b42318;
-			/* Hoverable, like the badges: its title is the only thing that says what
-			   the mark means, and pointer-events: none meant it never showed. */
+			padding: 0;
+			font: inherit;
 			pointer-events: auto;
-			cursor: help;
+			cursor: pointer;
 			z-index: 3;
+		}
+
+		/* The cut not made: the same shears in a faint blue, the way a control
+		   that is off is drawn, beside the trim line of an area that has grown. */
+		.overflow-mark.offered {
+			box-shadow: inset 0 0 0 var(--line) rgba(37, 99, 235, 0.45);
+			color: rgba(37, 99, 235, 0.6);
+		}
+
+		/* In line with the badges above them, and below the last of them where
+		   the edge they mark is higher than the column is long: on a shallow
+		   area the shears landed on the badges. They were moved a column further
+		   out for that, which put them out of line with every other mark. */
+		.overflow-mark {
+			top: max(
+				var(--edge, 100%),
+				calc(var(--stack, 0) * (var(--badge) + 2px * var(--ui-scale, 1)) + var(--badge) / 2)
+			);
+		}
+
+		.overflow-mark:hover:not(:disabled) {
+			background: #fff;
+		}
+
+		.overflow-mark.offered:hover:not(:disabled) {
+			box-shadow: inset 0 0 0 var(--line) #2563eb;
+			color: #2563eb;
+		}
+
+		.overflow-mark:disabled {
+			cursor: help;
 		}
 
 		/* Clear of the box, not straddling it: a badge sitting on the corner
@@ -2219,25 +2754,23 @@
 			display: flex;
 			flex-direction: column;
 			gap: calc(2px * var(--ui-scale, 1));
-			z-index: 3;
+			/* Above every handle, the pivot and the lever: the top corner handles'
+			   reach extends past the box to where the first badge sits, and took
+			   the press meant for it. The column itself passes clicks through, so
+			   this only ever gives the badges themselves priority. */
+			z-index: 7;
 			/* The column is click-through so a drag started beside the box still
 			   reaches it; the badges themselves are not, or their title — the only
 			   thing that says what they mean — could never be hovered. */
 			pointer-events: none;
 		}
 
-		/* The tie, at the other end of the same edge: stacked up from the bottom
-		   rather than down from the top, so it stays put as the area grows. */
-		.badges.foot {
-			top: auto;
-			bottom: 0;
-			flex-direction: column-reverse;
-		}
-
-		/* The shears straddle the bottom edge — half of their 13 above it — so
-		   the tie clears them by their own half-height and a hair. */
-		.badges.foot.clears-cut {
-			bottom: calc(8px * var(--ui-scale, 1));
+		/* The anchor's column at the top-left — the tie, then the buoy: the
+		   mirror of the column above, hanging off the left edge at the top. */
+		.badges.tie {
+			left: auto;
+			right: 100%;
+			margin: 0 calc(4px * var(--ui-scale, 1)) 0 0;
 		}
 
 		/* Quieter than the blue chrome around it. A badge is an annotation, not a
@@ -2253,14 +2786,19 @@
 			box-sizing: border-box;
 			border-radius: var(--radius-button);
 			background: #fff;
-			border: var(--line) solid #c4c4c4;
+			/* The edge is an inset shadow, like the handles', and for the same
+			   reason: a border is rounded to whole pixels of the zoomed card, and
+			   came out twice as heavy at 200%. */
+			--edge: #c4c4c4;
+			border: none;
+			box-shadow: inset 0 0 0 var(--line) var(--edge);
 			color: #767676;
 			pointer-events: auto;
 			cursor: help;
 		}
 
 		.badge:hover {
-			border-color: #767676;
+			--edge: #767676;
 			color: #333;
 		}
 
@@ -2270,7 +2808,7 @@
 		   which matters most when several areas are close enough for their badges
 		   to be nearer a neighbour's edge than their own. */
 		.box.selected .badge {
-			border-color: var(--bounds-color, #2563eb);
+			--edge: var(--bounds-color, #2563eb);
 			color: var(--bounds-color, #2563eb);
 		}
 
@@ -2352,15 +2890,51 @@
 			height: calc(var(--badge) * 0.7);
 		}
 
+		/* Over the whole trim and out past it, since a badge hangs outside its
+		   area and an area can hang off the page. Dotted — round caps on dashes
+		   of nothing — and walking from the tie toward the buoy, the way the
+		   relationship runs, whichever of the two is pointed at. */
+		.threads {
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			overflow: visible;
+			z-index: 6;
+		}
+
+		.threads path {
+			fill: none;
+			stroke: #2563eb;
+			stroke-width: calc(2 * var(--line));
+			stroke-linecap: round;
+			stroke-dasharray: 0 calc(5 * var(--line));
+		}
+
+		@media (prefers-reduced-motion: no-preference) {
+			.threads path {
+				animation: walk 600ms linear infinite;
+			}
+		}
+
+		@keyframes walk {
+			to {
+				stroke-dashoffset: calc(-10 * var(--line));
+			}
+		}
+
+		/* Three lines wide with the line drawn down the middle of it, rather than
+		   a box one line wide: a box is rounded to whole pixels of the zoomed
+		   card, so a guide was twice the weight of the bounds at 200%. The margin
+		   centres the drawn line where the box's own edge used to be. */
 		.guide {
 			position: absolute;
-			background: #ec4899;
+			background: linear-gradient(#ec4899, #ec4899) center / 100% 100% no-repeat;
 			pointer-events: none;
 			z-index: 4;
 		}
 
-		.guide.vertical { top: 0; bottom: 0; width: var(--line); }
-		.guide.horizontal { left: 0; right: 0; height: var(--line); }
+		.guide.vertical { top: 0; bottom: 0; width: calc(3 * var(--line)); margin-left: calc(-1 * var(--line)); background-size: var(--line) 100%; }
+		.guide.horizontal { left: 0; right: 0; height: calc(3 * var(--line)); margin-top: calc(-1 * var(--line)); background-size: 100% var(--line); }
 	}
 
 	/* The overlays are conditional on `bounds` and on being interactive, neither

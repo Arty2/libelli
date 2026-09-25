@@ -61,17 +61,18 @@ resize boxes directly, or type exact millimetres.
 
 - **Millimetres, from the trim edge** — changing the page size or switching bleed
   on moves nothing, because no coordinate was ever expressed in pixels.
-- **Content** — what an area holds, as one question with four answers.
+- **Content** — what an area holds, as one question with three answers.
   **Data Field** takes it from a column, so every card says something different;
   **Static Text** is words typed into the template, the same on every card;
-  **Bitmap** is a drawing made here, and **Image** is a picture from an address
-  or from this browser. The first two then take a **Mode** — plain text,
-  Markdown, or a QR code, and a data field can also be **Bitmap**, **Image** or
-  **Color**, since a column can hold any of the three. Words typed into the template cannot be a picture, so
-  Static Text does not offer that mode: Bitmap and Image are that answer, said
-  where the question is asked. Nothing about the file format changes — the four
-  are the slot, the mode and which field holds the value, read back as one
-  choice.
+  **Image** is a picture, the same on every card — **Upload…** one from this
+  device, give it an address with **URL…**, draw one with **Draw…**, pick a
+  **color** to fill it instead, or drop a picture onto it. Whichever was put in
+  last is what it shows. Switching the Content keeps only what the new choice
+  shows — static words do not ride along into an image or a data field — and
+  undo brings back what a switch dropped. The first two then take a **Mode** — plain text, Markdown,
+  or a QR code, and a data field can also be **Image** or **Color**, since a
+  column can hold either. Nothing about the file format changes — the three are
+  the slot and the mode, read back as one choice.
 - **Slots** — a box renders the column its slot is bound to. The bar calls it the
   area's **Name**; *slot* is what the file format calls it. The mapping lives
   outside the template, so the same template works against another spreadsheet.
@@ -90,13 +91,23 @@ resize boxes directly, or type exact millimetres.
   anchored, whose top is not its own to move. No area is ever less than 1mm
   either way, and type sizes, leading, radii and paddings are held to floors of
   their own, so a stray 0 or minus sign cannot make something unreachable.
+  Hold **Shift** while dragging a resize handle for the same thing on the card.
 - **Anchors** — a box can take its top edge from the *rendered* bottom of another
   box, plus a gap. The gap may be **negative**, tucking an area up under the one
   it follows so the two overlap. Drag an anchored box vertically and the gap
   changes rather than the link breaking. Both ends of the tie are marked and both marks are
   buttons: the **link** on the follower breaks its own tie, the **buoy** on the
   followed area casts off everything moored to it, and neither moves anything —
-  the released box keeps the place it was sitting in. Selecting either end lights
+  the released box keeps the place it was sitting in. Both hang off an area's
+  **top-left** corner, in a column of their own: the link, and under it the
+  buoy — an area in the middle of a chain wears both. **Point at either** and a dotted
+  thread draws itself between the two — an inverted S, leaving each badge
+  downwards before it crosses, and bowed out to the left when the two are one
+  above the other so it is never a straight rule — sagging a little, its dots
+  always walking from the link to the buoy, the way the tie runs, wherever on
+  the card they are. Pointing at a buoy threads it to what follows *that*
+  area, never to what it follows itself. It
+  is still while you have asked for less motion. Selecting either end lights
   the *mark* on the other — the glyph only, never a fill, because those badges
   are on areas you have not selected and a filled badge reads as a second
   selection. The one fill is on the area you do have: what is moored to it, which
@@ -145,21 +156,40 @@ resize boxes directly, or type exact millimetres.
   every card and travels with the design rather than with the data. An area with
   nothing typed into it is still an area — it keeps its fill, its border and its
   size, and **Hide When Empty** is what takes it away again. *+ Area* beside the
-  page adds one, starting as static text. An **empty area** draws its own name
-  in italics, in the accent blue, in the face and size it will print in — so an
+  page adds one, starting as static text. An **empty area** draws its name —
+  for an area bound to a column, the column's name, since that is what will be
+  in it — in italics, in the accent blue, in the face and size it will print in — so an
   empty area still shows where it is and how big its words will be. It is part
-  of the bounds: turning **Bounds** off takes it away with them, and it never
+  of the bounds: turning **Boxes** off takes it away with them, and it never
   reaches paper, the lightbox or a PNG. An area set to hide when empty hides on
   a card whose column is simply blank, because that is what it will do on
   paper; one with **nothing to draw from** at all — no rows, or a name bound to
-  no column or to one since renamed or deleted — stays put instead, because a
+  no column or to one since renamed or deleted, or an area holding its own
+  words with none in it — stays put instead, with its placeholder, because a
   design whose areas have all collapsed to nothing is a design you cannot click
-  on. An area carrying its own words wears a plug pulled out of its socket,
-  because it is not plugged into the data.
+  on. An area carrying its own words wears Carbon's *text creation* mark,
+  because its words are written here rather than coming from the data. A
+  selected area whose words come out of a column wears a **pencil-and-page**
+  badge at the top right, the same icon as **Edit** under the table: press it
+  and that cell opens full size in the table, the table opening if it was
+  folded away. A locked area, or a locked table, refuses it. An empty image area reads *Image*,
+  and an image area wears a mark at the corner the way static text does: a
+  pencil when it holds a drawing — press it to draw on it — and a picture
+  otherwise.
 - **Grown past its height** — an area set to **Grow** whose words need more room
-  than it was given keeps a sparse dashed line where its bottom edge was set, in
-  the bounds' own color and weight, so you can see how far the content has
-  pushed it. A clipped area draws the red cut line instead.
+  than it was given keeps a **trim line** where a clip would have cut: thin, in
+  the bounds' own color, with more than twice their gap between dashes so it is
+  not taken for an edge, and in the selection's blue while the area is
+  selected. Beside it are the shears in a faint blue, the cut *offered*: press
+  them and the area is clipped at that height. Under the pointer both pairs
+  shut, which is what pressing them does. The red shears on a clipped
+  area are the same switch the other way — press them and it grows to fit.
+- **A selected area** draws only its selection, not its dashed bound as well
+  under it, which doubled every edge.
+- **The anchor corner** — of a selected area's eight handles, the one at the
+  corner its words are set from is square: top-left for text aligned left and
+  to the top, bottom-right for right and bottom. Centred on either axis, no
+  corner is, and every handle is rounded.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with
   one selected, and a text box lies over the content inheriting the face, size,
   color and alignment it will print in. A bound area writes through to the cell;
@@ -172,8 +202,16 @@ resize boxes directly, or type exact millimetres.
   so can a cell, quoting another cell of its own row. Markdown around them works
   in a Markdown area. `{{Artist Name}}` finds the column `Artist-Name`, and case
   does not matter. Substitution happens **once**: what a placeholder is replaced
-  with is never read for placeholders itself, so a cell that names itself, or
-  two that name each other, print what they hold rather than looping.
+  with is never read for placeholders itself, so two cells that name each
+  other print what they hold rather than looping. A cell that names **its own
+  column** is not filled in at all: it is left as written and, on the card,
+  underlined in wavy red like a name nothing answers to, because it is the
+  same mistake. Type
+  `{{` in any field that takes text — a cell, the area's Text, the card
+  itself — and the columns are offered; arrows move, Enter or Tab takes one,
+  Esc leaves what you typed. A placeholder that names no column is
+  **underlined in wavy red** on the card while the bounds are on, since it
+  would otherwise print as the literal braces.
   `{{date}}` prints today's date, and `{{date:YYYY-MM-DD}}` prints it in a
   format of your own: `YYYY`, `YY`, `MM`, `DD` for the numbers, `MMMM`, `MMM`,
   `dddd`, `ddd` for the names. A column called `date` wins over the date; a
@@ -183,11 +221,28 @@ resize boxes directly, or type exact millimetres.
   months.
 - **Paragraphs** — **Paragraph** in the area bar, with a page-wide default in
   page setup: **Space After** each paragraph, or the next one's first line
-  **Indented**, by an amount in lines of the area's own leading, so it keeps its
-  proportion when the type changes. In plain text every line is a paragraph —
+  **Indented** — or **Continuous**, neither, which is where a template starts. A space in lines of the area's own leading, an indent in em of
+  its type size, so either keeps its proportion when the type changes. In plain text every line is a paragraph —
   Return starts a new one, as in a word processor; in Markdown it replaces the
-  space after a paragraph. An indent skips the first paragraph after a heading
-  or at the top, as in any book.
+  space after a paragraph. An indent goes on every paragraph but the area's
+  first — a heading or a list before it included, since on a card most
+  paragraphs follow one, and the book rule of indenting only a paragraph after
+  another meant it hardly ever showed.
+- **Lists** — **List** picks a Markdown bullet list's marker, **• Bullet**,
+  **● Disc**, **– Dash**, **— Em Dash** or **None**, each set in the area's own
+  font like the words beside it (a font without the glyph falls back as for any
+  missing character); **List Indent** is the space from the area's edge to
+  the markers, in em, and **List Spacing** the space between one item and the
+  next, in lines of the leading — the units the paragraph settings use. All
+  three are a group of their own in page setup and, for a Markdown area, in the
+  area bar, where each on its own overrides the page's; left blank, a list is
+  set as it always was.
+- **Baseline** — just after Leading: raises an area's text by a share of its size, in em, or lowers
+  it below 0: for a face that sits high or low on its line. Page setup's
+  applies only to areas in the page's font — it corrects a face, and would be
+  wrong for any other — and an area's own applies whatever it is set in. It
+  moves the words and nothing else: the area is as tall as it was, and what is
+  anchored under it stays put.
 - **The style clipboard** — **Copy Style** and **Paste Style** in the right-click
   menu, or <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>c</kbd> and
   <kbd>v</kbd>, carry type, fill, border, padding, radius and fit from one area
@@ -218,9 +273,11 @@ resize boxes directly, or type exact millimetres.
   below it do not move — turning one thing never shuffles the card.
 - **Overflow** — a box whose content is taller than the box will let it be draws
   the cut: a dashed red line along its bottom edge, where the words are actually
-  severed, with a pair of shears astride that line at the right-hand end. A
-  clipped card looks fine on screen right up until it is printed, and the line
-  says where.
+  severed, with a pair of shears astride that line at the right-hand end —
+  in line with the badges above it, and below the last of them when the
+  area is shallower than their column. A clipped card looks
+  fine on screen right up until it is printed, and the line says where; the
+  shears are also the way out, and a press lets the area grow.
 - **Past the edge** — the editor does not cut anything off at the card's edge:
   drag an area half off the page and it stays visible, with its handles where
   you can still reach them. What prints is another matter — the paper stops
@@ -253,10 +310,13 @@ resize boxes directly, or type exact millimetres.
   with the browser's **Background graphics** on — and it survives the PNG export,
   which was checked rather than assumed.
 - **Opacity** — how much of what is under an area shows through it, 0 to 100%.
-  It fades the whole area at once — its fill, its border and its content
-  together — so a wash of text over a picture is one setting rather than three
-  colors with alpha in them. 100% is the absence of the setting, which is what
-  every area has always been.
+  It fades what the area paints — its fill, its border and its content, the
+  placeholder included — and never its bounds, its handles or its badges, which
+  are how it is edited. 100% is the absence of the setting, which is what every
+  area has always been.
+- **Colors with alpha** — every color field is a swatch and an opacity in
+  percent beside it: text, paper, fill, border and a QR's background alike.
+  Opaque, a color is stored as the hex it always was; otherwise as `rgba()`.
 - **A border drawn by hand** — the pencil beside the border color draws it
   wobbling, as a line rather than a rule. Width, style and radius all still
   mean what they meant: a dashed 1mm hand border is dashed, 1mm and hand-drawn,
@@ -384,7 +444,8 @@ resize boxes directly, or type exact millimetres.
   button that unlocks it could never be reached. A page lock covers every box
   and the page settings as well. A padlock appears on a locked area, and it is a
   button: pressing it unlocks that area, the way the two anchor badges beside it
-  undo what they say. A locked
+  undo what they say. Words can still be typed into an area on a locked page,
+  and a drawing opened and drawn on: those are content, not the design. A locked
   *page* says **Locked** in a band above the sheet and greys every bound on the
   card, because nothing on it can be moved and so nothing on it is worth
   coloring for a reason. It also takes the per-area badges away: every one of
@@ -397,15 +458,26 @@ resize boxes directly, or type exact millimetres.
   settings bar is disabled behind it, so a press unlocks the design and it
   answers with the open padlock for a moment before it goes. Elsewhere the
   button that sets a lock is in the bar with the rest of that subject's
-  settings, and it says **Unlock** when that is what it will do. Turning bounds
-  off takes all of it with it.
+  settings, and it says **Unlock** when that is what it will do. Turning
+  **Boxes** off takes all of it with it. The band is pinned to the top of the
+  stage, the way the pager is to the bottom, so it never adds to what there is
+  to scroll.
+
+  A page lock is on the design, not on what it holds: **double-click an area**
+  and its words can still be typed into, as can a cell. An area's own lock
+  still refuses it, and so does a locked table for a bound area.
 - **CSS** — page setup has a CSS button; what you write there is saved
   inside the template and travels with it. Selectors are scoped to the card, so
   nothing in a template can restyle the editor around it, and `@import` and any
   `url()` pointing off this machine are stripped, so a template's CSS cannot
   reach the network at all.
   Each area wears its own **Name** as an id, so `#Job-Title { … }` reaches that
-  one area and nothing else; `.box` reaches all of them. The dialog has a
+  one area and nothing else; `.box` reaches all of them. Every area also wears
+  two classes: where its content comes from — `.content-field`,
+  `.content-static` or `.content-image` — and its mode — `.mode-plain`,
+  `.mode-markdown`, `.mode-image`, `.mode-color` or `.mode-qr`. The empty
+  field's placeholder lists this template's own ids and these classes. The
+  dialog can be dragged by its title, to see the card it is styling. The dialog has a
   **Cancel** beside its **Done**, and Cancel puts back the CSS that was there
   when it opened — <kbd>Esc</kbd> and a click on the ground behind do the same,
   because with a Cancel on the row the other two ways out that are not Done have
@@ -418,8 +490,11 @@ resize boxes directly, or type exact millimetres.
 **Several templates, one browser.** The **Template** field in page setup names the
 loaded template; the caret beside it opens every template this browser has saved,
 the open one ticked, with everything that acts on the template as a whole under a
-rule: **New template…**, **Import…**, **Export**, and in red **Reset…** and
-**Delete this template…**. **Lock** stays outside the menu, beside the field,
+rule: **New Template…**, **Import…**, **Export**, and in red **Reset…** and
+**Delete…** (whose dialog still says **Delete Template**, so the button you
+confirm with names what goes). An export is named for the template and the
+day — `a5-starter-template_2026-09-25.json` — so a folder of them sorts by
+date. **Lock** stays outside the menu, beside the field,
 because it is a state you need to see rather than an errand. Renaming is typing
 in the field — the template keeps its identity, so two of them may share a name
 without sharing anything else. Reset puts the starter card back under the same
@@ -446,8 +521,11 @@ took the column for, and a sample cell to check it against. That list is nearly
 the whole of the dialog — no paragraph explaining it, because the rows say it
 better. Change anything it has read wrongly, or untick a column to leave it off
 the card — the tick is apart from the kind, so ticking it again keeps what it
-was taken for. An empty column starts unticked. Every area it places sits the
-same distance from both sides of the paper, and from the top and the bottom.
+was taken for. An empty column starts unticked. It lays out inside the page's
+**Margin**, so the card is the same distance from every edge unless you set the
+margins otherwise; within that, heights and the gaps between areas are whole
+5mm grid steps, so the stack lines up with the grid down the page, and the
+widths run margin to margin.
 Columns it reached by length alone are marked *guess*. Where the template already
 has areas, a line above the buttons says how many are about to be replaced.
 
@@ -481,10 +559,11 @@ text itself previews it and chooses it; the tick in the gutter chooses several
 without moving the preview off the card you are looking at, and the tick in the
 corner of the header chooses every row or drops every row — it shows a dash while
 some but not all of them are chosen, which is what the next press will change.
-Whatever the table has to say goes to the app's status bar, so there is one place
+Whatever the table has to say goes to the app's status bar — tap it to read a
+long notice whole, in a dialog — so there is one place
 a notice can appear.
 
-- **Paste** — a modal that takes a block of cells off a spreadsheet. Tabs, commas and
+- **Paste** — in the **Table** menu: a modal that takes a block of cells off a spreadsheet. Tabs, commas and
   semicolons are told apart by sniffing, and quoted fields with embedded
   newlines survive. **No header row needed**: the cells land in the columns you
   already have, matched left to right, which is what a block copied out of those
@@ -499,11 +578,14 @@ a notice can appear.
   header's corner is how you say *all of them*. Its mark is a clipboard with
   something leaving it — this app has a clipboard for looks as well, and a
   Duplicate on the card, and the glyph is what tells the three apart.
-- **Import CSV** — the same parser against a whole file, header and all. Press
-  and *hold* the button instead of clicking it, and the four sample cards come
-  back: they walk through the app, and they are somewhere to start when a blank
-  table is not. Your rows are replaced, the template is untouched, and
-  Ctrl/Cmd+Z undoes it. A file holding no rows is **refused rather than
+- **Import…** — in the **Table** menu too, with **Export** beside it, so
+  the bar under the table holds only what acts on chosen rows, the picker and
+  the lock. The same parser against a whole file, header and all. **Getting
+  Started**, in the same menu under **New table…**, opens the four cards that
+  walk through the app: the table that holds them untouched if there is one,
+  and otherwise a new table of them — never over the rows you are in, so a
+  Getting Started table you have edited is kept and a fresh one is made
+  beside it. A file holding no rows is **refused rather than
   applied** — picking the wrong one in a file picker should not cost you the
   table — though a file of headers and no rows will still set up the columns of
   a table that is already empty.
@@ -517,31 +599,70 @@ a notice can appear.
   and headers imported from a file or a paste are cleaned the same way — because
   a column name is also something written between braces: `{{Artist-Name}}`.
   Letters of any script are letters.
-- **Reorder** — drag a header sideways and drop it where the blue edge shows.
+- **Reorder** — drag a header sideways and drop it where the blue line shows —
+  drawn down the whole height of the table, not only the header, so the gap it
+  lands in is plain wherever you are looking.
+  With a finger, hold the header still for a moment first — it lifts, with a
+  buzz — and then drag; a sideways swipe that has not lifted anything scrolls
+  the table instead.
   The ‹ › and the bin appear in a header only while it is pointed at or has the
   focus, so the name has the room the rest of the time; the sort stays, because
   it also says how the rows are sorted. Row objects are keyed by name, so
   moving a column changes the view and nothing else.
 - **Columns nothing prints** — a small broken link in front of a header marks a
   column no area is bound to and no area's words or printed cells name as
-  `{{column}}`: data no card will show.
-- **Counting** — while a cell is being typed in, its characters and words are
-  counted in its bottom corner.
-- **A cell full size** — press and hold a cell for a dialog with the whole of it
-  and the same count. It edits a copy: **Done** (or Ctrl/Cmd+Enter) keeps it,
-  **Cancel** and Esc do not.
-- **Lock** — the padlock under the table freezes it: no typing, no new, moved,
+  `{{column}}`: data no card will show. Press it to put the column on the card:
+  a new area, named after the column and bound to it, where a new area goes.
+- **Counting** — while a cell is being typed in, **Edit** appears just right of
+  the row height, and opens it full size; its characters and words are at the
+  right-hand end, and the lock, the table and the swap step aside until the cell
+  is left. With rows chosen they step aside too, for the row actions — the count, *3 rows* (nothing for one, whose tick says
+  it), the up and down chevrons, **Copy** and **Delete** — and come back when
+  the choice is cleared.
+- **Moving rows** — with rows chosen, the up and down chevrons before **Copy**
+  move them a row at a time, as a block; row order is print order. Or **drag a
+  row by its number** to anywhere in the table — a blue line shows where it will
+  land — and if it is one of the chosen rows, all of them go, in their own
+  order. With a finger, hold the number a moment first, as for a column. Either
+  way a sort that was on is dropped, since the rows are no longer in it, and
+  what was chosen stays chosen.
+- **Which area it feeds** — entering a cell flashes the areas on the card that
+  print it, in the bounds' blue, for a moment.
+- **A cell full size** — press **Edit**, press and hold a cell, press the
+  **[...]** on a cell that holds more than it shows, or press the edit badge on
+  a Data Field area, and the whole of it opens in the table's own space — over
+  the rows, with the card still in view beside or above it. Its column's name
+  and the **×** are at the top; the bar under it stays, saying **Row 2** at
+  the left and the count where the count always is. It edits the cell itself, live, so the
+  card follows as you type and undo reaches every change; the **×** at the top
+  right, Esc or Ctrl/Cmd+Enter put the table back. The words are set at twice
+  the table's size, for reading at length. On a locked table none of
+  the three opens it: the full-size editor is a way to type.
+- **Lock** — the padlock in the bar under the table, after the row height and
+  before the picker, freezes it: no typing, no new, moved,
   renamed or deleted rows and columns, no paste or import — and nothing typed,
-  dropped or drawn on the card reaches a cell either. Sorting and choosing rows
-  still work, because neither changes what any card says. It is saved with the
+  dropped or drawn on the card reaches a cell either. Nor does sorting, since
+  row order is print order; choosing rows still works. It is saved with the
   table and undoable.
 - **Column widths** — drag the right edge of a header, or double-click that edge
   for the default. The widths are a view preference of this browser's, not part
   of the data or the template: they follow a column through a rename and go with
   it when it is deleted. The table lays out `fixed`, so a width you set is the
   width you get and one long cell cannot shove every other column sideways.
-- **Cells fill their row** — a row is as tall as its tallest cell, and every
-  field in it is that tall, so the target you click is the cell you can see.
+- **Cells fill their row** — a row is as tall as its tallest cell, and a press
+  anywhere in a cell, the band under a short field included, is a press on its
+  field, so the target you click is the cell you can see.
+- **Row height** — the button at the left-hand end of the bar, always there and
+  the same width in every mode, cycles three heights:
+  **Short**, one line per row; **Long**, up to five lines, which is where a
+  table starts; and **Full**, every row as tall as its longest cell — Carbon's
+  *table*, *fit to screen* and *fit to height*. A cell holding more than its
+  row shows ends its last visible line in **[...]**, the words fading into it,
+  and has no scrollbar of its own; it scrolls again, and the mark goes, while
+  the cell is being typed in. It is kept for next time. **Double-click a row
+  number** to show just that row whole, and again to put it back. On a phone
+  the button keeps its icon and drops the word. Whatever the height, a row's number sits on the same baseline as the
+  first line of its cells, with its tick centred beside it.
 - **Sort** — the arrow in a header is a three-way toggle: A-Z, Z-A, then back to
   the order the rows arrived in. Numbers sort by value rather than by digit,
   case is ignored, and blanks stay at the bottom either way. This reorders the
@@ -561,10 +682,11 @@ a notice can appear.
   nobody. There is no Duplicate beside it any more: copying the rows and pasting
   them back is the same act in two presses that say what they do, and the icon
   was a third mark to tell apart in the smallest bar in the app.
-- **More than one table** — the **Table** field at the right-hand end of the same
-  row of buttons names the table you are in; the caret beside it opens the rest,
-  the open one ticked, and **New table…** and **Delete this table…** are below a
-  rule at the bottom of that list — which is the only way to delete one; there
+- **More than one table** — the **Table** field beside the lock names the table
+  you are in; the caret beside it opens the rest, the open one first and
+  ticked. Under a rule, **New table…** and **Getting Started**; under another,
+  **Paste…**, **Import…**, **Export** and **Delete Table…** — which is the only
+  way to delete one; there
   is no separate button to empty the table. A design and a table are kept apart on purpose — one design prints
   any number of tables, and one table can be printed by any number of designs —
   so switching either leaves the other exactly where it was. Bindings that still
@@ -583,7 +705,10 @@ a notice can appear.
   mis-aimed click on a 22px icon is not the whole of the decision.
 - **How wide the table is** — beside the page, drag the table's left edge to
   share the width between the two; double-click it to go back to the default.
-  The split is kept for next time.
+  The split is kept for next time as a share of the window, so a smaller
+  window gets the same proportion rather than the same pixels. On a phone the
+  tray's dragged height is kept too, though it opens no taller than three
+  quarters of the screen, so the card is always there to see.
 
 ## Markdown and color
 
@@ -623,24 +748,26 @@ functional notation is rebuilt from the numbers it parsed to.
 
 ## Images, colors and QR codes
 
-Three box modes carry something other than text, and the **Content** row picks
-between them: Bitmap and Image where the template holds the value, or any of the
-three as a **Mode** where a column supplies it. Both are framed by the box's
+Three box modes carry something other than text: **Image** is a Content type of
+its own where the template holds the picture, and Image, Color or QR is a
+**Mode** where a column supplies the value. Both are framed by the box's
 declared height, and both take a **Fit**: *fit* puts the whole thing inside the
 box, *cover* fills the box and crops the overflow, *stretch* distorts it to the
 box exactly, and *tile* — images only, since a tiled QR is not a QR — repeats it
 at its own size.
 
-- **Bitmap, Image and Color** — three modes, one for each thing a cell can hold.
+- **Image and Color** — two modes, one for each thing a cell can hold.
   **Color** fills the area with what the cell says and refuses anything that is
   not a color, so an address in a column of colors is ignored rather than
   fetched; colors are read in hex, `rgb()`, `hsl()` or by name, and they fill the
   area itself, so the fill reaches under the padding and takes the corner radius
-  with it. **Image** shows a picture — a data URL, an external URL, a name this
-  browser is holding, or inline SVG held in the template — and still accepts a
-  color, because it was the only mode for both and templates written then rely
-  on it. **Bitmap** is a drawing made in the app and written into the cell as
-  base64, so every row can carry its own and the picture travels with the table.
+  with it. **Image** shows a picture — a drawing made in the app, an external
+  URL, a name this browser is holding, or inline SVG held in the template — and
+  still accepts a color, because it was the only mode for both and templates
+  written then rely on it. A drawing is written into the cell as base64, so
+  every row can carry its own and the picture travels with the table. There
+  used to be a separate **Bitmap** mode for drawings; a template that says
+  `bitmap` opens as Image, drawing and all.
 
   Everything that can reach an `<img src>` from a cell goes through one guard
   that allows `http`, `https` and a base64 `data:` image and nothing else. A
@@ -670,18 +797,19 @@ at its own size.
   twice — they share one store, because an image is an image. Which store that is, and how to
   empty it, is **Images** in the toolbar — see below.
 - **Drawing one** — double-click an image area, press the **pen** beside the
-  page, or press **Draw…** in the area bar, and the drawing surface opens
-  **full screen**. The pen appears under **Area** whenever the one area you have
-  selected is one a drawing can go in, which is the same rule the bar follows. Never in place: an area on
-  a card is often a centimetre across, which is somewhere to show a drawing and
-  nowhere to make one. The board sits above its tools, and the tools are one
-  row: a pen in the area's own colour, a **line** — press where it starts, let
-  go where it ends — a rubber, three nib widths, undo, redo and clear, the size
-  of the board, a **light or dark checkerboard**, **rotate** and **crop**,
-  **copy** and
-  **paste**, and then Cancel and Done — leaving is a drawing tool like the rest
-  of them, and a row of its own under the board put the two most final buttons
-  furthest from the hand that had been drawing.
+  page, or press **Draw…** in the area bar, and the drawing surface opens in a
+  **dialog**, like the CSS editor's — the card stays in view round it, and the
+  dialog can be **dragged by its title** to see what it covers. The pen appears
+  under **Area** whenever the one area you have selected is one a drawing can go
+  in, which is the same rule the bar follows. Never in place: an area on a card
+  is often a centimetre across, which is somewhere to show a drawing and nowhere
+  to make one. The board's size sits above it, and the board is always drawn as
+  large as the dialog has room for, so there is never a scrollbar round it.
+  Under it the tools are two rows: a pen in the area's own colour, a **line** —
+  press where it starts, let go where it ends — a rubber, three nib widths, undo
+  and redo, and a **light or dark checkerboard**; then **rotate** and **crop**,
+  **copy** and **paste**, and at the far end **Delete** (in red, as everywhere),
+  **Cancel** and **Done**.
 
   **Rotate** turns the drawing a quarter turn clockwise, board and all — the
   budget does not notice, because the same pixels are arranged the other way up.
@@ -715,9 +843,8 @@ at its own size.
   size, because what is in the cell is the thing being edited.
 
   It is drawn at whole screen pixels each — a pixel editor that blurs its own
-  edges is no use — which is also why <kbd>Ctrl</kbd> and the wheel step the
-  zoom through whole numbers rather than scaling smoothly. There is no
-  two-finger pinch on the board: the fingers that would make one are the fingers
+  edges is no use — so the fit steps through whole numbers rather than scaling
+  smoothly. There is no zoom beyond the fit, and no two-finger pinch on the board: the fingers that would make one are the fingers
   drawing on it. A pinch is the page editor's, and stays that.
 
   What comes out is a base64 PNG written **into the row's cell**, which is the
@@ -755,8 +882,11 @@ at its own size.
   end up with a code no phone will read. Byte mode, versions 1–10, which holds
   213 characters at correction level M — enough for any URL worth putting on a
   card. **Correction** trades capacity for damage tolerance (L 7% to H 30%), and
-  **Quiet zone** sets the blank border scanners need; two modules is the
-  practical minimum. Text the encoder cannot hold renders as nothing rather than
+  the blank border scanners need is the area's own **Padding**, in millimetres,
+  like the space round anything else — the code has no quiet zone of its own,
+  so a code with no padding runs to the area's edge. A couple of millimetres is
+  plenty at card sizes; a padding older templates set in modules is not carried
+  over. Text the encoder cannot hold renders as nothing rather than
   as a square that will not scan.
 
 The encoder is written here rather than pulled in, like the Markdown renderer
@@ -772,12 +902,21 @@ and the browser may empty it. **Images**, in the toolbar between Page
 Setup and Data, opens a bar of its own in the same row as the other two — a bar
 rather than a dialog, so the card that uses the pictures stays in view.
 
-- **What is stored** — every picture this app can see, as a chip with its
-  weight, and a dashed chip marked *unused* where neither the current table nor
-  the template points at it. That is the whole point: *which of these forty can
-  I delete* is not a question browser storage can answer. Deleting is one press
-  on the chip, and it says so if something was using it. Hover a chip for where
-  it is kept.
+- **Upload…** — pictures from this device, in every browser and on a phone:
+  the folder below is Chromium's, and dropping a file onto an area is not
+  something a phone can do. They go wherever pictures go — the folder when
+  there is one, this browser otherwise.
+- **What is stored** — one line per picture, unused ones first: a thumbnail,
+  its name, its size in pixels and in bytes, and *unused* where neither the
+  current table nor the template points at it. With eight or more, a box to
+  find one by name appears. That is the whole point: *which of these forty can I
+  delete* is not a question browser storage can answer. Deleting is one press,
+  and it says so if something was using it. Hover a line for where it is kept.
+- **Onto the card** — drag a thumbnail out of the bar and let go over an area:
+  the picture goes where a dropped file would, into this row's cell when the
+  area is bound to a column and onto the area otherwise. The area under the
+  pointer is outlined while you carry it. It works with a finger as well as a
+  mouse.
 - **A folder of your own** — press **Choose Folder…** and pictures are written
   there as ordinary files from then on: replace one from a photo editor and the
   card follows, back them up with the rest of your work, and clear them out with
@@ -812,7 +951,8 @@ Pick a curated Google family, type any other family name, or upload a file.
   first, for a variable family; then regular and bold with their italics; then
   the family as it comes — Google refuses a request for a weight a family has
   not got, so each attempt either brings in exactly what exists or falls
-  through to the next.
+  through to the next. Which one answered is remembered per family, so the
+  next visit asks once.
 - **Only real weights** — the Weight menu lists the weights the family actually
   has in this browser, read off the faces its stylesheet or file declared. A
   family nothing has declared yet — a system face, or one still arriving —
@@ -898,7 +1038,10 @@ run. Choosing which pages go is at the left of that screen and **Print** and
 **PNG** are at the right, because the two are not one row of three equal things.
 From it: **Print**, or **PNG** — one 300 dpi file per selected page, or with
 **Pages per Sheet** on, one per sheet instead, each carrying every card tiled
-onto it — rendered here, with no library, by carrying the element into an SVG
+onto it. More than one file comes as **one ZIP** of them, named in print order,
+rather than as a download apiece that a browser asks about each time; the ZIP
+is written here too, stored rather than compressed, since a PNG already is. All
+rendered here, with no library, by carrying the element into an SVG
 `foreignObject` and drawing that to a canvas. Every face is embedded: uploaded
 ones from this browser, and a Google family by fetching the stylesheet the
 page already loaded and the font files it points at. That fetch is confined to
@@ -1036,13 +1179,19 @@ letting go of the area. They used to stack, which meant every selection added a
 whole toolbar to the top of the window — the stage lost that much height, the
 fitted scale changed with it, and the page jumped and resized under the pointer.
 
-The row also never shrinks: it is floored at the tallest bar it has held at this
-window size, so swapping one bar for the other does not move the page either. The
-cost is a band of the bar's own colour under the shorter of the two; the floor is
-dropped on a resize, because both bars wrap and neither height survives a change
-of width.
+The row also stands at the area bar's height from the start, on a desk and on a
+phone: an unseen area bar is kept in the row just to be measured, so the page bar
+already takes the room the area bar will need and selecting an area moves
+nothing — the page stays where it is and the fitted zoom does not change. It
+never shrinks below the tallest bar it has held at this window size either. The
+cost is a band of the bar's own colour under the page bar; the floor follows
+the window as both bars wrap differently at different widths.
 
 ## Keyboard shortcuts
+
+Every button that has a key says so in its tooltip, and the right-click menu
+lists them against its items — from one table in `keys.ts`, so a tooltip cannot
+name a key the app does not listen for.
 
 | Keys | Action |
 | --- | --- |
@@ -1064,7 +1213,8 @@ of width.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>c</kbd> | Copy the area's style |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>v</kbd> | Paste that style onto the selection |
 | <kbd>?</kbd> or <kbd>/</kbd> | The help panel |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>;</kbd> or <kbd>h</kbd> | Bounds on or off |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>h</kbd> | Boxes on or off — bounds, badges and the lock band |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>;</kbd> or <kbd>\|</kbd> | Guides on or off — Photoshop's key and Inkscape's |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> or <kbd>#</kbd> | Grid on or off (press and hold the Grid box for dots) |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>p</kbd> | Export — again from that screen to print |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>p</kbd> / <kbd>s</kbd> | Export, for the fingers that reach for those |
@@ -1091,19 +1241,11 @@ exactly the corner you may have reached for it to nudge — press and hold that
 middle chip and the pad comes with your finger. It can be pushed off the edge of
 the stage to get that corner back, as far as the middle chip: the arm you are
 not using goes out of sight, the chip you pick it up by never does. It is not
-drawn at all when nothing it could move is selected, and an area whose top comes
-from an anchor shows the link on its two vertical keys rather than an arrow that
-would do nothing: the millimetres between the two areas are the **Gap** in the
-bar. Those two keys keep the pad's own face — a faded mark on them, not a faded
-key, which would read as a hole in the cross — and they are not dead: they carry
-the two ways out of the tie. **Hold one** and the selection walks up the tie, to
-the area this one is following: that is where the Gap you actually want is, and
-finding that area by eye on a full page is the hard part. **Tap one three times**
-in a row and the tie itself goes, leaving the area exactly where it was sitting —
-the resolved top is written back as its own, so nothing jumps. Three rather than
-one, because these keys are also where a finger goes to nudge; after the first
-tap the key wears the broken link, and the run lapses after a second and a half,
-so the second and third taps are a decision rather than an accident.
+drawn at all when nothing it could move is selected. On an area whose top comes
+from an anchor, the two vertical keys change the **Gap** instead — the
+millimetres between it and the area it follows — and say so with a stop bar and
+a triangle rather than an arrow: the bar is the edge of that area, so up is
+towards it and down is away. They repeat on a hold like the arrows do.
 
 ### Touch gestures
 
@@ -1137,13 +1279,18 @@ so the second and third taps are a decision rather than an accident.
 The arrow keys and the pad both move every area in the selection, not only a
 lone one.
 
-Dragging snaps in this order: switch **Grid** on and everything snaps to the 5mm
-subgrid of a 10mm grid; otherwise a box latches onto the edges and centres of
-its neighbours as it passes them, and a guide shows what it caught. There is no
-key to hold for free movement — switch **Grid** and **Bounds** both off and
+Dragging snaps in this order: with **Guides** on the page **margins** show as a
+solid guide in magenta — over the grid and under every area — and an edge that comes within reach of one lands on it
+— the left and top edges, and the right and bottom when those are the edges
+being moved; then, with **Grid** on, the 5mm subgrid of a 10mm grid takes
+everything else; otherwise a box latches onto the edges and centres of its
+neighbours as it passes them, and a guide shows what it caught. There is no key
+to hold for free movement — switch **Grid**, **Guides** and **Boxes** off and
 nothing latches, because a box should never snap to a guide you cannot see.
 
-Press and *hold* the **Grid** box and the ruling becomes a **dot grid**: the same
+The grid is drawn in black on a light paper and in white on a dark one, at
+the same strengths, so it can be seen on a navy or black card as well as on
+white. Press and *hold* the **Grid** box and the ruling becomes a **dot grid**: the same
 millimetres and the same snapping, marked with a dot at each intersection instead
 of a line through the card. The word beside the box says which it is drawing. Both
 are placed as geometry rather than as a tiled background, so every line is where
@@ -1185,19 +1332,24 @@ instead of the full-screen look.
 
 ## Settings
 
-Each bar opens with a two-line head — what this is and what it is called, then
-the buttons that act on it — and runs in groups after that, outward from the
-thing itself.
+Each bar opens with a head — what this is and what it is called, then the
+buttons that act on it — and runs in groups after that, outward from the thing
+itself. On a phone the page bar's head — the template and its lock — is a line
+of its own, ruled off from the settings under it in the bar's border grey; on a
+wider screen it shares the first row with them, so the bar takes no more height
+than it has to.
 
-- **Page** — head: the template's name and the library behind its caret, which
-  also holds new, import, export, reset and delete, then lock ·
+- **Page** — head: the lock, then the template's name and the library behind
+  its caret, which also holds new, import, export, reset and delete ·
   sheet size (a preset or your own, a button to turn it over, and left and
-  right pages), bleed, crop marks · type defaults (font, size, leading,
-  spacing, paragraph) · surface (paper color, background image and fit) · page
+  right pages), margin (one number all round, or one per edge — top, bottom and
+  left and right, or inner and outer with left and right pages), bleed, crop marks · type defaults (font, size, leading,
+  spacing, paragraph, baseline, list marker, indent and spacing) · surface (paper color, background image and fit) · page
   number, whether to print the total, and its margin · CSS
-- **Area** — head: the field's name, then duplicate, delete, lock · content
+- **Area** — head, on one line: lock, the field's name, duplicate, delete · content
   (data field or static text, column, mode, fit, QR settings) · type (font,
-  size, weight, color) · setting (leading, spacing, paragraph, case) · alignment,
+  size, weight, color) · setting (leading, spacing, paragraph, baseline, and
+  for Markdown the list marker, indent and spacing, case) · alignment,
   horizontal and vertical · surface (fill, padding, border width, style, hand and
   color, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
   when empty, and mirror where the template has left and right pages) ·
@@ -1226,12 +1378,21 @@ thing itself.
   rectangles competing with the card; labels are set small and uppercase, units
   stay lowercase beside the number, and buttons keep their frames because a
   button is a thing you press.
-- **View** — in the bottom corners of the page itself, not the toolbar: grid and
-  area bounds at the left (screen only, never printed), zoom at the right;
+- **View** — in the bottom corners of the page itself, not the toolbar: **Grid**,
+  **Guides** (the page margins) and **Boxes** (each area's bounds) at the left (screen only, never printed), zoom at the right;
   between them, under the sheet, which card of how many you are looking at.
-  **Fit** in the zoom menu says the percentage fitting *would* give you, not the
-  one you are at. On a phone the two left-hand toggles keep their row and lose
-  their words — a **#** for the grid and a **B** for the bounds, beside ticks
+  The zoom menu puts the number first — *66% — Fit*, *133% — Actual* — and its
+  field sits on the corner's chip with no rule under it. **Fit** says the
+  percentage fitting *would* give you, not the one you are at. **Actual** under it shows the paper at its real size on this
+  screen. No browser says how big an inch of glass is, so it is worked out from
+  what the screen does report — its size and pixel ratio, which name the panel
+  for every Mac (in any of its scaled modes), iPad and iPhone the app knows,
+  and the commonest monitor for grids several share (marked as an estimate).
+  A screen it does not know gets the browser's own millimetre. Hover it to see
+  which it was. The other steps follow under a rule. The menu is drawn like the
+  template picker's, as are the font menus. On a phone the two left-hand toggles keep their row and lose
+  their words — a **#** for the grid, a **|** for the guides and a **B** for
+  the boxes, beside ticks
   that already say whether they are on — rather than stacking into a two-line
   panel that grew up over the sheet. What a screen reader is told does not
   change with the width.
@@ -1240,10 +1401,23 @@ thing itself.
   and over an arrow that has greyed out at the end of the run, and the card
   steps. Up and down still scroll.
 - **The table's own row** — under the table: what acts on the rows you have
-  chosen, behind a rule, then what acts on the whole table and its lock, and at
-  the far end the **Table** picker and the swap beside it.
-- **Images** — the third bar, in the same row: where pictures are kept, the
-  folder buttons, and a chip for every picture.
+  chosen, then at the far end the **Table** picker — whose menu holds paste,
+  import, export, new and delete — the swap beside it, and last the lock.
+- **Images** — a tray in the table's place, at the table's width on a wide
+  screen and its height on a phone, and only one of the two open at a time:
+  **Images** and **Data** in the window toolbar each close the other. At its
+  head *Images*, how many and how much they weigh; a line for every picture,
+  filling the height; and at its foot, where the table keeps its toolbar,
+  **Upload…** and **Choose Folder…**. On a phone its head is the grip that
+  shares the height with the page, as the table's header row is. Carry one onto an area to put it there, or onto the **page** between
+  areas for a new image area of its own, centred where it was let go, 40mm
+  across and in the picture's proportions; a picture file dragged in from
+  outside does the same. Every **Upload…** that takes a picture wears Carbon's
+  *image reference*, and every **URL…** its *copy link*. Deleting a picture
+  asks first — **Delete Image**, Escape to keep it — because undo keeps the
+  template and the table, not the bytes. A name something points at that this
+  browser has no picture for stays in the list as a dashed, red *missing* line,
+  with **Find…** to put a file back under that very name.
 - **The window toolbar** holds only what is about the whole app: the mark, then
   Help, Page Setup, Images, Data and Export — the two panels in the order they
   sit on screen, settings above the page and the table beside it. On a phone the
@@ -1252,7 +1426,7 @@ thing itself.
   mark in the middle, the four that act on what is on screen at the right.
 
 Every number says its unit: mm for geometry, bleed, spacing and gaps, pt for
-type size, modules for a QR padding.
+type size.
 
 ## Import and export
 
@@ -1295,6 +1469,9 @@ things you asked for by name:
   it, which is worth knowing before you open one from a stranger. The name is
   the only thing it controls: anything that is not a family name is refused
   rather than cleaned up. Upload a font file instead and nothing is requested.
+  Opening a font menu asks for every Google family it lists too, so each name
+  can be drawn in its own face — the first time, a stylesheet and the few
+  kilobytes of each face its name needs.
 - **A linked background image**, when a template names one. Only ever an
   http(s) address, never `data:` or anything else, and only the one the
   template names.

@@ -36,6 +36,7 @@ src/lib/
   boxops.ts       box and selection transforms: duplicate, delete, group, lock, nudge
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
   gestures.ts     swipe and press-and-hold, shared by the components that need them
+  complete.ts     the column names `{{` offers, in any field that holds text
   modal.ts        the two-Enter rule every dialog with a default action shares
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
@@ -45,7 +46,7 @@ src/lib/
   tile.ts         a drawing cropped to its ink, for an area that repeats
   table.ts        column reorder, row sorting
   imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
-  download.ts     hand the browser a file; the one copy both exports use
+  download.ts     hand the browser a file; zip.ts packs several into one
   template.ts     defaults, validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
   assets.ts       images — page backgrounds and a row's own; bytes in a folder or IndexedDB
@@ -69,7 +70,7 @@ src/lib/
     SheetLightbox.svelte  one sheet full screen; Lightbox's opposite number, on a different ground
     BitmapEditor.svelte  the drawing surface, full screen; writes a base64 PNG into the row
     ImagesPanel.svelte  what is stored, what it weighs, and the folder to keep it in instead
-    PrintPreview, PrintRoot, Lightbox, BoxMenu, SelectionTools, Icon
+    PrintPreview, PrintRoot, Lightbox, BoxMenu, SelectionTools, MenuSelect, ColorField, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   app state and wiring                             (~40k)
 src/routes/app.css        the :root tokens and app-wide rules
@@ -191,7 +192,10 @@ already have read the last version of. So: no bump until the PR exists, then
 - **Verify in a real browser, not just in tests.** Every feature here has been
   driven in headless Chromium — geometry read back in mm, PDFs counted page by
   page, dialogs opened and dismissed. Say what was actually checked, and say it
-  plainly; if something was not checked, say that too.
+  plainly; if something was not checked, say that too. Scripts and screenshots
+  from that driving go in a scratch directory outside the repository, never in
+  it: read `git status` before any `git add -A`, and commit nothing you did not
+  write on purpose.
 - **Read what the build emitted, not the config you wrote.** A config option
   that is silently dropped looks exactly like one that works. After a change to
   anything the toolchain rewrites — the service worker's precache list, the

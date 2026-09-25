@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, renderInline, renderMarkdown } from './markdown';
+import { escapeHtml, flagUnknown, renderInline, renderMarkdown } from './markdown';
+import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
 
 const render = (src: string) => renderMarkdown(src, { size: 12.5 });
 
@@ -109,8 +110,44 @@ describe('renderMarkdown paragraph style', () => {
 		expect(html).toContain('<p style="margin:0 0 1.5em">One</p>');
 	});
 
-	it('indents only a paragraph that follows another', () => {
+	it('indents every paragraph but the first, after a heading too', () => {
+		const html = renderMarkdown('## H\n\nOne', { size: 10, lineHeight: 1, paragraph: { mode: 'indent', amount: 1 } });
+		expect(html).toContain('<p style="margin:0;text-indent:1em">One</p>');
+	});
+
+	it('leaves the first paragraph flush, and indents in em whatever the leading', () => {
 		const html = renderMarkdown(two, { size: 10, lineHeight: 1.2, paragraph: { mode: 'indent', amount: 2 } });
-		expect(html).toBe('<p style="margin:0">One</p><p style="margin:0;text-indent:2.4em">Two</p>');
+		expect(html).toBe('<p style="margin:0">One</p><p style="margin:0;text-indent:2em">Two</p>');
+	});
+});
+
+describe('flagUnknown', () => {
+	const mark = (name: string) => `${UNKNOWN_OPEN}${name}${UNKNOWN_CLOSE}`;
+
+	it('underlines an unknown placeholder in text, escaped as it was', () => {
+		const html = renderMarkdown(`Hi **${mark('a<b')}**`, { size: 10 });
+		expect(flagUnknown(html)).toBe('<p style="margin:0 0 3mm">Hi <strong><span class="unknown-placeholder">{{a&lt;b}}</span></strong></p>');
+	});
+
+	it('never writes a span into an attribute', () => {
+		const html = `<a href="https://x.example/${mark('q')}">t</a>`;
+		expect(flagUnknown(html)).toBe('<a href="https://x.example/{{q}}">t</a>');
+	});
+});
+
+describe('list style', () => {
+	it('marks items with the chosen glyph and sets indent and spacing', () => {
+		const html = renderMarkdown('- a\n- b', { size: 10, lineHeight: 1.5, list: { marker: 'dash', indent: 3, spacing: 2 } });
+		expect(html).toContain('>–</span>');
+		// Indent in em, spacing in lines of the leading.
+		expect(html).toContain('padding:0 0 0 3em');
+		expect(html).toContain('margin:0 0 3em');
+		expect(renderMarkdown('- a', { size: 10 })).toContain('>•</span>');
+		expect(renderMarkdown('- a', { size: 10, list: { marker: 'disc' } })).toContain('>●</span>');
+	});
+
+	it('draws no marker, and no gap for one, when the marker is none', () => {
+		const html = renderMarkdown('- a', { size: 10, list: { marker: 'none' } });
+		expect(html).toContain('<li style="display:flex;align-items:baseline;gap:0;margin:0 0 0"><span style="flex:1;min-width:0">a</span></li>');
 	});
 });
