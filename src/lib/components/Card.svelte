@@ -25,7 +25,7 @@
 	import { flagUnknown, renderMarkdown } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
-	import { marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
+	import { baselineOf, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -39,6 +39,8 @@
 		loadingFonts?: string[];
 		/** snap drags to the 5mm subgrid rather than to sibling edges */
 		grid?: boolean;
+		/** draw the page margins, and snap to them */
+		guides?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
 		scale?: number;
 		interactive?: boolean;
@@ -108,6 +110,7 @@
 		bounds = false,
 		loadingFonts = [],
 		grid = false,
+		guides = false,
 		scale = 1,
 		interactive = false,
 		selectedIds = [],
@@ -456,6 +459,11 @@
 		if (box.italic) parts.push('font-style:italic');
 		if (box.textCase === 'uppercase') parts.push('text-transform:uppercase');
 		if (box.textCase === 'smallcaps') parts.push('font-variant-caps:small-caps');
+		// In points, worked out here: a custom property holding `em` resolves at
+		// each element that uses it, so a heading twice the size would have
+		// moved twice as far as the paragraph under it.
+		const baseline = baselineOf(box, template.defaults);
+		if (baseline) parts.push(`--baseline:${Math.round(-baseline * (box.size ?? template.defaults.size) * 1000) / 1000}pt`);
 		// Emitted whether or not there is any, because the selected-box padding
 		// guide reads these back and a missing custom property would fall to 0 and
 		// draw the guide exactly on top of the bounds.
@@ -849,13 +857,13 @@
 	}
 
 	/**
-	 * Snapping, strongest first: an enabled grid wins over everything else, and
-	 * otherwise a box latches onto a sibling's edge when it comes within
-	 * `SNAP_TOLERANCE`. Sibling edges come from the resolved layout, so a box
-	 * snaps to where a grown box really ends.
+	 * Snapping, strongest first: the page margins when the guides are on, then
+	 * an enabled grid, and otherwise a box latches onto a sibling's edge when it
+	 * comes within `SNAP_TOLERANCE`. Sibling edges come from the resolved
+	 * layout, so a box snaps to where a grown box really ends.
 	 *
-	 * There is no modifier to hold: the two toggles under the page are the whole
-	 * control. Grid off and Bounds off is free movement, because a box cannot
+	 * There is no modifier to hold: the toggles under the page are the whole
+	 * control. Grid, Guides and Boxes all off is free movement, because a box cannot
 	 * latch onto a guide that is not being drawn — a snap to an invisible edge is
 	 * indistinguishable from a bug.
 	 */
@@ -895,22 +903,22 @@
 		const edges = latch ? boxEdges(template.boxes, layout, drag.id) : { x: [], y: [] };
 		const latched = { x: null as number | null, y: null as number | null };
 
-		// With the grid on, the margins are guides too, and they win over a grid
-		// line within reach: a page whose margin is not a whole number of grid
+		// With the guides on, the margins win over a grid line or a sibling's
+		// edge within reach: a page whose margin is not a whole number of grid
 		// steps would otherwise have an edge nothing could be placed against.
 		const marginEdges = {
 			x: [margins.left, template.page.w - margins.right],
 			y: [margins.top, template.page.h - margins.bottom]
 		};
 		const place = (value: number, axis: 'x' | 'y'): number => {
-			if (grid) {
+			if (guides) {
 				const hit = snapToEdges(value, marginEdges[axis], SNAP_TOLERANCE);
 				if (hit !== null) {
 					latched[axis] = hit;
 					return hit;
 				}
-				return snapTo(value, GRID_MINOR);
 			}
+			if (grid) return snapTo(value, GRID_MINOR);
 			const hit = latch ? snapToEdges(value, edges[axis], SNAP_TOLERANCE) : null;
 			if (hit === null) return snapTo(value, FREE_STEP);
 			latched[axis] = hit;
@@ -1055,11 +1063,11 @@
 				next.h = Math.max(3, size(origin.h - dy));
 				break;
 		}
-		// The far edges against the margins too, with the grid on: a move whose
+		// The far edges against the margins too, with the guides on: a move whose
 		// right or bottom edge comes within reach of the margin puts it there,
 		// and so does a handle dragging that edge. Only the edge being moved —
 		// a box is never stretched to reach a guide it was not heading for.
-		if (grid) {
+		if (guides) {
 			const nearTo = (a: number, b: number) => Math.abs(a - b) < SNAP_TOLERANCE;
 			const [, right] = marginEdges.x;
 			const [, bottom] = marginEdges.y;
@@ -1278,6 +1286,57 @@
 		flashTimer = setTimeout(() => (flashedBadge = null), 900);
 	}
 
+	/**
+	 * The threads a hovered tie or mooring badge draws to its other end — the
+	 * badge on the area it is tied to, or on each area moored to it. They stand
+	 * in for an arrow nobody would read: pointing at a tie shows what it ties,
+	 * wherever on the card that is.
+	 *
+	 * Measured off the badges as drawn rather than worked out from the boxes'
+	 * millimetres: a badge is a fixed number of screen pixels off a box that
+	 * may be turned, mirrored and grown, and the DOM already knows where all of
+	 * that put it. Divided back by the zoom into the trim's own pixels, so the
+	 * overlay sits inside the card's transform like everything else on it.
+	 */
+	let trimEl = $state<HTMLElement | null>(null);
+	let threads = $state<string[]>([]);
+
+	function showThreads(from: HTMLElement, box: Box) {
+		if (!trimEl) return;
+		const ends =
+			box.anchor
+				? [trimEl.querySelector<HTMLElement>(`[data-moor="${CSS.escape(box.anchor.to)}"]`) ??
+						trimEl.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(box.anchor.to)}"]`)]
+				: template.boxes
+						.filter((b) => b.anchor?.to === box.id)
+						.map(
+							(b) =>
+								trimEl!.querySelector<HTMLElement>(`[data-tie="${CSS.escape(b.id)}"]`) ??
+								trimEl!.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(b.id)}"]`)
+						);
+		const origin = trimEl.getBoundingClientRect();
+		const at = (el: HTMLElement) => {
+			const r = el.getBoundingClientRect();
+			return { x: (r.left + r.width / 2 - origin.left) / scale, y: (r.top + r.height / 2 - origin.top) / scale };
+		};
+		const a = at(from);
+		threads = ends
+			.filter((el): el is HTMLElement => !!el)
+			.map((el) => {
+				const b = at(el);
+				// An S: level at both ends, turning across the middle, and sagging
+				// a little under its own weight the longer it is — a thread, not a
+				// connector in a diagram.
+				const mid = (a.x + b.x) / 2;
+				const sag = Math.hypot(b.x - a.x, b.y - a.y) * 0.15;
+				return `M${a.x} ${a.y}C${mid} ${a.y + sag} ${mid} ${b.y + sag} ${b.x} ${b.y}`;
+			});
+	}
+
+	/** Whether the column of badges hangs off this box's right-hand edge. */
+	const hasBadges = (box: Box) =>
+		bounds && !template.locked && !!(box.locked || isStatic(box) || pictureKind(box) || anchorTargets.has(box.id));
+
 	/** Cast off: every box moored to this one keeps its place and loses the tie. */
 	function releaseDependents(box: Box) {
 		const moored = dependentsOf(box.id).filter((b) => b.anchor?.to === box.id && !b.locked);
@@ -1350,8 +1409,15 @@
 	 * would hand back markup nobody asked for. It inherits everything from the
 	 * box it sits in, so what you type is set the way it will print.
 	 */
+	/**
+	 * Not `editable`: a locked page is a locked *design* — nothing moves,
+	 * nothing is restyled — and the words in an area are the content the design
+	 * holds, which a lock on the layout was never meant to freeze. An area's own
+	 * lock still refuses it; a locked table still refuses a typed cell, where
+	 * the page writes it.
+	 */
 	const canEdit = (box: Box) =>
-		editable(box) && (box.mode === 'plain' || box.mode === 'markdown');
+		interactive && !box.locked && (box.mode === 'plain' || box.mode === 'markdown');
 
 	function beginEdit(box: Box) {
 		// A picture is the one thing not edited in place: an area on a card is
@@ -1388,6 +1454,31 @@
      between these tags would be drawn. -->
 {#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.unknown}<span class="unknown-placeholder" title="No column called this in the table">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
 
+<!-- The shears, which are also the switch between cutting and growing. Red and
+     astride the cut on an area that is cutting its words off, where pressing
+     lets it grow; blue and faint beside the trim line on one that has grown,
+     where pressing cuts it back to the height it was given. -->
+{#snippet shears(box: Box, cutting: boolean)}
+	<button
+		class="overflow-mark"
+		class:offered={!cutting}
+		class:beside={hasBadges(box)}
+		style={cutting ? '' : `top:${box.h}mm`}
+		disabled={!editable(box)}
+		title={cutting
+			? 'The content does not fit — this area is cutting off what will print. Press to let it grow instead.'
+			: 'This area has grown past the height it was given. Press to cut it at that height instead.'}
+		aria-label={cutting ? 'Let this area grow to fit' : 'Cut this area at its height'}
+		onpointerdown={(e) => e.stopPropagation()}
+		onclick={() => {
+			onaction?.(cutting ? 'Let the area grow' : 'Cut the area at its height');
+			onchange?.({ ...box, overflow: cutting ? 'grow' : 'clip' });
+		}}
+	>
+		<Icon name="cut" size={11} />
+	</button>
+{/snippet}
+
 <div
 	class="card"
 	class:editing={interactive}
@@ -1395,7 +1486,7 @@
 	style={cardStyle()}
 	lang="en"
 >
-	<div class="trim" style="width:{template.page.w}mm;height:{template.page.h}mm">
+	<div class="trim" bind:this={trimEl} style="width:{template.page.w}mm;height:{template.page.h}mm">
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
 			{@html styleTag(customCss)}
@@ -1467,7 +1558,11 @@
 						{/each}
 					</svg>
 				{/if}
-				<div class="content" class:being-edited={editingId === box.id}>
+				<div
+					class="content"
+					class:being-edited={editingId === box.id}
+					class:shifted={!!baselineOf(box, template.defaults) && (box.mode === 'plain' || box.mode === 'markdown')}
+				>
 					{#if placeholderFor(box)}
 						<span class="placeholder">{placeholderFor(box)}</span>
 					{:else if box.mode === 'markdown'}
@@ -1476,7 +1571,8 @@
 							size: box.size ?? template.defaults.size,
 							md: box.md,
 							paragraph: paragraphOf(box),
-							lineHeight: box.lineHeight ?? template.defaults.lineHeight
+							lineHeight: box.lineHeight ?? template.defaults.lineHeight,
+							list: listOf(box, template.defaults)
 						}))}
 					{:else if box.mode === 'qr'}
 						<span class="media" style="height:{mediaHeight(box)}">
@@ -1546,7 +1642,9 @@
 				     1.33px inside a 75% card was drawn at 1px and one asked for at
 				     0.5px inside a 200% card was drawn at 2px. An SVG stroke is not
 				     rounded, so var(--line) lands exactly whatever the zoom. -->
-				{#if bounds && !empty}
+				<!-- Not on a selected area: the selection is its outline, and a dashed
+				     bound drawn under a solid one doubled every edge. -->
+				{#if bounds && !empty && !(interactive && isSelected(box))}
 					<svg class="chrome bounds" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 				{/if}
 				{#if interactive && isSelected(box)}
@@ -1558,16 +1656,18 @@
 				{/if}
 
 				{#if bounds && !empty && box.overflow === 'grow' && (layout.heights[box.id] ?? box.h) > box.h + 0.05}
-					<!-- The height the area was given, where its content has grown it
-					     past that: a sparse dash in the bound's own color and weight,
-					     so it reads as the same outline, remembered. -->
+					<!-- The trim line: the height the area was given, where its content
+					     has grown it past that. Sparser than the bound, so it is not
+					     taken for one, and with the shears beside it in blue — the cut
+					     this area *could* make, offered rather than made. -->
 					<svg class="chrome original-edge" aria-hidden="true" style="top:{box.h}mm">
 						<line x1="0" y1="0" x2="100%" y2="0" />
 					</svg>
+					{@render shears(box, false)}
 				{/if}
 
 				<!-- The cut is a clipped area's alone: a growing one is never cut —
-				     it has the dashed line above where a clip would fall instead. -->
+				     it has the trim line above instead. -->
 				{#if bounds && !empty && box.overflow === 'clip' && overflowing[box.id]}
 					<!-- Where the words are actually severed, drawn as the cut it is: a
 					     dashed red line along the bottom edge, with the shears straddling
@@ -1577,9 +1677,7 @@
 					<svg class="chrome cut-line" aria-hidden="true">
 						<line x1="0" y1="100%" x2="100%" y2="100%" />
 					</svg>
-					<span class="overflow-mark" title="The content does not fit — this area is cutting off what will print">
-						<Icon name="cut" size={11} />
-					</span>
+					{@render shears(box, true)}
 				{/if}
 
 				<!-- Every badge here says why *this* area will not do what you might
@@ -1590,15 +1688,13 @@
 				     not one of these: it is about what will print, which a lock does
 				     not change. -->
 				{#if bounds && !template.locked && box.anchor}
-					<!-- The tie sits at the *bottom* corner, on its own.
-					     Two reasons, and they agree. The column at the top corner is the
-					     one every other badge is in, and on a shallow area four of them
-					     are taller than the area itself; and the tie is the badge an area
-					     is most often carrying, so moving it halves that column in the
-					     common case. It stacks up from the bottom edge, clearing the
-					     shears when this area is also cutting its words off — two marks
-					     on one corner would otherwise land on top of each other. -->
-					<span class="badges foot" class:clears-cut={!empty && box.overflow === 'clip' && overflowing[box.id]}>
+					<!-- The tie sits at the top-left corner, on its own, outside the
+					     left edge. Off the right-hand column because on a shallow area
+					     four badges are taller than the area itself, and the tie is the
+					     badge an area most often carries; at the top because the top is
+					     the edge that is tied — and it used to sit at the bottom, where
+					     on an area shorter than the badge it rose over the top line. -->
+					<span class="badges tie">
 						<button
 							class="badge action"
 							class:lit={litFollowers.has(box.id)}
@@ -1607,9 +1703,17 @@
 							title="Tied to another area — its top follows that area's bottom. Press to break the tie and leave this area where it is."
 							aria-label="Break this area's anchor"
 							onpointerdown={(e) => e.stopPropagation()}
-							onpointerenter={() => (hoveredBadge = `${box.id}:tied`)}
-							onpointerleave={() => (hoveredBadge = null)}
+							data-tie={box.id}
+							onpointerenter={(e) => {
+								hoveredBadge = `${box.id}:tied`;
+								showThreads(e.currentTarget, box);
+							}}
+							onpointerleave={() => {
+								hoveredBadge = null;
+								threads = [];
+							}}
 							onclick={() => {
+								threads = [];
 								flashBadge(`${box.id}:tied`);
 								breakAnchor(box);
 							}}
@@ -1619,7 +1723,7 @@
 					</span>
 				{/if}
 
-				{#if bounds && !template.locked && (box.locked || isStatic(box) || pictureKind(box) || anchorTargets.has(box.id))}
+				{#if hasBadges(box)}
 					<!-- Why the box will not do what you might ask of it, stacked at its
 					     corner. All but the plug are buttons — the reason and the way out
 					     of it in the same 13 pixels — and each swaps to the icon of the
@@ -1660,9 +1764,17 @@
 								title="Other areas are moored to this one — moving it moves them too. Press to cast them off and leave them where they are."
 								aria-label="Cast off the areas anchored to this one"
 								onpointerdown={(e) => e.stopPropagation()}
-								onpointerenter={() => (hoveredBadge = `${box.id}:moored`)}
-								onpointerleave={() => (hoveredBadge = null)}
+								data-moor={box.id}
+								onpointerenter={(e) => {
+									hoveredBadge = `${box.id}:moored`;
+									showThreads(e.currentTarget, box);
+								}}
+								onpointerleave={() => {
+									hoveredBadge = null;
+									threads = [];
+								}}
 								onclick={() => {
+									threads = [];
 									flashBadge(`${box.id}:moored`);
 									releaseDependents(box);
 								}}
@@ -1711,7 +1823,9 @@
 							onpointerup={endDrag}
 							onpointercancel={endDrag}
 							role="presentation"
-						></span>
+						><svg class="pivot-mark" viewBox="0 0 15 15" aria-hidden="true"
+								><path d="M0 7.5H15M7.5 0V15" /><circle cx="7.5" cy="7.5" r="4" /></svg
+							></span>
 						<span
 							class="lever"
 							use:hold={() => resetRotation(box)}
@@ -1738,10 +1852,10 @@
 			</div>
 		{/each}
 
-		{#if interactive && grid}
-			<!-- The page margins, as a guide: with the grid, because it is the same
-			     kind of thing — lines to place against, and to snap to — and a
-			     page's frame drawn while nothing is being lined up is clutter. -->
+		{#if interactive && guides}
+			<!-- The page margins, as a guide, on a toggle of their own beside the
+			     grid's: lines to place against and to snap to, which a page may
+			     want without a grid over the whole of it. -->
 			{@const m = drawnMargins}
 			<div
 				class="margin-guide"
@@ -1760,6 +1874,12 @@
 					<span class="of" aria-hidden="true"></span><span class="of-total">{pageCount}</span>
 				{/if}
 			</div>
+		{/if}
+
+		{#if threads.length}
+			<svg class="chrome threads" aria-hidden="true">
+				{#each threads as d, i (i)}<path {d} />{/each}
+			</svg>
 		{/if}
 
 		{#if guide.x !== null}
@@ -1864,6 +1984,15 @@
 	.box.clipped > .content {
 		overflow: hidden;
 		min-height: 0;
+	}
+
+	/* Moved on the children, not on .content: a clipped area clips at
+	   .content's edge, and moving .content would have moved the cut with it.
+	   Relative, so nothing is measured differently — the area is as tall as
+	   it was and whatever is anchored under it stays where it was. */
+	.content.shifted > :global(*) {
+		position: relative;
+		top: var(--baseline, 0);
 	}
 
 	.plain {
@@ -2024,7 +2153,11 @@
 		   is that the outline is all there is to see, so it carries the weight on
 		   a dark background image where a white square used to stand out. */
 		background: transparent;
-		border: calc(1px * var(--ui-scale, 1)) solid #2563eb;
+		/* An inset shadow, not a border: a border is rounded to whole pixels of
+		   the card's zoomed frame, so at 200% a half-pixel border came out two
+		   screen pixels thick. A shadow keeps the fraction. */
+		border: none;
+		box-shadow: inset 0 0 0 var(--line, 1px) #2563eb;
 		border-radius: var(--radius-button);
 		box-sizing: border-box;
 		z-index: 3;
@@ -2050,32 +2183,10 @@
 	   turns about; turning is the lever. */
 	.pivot {
 		--mark: calc(15px * var(--ui-scale, 1));
-		/* The ring sits inside the arms, so the cross reads through it. */
-		--ring: calc(4.5px * var(--ui-scale, 1));
 		margin: calc(var(--mark) / -2) 0 0 calc(var(--mark) / -2);
 		border: none;
 		border-radius: 0;
 		box-shadow: none;
-		/* Two crossed bars, as background gradients. A gradient honours a
-		   sub-pixel width where a border is rounded to whole device pixels, so the
-		   arms come out the same weight as every other line on the card at any
-		   zoom, straight off --line — and it costs no element, which matters
-		   because ::before is the hit target. */
-		background-image:
-			linear-gradient(#2563eb, #2563eb),
-			linear-gradient(#2563eb, #2563eb),
-			radial-gradient(
-				circle at center,
-				transparent calc(var(--ring) - var(--line)),
-				#2563eb calc(var(--ring) - var(--line)) var(--ring),
-				transparent var(--ring)
-			);
-		background-size:
-			100% var(--line),
-			var(--line) 100%,
-			100% 100%;
-		background-position: center;
-		background-repeat: no-repeat;
 		cursor: move;
 	}
 
@@ -2103,17 +2214,38 @@
 		cursor: grabbing;
 	}
 
+	/* Drawn as one SVG scaled whole with the mark, rather than as gradients.
+	   Gradients with hard stops a fraction of a pixel apart — the arms and the
+	   ring were each one --line wide, in the card's own zoomed pixels — are
+	   rounded differently at every zoom, so the ring came out a different
+	   thickness and shape at 50% than at 200%. A viewBox is 15 units across
+	   whatever the zoom, and a stroke of one unit is one screen pixel. */
+	.pivot-mark {
+		display: block;
+		width: 100%;
+		height: 100%;
+		overflow: visible;
+		pointer-events: none;
+		fill: none;
+		stroke: #2563eb;
+		stroke-width: 1;
+	}
+
 	/* The arm is drawn, not grabbed. It runs from the knob back to the pivot, so
 	   leaving it hit-testable put a lever-shaped hole over the pivot and the point
 	   the box turns about could never be picked up. */
 	.lever::after {
 		content: '';
 		position: absolute;
-		top: calc(50% - var(--line, 1px) / 2);
+		top: calc(50% - 1.5 * var(--line, 1px));
 		right: 100%;
-		height: var(--line, 1px);
+		/* A gradient in a taller box, not a box one --line high: a box's edges
+		   are snapped to whole pixels of the card's own zoomed frame, so at 200%
+		   a half-pixel box painted two screen pixels thick. A gradient keeps the
+		   fraction. */
+		height: calc(3 * var(--line, 1px));
 		width: var(--arm);
-		background: #2563eb;
+		background: linear-gradient(#2563eb, #2563eb) center / 100% var(--line, 1px) no-repeat;
 		pointer-events: none;
 	}
 
@@ -2363,14 +2495,19 @@
 			height: var(--line);
 		}
 
-		/* Where a clip would have cut, on an area that grows instead: thin and
-		   dashed in the bounds' own rhythm, so it reads as the outline the area
-		   was given — not the red cut, and with no shears, because nothing here
-		   is cut. */
+		/* Where a clip would have cut, on an area that grows instead: thin, in the
+		   bounds' own color, but with more than twice the gap between dashes —
+		   the outline the area was given, and plainly not one of its edges. */
 		.original-edge line {
 			stroke: var(--bounds-color, rgba(37, 99, 235, 0.45));
 			stroke-width: var(--line);
-			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
+			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 7);
+		}
+
+		/* On a selected area the bound is not drawn — the selection is — but the
+		   trim line still is, in the selection's blue so it belongs to it. */
+		.box.selected .original-edge line {
+			stroke: #2563eb;
 		}
 
 		/* The line the words are cut on: dashed, the way a cut line is drawn on
@@ -2401,14 +2538,41 @@
 			height: var(--badge);
 			box-sizing: border-box;
 			border-radius: var(--radius-button);
-			border: var(--line) solid #b42318;
+			border: none;
+			box-shadow: inset 0 0 0 var(--line) #b42318;
 			background: transparent;
 			color: #b42318;
-			/* Hoverable, like the badges: its title is the only thing that says what
-			   the mark means, and pointer-events: none meant it never showed. */
+			padding: 0;
+			font: inherit;
 			pointer-events: auto;
-			cursor: help;
+			cursor: pointer;
 			z-index: 3;
+		}
+
+		/* The cut not made: the same shears in a faint blue, the way a control
+		   that is off is drawn, beside the trim line of an area that has grown. */
+		.overflow-mark.offered {
+			box-shadow: inset 0 0 0 var(--line) rgba(37, 99, 235, 0.45);
+			color: rgba(37, 99, 235, 0.6);
+		}
+
+		/* Out past the badge column where there is one: on a shallow area the
+		   column is taller than the area, and the shears landed under it. */
+		.overflow-mark.beside {
+			margin-left: calc(var(--badge) + 8px * var(--ui-scale, 1));
+		}
+
+		.overflow-mark:hover:not(:disabled) {
+			background: #fff;
+		}
+
+		.overflow-mark.offered:hover:not(:disabled) {
+			box-shadow: inset 0 0 0 var(--line) #2563eb;
+			color: #2563eb;
+		}
+
+		.overflow-mark:disabled {
+			cursor: help;
 		}
 
 		/* Clear of the box, not straddling it: a badge sitting on the corner
@@ -2429,18 +2593,12 @@
 			pointer-events: none;
 		}
 
-		/* The tie, at the other end of the same edge: stacked up from the bottom
-		   rather than down from the top, so it stays put as the area grows. */
-		.badges.foot {
-			top: auto;
-			bottom: 0;
-			flex-direction: column-reverse;
-		}
-
-		/* The shears straddle the bottom edge — half of their 13 above it — so
-		   the tie clears them by their own half-height and a hair. */
-		.badges.foot.clears-cut {
-			bottom: calc(8px * var(--ui-scale, 1));
+		/* The tie, on its own at the top-left: the mirror of the column above,
+		   hanging off the left edge at the top. */
+		.badges.tie {
+			left: auto;
+			right: 100%;
+			margin: 0 calc(4px * var(--ui-scale, 1)) 0 0;
 		}
 
 		/* Quieter than the blue chrome around it. A badge is an annotation, not a
@@ -2456,14 +2614,19 @@
 			box-sizing: border-box;
 			border-radius: var(--radius-button);
 			background: #fff;
-			border: var(--line) solid #c4c4c4;
+			/* The edge is an inset shadow, like the handles', and for the same
+			   reason: a border is rounded to whole pixels of the zoomed card, and
+			   came out twice as heavy at 200%. */
+			--edge: #c4c4c4;
+			border: none;
+			box-shadow: inset 0 0 0 var(--line) var(--edge);
 			color: #767676;
 			pointer-events: auto;
 			cursor: help;
 		}
 
 		.badge:hover {
-			border-color: #767676;
+			--edge: #767676;
 			color: #333;
 		}
 
@@ -2473,7 +2636,7 @@
 		   which matters most when several areas are close enough for their badges
 		   to be nearer a neighbour's edge than their own. */
 		.box.selected .badge {
-			border-color: var(--bounds-color, #2563eb);
+			--edge: var(--bounds-color, #2563eb);
 			color: var(--bounds-color, #2563eb);
 		}
 
@@ -2555,15 +2718,51 @@
 			height: calc(var(--badge) * 0.7);
 		}
 
+		/* Over the whole trim and out past it, since a badge hangs outside its
+		   area and an area can hang off the page. Dotted — round caps on dashes
+		   of nothing — and walking from the badge under the pointer toward the
+		   other end. */
+		.threads {
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			overflow: visible;
+			z-index: 6;
+		}
+
+		.threads path {
+			fill: none;
+			stroke: #2563eb;
+			stroke-width: calc(2 * var(--line));
+			stroke-linecap: round;
+			stroke-dasharray: 0 calc(5 * var(--line));
+		}
+
+		@media (prefers-reduced-motion: no-preference) {
+			.threads path {
+				animation: walk 600ms linear infinite;
+			}
+		}
+
+		@keyframes walk {
+			to {
+				stroke-dashoffset: calc(-10 * var(--line));
+			}
+		}
+
+		/* Three lines wide with the line drawn down the middle of it, rather than
+		   a box one line wide: a box is rounded to whole pixels of the zoomed
+		   card, so a guide was twice the weight of the bounds at 200%. The margin
+		   centres the drawn line where the box's own edge used to be. */
 		.guide {
 			position: absolute;
-			background: #ec4899;
+			background: linear-gradient(#ec4899, #ec4899) center / 100% 100% no-repeat;
 			pointer-events: none;
 			z-index: 4;
 		}
 
-		.guide.vertical { top: 0; bottom: 0; width: var(--line); }
-		.guide.horizontal { left: 0; right: 0; height: var(--line); }
+		.guide.vertical { top: 0; bottom: 0; width: calc(3 * var(--line)); margin-left: calc(-1 * var(--line)); background-size: var(--line) 100%; }
+		.guide.horizontal { left: 0; right: 0; height: calc(3 * var(--line)); margin-top: calc(-1 * var(--line)); background-size: 100% var(--line); }
 	}
 
 	/* The overlays are conditional on `bounds` and on being interactive, neither

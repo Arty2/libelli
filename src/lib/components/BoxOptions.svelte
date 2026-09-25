@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { DEFAULT_MD } from '$lib/markdown';
 	import './options-bar.css';
 	import { cssIdent } from '$lib/css';
 	import { completePlaceholders } from '$lib/complete';
@@ -10,6 +11,13 @@
 		BORDER_STYLES,
 		DEFAULT_QR,
 		MAX_PARAGRAPH,
+		MAX_BASELINE,
+		MAX_LIST,
+		LIST_MARKER_LABELS,
+		LIST_MARKERS,
+		baselineOf,
+		normaliseBaseline,
+		normaliseList,
 		MIN_BOX,
 		MIN_LEADING,
 		MIN_SIZE,
@@ -104,7 +112,7 @@
 	 * that is in neither list. Each name in its own face.
 	 */
 	const fontItems = $derived.by((): MenuItem[] => [
-		{ value: '', label: `Default — ${template.defaults.font}`, family: template.defaults.font },
+		{ value: '', label: `Default — ${template.defaults.font}` },
 		...families.used.map((family) => ({ value: family, label: family, family })),
 		{ rule: true },
 		...families.others.map((family) => ({ value: family, label: family, family })),
@@ -309,6 +317,14 @@
 		const value = Math.max(0, Math.min(MAX_PARAGRAPH, amount ?? selected?.paragraph?.amount ?? inheritedAmount));
 		patch({ paragraph: { mode, amount: value } });
 	}
+
+	/** The area's own list style, field by field; a blank field takes the page's. */
+	function setList(change: Record<string, unknown>) {
+		patch({ list: normaliseList({ ...selected?.list, ...change }) });
+	}
+
+	/** Whether the page's baseline reaches this area — only in the page's own face. */
+	const pageBaselineApplies = $derived((selected?.font ?? template.defaults.font) === template.defaults.font);
 
 	function setFont(value: string) {
 		if (value === '') {
@@ -795,6 +811,74 @@
 						onchange={(e) => setParagraph(selected.paragraph!.mode, numeric(e, selected.paragraph!.amount))}
 					/>
 					<span class="unit">lines</span>
+				</label>
+			{/if}
+			{#if selected.mode === 'plain' || selected.mode === 'markdown'}
+				<label class="field">
+					<span>Baseline</span>
+					<input
+						class="n-3"
+						type="number"
+						step="0.01"
+						min={-MAX_BASELINE}
+						max={MAX_BASELINE}
+						placeholder={String(baselineOf({ font: selected.font }, template.defaults))}
+						title={pageBaselineApplies
+							? 'Raise the text by this much of its size, or lower it below 0. Blank takes the page\'s'
+							: 'Raise the text by this much of its size, or lower it below 0. The page\'s is for its own font, so an area in another starts at 0'}
+						value={selected.baseline ?? ''}
+						disabled={boxFrozen}
+						onchange={(e) => patch({ baseline: normaliseBaseline(e.currentTarget.value) })}
+					/>
+					<span class="unit">em</span>
+				</label>
+			{/if}
+			{#if selected.mode === 'markdown'}
+				<label class="field">
+					<span>List</span>
+					<select
+						value={selected.list?.marker ?? ''}
+						title="What each item of a list is marked with"
+						disabled={boxFrozen}
+						onchange={(e) => setList({ marker: e.currentTarget.value || undefined })}
+					>
+						<option value="">Default — {LIST_MARKER_LABELS[template.defaults.list?.marker ?? 'bullet']}</option>
+						{#each LIST_MARKERS as marker (marker)}
+							<option value={marker}>{LIST_MARKER_LABELS[marker]}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="field">
+					<span>List Indent</span>
+					<input
+						class="n-2"
+						type="number"
+						step="0.5"
+						min="0"
+						max={MAX_LIST}
+						placeholder={String(template.defaults.list?.indent ?? DEFAULT_MD.list.indent)}
+						title="From the area's edge to a list's markers; blank takes the page's"
+						value={selected.list?.indent ?? ''}
+						disabled={boxFrozen}
+						onchange={(e) => setList({ indent: e.currentTarget.value })}
+					/>
+					<span class="unit">mm</span>
+				</label>
+				<label class="field">
+					<span>List Spacing</span>
+					<input
+						class="n-2"
+						type="number"
+						step="0.5"
+						min="0"
+						max={MAX_LIST}
+						placeholder={String(template.defaults.list?.spacing ?? DEFAULT_MD.list.itemSpacing)}
+						title="Between one list item and the next; blank takes the page's"
+						value={selected.list?.spacing ?? ''}
+						disabled={boxFrozen}
+						onchange={(e) => setList({ spacing: e.currentTarget.value })}
+					/>
+					<span class="unit">mm</span>
 				</label>
 			{/if}
 			<label class="field">

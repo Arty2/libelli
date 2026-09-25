@@ -214,6 +214,22 @@ export interface ParagraphStyle {
 	amount: number;
 }
 
+/** What a Markdown bullet list is marked with: `•`, `●` or `–`. */
+export type ListMarker = 'bullet' | 'disc' | 'dash';
+
+/**
+ * How a Markdown list is set. Each field on its own: an area can take the
+ * page's marker and change only its indent. Both lengths are mm, like every
+ * other space in the format.
+ */
+export interface ListStyle {
+	marker?: ListMarker;
+	/** mm from the area's edge to the marker */
+	indent?: number;
+	/** mm between one item and the next */
+	spacing?: number;
+}
+
 export interface TextStyle {
 	font?: string;
 	/** points */
@@ -228,12 +244,21 @@ export interface TextStyle {
 	letterSpacing?: number;
 	/** absent inherits the page's; absent there too is each renderer's own */
 	paragraph?: ParagraphStyle;
+	/** absent inherits the page's, field by field; Markdown areas only */
+	list?: ListStyle;
+	/**
+	 * Em of the area's size to raise the text by, below 0 to lower it: a face
+	 * that sits high or low on its line is set straight here. The page's
+	 * applies only to areas in the page's face — it corrects a font, and a
+	 * correction for one face is wrong for any other.
+	 */
+	baseline?: number;
 }
 
 export type Defaults = Required<
 	Pick<TextStyle, 'font' | 'size' | 'lineHeight' | 'weight' | 'color' | 'align' | 'letterSpacing'>
 > &
-	Pick<TextStyle, 'paragraph'>;
+	Pick<TextStyle, 'paragraph' | 'list' | 'baseline'>;
 
 /** Markdown block metrics. `size` values are multipliers of the box size; every spacing is mm. */
 export interface MarkdownStyle {
@@ -414,6 +439,8 @@ export interface UiState {
 	/** dashed box bounds and the trim edge; screen furniture, never printed */
 	showBounds: boolean;
 	showGrid: boolean;
+	/** the page margins, drawn and snapped to; screen furniture, never printed */
+	showGuides: boolean;
 	/** how the grid draws itself: ruled lines, or a dot at every intersection */
 	gridStyle: GridStyle;
 	/**

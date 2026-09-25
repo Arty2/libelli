@@ -13,6 +13,8 @@ import type {
 	Centre,
 	Defaults,
 	FontRef,
+	ListMarker,
+	ListStyle,
 	Mapping,
 	PageBackgroundImage,
 	PageNumberPosition,
@@ -132,6 +134,58 @@ export function normaliseParagraph(raw: unknown): ParagraphStyle | undefined {
 	if (!Number.isFinite(n)) return undefined;
 	return { mode, amount: Math.round(Math.max(0, Math.min(MAX_PARAGRAPH, n)) * 100) / 100 };
 }
+
+export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'dash'];
+
+/** Said with the glyph, since the glyph is the choice. */
+export const LIST_MARKER_LABELS: Record<ListMarker, string> = { bullet: '• Bullet', disc: '● Disc', dash: '– Dash' };
+
+/** How far a list may be indented, or its items spaced, in mm. */
+export const MAX_LIST = 50;
+
+/** How far the baseline may move, in em: past a line either way is no correction. */
+export const MAX_BASELINE = 1;
+
+/** A list style with only the fields that make sense; none of them, nothing. */
+export function normaliseList(raw: unknown): ListStyle | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const { marker, indent, spacing } = raw as Record<string, unknown>;
+	const length = (v: unknown) => {
+		if (v === undefined || v === null || v === '') return undefined;
+		const n = Number(v);
+		return Number.isFinite(n) ? Math.round(Math.max(0, Math.min(MAX_LIST, n)) * 100) / 100 : undefined;
+	};
+	const list = stripUndefined({
+		marker: LIST_MARKERS.includes(marker as ListMarker) ? (marker as ListMarker) : undefined,
+		indent: length(indent),
+		spacing: length(spacing)
+	});
+	return Object.keys(list).length ? list : undefined;
+}
+
+/** A baseline shift in em, negative allowed; zero is no shift and is dropped. */
+export function normaliseBaseline(raw: unknown): number | undefined {
+	if (raw === undefined || raw === null || raw === '') return undefined;
+	const n = Number(raw);
+	if (!Number.isFinite(n)) return undefined;
+	const v = Math.round(Math.max(-MAX_BASELINE, Math.min(MAX_BASELINE, n)) * 1000) / 1000;
+	return v === 0 ? undefined : v;
+}
+
+/**
+ * The baseline shift an area is set with. Its own, when it has one; the
+ * page's only when the area is in the page's face, because the page's is a
+ * correction for that face — carried onto another it would move text that
+ * sat right to begin with.
+ */
+export function baselineOf(box: Pick<Box, 'font' | 'baseline'>, defaults: Defaults): number {
+	if (box.baseline !== undefined) return box.baseline;
+	return (box.font ?? defaults.font) === defaults.font ? (defaults.baseline ?? 0) : 0;
+}
+
+/** An area's list style: its own fields over the page's, field by field. */
+export const listOf = (box: Pick<Box, 'list'>, defaults: Defaults): ListStyle | undefined =>
+	box.list || defaults.list ? { ...defaults.list, ...box.list } : undefined;
 
 /**
  * An anchor with a gap that is a number. The gap may be negative — an area
@@ -253,6 +307,8 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			weight: partial.weight === undefined ? undefined : Math.max(100, Math.min(900, num(partial.weight, 400))),
 			lineHeight: optionalAtLeast(partial.lineHeight, MIN_LEADING),
 			paragraph: normaliseParagraph(partial.paragraph),
+			list: normaliseList(partial.list),
+			baseline: normaliseBaseline(partial.baseline),
 			// Every color on a box goes through the parser before it can reach a
 			// style attribute; one that is not recognised is dropped rather than
 			// guessed at, the same rule the markdown renderer follows.
@@ -337,7 +393,9 @@ export function normaliseTemplate(raw: unknown): Template {
 			color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color,
 			size: atLeast(t.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
 			lineHeight: atLeast(t.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
-			paragraph: normaliseParagraph(t.defaults?.paragraph)
+			paragraph: normaliseParagraph(t.defaults?.paragraph),
+			list: normaliseList(t.defaults?.list),
+			baseline: normaliseBaseline(t.defaults?.baseline)
 		}) as Defaults,
 		slots,
 		boxes,

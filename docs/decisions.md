@@ -797,9 +797,10 @@ while `--reach` grows by the same amount, so the target stays 48px for a handle
 and 44px for the pivot. That separation is the point of the `::before`: what you
 see and what you can hit are set independently.
 
-**Snapping is the two view toggles, not a modifier.** The grid beats sibling
-edges, sibling edges beat plain `FREE_STEP` rounding, and there is no key to
-hold: Grid off and Bounds off is free movement, because a box must never latch
+**Snapping is the view toggles, not a modifier.** The margins (with Guides)
+beat the grid, the grid beats sibling edges, sibling edges beat plain
+`FREE_STEP` rounding, and there is no key to hold: all three off is free
+movement, because a box must never latch
 onto a guide that is not being drawn — a snap to an invisible edge reads as a
 bug. An anchored box always snaps its `gap`, never its `y`.
 
@@ -818,6 +819,17 @@ cut line is drawn on anything meant to be cut, and in the same rhythm as the
 bound it sits on so the two are one language. The other three edges are left
 alone: only one of them is doing the cutting, and saying so on all four would
 say nothing.
+
+**The shears are a switch.** Red astride the cut, a press lets the area grow;
+on an area that has grown, a faint blue pair beside the trim line — its given
+height, drawn sparser than a bound so it is not read as an edge — clips it back
+at that height. The cut and the offer are the same glyph in the two states a
+toggle is drawn in, and both sit a column further out when the area has
+badges, which on a shallow area came down over them.
+
+**A selected area has one outline.** The selection is drawn and the dashed
+bound is not: two lines on every edge said nothing the one did not. The trim
+line stays, in the selection's blue.
 
 The badge is hollow — red on nothing, where every other mark here is a filled
 chip. A solid red square at the corner was the heaviest thing on a card whose
@@ -947,12 +959,20 @@ step further away" where a second color would say "a different kind of tie".
 Upwards it stays one hop, as it always did: what this area follows is a
 relationship it has, and what that one follows is not.
 
-**The tie badge sits at the other end of the area from the rest.** Every badge
-used to stack at the top corner, and on a shallow area four of them are taller
-than the area they are about. The tie is the one an area carries most often, so
-moving it to the bottom corner halves that column in the common case — and it
-clears the shears by their own half-height when the area is cutting its words
-off, because two marks on one corner is worse than either alone.
+**The tie badge sits on its own, off the top-left corner.** Every badge used to
+stack at the top right, and on a shallow area four of them are taller than the
+area they are about. The tie is the one an area carries most often, so moving
+it halves that column in the common case. It went to the bottom corner first,
+and on an area shorter than the badge that stacked it up over the top line; the
+top-left is the tied edge's own end and has nothing else on it.
+
+**Pointing at a tie draws its thread.** The link and the buoy are at two
+corners of two areas, often with others between, and the lit glyph on the far
+one was a thing to hunt for. Hovering either draws a dotted S between the two
+badges, sagging with its length and walking from the pointer's end. It is
+measured off the badges as drawn — `getBoundingClientRect`, divided back by the
+zoom — because a badge is a fixed number of screen pixels off a box that may be
+turned, mirrored and grown, and the DOM already knows where all of that put it.
 
 **A drawing is drawn hard.** An area whose picture is a `data:` URL renders
 with `image-rendering: pixelated`. The drawing surface is the only thing that
@@ -1036,7 +1056,9 @@ meant for the page still scrolls it.
 side by side reach far enough into the bottom band that the pager's first arrow,
 centred in the same band, lands on top of "Bounds". They used to stack into a
 column for that, which halved the width by growing a two-line panel up over the
-sheet. Now the words go instead — a `#` for the grid, a `B` for the bounds —
+sheet. Now the words go instead — a `#` for the grid, a `||` for the guides, a
+`B` for the boxes (the toggle once called Bounds, renamed when Guides arrived
+beside it, since both draw bounds of a kind and only one of them is areas') —
 beside ticks that already say whether they are on, which is the part doing the
 work. Both forms are in the DOM at every width and CSS picks one, and the
 checkbox carries an `aria-label` either way, so nothing read aloud is ever
@@ -1069,10 +1091,14 @@ same flick one step on one machine and forty on another.
 `fit` subtracts the pager's measured height and the column gap before it sizes
 the page — otherwise the count is the first thing off the bottom of a short
 stage. Measured, not assumed: it is text and icons, and it is absent when there
-are no rows. The page-lock band above the sheet is in that column for the same
-reason, rather than hung off the sheet on a negative offset: on a phone the stage
-has eight pixels of padding, and anything overhanging it is scrolled off the top
-with no way to reach it.
+are no rows. The page-lock band was in that column too, and was taken out of
+it: in the column it was a band's height more to scroll at every zoom but Fit,
+so a page that fitted grew a scrollbar the moment it was locked. It is pinned
+to the top of the stage now, as the pager is to the bottom, and at Fit only the
+viewport's top padding keeps a band clear for it — at any other zoom it may lie
+over the sheet, like the pager, rather than push it. It was never hung off the
+sheet on a negative offset, and still is not: on a phone anything overhanging
+the sheet is scrolled off the top with no way to reach it.
 
 **The stage is two elements: a frame that never scrolls and a viewport that
 does.** Undo, the view toggles, the zoom and the pager were absolutely
@@ -1305,6 +1331,21 @@ box exactly one line of cell text tall — 12px at 1.45, starting the same 5px
 down a field's padding does — so the number lands on the cells' first baseline
 and the tick, centred in that line, is middle-aligned with it. `--cell-line` is
 the one place that measurement lives; the row-height modes are counted in it.
+The header's tick is the exception: the header has no line of text to sit on,
+so its gutter is padded evenly and middle-aligned, level with the sort marks
+in the column heads.
+
+**The bar under the table reads from the table to the rows.** Lock, the
+table's name and its swap, then the row height — what the table is and how it
+is held — at the left; what you are doing to the rows you have chosen, or the
+cell you are in, at the far right after a rule, where it can come and go
+without moving anything else. The cell's count is the one thing in the bar
+that gives way, ellipsised before it pushes Edit off the end.
+
+**A lock closes the full-size editor too.** Edit, the press and hold and the
+ellipsis all open it, and it is a way to type: on a locked table all three are
+off. The ellipsis stays drawn, disabled, because it still says a cell holds
+more than it shows.
 
 **Overflow is measured, because a textarea cannot say it.** `text-overflow`
 works on one line of an ordinary box; a field of wrapped lines just stops at its
@@ -2197,10 +2238,13 @@ except that 0 is kept, since a page worked to its trim is a real choice.
 Absent is `DEFAULT_MARGIN` all round. It is stored in the right-hand page's
 frame like everything else, so with facing pages its `left` is the inner edge
 and its `right` the outer, which is what the bar calls them; a left-hand page
-draws them swapped. The guide shows and hides with the Grid toggle, because it
-is the same kind of line — something to place against — and with the grid on a
-margin within reach beats the nearest grid line: a margin that is not a whole
-number of steps would otherwise be an edge nothing could land on. Far edges
+draws them swapped. The guide has a toggle of its own, **Guides**, beside Grid
+and Boxes: it first rode on the grid's, but a page wants its margins to place
+against far more often than it wants a ruling over the whole of it. With it on,
+a margin within reach beats a grid line or a sibling's edge: a margin that is
+not a whole number of steps would otherwise be an edge nothing could land on.
+The keys are Photoshop's Ctrl+; and Inkscape's bare `|`; Ctrl+; used to be one
+of Boxes' two, which keeps Ctrl+H — Photoshop's for its extras. Far edges
 snap only when they are the edges being moved, so a box is never stretched to
 reach a guide it was not heading for.
 
@@ -2217,6 +2261,36 @@ it is given padding; the starter card's QR carries 1mm, and Position
 Automagically gives one 2mm. The padding guide was also drawn as an SVG sized
 `auto`, which for an SVG is 300 × 150px, not what the insets leave — the
 green-blue rectangle far larger than the area.
+
+## Screen lines are drawn so the zoom cannot round them
+
+Everything on the card is inside one `transform: scale()`, and a box's edges
+and borders are snapped to whole pixels *of that frame* before the scale is
+applied. So a line one `--line` wide — half a pixel at 200% — came out two
+screen pixels thick, and a handle's border, a badge's, a snap guide and the
+pivot's gradients all drifted in weight and shape with the zoom. What does not
+round: an SVG stroke, a box-shadow, and a gradient's stops. So the pivot is a
+15-unit SVG scaled whole with its mark, handle and badge edges are inset
+shadows, and the lever's arm and the snap guides are a gradient line down the
+middle of a box three lines wide. The margin guide's dashed outline is the one
+line left as a border; it has no SVG cousin yet.
+
+## Lists and the baseline
+
+`TextStyle.list` is a marker (`bullet`, `disc`, `dash`), an indent and an item
+spacing, each optional and each merged over the page's on its own, so an area
+can change its indent and keep the page's marker. It overrides `md.list` in
+the renderer rather than replacing that object, which templates written by
+hand may still carry.
+
+`TextStyle.baseline` is em of the area's size, either sign. The page's is a
+correction for the page's face, so an area in another face never inherits it
+(`baselineOf`); an area's own always applies. It is turned into points in the
+box's style rather than handed down in em, because a custom property holding
+`em` resolves at each element that uses it and a heading would have moved
+twice as far as the paragraph under it. It moves `.content`'s children with
+`position: relative` — not `.content`, whose edge is where a clipped area
+cuts — so nothing is measured differently and nothing anchored below moves.
 
 ## `src/lib/components/MenuSelect.svelte`
 

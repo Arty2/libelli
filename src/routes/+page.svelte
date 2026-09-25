@@ -130,7 +130,7 @@
 		if (barHeight > barFloor) barFloor = barHeight;
 	});
 
-	let ui = $state<UiState>({ showBounds: true, showGrid: false, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
+	let ui = $state<UiState>({ showBounds: true, showGrid: false, showGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
 	let activeRow = $state(0);
 	let selectedIds = $state<string[]>([]);
 	let ready = $state(false);
@@ -2429,6 +2429,7 @@ em { color: #b42318 }`;
 			{mapping}
 			bounds={ui.showBounds}
 			grid={ui.showGrid}
+			guides={ui.showGuides}
 			gridStyle={ui.gridStyle}
 			{selectedIds}
 			zoom={ui.zoom}
@@ -2445,6 +2446,7 @@ em { color: #b42318 }`;
 			onaction={describe}
 			onbounds={(show) => (ui = { ...ui, showBounds: show })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
+			onguides={(show) => (ui = { ...ui, showGuides: show })}
 			ongridstyle={(gridStyle) => {
 				// A hold on a checkbox is a gesture nobody was taught, so it says what
 				// it did — and it turns the grid on if it was off, because changing

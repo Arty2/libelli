@@ -1,5 +1,5 @@
 import { parseColor } from './color';
-import type { MarkdownStyle, ParagraphStyle } from './types';
+import type { ListMarker, ListStyle, MarkdownStyle, ParagraphStyle } from './types';
 import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
 
 /**
@@ -22,7 +22,12 @@ export interface MarkdownOptions {
 	/** the area's paragraph style, with the leading its amount is counted in */
 	paragraph?: ParagraphStyle;
 	lineHeight?: number;
+	/** the area's list style, over the page's; each field over `md.list` */
+	list?: ListStyle;
 }
+
+/** The glyph each bullet marker names. */
+export const LIST_GLYPHS: Record<ListMarker, string> = { bullet: '•', disc: '●', dash: '–' };
 
 interface ListItem {
 	text: string;
@@ -44,7 +49,7 @@ const RULE = /^\s*(-{3,}|\*{3,}|_{3,})\s*$/;
 const BULLET = /^([ \t]*)([-*])\s+(.*)$/;
 const ORDERED = /^([ \t]*)(\d+)[.)]\s+(.*)$/;
 
-const DEFAULT_MD: Required<MarkdownStyle> = {
+export const DEFAULT_MD: Required<MarkdownStyle> = {
 	h1: { size: 1.5, spaceBefore: 6, spaceAfter: 1.5, weight: 700 },
 	h2: { size: 1.35, spaceBefore: 6, spaceAfter: 1.5, weight: 700 },
 	h3: { size: 1.15, spaceBefore: 4, spaceAfter: 1, weight: 700 },
@@ -205,6 +210,10 @@ const mm = (v: number) => `${round(v)}mm`;
 
 export function renderMarkdown(src: string, options: MarkdownOptions): string {
 	const md = mergeStyle(options.md);
+	const list = options.list;
+	if (list?.indent !== undefined) md.list = { ...md.list, indent: list.indent };
+	if (list?.spacing !== undefined) md.list = { ...md.list, itemSpacing: list.spacing };
+	const bullet = LIST_GLYPHS[list?.marker ?? 'bullet'];
 	const para = options.paragraph;
 	// In em of the area's own size: a line of leading is `lineHeight` em.
 	const lines = para ? `${round(para.amount * (options.lineHeight ?? 1))}em` : '';
@@ -229,9 +238,11 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 			case 'paragraph': {
 				// The area's paragraph style, when it has one, is the spacing
 				// between paragraphs; `md.paragraph` is what it is otherwise. An
-				// indent goes on a paragraph that follows another — the first one
-				// under a heading or at the top is flush, as in any book.
-				const follows = blocks[index - 1]?.type === 'paragraph';
+				// indent goes on every paragraph but the area's first. It was only
+				// on one following another paragraph, the book convention — but on
+				// a card, where most paragraphs follow a heading or a list, that
+				// meant it hardly ever showed and read as not working.
+				const follows = index > 0;
 				const style =
 					para?.mode === 'space'
 						? `margin:0 0 ${lines}`
@@ -252,7 +263,7 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 				break;
 			}
 			case 'list':
-				html.push(renderList(block, md, true));
+				html.push(renderList(block, md, true, bullet));
 				break;
 		}
 	});
@@ -260,7 +271,7 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 	return html.join('');
 }
 
-function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean): string {
+function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, bullet: string): string {
 	const cfg = md.list;
 	const tag = list.ordered ? 'ol' : 'ul';
 	const style = [
@@ -273,7 +284,7 @@ function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean):
 		.map((item, i) => {
 			// Ordered lists are renumbered from source order; a source that restarts
 			// its numbering part-way through is a bug, not intent.
-			const marker = list.ordered ? `${i + 1}.` : '•';
+			const marker = list.ordered ? `${i + 1}.` : bullet;
 			const itemStyle = [
 				'display:flex',
 				'align-items:baseline',
@@ -282,7 +293,7 @@ function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean):
 			].join(';');
 			const inner = [`<span style="flex:1;min-width:0">${renderInline(item.text)}`];
 			if (item.children) {
-				inner.push(`<div style="margin-top:${mm(cfg.itemSpacing ?? 0)}">${renderList(item.children, md, false)}</div>`);
+				inner.push(`<div style="margin-top:${mm(cfg.itemSpacing ?? 0)}">${renderList(item.children, md, false, bullet)}</div>`);
 			}
 			inner.push('</span>');
 			return `<li style="${itemStyle}"><span style="flex:none;white-space:nowrap">${escapeHtml(marker)}</span>${inner.join('')}</li>`;

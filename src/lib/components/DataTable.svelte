@@ -131,7 +131,7 @@
 	 */
 	let pickerOpen = $state(false);
 	let pickerEl = $state<HTMLElement | null>(null);
-	let pickerAt = $state({ right: 0, bottom: 0 });
+	let pickerAt = $state({ left: 0, bottom: 0 });
 
 	const tableName = $derived(dataset.name ?? '');
 
@@ -277,9 +277,9 @@
 		const box = pickerEl?.getBoundingClientRect();
 		// Upwards: this bar is at the bottom of the tray, so a menu hanging below
 		// it would be off the screen.
-		// Hung from its right edge, since the picker sits at the right-hand end
-		// of the bar and a menu reaching rightwards from it would leave the window.
-		if (box) pickerAt = { right: window.innerWidth - box.right, bottom: window.innerHeight - box.top + 4 };
+		// Hung from its left edge, since the picker sits near the left-hand end
+		// of the bar; the clamp in the style keeps it on a narrow screen.
+		if (box) pickerAt = { left: box.left, bottom: window.innerHeight - box.top + 4 };
 		pickerOpen = true;
 	}
 
@@ -1196,7 +1196,7 @@
 									title={locked ? undefined : 'Press and hold to open this cell full size'}
 									value={row[column] ?? ''}
 									readonly={locked}
-									use:hold={() => openBigCell(i, column)}
+									use:hold={() => !locked && openBigCell(i, column)}
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
 									use:completePlaceholders={dataset.columns}
@@ -1217,6 +1217,7 @@
 								<button
 									class="more"
 									tabindex="-1"
+									disabled={locked}
 									title="Show all of this cell"
 									aria-label="Show all of {column}, row {rowLabel(row, i)}"
 									onclick={(e) => {
@@ -1264,46 +1265,20 @@
 	<!-- One line, always: this bar wrapping was costing the table a row of its
 	     own height every time the tray narrowed. -->
 	<div class="actions">
-		{#if editing && dataset.rows[editing.row]}
-			<!-- While a cell is being typed in, the bar is about that cell: how
-			     long it is, and the way into the whole of it — the button a press
-			     and hold is the shortcut for. The row actions come back when the
-			     cell is left. Mousedown is held off the Edit button, or the field
-			     would lose its focus, and with it this bar, before the click. -->
-			{@const cell = editing}
-			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[cell.row]?.[cell.column] ?? '')}</span>
-			<button
-				title="Open this cell in the table's full room — the same as pressing and holding it"
-				onmousedown={(e) => e.preventDefault()}
-				onclick={() => openBigCell(cell.row, cell.column)}
-			><Icon name="task-edit" size={15} /> Edit</button>
-			<span class="rule"></span>
-		{:else if chosenRows.length}
-			<!-- What you can do to the rows you have chosen, in front of the things
-			     that act on the whole table, with a rule between the two. It appears
-			     only when there is a selection, so the bar is its usual length the
-			     rest of the time.
-
-			     Copy is one word and the glyph does the rest: a clipboard with
-			     something leaving it. Delete is a word too, rather than a bare bin
-			     in red: it is the one button here that takes rows away, and it
-			     should read as a button that does, not as a mark beside a count. -->
-			<span class="chosen-count">{chosenRows.length}</span>
-			<button
-				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
-				onclick={copyTsv}
-			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
-			<button
-				class="danger"
-				title="Delete the chosen rows"
-				disabled={locked}
-				onclick={deleteChosen}
-			><Icon name="trash" size={15} /> Delete</button>
-			<span class="rule"></span>
-		{/if}
-		<span class="spacer"></span>
-		<!-- What table this is, at the far end of the bar: the buttons act on it,
-		     and it is the one control here that is a name rather than an act. One
+		<!-- First in the bar: the state of the table named beside it, and the
+		     one thing here that is not an errand — the same reason the page bar
+		     keeps its Lock outside its menu. Never disabled by the lock it sets,
+		     or there would be no way out of it. -->
+		<button
+			aria-pressed={locked}
+			title={locked ? 'Unlock the table' : 'Lock the table — no typing, no new rows or columns, no paste or import'}
+			onclick={() => onlock(!locked)}
+		>
+			<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
+			{locked ? 'Unlock' : 'Lock'}
+		</button>
+		<!-- What table this is, beside its lock: the buttons act on it, and it
+		     is the one control here that is a name rather than an act. One
 		     design prints any number of tables, so this is not the template
 		     picker's second half: the two are switched independently. -->
 		<label class="picker" bind:this={pickerEl}>
@@ -1329,7 +1304,7 @@
 				<ul
 					class="picker-menu"
 					role="menu"
-					style="right:clamp(8px, {pickerAt.right}px, 100vw - 13rem);bottom:{pickerAt.bottom}px"
+					style="left:clamp(8px, {pickerAt.left}px, 100vw - 13rem);bottom:{pickerAt.bottom}px"
 				>
 					{#each tables as entry (entry.id)}
 						<li role="none">
@@ -1476,18 +1451,46 @@
 			</svg>
 			<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
 		</button>
-		<!-- Last in the bar, after the picker: the state of the table named
-		     just before it, and the one thing here that is not an errand — the
-		     same reason the page bar keeps its Lock outside its menu. Never
-		     disabled by the lock it sets, or there would be no way out of it. -->
-		<button
-			aria-pressed={locked}
-			title={locked ? 'Unlock the table' : 'Lock the table — no typing, no new rows or columns, no paste or import'}
-			onclick={() => onlock(!locked)}
-		>
-			<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
-			{locked ? 'Unlock' : 'Lock'}
-		</button>
+		<span class="spacer"></span>
+		{#if editing && dataset.rows[editing.row]}
+			<!-- While a cell is being typed in, the bar is about that cell: how
+			     long it is, and the way into the whole of it — the button a press
+			     and hold is the shortcut for. The row actions come back when the
+			     cell is left. Mousedown is held off the Edit button, or the field
+			     would lose its focus, and with it this bar, before the click. -->
+			{@const cell = editing}
+			<span class="rule"></span>
+			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[cell.row]?.[cell.column] ?? '')}</span>
+			<button
+				title="Open this cell in the table's full room — the same as pressing and holding it"
+				disabled={locked}
+				onmousedown={(e) => e.preventDefault()}
+				onclick={() => openBigCell(cell.row, cell.column)}
+			><Icon name="task-edit" size={15} /> Edit</button>
+		{:else if chosenRows.length}
+			<!-- What you can do to the rows you have chosen, at the far end of the
+			     bar after the things that act on the whole table, with a rule
+			     between the two. It appears
+			     only when there is a selection, so the bar is its usual length the
+			     rest of the time.
+
+			     Copy is one word and the glyph does the rest: a clipboard with
+			     something leaving it. Delete is a word too, rather than a bare bin
+			     in red: it is the one button here that takes rows away, and it
+			     should read as a button that does, not as a mark beside a count. -->
+			<span class="rule"></span>
+			<span class="chosen-count">{chosenRows.length}</span>
+			<button
+				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
+				onclick={copyTsv}
+			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
+			<button
+				class="danger"
+				title="Delete the chosen rows"
+				disabled={locked}
+				onclick={deleteChosen}
+			><Icon name="trash" size={15} /> Delete</button>
+		{/if}
 		<input
 			bind:this={fileInput}
 			type="file"
@@ -1890,8 +1893,14 @@
 		z-index: 1;
 	}
 
-	.more:hover {
+	.more:hover:not(:disabled) {
 		color: #1d4ed8;
+	}
+
+	/* Still drawn on a locked table, where it says only that there is more:
+	   the full-size editor is a way to type, and a lock is no typing. */
+	.more:disabled {
+		cursor: default;
 	}
 
 	td:global([data-more]) .more {
@@ -1980,6 +1989,12 @@
 	thead th.gutter {
 		z-index: 4;
 		background: #fafafa;
+		/* Level with the sort marks in the column heads, which are centred in
+		   theirs. The rows' gutters are padded low to sit on the text's line;
+		   the header has no line of text to sit on. */
+		padding-top: 4px;
+		padding-bottom: 4px;
+		vertical-align: middle;
 	}
 
 	/* The active and chosen tints have to be repainted here: the gutter carries
@@ -2478,6 +2493,11 @@
 		color: #555;
 		white-space: nowrap;
 		font-variant-numeric: tabular-nums;
+		/* The one thing in the bar that gives way: at the far end now, and a
+		   long count would otherwise push Edit out past the edge. */
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.cell-editor textarea {

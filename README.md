@@ -96,7 +96,12 @@ resize boxes directly, or type exact millimetres.
   changes rather than the link breaking. Both ends of the tie are marked and both marks are
   buttons: the **link** on the follower breaks its own tie, the **buoy** on the
   followed area casts off everything moored to it, and neither moves anything —
-  the released box keeps the place it was sitting in. Selecting either end lights
+  the released box keeps the place it was sitting in. The link hangs off the
+  follower's **top-left** corner, the edge that is tied; the buoy is in the
+  column at the followed area's top right. **Point at either** and a dotted
+  thread draws itself between the two, sagging a little and walking from the
+  one under the pointer to the other end — wherever on the card that is. It
+  is still while you have asked for less motion. Selecting either end lights
   the *mark* on the other — the glyph only, never a fill, because those badges
   are on areas you have not selected and a filled badge reads as a second
   selection. The one fill is on the area you do have: what is moored to it, which
@@ -149,7 +154,7 @@ resize boxes directly, or type exact millimetres.
   for an area bound to a column, the column's name, since that is what will be
   in it — in italics, in the accent blue, in the face and size it will print in — so an
   empty area still shows where it is and how big its words will be. It is part
-  of the bounds: turning **Bounds** off takes it away with them, and it never
+  of the bounds: turning **Boxes** off takes it away with them, and it never
   reaches paper, the lightbox or a PNG. An area set to hide when empty hides on
   a card whose column is simply blank, because that is what it will do on
   paper; one with **nothing to draw from** at all — no rows, or a name bound to
@@ -161,10 +166,14 @@ resize boxes directly, or type exact millimetres.
   pencil when it holds a drawing — press it to draw on it — and a picture
   otherwise.
 - **Grown past its height** — an area set to **Grow** whose words need more room
-  than it was given keeps a thin dashed line where a clip would have cut, in the
-  bounds' own color and rhythm, so you can see how far the content has pushed
-  it — and no shears, because nothing is cut. A clipped area draws the red cut
-  line and the shears instead.
+  than it was given keeps a **trim line** where a clip would have cut: thin, in
+  the bounds' own color, with more than twice their gap between dashes so it is
+  not taken for an edge, and in the selection's blue while the area is
+  selected. Beside it are the shears in a faint blue, the cut *offered*: press
+  them and the area is clipped at that height. The red shears on a clipped
+  area are the same switch the other way — press them and it grows to fit.
+- **A selected area** draws only its selection, not its dashed bound as well
+  under it, which doubled every edge.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with
   one selected, and a text box lies over the content inheriting the face, size,
   color and alignment it will print in. A bound area writes through to the cell;
@@ -196,8 +205,21 @@ resize boxes directly, or type exact millimetres.
   **Indented**, by an amount in lines of the area's own leading, so it keeps its
   proportion when the type changes. In plain text every line is a paragraph —
   Return starts a new one, as in a word processor; in Markdown it replaces the
-  space after a paragraph. An indent skips the first paragraph after a heading
-  or at the top, as in any book.
+  space after a paragraph. An indent goes on every paragraph but the area's
+  first — a heading or a list before it included, since on a card most
+  paragraphs follow one, and the book rule of indenting only a paragraph after
+  another meant it hardly ever showed.
+- **Lists** — **List** picks a Markdown bullet list's marker, **• Bullet**,
+  **● Disc** or **– Dash**; **List Indent** is the space from the area's edge to
+  the markers, and **List Spacing** the space between one item and the next,
+  both in mm. All three are in page setup and, for a Markdown area, in the area
+  bar, where each on its own overrides the page's.
+- **Baseline** — raises an area's text by a share of its size, in em, or lowers
+  it below 0: for a face that sits high or low on its line. Page setup's
+  applies only to areas in the page's font — it corrects a face, and would be
+  wrong for any other — and an area's own applies whatever it is set in. It
+  moves the words and nothing else: the area is as tall as it was, and what is
+  anchored under it stays put.
 - **The style clipboard** — **Copy Style** and **Paste Style** in the right-click
   menu, or <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>c</kbd> and
   <kbd>v</kbd>, carry type, fill, border, padding, radius and fit from one area
@@ -228,9 +250,10 @@ resize boxes directly, or type exact millimetres.
   below it do not move — turning one thing never shuffles the card.
 - **Overflow** — a box whose content is taller than the box will let it be draws
   the cut: a dashed red line along its bottom edge, where the words are actually
-  severed, with a pair of shears astride that line at the right-hand end. A
-  clipped card looks fine on screen right up until it is printed, and the line
-  says where.
+  severed, with a pair of shears astride that line at the right-hand end —
+  out past the column of badges when the area has one. A clipped card looks
+  fine on screen right up until it is printed, and the line says where; the
+  shears are also the way out, and a press lets the area grow.
 - **Past the edge** — the editor does not cut anything off at the card's edge:
   drag an area half off the page and it stays visible, with its handles where
   you can still reach them. What prints is another matter — the paper stops
@@ -407,8 +430,14 @@ resize boxes directly, or type exact millimetres.
   settings bar is disabled behind it, so a press unlocks the design and it
   answers with the open padlock for a moment before it goes. Elsewhere the
   button that sets a lock is in the bar with the rest of that subject's
-  settings, and it says **Unlock** when that is what it will do. Turning bounds
-  off takes all of it with it.
+  settings, and it says **Unlock** when that is what it will do. Turning
+  **Boxes** off takes all of it with it. The band is pinned to the top of the
+  stage, the way the pager is to the bottom, so it never adds to what there is
+  to scroll.
+
+  A page lock is on the design, not on what it holds: **double-click an area**
+  and its words can still be typed into, as can a cell. An area's own lock
+  still refuses it, and so does a locked table for a bound area.
 - **CSS** — page setup has a CSS button; what you write there is saved
   inside the template and travels with it. Selectors are scoped to the card, so
   nothing in a template can restyle the editor around it, and `@import` and any
@@ -547,7 +576,8 @@ a notice can appear.
   a new area, named after the column and bound to it, where a new area goes.
 - **Counting** — while a cell is being typed in, the bar under the table is
   about that cell: its characters and words, and **Edit**, which opens it full
-  size. The row actions come back when the cell is left.
+  size. The row actions come back when the cell is left. Both sit at the far
+  right of the bar; the lock, the table and the row height are at the left.
 - **Which area it feeds** — entering a cell flashes the areas on the card that
   print it, in the bounds' blue, for a moment.
 - **A cell full size** — press **Edit**, press and hold a cell, or press the
@@ -555,8 +585,9 @@ a notice can appear.
   in the table's own space — over the rows, with the card still in view beside
   or above it — with the same count. It edits the cell itself, live, so the
   card follows as you type and undo reaches every change; the **×** at the top
-  right, Esc or Ctrl/Cmd+Enter put the table back.
-- **Lock** — the padlock at the right-hand end of the bar under the table, after
+  right, Esc or Ctrl/Cmd+Enter put the table back. On a locked table none of
+  the three opens it: the full-size editor is a way to type.
+- **Lock** — the padlock at the left-hand end of the bar under the table, before
   the picker, freezes it: no typing, no new, moved,
   renamed or deleted rows and columns, no paste or import — and nothing typed,
   dropped or drawn on the card reaches a cell either. Nor does sorting, since
@@ -569,7 +600,7 @@ a notice can appear.
   width you get and one long cell cannot shove every other column sideways.
 - **Cells fill their row** — a row is as tall as its tallest cell, and every
   field in it is that tall, so the target you click is the cell you can see.
-- **Row height** — the button left of the **Table** picker, the same width in
+- **Row height** — the button right of the **Table** picker, the same width in
   every mode, cycles three heights:
   **Short**, one line per row; **Medium**, up to five lines, which is where a
   table starts; and **Full**, every row as tall as its longest cell. A cell
@@ -1121,7 +1152,8 @@ the window as both bars wrap differently at different widths.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>c</kbd> | Copy the area's style |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>v</kbd> | Paste that style onto the selection |
 | <kbd>?</kbd> or <kbd>/</kbd> | The help panel |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>;</kbd> or <kbd>h</kbd> | Bounds on or off |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>h</kbd> | Boxes on or off — bounds, badges and the lock band |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>;</kbd> or <kbd>\|</kbd> | Guides on or off — Photoshop's key and Inkscape's |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> or <kbd>#</kbd> | Grid on or off (press and hold the Grid box for dots) |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>p</kbd> | Export — again from that screen to print |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>p</kbd> / <kbd>s</kbd> | Export, for the fingers that reach for those |
@@ -1186,13 +1218,13 @@ towards it and down is away. They repeat on a hold like the arrows do.
 The arrow keys and the pad both move every area in the selection, not only a
 lone one.
 
-Dragging snaps in this order: switch **Grid** on and the page **margins** show
-as a dashed guide in magenta, and an edge that comes within reach of one lands
-on it — the left and top edges, and the right and bottom when those are the
-edges being moved — ahead of the 5mm subgrid of a 10mm grid, which takes
-everything else; otherwise a box latches onto the edges and centres of
-its neighbours as it passes them, and a guide shows what it caught. There is no
-key to hold for free movement — switch **Grid** and **Bounds** both off and
+Dragging snaps in this order: with **Guides** on the page **margins** show as a
+dashed guide in magenta, and an edge that comes within reach of one lands on it
+— the left and top edges, and the right and bottom when those are the edges
+being moved; then, with **Grid** on, the 5mm subgrid of a 10mm grid takes
+everything else; otherwise a box latches onto the edges and centres of its
+neighbours as it passes them, and a guide shows what it caught. There is no key
+to hold for free movement — switch **Grid**, **Guides** and **Boxes** off and
 nothing latches, because a box should never snap to a guide you cannot see.
 
 Press and *hold* the **Grid** box and the ruling becomes a **dot grid**: the same
@@ -1249,11 +1281,12 @@ than it has to.
   sheet size (a preset or your own, a button to turn it over, and left and
   right pages), margin (one number all round, or one per edge — top, bottom and
   left and right, or inner and outer with left and right pages), bleed, crop marks · type defaults (font, size, leading,
-  spacing, paragraph) · surface (paper color, background image and fit) · page
+  spacing, paragraph, baseline, list marker, indent and spacing) · surface (paper color, background image and fit) · page
   number, whether to print the total, and its margin · CSS
 - **Area** — head: the field's name, then duplicate, delete, lock · content
   (data field or static text, column, mode, fit, QR settings) · type (font,
-  size, weight, color) · setting (leading, spacing, paragraph, case) · alignment,
+  size, weight, color) · setting (leading, spacing, paragraph, baseline, and
+  for Markdown the list marker, indent and spacing, case) · alignment,
   horizontal and vertical · surface (fill, padding, border width, style, hand and
   color, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
   when empty, and mirror where the template has left and right pages) ·
@@ -1282,8 +1315,8 @@ than it has to.
   rectangles competing with the card; labels are set small and uppercase, units
   stay lowercase beside the number, and buttons keep their frames because a
   button is a thing you press.
-- **View** — in the bottom corners of the page itself, not the toolbar: grid and
-  area bounds at the left (screen only, never printed), zoom at the right;
+- **View** — in the bottom corners of the page itself, not the toolbar: **Grid**,
+  **Guides** (the page margins) and **Boxes** (each area's bounds) at the left (screen only, never printed), zoom at the right;
   between them, under the sheet, which card of how many you are looking at.
   The zoom menu puts the number first — *66% — Fit*, *133% — Actual* — and its
   field sits on the corner's chip with no rule under it. **Fit** says the
@@ -1295,7 +1328,8 @@ than it has to.
   A screen it does not know gets the browser's own millimetre. Hover it to see
   which it was. The other steps follow under a rule. The menu is drawn like the
   template picker's, as are the font menus. On a phone the two left-hand toggles keep their row and lose
-  their words — a **#** for the grid and a **B** for the bounds, beside ticks
+  their words — a **#** for the grid, a **||** for the guides and a **B** for
+  the boxes, beside ticks
   that already say whether they are on — rather than stacking into a two-line
   panel that grew up over the sheet. What a screen reader is told does not
   change with the width.

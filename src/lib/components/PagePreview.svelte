@@ -17,6 +17,8 @@
 		/** families still arriving, passed through so an area can pulse while it waits */
 		loadingFonts?: string[];
 		grid: boolean;
+		/** the page margins, drawn and snapped to */
+		guides: boolean;
 		/** ruled lines, or a dot at every intersection */
 		gridStyle: GridStyle;
 		selectedIds: string[];
@@ -47,6 +49,7 @@
 		onaction?: (what: string) => void;
 		onbounds: (show: boolean) => void;
 		ongrid: (show: boolean) => void;
+		onguides: (show: boolean) => void;
 		/** press and hold the Grid toggle: the same grid, drawn the other way */
 		ongridstyle: (style: GridStyle) => void;
 		onzoom: (zoom: 'fit' | 'actual' | number) => void;
@@ -96,6 +99,7 @@
 		bounds,
 		loadingFonts = [],
 		grid,
+		guides,
 		gridStyle,
 		selectedIds,
 		zoom,
@@ -116,6 +120,7 @@
 		onbounds,
 		ongrid,
 		ongridstyle,
+		onguides,
 		onzoom,
 		onnudge,
 		undoable,
@@ -247,15 +252,10 @@
 		// stage is the whole screen, so every millimetre of padding is a
 		// millimetre of card you cannot see.
 		const pad = hostSize.w < 560 ? 16 : 48;
-		// The lock band shares the page's column, so its height comes off the
-		// sheet. The pager does not any more — it is fixed to the stage and its
-		// band is real bottom padding on the viewport, which `contentRect` has
-		// already taken out of `hostSize.h`.
-		const under = lockHeight ? lockHeight + PAGE_GAP : 0;
-		const fit = Math.min(
-			(hostSize.w - pad) / mmToPx(outerW),
-			(hostSize.h - pad - under) / mmToPx(outerH)
-		);
+		// Neither the lock band nor the pager is in the page's column: both are
+		// fixed to the stage, and their bands are real padding on the viewport,
+		// which `contentRect` has already taken out of `hostSize.h`.
+		const fit = Math.min((hostSize.w - pad) / mmToPx(outerW), (hostSize.h - pad) / mmToPx(outerH));
 		return Math.max(0.15, Math.min(fit, 2));
 	});
 
@@ -529,6 +529,13 @@
 		// and zooming the page you cannot see behind Help is not what Ctrl+0 was
 		// asked for.
 		if (modalOpen) return;
+		// Inkscape's key for its guides, bare, as it has it there: nothing else
+		// on the stage is typed with a pipe.
+		if (event.key === '|' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+			event.preventDefault();
+			onguides(!guides);
+			return;
+		}
 		if (!event.ctrlKey && !event.metaKey) return;
 
 		switch (event.key) {
@@ -550,12 +557,17 @@
 			// Two keys each: the punctuation is what they are named after on a
 			// keyboard that has it, and the letters are what still works on one
 			// that does not.
+			// Photoshop's: Ctrl+H for its extras, which is what the boxes' bounds
+			// are here, and Ctrl+; for its guides.
 			case 'h':
 			case 'H':
+				event.preventDefault();
+				onbounds(!bounds);
+				return;
 			case ';':
 			case ':':
 				event.preventDefault();
-				onbounds(!bounds);
+				onguides(!guides);
 				return;
 			case "'":
 			case '"':
@@ -699,7 +711,7 @@
 <div
 	class="viewport"
 	bind:this={host}
-	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px"
+	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px;--lock-band:{lockHeight && zoom === 'fit' ? lockHeight + PAGE_GAP : 0}px"
 	onpointerdown={(e) => {
 		// Bare paper counts as empty space, not just the grey around the sheet:
 		// clicking away from everything is how every canvas editor deselects, and
@@ -713,25 +725,6 @@
 	tabindex="-1"
 >
 	<div class="page">
-	<!-- `unlocking` keeps the band up for the moment after it is pressed: the
-	     lock is gone by then, so without it the band would vanish on the same
-	     frame and the open padlock it answers with would never be seen. -->
-	{#if (template.locked || unlocking) && bounds}
-		<!-- An indicator, not a control: the button that sets this lives in page
-		     setup, where the rest of the page's settings are. Screen furniture, so
-		     the Bounds toggle takes it away with the rest — and part of the column
-		     rather than hung off the sheet, so it can never be scrolled off the
-		     top of the stage on a phone. -->
-		<button
-			class="page-lock"
-			bind:clientHeight={lockHeight}
-			title="The design is locked — press to unlock it"
-			onclick={unlock}
-		>
-			<Icon name={unlocking ? 'unlocked' : 'locked'} size={13} />
-			<span>{unlocking ? 'Unlocked' : 'Locked'}</span>
-		</button>
-	{/if}
 	<div class="sheet" style="width:{mmToPx(outerW) * scale}px;height:{mmToPx(outerH) * scale}px">
 		<div class="scaler" style="transform:scale({scale})">
 			<Card
@@ -741,6 +734,7 @@
 				{bounds}
 				{loadingFonts}
 				{grid}
+				{guides}
 				{scale}
 				{pageNumber}
 				{background}
@@ -827,6 +821,27 @@
 	     Outside the viewport, so it stays under the sheet at every zoom; the
 	     band it occupies is bottom padding on the viewport, which is what keeps
 	     the page clear of it. -->
+	<!-- `unlocking` keeps the band up for the moment after it is pressed: the
+	     lock is gone by then, so without it the band would vanish on the same
+	     frame and the open padlock it answers with would never be seen. -->
+	{#if (template.locked || unlocking) && bounds}
+		<!-- An indicator, not a control: the button that sets this lives in page
+		     setup, where the rest of the page's settings are. Screen furniture, so
+		     the Boxes toggle takes it away with the rest. Pinned to the stage, as
+		     the pager is, rather than in the scrolling column: in the column it
+		     was a band's height more to scroll at every zoom but Fit, and a page
+		     that fitted grew a scrollbar the moment it was locked. At Fit the
+		     viewport keeps a band clear for it, so it covers nothing there. -->
+		<button
+			class="page-lock"
+			bind:clientHeight={lockHeight}
+			title="The design is locked — press to unlock it"
+			onclick={unlock}
+		>
+			<Icon name={unlocking ? 'unlocked' : 'locked'} size={13} />
+			<span>{unlocking ? 'Unlocked' : 'Locked'}</span>
+		</button>
+	{/if}
 	{#if rowCount > 0}
 		<div class="pager" role="group" aria-label="Card" bind:clientHeight={pagerHeight}>
 			<!-- The swipe lives on this inner chip rather than on the row, because
@@ -996,11 +1011,11 @@
 	<!-- View state sits on the page it affects, one control per bottom corner,
 	     rather than in the toolbar among the actions. On a phone the two words
 	     side by side reach far enough into the band that the pager's first arrow,
-	     centred in the same band, lands on top of "Bounds". They used to stack
+	     centred in the same band, lands on top of "Boxes". They used to stack
 	     into a column for that, which grew a two-line panel up over the sheet;
-	     now the words go instead and the ticks keep their row — a # for the grid
-	     and a B for the bounds, beside checkboxes that already say whether they
-	     are on. The full word stays the accessible name either way, so nothing
+	     now the words go instead and the ticks keep their row — a # for the
+	     grid, a || for the guides and a B for the boxes, beside checkboxes that
+	     already say whether they are on. The full word stays the accessible name either way, so nothing
 	     read aloud is reduced to a single letter. -->
 	<div class="corner left">
 		<!-- Press and hold swaps the ruling for a dot at every intersection: the
@@ -1024,14 +1039,24 @@
 			<span class="wide">{gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
 			<span class="narrow" aria-hidden="true">#</span>
 		</label>
-		<label title="Dashed box bounds and the trim edge — screen only, never printed (Ctrl/Cmd+; or Ctrl/Cmd+H)">
+		<label title="The page margins, drawn and snapped to — screen only, never printed (Ctrl/Cmd+; or |)">
 			<input
 				type="checkbox"
-				aria-label="Bounds"
+				aria-label="Guides"
+				checked={guides}
+				onchange={(e) => onguides(e.currentTarget.checked)}
+			/>
+			<span class="wide">Guides</span>
+			<span class="narrow" aria-hidden="true">||</span>
+		</label>
+		<label title="Each area's dashed bounds, its badges and the trim edge — screen only, never printed (Ctrl/Cmd+H)">
+			<input
+				type="checkbox"
+				aria-label="Boxes"
 				checked={bounds}
 				onchange={(e) => onbounds(e.currentTarget.checked)}
 			/>
-			<span class="wide">Bounds</span>
+			<span class="wide">Boxes</span>
 			<span class="narrow" aria-hidden="true">B</span>
 		</label>
 	</div>
@@ -1144,7 +1169,7 @@
 		   the fitted scale, because the page is centred in what is left: taking it
 		   off the scale alone would have centred the sheet across the band and
 		   parked half of it under the count. */
-		padding: 24px 24px calc(24px + var(--pager-band, 0px));
+		padding: calc(24px + var(--lock-band, 0px)) 24px calc(24px + var(--pager-band, 0px));
 	}
 
 	.viewport:focus-visible {
@@ -1315,6 +1340,11 @@
 	}
 
 	.page-lock {
+		position: absolute;
+		top: 10px;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 2;
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;

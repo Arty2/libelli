@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { DEFAULT_MD } from '$lib/markdown';
 	import PrintSettingsPanel from './PrintSettingsPanel.svelte';
 	import './options-bar.css';
 	import { safeImageUrl } from '$lib/assets';
@@ -12,6 +13,12 @@
 		MIN_SIZE,
 		marginsOf,
 		normaliseMargin,
+		normaliseBaseline,
+		normaliseList,
+		LIST_MARKER_LABELS,
+		LIST_MARKERS,
+		MAX_BASELINE,
+		MAX_LIST,
 		FACING_PAGE_NUMBER_POSITIONS,
 		PAGE_NUMBER_POSITIONS,
 		PAGE_PRESETS,
@@ -239,6 +246,23 @@
 		}
 		const value = Math.max(0, Math.min(MAX_PARAGRAPH, amount ?? template.defaults.paragraph?.amount ?? 1));
 		patchTemplate({ defaults: { ...rest, paragraph: { mode, amount: value } } });
+	}
+
+	/**
+	 * The page's list style and baseline. A field left blank is the absence of
+	 * it, so the renderer's own spacing and an unmoved baseline stay what a
+	 * template that never set them gets.
+	 */
+	function setDefaultList(change: Record<string, unknown>) {
+		const { list: _was, ...rest } = template.defaults;
+		const list = normaliseList({ ...template.defaults.list, ...change });
+		patchTemplate({ defaults: list ? { ...rest, list } : rest });
+	}
+
+	function setDefaultBaseline(raw: string) {
+		const { baseline: _was, ...rest } = template.defaults;
+		const baseline = normaliseBaseline(raw);
+		patchTemplate({ defaults: baseline === undefined ? rest : { ...rest, baseline } });
 	}
 
 	/**
@@ -665,6 +689,67 @@
 					<span class="unit">lines</span>
 				</label>
 			{/if}
+			<label class="field">
+				<span>Baseline</span>
+				<input
+					class="n-3"
+					type="number"
+					step="0.01"
+					min={-MAX_BASELINE}
+					max={MAX_BASELINE}
+					placeholder="0"
+					title="Raise the text by this much of its size, or lower it below 0 — for a face that sits high or low on its line. Applies to areas in the page's font only"
+					value={template.defaults.baseline ?? ''}
+					disabled={pageFrozen}
+					onchange={(e) => setDefaultBaseline(e.currentTarget.value)}
+				/>
+				<span class="unit">em</span>
+			</label>
+			<label class="field">
+				<span>List</span>
+				<select
+					value={template.defaults.list?.marker ?? 'bullet'}
+					title="What each item of a Markdown list is marked with"
+					disabled={pageFrozen}
+					onchange={(e) => setDefaultList({ marker: e.currentTarget.value })}
+				>
+					{#each LIST_MARKERS as marker (marker)}
+						<option value={marker}>{LIST_MARKER_LABELS[marker]}</option>
+					{/each}
+				</select>
+			</label>
+			<label class="field">
+				<span>List Indent</span>
+				<input
+					class="n-2"
+					type="number"
+					step="0.5"
+					min="0"
+					max={MAX_LIST}
+					placeholder={String(DEFAULT_MD.list.indent)}
+					title="From the area's edge to a list's markers"
+					value={template.defaults.list?.indent ?? ''}
+					disabled={pageFrozen}
+					onchange={(e) => setDefaultList({ indent: e.currentTarget.value })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+			<label class="field">
+				<span>List Spacing</span>
+				<input
+					class="n-2"
+					type="number"
+					step="0.5"
+					min="0"
+					max={MAX_LIST}
+					placeholder={String(DEFAULT_MD.list.itemSpacing)}
+					title="Between one list item and the next"
+					value={template.defaults.list?.spacing ?? ''}
+					disabled={pageFrozen}
+					onchange={(e) => setDefaultList({ spacing: e.currentTarget.value })}
+				/>
+				<span class="unit">mm</span>
+			</label>
 		</span>
 
 		<span class="group" role="group" aria-label="Page surface">

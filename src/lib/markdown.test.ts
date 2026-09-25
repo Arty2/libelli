@@ -110,7 +110,12 @@ describe('renderMarkdown paragraph style', () => {
 		expect(html).toContain('<p style="margin:0 0 1.5em">One</p>');
 	});
 
-	it('indents only a paragraph that follows another', () => {
+	it('indents every paragraph but the first, after a heading too', () => {
+		const html = renderMarkdown('## H\n\nOne', { size: 10, lineHeight: 1, paragraph: { mode: 'indent', amount: 1 } });
+		expect(html).toContain('<p style="margin:0;text-indent:1em">One</p>');
+	});
+
+	it('leaves the first paragraph flush', () => {
 		const html = renderMarkdown(two, { size: 10, lineHeight: 1.2, paragraph: { mode: 'indent', amount: 2 } });
 		expect(html).toBe('<p style="margin:0">One</p><p style="margin:0;text-indent:2.4em">Two</p>');
 	});
@@ -127,5 +132,16 @@ describe('flagUnknown', () => {
 	it('never writes a span into an attribute', () => {
 		const html = `<a href="https://x.example/${mark('q')}">t</a>`;
 		expect(flagUnknown(html)).toBe('<a href="https://x.example/{{q}}">t</a>');
+	});
+});
+
+describe('list style', () => {
+	it('marks items with the chosen glyph and sets indent and spacing', () => {
+		const html = renderMarkdown('- a\n- b', { size: 10, list: { marker: 'dash', indent: 3, spacing: 2 } });
+		expect(html).toContain('>–</span>');
+		expect(html).toContain('padding:0 0 0 3mm');
+		expect(html).toContain('margin:0 0 2mm');
+		expect(renderMarkdown('- a', { size: 10 })).toContain('>•</span>');
+		expect(renderMarkdown('- a', { size: 10, list: { marker: 'disc' } })).toContain('>●</span>');
 	});
 });

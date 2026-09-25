@@ -11,6 +11,10 @@ import {
 	marginsOf,
 	normaliseMargin,
 	normaliseParagraph,
+	normaliseList,
+	normaliseBaseline,
+	baselineOf,
+	listOf,
 	arrangeBoxes,
 	autoMap,
 	normaliseCentre,
@@ -554,5 +558,46 @@ describe('page margins', () => {
 	it('survives a round trip through a template file', () => {
 		const t = normaliseTemplate({ ...blankTemplate(), page: { w: 148, h: 210, unit: 'mm', margin: { top: 20, right: 8, bottom: 15, left: 12 } } });
 		expect(t.page.margin).toEqual({ top: 20, right: 8, bottom: 15, left: 12 });
+	});
+});
+
+describe('list style and baseline', () => {
+	it('keeps only the list fields that make sense', () => {
+		expect(normaliseList({ marker: 'dash', indent: '4', spacing: -2 })).toEqual({ marker: 'dash', indent: 4, spacing: 0 });
+		expect(normaliseList({ marker: 'star', indent: 'x' })).toBeUndefined();
+		expect(normaliseList(null)).toBeUndefined();
+	});
+
+	it('clamps a baseline either way and drops zero', () => {
+		expect(normaliseBaseline('-0.05')).toBe(-0.05);
+		expect(normaliseBaseline(3)).toBe(1);
+		expect(normaliseBaseline(0)).toBeUndefined();
+		expect(normaliseBaseline('')).toBeUndefined();
+	});
+
+	it("gives the page's baseline only to areas in the page's face", () => {
+		const defaults = { ...DEFAULT_DEFAULTS, baseline: 0.1 };
+		expect(baselineOf({}, defaults)).toBe(0.1);
+		expect(baselineOf({ font: defaults.font }, defaults)).toBe(0.1);
+		expect(baselineOf({ font: 'Other Face' }, defaults)).toBe(0);
+		expect(baselineOf({ font: 'Other Face', baseline: -0.2 }, defaults)).toBe(-0.2);
+	});
+
+	it('merges an area list over the page list field by field', () => {
+		const defaults = { ...DEFAULT_DEFAULTS, list: { marker: 'disc' as const, indent: 3 } };
+		expect(listOf({ list: { indent: 9 } }, defaults)).toEqual({ marker: 'disc', indent: 9 });
+		expect(listOf({}, DEFAULT_DEFAULTS)).toBeUndefined();
+	});
+
+	it('survives a load on the page and on an area', () => {
+		const t = builtinTemplate();
+		const raw = JSON.parse(JSON.stringify({ ...t, defaults: { ...t.defaults, list: { marker: 'dash' }, baseline: 0.04 } }));
+		raw.boxes[0].list = { spacing: 2 };
+		raw.boxes[0].baseline = -0.1;
+		const back = normaliseTemplate(raw);
+		expect(back.defaults.list).toEqual({ marker: 'dash' });
+		expect(back.defaults.baseline).toBe(0.04);
+		expect(back.boxes[0].list).toEqual({ spacing: 2 });
+		expect(back.boxes[0].baseline).toBe(-0.1);
 	});
 });
