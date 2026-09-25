@@ -1005,13 +1005,20 @@
 			onchange={(e) => onzoom(e.currentTarget.value === 'fit' ? 'fit' : Number(e.currentTarget.value))}
 		>
 			<option value="fit">Fit — {Math.round(fitScale * 100)}%</option>
+			<!-- The paper at its own size: the card is laid out in millimetres, so
+			     a scale of 1 is those millimetres as the browser draws them. That
+			     is CSS's millimetre, a 96th of an inch per 3.78 pixels — true to a
+			     ruler on most screens at their default zoom, not on all of them,
+			     since no browser will say how dense a screen really is. -->
+			<option value="1" title="The paper at its own size, in the browser's millimetres">Actual — 100%</option>
+			<hr />
 			<!-- A pinch or a Ctrl+= lands between the steps, and a select with no
 			     matching option shows nothing at all. The odd value gets an option
 			     of its own so the control always says where the page is. -->
-			{#if typeof zoom === 'number' && !ZOOM_STEPS.includes(zoom)}
+			{#if typeof zoom === 'number' && zoom !== 1 && !ZOOM_STEPS.includes(zoom)}
 				<option value={String(zoom)}>{Math.round(zoom * 100)}%</option>
 			{/if}
-			{#each ZOOM_STEPS as step (step)}
+			{#each ZOOM_STEPS.filter((step) => step !== 1) as step (step)}
 				<option value={String(step)}>{step * 100}%</option>
 			{/each}
 		</select>

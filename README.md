@@ -1263,7 +1263,10 @@ than it has to.
   area bounds at the left (screen only, never printed), zoom at the right;
   between them, under the sheet, which card of how many you are looking at.
   **Fit** in the zoom menu says the percentage fitting *would* give you, not the
-  one you are at. On a phone the two left-hand toggles keep their row and lose
+  one you are at. **Actual** under it shows the paper at its own size — the
+  browser's millimetres, which match a ruler on most screens at their default
+  zoom but not every one, since a browser cannot tell how dense a screen really
+  is — and the other steps follow under a rule. On a phone the two left-hand toggles keep their row and lose
   their words — a **#** for the grid and a **B** for the bounds, beside ticks
   that already say whether they are on — rather than stacking into a two-line
   panel that grew up over the sheet. What a screen reader is told does not
