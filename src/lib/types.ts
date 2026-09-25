@@ -249,8 +249,9 @@ export interface MarkdownStyle {
 export interface QrSettings {
 	/** error correction: L 7%, M 15%, Q 25%, H 30% of the code recoverable */
 	level: 'L' | 'M' | 'Q' | 'H';
-	/** quiet zone in modules — the white border a scanner needs */
-	margin: number;
+	// No quiet zone of its own: the white border a scanner needs is the area's
+	// padding, like the space round anything else. A `margin` in an older
+	// file is dropped when it is read.
 	/** absent means transparent: the paper (or the box background) shows through */
 	background?: string;
 }

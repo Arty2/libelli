@@ -239,8 +239,8 @@ describe('normaliseTemplate', () => {
 				{ id: 'b', slot: 'link', x: 0, y: 0, w: 20, h: 20, mode: 'qr', qr: { level: 'X', margin: 99 } }
 			]
 		});
-		expect(t.boxes[0].qr).toEqual({ level: 'M', margin: 2 });
-		expect(t.boxes[1].qr).toEqual({ level: 'M', margin: 8 });
+		expect(t.boxes[0].qr).toEqual({ level: 'M' });
+		expect(t.boxes[1].qr).toEqual({ level: 'M' });
 	});
 
 	it('rejects anything that is not a template', () => {

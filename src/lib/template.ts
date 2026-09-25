@@ -349,13 +349,12 @@ export function normaliseTemplate(raw: unknown): Template {
 	};
 }
 
-export const DEFAULT_QR: QrSettings = { level: 'M', margin: 2 };
+export const DEFAULT_QR: QrSettings = { level: 'M' };
 
 function normaliseQr(raw: any): QrSettings {
 	const level = ['L', 'M', 'Q', 'H'].includes(raw?.level) ? raw.level : DEFAULT_QR.level;
-	const margin = Math.max(0, Math.min(8, num(raw?.margin, DEFAULT_QR.margin)));
 	const background = parseColor(raw?.background);
-	return { level, margin, ...(background ? { background } : {}) };
+	return { level, ...(background ? { background } : {}) };
 }
 
 function normaliseBleed(raw: any): Template['bleed'] {

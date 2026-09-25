@@ -797,8 +797,11 @@ at its own size.
   end up with a code no phone will read. Byte mode, versions 1–10, which holds
   213 characters at correction level M — enough for any URL worth putting on a
   card. **Correction** trades capacity for damage tolerance (L 7% to H 30%), and
-  **Quiet zone** sets the blank border scanners need; two modules is the
-  practical minimum. Text the encoder cannot hold renders as nothing rather than
+  the blank border scanners need is the area's own **Padding**, in millimetres,
+  like the space round anything else — the code has no quiet zone of its own,
+  so a code with no padding runs to the area's edge. A couple of millimetres is
+  plenty at card sizes; a padding older templates set in modules is not carried
+  over. Text the encoder cannot hold renders as nothing rather than
   as a square that will not scan.
 
 The encoder is written here rather than pulled in, like the Markdown renderer
@@ -1313,7 +1316,7 @@ than it has to.
   mark in the middle, the four that act on what is on screen at the right.
 
 Every number says its unit: mm for geometry, bleed, spacing and gaps, pt for
-type size, modules for a QR padding.
+type size.
 
 ## Import and export
 

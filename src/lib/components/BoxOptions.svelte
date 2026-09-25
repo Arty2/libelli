@@ -655,21 +655,6 @@
 					</select>
 				</label>
 				<label class="field">
-					<span>Padding</span>
-					<input
-						class="n-2"
-						type="number"
-						min="0"
-						max="8"
-						step="1"
-						title="Blank border in modules; scanners need at least two"
-						value={selected.qr?.margin ?? DEFAULT_QR.margin}
-						disabled={boxFrozen}
-						onchange={(e) => setQr({ margin: Math.max(0, Math.min(8, Math.round(numeric(e, DEFAULT_QR.margin)))) })}
-					/>
-					<span class="unit">modules</span>
-				</label>
-				<label class="field">
 					<span>Background</span>
 					<select
 						value={selected.qr?.background ? 'opaque' : 'transparent'}

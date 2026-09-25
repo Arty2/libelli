@@ -245,7 +245,10 @@
 			return fitSvg(
 				qrSvg(value, {
 					level: box.qr?.level ?? 'M',
-					margin: box.qr?.margin ?? 2,
+					// No quiet zone of the code's own: the area's padding is the space
+					// round it, the same control every other area uses, and the old
+					// setting beside it was a second way to say one thing.
+					margin: 0,
 					color: box.color ?? template.defaults.color,
 					background: box.qr?.background
 				}),
@@ -254,6 +257,17 @@
 		} catch {
 			return '';
 		}
+	}
+
+	/**
+	 * How tall a picture or a code is drawn: the area's declared height, less
+	 * its padding and border. It was the whole height, so padding pushed the
+	 * picture down and out of the bottom of the area instead of framing it.
+	 */
+	function mediaHeight(box: Box): string {
+		const pad = sidesOf(box.padding ?? 0);
+		const border = sidesOf(box.borderWidth ?? 0);
+		return `${Math.max(0, box.h - pad.top - pad.bottom - border.top - border.bottom)}mm`;
 	}
 
 	/**
@@ -1465,7 +1479,7 @@
 							lineHeight: box.lineHeight ?? template.defaults.lineHeight
 						}))}
 					{:else if box.mode === 'qr'}
-						<span class="media" style="height:{box.h}mm">
+						<span class="media" style="height:{mediaHeight(box)}">
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
 							{@html qrFor(box)}
 						</span>
@@ -1474,7 +1488,7 @@
 						<!-- A color and a tile are both drawn by the box's own background,
 						     in boxStyle, so there is nothing to put in here for either. -->
 						{#if media.svg || (media.src && box.fit !== 'repeat')}
-							<span class="media" style="height:{box.h}mm">
+							<span class="media" style="height:{mediaHeight(box)}">
 								{#if media.svg}
 									<!-- eslint-disable-next-line svelte/no-at-html-tags -- safeSvg is the chokepoint; fitSvg only rewrites its width and height -->
 									{@html fitSvg(safeSvg(media.svg), box.fit)}
@@ -2325,10 +2339,13 @@
 
 		/* Positioned by the padding the box was given, so the guide moves with it
 		   without anything having to convert millimetres to pixels. */
+		/* Sized by subtraction, not by `auto`: for an SVG, auto is not "whatever
+		   the insets leave" but the default replaced size of 300 × 150 pixels,
+		   which drew this guide as a rectangle far bigger than the area. */
 		.pad {
 			inset: var(--pad-t, 0) var(--pad-r, 0) var(--pad-b, 0) var(--pad-l, 0);
-			width: auto;
-			height: auto;
+			width: calc(100% - var(--pad-l, 0mm) - var(--pad-r, 0mm));
+			height: calc(100% - var(--pad-t, 0mm) - var(--pad-b, 0mm));
 		}
 
 		.pad rect {
@@ -2338,9 +2355,12 @@
 
 		/* Where a grown area's bottom was set. Zero high and positioned by the
 		   declared height, so it sits exactly on that edge whatever the zoom. */
+		/* One line's weight tall, not 0: an SVG with a zero height is not drawn
+		   at all — the spec disables rendering for it — which is how this line
+		   was in the page and never on the screen. */
 		.original-edge {
 			inset: auto 0;
-			height: 0;
+			height: var(--line);
 		}
 
 		/* Where a clip would have cut, on an area that grows instead: thin and

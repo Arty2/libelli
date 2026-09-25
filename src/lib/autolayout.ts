@@ -435,7 +435,9 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 			overflow: 'clip',
 			fit: 'contain',
 			anchor: null,
-			qr: { level: 'M', margin: 1 }
+			qr: { level: 'M' },
+			// The quiet zone a scanner needs, as the area's own padding.
+			padding: 2
 		});
 	}
 

@@ -562,6 +562,11 @@ millimetre figure does not; it is written as `amount × leading` em rather than
 in `lh`, which only recently became widely available and would take the whole
 declaration with it where it is not.
 
+**The grown-edge line is one line tall, not zero.** It was an SVG with a height
+of 0, and an SVG with a zero dimension is not rendered at all, so the line was
+in the page and never on the screen — the check that counted it passed while
+nobody could see it.
+
 **A grown area remembers its height as a line, not a number.** The dashed
 original bottom edge is drawn in the bounds' own color and weight but sparse, so
 it reads as the same outline, remembered, rather than as a second warning beside
@@ -2198,6 +2203,20 @@ margin within reach beats the nearest grid line: a margin that is not a whole
 number of steps would otherwise be an edge nothing could land on. Far edges
 snap only when they are the edges being moved, so a box is never stretched to
 reach a guide it was not heading for.
+
+## A QR's quiet zone is the area's padding
+
+A QR area had two ways to put space round its code — the code's own quiet zone,
+in modules, and the area's padding, in mm — and they added up. The quiet zone
+is gone (`QrSettings.margin`, dropped on load), so the padding is the one
+control, as it is for every other area. The code is drawn at the area's height
+less its padding and border, as every picture is now: it was drawn at the full
+height, so padding pushed it out of the bottom. The trade-off: a template that
+relied on a quiet zone of modules opens with its code to the area's edge until
+it is given padding; the starter card's QR carries 1mm, and Position
+Automagically gives one 2mm. The padding guide was also drawn as an SVG sized
+`auto`, which for an SVG is 300 × 150px, not what the insets leave — the
+green-blue rectangle far larger than the area.
 
 ## `src/lib/components/MenuSelect.svelte`
 

@@ -143,9 +143,9 @@
       "hideWhenEmpty": true,
       "fit": "contain",
       "color": "#000000",
+      "padding": 1,
       "qr": {
-        "level": "M",
-        "margin": 1
+        "level": "M"
       }
     }
   ]
