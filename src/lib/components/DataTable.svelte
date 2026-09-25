@@ -1468,6 +1468,7 @@
 			     its menu. Never disabled by the lock it sets, or there would be no
 			     way out of it. -->
 			<button
+				class="lock-toggle"
 				aria-pressed={locked}
 				title={locked ? 'Unlock the table' : 'Lock the table — no typing, no new rows or columns, no paste or import'}
 				onclick={() => onlock(!locked)}
@@ -2460,8 +2461,10 @@
 		white-space: nowrap;
 	}
 
+	/* Narrower than it was, so the bar fits a phone with a cell open and its
+	   Edit showing; a longer name still scrolls within the field. */
 	.picker input {
-		width: 7.5rem;
+		width: 6rem;
 		min-width: 0;
 		padding: 3px 2px;
 		border: none;
@@ -2627,6 +2630,17 @@
 	@media (max-width: 900px) {
 		.row-height .label {
 			display: none;
+		}
+
+		/* The field says it is a table by what is in it; the word is the room. */
+		.picker > span:first-child {
+			display: none;
+		}
+
+		/* And the field a little narrower again: at 390px wide, a cell open with
+		   its Edit showing was 7px past the edge. */
+		.picker input {
+			width: 5.5rem;
 		}
 	}
 

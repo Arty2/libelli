@@ -102,3 +102,12 @@ html, body {
 	background: #eaf1fe;
 	color: #1d4ed8;
 }
+
+/* Every Lock button — the page's, an area's, the table's — one width, the
+   width of "Unlock": it said Lock at 68px and Unlock at 82, so pressing it
+   shoved everything after it along the bar, and the three were three sizes. */
+.lock-toggle {
+	box-sizing: border-box;
+	width: 84px;
+	justify-content: center;
+}

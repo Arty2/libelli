@@ -540,6 +540,7 @@
 		<span class="head">
 			<span class="head-row">
 				<button
+					class="lock-toggle"
 					aria-pressed={!!selected.locked}
 					title={selected.locked ? 'Unlock this area' : 'Lock this area — no dragging, no resizing, no option changes'}
 					disabled={pageFrozen}

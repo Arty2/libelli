@@ -364,6 +364,7 @@
 				     Never disabled by the lock it sets, or there would be no way out
 				     of it. -->
 				<button
+					class="lock-toggle"
 					aria-pressed={pageFrozen}
 					title={pageFrozen ? 'Unlock the design' : 'Lock the design — no dragging, no option changes'}
 					onclick={() => patchTemplate({ locked: pageFrozen ? undefined : true })}
