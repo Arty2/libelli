@@ -615,8 +615,8 @@ a notice can appear.
   a new area, named after the column and bound to it, where a new area goes.
 - **Counting** — while a cell is being typed in, **Edit** appears just right of
   the row height, and opens it full size; its characters and words are at the
-  right-hand end. With rows chosen the lock, the table and the swap step aside
-  for the row actions — the count, *3 rows* (nothing for one, whose tick says
+  right-hand end, and the lock, the table and the swap step aside until the cell
+  is left. With rows chosen they step aside too, for the row actions — the count, *3 rows* (nothing for one, whose tick says
   it), the up and down chevrons, **Copy** and **Delete** — and come back when
   the choice is cleared.
 - **Moving rows** — with rows chosen, the up and down chevrons before **Copy**

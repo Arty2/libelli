@@ -1459,10 +1459,10 @@
 				onclick={() => editing && openBigCell(editing.row, editing.column)}
 			><Icon name="task-edit" size={15} /> Edit</button>
 		{/if}
-		<!-- Which table, and its lock, gone while rows are chosen: the row
-		     actions take the bar then, and the two together ran out of room on a
-		     narrow tray. -->
-		{#if !chosenRows.length || editing}
+		<!-- Which table, and its lock, gone while rows are chosen or a cell is
+		     typed in: the row actions or the cell's Edit and count take the bar
+		     then, and either with these beside them ran out of room on a phone. -->
+		{#if !chosenRows.length && !editing}
 			<!-- The state of the table named beside it, and the one thing here that
 			     is not an errand — the same reason the page bar keeps its Lock outside
 			     its menu. Never disabled by the lock it sets, or there would be no
