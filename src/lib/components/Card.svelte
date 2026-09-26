@@ -2221,16 +2221,16 @@
 	   the area's own, so it shows where the area is and how big what lands in
 	   it will be. Drawn only where `interactive` is set, so nothing on paper
 	   reaches this rule. */
-	/* The page margins. The bounds' weight, solid, in a colour of their own —
-	   the one layout software has long drawn margins in — so a margin is never
-	   taken for an area. Screen only: drawn only where
+	/* The page margins. The bounds' weight, solid, in the accent's inverse —
+	   the colour furthest from the areas' outlines, which are the accent — so a
+	   margin is never taken for an area. Screen only: drawn only where
 	   `interactive` is set. */
 	.margin-guide {
 		position: absolute;
 		pointer-events: none;
 		/* Solid, and an inset shadow rather than an outline: an outline is
 		   rounded to whole pixels of the zoomed card, and doubled at 200%. */
-		box-shadow: inset 0 0 0 var(--line) rgba(192, 38, 211, 0.55);
+		box-shadow: inset 0 0 0 var(--line) color-mix(in srgb, var(--accent-inverse) 55%, transparent);
 	}
 
 	/* The stage's grid, under the trim and everything in it. Positioned from
@@ -2941,7 +2941,7 @@
 		   centres the drawn line where the box's own edge used to be. */
 		.guide {
 			position: absolute;
-			background: linear-gradient(#ec4899, #ec4899) center / 100% 100% no-repeat;
+			background: linear-gradient(var(--accent-inverse), var(--accent-inverse)) center / 100% 100% no-repeat;
 			pointer-events: none;
 			z-index: 4;
 		}

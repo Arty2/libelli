@@ -1344,7 +1344,7 @@ The arrow keys and the pad both move every area in the selection, not only a
 lone one.
 
 Dragging snaps in this order: with **Guides** on the page **margins** show as a
-solid guide in magenta — over the grid and under every area — and an edge that comes within reach of one lands on it
+solid guide in the inverse of the accent (amber against the default blue outlines) — over the grid and under every area — and an edge that comes within reach of one lands on it
 — the left and top edges, and the right and bottom when those are the edges
 being moved; then, with **Grid** on, the 5mm subgrid of a 10mm grid takes
 everything else; otherwise a box latches onto the edges and centres of its

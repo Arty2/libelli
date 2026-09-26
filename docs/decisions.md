@@ -2800,6 +2800,14 @@ A named `blue` in `color.ts` is content, not chrome, and stays a fixed colour.
 `color-mix` is Widely available; relative colour syntax is not yet, which is
 why the tints are mixes rather than `rgb(from …)`.
 
+**The guides are the accent's inverse.** The page margins and the snap guides
+are drawn over the areas' outlines, which are the accent, so they take
+`--accent-inverse` — the colour furthest from it — rather than a fixed magenta
+that sat beside a blue outline well and beside a pink or purple system accent
+not at all. The true inverse needs relative colour syntax, which is Baseline
+Newly, so it is behind `@supports`; without it the guides are `#da9c14`, the
+inverse of the fallback blue, worked out by hand.
+
 ## `src/lib/components/Tooltip.svelte` and `src/lib/tooltip.ts`
 
 **One tooltip, for every `title`.** The browser's own cannot be styled, arrives

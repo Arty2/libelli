@@ -27,6 +27,14 @@
 	--accent-soft: color-mix(in srgb, var(--accent) 16%, #fff);
 	--accent-tint: color-mix(in srgb, var(--accent) 10%, #fff);
 	--accent-wash: color-mix(in srgb, var(--accent) 6%, #fff);
+	/* The accent turned inside out, for the guides — the page margins and the
+	   lines a drag snaps to. They are drawn over the boxes' outlines, which are
+	   the accent, so they want the colour furthest from it rather than a second
+	   fixed one: magenta sat beside a blue outline well enough, and beside a
+	   purple or a pink system accent not at all. This is the fallback blue's
+	   inverse, worked out by hand; the true inverse of whatever the accent is
+	   follows below where the browser can compute it. */
+	--accent-inverse: #da9c14;
 }
 
 /* `AccentColor` is not yet Baseline Widely, so it is behind a feature query:
@@ -35,6 +43,17 @@
 @supports (color: AccentColor) {
 	:root {
 		--accent: AccentColor;
+	}
+}
+
+/* Relative colour syntax is Baseline Newly, not yet Widely: behind a query,
+   so a browser without it keeps the inverse of the blue above. A browser with
+   `AccentColor` but without this would pair the system accent with that
+   fixed amber — a mismatch, but a visible one, which is what a guide has to
+   be. */
+@supports (color: rgb(from red r g b)) {
+	:root {
+		--accent-inverse: rgb(from var(--accent) calc(255 - r) calc(255 - g) calc(255 - b));
 	}
 }
 
