@@ -864,6 +864,12 @@ at its own size.
   the bar under the panel, and **Delete** and **Save** at its far right; Delete
   is how the board is emptied.
 
+  The **×** goes back to where the drawing was opened from: the table if you
+  opened it there (or the table was already showing), the Images tray if it
+  came from there, and otherwise it simply closes the panel — drawing on an
+  area never leaves the table open behind it. The **‹** at the other end of the
+  title bar steps back to the table (or to Images), to see the drawing's row.
+
   **Rotate** turns the drawing a quarter turn clockwise, board and all.
   **Flip** mirrors it on the same board, pixel for pixel. **Crop** works as it
   does on a stored image: drag a frame over the board — it snaps to whole

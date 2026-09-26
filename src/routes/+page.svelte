@@ -946,7 +946,7 @@
 	}
 
 	/** An area with no column, asked to be drawn in the side panel. */
-	let areaRequest = $state<{ id: string; name: string; value: string; pixels?: { w: number; h: number }; ink: string } | null>(null);
+	let areaRequest = $state<{ id: string; name: string; value: string; pixels?: { w: number; h: number }; ink: string; from?: 'card' | 'images' } | null>(null);
 
 	/**
 	 * A drawing onto an area with no column: it has no cell, so it goes onto
@@ -1006,18 +1006,23 @@
 	 * but draws in the same place, onto the area; a locked table is no reason
 	 * to refuse that, since nothing in the table changes.
 	 */
-	function drawArea(id: string) {
+	function drawArea(id: string, via: 'card' | 'images' = 'card') {
 		const box = template.boxes.find((b) => b.id === id);
 		const column = box?.slot ? mapping[box.slot] : undefined;
 		if (!box) return;
 		if (column && row && refuseLockedTable()) return;
+		// Where the editor's × goes back to. With the table already showing,
+		// that is the table; otherwise the panel was opened only to draw in,
+		// and closing the drawing closes it (or goes back to Images).
+		const from = via === 'images' ? via : dataOpen ? undefined : 'card';
 		dataOpen = true;
 		imagesOpen = false;
 		if (column && row) {
-			cellRequest = { row: activeRow, column, draw: true };
+			cellRequest = { row: activeRow, column, draw: true, from };
 			return;
 		}
 		areaRequest = {
+			from,
 			id,
 			name: box.slot?.trim() || 'Drawing',
 			value: areaDrawingValue(box),
@@ -1053,7 +1058,7 @@
 	/** A drawing pressed in the Images tray, opened in the drawing editor it belongs to. */
 	function openDrawing(key: string) {
 		if (key.startsWith('area:')) {
-			drawArea(key.slice('area:'.length));
+			drawArea(key.slice('area:'.length), 'images');
 			return;
 		}
 		const [, index, ...rest] = key.split(':');
@@ -1064,7 +1069,7 @@
 		activeRow = rowIndex;
 		dataOpen = true;
 		imagesOpen = false;
-		cellRequest = { row: rowIndex, column, draw: true };
+		cellRequest = { row: rowIndex, column, draw: true, from: 'images' };
 	}
 
 	/** A stored picture, opened large in the Images tray. */
@@ -2141,7 +2146,7 @@
 	 * size in the table. The table is opened for it if it was folded away; a
 	 * locked table says so rather than opening an editor it would refuse.
 	 */
-	let cellRequest = $state<{ row: number; column: string; draw?: boolean } | null>(null);
+	let cellRequest = $state<{ row: number; column: string; draw?: boolean; from?: 'card' | 'images' } | null>(null);
 
 	// A request is a one-off: the table reads it as it mounts, so one left
 	// standing when the panel closes would open the editor again the next time
@@ -2817,6 +2822,10 @@
 				onsavearea={saveAreaDrawing}
 				ondeletearea={deleteAreaDrawing}
 				ondrawing={(on) => (drawingInTable = on)}
+				onleave={(to) => {
+					dataOpen = false;
+					if (to === 'images') imagesOpen = true;
+				}}
 				onopenimage={openImage}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name

@@ -574,6 +574,15 @@ on the window, and a Delete meant for the board would delete an area. A stroke
 focuses the board, because its press is held back from the page and would not
 otherwise move the focus off the Save just pressed.
 
+**The drawing editor closes to where it was opened from.** It lives in the
+table's panel, so opening it from an area on the card opened the table, and
+its × then left the table showing — a panel nobody had asked for. Each request
+now carries where it came from (`from` on `openRequest` and `areaRequest`):
+× goes back to the table only when the drawing was opened there or the table
+was already showing, back to Images when it came from there, and otherwise
+closes the panel (`onleave`). The ‹, as the Images tray's large view has it, is
+one step back — to Images, or to the table the drawing lives in.
+
 **Drawings are listed in the Images tray, not stored there.** A drawing lives
 in its cell, or on an area with no column, on purpose (see `bitmap.ts` above),
 and so the tray — "every image this browser is holding" — was missing exactly

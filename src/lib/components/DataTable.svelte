@@ -13,6 +13,9 @@
 	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
 	import type { Dataset, Row, RowHeight } from '$lib/types';
 
+	/** Where a drawing was opened from, other than the table itself. */
+	type Origin = 'card' | 'images';
+
 	interface Props {
 		dataset: Dataset;
 		/** every table stored in this browser, for the picker */
@@ -48,7 +51,7 @@
 		 * draws in the same side panel, and its drawing goes onto the area. A
 		 * new object each time, as `openRequest` is.
 		 */
-		areaRequest?: { id: string; name: string; value: string; pixels?: Grid; ink: string } | null;
+		areaRequest?: { id: string; name: string; value: string; pixels?: Grid; ink: string; from?: Origin } | null;
 		onsavearea: (id: string, dataUrl: string, pixels: Grid | undefined) => void;
 		ondeletearea: (id: string) => void;
 		/**
@@ -90,7 +93,13 @@
 		 * a Data Field area. A new object each time, so asking twice for the
 		 * same cell opens it twice.
 		 */
-		openRequest?: { row: number; column: string; draw?: boolean } | null;
+		openRequest?: { row: number; column: string; draw?: boolean; from?: Origin } | null;
+		/**
+		 * The editor closed on something that was not opened from the table: the
+		 * page puts back what was there before — the Images tray, or no panel at
+		 * all — rather than leaving the table showing, which nobody asked for.
+		 */
+		onleave?: (to: Origin) => void;
 		/** open the Getting Started table, or start one */
 		ongettingstarted: () => void;
 		/**
@@ -136,8 +145,17 @@
 		onrenamecolumn,
 		ongettingstarted,
 		openRequest = null,
+		onleave,
 		onnotice
 	}: Props = $props();
+
+	/**
+	 * Where the open editor was asked for from, and so where its × goes back
+	 * to. From the table itself, the table; from an area on the card, the
+	 * panel closes, since it was only opened to draw in; from the Images
+	 * tray, back to that.
+	 */
+	let leaveTo = $state<'table' | Origin>('table');
 
 	/**
 	 * The row the page is showing, brought into view. Paging the card with the
@@ -307,7 +325,7 @@
 	 * editor's to open at all — it goes to the Images tray, where it can be
 	 * seen large and cropped or turned.
 	 */
-	function openBigCell(rowIndex: number, column: string, draw = false) {
+	function openBigCell(rowIndex: number, column: string, draw = false, from: 'table' | Origin = 'table') {
 		const value = dataset.rows[rowIndex]?.[column];
 		if (value === undefined) return false;
 		const stored = localImageName(value);
@@ -319,6 +337,7 @@
 		// the outline lit behind the editor.
 		(document.activeElement as HTMLElement | null)?.blur();
 		drawingArea = null;
+		leaveTo = from;
 		bigCell = { row: rowIndex, column, draw: draw || undefined };
 		drawnValue = value;
 		onactivate(rowIndex);
@@ -330,7 +349,7 @@
 		const ask = openRequest;
 		if (!ask) return;
 		untrack(() => {
-			if (!locked && dataset.columns.includes(ask.column)) openBigCell(ask.row, ask.column, !!ask.draw);
+			if (!locked && dataset.columns.includes(ask.column)) openBigCell(ask.row, ask.column, !!ask.draw, ask.from ?? 'table');
 		});
 	});
 
@@ -428,6 +447,7 @@
 		if (!ask) return;
 		untrack(() => {
 			bigCell = null;
+			leaveTo = ask.from ?? 'table';
 			drawingArea = { ...ask };
 			areaEpoch += 1;
 		});
@@ -473,10 +493,20 @@
 		return text.startsWith('data:image/') ? safeMediaUrl(text) : null;
 	}
 
-	function closeBigCell() {
+	/** Close the editor, back to where it was opened from — or, `toTable`, to the table regardless. */
+	function closeBigCell(toTable = false) {
+		const to = leaveTo;
 		bigCell = null;
 		drawingArea = null;
+		leaveTo = 'table';
+		if (!toTable && to !== 'table') onleave?.(to);
 	}
+
+	/** The chevron: one step back — to the Images tray it came from, or else to the table. */
+	const stepBack = () => closeBigCell(leaveTo !== 'images');
+
+	const leaveTitle = (dirty: boolean) =>
+		(dirty ? 'Close — the drawing not saved is dropped' : leaveTo === 'images' ? 'Back to Images' : leaveTo === 'card' ? 'Close' : 'Back to the table') + ' (Esc)';
 
 	const focusOnOpen = (node: HTMLElement) => node.focus();
 
@@ -1978,6 +2008,19 @@
 	     table hid the card the words are for. It takes exactly the table's
 	     room — the rows and the bar under them — and gives it back on Done or
 	     Cancel. -->
+	<!-- The drawing editor's way back, as the Images tray's large view has it:
+	     one step — to Images if that is where it came from, else to the table
+	     the drawing lives in. The × beside it closes to wherever it came from. -->
+	{#snippet back()}
+		<button
+			class="icon back"
+			title={leaveTo === 'images' ? 'Back to Images' : 'Back to the table'}
+			aria-label={leaveTo === 'images' ? 'Back to Images' : 'Back to the table'}
+			onclick={stepBack}
+		>
+			<Icon name="chevron-left" size={16} />
+		</button>
+	{/snippet}
 	{#if drawingArea}
 		{@const area = drawingArea}
 		<div class="cell-editor drawing" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
@@ -1994,9 +2037,10 @@
 				<!-- The title's room holds the board's own row instead — its size,
 				     the paper, its weight — moved in by the board; the name stays
 				     for a screen reader. -->
+				{@render back()}
 				<h2 id="cell-editor-title" class="sr-only">{area.name}</h2>
 				<span class="board-head" bind:this={boardHead}></span>
-				<button class="icon close" title={boardDirty ? 'Close — the drawing not saved is dropped (Esc)' : 'Back to the table (Esc)'} aria-label="Close" onclick={closeBigCell}>
+				<button class="icon close" title={leaveTitle(boardDirty)} aria-label="Close" onclick={() => closeBigCell()}>
 					<Icon name="close" size={18} />
 				</button>
 			</div>
@@ -2030,13 +2074,14 @@
 				onclickcapture={swallowClick}
 			>
 				{#if boardShown(open)}
+					{@render back()}
 					<h2 id="cell-editor-title" class="sr-only">{open.column}</h2>
 					<span class="board-head" bind:this={boardHead}></span>
 				{:else}
 					<h2 id="cell-editor-title">{open.column}</h2>
 					<span class="spacer"></span>
 				{/if}
-				<button class="icon close" title={boardShown(open) && boardDirty ? 'Close — the drawing not saved is dropped (Esc)' : 'Back to the table (Esc)'} aria-label="Close" onclick={closeBigCell}>
+				<button class="icon close" title={leaveTitle(boardShown(open) && boardDirty)} aria-label="Close" onclick={() => closeBigCell()}>
 					<Icon name="close" size={18} />
 				</button>
 			</div>
@@ -3181,7 +3226,14 @@
 		display: flex;
 		justify-content: center;
 		min-width: 0;
-		padding-left: 32px;
+	}
+
+	/* The chevron on the left, the × on the right: the same width each, so the
+	   board's row between them is centred on the panel. */
+	.cell-editor .back {
+		flex: none;
+		width: 28px;
+		height: 28px;
 	}
 
 	.board-bar {
