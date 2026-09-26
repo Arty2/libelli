@@ -7,7 +7,7 @@
 	import { cssIdent, scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
-	import { HOLD_SLOP, hold } from '$lib/gestures';
+	import { HOLD_SLOP } from '$lib/gestures';
 	import {
 		FREE_STEP,
 		GRID_MINOR,
@@ -20,6 +20,7 @@
 		pxToMm,
 		mmToPx,
 		resolveLayout,
+		latchSpan,
 		snapTo,
 		snapToEdges
 	} from '$lib/layout';
@@ -36,12 +37,21 @@
 		mapping?: Mapping;
 		/** dashed box bounds and the bleed marker; screen only, never printed */
 		bounds?: boolean;
+		/** every tie drawn as its thread, not only the one pointed at — with the bounds */
+		ties?: boolean;
 		/** families still arriving, so an area can say so rather than sit in the fallback */
 		loadingFonts?: string[];
-		/** snap drags to the 5mm subgrid rather than to sibling edges */
+		/** snap drags to the 5mm subgrid */
 		grid?: boolean;
 		/** draw the page margins, and snap to them */
 		guides?: boolean;
+		/**
+		 * The temporary guides: while a box is dragged it latches onto another
+		 * box's edges and middle, and onto the page's centre lines, and a line
+		 * shows what it caught. On a switch of its own, apart from the margins,
+		 * so they can be had without the margins drawn.
+		 */
+		smartGuides?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
 		scale?: number;
 		interactive?: boolean;
@@ -113,9 +123,11 @@
 		row = null,
 		mapping = {},
 		bounds = false,
+		ties = false,
 		loadingFonts = [],
 		grid = false,
 		guides = false,
+		smartGuides = false,
 		scale = 1,
 		interactive = false,
 		selectedIds = [],
@@ -910,15 +922,20 @@
 	}
 
 	/**
-	 * Snapping, strongest first: the page margins when the guides are on, then
-	 * an enabled grid, and otherwise a box latches onto a sibling's edge when it
-	 * comes within `SNAP_TOLERANCE`. Sibling edges come from the resolved
-	 * layout, so a box snaps to where a grown box really ends.
+	 * Snapping, strongest first: the page margins when they are drawn, then the
+	 * temporary guides — another box's edges and middle, and the page's centre
+	 * lines, within `SNAP_TOLERANCE` — then an enabled grid. A box being moved
+	 * tries its left, middle and right (top, middle, bottom) and takes whichever
+	 * is nearest, so boxes line up by their middles as well as their edges; a
+	 * handle, which moves one edge, tries that edge. Sibling edges come from the
+	 * resolved layout, so a box snaps to where a grown box really ends. An
+	 * alignment in reach beats the grid, because it is the more specific thing
+	 * to have meant.
 	 *
 	 * There is no modifier to hold: the toggles under the page are the whole
-	 * control. Grid, Guides and Boxes all off is free movement, because a box cannot
-	 * latch onto a guide that is not being drawn — a snap to an invisible edge is
-	 * indistinguishable from a bug.
+	 * control. Grid and Guides both off is free movement; every latch draws the
+	 * line it caught, because a snap to an invisible edge is indistinguishable
+	 * from a bug.
 	 */
 	const SNAP_TOLERANCE = 1.5;
 
@@ -952,8 +969,13 @@
 
 	function moveDrag(event: PointerEvent) {
 		if (!drag) return;
-		const latch = !grid && bounds;
-		const edges = latch ? boxEdges(template.boxes, layout, drag.id) : { x: [], y: [] };
+		const edges = smartGuides ? boxEdges(template.boxes, layout, drag.id) : { x: [], y: [] };
+		// The page's own centre lines too: a box centred on the card is the
+		// alignment most cards want, and there may be no box there to line up with.
+		if (smartGuides) {
+			edges.x.push(template.page.w / 2);
+			edges.y.push(template.page.h / 2);
+		}
 		const latched = { x: null as number | null, y: null as number | null };
 
 		// With the guides on, the margins win over a grid line or a sibling's
@@ -963,7 +985,8 @@
 			x: [margins.left, template.page.w - margins.right],
 			y: [margins.top, template.page.h - margins.bottom]
 		};
-		const place = (value: number, axis: 'x' | 'y'): number => {
+		/** `length` is the box's extent on this axis when the whole box is moving. */
+		const place = (value: number, axis: 'x' | 'y', length?: number): number => {
 			if (guides) {
 				const hit = snapToEdges(value, marginEdges[axis], SNAP_TOLERANCE);
 				if (hit !== null) {
@@ -971,11 +994,20 @@
 					return hit;
 				}
 			}
-			if (grid) return snapTo(value, GRID_MINOR);
-			const hit = latch ? snapToEdges(value, edges[axis], SNAP_TOLERANCE) : null;
-			if (hit === null) return snapTo(value, FREE_STEP);
-			latched[axis] = hit;
-			return hit;
+			if (length !== undefined) {
+				const hit = latchSpan(value, length, edges[axis], SNAP_TOLERANCE);
+				if (hit) {
+					latched[axis] = hit.edge;
+					return round2(hit.start);
+				}
+			} else {
+				const hit = snapToEdges(value, edges[axis], SNAP_TOLERANCE);
+				if (hit !== null) {
+					latched[axis] = hit;
+					return hit;
+				}
+			}
+			return snapTo(value, grid ? GRID_MINOR : FREE_STEP);
 		};
 		// A size is not a position: it rounds, but it never latches onto an edge.
 		const size = (value: number) => snapTo(value, grid ? GRID_MINOR : FREE_STEP);
@@ -1022,13 +1054,13 @@
 		const mode = flip ? MIRRORED_MODE[drag.mode] : drag.mode;
 		const next: Box = { ...origin };
 
-		const setTop = (deltaY: number) => {
+		const setTop = (deltaY: number, length?: number) => {
 			// An anchored box has no independent top: move its gap instead, so the
 			// relationship the template author set up survives being dragged. No
 			// floor under it — dragged up past the area it follows, it overlaps
 			// that area, with a negative gap, rather than stopping dead.
 			if (origin.anchor) next.anchor = { ...origin.anchor, gap: size(origin.anchor.gap + deltaY) };
-			else next.y = place(origin.y + deltaY, 'y');
+			else next.y = place(origin.y + deltaY, 'y', length);
 		};
 
 		switch (mode) {
@@ -1078,8 +1110,8 @@
 				break;
 			}
 			case 'move':
-				next.x = place(origin.x + dx, 'x');
-				setTop(dy);
+				next.x = place(origin.x + dx, 'x', origin.w);
+				setTop(dy, layout.heights[origin.id] ?? origin.h);
 				break;
 			case 'e':
 				next.w = Math.max(4, size(origin.w + dx));
@@ -1367,31 +1399,57 @@
 	 * overlay sits inside the card's transform like everything else on it.
 	 */
 	let trimEl = $state<HTMLElement | null>(null);
+
+	/**
+	 * A finger's tap on the card is not also a tap on whatever slid under it.
+	 *
+	 * A touch's click is aimed at what is under the finger when it lifts, not
+	 * at what it pressed. Pressing an area selects it on the way down, and on a
+	 * phone that brings the area bar into the options row above the stage and
+	 * pushes the card down a bar's height — so by the time the finger lifted,
+	 * the font menu or an alignment button was under it, and got the click.
+	 * The click that follows a touch on the card is dropped when it lands off
+	 * the card. A mouse is left alone: its click goes to what was both pressed
+	 * and released, which a shift underneath cannot change.
+	 */
+	function guardGhostClick(event: PointerEvent) {
+		if (event.pointerType === 'mouse' || !trimEl) return;
+		const card = trimEl;
+		const swallow = (click: MouseEvent) => {
+			window.removeEventListener('click', swallow, true);
+			if (click.target instanceof Node && card.contains(click.target)) return;
+			click.preventDefault();
+			click.stopPropagation();
+		};
+		// Armed for the moment after the finger lifts, which is when a tap's
+		// click arrives. A drag makes no click at all, so the guard stands down
+		// shortly after — it must never eat the next, real tap somewhere else.
+		const lifted = () => setTimeout(() => window.removeEventListener('click', swallow, true), 350);
+		window.addEventListener('click', swallow, true);
+		window.addEventListener('pointerup', lifted, { once: true });
+		window.addEventListener('pointercancel', lifted, { once: true });
+	}
 	let threads = $state<string[]>([]);
 
-	function showThreads(box: Box, kind: 'tied' | 'moored') {
-		if (!trimEl) return;
+	/** A tie badge, or its area where the badge is not drawn. */
+	function badgeOf(attr: 'tie' | 'moor', id: string): HTMLElement | null {
 		const el = trimEl;
-		const badge = (attr: 'tie' | 'moor', id: string) =>
+		if (!el) return null;
+		return (
 			el.querySelector<HTMLElement>(`[data-${attr}="${CSS.escape(id)}"]`) ??
-			el.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`);
-		// By the badge pointed at, not by what the area happens to be: an area in
-		// the middle of a chain wears both, and pointing at its buoy used to draw
-		// the thread up to its own parent instead of down to what follows it.
-		// Every pair is tie first, buoy second, whichever end is pointed at: the
-		// dots always walk from the area that follows to the one it is tied to.
-		const pairs: Array<[HTMLElement | null, HTMLElement | null]> =
-			kind === 'tied'
-				? box.anchor
-					? [[badge('tie', box.id), badge('moor', box.anchor.to)]]
-					: []
-				: template.boxes.filter((b) => b.anchor?.to === box.id).map((b) => [badge('tie', b.id), badge('moor', box.id)]);
-		const origin = el.getBoundingClientRect();
+			el.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`)
+		);
+	}
+
+	/** Each pair, tie first and buoy second, as a path in the trim's own pixels. */
+	function threadPaths(pairs: Array<[HTMLElement | null, HTMLElement | null]>): string[] {
+		if (!trimEl) return [];
+		const origin = trimEl.getBoundingClientRect();
 		const at = (node: HTMLElement) => {
 			const r = node.getBoundingClientRect();
 			return { x: (r.left + r.width / 2 - origin.left) / scale, y: (r.top + r.height / 2 - origin.top) / scale };
 		};
-		threads = pairs
+		return pairs
 			.filter((pair): pair is [HTMLElement, HTMLElement] => !!pair[0] && !!pair[1])
 			.map(([tie, buoy]) => {
 				const a = at(tie);
@@ -1410,9 +1468,65 @@
 			});
 	}
 
+	function showThreads(box: Box, kind: 'tied' | 'moored') {
+		// By the badge pointed at, not by what the area happens to be: an area in
+		// the middle of a chain wears both, and pointing at its buoy used to draw
+		// the thread up to its own parent instead of down to what follows it.
+		// Every pair is tie first, buoy second, whichever end is pointed at: the
+		// dots always walk from the area that follows to the one it is tied to.
+		threads = threadPaths(
+			kind === 'tied'
+				? box.anchor
+					? [[badgeOf('tie', box.id), badgeOf('moor', box.anchor.to)]]
+					: []
+				: template.boxes
+						.filter((b) => b.anchor?.to === box.id)
+						.map((b) => [badgeOf('tie', b.id), badgeOf('moor', box.id)])
+		);
+	}
+
+	/**
+	 * With the Boxes box at its dash, every tie on the card, all the time.
+	 * Measured after the card has laid out — an anchored area's place is only
+	 * known once what it hangs from has been measured — and again whenever the
+	 * layout, the zoom or the selection (which moves badges) changes.
+	 */
+	let allThreads = $state<string[]>([]);
+	const showsAllTies = $derived(ties && bounds && !template.locked);
+
+	$effect(() => {
+		if (!showsAllTies) {
+			allThreads = [];
+			return;
+		}
+		// Read so the effect runs again when any of them changes.
+		void [layout, scale, template.boxes, selectedIds];
+		const frame = requestAnimationFrame(() => {
+			allThreads = threadPaths(
+				template.boxes
+					.filter((b) => b.anchor && !hidden.has(b.id))
+					.map((b) => [badgeOf('tie', b.id), badgeOf('moor', b.anchor!.to)])
+			);
+		});
+		return () => cancelAnimationFrame(frame);
+	});
+
+	/** What is drawn: every tie while they are all on show, else the one pointed at. */
+	const drawnThreads = $derived(showsAllTies ? allThreads : threads);
+
+	/**
+	 * Whether this area's badges are on show at all. Only on the area you are
+	 * working on and on the areas tied to it: a badge on every area of a busy
+	 * card was a field of little marks competing with the design, and what a
+	 * badge says — locked, tied, static — matters when you are about to act on
+	 * that area. Its chain comes along because moving it moves them.
+	 */
+	const showsBadges = (box: Box) =>
+		isSelected(box) || litFollowers.has(box.id) || litKin.has(box.id) || litTargets.has(box.id);
+
 	/** Whether the column of badges hangs off this box's right-hand edge. */
 	const hasBadges = (box: Box) =>
-		bounds && !template.locked && !!(box.locked || isStatic(box) || pictureKind(box) || editsCell(box));
+		bounds && !template.locked && showsBadges(box) && !!(box.locked || isStatic(box) || pictureKind(box) || editsCell(box));
 
 	/**
 	 * A selected area whose words come out of a cell carries the way into that
@@ -1456,15 +1570,14 @@
 	}
 
 	/**
-	 * Press and hold the pivot, or the knob on its arm, to put it back.
+	 * Double-click the pivot, or the knob on its arm, to put it back.
 	 *
 	 * Both marks are dragged to a value with no number written anywhere on the
 	 * card, and both have a resting state that is the only one most cards want:
 	 * the middle, and upright. Getting back to either by dragging is a game of
-	 * pixel-hunting, and the two fields in the bar are three clicks away and only
-	 * there for a single selection. A hold on the mark itself is the shortest
-	 * line back, and `hold` gives up the moment the pointer moves, so the drag
-	 * these share an element with is never mistaken for one.
+	 * pixel-hunting; the fields in the bar do it exactly, and a double-click on
+	 * the mark itself is the shortest line back. It was a press and hold, until
+	 * a hold came to mean "what is this?" everywhere in the app.
 	 *
 	 * The drag in flight is dropped along with it: it snapshotted the old value
 	 * at pointerdown, and a move arriving afterwards would write that snapshot
@@ -1586,7 +1699,12 @@
 	{#if underlay}
 		<div class="underlay" aria-hidden="true">{@render underlay()}</div>
 	{/if}
-	<div class="trim" bind:this={trimEl} style="width:{template.page.w}mm;height:{template.page.h}mm">
+	<div
+		class="trim"
+		bind:this={trimEl}
+		style="width:{template.page.w}mm;height:{template.page.h}mm"
+		onpointerdowncapture={guardGhostClick}
+	>
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
 			{@html styleTag(customCss)}
@@ -1805,11 +1923,11 @@
 				     buttons that would be refused anyway. The overflow mark below is
 				     not one of these: it is about what will print, which a lock does
 				     not change. -->
-				{#if bounds && !template.locked && (box.anchor || anchorTargets.has(box.id))}
-					<!-- The anchor's two ends, in a column of their own off the top-left
-					     corner: the tie on an area that follows another, and under it the
-					     buoy on one that others follow — a middle link in a chain wears
-					     both. Off the right-hand column because on a shallow area four
+				{#if bounds && !template.locked && (showsBadges(box) || showsAllTies) && (box.anchor || anchorTargets.has(box.id))}
+					<!-- The anchor's two ends, in a row of their own off the top-left
+					     corner: the buoy in the corner on one that others follow, and to
+					     its left the tie on an area that follows another — a middle link
+					     in a chain wears both. Off the right-hand column because on a shallow area four
 					     badges are taller than the area itself, and these are the badges
 					     areas most often carry; together because they are one
 					     relationship, and the thread between them runs from this side. -->
@@ -1950,9 +2068,13 @@
 						     has to be there before there is any rotation to show. -->
 						<span
 							class="pivot"
-							use:hold={() => resetPivot(box)}
+							ondblclick={(e) => {
+								// Not also a double-click on the area, which opens it for typing.
+								e.stopPropagation();
+								resetPivot(box);
+							}}
 							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
-							title="The point this area turns about — drag it, or type it in the bar. Press and hold to put it back in the middle."
+							title="The point this area turns about — drag it, or type it in the bar. Double-click to put it back in the middle."
 							onpointerdown={(e) => startDrag(e, box, 'centre')}
 							onpointermove={moveDrag}
 							onpointerup={endDrag}
@@ -1963,9 +2085,12 @@
 							></span>
 						<span
 							class="lever"
-							use:hold={() => resetRotation(box)}
+							ondblclick={(e) => {
+								e.stopPropagation();
+								resetRotation(box);
+							}}
 							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
-							title="Drag to turn this area — hold Shift for 15° steps. Press and hold to set it upright."
+							title="Drag to turn this area — hold Shift for 15° steps. Double-click to set it upright."
 							onpointerdown={(e) => startDrag(e, box, 'rotate')}
 							onpointermove={moveDrag}
 							onpointerup={endDrag}
@@ -2001,9 +2126,9 @@
 			</div>
 		{/if}
 
-		{#if threads.length}
+		{#if drawnThreads.length}
 			<svg class="chrome threads" aria-hidden="true">
-				{#each threads as d, i (i)}<path {d} />{/each}
+				{#each drawnThreads as d, i (i)}<path {d} />{/each}
 			</svg>
 		{/if}
 
@@ -2191,7 +2316,7 @@
 		text-align: inherit;
 		letter-spacing: inherit;
 		line-height: inherit;
-		outline: var(--line-thick) solid #2563eb;
+		outline: var(--line-thick) solid var(--accent);
 		/* The box is `touch-action: none` so it can be dragged; the editor inside
 		   it has to hand scrolling and text selection back. */
 		touch-action: auto;
@@ -2208,16 +2333,16 @@
 	   the area's own, so it shows where the area is and how big what lands in
 	   it will be. Drawn only where `interactive` is set, so nothing on paper
 	   reaches this rule. */
-	/* The page margins. The bounds' weight, solid, in a colour of their own —
-	   the one layout software has long drawn margins in — so a margin is never
-	   taken for an area. Screen only: drawn only where
+	/* The page margins. The bounds' weight, solid, in the accent's inverse —
+	   the colour furthest from the areas' outlines, which are the accent — so a
+	   margin is never taken for an area. Screen only: drawn only where
 	   `interactive` is set. */
 	.margin-guide {
 		position: absolute;
 		pointer-events: none;
 		/* Solid, and an inset shadow rather than an outline: an outline is
 		   rounded to whole pixels of the zoomed card, and doubled at 200%. */
-		box-shadow: inset 0 0 0 var(--line) rgba(192, 38, 211, 0.55);
+		box-shadow: inset 0 0 0 var(--line) color-mix(in srgb, var(--accent-inverse) 55%, transparent);
 	}
 
 	/* The stage's grid, under the trim and everything in it. Positioned from
@@ -2235,9 +2360,9 @@
 	   ImagesPanel as an attribute, so the card's own class handling cannot
 	   take it off mid-drag. */
 	.box:global([data-image-target]) {
-		outline: calc(2px * var(--ui-scale, 1)) solid #2563eb;
+		outline: calc(2px * var(--ui-scale, 1)) solid var(--accent);
 		outline-offset: calc(1px * var(--ui-scale, 1));
-		background-color: rgba(37, 99, 235, 0.08);
+		background-color: color-mix(in srgb, var(--accent) 8%, transparent);
 	}
 
 	/* A `{{name}}` no column answers to, in the editor: underlined in the
@@ -2251,7 +2376,7 @@
 	/* Editor chrome standing in for a value: selecting it would copy a column
 	   name that is not on the card. */
 	.placeholder {
-		color: #2563eb;
+		color: var(--accent);
 		font-style: italic;
 		opacity: 0.7;
 		user-select: none;
@@ -2315,7 +2440,7 @@
 		   the card's zoomed frame, so at 200% a half-pixel border came out two
 		   screen pixels thick. A shadow keeps the fraction. */
 		border: none;
-		box-shadow: inset 0 0 0 var(--line, 1px) #2563eb;
+		box-shadow: inset 0 0 0 var(--line, 1px) var(--accent);
 		border-radius: var(--radius-button);
 		box-sizing: border-box;
 		z-index: 3;
@@ -2385,7 +2510,7 @@
 		overflow: visible;
 		pointer-events: none;
 		fill: none;
-		stroke: #2563eb;
+		stroke: var(--accent);
 		stroke-width: 1;
 	}
 
@@ -2403,7 +2528,7 @@
 		   fraction. */
 		height: calc(3 * var(--line, 1px));
 		width: var(--arm);
-		background: linear-gradient(#2563eb, #2563eb) center / 100% var(--line, 1px) no-repeat;
+		background: linear-gradient(var(--accent), var(--accent)) center / 100% var(--line, 1px) no-repeat;
 		pointer-events: none;
 	}
 
@@ -2587,7 +2712,7 @@
 		}
 
 		.bounds rect {
-			stroke: var(--bounds-color, rgba(37, 99, 235, 0.45));
+			stroke: var(--bounds-color, color-mix(in srgb, var(--accent) 45%, transparent));
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
@@ -2616,7 +2741,7 @@
 		}
 
 		.selection rect {
-			stroke: #2563eb;
+			stroke: var(--accent);
 		}
 
 		.card.frozen .box {
@@ -2662,7 +2787,7 @@
 		   bounds' own color, but with more than twice the gap between dashes —
 		   the outline the area was given, and plainly not one of its edges. */
 		.original-edge line {
-			stroke: var(--bounds-color, rgba(37, 99, 235, 0.45));
+			stroke: var(--bounds-color, color-mix(in srgb, var(--accent) 45%, transparent));
 			stroke-width: var(--line);
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 7);
 		}
@@ -2670,7 +2795,7 @@
 		/* On a selected area the bound is not drawn — the selection is — but the
 		   trim line still is, in the selection's blue so it belongs to it. */
 		.box.selected .original-edge line {
-			stroke: #2563eb;
+			stroke: var(--accent);
 		}
 
 		/* The line the words are cut on: dashed, the way a cut line is drawn on
@@ -2715,8 +2840,8 @@
 		/* The cut not made: the same shears in a faint blue, the way a control
 		   that is off is drawn, beside the trim line of an area that has grown. */
 		.overflow-mark.offered {
-			box-shadow: inset 0 0 0 var(--line) rgba(37, 99, 235, 0.45);
-			color: rgba(37, 99, 235, 0.6);
+			box-shadow: inset 0 0 0 var(--line) color-mix(in srgb, var(--accent) 45%, transparent);
+			color: color-mix(in srgb, var(--accent) 60%, transparent);
 		}
 
 		/* In line with the badges above them, and below the last of them where
@@ -2735,8 +2860,8 @@
 		}
 
 		.overflow-mark.offered:hover:not(:disabled) {
-			box-shadow: inset 0 0 0 var(--line) #2563eb;
-			color: #2563eb;
+			box-shadow: inset 0 0 0 var(--line) var(--accent);
+			color: var(--accent);
 		}
 
 		.overflow-mark:disabled {
@@ -2765,12 +2890,16 @@
 			pointer-events: none;
 		}
 
-		/* The anchor's column at the top-left — the tie, then the buoy: the
-		   mirror of the column above, hanging off the left edge at the top. */
+		/* The anchor's badges at the top-left, hanging off the left edge. A row,
+		   not a column: an area both tied and moored keeps its buoy in the
+		   corner, where it sits on every area others follow, and wears the tie
+		   to the left of it — stacked, the buoy dropped a badge down the edge
+		   whenever the area happened to follow another. */
 		.badges.tie {
 			left: auto;
 			right: 100%;
 			margin: 0 calc(4px * var(--ui-scale, 1)) 0 0;
+			flex-direction: row;
 		}
 
 		/* Quieter than the blue chrome around it. A badge is an annotation, not a
@@ -2808,8 +2937,8 @@
 		   which matters most when several areas are close enough for their badges
 		   to be nearer a neighbour's edge than their own. */
 		.box.selected .badge {
-			--edge: var(--bounds-color, #2563eb);
-			color: var(--bounds-color, #2563eb);
+			--edge: var(--bounds-color, var(--accent));
+			color: var(--bounds-color, var(--accent));
 		}
 
 		/* Something moved that you were not watching. Long enough to catch out of
@@ -2825,20 +2954,20 @@
 			   mark on this card, and drawn against the zoom so it is the same
 			   weight at 50% as at 200%. */
 			.box.dropping {
-				box-shadow: 0 0 0 calc(2px * var(--ui-scale, 1)) rgba(37, 99, 235, 0.9);
-				background-color: rgba(37, 99, 235, 0.08);
+				box-shadow: 0 0 0 calc(2px * var(--ui-scale, 1)) color-mix(in srgb, var(--accent) 90%, transparent);
+				background-color: color-mix(in srgb, var(--accent) 8%, transparent);
 			}
 		}
 
 		@keyframes found {
 			0%,
 			70% {
-				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) rgba(37, 99, 235, 0.55);
-				background-color: rgba(37, 99, 235, 0.18);
+				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) color-mix(in srgb, var(--accent) 55%, transparent);
+				background-color: color-mix(in srgb, var(--accent) 18%, transparent);
 			}
 			100% {
-				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) rgba(37, 99, 235, 0);
-				background-color: rgba(37, 99, 235, 0);
+				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) color-mix(in srgb, var(--accent) 0%, transparent);
+				background-color: color-mix(in srgb, var(--accent) 0%, transparent);
 			}
 		}
 
@@ -2861,14 +2990,14 @@
 		   on an unselected area reads as a second selection. A coloured glyph on
 		   the card's own quiet badge is enough to find it. */
 		.badge.lit {
-			color: #2563eb;
+			color: var(--accent);
 		}
 
 		/* The exception, on the selected area itself: what is moored to it is
 		   filled. That one is the hub of the relationship the other badges are
 		   only pointing at, and it is on the area you already have. */
 		.box.selected .badge.moored {
-			background: #eaf1fe;
+			background: var(--accent-tint);
 		}
 
 		/* Further down the same chain — what hangs off what follows this area,
@@ -2878,7 +3007,7 @@
 		   out. Weaker rather than a different color, because this is the same
 		   relationship at one remove and not another kind of tie. */
 		.badge.lit-edge {
-			color: rgba(37, 99, 235, 0.45);
+			color: color-mix(in srgb, var(--accent) 45%, transparent);
 		}
 
 		/* Icon takes a px size, which is inside the card's transform like
@@ -2904,7 +3033,7 @@
 
 		.threads path {
 			fill: none;
-			stroke: #2563eb;
+			stroke: var(--accent);
 			stroke-width: calc(2 * var(--line));
 			stroke-linecap: round;
 			stroke-dasharray: 0 calc(5 * var(--line));
@@ -2928,7 +3057,7 @@
 		   centres the drawn line where the box's own edge used to be. */
 		.guide {
 			position: absolute;
-			background: linear-gradient(#ec4899, #ec4899) center / 100% 100% no-repeat;
+			background: linear-gradient(var(--accent-inverse), var(--accent-inverse)) center / 100% 100% no-repeat;
 			pointer-events: none;
 			z-index: 4;
 		}

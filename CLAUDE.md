@@ -2,14 +2,15 @@
 
 @AGENTS.md
 
-The above is this project's real instructions file, written so any agent —
-Claude Code, Codex or otherwise — reads the same rules rather than a worse
-copy of them. Edit `AGENTS.md`, not this file. Two things are Claude
-Code-specific and live only here:
+The above is the real instructions file, shared with every agent; edit
+`AGENTS.md`, not this one. What is Claude Code-specific lives here:
 
 - `.claude/settings.json` pre-approves the read-only and check/build commands
   this repo uses constantly, and wires a `SessionStart` hook
   (`.claude/hooks/session-start.sh`) that installs dependencies before the
-  first turn of a Claude Code web session.
-- `.claude/logs/gates.jsonl` is a local, gitignored log that `npm run gates`
-  appends one line to per run — see AGENTS.md § Rules that execute.
+  first turn of a web session.
+- It also **denies reading `package-lock.json`**, so change that file only
+  through npm (`npm install --package-lock-only`) and check its version with
+  `node -p "require('./package-lock.json').version"`.
+- `.claude/logs/gates.jsonl` is the local, gitignored log `npm run gates`
+  appends to — see AGENTS.md § Rules that execute.

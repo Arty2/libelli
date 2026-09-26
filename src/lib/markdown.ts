@@ -7,7 +7,7 @@ import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
  * dependency-free and fully offline-capable.
  *
  * Supported: `#`/`##`/`###` headings, `-`/`*` bullets (one nesting level),
- * `1.` ordered lists, `**bold**`, `*italic*`, `~~strikethrough~~`, `` `code` ``,
+ * `1.` ordered lists, `**bold**`, `*italic*`, `~~strikethrough~~`, `==highlight==`, `` `code` ``,
  * `[text](url)`, `[text]{color}` for a colored run of words, blank-line
  * paragraphs and `---` rules. Everything else is literal text.
  *
@@ -199,6 +199,11 @@ export function renderInline(text: string): string {
 	// left alone: it is a real character in prices, ranges and file paths, and
 	// only the doubled pair is markup here.
 	out = out.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+	// A highlight hugs its words, as it does in every editor that has it: `a ==
+	// b == c` in a formula or a comparison stays as typed, and only `==this==`
+	// — no space just inside either pair — is marked. The browser's own <mark>
+	// colours, black on yellow, which read on any paper an area is set on.
+	out = out.replace(/==(?=[^\s=])([^=]*?[^\s=])==/g, '<mark>$1</mark>');
 	out = out.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
 
 	const codeStyle = 'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.92em';

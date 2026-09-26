@@ -297,7 +297,7 @@
 		display: inline-grid;
 		place-items: center;
 		width: 1rem;
-		color: #1a5fb4;
+		color: var(--accent-strong);
 	}
 
 	.menu hr {

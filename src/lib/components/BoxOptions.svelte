@@ -248,11 +248,11 @@
 	/** An address, asked for the way the page's background asks for one. */
 	function linkPicture() {
 		const was = selected?.static?.url && !pictureColor ? selected.static.url : 'https://';
-		const url = window.prompt('Address of the picture', was);
+		const url = window.prompt('Address of the image', was);
 		if (url === null) return;
 		const safe = safeImageUrl(url);
 		if (!safe) {
-			onnotice('A picture address has to be an http or https address.', 'warning');
+			onnotice('An image address has to be an http or https address.', 'warning');
 			return;
 		}
 		setPictureAddress(safe);
@@ -609,7 +609,7 @@
 				     the address and the color both, which nobody guessed took a color. -->
 				<button
 					disabled={boxFrozen}
-					title="A picture from this device — kept in this browser (or your images folder), the template only names it"
+					title="An image from this device — kept in this browser (or your images folder), the template only names it"
 					onclick={() => pictureInput?.click()}
 				>
 					<Icon name="image-reference" size={14} /> Upload…
@@ -623,7 +623,7 @@
 				</button>
 				<button
 					disabled={boxFrozen}
-					title="Draw a small picture for this area, saved in the template — over the one it shows, where the browser allows"
+					title="Draw a small image for this area, saved in the template — over the one it shows, where the browser allows"
 					onclick={() => ondraw?.(selected.id)}
 				>
 					<Icon name="edit" size={14} /> {selected.static?.dataUrl ? 'Edit…' : 'Draw…'}
@@ -634,7 +634,7 @@
 						value={pictureColor ?? undefined}
 						fallback="#ffffff"
 						label="Area color"
-						title="Fill the area with a color instead of a picture"
+						title="Fill the area with a color instead of an image"
 						disabled={boxFrozen}
 						onchange={(v) => setPictureAddress(v)}
 					/>
@@ -707,7 +707,7 @@
 				     page. -->
 				<button
 					disabled={boxFrozen}
-					title="Draw a small picture for this area. It is written into this row's cell, so every row can have its own"
+					title="Draw a small image for this area. It is written into this row's cell, so every row can have its own"
 					onclick={() => ondraw?.(selected.id)}
 				>
 					<Icon name="edit" size={14} /> Draw…

@@ -2,9 +2,9 @@
 	import { tick, untrack } from 'svelte';
 	import { base } from '$app/paths';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
-	import BitmapEditor from '$lib/components/BitmapEditor.svelte';
 	import ImagesPanel from '$lib/components/ImagesPanel.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Lightbox from '$lib/components/Lightbox.svelte';
@@ -16,6 +16,7 @@
 		localImageRef,
 		resolveBackground,
 		resolveLocalImages,
+		safeMediaUrl,
 		storeLocalImage,
 		uploadBackgroundImage
 	} from '$lib/assets';
@@ -131,7 +132,7 @@
 		if (barHeight > barFloor) barFloor = barHeight;
 	});
 
-	let ui = $state<UiState>({ showBounds: true, showGrid: false, showGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
+	let ui = $state<UiState>({ showBounds: true, showTies: false, showGrid: false, showGuides: true, smartGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
 	let activeRow = $state(0);
 	let selectedIds = $state<string[]>([]);
 	let ready = $state(false);
@@ -433,7 +434,7 @@
 			'',
 			'.content-field { }    /* by what fills it: a column, */',
 			'.content-static { }   /* its own words, */',
-			'.content-image { }    /* or a picture */',
+			'.content-image { }    /* or an image */',
 			'.mode-plain { }       /* by mode: also .mode-markdown, */',
 			'.mode-qr { }          /* .mode-image, .mode-color */',
 			'',
@@ -493,6 +494,14 @@
 	const selected = $derived(
 		selectedIds.length === 1 ? (template.boxes.find((b) => b.id === selectedIds[0]) ?? null) : null
 	);
+	/**
+	 * The area the options row is about. None while the page is locked: every
+	 * field in the area bar would be greyed out, so opening it only swapped the
+	 * page bar for a wall of disabled controls. An area can still be selected on
+	 * a locked page — to type into it, or to reach its own padlock — and the row
+	 * stays as it was.
+	 */
+	const barBox = $derived(template.locked ? null : selected);
 	const selectedBoxes = $derived(template.boxes.filter((b) => selectedIds.includes(b.id)));
 	/** The box the menu was opened on, whether or not it is the only one chosen. */
 	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
@@ -553,6 +562,11 @@
 		let unreadable = false;
 
 		const storedTemplate = await loadTemplate();
+		// A first visit lands on the starter card locked: it is the tour, read
+		// before it is edited, and a stray drag on a phone should not rearrange
+		// it. The padlock above Area unlocks it. Only here — Reset and a new
+		// template are asked for by somebody who means to design.
+		if (!storedTemplate) template = { ...starterTemplate(), locked: true };
 		if (storedTemplate) {
 			try {
 				template = normaliseTemplate(storedTemplate);
@@ -818,7 +832,7 @@
 		const box = template.boxes.find((b) => b.id === boxId);
 		if (!box) return;
 		if (template.locked || box.locked) {
-			notify('That area is locked — unlock it to put a picture in it.', 'warning');
+			notify('That area is locked — unlock it to put an image in it.', 'warning');
 			return;
 		}
 		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
@@ -915,12 +929,8 @@
 		return true;
 	}
 
-	/** the area whose picture is being drawn, if any — full screen, never in place */
-	let drawing = $state<string | null>(null);
-	const drawingBox = $derived(drawing ? (template.boxes.find((b) => b.id === drawing) ?? null) : null);
-
 	/**
-	 * What the drawing surface opens on.
+	 * What an area with no column is drawn on top of.
 	 *
 	 * A data URL, or one of this browser's own images, can be drawn on top of.
 	 * An address from somewhere else cannot: drawing a cross-origin picture onto
@@ -928,53 +938,157 @@
 	 * drawn — so the drawing could never be saved. That one case opens blank
 	 * rather than opening on something it would lose.
 	 */
-	const drawingValue = $derived.by(() => {
-		const box = drawingBox;
-		if (!box) return '';
-		const column = box.slot ? mapping[box.slot] : undefined;
-		const written = column ? (row?.[column] ?? '') : (box.static?.dataUrl ?? box.static?.url ?? '');
-		const value = String(written).trim();
+	function areaDrawingValue(box: Box): string {
+		const value = String(box.static?.dataUrl ?? box.static?.url ?? '').trim();
 		if (value.startsWith('data:image/')) return value;
 		const name = localImageName(value);
 		return name ? (images[name] ?? '') : '';
-	});
+	}
+
+	/** An area with no column, asked to be drawn in the side panel. */
+	let areaRequest = $state<{ id: string; name: string; value: string; pixels?: { w: number; h: number }; ink: string; from?: 'card' | 'images' } | null>(null);
 
 	/**
-	 * A drawing goes where the words of that area go: into the row's cell when it
-	 * is bound to a column, so every row can have its own picture and it travels
-	 * with the table, and onto the area itself when it is not. One undo entry
-	 * however many strokes it took — the editor's own undo goes no further than
-	 * the editor.
+	 * A drawing onto an area with no column: it has no cell, so it goes onto
+	 * the area, replacing an address the area was showing — the same "last one
+	 * in is shown" the bar's Source field follows.
 	 */
-	function saveDrawing(dataUrl: string, pixels: { w: number; h: number } | undefined) {
-		const box = drawingBox;
-		drawing = null;
+	function saveAreaDrawing(id: string, dataUrl: string, pixels: { w: number; h: number } | undefined) {
+		const box = template.boxes.find((b) => b.id === id);
 		if (!box) return;
 		describe('Draw');
-		const column = box.slot ? mapping[box.slot] : undefined;
 		const current = $state.snapshot(box) as Box;
-		if (column && row) {
-			if (refuseLockedTable()) return;
-			dataset = {
-				...dataset,
-				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: dataUrl } : r))
-			};
-			// The drawing goes in the cell, but the board is remembered on the
-			// area: it is where the next row's drawing starts. A row that already
-			// holds a picture of another size still opens at that size — what is
-			// in the cell wins over what the area remembers.
-			if (JSON.stringify(pixels ?? null) !== JSON.stringify(box.pixels ?? null)) {
-				updateBox({ ...current, pixels });
-			}
-		} else {
-			// The drawing replaces an address the area was showing, the same
-			// "last one in is shown" the bar's Source field follows.
-			const { url: _address, ...kept } = box.static ?? {};
-			updateBox({ ...current, pixels, static: { ...kept, dataUrl } });
-		}
+		const { url: _address, ...kept } = current.static ?? {};
+		updateBox({ ...current, pixels, static: { ...kept, dataUrl } });
+	}
+
+	/** The area's picture gone, drawn or pointed at; its board size stays. */
+	function deleteAreaDrawing(id: string) {
+		const box = template.boxes.find((b) => b.id === id);
+		if (!box) return;
+		describe('Delete the drawing');
+		const current = $state.snapshot(box) as Box;
+		const { url: _address, dataUrl: _drawn, ...kept } = current.static ?? {};
+		updateBox({ ...current, static: Object.keys(kept).length ? kept : undefined });
 	}
 
 	// ---- undo/redo ----------------------------------------------------------
+
+	/**
+	 * A drawing saved from the side panel into a cell. The board is
+	 * remembered on the picture areas that print the column, as it is when the
+	 * drawing is opened from one of them: where the next row's drawing starts.
+	 */
+	function drawIntoCell(rowIndex: number, column: string, dataUrl: string, pixels: { w: number; h: number } | undefined) {
+		if (refuseLockedTable()) return;
+		describe('Draw');
+		dataset = {
+			...dataset,
+			rows: dataset.rows.map((r, i) => (i === rowIndex ? { ...r, [column]: dataUrl } : r))
+		};
+		for (const box of template.boxes) {
+			if (box.mode !== 'image' || !box.slot || mapping[box.slot] !== column) continue;
+			if (JSON.stringify(pixels ?? null) === JSON.stringify(box.pixels ?? null)) continue;
+			updateBox({ ...($state.snapshot(box) as Box), pixels });
+		}
+	}
+
+	/** The board and ink a drawing in this column is made with — its picture area's. */
+	function drawingFor(column: string) {
+		const area = template.boxes.find((b) => b.mode === 'image' && !!b.slot && mapping[b.slot] === column);
+		return { pixels: area?.pixels, ink: area?.color ?? template.defaults.color };
+	}
+
+	/**
+	 * Drawing, asked for from an area — always in the side panel. One bound to
+	 * a column draws into this row's cell, in the table's full-size editor,
+	 * with the pager to step down the rows. One with no column has no cell,
+	 * but draws in the same place, onto the area; a locked table is no reason
+	 * to refuse that, since nothing in the table changes.
+	 */
+	function drawArea(id: string, via: 'card' | 'images' = 'card') {
+		const box = template.boxes.find((b) => b.id === id);
+		const column = box?.slot ? mapping[box.slot] : undefined;
+		if (!box) return;
+		if (column && row && refuseLockedTable()) return;
+		// Where the editor's × goes back to. With the table already showing,
+		// that is the table; otherwise the panel was opened only to draw in,
+		// and closing the drawing closes it (or goes back to Images).
+		const from = via === 'images' ? via : dataOpen ? undefined : 'card';
+		dataOpen = true;
+		imagesOpen = false;
+		if (column && row) {
+			cellRequest = { row: activeRow, column, draw: true, from };
+			return;
+		}
+		areaRequest = {
+			from,
+			id,
+			name: box.slot?.trim() || 'Drawing',
+			value: areaDrawingValue(box),
+			pixels: box.pixels,
+			ink: box.color ?? template.defaults.color
+		};
+	}
+
+	/**
+	 * Every picture held in the table or on an area rather than in storage,
+	 * for the Images tray: a cell's drawing, by column and row, and a drawing
+	 * on an area with no column. Only `data:` pictures that pass the same
+	 * check a cell's thumbnail does — the cell is untrusted.
+	 */
+	const drawings = $derived.by(() => {
+		const out: Array<{ key: string; label: string; where: string; src: string }> = [];
+		dataset.rows.forEach((cells, i) => {
+			for (const column of dataset.columns) {
+				const text = cells[column]?.trim() ?? '';
+				const src = text.startsWith('data:image/') ? safeMediaUrl(text) : null;
+				if (src) out.push({ key: `cell:${i}:${column}`, label: column, where: `row ${i + 1}`, src });
+			}
+		});
+		for (const box of template.boxes) {
+			if (box.slot && mapping[box.slot]) continue;
+			const text = String(box.static?.dataUrl ?? '').trim();
+			const src = text.startsWith('data:image/') ? safeMediaUrl(text) : null;
+			if (src) out.push({ key: `area:${box.id}`, label: box.slot?.trim() || 'Drawing', where: 'on the area', src });
+		}
+		return out;
+	});
+
+	/** A drawing pressed in the Images tray, opened in the drawing editor it belongs to. */
+	function openDrawing(key: string) {
+		if (key.startsWith('area:')) {
+			drawArea(key.slice('area:'.length), 'images');
+			return;
+		}
+		const [, index, ...rest] = key.split(':');
+		const rowIndex = Number(index);
+		const column = rest.join(':');
+		if (!dataset.columns.includes(column) || !dataset.rows[rowIndex]) return;
+		if (refuseLockedTable()) return;
+		activeRow = rowIndex;
+		dataOpen = true;
+		imagesOpen = false;
+		cellRequest = { row: rowIndex, column, draw: true, from: 'images' };
+	}
+
+	/** A stored picture, opened large in the Images tray. */
+	let imageFocus = $state<string | null>(null);
+	/**
+	 * A picture being worked on in the side panel — the drawing board, or one
+	 * stored image open large to crop or turn. The options row goes away while
+	 * it is: on a phone the bar and the tray share the height, and with the area
+	 * bar up the tray could not open far enough to reach the board. It comes
+	 * back when the picture is closed.
+	 */
+	let drawingInTable = $state(false);
+	const editingPicture = $derived((dataOpen && drawingInTable) || (imagesOpen && imageFocus !== null));
+
+	function openImage(name: string) {
+		imageFocus = name;
+		imagesOpen = true;
+		dataOpen = false;
+	}
 
 	/**
 	 * What the user did, waiting to be attached to the entry it produces.
@@ -2032,7 +2146,16 @@
 	 * size in the table. The table is opened for it if it was folded away; a
 	 * locked table says so rather than opening an editor it would refuse.
 	 */
-	let cellRequest = $state<{ row: number; column: string } | null>(null);
+	let cellRequest = $state<{ row: number; column: string; draw?: boolean; from?: 'card' | 'images' } | null>(null);
+
+	// A request is a one-off: the table reads it as it mounts, so one left
+	// standing when the panel closes would open the editor again the next time
+	// the Data button shows the table — the table was asked for, not the cell.
+	$effect(() => {
+		if (dataOpen) return;
+		cellRequest = null;
+		areaRequest = null;
+	});
 
 	function editCell(id: string) {
 		const box = template.boxes.find((b) => b.id === id);
@@ -2155,7 +2278,7 @@
 		try {
 			const image = await uploadBackgroundImage(file, template.page.image?.fit ?? 'cover', nameOverride);
 			template = { ...template, page: { ...template.page, image } };
-			notify(`${image.src} set as the page background — the picture stays in this browser, the template only names it.`);
+			notify(`${image.src} set as the page background — the image stays in this browser, the template only names it.`);
 		} catch {
 			notify('That image could not be read.', 'warning');
 		}
@@ -2174,7 +2297,7 @@
 		try {
 			const image = await uploadBackgroundImage(file, template.print.background?.fit ?? 'cover', nameOverride);
 			template = { ...template, print: { ...template.print, background: image } };
-			notify(`${image.src} set as the sheet background — the picture stays in this browser, the template only names it.`);
+			notify(`${image.src} set as the sheet background — the image stays in this browser, the template only names it.`);
 		} catch {
 			notify('That image could not be read.', 'warning');
 		}
@@ -2250,6 +2373,8 @@
      answer to a dropped image is to navigate to it, which leaves the design
      behind — and the one place a drop means something is the card, which takes
      it before this ever sees it. -->
+<Tooltip />
+
 <svelte:window
 	onkeydown={onWindowKeydown}
 	onafterprint={onAfterPrint}
@@ -2279,13 +2404,13 @@
 				// Not a plain toggle any more: the two bars share one row, so this
 				// says "show me the page" — which, with an area selected, means
 				// letting go of the area rather than stacking a second bar on top.
-				const showing = pageSetupOpen && !selected;
+				const showing = pageSetupOpen && !barBox;
 				pageSetupOpen = !showing;
-				if (!showing) selectBox(null);
+				if (!showing && barBox) selectBox(null);
 			}}
-			aria-pressed={pageSetupOpen && !selected}
-			aria-expanded={pageSetupOpen && !selected}
-			title={selected && pageSetupOpen
+			aria-pressed={pageSetupOpen && !barBox}
+			aria-expanded={pageSetupOpen && !barBox}
+			title={barBox && pageSetupOpen
 				? 'Page setup — the area bar has the row; this takes it back'
 				: 'Show or hide the page setup'}
 		>
@@ -2301,9 +2426,10 @@
 			aria-expanded={imagesOpen}
 			onclick={() => {
 				imagesOpen = !imagesOpen;
+				imageFocus = null;
 				if (imagesOpen) dataOpen = false;
 			}}
-			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
+			title="Every image this browser is holding — what each weighs, whether anything uses it, and where they are kept"
 		>
 			<Icon name="image" size={15} /> <span class="label">Images</span>
 		</button>
@@ -2354,8 +2480,8 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if selected || pageSetupOpen}
-		<div class="bar-row" class:box={!!selected} style="min-height:{Math.max(barFloor, probeHeight)}px">
+	{#if (barBox || pageSetupOpen) && !editingPicture}
+		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
 			<div class="bar-probe" aria-hidden="true" inert bind:clientHeight={probeHeight}>
@@ -2387,7 +2513,7 @@
 				/>
 			</div>
 			<div class="bar-fit" bind:clientHeight={barHeight}>
-				{#if selected}
+				{#if barBox}
 					<!-- No menu here, and the guard above is only ever set by the page
 					     bar; the box bar taking the row clears it because the page bar
 					     unmounts with its menu. -->
@@ -2397,7 +2523,7 @@
 						{template}
 						{dataset}
 						{mapping}
-						{selected}
+						selected={barBox}
 						onboxchange={updateBox}
 						ontemplatechange={applyTemplate}
 						onmappingchange={(m) => (mapping = m)}
@@ -2417,7 +2543,7 @@
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
-						ondraw={(id) => (drawing = id)}
+						ondraw={drawArea}
 						onuploadimage={(id, file) => {
 							const box = template.boxes.find((b) => b.id === id);
 							if (box) void handleImageDrop(box, file);
@@ -2449,7 +2575,7 @@
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
-						ondraw={(id) => (drawing = id)}
+						ondraw={drawArea}
 						onuploadimage={(id, file) => {
 							const box = template.boxes.find((b) => b.id === id);
 							if (box) void handleImageDrop(box, file);
@@ -2477,7 +2603,7 @@
 		<div class="banner" role="alert">
 			<span>
 				This template's background image, <strong>{missingImage}</strong>, is not in this browser. The template
-				carries its name, never the picture.
+				carries its name, never the file.
 			</span>
 			<button onclick={() => backgroundInput?.click()}>Choose {missingImage}…</button>
 			<button
@@ -2490,7 +2616,7 @@
 		<div class="banner" role="alert">
 			<span>
 				This template's sheet background image, <strong>{missingPrintImage}</strong>, is not in this browser. The
-				template carries its name, never the picture.
+				template carries its name, never the file.
 			</span>
 			<button onclick={() => printBackgroundInput?.click()}>Choose {missingPrintImage}…</button>
 			<button
@@ -2533,8 +2659,10 @@
 			{row}
 			{mapping}
 			bounds={ui.showBounds}
+			ties={ui.showTies}
 			grid={ui.showGrid}
 			guides={ui.showGuides}
+			smartGuides={ui.smartGuides}
 			gridStyle={ui.gridStyle}
 			{selectedIds}
 			zoom={ui.zoom}
@@ -2550,9 +2678,9 @@
 			onimagedrop={(box, file) => void handleImageDrop(box, file)}
 			onimagepagedrop={(file, x, y) => void (async () => placeImageOnPage(await storeLocalImage(file), x, y, file))()}
 			onaction={describe}
-			onbounds={(show) => (ui = { ...ui, showBounds: show })}
+			onbounds={(show, ties) => (ui = { ...ui, showBounds: show, showTies: ties })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
-			onguides={(show) => (ui = { ...ui, showGuides: show })}
+			onguides={(margins, smart) => (ui = { ...ui, showGuides: margins, smartGuides: smart })}
 			ongridstyle={(gridStyle) => {
 				// A hold on a checkbox is a gesture nobody was taught, so it says what
 				// it did — and it turns the grid on if it was off, because changing
@@ -2578,7 +2706,7 @@
 			onstoppicking={() => (picking = false)}
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
 			onedit={(id) => (editingId = id)}
-			ondraw={(id) => (drawing = id)}
+			ondraw={drawArea}
 			oneditcell={editCell}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
@@ -2590,7 +2718,6 @@
 				boxMenu !== null ||
 				deletingTable ||
 				editingId !== null ||
-				drawing !== null ||
 				magic !== null}
 			{selectedBoxes}
 			onalign={alignSelection}
@@ -2645,6 +2772,10 @@
 					onplacepage={(name, x, y) => void placeImageOnPage(name, x, y)}
 					onnotice={notify}
 					onchanged={() => (imagesVersion += 1)}
+					focus={imageFocus}
+					onfocus={(name) => (imageFocus = name)}
+					{drawings}
+					onopendrawing={openDrawing}
 					ontraydrag={stacked ? dragTray : undefined}
 				/>
 			{:else}
@@ -2684,6 +2815,18 @@
 				onnotice={notify}
 				ongettingstarted={() => void gettingStarted()}
 				openRequest={cellRequest}
+				{images}
+				{drawingFor}
+				ondrawn={drawIntoCell}
+				{areaRequest}
+				onsavearea={saveAreaDrawing}
+				ondeletearea={deleteAreaDrawing}
+				ondrawing={(on) => (drawingInTable = on)}
+				onleave={(to) => {
+					dataOpen = false;
+					if (to === 'images') imagesOpen = true;
+				}}
+				onopenimage={openImage}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
 					// follows it, so the card keeps rendering what it rendered before.
@@ -2877,8 +3020,8 @@
 		</ul>
 		<!-- Only where there is something to lose. The button says OK either way, so
 		     without this the destructive case and the harmless one read identically
-		     — and on a template with areas the only way in is a press and hold,
-		     which is easy to trigger without meaning to. -->
+		     — and the button that opens this is always there, even over a card
+		     somebody has built. -->
 		{#if template.boxes.length}
 			<p class="magic-warning" role="status">
 				<Icon name="warning" size={13} />
@@ -2908,207 +3051,17 @@
 			</button>
 		</header>
 
+		<!-- Brief on purpose: every control explains itself — rest the pointer
+		     on it, or press and hold it on a phone — and the README has the
+		     rest at length. What cannot be discovered by pointing is the keys. -->
 		<p>Rows of a spreadsheet in, print-ready cards out.</p>
 		<p>
-			All of it happens in this browser. Your rows, your template, the fonts and images you add — none of it is
-			uploaded, because there is no server to upload it to and no account to make. It works with the network off, a
-			template is a small file you can hand to somebody, and closing the tab is the only thing that deletes anything.
-			Where your browser offers it, <strong>Install</strong> gives libelli its own window; when a new version has
-			downloaded the status bar says so and waits for <strong>Update</strong>, because a restart nobody asked
-				for would take undo with it.
-		</p>
-
-		<h3>Areas</h3>
-		<p>
-			<em>+ Area</em> beside the page adds one. <strong>Content</strong> says where it gets what it shows:
-			<strong>Data Field</strong> binds it to a column, so it changes card to card, and <strong>Static Text</strong>
-			is typed into the template and says the same on every card. An area's <strong>Name</strong> is the template's own
-			word for what it holds — <em>title</em>, <em>body</em> — and <strong>Column</strong> beside it says which
-			spreadsheet column fills that. Rebinding the columns is how one template serves another spreadsheet.
+			Paste or import a table, put areas on the page and bind them to its columns, and print one card per row. It
+			all stays in this browser — nothing is uploaded, and it works offline.
 		</p>
 		<p>
-			The button under it — the one wearing three shapes — writes a whole card from your columns: a title, a
-			body, a picture, a footer and a QR code, sized for the page. It shows you what it took each column for
-			before it moves anything, and marks the ones it reached by guesswork. On an empty template it is that
-			button; on a template that already has areas it is <strong>press and hold</strong> on <em>+ Area</em>,
-			since it replaces every area you have. One Ctrl/Cmd+Z puts the old design back.
-		</p>
-		<p>
-			Double-click an area, or press <strong>Enter</strong> with one selected, to type into it on the card itself.
-			Bound areas write to the cell, static ones to the template. Selecting an area points the table at the cells that
-			fill it.
-		</p>
-		<p>
-			<strong>Content</strong> is where an area gets what it shows: a Data Field, Static Text, a Bitmap drawn
-			here, or an Image. A field then takes a <strong>Mode</strong> — Plain Text, Markdown, Bitmap, Image, Color
-			or QR Code. Color fills the area with what the cell says and ignores anything that is not one, in hex,
-			<code>rgb()</code>, <code>hsl()</code> or by name; Image shows a picture, and still accepts a color.
-		</p>
-		<p>
-			<code>&#123;&#123;date&#125;&#125;</code> anywhere in an area or a cell prints today's date, and
-			<code>&#123;&#123;date:YYYY-MM-DD&#125;&#125;</code> prints it your way — <code>YYYY</code>, <code>MM</code>,
-			<code>DD</code> for the numbers, <code>MMMM</code> and <code>dddd</code> for the names. Anything else in braces
-			is left as written.
-		</p>
-
-		<h3>Placing them</h3>
-		<p>
-			Drag areas on the page or type exact millimetres. An area latches onto the edges and centres of its neighbours as
-			it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid instead. Grid off and
-			<strong>Bounds</strong> off is free movement, because an area should never latch onto a guide that is not drawn.
-			Press and <em>hold</em> the Grid box for a <strong>dot grid</strong> — the same grid and the same snapping,
-			drawn as a dot at each intersection rather than as ruled lines, which is quieter under a page of type. The
-			word beside the box says which of the two you are on.
-		</p>
-		<p>
-			<strong>Rotation</strong> has two marks on a selected area, because they do two different things. The
-			<strong>crosshair</strong> is the pivot: drag it to move the point the area turns about. The <strong>knob</strong>
-			on the arm below it is the lever: swing it to turn the area, holding <strong>Shift</strong> for 15° steps. The
-			<strong>X</strong> and <strong>Y</strong> beside the rotation place the pivot exactly, as a percentage of the
-			area's own size. A turned area still occupies the space it would have upright, so one rotation does not shuffle
-			the card.
-		</p>
-		<p>
-			Stacking order is the column beside the page: areas paint in the order they are listed, so <em>Bring to Front</em>
-			is a move to the end of that list. If an area ends up off the sheet — all of it, or a corner of it — a
-			button appears under <em>Area</em> to bring that area back on, and only that area: everything already on
-			the paper stays where it was put. Crossing into the bleed does not count, because that is what bleed is
-			for.
-		</p>
-
-		<h3>Marks on an area</h3>
-		<p>
-			A red corner means the content does not fit and the print will clip it. The <strong>plug</strong> says the area
-			carries its own words rather than a column's. The <strong>link</strong> and the <strong>buoy</strong> are the
-			two ends of an anchor — an anchored area takes its top from another area's rendered bottom, so dragging it
-			changes the gap rather than breaking the tie — and the <strong>padlock</strong> says the area is locked. All
-			three are buttons, and each undoes what it says: the link breaks this area's tie, the buoy casts off everything
-			moored to this one, the padlock unlocks the area. Neither anchor button moves anything. Each shows the icon of
-			its own undoing as you reach for it, so no two of them answer with the same mark. Selecting either end of an
-			anchor lights up the other — filled on what follows this area directly, outlined further down the chain, so a
-			stack of tied areas says how far the tie reaches. <strong>Bounds</strong> takes all of it away.
-		</p>
-
-		<h3>Several at once</h3>
-		<p>
-			Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them; on a touchscreen,
-			<strong>Select Multiple</strong> in the right-click menu makes every press add or drop, with a chip beside
-			<em>+ Area</em> saying so until you press it or <strong>Esc</strong>. Dragging any one moves the
-			set, and a column of icons appears beside the page to line them up against the box enclosing them all, and to
-			group, lock, duplicate or delete the lot. <strong>Group</strong> makes a selection stick until you ungroup it. An
-			anchored area sits out of a vertical align, because an anchor would move it straight back.
-		</p>
-		<p>
-			<strong>Copy Style</strong> and <strong>Paste Style</strong> carry type, fill, border, padding and radius from one
-			area to any number of others. A paste is "make this look like that", so it takes away what the source did not have.
-		</p>
-
-		<h3>Templates</h3>
-		<p>
-			The <strong>Template</strong> field names the one you are working on; the caret beside it lists every
-			template saved in this browser, with <em>New template…</em> and <em>Delete this template…</em> under a rule.
-			Renaming is typing in the field. Deleting takes the loaded template and opens the next one — or a new empty
-			template, if it was the last — where <strong>Reset</strong>, in the row of buttons below, puts the starter
-			card back under the same name. Both ask first, and both are one Ctrl/Cmd+Z away. The list lives
-			in this browser only; <strong>Export</strong> is how a template leaves, and an import joins the list rather
-			than replacing what is open.
-		</p>
-
-		<h3>The sheet</h3>
-		<p>
-			<strong>Size</strong> has A6, A5, A4, A3 and a 4 × 6 inch postcard; picking one keeps the orientation you are
-			in, and <strong>⇄</strong> turns the page over. Neither moves anything on the card — coordinates are
-			measured from the trim edge, so trying a design the other way round costs nothing. Bleed is an outset on the
-			sheet, never an offset on the content — so it is also how you widen a card evenly without moving anything on
-			it, with <strong>Crop Marks</strong> left unticked.
-		</p>
-		<p>
-			Page setup holds the type defaults — family, size, leading, spacing, color. An area that leaves those fields
-			blank inherits them. It also sets the paper color and a background image, and can print a page number, optionally
-			as <em>3 / 12</em>.
-		</p>
-		<p>
-			<strong>CSS</strong> holds styles saved inside the template. Selectors are scoped to the card, and
-			<code>@import</code> and any <code>url()</code> pointing off this machine are stripped, so a template's
-			CSS cannot reach the network. What a template <em>can</em> ask for is a Google font by family name and a
-			background image by address — both only as names it is allowed to write, never as arbitrary requests.
-		</p>
-
-		<h3>Locking</h3>
-		<p>
-			<strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page
-			lock covers every area and the page settings, greys every bound and says so above the sheet. The same button
-			unlocks.
-		</p>
-
-		<h3>Data</h3>
-		<p>
-			Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column.
-			Drag the right edge of a header to set that column's width, or double-click that edge to hand it back the
-			default; the widths stay in this browser and follow a column through a rename.
-			Clicking a row previews it; the tick in the gutter chooses several, and <strong>Copy</strong> and delete for
-			those appear at the head of the buttons below. The row numbers travel with their rows through a
-			sort, and a column header sorts A-Z, then Z-A, then back to the order the rows arrived in.
-		</p>
-		<p>
-			<strong>Table</strong> at the left of that row names the table you are in; the caret opens the rest, with
-			<strong>New table…</strong> and <strong>Delete…</strong> under a rule at the bottom. The
-			<strong>⇄</strong> beside it goes back to the table you were on before, and back again — the two you are
-			working between, one press apart. A design and a table are kept apart on purpose: switching either leaves the
-			other exactly where it was, and bindings that still name a column that exists are kept across the switch.
-		</p>
-		<p>
-			<strong>Paste</strong> takes a block of cells off a spreadsheet with no header row and lands it in the columns
-			you already have. <strong>Import CSV…</strong> takes a whole file; press and <em>hold</em> it and the four sample
-			cards come back. <strong>Export CSV</strong> hands the table back as a file. Deleting a column asks, because it is
-			a field of every card at once; the red <strong>Delete</strong> empties the whole table. All of it is undoable, and
-			none of it touches the template — as <strong>Reset</strong> in page setup does not touch the data.
-		</p>
-
-		<h3>Getting cards out</h3>
-		<p>
-			<strong>Export</strong>, or <strong>Ctrl/Cmd+P</strong>, opens every card as a small page. The browser's own print
-			dialog is intercepted rather than left to fire, because it would print the editor. Untick any card you do not
-			want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The checklist under the
-			pages is four settings that decide whether what you saw is what comes out; a PNG needs none of them.
-		</p>
-		<p>
-			The count under the sheet — <em>3 / 12</em> — opens that card on its own, big, over everything; so does a
-			thumbnail on the export screen. The arrows either side, the left and right arrow keys, and a swipe step through
-			the run. Nothing is printed from there.
-		</p>
-
-		<h3>Dialogs</h3>
-		<p>
-			A dialog opens with nothing pressed. <strong>Enter</strong> moves onto the action it suggests, and a second
-			Enter presses it — so a stray Return arriving a beat late cannot delete a template or replace every row on its
-			own. <strong>Esc</strong> closes the dialog at any point — in the CSS dialog, which has a
-			<strong>Cancel</strong>, closing that way cancels, and the CSS that was there when it opened comes back.
-		</p>
-
-		<h3>On a touchscreen</h3>
-		<p>
-			<strong>Pinch to zoom</strong> the page, anywhere over the stage — over the areas as well as the ground
-			around them. A second finger never drags: an area that was moving goes back where it was, so a pinch zooms
-			and leaves the card alone. Every button answers a press with a few milliseconds of vibration, where the
-			device has it.
-		</p>
-		<p>
-			The <strong>cross of arrows</strong> by the page nudges the selection; its middle button cycles the step, and
-			holding it moves the pad out of the way. When the selection is <em>tied</em> to another area, the two vertical
-			arrows wear a link instead: <strong>hold</strong> one and you take hold of the area it hangs from, which is
-			the one that can still move up and down — or <strong>tap</strong> it three times to break the tie and leave the
-			area exactly where it sits.
-		</p>
-		<p>
-			<strong>Press and hold an area</strong> for its menu — and if the finger carries on, the menu goes and the
-			area moves with it: it was being dragged under the menu the whole time. Under the page, the data tray opens
-			at about half the screen and is <strong>dragged taller by the table's header</strong>; a press that goes
-			nowhere still presses the button underneath it.
-		</p>
-		<p>
-			A card opened <strong>full screen</strong> is the one place a pinch zooms the card itself, up to six times, with
-			a drag to move around it. Pinch back and it settles; a flick pages the run again.
+			To learn what something does, <strong>rest the pointer on it</strong>, or <strong>press and hold</strong> it on
+			a touchscreen. Double-click an area to type in it or draw in it; right-click it, or long-press it, for its menu.
 		</p>
 
 		<h3>Keys</h3>
@@ -3136,13 +3089,23 @@
 			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page</dd>
 			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
-			<dt>Ctrl/Cmd + ;<span>Ctrl/Cmd + H</span></dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off (hold the Grid box for dots)</dd>
+			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
+			<dt>Ctrl/Cmd + ;<span>|</span></dt><dd>Guides on or off</dd>
+			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + S</dt><dd>Save the drawing, while drawing</dd>
 			<dt>Ctrl/Cmd + P</dt><dd>Export — press again from that screen to print</dd>
 			<dt>Ctrl/Cmd + Shift + S</dt><dd>Export, for the fingers that reach for that instead</dd>
 			<dt>?<span>/</span></dt><dd>This panel</dd>
 		</dl>
 
+		<!-- Where else the app lives, in the README's order: what it is, where
+		     to use it, and how it is made. Links a person follows, so none of
+		     them is a request the app makes on its own. -->
+		<ul class="elsewhere">
+			<li><a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Project page</a></li>
+			<li><a href="https://libelli.vercel.app" target="_blank" rel="noreferrer">Live instance</a></li>
+			<li><a href="https://github.com/Arty2/libelli" target="_blank" rel="noreferrer">Source</a></li>
+		</ul>
 
 		<p class="credit">
 			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>
@@ -3197,16 +3160,6 @@
 		onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 		onnotice={notify}
 		onclose={() => (previewOpen = false)}
-	/>
-{/if}
-
-{#if drawingBox}
-	<BitmapEditor
-		box={drawingBox}
-		value={drawingValue}
-		ink={drawingBox.color ?? template.defaults.color}
-		onsave={saveDrawing}
-		oncancel={() => (drawing = null)}
 	/>
 {/if}
 
@@ -3282,8 +3235,8 @@
 	}
 
 	.bar-row.box {
-		background: #eef3fb;
-		border-bottom-color: #cfdcf3;
+		background: var(--accent-wash);
+		border-bottom-color: var(--accent-line);
 	}
 
 	.bar-row :global(.options) {
@@ -3338,7 +3291,7 @@
 		bottom: 0;
 		left: 3px;
 		width: 2px;
-		background: #2563eb;
+		background: var(--accent);
 		opacity: 0;
 		transition: opacity 0.12s;
 	}
@@ -3505,9 +3458,9 @@
 	}
 
 	button[aria-pressed='true']:not(.primary):not(.danger-outline) {
-		border-color: #2563eb;
-		color: #2563eb;
-		background: #eaf1fe;
+		border-color: var(--accent);
+		color: var(--accent);
+		background: var(--accent-tint);
 	}
 
 	select {
@@ -3696,16 +3649,31 @@
 		outline: none;
 	}
 
-	.modal code {
-		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-		font-size: 11.5px;
-		background: #f3f3f3;
-		padding: 1px 4px;
-		border-radius: 3px;
-	}
-
 	.credit a {
 		color: inherit;
+	}
+
+	.elsewhere {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 4px 18px;
+		margin: 18px 0 0;
+		padding: 12px 0 0;
+		border-top: 1px solid #eee;
+		list-style: none;
+		font-size: 13px;
+	}
+
+	.elsewhere a {
+		color: var(--accent);
+	}
+
+	/* The rule above the links is the one between the help and the rest. */
+	.elsewhere + .credit {
+		margin-top: 10px;
+		padding-top: 0;
+		border-top: none;
 	}
 
 	.credit {

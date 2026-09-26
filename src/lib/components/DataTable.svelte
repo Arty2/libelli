@@ -2,14 +2,19 @@
 	import { untrack } from 'svelte';
 	import Icon from './Icon.svelte';
 	import { download } from '$lib/download';
-	import { hold } from '$lib/gestures';
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { armDefault } from '$lib/modal';
+	import { localImageName, safeMediaUrl } from '$lib/assets';
+	import type { Grid } from '$lib/bitmap';
+	import BitmapEditor from './BitmapEditor.svelte';
 	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
 	import { countText, dropTarget, indexAfterSort, moveColumn, moveRows, moveRowsTo, sortRows, type SortDirection } from '$lib/table';
 	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
 	import type { Dataset, Row, RowHeight } from '$lib/types';
+
+	/** Where a drawing was opened from, other than the table itself. */
+	type Origin = 'card' | 'images';
 
 	interface Props {
 		dataset: Dataset;
@@ -31,6 +36,32 @@
 		onplacecolumn: (column: string) => void;
 		/** a cell of this column has just been entered, so the card can point at it */
 		oncellfocus: (column: string) => void;
+		/**
+		 * Stored pictures by name, resolved — what a `local:name` cell shows as
+		 * its thumbnail, and what the drawing surface opens on when asked to
+		 * draw over one.
+		 */
+		images?: Record<string, string>;
+		/** The board and the ink a drawing in this column is made with. */
+		drawingFor: (column: string) => { pixels?: Grid; ink: string };
+		/** A drawing saved into a cell, from the side panel's Save. */
+		ondrawn: (row: number, column: string, dataUrl: string, pixels: Grid | undefined) => void;
+		/**
+		 * An area with no column, asked to be drawn in: it has no cell, but it
+		 * draws in the same side panel, and its drawing goes onto the area. A
+		 * new object each time, as `openRequest` is.
+		 */
+		areaRequest?: { id: string; name: string; value: string; pixels?: Grid; ink: string; from?: Origin } | null;
+		onsavearea: (id: string, dataUrl: string, pixels: Grid | undefined) => void;
+		ondeletearea: (id: string) => void;
+		/**
+		 * Whether the panel is showing the drawing board. The page puts its
+		 * options row away while it is, so on a phone the tray can open far
+		 * enough to draw in.
+		 */
+		ondrawing?: (drawing: boolean) => void;
+		/** A stored picture, opened large in the Images tray to be looked at and edited. */
+		onopenimage: (name: string) => void;
 		/** lock or unlock the whole table; the page owns the dataset */
 		onlock: (locked: boolean) => void;
 		ondeletetable: () => void;
@@ -62,7 +93,13 @@
 		 * a Data Field area. A new object each time, so asking twice for the
 		 * same cell opens it twice.
 		 */
-		openRequest?: { row: number; column: string } | null;
+		openRequest?: { row: number; column: string; draw?: boolean; from?: Origin } | null;
+		/**
+		 * The editor closed on something that was not opened from the table: the
+		 * page puts back what was there before — the Images tray, or no panel at
+		 * all — rather than leaving the table showing, which nobody asked for.
+		 */
+		onleave?: (to: Origin) => void;
 		/** open the Getting Started table, or start one */
 		ongettingstarted: () => void;
 		/**
@@ -83,6 +120,14 @@
 		usedColumns,
 		onplacecolumn,
 		oncellfocus,
+		images = {},
+		drawingFor,
+		ondrawn,
+		areaRequest = null,
+		onsavearea,
+		ondeletearea,
+		ondrawing,
+		onopenimage,
 		onlock,
 		ondeletetable,
 		onswaptable,
@@ -100,8 +145,17 @@
 		onrenamecolumn,
 		ongettingstarted,
 		openRequest = null,
+		onleave,
 		onnotice
 	}: Props = $props();
+
+	/**
+	 * Where the open editor was asked for from, and so where its × goes back
+	 * to. From the table itself, the table; from an area on the card, the
+	 * panel closes, since it was only opened to draw in; from the Images
+	 * tray, back to that.
+	 */
+	let leaveTo = $state<'table' | Origin>('table');
 
 	/**
 	 * The row the page is showing, brought into view. Paging the card with the
@@ -253,24 +307,39 @@
 	};
 
 	/**
-	 * A cell opened full size — press and hold it, or press Edit in the bar
+	 * A cell opened full size — its [...], or Edit in the bar
 	 * under the table while it is being typed in. A cell of a long body of
 	 * Markdown is a keyhole at the height a table row can spare, so the whole
 	 * of it gets the table's room. It edits the cell itself, live, as the small
 	 * field does: the card follows each keystroke, undo reaches every change,
 	 * and there is nothing to confirm — the × or Escape puts the table back.
 	 */
-	let bigCell = $state<{ row: number; column: string } | null>(null);
+	let bigCell = $state<{ row: number; column: string; draw?: boolean } | null>(null);
 	/** The bar's height: the full-size editor stops above it, so the bar stays. */
 	let barHeight = $state(0);
 
-	function openBigCell(rowIndex: number, column: string) {
+	/**
+	 * `draw` is the card asking for the drawing surface on an area bound to
+	 * this column: then an empty cell, or one pointing at a stored picture, is
+	 * drawn on rather than typed in. Without it, a stored picture is not this
+	 * editor's to open at all — it goes to the Images tray, where it can be
+	 * seen large and cropped or turned.
+	 */
+	function openBigCell(rowIndex: number, column: string, draw = false, from: 'table' | Origin = 'table') {
 		const value = dataset.rows[rowIndex]?.[column];
 		if (value === undefined) return false;
+		const stored = localImageName(value);
+		if (stored && !draw) {
+			onopenimage(stored);
+			return;
+		}
 		// The small field under the press still has the focus, and would keep
 		// the outline lit behind the editor.
 		(document.activeElement as HTMLElement | null)?.blur();
-		bigCell = { row: rowIndex, column };
+		drawingArea = null;
+		leaveTo = from;
+		bigCell = { row: rowIndex, column, draw: draw || undefined };
+		drawnValue = value;
 		onactivate(rowIndex);
 	}
 
@@ -280,13 +349,164 @@
 		const ask = openRequest;
 		if (!ask) return;
 		untrack(() => {
-			if (!locked && dataset.columns.includes(ask.column)) openBigCell(ask.row, ask.column);
+			if (!locked && dataset.columns.includes(ask.column)) openBigCell(ask.row, ask.column, !!ask.draw, ask.from ?? 'table');
 		});
 	});
 
-	function closeBigCell() {
-		bigCell = null;
+	/** The same column, a row up or down, as the card's pager steps cards. */
+	function stepBigCell(by: number) {
+		if (!bigCell) return;
+		const row = Math.max(0, Math.min(dataset.rows.length - 1, bigCell.row + by));
+		if (row === bigCell.row) return;
+		bigCell = { ...bigCell, row };
+		drawnValue = dataset.rows[row]?.[bigCell.column] ?? '';
+		onactivate(row);
 	}
+
+	/**
+	 * What the full-size editor is for this cell: the drawing surface for a
+	 * picture, and for any cell at all when it was opened to draw — an area
+	 * showing pictures asked for it, so the column is a column of pictures,
+	 * and whatever a cell holds that cannot be drawn over (an address from
+	 * elsewhere) opens as a blank board, as it always has. Otherwise a stored
+	 * picture's own look with the way to the Images tray, or the words.
+	 */
+	/** Whether the panel shows the drawing board for this open cell. */
+	$effect(() => {
+		ondrawing?.(!!drawingArea || (!!bigCell && boardShown(bigCell)));
+	});
+
+	const boardShown = (open: { row: number; column: string; draw?: boolean }) =>
+		!locked && bigKind(dataset.rows[open.row]?.[open.column] ?? '', open.draw) === 'drawing';
+
+	function bigKind(value: string, draw: boolean | undefined): 'drawing' | 'stored' | 'text' {
+		if (draw || cellPicture(value)) return 'drawing';
+		if (localImageName(value)) return 'stored';
+		return 'text';
+	}
+
+	/**
+	 * The drawing surface reads its picture once, when it opens. A cell changed
+	 * underneath it — undo, a paste into the table, the row stepped — has to
+	 * open it again on what is there now; a cell changed *by* it must not, or
+	 * every stroke would start the board afresh and lose its own undo.
+	 * `drawnValue` is the last value the surface knows about, and `drawEpoch`
+	 * the key that remounts it.
+	 */
+	let drawnValue = '';
+	let drawEpoch = $state(0);
+
+	$effect(() => {
+		const open = bigCell;
+		if (!open) return;
+		const now = dataset.rows[open.row]?.[open.column] ?? '';
+		untrack(() => {
+			if (now === drawnValue) return;
+			drawnValue = now;
+			drawEpoch += 1;
+		});
+	});
+
+	function drew(rowIndex: number, column: string, dataUrl: string, pixels: Grid | undefined) {
+		drawnValue = dataUrl;
+		ondrawn(rowIndex, column, dataUrl, pixels);
+	}
+
+	/**
+	 * The board in the panel, and whether it holds drawing not yet saved. Its
+	 * Save and Delete are in the panel's bar, beside the pager — where every
+	 * picture's are, the Images tray's included — so the bar asks the board.
+	 * Closing with drawing unsaved drops it, as Cancel did; the pager waits
+	 * instead, because stepping away is not a way of saying "never mind".
+	 */
+	let board = $state<ReturnType<typeof BitmapEditor> | null>(null);
+	/** Where the board puts its size row and its undo — see BitmapEditor's `head` and `bar`. */
+	let boardHead = $state<HTMLElement | null>(null);
+	let boardBar = $state<HTMLElement | null>(null);
+	let boardDirty = $state(false);
+
+	/** A drawing in the cell gone: the cell emptied, which the app's undo reaches. */
+	function deleteDrawing() {
+		if (!bigCell) return;
+		setCell(bigCell.row, bigCell.column, '');
+		// Still a board: an empty cell opened without asking to draw is words,
+		// and deleting a drawing is not a request to start typing.
+		bigCell = { ...bigCell, draw: true };
+		// Opened afresh even when the cell was already empty — a drawing not yet
+		// saved is on the board, not in the cell, and Delete means that too.
+		drawnValue = '';
+		drawEpoch += 1;
+	}
+
+	/** An area with no column, being drawn in — see `areaRequest`. */
+	let drawingArea = $state<{ id: string; name: string; value: string; pixels?: Grid; ink: string } | null>(null);
+	let areaEpoch = $state(0);
+
+	$effect(() => {
+		const ask = areaRequest;
+		if (!ask) return;
+		untrack(() => {
+			bigCell = null;
+			leaveTo = ask.from ?? 'table';
+			drawingArea = { ...ask };
+			areaEpoch += 1;
+		});
+	});
+
+	function saveArea(dataUrl: string, pixels: Grid | undefined) {
+		if (!drawingArea) return;
+		drawingArea = { ...drawingArea, value: dataUrl, pixels };
+		onsavearea(drawingArea.id, dataUrl, pixels);
+	}
+
+	function deleteArea() {
+		if (!drawingArea) return;
+		ondeletearea(drawingArea.id);
+		drawingArea = { ...drawingArea, value: '' };
+		areaEpoch += 1;
+	}
+
+	/** What the drawing surface opens on: the picture, or a stored one resolved. */
+	function drawingSource(value: string): string {
+		const picture = cellPicture(value);
+		if (picture) return picture;
+		const stored = localImageName(value);
+		return stored ? (images[stored] ?? '') : '';
+	}
+
+	/** A stored picture's resolved address, for its thumbnail. */
+	const storedPicture = (value: string | undefined) => {
+		const name = localImageName(value);
+		return name ? (images[name] ?? null) : null;
+	};
+
+	/**
+	 * A cell holding a picture — a drawing, or one pasted in as a data URL —
+	 * shown as the picture. Its words are a few hundred kilobytes of base64
+	 * that nobody reads or types into, and they pushed every other cell's
+	 * words off the row. Only a `data:` URL: an address is a request, and the
+	 * table makes none. Through `safeMediaUrl`, because the cell is untrusted
+	 * and a prefix is not a shape.
+	 */
+	function cellPicture(value: string | undefined): string | null {
+		const text = value?.trim() ?? '';
+		return text.startsWith('data:image/') ? safeMediaUrl(text) : null;
+	}
+
+	/** Close the editor, back to where it was opened from — or, `toTable`, to the table regardless. */
+	function closeBigCell(toTable = false) {
+		const to = leaveTo;
+		bigCell = null;
+		drawingArea = null;
+		leaveTo = 'table';
+		if (!toTable && to !== 'table') onleave?.(to);
+	}
+
+	/** The chevron: one step back — to the Images tray it came from, or else to the table. */
+	const stepBack = () => closeBigCell(leaveTo !== 'images');
+
+	const leaveTitle = (dirty: boolean) =>
+		(dirty ? 'Close — the drawing not saved is dropped' : leaveTo === 'images' ? 'Back to Images' : leaveTo === 'card' ? 'Close' : 'Back to the table') + ' (Esc)';
 
 	const focusOnOpen = (node: HTMLElement) => node.focus();
 
@@ -403,19 +623,24 @@
 		traying = null;
 		watchTray(false);
 		if (!dragged) return;
-		trayClick = true;
+		trayClick = performance.now() + 400;
 		ontraydrag('end', event.clientY);
 	}
 
 	/** The press that resized the tray is not also a press on what it started on. */
 	function swallowClick(event: MouseEvent) {
-		if (!trayClick) return;
-		trayClick = false;
+		if (performance.now() > trayClick) return;
+		trayClick = 0;
 		event.preventDefault();
 		event.stopPropagation();
 	}
 
-	let trayClick = false;
+	/**
+	 * Until when a click is the tail of a drag rather than a press. A moment,
+	 * not a flag: a finger's drag makes no click at all, and a flag left set by
+	 * one ate the next real tap — the × on the full-size editor, a header's sort.
+	 */
+	let trayClick = 0;
 
 	/**
 	 * Drag a header sideways to move its column.
@@ -543,9 +768,32 @@
 		if (!on || event.type === 'pointercancel') return;
 		// The press that carried the column is not also a press on the name
 		// field or the button it was let go over.
-		trayClick = true;
+		trayClick = performance.now() + 400;
 		const to = dropTarget(from, before);
 		if (to !== from) onchange(moveColumn(dataset, from, to));
+	}
+
+	/**
+	 * A name that is not being edited is not there for the pointer.
+	 *
+	 * The name field fills most of each header, so most drags of the header —
+	 * the tray pulled up, the column carried sideways — begin on it, and a text
+	 * field answers a press with gestures of its own: a selection, the browser
+	 * dragging selected text, and on a phone its own text handling, which the
+	 * page cannot hold back from a pointerdown at all. Holding the press back
+	 * worked in every browser here and not on the phones it was for. So an
+	 * unfocused name takes no pointer events (see `.column-name` in the styles):
+	 * a press lands on the header, which drags, and a tap that went nowhere —
+	 * a drag swallows its own click — puts the name into editing, caret at the
+	 * end. Focused, the field takes the pointer back, to place the caret. The
+	 * keyboard reaches it by Tab as it always did.
+	 */
+	function takeName(event: MouseEvent) {
+		if ((event.target as Element).closest('button')) return;
+		const field = (event.currentTarget as HTMLElement).querySelector<HTMLInputElement>('input.column-name');
+		if (!field || document.activeElement === field) return;
+		field.focus();
+		field.setSelectionRange(field.value.length, field.value.length);
 	}
 
 	let pasteOpen = $state(false);
@@ -651,7 +899,7 @@
 			// and closes something behind this.
 			event.stopPropagation();
 			pickerOpen = false;
-		} else if (bigCell) {
+		} else if (bigCell || drawingArea) {
 			event.stopPropagation();
 			closeBigCell();
 		} else if (confirmColumn !== null) {
@@ -1113,6 +1361,7 @@
 	class="data"
 	class:rows-short={rowHeight === 'short'}
 	class:rows-full={rowHeight === 'full'}
+	class:locked
 	aria-label="Card data"
 >
 	<div class="scroll" bind:this={scrollEl}>
@@ -1160,7 +1409,7 @@
 								title={allChosen ? 'Drop every row' : 'Choose every row'}
 								aria-label={allChosen ? 'Drop every row' : 'Choose every row'}
 								onclick={toggleAll}
-							></button>
+							><Icon name={allChosen ? 'checkbox-checked' : someChosen ? 'checkbox-indeterminate' : 'checkbox'} size={14} /></button>
 						{/if}
 						{#if sortedBy}
 							<button
@@ -1185,8 +1434,14 @@
 							class:drop-after={carrying?.on && i === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
 							aria-sort={sortedBy?.column === column ? (sortedBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
 							onpointerdown={(e) => startCarry(e, i)}
+							data-no-hold-tip
 						>
-							<span class="column-head">
+							<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+							<span
+								class="column-head"
+								title={locked ? column : 'Rename this column — drag it sideways to move it'}
+								onclick={takeName}
+							>
 							<!-- Data nothing on the card prints: no area is bound to it and
 							     nothing names it as {{column}}. Worth saying, because it is
 							     either a column still to be placed or one that can go. -->
@@ -1205,10 +1460,22 @@
 								value={column}
 								readonly={locked}
 								aria-label="Rename column {column}"
-								title={locked ? column : 'Rename this column — drag it sideways to move it'}
 								onchange={(e) => renameColumn(i, e.currentTarget.value, e.currentTarget)}
 							/>
 							<span class="column-tools">
+								<!-- Only on hover or while the header has the focus: three
+								     buttons in every header, always, were the name's room. The
+								     keyboard still reaches them, since a focused name shows them. -->
+								{#if !locked}
+									<span class="column-move">
+										<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
+										<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
+										<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
+									</span>
+								{/if}
+								<!-- Sort last, at the header's far edge: the move and delete
+								     buttons come and go before it, so it stays on the same
+								     spot whether they are showing or not. -->
 								<!-- Three states on the one control: A-Z, Z-A, and the order the
 								     rows came in. The icon says which of the three it is on. -->
 								<button
@@ -1232,16 +1499,6 @@
 										size={14}
 									/>
 								</button>
-								<!-- Only on hover or while the header has the focus: three
-								     buttons in every header, always, were the name's room. The
-								     keyboard still reaches them, since a focused name shows them. -->
-								{#if !locked}
-									<span class="column-move">
-										<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
-										<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
-										<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
-									</span>
-								{/if}
 							</span>
 							</span>
 							<!-- The right edge of the header is the grip, which is where
@@ -1304,7 +1561,7 @@
 									e.stopPropagation();
 									toggleRow(i);
 								}}
-							></button>
+							><Icon name={selectedRows.has(i) ? 'checkbox-checked' : 'checkbox'} size={14} /></button>
 							<!-- The number the row arrived with, not where it is sitting:
 							     sorting carries it along, so you can see where a row came
 							     from and find it again after unsorting. -->
@@ -1316,6 +1573,7 @@
 							<span
 								class="number"
 								class:grip={!locked}
+								data-no-hold-tip
 								role="presentation"
 								title={locked
 									? undefined
@@ -1332,6 +1590,7 @@
 							</span>
 						</td>
 						{#each dataset.columns as column, c (column)}
+							{@const picture = cellPicture(row[column]) ?? storedPicture(row[column])}
 							<!-- The drop line runs down the whole column, not just its
 							     header, so it says which gap the column lands in however
 							     far down the table the eye is. -->
@@ -1350,14 +1609,33 @@
 								class:drop-before={carrying?.on && carrying.before === c}
 								class:drop-after={carrying?.on && c === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
 							>
-								<!-- Press and hold for the whole cell in a dialog of its own. -->
+								{#if picture}
+									<!-- The picture in place of its base64, or of the name of a
+									     stored one. A press picks the row, as anywhere else on
+									     it; a double-click opens it — a drawing on the
+									     drawing surface, a stored picture large in Images. -->
+									<img
+										class="cell-picture"
+										src={picture}
+										alt="{column}, row {rowLabel(row, i)}"
+										title={locked
+											? undefined
+											: localImageName(row[column])
+												? `${localImageName(row[column])} — double-click to open it in Images`
+												: 'A drawing — double-click to draw on it'}
+										draggable="false"
+										ondblclick={() => !locked && openBigCell(i, column)}
+									/>
+								{:else}
+								<!-- The whole cell, full size, is Edit in the bar while this is
+								     typed in, or the [...] when it holds more than it shows. It
+								     was a press and hold too, until a hold came to mean "what is
+								     this?" everywhere. -->
 								<textarea
 									rows="1"
 									aria-label="{column}, row {rowLabel(row, i)}"
-									title={locked ? undefined : 'Press and hold to open this cell full size'}
 									value={row[column] ?? ''}
 									readonly={locked}
-									use:hold={() => !locked && openBigCell(i, column)}
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
 									use:completePlaceholders={dataset.columns}
@@ -1372,8 +1650,7 @@
 								></textarea>
 								<!-- Drawn only when the cell holds more than it shows (see
 								     `overflowMark`), and a way into the rest: the same full-size
-								     editor a press and hold opens, for anybody who never learnt
-								     the hold. Out of the tab order — the field before it is where
+								     editor Edit opens. Out of the tab order — the field before it is where
 								     the keyboard is, and it can scroll. -->
 								<button
 									class="more"
@@ -1386,6 +1663,7 @@
 										openBigCell(i, column);
 									}}
 								>[...]</button>
+								{/if}
 							</td>
 						{/each}
 						<td></td>
@@ -1426,14 +1704,49 @@
 	<!-- One line, always: this bar wrapping was costing the table a row of its
 	     own height every time the tray narrowed. -->
 	<div class="actions" bind:offsetHeight={barHeight}>
-		{#if bigCell}
+		{#if drawingArea}
+			<!-- An area's own drawing has no row to step to: its undo and redo at
+			     the far left, its Delete and its Save at the far right, where a
+			     cell's drawing has them. -->
+			<span class="board-bar" bind:this={boardBar}></span>
+			<span class="spacer"></span>
+			{@render drawingButtons(!!drawingArea.value, deleteArea)}
+		{:else if bigCell}
 			<!-- With a cell open full size the bar is about that cell, as it is
 			     while one is typed in: which row it is at the start, where the
 			     table's name usually is, and its count at the end, where the count
 			     always is. The editor above keeps the column's name and the ×. -->
-			<span class="big-row">Row {rowLabel(dataset.rows[bigCell.row], bigCell.row)}</span>
+			<!-- Which row, and the way to the next one's cell: the same pager the
+			     card has under it, so reading one column down the rows full size
+			     is a press per row rather than close, find, hold, per row. -->
+			{@const at = bigCell.row}
+			{#if boardShown(bigCell)}
+				<!-- The board's undo and redo, first in the bar, moved in by it. -->
+				<span class="board-bar" bind:this={boardBar}></span>
+			{/if}
+			<span class="big-pager" role="group" aria-label="Row">
+				<button
+					class="icon step"
+					disabled={at <= 0 || boardShown(bigCell) && boardDirty}
+					title={boardShown(bigCell) && boardDirty ? 'Save the drawing first' : 'Previous row'}
+					aria-label="Previous row"
+					onclick={() => stepBigCell(-1)}
+				><Icon name="chevron-left" size={16} /></button>
+				<span class="big-row">{at + 1} / {dataset.rows.length}</span>
+				<button
+					class="icon step"
+					disabled={at >= dataset.rows.length - 1 || boardShown(bigCell) && boardDirty}
+					title={boardShown(bigCell) && boardDirty ? 'Save the drawing first' : 'Next row'}
+					aria-label="Next row"
+					onclick={() => stepBigCell(1)}
+				><Icon name="chevron-right" size={16} /></button>
+			</span>
 			<span class="spacer"></span>
-			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
+			{#if boardShown(bigCell)}
+				{@render drawingButtons(!!(dataset.rows[bigCell.row]?.[bigCell.column] ?? '').trim(), deleteDrawing)}
+			{:else if bigKind(dataset.rows[bigCell.row]?.[bigCell.column] ?? '', bigCell.draw) === 'text'}
+				<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
+			{/if}
 		{:else}
 		<!-- How tall a row may be: one line, a few, or all of its longest cell.
 		     First in the bar and always there: it is about how the table is
@@ -1453,7 +1766,7 @@
 			     whole of it. Mousedown is held off, or the field would lose its
 			     focus, and with it this button, before the click. -->
 			<button
-				title="Open this cell in the table's full room — the same as pressing and holding it"
+				title="Open this cell in the table's full room"
 				disabled={locked}
 				onmousedown={(e) => e.preventDefault()}
 				onclick={() => editing && openBigCell(editing.row, editing.column)}
@@ -1629,13 +1942,12 @@
 					: 'Nothing to swap back to yet — this is the only table you have opened'}
 				aria-label="Swap to the previous table"
 				onclick={onswaptable}
-			><Icon name="arrows-horizontal" size={15} /></button>
+			><Icon name="compare" size={15} /></button>
 		{/if}
 		<span class="spacer"></span>
 		{#if editing && dataset.rows[editing.row]}
 			<!-- While a cell is being typed in, the bar is about that cell: how
-			     long it is, and the way into the whole of it — the button a press
-			     and hold is the shortcut for. The row actions come back when the
+			     long it is, and the way into the whole of it. The row actions come back when the
 			     cell is left. Mousedown is held off the Edit button, or the field
 			     would lose its focus, and with it this bar, before the click. -->
 			{@const cell = editing}
@@ -1696,17 +2008,116 @@
 	     table hid the card the words are for. It takes exactly the table's
 	     room — the rows and the bar under them — and gives it back on Done or
 	     Cancel. -->
-	{#if bigCell}
-		{@const open = bigCell}
-		{@const text = dataset.rows[open.row]?.[open.column] ?? ''}
-		<div class="cell-editor" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
-			<div class="cell-editor-head">
-				<h2 id="cell-editor-title">{open.column}</h2>
-				<span class="spacer"></span>
-				<button class="icon close" title="Back to the table (Esc)" aria-label="Close" onclick={closeBigCell}>
+	<!-- The drawing editor's way back, as the Images tray's large view has it:
+	     one step — to Images if that is where it came from, else to the table
+	     the drawing lives in. The × beside it closes to wherever it came from. -->
+	{#snippet back()}
+		<button
+			class="icon back"
+			title={leaveTo === 'images' ? 'Back to Images' : 'Back to the table'}
+			aria-label={leaveTo === 'images' ? 'Back to Images' : 'Back to the table'}
+			onclick={stepBack}
+		>
+			<Icon name="chevron-left" size={16} />
+		</button>
+	{/snippet}
+	{#if drawingArea}
+		{@const area = drawingArea}
+		<div class="cell-editor drawing" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
+			<!-- The editor's head is the tray's grip too, as the table's header row
+			     is: the editor covers that row, and on a phone a drawing wants
+			     more of the height than the tray opened with. -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="cell-editor-head"
+				class:draggable={trayDraggable}
+				onpointerdown={startTrayDrag}
+				onclickcapture={swallowClick}
+			>
+				<!-- The title's room holds the board's own row instead — its size,
+				     the paper, its weight — moved in by the board; the name stays
+				     for a screen reader. -->
+				{@render back()}
+				<h2 id="cell-editor-title" class="sr-only">{area.name}</h2>
+				<span class="board-head" bind:this={boardHead}></span>
+				<button class="icon close" title={leaveTitle(boardDirty)} aria-label="Close" onclick={() => closeBigCell()}>
 					<Icon name="close" size={18} />
 				</button>
 			</div>
+			{#key `${area.id}:${areaEpoch}`}
+				<BitmapEditor
+					bind:this={board}
+					box={{ pixels: area.pixels }}
+					value={area.value}
+					ink={area.ink}
+					onsave={saveArea}
+					ondirty={(d) => (boardDirty = d)}
+					head={boardHead}
+					bar={boardBar}
+					{onnotice}
+				/>
+			{/key}
+		</div>
+	{:else if bigCell}
+		{@const open = bigCell}
+		{@const text = dataset.rows[open.row]?.[open.column] ?? ''}
+		{@const kind = bigKind(text, open.draw)}
+		<div class="cell-editor" class:drawing={boardShown(bigCell)} role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
+			<!-- The editor's head is the tray's grip too, as the table's header row
+			     is: the editor covers that row, and on a phone a drawing wants
+			     more of the height than the tray opened with. -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="cell-editor-head"
+				class:draggable={trayDraggable}
+				onpointerdown={startTrayDrag}
+				onclickcapture={swallowClick}
+			>
+				{#if boardShown(open)}
+					{@render back()}
+					<h2 id="cell-editor-title" class="sr-only">{open.column}</h2>
+					<span class="board-head" bind:this={boardHead}></span>
+				{:else}
+					<h2 id="cell-editor-title">{open.column}</h2>
+					<span class="spacer"></span>
+				{/if}
+				<button class="icon close" title={leaveTitle(boardShown(open) && boardDirty)} aria-label="Close" onclick={() => closeBigCell()}>
+					<Icon name="close" size={18} />
+				</button>
+			</div>
+			<!-- One editor for a cell, whatever it holds: words are typed, a
+			     drawing is drawn — on the same surface the card opens, in this
+			     same room, with the pager below stepping down the column through
+			     either, and the drawing's Delete and Save beside it. Keyed on the cell, so each row's drawing starts
+			     with its own board and its own undo. A locked table shows the
+			     picture and nothing to draw with. -->
+			{#if kind === 'drawing' && !locked}
+				{@const look = drawingFor(open.column)}
+				{#key `${open.row}:${open.column}:${drawEpoch}`}
+					<BitmapEditor
+						bind:this={board}
+						box={{ pixels: look.pixels }}
+						value={drawingSource(text)}
+						ink={look.ink}
+						onsave={(dataUrl, pixels) => drew(open.row, open.column, dataUrl, pixels)}
+						ondirty={(d) => (boardDirty = d)}
+						head={boardHead}
+						bar={boardBar}
+						{onnotice}
+					/>
+				{/key}
+			{:else if kind !== 'text'}
+				<!-- A stored picture landed on by the pager, or any picture in a
+				     locked table: itself, large. A stored one is the Images tray's
+				     to edit, and a press takes it there. -->
+				{@const stored = localImageName(text)}
+				<button
+					class="big-picture"
+					disabled={!stored}
+					title={stored ? `Open ${stored} in Images` : undefined}
+					onclick={() => stored && onopenimage(stored)}
+				><img src={drawingSource(text)} alt={open.column} /></button>
+			{:else}
 			<textarea
 				value={text}
 				readonly={locked}
@@ -1720,6 +2131,7 @@
 					}
 				}}
 			></textarea>
+			{/if}
 		</div>
 	{/if}
 </section>
@@ -1762,6 +2174,18 @@
 		</div>
 	</div>
 {/if}
+
+<!-- A picture's two acts, at the far end of the panel's bar as they are in
+     the Images tray: Delete in red, then Save, lit while there is drawing to
+     keep. -->
+{#snippet drawingButtons(present: boolean, remove: () => void)}
+	<button class="danger" disabled={!present && !boardDirty} title="Delete this drawing" onclick={remove}>
+		<Icon name="trash" size={15} /> Delete
+	</button>
+	<button class="primary" disabled={!boardDirty} title="Save this drawing (Ctrl/Cmd+S)" onclick={() => board?.save()}>
+		Save
+	</button>
+{/snippet}
 
 <style>
 	.data {
@@ -1824,6 +2248,15 @@
 		padding: 0;
 	}
 
+	/* A locked table is ruled in the blue its Lock button wears when pressed,
+	   so the state is on the thing it applies to and not only on the button:
+	   read-only cells otherwise look exactly like cells that refuse your typing
+	   for no reason. */
+	.locked th,
+	.locked td {
+		border-color: var(--accent);
+	}
+
 	/* The table's own outside, which no cell's right or bottom edge covers. */
 	tr > :first-child {
 		border-left-width: 1px;
@@ -1869,24 +2302,45 @@
 		min-width: 0;
 	}
 
+	/* The same field the bars use — a rule under the value, no well around it —
+	   because it is the same act: typing a name into something. A white box
+	   popping up over the header on hover read as a different kind of control
+	   from every other field in the app. */
+	/* Not the pointer's until it has the focus — see `takeName`. The header
+	   under it is, so a press here drags the tray or the column. */
+	.column-name:not(:focus) {
+		pointer-events: none;
+	}
+
+	.column-head {
+		cursor: text;
+	}
+
+	.column-head :global(button) {
+		cursor: pointer;
+	}
+
 	.column-name {
-		border: 1px solid transparent;
-		border-radius: var(--radius-input);
+		border: none;
+		border-bottom: 1px solid transparent;
+		border-radius: 0;
 		background: transparent;
 		font: 600 12px ui-sans-serif, system-ui, sans-serif;
 		flex: 1 1 auto;
 		min-width: 0;
-		padding: 3px;
+		padding: 3px 2px;
 	}
 
-	.column-name:hover {
-		border-color: #ddd;
-		background: #fff;
+	.column-head:hover .column-name:not([readonly]) {
+		border-bottom-color: var(--border-control-hover);
 	}
 
-	.column-name:focus {
-		border-color: #2563eb;
-		background: #fff;
+	/* Editing: the underline turns the accent and doubles, as the bars' fields
+	   do — no ring round it and no ground under it. */
+	.column-head .column-name:not([readonly]):focus {
+		outline: none;
+		border-bottom-color: var(--accent);
+		box-shadow: 0 1px 0 var(--accent);
 	}
 
 	.column-tools,
@@ -1921,8 +2375,8 @@
 	}
 
 	.icon.unused:hover {
-		color: #1d4ed8;
-		background: #eaf1fe;
+		color: var(--accent-strong);
+		background: var(--accent-tint);
 	}
 
 	/* A column being carried, and the gap it would land in. */
@@ -1932,8 +2386,8 @@
 
 	/* Held long enough to be lifted: raised off the row, ready to go. */
 	th.lifted {
-		background: #eaf1fe;
-		box-shadow: inset 0 -2px 0 #2563eb;
+		background: var(--accent-tint);
+		box-shadow: inset 0 -2px 0 var(--accent);
 	}
 
 	/* The header claims a touch for itself, so a finger can lift a column
@@ -1943,11 +2397,11 @@
 	}
 
 	th.drop-before {
-		box-shadow: inset 3px 0 0 #2563eb;
+		box-shadow: inset 3px 0 0 var(--accent);
 	}
 
 	th.drop-after {
-		box-shadow: inset -3px 0 0 #2563eb;
+		box-shadow: inset -3px 0 0 var(--accent);
 	}
 
 	/* A cell's field fills it and would cover an inset shadow, so the body's
@@ -1959,7 +2413,7 @@
 		top: 0;
 		bottom: 0;
 		width: 3px;
-		background: #2563eb;
+		background: var(--accent);
 		pointer-events: none;
 		z-index: 2;
 	}
@@ -1993,7 +2447,7 @@
 		position: absolute;
 		inset: 2px 3px;
 		border-radius: 1px;
-		background: #2563eb;
+		background: var(--accent);
 		opacity: 0;
 	}
 
@@ -2115,7 +2569,7 @@
 	}
 
 	.more:hover:not(:disabled) {
-		color: #1d4ed8;
+		color: var(--accent-strong);
 	}
 
 	/* Still drawn on a locked table, where it says only that there is more:
@@ -2141,7 +2595,7 @@
 
 
 	td textarea:focus {
-		outline: 2px solid #2563eb;
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 		max-height: 18rem;
 		position: relative;
@@ -2177,6 +2631,31 @@
 		padding-bottom: 5px;
 	}
 
+	/* A picture sits where the cell's first lines would, as tall as they are
+	   at each row height, so an image cell sets no row taller than its
+	   neighbours' words do. */
+	.cell-picture {
+		display: block;
+		box-sizing: border-box;
+		max-width: 100%;
+		height: calc(var(--cell-line) * 3 + 7px);
+		padding: 4px 6px;
+		object-fit: contain;
+		object-position: left center;
+		cursor: default;
+	}
+
+	.data.rows-short .cell-picture {
+		height: calc(var(--cell-line) + 7px);
+		padding: 2px 6px;
+	}
+
+	.data.rows-full .cell-picture,
+	.data tr.expanded .cell-picture {
+		height: auto;
+		max-height: 12rem;
+	}
+
 	/* Each cell's ground as a custom property as well as a background, so the
 	   overflow mark can fade into whatever the cell is painted. */
 	tbody td {
@@ -2184,8 +2663,8 @@
 	}
 
 	tr.active td {
-		--cell-bg: #eff5ff;
-		background: #eff5ff;
+		--cell-bg: var(--accent-wash);
+		background: var(--accent-wash);
 	}
 
 	/* As narrow as a two-digit number and its tick: every millimetre here is a
@@ -2221,12 +2700,12 @@
 	/* The active and chosen tints have to be repainted here: the gutter carries
 	   its own opaque background now, so the row's would not show through it. */
 	tr.active .gutter {
-		background: #eff5ff;
+		background: var(--accent-wash);
 	}
 
 	tr.chosen .gutter {
-		background: #dbe7fd;
-		color: #1d4ed8;
+		background: var(--accent-soft);
+		color: var(--accent-strong);
 	}
 
 	/* Sized and coloured like the sort control in a column header, because it is
@@ -2242,7 +2721,7 @@
 		width: 18px;
 		height: 18px;
 		transform: translateY(-50%);
-		color: #1d4ed8;
+		color: var(--accent-strong);
 	}
 
 	/* The tick and what follows it — the row's number, or in the header the
@@ -2285,7 +2764,7 @@
 		left: 0;
 		right: 0;
 		height: 3px;
-		background: #2563eb;
+		background: var(--accent);
 		pointer-events: none;
 		z-index: 3;
 	}
@@ -2305,34 +2784,26 @@
 		line-height: var(--cell-line);
 	}
 
-	/* A square, not a radio: several rows can be chosen at once, and the
-	   checkboxes on the export screen are square too. */
+	/* Carbon's three checkbox icons, the ones every checkbox in the app is
+	   drawn as (see app.css): empty, ticked, and the dash for some-but-not-all
+	   in the header. A button of our own rather than an input, because it
+	   carries the tri-state the gutter needs; the icon is inside it, so its
+	   focus ring is its own. */
 	.tick {
-		width: 11px;
-		height: 11px;
+		display: grid;
+		place-items: center;
+		width: 14px;
+		height: 14px;
 		flex: none;
 		padding: 0;
-		border: 1px solid #bbb;
-		border-radius: var(--radius-input);
-		background: #fff;
+		border: none;
+		background: none;
+		color: #555;
 		cursor: pointer;
 	}
 
-	.tick[aria-checked='true'] {
-		border-color: #2563eb;
-		background: #2563eb;
-		box-shadow: inset 0 0 0 2px #fff;
-	}
-
-	/* Some but not all: a dash, which is what every tri-state checkbox draws and
-	   the one mark that is neither the empty square nor the filled one. A
-	   smaller version of the filled square would have read as "chosen" at the
-	   size this tick actually is. */
-	.tick[aria-checked='mixed'] {
-		border-color: #2563eb;
-		background:
-			linear-gradient(#2563eb, #2563eb) center / 5px 2px no-repeat,
-			#fff;
+	.tick:is([aria-checked='true'], [aria-checked='mixed']) {
+		color: var(--accent);
 	}
 
 	tbody tr {
@@ -2426,7 +2897,7 @@
 	   as a footnote to them rather than as their subject. */
 	.actions .chosen-count {
 		font: 600 13px ui-sans-serif, system-ui, sans-serif;
-		color: #1d4ed8;
+		color: var(--accent-strong);
 		padding: 0 2px;
 		white-space: nowrap;
 	}
@@ -2477,7 +2948,8 @@
 
 	.picker input:focus {
 		outline: none;
-		border-bottom-color: #2563eb;
+		border-bottom-color: var(--accent);
+		box-shadow: 0 1px 0 var(--accent);
 	}
 
 	.picker .caret {
@@ -2550,7 +3022,7 @@
 		display: inline-grid;
 		place-items: center;
 		width: 1rem;
-		color: #1a5fb4;
+		color: var(--accent-strong);
 	}
 
 	.picker-menu button.danger .mark {
@@ -2655,9 +3127,9 @@
 	}
 
 	.actions button[aria-pressed='true'] {
-		border-color: #2563eb;
-		color: #2563eb;
-		background: #eaf1fe;
+		border-color: var(--accent);
+		color: var(--accent);
+		background: var(--accent-tint);
 	}
 
 	button.primary {
@@ -2731,10 +3203,64 @@
 		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
 	}
 
+	/* A drawing wants every pixel of the room: a thinner margin, and what does
+	   not fit — the tool rows, when the tray is pulled right down — slides
+	   under the bottom bar rather than squeezing the board. */
+	.cell-editor.drawing {
+		gap: 6px;
+		padding: 6px 8px 8px;
+		overflow: hidden;
+	}
+
 	.cell-editor-head {
 		display: flex;
 		align-items: center;
 		gap: 10px;
+	}
+
+	/* The board's row, centred in the head: a spacer of the close button's
+	   width on the left keeps it centred on the panel rather than on what is
+	   left beside the ×. */
+	.board-head {
+		flex: 1;
+		display: flex;
+		justify-content: center;
+		min-width: 0;
+	}
+
+	/* The chevron on the left, the × on the right: the same width each, so the
+	   board's row between them is centred on the panel. */
+	.cell-editor .back {
+		flex: none;
+		width: 28px;
+		height: 28px;
+	}
+
+	.board-bar {
+		display: inline-flex;
+		gap: 4px;
+	}
+
+	.board-bar:empty {
+		display: none;
+	}
+
+	/* The same bargain as the table's header row: the drag is the tray's, so
+	   the browser's own scroll gives way. Padding lends it a finger's height. */
+	.cell-editor-head.draggable {
+		touch-action: none;
+		margin: -12px -12px 0;
+		padding: 12px 12px 4px;
+		cursor: ns-resize;
+	}
+
+	.cell-editor.drawing .cell-editor-head.draggable {
+		margin: -6px -8px 0;
+		padding: 6px 8px 2px;
+	}
+
+	.cell-editor-head.draggable :global(button) {
+		cursor: pointer;
 	}
 
 	.cell-editor h2 {
@@ -2748,10 +3274,19 @@
 	}
 
 	/* Where the table's name usually is, while a cell is open full size. */
+	.actions .big-pager {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+	}
+
 	.actions .big-row {
-		font: 600 12px ui-sans-serif, system-ui, sans-serif;
-		color: #333;
+		font: 500 12px ui-sans-serif, system-ui, sans-serif;
+		color: #555;
 		white-space: nowrap;
+		min-width: 2.75rem;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
 	}
 
 	/* Carbon's two halves of chevron--sort each sit in their own half of the
@@ -2787,6 +3322,28 @@
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	/* A picture landed on by the pager, in the room the text would take. */
+	.big-picture {
+		flex: 1;
+		min-height: 0;
+		width: 100%;
+		padding: 8px;
+		border: 1px solid #ccc;
+		border-radius: var(--radius-input);
+		background: #fff;
+		cursor: pointer;
+	}
+
+	.big-picture:disabled {
+		cursor: default;
+	}
+
+	.big-picture img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
 	}
 
 	.cell-editor textarea {

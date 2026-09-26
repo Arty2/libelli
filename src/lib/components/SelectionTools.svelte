@@ -109,7 +109,7 @@
 	}
 
 	button:hover:not(:disabled) {
-		background: #eef3fb;
+		background: var(--accent-wash);
 		border-color: var(--border-control-hover);
 	}
 
@@ -119,9 +119,9 @@
 	}
 
 	button[aria-pressed='true'] {
-		border-color: #2563eb;
-		color: #2563eb;
-		background: #eaf1fe;
+		border-color: var(--accent);
+		color: var(--accent);
+		background: var(--accent-tint);
 	}
 
 	button.danger {

@@ -13,6 +13,48 @@
 	--radius-input: 1px;
 	--border-control: #ccc;
 	--border-control-hover: #999;
+
+	/* The one accent, and every blue in the app mixed from it: pressed buttons,
+	   locks, focus rings, selection chrome, the row being previewed. It is the
+	   colour the system picks for its own controls — the one a checkbox is
+	   drawn in — where the browser will say what that is, and the blue these
+	   all used to be where it will not. The tints are mixes with white and the
+	   deep shade a mix with black, so an orange or a graphite accent comes with
+	   its own wash and its own hover rather than a blue one. */
+	--accent: #2563eb;
+	--accent-strong: color-mix(in srgb, var(--accent) 80%, #000);
+	--accent-line: color-mix(in srgb, var(--accent) 22%, #fff);
+	--accent-soft: color-mix(in srgb, var(--accent) 16%, #fff);
+	--accent-tint: color-mix(in srgb, var(--accent) 10%, #fff);
+	--accent-wash: color-mix(in srgb, var(--accent) 6%, #fff);
+	/* The accent turned inside out, for the guides — the page margins and the
+	   lines a drag snaps to. They are drawn over the boxes' outlines, which are
+	   the accent, so they want the colour furthest from it rather than a second
+	   fixed one: magenta sat beside a blue outline well enough, and beside a
+	   purple or a pink system accent not at all. This is the fallback blue's
+	   inverse, worked out by hand; the true inverse of whatever the accent is
+	   follows below where the browser can compute it. */
+	--accent-inverse: #da9c14;
+}
+
+/* `AccentColor` is not yet Baseline Widely, so it is behind a feature query:
+   a browser that does not know the keyword keeps the blue above rather than
+   an invalid colour, which is the whole of the failure mode. */
+@supports (color: AccentColor) {
+	:root {
+		--accent: AccentColor;
+	}
+}
+
+/* Relative colour syntax is Baseline Newly, not yet Widely: behind a query,
+   so a browser without it keeps the inverse of the blue above. A browser with
+   `AccentColor` but without this would pair the system accent with that
+   fixed amber — a mismatch, but a visible one, which is what a guide has to
+   be. */
+@supports (color: rgb(from red r g b)) {
+	:root {
+		--accent-inverse: rgb(from var(--accent) calc(255 - r) calc(255 - g) calc(255 - b));
+	}
 }
 
 /* Chrome is not prose: dragging across a toolbar should not leave half the
@@ -54,7 +96,7 @@ html, body {
 }
 
 *:focus-visible {
-	outline: 2px solid #2563eb;
+	outline: 2px solid var(--accent);
 	outline-offset: 1px;
 }
 
@@ -99,8 +141,8 @@ html, body {
 
 .placeholder-complete li[aria-selected='true'],
 .placeholder-complete li:hover {
-	background: #eaf1fe;
-	color: #1d4ed8;
+	background: var(--accent-tint);
+	color: var(--accent-strong);
 }
 
 /* Every Lock button — the page's, an area's, the table's — one width, the
@@ -112,4 +154,46 @@ html, body {
 	box-sizing: border-box;
 	width: 84px;
 	justify-content: flex-start;
+}
+
+/* Every checkbox is Carbon's: `checkbox`, `checkbox--checked` and
+   `checkbox--indeterminate`, drawn as masks so they take a colour from CSS —
+   the text colour empty, the accent ticked. The native control stays, for its
+   keyboard, its label and its state; only its look is replaced. The masks are
+   built from icons.ts and set on the root by +layout.svelte, with the class
+   that turns this on, so there is one copy of each path.
+
+   A mask clips everything the element paints, its focus ring included, so
+   the ring goes on what holds the box instead — the label, or the list item
+   where there is no label. `:has` is Baseline Widely available. */
+.icon-checkboxes input[type='checkbox'] {
+	appearance: none;
+	flex: none;
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	vertical-align: middle;
+	background: #555;
+	mask: var(--mask-checkbox) center / contain no-repeat;
+	cursor: pointer;
+}
+
+.icon-checkboxes input[type='checkbox']:checked {
+	background: var(--accent);
+	mask-image: var(--mask-checkbox-checked);
+}
+
+.icon-checkboxes input[type='checkbox']:indeterminate {
+	background: var(--accent);
+	mask-image: var(--mask-checkbox-indeterminate);
+}
+
+.icon-checkboxes input[type='checkbox']:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.icon-checkboxes :is(label, li):has(> input[type='checkbox']:focus-visible) {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
 }

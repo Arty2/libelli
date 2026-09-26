@@ -1,3 +1,4 @@
+import { localImageName } from './assets';
 import { parseColor } from './color';
 import { GRID_MINOR } from './layout';
 import { marginsOf, newBox } from './template';
@@ -36,12 +37,19 @@ import type { Box, Defaults, Mapping, PageSpec, Row } from './types';
  * cells, so the data wins over the heading. `title`, `subtitle`, `body`,
  * `label` and `code` are roles — nothing in a string of forty characters says
  * whether it is a heading or a caption, so the heading wins over the data.
+ *
+ * Two roles are small lines with a place of their own. A `detail` stacks under
+ * the subtitle — the medium of a work, a film's duration, a size — because it
+ * belongs to the heading it describes. A `credit` is the very last line of the
+ * card, under the rest of the foot, where a credit line is printed.
  */
 export type FieldKind =
 	| 'title'
 	| 'subtitle'
+	| 'detail'
 	| 'body'
 	| 'label'
+	| 'credit'
 	| 'number'
 	| 'date'
 	| 'image'
@@ -73,30 +81,51 @@ export interface FieldGuess {
 export const FIELD_KINDS: FieldKind[] = [
 	'title',
 	'subtitle',
+	'detail',
 	'body',
 	'label',
 	'number',
 	'date',
 	'image',
 	'link',
-	'code'
+	'code',
+	'credit'
 ];
 
 export const KIND_LABELS: Record<FieldKind, string> = {
 	title: 'Title',
 	subtitle: 'Subtitle',
+	detail: 'Detail line',
 	body: 'Body',
 	label: 'Small line',
 	number: 'Number',
 	date: 'Date',
-	image: 'Picture',
+	image: 'Image',
 	link: 'QR code',
-	code: 'Code'
+	code: 'Code',
+	credit: 'Credit line'
 };
 
 // ---- reading a column ------------------------------------------------------
 
-const normalise = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+/**
+ * A heading, lowercased first — every hint below is lowercase, and `Photo`,
+ * `PHOTO` and `photo` are one heading — then taken apart into its words.
+ * Letters and digits in any script count, so a heading in Greek is words
+ * rather than nothing; the hints themselves are English.
+ */
+const headingWords = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+/**
+ * Headings that name a person. A person is the title of their own card — an
+ * artist's name over the work, a speaker's over the talk — so where one of
+ * these sits beside a column called Title, the person takes the title and the
+ * Title column, which is then the name of the work, becomes the subtitle. See
+ * `guessRoles`.
+ */
+const PEOPLE = ['artist', 'artists', 'author', 'authors', 'creator', 'maker', 'designer', 'photographer', 'illustrator', 'architect', 'director', 'composer', 'performer', 'musician', 'band', 'speaker', 'presenter', 'host', 'guest', 'writer', 'poet', 'curator', 'person', 'who', 'by', 'student', 'member', 'employee', 'player'];
+
+const isPerson = (column: string) => headingWords(column).some((word) => PEOPLE.includes(word));
 
 /**
  * Headings that name a role outright. Longest-standing spreadsheet habits
@@ -104,25 +133,40 @@ const normalise = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
  * cells, which is the more reliable signal anyway.
  */
 const NAME_HINTS: Array<[FieldKind, string[]]> = [
-	['title', ['title', 'name', 'heading', 'header', 'card', 'product', 'item', 'term', 'word', 'question']],
-	['subtitle', ['subtitle', 'sub', 'tagline', 'caption', 'role', 'byline', 'strapline', 'summary']],
-	['body', ['body', 'content', 'text', 'description', 'notes', 'note', 'detail', 'details', 'answer', 'markdown', 'definition']],
-	['label', ['category', 'tag', 'tags', 'section', 'group', 'type', 'kind', 'class', 'status', 'level', 'set']],
-	['number', ['price', 'cost', 'amount', 'qty', 'quantity', 'count', 'number', 'no', 'num', 'score', 'points', 'value', 'weight', 'size']],
-	['date', ['date', 'day', 'when', 'year', 'created', 'updated', 'due', 'expires', 'published']],
-	['image', ['image', 'img', 'photo', 'picture', 'logo', 'avatar', 'cover', 'thumbnail', 'thumb', 'icon', 'art', 'illustration', 'color', 'colour', 'background']],
-	['link', ['link', 'url', 'qr', 'website', 'web', 'href', 'address', 'permalink']],
-	['code', ['code', 'id', 'sku', 'ref', 'reference', 'isbn', 'serial', 'barcode', 'slug']]
+	// `detail` and `credit` first: they are the most specific, and a heading
+	// that names one — Running time, Photo credit — is sure of it.
+	['detail', ['medium', 'media', 'material', 'materials', 'technique', 'dimensions', 'duration', 'runtime', 'runningtime', 'length', 'edition', 'format', 'instrumentation', 'ingredients']],
+	['credit', ['credit', 'credits', 'photocredit', 'copyright', 'courtesy', 'acknowledgement', 'acknowledgements', 'acknowledgment', 'rights', 'license', 'licence', 'collection', 'lender', 'provenance', 'source', 'sponsor', 'sponsors', 'funding']],
+	['title', ['title', 'name', 'heading', 'header', 'headline', 'card', 'product', 'item', 'term', 'word', 'question', ...PEOPLE]],
+	['subtitle', ['subtitle', 'sub', 'tagline', 'caption', 'role', 'byline', 'strapline', 'summary', 'artwork', 'work', 'piece', 'series', 'album', 'track', 'song', 'film', 'book', 'show', 'project', 'position', 'jobtitle', 'affiliation', 'organisation', 'organization', 'company']],
+	['body', ['body', 'content', 'text', 'description', 'desc', 'notes', 'note', 'detail', 'details', 'answer', 'markdown', 'definition', 'about', 'bio', 'biography', 'statement', 'abstract', 'synopsis', 'blurb', 'story', 'excerpt', 'quote', 'comment', 'comments', 'review', 'overview', 'info', 'information']],
+	['label', ['category', 'tag', 'tags', 'section', 'group', 'type', 'kind', 'class', 'status', 'level', 'set', 'genre', 'theme', 'topic', 'location', 'venue', 'place', 'room', 'city', 'country', 'origin', 'language', 'department']],
+	['number', ['price', 'cost', 'amount', 'qty', 'quantity', 'count', 'number', 'no', 'num', 'score', 'points', 'value', 'weight', 'size', 'rating', 'rank', 'total', 'pages', 'age', 'fee']],
+	['date', ['date', 'dates', 'day', 'when', 'year', 'created', 'updated', 'due', 'expires', 'published', 'released', 'born', 'died', 'time', 'period', 'era', 'season', 'deadline']],
+	['image', ['image', 'img', 'photo', 'picture', 'logo', 'avatar', 'cover', 'thumbnail', 'thumb', 'icon', 'art', 'illustration', 'color', 'colour', 'background', 'portrait', 'headshot', 'still', 'poster']],
+	['link', ['link', 'url', 'qr', 'website', 'web', 'href', 'address', 'permalink', 'site', 'homepage', 'instagram']],
+	['code', ['code', 'id', 'sku', 'ref', 'reference', 'isbn', 'serial', 'barcode', 'slug', 'catalogue', 'catalog', 'inventory', 'accession', 'lot']]
 ];
 
 const nameKind = (column: string): FieldKind | undefined => {
-	const key = normalise(column);
+	const words = headingWords(column);
+	const key = words.join('');
 	if (!key) return undefined;
-	// Exact match first: a column called "Notes" is a body, but "Note number"
-	// should not become one on the strength of its first word.
-	for (const [kind, words] of NAME_HINTS) if (words.includes(key)) return kind;
-	for (const [kind, words] of NAME_HINTS) {
-		if (words.some((word) => word.length > 3 && key.includes(word))) return kind;
+	const known = (word: string) => NAME_HINTS.find(([, hints]) => hints.includes(word))?.[0];
+	// The whole heading, run together, first: "Sub-title" is a subtitle.
+	const whole = known(key);
+	if (whole) return whole;
+	// Then word by word, from the last: in English the noun a heading is about
+	// comes last, so "Product image" is an image and "Note number" a number —
+	// read from the front, both were taken for what their first word names.
+	for (const word of [...words].reverse()) {
+		const kind = known(word);
+		if (kind) return kind;
+	}
+	// Last, a hint inside a word, for headings written as one: "coverphoto".
+	// Only hints of four letters or more, so "no" is not found in "Notes".
+	for (const [kind, hints] of NAME_HINTS) {
+		if (hints.some((hint) => hint.length > 3 && key.includes(hint))) return kind;
 	}
 	return undefined;
 };
@@ -175,8 +219,15 @@ function shapeKind(values: string[]): FieldKind | undefined {
 	const filled = values.map((v) => (v ?? '').trim()).filter(Boolean);
 	if (!filled.length) return undefined;
 	const every = (test: (v: string) => boolean) => filled.every(test);
-	if (every((v) => HTTP_URL.test(v))) return every((v) => IMAGE_FILE.test(v)) ? 'image' : 'link';
-	// A column of colors is a picture as far as a box is concerned: an `image`
+	// Images, by what the cell holds rather than what the column is called:
+	// a drawing or a pasted picture is a `data:image` URL, a stored one is
+	// `local:name`, and an address from elsewhere ends in an image file's name.
+	// First, because a drawing is a long cell and would otherwise read as prose.
+	const isImage = (v: string) =>
+		/^data:image\//i.test(v) || localImageName(v) !== null || (HTTP_URL.test(v) && IMAGE_FILE.test(v));
+	if (every(isImage)) return 'image';
+	if (every((v) => HTTP_URL.test(v))) return 'link';
+	// A column of colors is an image as far as a box is concerned: an `image`
 	// box shows whatever its source resolves to, and a color resolves to a fill.
 	if (every((v) => parseColor(v) !== null)) return 'image';
 	if (every((v) => NUMERIC.test(v))) return 'number';
@@ -208,6 +259,12 @@ export function classifyColumn(column: string, values: string[]): FieldGuess {
 	// body even where every cell happens to parse as something else.
 	const prose = stats.median > BODY_LENGTH || values.some((v) => MARKUP.test(v ?? ''));
 	if (prose && shape !== 'image' && shape !== 'link') return { column, kind: 'body', sure: true, sample };
+	// A heading that names a detail or a credit outright beats a column of
+	// numbers: a Duration of 90 is still the line under the subtitle, not a
+	// figure in the foot. Pictures and links are facts about the cells, and win.
+	if (shape === 'number' && (named === 'detail' || named === 'credit')) {
+		return { column, kind: named, sure: true, sample };
+	}
 	if (shape) return { column, kind: shape, sure: true, sample };
 	if (named) return { column, kind: named, sure: true, sample };
 
@@ -234,7 +291,7 @@ export function guessRoles(columns: string[], rows: Row[]): FieldGuess[] {
 		classifyColumn(column, rows.map((row) => row[column] ?? ''))
 	);
 
-	const only = (kind: FieldKind, keep: (g: FieldGuess) => boolean) => {
+	const only = (kind: FieldKind, keep: (g: FieldGuess) => boolean, demote: FieldKind = 'label') => {
 		let kept = false;
 		for (const guess of guesses) {
 			if (guess.kind !== kind || guess.include === false) continue;
@@ -244,11 +301,26 @@ export function guessRoles(columns: string[], rows: Row[]): FieldGuess[] {
 			}
 			// Demoted rather than dropped: a second title is still worth printing,
 			// just not as the title.
-			guess.kind = 'label';
+			guess.kind = demote;
 			guess.sure = false;
 		}
 		return kept;
 	};
+
+	// A person and a title both claim the title: the person has it, and the
+	// Title column — the name of their work — is the subtitle, ahead of any
+	// column that only called itself a subtitle. An artist over the artwork,
+	// an author over the book.
+	const titled = guesses.filter((g) => g.kind === 'title' && g.include !== false);
+	const person = titled.find((g) => isPerson(g.column));
+	let work: FieldGuess | undefined;
+	if (person) {
+		for (const guess of titled) {
+			if (guess === person || isPerson(guess.column)) continue;
+			guess.kind = 'subtitle';
+			work ??= guess;
+		}
+	}
 
 	// The body is the longest of the candidates rather than the first: where two
 	// columns both read as prose, the card wants the one with more in it. By the
@@ -265,8 +337,9 @@ export function guessRoles(columns: string[], rows: Row[]): FieldGuess[] {
 		);
 	only('body', (g) => g === widest);
 
-	const hasTitle = only('title', () => true);
-	only('subtitle', () => true);
+	const hasTitle = only('title', (g) => !person || g === person);
+	// A second subtitle is a line under the first rather than one in the foot.
+	only('subtitle', (g) => !work || g === work, 'detail');
 
 	// No column said it was the title, so the first line-length column becomes
 	// one. A card with no heading at all reads as a paragraph on a page.
@@ -400,9 +473,19 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	// the room a foot may take rather than by a count: a quarter of the card is
 	// as much as a footer can have before it is a second body, and how many
 	// lines that buys depends on the page, not on a number chosen here.
-	const footFields = guesses.filter((g) => ['label', 'number', 'date', 'code'].includes(g.kind));
+	// Credits last, at the very bottom, and kept first when the room runs out:
+	// a credit line is the one line of a foot that is owed rather than chosen.
+	const credits = guesses.filter((g) => g.kind === 'credit');
+	const footFields = [
+		...guesses.filter((g) => ['label', 'number', 'date', 'code'].includes(g.kind)),
+		...credits
+	];
 	const footCapacity = Math.max(1, Math.floor((contentH * 0.25) / smallH));
-	const footLines = footFields.slice(0, footCapacity);
+	const keptCredits = credits.slice(0, footCapacity);
+	const footLines = [
+		...footFields.filter((g) => g.kind !== 'credit').slice(0, footCapacity - keptCredits.length),
+		...keptCredits
+	];
 	const footH = Math.max(footLines.length * smallH, qrSide);
 	const footTop = bottomEdge - footH;
 	// The foot's left column stops short of the QR rather than running under it.
@@ -443,7 +526,7 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 
 	// Past that there is genuinely no room, and saying so is better than a card
 	// with two lines of type printed over its own footer.
-	for (const field of footFields.slice(footCapacity)) left.push(field.column);
+	for (const field of footFields) if (!footLines.includes(field)) left.push(field.column);
 
 	// ---- the head ------------------------------------------------------------
 
@@ -510,6 +593,26 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 			},
 			// Tight under the title: a subtitle belongs to it. Zero rather than
 			// a fraction of a step, which would put everything below off the grid.
+			0
+		);
+	}
+
+	// Detail lines, under the subtitle — or the title, where there is none — in
+	// column order, tight to it and to each other: the medium and the duration
+	// belong to the heading they describe, not to the foot.
+	for (const field of guesses.filter((g) => g.kind === 'detail')) {
+		stack(
+			{
+				slot: field.column,
+				x: margin,
+				w: contentW,
+				h: smallH,
+				size: smallSize,
+				lineHeight: 1.2,
+				color: '#555555',
+				mode: 'plain',
+				overflow: 'grow'
+			},
 			0
 		);
 	}

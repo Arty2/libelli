@@ -201,6 +201,34 @@ export function snapToEdges(value: number, edges: number[], tolerance: number): 
 }
 
 /**
+ * A box being moved, latched by whichever of its three lines comes nearest an
+ * edge: its start, its middle or its end — left, centre and right across, top,
+ * middle and bottom down. Only the start used to be tried, so a box could be
+ * lined up by its left edge and never by its middle, which is the alignment a
+ * centred card is built on. Returns where the box's start goes and the edge
+ * it caught, for the guide to be drawn at; null when nothing is in reach.
+ */
+export function latchSpan(
+	start: number,
+	length: number,
+	edges: number[],
+	tolerance: number
+): { start: number; edge: number } | null {
+	let best: { start: number; edge: number } | null = null;
+	let bestDistance = tolerance;
+	for (const offset of [0, length / 2, length]) {
+		for (const edge of edges) {
+			const distance = Math.abs(start + offset - edge);
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				best = { start: edge - offset, edge };
+			}
+		}
+	}
+	return best;
+}
+
+/**
  * Edges every other box offers to snap against: left/centre/right horizontally,
  * and resolved top/centre/bottom vertically. Vertical edges come from the
  * resolved layout rather than from `y`, so a box snaps to where a grown box

@@ -438,9 +438,20 @@ export type Mapping = Record<string, string>;
 export interface UiState {
 	/** dashed box bounds and the trim edge; screen furniture, never printed */
 	showBounds: boolean;
+	/**
+	 * Every tie drawn as its thread, all the time rather than on pointing at a
+	 * badge — the Boxes box's dash. Only means anything with the bounds on.
+	 */
+	showTies: boolean;
 	showGrid: boolean;
 	/** the page margins, drawn and snapped to; screen furniture, never printed */
 	showGuides: boolean;
+	/**
+	 * The temporary guides a drag lines up on — other areas' edges and middles,
+	 * the page's centre. With the margins off and these on, the Guides box shows
+	 * its dash.
+	 */
+	smartGuides: boolean;
 	/** how the grid draws itself: ruled lines, or a dot at every intersection */
 	gridStyle: GridStyle;
 	/**

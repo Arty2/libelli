@@ -102,6 +102,33 @@ that is what makes it worth writing down.
 
 ## `src/lib/autolayout.ts`
 
+**A heading is lowercased, then read word by word from the end.** Every hint
+is lowercase, so `PHOTO` and `Photo` are one heading. The whole heading run
+together is tried first (`Sub-title`), then its words from the last, because an
+English heading ends on the noun it is about — `Product image` is an image and
+`Note number` a number, where reading from the front took both for what their
+first word names. A hint found inside a word comes last, and only for hints of
+four letters or more.
+
+**Two small lines have a place of their own: `detail` and `credit`.** A
+medium, a duration, a size belong to the heading they describe, so a detail
+stacks under the subtitle, anchored like the rest of the head; a credit line
+is owed rather than chosen, so it is the foot's last line and the one kept
+when the foot is full. Both are roles, but a heading naming one beats a
+column of numbers — a Duration of 90 is a detail, not a figure in the foot.
+
+**A person takes the title over a Title column.** Where a heading names a
+person (`PEOPLE`) and another is plain Title, the card is about the person and
+the Title column is the name of their work, so it becomes the subtitle, ahead
+of a column that only called itself one; a second subtitle becomes a detail
+line. Without a person, Title keeps the title, as before.
+
+**An image is known by its cells before its heading.** A column whose every
+filled cell is a `data:image` URL, a `local:name` or an address ending in an
+image file is an image whatever it is called — and that test runs before the
+prose test, since a drawing is a long cell and read as a body otherwise. The
+dialog calls the kind *Image*, the word the rest of the app uses.
+
 **Inside the page margins; grid steps within them.** For one release every
 generated edge was on the 5mm grid, which on a page that is not a whole number
 of steps wide made the side margins uneven (10 and 13mm on A5). Even margins
@@ -388,20 +415,33 @@ to someone. In the cell it travels with the words, and a row's picture is
 exactly as portable as its text. The cost is a long cell, which is why the next
 decision is what it is.
 
-**One ink, and it is the area's own.** There is no palette here. An area is set
-to a colour in the bar, and a drawing made in it should be that colour rather
-than a second decision made in a second place — so the pen is that colour and the
-only other tool is the rubber. The trade-off is that the ink is fixed at the
-moment of drawing: this is a PNG, not a mask, so changing the area's colour
-afterwards does not recolour what was drawn.
+**The ink starts as the area's own.** There was no palette here at first: an
+area is set to a colour in the bar, and a drawing in it should be that colour
+rather than a second decision made in a second place. That held until a drawing
+wanted two colours. The picker is beside the nib now, and it opens on the
+area's colour, so the one-decision case costs nothing. The ink is fixed at the
+moment of drawing either way: this is a PNG, not a mask, so changing the area's
+colour afterwards does not recolour what was drawn.
 
-**Low resolution is the feature, and it is a budget rather than a shape.** A
-board is 64 by 64 pixels' worth — 4096 of them — spent in any arrangement:
-64 x 64, 128 x 32, 512 x 8. What a cell cares about is how many pixels it is
-being asked to hold, not how they are arranged, so that is the one thing held
-constant; a kilobyte or two of base64 is a long cell but one a spreadsheet can
-hold and a person can scroll past. The header says what the drawing is costing
-as it is drawn, so the limit is visible rather than a rule that bites later.
+**Shapes are rasterised by hand, not by the canvas.** `rectOutline` and
+`ellipseOutline` return the pixels, which the nib paints like a stroke's; a
+canvas `ellipse()` would antialias its edge into shades that were never chosen,
+the one thing a pixel drawing cannot have. The ellipse is Zingl's midpoint
+ellipse in a rectangle, because the centre-and-radius form cannot draw an even
+width: a circle dragged 16 pixels across came out 15 or 17. Square and circle
+are a second press on the tool rather than a tool each — the row had to fit a
+phone — timed in the component rather than left to `dblclick`, which a phone
+may not send for two taps; Shift flips it for one drag, as everywhere else.
+
+**Small by default, not by rule.** Every board starts at 64 x 64, where a
+drawing is a kilobyte or two of base64 — a long cell, but one a spreadsheet can
+hold and a person can scroll past. It was a budget: 64 x 64 pixels' worth,
+spent in any shape (128 x 32, 512 x 8). That was lifted when a banner and a
+detailed drawing both wanted more than it allowed. The title bar says what the
+drawing is costing as it is drawn, so a large board's cost is in view rather
+than forbidden. What is left is `MAX_SIDE`, 2048 a side: not a budget but a
+guard, because a template is a file anyone can hand you and the board it names
+is a canvas the browser allocates, thirty times over in the editor's undo.
 
 **The board does not follow the area.** It did at first — the area's own
 proportions, longest side pinned — and that tied a drawing's cost to the
@@ -414,10 +454,8 @@ rule the rest of the format follows.
 
 **A picture already in the cell opens at its own size.** The thing being edited
 is what is in the cell, and opening it on the board the area remembers would
-resample a picture nobody asked to resize. Only one too big for the budget — a
-photograph dropped on the area, not a drawing — is scaled down to fit, and one
-smaller than the smallest board sits in the corner of it rather than being blown
-up by a fraction.
+resample a picture nobody asked to resize. Only one with a side past
+`MAX_SIDE` is scaled down to fit, keeping its shape.
 
 **A resize scales what is drawn; undo restores the board and the detail.**
 Refusing to resize once anything is drawn would make the size a decision you had
@@ -460,12 +498,14 @@ line around leaves a fan of every line it passed through. The copy is the
 editor's own, not a history entry: the whole drag is one step in undo, the same
 as a stroke.
 
-**Rotate and crop are board transforms, not drawing.** Both could be done by
-hand with the pen and neither should have to be: a quarter turn resamples
-nothing (the same pixels, arranged the other way up, and the budget cannot
-notice because w x h is unchanged), and cropping to the ink is the same
-rectangle a tiled area repeats, made permanent. Each one is a single entry in
-the editor's own stack, board and all, so either is one undo away.
+**Rotate, flip and crop are board transforms, not drawing.** None resamples:
+a quarter turn and a flip are the same pixels rearranged, and a crop keeps the
+ones inside its frame one to one. Crop was a trim to the ink at first, which is
+what a tiled area already does as it is drawn and left no way to keep a margin
+or cut into the drawing; it is now the Images tray's crop — a frame dragged
+over the board, `photo.ts`'s fractions, snapped to whole pixels as it is drawn
+so what is shown is what is kept. Each is one entry in the editor's own stack,
+board and all, so any is one undo away.
 
 **Copy and paste go through the system clipboard as a PNG.** Not an internal
 buffer: the point is to get a drawing out to another program and a picture in
@@ -486,12 +526,18 @@ the board it sizes, which is where the eye already is when it is changed.
 — the fingers that would make one are the fingers drawing — and then
 Ctrl+wheel. With the board always drawn as large as its room, measured off the
 stage itself, a zoom in could only push part of it out of view behind a
-scrollbar, so the one zoom there is is the fit. It steps through whole numbers:
-whole screen pixels per pixel of the board, because a board at 7.5 screen
-pixels a side lands half its pixels on half a screen pixel, and a pixel editor
-that blurs its own edges is no use. It is also what lets the checkerboard be one
-check per pixel, so the pattern that says "nothing painted here" is also the
-grid.
+scrollbar, so the one zoom there is is the fit. It stepped through whole screen
+pixels per board pixel at first, and on a phone that left up to a third of the
+tray empty round a board that could have filled it. It fills now:
+`image-rendering: pixelated` keeps the edges hard, and the cost is that a
+column of pixels here and there is a screen pixel wider than its neighbours,
+which at these sizes reads as nothing. The checkerboard is still one check per
+pixel, so the pattern that says "nothing painted here" is also the grid.
+
+**At its least, the board keeps its room and the tools give way.** The tool
+rows never shrink and the board has a floor, so a tray pulled right down clips
+the rows under the panel's bottom bar instead of squeezing the board to a
+strip: what you pull the tray down to look at is the drawing.
 
 **A dialog, never in place.** Every other kind of area is edited where it sits,
 and this one cannot be: areas are frequently a centimetre across, which is
@@ -502,17 +548,62 @@ stays in view round it — and like that editor it is dragged by its title
 (`dragByTitle` in modal.ts), clamped so a strip of the title always stays on
 screen to drag it back by.
 
-**Nothing is written until Done, and it is one undo entry.** The editor keeps
-its own stack of whole canvases — at this size a canvas is nothing — so undo in
-there is strokes, and undo out here is the drawing. Mixing the two would have
-made a fifty-stroke drawing fifty steps of the app's history, and the app's
-undo is snapshots of the whole editable state.
+**Nothing is written until Save, and each save is one undo entry.** The editor
+keeps its own stack of whole canvases — at this size a canvas is nothing — so
+undo in there is strokes, and undo out here is the drawing. Mixing the two would
+have made a fifty-stroke drawing fifty steps of the app's history, and the app's
+undo is snapshots of the whole editable state. Save and Delete are the side
+panel's, in its bar, not the board's: the board calls `save()` when asked, and
+reports whether it holds anything unsaved so the bar can light Save and hold the
+pager. Unsaved is a count of edits against the count at the last save, not the
+length of `history`, which is capped and stops growing.
 
 **A picture from off this machine opens blank.** Drawing a cross-origin image
 onto a canvas taints it, and a tainted canvas refuses `toDataURL` — so the
 surface would open on a photo, take a stroke, and fail to save at the very end.
 Opening blank is the honest version of that, and a `blob:` URL from this
 browser's own store is same-origin and draws in fine.
+
+**Always in the side panel.** It was a dialog; it now lives in the table's
+full-size editor, for a cell and for an area with no column alike (the second
+has no row, so no pager, and writes onto the area). The table keys the surface
+on the cell plus an epoch that moves only when the cell changes *under* it —
+undo, a paste, Delete — so a save's own write does not remount it and throw its
+undo away. Every key but Escape stops at the board: the app's shortcuts listen
+on the window, and a Delete meant for the board would delete an area. A stroke
+focuses the board, because its press is held back from the page and would not
+otherwise move the focus off the Save just pressed.
+
+**The drawing editor closes to where it was opened from.** It lives in the
+table's panel, so opening it from an area on the card opened the table, and
+its × then left the table showing — a panel nobody had asked for. Each request
+now carries where it came from (`from` on `openRequest` and `areaRequest`):
+× goes back to the table only when the drawing was opened there or the table
+was already showing, back to Images when it came from there, and otherwise
+closes the panel (`onleave`). The ‹, as the Images tray's large view has it, is
+one step back — to Images, or to the table the drawing lives in.
+
+**Drawings are listed in the Images tray, not stored there.** A drawing lives
+in its cell, or on an area with no column, on purpose (see `bitmap.ts` above),
+and so the tray — "every image this browser is holding" — was missing exactly
+the pictures made in the app. They are listed under the stored ones, read off
+the table and the template as they stand, through `safeMediaUrl` as a cell's
+thumbnail is. No delete and no carry: they are not files, and a press opens
+the one editor that can change them.
+
+## `src/lib/photo.ts` and the Images tray's large view
+
+**Edits to a stored picture wait for Save.** Rotate, flip and crop draw on a canvas
+at the picture's own size; nothing reaches the store until Save, because these
+are the picture's bytes and the app's undo holds template and table only. The
+name is kept — it is what cells point at — and so is the type it promises:
+`editableType` answers PNG, JPEG or WebP from the name and nothing else, and a
+blob that comes back as another type (Safari asked for WebP) is refused rather
+than written as a PNG under a `.webp` name. The crop frame is fractions of the
+picture, so the one rectangle means the same on screen and at full size.
+The tools sit in a row under the picture, as the drawing editor's do, and
+rotate is one button, clockwise, as it is there: three presses are the other
+way, and a row that fits a phone is worth the two extra taps.
 
 ## `src/lib/history.ts`
 
@@ -547,6 +638,37 @@ undo or a redo, "the last change" is a different change and an alternating key
 would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
+
+**A touch on the card drops the click that lands off it.** A touch's click
+is aimed at what is under the finger when it lifts. Pressing an area selects
+it on the way down, and on a phone that brings the area bar into the options
+row and pushes the card down a bar's height, so the click landed on the font
+menu or an alignment button that had just slid under the finger. The card now
+arms a one-shot guard on a non-mouse press: the next click is dropped if its
+target is outside the card, and the guard stands down 350ms after the finger
+lifts, so a drag (which makes no click) cannot leave it to eat a later tap.
+
+**The temporary guides are the Guides box's middle state, and a box moves by
+its middle too.** They were tied to Boxes being on and the grid being off, so
+turning the grid on — or the margins off — took them away without a word, and a
+moving box only ever tried its left and top edges, so nothing lined up by its
+middle. Now Guides goes round three states (margins and temporary guides, the
+temporary guides alone as the dash, neither), the temporary guides include the
+page's centre lines, a moving box tries start, middle and end (`latchSpan`),
+and an alignment in reach beats the grid. The margins still win over both,
+because a margin that is not a whole number of grid steps would otherwise have
+an edge nothing could be placed against.
+
+**Every tie at once is the Boxes box's dash.** A thread was only ever drawn
+while a tie badge was pointed at, and the badges only on the selected area's
+chain, so there was no way to see how a card's areas hang together short of
+pointing at each one. Boxes now goes round on, the dash, off: the dash shows the
+tie badges on every tied area and draws every thread, measured off the badges a
+frame after each layout, zoom or selection change (an anchored area's place is
+only known once what it hangs from is measured). It is after the tick rather
+than before it, as Guides' dash is, because it is more rather than less, and the
+threads mean nothing without the boxes they join. A locked template still shows
+none of it, as it shows no badges.
 
 **An empty area's name is part of the bounds.** It used to appear only where an
 area had nothing to draw from at all, in grey. It now stands in whenever an area
@@ -926,7 +1048,10 @@ is empty and its glyph comes from CSS, precisely so a template's own stylesheet
 can reach it — `content: ' of '`, or nothing. A literal `" / "` in the markup
 would have been unaddressable.
 
-**Press and hold the pivot or the lever to put it back.** Both marks are dragged
+**Double-click the pivot or the lever to put it back.** (It was a press and
+hold, until a hold came to mean "show me the tooltip" — see `Tooltip.svelte`.
+The double-click stops at the mark, or it would also open the area for typing.)
+Both marks are dragged
 to a value with no number written anywhere on the card, and both have a resting
 state that is the only one most cards want — the middle, and upright. Dragging
 back to either is pixel-hunting, and the fields in the bar are three clicks away
@@ -1187,8 +1312,9 @@ changed a number the pad does not show was the worse of the two.
 
 **The nudge pad can be picked up.** It parks over the bottom-right corner of the
 page, which on a phone is exactly the corner of the card you reached for it to
-nudge. The second gesture goes on the middle button because the four arrows
-already use press-and-hold to repeat, and the pad is clamped to the stage — a
+nudge. The second gesture goes on the middle button: a tap cycles the step, a
+drag past a few pixels carries the pad (it was a hold, before holds became
+tooltips), and the pad is clamped to the stage — a
 control dragged off the edge of a phone is a control you do not get back.
 
 **Controls sit next to what they act on.** Undo and redo are a column at the
@@ -1227,14 +1353,14 @@ between the measurement and the mark. The SVG sits outside the card's transform,
 so the hairline is in screen pixels and does not thicken with the zoom, the same
 bargain the trim line makes.
 
-**Press and hold the Grid box for a dot grid.** Same millimetres, same snapping,
-a dot at each intersection instead of a line across the card — quieter to lay
-type over. Dots are one path too: a zero-length subpath with a round cap is a
-dot, so an A3 page is one `d` string rather than five thousand circles. The
-gesture is `hold` on the label, so the click it swallows does not toggle the
-checkbox under it; the word beside the box changes to *Dots*, because a mode with
-no visible sign is a trap, and the hold turns the grid *on* if it was off — there
-is no answering "which way is it drawn" about something invisible.
+**The Grid box goes round three states: off, ruled, dots.** Same millimetres,
+same snapping, a dot at each intersection instead of a line across the card —
+quieter to lay type over. Dots are one path too: a zero-length subpath with a
+round cap is a dot, so an A3 page is one `d` string rather than five thousand
+circles. It was a hold on the box until a hold came to mean "show me the
+tooltip"; a third state costs a press but no gesture nobody was taught. The
+word beside the box says *Dots* while dots are drawn, because a mode with no
+visible sign is a trap; the keyboard's grid key still toggles on and off.
 
 **A major line is drawn once.** Every major tick is also a minor one; drawing
 both would double the ink exactly where the grid must stay quietest, so the minor
@@ -1413,9 +1539,9 @@ edit badge opens it from the card, through an `openRequest` the page hands the
 table; only the request is tracked, so a dataset changing under an old request
 does not open the cell again.
 
-**A lock closes the full-size editor too.** Edit, the press and hold and the
-ellipsis all open it, and it is a way to type: on a locked table all three are
-off. The ellipsis stays drawn, disabled, because it still says a cell holds
+**A lock closes the full-size editor too.** Edit and the ellipsis open it (a
+press and hold did too, until holds became tooltips), and it is a way to type:
+on a locked table both are off. The ellipsis stays drawn, disabled, because it still says a cell holds
 more than it shows.
 
 **Overflow is measured, because a textarea cannot say it.** `text-overflow`
@@ -1481,8 +1607,8 @@ draft, which made it the one place in the table where typing did not show on
 the card until confirmed. Now it writes through like the small field, undo
 covers it the same way, and closing is all that is left to do — an × and Esc.
 While the small field has the focus, the bar under the table is about that
-cell: its count, where the in-cell count used to sit over the words, and an
-Edit button for anyone who never learnt the press and hold.
+cell: its count, where the in-cell count used to sit over the words, and the
+Edit button that opens it whole.
 
 **A cell opened whole takes the table's room, not the screen's.** It was a
 modal over everything, the third layer after the page and the table, and it
@@ -1495,8 +1621,7 @@ area gets, on every area bound to the cell's column or naming it as
 `{{column}}`: a pointer from the cell to the card, not a selection, so it
 changes nothing about what is selected.
 
-**The overflow mark is a button.** It opens the full-size editor, the one
-action a hold gave, for anyone who never learnt the hold. It hides while the
+**The overflow mark is a button.** It opens the full-size editor. It hides while the
 field is focused through `:has(textarea:focus)` rather than `:focus-within`,
 which the mark itself sets the instant it is pressed — hiding it before its own
 click could land.
@@ -1639,7 +1764,9 @@ does not scan looks exactly like one that does. Every card is checked to end
 above its footer in the real faces, since the body grows and a growing box
 never shows the shears.
 
-**Press and hold Import to bring them back.** The actions bar is deliberately one
+**Press and hold Import to bring them back** (since replaced by *Getting
+Started* in the Table menu — kept as the reason the samples are one step
+away). The actions bar is deliberately one
 line, so a fifth button would cost the table a row of its own height every time
 the tray narrowed; the gesture hangs off the button whose job is closest. A held
 mouse button and a held finger are the same pointer events, so there is no
@@ -2757,20 +2884,13 @@ that press *is* the second one.
 
 ## `src/lib/gestures.ts`
 
-**A hold is always the bigger of a button's two actions, and always one undo
-away.** `hold` exists because both bars are fighting for width and a second
-button costs a row; it is only ever used where the two actions are the same
-*kind* of thing — import a file or import the samples, add an area or lay every
-area out. A gesture nobody was taught has to be survivable when it fires by
-accident, which is what the undo entry is for. The click behind a completed hold
-is swallowed, or the tap action runs straight after the hold action.
-
-**A hold gives up as soon as the pointer moves.** It used to end only on
-pointerup or pointerleave, which is enough for a button but not for a mark that
-is also a drag target: the pivot and the rotation lever both reset on a hold and
-both move on a drag, and a slow drag would sit still long enough to fire the
-reset it was trying to avoid. A few pixels of slop, because a finger is never
-still and a deliberate drag clears it in the first moment.
+**There is no `hold` any more.** It was a second action on a button — import
+or import the samples, add an area or lay them all out, reset the pivot, dots
+for the grid — until a press and hold came to mean one thing everywhere: *what
+is this?* (see `Tooltip.svelte` below). Each second action found another way:
+a double-click, a third state, a visible button, a drag. What is left here is
+`HOLD_SLOP`, the few pixels a finger may wander and still be pressing rather
+than dragging, which the area menu uses.
 
 **Reading a swipe is a pure function; feeding it events is an action.** A flick
 has to beat both a minimum distance and a slope, because a drag at 45 degrees is
@@ -2779,10 +2899,50 @@ under them is worse than doing nothing. Touch only: a mouse has a wheel and two
 arrows either side of the count, and treating a click-drag as a swipe would page
 the cards every time somebody tried to select the counter's text.
 
-**A hold buzzes as it fires.** A hold is the one gesture with nothing on screen
-to say it has happened until its action does, and on touch that vibration is the
-whole of the feedback. Touch only: a mouse hold on a touchscreen laptop should
-not shake the machine.
+## `src/routes/app.css` — the accent
+
+**Every blue is the accent, and the accent is the system's.** Pressed buttons,
+locks, focus rings, selection chrome, the previewed row: all read `--accent`
+or a token mixed from it (`--accent-strong` with black, `--accent-line`,
+`-soft`, `-tint` and `-wash` with white, translucent ones inline as a mix with
+`transparent`). `--accent` is `AccentColor` — the colour the platform draws its
+own checkboxes in — behind `@supports`, because the keyword is not Baseline
+Widely and Chromium does not know it yet; there it is the blue these all were.
+A named `blue` in `color.ts` is content, not chrome, and stays a fixed colour.
+`color-mix` is Widely available; relative colour syntax is not yet, which is
+why the tints are mixes rather than `rgb(from …)`.
+
+**The guides are the accent's inverse.** The page margins and the snap guides
+are drawn over the areas' outlines, which are the accent, so they take
+`--accent-inverse` — the colour furthest from it — rather than a fixed magenta
+that sat beside a blue outline well and beside a pink or purple system accent
+not at all. The true inverse needs relative colour syntax, which is Baseline
+Newly, so it is behind `@supports`; without it the guides are `#da9c14`, the
+inverse of the fallback blue, worked out by hand.
+
+## `src/lib/components/Tooltip.svelte` and `src/lib/tooltip.ts`
+
+**One tooltip, for every `title`.** The browser's own cannot be styled, arrives
+late, and on a touchscreen never arrives at all — so every hint written into a
+title was out of reach on a phone. This one is mounted once and listens on the
+document, so the hundreds of `title`s already written need nothing more, and
+there stays one place to write a hint. While the pointer is on an element its
+title is moved into `data-tip`, which is what keeps the native tip from
+appearing under this one, and put back when the pointer leaves; a title Svelte
+sets again under the pointer is taken up on the next move. Disabled buttons get
+theirs too — Chromium dispatches pointer events to them.
+
+**A press and hold is a question, not a press.** On touch, a still finger shows
+the tip above itself (the finger covers what is under it), gives the firmer
+buzz, and the click its release would make is dropped — you were asking. It is
+not offered in text fields, where a long press is how a phone pastes, or where
+a hold already means something: `data-no-hold-tip` on the nudge pad (its arrows
+repeat), a column header and a row number (they lift before a drag). Areas have
+no title, so a long press on one still reaches the browser's context menu.
+
+**Square, an em from the pointer.** Below and right of a mouse, flipped where
+it would leave the window, clamped where neither side has room — a tip half off
+the screen says half of what it says. The placement is `tooltip.ts`, tested.
 
 ## `src/lib/haptics.ts`
 

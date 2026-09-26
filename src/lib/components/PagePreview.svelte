@@ -7,7 +7,7 @@
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
-	import { hold, swipe } from '$lib/gestures';
+	import { swipe } from '$lib/gestures';
 	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
@@ -16,11 +16,15 @@
 		row: Row | null;
 		mapping: Mapping;
 		bounds: boolean;
+		/** every tie's thread drawn without pointing at it — the Boxes box's dash */
+		ties: boolean;
 		/** families still arriving, passed through so an area can pulse while it waits */
 		loadingFonts?: string[];
 		grid: boolean;
 		/** the page margins, drawn and snapped to */
 		guides: boolean;
+		/** the temporary guides a drag shows as it lines up — see Card's `smartGuides` */
+		smartGuides: boolean;
 		/** ruled lines, or a dot at every intersection */
 		gridStyle: GridStyle;
 		selectedIds: string[];
@@ -51,9 +55,10 @@
 		onimagepagedrop?: (file: File, clientX: number, clientY: number) => void;
 		/** forwarded to the card: what a drag is about to do, for the undo label */
 		onaction?: (what: string) => void;
-		onbounds: (show: boolean) => void;
+		onbounds: (show: boolean, ties: boolean) => void;
 		ongrid: (show: boolean) => void;
-		onguides: (show: boolean) => void;
+		/** the margins and the temporary guides, together — the Guides box's three states */
+		onguides: (margins: boolean, smart: boolean) => void;
 		/** press and hold the Grid toggle: the same grid, drawn the other way */
 		ongridstyle: (style: GridStyle) => void;
 		onzoom: (zoom: 'fit' | 'actual' | number) => void;
@@ -102,9 +107,11 @@
 		row,
 		mapping,
 		bounds,
+		ties,
 		loadingFonts = [],
 		grid,
 		guides,
+		smartGuides,
 		gridStyle,
 		selectedIds,
 		zoom,
@@ -170,13 +177,6 @@
 	 * Its own height never depends on the scale, so reading it back cannot loop.
 	 */
 	let pagerHeight = $state(0);
-	/**
-	 * And the padlock band above it, for the same reason. The page lock sits in
-	 * the column rather than hanging off the sheet on a negative offset, so that
-	 * on a phone — where the stage has eight pixels of padding — it cannot end up
-	 * above the top of the scroller with no way to reach it.
-	 */
-	let lockHeight = $state(0);
 	/** must match the `.page` column's gap, which is what separates the two */
 	const PAGE_GAP = 10;
 	/** the step the pad moves by, cycled 1 -> 5 -> 10; the keyboard has modifiers */
@@ -259,9 +259,9 @@
 		// stage is the whole screen, so every millimetre of padding is a
 		// millimetre of card you cannot see.
 		const pad = hostSize.w < 560 ? 16 : 48;
-		// Neither the lock band nor the pager is in the page's column: both are
-		// fixed to the stage, and their bands are real padding on the viewport,
-		// which `contentRect` has already taken out of `hostSize.h`.
+		// The pager is not in the page's column: it is fixed to the stage, and its
+		// band is real padding on the viewport, which `contentRect` has already
+		// taken out of `hostSize.h`.
 		const fit = Math.min((hostSize.w - pad) / mmToPx(outerW), (hostSize.h - pad) / mmToPx(outerH));
 		return Math.max(0.15, Math.min(fit, 2));
 	});
@@ -540,7 +540,7 @@
 		// on the stage is typed with a pipe.
 		if (event.key === '|' && !event.ctrlKey && !event.metaKey && !event.altKey) {
 			event.preventDefault();
-			onguides(!guides);
+			cycleGuides();
 			return;
 		}
 		if (!event.ctrlKey && !event.metaKey) return;
@@ -569,12 +569,12 @@
 			case 'h':
 			case 'H':
 				event.preventDefault();
-				onbounds(!bounds);
+				cycleBounds();
 				return;
 			case ';':
 			case ':':
 				event.preventDefault();
-				onguides(!guides);
+				cycleGuides();
 				return;
 			case "'":
 			case '"':
@@ -622,27 +622,23 @@
 	 *
 	 * It has to be movable because it is parked over the one corner of the page
 	 * a right-aligned area lives in, and on a phone that is exactly the area you
-	 * reached for the pad to nudge. Press and hold its middle button — the one
-	 * that is not already a press-and-hold, because the arrows repeat — and it
-	 * comes with your finger.
+	 * reached for the pad to nudge. Drag its middle button — the one the arrows
+	 * are arranged round — and the pad comes with it; a tap still cycles the
+	 * step. It was a press and hold, until a hold came to mean "what is this?".
 	 */
 	const PAD_HOME = { right: 12, bottom: 52 };
+	/** How far the middle button travels before a press is a drag of the pad. */
+	const PAD_SLOP = 6;
 	let padAt = $state({ ...PAD_HOME });
 	let padDrag = $state<{ x: number; y: number; from: { right: number; bottom: number } } | null>(null);
 	let padHeld = $state(false);
-	let padHold: ReturnType<typeof setTimeout> | null = null;
+	let padPress: { x: number; y: number; from: { right: number; bottom: number } } | null = null;
 
 	function padPickup(event: PointerEvent) {
 		if (event.button !== 0) return;
-		const from = { ...padAt };
-		const { clientX: x, clientY: y } = event;
-		const target = event.currentTarget as HTMLElement;
-		padHold = setTimeout(() => {
-			padHold = null;
-			padHeld = true;
-			padDrag = { x, y, from };
-			target.setPointerCapture(event.pointerId);
-		}, 450);
+		padPress = { x: event.clientX, y: event.clientY, from: { ...padAt } };
+		// Captured now, so a quick drag that leaves the button still brings the pad.
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 	}
 
 	/**
@@ -654,6 +650,11 @@
 	const PAD_SIZE = PAD_CELL * 3;
 
 	function padMove(event: PointerEvent) {
+		if (!padDrag && padPress) {
+			if (Math.hypot(event.clientX - padPress.x, event.clientY - padPress.y) < PAD_SLOP) return;
+			padDrag = padPress;
+			padHeld = true;
+		}
 		if (!padDrag || !host) return;
 		event.preventDefault();
 		const stage = host.getBoundingClientRect();
@@ -694,12 +695,49 @@
 	}
 
 	function padDrop() {
-		if (padHold) clearTimeout(padHold);
-		padHold = null;
+		padPress = null;
 		padDrag = null;
-		// Cleared on the next tick, so the click that follows the hold — which is
+		// Cleared on the next tick, so the click that follows the drag — which is
 		// what would otherwise cycle the step — has already been swallowed.
 		setTimeout(() => (padHeld = false), 0);
+	}
+
+	/**
+	 * The Grid box's third state, dots, drawn as the indeterminate box — the
+	 * dash — rather than a second tick that looks the same as ruled.
+	 * `indeterminate` is a property with no attribute, so it is set here rather
+	 * than in the markup; a click clears it natively, and the next update puts
+	 * back whatever the grid is then.
+	 */
+	/**
+	 * The Guides box's three states, one press apart: ticked draws the page
+	 * margins and shows the temporary guides a drag lines up on; the dash keeps
+	 * the temporary guides with no margins drawn; off is neither. Temporary
+	 * guides are what most people mean by guides, so they are what the middle
+	 * state keeps. The keys go round the same way.
+	 */
+	function cycleGuides() {
+		if (guides) onguides(false, true);
+		else if (smartGuides) onguides(false, false);
+		else onguides(true, true);
+	}
+
+	/**
+	 * The Boxes box's three states: ticked is the bounds and badges; the dash
+	 * adds every tie drawn as its thread, as pointing at a tie badge draws one;
+	 * off is none of it. The dash comes after the tick here, not before as on
+	 * Guides, because it is more rather than less: the threads are about the
+	 * boxes, and mean nothing without them.
+	 */
+	function cycleBounds() {
+		if (!bounds) onbounds(true, false);
+		else if (!ties) onbounds(true, true);
+		else onbounds(false, false);
+	}
+
+	function mixed(node: HTMLInputElement, on: boolean) {
+		node.indeterminate = on;
+		return { update: (next: boolean) => (node.indeterminate = next) };
 	}
 </script>
 
@@ -734,13 +772,13 @@
 				class="minor"
 				class:dot={gridArt.dots}
 				d={gridArt.minorPath}
-				stroke-width={gridArt.dots ? 1.1 : GRID_HAIRLINE}
+				stroke-width={gridArt.dots ? 0.7 : GRID_HAIRLINE}
 			/>
 			<path
 				class="major"
 				class:dot={gridArt.dots}
 				d={gridArt.majorPath}
-				stroke-width={gridArt.dots ? 2 : GRID_HAIRLINE}
+				stroke-width={gridArt.dots ? 1.1 : GRID_HAIRLINE}
 			/>
 		</svg>
 	{/if}
@@ -750,7 +788,7 @@
 <div
 	class="viewport"
 	bind:this={host}
-	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px;--lock-band:{lockHeight && zoom === 'fit' ? lockHeight + PAGE_GAP : 0}px"
+	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px"
 	onpointerdown={(e) => {
 		// Bare paper counts as empty space, not just the grey around the sheet:
 		// clicking away from everything is how every canvas editor deselects, and
@@ -790,9 +828,11 @@
 				{row}
 				{mapping}
 				{bounds}
+				{ties}
 				{loadingFonts}
 				{grid}
 				{guides}
+				{smartGuides}
 				{scale}
 				{pageNumber}
 				{background}
@@ -853,27 +893,6 @@
 	     Outside the viewport, so it stays under the sheet at every zoom; the
 	     band it occupies is bottom padding on the viewport, which is what keeps
 	     the page clear of it. -->
-	<!-- `unlocking` keeps the band up for the moment after it is pressed: the
-	     lock is gone by then, so without it the band would vanish on the same
-	     frame and the open padlock it answers with would never be seen. -->
-	{#if (template.locked || unlocking) && bounds}
-		<!-- An indicator, not a control: the button that sets this lives in page
-		     setup, where the rest of the page's settings are. Screen furniture, so
-		     the Boxes toggle takes it away with the rest. Pinned to the stage, as
-		     the pager is, rather than in the scrolling column: in the column it
-		     was a band's height more to scroll at every zoom but Fit, and a page
-		     that fitted grew a scrollbar the moment it was locked. At Fit the
-		     viewport keeps a band clear for it, so it covers nothing there. -->
-		<button
-			class="page-lock"
-			bind:clientHeight={lockHeight}
-			title="The design is locked — press to unlock it"
-			onclick={unlock}
-		>
-			<Icon name={unlocking ? 'unlocked' : 'locked'} size={13} />
-			<span>{unlocking ? 'Unlocked' : 'Locked'}</span>
-		</button>
-	{/if}
 	{#if rowCount > 0}
 		<div class="pager" role="group" aria-label="Card" bind:clientHeight={pagerHeight}>
 			<!-- The swipe lives on this inner chip rather than on the row, because
@@ -894,7 +913,7 @@
 						title={withKey('Previous card', 'cards')}
 						aria-label="Previous card"
 						onclick={() => onactivate(Math.max(0, activeRow - 1))}
-					><Icon name="caret-left" size={18} /></button>
+					><Icon name="chevron-left" size={18} /></button>
 				{/if}
 				<button
 					class="count"
@@ -908,7 +927,7 @@
 						title={withKey('Next card', 'cards')}
 						aria-label="Next card"
 						onclick={() => onactivate(Math.min(rowCount - 1, activeRow + 1))}
-					><Icon name="caret-right" size={18} /></button>
+					><Icon name="chevron-right" size={18} /></button>
 				{/if}
 			</div>
 		</div>
@@ -972,12 +991,30 @@
 	     merge into a smudge. The column moves together, because one button
 	     drawn larger than the four beside it reads as a mistake. -->
 	<div class="corner top right stacked">
+		<!-- The page's lock, while it is locked: a padlock and no word, at the
+		     head of the column whose buttons it switches off, so the reason Area
+		     is greyed out sits directly above it. A button, not only a sign —
+		     pressing it unlocks, and for a moment afterwards it wears the open
+		     padlock (`unlocking`), or it would vanish on the same frame and the
+		     press would go unanswered. It was a "Locked" band over the sheet,
+		     which took a band's height off the page at Fit. Screen furniture:
+		     Boxes takes it away with the rest. -->
+		{#if (template.locked || unlocking) && bounds}
+			<button
+				class="square page-lock"
+				aria-pressed={!unlocking}
+				title={unlocking ? 'Unlocked' : 'The design is locked — press to unlock it'}
+				aria-label={unlocking ? 'Unlocked' : 'Unlock the design'}
+				onclick={unlock}
+			>
+				<Icon name={unlocking ? 'unlocked' : 'locked'} size={16} />
+			</button>
+		{/if}
 		<button
 			class="square"
 			onclick={onaddbox}
-			use:hold={onmagiclayout}
 			disabled={!!template.locked}
-			title="Add an area to the page — press and hold to position every area from the columns instead"
+			title="Add an area to the page"
 		>
 			<Icon name="shapes" size={16} /><span class="sr-only">Area</span>
 		</button>
@@ -987,27 +1024,26 @@
 			<button
 				class="square"
 				onclick={() => ondraw?.(drawTarget)}
-				title="Draw this area's picture"
+				title="Draw this area's image"
 			>
 				<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
 			</button>
 		{/if}
-		{#if !template.boxes.length}
-			<!-- Only on an empty page, where it is the answer to "now what?" and
-			     there is nothing for it to destroy. Once there are areas it is the
-			     hold on the button above: a control that replaces the whole design
-			     should not sit one mis-tap away from a page somebody has built. -->
-			<button
-				class="square"
-				onclick={onmagiclayout}
-				disabled={!!template.locked}
-				title={hasColumns
-					? 'Position areas automagically — a card worked out from your headings and your data'
-					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
-			>
-				<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
-			</button>
-		{/if}
+		<!-- Always there. It used to show only on an empty page, and be a press
+		     and hold on Area otherwise, so that a control replacing the design
+		     was not one mis-tap away — but it opens a dialog that says how many
+		     areas it would replace, with Cancel, which is the guard; and a hold
+		     is now how anything here explains itself. -->
+		<button
+			class="square"
+			onclick={onmagiclayout}
+			disabled={!!template.locked}
+			title={hasColumns
+				? 'Position areas automagically — a card worked out from your headings and your data'
+				: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
+		>
+			<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
+		</button>
 		{#if picking}
 			<!-- A mode with no visible sign is a trap: every press is doing something
 			     other than what it usually does, and the only place that was said is
@@ -1050,43 +1086,81 @@
 	     already say whether they are on. The full word stays the accessible name either way, so nothing
 	     read aloud is reduced to a single letter. -->
 	<div class="corner left">
-		<!-- Press and hold swaps the ruling for a dot at every intersection: the
-		     same grid and the same snapping, drawn quietly enough to lay type
-		     over. A hold rather than a second control, because the corner has two
-		     words in it and the grid already has a checkbox — and the label says
-		     which of the two it is currently drawing. -->
+		<!-- Three presses round: off, ruled, dots — a dot at every intersection,
+		     the same grid and the same snapping, drawn quietly enough to lay type
+		     over. One box rather than a second control, because the corner has
+		     two words in it already, and the label says which it is drawing. It
+		     was a press and hold, until a hold came to mean "what is this?". -->
 		<label
-			use:hold={() => ongridstyle(gridStyle === 'dots' ? 'lines' : 'dots')}
-			title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it ({SHORTCUTS.grid}). Press and hold for {gridStyle ===
-			'dots'
-				? 'ruled lines'
-				: 'a dot grid'}."
+			title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it ({SHORTCUTS.grid}). Press again for {grid &&
+			gridStyle === 'lines'
+				? 'a dot grid'
+				: grid
+					? 'no grid'
+					: 'ruled lines'}."
 		>
 			<input
 				type="checkbox"
-				aria-label={gridStyle === 'dots' ? 'Dots' : 'Grid'}
+				aria-label={grid && gridStyle === 'dots' ? 'Dots' : 'Grid'}
 				checked={grid}
-				onchange={(e) => ongrid(e.currentTarget.checked)}
+				use:mixed={grid && gridStyle === 'dots'}
+				onchange={(e) => {
+					if (!grid) ongridstyle('lines');
+					else if (gridStyle === 'lines') {
+						// Ruled to dots: still on, so the box stays ticked.
+						e.currentTarget.checked = true;
+						ongridstyle('dots');
+					} else ongrid(false);
+				}}
 			/>
-			<span class="wide">{gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
+			<span class="wide">{grid && gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
 			<span class="narrow" aria-hidden="true">#</span>
 		</label>
-		<label title={withKey('The page margins, drawn and snapped to — screen only, never printed', 'guides')}>
+		<label
+			title={withKey(
+				guides
+					? 'Page margins and alignment guides — press for alignment guides only'
+					: smartGuides
+						? 'Alignment guides only: a drag lines up on other areas\' edges and middles, and the page\'s centre — press to turn guides off'
+						: 'No guides — press for the page margins and alignment guides',
+				'guides'
+			)}
+		>
 			<input
 				type="checkbox"
 				aria-label="Guides"
-				checked={guides}
-				onchange={(e) => onguides(e.currentTarget.checked)}
+				checked={guides || smartGuides}
+				use:mixed={!guides && smartGuides}
+				onchange={(e) => {
+					// The box's own toggle is overruled by the three states: what it
+					// shows is set from them on the next update.
+					e.currentTarget.checked = !(guides === false && smartGuides);
+					cycleGuides();
+				}}
 			/>
 			<span class="wide">Guides</span>
 			<span class="narrow" aria-hidden="true">|</span>
 		</label>
-		<label title={withKey("Each area's dashed bounds, its badges and the trim edge — screen only, never printed", 'boxes')}>
+		<label
+			title={withKey(
+				!bounds
+					? "No boxes — press for each area's dashed bounds, its badges and the trim edge (screen only, never printed)"
+					: ties
+						? 'Boxes, and every tie between areas drawn as its thread — press to turn boxes off'
+						: "Each area's dashed bounds, its badges and the trim edge, screen only — press to draw every tie as well",
+				'boxes'
+			)}
+		>
 			<input
 				type="checkbox"
 				aria-label="Boxes"
 				checked={bounds}
-				onchange={(e) => onbounds(e.currentTarget.checked)}
+				use:mixed={bounds && ties}
+				onchange={(e) => {
+					// Overruled by the three states, as Guides is.
+					e.currentTarget.checked = !(bounds && ties);
+					cycleBounds();
+				}}
 			/>
 			<span class="wide">Boxes</span>
 			<span class="narrow" aria-hidden="true">B</span>
@@ -1111,9 +1185,11 @@
 	{#if padUsable}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
 		     hopeless. Shown only where there is no keyboard to fall back on, and
-		     only while there is something it could actually move. -->
+		     only while there is something it could actually move. Its arrows
+		     repeat while held, so a hold here is never a request for a tip. -->
 		<div
 			class="pad"
+			data-no-hold-tip
 			class:moving={!!padDrag}
 			class:push-up={pushed === 'up'}
 			class:push-down={pushed === 'down'}
@@ -1138,12 +1214,11 @@
 				<Icon name={verticalTied ? 'skip-back-filled' : 'caret-up'} size={verticalTied ? 16 : 30} />
 			</button>
 			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
-			<!-- The middle button carries the second gesture, because the arrows
-			     already use press-and-hold to repeat: hold this one and the pad
+			<!-- The middle button carries the second gesture: drag it and the pad
 			     comes with your finger. A tap still cycles the step. -->
 			<button
 				class="step"
-				title="Step size — 1, 5 or 10mm. Press and hold to move the pad."
+				title="Step size — 1, 5 or 10mm. Drag it to move the pad."
 				onpointerdown={(e) => {
 					pushed = 'centre';
 					padPickup(e);
@@ -1202,11 +1277,11 @@
 		   the fitted scale, because the page is centred in what is left: taking it
 		   off the scale alone would have centred the sheet across the band and
 		   parked half of it under the count. */
-		padding: calc(24px + var(--lock-band, 0px)) 24px calc(24px + var(--pager-band, 0px));
+		padding: 24px 24px calc(24px + var(--pager-band, 0px));
 	}
 
 	.viewport:focus-visible {
-		outline: 2px solid #2563eb;
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 	}
 
@@ -1249,7 +1324,7 @@
 		pointer-events: none;
 	}
 
-	/* Close about the count, so the triangles stay clear of the chips in the
+	/* Close about the count, so the chevrons stay clear of the chips in the
 	   two corners: on a narrow phone the arrows sat under the # | B on one
 	   side and the zoom on the other. */
 	.pager .controls {
@@ -1289,7 +1364,7 @@
 		color: #111;
 	}
 
-	/* The triangle is the control, as in the lightbox: a chip around it would
+	/* The chevron is the control, as in the lightbox: a chip around it would
 	   make two marks out of one. */
 	.pager .step {
 		display: grid;
@@ -1362,9 +1437,11 @@
 	}
 
 	/* Dots carry less ink than rules at the same value, so both weights come up
-	   to stay legible against the paper they are drawn on. */
+	   to stay legible against the paper they are drawn on — the minor ones most,
+	   at under a pixel across (0.7 screen px, the majors 1.1), where a lighter
+	   ink would leave only the majors visible and the subgrid would vanish. */
 	.grid-overlay .minor.dot {
-		stroke: rgba(var(--grid-ink), 0.22);
+		stroke: rgba(var(--grid-ink), 0.32);
 	}
 
 	.grid-overlay .major.dot {
@@ -1391,31 +1468,12 @@
 		stroke-width: 0.5;
 	}
 
-	.page-lock {
-		position: absolute;
-		top: 10px;
-		left: 50%;
-		transform: translateX(-50%);
-		z-index: 2;
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		padding: 4px 9px;
-		border: 1px solid #999;
-		border-radius: var(--radius-button);
-		background: #fff;
-		color: #555;
-		font: 500 11px/1 ui-sans-serif, system-ui, sans-serif;
-		cursor: pointer;
-		/* It reads as a label and behaves as a button, so dragging across it must
-		   not leave the word highlighted — the rest of this app's chrome opts out
-		   of selection for the same reason, in app.css. */
-		user-select: none;
-	}
-
-	.page-lock:hover {
-		border-color: #555;
-		color: #111;
+	/* Pressed, in the accent, like every Lock that is on: the state and the
+	   way out of it in one square. */
+	.page-lock[aria-pressed='true'] {
+		border-color: var(--accent);
+		color: var(--accent);
+		background: var(--accent-tint);
 	}
 
 	.stage {
@@ -1440,6 +1498,11 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
+	}
+
+	/* The word says it is on in the colour the tick does. */
+	.corner label:has(input:is(:checked, :indeterminate)) {
+		color: var(--accent);
 	}
 
 	.corner.left {
@@ -1733,27 +1796,27 @@
 	}
 
 	.pad.moving .up {
-		border-top-color: #2563eb;
-		border-left-color: #2563eb;
-		border-right-color: #2563eb;
+		border-top-color: var(--accent);
+		border-left-color: var(--accent);
+		border-right-color: var(--accent);
 	}
 
 	.pad.moving .left {
-		border-top-color: #2563eb;
-		border-left-color: #2563eb;
-		border-bottom-color: #2563eb;
+		border-top-color: var(--accent);
+		border-left-color: var(--accent);
+		border-bottom-color: var(--accent);
 	}
 
 	.pad.moving .right {
-		border-top-color: #2563eb;
-		border-right-color: #2563eb;
-		border-bottom-color: #2563eb;
+		border-top-color: var(--accent);
+		border-right-color: var(--accent);
+		border-bottom-color: var(--accent);
 	}
 
 	.pad.moving .down {
-		border-bottom-color: #2563eb;
-		border-left-color: #2563eb;
-		border-right-color: #2563eb;
+		border-bottom-color: var(--accent);
+		border-left-color: var(--accent);
+		border-right-color: var(--accent);
 	}
 
 	.pad .up { grid-area: 1 / 2; }
@@ -1810,7 +1873,7 @@
 	}
 
 	/* Tighter again where the corners are closest: the count's floor comes
-	   off, so the three are as narrow as "1 / 4" and two triangles. */
+	   off, so the three are as narrow as "1 / 4" and two chevrons. */
 	@media (max-width: 400px) {
 		.pager .count {
 			min-width: 0;

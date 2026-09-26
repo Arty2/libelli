@@ -24,6 +24,19 @@ export function downloadBlob(filename: string, blob: Blob) {
 	requestAnimationFrame(() => URL.revokeObjectURL(url));
 }
 
+/**
+ * Save what is already behind an address — an object URL the app made, or a
+ * data URL — under a file name. Nothing is fetched: a link with `download` is
+ * how a browser is asked to save one, and the address stays the caller's to
+ * revoke.
+ */
+export function downloadUrl(filename: string, url: string) {
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = filename;
+	link.click();
+}
+
 /** A filename stem from a human name: lowercase, hyphens, nothing surprising. */
 export const slugify = (name: string) =>
 	name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'untitled';
