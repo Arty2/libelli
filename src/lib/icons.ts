@@ -13,6 +13,8 @@
  */
 
 export const ICONS: Record<string, string> = {
+	'compare': '<path d="M28,6H18V4a2,2,0,0,0-2-2H4A2,2,0,0,0,2,4V24a2,2,0,0,0,2,2H14v2a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V8A2,2,0,0,0,28,6ZM4,15h6.17L7.59,17.59,9,19l5-5L9,9,7.59,10.41,10.17,13H4V4H16V24H4ZM16,28V26a2,2,0,0,0,2-2V8H28v9H21.83l2.58-2.59L23,13l-5,5,5,5,1.41-1.41L21.83,19H28v9Z"/>',
+	'checkbox-indeterminate': '<path d="M10 14H22V18H10z"/><path d="M26,4H6A2,2,0,0,0,4,6V26a2,2,0,0,0,2,2H26a2,2,0,0,0,2-2V6A2,2,0,0,0,26,4ZM6,26V6H26V26Z"/>',
 	'undo': '<path d="M20,10H7.8149l3.5874-3.5859L10,5,4,11,10,17l1.4023-1.4146L7.8179,12H20a6,6,0,0,1,0,12H12v2h8a8,8,0,0,0,0-16Z"/>',
 	'redo': '<path d="M12,10H24.1851L20.5977,6.4141,22,5,28,11,22,17l-1.4023-1.4146L24.1821,12H12a6,6,0,0,0,0,12h8v2H12a8,8,0,0,1,0-16Z"/>',
 	'help': '<path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2Zm0,26A12,12,0,1,1,28,16,12,12,0,0,1,16,28Z"/><circle cx="16" cy="23.5" r="1.5"/><path d="M17,8H15.5A4.49,4.49,0,0,0,11,12.5V13h2v-.5A2.5,2.5,0,0,1,15.5,10H17a2.5,2.5,0,0,1,0,5H15v4.5h2V17a4.5,4.5,0,0,0,0-9Z"/>',
@@ -142,3 +144,15 @@ export const ICONS: Record<string, string> = {
 };
 
 export type IconName = keyof typeof ICONS;
+
+/**
+ * An icon as a CSS `url()`, for a mask — what lets a stylesheet draw a glyph
+ * in whatever colour it likes, which an `<img>` of the same SVG cannot. The
+ * checkboxes use it (see +layout.svelte and app.css), so the paths stay here,
+ * in the one place every other icon's are.
+ */
+export function iconMask(name: string): string {
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">${ICONS[name] ?? ''}</svg>`;
+	return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+

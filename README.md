@@ -720,7 +720,7 @@ a notice can appear.
   name a column that exists are kept across the switch, which is the usual case
   when two tables are the same list twice; when none of them survives, the
   columns are guessed at afresh.
-- **Swapping between two** — the ⇄ beside the picker goes back to the table you
+- **Swapping between two** — the **compare** icon beside the picker goes back to the table you
   were on before this one, and pressing it again comes back. Two is the case
   that actually happens — this year's list and last year's, the real one and the
   one you are trying something on — and reaching the second through a menu every
@@ -1118,6 +1118,10 @@ them; sideways, the run costs one screen however long it is, and each
 thumbnail takes two thirds of the width so the next one peeks in and says the
 strip moves. A desktop keeps the wrapping grid, where the whole run is a few
 scrolls whatever its length.
+
+Every checkbox in the app is Carbon's own — an empty square, a ticked one in
+the accent, and a dash for *some but not all* where a box speaks for a set, as
+the table's header tick does.
 
 Every page has a checkbox under it, and only the ticked ones print — untick the
 three proofs that came out wrong and reprint just those — the whole caption row

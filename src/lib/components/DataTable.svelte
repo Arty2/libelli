@@ -1361,7 +1361,7 @@
 								title={allChosen ? 'Drop every row' : 'Choose every row'}
 								aria-label={allChosen ? 'Drop every row' : 'Choose every row'}
 								onclick={toggleAll}
-							></button>
+							><Icon name={allChosen ? 'checkbox-checked' : someChosen ? 'checkbox-indeterminate' : 'checkbox'} size={14} /></button>
 						{/if}
 						{#if sortedBy}
 							<button
@@ -1508,7 +1508,7 @@
 									e.stopPropagation();
 									toggleRow(i);
 								}}
-							></button>
+							><Icon name={selectedRows.has(i) ? 'checkbox-checked' : 'checkbox'} size={14} /></button>
 							<!-- The number the row arrived with, not where it is sitting:
 							     sorting carries it along, so you can see where a row came
 							     from and find it again after unsorting. -->
@@ -1883,7 +1883,7 @@
 					: 'Nothing to swap back to yet — this is the only table you have opened'}
 				aria-label="Swap to the previous table"
 				onclick={onswaptable}
-			><Icon name="arrows-horizontal" size={15} /></button>
+			><Icon name="compare" size={15} /></button>
 		{/if}
 		<span class="spacer"></span>
 		{#if editing && dataset.rows[editing.row]}
@@ -2660,34 +2660,26 @@
 		line-height: var(--cell-line);
 	}
 
-	/* A square, not a radio: several rows can be chosen at once, and the
-	   checkboxes on the export screen are square too. */
+	/* Carbon's three checkbox icons, the ones every checkbox in the app is
+	   drawn as (see app.css): empty, ticked, and the dash for some-but-not-all
+	   in the header. A button of our own rather than an input, because it
+	   carries the tri-state the gutter needs; the icon is inside it, so its
+	   focus ring is its own. */
 	.tick {
-		width: 11px;
-		height: 11px;
+		display: grid;
+		place-items: center;
+		width: 14px;
+		height: 14px;
 		flex: none;
 		padding: 0;
-		border: 1px solid #bbb;
-		border-radius: var(--radius-input);
-		background: #fff;
+		border: none;
+		background: none;
+		color: #555;
 		cursor: pointer;
 	}
 
-	.tick[aria-checked='true'] {
-		border-color: var(--accent);
-		background: var(--accent);
-		box-shadow: inset 0 0 0 2px #fff;
-	}
-
-	/* Some but not all: a dash, which is what every tri-state checkbox draws and
-	   the one mark that is neither the empty square nor the filled one. A
-	   smaller version of the filled square would have read as "chosen" at the
-	   size this tick actually is. */
-	.tick[aria-checked='mixed'] {
-		border-color: var(--accent);
-		background:
-			linear-gradient(var(--accent), var(--accent)) center / 5px 2px no-repeat,
-			#fff;
+	.tick:is([aria-checked='true'], [aria-checked='mixed']) {
+		color: var(--accent);
 	}
 
 	tbody tr {

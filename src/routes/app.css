@@ -155,3 +155,45 @@ html, body {
 	width: 84px;
 	justify-content: flex-start;
 }
+
+/* Every checkbox is Carbon's: `checkbox`, `checkbox--checked` and
+   `checkbox--indeterminate`, drawn as masks so they take a colour from CSS —
+   the text colour empty, the accent ticked. The native control stays, for its
+   keyboard, its label and its state; only its look is replaced. The masks are
+   built from icons.ts and set on the root by +layout.svelte, with the class
+   that turns this on, so there is one copy of each path.
+
+   A mask clips everything the element paints, its focus ring included, so
+   the ring goes on what holds the box instead — the label, or the list item
+   where there is no label. `:has` is Baseline Widely available. */
+.icon-checkboxes input[type='checkbox'] {
+	appearance: none;
+	flex: none;
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	vertical-align: middle;
+	background: #555;
+	mask: var(--mask-checkbox) center / contain no-repeat;
+	cursor: pointer;
+}
+
+.icon-checkboxes input[type='checkbox']:checked {
+	background: var(--accent);
+	mask-image: var(--mask-checkbox-checked);
+}
+
+.icon-checkboxes input[type='checkbox']:indeterminate {
+	background: var(--accent);
+	mask-image: var(--mask-checkbox-indeterminate);
+}
+
+.icon-checkboxes input[type='checkbox']:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.icon-checkboxes :is(label, li):has(> input[type='checkbox']:focus-visible) {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
