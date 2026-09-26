@@ -48,8 +48,8 @@ settings — the column mapping, keyed by template name, and UI state — live i
 IndexedDB, which is where base64 fonts have to go once they blow past
 localStorage's ~5MB. Each library is the working copy plus one document per
 saved table or template, kept under an id rather than a name so renaming one
-costs nothing. Pictures can live in a [folder of your
-own](#where-the-pictures-live) instead, where the browser offers one.
+costs nothing. Images can live in a [folder of your
+own](#where-the-images-live) instead, where the browser offers one.
 [Undo](#undo-and-redo) keeps its snapshots in memory.
 
 ## Cards and boxes
@@ -64,9 +64,9 @@ resize boxes directly, or type exact millimetres.
 - **Content** — what an area holds, as one question with three answers.
   **Data Field** takes it from a column, so every card says something different;
   **Static Text** is words typed into the template, the same on every card;
-  **Image** is a picture, the same on every card — **Upload…** one from this
+  **Image** is one image, the same on every card — **Upload…** one from this
   device, give it an address with **URL…**, draw one with **Draw…**, pick a
-  **color** to fill it instead, or drop a picture onto it. Whichever was put in
+  **color** to fill it instead, or drop an image onto it. Whichever was put in
   last is what it shows. Switching the Content keeps only what the new choice
   shows — static words do not ride along into an image or a data field — and
   undo brings back what a switch dropped. The first two then take a **Mode** — plain text, Markdown,
@@ -176,7 +176,7 @@ resize boxes directly, or type exact millimetres.
   and that cell opens full size in the table, the table opening if it was
   folded away. A locked area, or a locked table, refuses it. An empty image area reads *Image*,
   and an image area wears a mark at the corner the way static text does: a
-  pencil when it holds a drawing — press it to draw on it — and a picture
+  pencil when it holds a drawing — press it to draw on it — and an image
   otherwise.
 - **Grown past its height** — an area set to **Grow** whose words need more room
   than it was given keeps a **trim line** where a clip would have cut: thin, in
@@ -407,7 +407,7 @@ resize boxes directly, or type exact millimetres.
   an http(s) address, and either can **cover**, be **contained**, or **tile**.
   The image reaches the cut edge, bleed included, and sits on top of the paper
   color — so like the paper color, it prints only with background graphics on.
-  **The picture is never part of the template.** An uploaded file's bytes stay in
+  **The image is never part of the template.** An uploaded file's bytes stay in
   this browser and the template carries only its name; a linked one carries the
   address. Open a template on another machine and it asks for the file by name
   rather than rendering a blank page — the same bargain as an uploaded font.
@@ -508,7 +508,7 @@ loaded.
 
 **Position areas automagically.** The button below *+ Area* — the one wearing
 three shapes — reads your columns and writes a first draft of a card:
-title, subtitle, body, a picture, a footer of small lines and a QR code, sized
+title, subtitle, body, an image, a footer of small lines and a QR code, sized
 and placed for the page you are on. It is always there, and it never acts on
 the first press: it shows you what it thinks first, and says how many areas it
 would replace, with **Cancel** beside **OK**.
@@ -635,12 +635,12 @@ a notice can appear.
   and the **×** are at the top; the bar under it stays, with a pager at the
   left — **‹ 2 / 4 ›**, the same as the card's — that steps to the same column
   in the row above or below, and the count where the count always is. A cell
-  holding a `data:image` — a drawing, or a picture pasted in as one — shows the
-  picture in the table rather than its base64, and opens here as the
+  holding a `data:image` — a drawing, or an image pasted in as one — shows the
+  image in the table rather than its base64, and opens here as the
   **drawing surface** rather than as text: the same board and tools the card
   opens, in this same room, and the pager steps down the column through words
-  and drawings alike. A cell pointing at a stored picture (`local:name`) shows
-  that picture too, and opens it large in **Images** instead — see below. A
+  and drawings alike. A cell pointing at a stored image (`local:name`) shows
+  that image too, and opens it large in **Images** instead — see below. A
   drawing is kept with **Save** in the bar, beside **Delete** — see *Drawing
   one* below. Words are edited live, so the
   card follows as you type and undo reaches every change; the **×** at the top
@@ -759,7 +759,7 @@ functional notation is rebuilt from the numbers it parsed to.
 ## Images, colors and QR codes
 
 Three box modes carry something other than text: **Image** is a Content type of
-its own where the template holds the picture, and Image, Color or QR is a
+its own where the template holds the image, and Image, Color or QR is a
 **Mode** where a column supplies the value. Both are framed by the box's
 declared height, and both take a **Fit**: *fit* puts the whole thing inside the
 box, *cover* fills the box and crops the overflow, *stretch* distorts it to the
@@ -771,11 +771,11 @@ at its own size.
   not a color, so an address in a column of colors is ignored rather than
   fetched; colors are read in hex, `rgb()`, `hsl()` or by name, and they fill the
   area itself, so the fill reaches under the padding and takes the corner radius
-  with it. **Image** shows a picture — a drawing made in the app, an external
+  with it. **Image** shows an image — a drawing made in the app, an external
   URL, a name this browser is holding, or inline SVG held in the template — and
   still accepts a color, because it was the only mode for both and templates
   written then rely on it. A drawing is written into the cell as base64, so
-  every row can carry its own and the picture travels with the table. There
+  every row can carry its own and the image travels with the table. There
   used to be a separate **Bitmap** mode for drawings; a template that says
   `bitmap` opens as Image, drawing and all.
 
@@ -786,12 +786,12 @@ at its own size.
   resolved against this app's own address, because the words in an ordinary
   cell are all relative addresses and every one of them would have been a
   request back to the app.
-- **A picture from this machine** — drag an image file onto an area. The area
+- **An image from this machine** — drag an image file onto an area. The area
   turns into an image area, the bytes go into this browser, and the *name* goes
   into the table: the cell for that row reads `local:sketch.png`, so every row
-  can carry its own picture and nothing about the design has to change. An area
+  can carry its own image and nothing about the design has to change. An area
   bound to no column has nowhere in the table to put it, so it keeps the
-  reference itself and shows the same picture on every card.
+  reference itself and shows the same image on every card.
 
   `local:` is a name, not an address — the bytes are in this browser, beside the
   fonts and the page backgrounds, and a cell that named a file any other way
@@ -802,7 +802,7 @@ at its own size.
 
   Nothing is uploaded and nothing is copied into the template, so a template or
   a CSV handed to someone else carries the *names*: their copy says which
-  pictures it is missing, and dropping the files on again puts them back. An
+  images it is missing, and dropping the files on again puts them back. An
   image uploaded as a page background can be used in a row without uploading it
   twice — they share one store, because an image is an image. Which store that is, and how to
   empty it, is **Images** in the toolbar — see below.
@@ -858,7 +858,7 @@ at its own size.
   undo like any other — one <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Z</kbd> puts the
   board *and* the detail back exactly as they were, so a board set too small
   costs nothing. A board is remembered on the area, and it is where the next
-  drawing starts; a row that already holds a picture opens at that picture's own
+  drawing starts; a row that already holds an image opens at that image's own
   size, because what is in the cell is the thing being edited.
 
   It is drawn at whole screen pixels each — a pixel editor that blurs its own
@@ -867,8 +867,8 @@ at its own size.
   drawing on it. A pinch is the page editor's, and stays that.
 
   What comes out is a base64 PNG written **into the row's cell**, which is the
-  point: the picture travels with the table, so a CSV carries the drawings with
-  the words and a row's picture is as portable as its text. That is also why the
+  point: the image travels with the table, so a CSV carries the drawings with
+  the words and a row's image is as portable as its text. That is also why the
   board is small — the header says what the drawing is costing the cell as you
   draw it, and a couple of hundred bytes is a long cell but a real one.
 
@@ -888,11 +888,11 @@ at its own size.
   is.
   And the area draws it *hard* — `image-rendering: pixelated` — so sixty-four
   pixels blown up to a centimetre or ten stay the pixels that were drawn rather
-  than being smudged into a gradient by the browser. That applies to any picture
+  than being smudged into a gradient by the browser. That applies to any image
   an area holds as a data URL, which in practice means the ones drawn here; a
   photograph dropped on an area comes from a folder or this browser's store and
   keeps its smoothing.
-  Opening the surface on an area that already holds a picture draws it in, so a
+  Opening the surface on an area that already holds an image draws it in, so a
   dropped photo can be scribbled on — unless it came from an address off this
   machine, which a canvas refuses to hand back once drawn, and which therefore
   opens blank rather than opening on something it could never save.
@@ -912,27 +912,27 @@ The encoder is written here rather than pulled in, like the Markdown renderer
 and the CSV parser. Its tests decode what it produces with an independent
 decoder, since a QR that does not scan looks exactly like one that does.
 
-## Where the pictures live
+## Where the images live
 
 Everything else this app keeps is small — a template is a page of JSON, a
-dataset is text. Pictures are not, and browser storage is a poor place for them:
+dataset is text. Images are not, and browser storage is a poor place for them:
 it is a bucket you cannot look into, shared with everything else the app saves,
 and the browser may empty it. **Images**, in the toolbar between Page
 Setup and Data, opens a bar of its own in the same row as the other two — a bar
-rather than a dialog, so the card that uses the pictures stays in view.
+rather than a dialog, so the card that uses the images stays in view.
 
-- **Upload…** — pictures from this device, in every browser and on a phone:
+- **Upload…** — images from this device, in every browser and on a phone:
   the folder below is Chromium's, and dropping a file onto an area is not
-  something a phone can do. They go wherever pictures go — the folder when
+  something a phone can do. They go wherever images go — the folder when
   there is one, this browser otherwise.
-- **What is stored** — one line per picture, unused ones first: a thumbnail,
+- **What is stored** — one line per image, unused ones first: a thumbnail,
   its name, its size in pixels and in bytes, and *unused* where neither the
   current table nor the template points at it. With eight or more, a box to
   find one by name appears. That is the whole point: *which of these forty can I
   delete* is not a question browser storage can answer. Deleting is one press,
   and it says so if something was using it. Hover a line for where it is kept.
-- **One picture, large** — tap a thumbnail, or open a table cell that points
-  at a stored picture, and it fills the tray, with its size in pixels at the
+- **One image, large** — tap a thumbnail, or open a table cell that points
+  at a stored image, and it fills the tray, with its size in pixels at the
   head and a **‹ 1 / 5 ›** pager at the foot. **Rotate** turns it a quarter
   either way; **Crop** lets you drag a frame over it and **Apply Crop** keeps
   what is inside. **Delete** and **Save** are at the far end of the bar, as a
@@ -945,26 +945,26 @@ rather than a dialog, so the card that uses the pictures stays in view.
   because a canvas cannot write one back, and a browser that cannot write the
   type a file's name promises refuses rather than saving a PNG under it.
 - **Onto the card** — drag a thumbnail out of the bar and let go over an area:
-  the picture goes where a dropped file would, into this row's cell when the
+  the image goes where a dropped file would, into this row's cell when the
   area is bound to a column and onto the area otherwise. The area under the
   pointer is outlined while you carry it. It works with a finger as well as a
   mouse.
-- **A folder of your own** — press **Choose Folder…** and pictures are written
+- **A folder of your own** — press **Choose Folder…** and images are written
   there as ordinary files from then on: replace one from a photo editor and the
   card follows, back them up with the rest of your work, and clear them out with
   your file manager rather than through this app. The folder is remembered
   between visits, but a browser asks to be let into it once per visit — the
-  bar says so, with the button to do it — and until then pictures come from
+  bar says so, with the button to do it — and until then images come from
   browser storage as before. **Forget** lets go of the folder; nothing in it
   is deleted.
 - **Where that works** — the File System Access API is Chromium's: Chrome, Edge,
   Opera and Arc have it; Firefox and Safari do not. Everywhere else the app keeps
-  pictures in IndexedDB exactly as it always did, and the bar says which of the
+  images in IndexedDB exactly as it always did, and the bar says which of the
   two is in force.
-- **Both at once** — a picture is looked for in the folder first and in this
+- **Both at once** — an image is looked for in the folder first and in this
   browser second, so a run made before you chose a folder keeps rendering, and
   a name put in the folder afterwards is what that name means from then on. New
-  pictures only ever go to one place, and a name written to the folder drops its
+  images only ever go to one place, and a name written to the folder drops its
   copy out of browser storage.
 
 Drawings are the exception, and deliberately: they are base64 in the cell, so
@@ -1081,10 +1081,10 @@ the export, because a PNG in the wrong typeface is not the card. A request that 
 blocked or offline leaves that family in the fallback stack and the export
 says which.
 
-Every picture is embedded the same way, and for a sharper reason: an SVG
+Every image is embedded the same way, and for a sharper reason: an SVG
 rasterised through an `<img>` — which is how this becomes a PNG — cannot load a
 single external resource, and it fails *silently*. A card with an uploaded
-background or a photo in an area used to export as a blank where the picture
+background or a photo in an area used to export as a blank where the image
 was, with nothing to say so. They are read back and inlined as data before the
 SVG is built, each address once per card however many areas share it.
 
@@ -1454,17 +1454,17 @@ than it has to.
 - **Images** — a tray in the table's place, at the table's width on a wide
   screen and its height on a phone, and only one of the two open at a time:
   **Images** and **Data** in the window toolbar each close the other. At its
-  head *Images*, how many and how much they weigh; a line for every picture,
+  head *Images*, how many and how much they weigh; a line for every image,
   filling the height; and at its foot, where the table keeps its toolbar,
   **Upload…** and **Choose Folder…**. On a phone its head is the grip that
   shares the height with the page, as the table's header row is. Carry one onto an area to put it there, or onto the **page** between
   areas for a new image area of its own, centred where it was let go, 40mm
-  across and in the picture's proportions; a picture file dragged in from
-  outside does the same. Every **Upload…** that takes a picture wears Carbon's
-  *image reference*, and every **URL…** its *copy link*. Deleting a picture
+  across and in the image's proportions; an image file dragged in from
+  outside does the same. Every **Upload…** that takes an image wears Carbon's
+  *image reference*, and every **URL…** its *copy link*. Deleting an image
   asks first — **Delete Image**, Escape to keep it — because undo keeps the
   template and the table, not the bytes. A name something points at that this
-  browser has no picture for stays in the list as a dashed, red *missing* line,
+  browser has no image for stays in the list as a dashed, red *missing* line,
   with **Find…** to put a file back under that very name.
 - **The window toolbar** holds only what is about the whole app: the mark, then
   Help, Page Setup, Images, Data and Export — the two panels in the order they
@@ -1482,7 +1482,7 @@ A template travels as JSON and carries no data with it — that is the point of
 keeping the column mapping outside it.
 
 - **Export** — in the template menu in page setup: fonts referenced by family name, and a background image
-  by file name or address. Small, diffable, git-friendly — no picture and no font
+  by file name or address. Small, diffable, git-friendly — no image and no font
   bytes are ever folded into it. Its CSS, page numbers, locks, whether it has
   left and right pages and how its sheets are ordered all travel with it.
 - **Import** — beside that export, so it cannot be mistaken for *Import CSV*

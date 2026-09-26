@@ -37,7 +37,7 @@ Every box is dragged in millimetres from the trim edge, so the page size can cha
 - [⚠]{blue} A box can take its top from the box above instead of its own position — which is why this text moves down when a title runs to two lines.
 
 Try it: make this card's title very long, and watch everything below it give way.",Layout,https://heracl.es/libelli
-Getting it out,"Paper, picture, or the template","## To paper [4]{blue}
+Getting it out,"Paper, image, or the template","## To paper [4]{blue}
 
 1. Press **Print**, or Ctrl/Cmd+P.
 2. Check the preview — it shows every card, and you can untick any you do not want.
@@ -45,7 +45,7 @@ Getting it out,"Paper, picture, or the template","## To paper [4]{blue}
 
 ## Other ways out
 
-- **PNG** saves one card as a picture, at print resolution.
+- **PNG** saves one card as an image, at print resolution.
 - **Export** saves the design as a small file you can send to someone. It carries the layout, not the data.
 - **Export CSV** saves the words on their own.
 

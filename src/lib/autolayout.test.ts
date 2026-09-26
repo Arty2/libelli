@@ -61,6 +61,28 @@ describe('classifyColumn', () => {
 		expect(kindOf('Subtitle', ['One two three', 'Four five six'])).toBe('subtitle');
 	});
 
+	it('reads a heading lowercased, whatever case it was typed in', () => {
+		expect(kindOf('PHOTO', ['a', 'b'])).toBe('image');
+		expect(kindOf('Category', ['Alpha', 'Beta'])).toBe(kindOf('category', ['Alpha', 'Beta']));
+	});
+
+	it('reads a heading by its last word first, the noun it is about', () => {
+		expect(kindOf('Product Image', ['a', 'b'])).toBe('image');
+		expect(kindOf('note_number', ['a', 'b'])).toBe('number');
+		expect(kindOf('Sub-title', ['One two three', 'Four five six'])).toBe('subtitle');
+	});
+
+	it('knows an image by its cells, whatever the column is called', () => {
+		const drawing = 'data:image/png;base64,' + 'A'.repeat(400);
+		expect(kindOf('Notes', [drawing, drawing])).toBe('image');
+		expect(kindOf('Sketch', ['local:cat.png', '', 'local:dog.jpg'])).toBe('image');
+		expect(kindOf('Stuff', [drawing, 'local:cat.png', 'https://example.com/a.jpg'])).toBe('image');
+	});
+
+	it('does not take one image among words for a column of images', () => {
+		expect(kindOf('Notes', ['local:cat.png', 'a line of words'])).not.toBe('image');
+	});
+
 	it('matches a heading exactly before matching it loosely', () => {
 		// "no" is a number alias; "Notes" must not become one on a substring.
 		expect(kindOf('Notes', ['a note', 'another note'])).toBe('body');

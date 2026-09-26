@@ -986,7 +986,7 @@
 			<button
 				class="square"
 				onclick={() => ondraw?.(drawTarget)}
-				title="Draw this area's picture"
+				title="Draw this area's image"
 			>
 				<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
 			</button>

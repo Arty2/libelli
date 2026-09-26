@@ -367,7 +367,7 @@
 			return;
 		}
 		if (!source) {
-			say('No picture on the clipboard');
+			say('No image on the clipboard');
 			return;
 		}
 		try {
@@ -686,12 +686,12 @@
 		</span>
 
 		<span class="segmented">
-			<button onclick={copy} title="Copy the drawing as a picture (Ctrl/Cmd+C)" aria-label="Copy">
+			<button onclick={copy} title="Copy the drawing as an image (Ctrl/Cmd+C)" aria-label="Copy">
 				<Icon name="copy" size={15} />
 			</button>
 			<button
 				onclick={paste}
-				title="Paste a picture from the clipboard — it replaces the board and brings its own size (Ctrl/Cmd+V)"
+				title="Paste an image from the clipboard — it replaces the board and brings its own size (Ctrl/Cmd+V)"
 				aria-label="Paste"
 			>
 				<Icon name="paste" size={15} />

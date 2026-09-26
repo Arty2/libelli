@@ -1,3 +1,4 @@
+import { localImageName } from './assets';
 import { parseColor } from './color';
 import { GRID_MINOR } from './layout';
 import { marginsOf, newBox } from './template';
@@ -89,14 +90,20 @@ export const KIND_LABELS: Record<FieldKind, string> = {
 	label: 'Small line',
 	number: 'Number',
 	date: 'Date',
-	image: 'Picture',
+	image: 'Image',
 	link: 'QR code',
 	code: 'Code'
 };
 
 // ---- reading a column ------------------------------------------------------
 
-const normalise = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+/**
+ * A heading, lowercased first — every hint below is lowercase, and `Photo`,
+ * `PHOTO` and `photo` are one heading — then taken apart into its words.
+ * Letters and digits in any script count, so a heading in Greek is words
+ * rather than nothing; the hints themselves are English.
+ */
+const headingWords = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 
 /**
  * Headings that name a role outright. Longest-standing spreadsheet habits
@@ -116,13 +123,24 @@ const NAME_HINTS: Array<[FieldKind, string[]]> = [
 ];
 
 const nameKind = (column: string): FieldKind | undefined => {
-	const key = normalise(column);
+	const words = headingWords(column);
+	const key = words.join('');
 	if (!key) return undefined;
-	// Exact match first: a column called "Notes" is a body, but "Note number"
-	// should not become one on the strength of its first word.
-	for (const [kind, words] of NAME_HINTS) if (words.includes(key)) return kind;
-	for (const [kind, words] of NAME_HINTS) {
-		if (words.some((word) => word.length > 3 && key.includes(word))) return kind;
+	const known = (word: string) => NAME_HINTS.find(([, hints]) => hints.includes(word))?.[0];
+	// The whole heading, run together, first: "Sub-title" is a subtitle.
+	const whole = known(key);
+	if (whole) return whole;
+	// Then word by word, from the last: in English the noun a heading is about
+	// comes last, so "Product image" is an image and "Note number" a number —
+	// read from the front, both were taken for what their first word names.
+	for (const word of [...words].reverse()) {
+		const kind = known(word);
+		if (kind) return kind;
+	}
+	// Last, a hint inside a word, for headings written as one: "coverphoto".
+	// Only hints of four letters or more, so "no" is not found in "Notes".
+	for (const [kind, hints] of NAME_HINTS) {
+		if (hints.some((hint) => hint.length > 3 && key.includes(hint))) return kind;
 	}
 	return undefined;
 };
@@ -175,8 +193,15 @@ function shapeKind(values: string[]): FieldKind | undefined {
 	const filled = values.map((v) => (v ?? '').trim()).filter(Boolean);
 	if (!filled.length) return undefined;
 	const every = (test: (v: string) => boolean) => filled.every(test);
-	if (every((v) => HTTP_URL.test(v))) return every((v) => IMAGE_FILE.test(v)) ? 'image' : 'link';
-	// A column of colors is a picture as far as a box is concerned: an `image`
+	// Images, by what the cell holds rather than what the column is called:
+	// a drawing or a pasted picture is a `data:image` URL, a stored one is
+	// `local:name`, and an address from elsewhere ends in an image file's name.
+	// First, because a drawing is a long cell and would otherwise read as prose.
+	const isImage = (v: string) =>
+		/^data:image\//i.test(v) || localImageName(v) !== null || (HTTP_URL.test(v) && IMAGE_FILE.test(v));
+	if (every(isImage)) return 'image';
+	if (every((v) => HTTP_URL.test(v))) return 'link';
+	// A column of colors is an image as far as a box is concerned: an `image`
 	// box shows whatever its source resolves to, and a color resolves to a fill.
 	if (every((v) => parseColor(v) !== null)) return 'image';
 	if (every((v) => NUMERIC.test(v))) return 'number';

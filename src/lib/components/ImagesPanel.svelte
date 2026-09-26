@@ -152,7 +152,7 @@
 		await refresh();
 		onchanged();
 		onnotice(
-			`${names.length === 1 ? names[0] : `${names.length} pictures`} added. Drag ${names.length === 1 ? 'it' : 'one'} onto an area to put it there, or onto the page for an area of its own.`
+			`${names.length === 1 ? names[0] : `${names.length} images`} added. Drag ${names.length === 1 ? 'it' : 'one'} onto an area to put it there, or onto the page for an area of its own.`
 		);
 	}
 
@@ -214,7 +214,7 @@
 		if (area?.dataset.boxId) onplace(area.dataset.boxId, name);
 		else if (document.elementFromPoint(event.clientX, event.clientY)?.closest('.viewport .sheet'))
 			onplacepage(name, event.clientX, event.clientY);
-		else onnotice('Let go over the page to put the picture on it — over an area to put it in that one.');
+		else onnotice('Let go over the page to put the image on it — over an area to put it in that one.');
 	}
 
 	$effect(() => {
@@ -246,7 +246,7 @@
 	async function choose() {
 		const chosen = await chooseImageFolder();
 		if (!chosen) return;
-		onnotice(`Pictures go into ${chosen.name} from now on. The ones already in this browser stay where they are.`);
+		onnotice(`Images go into ${chosen.name} from now on. The ones already in this browser stay where they are.`);
 		await refresh();
 		onchanged();
 	}
@@ -254,7 +254,7 @@
 	async function reopen() {
 		const state = await reopenImageFolder();
 		if (!state?.ready) {
-			onnotice('That folder was not opened, so pictures are coming from this browser.', 'warning');
+			onnotice('That folder was not opened, so images are coming from this browser.', 'warning');
 			return;
 		}
 		await refresh();
@@ -451,8 +451,8 @@
 		{#if focus}
 			<button
 				class="back"
-				title={dirty ? 'Save or revert the edit first' : 'Back to every picture'}
-				aria-label="Back to every picture"
+				title={dirty ? 'Save or revert the edit first' : 'Back to every image'}
+				aria-label="Back to every image"
 				disabled={dirty}
 				onclick={() => onfocus?.(null)}
 			><Icon name="chevron-left" size={14} /></button>
@@ -481,7 +481,7 @@
 		{/if}
 		{#if images.length >= FILTER_FROM && !focus}
 			<label class="find">
-				<span class="sr-only">Find a picture</span>
+				<span class="sr-only">Find an image</span>
 				<input type="search" placeholder="Find…" bind:value={filter} />
 			</label>
 		{/if}
@@ -598,10 +598,10 @@
 		     edit or go back to what is stored. The pager steps through the
 		     list in its own order, once nothing is waiting to be saved. -->
 		<div class="actions">
-			<span class="pager" role="group" aria-label="Picture">
-				<button class="step" title={dirty ? 'Save or revert the edit first' : 'Previous picture'} aria-label="Previous picture" disabled={dirty || focusIndex <= 0} onclick={() => step(-1)}><Icon name="chevron-left" size={16} /></button>
+			<span class="pager" role="group" aria-label="Image">
+				<button class="step" title={dirty ? 'Save or revert the edit first' : 'Previous image'} aria-label="Previous image" disabled={dirty || focusIndex <= 0} onclick={() => step(-1)}><Icon name="chevron-left" size={16} /></button>
 				<span class="count">{focusIndex + 1} / {shown.length}</span>
-				<button class="step" title={dirty ? 'Save or revert the edit first' : 'Next picture'} aria-label="Next picture" disabled={dirty || focusIndex < 0 || focusIndex >= shown.length - 1} onclick={() => step(1)}><Icon name="chevron-right" size={16} /></button>
+				<button class="step" title={dirty ? 'Save or revert the edit first' : 'Next image'} aria-label="Next image" disabled={dirty || focusIndex < 0 || focusIndex >= shown.length - 1} onclick={() => step(1)}><Icon name="chevron-right" size={16} /></button>
 			</span>
 			{#if focusType && focusUrl}
 				<button class="square" title="Turn a quarter to the left" aria-label="Rotate left" onclick={() => turn(false)}><span class="mirror"><Icon name="rotate" size={15} /></span></button>
@@ -609,7 +609,7 @@
 				<button
 					class="square"
 					aria-pressed={cropping}
-					title={cropping ? 'Stop cropping' : 'Crop — drag a frame over the picture'}
+					title={cropping ? 'Stop cropping' : 'Crop — drag a frame over the image'}
 					aria-label="Crop"
 					onclick={() => {
 						cropping = !cropping;
@@ -620,7 +620,7 @@
 					<button disabled={!isCrop(frame)} title="Keep only what is inside the frame" onclick={applyCrop}>Apply Crop</button>
 				{/if}
 				<span class="spacer"></span>
-				<button disabled={!dirty} title="Back to the picture as it is stored" onclick={() => focusUrl && load(focusUrl)}>Revert</button>
+				<button disabled={!dirty} title="Back to the image as it is stored" onclick={() => focusUrl && load(focusUrl)}>Revert</button>
 			{:else if focusUrl}
 				<span class="note">Shown only — this browser cannot write {focus.split('.').pop()?.toUpperCase() || 'this kind of'} files.</span>
 				<span class="spacer"></span>
@@ -641,7 +641,7 @@
 	<!-- The ways in, where the table keeps its toolbar. Upload is every
 	     browser's, a phone included; the folder is Chromium's. -->
 	<div class="actions">
-		<button title="Add pictures from this device" onclick={() => fileInput?.click()}>
+		<button title="Add images from this device" onclick={() => fileInput?.click()}>
 			<Icon name="image-reference" size={15} /> Upload…
 		</button>
 		{#if available}
@@ -649,7 +649,7 @@
 				<button class="primary" onclick={reopen}>Open {folder.name}</button>
 			{/if}
 			<button
-				title="Keep pictures as ordinary files in a folder of your own, rather than in this browser's storage"
+				title="Keep images as ordinary files in a folder of your own, rather than in this browser's storage"
 				onclick={choose}><Icon name="folder" size={15} /> {folder ? 'Another Folder…' : 'Choose Folder…'}</button
 			>
 			{#if folder}

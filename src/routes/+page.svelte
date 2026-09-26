@@ -433,7 +433,7 @@
 			'',
 			'.content-field { }    /* by what fills it: a column, */',
 			'.content-static { }   /* its own words, */',
-			'.content-image { }    /* or a picture */',
+			'.content-image { }    /* or an image */',
 			'.mode-plain { }       /* by mode: also .mode-markdown, */',
 			'.mode-qr { }          /* .mode-image, .mode-color */',
 			'',
@@ -818,7 +818,7 @@
 		const box = template.boxes.find((b) => b.id === boxId);
 		if (!box) return;
 		if (template.locked || box.locked) {
-			notify('That area is locked — unlock it to put a picture in it.', 'warning');
+			notify('That area is locked — unlock it to put an image in it.', 'warning');
 			return;
 		}
 		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
@@ -2200,7 +2200,7 @@
 		try {
 			const image = await uploadBackgroundImage(file, template.page.image?.fit ?? 'cover', nameOverride);
 			template = { ...template, page: { ...template.page, image } };
-			notify(`${image.src} set as the page background — the picture stays in this browser, the template only names it.`);
+			notify(`${image.src} set as the page background — the image stays in this browser, the template only names it.`);
 		} catch {
 			notify('That image could not be read.', 'warning');
 		}
@@ -2219,7 +2219,7 @@
 		try {
 			const image = await uploadBackgroundImage(file, template.print.background?.fit ?? 'cover', nameOverride);
 			template = { ...template, print: { ...template.print, background: image } };
-			notify(`${image.src} set as the sheet background — the picture stays in this browser, the template only names it.`);
+			notify(`${image.src} set as the sheet background — the image stays in this browser, the template only names it.`);
 		} catch {
 			notify('That image could not be read.', 'warning');
 		}
@@ -2351,7 +2351,7 @@
 				imageFocus = null;
 				if (imagesOpen) dataOpen = false;
 			}}
-			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
+			title="Every image this browser is holding — what each weighs, whether anything uses it, and where they are kept"
 		>
 			<Icon name="image" size={15} /> <span class="label">Images</span>
 		</button>
@@ -2525,7 +2525,7 @@
 		<div class="banner" role="alert">
 			<span>
 				This template's background image, <strong>{missingImage}</strong>, is not in this browser. The template
-				carries its name, never the picture.
+				carries its name, never the file.
 			</span>
 			<button onclick={() => backgroundInput?.click()}>Choose {missingImage}…</button>
 			<button
@@ -2538,7 +2538,7 @@
 		<div class="banner" role="alert">
 			<span>
 				This template's sheet background image, <strong>{missingPrintImage}</strong>, is not in this browser. The
-				template carries its name, never the picture.
+				template carries its name, never the file.
 			</span>
 			<button onclick={() => printBackgroundInput?.click()}>Choose {missingPrintImage}…</button>
 			<button

@@ -102,6 +102,20 @@ that is what makes it worth writing down.
 
 ## `src/lib/autolayout.ts`
 
+**A heading is lowercased, then read word by word from the end.** Every hint
+is lowercase, so `PHOTO` and `Photo` are one heading. The whole heading run
+together is tried first (`Sub-title`), then its words from the last, because an
+English heading ends on the noun it is about — `Product image` is an image and
+`Note number` a number, where reading from the front took both for what their
+first word names. A hint found inside a word comes last, and only for hints of
+four letters or more.
+
+**An image is known by its cells before its heading.** A column whose every
+filled cell is a `data:image` URL, a `local:name` or an address ending in an
+image file is an image whatever it is called — and that test runs before the
+prose test, since a drawing is a long cell and read as a body otherwise. The
+dialog calls the kind *Image*, the word the rest of the app uses.
+
 **Inside the page margins; grid steps within them.** For one release every
 generated edge was on the 5mm grid, which on a page that is not a whole number
 of steps wide made the side margins uneven (10 and 13mm on A5). Even margins
