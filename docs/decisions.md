@@ -1799,7 +1799,7 @@ other property. The title reaches it with `!important`, since an area's ink is
 set inline; the stamp's field is its `.surface`, inset to the padding. The band
 is the one place it is written out again: it is a cell of the table, the lesson
 on card 2 is that typing `orange` there changes it, and a cell cannot name a
-variable. Titles at weight 100 and body headings at 200: in a light green,
+variable. Titles and body headings both at weight 200: in a light green,
 Fraunces' hairline cuts are the whole of the color there is.
 
 The rest is chosen to show one of each thing the tour mentions, without a
