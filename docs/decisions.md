@@ -600,6 +600,15 @@ would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
 
+**A touch on the card drops the click that lands off it.** A touch's click
+is aimed at what is under the finger when it lifts. Pressing an area selects
+it on the way down, and on a phone that brings the area bar into the options
+row and pushes the card down a bar's height, so the click landed on the font
+menu or an alignment button that had just slid under the finger. The card now
+arms a one-shot guard on a non-mouse press: the next click is dropped if its
+target is outside the card, and the guard stands down 350ms after the finger
+lifts, so a drag (which makes no click) cannot leave it to eat a later tap.
+
 **The temporary guides are the Guides box's middle state, and a box moves by
 its middle too.** They were tied to Boxes being on and the grid being off, so
 turning the grid on — or the margins off — took them away without a word, and a

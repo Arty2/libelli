@@ -1393,6 +1393,36 @@
 	 * overlay sits inside the card's transform like everything else on it.
 	 */
 	let trimEl = $state<HTMLElement | null>(null);
+
+	/**
+	 * A finger's tap on the card is not also a tap on whatever slid under it.
+	 *
+	 * A touch's click is aimed at what is under the finger when it lifts, not
+	 * at what it pressed. Pressing an area selects it on the way down, and on a
+	 * phone that brings the area bar into the options row above the stage and
+	 * pushes the card down a bar's height — so by the time the finger lifted,
+	 * the font menu or an alignment button was under it, and got the click.
+	 * The click that follows a touch on the card is dropped when it lands off
+	 * the card. A mouse is left alone: its click goes to what was both pressed
+	 * and released, which a shift underneath cannot change.
+	 */
+	function guardGhostClick(event: PointerEvent) {
+		if (event.pointerType === 'mouse' || !trimEl) return;
+		const card = trimEl;
+		const swallow = (click: MouseEvent) => {
+			window.removeEventListener('click', swallow, true);
+			if (click.target instanceof Node && card.contains(click.target)) return;
+			click.preventDefault();
+			click.stopPropagation();
+		};
+		// Armed for the moment after the finger lifts, which is when a tap's
+		// click arrives. A drag makes no click at all, so the guard stands down
+		// shortly after — it must never eat the next, real tap somewhere else.
+		const lifted = () => setTimeout(() => window.removeEventListener('click', swallow, true), 350);
+		window.addEventListener('click', swallow, true);
+		window.addEventListener('pointerup', lifted, { once: true });
+		window.addEventListener('pointercancel', lifted, { once: true });
+	}
 	let threads = $state<string[]>([]);
 
 	function showThreads(box: Box, kind: 'tied' | 'moored') {
@@ -1621,7 +1651,12 @@
 	{#if underlay}
 		<div class="underlay" aria-hidden="true">{@render underlay()}</div>
 	{/if}
-	<div class="trim" bind:this={trimEl} style="width:{template.page.w}mm;height:{template.page.h}mm">
+	<div
+		class="trim"
+		bind:this={trimEl}
+		style="width:{template.page.w}mm;height:{template.page.h}mm"
+		onpointerdowncapture={guardGhostClick}
+	>
 		{#if customCss}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- scopeCss confines it to .trim and strips @import, remote url() and any closing style tag -->
 			{@html styleTag(customCss)}
