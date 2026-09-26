@@ -51,6 +51,12 @@
 		areaRequest?: { id: string; name: string; value: string; pixels?: Grid; ink: string } | null;
 		onsavearea: (id: string, dataUrl: string, pixels: Grid | undefined) => void;
 		ondeletearea: (id: string) => void;
+		/**
+		 * Whether the panel is showing the drawing board. The page puts its
+		 * options row away while it is, so on a phone the tray can open far
+		 * enough to draw in.
+		 */
+		ondrawing?: (drawing: boolean) => void;
 		/** A stored picture, opened large in the Images tray to be looked at and edited. */
 		onopenimage: (name: string) => void;
 		/** lock or unlock the whole table; the page owns the dataset */
@@ -111,6 +117,7 @@
 		areaRequest = null,
 		onsavearea,
 		ondeletearea,
+		ondrawing,
 		onopenimage,
 		onlock,
 		ondeletetable,
@@ -346,6 +353,10 @@
 	 * picture's own look with the way to the Images tray, or the words.
 	 */
 	/** Whether the panel shows the drawing board for this open cell. */
+	$effect(() => {
+		ondrawing?.(!!drawingArea || (!!bigCell && boardShown(bigCell)));
+	});
+
 	const boardShown = (open: { row: number; column: string; draw?: boolean }) =>
 		!locked && bigKind(dataset.rows[open.row]?.[open.column] ?? '', open.draw) === 'drawing';
 

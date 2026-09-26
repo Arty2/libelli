@@ -829,7 +829,10 @@ at its own size.
   empty it, is **Images** in the toolbar — see below.
 - **Drawing one** — double-click an image area, press the **pen** beside the
   page, or press **Draw…** in the area bar, and the drawing surface opens in the
-  **side panel**, in the table's room, with the card in view beside it. An area
+  **side panel**, in the table's room, with the card in view beside it. While a
+  drawing is open — or an image is open large in **Images** — the options row
+  at the top is put away, so on a phone the tray has the height to reach the
+  board; it comes back when the picture is closed. An area
   bound to a column draws into this row's cell, and the pager under it steps to
   the same cell in the next row; an area with no column draws onto the area
   itself, in the same place — a locked table does not stop that, since nothing

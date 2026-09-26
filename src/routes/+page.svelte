@@ -1027,6 +1027,15 @@
 
 	/** A stored picture, opened large in the Images tray. */
 	let imageFocus = $state<string | null>(null);
+	/**
+	 * A picture being worked on in the side panel — the drawing board, or one
+	 * stored image open large to crop or turn. The options row goes away while
+	 * it is: on a phone the bar and the tray share the height, and with the area
+	 * bar up the tray could not open far enough to reach the board. It comes
+	 * back when the picture is closed.
+	 */
+	let drawingInTable = $state(false);
+	const editingPicture = $derived((dataOpen && drawingInTable) || (imagesOpen && imageFocus !== null));
 
 	function openImage(name: string) {
 		imageFocus = name;
@@ -2415,7 +2424,7 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if barBox || pageSetupOpen}
+	{#if (barBox || pageSetupOpen) && !editingPicture}
 		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
@@ -2753,6 +2762,7 @@
 				{areaRequest}
 				onsavearea={saveAreaDrawing}
 				ondeletearea={deleteAreaDrawing}
+				ondrawing={(on) => (drawingInTable = on)}
 				onopenimage={openImage}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
