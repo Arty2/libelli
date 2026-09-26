@@ -3148,8 +3148,8 @@
 	}
 
 	.bar-row.box {
-		background: #eef3fb;
-		border-bottom-color: #cfdcf3;
+		background: var(--accent-wash);
+		border-bottom-color: var(--accent-line);
 	}
 
 	.bar-row :global(.options) {
@@ -3204,7 +3204,7 @@
 		bottom: 0;
 		left: 3px;
 		width: 2px;
-		background: #2563eb;
+		background: var(--accent);
 		opacity: 0;
 		transition: opacity 0.12s;
 	}
@@ -3371,9 +3371,9 @@
 	}
 
 	button[aria-pressed='true']:not(.primary):not(.danger-outline) {
-		border-color: #2563eb;
-		color: #2563eb;
-		background: #eaf1fe;
+		border-color: var(--accent);
+		color: var(--accent);
+		background: var(--accent-tint);
 	}
 
 	select {
@@ -3579,7 +3579,7 @@
 	}
 
 	.elsewhere a {
-		color: #2563eb;
+		color: var(--accent);
 	}
 
 	/* The rule above the links is the one between the help and the rest. */

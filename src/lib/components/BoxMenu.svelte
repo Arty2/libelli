@@ -208,7 +208,7 @@
 	}
 
 	button:hover:not(:disabled) {
-		background: #eef3fb;
+		background: var(--accent-wash);
 	}
 
 	button:disabled {
@@ -222,7 +222,7 @@
 	   all of them. */
 
 	button.on {
-		color: #2563eb;
+		color: var(--accent);
 	}
 
 	button.danger {

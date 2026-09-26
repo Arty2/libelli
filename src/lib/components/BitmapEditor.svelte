@@ -765,9 +765,9 @@
 	}
 
 	.tools button[aria-pressed='true'] {
-		background: #e8efff;
-		border-color: #2563eb;
-		color: #1d4ed8;
+		background: var(--accent-tint);
+		border-color: var(--accent);
+		color: var(--accent-strong);
 	}
 
 	.tools button:disabled {

@@ -20,8 +20,8 @@
 }
 
 .box-options {
-	background: #eef3fb;
-	border-bottom-color: #cfdcf3;
+	background: var(--accent-wash);
+	border-bottom-color: var(--accent-line);
 }
 
 .options .context {
@@ -109,7 +109,7 @@
 }
 
 .box-options .group {
-	border-color: #cfdcf3;
+	border-color: var(--accent-line);
 }
 
 /* The image is named, not shown: a thumbnail in a toolbar this dense reads as
@@ -250,9 +250,9 @@
 }
 
 .options button[aria-pressed='true'] {
-	border-color: #2563eb;
-	color: #2563eb;
-	background: #eaf1fe;
+	border-color: var(--accent);
+	color: var(--accent);
+	background: var(--accent-tint);
 }
 
 .options button.danger-outline {
@@ -303,7 +303,7 @@
 }
 
 .box-options .head {
-	border-right-color: #cfdcf3;
+	border-right-color: var(--accent-line);
 }
 
 .options .head-row {
@@ -389,7 +389,7 @@
 	display: inline-grid;
 	place-items: center;
 	width: 1rem;
-	color: #1a5fb4;
+	color: var(--accent-strong);
 }
 
 .options .picker-menu button.danger .tick {

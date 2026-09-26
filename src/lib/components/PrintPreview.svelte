@@ -540,7 +540,7 @@
 	}
 
 	.counts .count:focus-visible {
-		outline: 2px solid #2563eb;
+		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 		border-radius: 2px;
 	}
@@ -735,7 +735,7 @@
 	}
 
 	.thumb.current {
-		outline: 2px solid #2563eb;
+		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
 

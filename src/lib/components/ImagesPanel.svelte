@@ -827,9 +827,9 @@
 	}
 
 	.actions button[aria-pressed='true'] {
-		border-color: #2563eb;
-		color: #2563eb;
-		background: #eaf1fe;
+		border-color: var(--accent);
+		color: var(--accent);
+		background: var(--accent-tint);
 	}
 
 	.actions .spacer {
@@ -939,7 +939,7 @@
 	.crop-frame {
 		position: absolute;
 		border: 1px dashed #fff;
-		outline: 1px solid #2563eb;
+		outline: 1px solid var(--accent);
 		box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
 		pointer-events: none;
 	}
@@ -1151,7 +1151,7 @@
 		object-fit: contain;
 		margin: -64px 0 0 8px;
 		pointer-events: none;
-		border: 1px solid #2563eb;
+		border: 1px solid var(--accent);
 		border-radius: 3px;
 		background: #fff;
 		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);

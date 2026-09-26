@@ -2148,7 +2148,7 @@
 	   for no reason. */
 	.locked th,
 	.locked td {
-		border-color: #2563eb;
+		border-color: var(--accent);
 	}
 
 	/* The table's own outside, which no cell's right or bottom edge covers. */
@@ -2251,8 +2251,8 @@
 	}
 
 	.icon.unused:hover {
-		color: #1d4ed8;
-		background: #eaf1fe;
+		color: var(--accent-strong);
+		background: var(--accent-tint);
 	}
 
 	/* A column being carried, and the gap it would land in. */
@@ -2262,8 +2262,8 @@
 
 	/* Held long enough to be lifted: raised off the row, ready to go. */
 	th.lifted {
-		background: #eaf1fe;
-		box-shadow: inset 0 -2px 0 #2563eb;
+		background: var(--accent-tint);
+		box-shadow: inset 0 -2px 0 var(--accent);
 	}
 
 	/* The header claims a touch for itself, so a finger can lift a column
@@ -2273,11 +2273,11 @@
 	}
 
 	th.drop-before {
-		box-shadow: inset 3px 0 0 #2563eb;
+		box-shadow: inset 3px 0 0 var(--accent);
 	}
 
 	th.drop-after {
-		box-shadow: inset -3px 0 0 #2563eb;
+		box-shadow: inset -3px 0 0 var(--accent);
 	}
 
 	/* A cell's field fills it and would cover an inset shadow, so the body's
@@ -2289,7 +2289,7 @@
 		top: 0;
 		bottom: 0;
 		width: 3px;
-		background: #2563eb;
+		background: var(--accent);
 		pointer-events: none;
 		z-index: 2;
 	}
@@ -2323,7 +2323,7 @@
 		position: absolute;
 		inset: 2px 3px;
 		border-radius: 1px;
-		background: #2563eb;
+		background: var(--accent);
 		opacity: 0;
 	}
 
@@ -2445,7 +2445,7 @@
 	}
 
 	.more:hover:not(:disabled) {
-		color: #1d4ed8;
+		color: var(--accent-strong);
 	}
 
 	/* Still drawn on a locked table, where it says only that there is more:
@@ -2471,7 +2471,7 @@
 
 
 	td textarea:focus {
-		outline: 2px solid #2563eb;
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 		max-height: 18rem;
 		position: relative;
@@ -2539,8 +2539,8 @@
 	}
 
 	tr.active td {
-		--cell-bg: #eff5ff;
-		background: #eff5ff;
+		--cell-bg: var(--accent-wash);
+		background: var(--accent-wash);
 	}
 
 	/* As narrow as a two-digit number and its tick: every millimetre here is a
@@ -2576,12 +2576,12 @@
 	/* The active and chosen tints have to be repainted here: the gutter carries
 	   its own opaque background now, so the row's would not show through it. */
 	tr.active .gutter {
-		background: #eff5ff;
+		background: var(--accent-wash);
 	}
 
 	tr.chosen .gutter {
-		background: #dbe7fd;
-		color: #1d4ed8;
+		background: var(--accent-soft);
+		color: var(--accent-strong);
 	}
 
 	/* Sized and coloured like the sort control in a column header, because it is
@@ -2597,7 +2597,7 @@
 		width: 18px;
 		height: 18px;
 		transform: translateY(-50%);
-		color: #1d4ed8;
+		color: var(--accent-strong);
 	}
 
 	/* The tick and what follows it — the row's number, or in the header the
@@ -2640,7 +2640,7 @@
 		left: 0;
 		right: 0;
 		height: 3px;
-		background: #2563eb;
+		background: var(--accent);
 		pointer-events: none;
 		z-index: 3;
 	}
@@ -2674,8 +2674,8 @@
 	}
 
 	.tick[aria-checked='true'] {
-		border-color: #2563eb;
-		background: #2563eb;
+		border-color: var(--accent);
+		background: var(--accent);
 		box-shadow: inset 0 0 0 2px #fff;
 	}
 
@@ -2684,9 +2684,9 @@
 	   smaller version of the filled square would have read as "chosen" at the
 	   size this tick actually is. */
 	.tick[aria-checked='mixed'] {
-		border-color: #2563eb;
+		border-color: var(--accent);
 		background:
-			linear-gradient(#2563eb, #2563eb) center / 5px 2px no-repeat,
+			linear-gradient(var(--accent), var(--accent)) center / 5px 2px no-repeat,
 			#fff;
 	}
 
@@ -2781,7 +2781,7 @@
 	   as a footnote to them rather than as their subject. */
 	.actions .chosen-count {
 		font: 600 13px ui-sans-serif, system-ui, sans-serif;
-		color: #1d4ed8;
+		color: var(--accent-strong);
 		padding: 0 2px;
 		white-space: nowrap;
 	}
@@ -2832,7 +2832,7 @@
 
 	.picker input:focus {
 		outline: none;
-		border-bottom-color: #2563eb;
+		border-bottom-color: var(--accent);
 	}
 
 	.picker .caret {
@@ -2905,7 +2905,7 @@
 		display: inline-grid;
 		place-items: center;
 		width: 1rem;
-		color: #1a5fb4;
+		color: var(--accent-strong);
 	}
 
 	.picker-menu button.danger .mark {
@@ -3010,9 +3010,9 @@
 	}
 
 	.actions button[aria-pressed='true'] {
-		border-color: #2563eb;
-		color: #2563eb;
-		background: #eaf1fe;
+		border-color: var(--accent);
+		color: var(--accent);
+		background: var(--accent-tint);
 	}
 
 	button.primary {

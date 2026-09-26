@@ -1213,7 +1213,7 @@
 	}
 
 	.viewport:focus-visible {
-		outline: 2px solid #2563eb;
+		outline: 2px solid var(--accent);
 		outline-offset: -2px;
 	}
 
@@ -1742,27 +1742,27 @@
 	}
 
 	.pad.moving .up {
-		border-top-color: #2563eb;
-		border-left-color: #2563eb;
-		border-right-color: #2563eb;
+		border-top-color: var(--accent);
+		border-left-color: var(--accent);
+		border-right-color: var(--accent);
 	}
 
 	.pad.moving .left {
-		border-top-color: #2563eb;
-		border-left-color: #2563eb;
-		border-bottom-color: #2563eb;
+		border-top-color: var(--accent);
+		border-left-color: var(--accent);
+		border-bottom-color: var(--accent);
 	}
 
 	.pad.moving .right {
-		border-top-color: #2563eb;
-		border-right-color: #2563eb;
-		border-bottom-color: #2563eb;
+		border-top-color: var(--accent);
+		border-right-color: var(--accent);
+		border-bottom-color: var(--accent);
 	}
 
 	.pad.moving .down {
-		border-bottom-color: #2563eb;
-		border-left-color: #2563eb;
-		border-right-color: #2563eb;
+		border-bottom-color: var(--accent);
+		border-left-color: var(--accent);
+		border-right-color: var(--accent);
 	}
 
 	.pad .up { grid-area: 1 / 2; }

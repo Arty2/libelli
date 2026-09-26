@@ -13,6 +13,29 @@
 	--radius-input: 1px;
 	--border-control: #ccc;
 	--border-control-hover: #999;
+
+	/* The one accent, and every blue in the app mixed from it: pressed buttons,
+	   locks, focus rings, selection chrome, the row being previewed. It is the
+	   colour the system picks for its own controls — the one a checkbox is
+	   drawn in — where the browser will say what that is, and the blue these
+	   all used to be where it will not. The tints are mixes with white and the
+	   deep shade a mix with black, so an orange or a graphite accent comes with
+	   its own wash and its own hover rather than a blue one. */
+	--accent: #2563eb;
+	--accent-strong: color-mix(in srgb, var(--accent) 80%, #000);
+	--accent-line: color-mix(in srgb, var(--accent) 22%, #fff);
+	--accent-soft: color-mix(in srgb, var(--accent) 16%, #fff);
+	--accent-tint: color-mix(in srgb, var(--accent) 10%, #fff);
+	--accent-wash: color-mix(in srgb, var(--accent) 6%, #fff);
+}
+
+/* `AccentColor` is not yet Baseline Widely, so it is behind a feature query:
+   a browser that does not know the keyword keeps the blue above rather than
+   an invalid colour, which is the whole of the failure mode. */
+@supports (color: AccentColor) {
+	:root {
+		--accent: AccentColor;
+	}
 }
 
 /* Chrome is not prose: dragging across a toolbar should not leave half the
@@ -54,7 +77,7 @@ html, body {
 }
 
 *:focus-visible {
-	outline: 2px solid #2563eb;
+	outline: 2px solid var(--accent);
 	outline-offset: 1px;
 }
 
@@ -99,8 +122,8 @@ html, body {
 
 .placeholder-complete li[aria-selected='true'],
 .placeholder-complete li:hover {
-	background: #eaf1fe;
-	color: #1d4ed8;
+	background: var(--accent-tint);
+	color: var(--accent-strong);
 }
 
 /* Every Lock button — the page's, an area's, the table's — one width, the

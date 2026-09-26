@@ -2760,6 +2760,19 @@ under them is worse than doing nothing. Touch only: a mouse has a wheel and two
 arrows either side of the count, and treating a click-drag as a swipe would page
 the cards every time somebody tried to select the counter's text.
 
+## `src/routes/app.css` — the accent
+
+**Every blue is the accent, and the accent is the system's.** Pressed buttons,
+locks, focus rings, selection chrome, the previewed row: all read `--accent`
+or a token mixed from it (`--accent-strong` with black, `--accent-line`,
+`-soft`, `-tint` and `-wash` with white, translucent ones inline as a mix with
+`transparent`). `--accent` is `AccentColor` — the colour the platform draws its
+own checkboxes in — behind `@supports`, because the keyword is not Baseline
+Widely and Chromium does not know it yet; there it is the blue these all were.
+A named `blue` in `color.ts` is content, not chrome, and stays a fixed colour.
+`color-mix` is Widely available; relative colour syntax is not yet, which is
+why the tints are mixes rather than `rgb(from …)`.
+
 ## `src/lib/components/Tooltip.svelte` and `src/lib/tooltip.ts`
 
 **One tooltip, for every `title`.** The browser's own cannot be styled, arrives

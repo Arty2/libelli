@@ -2204,7 +2204,7 @@
 		text-align: inherit;
 		letter-spacing: inherit;
 		line-height: inherit;
-		outline: var(--line-thick) solid #2563eb;
+		outline: var(--line-thick) solid var(--accent);
 		/* The box is `touch-action: none` so it can be dragged; the editor inside
 		   it has to hand scrolling and text selection back. */
 		touch-action: auto;
@@ -2248,9 +2248,9 @@
 	   ImagesPanel as an attribute, so the card's own class handling cannot
 	   take it off mid-drag. */
 	.box:global([data-image-target]) {
-		outline: calc(2px * var(--ui-scale, 1)) solid #2563eb;
+		outline: calc(2px * var(--ui-scale, 1)) solid var(--accent);
 		outline-offset: calc(1px * var(--ui-scale, 1));
-		background-color: rgba(37, 99, 235, 0.08);
+		background-color: color-mix(in srgb, var(--accent) 8%, transparent);
 	}
 
 	/* A `{{name}}` no column answers to, in the editor: underlined in the
@@ -2264,7 +2264,7 @@
 	/* Editor chrome standing in for a value: selecting it would copy a column
 	   name that is not on the card. */
 	.placeholder {
-		color: #2563eb;
+		color: var(--accent);
 		font-style: italic;
 		opacity: 0.7;
 		user-select: none;
@@ -2328,7 +2328,7 @@
 		   the card's zoomed frame, so at 200% a half-pixel border came out two
 		   screen pixels thick. A shadow keeps the fraction. */
 		border: none;
-		box-shadow: inset 0 0 0 var(--line, 1px) #2563eb;
+		box-shadow: inset 0 0 0 var(--line, 1px) var(--accent);
 		border-radius: var(--radius-button);
 		box-sizing: border-box;
 		z-index: 3;
@@ -2398,7 +2398,7 @@
 		overflow: visible;
 		pointer-events: none;
 		fill: none;
-		stroke: #2563eb;
+		stroke: var(--accent);
 		stroke-width: 1;
 	}
 
@@ -2416,7 +2416,7 @@
 		   fraction. */
 		height: calc(3 * var(--line, 1px));
 		width: var(--arm);
-		background: linear-gradient(#2563eb, #2563eb) center / 100% var(--line, 1px) no-repeat;
+		background: linear-gradient(var(--accent), var(--accent)) center / 100% var(--line, 1px) no-repeat;
 		pointer-events: none;
 	}
 
@@ -2600,7 +2600,7 @@
 		}
 
 		.bounds rect {
-			stroke: var(--bounds-color, rgba(37, 99, 235, 0.45));
+			stroke: var(--bounds-color, color-mix(in srgb, var(--accent) 45%, transparent));
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
@@ -2629,7 +2629,7 @@
 		}
 
 		.selection rect {
-			stroke: #2563eb;
+			stroke: var(--accent);
 		}
 
 		.card.frozen .box {
@@ -2675,7 +2675,7 @@
 		   bounds' own color, but with more than twice the gap between dashes —
 		   the outline the area was given, and plainly not one of its edges. */
 		.original-edge line {
-			stroke: var(--bounds-color, rgba(37, 99, 235, 0.45));
+			stroke: var(--bounds-color, color-mix(in srgb, var(--accent) 45%, transparent));
 			stroke-width: var(--line);
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 7);
 		}
@@ -2683,7 +2683,7 @@
 		/* On a selected area the bound is not drawn — the selection is — but the
 		   trim line still is, in the selection's blue so it belongs to it. */
 		.box.selected .original-edge line {
-			stroke: #2563eb;
+			stroke: var(--accent);
 		}
 
 		/* The line the words are cut on: dashed, the way a cut line is drawn on
@@ -2728,8 +2728,8 @@
 		/* The cut not made: the same shears in a faint blue, the way a control
 		   that is off is drawn, beside the trim line of an area that has grown. */
 		.overflow-mark.offered {
-			box-shadow: inset 0 0 0 var(--line) rgba(37, 99, 235, 0.45);
-			color: rgba(37, 99, 235, 0.6);
+			box-shadow: inset 0 0 0 var(--line) color-mix(in srgb, var(--accent) 45%, transparent);
+			color: color-mix(in srgb, var(--accent) 60%, transparent);
 		}
 
 		/* In line with the badges above them, and below the last of them where
@@ -2748,8 +2748,8 @@
 		}
 
 		.overflow-mark.offered:hover:not(:disabled) {
-			box-shadow: inset 0 0 0 var(--line) #2563eb;
-			color: #2563eb;
+			box-shadow: inset 0 0 0 var(--line) var(--accent);
+			color: var(--accent);
 		}
 
 		.overflow-mark:disabled {
@@ -2821,8 +2821,8 @@
 		   which matters most when several areas are close enough for their badges
 		   to be nearer a neighbour's edge than their own. */
 		.box.selected .badge {
-			--edge: var(--bounds-color, #2563eb);
-			color: var(--bounds-color, #2563eb);
+			--edge: var(--bounds-color, var(--accent));
+			color: var(--bounds-color, var(--accent));
 		}
 
 		/* Something moved that you were not watching. Long enough to catch out of
@@ -2838,20 +2838,20 @@
 			   mark on this card, and drawn against the zoom so it is the same
 			   weight at 50% as at 200%. */
 			.box.dropping {
-				box-shadow: 0 0 0 calc(2px * var(--ui-scale, 1)) rgba(37, 99, 235, 0.9);
-				background-color: rgba(37, 99, 235, 0.08);
+				box-shadow: 0 0 0 calc(2px * var(--ui-scale, 1)) color-mix(in srgb, var(--accent) 90%, transparent);
+				background-color: color-mix(in srgb, var(--accent) 8%, transparent);
 			}
 		}
 
 		@keyframes found {
 			0%,
 			70% {
-				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) rgba(37, 99, 235, 0.55);
-				background-color: rgba(37, 99, 235, 0.18);
+				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) color-mix(in srgb, var(--accent) 55%, transparent);
+				background-color: color-mix(in srgb, var(--accent) 18%, transparent);
 			}
 			100% {
-				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) rgba(37, 99, 235, 0);
-				background-color: rgba(37, 99, 235, 0);
+				box-shadow: 0 0 0 calc(3px * var(--ui-scale, 1)) color-mix(in srgb, var(--accent) 0%, transparent);
+				background-color: color-mix(in srgb, var(--accent) 0%, transparent);
 			}
 		}
 
@@ -2874,14 +2874,14 @@
 		   on an unselected area reads as a second selection. A coloured glyph on
 		   the card's own quiet badge is enough to find it. */
 		.badge.lit {
-			color: #2563eb;
+			color: var(--accent);
 		}
 
 		/* The exception, on the selected area itself: what is moored to it is
 		   filled. That one is the hub of the relationship the other badges are
 		   only pointing at, and it is on the area you already have. */
 		.box.selected .badge.moored {
-			background: #eaf1fe;
+			background: var(--accent-tint);
 		}
 
 		/* Further down the same chain — what hangs off what follows this area,
@@ -2891,7 +2891,7 @@
 		   out. Weaker rather than a different color, because this is the same
 		   relationship at one remove and not another kind of tie. */
 		.badge.lit-edge {
-			color: rgba(37, 99, 235, 0.45);
+			color: color-mix(in srgb, var(--accent) 45%, transparent);
 		}
 
 		/* Icon takes a px size, which is inside the card's transform like
@@ -2917,7 +2917,7 @@
 
 		.threads path {
 			fill: none;
-			stroke: #2563eb;
+			stroke: var(--accent);
 			stroke-width: calc(2 * var(--line));
 			stroke-linecap: round;
 			stroke-dasharray: 0 calc(5 * var(--line));
