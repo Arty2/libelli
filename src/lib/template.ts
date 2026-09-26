@@ -690,6 +690,18 @@ export function sidesOf(width: SideValue | undefined): Sides {
 	return width ?? { top: 0, right: 0, bottom: 0, left: 0 };
 }
 
+/**
+ * The height left for a picture or a QR once the padding and the border have
+ * taken theirs, in mm. `.box` is border-box, so both come out of the declared
+ * height; a frame of the whole `h` spilled out of the bottom of any padded
+ * area, cropping the picture and flagging the area as cut.
+ */
+export function frameHeight(box: Pick<Box, 'h' | 'padding' | 'borderWidth'>): number {
+	const pad = sidesOf(box.padding);
+	const border = sidesOf(box.borderWidth);
+	return Math.max(0, box.h - pad.top - pad.bottom - border.top - border.bottom);
+}
+
 /** A recognised color, or nothing at all — never the string it was handed. */
 const color = (raw: unknown): string | undefined =>
 	parseColor(typeof raw === 'string' ? raw : undefined) ?? undefined;
