@@ -2101,6 +2101,15 @@
 	 */
 	let cellRequest = $state<{ row: number; column: string; draw?: boolean } | null>(null);
 
+	// A request is a one-off: the table reads it as it mounts, so one left
+	// standing when the panel closes would open the editor again the next time
+	// the Data button shows the table — the table was asked for, not the cell.
+	$effect(() => {
+		if (dataOpen) return;
+		cellRequest = null;
+		areaRequest = null;
+	});
+
 	function editCell(id: string) {
 		const box = template.boxes.find((b) => b.id === id);
 		const column = box?.slot ? mapping[box.slot] : undefined;
