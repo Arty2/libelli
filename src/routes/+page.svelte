@@ -493,6 +493,14 @@
 	const selected = $derived(
 		selectedIds.length === 1 ? (template.boxes.find((b) => b.id === selectedIds[0]) ?? null) : null
 	);
+	/**
+	 * The area the options row is about. None while the page is locked: every
+	 * field in the area bar would be greyed out, so opening it only swapped the
+	 * page bar for a wall of disabled controls. An area can still be selected on
+	 * a locked page — to type into it, or to reach its own padlock — and the row
+	 * stays as it was.
+	 */
+	const barBox = $derived(template.locked ? null : selected);
 	const selectedBoxes = $derived(template.boxes.filter((b) => selectedIds.includes(b.id)));
 	/** The box the menu was opened on, whether or not it is the only one chosen. */
 	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
@@ -2331,13 +2339,13 @@
 				// Not a plain toggle any more: the two bars share one row, so this
 				// says "show me the page" — which, with an area selected, means
 				// letting go of the area rather than stacking a second bar on top.
-				const showing = pageSetupOpen && !selected;
+				const showing = pageSetupOpen && !barBox;
 				pageSetupOpen = !showing;
-				if (!showing) selectBox(null);
+				if (!showing && barBox) selectBox(null);
 			}}
-			aria-pressed={pageSetupOpen && !selected}
-			aria-expanded={pageSetupOpen && !selected}
-			title={selected && pageSetupOpen
+			aria-pressed={pageSetupOpen && !barBox}
+			aria-expanded={pageSetupOpen && !barBox}
+			title={barBox && pageSetupOpen
 				? 'Page setup — the area bar has the row; this takes it back'
 				: 'Show or hide the page setup'}
 		>
@@ -2407,8 +2415,8 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if selected || pageSetupOpen}
-		<div class="bar-row" class:box={!!selected} style="min-height:{Math.max(barFloor, probeHeight)}px">
+	{#if barBox || pageSetupOpen}
+		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
 			<div class="bar-probe" aria-hidden="true" inert bind:clientHeight={probeHeight}>
@@ -2440,7 +2448,7 @@
 				/>
 			</div>
 			<div class="bar-fit" bind:clientHeight={barHeight}>
-				{#if selected}
+				{#if barBox}
 					<!-- No menu here, and the guard above is only ever set by the page
 					     bar; the box bar taking the row clears it because the page bar
 					     unmounts with its menu. -->
@@ -2450,7 +2458,7 @@
 						{template}
 						{dataset}
 						{mapping}
-						{selected}
+						selected={barBox}
 						onboxchange={updateBox}
 						ontemplatechange={applyTemplate}
 						onmappingchange={(m) => (mapping = m)}

@@ -694,6 +694,18 @@
 		// what would otherwise cycle the step — has already been swallowed.
 		setTimeout(() => (padHeld = false), 0);
 	}
+
+	/**
+	 * The Grid box's third state, dots, drawn as the indeterminate box — the
+	 * dash — rather than a second tick that looks the same as ruled.
+	 * `indeterminate` is a property with no attribute, so it is set here rather
+	 * than in the markup; a click clears it natively, and the next update puts
+	 * back whatever the grid is then.
+	 */
+	function mixed(node: HTMLInputElement, on: boolean) {
+		node.indeterminate = on;
+		return { update: (next: boolean) => (node.indeterminate = next) };
+	}
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -1056,6 +1068,7 @@
 				type="checkbox"
 				aria-label={grid && gridStyle === 'dots' ? 'Dots' : 'Grid'}
 				checked={grid}
+				use:mixed={grid && gridStyle === 'dots'}
 				onchange={(e) => {
 					if (!grid) ongridstyle('lines');
 					else if (gridStyle === 'lines') {
@@ -1421,6 +1434,11 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
+	}
+
+	/* The word says it is on in the colour the tick does. */
+	.corner label:has(input:is(:checked, :indeterminate)) {
+		color: var(--accent);
 	}
 
 	.corner.left {

@@ -446,7 +446,8 @@ resize boxes directly, or type exact millimetres.
   and a drawing opened and drawn on: those are content, not the design. A locked
   *page* shows a **padlock** at the head of the column beside the page, above
   *+ Area* — a button with no word on it, which unlocks the page when pressed —
-  and greys every bound on the
+  keeps the area bar closed when an area is selected (every field in it would
+  be greyed out; the row stays as it was), and greys every bound on the
   card, because nothing on it can be moved and so nothing on it is worth
   coloring for a reason. It also takes the per-area badges away: every one of
   them says why *that* area will not do what you ask, and on a locked page the
@@ -1364,7 +1365,9 @@ the same strengths, so it can be seen on a navy or black card as well as on
 white. The **Grid** box goes round three states — off, ruled, and a **dot grid**:
 the same millimetres and the same snapping, marked with a dot at each
 intersection instead of a line through the card. The word beside the box says
-which it is drawing. Both
+which it is drawing, and the box itself does too: ticked for ruled, the dash
+of an indeterminate box for dots. Each of the three toggles — Grid, Guides,
+Boxes — has its word in the accent while it is on. Both
 are placed as geometry rather than as a tiled background, so every line is where
 its millimetre is at any zoom — a repeating gradient rounds its tile to whole
 device pixels and drops whichever lines fall inside the rounding, which is why the
