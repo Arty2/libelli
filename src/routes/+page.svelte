@@ -3144,6 +3144,15 @@
 		</dl>
 
 
+		<!-- Where else the app lives, in the README's order: what it is, where
+		     to use it, and how it is made. Links a person follows, so none of
+		     them is a request the app makes on its own. -->
+		<ul class="elsewhere">
+			<li><a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Project page</a></li>
+			<li><a href="https://libelli.vercel.app" target="_blank" rel="noreferrer">Live instance</a></li>
+			<li><a href="https://github.com/Arty2/libelli" target="_blank" rel="noreferrer">Source</a></li>
+		</ul>
+
 		<p class="credit">
 			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>
 			of Heracles Papatheodorou and&nbsp;Claude
@@ -3706,6 +3715,29 @@
 
 	.credit a {
 		color: inherit;
+	}
+
+	.elsewhere {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 4px 18px;
+		margin: 18px 0 0;
+		padding: 12px 0 0;
+		border-top: 1px solid #eee;
+		list-style: none;
+		font-size: 13px;
+	}
+
+	.elsewhere a {
+		color: #2563eb;
+	}
+
+	/* The rule above the links is the one between the help and the rest. */
+	.elsewhere + .credit {
+		margin-top: 10px;
+		padding-top: 0;
+		border-top: none;
 	}
 
 	.credit {
