@@ -794,6 +794,18 @@ boxes that did not need it. A `MutationObserver` on the box's subtree catches
 the content change itself. It settles rather than looping, because `read()`
 writes state only when a number actually moved.
 
+**Only a clipped box can be cut.** A growing box is a `min-height`, so it is
+always as tall as its lines, and yet it used to wear the shears whenever
+`scrollHeight` beat its height. A face whose ascent and descent outrun a tight
+line height — Patrick Hand at 1.05, as the starter title once was — hangs its last line's
+inline box a few pixels below the line, and `scrollHeight` counts that. It only
+showed on two-line titles, where the 16mm minimum had no slack left to hide it,
+which is why it went unseen until the tour had one.
+
+**A picture is framed inside the padding** — see *A QR's quiet zone is the
+area's padding* for why. The arithmetic is `frameHeight` in `template.ts`, so a
+test can hold it, and `mediaHeight` is only its unit.
+
 **Anchoring shows at both ends, and moves at both ends.** A box that hangs off
 another wears a link; the box it hangs from wears a harbour buoy. Until now only one
 end was visible, and the box being followed gave no sign that moving it would
@@ -1714,13 +1726,43 @@ the seam was along its top.
 
 **The sample rows are the tour.** A first run lands on four cards that explain
 the app rather than on invented filler, because they are the first thing anyone
-sees and they are rendered by the very machinery they describe: a row is a card,
-a column is a field, the Markdown subset is on the page in front of you. Card 2
-leaves its `link` cell empty on purpose, so its QR disappears and the card can
-point at the gap — one row teaching `hideWhenEmpty` by not having it. They stay
-inside what `markdown.ts` actually supports, and the QR URLs are decoded by an
-independent decoder in the verification pass, because a QR that does not scan
-looks exactly like one that does.
+sees and they are rendered by the very machinery they describe. Each card is one
+subject — the row, the cell, the design, the way out — and says what to *do*,
+not what the interface looks like: anything a click finds unaided is left for
+the click. The voice is conversational on purpose; a tour that reads like a
+manual gets skimmed like one.
+
+The rows carry the features by being them rather than describing them. Card 2
+leaves its `link` empty so its QR disappears, and is the only row with an
+`accent` — a Color area bound to a column — so color, inline and per area, is
+one page's subject instead of decoration on all four. Card 3 is the only row
+with a `sketch`, a 64 x 64 Bitmap drawing stored in the cell, shown in an area
+that is rotated, padded and hand-bordered: the styles are on the page to be
+selected and read back. The starter template has facing pages on, so the four
+rows are exactly one 2-up zine, and card 4 says how to fold it; the title,
+subtitle and sticker opt out of the mirror so a left-hand page does not push its
+title to the right.
+
+The template also carries the two things a row cannot: an area of its own
+text, `{{date:YYYY-MM-DD}}`, centred in the footer so it holds still
+while the rest of the footer mirrors, and a paragraph indent on the body.
+Card 2 shows `{{title}}` filled in inside a cell and `{{column}}` left as
+written, which is the literal form for free — no column is called `column`,
+and an unrecognised name is never eaten. A date cannot be shown that way,
+since `{{date…}}` is always replaced, so the card points at the footer
+instead of spelling it out.
+
+Three families, each with a job: Fraunces, large and light, for titles;
+Instrument Sans for everything that is read, subtitles and the date included;
+and Patrick Hand for the kicker pill alone. The hand face on titles and body
+made every card look like a sticky note — as one small label it is the
+personality, and the rest can be set like a book.
+
+They stay inside what `markdown.ts` actually supports, and the QR URLs are
+decoded by an independent decoder in the verification pass, because a QR that
+does not scan looks exactly like one that does. Every card is checked to end
+above its footer in the real faces, since the body grows and a growing box
+never shows the shears.
 
 **Press and hold Import to bring them back** (since replaced by *Getting
 Started* in the Table menu — kept as the reason the samples are one step

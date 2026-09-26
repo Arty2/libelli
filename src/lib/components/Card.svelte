@@ -27,7 +27,7 @@
 	import { flagUnknown, renderMarkdown } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
-	import { baselineOf, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
+	import { baselineOf, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -289,11 +289,7 @@
 	 * its padding and border. It was the whole height, so padding pushed the
 	 * picture down and out of the bottom of the area instead of framing it.
 	 */
-	function mediaHeight(box: Box): string {
-		const pad = sidesOf(box.padding ?? 0);
-		const border = sidesOf(box.borderWidth ?? 0);
-		return `${Math.max(0, box.h - pad.top - pad.bottom - border.top - border.bottom)}mm`;
-	}
+	const mediaHeight = (box: Box): string => `${frameHeight(box)}mm`;
 
 	/**
 	 * `object-fit` does nothing to an inline SVG, so the equivalent goes on the
@@ -416,8 +412,15 @@
 			// handles and badges are absolutely positioned children that stick out
 			// past the edge, and they would otherwise read as overflow on every box
 			// the moment it was selected.
+			//
+			// Only a clipped box can cut anything off. A growing one is a
+			// min-height, so it is always as tall as its lines — but a face whose
+			// ascent and descent outrun a tight line height (Patrick Hand at 1.1)
+			// hangs its last line's inline box a few pixels past them, and
+			// scrollHeight counts that, which flagged every two-line title as cut.
 			const content = node.querySelector<HTMLElement>('.content');
-			const spills = !!content && content.scrollHeight > node.clientHeight + 1;
+			const clipped = template.boxes.find((b) => b.id === id)?.overflow === 'clip';
+			const spills = clipped && !!content && content.scrollHeight > node.clientHeight + 1;
 			if ((overflowing[id] ?? false) !== spills) overflowing = { ...overflowing, [id]: spills };
 		};
 		read();
