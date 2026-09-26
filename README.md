@@ -95,8 +95,10 @@ resize boxes directly, or type exact millimetres.
 - **Anchors** — a box can take its top edge from the *rendered* bottom of another
   box, plus a gap. The gap may be **negative**, tucking an area up under the one
   it follows so the two overlap. Drag an anchored box vertically and the gap
-  changes rather than the link breaking. Both ends of the tie are marked and both marks are
-  buttons: the **link** on the follower breaks its own tie, the **buoy** on the
+  changes rather than the link breaking. Both ends of the tie are marked — on
+  the area you have selected and on the areas tied to it, and not otherwise:
+  badges on every area of a busy card were a field of marks competing with the
+  design — and both marks are buttons: the **link** on the follower breaks its own tie, the **buoy** on the
   followed area casts off everything moored to it, and neither moves anything —
   the released box keeps the place it was sitting in. Both hang off an area's
   **top-left** corner, in a column of their own: the link, and under it the
@@ -442,7 +444,7 @@ resize boxes directly, or type exact millimetres.
 - **Lock** — **Lock** in either bar freezes what you have: no dragging, no
   resizing, no option changes. A locked area can still be *selected*, or the
   button that unlocks it could never be reached. A page lock covers every box
-  and the page settings as well. A padlock appears on a locked area, and it is a
+  and the page settings as well. A padlock appears on a locked area while it is selected, and it is a
   button: pressing it unlocks that area, the way the two anchor badges beside it
   undo what they say. Words can still be typed into an area on a locked page,
   and a drawing opened and drawn on: those are content, not the design. A locked
@@ -593,7 +595,10 @@ a notice can appear.
   row with it: the `+` that adds rows lives under the row numbers, so until there
   is a column there is nowhere for it to be, and a column with no row under it is
   a table you cannot type in.
-- **Rename in place** — type in a column header; the cells and any slot bound to
+- **Rename in place** — click a column header's name and type; it is a field
+  with a rule under it, like those in the bars. A press that travels instead
+  drags the header — the tray, or the column — rather than selecting the name,
+  until the name is being edited. The cells and any slot bound to
   that column follow the rename. A column name has **no spaces and no special
   characters** — spaces become dashes and the rest is dropped as you commit it,
   and headers imported from a file or a paste are cleaned the same way — because
@@ -632,8 +637,11 @@ a notice can appear.
   **[...]** on a cell that holds more than it shows, or press the edit badge on
   a Data Field area, and the whole of it opens in the table's own space — over
   the rows, with the card still in view beside or above it. Its column's name
-  and the **×** are at the top; the bar under it stays, saying **Row 2** at
-  the left and the count where the count always is. It edits the cell itself, live, so the
+  and the **×** are at the top; the bar under it stays, with a pager at the
+  left — **‹ 2 / 4 ›**, the same as the card's — that steps to the same column
+  in the row above or below, and the count where the count always is. A cell
+  holding a `data:image` — a drawing, or a picture pasted in as one — shows the
+  picture there and in the table, rather than its base64. It edits the cell itself, live, so the
   card follows as you type and undo reaches every change; the **×** at the top
   right, Esc or Ctrl/Cmd+Enter put the table back. The words are set at twice
   the table's size, for reading at length. On a locked table none of
@@ -642,8 +650,9 @@ a notice can appear.
   before the picker, freezes it: no typing, no new, moved,
   renamed or deleted rows and columns, no paste or import — and nothing typed,
   dropped or drawn on the card reaches a cell either. Nor does sorting, since
-  row order is print order; choosing rows still works. It is saved with the
-  table and undoable.
+  row order is print order; choosing rows still works. The cells are ruled in
+  the blue of the pressed Lock while it is on. It is saved with the table and
+  undoable.
 - **Column widths** — drag the right edge of a header, or double-click that edge
   for the default. The widths are a view preference of this browser's, not part
   of the data or the template: they follow a column through a rename and go with

@@ -6,6 +6,7 @@
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { armDefault } from '$lib/modal';
+	import { safeMediaUrl } from '$lib/assets';
 	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
 	import { countText, dropTarget, indexAfterSort, moveColumn, moveRows, moveRowsTo, sortRows, type SortDirection } from '$lib/table';
 	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
@@ -284,6 +285,28 @@
 		});
 	});
 
+	/** The same column, a row up or down, as the card's pager steps cards. */
+	function stepBigCell(by: number) {
+		if (!bigCell) return;
+		const row = Math.max(0, Math.min(dataset.rows.length - 1, bigCell.row + by));
+		if (row === bigCell.row) return;
+		bigCell = { row, column: bigCell.column };
+		onactivate(row);
+	}
+
+	/**
+	 * A cell holding a picture — a drawing, or one pasted in as a data URL —
+	 * shown as the picture. Its words are a few hundred kilobytes of base64
+	 * that nobody reads or types into, and they pushed every other cell's
+	 * words off the row. Only a `data:` URL: an address is a request, and the
+	 * table makes none. Through `safeMediaUrl`, because the cell is untrusted
+	 * and a prefix is not a shape.
+	 */
+	function cellPicture(value: string | undefined): string | null {
+		const text = value?.trim() ?? '';
+		return text.startsWith('data:image/') ? safeMediaUrl(text) : null;
+	}
+
 	function closeBigCell() {
 		bigCell = null;
 	}
@@ -546,6 +569,30 @@
 		trayClick = true;
 		const to = dropTarget(from, before);
 		if (to !== from) onchange(moveColumn(dataset, from, to));
+	}
+
+	/**
+	 * A press on a name that is not being edited is a press on the header.
+	 *
+	 * The name field fills most of each header, so most drags of the header —
+	 * the tray pulled up, the column carried sideways — begin inside it, and a
+	 * text field answers a press by taking the focus and starting a selection.
+	 * Past a few pixels that selection is the browser's own drag, and a name
+	 * that was already selected went further and started dragging its text,
+	 * which cancels the pointer outright. So until the field has the focus, the
+	 * press is held back from it, and the click that follows — only when it
+	 * went nowhere, since a drag swallows its click — hands the focus over.
+	 * Once the field has it, a press is left alone to place the caret.
+	 */
+	function holdName(event: PointerEvent) {
+		if (event.button === 0 && document.activeElement !== event.currentTarget) event.preventDefault();
+	}
+
+	function takeName(event: MouseEvent) {
+		const field = event.currentTarget as HTMLInputElement;
+		if (document.activeElement === field) return;
+		field.focus();
+		field.setSelectionRange(field.value.length, field.value.length);
 	}
 
 	let pasteOpen = $state(false);
@@ -1113,6 +1160,7 @@
 	class="data"
 	class:rows-short={rowHeight === 'short'}
 	class:rows-full={rowHeight === 'full'}
+	class:locked
 	aria-label="Card data"
 >
 	<div class="scroll" bind:this={scrollEl}>
@@ -1206,6 +1254,8 @@
 								readonly={locked}
 								aria-label="Rename column {column}"
 								title={locked ? column : 'Rename this column — drag it sideways to move it'}
+								onpointerdown={holdName}
+								onclick={takeName}
 								onchange={(e) => renameColumn(i, e.currentTarget.value, e.currentTarget)}
 							/>
 							<span class="column-tools">
@@ -1332,6 +1382,7 @@
 							</span>
 						</td>
 						{#each dataset.columns as column, c (column)}
+							{@const picture = cellPicture(row[column])}
 							<!-- The drop line runs down the whole column, not just its
 							     header, so it says which gap the column lands in however
 							     far down the table the eye is. -->
@@ -1350,6 +1401,20 @@
 								class:drop-before={carrying?.on && carrying.before === c}
 								class:drop-after={carrying?.on && c === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
 							>
+								{#if picture}
+									<!-- The picture in place of its base64. A press picks the
+									     row, as anywhere else on it; a hold or a double-click
+									     opens the cell full size, where the text still is. -->
+									<img
+										class="cell-picture"
+										src={picture}
+										alt="{column}, row {rowLabel(row, i)}"
+										title={locked ? undefined : 'An image — press and hold, or double-click, to open this cell full size'}
+										draggable="false"
+										use:hold={() => !locked && openBigCell(i, column)}
+										ondblclick={() => !locked && openBigCell(i, column)}
+									/>
+								{:else}
 								<!-- Press and hold for the whole cell in a dialog of its own. -->
 								<textarea
 									rows="1"
@@ -1386,6 +1451,7 @@
 										openBigCell(i, column);
 									}}
 								>[...]</button>
+								{/if}
 							</td>
 						{/each}
 						<td></td>
@@ -1431,7 +1497,27 @@
 			     while one is typed in: which row it is at the start, where the
 			     table's name usually is, and its count at the end, where the count
 			     always is. The editor above keeps the column's name and the ×. -->
-			<span class="big-row">Row {rowLabel(dataset.rows[bigCell.row], bigCell.row)}</span>
+			<!-- Which row, and the way to the next one's cell: the same pager the
+			     card has under it, so reading one column down the rows full size
+			     is a press per row rather than close, find, hold, per row. -->
+			{@const at = bigCell.row}
+			<span class="big-pager" role="group" aria-label="Row">
+				<button
+					class="icon step"
+					disabled={at <= 0}
+					title="Previous row"
+					aria-label="Previous row"
+					onclick={() => stepBigCell(-1)}
+				><Icon name="chevron-left" size={16} /></button>
+				<span class="big-row">{at + 1} / {dataset.rows.length}</span>
+				<button
+					class="icon step"
+					disabled={at >= dataset.rows.length - 1}
+					title="Next row"
+					aria-label="Next row"
+					onclick={() => stepBigCell(1)}
+				><Icon name="chevron-right" size={16} /></button>
+			</span>
 			<span class="spacer"></span>
 			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
 		{:else}
@@ -1707,6 +1793,9 @@
 					<Icon name="close" size={18} />
 				</button>
 			</div>
+			{#if cellPicture(text)}
+				<img class="big-picture" src={cellPicture(text)} alt={open.column} />
+			{/if}
 			<textarea
 				value={text}
 				readonly={locked}
@@ -1824,6 +1913,15 @@
 		padding: 0;
 	}
 
+	/* A locked table is ruled in the blue its Lock button wears when pressed,
+	   so the state is on the thing it applies to and not only on the button:
+	   read-only cells otherwise look exactly like cells that refuse your typing
+	   for no reason. */
+	.locked th,
+	.locked td {
+		border-color: #2563eb;
+	}
+
 	/* The table's own outside, which no cell's right or bottom edge covers. */
 	tr > :first-child {
 		border-left-width: 1px;
@@ -1869,24 +1967,27 @@
 		min-width: 0;
 	}
 
+	/* The same field the bars use — a rule under the value, no well around it —
+	   because it is the same act: typing a name into something. A white box
+	   popping up over the header on hover read as a different kind of control
+	   from every other field in the app. */
 	.column-name {
-		border: 1px solid transparent;
-		border-radius: var(--radius-input);
+		border: none;
+		border-bottom: 1px solid transparent;
+		border-radius: 0;
 		background: transparent;
 		font: 600 12px ui-sans-serif, system-ui, sans-serif;
 		flex: 1 1 auto;
 		min-width: 0;
-		padding: 3px;
+		padding: 3px 2px;
 	}
 
-	.column-name:hover {
-		border-color: #ddd;
-		background: #fff;
+	.column-name:not([readonly]):hover {
+		border-bottom-color: var(--border-control-hover);
 	}
 
-	.column-name:focus {
-		border-color: #2563eb;
-		background: #fff;
+	.column-name:not([readonly]):focus {
+		border-bottom-color: var(--border-control-hover);
 	}
 
 	.column-tools,
@@ -2175,6 +2276,31 @@
 		max-height: none;
 		/* Nothing is ever cut off here, so the bottom padding comes back. */
 		padding-bottom: 5px;
+	}
+
+	/* A picture sits where the cell's first lines would, as tall as they are
+	   at each row height, so an image cell sets no row taller than its
+	   neighbours' words do. */
+	.cell-picture {
+		display: block;
+		box-sizing: border-box;
+		max-width: 100%;
+		height: calc(var(--cell-line) * 3 + 7px);
+		padding: 4px 6px;
+		object-fit: contain;
+		object-position: left center;
+		cursor: default;
+	}
+
+	.data.rows-short .cell-picture {
+		height: calc(var(--cell-line) + 7px);
+		padding: 2px 6px;
+	}
+
+	.data.rows-full .cell-picture,
+	.data tr.expanded .cell-picture {
+		height: auto;
+		max-height: 12rem;
 	}
 
 	/* Each cell's ground as a custom property as well as a background, so the
@@ -2748,10 +2874,19 @@
 	}
 
 	/* Where the table's name usually is, while a cell is open full size. */
+	.actions .big-pager {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+	}
+
 	.actions .big-row {
-		font: 600 12px ui-sans-serif, system-ui, sans-serif;
-		color: #333;
+		font: 500 12px ui-sans-serif, system-ui, sans-serif;
+		color: #555;
 		white-space: nowrap;
+		min-width: 2.75rem;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
 	}
 
 	/* Carbon's two halves of chevron--sort each sit in their own half of the
@@ -2787,6 +2922,16 @@
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	/* The picture over its text, taking most of the room: the text is still
+	   there to paste over or clear, but it is not what anybody opened this to
+	   read. */
+	.big-picture {
+		flex: 2 1 0;
+		min-height: 0;
+		width: 100%;
+		object-fit: contain;
 	}
 
 	.cell-editor textarea {
