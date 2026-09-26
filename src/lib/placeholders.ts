@@ -24,6 +24,7 @@
 
 import { columnName } from './parse';
 import type { Row } from './types';
+import { t } from './strings';
 
 /** The one thing that changes between calls, injected so this stays testable. */
 export interface PlaceholderContext {
@@ -56,22 +57,11 @@ export const UNKNOWN_OPEN = '\uE010';
 export const UNKNOWN_CLOSE = '\uE011';
 const UNKNOWN_CHARS = /[\uE010\uE011]/g;
 
-const MONTHS = [
-	'January',
-	'February',
-	'March',
-	'April',
-	'May',
-	'June',
-	'July',
-	'August',
-	'September',
-	'October',
-	'November',
-	'December'
-];
-
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/** Names a `{{date}}` prints, from the catalogue: a card says the date in the interface's language. */
+const MONTHS = t.dates.months;
+const MONTHS_SHORT = t.dates.monthsShort;
+const DAYS = t.dates.days;
+const DAYS_SHORT = t.dates.daysShort;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -83,11 +73,11 @@ const TOKENS: Array<[string, (d: Date) => string]> = [
 	['YYYY', (d) => String(d.getFullYear())],
 	['YY', (d) => pad(d.getFullYear() % 100)],
 	['MMMM', (d) => MONTHS[d.getMonth()]],
-	['MMM', (d) => MONTHS[d.getMonth()].slice(0, 3)],
+	['MMM', (d) => MONTHS_SHORT[d.getMonth()]],
 	['MM', (d) => pad(d.getMonth() + 1)],
 	['M', (d) => String(d.getMonth() + 1)],
 	['dddd', (d) => DAYS[d.getDay()]],
-	['ddd', (d) => DAYS[d.getDay()].slice(0, 3)],
+	['ddd', (d) => DAYS_SHORT[d.getDay()]],
 	['DD', (d) => pad(d.getDate())],
 	['D', (d) => String(d.getDate())]
 ];

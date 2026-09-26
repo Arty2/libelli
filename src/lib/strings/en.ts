@@ -1164,6 +1164,53 @@ export const en = {
 		credit: 'of Heracles Papatheodorou and Claude'
 	},
 
+	/**
+	 * The first run: what the starter card and the walkthrough table are called,
+	 * and what the app says as they open. The walkthrough's own rows are
+	 * `sample-cards.csv`, which is content and not in this catalogue.
+	 */
+	onboarding: {
+		starterTemplate: 'A5 Starter Template',
+		table: 'Getting Started',
+		firstRun:
+			'Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.',
+		alreadyOpen: 'This is the Getting Started table, as it came.',
+		started: '“{name}” started, with the cards that walk through the app. Your other tables are untouched.'
+	},
+
+	/** Paper sizes in the Size and Sheet menus. The A sizes are the same everywhere; translate them only if yours are not. */
+	pagePresets: {
+		a6: 'A6',
+		a5: 'A5',
+		a4: 'A4',
+		a3: 'A3',
+		postcard: 'Postcard'
+	},
+
+	/**
+	 * What `{{date:…}}` prints on a card — MMMM, MMM, dddd and ddd. Months run
+	 * January to December; days start on Sunday, as JavaScript counts them.
+	 */
+	dates: {
+		months: [
+			'January',
+			'February',
+			'March',
+			'April',
+			'May',
+			'June',
+			'July',
+			'August',
+			'September',
+			'October',
+			'November',
+			'December'
+		],
+		monthsShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+		days: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+		daysShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+	},
+
 	/** Errors the library code raises; they reach the status bar as they are. */
 	errors: {
 		nothingToExport: 'Nothing to export.',

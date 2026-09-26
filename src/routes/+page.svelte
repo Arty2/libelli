@@ -629,7 +629,7 @@
 		} else if (unreadable)
 			notify(t.app.unreadable, 'warning');
 		else if (firstRun)
-			notify('Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.');
+			notify(t.onboarding.firstRun);
 		missingFonts = await ensureTemplateFonts(template);
 
 		// Last, so the precache download is not competing with the first paint.
@@ -2054,7 +2054,7 @@
 		const untouched = (d: Dataset) =>
 			JSON.stringify([d.columns, d.rows]) === JSON.stringify([sample.columns, sample.rows]);
 		if (untouched(dataset)) {
-			notify(`This is the Getting Started table, as it came.`);
+			notify(t.onboarding.alreadyOpen);
 			return;
 		}
 		for (const entry of tables) {
@@ -2067,18 +2067,18 @@
 		}
 		settleProvisional();
 		await flushDataset();
-		describe('Getting Started');
+		describe(t.onboarding.table);
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
 		saveDatasetId(datasetId);
-		dataset = { ...sample, name: freeTableName(sample.name ?? 'Getting Started') };
+		dataset = { ...sample, name: freeTableName(sample.name ?? t.onboarding.table) };
 		activeRow = 0;
 		// Mapped the way a first run maps: this template's slots against the
 		// sample's columns, so the cards render rather than coming up blank.
 		mapping = autoMap(usedSlots(template), dataset.columns);
 		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
 		await refreshTables();
-		notify(`“${dataset.name}” started, with the cards that walk through the app. Your other tables are untouched.`);
+		notify(fmt(t.onboarding.started, { name: dataset.name ?? '' }));
 	}
 
 	/**

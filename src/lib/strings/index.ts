@@ -8,12 +8,11 @@
  * sides rewritten, typed as `Strings` so a missing or misspelt key fails
  * `npm run check` rather than showing up blank.
  *
- * What is *not* here: anything a card prints, and the onboarding. Sample
- * rows, the starter template, the month names a `{{date}}` fills in, the
- * first-run notice and the Getting Started table's own notices are content —
- * they belong to the template and the table (or walk through them), and a
- * template made in one language keeps saying what it said when opened in
- * another.
+ * What is *not* here: the walkthrough's rows, `sample-cards.csv`. They are
+ * data, edited in a spreadsheet like any other table, and a table does not
+ * change language when the interface does. Everything around them — the
+ * starter card's name, the Getting Started table's name and notices, the
+ * first-run notice, and the month and day names a `{{date}}` prints — is here.
  *
  * Choosing a catalogue happens once, at load, from the browser's preferred
  * languages. There is no switch in the app: the platform already has one, and

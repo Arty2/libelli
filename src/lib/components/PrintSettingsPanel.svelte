@@ -324,7 +324,7 @@
 			>
 				<option value="">{t.printSettings.custom}</option>
 				{#each PAGE_PRESETS as option (option.name)}
-					<option value={option.name}>{option.name}</option>
+					<option value={option.name}>{option.label}</option>
 				{/each}
 			</select>
 		</label>

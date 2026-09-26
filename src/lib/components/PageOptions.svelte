@@ -302,7 +302,9 @@
 		const size = presetSize(name, template.page.w > template.page.h);
 		if (!size) return;
 		patchTemplate({ page: { ...template.page, ...size } });
-		onnotice(fmt(t.pageOptions.sizeChosen, { name, w: size.w, h: size.h }));
+		onnotice(
+			fmt(t.pageOptions.sizeChosen, { name: PAGE_PRESETS.find((p) => p.name === name)?.label ?? name, w: size.w, h: size.h })
+		);
 	}
 
 	/**
@@ -475,7 +477,7 @@
 				>
 					<option value="">{t.printSettings.custom}</option>
 					{#each PAGE_PRESETS as option (option.name)}
-						<option value={option.name}>{option.name}</option>
+						<option value={option.name}>{option.label}</option>
 					{/each}
 				</select>
 			</label>

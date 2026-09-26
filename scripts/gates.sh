@@ -212,8 +212,8 @@ fi
 # are what a grep can tell from code; text between tags is too often a variable
 # to match without false alarms. The one literal allowed is the app's own name
 # on the logo, which is a name in every language.
-# Onboarding (the sample cards, the starter template, the first-run notice) is
-# content rather than interface and is deliberately left out of the catalogue.
+# The walkthrough's rows (sample-cards.csv) are data, and are the one thing
+# deliberately left out of the catalogue.
 literals=$(grep -rnE '[[:space:]](title|aria-label|placeholder|alt|label)="[^"{]*[A-Za-z]{2}' \
 	--include='*.svelte' src 2>/dev/null |
 	grep -v 'alt="libelli"')

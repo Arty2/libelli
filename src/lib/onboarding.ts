@@ -1,4 +1,5 @@
 import sampleCsv from './sample-cards.csv?raw';
+import { t } from './strings';
 import { parseTable } from './parse';
 import { builtinTemplate } from './template';
 import type { Dataset, Template } from './types';
@@ -22,6 +23,6 @@ export const SAMPLE_CSV = sampleCsv;
  * is a worse answer to “what am I looking at” than the four cards themselves
  * give.
  */
-export const sampleDataset = (): Dataset => ({ ...parseTable(SAMPLE_CSV), name: 'Getting Started' });
+export const sampleDataset = (): Dataset => ({ ...parseTable(SAMPLE_CSV), name: t.onboarding.table });
 
 export const starterTemplate = (): Template => builtinTemplate();

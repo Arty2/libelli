@@ -2677,12 +2677,14 @@ runs the page draws as elements, so a translator can move the emphasis with the
 word and nothing in a catalogue can become markup — the `{@html}` gate stays at
 three files.
 
-**What stays out.** Content and onboarding: anything a card prints (sample rows,
-the starter template, the months a `{{date}}` fills in), the first-run notice,
-and the Getting Started table's own notices. A template made in one language
-should keep saying what it said when opened in another, and the onboarding is
-material about the app rather than the app's controls. Key names in shortcuts
-are in the catalogue but read as printed on the keyboard.
+**What stays out: the walkthrough's rows.** `sample-cards.csv` is data — it is
+edited in a spreadsheet like any other table, and a table does not change
+language when the interface does. Everything around it is in: the starter
+card's name, the Getting Started table's name and notices, the first-run
+notice, the paper sizes' names, and the month and day names a `{{date}}` prints
+(with their short forms spelled out, since three letters of a month is not an
+abbreviation in every language). Key names in shortcuts are in the catalogue
+but read as printed on the keyboard.
 
 **The gate.** `gates.sh` § 9 fails a `title`, `aria-label`, `placeholder`, `alt`
 or component `label` written as a literal in a `.svelte` file. Text between

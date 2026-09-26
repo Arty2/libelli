@@ -242,7 +242,9 @@ export const FACING_PAGE_NUMBER_POSITIONS: PageNumberPosition[] = [
 const ALL_PAGE_NUMBER_POSITIONS = [...PAGE_NUMBER_POSITIONS, ...FACING_PAGE_NUMBER_POSITIONS];
 
 export function builtinTemplate(): Template {
-	return normaliseTemplate(BUILTIN_TEMPLATE_JSON);
+	// The starter's name is interface, not design: it is what the picker calls
+	// the card a first run lands on, so it comes from the catalogue.
+	return { ...normaliseTemplate(BUILTIN_TEMPLATE_JSON), name: ui.onboarding.starterTemplate };
 }
 
 /**
@@ -582,12 +584,13 @@ export function arrangeBoxes(boxes: Box[], ids: string[], where: Arrange): Box[]
  * closest this list can safely go — a Postcard at 105 x 148 would be A6 turned
  * on its side, and the Size menu would name it wrongly rather than offer both.
  */
-export const PAGE_PRESETS: Array<{ name: string; w: number; h: number }> = [
-	{ name: 'A6', w: 105, h: 148 },
-	{ name: 'A5', w: 148, h: 210 },
-	{ name: 'A4', w: 210, h: 297 },
-	{ name: 'A3', w: 297, h: 420 },
-	{ name: 'Postcard', w: 102, h: 152 }
+/** `name` is the key a size is matched and stored by; `label` is what the menus say. */
+export const PAGE_PRESETS: Array<{ name: string; label: string; w: number; h: number }> = [
+	{ name: 'A6', label: ui.pagePresets.a6, w: 105, h: 148 },
+	{ name: 'A5', label: ui.pagePresets.a5, w: 148, h: 210 },
+	{ name: 'A4', label: ui.pagePresets.a4, w: 210, h: 297 },
+	{ name: 'A3', label: ui.pagePresets.a3, w: 297, h: 420 },
+	{ name: 'Postcard', label: ui.pagePresets.postcard, w: 102, h: 152 }
 ];
 
 const close = (a: number, b: number) => Math.abs(a - b) < 0.05;
