@@ -324,6 +324,30 @@
 	gap: 8px;
 }
 
+/* Its buttons hold their one line: squeezed, the row gave way at the space in
+   "</> CSS •" and stacked the icon over the word, when it is the name field
+   beside them that has room to give. */
+.options .head-row > button {
+	flex: none;
+	white-space: nowrap;
+}
+
+/* …and the name field is what gives. On a phone the row is wider than the
+   screen, and with the buttons held to one line the caret was pushed off the
+   right edge; the name shrinks to fit instead, down to a few letters. */
+.options .head,
+.options .head-row {
+	max-width: 100%;
+	box-sizing: border-box;
+}
+.options .head-row .field.picker {
+	min-width: 0;
+}
+.options .head-row .field.picker input {
+	flex: 0 1 auto;
+	min-width: 3rem;
+}
+
 /* The template name and the library behind it. The menu is `position: fixed`
    and placed from a measurement — see PageOptions — so nothing here has to
    make room for it. */
