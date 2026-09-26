@@ -54,10 +54,21 @@ right-hand page; `pageSide` reads the parity of the page number the card was
 handed, which is why the editor shows the fold as it pages through the rows
 without being told about it separately.
 
-**Mirroring places a box; it does not turn it over.** Rotation and the pivot are
+**Mirroring places a box; it does not turn it over.** A tilt and its pivot are
 carried across untouched. A true mirror of the *appearance* would stand a
-signature or a corner flourish on its head, which no spread wants, and a box
-that means to be turned the other way on the other page can say so itself.
+signature or a corner flourish on its head, which no spread wants.
+
+**Except a quarter turn, which is reversed.** 90° is not a tilt but a
+direction: words running up the outer edge, their tops towards it. The facing
+page's outer edge is the other one, so there it is -90° (and -90° is 90°),
+about the mirrored pivot — which leaves the whole box exactly the reflection of
+the stored one, words still reading forwards. Only exact quarter turns:
+reversing every angle would flip a tilted sticker too, and a box at 89° is a
+tilt someone chose. It stays its own inverse, so a drag on a left-hand page
+writes back through the same function (`facingRotation`): the lever turns the
+angle as drawn, and one dragged to -90° there is stored as 90°. The handles
+un-rotate by the drawn angle for the same reason, and the pivot's drag is
+flipped back when — only when — the pivot itself was mirrored.
 
 **Only an alignment that was chosen mirrors.** An explicit `left` or `right`
 swaps, because that is an area deliberately pushed against an edge and the edge

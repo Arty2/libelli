@@ -9,6 +9,8 @@ import {
 	boxEdges,
 	facingPosition,
 	mirrorBox,
+	quarterTurn,
+	facingRotation,
 	mirrors,
 	pageSide,
 	resolveLayout,
@@ -225,6 +227,31 @@ describe('mirrorBox', () => {
 		const mirrored = mirrorBox(box, page);
 		expect(mirrored.rotation).toBe(12);
 		expect(mirrored.centre).toEqual({ x: 20, y: 80 });
+	});
+
+	it('reverses a quarter turn, about the mirrored pivot, so it faces the other outer edge', () => {
+		const up = newBox({ id: 'a', x: 130, w: 60, rotation: 90, centre: { x: 20, y: 80 } });
+		expect(mirrorBox(up, page).rotation).toBe(-90);
+		expect(mirrorBox(up, page).centre).toEqual({ x: 80, y: 80 });
+		expect(mirrorBox(newBox({ id: 'a', rotation: -90 }), page).rotation).toBe(90);
+		// however it is written, and with the pivot left absent when it is the middle
+		expect(mirrorBox({ ...newBox({ id: 'a' }), rotation: 270 }, page).rotation).toBe(-270);
+		expect(mirrorBox(newBox({ id: 'a', rotation: 90 }), page).centre).toBeUndefined();
+		// …and back again, since the facing page of the facing page is this one.
+		expect(mirrorBox(mirrorBox(up, page), page)).toEqual(up);
+	});
+});
+
+describe('quarterTurn and facingRotation', () => {
+	it('knows a quarter turn, and nothing else, as the one to reverse', () => {
+		expect([90, -90, 270, -270, 450].map(quarterTurn)).toEqual([true, true, true, true, true]);
+		expect([undefined, 0, 12, 89, 180, -180].map(quarterTurn)).toEqual([false, false, false, false, false, false]);
+	});
+
+	it('writes a facing page back to the stored one: -90° there is 90° here, a tilt is itself', () => {
+		expect(facingRotation(-90)).toBe(90);
+		expect(facingRotation(90)).toBe(-90);
+		expect(facingRotation(-7)).toBe(-7);
 	});
 });
 

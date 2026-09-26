@@ -16,6 +16,8 @@
 		boxEdges,
 		facingPosition,
 		mirrorBox,
+		quarterTurn,
+		facingRotation,
 		mirrors,
 		pageSide,
 		pxToMm,
@@ -594,9 +596,11 @@
 		// what anchored boxes below follow. That is the intended bargain: turning a
 		// box does not shove the rest of the card around. Snapping sees the upright
 		// rectangle too.
-		if (box.rotation) {
-			const centre = box.centre ?? { x: 50, y: 50 };
-			parts.push(`transform:rotate(${box.rotation}deg)`, `transform-origin:${centre.x}% ${centre.y}%`);
+		// As drawn: on a facing page a quarter turn is the opposite one, about
+		// the mirrored pivot — see `mirrorBox`.
+		if (drawn.rotation) {
+			const centre = drawn.centre ?? { x: 50, y: 50 };
+			parts.push(`transform:rotate(${drawn.rotation}deg)`, `transform-origin:${centre.x}% ${centre.y}%`);
 		}
 		if (hidden.has(box.id)) {
 			parts.push('height:0', 'overflow:hidden', 'visibility:hidden');
@@ -1054,7 +1058,10 @@
 		// rotation is read from where the pointer *is* rather than how far it has
 		// come. Every new mode lands in the un-rotating branch by default, which
 		// is why this reads as a list rather than a single comparison.
-		const turn = drag.mode === 'move' || drag.mode === 'rotate' ? 0 : ((origin.rotation ?? 0) * Math.PI) / 180;
+		// The turn as drawn, which on a facing page may be the opposite quarter
+		// turn: the handles are where it put them.
+		const drawnOrigin = placed(origin);
+		const turn = drag.mode === 'move' || drag.mode === 'rotate' ? 0 : ((drawnOrigin.rotation ?? 0) * Math.PI) / 180;
 		const cos = Math.cos(turn);
 		const sin = Math.sin(turn);
 		// On a left-hand page a mirrored box is drawn at its facing position, so
@@ -1063,7 +1070,12 @@
 		// stored box. Undoing both here keeps every case below in one frame — the
 		// one the template is written in. The pivot and the rotation handle are
 		// exempt: mirroring places a box, it does not flip what is inside it.
-		const flip = mirroredDrag(origin) && drag.mode !== 'centre' && drag.mode !== 'rotate';
+		// A quarter-turned box is the exception for the pivot: its pivot *is*
+		// mirrored, so a pointer moving it right moved the stored one left.
+		const flip =
+			mirroredDrag(origin) &&
+			drag.mode !== 'rotate' &&
+			(drag.mode !== 'centre' || quarterTurn(origin.rotation));
 		const dx = (screenX * cos + screenY * sin) * (flip ? -1 : 1);
 		const dy = -screenX * sin + screenY * cos;
 		const mode = flip ? MIRRORED_MODE[drag.mode] : drag.mode;
@@ -1096,7 +1108,7 @@
 				// is the transform origin, so it is the one point that does not move
 				// when the rotation changes — which is what makes this valid.
 				const trim = trimEl.getBoundingClientRect();
-				const c = origin.centre ?? { x: 50, y: 50 };
+				const c = drawnOrigin.centre ?? { x: 50, y: 50 };
 				const pivotX = trim.left + (boxEl.offsetLeft + (boxEl.offsetWidth * c.x) / 100) * scale;
 				const pivotY = trim.top + (boxEl.offsetTop + (boxEl.offsetHeight * c.y) / 100) * scale;
 				// The lever is grabbed at arm's length from the pivot, so the angle is
@@ -1105,17 +1117,23 @@
 				// nothing to measure and a pixel of movement swings the box wildly.
 				const now = Math.atan2(event.clientY - pivotY, event.clientX - pivotX);
 				const then = Math.atan2(drag.startY - pivotY, drag.startX - pivotX);
-				let deg = (origin.rotation ?? 0) + ((now - then) * 180) / Math.PI;
+				// Turned from the angle as drawn, which on a facing page may be the
+				// opposite quarter turn, and written back through the same mirror:
+				// a box dragged to -90° there is stored as 90°.
+				let deg = (drawnOrigin.rotation ?? 0) + ((now - then) * 180) / Math.PI;
 				// Whole degrees, or a quarter turn with Shift — the same bargain the
 				// grid makes for position: coarse by default, exact when typed.
 				deg = event.shiftKey ? Math.round(deg / 15) * 15 : Math.round(deg);
-				next.rotation = normaliseRotation(deg) ?? 0;
+				const turned = normaliseRotation(deg) ?? 0;
+				next.rotation = mirroredDrag(origin) ? facingRotation(turned) : turned;
 				break;
 			}
 			case 'centre': {
 				// Percent of the box, not millimetres, because that is how the pivot
 				// is stored — and clamped to the box, so it can never be dragged
 				// somewhere the marker cannot be picked up again.
+				// In the stored frame: `dx` has already been flipped back for a
+				// quarter-turned box on a facing page, whose pivot is mirrored.
 				const was = origin.centre ?? { x: 50, y: 50 };
 				const pct = (value: number) => Math.round(Math.max(0, Math.min(100, value)) * 10) / 10;
 				next.centre = {
@@ -2098,7 +2116,7 @@
 								e.stopPropagation();
 								resetPivot(box);
 							}}
-							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
+							style="left:{(placed(box).centre ?? { x: 50, y: 50 }).x}%;top:{(placed(box).centre ?? { x: 50, y: 50 }).y}%"
 							title="The point this area turns about — drag it, or type it in the bar. Double-click to put it back in the middle."
 							onpointerdown={(e) => startDrag(e, box, 'centre')}
 							onpointermove={moveDrag}
@@ -2114,7 +2132,7 @@
 								e.stopPropagation();
 								resetRotation(box);
 							}}
-							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
+							style="left:{(placed(box).centre ?? { x: 50, y: 50 }).x}%;top:{(placed(box).centre ?? { x: 50, y: 50 }).y}%"
 							title="Drag to turn this area — hold Shift for 15° steps. Double-click to set it upright."
 							onpointerdown={(e) => startDrag(e, box, 'rotate')}
 							onpointermove={moveDrag}

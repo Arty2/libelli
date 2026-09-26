@@ -451,7 +451,10 @@ resize boxes directly, or type exact millimetres.
   alignment you *chose* mirrors with it, so text pushed against one edge hugs
   the other edge on the facing page, while an alignment inherited from the page
   defaults is left alone — body text reads the same way on both sides of a
-  spread. And **Outer**/**Inner** page numbers know which edge they are on.
+  spread. An area turned a quarter — 90° or -90°, words running up or down an
+  edge — is turned the opposite way on the facing page, so it faces that
+  page's outer edge; a smaller tilt is the same on both pages. And
+  **Outer**/**Inner** page numbers know which edge they are on.
   Mirroring is worked out as the page is drawn: the template stores one set of
   millimetres, measured on the right-hand page, so nothing is duplicated and
   turning the setting off puts everything back. Page through the rows and the
