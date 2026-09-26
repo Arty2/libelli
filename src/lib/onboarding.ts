@@ -25,3 +25,20 @@ export const SAMPLE_CSV = sampleCsv;
 export const sampleDataset = (): Dataset => ({ ...parseTable(SAMPLE_CSV), name: 'Getting Started' });
 
 export const starterTemplate = (): Template => builtinTemplate();
+
+/**
+ * Whether a template is the starter as it came — the question A5 Starter Booklet asks
+ * of every template in the library before it adds another copy, the way
+ * Getting Started asks it of every table.
+ *
+ * The name and the padlock are left out: a first run lands on the starter
+ * locked, and a copy somebody has only renamed or unlocked still has nothing
+ * of theirs in it worth protecting. Anything else — one area nudged, one
+ * color changed — makes it theirs, and it is never handed back as the
+ * original. Both sides are compared as normalised, so a stored copy that
+ * gained defaults on the way through `normaliseTemplate` still matches.
+ */
+export function isStarterTemplate(template: Template): boolean {
+	const design = ({ name: _name, locked: _locked, ...rest }: Template) => JSON.stringify(rest);
+	return design(template) === design(starterTemplate());
+}

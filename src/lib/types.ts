@@ -29,7 +29,12 @@ export type Align = 'left' | 'center' | 'right' | 'justify';
 /** vertical placement of a box's content within its own frame */
 export type VAlign = 'top' | 'middle' | 'bottom';
 export type TextCase = 'none' | 'smallcaps' | 'uppercase';
-export type BorderStyle = 'solid' | 'dashed' | 'dotted' | 'double';
+/**
+ * `stamp` is the one no CSS border can draw: a postage stamp's perforated
+ * edge. It is always drawn as SVG, like a border drawn by hand, and whether it
+ * wobbles is still `borderHand`'s to say.
+ */
+export type BorderStyle = 'solid' | 'dashed' | 'dotted' | 'double' | 'stamp';
 
 /**
  * How an area's ink meets what is under it — the paper, its background image,

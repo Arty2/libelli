@@ -7,6 +7,7 @@
 	import { cssIdent, scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
+	import { isParked } from '$lib/boxops';
 	import { HOLD_SLOP } from '$lib/gestures';
 	import {
 		FREE_STEP,
@@ -472,6 +473,14 @@
 	function surfaceStyle(box: Box): string {
 		const parts: string[] = [];
 		if (box.background) parts.push(`background:${box.background}`);
+		// On a stamp the fill is the field printed on the paper, not the paper:
+		// inside the padding, which is the stamp's margin. Spread to the border
+		// box it would fill the perforations back in, and a drop-shadow would
+		// trace the rectangle rather than the holes.
+		if (stamped(box)) {
+			const pad = sidesOf(box.padding ?? 0);
+			parts.push(`top:${pad.top}mm`, `right:${pad.right}mm`, `bottom:${pad.bottom}mm`, `left:${pad.left}mm`);
+		}
 		// A color out of the data fills the area itself, not a panel inside it, so
 		// it reaches under the padding and takes the corner radius with it. After
 		// the declared fill, because the row is the more specific answer.
@@ -493,7 +502,7 @@
 				if (drawnByHand(media.src)) parts.push('image-rendering:pixelated');
 			}
 		}
-		if (box.borderWidth && !box.borderHand) {
+		if (box.borderWidth && !drawnBorder(box)) {
 			const { top, right, bottom, left } = sidesOf(box.borderWidth);
 			parts.push(
 				`border-width:${top}mm ${right}mm ${bottom}mm ${left}mm`,
@@ -642,6 +651,11 @@
 
 	const borderColorOf = (box: Box) => box.borderColor ?? box.color ?? template.defaults.color;
 
+	/** A stamp, which no CSS border can draw: its perforations are always SVG. */
+	const stamped = (box: Box) => !!box.borderWidth && box.borderStyle === 'stamp';
+	/** A border the SVG layer draws rather than CSS — by hand, or a stamp. */
+	const drawnBorder = (box: Box) => !!box.borderWidth && (!!box.borderHand || stamped(box));
+
 	/**
 	 * The strokes of a hand-drawn border, in the millimetres of the box's own
 	 * border box — its declared width, and the height the layout resolved, which
@@ -651,14 +665,15 @@
 	 * and does not redraw itself as the words underneath it are typed.
 	 */
 	function handStrokes(box: Box): HandStroke[] {
-		if (!box.borderHand || !box.borderWidth) return [];
+		if (!drawnBorder(box)) return [];
 		return handBorder({
 			w: box.w,
 			h: layout.heights[box.id] ?? box.h,
 			widths: sidesOf(box.borderWidth),
 			radius: box.borderRadius ?? 0,
 			style: box.borderStyle ?? 'solid',
-			seed: box.id
+			seed: box.id,
+			steady: !box.borderHand
 		});
 	}
 	/**
@@ -1655,6 +1670,32 @@
 	}
 </script>
 
+<!-- Drawn over the room the transparent CSS border is holding, so it covers
+     exactly what that border would have painted. Sized in millimetres against
+     a viewBox of the same numbers, which makes one user unit one millimetre
+     and the stroke widths literal. A closed outline is a stamp's paper, filled
+     in the border color: the perforated sheet the field is printed on. -->
+{#snippet drawnEdge(box: Box, strokes: HandStroke[])}
+	<svg
+		class="hand-border"
+		aria-hidden="true"
+		viewBox="0 0 {box.w} {layout.heights[box.id] ?? box.h}"
+		style="width:{box.w}mm;height:{layout.heights[box.id] ?? box.h}mm"
+		fill="none"
+		stroke={borderColorOf(box)}
+	>
+		{#each strokes as stroke, i (i)}
+			<path
+				d={stroke.d}
+				stroke-width={stroke.width}
+				stroke-dasharray={stroke.dash ?? 'none'}
+				stroke-linecap={stroke.cap ?? 'butt'}
+				fill={stroke.closed ? borderColorOf(box) : 'none'}
+			/>
+		{/each}
+	</svg>
+{/snippet}
+
 <!-- Plain text with any unknown `{{name}}` in it marked — see `shownTextOf`.
      Written on one line: the text is `white-space: pre-wrap`, and a newline
      between these tags would be drawn. -->
@@ -1766,32 +1807,16 @@
 				ondrop={(e) => drop(e, box)}
 				role="presentation"
 			>
+				<!-- A stamp's paper goes under the field printed on it; every other
+				     border drawn in SVG goes over the fill, as a CSS border would. -->
+				{#if strokes.length && stamped(box)}
+					{@render drawnEdge(box, strokes)}
+				{/if}
 				{#if surfaceStyle(box)}
 					<div class="surface" aria-hidden="true" style={surfaceStyle(box)}></div>
 				{/if}
-				{#if strokes.length}
-					<!-- Drawn over the room the transparent CSS border is holding, so
-					     it covers exactly what that border would have painted. Sized
-					     in millimetres against a viewBox of the same numbers, which
-					     makes one user unit one millimetre and the stroke widths
-					     literal. -->
-					<svg
-						class="hand-border"
-						aria-hidden="true"
-						viewBox="0 0 {box.w} {layout.heights[box.id] ?? box.h}"
-						style="width:{box.w}mm;height:{layout.heights[box.id] ?? box.h}mm"
-						fill="none"
-						stroke={borderColorOf(box)}
-					>
-						{#each strokes as stroke, i (i)}
-							<path
-								d={stroke.d}
-								stroke-width={stroke.width}
-								stroke-dasharray={stroke.dash ?? 'none'}
-								stroke-linecap={stroke.cap ?? 'butt'}
-							/>
-						{/each}
-					</svg>
+				{#if strokes.length && !stamped(box)}
+					{@render drawnEdge(box, strokes)}
 				{/if}
 				<div
 					class="content"
@@ -1880,7 +1905,7 @@
 				     rounded, so var(--line) lands exactly whatever the zoom. -->
 				<!-- Not on a selected area: the selection is its outline, and a dashed
 				     bound drawn under a solid one doubled every edge. -->
-				{#if bounds && !empty && !(interactive && isSelected(box))}
+				{#if bounds && !empty && !(interactive && isSelected(box)) && !isParked(box, template.page, bleed)}
 					<svg class="chrome bounds" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 				{/if}
 				{#if interactive && isSelected(box)}

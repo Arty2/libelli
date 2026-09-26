@@ -375,6 +375,22 @@ for that context.
 
 ## `src/lib/hand.ts`
 
+**A stamp is a border style, and a shape rather than a line.** It sits in the
+style menu beside dashed and dotted because it is one more way of drawing the
+same edge, but no CSS border can draw it, so it is the one style that always
+goes to the SVG layer — `borderHand` only decides whether it wobbles. It is
+one closed path filled with the *border* color, which is the paper, and the
+area's fill is the field printed on it, inside the padding, which is the
+margin. That is how a stamp is made, and it gives both colors a job: it
+started as the fill on the paper alone, which left no way to have a white
+margin round a colored picture. The paper is drawn under the fill, the one
+drawn border that is — every other goes over, as a CSS border would. Spread to
+the border box, the fill would fill the holes back in, and a `drop-shadow()`
+would trace the rectangle instead of the perforations. One width for all four edges, the heaviest, because a stamp is
+torn along one row of holes; the radius is ignored, as on every perforated
+stamp. The holes are sized to the line, not the area, and spaced to fit each
+edge exactly, half a gap from each corner, so all four corners come out alike.
+
 **The wobble is seeded, not random.** A border drawn from `Math.random` is a
 different border on every keystroke, every re-measure and every page of the
 run — which reads as a fault, not as a hand. The seed is the box's own id, so
@@ -1739,24 +1755,63 @@ one page's subject instead of decoration on all four. Card 3 is the only row
 with a `sketch`, a 64 x 64 Bitmap drawing stored in the cell, shown in an area
 that is rotated, padded and hand-bordered: the styles are on the page to be
 selected and read back. The starter template has facing pages on, so the four
-rows are exactly one 2-up zine, and card 4 says how to fold it; the title,
+rows are exactly one 2-up zine, and card 4 says how to fold it; the kicker, title,
 subtitle and sticker opt out of the mirror so a left-hand page does not push its
 title to the right.
 
-The template also carries the two things a row cannot: an area of its own
-text, `{{date:YYYY-MM-DD}}`, centred in the footer so it holds still
-while the rest of the footer mirrors, and a paragraph indent on the body.
-Card 2 shows `{{title}}` filled in inside a cell and `{{column}}` left as
-written, which is the literal form for free — no column is called `column`,
-and an unrecognised name is never eaten. A date cannot be shown that way,
-since `{{date…}}` is always replaced, so the card points at the footer
+The template also carries what a row cannot: two areas of its own text in the
+footer — `{{link}}`, which empties and so hides on a row with no link, beside
+the QR that hides with it, and `{{date:YYYY-MM-DD}}` — and a paragraph indent
+on the body. The band, the QR and the page number follow the fold to the outer
+edge; the link and date follow with them, set right-aligned against the code so
+that the mirror, which flips alignment too, sets them left-aligned against it on
+a left-hand page rather than stranded mid-page. Card 2 shows `{{title}}` filled in inside a cell and `{{column}}`
+left as written, which is the literal form for free — no column is called
+`column`, and an unrecognised name is never eaten. A date cannot be shown that
+way, since `{{date…}}` is always replaced, so the card points at the footer
 instead of spelling it out.
 
-Three families, each with a job: Fraunces, large and light, for titles;
-Instrument Sans for everything that is read, subtitles and the date included;
-and Patrick Hand for the kicker pill alone. The hand face on titles and body
-made every card look like a sticky note — as one small label it is the
-personality, and the rest can be set like a book.
+Four families, each with a job, as a book would set them: Fraunces for titles
+and, through the template's own CSS, the headings inside the body; Ysabeau
+Office, a humanist sans at weight 300, for the subtitle, so it reads as a quiet
+second voice rather than a smaller title; Instrument Sans for the body; and IBM
+Plex Mono for every small line — the kicker, the link, the date, the page
+number and `code` in the body. Patrick Hand, which used to set the kicker, is
+gone from the starter: the drawn sticker is personality enough, and a hand face
+beside four others was one voice too many. Ysabeau Office because it is
+variable across the whole weight range, which is the one request `fonts.ts`
+tries first — a static humanist family (Alegreya Sans, Fira Sans) would arrive
+with 400 and 700 only, and the light cut would silently be regular.
+
+Off the page's outer edge sits a post-it, bound to a `notes` column: an area
+on the pasteboard never prints, so it is the place for a note to yourself. Set
+in Patrick Hand — the one hand face left, on the one thing written by hand —
+with a `box-shadow` curl and a glue strip from `::after` in the CSS, locked so
+the rescue button leaves it where it is (see `boxops.ts`).
+
+It prints as card 4 says to: two to an A4 sheet, in a zine's order, so
+Export opens on the booklet rather than on four loose pages — hence the name.
+The accent band on card 2 and the stamp share one green, so the one color the
+set has reads as a decision rather than as two.
+
+The rest is chosen to show one of each thing the tour mentions, without a
+paragraph of its own: the kicker is a per-edge border (a hairline under it)
+with uppercase and tracking; the drawing is a stamp, hand-perforated, with a
+`drop-shadow()` from the template's CSS that follows the holes; the accent band multiplies rather than covers;
+the body's list uses the em dash marker; card 2 runs a `==highlighter==` over a
+word and draws a `---` rule, which the body sets as a pale hairline; the CSS box is not empty, so opening it
+shows what a template's stylesheet can reach (`#body h2`, `.page-number`).
+The page number is the one small line with no area of its own, so the CSS sets
+it with `!important` over the inline style it takes from the page defaults.
+
+**A5 Starter Booklet in the template menu, beside Reset.** The table has had Getting
+Started since there was more than one table; the template had only Reset, which
+puts the starter over whatever is open. A5 Starter Booklet is the non-destructive twin:
+it opens a copy of the starter nobody has changed if the library has one, and
+otherwise adds a fresh one. "Nobody has changed" ignores the name and the
+padlock (`isStarterTemplate`) — a first run lands on it locked — and nothing
+else, so a copy with one area nudged is theirs and is never handed back as the
+original. Like Getting Started, the lock does not disable it.
 
 They stay inside what `markdown.ts` actually supports, and the QR URLs are
 decoded by an independent decoder in the verification pass, because a QR that
@@ -2823,7 +2878,27 @@ x alone; its vertical position is the Gap field in the bar. For the same reason
 the handler counts the *unlocked* strays: a locked area is not this button's to
 move, and when every stray is locked it says so rather than doing nothing.
 
+**A locked area wholly off the paper is parked, not stray.** The pasteboard is
+a place to keep things — the A5 Starter Booklet keeps a post-it of the row's `notes`
+there — and an area put there on purpose lit the rescue button for good, and
+pressing it dragged the note onto the card. Both conditions are needed: wholly
+off alone is exactly what a shrunk page leaves behind, the case the button is
+for, and a locked area half off the edge is still cut in half by every print.
+The cost is that a parked note is locked, so it is typed into from the table,
+not on the card.
+
 ## `src/lib/placeholders.ts`
+
+**Find and replace is two parts after a column, never a pattern.**
+`{{column:find:replace}}` is a literal, case-sensitive swap of every
+occurrence — the spreadsheet's Find, not a regex, so nothing typed into a cell
+can become a pattern that runs away. It takes both colons: a single part after
+a column meant nothing before and still does, rather than quietly becoming a
+deletion, and `{{date:FORMAT}}` keeps its meaning whether or not a column is
+called `date`. The find ends at the first colon, so the replacement may hold
+one; neither part is trimmed, since a space is the commonest thing to replace.
+It runs inside the same single pass, so a replacement is never read for
+placeholders either.
 
 **A column by name, once, and nothing more.** `{{title}}` fills from the row the
 card is drawing, in an area's own words and in a cell alike — a card still

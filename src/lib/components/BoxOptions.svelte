@@ -161,7 +161,8 @@
 		solid: 'Solid',
 		dashed: 'Dashed',
 		dotted: 'Dotted',
-		double: 'Double'
+		double: 'Double',
+		stamp: 'Stamp'
 	};
 
 	const ALIGNMENTS: Array<{ value: Align; icon: string; label: string }> = [

@@ -219,7 +219,11 @@ resize boxes directly, or type exact millimetres.
   `{{date}}` prints today's date, and `{{date:YYYY-MM-DD}}` prints it in a
   format of your own: `YYYY`, `YY`, `MM`, `DD` for the numbers, `MMMM`, `MMM`,
   `dddd`, `ddd` for the names. A column called `date` wins over the date; a
-  format after the colon only ever means the date. Deliberately small — no
+  format after the colon only ever means the date. After a column, a find and
+  a replace change it on the way in: `{{title:words:that}}` swaps every
+  `words` for `that`, `{{title: :-}}` puts hyphens for spaces, and an empty
+  replacement deletes. Literal and case-sensitive, never a pattern; the find
+  ends at the first colon, so the replacement may hold colons. Deliberately small — no
   conditionals, no loops — and anything in braces it does not recognise is left
   exactly as written. No time of day: a card is printed once and read for
   months.
@@ -329,6 +333,21 @@ resize boxes directly, or type exact millimetres.
   It is an SVG over the room the CSS border was already holding, so switching
   it on moves no text and changes no measurement, and it prints and exports
   like anything else on the card.
+- **Off the page** — an area can sit beside the page, on the pasteboard, where
+  it is drawn in the editor and never printed or exported: the A5 Starter Booklet
+  keeps a post-it of each row's `notes` there. Lock it and the button that
+  brings stray areas back leaves it alone — a locked area *wholly* off the
+  paper is parked, not lost. Half off still counts as stray, locked or not,
+  because the half on the paper still prints cut.
+- **A stamp** — the **Stamp** border style is a postage stamp: perforated
+  paper in the **border color**, with a half-round hole bitten out at every
+  perforation so the page shows through, and the area's **fill** printed on it
+  as a field inside the padding — the padding is the stamp's margin. The width
+  sets the size of the holes; the radius does not apply. It is always
+  drawn as SVG, since no CSS border can draw it, and the pencil decides whether
+  it is punched true or by hand. A `filter: drop-shadow(…)` on the area in the
+  template's CSS follows the perforations, which is how the A5 Starter Booklet's stamp
+  sits off the page.
 - **Type without the bar** — <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> and the
   scroll wheel sizes whatever the pointer is over, in points, and the same
   modifiers with the arrows step the alignment of the selection in the direction
@@ -469,7 +488,7 @@ resize boxes directly, or type exact millimetres.
   A page lock is on the design, not on what it holds: **double-click an area**
   and its words can still be typed into, as can a cell. An area's own lock
   still refuses it, and so does a locked table for a bound area.
-- **CSS** — page setup has a CSS button; what you write there is saved
+- **CSS** — page setup has a CSS button, just left of the template's name; what you write there is saved
   inside the template and travels with it. Selectors are scoped to the card, so
   nothing in a template can restyle the editor around it, and `@import` and any
   `url()` pointing off this machine are stripped, so a template's CSS cannot
@@ -493,15 +512,17 @@ resize boxes directly, or type exact millimetres.
 **Several templates, one browser.** The **Template** field in page setup names the
 loaded template; the caret beside it opens every template this browser has saved,
 the open one ticked, with everything that acts on the template as a whole under a
-rule: **New Template…**, **Import…**, **Export**, and in red **Reset…** and
+rule: **New Template…**, **A5 Starter Booklet**, **Import…**, **Export**, and in red **Reset…** and
 **Delete…** (whose dialog still says **Delete Template**, so the button you
 confirm with names what goes). An export is named for the template and the
-day — `a5-starter-template_2026-09-25.json` — so a folder of them sorts by
+day — `a5-starter-booklet_2026-09-25.json` — so a folder of them sorts by
 date. **Lock** stays outside the menu, beside the field,
 because it is a state you need to see rather than an errand. Renaming is typing
 in the field — the template keeps its identity, so two of them may share a name
-without sharing anything else. Reset puts the starter card back under the same
-name; Delete removes the template and opens the next one, or a new empty
+without sharing anything else. **A5 Starter Booklet** opens the design a first run
+lands on, as it came: a copy nobody has changed if you have one, or a new one
+beside the rest — it never touches the template that is open. Reset puts the
+starter card back over the open template, under the same name; Delete removes the template and opens the next one, or a new empty
 template when it was the last one, so the card a first run lands on can be
 deleted like any other. Both ask first, and both are one Ctrl/Cmd+Z away — an
 undone delete is written back out under the id it had. The menu opens over the

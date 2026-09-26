@@ -53,6 +53,8 @@
 		templateId: string;
 		onselecttemplate: (id: string) => void;
 		onnewtemplate: () => void;
+		/** open the A5 Starter Booklet as it came, or add it to the library */
+		onstartertemplate: () => void;
 		ondeletetemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
@@ -78,6 +80,7 @@
 		templateId,
 		onselecttemplate,
 		onnewtemplate,
+		onstartertemplate,
 		ondeletetemplate,
 		onuploadbackground,
 		onuploadprintbackground,
@@ -372,6 +375,13 @@
 					<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
 					{pageFrozen ? 'Unlock' : 'Lock'}
 				</button>
+				<!-- Beside the template's name rather than at the far end of the
+				     bar: the stylesheet is part of the template, travels with it, and
+				     is the last thing anyone would think to look for among page
+				     sizes and margins. -->
+				<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
+					<Icon name="code" size={14} /> CSS{template.css ? ' •' : ''}
+				</button>
 				<label class="field picker" bind:this={pickerEl}>
 					<span>Template</span>
 					<input
@@ -418,6 +428,19 @@
 									New Template…
 								</button>
 							</li>
+							<!-- Never over the loaded design: it opens a copy of the starter that
+							     nobody has changed, or adds one — so, like Getting Started under
+							     the table, the lock does not disable it. -->
+							<li role="none">
+								<button
+									role="menuitem"
+									title="The design the tour is set in, as it came — your templates are untouched"
+									onclick={fromMenu(onstartertemplate)}
+								>
+									<span class="tick" aria-hidden="true"><Icon name="information-square" size={14} /></span>
+									A5 Starter Booklet
+								</button>
+							</li>
 							<li role="none">
 								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onimporttemplate)}>
 									<span class="tick" aria-hidden="true"><Icon name="document-import" size={14} /></span>
@@ -438,7 +461,7 @@
 									class="danger"
 									role="menuitem"
 									disabled={pageFrozen}
-									title="Back to the starter card. Your rows are not touched."
+									title="Put the A5 Starter Booklet over this design. Your rows are not touched."
 									onclick={fromMenu(onresettemplate)}
 								>
 									<span class="tick" aria-hidden="true"><Icon name="reset" size={14} /></span>
@@ -859,12 +882,6 @@
 					<span class="unit">mm</span>
 				</label>
 			{/if}
-		</span>
-
-		<span class="group" role="group" aria-label="Stylesheet">
-			<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
-				<Icon name="code" size={14} /> CSS{template.css ? ' •' : ''}
-			</button>
 		</span>
 	</div>
 

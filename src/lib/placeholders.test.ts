@@ -128,3 +128,34 @@ describe('typing a placeholder', () => {
 		expect(placeholderChoices('', ['a'])).toEqual(['a', 'date']);
 	});
 });
+
+describe('find and replace after a column', () => {
+	const row = { title: 'Cells can do more than words', city: 'New York', date: 'yesterday' };
+
+	it('replaces every occurrence, literally and case-sensitively', () => {
+		expect(applyPlaceholders('{{title:words:that}}', { row })).toBe('Cells can do more than that');
+		expect(applyPlaceholders('{{title: :-}}', { row })).toBe('Cells-can-do-more-than-words');
+		expect(applyPlaceholders('{{title:Words:that}}', { row })).toBe('Cells can do more than words');
+		expect(applyPlaceholders('{{city:.:!}}', { row })).toBe('New York');
+	});
+
+	it('deletes on an empty replacement, keeps colons in the replacement, and ignores an empty find', () => {
+		expect(applyPlaceholders('{{title: words:}}', { row })).toBe('Cells can do more than');
+		expect(applyPlaceholders('{{city:New :at: }}', { row })).toBe('at: York');
+		expect(applyPlaceholders('{{city::x}}', { row })).toBe('New York');
+	});
+
+	it('takes both colons to mean it: one part after a column is still not a column', () => {
+		expect(applyPlaceholders('{{city:York}}', { row })).toBe('{{city:York}}');
+		// …and a single part after `date` is still a date format, column or no column.
+		expect(applyPlaceholders('{{date:YYYY}}', { row, now: DAY })).toBe('2026');
+	});
+
+	it('is never a way for a cell to quote itself', () => {
+		expect(applyPlaceholders('{{title:a:b}}', { row, self: 'title' })).toBe('{{title:a:b}}');
+	});
+
+	it('counts as naming the column', () => {
+		expect(referencedColumns('{{city: :_}} and {{date:YYYY}}', ['city', 'title'])).toEqual(['city']);
+	});
+});

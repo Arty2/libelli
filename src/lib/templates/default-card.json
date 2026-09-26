@@ -1,10 +1,17 @@
 {
   "schema": 5,
-  "name": "A5 Starter Template",
+  "name": "A5 Starter Booklet",
   "page": {
     "w": 148,
     "h": 210,
-    "unit": "mm"
+    "unit": "mm",
+    "background": "#ffffff",
+    "margin": {
+      "top": 11,
+      "right": 14,
+      "bottom": 8,
+      "left": 14
+    }
   },
   "bleed": {
     "enabled": false,
@@ -14,7 +21,7 @@
   "pageNumber": {
     "enabled": true,
     "position": "bottom-outer",
-    "margin": 8
+    "margin": 9
   },
   "fonts": [
     {
@@ -26,16 +33,24 @@
       "source": "google"
     },
     {
+      "family": "Ysabeau Office",
+      "source": "google"
+    },
+    {
+      "family": "IBM Plex Mono",
+      "source": "google"
+    },
+    {
       "family": "Patrick Hand",
       "source": "google"
     }
   ],
   "defaults": {
     "font": "Instrument Sans",
-    "size": 11,
-    "lineHeight": 1.5,
+    "size": 10,
+    "lineHeight": 1.45,
     "weight": 400,
-    "color": "#000000",
+    "color": "#1c1b19",
     "align": "left",
     "letterSpacing": 0
   },
@@ -46,51 +61,94 @@
     "category",
     "link",
     "accent",
-    "sketch"
+    "sketch",
+    "notes"
   ],
   "boxes": [
     {
       "id": "b_accent",
       "slot": "accent",
-      "x": 141,
+      "x": 142,
       "y": 0,
-      "w": 7,
+      "w": 6,
       "h": 210,
       "mode": "color",
       "overflow": "clip",
-      "hideWhenEmpty": true
+      "hideWhenEmpty": true,
+      "blend": "multiply"
+    },
+    {
+      "id": "b_category",
+      "slot": "category",
+      "x": 14,
+      "y": 11,
+      "w": 90,
+      "h": 5,
+      "font": "IBM Plex Mono",
+      "size": 6.5,
+      "lineHeight": 1.2,
+      "letterSpacing": 0.35,
+      "textCase": "uppercase",
+      "color": "#6b675f",
+      "valign": "bottom",
+      "padding": {
+        "top": 0,
+        "right": 0,
+        "bottom": 1.5,
+        "left": 0
+      },
+      "borderWidth": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0.2,
+        "left": 0
+      },
+      "borderStyle": "solid",
+      "borderColor": "#b9b4a8",
+      "mode": "plain",
+      "overflow": "clip",
+      "hideWhenEmpty": true,
+      "mirror": false
     },
     {
       "id": "b_title",
       "slot": "title",
-      "x": 12,
-      "y": 13,
-      "w": 96,
-      "h": 16,
-      "size": 34,
-      "lineHeight": 1.05,
+      "x": 14,
+      "y": 21,
+      "w": 90,
+      "h": 14,
+      "font": "Fraunces",
+      "size": 30,
+      "weight": 360,
+      "lineHeight": 0.95,
+      "letterSpacing": -0.25,
       "mode": "plain",
       "overflow": "grow",
+      "anchor": {
+        "to": "b_category",
+        "gap": 5
+      },
       "hideWhenEmpty": true,
       "mirror": false,
-      "font": "Fraunces",
-      "weight": 300
+      "valign": "bottom"
     },
     {
       "id": "b_subtitle",
       "slot": "subtitle",
-      "x": 12,
-      "y": 31,
-      "w": 96,
-      "h": 8,
+      "x": 14,
+      "y": 37,
+      "w": 90,
+      "h": 7,
+      "font": "Ysabeau Office",
       "size": 13,
-      "lineHeight": 1.3,
-      "color": "#555555",
+      "weight": 300,
+      "lineHeight": 1.25,
+      "color": "#55514a",
       "mode": "plain",
       "overflow": "grow",
       "anchor": {
         "to": "b_title",
-        "gap": 2
+        "gap": 2.5
       },
       "hideWhenEmpty": true,
       "mirror": false
@@ -98,10 +156,10 @@
     {
       "id": "b_body",
       "slot": "body",
-      "x": 12,
-      "y": 44,
-      "w": 124,
-      "h": 110,
+      "x": 14,
+      "y": 52,
+      "w": 120,
+      "h": 120,
       "mode": "markdown",
       "overflow": "grow",
       "anchor": {
@@ -110,111 +168,169 @@
       },
       "md": {
         "h1": {
-          "size": 1.5,
-          "spaceBefore": 6,
-          "spaceAfter": 1.5
+          "size": 2.05,
+          "spaceBefore": 5,
+          "spaceAfter": 1.5,
+          "weight": 400
         },
         "h2": {
-          "size": 1.35,
-          "spaceBefore": 6,
-          "spaceAfter": 1.5
+          "size": 1.85,
+          "spaceBefore": 5,
+          "spaceAfter": 1.2,
+          "weight": 400
         },
         "h3": {
-          "size": 1.15,
+          "size": 1.6,
           "spaceBefore": 4,
-          "spaceAfter": 1
+          "spaceAfter": 1,
+          "weight": 400
         },
         "paragraph": {
           "spaceAfter": 3
         },
         "list": {
-          "indent": 7,
-          "markerGap": 4,
-          "itemSpacing": 1.5
+          "indent": 6,
+          "markerGap": 3,
+          "itemSpacing": 1.2
+        },
+        "rule": {
+          "spaceBefore": 4,
+          "spaceAfter": 4,
+          "color": "#cfcabe"
         }
       },
       "paragraph": {
         "mode": "indent",
         "amount": 1
+      },
+      "list": {
+        "marker": "emdash"
       }
     },
     {
       "id": "b_sketch",
       "slot": "sketch",
-      "x": 110,
-      "y": 11,
-      "w": 26,
-      "h": 26,
-      "mode": "bitmap",
+      "x": 111,
+      "y": 9,
+      "w": 24,
+      "h": 32,
+      "mode": "image",
       "overflow": "clip",
       "fit": "contain",
       "hideWhenEmpty": true,
       "rotation": -7,
-      "padding": 2,
-      "borderWidth": 0.5,
-      "borderStyle": "solid",
-      "borderRadius": 2,
+      "padding": 2.2,
+      "borderWidth": 0.3,
+      "borderStyle": "stamp",
       "borderHand": true,
-      "color": "#111111",
-      "mirror": false
+      "background": "#6f9479",
+      "color": "#1c1b19",
+      "mirror": false,
+      "borderColor": "#ffffff"
     },
     {
-      "id": "b_category",
-      "slot": "category",
-      "x": 12,
-      "y": 196,
-      "w": 34,
-      "h": 7,
-      "font": "Patrick Hand",
-      "size": 12.5,
-      "lineHeight": 1.1,
-      "align": "center",
-      "valign": "middle",
-      "background": "#ecece6",
-      "borderRadius": 3.5,
-      "color": "#333333",
+      "id": "b_link",
+      "slot": null,
+      "x": 34,
+      "y": 194,
+      "w": 80,
+      "h": 4,
+      "font": "IBM Plex Mono",
+      "size": 6.5,
+      "lineHeight": 1.2,
+      "color": "#1c1b19",
+      "valign": "bottom",
       "mode": "plain",
       "overflow": "clip",
-      "anchor": null
+      "hideWhenEmpty": true,
+      "static": {
+        "text": "{{link}}"
+      },
+      "align": "right"
     },
     {
       "id": "b_date",
       "slot": null,
-      "x": 54,
-      "y": 196,
-      "w": 40,
-      "h": 7,
-      "size": 7.5,
+      "x": 34,
+      "y": 198.5,
+      "w": 80,
+      "h": 4,
+      "font": "IBM Plex Mono",
+      "size": 6.5,
       "lineHeight": 1.2,
-      "color": "#777777",
-      "valign": "middle",
+      "color": "#8a857b",
+      "letterSpacing": 0.15,
+      "valign": "bottom",
       "mode": "plain",
       "overflow": "clip",
-      "anchor": null,
       "static": {
-        "text": "{{date:YYYY-MM-DD}}"
+        "text": "Printed {{date:YYYY-MM-DD}}"
       },
-      "align": "center",
-      "letterSpacing": 0.2
+      "align": "right"
     },
     {
       "id": "b_qr",
       "slot": "link",
-      "x": 112,
+      "x": 118,
       "y": 186,
-      "w": 20,
-      "h": 20,
+      "w": 16,
+      "h": 16,
       "mode": "qr",
       "overflow": "clip",
-      "anchor": null,
       "hideWhenEmpty": true,
       "fit": "contain",
-      "color": "#000000",
+      "color": "#1c1b19",
       "padding": 1,
       "qr": {
         "level": "M"
       }
+    },
+    {
+      "id": "b_notes",
+      "slot": "notes",
+      "x": 156,
+      "y": 14,
+      "w": 46,
+      "h": 46,
+      "font": "Patrick Hand",
+      "size": 13,
+      "lineHeight": 1.15,
+      "color": "#3b3522",
+      "background": "#fdf08a",
+      "padding": {
+        "top": 7,
+        "right": 5,
+        "bottom": 4,
+        "left": 5
+      },
+      "rotation": 2.5,
+      "mode": "markdown",
+      "overflow": "clip",
+      "hideWhenEmpty": true,
+      "mirror": false,
+      "locked": true,
+      "md": {
+        "paragraph": {
+          "spaceAfter": 2
+        }
+      }
     }
   ],
-  "facing": true
+  "facing": true,
+  "css": "/* The page number takes the page's own face; this sets it in the mono of the footer. */\n.page-number {\n  font-family: 'IBM Plex Mono', monospace !important;\n  font-size: 6.5pt !important;\n  letter-spacing: 0.3mm;\n  color: #8a857b !important;\n}\n\n/* Headings inside the body in the title's serif. */\n#body h1, #body h2, #body h3 {\n  font-family: 'Fraunces', serif;\n  letter-spacing: -0.1mm;\n}\n\n/* `code` in the footer's mono, on a faint chip. */\n#body code {\n  font-family: 'IBM Plex Mono', monospace;\n  font-size: 0.86em;\n  background: #efece4;\n  padding: 0 0.6mm;\n  border-radius: 0.6mm;\n}\n\n/* The drawing's stamp, lifted off the page. A drop-shadow follows what is\n   painted, so it traces the perforations; a box-shadow would be a rectangle.\n   The first four are a 1px hairline all round — white paper on white paper\n   needs an edge — and the last is the shadow, cast by paper and hairline\n   together, since each filter works on what the one before it drew. */\n#sketch {\n  filter:\n    drop-shadow(1px 0 0 #eee) drop-shadow(-1px 0 0 #eee)\n    drop-shadow(0 1px 0 #eee) drop-shadow(0 -1px 0 #eee)\n    drop-shadow(0.5mm 0.7mm 0.2mm rgba(40, 30, 10, 0.3));\n}\n\n/* The post-it off the page's edge: a curl of shadow under its lower corners,\n   and a strip of darker yellow where the glue is. Never printed — it is off\n   the paper — so it is only ever the editor's. */\n#notes {\n  box-shadow: 0 1.6mm 2.2mm -1mm rgba(60, 45, 0, 0.35);\n}\n#notes::after {\n  content: '';\n  position: absolute;\n  inset: 0 0 auto 0;\n  height: 4mm;\n  background: rgba(190, 160, 0, 0.14);\n}\n\n#body mark {\n  background: #f6e27a;\n  padding: 0 0.4mm;\n}\n",
+  "print": {
+    "enabled": true,
+    "count": 2,
+    "order": "zine",
+    "sheet": {
+      "w": 210,
+      "h": 297
+    },
+    "orientation": "auto",
+    "bleed": {
+      "enabled": false,
+      "amount": 3,
+      "cropMarks": false
+    }
+  }
 }
