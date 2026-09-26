@@ -444,11 +444,13 @@ resize boxes directly, or type exact millimetres.
   button: pressing it unlocks that area, the way the two anchor badges beside it
   undo what they say. Words can still be typed into an area on a locked page,
   and a drawing opened and drawn on: those are content, not the design. A locked
-  *page* says **Locked** in a band above the sheet and greys every bound on the
+  *page* shows a **padlock** at the head of the column beside the page, above
+  *+ Area* — a button with no word on it, which unlocks the page when pressed —
+  and greys every bound on the
   card, because nothing on it can be moved and so nothing on it is worth
   coloring for a reason. It also takes the per-area badges away: every one of
   them says why *that* area will not do what you ask, and on a locked page the
-  answer is the same for all of them and the band has already given it. The
+  answer is the same for all of them and the padlock has already given it. The
   shears that warn of a clipped print stay, because a lock does not change what
   will come out.
 
@@ -1281,7 +1283,7 @@ name a key the app does not listen for.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>c</kbd> | Copy the area's style |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>v</kbd> | Paste that style onto the selection |
 | <kbd>?</kbd> or <kbd>/</kbd> | The help panel — a few lines, and these keys |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>h</kbd> | Boxes on or off — bounds, badges and the lock band |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>h</kbd> | Boxes on or off — bounds, badges and the page's padlock |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>;</kbd> or <kbd>\|</kbd> | Guides on or off — Photoshop's key and Inkscape's |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> or <kbd>#</kbd> | Grid on or off |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>s</kbd> | Save the drawing, while drawing |
@@ -1569,6 +1571,10 @@ npm run build    # static output in ./build, deployable anywhere
   because a request failed. It is a plain CSV precisely so the walkthrough can be
   edited in a spreadsheet rather than in a string literal. The four rows are a walkthrough of the app rather
   than filler; **Getting Started** in the Table menu brings them back at any time.
+  A first visit opens the starter card **locked**, so a stray drag cannot
+  rearrange the tour before it has been read; the padlock above *+ Area* unlocks
+  it, and it stays unlocked from then on. Reset and a new template start
+  unlocked — they are asked for by somebody who means to design.
 - **Reset** — puts the template back to the starter card and leaves the data,
   the mapping and any uploaded fonts alone. Undo reaches it — one snapshot
   carries the template and the data together — but it asks first anyway, because

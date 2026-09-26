@@ -24,12 +24,14 @@ The header of each column is its name. A box on the page asks for a field *by th
 This row's `link` cell is blank, which is why **the code in the corner is missing here** and present on the other three. A box set to Hide When Empty takes its space with it rather than leaving a hole.
 
 - Compare this footer with card 1's.",Data,
-The card above,Drag anything. Nothing is stuck.,"## Move things [3]{blue}
+The card above,Unlock it and drag anything.,"## Move things [3]{blue}
+
+The design starts **locked**, so nothing on the tour moves by accident. The padlock above the area button beside the page unlocks it.
 
 Every box is dragged in millimetres from the trim edge, so the page size can change underneath a design without moving anything on it.
 
 - Drag a box. Grab a corner to resize it.
-- Grid and Bounds, bottom left, decide what it snaps to.
+- Grid and Guides, bottom left, decide what it snaps to.
 
 ## What the marks mean
 
@@ -49,4 +51,4 @@ Getting it out,"Paper, image, or the template","## To paper [4]{blue}
 - **Export** saves the design as a small file you can send to someone. It carries the layout, not the data.
 - **Export CSV** saves the words on their own.
 
-Press and hold *Import CSV…* to bring these four cards back at any time. Scan the corner for the source code.",Output,https://github.com/Arty2/libelli
+**Getting Started**, in the table's menu, brings these four cards back at any time. Scan the corner for the source code.",Output,https://github.com/Arty2/libelli

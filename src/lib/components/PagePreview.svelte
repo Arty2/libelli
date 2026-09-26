@@ -170,13 +170,6 @@
 	 * Its own height never depends on the scale, so reading it back cannot loop.
 	 */
 	let pagerHeight = $state(0);
-	/**
-	 * And the padlock band above it, for the same reason. The page lock sits in
-	 * the column rather than hanging off the sheet on a negative offset, so that
-	 * on a phone — where the stage has eight pixels of padding — it cannot end up
-	 * above the top of the scroller with no way to reach it.
-	 */
-	let lockHeight = $state(0);
 	/** must match the `.page` column's gap, which is what separates the two */
 	const PAGE_GAP = 10;
 	/** the step the pad moves by, cycled 1 -> 5 -> 10; the keyboard has modifiers */
@@ -259,9 +252,9 @@
 		// stage is the whole screen, so every millimetre of padding is a
 		// millimetre of card you cannot see.
 		const pad = hostSize.w < 560 ? 16 : 48;
-		// Neither the lock band nor the pager is in the page's column: both are
-		// fixed to the stage, and their bands are real padding on the viewport,
-		// which `contentRect` has already taken out of `hostSize.h`.
+		// The pager is not in the page's column: it is fixed to the stage, and its
+		// band is real padding on the viewport, which `contentRect` has already
+		// taken out of `hostSize.h`.
 		const fit = Math.min((hostSize.w - pad) / mmToPx(outerW), (hostSize.h - pad) / mmToPx(outerH));
 		return Math.max(0.15, Math.min(fit, 2));
 	});
@@ -750,7 +743,7 @@
 <div
 	class="viewport"
 	bind:this={host}
-	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px;--lock-band:{lockHeight && zoom === 'fit' ? lockHeight + PAGE_GAP : 0}px"
+	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px"
 	onpointerdown={(e) => {
 		// Bare paper counts as empty space, not just the grey around the sheet:
 		// clicking away from everything is how every canvas editor deselects, and
@@ -853,27 +846,6 @@
 	     Outside the viewport, so it stays under the sheet at every zoom; the
 	     band it occupies is bottom padding on the viewport, which is what keeps
 	     the page clear of it. -->
-	<!-- `unlocking` keeps the band up for the moment after it is pressed: the
-	     lock is gone by then, so without it the band would vanish on the same
-	     frame and the open padlock it answers with would never be seen. -->
-	{#if (template.locked || unlocking) && bounds}
-		<!-- An indicator, not a control: the button that sets this lives in page
-		     setup, where the rest of the page's settings are. Screen furniture, so
-		     the Boxes toggle takes it away with the rest. Pinned to the stage, as
-		     the pager is, rather than in the scrolling column: in the column it
-		     was a band's height more to scroll at every zoom but Fit, and a page
-		     that fitted grew a scrollbar the moment it was locked. At Fit the
-		     viewport keeps a band clear for it, so it covers nothing there. -->
-		<button
-			class="page-lock"
-			bind:clientHeight={lockHeight}
-			title="The design is locked — press to unlock it"
-			onclick={unlock}
-		>
-			<Icon name={unlocking ? 'unlocked' : 'locked'} size={13} />
-			<span>{unlocking ? 'Unlocked' : 'Locked'}</span>
-		</button>
-	{/if}
 	{#if rowCount > 0}
 		<div class="pager" role="group" aria-label="Card" bind:clientHeight={pagerHeight}>
 			<!-- The swipe lives on this inner chip rather than on the row, because
@@ -972,6 +944,25 @@
 	     merge into a smudge. The column moves together, because one button
 	     drawn larger than the four beside it reads as a mistake. -->
 	<div class="corner top right stacked">
+		<!-- The page's lock, while it is locked: a padlock and no word, at the
+		     head of the column whose buttons it switches off, so the reason Area
+		     is greyed out sits directly above it. A button, not only a sign —
+		     pressing it unlocks, and for a moment afterwards it wears the open
+		     padlock (`unlocking`), or it would vanish on the same frame and the
+		     press would go unanswered. It was a "Locked" band over the sheet,
+		     which took a band's height off the page at Fit. Screen furniture:
+		     Boxes takes it away with the rest. -->
+		{#if (template.locked || unlocking) && bounds}
+			<button
+				class="square page-lock"
+				aria-pressed={!unlocking}
+				title={unlocking ? 'Unlocked' : 'The design is locked — press to unlock it'}
+				aria-label={unlocking ? 'Unlocked' : 'Unlock the design'}
+				onclick={unlock}
+			>
+				<Icon name={unlocking ? 'unlocked' : 'locked'} size={16} />
+			</button>
+		{/if}
 		<button
 			class="square"
 			onclick={onaddbox}
@@ -1209,7 +1200,7 @@
 		   the fitted scale, because the page is centred in what is left: taking it
 		   off the scale alone would have centred the sheet across the band and
 		   parked half of it under the count. */
-		padding: calc(24px + var(--lock-band, 0px)) 24px calc(24px + var(--pager-band, 0px));
+		padding: 24px 24px calc(24px + var(--pager-band, 0px));
 	}
 
 	.viewport:focus-visible {
@@ -1400,31 +1391,12 @@
 		stroke-width: 0.5;
 	}
 
-	.page-lock {
-		position: absolute;
-		top: 10px;
-		left: 50%;
-		transform: translateX(-50%);
-		z-index: 2;
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		padding: 4px 9px;
-		border: 1px solid #999;
-		border-radius: var(--radius-button);
-		background: #fff;
-		color: #555;
-		font: 500 11px/1 ui-sans-serif, system-ui, sans-serif;
-		cursor: pointer;
-		/* It reads as a label and behaves as a button, so dragging across it must
-		   not leave the word highlighted — the rest of this app's chrome opts out
-		   of selection for the same reason, in app.css. */
-		user-select: none;
-	}
-
-	.page-lock:hover {
-		border-color: #555;
-		color: #111;
+	/* Pressed, in the accent, like every Lock that is on: the state and the
+	   way out of it in one square. */
+	.page-lock[aria-pressed='true'] {
+		border-color: var(--accent);
+		color: var(--accent);
+		background: var(--accent-tint);
 	}
 
 	.stage {

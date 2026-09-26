@@ -553,6 +553,11 @@
 		let unreadable = false;
 
 		const storedTemplate = await loadTemplate();
+		// A first visit lands on the starter card locked: it is the tour, read
+		// before it is edited, and a stray drag on a phone should not rearrange
+		// it. The padlock above Area unlocks it. Only here — Reset and a new
+		// template are asked for by somebody who means to design.
+		if (!storedTemplate) template = { ...starterTemplate(), locked: true };
 		if (storedTemplate) {
 			try {
 				template = normaliseTemplate(storedTemplate);
