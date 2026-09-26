@@ -16,6 +16,8 @@
 
 import { inkBounds } from './bitmap';
 
+import { t } from './strings';
+
 /** src -> what to tile instead. A drawing's own URL when there is nothing to trim. */
 const crops = new Map<string, string>();
 const asked = new Set<string>();
@@ -29,7 +31,7 @@ function drawn(src: string): Promise<HTMLImageElement> {
 	return new Promise((resolve, reject) => {
 		const image = new Image();
 		image.onload = () => resolve(image);
-		image.onerror = () => reject(new Error('That picture did not load.'));
+		image.onerror = () => reject(new Error(t.errors.pictureDidNotLoad));
 		image.src = src;
 	});
 }

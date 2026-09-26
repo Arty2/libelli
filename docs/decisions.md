@@ -2654,6 +2654,41 @@ x alone; its vertical position is the Gap field in the bar. For the same reason
 the handler counts the *unlocked* strays: a locked area is not this button's to
 move, and when every stray is locked it says so rather than doing nothing.
 
+## `src/lib/strings/`
+
+**One catalogue, read by everything.** Every label, tooltip, heading, notice and
+screen-reader name is a key in `en.ts`, grouped by the part of the screen that
+says it. That file is the thing to review — the whole voice of the app in one
+read — and a translation is a copy of it typed as `Strings`, so a missing key
+fails `npm run check` instead of showing a blank. `index.ts` picks a catalogue
+once, from the browser's languages; there is no switch in the app, because the
+platform has one and `ssr = false` means nothing was rendered to be undone.
+
+**Whole sentences, with holes.** `fmt` fills `{name}`; `plural` picks a form by
+`Intl.PluralRules`, so a language with four forms gets four. Sentences are never
+glued from fragments where it can be helped: a fragment fixes the word order of
+English into every other language. Where a sentence wraps an element — a bold
+file name, a `<strong>` in the print checklist — it is split into the text
+before and after, and the translator gets a comment saying so.
+
+**Three marks, not HTML.** The Help panel is prose with a bold word here and a
+code span there. `rich.ts` reads `**bold**`, `_italic_` and `` `code` `` into
+runs the page draws as elements, so a translator can move the emphasis with the
+word and nothing in a catalogue can become markup — the `{@html}` gate stays at
+three files.
+
+**What stays out.** Content and onboarding: anything a card prints (sample rows,
+the starter template, the months a `{{date}}` fills in), the first-run notice,
+and the Getting Started table's own notices. A template made in one language
+should keep saying what it said when opened in another, and the onboarding is
+material about the app rather than the app's controls. Key names in shortcuts
+are in the catalogue but read as printed on the keyboard.
+
+**The gate.** `gates.sh` § 9 fails a `title`, `aria-label`, `placeholder`, `alt`
+or component `label` written as a literal in a `.svelte` file. Text between
+tags is not checked: too much of it is a variable for a grep to tell apart, so
+that half is on review.
+
 ## `src/lib/placeholders.ts`
 
 **A column by name, once, and nothing more.** `{{title}}` fills from the row the

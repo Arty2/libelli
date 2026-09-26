@@ -7,6 +7,7 @@
  * has focus, whether the lightbox is in front, whether the page is locked.
  */
 import { GRID_MINOR } from './layout';
+import { fmt, t } from './strings';
 
 /** Ctrl/Cmd+Shift turns the arrows into alignment, in the direction pressed. */
 export const ALIGN_KEYS: Record<string, ['h' | 'v', -1 | 1]> = {
@@ -63,21 +64,21 @@ export function isAlignChord(event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey' | 
  * copy to keep in step.
  */
 export const SHORTCUTS = {
-	undo: 'Ctrl/Cmd+Z',
-	redo: 'Ctrl/Cmd+Y',
-	duplicate: 'Ctrl/Cmd+D',
-	delete: 'Delete',
-	copyStyle: 'Ctrl/Cmd+Shift+C',
-	pasteStyle: 'Ctrl/Cmd+Shift+V',
-	export: 'Ctrl/Cmd+P',
-	help: '?',
-	grid: "Ctrl/Cmd+' or Ctrl/Cmd+#",
-	guides: 'Ctrl/Cmd+; or |',
-	boxes: 'Ctrl/Cmd+H',
-	zoom: 'Ctrl/Cmd + and −, Ctrl/Cmd+0 to fit',
-	cards: 'arrows or PageUp/PageDown, with nothing selected',
-	type: 'Enter'
+	undo: t.keys.undo,
+	redo: t.keys.redo,
+	duplicate: t.keys.duplicate,
+	delete: t.keys.delete,
+	copyStyle: t.keys.copyStyle,
+	pasteStyle: t.keys.pasteStyle,
+	export: t.keys.export,
+	help: t.keys.help,
+	grid: t.keys.grid,
+	guides: t.keys.guides,
+	boxes: t.keys.boxes,
+	zoom: t.keys.zoom,
+	cards: t.keys.cards,
+	type: t.keys.type
 } as const;
 
 /** A title with its shortcut after it, in brackets, the way every tooltip says one. */
-export const withKey = (title: string, key: keyof typeof SHORTCUTS) => `${title} (${SHORTCUTS[key]})`;
+export const withKey = (title: string, key: keyof typeof SHORTCUTS) => fmt(t.keys.withKey, { title, key: SHORTCUTS[key] });

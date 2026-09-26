@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { t } from '$lib/strings';
 	import { withKey } from '$lib/keys';
 	import type { AlignEdge } from '$lib/layout';
 	import type { Box } from '$lib/types';
@@ -22,12 +23,12 @@
 	);
 
 	const ALIGN_EDGES: Array<{ value: AlignEdge; icon: string; label: string }> = [
-		{ value: 'left', icon: 'obj-left', label: 'Align Left' },
-		{ value: 'centre-x', icon: 'obj-centre-x', label: 'Centre Horizontally' },
-		{ value: 'right', icon: 'obj-right', label: 'Align Right' },
-		{ value: 'top', icon: 'obj-top', label: 'Align Top' },
-		{ value: 'centre-y', icon: 'obj-centre-y', label: 'Centre Vertically' },
-		{ value: 'bottom', icon: 'obj-bottom', label: 'Align Bottom' }
+		{ value: 'left', icon: 'obj-left', label: t.align.left },
+		{ value: 'centre-x', icon: 'obj-centre-x', label: t.align.centreX },
+		{ value: 'right', icon: 'obj-right', label: t.align.right },
+		{ value: 'top', icon: 'obj-top', label: t.align.top },
+		{ value: 'centre-y', icon: 'obj-centre-y', label: t.align.centreY },
+		{ value: 'bottom', icon: 'obj-bottom', label: t.align.bottom }
 	];
 </script>
 
@@ -35,7 +36,7 @@
      more than one box chosen, so they belong beside the page rather than
      pushing the options bar around every time a second box is picked up. Icons
      only — the count and the wording live in the right-click menu. -->
-<div class="tools" role="toolbar" aria-label="Selection" aria-orientation="vertical">
+<div class="tools" role="toolbar" aria-label={t.selectionTools.label} aria-orientation="vertical">
 	<span class="count" aria-hidden="true">{boxes.length}</span>
 
 	{#each ALIGN_EDGES as option (option.value)}
@@ -48,8 +49,8 @@
 
 	<button
 		aria-pressed={grouped}
-		title={grouped ? 'Ungroup' : 'Group — move, lock and delete these as one'}
-		aria-label={grouped ? 'Ungroup' : 'Group'}
+		title={grouped ? t.common.ungroup : t.selectionTools.groupTitle}
+		aria-label={grouped ? t.common.ungroup : t.common.group}
 		disabled={frozen}
 		onclick={ongroup}
 	>
@@ -57,17 +58,17 @@
 	</button>
 	<button
 		aria-pressed={allLocked}
-		title={allLocked ? 'Unlock all of them' : 'Lock all of them'}
-		aria-label={allLocked ? 'Unlock' : 'Lock'}
+		title={allLocked ? t.selectionTools.unlockAll : t.selectionTools.lockAll}
+		aria-label={allLocked ? t.common.unlock : t.common.lock}
 		disabled={frozen}
 		onclick={onlock}
 	>
 		<Icon name="locked" size={16} />
 	</button>
-	<button title={withKey('Duplicate', 'duplicate')} aria-label="Duplicate" disabled={frozen} onclick={onduplicate}>
+	<button title={withKey(t.common.duplicate, 'duplicate')} aria-label={t.common.duplicate} disabled={frozen} onclick={onduplicate}>
 		<Icon name="replicate" size={16} />
 	</button>
-	<button class="danger" title={withKey('Delete', 'delete')} aria-label="Delete" disabled={frozen || allLocked} onclick={ondelete}>
+	<button class="danger" title={withKey(t.common.delete, 'delete')} aria-label={t.common.delete} disabled={frozen || allLocked} onclick={ondelete}>
 		<Icon name="trash" size={16} />
 	</button>
 </div>

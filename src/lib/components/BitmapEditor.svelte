@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
+	import { fmt, plural, t } from '$lib/strings';
 	import Icon from './Icon.svelte';
 	import { dragByTitle } from '$lib/modal';
 	import {
@@ -273,12 +274,12 @@
 		const before = remember();
 		const bounds = before && inkBounds(before.image);
 		if (!before || !bounds) {
-			say('Nothing drawn to crop to');
+			say(t.draw.nothingToCrop);
 			return;
 		}
 		const next = fitBoard(Math.max(MIN_SIDE, bounds.w), Math.max(MIN_SIDE, bounds.h));
 		if (next.w === grid.w && next.h === grid.h) {
-			say('Already cropped');
+			say(t.draw.alreadyCropped);
 			return;
 		}
 		grid = next;
@@ -309,13 +310,13 @@
 		if (!data) return;
 		try {
 			await navigator.clipboard.write([new ClipboardItem({ 'image/png': data })]);
-			say('Copied');
+			say(t.draw.copied);
 		} catch {
 			// Firefox writes images only from a user gesture it recognises, and a
 			// page without the permission gets nothing. Said out loud rather than
 			// failing quietly, because a copy that did not happen looks exactly
 			// like one that did until you paste.
-			say('This browser would not let go of the clipboard');
+			say(t.draw.clipboardRefused);
 		}
 	}
 
@@ -329,11 +330,11 @@
 				break;
 			}
 		} catch {
-			say('This browser would not let go of the clipboard');
+			say(t.draw.clipboardRefused);
 			return;
 		}
 		if (!source) {
-			say('No picture on the clipboard');
+			say(t.draw.noPicture);
 			return;
 		}
 		try {
@@ -359,7 +360,7 @@
 				ctx.drawImage(image, 0, 0, grid.w, grid.h);
 			}
 			measure();
-			say('Pasted');
+			say(t.draw.pasted);
 		} finally {
 			URL.revokeObjectURL(source);
 		}
@@ -506,11 +507,11 @@
 <div class="backdrop" role="presentation"></div>
 <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="draw-title" use:dragByTitle>
 	<header data-drag-handle>
-		<h2 id="draw-title">Draw</h2>
+		<h2 id="draw-title">{t.draw.title}</h2>
 		<!-- Said out loud, because this is going into a cell of the table and a
 		     long cell is the cost of it travelling with the words. -->
 		{#if weight !== null}
-			<span class="weight" title="What this drawing adds to the cell it is written into">{weight} KB</span>
+			<span class="weight" title={t.draw.weightTitle}>{fmt(t.units.kb, { n: weight })}</span>
 		{/if}
 		{#if said}
 			<span class="said" role="status">{said}</span>
@@ -520,14 +521,14 @@
 	<!-- The board's size, over the board it sizes: 64 by 64 pixels' worth,
 	     spent however you like. Type a side and the other one moves to pay for
 	     it. -->
-	<div class="board" title="The board, in pixels — {BUDGET} of them to spend">
+	<div class="board" title={fmt(t.draw.boardTitle, { budget: BUDGET })}>
 		<input
 			type="number"
 			min={MIN_SIDE}
 			max={MAX_SIDE}
 			value={grid.w}
-			title="Board width, in pixels"
-			aria-label="Board width in pixels"
+			title={t.draw.widthTitle}
+			aria-label={t.draw.widthLabel}
 			onchange={(e) => setSide('w', e.currentTarget.value)}
 		/>
 		<span class="by" aria-hidden="true">×</span>
@@ -536,11 +537,11 @@
 			min={MIN_SIDE}
 			max={MAX_SIDE}
 			value={grid.h}
-			title="Board height, in pixels"
-			aria-label="Board height in pixels"
+			title={t.draw.heightTitle}
+			aria-label={t.draw.heightLabel}
 			onchange={(e) => setSide('h', e.currentTarget.value)}
 		/>
-		<span class="by">pixels</span>
+		<span class="by">{t.draw.pixels}</span>
 	</div>
 
 	<!-- The checks show through where nothing has been drawn: an area's fill and
@@ -565,12 +566,12 @@
 	<!-- Two rows. What you draw with — the tool, the nib, undo, and the paper
 	     to see it on — and under it what you do to the whole board, with the
 	     three ways out at the far end: Delete, then Cancel and Done. -->
-	<div class="tools" role="toolbar" aria-label="Drawing tools">
+	<div class="tools" role="toolbar" aria-label={t.draw.tools}>
 		<span class="segmented">
 			<button
 				aria-pressed={tool === 'pen'}
-				title="Draw in this area's own colour"
-				aria-label="Draw"
+				title={t.draw.penTitle}
+				aria-label={t.draw.pen}
 				onclick={() => (tool = 'pen')}
 			>
 				<!-- A pen, drawn in the ink it puts down: the tool and the colour in
@@ -580,16 +581,16 @@
 			</button>
 			<button
 				aria-pressed={tool === 'line'}
-				title="Straight line — press where it starts and let go where it ends"
-				aria-label="Line"
+				title={t.draw.lineTitle}
+				aria-label={t.draw.line}
 				onclick={() => (tool = 'line')}
 			>
 				<Icon name="line" size={15} />
 			</button>
 			<button
 				aria-pressed={tool === 'eraser'}
-				title="Rub out — back to the paper, not to white"
-				aria-label="Erase"
+				title={t.draw.eraseTitle}
+				aria-label={t.draw.erase}
 				onclick={() => (tool = 'eraser')}
 			>
 				<Icon name="erase" size={15} />
@@ -603,8 +604,8 @@
 			{#each [1, 2, 4] as size (size)}
 				<button
 					aria-pressed={nib === size}
-					title="{size} pixel{size === 1 ? '' : 's'} wide"
-					aria-label="{size} pixel nib"
+					title={plural(t.draw.nibTitle, size)}
+					aria-label={fmt(t.draw.nibLabel, { n: size })}
 					onclick={() => (nib = size)}
 				>
 					<span
@@ -619,10 +620,10 @@
 		</span>
 
 		<span class="segmented">
-			<button onclick={undo} disabled={!history.length} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
+			<button onclick={undo} disabled={!history.length} title={t.draw.undoTitle} aria-label={t.draw.undo}>
 				<Icon name="undo" size={15} />
 			</button>
-			<button onclick={redo} disabled={!future.length} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
+			<button onclick={redo} disabled={!future.length} title={t.draw.redoTitle} aria-label={t.draw.redo}>
 				<Icon name="redo" size={15} />
 			</button>
 		</span>
@@ -630,8 +631,8 @@
 		<span class="segmented">
 			<button
 				aria-pressed={checks === 'dark'}
-				title="Show the transparent squares dark or light — a pale drawing needs the dark ones"
-				aria-label="Dark checkerboard"
+				title={t.draw.checksTitle}
+				aria-label={t.draw.checks}
 				onclick={() => (checks = checks === 'dark' ? 'light' : 'dark')}
 			>
 				<Icon name="contrast" size={15} />
@@ -639,26 +640,26 @@
 		</span>
 	</div>
 
-	<div class="tools second" role="toolbar" aria-label="Board">
+	<div class="tools second" role="toolbar" aria-label={t.draw.board}>
 		<!-- The two that redraw the whole board rather than a pixel of it. Both
 		     are one undo away, board and all. -->
 		<span class="segmented">
-			<button onclick={rotate} title="Turn the drawing a quarter turn clockwise" aria-label="Rotate">
+			<button onclick={rotate} title={t.draw.rotateTitle} aria-label={t.draw.rotate}>
 				<Icon name="rotate" size={15} />
 			</button>
-			<button onclick={crop} title="Crop the board to what is drawn on it" aria-label="Crop">
+			<button onclick={crop} title={t.draw.cropTitle} aria-label={t.draw.crop}>
 				<Icon name="crop" size={15} />
 			</button>
 		</span>
 
 		<span class="segmented">
-			<button onclick={copy} title="Copy the drawing as a picture (Ctrl/Cmd+C)" aria-label="Copy">
+			<button onclick={copy} title={t.draw.copyTitle} aria-label={t.draw.copy}>
 				<Icon name="copy" size={15} />
 			</button>
 			<button
 				onclick={paste}
-				title="Paste a picture from the clipboard — it replaces the board and brings its own size (Ctrl/Cmd+V)"
-				aria-label="Paste"
+				title={t.draw.pasteTitle}
+				aria-label={t.draw.paste}
 			>
 				<Icon name="paste" size={15} />
 			</button>
@@ -669,11 +670,11 @@
 		<!-- Delete in words and in red, as every Delete in the app is: it empties
 		     the board, which undo still reaches. Then the two ways out. -->
 		<span class="segmented done">
-			<button class="danger" onclick={clear} title="Clear the whole drawing — undo brings it back">
-				<Icon name="trash" size={15} /> Delete
+			<button class="danger" onclick={clear} title={t.draw.clearTitle}>
+				<Icon name="trash" size={15} /> {t.common.delete}
 			</button>
-			<button onclick={oncancel} title="Leave the cell as it was (Esc)">Cancel</button>
-			<button class="primary" onclick={done} title="Write this drawing into the area">Done</button>
+			<button onclick={oncancel} title={t.draw.cancelTitle}>{t.common.cancel}</button>
+			<button class="primary" onclick={done} title={t.draw.doneTitle}>{t.draw.done}</button>
 		</span>
 	</div>
 </div>

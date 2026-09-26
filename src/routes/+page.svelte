@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
+	import { fmt, plural, t } from '$lib/strings';
+	import { rich } from '$lib/strings/rich';
 	import { base } from '$app/paths';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
 	import BitmapEditor from '$lib/components/BitmapEditor.svelte';
@@ -428,21 +430,21 @@
 	const cssPlaceholder = $derived.by(() => {
 		const ids = [...new Set(template.boxes.map((b) => cssIdent(b.slot ?? '')).filter(Boolean))];
 		return [
-			'.box { }              /* every area */',
+			`.box { }              /* ${t.css.everyArea} */`,
 			...ids.map((id) => `#${id} { }`),
 			'',
-			'.content-field { }    /* by what fills it: a column, */',
-			'.content-static { }   /* its own words, */',
-			'.content-image { }    /* or a picture */',
-			'.mode-plain { }       /* by mode: also .mode-markdown, */',
+			`.content-field { }    /* ${t.css.byContent} */`,
+			`.content-static { }   /* ${t.css.ownWords} */`,
+			`.content-image { }    /* ${t.css.picture} */`,
+			`.mode-plain { }       /* ${t.css.byMode} */`,
 			'.mode-qr { }          /* .mode-image, .mode-color */',
 			'',
-			'h1, h2, h3 { }        /* Markdown headings */',
-			'p, ul, li { }         /* Markdown blocks */',
+			`h1, h2, h3 { }        /* ${t.css.headings} */`,
+			`p, ul, li { }         /* ${t.css.blocks} */`,
 			'em, strong, code { }',
 			'hr { }',
-			'.page-number { }      /* the number on the card */',
-			".page-number .of::before { content: ' of ' }"
+			`.page-number { }      /* ${t.css.pageNumber} */`,
+			`.page-number .of::before { content: '${t.css.of}' }`
 		].join('\n');
 	});
 
@@ -623,12 +625,9 @@
 			// moment later, and "no longer being saved" is a worse thing to read
 			// than the truth: it was never going to be saved in this browser.
 			saveFailed = true;
-			notify(
-				'This browser will not let libelli store anything — private mode, or storage turned off for this site. Everything here works, but none of it will be here next time. Export your template before you close the tab.',
-				'warning'
-			);
+			notify(t.app.noStorage, 'warning');
 		} else if (unreadable)
-			notify('The saved template could not be read, so this is the starter card. Your data is untouched.', 'warning');
+			notify(t.app.unreadable, 'warning');
 		else if (firstRun)
 			notify('Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.');
 		missingFonts = await ensureTemplateFonts(template);
@@ -636,7 +635,7 @@
 		// Last, so the precache download is not competing with the first paint.
 		registerServiceWorker(() => {
 			updateReady = true;
-			notify('New version — keep undo history or update now to restart this session.');
+			notify(t.app.updateReady);
 		});
 	}
 
@@ -708,8 +707,8 @@
 		const outcome = await promptInstall();
 		// The offer is spent either way, so the button goes whatever they chose.
 		installable = false;
-		if (outcome === 'accepted') notify('Installed. libelli opens in its own window from now on.');
-		else if (outcome === 'dismissed') notify('Left in the browser — the offer comes back on a later visit.');
+		if (outcome === 'accepted') notify(t.app.installed);
+		else if (outcome === 'dismissed') notify(t.app.installDismissed);
 	}
 
 	/**
@@ -818,7 +817,7 @@
 		const box = template.boxes.find((b) => b.id === boxId);
 		if (!box) return;
 		if (template.locked || box.locked) {
-			notify('That area is locked — unlock it to put a picture in it.', 'warning');
+			notify(t.app.areaLockedPicture, 'warning');
 			return;
 		}
 		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
@@ -833,7 +832,7 @@
 	 */
 	async function placeImageOnPage(name: string, clientX: number, clientY: number, file?: Blob) {
 		if (template.locked) {
-			notify('The design is locked — unlock it to add an area.', 'warning');
+			notify(t.app.designLockedArea, 'warning');
 			return;
 		}
 		const trim = document.querySelector<HTMLElement>('.viewport .trim');
@@ -861,7 +860,7 @@
 		const h = Math.min(Math.round(w * aspect * 10) / 10, pageH);
 		const clamp = (v: number, size: number, max: number) => Math.round(Math.max(0, Math.min(max - size, v - size / 2)) * 10) / 10;
 		settleProvisional();
-		describe('Place an image');
+		describe(t.history.placeImage);
 		const box = newBox({
 			id: nextBoxId(template.boxes),
 			x: clamp(at.x, w, pageW),
@@ -875,13 +874,13 @@
 		template = { ...template, boxes: [...template.boxes, box] };
 		selectedIds = [box.id];
 		flash([box.id]);
-		notify(`${name} is on the card in an area of its own, the same on every card.`);
+		notify(fmt(t.app.imagePlacedPage, { name }));
 	}
 
 	function placeImage(box: Box, name: string) {
 		const reference = localImageRef(name);
 		const column = box.slot ? mapping[box.slot] : undefined;
-		describe('Drop image');
+		describe(t.history.dropImage);
 		// A picture dropped on a text area was meant as a picture: an area left
 		// in text mode would render the reference as the words `local:…`.
 		const next = { ...$state.snapshot(box), mode: 'image' } as Box;
@@ -891,13 +890,13 @@
 				...dataset,
 				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: reference } : r))
 			};
-			notify(`${name} is in ${column} for this row, and stays in this browser.`);
+			notify(fmt(t.app.imagePlacedCell, { name, column }));
 		} else {
 			// The picture dropped is what the area shows now: a drawing it held
 			// would otherwise win over it — see `setPictureAddress`.
 			const { dataUrl: _drawn, ...kept } = box.static ?? {};
 			updateBox({ ...next, static: { ...kept, url: reference } });
-			notify(`${name} is on this area, the same on every card, and stays in this browser.`);
+			notify(fmt(t.app.imagePlacedArea, { name }));
 		}
 	}
 
@@ -911,7 +910,7 @@
 	 */
 	function refuseLockedTable(): boolean {
 		if (!dataset.locked) return false;
-		notify('The table is locked — unlock it under the table to change its cells.', 'warning');
+		notify(t.app.tableLocked, 'warning');
 		return true;
 	}
 
@@ -950,7 +949,7 @@
 		const box = drawingBox;
 		drawing = null;
 		if (!box) return;
-		describe('Draw');
+		describe(t.history.draw);
 		const column = box.slot ? mapping[box.slot] : undefined;
 		const current = $state.snapshot(box) as Box;
 		if (column && row) {
@@ -1039,7 +1038,7 @@
 		// Cleared, or the label of whatever was pending when undo landed would
 		// attach itself to the user's next action instead.
 		pending = '';
-		notify(what ? `Undone: ${what}` : 'Undone.');
+		notify(what ? fmt(t.app.undoneWhat, { what }) : t.app.undone);
 	}
 
 	function redo() {
@@ -1049,7 +1048,7 @@
 		history = redoStep(history);
 		applySnapshot(history.present.state);
 		pending = '';
-		notify(what ? `Redone: ${what}` : 'Redone.');
+		notify(what ? fmt(t.app.redoneWhat, { what }) : t.app.redone);
 	}
 
 	/**
@@ -1092,7 +1091,7 @@
 	function reportSave(landed: boolean) {
 		if (landed || saveFailed) return;
 		saveFailed = true;
-		notify('Your work is no longer being saved — this browser is out of room, or has stopped allowing it. Export what you have.', 'warning');
+		notify(t.app.saveFailed, 'warning');
 	}
 
 	// The working copy and the library entry are written together, on one
@@ -1116,7 +1115,7 @@
 	 * work to discover the letter you just pressed.
 	 */
 	$effect(() => {
-		const name = template.name.trim() || 'Untitled card';
+		const name = template.name.trim() || t.defaults.untitledCard;
 		const id = templateId;
 		if (!ready || !id) return;
 		if (library.some((entry) => entry.id === id && entry.name === name)) return;
@@ -1181,7 +1180,7 @@
 	 * where the image lives.
 	 */
 	function applyTemplate(next: Template) {
-		describe('Page settings');
+		describe(t.history.pageSettings);
 		template = { ...stripUndefined(next), page: stripUndefined(next.page) } as Template;
 	}
 
@@ -1208,7 +1207,7 @@
 	let provisional = $state<string | null>(null);
 
 	function addTextBox() {
-		describe('New area');
+		describe(t.history.newArea);
 		const box = newBox({
 			id: nextBoxId(template.boxes),
 			slot: null,
@@ -1237,14 +1236,14 @@
 	 */
 	function placeColumn(column: string) {
 		if (template.locked) {
-			notify('The design is locked — unlock it to add an area.', 'warning');
+			notify(t.app.designLockedArea, 'warning');
 			return;
 		}
 		settleProvisional();
 		const taken = new Set(template.boxes.map((b) => b.slot).filter(Boolean));
 		let slot = column;
 		for (let n = 2; taken.has(slot); n++) slot = `${column}-${n}`;
-		describe('Place a column');
+		describe(t.history.placeColumn);
 		const box = newBox({ id: nextBoxId(template.boxes), slot, x: 14, y: 60, w: 80, h: 12, mode: 'plain' });
 		template = {
 			...template,
@@ -1254,7 +1253,7 @@
 		mapping = { ...mapping, [slot]: column };
 		selectedIds = [box.id];
 		flash([box.id]);
-		notify(`${column} is on the card — drag the new area where it belongs.`);
+		notify(fmt(t.app.columnPlaced, { column }));
 	}
 
 	/**
@@ -1292,7 +1291,7 @@
 	function openMagic() {
 		if (template.locked) return;
 		if (!dataset.columns.length) {
-			notify('There are no columns to lay out yet — import a CSV or paste a table under the page first.', 'warning');
+			notify(t.app.noColumnsToLayOut, 'warning');
 			return;
 		}
 		settleProvisional();
@@ -1323,16 +1322,16 @@
 			// anchoring the moment one came back.
 			nextId: () => nextBoxId(current.boxes)
 		});
-		describe(current.boxes.length ? 'Position the areas again' : 'Position the areas');
+		describe(current.boxes.length ? t.history.positionAgain : t.history.position);
 		template = { ...current, slots, boxes };
 		mapping = { ...bound };
 		selectedIds = [];
 		const skipped = roles.filter((role) => role.include === false).map((role) => role.column);
 		const notes = [
-			`${boxes.length} area${boxes.length === 1 ? '' : 's'} laid out from ${dataset.columns.length} column${dataset.columns.length === 1 ? '' : 's'}.`,
-			skipped.length ? `Left out: ${skipped.join(', ')}.` : '',
-			left.length ? `No room on the card for ${left.join(', ')} — add ${left.length === 1 ? 'an area' : 'areas'} by hand if you need ${left.length === 1 ? 'it' : 'them'}.` : '',
-			'Ctrl/Cmd+Z puts the old design back.'
+			plural(t.app.laidOut, boxes.length, { columns: plural(t.app.columns, dataset.columns.length) }),
+			skipped.length ? fmt(t.app.leftOut, { columns: skipped.join(', ') }) : '',
+			left.length ? plural(t.app.noRoom, left.length, { columns: left.join(', ') }) : '',
+			t.app.undoDesign
 		];
 		notify(notes.filter(Boolean).join(' '));
 	}
@@ -1360,10 +1359,10 @@
 	}
 
 	const ARRANGE_LABELS: Record<Arrange, string> = {
-		front: 'Bring to front',
-		forward: 'Bring forward',
-		backward: 'Send backward',
-		back: 'Send to back'
+		front: t.history.front,
+		forward: t.history.forward,
+		backward: t.history.backward,
+		back: t.history.back
 	};
 
 	function arrange(where: Arrange) {
@@ -1383,11 +1382,11 @@
 	 */
 	function resetTemplate() {
 		resetting = false;
-		describe('Reset the template');
+		describe(t.history.resetTemplate);
 		template = starterTemplate();
 		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
-		notify('Template reset to the starter card. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
+		notify(t.app.templateReset);
 	}
 
 	// ---- the template library -----------------------------------------------
@@ -1416,7 +1415,7 @@
 		await flushTemplate();
 		const doc = await loadTemplateDoc(id);
 		if (!doc) {
-			notify('That template is no longer in this browser.', 'warning');
+			notify(t.app.templateGone, 'warning');
 			await refreshLibrary();
 			return;
 		}
@@ -1424,10 +1423,10 @@
 		try {
 			next = normaliseTemplate(doc);
 		} catch (error) {
-			notify(error instanceof Error ? error.message : 'That template could not be read.', 'warning');
+			notify(error instanceof Error ? error.message : t.app.templateUnreadable, 'warning');
 			return;
 		}
-		describe(`Load “${next.name}”`);
+		describe(fmt(t.history.load, { name: next.name }));
 		templateId = id;
 		saveTemplateId(id);
 		template = next;
@@ -1436,7 +1435,7 @@
 		const stored = loadMapping(id, next.name);
 		mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(next), dataset.columns);
 		missingFonts = await ensureTemplateFonts(next);
-		notify(`“${next.name}” loaded. Your rows are untouched.`);
+		notify(fmt(t.app.templateLoaded, { name: next.name }));
 	}
 
 	/** A name nothing else in the library is already using. */
@@ -1456,7 +1455,7 @@
 	async function newTemplate() {
 		settleProvisional();
 		await flushTemplate();
-		describe('New template');
+		describe(t.history.newTemplate);
 		const next = blankTemplate();
 		next.name = freeName(next.name);
 		templateId = nextTemplateId();
@@ -1467,7 +1466,7 @@
 		mapping = autoMap(usedSlots(next), dataset.columns);
 		await saveTemplateDoc(templateId, $state.snapshot(template));
 		await refreshLibrary();
-		notify(`“${next.name}” started. Your rows are untouched — press ${dataset.columns.length ? 'the shapes button beside the page to lay them out' : 'Import under the table to bring some in'}.`);
+		notify(fmt(dataset.columns.length ? t.app.templateStartedLayOut : t.app.templateStartedImport, { name: next.name }));
 	}
 
 	/**
@@ -1483,7 +1482,7 @@
 		const name = template.name;
 		await deleteTemplateDoc(gone);
 		const rest = library.filter((entry) => entry.id !== gone);
-		describe(`Delete “${name}”`);
+		describe(fmt(t.history.deleteNamed, { name }));
 		if (rest.length) {
 			templateId = '';
 			await switchTemplate(rest[0].id);
@@ -1504,8 +1503,8 @@
 		await refreshLibrary();
 		notify(
 			rest.length
-				? `“${name}” deleted. Ctrl/Cmd+Z brings the design back.`
-				: `“${name}” deleted — that was the last one, so this is a new empty template. Ctrl/Cmd+Z brings the design back.`
+				? fmt(t.app.templateDeleted, { name })
+				: fmt(t.app.templateDeletedLast, { name })
 		);
 	}
 
@@ -1548,12 +1547,12 @@
 		await flushDataset();
 		const doc = await loadDatasetDoc(id);
 		if (!doc) {
-			notify('That table is no longer in this browser.', 'warning');
+			notify(t.app.tableGone, 'warning');
 			await refreshTables();
 			return;
 		}
 		const name = doc.name?.trim() || UNTITLED_TABLE;
-		describe(`Open “${name}”`);
+		describe(fmt(t.history.open, { name }));
 		// Not when there is nothing to come back to: deleting a table switches
 		// away from an id that no longer exists, and the pair it leaves behind is
 		// still a perfectly good pair.
@@ -1566,7 +1565,7 @@
 			Object.entries(mapping).filter(([, column]) => doc.columns.includes(column))
 		);
 		mapping = Object.keys(kept).length ? kept : autoMap(usedSlots(template), doc.columns);
-		notify(`“${name}” opened — ${doc.rows.length} row${doc.rows.length === 1 ? '' : 's'}. Your design is untouched.`);
+		notify(plural(t.app.tableOpened, doc.rows.length, { name }));
 	}
 
 	/** A name nothing else in the library is already using. */
@@ -1586,16 +1585,16 @@
 	async function newDataset() {
 		settleProvisional();
 		await flushDataset();
-		describe('New table');
+		describe(t.history.newTable);
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
 		saveDatasetId(datasetId);
-		dataset = { columns: [], rows: [], name: freeTableName('New table') };
+		dataset = { columns: [], rows: [], name: freeTableName(t.defaults.newTable) };
 		activeRow = 0;
 		mapping = {};
 		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
 		await refreshTables();
-		notify(`“${dataset.name}” started. Your design is untouched — press Paste or Import under the table to fill it.`);
+		notify(fmt(t.app.tableStarted, { name: dataset.name ?? '' }));
 	}
 
 	/** Back to the table before this one, and from there back again. */
@@ -1618,7 +1617,7 @@
 		await deleteDatasetDoc(gone);
 		if (previousTable === gone) rememberTable('');
 		const rest = tables.filter((entry) => entry.id !== gone);
-		describe(`Delete “${name}”`);
+		describe(fmt(t.history.deleteNamed, { name }));
 		if (rest.length) {
 			datasetId = '';
 			await switchDataset(rest[0].id);
@@ -1633,15 +1632,15 @@
 		await refreshTables();
 		notify(
 			rest.length
-				? `“${name}” deleted. Ctrl/Cmd+Z brings the rows back.`
-				: `“${name}” deleted — that was the last one, so this is a new empty table. Ctrl/Cmd+Z brings the rows back.`
+				? fmt(t.app.tableDeleted, { name })
+				: fmt(t.app.tableDeletedLast, { name })
 		);
 	}
 
 	/** Renaming is typing: the name is part of the table, so it saves with it. */
 	function renameDataset(name: string) {
 		const wanted = name.trim();
-		describe('Rename the table');
+		describe(t.history.renameTable);
 		dataset = wanted ? { ...dataset, name: wanted } : { columns: dataset.columns, rows: dataset.rows };
 	}
 
@@ -1666,7 +1665,7 @@
 
 	function duplicateBox() {
 		if (!selectedBoxes.length || template.locked) return;
-		describe(selectedBoxes.length === 1 ? 'Duplicate area' : `Duplicate ${selectedBoxes.length} areas`);
+		describe(plural(t.history.duplicate, selectedBoxes.length));
 		// Snapshotted: duplicateBoxes deep-clones its sources, which a state
 		// proxy cannot be.
 		const { boxes, created } = duplicateBoxes($state.snapshot(template.boxes) as Box[], selectedIds);
@@ -1678,10 +1677,10 @@
 		if (template.locked) return;
 		const { boxes, removed } = deleteBoxes(template.boxes, selectedIds);
 		if (!removed) return;
-		describe(`Delete ${removed} area${removed === 1 ? '' : 's'}`);
+		describe(plural(t.history.delete, removed));
 		template = { ...template, boxes };
 		selectedIds = [];
-		notify(`${removed} area${removed === 1 ? '' : 's'} deleted. Ctrl/Cmd+Z brings ${removed === 1 ? 'it' : 'them'} back.`);
+		notify(plural(t.app.areasDeleted, removed));
 	}
 
 	function alignSelection(edge: AlignEdge) {
@@ -1690,11 +1689,11 @@
 		if (boxes === template.boxes) return;
 		const vertical = edge === 'top' || edge === 'centre-y' || edge === 'bottom';
 		const skipped = vertical ? selectedBoxes.filter((b) => b.anchor && !b.locked).length : 0;
-		describe('Align');
+		describe(t.history.align);
 		template = { ...template, boxes };
 		notify(skipped
-			? `Aligned. ${skipped} anchored ${skipped === 1 ? 'area takes its top' : 'areas take their tops'} from another, so vertical alignment left ${skipped === 1 ? 'it' : 'them'} alone.`
-			: 'Aligned.');
+			? plural(t.app.alignedSkipped, skipped)
+			: t.app.aligned);
 	}
 
 	/**
@@ -1709,14 +1708,14 @@
 		if (box.slot) {
 			const column = mapping[box.slot];
 			if (!column || !row || refuseLockedTable()) return;
-			describe('Edit the text');
+			describe(t.history.editText);
 			dataset = {
 				...dataset,
 				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: value } : r))
 			};
 			return;
 		}
-		describe('Edit the text');
+		describe(t.history.editText);
 		updateBox({ ...$state.snapshot(box), static: { ...box.static, text: value } } as Box);
 	}
 
@@ -1734,21 +1733,19 @@
 		const movable = strays.filter((b) => !b.locked);
 		const boxes = bringOnPage(template.boxes, movable.map((b) => b.id), template.page);
 		if (boxes === template.boxes) {
-			notify('Every area hanging off the sheet is locked, so none of them moved.', 'warning');
+			notify(t.app.straysLocked, 'warning');
 			return;
 		}
 		// Counted before the move. `strays` is derived from the template, so it is
 		// empty the instant the boxes land — the notice used to say "0 areas were
 		// off the sheet", which is true by the time you read it and useless.
 		const rescued = movable.length;
-		describe(`Bring ${rescued} area${rescued === 1 ? '' : 's'} back on`);
+		describe(plural(t.history.rescue, rescued));
 		const moved = movable.map((b) => b.id);
 		template = { ...template, boxes };
 		flash(moved);
 		notify(
-			rescued === 1
-				? 'One area was hanging off the sheet and is wholly on it now. Ctrl/Cmd+Z puts it back.'
-				: `${rescued} areas were hanging off the sheet and are wholly on it now. Ctrl/Cmd+Z puts them back.`
+			plural(t.app.rescued, rescued)
 		);
 	}
 
@@ -1764,30 +1761,30 @@
 		const from = selected ?? selectedBoxes[0];
 		if (!from) return;
 		styleClipboard = copyStyle($state.snapshot(from) as Box);
-		notify('Style copied — Ctrl/Cmd+Shift+V puts it on another area.');
+		notify(t.app.styleCopied);
 	}
 
 	function pasteBoxStyle() {
 		if (!styleClipboard || template.locked) return;
 		const targets = selectedBoxes.filter((b) => !b.locked).map((b) => $state.snapshot(b) as Box);
 		if (!targets.length) return;
-		describe(targets.length === 1 ? 'Paste the style' : `Paste the style onto ${targets.length} areas`);
+		describe(plural(t.history.pasteStyle, targets.length));
 		for (const box of targets) updateBox(applyStyle(box, styleClipboard));
-		notify(`Style pasted onto ${targets.length} area${targets.length === 1 ? '' : 's'}.`);
+		notify(plural(t.app.stylePasted, targets.length));
 	}
 
 	function lockSelection() {
 		if (template.locked || !selectedBoxes.length) return;
-		describe(selectedBoxes.every((b) => b.locked) ? 'Unlock' : 'Lock');
+		describe(selectedBoxes.every((b) => b.locked) ? t.common.unlock : t.common.lock);
 		template = { ...template, boxes: toggleLock(template.boxes, selectedIds).boxes };
 	}
 
 	function groupSelection() {
 		if (template.locked || selectedBoxes.length < 2) return;
 		const { boxes, grouped } = toggleGroup(template.boxes, selectedIds);
-		describe(grouped ? 'Group' : 'Ungroup');
+		describe(grouped ? t.common.group : t.common.ungroup);
 		template = { ...template, boxes };
-		notify(grouped ? `${selectedBoxes.length} areas grouped — clicking any one now takes all of them.` : 'Ungrouped.');
+		notify(grouped ? plural(t.app.grouped, selectedBoxes.length) : t.app.ungrouped);
 	}
 
 	/**
@@ -1808,7 +1805,7 @@
 		if (!targets.length) return;
 		// Millimetres: the editor has no pixels, and a status line that invented
 		// them would be describing a different app.
-		describe(`Move ${Math.max(Math.abs(dx), Math.abs(dy))}mm`);
+		describe(fmt(t.history.nudge, { n: Math.max(Math.abs(dx), Math.abs(dy)) }));
 		for (const box of targets) {
 			const next = nudge(box, dx, dy);
 			if (next) updateBox(next);
@@ -1828,8 +1825,8 @@
 			landed.add(step.landed);
 			if (step.changed) updateBox({ ...box, ...(axis === 'h' ? { align: step.align } : { valign: step.valign }) });
 		}
-		describe(landed.size === 1 ? `Align ${ALIGN_LABELS[[...landed][0]]}` : 'Step the alignment');
-		notify(landed.size === 1 ? `Aligned ${ALIGN_LABELS[[...landed][0]]}.` : 'Alignment stepped.');
+		describe(landed.size === 1 ? fmt(t.history.alignTo, { edge: ALIGN_LABELS[[...landed][0]] }) : t.history.stepAlign);
+		notify(landed.size === 1 ? fmt(t.app.alignedTo, { edge: ALIGN_LABELS[[...landed][0]] }) : t.app.alignStepped);
 	}
 
 	/**
@@ -1849,14 +1846,14 @@
 		if (!box || !navigator.clipboard) return;
 		const text = box.slot ? (row?.[mapping[box.slot] ?? ''] ?? '') : (box.static?.text ?? '');
 		if (!text) {
-			notify('That area has no words to copy.', 'warning');
+			notify(t.app.noWords, 'warning');
 			return;
 		}
 		try {
 			await navigator.clipboard.writeText(text);
-			notify('Copied the area\u2019s text.');
+			notify(t.app.textCopied);
 		} catch {
-			notify('This browser would not let libelli reach the clipboard.', 'warning');
+			notify(t.app.clipboardWrite, 'warning');
 		}
 	}
 
@@ -1866,11 +1863,11 @@
 		try {
 			text = await navigator.clipboard.readText();
 		} catch {
-			notify('This browser would not let libelli read the clipboard.', 'warning');
+			notify(t.app.clipboardRead, 'warning');
 			return;
 		}
 		if (!text.trim()) return;
-		describe('Paste an area');
+		describe(t.history.pasteArea);
 		const box = newBox({
 			id: nextBoxId(template.boxes),
 			slot: null,
@@ -1884,7 +1881,7 @@
 		});
 		template = { ...template, boxes: [...template.boxes, box] };
 		selectedIds = [box.id];
-		notify('Pasted as a new area, holding its own words. Ctrl/Cmd+Z takes it away.');
+		notify(t.app.pastedArea);
 	}
 
 	function onWindowKeydown(event: KeyboardEvent) {
@@ -2098,7 +2095,7 @@
 		// Dated, so a folder of exports says which is which and the newest sorts
 		// last: `name_2026-09-25.json`, in the underscore `pageFilename` uses.
 		download(`${slugify(template.name)}_${formatDate(new Date(), 'YYYY-MM-DD')}.json`, exportTemplate($state.snapshot(template)));
-		notify('Template exported — fonts referenced by name.');
+		notify(t.app.templateExported);
 	}
 
 	async function importTemplate(event: Event) {
@@ -2125,9 +2122,9 @@
 			missingFonts = await ensureTemplateFonts(template);
 			await saveTemplateDoc(templateId, $state.snapshot(template));
 			await refreshLibrary();
-			notify(`Loaded “${template.name}”.`);
+			notify(fmt(t.app.templateImported, { name: template.name }));
 		} catch (error) {
-			notify(error instanceof Error ? error.message : 'That file is not a template.', 'warning');
+			notify(error instanceof Error ? error.message : t.app.notATemplate, 'warning');
 		}
 	}
 
@@ -2145,9 +2142,9 @@
 			// upload was started from a box, and only when it replaces no missing
 			// reference — that flow is repairing a name the template already uses.
 			if (!family && selected) updateBox({ ...$state.snapshot(selected), font: ref.family } as Box);
-			notify(`${ref.family} installed in this browser.`);
+			notify(fmt(t.app.fontInstalled, { family: ref.family }));
 		} catch {
-			notify('That font file could not be read.', 'warning');
+			notify(t.app.fontUnreadable, 'warning');
 		}
 	}
 
@@ -2155,9 +2152,9 @@
 		try {
 			const image = await uploadBackgroundImage(file, template.page.image?.fit ?? 'cover', nameOverride);
 			template = { ...template, page: { ...template.page, image } };
-			notify(`${image.src} set as the page background — the picture stays in this browser, the template only names it.`);
+			notify(fmt(t.app.pageBackgroundSet, { name: image.src }));
 		} catch {
-			notify('That image could not be read.', 'warning');
+			notify(t.app.imageUnreadable, 'warning');
 		}
 	}
 
@@ -2174,9 +2171,9 @@
 		try {
 			const image = await uploadBackgroundImage(file, template.print.background?.fit ?? 'cover', nameOverride);
 			template = { ...template, print: { ...template.print, background: image } };
-			notify(`${image.src} set as the sheet background — the picture stays in this browser, the template only names it.`);
+			notify(fmt(t.app.sheetBackgroundSet, { name: image.src }));
 		} catch {
-			notify('That image could not be read.', 'warning');
+			notify(t.app.imageUnreadable, 'warning');
 		}
 	}
 
@@ -2210,7 +2207,7 @@
 	 */
 	function requestPrint() {
 		if (!dataset.rows.length) {
-			notify('Nothing to print yet.', 'warning');
+			notify(t.app.nothingToPrint, 'warning');
 			return;
 		}
 		// Every page and every sheet, every time. The selection is by row index,
@@ -2246,6 +2243,12 @@
 
 </script>
 
+<!-- Catalogue prose with its three marks — see `strings/rich.ts`. Every run is
+     text, so there is no markup here for a translation to smuggle in. -->
+{#snippet prose(text: string)}{#each rich(text) as run, i (i)}{#if run.mark === 'strong'}<strong>{run.text}</strong
+		>{:else if run.mark === 'em'}<em>{run.text}</em>{:else if run.mark === 'code'}<code>{run.text}</code
+		>{:else}{run.text}{/if}{/each}{/snippet}
+
 <!-- A file dropped anywhere but on an area is swallowed here. The browser's own
      answer to a dropped image is to navigate to it, which leaves the design
      behind — and the one place a drop means something is the card, which takes
@@ -2266,12 +2269,12 @@
 		<img class="brand" src="{base}/logo.svg" alt="libelli" width="389" height="314" />
 		<span class="spacer"></span>
 		{#if installable}
-			<button class="install" onclick={() => void install()} title="Install libelli on this device">
-				<Icon name="package" size={15} /> Install
+			<button class="install" onclick={() => void install()} title={t.toolbar.installTitle}>
+				<Icon name="package" size={15} /> {t.toolbar.install}
 			</button>
 		{/if}
-		<button class="help" onclick={() => (helpOpen = true)} title={withKey("How this works, and the keys", "help")}>
-			<Icon name="help" size={15} /> <span class="label">Help</span>
+		<button class="help" onclick={() => (helpOpen = true)} title={withKey(t.toolbar.helpTitle, 'help')}>
+			<Icon name="help" size={15} /> <span class="label">{t.toolbar.help}</span>
 		</button>
 		<button
 			class="page"
@@ -2286,10 +2289,10 @@
 			aria-pressed={pageSetupOpen && !selected}
 			aria-expanded={pageSetupOpen && !selected}
 			title={selected && pageSetupOpen
-				? 'Page setup — the area bar has the row; this takes it back'
-				: 'Show or hide the page setup'}
+				? t.toolbar.pageSetupBack
+				: t.toolbar.pageSetupTitle}
 		>
-			<Icon name="document-blank" size={15} /> <span class="label">Page Setup</span>
+			<Icon name="document-blank" size={15} /> <span class="label">{t.toolbar.pageSetup}</span>
 		</button>
 		<!-- Every stored picture, in a tray of its own in the table's place: the
 		     pictures are the browser's, not the page's — a row's own photograph
@@ -2303,9 +2306,9 @@
 				imagesOpen = !imagesOpen;
 				if (imagesOpen) dataOpen = false;
 			}}
-			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
+			title={t.toolbar.imagesTitle}
 		>
-			<Icon name="image" size={15} /> <span class="label">Images</span>
+			<Icon name="image" size={15} /> <span class="label">{t.images.title}</span>
 		</button>
 		<button
 			class="data"
@@ -2315,17 +2318,17 @@
 			}}
 			aria-pressed={dataOpen}
 			aria-expanded={dataOpen}
-			title="Show or hide the table"
+			title={t.toolbar.dataTitle}
 		>
-			<Icon name="table-split" size={15} /> <span class="label">Data</span>
+			<Icon name="table-split" size={15} /> <span class="label">{t.toolbar.data}</span>
 		</button>
 		<button
 			class="primary export"
 			onclick={requestPrint}
 			disabled={!dataset.rows.length}
-			title={withKey('Open every card as a page to print or save', 'export')}
+			title={withKey(t.toolbar.exportTitle, 'export')}
 		>
-			<Icon name="document-multiple" size={15} /> <span class="label">Export…</span>
+			<Icon name="document-multiple" size={15} /> <span class="label">{t.toolbar.export}</span>
 		</button>
 		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
@@ -2463,12 +2466,10 @@
 	{#if missingFonts.length}
 		<div class="banner" role="alert">
 			<span>
-				This template needs {missingFonts.length} font{missingFonts.length === 1 ? '' : 's'} that
-				{missingFonts.length === 1 ? 'is' : 'are'} not in this browser. Nothing is substituted until you supply
-				{missingFonts.length === 1 ? 'it' : 'them'}.
+				{plural(t.app.missingFonts, missingFonts.length)}
 			</span>
 			{#each missingFonts as font (font.ref ?? font.family)}
-				<button onclick={() => pickMissingFont(font)}>Choose {font.family} File…</button>
+				<button onclick={() => pickMissingFont(font)}>{fmt(t.app.chooseFontFile, { family: font.family })}</button>
 			{/each}
 		</div>
 	{/if}
@@ -2476,44 +2477,42 @@
 	{#if missingImage}
 		<div class="banner" role="alert">
 			<span>
-				This template's background image, <strong>{missingImage}</strong>, is not in this browser. The template
-				carries its name, never the picture.
+				{t.app.missingImageBefore}<strong>{missingImage}</strong>{t.app.missingImageAfter}
 			</span>
-			<button onclick={() => backgroundInput?.click()}>Choose {missingImage}…</button>
+			<button onclick={() => backgroundInput?.click()}>{fmt(t.app.chooseFile, { name: missingImage })}</button>
 			<button
 				onclick={() => (template = { ...template, page: { ...template.page, image: undefined } })}
-			>Remove It</button>
+			>{t.app.removeIt}</button>
 		</div>
 	{/if}
 
 	{#if missingPrintImage}
 		<div class="banner" role="alert">
 			<span>
-				This template's sheet background image, <strong>{missingPrintImage}</strong>, is not in this browser. The
-				template carries its name, never the picture.
+				{t.app.missingSheetImageBefore}<strong>{missingPrintImage}</strong>{t.app.missingImageAfter}
 			</span>
-			<button onclick={() => printBackgroundInput?.click()}>Choose {missingPrintImage}…</button>
+			<button onclick={() => printBackgroundInput?.click()}>{fmt(t.app.chooseFile, { name: missingPrintImage })}</button>
 			<button
 				onclick={() => (template = { ...template, print: { ...template.print, background: undefined } })}
-			>Remove It</button>
+			>{t.app.removeIt}</button>
 		</div>
 	{/if}
 
 	{#if mappingPrompt}
 		<div class="banner" role="alert">
-			<span>Check the column mapping for this template:</span>
+			<span>{t.app.checkMapping}</span>
 			{#each slots as slot (slot)}
 				<label class="check">
 					{slot}
 					<select value={mapping[slot] ?? ''} onchange={(e) => (mapping = { ...mapping, [slot]: e.currentTarget.value })}>
-						<option value="">— None —</option>
+						<option value="">{t.boxOptions.noColumn}</option>
 						{#each dataset.columns as column (column)}
 							<option value={column}>{column}</option>
 						{/each}
 					</select>
 				</label>
 			{/each}
-			<button class="primary" onclick={() => (mappingPrompt = false)}>Confirm</button>
+			<button class="primary" onclick={() => (mappingPrompt = false)}>{t.app.confirm}</button>
 		</div>
 	{/if}
 
@@ -2558,7 +2557,7 @@
 				// it did — and it turns the grid on if it was off, because changing
 				// how something invisible is drawn is otherwise no answer at all.
 				ui = { ...ui, gridStyle, showGrid: true };
-				notify(gridStyle === 'dots' ? 'Dot grid.' : 'Ruled grid.');
+				notify(gridStyle === 'dots' ? t.app.dotGrid : t.app.ruledGrid);
 			}}
 			onzoom={(zoom) => (ui = { ...ui, zoom })}
 			onnudge={nudgeBox}
@@ -2618,12 +2617,12 @@
 					class:on={trayResizing !== null}
 					role="separator"
 					aria-orientation="vertical"
-					aria-label="Table width"
+					aria-label={t.app.trayWidth}
 					aria-valuenow={ui.trayWidthShare ? Math.round(ui.trayWidthShare * 100) : undefined}
 					aria-valuemin={0}
 					aria-valuemax={100}
 					tabindex="0"
-					title="Drag to share the width between the page and the table — double-click to reset"
+					title={t.app.trayWidthTitle}
 					onpointerdown={startTrayResize}
 					onpointermove={moveTrayResize}
 					onpointerup={endTrayResize}
@@ -2659,7 +2658,7 @@
 				onplacecolumn={placeColumn}
 				oncellfocus={flashColumn}
 				onlock={(locked) => {
-					describe(locked ? 'Lock the table' : 'Unlock the table');
+					describe(locked ? t.history.lockTable : t.history.unlockTable);
 					dataset = stripUndefined({ ...$state.snapshot(dataset), locked: locked || undefined }) as Dataset;
 				}}
 				ondeletetable={() => (deletingTable = true)}
@@ -2720,7 +2719,7 @@
 			</button>
 		</span>
 		{#if updateReady}
-			<button class="reload" onclick={applyUpdate}>Update</button>
+			<button class="reload" onclick={applyUpdate}>{t.app.update}</button>
 		{/if}
 		<span class="version">v{VERSION}</span>
 	</footer>
@@ -2728,14 +2727,14 @@
 
 {#if statusOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (statusOpen = false)}></div>
-	<div class="modal narrow" role="dialog" aria-modal="true" aria-label="Notice" use:armDefault>
+	<div class="modal narrow" role="dialog" aria-modal="true" aria-label={t.app.notice} use:armDefault>
 		<p class="status-full" class:warning={statusTone === 'warning'}>
 			{#if statusTone === 'warning'}<Icon name="warning" size={14} />{/if}
 			<span>{status}</span>
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button class="primary" data-default onclick={() => (statusOpen = false)}>OK</button>
+			<button class="primary" data-default onclick={() => (statusOpen = false)}>{t.common.ok}</button>
 		</div>
 	</div>
 {/if}
@@ -2744,7 +2743,7 @@
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
 	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
 		<!-- Dragged by its title, so the card it is styling can be seen beside it. -->
-		<h2 id="css-title" class="drag-title" data-drag-handle>CSS</h2>
+		<h2 id="css-title" class="drag-title" data-drag-handle>{t.pageOptions.css}</h2>
 		<!-- The placeholder is the documentation. It used to be two lines of
 		     example and two paragraphs of prose above and below it; what an author
 		     actually needs is the names of the things they can reach, and a
@@ -2762,8 +2761,8 @@
 		></textarea>
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button onclick={cancelCss}>Cancel</button>
-			<button class="primary" onclick={() => (cssOpen = false)}>Done</button>
+			<button onclick={cancelCss}>{t.common.cancel}</button>
+			<button class="primary" onclick={() => (cssOpen = false)}>{t.draw.done}</button>
 		</div>
 	</div>
 {/if}
@@ -2774,16 +2773,15 @@
      A count rather than a paragraph, the same shape as that dialog. -->
 {#if resetting}
 	<div class="modal-backdrop" role="presentation" onclick={() => (resetting = false)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the template?" use:armDefault>
-		<h2>Reset the template?</h2>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label={t.app.resetConfirm} use:armDefault>
+		<h2>{t.app.resetConfirm}</h2>
 		<p>
-			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the starter card. Your rows are
-			not touched.
+			{plural(t.app.resetBody, template.boxes.length)}
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button onclick={() => (resetting = false)}>Cancel</button>
-			<button class="danger-solid" data-default onclick={resetTemplate}>Reset Template</button>
+			<button onclick={() => (resetting = false)}>{t.common.cancel}</button>
+			<button class="danger-solid" data-default onclick={resetTemplate}>{t.app.resetTemplate}</button>
 		</div>
 	</div>
 {/if}
@@ -2795,17 +2793,17 @@
      should have to know. -->
 {#if deleting}
 	<div class="modal-backdrop" role="presentation" onclick={() => (deleting = false)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete this template?" use:armDefault>
-		<h2>Delete “{template.name}”?</h2>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label={t.app.deleteTemplateConfirm} use:armDefault>
+		<h2>{fmt(t.images.confirmTitle, { name: template.name })}</h2>
 		<p>
-			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'}, and this template's own settings.
-			{library.length > 1 ? 'The next template in the list opens.' : 'A new empty template opens, since this is the last one.'}
-			Your rows are not touched.
+			{plural(t.app.deleteTemplateBody, template.boxes.length)}
+			{library.length > 1 ? t.app.deleteTemplateNext : t.app.deleteTemplateLast}
+			{t.app.rowsUntouched}
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button onclick={() => (deleting = false)}>Cancel</button>
-			<button class="danger-solid" data-default onclick={() => void deleteTemplate()}>Delete Template</button>
+			<button onclick={() => (deleting = false)}>{t.common.cancel}</button>
+			<button class="danger-solid" data-default onclick={() => void deleteTemplate()}>{t.app.deleteTemplate}</button>
 		</div>
 	</div>
 {/if}
@@ -2817,15 +2815,14 @@
 {#if deletingTable}
 	<div class="modal-backdrop" role="presentation" onclick={() => (deletingTable = false)}></div>
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="delete-table-title" use:armDefault>
-		<h2 id="delete-table-title">Delete “{tableName}”?</h2>
+		<h2 id="delete-table-title">{fmt(t.images.confirmTitle, { name: tableName })}</h2>
 		<p>
-			{dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'} in this browser. Your design is not
-			touched.
+			{plural(t.app.deleteTableBody, dataset.rows.length)}
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button onclick={() => (deletingTable = false)}>Cancel</button>
-			<button class="danger-solid" data-default onclick={() => void deleteDataset()}>Delete Table</button>
+			<button onclick={() => (deletingTable = false)}>{t.common.cancel}</button>
+			<button class="danger-solid" data-default onclick={() => void deleteDataset()}>{t.app.deleteTable}</button>
 		</div>
 	</div>
 {/if}
@@ -2837,7 +2834,7 @@
 {#if magic}
 	<div class="modal-backdrop" role="presentation" onclick={() => (magic = null)}></div>
 	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title" use:armDefault>
-		<h2 id="magic-title">Position Areas Automagically</h2>
+		<h2 id="magic-title">{t.magic.title}</h2>
 		<ul class="magic-list">
 			{#each magic as guess, index (guess.column)}
 				<li class:left-out={guess.include === false}>
@@ -2845,8 +2842,8 @@
 					     keeps whatever it was taken for. -->
 					<input
 						type="checkbox"
-						aria-label="Give {guess.column} an area"
-						title={guess.include === false ? 'Left out — tick to give it an area' : 'Untick to leave it off the card'}
+						aria-label={fmt(t.magic.include, { column: guess.column })}
+						title={guess.include === false ? t.magic.leftOut : t.magic.untick}
 						checked={guess.include !== false}
 						onchange={(e) => {
 							const include = e.currentTarget.checked;
@@ -2856,7 +2853,7 @@
 					<span class="magic-column" title={guess.column}>{guess.column}</span>
 					<span class="magic-sample" title={guess.sample}>{guess.sample.slice(0, 60) || '—'}</span>
 					<select
-						aria-label="What {guess.column} is"
+						aria-label={fmt(t.magic.kind, { column: guess.column })}
 						disabled={guess.include === false}
 						value={guess.kind}
 						onchange={(e) => {
@@ -2870,7 +2867,7 @@
 						{/each}
 					</select>
 					{#if !guess.sure}
-						<span class="magic-unsure" title="Nothing but the length of the cells pointed at this">guess</span>
+						<span class="magic-unsure" title={t.magic.guessTitle}>{t.magic.guess}</span>
 					{/if}
 				</li>
 			{/each}
@@ -2883,15 +2880,14 @@
 			<p class="magic-warning" role="status">
 				<Icon name="warning" size={13} />
 				<span>
-					Replaces the {template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} already on this card.
-					Ctrl/Cmd+Z puts {template.boxes.length === 1 ? 'it' : 'them'} back.
+					{plural(t.magic.replaces, template.boxes.length)}
 				</span>
 			</p>
 		{/if}
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button onclick={() => (magic = null)}>Cancel</button>
-			<button class="primary" data-default onclick={applyMagic}>OK</button>
+			<button onclick={() => (magic = null)}>{t.common.cancel}</button>
+			<button class="primary" data-default onclick={applyMagic}>{t.common.ok}</button>
 		</div>
 	</div>
 {/if}
@@ -2902,251 +2898,34 @@
 		<!-- The header stays put while the rest scrolls: the way out of a long
 		     dialog should not be at the bottom of it. -->
 		<header class="modal-header">
-			<h2 id="help-title">libelli</h2>
-			<button class="icon" use:focusOnOpen onclick={() => (helpOpen = false)} title="Close" aria-label="Close">
+			<h2 id="help-title">{t.help.title}</h2>
+			<button class="icon" use:focusOnOpen onclick={() => (helpOpen = false)} title={t.common.close} aria-label={t.common.close}>
 				<Icon name="close" size={16} />
 			</button>
 		</header>
 
-		<p>Rows of a spreadsheet in, print-ready cards out.</p>
-		<p>
-			All of it happens in this browser. Your rows, your template, the fonts and images you add — none of it is
-			uploaded, because there is no server to upload it to and no account to make. It works with the network off, a
-			template is a small file you can hand to somebody, and closing the tab is the only thing that deletes anything.
-			Where your browser offers it, <strong>Install</strong> gives libelli its own window; when a new version has
-			downloaded the status bar says so and waits for <strong>Update</strong>, because a restart nobody asked
-				for would take undo with it.
-		</p>
+		{#each t.help.intro as paragraph, i (i)}
+			<p>{@render prose(paragraph)}</p>
+		{/each}
 
-		<h3>Areas</h3>
-		<p>
-			<em>+ Area</em> beside the page adds one. <strong>Content</strong> says where it gets what it shows:
-			<strong>Data Field</strong> binds it to a column, so it changes card to card, and <strong>Static Text</strong>
-			is typed into the template and says the same on every card. An area's <strong>Name</strong> is the template's own
-			word for what it holds — <em>title</em>, <em>body</em> — and <strong>Column</strong> beside it says which
-			spreadsheet column fills that. Rebinding the columns is how one template serves another spreadsheet.
-		</p>
-		<p>
-			The button under it — the one wearing three shapes — writes a whole card from your columns: a title, a
-			body, a picture, a footer and a QR code, sized for the page. It shows you what it took each column for
-			before it moves anything, and marks the ones it reached by guesswork. On an empty template it is that
-			button; on a template that already has areas it is <strong>press and hold</strong> on <em>+ Area</em>,
-			since it replaces every area you have. One Ctrl/Cmd+Z puts the old design back.
-		</p>
-		<p>
-			Double-click an area, or press <strong>Enter</strong> with one selected, to type into it on the card itself.
-			Bound areas write to the cell, static ones to the template. Selecting an area points the table at the cells that
-			fill it.
-		</p>
-		<p>
-			<strong>Content</strong> is where an area gets what it shows: a Data Field, Static Text, a Bitmap drawn
-			here, or an Image. A field then takes a <strong>Mode</strong> — Plain Text, Markdown, Bitmap, Image, Color
-			or QR Code. Color fills the area with what the cell says and ignores anything that is not one, in hex,
-			<code>rgb()</code>, <code>hsl()</code> or by name; Image shows a picture, and still accepts a color.
-		</p>
-		<p>
-			<code>&#123;&#123;date&#125;&#125;</code> anywhere in an area or a cell prints today's date, and
-			<code>&#123;&#123;date:YYYY-MM-DD&#125;&#125;</code> prints it your way — <code>YYYY</code>, <code>MM</code>,
-			<code>DD</code> for the numbers, <code>MMMM</code> and <code>dddd</code> for the names. Anything else in braces
-			is left as written.
-		</p>
+		{#each t.help.sections as section, i (i)}
+			<h3>{section.title}</h3>
+			{#each section.paragraphs as paragraph, j (j)}
+				<p>{@render prose(paragraph)}</p>
+			{/each}
+		{/each}
 
-		<h3>Placing them</h3>
-		<p>
-			Drag areas on the page or type exact millimetres. An area latches onto the edges and centres of its neighbours as
-			it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid instead. Grid off and
-			<strong>Bounds</strong> off is free movement, because an area should never latch onto a guide that is not drawn.
-			Press and <em>hold</em> the Grid box for a <strong>dot grid</strong> — the same grid and the same snapping,
-			drawn as a dot at each intersection rather than as ruled lines, which is quieter under a page of type. The
-			word beside the box says which of the two you are on.
-		</p>
-		<p>
-			<strong>Rotation</strong> has two marks on a selected area, because they do two different things. The
-			<strong>crosshair</strong> is the pivot: drag it to move the point the area turns about. The <strong>knob</strong>
-			on the arm below it is the lever: swing it to turn the area, holding <strong>Shift</strong> for 15° steps. The
-			<strong>X</strong> and <strong>Y</strong> beside the rotation place the pivot exactly, as a percentage of the
-			area's own size. A turned area still occupies the space it would have upright, so one rotation does not shuffle
-			the card.
-		</p>
-		<p>
-			Stacking order is the column beside the page: areas paint in the order they are listed, so <em>Bring to Front</em>
-			is a move to the end of that list. If an area ends up off the sheet — all of it, or a corner of it — a
-			button appears under <em>Area</em> to bring that area back on, and only that area: everything already on
-			the paper stays where it was put. Crossing into the bleed does not count, because that is what bleed is
-			for.
-		</p>
-
-		<h3>Marks on an area</h3>
-		<p>
-			A red corner means the content does not fit and the print will clip it. The <strong>plug</strong> says the area
-			carries its own words rather than a column's. The <strong>link</strong> and the <strong>buoy</strong> are the
-			two ends of an anchor — an anchored area takes its top from another area's rendered bottom, so dragging it
-			changes the gap rather than breaking the tie — and the <strong>padlock</strong> says the area is locked. All
-			three are buttons, and each undoes what it says: the link breaks this area's tie, the buoy casts off everything
-			moored to this one, the padlock unlocks the area. Neither anchor button moves anything. Each shows the icon of
-			its own undoing as you reach for it, so no two of them answer with the same mark. Selecting either end of an
-			anchor lights up the other — filled on what follows this area directly, outlined further down the chain, so a
-			stack of tied areas says how far the tie reaches. <strong>Bounds</strong> takes all of it away.
-		</p>
-
-		<h3>Several at once</h3>
-		<p>
-			Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them; on a touchscreen,
-			<strong>Select Multiple</strong> in the right-click menu makes every press add or drop, with a chip beside
-			<em>+ Area</em> saying so until you press it or <strong>Esc</strong>. Dragging any one moves the
-			set, and a column of icons appears beside the page to line them up against the box enclosing them all, and to
-			group, lock, duplicate or delete the lot. <strong>Group</strong> makes a selection stick until you ungroup it. An
-			anchored area sits out of a vertical align, because an anchor would move it straight back.
-		</p>
-		<p>
-			<strong>Copy Style</strong> and <strong>Paste Style</strong> carry type, fill, border, padding and radius from one
-			area to any number of others. A paste is "make this look like that", so it takes away what the source did not have.
-		</p>
-
-		<h3>Templates</h3>
-		<p>
-			The <strong>Template</strong> field names the one you are working on; the caret beside it lists every
-			template saved in this browser, with <em>New template…</em> and <em>Delete this template…</em> under a rule.
-			Renaming is typing in the field. Deleting takes the loaded template and opens the next one — or a new empty
-			template, if it was the last — where <strong>Reset</strong>, in the row of buttons below, puts the starter
-			card back under the same name. Both ask first, and both are one Ctrl/Cmd+Z away. The list lives
-			in this browser only; <strong>Export</strong> is how a template leaves, and an import joins the list rather
-			than replacing what is open.
-		</p>
-
-		<h3>The sheet</h3>
-		<p>
-			<strong>Size</strong> has A6, A5, A4, A3 and a 4 × 6 inch postcard; picking one keeps the orientation you are
-			in, and <strong>⇄</strong> turns the page over. Neither moves anything on the card — coordinates are
-			measured from the trim edge, so trying a design the other way round costs nothing. Bleed is an outset on the
-			sheet, never an offset on the content — so it is also how you widen a card evenly without moving anything on
-			it, with <strong>Crop Marks</strong> left unticked.
-		</p>
-		<p>
-			Page setup holds the type defaults — family, size, leading, spacing, color. An area that leaves those fields
-			blank inherits them. It also sets the paper color and a background image, and can print a page number, optionally
-			as <em>3 / 12</em>.
-		</p>
-		<p>
-			<strong>CSS</strong> holds styles saved inside the template. Selectors are scoped to the card, and
-			<code>@import</code> and any <code>url()</code> pointing off this machine are stripped, so a template's
-			CSS cannot reach the network. What a template <em>can</em> ask for is a Google font by family name and a
-			background image by address — both only as names it is allowed to write, never as arbitrary requests.
-		</p>
-
-		<h3>Locking</h3>
-		<p>
-			<strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page
-			lock covers every area and the page settings, greys every bound and says so above the sheet. The same button
-			unlocks.
-		</p>
-
-		<h3>Data</h3>
-		<p>
-			Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column.
-			Drag the right edge of a header to set that column's width, or double-click that edge to hand it back the
-			default; the widths stay in this browser and follow a column through a rename.
-			Clicking a row previews it; the tick in the gutter chooses several, and <strong>Copy</strong> and delete for
-			those appear at the head of the buttons below. The row numbers travel with their rows through a
-			sort, and a column header sorts A-Z, then Z-A, then back to the order the rows arrived in.
-		</p>
-		<p>
-			<strong>Table</strong> at the left of that row names the table you are in; the caret opens the rest, with
-			<strong>New table…</strong> and <strong>Delete…</strong> under a rule at the bottom. The
-			<strong>⇄</strong> beside it goes back to the table you were on before, and back again — the two you are
-			working between, one press apart. A design and a table are kept apart on purpose: switching either leaves the
-			other exactly where it was, and bindings that still name a column that exists are kept across the switch.
-		</p>
-		<p>
-			<strong>Paste</strong> takes a block of cells off a spreadsheet with no header row and lands it in the columns
-			you already have. <strong>Import CSV…</strong> takes a whole file; press and <em>hold</em> it and the four sample
-			cards come back. <strong>Export CSV</strong> hands the table back as a file. Deleting a column asks, because it is
-			a field of every card at once; the red <strong>Delete</strong> empties the whole table. All of it is undoable, and
-			none of it touches the template — as <strong>Reset</strong> in page setup does not touch the data.
-		</p>
-
-		<h3>Getting cards out</h3>
-		<p>
-			<strong>Export</strong>, or <strong>Ctrl/Cmd+P</strong>, opens every card as a small page. The browser's own print
-			dialog is intercepted rather than left to fire, because it would print the editor. Untick any card you do not
-			want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The checklist under the
-			pages is four settings that decide whether what you saw is what comes out; a PNG needs none of them.
-		</p>
-		<p>
-			The count under the sheet — <em>3 / 12</em> — opens that card on its own, big, over everything; so does a
-			thumbnail on the export screen. The arrows either side, the left and right arrow keys, and a swipe step through
-			the run. Nothing is printed from there.
-		</p>
-
-		<h3>Dialogs</h3>
-		<p>
-			A dialog opens with nothing pressed. <strong>Enter</strong> moves onto the action it suggests, and a second
-			Enter presses it — so a stray Return arriving a beat late cannot delete a template or replace every row on its
-			own. <strong>Esc</strong> closes the dialog at any point — in the CSS dialog, which has a
-			<strong>Cancel</strong>, closing that way cancels, and the CSS that was there when it opened comes back.
-		</p>
-
-		<h3>On a touchscreen</h3>
-		<p>
-			<strong>Pinch to zoom</strong> the page, anywhere over the stage — over the areas as well as the ground
-			around them. A second finger never drags: an area that was moving goes back where it was, so a pinch zooms
-			and leaves the card alone. Every button answers a press with a few milliseconds of vibration, where the
-			device has it.
-		</p>
-		<p>
-			The <strong>cross of arrows</strong> by the page nudges the selection; its middle button cycles the step, and
-			holding it moves the pad out of the way. When the selection is <em>tied</em> to another area, the two vertical
-			arrows wear a link instead: <strong>hold</strong> one and you take hold of the area it hangs from, which is
-			the one that can still move up and down — or <strong>tap</strong> it three times to break the tie and leave the
-			area exactly where it sits.
-		</p>
-		<p>
-			<strong>Press and hold an area</strong> for its menu — and if the finger carries on, the menu goes and the
-			area moves with it: it was being dragged under the menu the whole time. Under the page, the data tray opens
-			at about half the screen and is <strong>dragged taller by the table's header</strong>; a press that goes
-			nowhere still presses the button underneath it.
-		</p>
-		<p>
-			A card opened <strong>full screen</strong> is the one place a pinch zooms the card itself, up to six times, with
-			a drag to move around it. Pinch back and it settles; a flick pages the run again.
-		</p>
-
-		<h3>Keys</h3>
+		<h3>{t.help.keysTitle}</h3>
 		<dl class="keys">
-			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
-			<dt>Ctrl/Cmd + Y</dt><dd>Redo</dd>
-			<dt>Ctrl/Cmd + Shift + Z</dt><dd>The last change off, and on again — press it twice to compare</dd>
-			<dt>Enter</dt><dd>Type into the selected area</dd>
-			<dt>Esc</dt><dd>Stop typing, leave Select Multiple, deselect, or close what is open</dd>
-			<dt>Arrows</dt><dd>Nudge the selection by 1mm</dd>
-			<dt>Shift + Arrows</dt><dd>Nudge by 5mm</dd>
-			<dt>Alt + Shift + Arrows</dt><dd>Nudge by 10mm</dd>
-			<dt>Arrows<span>PageUp / PageDown</span></dt><dd>Step through the cards, with nothing selected</dd>
-			<dt>← / →</dt><dd>Step through the cards, with one open full screen</dd>
-			<dt>Shift + click<span>Ctrl / ⌘ + click</span></dt><dd>Add an area to the selection, or drop it</dd>
-			<dt>Ctrl/Cmd + A</dt><dd>Select every area</dd>
-			<dt>Ctrl/Cmd + D</dt><dd>Duplicate the selected areas</dd>
-			<dt>Delete<span>Backspace</span></dt><dd>Remove the selected areas</dd>
-			<dt>Ctrl/Cmd + C</dt><dd>Copy the selected area's words</dd>
-			<dt>Ctrl/Cmd + V</dt><dd>Paste plain text as a new area</dd>
-			<dt>Ctrl/Cmd + Shift + C</dt><dd>Copy the area's style</dd>
-			<dt>Ctrl/Cmd + Shift + V</dt><dd>Paste that style onto the selection</dd>
-			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
-			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
-			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page</dd>
-			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
-			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
-			<dt>Ctrl/Cmd + ;<span>Ctrl/Cmd + H</span></dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off (hold the Grid box for dots)</dd>
-			<dt>Ctrl/Cmd + P</dt><dd>Export — press again from that screen to print</dd>
-			<dt>Ctrl/Cmd + Shift + S</dt><dd>Export, for the fingers that reach for that instead</dd>
-			<dt>?<span>/</span></dt><dd>This panel</dd>
+			{#each t.help.keys as key, i (i)}
+				<dt>{key.keys}{#if key.alt}<span>{key.alt}</span>{/if}</dt><dd>{key.does}</dd>
+			{/each}
 		</dl>
 
 
 		<p class="credit">
-			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>
-			of Heracles Papatheodorou and&nbsp;Claude
+			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">{t.help.creditLink}</a>
+			{t.help.credit}
 		</p>
 
 	</div>

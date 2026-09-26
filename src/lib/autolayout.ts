@@ -1,4 +1,5 @@
 import { parseColor } from './color';
+import { t } from './strings';
 import { GRID_MINOR } from './layout';
 import { marginsOf, newBox } from './template';
 import type { Box, Defaults, Mapping, PageSpec, Row } from './types';
@@ -83,15 +84,15 @@ export const FIELD_KINDS: FieldKind[] = [
 ];
 
 export const KIND_LABELS: Record<FieldKind, string> = {
-	title: 'Title',
-	subtitle: 'Subtitle',
-	body: 'Body',
-	label: 'Small line',
-	number: 'Number',
-	date: 'Date',
-	image: 'Picture',
-	link: 'QR code',
-	code: 'Code'
+	title: t.magic.kinds.title,
+	subtitle: t.magic.kinds.subtitle,
+	body: t.magic.kinds.body,
+	label: t.magic.kinds.label,
+	number: t.magic.kinds.number,
+	date: t.magic.kinds.date,
+	image: t.magic.kinds.image,
+	link: t.magic.kinds.link,
+	code: t.magic.kinds.code
 };
 
 // ---- reading a column ------------------------------------------------------

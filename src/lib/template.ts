@@ -1,4 +1,5 @@
 import { safeImageUrl } from './assets';
+import { fmt, t as ui } from './strings';
 import { clampSide, fitBoard } from './bitmap';
 import { parseColor } from './color';
 import defaultCard from './templates/default-card.json';
@@ -139,11 +140,11 @@ export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'dash', 'emdash', '
 
 /** Said with the glyph, since the glyph is the choice. */
 export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
-	bullet: '• Bullet',
-	disc: '● Disc',
-	dash: '– Dash',
-	emdash: '— Em Dash',
-	none: 'None'
+	bullet: ui.listMarkers.bullet,
+	disc: ui.listMarkers.disc,
+	dash: ui.listMarkers.dash,
+	emdash: ui.listMarkers.emdash,
+	none: ui.listMarkers.none
 };
 
 /** How far a list may be indented (em) or its items spaced (lines). */
@@ -256,7 +257,7 @@ export function builtinTemplate(): Template {
 export function blankTemplate(): Template {
 	return {
 		schema: SCHEMA_VERSION,
-		name: 'Untitled card',
+		name: ui.defaults.untitledCard,
 		page: { w: 148, h: 210, unit: 'mm', background: '#ffffff' },
 		bleed: { enabled: false, amount: 3, cropMarks: false },
 		print: { ...DEFAULT_PRINT_SETTINGS },
@@ -359,14 +360,14 @@ export function newBox(partial: Partial<Box> = {}): Box {
  * half-read.
  */
 export function normaliseTemplate(raw: unknown): Template {
-	if (!raw || typeof raw !== 'object') throw new Error('Not a template file.');
+	if (!raw || typeof raw !== 'object') throw new Error(ui.errors.notTemplate);
 	const t = raw as Record<string, any>;
 	const schema = Number(t.schema ?? SCHEMA_VERSION);
-	if (!Number.isFinite(schema)) throw new Error('Template is missing a schema version.');
+	if (!Number.isFinite(schema)) throw new Error(ui.errors.noSchema);
 	if (schema > SCHEMA_VERSION) {
-		throw new Error(`This template needs a newer version of the app (schema ${schema}).`);
+		throw new Error(fmt(ui.errors.newerSchema, { schema }));
 	}
-	if (!Array.isArray(t.boxes)) throw new Error('Template has no boxes.');
+	if (!Array.isArray(t.boxes)) throw new Error(ui.errors.noBoxes);
 
 	const boxes: Box[] = t.boxes.map((b: any) => newBox(b));
 	const ids = new Set(boxes.map((b) => b.id));
@@ -381,7 +382,7 @@ export function normaliseTemplate(raw: unknown): Template {
 
 	return {
 		schema: SCHEMA_VERSION,
-		name: typeof t.name === 'string' && t.name.trim() ? t.name.trim() : 'Untitled card',
+		name: typeof t.name === 'string' && t.name.trim() ? t.name.trim() : ui.defaults.untitledCard,
 		page: {
 			w: paper(t.page?.w, 148),
 			h: paper(t.page?.h, 210),

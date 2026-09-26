@@ -9,6 +9,7 @@
  * recording undo, and telling the user what happened.
  */
 import type { Align, Box, PageSpec, VAlign } from './types';
+import { t } from './strings';
 import { nextBoxId, stripUndefined } from './template';
 
 /** Group ids only have to be unique within one template. */
@@ -143,13 +144,13 @@ export const H_ALIGN: Align[] = ['left', 'center', 'right', 'justify'];
 export const V_ALIGN: VAlign[] = ['top', 'middle', 'bottom'];
 
 export const ALIGN_LABELS: Record<string, string> = {
-	left: 'left',
-	center: 'centred',
-	right: 'right',
-	justify: 'justified',
-	top: 'top',
-	middle: 'middle',
-	bottom: 'bottom'
+	left: t.alignEdges.left,
+	center: t.alignEdges.center,
+	right: t.alignEdges.right,
+	justify: t.alignEdges.justify,
+	top: t.alignEdges.top,
+	middle: t.alignEdges.middle,
+	bottom: t.alignEdges.bottom
 };
 
 /** Where one box lands after a step along an axis, and whether that moved it. */

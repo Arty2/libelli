@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { fmt, t } from '$lib/strings';
 	import PrintSheet from './PrintSheet.svelte';
 	import { swipe } from '$lib/gestures';
 	import { mmToPx } from '$lib/layout';
@@ -101,7 +102,7 @@
 <svelte:window onkeydown={onKeydown} />
 
 <div class="full" role="presentation" onclick={onclose} use:swipe={(by) => step(index + by)}>
-	<button class="plain close" onclick={onclose} title="Close" aria-label="Close">
+	<button class="plain close" onclick={onclose} title={t.common.close} aria-label={t.common.close}>
 		<Icon name="close" size={22} />
 	</button>
 
@@ -128,15 +129,15 @@
 	<!-- Under the sheet with the count between them, the same one control the
 	     card lightbox puts there. -->
 	<div class="nav-bar" role="presentation" onclick={(e) => e.stopPropagation()}>
-		<button class="plain" disabled={index === 0} onclick={() => step(index - 1)} aria-label="Previous sheet">
+		<button class="plain" disabled={index === 0} onclick={() => step(index - 1)} aria-label={t.sheetLightbox.previous}>
 			<Icon name="caret-left" size={26} />
 		</button>
-		<span class="counter">Sheet {index + 1} / {sheets.length}</span>
+		<span class="counter">{fmt(t.sheetLightbox.counter, { n: index + 1, total: sheets.length })}</span>
 		<button
 			class="plain"
 			disabled={index === sheets.length - 1}
 			onclick={() => step(index + 1)}
-			aria-label="Next sheet"
+			aria-label={t.sheetLightbox.next}
 		>
 			<Icon name="caret-right" size={26} />
 		</button>

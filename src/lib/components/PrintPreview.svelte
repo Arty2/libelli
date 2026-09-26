@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Card from './Card.svelte';
+	import { fmt, plural, t } from '$lib/strings';
 	import Icon from './Icon.svelte';
 	import Lightbox from './Lightbox.svelte';
 	import PrintSettingsPanel from './PrintSettingsPanel.svelte';
@@ -123,15 +124,15 @@
 				progress = { done: written, total: elements.length };
 			}
 			if (files.length) downloadBlob(`${stem}.zip`, new Blob([zipStore(files)], { type: 'application/zip' }));
-			const noun = imposed ? 'sheet' : 'page';
+			const s = t.printPreview;
 			onnotice(
-				`${written} PNG${written === 1 ? '' : 's'} exported at 300 dpi, one per ${noun}${files.length ? `, in ${stem}.zip` : ''}.` +
-					(missing.size
-						? ` ${[...missing].join(', ')} could not be embedded — upload the font file to export it as itself.`
-						: '')
+				plural(imposed ? s.exportedSheets : s.exportedPages, written) +
+					(files.length ? fmt(s.exportedZip, { file: `${stem}.zip` }) : '') +
+					s.exportedEnd +
+					(missing.size ? fmt(s.fontsNotEmbedded, { fonts: [...missing].join(', ') }) : '')
 			);
 		} catch (error) {
-			const reason = error instanceof Error ? error.message : 'That could not be exported.';
+			const reason = error instanceof Error ? error.message : t.printPreview.exportFailed;
 			// Which file it died on matters: the ones already saved are real, and
 			// saying nothing about them reads as though the whole run was lost.
 			// Nothing is saved until the end now — a single PNG, or the archive
@@ -235,7 +236,7 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Export">
+<div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label={t.printPreview.title}>
 	<!--
 		Two rows, each with one thing at either end and nothing in the middle to
 		align against: the name of the screen and the way out on the first, what
@@ -245,11 +246,11 @@
 	-->
 	<header>
 		<div class="header-row">
-			<h2>Export</h2>
+			<h2>{t.printPreview.title}</h2>
 			<!-- Unstyled, in the corner, where the lightbox puts its own: leaving
 			     is not one of the things you came here to do, and a button beside
 			     Print read as though it were. -->
-			<button class="close" onclick={onclose} title="Close" aria-label="Close">
+			<button class="close" onclick={onclose} title={t.common.close} aria-label={t.common.close}>
 				<Icon name="close" size={20} />
 			</button>
 		</div>
@@ -265,23 +266,21 @@
 			<p class="counts">
 				<button
 					class="count"
-					title="{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'} going. Press to {allChosen
-						? 'clear them and choose'
-						: 'take all of them'}."
+					title={plural(t.printPreview.pagesGoing, dataset.rows.length, { chosen }) +
+						(allChosen ? t.printPreview.pressToClear : t.printPreview.pressToTakeAll)}
 					onclick={() => setAll(!allChosen)}
 				>
-					{chosen} page{chosen === 1 ? '' : 's'}
+					{plural(t.printPreview.pages, chosen)}
 				</button>
 				{#if imposed}
 					<span class="divider">/</span>
 					<button
 						class="count"
-						title="{chosenSheets} of {sheetGroups.length} sheet{sheetGroups.length === 1
-							? ''
-							: 's'} going. Press to {allSheetsChosen ? 'clear them and choose' : 'take all of them'}."
+						title={plural(t.printPreview.sheetsGoing, sheetGroups.length, { chosen: chosenSheets }) +
+							(allSheetsChosen ? t.printPreview.pressToClear : t.printPreview.pressToTakeAll)}
 						onclick={() => setAllSheets(!allSheetsChosen)}
 					>
-						{chosenSheets} sheet{chosenSheets === 1 ? '' : 's'}
+						{plural(t.printPreview.sheets, chosenSheets)}
 					</button>
 				{/if}
 			</p>
@@ -290,15 +289,15 @@
 					<Icon name="download" size={15} />
 					{#if exporting}
 						{progress && progress.total > 1
-							? `Exporting ${Math.min(progress.done + 1, progress.total)}/${progress.total}…`
-							: 'Exporting…'}
+							? fmt(t.printPreview.exportingOf, { n: Math.min(progress.done + 1, progress.total), total: progress.total })
+							: t.printPreview.exporting}
 					{:else}
-						PNG
+						{t.printPreview.png}
 					{/if}
 				</button>
-				<button class="primary" onclick={onprint} disabled={goingOut === 0} title={withKey('Print the pages that are going', 'export')}>
+				<button class="primary" onclick={onprint} disabled={goingOut === 0} title={withKey(t.printPreview.printTitle, 'export')}>
 					<Icon name="print" size={15} />
-					Print
+					{t.printPreview.print}
 				</button>
 			</div>
 		</div>
@@ -319,7 +318,7 @@
 					style="width:{mmToPx(outerW) * thumbScale}px;height:{mmToPx(outerH) * thumbScale}px"
 					class:current={i === activeRow}
 					onclick={() => open(i)}
-					aria-label="Open card {i + 1} full screen"
+					aria-label={fmt(t.printPreview.openCard, { n: i + 1 })}
 				>
 					<span class="scaler" style="transform:scale({thumbScale})">
 						<Card
@@ -366,7 +365,7 @@
 		<!-- What Print (and a PNG export) will actually produce: the chosen cards
 		     above, tiled onto physical sheets exactly as PrintRoot.svelte renders
 		     them for real, only scaled down for the screen. -->
-		<section class="sheets" aria-label="Sheet preview">
+		<section class="sheets" aria-label={t.printPreview.sheetPreview}>
 			<div
 				class="grid sheet-grid"
 				class:narrow={sheetNarrow}
@@ -381,7 +380,7 @@
 							class="thumb sheet-thumb"
 							style="width:{mmToPx(printSheetW) * sheetThumbScale}px;height:{mmToPx(printSheetH) * sheetThumbScale}px"
 							onclick={() => (sheetFullscreen = i)}
-							aria-label="Open sheet {i + 1} full screen"
+							aria-label={fmt(t.printPreview.openSheet, { n: i + 1 })}
 						>
 							<span class="scaler" style="transform:scale({sheetThumbScale})">
 								<PrintSheet
@@ -405,7 +404,7 @@
 									checked={included}
 									onchange={(e) => toggleSheet(i, e.currentTarget.checked)}
 								/>
-								Sheet {i + 1}
+								{fmt(t.printPreview.sheetN, { n: i + 1 })}
 							</label>
 						</figcaption>
 					</figure>
@@ -418,19 +417,23 @@
 
 	<!-- Under the pages, not above them: the cards are what you came to look at,
 	     and these four settings are what to do once you have. -->
-	<section class="checklist" aria-label="Before you print">
-		<h3>Before you print</h3>
+	<section class="checklist" aria-label={t.printPreview.checklist}>
+		<h3>{t.printPreview.checklist}</h3>
 		<ol>
 			<li>
-				<strong>Paper size</strong> — the one matching <strong>{printSheetW} × {printSheetH} mm</strong>, or a larger sheet you trim.
-				{#if imposed}{template.print.count} cards per sheet{imposed.scale < 0.999 ? `, scaled to ${Math.round(imposed.scale * 100)}%` : ''}.{/if}
+				<strong>{t.printPreview.paperSize}</strong> — {t.printPreview.paperSizeBefore}<strong
+					>{fmt(t.printPreview.paperSizeValue, { w: printSheetW, h: printSheetH })}</strong
+				>{t.printPreview.paperSizeAfter}
+				{#if imposed}{fmt(t.printPreview.perSheet, { count: template.print.count })}{imposed.scale < 0.999
+						? fmt(t.printPreview.perSheetScaled, { percent: Math.round(imposed.scale * 100) })
+						: ''}{t.printPreview.perSheetEnd}{/if}
 			</li>
-			<li><strong>Margins</strong> — <em>None</em>.</li>
-			<li><strong>Headers and footers</strong> — off.</li>
-			<li><strong>Background graphics</strong> — on, or the browser drops the paper color.</li>
+			<li><strong>{t.printPreview.margins}</strong> — <em>{t.printPreview.marginsValue}</em>.</li>
+			<li><strong>{t.printPreview.headers}</strong> — {t.printPreview.headersValue}</li>
+			<li><strong>{t.printPreview.backgrounds}</strong> — {t.printPreview.backgroundsValue}</li>
 		</ol>
 		<p class="muted">
-			A PNG export needs none of this — it comes out at 300 dpi whatever the print dialog says.
+			{t.printPreview.pngNote}
 		</p>
 	</section>
 

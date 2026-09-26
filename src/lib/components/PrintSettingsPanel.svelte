@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { fmt, t } from '$lib/strings';
 	import { safeImageUrl } from '$lib/assets';
 	import { IMPOSITION_COUNTS, foldsIntoAZine, resolveImposition } from '$lib/imposition';
 	import { bleedFor } from '$lib/layout';
@@ -150,21 +151,18 @@
 		if (template.print.order !== 'zine') return undefined;
 		if (!foldsIntoAZine(template.print.count)) {
 			return {
-				label: 'Folds at 2-up or 8-up',
-				title:
-					'Only two up and eight up fold into a zine: two is a stapled booklet, eight the sheet that is folded and cut into a mini zine. Any other count prints in reading order.'
+				label: t.printSettings.zineNoFold,
+				title: t.printSettings.zineNoFoldTitle
 			};
 		}
 		return template.print.count === 2
 			? {
-					label: 'Fold, nest, staple',
-					title:
-						'Each sheet comes out as its front and then its back: print double-sided, flipped on the long edge. Fold the stack in half, one sheet inside another, and staple the spine.'
+					label: t.printSettings.zineStaple,
+					title: t.printSettings.zineStapleTitle
 				}
 			: {
-					label: 'Fold three times, cut the middle',
-					title:
-						'Eight pages on one side of one sheet. Fold it in half three times, unfold, cut along the middle fold between the two centre panels, then fold it back and collapse it into a zine.'
+					label: t.printSettings.zineMini,
+					title: t.printSettings.zineMiniTitle
 				};
 	});
 
@@ -173,11 +171,11 @@
 	}
 
 	function linkBackground() {
-		const url = window.prompt('Address of the sheet background image', template.print.background?.src ?? 'https://');
+		const url = window.prompt(t.printSettings.imageAddressPrompt, template.print.background?.src ?? 'https://');
 		if (url === null) return;
 		const safe = safeImageUrl(url);
 		if (!safe) {
-			onnotice('A background image has to be an http or https address.', 'warning');
+			onnotice(t.printSettings.imageAddressInvalid, 'warning');
 			return;
 		}
 		setBackground({ src: safe, source: 'url', fit: template.print.background?.fit ?? 'cover' });
@@ -194,16 +192,16 @@
 <!-- The card's own bleed, here rather than only in the Card size group: it is a
      print decision, and the print screen is where you are when you notice the
      cards need one. -->
-<span class="group" role="group" aria-label="Page bleed">
+<span class="group" role="group" aria-label={t.printSettings.pageBleedLabel}>
 	<label class="check">
 		<input
 			type="checkbox"
 			checked={template.bleed.enabled}
 			disabled={pageFrozen}
-			title="Also the gap between cards, and the crop marks between them, when several are printed to a sheet"
+			title={t.printSettings.pageBleedTitle}
 			onchange={(e) => patchBleed({ enabled: e.currentTarget.checked })}
 		/>
-		Page Bleed
+		{t.printSettings.pageBleed}
 	</label>
 	{#if template.bleed.enabled}
 		<label class="field">
@@ -212,12 +210,12 @@
 				type="number"
 				step="0.5"
 				min="0"
-				aria-label="Page bleed amount"
+				aria-label={t.printSettings.pageBleedAmount}
 				value={template.bleed.amount}
 				disabled={pageFrozen}
 				onchange={(e) => patchBleed({ amount: distance(e, template.bleed.amount) })}
 			/>
-			<span class="unit">mm</span>
+			<span class="unit">{t.units.mm}</span>
 		</label>
 		<label class="check">
 			<input
@@ -226,7 +224,7 @@
 				disabled={pageFrozen}
 				onchange={(e) => patchBleed({ cropMarks: e.currentTarget.checked })}
 			/>
-			Crop Marks
+			{t.printSettings.cropMarks}
 		</label>
 	{/if}
 
@@ -241,10 +239,10 @@
 				type="checkbox"
 				checked={template.print.bleed.enabled}
 				disabled={pageFrozen}
-				title="An outset on the paper around the sheet, for printing a sheet that runs to its own edge"
+				title={t.printSettings.sheetBleedTitle}
 				onchange={(e) => patchSheetBleed({ enabled: e.currentTarget.checked })}
 			/>
-			Sheet Bleed
+			{t.printSettings.sheetBleed}
 		</label>
 		{#if template.print.bleed.enabled}
 			<label class="field">
@@ -253,12 +251,12 @@
 					type="number"
 					step="0.5"
 					min="0"
-					aria-label="Sheet bleed amount"
+					aria-label={t.printSettings.sheetBleedAmount}
 					value={template.print.bleed.amount}
 					disabled={pageFrozen}
 					onchange={(e) => patchSheetBleed({ amount: distance(e, template.print.bleed.amount) })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 			</label>
 			<!-- Under the sheet's bleed, the way Crop Marks sits under the page's.
 			     These marks say where to cut the sheet down to its own edge, which
@@ -269,21 +267,21 @@
 					type="checkbox"
 					checked={template.print.bleed.cropMarks}
 					disabled={pageFrozen}
-					title="Marks at the corners of the tiled block, for the cut that takes it off the sheet"
+					title={t.printSettings.sheetCropMarksTitle}
 					onchange={(e) => patchSheetBleed({ cropMarks: e.currentTarget.checked })}
 				/>
-				Sheet Crop Marks
+				{t.printSettings.sheetCropMarks}
 			</label>
 		{/if}
 	{/if}
 </span>
 
-<span class="group" role="group" aria-label="Print Settings">
+<span class="group" role="group" aria-label={t.printSettings.label}>
 	<label class="field">
-		<span>Pages per Sheet</span>
+		<span>{t.printSettings.perSheet}</span>
 		<select
 			bind:this={perSheetSelect}
-			title="Print several cards to one physical sheet"
+			title={t.printSettings.perSheetTitle}
 			disabled={pageFrozen}
 			onchange={(e) => {
 				const value = e.currentTarget.value;
@@ -294,37 +292,37 @@
 				patchPrint({ enabled: true, count: Number(value) as PrintSettings['count'] });
 			}}
 		>
-			<option value="">Off</option>
+			<option value="">{t.printSettings.off}</option>
 			{#each IMPOSITION_COUNTS as count (count)}
-				<option value={count}>{count}-up</option>
+				<option value={count}>{fmt(t.printSettings.nUp, { n: count })}</option>
 			{/each}
 		</select>
 	</label>
 	{#if template.print.enabled}
 		<label class="field">
-			<span>Order</span>
+			<span>{t.printSettings.order}</span>
 			<select
 				value={template.print.order}
-				title="Sequential fills each sheet in reading order, to cut apart. Zinemaker lays the pages out so that folding the sheet gives a booklet that reads 1, 2, 3"
+				title={t.printSettings.orderTitle}
 				disabled={pageFrozen}
 				onchange={(e) => patchPrint({ order: e.currentTarget.value as SheetOrder })}
 			>
-				<option value="sequential">Sequential</option>
-				<option value="zine">Zinemaker</option>
+				<option value="sequential">{t.printSettings.sequential}</option>
+				<option value="zine">{t.printSettings.zine}</option>
 			</select>
 		</label>
 		{#if zineHint}
 			<span class="field-label" title={zineHint.title}>{zineHint.label}</span>
 		{/if}
 		<label class="field">
-			<span>Sheet</span>
+			<span>{t.printSettings.sheet}</span>
 			<select
 				bind:this={sheetPresetSelect}
-				title="The physical paper the cards print onto"
+				title={t.printSettings.sheetTitle}
 				disabled={pageFrozen}
 				onchange={(e) => setPreset(e.currentTarget.value)}
 			>
-				<option value="">Custom</option>
+				<option value="">{t.printSettings.custom}</option>
 				{#each PAGE_PRESETS as option (option.name)}
 					<option value={option.name}>{option.name}</option>
 				{/each}
@@ -332,7 +330,7 @@
 		</label>
 		{#if showSize}
 			<label class="field">
-				<span>Width</span>
+				<span>{t.printSettings.width}</span>
 				<input
 					class="n-3"
 					type="number"
@@ -342,10 +340,10 @@
 					disabled={pageFrozen}
 					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, w: paper(e, template.print.sheet.w) } })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 			</label>
 			<label class="field">
-				<span>Height</span>
+				<span>{t.printSettings.height}</span>
 				<input
 					class="n-3"
 					type="number"
@@ -355,7 +353,7 @@
 					disabled={pageFrozen}
 					onchange={(e) => patchPrint({ sheet: { ...template.print.sheet, h: paper(e, template.print.sheet.h) } })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 			</label>
 		{/if}
 		<!-- Auto is the default and the interesting one: the count and the card
@@ -366,32 +364,32 @@
 		     beside it says what Auto settled on, because an orientation nothing
 		     reports is one you find out about at the printer. -->
 		<label class="field">
-			<span>Orientation</span>
+			<span>{t.printSettings.orientation}</span>
 			<select
 				value={template.print.orientation}
-				title="Which way round the paper goes. Auto turns it to whichever way fits these cards with the least shrinking."
+				title={t.printSettings.orientationTitle}
 				disabled={pageFrozen}
 				onchange={(e) => setOrientation(e.currentTarget.value as SheetOrientation)}
 			>
-				<option value="auto">Auto</option>
-				<option value="portrait">Portrait</option>
-				<option value="landscape">Landscape</option>
+				<option value="auto">{t.printSettings.auto}</option>
+				<option value="portrait">{t.printSettings.portrait}</option>
+				<option value="landscape">{t.printSettings.landscape}</option>
 			</select>
 		</label>
 		{#if autoTurned && fit}
-			<span class="field-label" title="What Auto settled on for this count and this card: {fit.sheetW} × {fit.sheetH}mm">
-				{fit.orientation === 'landscape' ? 'Landscape' : 'Portrait'}
+			<span class="field-label" title={fmt(t.printSettings.autoSettledTitle, { w: fit.sheetW, h: fit.sheetH })}>
+				{fit.orientation === 'landscape' ? t.printSettings.landscape : t.printSettings.portrait}
 			</span>
 		{/if}
 		{#if fit && fit.scale < 0.999}
 			<span
 				class="field-label"
-				title="These cards do not fit this sheet at their own size in any orientation, so print shrinks every card on the sheet together to fit"
+				title={t.printSettings.scaledTitle}
 			>
-				Scaled to {Math.round(fit.scale * 100)}%
+				{fmt(t.printSettings.scaled, { percent: Math.round(fit.scale * 100) })}
 			</span>
 		{/if}
-		<span class="field-label">Sheet Image</span>
+		<span class="field-label">{t.printSettings.sheetImage}</span>
 		{#if template.print.background}
 			<span class="asset" title={template.print.background.src}>
 				<Icon name={template.print.background.source === 'url' ? 'link' : 'image'} size={12} />
@@ -399,19 +397,19 @@
 			</span>
 			<select
 				value={template.print.background.fit}
-				title="How the image fills the sheet"
+				title={t.printSettings.fitTitle}
 				disabled={pageFrozen}
 				onchange={(e) =>
 					setBackground({ ...template.print.background!, fit: e.currentTarget.value as BackgroundFit })}
 			>
-				<option value="cover">Cover</option>
-				<option value="contain">Contain</option>
-				<option value="repeat">Tile</option>
+				<option value="cover">{t.imageFit.cover}</option>
+				<option value="contain">{t.imageFit.contain}</option>
+				<option value="repeat">{t.imageFit.tile}</option>
 			</select>
 			<button
 				class="square"
-				title="Remove the sheet background image"
-				aria-label="Remove the sheet background image"
+				title={t.printSettings.removeImage}
+				aria-label={t.printSettings.removeImage}
 				disabled={pageFrozen}
 				onclick={() => setBackground(undefined)}
 			>
@@ -420,11 +418,11 @@
 		{:else}
 			<button
 				disabled={pageFrozen}
-				title="A file from this machine; the picture stays in this browser, the template only names it"
-				onclick={() => imageInput?.click()}><Icon name="image-reference" size={14} /> Upload…</button
+				title={t.printSettings.uploadTitle}
+				onclick={() => imageInput?.click()}><Icon name="image-reference" size={14} /> {t.printSettings.upload}</button
 			>
-			<button disabled={pageFrozen} title="An http(s) address the template will carry as written" onclick={linkBackground}
-				><Icon name="copy-link" size={14} /> URL…</button
+			<button disabled={pageFrozen} title={t.printSettings.urlTitle} onclick={linkBackground}
+				><Icon name="copy-link" size={14} /> {t.printSettings.url}</button
 			>
 		{/if}
 	{/if}

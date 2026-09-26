@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { fmt, plural, t } from '$lib/strings';
 	import Icon from './Icon.svelte';
 	import { download } from '$lib/download';
 	import { hold } from '$lib/gestures';
@@ -149,7 +150,7 @@
 	 * setting you look up.
 	 */
 	const ROW_HEIGHTS: RowHeight[] = ['short', 'medium', 'full'];
-	const ROW_HEIGHT_LABELS: Record<RowHeight, string> = { short: 'Short', medium: 'Long', full: 'Full' };
+	const ROW_HEIGHT_LABELS: Record<RowHeight, string> = { short: t.table.rowShort, medium: t.table.rowLong, full: t.table.rowFull };
 	/** Carbon's: the ruled table for one line a row, fit to screen, fit to height. */
 	const ROW_HEIGHT_ICONS: Record<RowHeight, string> = { short: 'table', medium: 'fit-to-screen', full: 'fit-to-height' };
 	const nextRowHeight = $derived(ROW_HEIGHTS[(ROW_HEIGHTS.indexOf(rowHeight) + 1) % ROW_HEIGHTS.length]);
@@ -249,7 +250,7 @@
 
 	const countLabel = (value: string) => {
 		const { characters, words } = countText(value);
-		return `${characters} character${characters === 1 ? '' : 's'} · ${words} word${words === 1 ? '' : 's'}`;
+		return `${plural(t.table.characters, characters)} · ${plural(t.table.words, words)}`;
 	};
 
 	/**
@@ -573,7 +574,7 @@
 	let unsorted = $state<Row[] | null>(null);
 	let pasteText = $state('');
 	/** Two rows of two tab-separated cells: what comes off a spreadsheet. */
-	const PASTE_EXAMPLE = 'Bellwether\tA quiet start\nCatalogue\tThe second card';
+	const PASTE_EXAMPLE = t.table.pasteExample;
 	let fileInput = $state<HTMLInputElement | null>(null);
 
 	/**
@@ -702,7 +703,7 @@
 		if (field) field.value = to;
 		if (to === from) return;
 		if (dataset.columns.includes(to)) {
-			onnotice(`There is already a column called “${to}”.`, 'warning');
+			onnotice(fmt(t.table.columnExists, { name: to }), 'warning');
 			return;
 		}
 		const columns = dataset.columns.map((c, i) => (i === index ? to : c));
@@ -766,7 +767,7 @@
 		expanded = new Set();
 		onchange(restored);
 		onactivate(previewed);
-		onnotice('Back to the order the rows came in.');
+		onnotice(t.table.unsorted);
 	}
 
 	/**
@@ -778,14 +779,14 @@
 		if (locked) return;
 		const wanted = name === undefined ? undefined : columnName(name) || undefined;
 		if (wanted && dataset.columns.includes(wanted)) {
-			onnotice(`There is already a column called \u201c${wanted}\u201d.`, 'warning');
+			onnotice(fmt(t.table.columnExists, { name: wanted }), 'warning');
 			return;
 		}
 		let column = wanted ?? '';
 		if (!column) {
 			let n = dataset.columns.length + 1;
-			while (dataset.columns.includes(`Column-${n}`)) n++;
-			column = `Column-${n}`;
+			while (dataset.columns.includes(fmt(t.defaults.column, { n }))) n++;
+			column = fmt(t.defaults.column, { n });
 		}
 		const columns = [...dataset.columns, column];
 		// The first column brings a row with it. A column with nothing under it
@@ -825,7 +826,7 @@
 			})
 		});
 		resetWidth(column);
-		onnotice(`Deleted the column \u201c${column}\u201d. Ctrl/Cmd+Z brings it back.`);
+		onnotice(fmt(t.table.columnDeleted, { name: column }));
 	}
 
 	/** How many cells go with a column, which is what the question is about. */
@@ -996,7 +997,7 @@
 		selectedRows = new Set();
 		onchange({ ...dataset, rows });
 		if (activeRow >= rows.length) onactivate(Math.max(0, rows.length - 1));
-		onnotice(`Deleted ${gone.size} row${gone.size === 1 ? '' : 's'}. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`);
+		onnotice(plural(t.table.rowsDeleted, gone.size));
 	}
 
 	/**
@@ -1013,7 +1014,7 @@
 		const bare = dataset.columns.length === 0;
 		const parsed = parseTable(pasteText, bare ? {} : { header: false });
 		if (!parsed.rows.length && !parsed.columns.length) {
-			onnotice('Nothing recognisable in there.', 'warning');
+			onnotice(t.table.nothingRecognisable, 'warning');
 			return;
 		}
 		commitImport(parsed, mode);
@@ -1023,14 +1024,14 @@
 
 	function commitImport(parsed: Dataset, mode: 'replace' | 'append') {
 		if (locked) {
-			onnotice('The table is locked — unlock it to paste or import into it.', 'warning');
+			onnotice(t.table.lockedImport, 'warning');
 			return;
 		}
 		// The one place the emptiness policy is decided, for the paste and the
 		// file import alike — see `wouldEmptyTable`. A mis-click in a file picker
 		// should not cost you the table.
 		if (wouldEmptyTable(dataset, parsed, mode)) {
-			onnotice('Nothing readable as rows in there — the table is unchanged.', 'warning');
+			onnotice(t.table.nothingReadable, 'warning');
 			return;
 		}
 		const rows = dataset.columns.length ? realign(parsed) : parsed.rows;
@@ -1044,7 +1045,7 @@
 		sortedBy = null;
 		unsorted = null;
 		selectedRows = new Set();
-		onnotice(`${rows.length} row${rows.length === 1 ? '' : 's'} ${mode === 'append' ? 'added' : 'loaded'}.`);
+		onnotice(plural(mode === 'append' ? t.table.rowsAdded : t.table.rowsLoaded, rows.length));
 	}
 
 	/** Incoming rows, laid into the columns this table already has. */
@@ -1094,16 +1095,16 @@
 			// No clipboard at all (an insecure origin) or permission refused. There
 			// is no silent fallback worth having — the old execCommand path needs a
 			// visible selection — so it says so and points at the one that works.
-			onnotice('This browser would not hand over the clipboard. Export CSV instead.', 'warning');
+			onnotice(t.table.clipboardRefused, 'warning');
 			return;
 		}
-		onnotice(`${rows.length} row${rows.length === 1 ? '' : 's'} copied, ready to paste into a spreadsheet.`);
+		onnotice(plural(t.table.rowsCopied, rows.length));
 	}
 
 	/** The table as it stands, back out as a file. Nothing leaves the browser. */
 	function exportCsv() {
 		download('card-data.csv', toCsv(dataset), 'text/csv');
-		onnotice(`${dataset.rows.length} row${dataset.rows.length === 1 ? '' : 's'} exported as CSV.`);
+		onnotice(plural(t.table.rowsExported, dataset.rows.length));
 	}
 </script>
 
@@ -1113,7 +1114,7 @@
 	class="data"
 	class:rows-short={rowHeight === 'short'}
 	class:rows-full={rowHeight === 'full'}
-	aria-label="Card data"
+	aria-label={t.table.label}
 >
 	<div class="scroll" bind:this={scrollEl}>
 		<table style="min-width:{tableWidth}px">
@@ -1157,21 +1158,21 @@
 								class="tick"
 								role="checkbox"
 								aria-checked={allChosen ? 'true' : someChosen ? 'mixed' : 'false'}
-								title={allChosen ? 'Drop every row' : 'Choose every row'}
-								aria-label={allChosen ? 'Drop every row' : 'Choose every row'}
+								title={allChosen ? t.table.dropAll : t.table.chooseAll}
+								aria-label={allChosen ? t.table.dropAll : t.table.chooseAll}
 								onclick={toggleAll}
 							></button>
 						{/if}
 						{#if sortedBy}
 							<button
 								class="icon unsort"
-								title="Sorted by “{sortedBy.column}” — press to put the rows back in the order they arrived in"
-								aria-label="Clear the sorting"
+								title={fmt(t.table.sortedTitle, { column: sortedBy.column })}
+								aria-label={t.table.clearSort}
 								disabled={locked}
 								onclick={clearSort}
 							><Icon name="activity" size={14} /></button>
 						{:else if !dataset.rows.length}
-							<span class="sr-only">Row</span>
+							<span class="sr-only">{t.table.row}</span>
 						{/if}
 						</span>
 					</th>
@@ -1195,8 +1196,8 @@
 								     to the column, where a new area goes. -->
 								<button
 									class="icon unused"
-									title="No area uses “{column}” — press to place it on the card, or write {`{{${column}}}`} in an area"
-									aria-label="Place {column} on the card"
+									title={fmt(t.table.unusedTitle, { column, placeholder: `{{${column}}}` })}
+									aria-label={fmt(t.table.place, { column })}
 									onclick={() => onplacecolumn(column)}
 								><Icon name="unlink" size={12} /></button>
 							{/if}
@@ -1204,8 +1205,8 @@
 								class="column-name"
 								value={column}
 								readonly={locked}
-								aria-label="Rename column {column}"
-								title={locked ? column : 'Rename this column — drag it sideways to move it'}
+								aria-label={fmt(t.table.rename, { column })}
+								title={locked ? column : t.table.renameTitle}
 								onchange={(e) => renameColumn(i, e.currentTarget.value, e.currentTarget)}
 							/>
 							<span class="column-tools">
@@ -1216,10 +1217,10 @@
 									class:on={sortedBy?.column === column}
 									title={sortedBy?.column === column
 										? sortedBy.direction === 'asc'
-											? `Sort ${column} Z to A`
-											: 'Back to the order the rows came in'
-										: `Sort rows by ${column}, A to Z`}
-									aria-label="Sort rows by {column}"
+											? fmt(t.table.sortDesc, { column })
+											: t.table.sortClear
+										: fmt(t.table.sortAsc, { column })}
+									aria-label={fmt(t.table.sort, { column })}
 									disabled={locked}
 									onclick={() => sortBy(column)}
 								>
@@ -1237,9 +1238,9 @@
 								     keyboard still reaches them, since a focused name shows them. -->
 								{#if !locked}
 									<span class="column-move">
-										<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
-										<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
-										<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
+										<button class="icon" title={t.table.moveLeftTitle} aria-label={fmt(t.table.moveLeft, { column })} disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
+										<button class="icon" title={t.table.moveRightTitle} aria-label={fmt(t.table.moveRight, { column })} disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
+										<button class="icon" title={t.table.deleteColumnTitle} aria-label={fmt(t.table.deleteColumnLabel, { column })} onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
 									</span>
 								{/if}
 							</span>
@@ -1253,7 +1254,7 @@
 								class="resize"
 								class:on={resizing?.column === column}
 								role="presentation"
-								title="Drag to set this column's width — double-click for the default"
+								title={t.table.resizeTitle}
 								onpointerdown={(e) => startResize(e, column)}
 								onpointermove={moveResize}
 								onpointerup={endResize}
@@ -1267,7 +1268,7 @@
 						     already editable in place. -->
 						<th class="ghost" scope="col">
 							{#if !locked}
-								<button class="icon add" title="Add a column" aria-label="Add a column" onclick={() => addColumn()}>
+								<button class="icon add" title={t.table.addColumn} aria-label={t.table.addColumn} onclick={() => addColumn()}>
 									<Icon name="add" size={16} />
 								</button>
 							{/if}
@@ -1296,8 +1297,8 @@
 								class="tick"
 								role="checkbox"
 								aria-checked={selectedRows.has(i)}
-								title="Choose this row as well"
-								aria-label="Choose row {rowLabel(row, i)}"
+								title={t.table.chooseRowTitle}
+								aria-label={fmt(t.table.chooseRow, { n: rowLabel(row, i) })}
 								onclick={(e) => {
 									// Not the row's own click: the tick builds a set without
 									// moving the preview off the card you are looking at.
@@ -1319,7 +1320,8 @@
 								role="presentation"
 								title={locked
 									? undefined
-									: `Drag to move this row${selectedRows.has(i) && selectedRows.size > 1 ? ' and the other chosen rows' : ''}. ${expanded.has(i) ? 'Double-click to put this row back' : 'Double-click to show this whole row'}`}
+									: (selectedRows.has(i) && selectedRows.size > 1 ? t.table.dragRows : t.table.dragRow) +
+										(expanded.has(i) ? t.table.collapseRow : t.table.expandRow)}
 								onpointerdown={(e) => startRowDrag(e, i)}
 								onpointermove={moveRowDrag}
 								onpointerup={endRowDrag}
@@ -1353,8 +1355,8 @@
 								<!-- Press and hold for the whole cell in a dialog of its own. -->
 								<textarea
 									rows="1"
-									aria-label="{column}, row {rowLabel(row, i)}"
-									title={locked ? undefined : 'Press and hold to open this cell full size'}
+									aria-label={fmt(t.table.cell, { column, n: rowLabel(row, i) })}
+									title={locked ? undefined : t.table.cellTitle}
 									value={row[column] ?? ''}
 									readonly={locked}
 									use:hold={() => !locked && openBigCell(i, column)}
@@ -1379,8 +1381,8 @@
 									class="more"
 									tabindex="-1"
 									disabled={locked}
-									title="Show all of this cell"
-									aria-label="Show all of {column}, row {rowLabel(row, i)}"
+									title={t.table.moreTitle}
+									aria-label={fmt(t.table.more, { column, n: rowLabel(row, i) })}
 									onclick={(e) => {
 										e.stopPropagation();
 										openBigCell(i, column);
@@ -1400,10 +1402,9 @@
 						     nothing was below it was the whole of the trouble. -->
 						<td class="empty" colspan={dataset.columns.length + 2}>
 							{#if dataset.columns.length}
-								No rows yet. Paste from a spreadsheet, import a CSV, or add a row with the + below.
+								{t.table.noRows}
 							{:else}
-								Nothing here yet. Paste from a spreadsheet, import a CSV, or add a column with
-								the + above — it arrives with a row in it.
+								{t.table.noColumns}
 							{/if}
 						</td>
 					</tr>
@@ -1412,7 +1413,7 @@
 					<!-- One button under the last row, centred on the gutter it sits in. -->
 					<tr class="ghost-row">
 						<td class="gutter">
-							<button class="icon add" title="Add a row" aria-label="Add a row" onclick={() => addRow()}>
+							<button class="icon add" title={t.table.addRow} aria-label={t.table.addRow} onclick={() => addRow()}>
 								<Icon name="add" size={16} />
 							</button>
 						</td>
@@ -1431,7 +1432,7 @@
 			     while one is typed in: which row it is at the start, where the
 			     table's name usually is, and its count at the end, where the count
 			     always is. The editor above keeps the column's name and the ×. -->
-			<span class="big-row">Row {rowLabel(dataset.rows[bigCell.row], bigCell.row)}</span>
+			<span class="big-row">{fmt(t.table.rowN, { n: rowLabel(dataset.rows[bigCell.row], bigCell.row) })}</span>
 			<span class="spacer"></span>
 			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
 		{:else}
@@ -1441,8 +1442,8 @@
 		     are at; the title, the next. -->
 		<button
 			class="row-height"
-			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
-			aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
+			title={fmt(t.table.rowHeightTitle, { now: ROW_HEIGHT_LABELS[rowHeight], next: ROW_HEIGHT_LABELS[nextRowHeight] })}
+			aria-label={fmt(t.table.rowHeight, { now: ROW_HEIGHT_LABELS[rowHeight] })}
 			onclick={() => onrowheight(nextRowHeight)}
 		>
 			<Icon name={ROW_HEIGHT_ICONS[rowHeight]} size={15} />
@@ -1453,11 +1454,11 @@
 			     whole of it. Mousedown is held off, or the field would lose its
 			     focus, and with it this button, before the click. -->
 			<button
-				title="Open this cell in the table's full room — the same as pressing and holding it"
+				title={t.table.editTitle}
 				disabled={locked}
 				onmousedown={(e) => e.preventDefault()}
 				onclick={() => editing && openBigCell(editing.row, editing.column)}
-			><Icon name="task-edit" size={15} /> Edit</button>
+			><Icon name="task-edit" size={15} /> {t.table.edit}</button>
 		{/if}
 		<!-- Which table, and its lock, gone while rows are chosen or a cell is
 		     typed in: the row actions or the cell's Edit and count take the bar
@@ -1470,22 +1471,22 @@
 			<button
 				class="lock-toggle"
 				aria-pressed={locked}
-				title={locked ? 'Unlock the table' : 'Lock the table — no typing, no new rows or columns, no paste or import'}
+				title={locked ? t.table.unlockTable : t.table.lockTable}
 				onclick={() => onlock(!locked)}
 			>
 				<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
-				{locked ? 'Unlock' : 'Lock'}
+				{locked ? t.common.unlock : t.common.lock}
 			</button>
 			<!-- What table this is, beside its lock: the buttons act on it, and it
 			     is the one control here that is a name rather than an act. One
 			     design prints any number of tables, so this is not the template
 			     picker's second half: the two are switched independently. -->
 			<label class="picker" bind:this={pickerEl}>
-				<span>Table</span>
+				<span>{t.table.table}</span>
 				<input
 					value={tableName}
 					placeholder={UNTITLED_TABLE}
-					aria-label="Table name"
+					aria-label={t.table.tableName}
 					readonly={locked}
 					onchange={(e) => onrenametable(e.currentTarget.value)}
 				/>
@@ -1493,8 +1494,8 @@
 					class="caret"
 					aria-haspopup="menu"
 					aria-expanded={pickerOpen}
-					title="{tables.length} table{tables.length === 1 ? '' : 's'} in this browser"
-					aria-label="Saved tables"
+					title={plural(t.table.libraryTitle, tables.length)}
+					aria-label={t.table.library}
 					onclick={togglePicker}
 				>
 					<Icon name="caret-down" size={18} />
@@ -1534,7 +1535,7 @@
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="add" size={14} /></span>
-								New table…
+								{t.table.newTable}
 							</button>
 						</li>
 						<!-- Never over the open table's rows: it opens a table that already
@@ -1543,14 +1544,14 @@
 						<li role="none">
 							<button
 								role="menuitem"
-								title="The cards that walk through the app, in a table of their own — your tables are untouched"
+								title={t.table.gettingStartedTitle}
 								onclick={() => {
 									pickerOpen = false;
 									ongettingstarted();
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="information-square" size={14} /></span>
-								Getting Started
+								{t.table.gettingStarted}
 							</button>
 						</li>
 						<!-- And below the next, what can be done to the open table: rows in,
@@ -1560,42 +1561,42 @@
 							<button
 								role="menuitem"
 								disabled={locked}
-								title="Paste a block of cells straight off a spreadsheet"
+								title={t.table.pasteTitle}
 								onclick={() => {
 									pickerOpen = false;
 									pasteOpen = true;
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="task-add" size={14} /></span>
-								Paste…
+								{t.table.paste}
 							</button>
 						</li>
 						<li role="none">
 							<button
 								role="menuitem"
 								disabled={locked}
-								title="Replace the rows with a CSV file"
+								title={t.table.importTitle}
 								onclick={() => {
 									pickerOpen = false;
 									fileInput?.click();
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="table-shortcut" size={14} /></span>
-								Import…
+								{t.table.import}
 							</button>
 						</li>
 						<li role="none">
 							<button
 								role="menuitem"
 								disabled={!dataset.columns.length}
-								title="Save the rows as a CSV file"
+								title={t.table.exportTitle}
 								onclick={() => {
 									pickerOpen = false;
 									exportCsv();
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="table-built" size={14} /></span>
-								Export
+								{t.table.export}
 							</button>
 						</li>
 						<li role="none">
@@ -1603,14 +1604,14 @@
 								class="danger"
 								role="menuitem"
 								disabled={locked}
-								title="Delete this table from this browser. Your design is not touched."
+								title={t.table.deleteTitle}
 								onclick={() => {
 									pickerOpen = false;
 									ondeletetable();
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="trash" size={14} /></span>
-								Delete…
+								{t.table.delete}
 							</button>
 						</li>
 					</ul>
@@ -1625,9 +1626,9 @@
 				class="icon"
 				disabled={!previousTable}
 				title={previousTable
-					? `Back to “${tables.find((t) => t.id === previousTable)?.name ?? UNTITLED_TABLE}”`
-					: 'Nothing to swap back to yet — this is the only table you have opened'}
-				aria-label="Swap to the previous table"
+					? fmt(t.table.swapTo, { name: tables.find((table) => table.id === previousTable)?.name ?? UNTITLED_TABLE })
+					: t.table.swapNothing}
+				aria-label={t.table.swap}
 				onclick={onswaptable}
 			><Icon name="arrows-horizontal" size={15} /></button>
 		{/if}
@@ -1654,33 +1655,33 @@
 			     should read as a button that does, not as a mark beside a count. -->
 			<span class="rule"></span>
 			<!-- "3 rows"; one row says nothing — the tick beside it already does. -->
-			{#if chosenRows.length > 1}<span class="chosen-count">{chosenRows.length} rows</span>{/if}
+			{#if chosenRows.length > 1}<span class="chosen-count">{plural(t.table.rows, chosenRows.length)}</span>{/if}
 			<!-- Up and down first: they are about where the rows are, before what
 			     is done with them. Icon-only, the pair reads as one control. -->
 			<button
 				class="icon"
-				title="Move the chosen rows up — earlier in print order"
-				aria-label="Move the chosen rows up"
+				title={t.table.rowsUpTitle}
+				aria-label={t.table.rowsUp}
 				disabled={locked || chosenRows[0] === 0}
 				onclick={() => moveChosen(-1)}
 			><span class="nudge-up"><Icon name="chevron-sort-up" size={20} /></span></button>
 			<button
 				class="icon"
-				title="Move the chosen rows down — later in print order"
-				aria-label="Move the chosen rows down"
+				title={t.table.rowsDownTitle}
+				aria-label={t.table.rowsDown}
 				disabled={locked || chosenRows[chosenRows.length - 1] === dataset.rows.length - 1}
 				onclick={() => moveChosen(1)}
 			><span class="nudge-down"><Icon name="chevron-sort-down" size={20} /></span></button>
 			<button
-				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
+				title={t.table.copyTitle}
 				onclick={copyTsv}
-			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
+			><Icon name="copy-to-clipboard" size={15} /> {t.table.copy}</button>
 			<button
 				class="danger"
-				title="Delete the chosen rows"
+				title={t.table.deleteRowsTitle}
 				disabled={locked}
 				onclick={deleteChosen}
-			><Icon name="trash" size={15} /> Delete</button>
+			><Icon name="trash" size={15} /> {t.common.delete}</button>
 		{/if}
 		{/if}
 		<input
@@ -1703,7 +1704,7 @@
 			<div class="cell-editor-head">
 				<h2 id="cell-editor-title">{open.column}</h2>
 				<span class="spacer"></span>
-				<button class="icon close" title="Back to the table (Esc)" aria-label="Close" onclick={closeBigCell}>
+				<button class="icon close" title={t.table.closeCellTitle} aria-label={t.common.close} onclick={closeBigCell}>
 					<Icon name="close" size={18} />
 				</button>
 			</div>
@@ -1727,38 +1728,37 @@
 {#if confirmColumn !== null && dataset.columns[confirmColumn]}
 	{@const column = dataset.columns[confirmColumn]}
 	<div class="modal-backdrop" role="presentation" onclick={() => (confirmColumn = null)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete this column?" use:armDefault>
-		<h2>Delete “{column}”?</h2>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label={t.table.confirmColumnLabel} use:armDefault>
+		<h2>{fmt(t.table.confirmColumnTitle, { name: column })}</h2>
 		<p>
-			{filledCells(column)} filled cell{filledCells(column) === 1 ? '' : 's'}, across {dataset.rows.length}
-			row{dataset.rows.length === 1 ? '' : 's'}.
+			{plural(t.table.filledCells, filledCells(column))}{plural(t.table.acrossRows, dataset.rows.length)}
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button onclick={() => (confirmColumn = null)}>Cancel</button>
-			<button class="danger-solid" data-default onclick={() => deleteColumn(confirmColumn!)}>Delete Column</button>
+			<button onclick={() => (confirmColumn = null)}>{t.common.cancel}</button>
+			<button class="danger-solid" data-default onclick={() => deleteColumn(confirmColumn!)}>{t.table.confirmColumnDelete}</button>
 		</div>
 	</div>
 {/if}
 
 {#if pasteOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (pasteOpen = false)}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-label="Paste from Sheet" use:armDefault>
-		<h2>Paste from Sheet</h2>
+	<div class="modal" role="dialog" aria-modal="true" aria-label={t.table.pasteDialog} use:armDefault>
+		<h2>{t.table.pasteDialog}</h2>
 		<!-- Only where the answer is not already on screen. With columns in the
 		     table the paste lands in them left to right, which is what the table
 		     behind this dialog shows; saying it as well was a line everybody read
 		     once and then read past. With no columns yet there is nothing behind
 		     the dialog to read, so the first row's fate still has to be said. -->
 		{#if !dataset.columns.length}
-			<p>The first line names the columns — there is nothing else here to name them with yet.</p>
+			<p>{t.table.pasteFirstLine}</p>
 		{/if}
 		<textarea bind:value={pasteText} rows="10" placeholder={PASTE_EXAMPLE}></textarea>
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button onclick={() => (pasteOpen = false)}>Cancel</button>
-			<button disabled={!dataset.rows.length} onclick={() => applyPaste('append')}>Add Rows</button>
-			<button class="primary" data-default onclick={() => applyPaste('replace')}>Replace Rows</button>
+			<button onclick={() => (pasteOpen = false)}>{t.common.cancel}</button>
+			<button disabled={!dataset.rows.length} onclick={() => applyPaste('append')}>{t.table.addRows}</button>
+			<button class="primary" data-default onclick={() => applyPaste('replace')}>{t.table.replaceRows}</button>
 		</div>
 	</div>
 {/if}

@@ -203,6 +203,30 @@ else
 		"instructions-file-budget"
 fi
 
+# ── 9. Interface words come from the catalogue ──────────────────────────────
+# Every word a person reads lives in src/lib/strings/en.ts, so it can be read
+# through in one place and translated by copying one file. A tooltip or a label
+# typed straight into a component is invisible to both, and it is exactly how
+# the first one would come back. Only the attributes are checked — `title`,
+# `aria-label`, `placeholder`, `alt` and a component's `label` — because those
+# are what a grep can tell from code; text between tags is too often a variable
+# to match without false alarms. The one literal allowed is the app's own name
+# on the logo, which is a name in every language.
+# Onboarding (the sample cards, the starter template, the first-run notice) is
+# content rather than interface and is deliberately left out of the catalogue.
+literals=$(grep -rnE '[[:space:]](title|aria-label|placeholder|alt|label)="[^"{]*[A-Za-z]{2}' \
+	--include='*.svelte' src 2>/dev/null |
+	grep -v 'alt="libelli"')
+
+if [ -n "$literals" ]; then
+	fail "interface text written into a component" \
+		"$literals
+put it in src/lib/strings/en.ts and read it from \`t\`" \
+		"strings-from-catalogue"
+else
+	pass "interface text read from the catalogue" "strings-from-catalogue"
+fi
+
 # ── local, gitignored log — see the header comment ───────────────────────────
 mkdir -p .claude/logs
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)

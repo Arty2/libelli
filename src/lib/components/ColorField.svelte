@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { fromRgba, toRgba } from '$lib/color';
+	import { fmt, t } from '$lib/strings';
 
 	/**
 	 * A color with an opacity: the platform's swatch for the hue, and a number
@@ -67,8 +68,8 @@
 		step="5"
 		value={percent}
 		{disabled}
-		aria-label="{label} opacity, percent"
-		title="Opacity, in percent"
+		aria-label={fmt(t.colorField.opacityLabel, { label })}
+		title={t.colorField.opacityTitle}
 		onchange={(e) => setAlpha(e.currentTarget)}
 	/>
 	<span class="unit" aria-hidden="true">%</span>

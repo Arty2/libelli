@@ -13,6 +13,8 @@
 
 import { parseColor } from './color';
 
+import { t } from './strings';
+
 export type EccLevel = 'L' | 'M' | 'Q' | 'H';
 
 /**
@@ -161,7 +163,7 @@ function chooseVersion(byteLength: number, level: EccLevel): number {
 		const needed = Math.ceil((4 + lengthBits(version) + byteLength * 8) / 8);
 		if (needed <= capacity) return version;
 	}
-	throw new Error('Too much text for a QR code of this size.');
+	throw new Error(t.errors.qrTooLong);
 }
 
 function codewords(bytes: number[], version: number, level: EccLevel): number[] {
@@ -420,7 +422,7 @@ export interface QrOptions {
 export function qrMatrix(text: string, options: QrOptions = {}): boolean[][] {
 	const level = options.level ?? 'M';
 	const bytes = Array.from(new TextEncoder().encode(text));
-	if (!bytes.length) throw new Error('Nothing to encode.');
+	if (!bytes.length) throw new Error(t.errors.nothingToEncode);
 	const version = chooseVersion(bytes.length, level);
 	const data = codewords(bytes, version, level);
 

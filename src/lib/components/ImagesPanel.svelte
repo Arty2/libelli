@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { fmt, plural, t } from '$lib/strings';
 	import { armDefault } from '$lib/modal';
 	import {
 		chooseImageFolder,
@@ -67,7 +68,7 @@
 		await storeLocalImage(file, name);
 		await refresh();
 		onchanged();
-		onnotice(`${name} is back, from ${file.name}.`);
+		onnotice(fmt(t.images.putBack, { name, file: file.name }));
 	}
 
 	/**
@@ -135,7 +136,7 @@
 		await refresh();
 		onchanged();
 		onnotice(
-			`${names.length === 1 ? names[0] : `${names.length} pictures`} added. Drag ${names.length === 1 ? 'it' : 'one'} onto an area to put it there, or onto the page for an area of its own.`
+			plural(t.images.added, names.length, { name: names[0] })
 		);
 	}
 
@@ -195,7 +196,7 @@
 		if (area?.dataset.boxId) onplace(area.dataset.boxId, name);
 		else if (document.elementFromPoint(event.clientX, event.clientY)?.closest('.viewport .sheet'))
 			onplacepage(name, event.clientX, event.clientY);
-		else onnotice('Let go over the page to put the picture on it — over an area to put it in that one.');
+		else onnotice(t.images.dropMissed);
 	}
 
 	$effect(() => {
@@ -222,12 +223,14 @@
 
 	/** Kilobytes under a megabyte, one decimal above it; nobody wants 1483 KB. */
 	const weigh = (bytes: number) =>
-		bytes >= 1024 * 1024 ? `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+		bytes >= 1024 * 1024
+			? fmt(t.units.mb, { n: Math.round((bytes / 1024 / 1024) * 10) / 10 })
+			: fmt(t.units.kb, { n: Math.max(1, Math.round(bytes / 1024)) });
 
 	async function choose() {
 		const chosen = await chooseImageFolder();
 		if (!chosen) return;
-		onnotice(`Pictures go into ${chosen.name} from now on. The ones already in this browser stay where they are.`);
+		onnotice(fmt(t.images.folderChosen, { folder: chosen.name }));
 		await refresh();
 		onchanged();
 	}
@@ -235,7 +238,7 @@
 	async function reopen() {
 		const state = await reopenImageFolder();
 		if (!state?.ready) {
-			onnotice('That folder was not opened, so pictures are coming from this browser.', 'warning');
+			onnotice(t.images.folderNotOpened, 'warning');
 			return;
 		}
 		await refresh();
@@ -244,7 +247,7 @@
 
 	async function forget() {
 		await forgetImageFolder();
-		onnotice('Let go of the folder. Nothing in it was deleted — this app has simply stopped reading it.');
+		onnotice(t.images.folderForgotten);
 		await refresh();
 		onchanged();
 	}
@@ -252,8 +255,7 @@
 	async function remove(image: ImageRecord) {
 		await deleteImage(image.name, image.where);
 		onnotice(
-			`${image.name} deleted.` +
-				(used.has(image.name) ? ' The areas pointing at it will draw nothing until it is put back.' : '')
+			fmt(t.images.deleted, { name: image.name }) + (used.has(image.name) ? t.images.deletedWasUsed : '')
 		);
 		await refresh();
 		onchanged();
@@ -268,7 +270,7 @@
 	is stored and what it weighs at the top, the ways in at the foot, where
 	the table keeps its own.
 -->
-<section class="images-tray" aria-label="Images">
+<section class="images-tray" aria-label={t.images.title}>
 	<!-- The head is also the tray's grip on a phone, as the table's header
 	     row is: pulled up or down, it shares the height with the page. -->
 	<div
@@ -280,7 +282,7 @@
 		onpointerup={endTrayDrag}
 		onpointercancel={endTrayDrag}
 	>
-		<span class="context">Images</span>
+		<span class="context">{t.images.title}</span>
 		{#if images.length}
 			<span class="total">{images.length} · {weigh(total)}</span>
 		{/if}
@@ -289,14 +291,14 @@
 				{#if folder.ready}
 					<Icon name="folder" size={12} /> {folder.name}
 				{:else}
-					{folder.name} — not opened
+					{fmt(t.images.folderNotOpenedTag, { folder: folder.name })}
 				{/if}
 			</span>
 		{/if}
 		{#if images.length >= FILTER_FROM}
 			<label class="find">
-				<span class="sr-only">Find a picture</span>
-				<input type="search" placeholder="Find…" bind:value={filter} />
+				<span class="sr-only">{t.images.findLabel}</span>
+				<input type="search" placeholder={t.images.findPlaceholder} bind:value={filter} />
 			</label>
 		{/if}
 	</div>
@@ -305,21 +307,25 @@
 		{#if busy}
 			<p class="empty">…</p>
 		{:else if !images.length && !missing.length}
-			<p class="empty">Nothing here yet.</p>
+			<p class="empty">{t.images.empty}</p>
 		{:else}
 			<!-- One picture a line: what it looks like, what it is called, how big
 			     it is in pixels and in bytes, and whether anything uses it. The
 			     thumbnail is also the handle it is carried onto an area by. -->
 			<ul class="images">
 				{#each shown as image (image.where + image.name)}
-					<li class:unused={!used.has(image.name)} title="{image.name} — {image.where === 'folder' ? 'in the folder' : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}">
+					<li class:unused={!used.has(image.name)} title={fmt(t.images.itemTitle, {
+						name: image.name,
+						where: image.where === 'folder' ? t.images.inFolder : t.images.inBrowser,
+						use: used.has(image.name) ? t.images.inUse : t.images.unused
+					})}>
 						<span
 							class="thumb"
 							class:carrying={carry?.on && carry.name === image.name}
 							role="button"
 							tabindex="-1"
-							aria-label="Drag {image.name} onto an area"
-							title="Drag onto an area, or onto the page for an area of its own"
+							aria-label={fmt(t.images.dragLabel, { name: image.name })}
+							title={t.images.dragTitle}
 							onpointerdown={(e) => startCarry(e, image.name)}
 							onpointermove={moveCarry}
 							onpointerup={endCarry}
@@ -339,16 +345,16 @@
 						</span>
 						<span class="name">{image.name}</span>
 						<span class="size">{[
-							sizes[image.name] ? `${sizes[image.name].w} × ${sizes[image.name].h} px` : '',
+							sizes[image.name] ? fmt(t.units.pixels, { w: sizes[image.name].w, h: sizes[image.name].h }) : '',
 							weigh(image.bytes)
 						]
 							.filter(Boolean)
 							.join(' · ')}</span>
-						{#if !used.has(image.name)}<span class="tag">unused</span>{/if}
+						{#if !used.has(image.name)}<span class="tag">{t.images.unused}</span>{/if}
 						<button
 							class="square"
-							title="Delete {image.name}"
-							aria-label="Delete {image.name}"
+							title={fmt(t.images.deleteItem, { name: image.name })}
+							aria-label={fmt(t.images.deleteItem, { name: image.name })}
 							onclick={() => (confirming = image)}
 						>
 							<Icon name="trash" size={12} />
@@ -356,12 +362,12 @@
 					</li>
 				{/each}
 				{#each missing as name (name)}
-					<li class="missing" title="{name} — pointed at, but not in this browser">
+					<li class="missing" title={fmt(t.images.missingTitle, { name })}>
 						<span class="thumb empty-thumb" aria-hidden="true"><Icon name="image" size={16} /></span>
 						<span class="name">{name}</span>
-						<span class="tag missing-tag">missing</span>
-						<button class="find" title="Choose the file to use for {name}" onclick={() => findFor(name)}>
-							<Icon name="image-reference" size={13} /> Find…
+						<span class="tag missing-tag">{t.images.missing}</span>
+						<button class="find" title={fmt(t.images.findTitle, { name })} onclick={() => findFor(name)}>
+							<Icon name="image-reference" size={13} /> {t.images.find}
 						</button>
 					</li>
 				{/each}
@@ -372,19 +378,19 @@
 	<!-- The ways in, where the table keeps its toolbar. Upload is every
 	     browser's, a phone included; the folder is Chromium's. -->
 	<div class="actions">
-		<button title="Add pictures from this device" onclick={() => fileInput?.click()}>
-			<Icon name="image-reference" size={15} /> Upload…
+		<button title={t.images.uploadTitle} onclick={() => fileInput?.click()}>
+			<Icon name="image-reference" size={15} /> {t.images.upload}
 		</button>
 		{#if available}
 			{#if folder && !folder.ready}
-				<button class="primary" onclick={reopen}>Open {folder.name}</button>
+				<button class="primary" onclick={reopen}>{fmt(t.images.openFolder, { folder: folder.name })}</button>
 			{/if}
 			<button
-				title="Keep pictures as ordinary files in a folder of your own, rather than in this browser's storage"
-				onclick={choose}><Icon name="folder" size={15} /> {folder ? 'Another Folder…' : 'Choose Folder…'}</button
+				title={t.images.chooseFolderTitle}
+				onclick={choose}><Icon name="folder" size={15} /> {folder ? t.images.anotherFolder : t.images.chooseFolder}</button
 			>
 			{#if folder}
-				<button title="Stop reading the folder. Nothing in it is deleted" onclick={forget}>Forget</button>
+				<button title={t.images.forgetTitle} onclick={forget}>{t.images.forget}</button>
 			{/if}
 		{/if}
 	</div>
@@ -410,15 +416,15 @@
 			if (e.key === 'Escape') confirming = null;
 		}}
 	>
-		<h2 id="delete-image-title">Delete “{image.name}”?</h2>
+		<h2 id="delete-image-title">{fmt(t.images.confirmTitle, { name: image.name })}</h2>
 		<p>
-			It is removed from {image.where === 'folder' ? 'the folder' : 'this browser'}, and this cannot be undone.
+			{image.where === 'folder' ? t.images.confirmFolder : t.images.confirmBrowser}
 			{#if used.has(image.name)}
-				Something on this card or in this table uses it, and will draw nothing until it is put back.
+				{t.images.confirmUsed}
 			{/if}
 		</p>
 		<div class="confirm-actions">
-			<button onclick={() => (confirming = null)}>Cancel</button>
+			<button onclick={() => (confirming = null)}>{t.common.cancel}</button>
 			<button
 				class="danger-solid"
 				data-default
@@ -428,7 +434,7 @@
 					const doomed = image;
 					confirming = null;
 					void remove(doomed);
-				}}>Delete Image</button
+				}}>{t.images.confirmDelete}</button
 			>
 		</div>
 	</div>
