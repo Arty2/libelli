@@ -50,9 +50,29 @@
 		 * up on it, and its pager waits for it.
 		 */
 		ondirty?: (dirty: boolean) => void;
+		/**
+		 * Where the panel wants the board's own row — its size, the paper, its
+		 * weight — and its undo and redo: in the panel's title bar and at the
+		 * head of its bottom bar, beside Delete and Save, rather than in rows of
+		 * their own that took height from the board. Moved there as they are
+		 * drawn (see `portal`); without a slot they stay here.
+		 */
+		head?: HTMLElement | null;
+		bar?: HTMLElement | null;
+		/** What the clipboard answered, to the app's status bar. */
+		onnotice?: (message: string, tone?: 'info' | 'warning') => void;
 	}
 
-	let { box, value, ink, onsave, ondirty }: Props = $props();
+	let { box, value, ink, onsave, ondirty, head = null, bar = null, onnotice }: Props = $props();
+
+	/** Put a node inside another element, and take it out again with this editor. */
+	function portal(node: HTMLElement, target: HTMLElement | null) {
+		const move = (to: HTMLElement | null) => {
+			if (to && node.parentElement !== to) to.appendChild(node);
+		};
+		move(target);
+		return { update: move, destroy: () => node.remove() };
+	}
 
 	/**
 	 * Changes made, and how many of them the last save had seen. A count rather
@@ -322,7 +342,7 @@
 		const before = remember();
 		const bounds = before && inkBounds(before.image);
 		if (!before || !bounds) {
-			say('Nothing drawn to crop to');
+			say('Nothing drawn to crop to', 'warning');
 			return;
 		}
 		const next = fitBoard(Math.max(MIN_SIDE, bounds.w), Math.max(MIN_SIDE, bounds.h));
@@ -364,7 +384,7 @@
 			// page without the permission gets nothing. Said out loud rather than
 			// failing quietly, because a copy that did not happen looks exactly
 			// like one that did until you paste.
-			say('This browser would not let go of the clipboard');
+			say('This browser would not let go of the clipboard', 'warning');
 		}
 	}
 
@@ -378,11 +398,11 @@
 				break;
 			}
 		} catch {
-			say('This browser would not let go of the clipboard');
+			say('This browser would not let go of the clipboard', 'warning');
 			return;
 		}
 		if (!source) {
-			say('No image on the clipboard');
+			say('No image on the clipboard', 'warning');
 			return;
 		}
 		try {
@@ -414,14 +434,13 @@
 		}
 	}
 
-	/** A word in the header for a moment: the clipboard's answers are invisible otherwise. */
-	let said = $state<string | null>(null);
-	let saying: ReturnType<typeof setTimeout> | null = null;
-
-	function say(words: string) {
-		said = words;
-		if (saying) clearTimeout(saying);
-		saying = setTimeout(() => (said = null), 2200);
+	/**
+	 * The clipboard's answers, and crop's, in the app's status bar, where every
+	 * other notice is: a refusal is otherwise invisible, and a copy that did not
+	 * happen looks exactly like one that did until you paste.
+	 */
+	function say(words: string, tone: 'info' | 'warning' = 'info') {
+		onnotice?.(words, tone);
 	}
 
 	/**
@@ -558,7 +577,16 @@
 	<!-- One row over the board: its size, the paper to see it on, and at the far
 	     end what it weighs. 64 by 64 pixels' worth, spent however you like —
 	     type a side and the other one moves to pay for it. -->
-	<div class="board" title="The board, in pixels — {BUDGET} of them to spend">
+	<div class="board" title="The board, in pixels — {BUDGET} of them to spend" use:portal={head}>
+		<button
+			class="square"
+			aria-pressed={checks === 'dark'}
+			title="Show the transparent squares dark or light — a pale drawing needs the dark ones"
+			aria-label="Dark checkerboard"
+			onclick={() => (checks = checks === 'dark' ? 'light' : 'dark')}
+		>
+			<Icon name="contrast" size={16} />
+		</button>
 		<input
 			type="number"
 			min={MIN_SIDE}
@@ -578,24 +606,11 @@
 			aria-label="Board height in pixels"
 			onchange={(e) => setSide('h', e.currentTarget.value)}
 		/>
-		<span class="by">pixels</span>
-		<button
-			class="square"
-			aria-pressed={checks === 'dark'}
-			title="Show the transparent squares dark or light — a pale drawing needs the dark ones"
-			aria-label="Dark checkerboard"
-			onclick={() => (checks = checks === 'dark' ? 'light' : 'dark')}
-		>
-			<Icon name="contrast" size={15} />
-		</button>
-		<span class="spacer"></span>
-		{#if said}
-			<span class="said" role="status">{said}</span>
-		{/if}
+		<span class="by">px</span>
 		<!-- Said out loud, because this is going into a cell of the table and a
 		     long cell is the cost of it travelling with the words. -->
 		{#if weight !== null}
-			<span class="weight" title="What this drawing adds to the cell it is written into">{weight} KB</span>
+			<span class="weight" title="What this drawing adds to the cell it is written into">/ {weight} KB</span>
 		{/if}
 	</div>
 
@@ -632,7 +647,7 @@
 				<!-- The pencil the Draw buttons wear, drawn in the ink it puts down:
 				     the tool and the colour in one glyph, since there is only ever one
 				     colour here and it is the area's own. -->
-				<span class="ink" style="color:{ink}"><Icon name="edit" size={15} /></span>
+				<span class="ink" style="color:{ink}"><Icon name="edit" size={16} /></span>
 			</button>
 			<button
 				aria-pressed={tool === 'line'}
@@ -640,7 +655,7 @@
 				aria-label="Line"
 				onclick={() => (tool = 'line')}
 			>
-				<Icon name="line" size={15} />
+				<Icon name="line" size={16} />
 			</button>
 			<button
 				aria-pressed={tool === 'eraser'}
@@ -648,7 +663,7 @@
 				aria-label="Erase"
 				onclick={() => (tool = 'eraser')}
 			>
-				<Icon name="erase" size={15} />
+				<Icon name="erase" size={16} />
 			</button>
 		</span>
 
@@ -674,44 +689,47 @@
 			{/each}
 		</span>
 
-		<span class="segmented">
+
+	</div>
+
+	<!-- Undo and redo, at the far left of the panel's bottom bar. -->
+		<span class="segmented undo" use:portal={bar}>
 			<button onclick={undo} disabled={!history.length} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
-				<Icon name="undo" size={15} />
+				<Icon name="undo" size={16} />
 			</button>
 			<button onclick={redo} disabled={!future.length} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
-				<Icon name="redo" size={15} />
+				<Icon name="redo" size={16} />
 			</button>
 		</span>
-	</div>
 
 	<div class="tools second" role="toolbar" aria-label="Board">
 		<!-- The ones that redraw the whole board rather than a pixel of it. All
 		     are one undo away, board and all. -->
 		<span class="segmented">
 			<button onclick={rotate} title="Turn the drawing a quarter turn clockwise" aria-label="Rotate">
-				<Icon name="rotate" size={15} />
+				<Icon name="rotate" size={16} />
 			</button>
 			<button onclick={() => flip('x')} title="Flip the drawing left to right" aria-label="Flip horizontally">
-				<Icon name="reflect-horizontal" size={15} />
+				<Icon name="reflect-horizontal" size={16} />
 			</button>
 			<button onclick={() => flip('y')} title="Flip the drawing upside down" aria-label="Flip vertically">
-				<Icon name="reflect-vertical" size={15} />
+				<Icon name="reflect-vertical" size={16} />
 			</button>
 			<button onclick={crop} title="Crop the board to what is drawn on it" aria-label="Crop">
-				<Icon name="crop" size={15} />
+				<Icon name="crop" size={16} />
 			</button>
 		</span>
 
 		<span class="segmented">
 			<button onclick={copy} title="Copy the drawing as an image (Ctrl/Cmd+C)" aria-label="Copy">
-				<Icon name="copy" size={15} />
+				<Icon name="copy" size={16} />
 			</button>
 			<button
 				onclick={paste}
 				title="Paste an image from the clipboard — it replaces the board and brings its own size (Ctrl/Cmd+V)"
 				aria-label="Paste"
 			>
-				<Icon name="paste" size={15} />
+				<Icon name="paste" size={16} />
 			</button>
 		</span>
 
@@ -746,17 +764,13 @@
 		gap: 4px;
 	}
 
-	.board .spacer {
-		flex: 1;
-	}
-
 	/* The paper toggle, sized and drawn as the tools below are. */
 	.board .square {
 		display: grid;
 		place-items: center;
 		width: 30px;
 		height: 30px;
-		margin-left: 6px;
+		margin-right: 6px;
 		padding: 0;
 		border: 1px solid #c9cdd4;
 		border-radius: 6px;
@@ -770,16 +784,20 @@
 		color: var(--accent-strong);
 	}
 
+	/* Centred under the board, which is centred in its room. */
 	.tools {
 		display: flex;
 		align-items: center;
+		justify-content: center;
 		gap: 8px;
 		flex-wrap: wrap;
 	}
 
 	/* Square, all of them: every one holds a glyph of the same size, and a row of
-	   squares reads as a row of tools rather than as words of different lengths. */
-	.tools button {
+	   squares reads as a row of tools rather than as words of different lengths.
+	   Undo and redo too, which live in the panel's bottom bar. */
+	.tools button,
+	.undo button {
 		font: 600 13px ui-sans-serif, system-ui, sans-serif;
 		background: #fff;
 		border: 1px solid #c9cdd4;
@@ -798,7 +816,8 @@
 		color: var(--accent-strong);
 	}
 
-	.tools button:disabled {
+	.tools button:disabled,
+	.undo button:disabled {
 		opacity: 0.4;
 		cursor: default;
 	}
@@ -833,12 +852,11 @@
 		font: 13px ui-sans-serif, system-ui, sans-serif;
 	}
 
-	/* The pen, in the ink. A shadow of the button's own white under it, so a
-	   pen drawn in white is still a pen rather than a hole in the button. */
+	/* The pencil, in the ink. No shadow round it: a half-pixel drop shadow is a
+	   blur, and it was what made the pencil the one soft icon in the row. */
 	.ink {
 		display: grid;
 		place-items: center;
-		filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.45));
 	}
 
 	/* The weight, drawn: 1, 2 and 4 pixels as squares that grow with them, in
@@ -865,8 +883,6 @@
 		place-items: center;
 		overflow: hidden;
 		line-height: 0;
-		background: #f3f4f6;
-		border-radius: 6px;
 	}
 
 	.stage canvas {
@@ -900,13 +916,5 @@
 	canvas.dark {
 		--check-a: #3a4150;
 		--check-b: #2b313c;
-	}
-
-	.said {
-		color: #333;
-		font-size: 12px;
-		background: #eef2f7;
-		border-radius: 999px;
-		padding: 1px 10px;
 	}
 </style>

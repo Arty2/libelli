@@ -846,14 +846,16 @@ at its own size.
   under **Area** whenever the one area you have selected is one a drawing can go
   in, which is the same rule the bar follows. Never in place: an area on a card
   is often a centimetre across, which is somewhere to show a drawing and nowhere
-  to make one. Above the board is one row: its size in pixels, the **light or
-  dark checkerboard** to see it on, and at the far end what the drawing weighs.
-  The board is always drawn as large as the panel has room for, so there is
-  never a scrollbar round it. Under it the tools are two rows: the **pencil** —
-  the same one the Draw buttons wear — in the area's own colour, a **line** —
-  press where it starts, let go where it ends — a rubber, three nib widths, undo
-  and redo; then **rotate**, **flip** left to right and upside down, **crop**,
-  **copy** and **paste**. Emptying the board is **Delete**, in the bar under it.
+  to make one. The panel's title bar holds the board's own row, centred: the
+  **light or dark checkerboard** to see it on, the size in px, and what the
+  drawing weighs. The board is always drawn as large as the panel has room for,
+  so there is never a scrollbar round it. Under it the tools are two centred
+  rows: the **pencil** — the same one the Draw buttons wear — in the area's own
+  colour, a **line** — press where it starts, let go where it ends — a rubber and
+  three nib widths; then **rotate**, **flip** left to right and upside down,
+  **crop**, **copy** and **paste**. **Undo** and **redo** are at the far left of
+  the bar under the panel, and **Delete** and **Save** at its far right; Delete
+  is how the board is emptied.
 
   **Rotate** turns the drawing a quarter turn clockwise, board and all — the
   budget does not notice, because the same pixels are arranged the other way up.
@@ -862,7 +864,7 @@ at its own size.
   clipboard as a PNG and **paste** takes one off it, replacing the board and
   bringing its own size with it; both are on
   <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>C</kbd> and <kbd>V</kbd>, and a browser that
-  refuses the clipboard says so beside the weight rather than failing quietly.
+  refuses the clipboard says so in the status bar rather than failing quietly.
   All of them are one undo away, board and all.
 
   <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Z</kbd> steps back inside the surface while

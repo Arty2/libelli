@@ -401,6 +401,9 @@
 	 * instead, because stepping away is not a way of saying "never mind".
 	 */
 	let board = $state<ReturnType<typeof BitmapEditor> | null>(null);
+	/** Where the board puts its size row and its undo — see BitmapEditor's `head` and `bar`. */
+	let boardHead = $state<HTMLElement | null>(null);
+	let boardBar = $state<HTMLElement | null>(null);
 	let boardDirty = $state(false);
 
 	/** A drawing in the cell gone: the cell emptied, which the app's undo reaches. */
@@ -1672,8 +1675,10 @@
 	     own height every time the tray narrowed. -->
 	<div class="actions" bind:offsetHeight={barHeight}>
 		{#if drawingArea}
-			<!-- An area's own drawing has no row to step to: only its Delete and
-			     its Save, where a cell's drawing has them. -->
+			<!-- An area's own drawing has no row to step to: its undo and redo at
+			     the far left, its Delete and its Save at the far right, where a
+			     cell's drawing has them. -->
+			<span class="board-bar" bind:this={boardBar}></span>
 			<span class="spacer"></span>
 			{@render drawingButtons(!!drawingArea.value, deleteArea)}
 		{:else if bigCell}
@@ -1685,6 +1690,10 @@
 			     card has under it, so reading one column down the rows full size
 			     is a press per row rather than close, find, hold, per row. -->
 			{@const at = bigCell.row}
+			{#if boardShown(bigCell)}
+				<!-- The board's undo and redo, first in the bar, moved in by it. -->
+				<span class="board-bar" bind:this={boardBar}></span>
+			{/if}
 			<span class="big-pager" role="group" aria-label="Row">
 				<button
 					class="icon step"
@@ -1982,8 +1991,11 @@
 				onpointerdown={startTrayDrag}
 				onclickcapture={swallowClick}
 			>
-				<h2 id="cell-editor-title">{area.name}</h2>
-				<span class="spacer"></span>
+				<!-- The title's room holds the board's own row instead — its size,
+				     the paper, its weight — moved in by the board; the name stays
+				     for a screen reader. -->
+				<h2 id="cell-editor-title" class="sr-only">{area.name}</h2>
+				<span class="board-head" bind:this={boardHead}></span>
 				<button class="icon close" title={boardDirty ? 'Close — the drawing not saved is dropped (Esc)' : 'Back to the table (Esc)'} aria-label="Close" onclick={closeBigCell}>
 					<Icon name="close" size={18} />
 				</button>
@@ -1996,6 +2008,9 @@
 					ink={area.ink}
 					onsave={saveArea}
 					ondirty={(d) => (boardDirty = d)}
+					head={boardHead}
+					bar={boardBar}
+					{onnotice}
 				/>
 			{/key}
 		</div>
@@ -2014,8 +2029,13 @@
 				onpointerdown={startTrayDrag}
 				onclickcapture={swallowClick}
 			>
-				<h2 id="cell-editor-title">{open.column}</h2>
-				<span class="spacer"></span>
+				{#if boardShown(open)}
+					<h2 id="cell-editor-title" class="sr-only">{open.column}</h2>
+					<span class="board-head" bind:this={boardHead}></span>
+				{:else}
+					<h2 id="cell-editor-title">{open.column}</h2>
+					<span class="spacer"></span>
+				{/if}
 				<button class="icon close" title={boardShown(open) && boardDirty ? 'Close — the drawing not saved is dropped (Esc)' : 'Back to the table (Esc)'} aria-label="Close" onclick={closeBigCell}>
 					<Icon name="close" size={18} />
 				</button>
@@ -2036,6 +2056,9 @@
 						ink={look.ink}
 						onsave={(dataUrl, pixels) => drew(open.row, open.column, dataUrl, pixels)}
 						ondirty={(d) => (boardDirty = d)}
+						head={boardHead}
+						bar={boardBar}
+						{onnotice}
 					/>
 				{/key}
 			{:else if kind !== 'text'}
@@ -3139,6 +3162,26 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
+	}
+
+	/* The board's row, centred in the head: a spacer of the close button's
+	   width on the left keeps it centred on the panel rather than on what is
+	   left beside the ×. */
+	.board-head {
+		flex: 1;
+		display: flex;
+		justify-content: center;
+		min-width: 0;
+		padding-left: 32px;
+	}
+
+	.board-bar {
+		display: inline-flex;
+		gap: 4px;
+	}
+
+	.board-bar:empty {
+		display: none;
 	}
 
 	/* The same bargain as the table's header row: the drag is the tray's, so
