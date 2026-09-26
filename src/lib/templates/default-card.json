@@ -186,6 +186,11 @@
           "indent": 6,
           "markerGap": 3,
           "itemSpacing": 1.2
+        },
+        "rule": {
+          "spaceBefore": 4,
+          "spaceAfter": 4,
+          "color": "#cfcabe"
         }
       },
       "paragraph": {
@@ -220,9 +225,9 @@
     {
       "id": "b_link",
       "slot": null,
-      "x": 14,
+      "x": 26,
       "y": 194,
-      "w": 88,
+      "w": 80,
       "h": 4,
       "font": "IBM Plex Mono",
       "size": 6.5,
@@ -235,14 +240,14 @@
       "static": {
         "text": "{{link}}"
       },
-      "mirror": false
+      "align": "right"
     },
     {
       "id": "b_date",
       "slot": null,
-      "x": 14,
+      "x": 26,
       "y": 198.5,
-      "w": 88,
+      "w": 80,
       "h": 4,
       "font": "IBM Plex Mono",
       "size": 6.5,
@@ -255,7 +260,7 @@
       "static": {
         "text": "Printed {{date:YYYY-MM-DD}}"
       },
-      "mirror": false
+      "align": "right"
     },
     {
       "id": "b_qr",
@@ -272,8 +277,7 @@
       "padding": 1,
       "qr": {
         "level": "M"
-      },
-      "mirror": false
+      }
     }
   ],
   "facing": true,
