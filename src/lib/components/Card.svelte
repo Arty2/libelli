@@ -1407,9 +1407,19 @@
 			});
 	}
 
+	/**
+	 * Whether this area's badges are on show at all. Only on the area you are
+	 * working on and on the areas tied to it: a badge on every area of a busy
+	 * card was a field of little marks competing with the design, and what a
+	 * badge says — locked, tied, static — matters when you are about to act on
+	 * that area. Its chain comes along because moving it moves them.
+	 */
+	const showsBadges = (box: Box) =>
+		isSelected(box) || litFollowers.has(box.id) || litKin.has(box.id) || litTargets.has(box.id);
+
 	/** Whether the column of badges hangs off this box's right-hand edge. */
 	const hasBadges = (box: Box) =>
-		bounds && !template.locked && !!(box.locked || isStatic(box) || pictureKind(box) || editsCell(box));
+		bounds && !template.locked && showsBadges(box) && !!(box.locked || isStatic(box) || pictureKind(box) || editsCell(box));
 
 	/**
 	 * A selected area whose words come out of a cell carries the way into that
@@ -1802,7 +1812,7 @@
 				     buttons that would be refused anyway. The overflow mark below is
 				     not one of these: it is about what will print, which a lock does
 				     not change. -->
-				{#if bounds && !template.locked && (box.anchor || anchorTargets.has(box.id))}
+				{#if bounds && !template.locked && showsBadges(box) && (box.anchor || anchorTargets.has(box.id))}
 					<!-- The anchor's two ends, in a column of their own off the top-left
 					     corner: the tie on an area that follows another, and under it the
 					     buoy on one that others follow — a middle link in a chain wears
