@@ -894,7 +894,7 @@
 						title={withKey('Previous card', 'cards')}
 						aria-label="Previous card"
 						onclick={() => onactivate(Math.max(0, activeRow - 1))}
-					><Icon name="caret-left" size={18} /></button>
+					><Icon name="chevron-left" size={18} /></button>
 				{/if}
 				<button
 					class="count"
@@ -908,7 +908,7 @@
 						title={withKey('Next card', 'cards')}
 						aria-label="Next card"
 						onclick={() => onactivate(Math.min(rowCount - 1, activeRow + 1))}
-					><Icon name="caret-right" size={18} /></button>
+					><Icon name="chevron-right" size={18} /></button>
 				{/if}
 			</div>
 		</div>
@@ -1249,7 +1249,7 @@
 		pointer-events: none;
 	}
 
-	/* Close about the count, so the triangles stay clear of the chips in the
+	/* Close about the count, so the chevrons stay clear of the chips in the
 	   two corners: on a narrow phone the arrows sat under the # | B on one
 	   side and the zoom on the other. */
 	.pager .controls {
@@ -1289,7 +1289,7 @@
 		color: #111;
 	}
 
-	/* The triangle is the control, as in the lightbox: a chip around it would
+	/* The chevron is the control, as in the lightbox: a chip around it would
 	   make two marks out of one. */
 	.pager .step {
 		display: grid;
@@ -1810,7 +1810,7 @@
 	}
 
 	/* Tighter again where the corners are closest: the count's floor comes
-	   off, so the three are as narrow as "1 / 4" and two triangles. */
+	   off, so the three are as narrow as "1 / 4" and two chevrons. */
 	@media (max-width: 400px) {
 		.pager .count {
 			min-width: 0;

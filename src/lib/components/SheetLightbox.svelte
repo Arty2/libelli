@@ -129,7 +129,7 @@
 	     card lightbox puts there. -->
 	<div class="nav-bar" role="presentation" onclick={(e) => e.stopPropagation()}>
 		<button class="plain" disabled={index === 0} onclick={() => step(index - 1)} aria-label="Previous sheet">
-			<Icon name="caret-left" size={26} />
+			<Icon name="chevron-left" size={26} />
 		</button>
 		<span class="counter">Sheet {index + 1} / {sheets.length}</span>
 		<button
@@ -138,7 +138,7 @@
 			onclick={() => step(index + 1)}
 			aria-label="Next sheet"
 		>
-			<Icon name="caret-right" size={26} />
+			<Icon name="chevron-right" size={26} />
 		</button>
 	</div>
 </div>
