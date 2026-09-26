@@ -641,7 +641,10 @@ a notice can appear.
   left — **‹ 2 / 4 ›**, the same as the card's — that steps to the same column
   in the row above or below, and the count where the count always is. A cell
   holding a `data:image` — a drawing, or a picture pasted in as one — shows the
-  picture there and in the table, rather than its base64. It edits the cell itself, live, so the
+  picture in the table rather than its base64, and never opens here as text:
+  a hold or a double-click on it, or any of the ways in above, opens it on the
+  drawing surface instead, and Done writes the drawing back into that cell.
+  Stepping onto one with the pager shows the picture; press it to draw. It edits the cell itself, live, so the
   card follows as you type and undo reaches every change; the **×** at the top
   right, Esc or Ctrl/Cmd+Enter put the table back. The words are set at twice
   the table's size, for reading at length. On a locked table none of

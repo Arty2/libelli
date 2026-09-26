@@ -977,6 +977,37 @@
 	// ---- undo/redo ----------------------------------------------------------
 
 	/**
+	 * A picture opened from the table rather than from an area: the cell is what
+	 * is being drawn, so the drawing goes back into it, whichever area — if any —
+	 * prints that column. The board and the ink are borrowed from the first
+	 * picture area bound to it, which is where a drawing of that column would
+	 * have opened from the card; with none, the usual board and the page's ink.
+	 */
+	let drawingCell = $state<{ row: number; column: string } | null>(null);
+	const cellArea = $derived.by(() => {
+		const cell = drawingCell;
+		if (!cell) return null;
+		return template.boxes.find((b) => b.mode === 'image' && !!b.slot && mapping[b.slot] === cell.column) ?? null;
+	});
+
+	function drawCell(rowIndex: number, column: string) {
+		if (refuseLockedTable()) return;
+		activeRow = rowIndex;
+		drawingCell = { row: rowIndex, column };
+	}
+
+	function saveCellDrawing(dataUrl: string) {
+		const cell = drawingCell;
+		drawingCell = null;
+		if (!cell || refuseLockedTable()) return;
+		describe('Draw');
+		dataset = {
+			...dataset,
+			rows: dataset.rows.map((r, i) => (i === cell.row ? { ...r, [cell.column]: dataUrl } : r))
+		};
+	}
+
+	/**
 	 * What the user did, waiting to be attached to the entry it produces.
 	 *
 	 * The recorder watches state and cannot know what changed, so each action
@@ -2591,6 +2622,7 @@
 				deletingTable ||
 				editingId !== null ||
 				drawing !== null ||
+				drawingCell !== null ||
 				magic !== null}
 			{selectedBoxes}
 			onalign={alignSelection}
@@ -2684,6 +2716,7 @@
 				onnotice={notify}
 				ongettingstarted={() => void gettingStarted()}
 				openRequest={cellRequest}
+				ondrawcell={drawCell}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
 					// follows it, so the card keeps rendering what it rendered before.
@@ -3216,6 +3249,14 @@
 		ink={drawingBox.color ?? template.defaults.color}
 		onsave={saveDrawing}
 		oncancel={() => (drawing = null)}
+	/>
+{:else if drawingCell}
+	<BitmapEditor
+		box={cellArea ?? {}}
+		value={String(dataset.rows[drawingCell.row]?.[drawingCell.column] ?? '').trim()}
+		ink={cellArea?.color ?? template.defaults.color}
+		onsave={saveCellDrawing}
+		oncancel={() => (drawingCell = null)}
 	/>
 {/if}
 

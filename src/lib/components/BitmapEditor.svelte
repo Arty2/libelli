@@ -33,7 +33,8 @@
 	 */
 
 	interface Props {
-		box: Box;
+		/** Only its board is read — a cell opened from the table may have no area. */
+		box: Pick<Box, 'pixels'>;
 		/** what the area holds now: a data URL to draw on top of, or nothing */
 		value: string;
 		/**

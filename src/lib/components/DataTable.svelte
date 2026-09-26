@@ -32,6 +32,8 @@
 		onplacecolumn: (column: string) => void;
 		/** a cell of this column has just been entered, so the card can point at it */
 		oncellfocus: (column: string) => void;
+		/** A picture cell, opened on the drawing surface rather than as text. */
+		ondrawcell: (row: number, column: string) => void;
 		/** lock or unlock the whole table; the page owns the dataset */
 		onlock: (locked: boolean) => void;
 		ondeletetable: () => void;
@@ -84,6 +86,7 @@
 		usedColumns,
 		onplacecolumn,
 		oncellfocus,
+		ondrawcell,
 		onlock,
 		ondeletetable,
 		onswaptable,
@@ -268,6 +271,12 @@
 	function openBigCell(rowIndex: number, column: string) {
 		const value = dataset.rows[rowIndex]?.[column];
 		if (value === undefined) return false;
+		// A picture is drawn on, not read as text: every way in that would have
+		// opened its base64 full size opens the drawing surface instead.
+		if (cellPicture(value)) {
+			ondrawcell(rowIndex, column);
+			return;
+		}
 		// The small field under the press still has the focus, and would keep
 		// the outline lit behind the editor.
 		(document.activeElement as HTMLElement | null)?.blur();
@@ -1404,15 +1413,15 @@
 								{#if picture}
 									<!-- The picture in place of its base64. A press picks the
 									     row, as anywhere else on it; a hold or a double-click
-									     opens the cell full size, where the text still is. -->
+									     opens it on the drawing surface — never as text. -->
 									<img
 										class="cell-picture"
 										src={picture}
 										alt="{column}, row {rowLabel(row, i)}"
-										title={locked ? undefined : 'An image — press and hold, or double-click, to open this cell full size'}
+										title={locked ? undefined : 'An image — press and hold, or double-click, to draw on it'}
 										draggable="false"
-										use:hold={() => !locked && openBigCell(i, column)}
-										ondblclick={() => !locked && openBigCell(i, column)}
+										use:hold={() => !locked && ondrawcell(i, column)}
+										ondblclick={() => !locked && ondrawcell(i, column)}
 									/>
 								{:else}
 								<!-- Press and hold for the whole cell in a dialog of its own. -->
@@ -1519,7 +1528,9 @@
 				><Icon name="chevron-right" size={16} /></button>
 			</span>
 			<span class="spacer"></span>
-			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
+			{#if !cellPicture(dataset.rows[bigCell.row]?.[bigCell.column])}
+				<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
+			{/if}
 		{:else}
 		<!-- How tall a row may be: one line, a few, or all of its longest cell.
 		     First in the bar and always there: it is about how the table is
@@ -1793,9 +1804,23 @@
 					<Icon name="close" size={18} />
 				</button>
 			</div>
+			<!-- Reached only by the pager: a picture is never opened here, but
+			     stepping down a column can land on one. It shows as itself, and a
+			     press takes it to the drawing surface; its base64 is not offered. -->
 			{#if cellPicture(text)}
-				<img class="big-picture" src={cellPicture(text)} alt={open.column} />
-			{/if}
+				<button
+					class="big-picture"
+					title={locked ? undefined : 'Draw on this image'}
+					disabled={locked}
+					onclick={() => {
+						// Handed over, not stacked: left open behind the drawing
+						// surface, this editor took the Escape meant for that one.
+						const { row, column } = open;
+						closeBigCell();
+						ondrawcell(row, column);
+					}}
+				><img src={cellPicture(text)} alt={open.column} /></button>
+			{:else}
 			<textarea
 				value={text}
 				readonly={locked}
@@ -1809,6 +1834,7 @@
 					}
 				}}
 			></textarea>
+			{/if}
 		</div>
 	{/if}
 </section>
@@ -2924,13 +2950,25 @@
 		text-overflow: ellipsis;
 	}
 
-	/* The picture over its text, taking most of the room: the text is still
-	   there to paste over or clear, but it is not what anybody opened this to
-	   read. */
+	/* A picture landed on by the pager, in the room the text would take. */
 	.big-picture {
-		flex: 2 1 0;
+		flex: 1;
 		min-height: 0;
 		width: 100%;
+		padding: 8px;
+		border: 1px solid #ccc;
+		border-radius: var(--radius-input);
+		background: #fff;
+		cursor: pointer;
+	}
+
+	.big-picture:disabled {
+		cursor: default;
+	}
+
+	.big-picture img {
+		width: 100%;
+		height: 100%;
 		object-fit: contain;
 	}
 
