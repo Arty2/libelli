@@ -46,6 +46,14 @@
 		 */
 		focus?: string | null;
 		onfocus?: (name: string | null) => void;
+		/**
+		 * The pictures that live in the table's cells and on areas rather than
+		 * in storage — drawings, mostly — listed under the stored ones so every
+		 * picture the card uses is in one place. Pressed, one opens in the
+		 * drawing editor it belongs to.
+		 */
+		drawings?: Array<{ key: string; label: string; where: string; src: string }>;
+		onopendrawing?: (key: string) => void;
 	}
 
 	let {
@@ -57,6 +65,8 @@
 		onplacepage,
 		ontraydrag,
 		focus = null,
+		drawings = [],
+		onopendrawing,
 		onfocus
 	}: Props = $props();
 
@@ -240,6 +250,9 @@
 	);
 
 	/** Kilobytes under a megabyte, one decimal above it; nobody wants 1483 KB. */
+	/** A drawing's pixels, read off its thumbnail as it loads. */
+	let drawnSizes = $state<Record<string, { w: number; h: number }>>({});
+
 	const weigh = (bytes: number) =>
 		bytes >= 1024 * 1024 ? `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
@@ -542,7 +555,7 @@
 	<div class="list">
 		{#if busy}
 			<p class="empty">…</p>
-		{:else if !images.length && !missing.length}
+		{:else if !images.length && !missing.length && !drawings.length}
 			<p class="empty">Nothing here yet.</p>
 		{:else}
 			<!-- One picture a line: what it looks like, what it is called, how big
@@ -600,6 +613,38 @@
 						<span class="tag missing-tag">missing</span>
 						<button class="find" title="Choose the file to use for {name}" onclick={() => findFor(name)}>
 							<Icon name="image-reference" size={13} /> Find…
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+		{#if !busy && drawings.length}
+			<!-- The pictures kept in the table itself, and on areas with no
+			     column: not files, so nothing to delete or carry here — a press
+			     opens one to draw on, in the side panel. -->
+			<h3 class="section">Drawings <span class="total">{drawings.length} · {weigh(drawings.reduce((sum, d) => sum + d.src.length * 0.75, 0))}</span></h3>
+			<ul class="images">
+				{#each drawings as drawing (drawing.key)}
+					<li>
+						<button class="drawing" title="Open {drawing.label}, {drawing.where}, to draw on" onclick={() => onopendrawing?.(drawing.key)}>
+							<span class="thumb pixels">
+								<img
+									src={drawing.src}
+									alt=""
+									draggable="false"
+									onload={(e) => {
+										const img = e.currentTarget as HTMLImageElement;
+										drawnSizes = { ...drawnSizes, [drawing.key]: { w: img.naturalWidth, h: img.naturalHeight } };
+									}}
+								/>
+							</span>
+							<span class="name">{drawing.label} <span class="where-in">{drawing.where}</span></span>
+							<span class="size">{[
+								drawnSizes[drawing.key] ? `${drawnSizes[drawing.key].w} × ${drawnSizes[drawing.key].h} px` : '',
+								weigh(drawing.src.length * 0.75)
+							]
+								.filter(Boolean)
+								.join(' · ')}</span>
 						</button>
 					</li>
 				{/each}
@@ -1109,6 +1154,56 @@
 	.images li :global(button.square:hover) {
 		color: #b42318;
 		background: #fdf3f2;
+	}
+
+	/* The drawings' heading, under the stored pictures. */
+	.section {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		margin: 12px 4px 4px;
+		font: 600 11px ui-sans-serif, system-ui, sans-serif;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: #555;
+	}
+
+	.section .total {
+		font-weight: 400;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+
+	/* A drawing's whole line is the button: there is nothing else on it. */
+	.drawing {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 0;
+		border: none;
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.drawing .thumb {
+		cursor: pointer;
+	}
+
+	/* Drawn at a few pixels a side, and shown as the pixels they are. */
+	.thumb.pixels img {
+		image-rendering: pixelated;
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
+
+	.where-in {
+		color: #767676;
 	}
 
 	/* Pointed at, not held: a dashed frame where the thumbnail would be. */

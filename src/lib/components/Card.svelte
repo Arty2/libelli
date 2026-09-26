@@ -1921,10 +1921,10 @@
 				     not one of these: it is about what will print, which a lock does
 				     not change. -->
 				{#if bounds && !template.locked && (showsBadges(box) || showsAllTies) && (box.anchor || anchorTargets.has(box.id))}
-					<!-- The anchor's two ends, in a column of their own off the top-left
-					     corner: the tie on an area that follows another, and under it the
-					     buoy on one that others follow — a middle link in a chain wears
-					     both. Off the right-hand column because on a shallow area four
+					<!-- The anchor's two ends, in a row of their own off the top-left
+					     corner: the buoy in the corner on one that others follow, and to
+					     its left the tie on an area that follows another — a middle link
+					     in a chain wears both. Off the right-hand column because on a shallow area four
 					     badges are taller than the area itself, and these are the badges
 					     areas most often carry; together because they are one
 					     relationship, and the thread between them runs from this side. -->
@@ -2887,12 +2887,16 @@
 			pointer-events: none;
 		}
 
-		/* The anchor's column at the top-left — the tie, then the buoy: the
-		   mirror of the column above, hanging off the left edge at the top. */
+		/* The anchor's badges at the top-left, hanging off the left edge. A row,
+		   not a column: an area both tied and moored keeps its buoy in the
+		   corner, where it sits on every area others follow, and wears the tie
+		   to the left of it — stacked, the buoy dropped a badge down the edge
+		   whenever the area happened to follow another. */
 		.badges.tie {
 			left: auto;
 			right: 100%;
 			margin: 0 calc(4px * var(--ui-scale, 1)) 0 0;
+			flex-direction: row;
 		}
 
 		/* Quieter than the blue chrome around it. A badge is an annotation, not a

@@ -101,8 +101,8 @@ resize boxes directly, or type exact millimetres.
   design — and both marks are buttons: the **link** on the follower breaks its own tie, the **buoy** on the
   followed area casts off everything moored to it, and neither moves anything —
   the released box keeps the place it was sitting in. Both hang off an area's
-  **top-left** corner, in a column of their own: the link, and under it the
-  buoy — an area in the middle of a chain wears both. **Point at either** and a dotted
+  **top-left** corner: the buoy in the corner, and the link to the left of
+  it — an area in the middle of a chain wears both. **Point at either** and a dotted
   thread draws itself between the two — an inverted S, leaving each badge
   downwards before it crosses, and bowed out to the left when the two are one
   above the other so it is never a straight rule — sagging a little, its dots
@@ -962,6 +962,11 @@ rather than a dialog, so the card that uses the images stays in view.
   find one by name appears. That is the whole point: *which of these forty can I
   delete* is not a question browser storage can answer. Deleting is one press,
   and it says so if something was using it. Hover a line for where it is kept.
+- **Drawings** — under the stored images, every picture kept in the table
+  itself or on an area with no column: its column and row (or *on the area*),
+  its size in pixels and what it weighs. They are not files, so there is
+  nothing to delete or carry here; press one and it opens in the drawing
+  editor, in the side panel.
 - **One image, large** — tap a thumbnail, or open a table cell that points
   at a stored image, and it fills the tray, with its size in pixels at the
   head and a **‹ 1 / 5 ›** pager at the foot. Under it is a row of tools, as

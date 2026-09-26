@@ -16,6 +16,7 @@
 		localImageRef,
 		resolveBackground,
 		resolveLocalImages,
+		safeMediaUrl,
 		storeLocalImage,
 		uploadBackgroundImage
 	} from '$lib/assets';
@@ -1023,6 +1024,47 @@
 			pixels: box.pixels,
 			ink: box.color ?? template.defaults.color
 		};
+	}
+
+	/**
+	 * Every picture held in the table or on an area rather than in storage,
+	 * for the Images tray: a cell's drawing, by column and row, and a drawing
+	 * on an area with no column. Only `data:` pictures that pass the same
+	 * check a cell's thumbnail does — the cell is untrusted.
+	 */
+	const drawings = $derived.by(() => {
+		const out: Array<{ key: string; label: string; where: string; src: string }> = [];
+		dataset.rows.forEach((cells, i) => {
+			for (const column of dataset.columns) {
+				const text = cells[column]?.trim() ?? '';
+				const src = text.startsWith('data:image/') ? safeMediaUrl(text) : null;
+				if (src) out.push({ key: `cell:${i}:${column}`, label: column, where: `row ${i + 1}`, src });
+			}
+		});
+		for (const box of template.boxes) {
+			if (box.slot && mapping[box.slot]) continue;
+			const text = String(box.static?.dataUrl ?? '').trim();
+			const src = text.startsWith('data:image/') ? safeMediaUrl(text) : null;
+			if (src) out.push({ key: `area:${box.id}`, label: box.slot?.trim() || 'Drawing', where: 'on the area', src });
+		}
+		return out;
+	});
+
+	/** A drawing pressed in the Images tray, opened in the drawing editor it belongs to. */
+	function openDrawing(key: string) {
+		if (key.startsWith('area:')) {
+			drawArea(key.slice('area:'.length));
+			return;
+		}
+		const [, index, ...rest] = key.split(':');
+		const rowIndex = Number(index);
+		const column = rest.join(':');
+		if (!dataset.columns.includes(column) || !dataset.rows[rowIndex]) return;
+		if (refuseLockedTable()) return;
+		activeRow = rowIndex;
+		dataOpen = true;
+		imagesOpen = false;
+		cellRequest = { row: rowIndex, column, draw: true };
 	}
 
 	/** A stored picture, opened large in the Images tray. */
@@ -2727,6 +2769,8 @@
 					onchanged={() => (imagesVersion += 1)}
 					focus={imageFocus}
 					onfocus={(name) => (imageFocus = name)}
+					{drawings}
+					onopendrawing={openDrawing}
 					ontraydrag={stacked ? dragTray : undefined}
 				/>
 			{:else}

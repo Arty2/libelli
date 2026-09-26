@@ -574,6 +574,14 @@ on the window, and a Delete meant for the board would delete an area. A stroke
 focuses the board, because its press is held back from the page and would not
 otherwise move the focus off the Save just pressed.
 
+**Drawings are listed in the Images tray, not stored there.** A drawing lives
+in its cell, or on an area with no column, on purpose (see `bitmap.ts` above),
+and so the tray — "every image this browser is holding" — was missing exactly
+the pictures made in the app. They are listed under the stored ones, read off
+the table and the template as they stand, through `safeMediaUrl` as a cell's
+thumbnail is. No delete and no carry: they are not files, and a press opens
+the one editor that can change them.
+
 ## `src/lib/photo.ts` and the Images tray's large view
 
 **Edits to a stored picture wait for Save.** Rotate, flip and crop draw on a canvas
