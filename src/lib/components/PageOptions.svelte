@@ -53,6 +53,8 @@
 		templateId: string;
 		onselecttemplate: (id: string) => void;
 		onnewtemplate: () => void;
+		/** open the A5 Starter as it came, or add it to the library */
+		onstartertemplate: () => void;
 		ondeletetemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
@@ -78,6 +80,7 @@
 		templateId,
 		onselecttemplate,
 		onnewtemplate,
+		onstartertemplate,
 		ondeletetemplate,
 		onuploadbackground,
 		onuploadprintbackground,
@@ -418,6 +421,19 @@
 									New Template…
 								</button>
 							</li>
+							<!-- Never over the loaded design: it opens a copy of the starter that
+							     nobody has changed, or adds one — so, like Getting Started under
+							     the table, the lock does not disable it. -->
+							<li role="none">
+								<button
+									role="menuitem"
+									title="The design the tour is set in, as it came — your templates are untouched"
+									onclick={fromMenu(onstartertemplate)}
+								>
+									<span class="tick" aria-hidden="true"><Icon name="information-square" size={14} /></span>
+									A5 Starter
+								</button>
+							</li>
 							<li role="none">
 								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onimporttemplate)}>
 									<span class="tick" aria-hidden="true"><Icon name="document-import" size={14} /></span>
@@ -438,7 +454,7 @@
 									class="danger"
 									role="menuitem"
 									disabled={pageFrozen}
-									title="Back to the starter card. Your rows are not touched."
+									title="Put the A5 Starter over this design. Your rows are not touched."
 									onclick={fromMenu(onresettemplate)}
 								>
 									<span class="tick" aria-hidden="true"><Icon name="reset" size={14} /></span>

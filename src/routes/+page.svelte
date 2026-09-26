@@ -51,7 +51,7 @@
 	} from '$lib/boxops';
 	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport, withKey } from '$lib/keys';
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
-	import { sampleDataset, starterTemplate } from '$lib/onboarding';
+	import { isStarterTemplate, sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { cssIdent } from '$lib/css';
@@ -1501,7 +1501,7 @@
 		template = starterTemplate();
 		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
-		notify('Template reset to the starter card. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
+		notify('Template reset to the A5 Starter. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
 	}
 
 	// ---- the template library -----------------------------------------------
@@ -1582,6 +1582,54 @@
 		await saveTemplateDoc(templateId, $state.snapshot(template));
 		await refreshLibrary();
 		notify(`“${next.name}” started. Your rows are untouched — press ${dataset.columns.length ? 'the shapes button beside the page to lay them out' : 'Import under the table to bring some in'}.`);
+	}
+
+	/**
+	 * A5 Starter: the design a first run lands on, as it came — the template
+	 * library's Getting Started.
+	 *
+	 * Never over the loaded template, and never over a copy anybody has changed:
+	 * it opens a copy of the starter already in the library untouched, if there
+	 * is one, and otherwise adds a fresh one beside the rest. Reset is the one
+	 * that puts the starter over what is open, and it asks first.
+	 */
+	async function a5Starter() {
+		const untouched = (raw: unknown) => {
+			try {
+				return isStarterTemplate(normaliseTemplate(raw));
+			} catch {
+				return false;
+			}
+		};
+		if (untouched($state.snapshot(template))) {
+			notify(`This is the A5 Starter, as it came.`);
+			return;
+		}
+		for (const entry of library) {
+			if (entry.id === templateId) continue;
+			const doc = await loadTemplateDoc(entry.id);
+			if (doc && untouched(doc)) {
+				await switchTemplate(entry.id);
+				return;
+			}
+		}
+		settleProvisional();
+		await flushTemplate();
+		describe('A5 Starter');
+		templateId = nextTemplateId();
+		saveTemplateId(templateId);
+		// Named after the new id is in place: `freeName` skips the loaded
+		// template's own entry, and the one being left keeps its name.
+		const next = starterTemplate();
+		next.name = freeName(next.name);
+		template = next;
+		selectedIds = [];
+		editingId = null;
+		mapping = autoMap(usedSlots(next), dataset.columns);
+		missingFonts = await ensureTemplateFonts(next);
+		await saveTemplateDoc(templateId, $state.snapshot(template));
+		await refreshLibrary();
+		notify(`“${next.name}” added to your templates, as it came. Your other templates and your rows are untouched.`);
 	}
 
 	/**
@@ -2502,6 +2550,7 @@
 					{editorFonts}
 					onselecttemplate={() => {}}
 					onnewtemplate={() => {}}
+					onstartertemplate={() => {}}
 					ondeletetemplate={() => {}}
 					onuploadfont={() => {}}
 					onuploadbackground={() => {}}
@@ -2535,6 +2584,7 @@
 						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
+						onstartertemplate={() => void a5Starter()}
 						ondeletetemplate={() => (deleting = true)}
 						onuploadfont={(file) => handleFontUpload(file)}
 						onuploadbackground={(file) => void handleBackgroundUpload(file)}
@@ -2567,6 +2617,7 @@
 						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
+						onstartertemplate={() => void a5Starter()}
 						ondeletetemplate={() => (deleting = true)}
 						onuploadfont={(file) => handleFontUpload(file)}
 						onuploadbackground={(file) => void handleBackgroundUpload(file)}
@@ -2920,7 +2971,7 @@
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the template?" use:armDefault>
 		<h2>Reset the template?</h2>
 		<p>
-			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the starter card. Your rows are
+			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the A5 Starter. Your rows are
 			not touched.
 		</p>
 		<div class="modal-actions">

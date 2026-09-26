@@ -1739,24 +1739,49 @@ one page's subject instead of decoration on all four. Card 3 is the only row
 with a `sketch`, a 64 x 64 Bitmap drawing stored in the cell, shown in an area
 that is rotated, padded and hand-bordered: the styles are on the page to be
 selected and read back. The starter template has facing pages on, so the four
-rows are exactly one 2-up zine, and card 4 says how to fold it; the title,
+rows are exactly one 2-up zine, and card 4 says how to fold it; the kicker, title,
 subtitle and sticker opt out of the mirror so a left-hand page does not push its
 title to the right.
 
-The template also carries the two things a row cannot: an area of its own
-text, `{{date:YYYY-MM-DD}}`, centred in the footer so it holds still
-while the rest of the footer mirrors, and a paragraph indent on the body.
-Card 2 shows `{{title}}` filled in inside a cell and `{{column}}` left as
-written, which is the literal form for free — no column is called `column`,
-and an unrecognised name is never eaten. A date cannot be shown that way,
-since `{{date…}}` is always replaced, so the card points at the footer
+The template also carries what a row cannot: two areas of its own text in the
+footer — `{{link}}`, which empties and so hides on a row with no link, beside
+the QR that hides with it, and `{{date:YYYY-MM-DD}}` — and a paragraph indent
+on the body. The footer opts out of the mirror as a whole: mirrored, its
+left-aligned text landed mid-page on a left-hand page, a long way from the code
+it captions. Only the band and the page number follow the fold. Card 2 shows `{{title}}` filled in inside a cell and `{{column}}`
+left as written, which is the literal form for free — no column is called
+`column`, and an unrecognised name is never eaten. A date cannot be shown that
+way, since `{{date…}}` is always replaced, so the card points at the footer
 instead of spelling it out.
 
-Three families, each with a job: Fraunces, large and light, for titles;
-Instrument Sans for everything that is read, subtitles and the date included;
-and Patrick Hand for the kicker pill alone. The hand face on titles and body
-made every card look like a sticky note — as one small label it is the
-personality, and the rest can be set like a book.
+Four families, each with a job, as a book would set them: Fraunces for titles
+and, through the template's own CSS, the headings inside the body; Ysabeau
+Office, a humanist sans at weight 300, for the subtitle, so it reads as a quiet
+second voice rather than a smaller title; Instrument Sans for the body; and IBM
+Plex Mono for every small line — the kicker, the link, the date, the page
+number and `code` in the body. Patrick Hand, which used to set the kicker, is
+gone from the starter: the drawn sticker is personality enough, and a hand face
+beside four others was one voice too many. Ysabeau Office because it is
+variable across the whole weight range, which is the one request `fonts.ts`
+tries first — a static humanist family (Alegreya Sans, Fira Sans) would arrive
+with 400 and 700 only, and the light cut would silently be regular.
+
+The rest is chosen to show one of each thing the tour mentions, without a
+paragraph of its own: the kicker is a per-edge border (a hairline under it)
+with uppercase and tracking; the accent band multiplies rather than covers;
+the body's list uses the dash marker; the CSS box is not empty, so opening it
+shows what a template's stylesheet can reach (`#body h2`, `.page-number`).
+The page number is the one small line with no area of its own, so the CSS sets
+it with `!important` over the inline style it takes from the page defaults.
+
+**A5 Starter in the template menu, beside Reset.** The table has had Getting
+Started since there was more than one table; the template had only Reset, which
+puts the starter over whatever is open. A5 Starter is the non-destructive twin:
+it opens a copy of the starter nobody has changed if the library has one, and
+otherwise adds a fresh one. "Nobody has changed" ignores the name and the
+padlock (`isStarterTemplate`) — a first run lands on it locked — and nothing
+else, so a copy with one area nudged is theirs and is never handed back as the
+original. Like Getting Started, the lock does not disable it.
 
 They stay inside what `markdown.ts` actually supports, and the QR URLs are
 decoded by an independent decoder in the verification pass, because a QR that

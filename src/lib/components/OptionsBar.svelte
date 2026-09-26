@@ -31,6 +31,8 @@
 		templateId: string;
 		onselecttemplate: (id: string) => void;
 		onnewtemplate: () => void;
+		/** open the A5 Starter as it came, or add it to the library */
+		onstartertemplate: () => void;
 		ondeletetemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;

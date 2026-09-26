@@ -493,15 +493,17 @@ resize boxes directly, or type exact millimetres.
 **Several templates, one browser.** The **Template** field in page setup names the
 loaded template; the caret beside it opens every template this browser has saved,
 the open one ticked, with everything that acts on the template as a whole under a
-rule: **New Template…**, **Import…**, **Export**, and in red **Reset…** and
+rule: **New Template…**, **A5 Starter**, **Import…**, **Export**, and in red **Reset…** and
 **Delete…** (whose dialog still says **Delete Template**, so the button you
 confirm with names what goes). An export is named for the template and the
-day — `a5-starter-template_2026-09-25.json` — so a folder of them sorts by
+day — `a5-starter_2026-09-25.json` — so a folder of them sorts by
 date. **Lock** stays outside the menu, beside the field,
 because it is a state you need to see rather than an errand. Renaming is typing
 in the field — the template keeps its identity, so two of them may share a name
-without sharing anything else. Reset puts the starter card back under the same
-name; Delete removes the template and opens the next one, or a new empty
+without sharing anything else. **A5 Starter** opens the design a first run
+lands on, as it came: a copy nobody has changed if you have one, or a new one
+beside the rest — it never touches the template that is open. Reset puts the
+starter card back over the open template, under the same name; Delete removes the template and opens the next one, or a new empty
 template when it was the last one, so the card a first run lands on can be
 deleted like any other. Both ask first, and both are one Ctrl/Cmd+Z away — an
 undone delete is written back out under the id it had. The menu opens over the

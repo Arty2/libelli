@@ -1,10 +1,17 @@
 {
   "schema": 5,
-  "name": "A5 Starter Template",
+  "name": "A5 Starter",
   "page": {
     "w": 148,
     "h": 210,
-    "unit": "mm"
+    "unit": "mm",
+    "background": "#ffffff",
+    "margin": {
+      "top": 11,
+      "right": 14,
+      "bottom": 8,
+      "left": 14
+    }
   },
   "bleed": {
     "enabled": false,
@@ -14,7 +21,7 @@
   "pageNumber": {
     "enabled": true,
     "position": "bottom-outer",
-    "margin": 8
+    "margin": 9
   },
   "fonts": [
     {
@@ -26,16 +33,20 @@
       "source": "google"
     },
     {
-      "family": "Patrick Hand",
+      "family": "Ysabeau Office",
+      "source": "google"
+    },
+    {
+      "family": "IBM Plex Mono",
       "source": "google"
     }
   ],
   "defaults": {
     "font": "Instrument Sans",
-    "size": 11,
-    "lineHeight": 1.5,
+    "size": 10,
+    "lineHeight": 1.45,
     "weight": 400,
-    "color": "#000000",
+    "color": "#1c1b19",
     "align": "left",
     "letterSpacing": 0
   },
@@ -52,45 +63,86 @@
     {
       "id": "b_accent",
       "slot": "accent",
-      "x": 141,
+      "x": 142,
       "y": 0,
-      "w": 7,
+      "w": 6,
       "h": 210,
       "mode": "color",
       "overflow": "clip",
-      "hideWhenEmpty": true
+      "hideWhenEmpty": true,
+      "blend": "multiply"
+    },
+    {
+      "id": "b_category",
+      "slot": "category",
+      "x": 14,
+      "y": 11,
+      "w": 90,
+      "h": 5,
+      "font": "IBM Plex Mono",
+      "size": 6.5,
+      "lineHeight": 1.2,
+      "letterSpacing": 0.35,
+      "textCase": "uppercase",
+      "color": "#6b675f",
+      "valign": "bottom",
+      "padding": {
+        "top": 0,
+        "right": 0,
+        "bottom": 1.5,
+        "left": 0
+      },
+      "borderWidth": {
+        "top": 0,
+        "right": 0,
+        "bottom": 0.2,
+        "left": 0
+      },
+      "borderStyle": "solid",
+      "borderColor": "#b9b4a8",
+      "mode": "plain",
+      "overflow": "clip",
+      "hideWhenEmpty": true,
+      "mirror": false
     },
     {
       "id": "b_title",
       "slot": "title",
-      "x": 12,
-      "y": 13,
-      "w": 96,
-      "h": 16,
-      "size": 34,
-      "lineHeight": 1.05,
+      "x": 14,
+      "y": 21,
+      "w": 90,
+      "h": 14,
+      "font": "Fraunces",
+      "size": 30,
+      "weight": 360,
+      "lineHeight": 1.04,
+      "letterSpacing": -0.25,
       "mode": "plain",
       "overflow": "grow",
+      "anchor": {
+        "to": "b_category",
+        "gap": 5
+      },
       "hideWhenEmpty": true,
-      "mirror": false,
-      "font": "Fraunces",
-      "weight": 300
+      "mirror": false
     },
     {
       "id": "b_subtitle",
       "slot": "subtitle",
-      "x": 12,
-      "y": 31,
-      "w": 96,
-      "h": 8,
+      "x": 14,
+      "y": 37,
+      "w": 90,
+      "h": 7,
+      "font": "Ysabeau Office",
       "size": 13,
-      "lineHeight": 1.3,
-      "color": "#555555",
+      "weight": 300,
+      "lineHeight": 1.25,
+      "color": "#55514a",
       "mode": "plain",
       "overflow": "grow",
       "anchor": {
         "to": "b_title",
-        "gap": 2
+        "gap": 2.5
       },
       "hideWhenEmpty": true,
       "mirror": false
@@ -98,10 +150,10 @@
     {
       "id": "b_body",
       "slot": "body",
-      "x": 12,
-      "y": 44,
-      "w": 124,
-      "h": 110,
+      "x": 14,
+      "y": 52,
+      "w": 120,
+      "h": 120,
       "mode": "markdown",
       "overflow": "grow",
       "anchor": {
@@ -110,42 +162,48 @@
       },
       "md": {
         "h1": {
-          "size": 1.5,
-          "spaceBefore": 6,
-          "spaceAfter": 1.5
+          "size": 1.6,
+          "spaceBefore": 5,
+          "spaceAfter": 1.5,
+          "weight": 500
         },
         "h2": {
-          "size": 1.35,
-          "spaceBefore": 6,
-          "spaceAfter": 1.5
+          "size": 1.4,
+          "spaceBefore": 5,
+          "spaceAfter": 1.2,
+          "weight": 500
         },
         "h3": {
           "size": 1.15,
           "spaceBefore": 4,
-          "spaceAfter": 1
+          "spaceAfter": 1,
+          "weight": 500
         },
         "paragraph": {
           "spaceAfter": 3
         },
         "list": {
-          "indent": 7,
-          "markerGap": 4,
-          "itemSpacing": 1.5
+          "indent": 6,
+          "markerGap": 3,
+          "itemSpacing": 1.2
         }
       },
       "paragraph": {
         "mode": "indent",
         "amount": 1
+      },
+      "list": {
+        "marker": "dash"
       }
     },
     {
       "id": "b_sketch",
       "slot": "sketch",
-      "x": 110,
-      "y": 11,
+      "x": 109,
+      "y": 10,
       "w": 26,
       "h": 26,
-      "mode": "bitmap",
+      "mode": "image",
       "overflow": "clip",
       "fit": "contain",
       "hideWhenEmpty": true,
@@ -155,66 +213,69 @@
       "borderStyle": "solid",
       "borderRadius": 2,
       "borderHand": true,
-      "color": "#111111",
+      "background": "#ffffff",
+      "color": "#1c1b19",
       "mirror": false
     },
     {
-      "id": "b_category",
-      "slot": "category",
-      "x": 12,
-      "y": 196,
-      "w": 34,
-      "h": 7,
-      "font": "Patrick Hand",
-      "size": 12.5,
-      "lineHeight": 1.1,
-      "align": "center",
-      "valign": "middle",
-      "background": "#ecece6",
-      "borderRadius": 3.5,
-      "color": "#333333",
+      "id": "b_link",
+      "slot": null,
+      "x": 14,
+      "y": 194,
+      "w": 88,
+      "h": 4,
+      "font": "IBM Plex Mono",
+      "size": 6.5,
+      "lineHeight": 1.2,
+      "color": "#1c1b19",
+      "valign": "bottom",
       "mode": "plain",
       "overflow": "clip",
-      "anchor": null
+      "hideWhenEmpty": true,
+      "static": {
+        "text": "{{link}}"
+      },
+      "mirror": false
     },
     {
       "id": "b_date",
       "slot": null,
-      "x": 54,
-      "y": 196,
-      "w": 40,
-      "h": 7,
-      "size": 7.5,
+      "x": 14,
+      "y": 198.5,
+      "w": 88,
+      "h": 4,
+      "font": "IBM Plex Mono",
+      "size": 6.5,
       "lineHeight": 1.2,
-      "color": "#777777",
-      "valign": "middle",
+      "color": "#8a857b",
+      "letterSpacing": 0.15,
+      "valign": "bottom",
       "mode": "plain",
       "overflow": "clip",
-      "anchor": null,
       "static": {
-        "text": "{{date:YYYY-MM-DD}}"
+        "text": "Printed {{date:YYYY-MM-DD}}"
       },
-      "align": "center",
-      "letterSpacing": 0.2
+      "mirror": false
     },
     {
       "id": "b_qr",
       "slot": "link",
-      "x": 112,
-      "y": 186,
-      "w": 20,
-      "h": 20,
+      "x": 110,
+      "y": 181,
+      "w": 21,
+      "h": 21,
       "mode": "qr",
       "overflow": "clip",
-      "anchor": null,
       "hideWhenEmpty": true,
       "fit": "contain",
-      "color": "#000000",
+      "color": "#1c1b19",
       "padding": 1,
       "qr": {
         "level": "M"
-      }
+      },
+      "mirror": false
     }
   ],
-  "facing": true
+  "facing": true,
+  "css": "/* The page number takes the page's own face; this sets it in the mono of the footer. */\n.page-number {\n  font-family: 'IBM Plex Mono', monospace !important;\n  font-size: 6.5pt !important;\n  letter-spacing: 0.3mm;\n  color: #8a857b !important;\n}\n\n/* Headings inside the body in the title's serif. */\n#body h1, #body h2, #body h3 {\n  font-family: 'Fraunces', serif;\n  letter-spacing: -0.1mm;\n}\n\n/* `code` in the footer's mono, on a faint chip. */\n#body code {\n  font-family: 'IBM Plex Mono', monospace;\n  font-size: 0.86em;\n  background: #efece4;\n  padding: 0 0.6mm;\n  border-radius: 0.6mm;\n}\n\n#body mark {\n  background: #f6e27a;\n  padding: 0 0.4mm;\n}\n"
 }
