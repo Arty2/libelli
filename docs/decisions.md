@@ -1791,8 +1791,16 @@ the rescue button leaves it where it is (see `boxops.ts`).
 
 It prints as card 4 says to: two to an A4 sheet, in a zine's order, so
 Export opens on the booklet rather than on four loose pages — hence the name.
-The accent band on card 2 and the stamp share one green, so the one color the
-set has reads as a decision rather than as two.
+The accent band on card 2, every title and the stamp's field share one green,
+named once in the template's CSS as `--accent-color` on `:root` (which `css.ts`
+turns into the card). A custom property rather than the `accent-color`
+property itself, which only tints form controls and cannot be read by any
+other property. The title reaches it with `!important`, since an area's ink is
+set inline; the stamp's field is its `.surface`, inset to the padding. The band
+is the one place it is written out again: it is a cell of the table, the lesson
+on card 2 is that typing `orange` there changes it, and a cell cannot name a
+variable. Titles at weight 100 and body headings at 200: in a light green,
+Fraunces' hairline cuts are the whole of the color there is.
 
 The rest is chosen to show one of each thing the tour mentions, without a
 paragraph of its own: the kicker is a per-edge border (a hairline under it)
