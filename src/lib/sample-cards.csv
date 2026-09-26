@@ -13,15 +13,13 @@ Go ahead and change *This is a card* in the table. The title changes as you type
 No account, no upload, no server: nothing leaves this browser. Install libelli from your browser and it works offline, or scan the corner to open it on your phone. Want this tour back? **Getting Started** is in the table's menu.",Start here,https://libelli.vercel.app,,
 Cells can do more than words,"Markdown, colour, and the art of leaving things out","## Formatting without a toolbar
 
-Any cell can carry **bold**, *italic*, ~~strikethrough~~, `code`, lists and [links](https://heracl.es/libelli), and `==two equals signs==` run a ==highlighter== over a few words. Want a few words in colour? Write `[this]{red}` and you get [this]{red}. Hex, `rgb()` and names like [green]{green} or [purple]{purple} all work, and `red` prints as a printer's red rather than your screen's.
+Any cell can carry **bold**, *italic*, ~~strikethrough~~, `code`, lists, [links](https://heracl.es/libelli) and a rule (`---`, below), and `==two equals signs==` run a ==highlighter== over a few words. Want a few words in colour? Write `[this]{red}` and you get [this]{red}. Hex, `rgb()` and names like [green]{green} or [purple]{purple} all work, and `red` prints as a printer's red rather than your screen's.
 
 That band down the edge is a column too. Type `orange` into this row's `accent` cell and watch it change.
 
 ## One cell, many columns
 
-Put a column's name in double braces, like `{{column}}`, and it's replaced by whatever this row holds there — in a cell, or in an area's own text. This card is called *{{title}}*, and nobody had to type that twice. The squiggle under `{{column}}` means no column has that name; it never prints.
-
-A line of three dashes, `---`, draws a rule:
+Any cell, and any area's own text, can pull in another column: type `{{` and pick one from the list, and `{{column}}` is replaced by whatever this row holds there. This card is called *{{title}}*, and nobody had to type that twice. Add a find and a replace, `{{column:find:replace}}`, and it changes on the way in: swap *words* for *that* in this title and it reads *{{title:words:that}}*. The squiggle under `{{column}}` means no column has that name; it never prints.
 
 ---
 
@@ -34,7 +32,7 @@ The design starts **locked**, so the tour can't be knocked out of place by accid
 
 ## Style is per area
 
-That sticker is a drawing stored in the row itself, turned a few degrees, with a border drawn by hand. Double-click it to draw your own.
+That stamp is a drawing stored in the row itself, turned a few degrees, its perforated border drawn by hand and its shadow cast by the template's own CSS. Double-click it to draw your own.
 
 Even the paragraphs have a style: these are told apart by an indent rather than a gap, measured in lines of leading. Select anything and the bar above shows how it's made.
 

@@ -375,6 +375,18 @@ for that context.
 
 ## `src/lib/hand.ts`
 
+**A stamp is a border style, and a shape rather than a line.** It sits in the
+style menu beside dashed and dotted because it is one more way of drawing the
+same edge, but no CSS border can draw it, so it is the one style that always
+goes to the SVG layer — `borderHand` only decides whether it wobbles. It is
+one closed path filled with the area's background, and the surface paints no
+background under it: a rectangle of the same color would fill the holes back
+in, and a `drop-shadow()` would trace the rectangle instead of the
+perforations. One width for all four edges, the heaviest, because a stamp is
+torn along one row of holes; the radius is ignored, as on every perforated
+stamp. The holes are sized to the line, not the area, and spaced to fit each
+edge exactly, half a gap from each corner, so all four corners come out alike.
+
 **The wobble is seeded, not random.** A border drawn from `Math.random` is a
 different border on every keystroke, every re-measure and every page of the
 run — which reads as a fault, not as a hand. The seed is the box's own id, so
@@ -1769,8 +1781,9 @@ with 400 and 700 only, and the light cut would silently be regular.
 
 The rest is chosen to show one of each thing the tour mentions, without a
 paragraph of its own: the kicker is a per-edge border (a hairline under it)
-with uppercase and tracking; the accent band multiplies rather than covers;
-the body's list uses the dash marker; card 2 runs a `==highlighter==` over a
+with uppercase and tracking; the drawing is a stamp, hand-perforated, with a
+`drop-shadow()` from the template's CSS that follows the holes; the accent band multiplies rather than covers;
+the body's list uses the em dash marker; card 2 runs a `==highlighter==` over a
 word and draws a `---` rule, which the body sets as a pale hairline; the CSS box is not empty, so opening it
 shows what a template's stylesheet can reach (`#body h2`, `.page-number`).
 The page number is the one small line with no area of its own, so the CSS sets
@@ -2851,6 +2864,17 @@ the handler counts the *unlocked* strays: a locked area is not this button's to
 move, and when every stray is locked it says so rather than doing nothing.
 
 ## `src/lib/placeholders.ts`
+
+**Find and replace is two parts after a column, never a pattern.**
+`{{column:find:replace}}` is a literal, case-sensitive swap of every
+occurrence — the spreadsheet's Find, not a regex, so nothing typed into a cell
+can become a pattern that runs away. It takes both colons: a single part after
+a column meant nothing before and still does, rather than quietly becoming a
+deletion, and `{{date:FORMAT}}` keeps its meaning whether or not a column is
+called `date`. The find ends at the first colon, so the replacement may hold
+one; neither part is trimmed, since a space is the commonest thing to replace.
+It runs inside the same single pass, so a replacement is never read for
+placeholders either.
 
 **A column by name, once, and nothing more.** `{{title}}` fills from the row the
 card is drawing, in an area's own words and in a cell alike — a card still

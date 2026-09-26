@@ -114,6 +114,17 @@ export function formatDate(date: Date, format: string = DEFAULT_DATE_FORMAT): st
  * column `date` meant that column — but a format after the colon only ever
  * means the date, since a column has nothing to format.
  *
+ * After a column, two more parts are a find and a replace:
+ * `{{title:words:that}}` is the title with every `words` made `that`, and
+ * `{{title: :-}}` puts hyphens for its spaces. Literal and case-sensitive, like
+ * the find in a spreadsheet — no patterns, so nothing typed into a cell can be
+ * read as one. Neither part is trimmed, since a space is the commonest thing
+ * to replace; the find ends at the first colon after the name, so the
+ * replacement may hold colons and the find may not. An empty replacement
+ * deletes. It takes both colons to mean this: `{{date:YYYY}}` is still a date,
+ * and a single part after a column's name still means nothing, as it always
+ * has, rather than quietly becoming a deletion.
+ *
  * A name is matched as written, then in the shape column names are stored in
  * (`{{Artist Name}}` finds `Artist-Name`), then ignoring case. The date's
  * tokens are case-sensitive by design, the same way every date library spells
@@ -138,11 +149,18 @@ export function referencedColumns(text: string, columns: readonly string[]): str
 	if (!text || !text.includes('{{')) return [];
 	const found = new Set<string>();
 	for (const match of text.matchAll(PLACEHOLDER)) {
-		if (match[2] !== undefined) continue;
+		if (match[2] !== undefined && findReplace(match[2]) === null) continue;
 		const column = findColumn(match[1], columns);
 		if (column) found.add(column);
 	}
 	return [...found];
+}
+
+/** `find:replace` split at its first colon, or null when there is no colon. */
+function findReplace(spec: string): { find: string; replace: string } | null {
+	const colon = spec.indexOf(':');
+	if (colon === -1) return null;
+	return { find: spec.slice(0, colon), replace: spec.slice(colon + 1) };
 }
 
 export function applyPlaceholders(text: string, context: PlaceholderContext = {}): string {
@@ -155,9 +173,14 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 	// One `replace`, one pass: the callback's return value is never scanned
 	// again, which is what keeps a cell quoting itself from going anywhere.
 	return text.replace(PLACEHOLDER, (whole, name: string, format?: string) => {
-		if (format === undefined && row) {
+		const swap = format === undefined ? null : findReplace(format);
+		if ((format === undefined || swap) && row) {
 			const column = findColumn(name, columns);
-			if (column && column !== context.self) return String(row[column] ?? '');
+			if (column && column !== context.self) {
+				const value = String(row[column] ?? '');
+				// An empty find would put the replacement between every letter.
+				return swap && swap.find ? value.split(swap.find).join(swap.replace) : value;
+			}
 			if (column) return context.markUnknown ? `${UNKNOWN_OPEN}${whole.slice(2, -2)}${UNKNOWN_CLOSE}` : whole;
 		}
 		if (name.toLowerCase() !== 'date') {

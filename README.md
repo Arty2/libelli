@@ -219,7 +219,11 @@ resize boxes directly, or type exact millimetres.
   `{{date}}` prints today's date, and `{{date:YYYY-MM-DD}}` prints it in a
   format of your own: `YYYY`, `YY`, `MM`, `DD` for the numbers, `MMMM`, `MMM`,
   `dddd`, `ddd` for the names. A column called `date` wins over the date; a
-  format after the colon only ever means the date. Deliberately small — no
+  format after the colon only ever means the date. After a column, a find and
+  a replace change it on the way in: `{{title:words:that}}` swaps every
+  `words` for `that`, `{{title: :-}}` puts hyphens for spaces, and an empty
+  replacement deletes. Literal and case-sensitive, never a pattern; the find
+  ends at the first colon, so the replacement may hold colons. Deliberately small — no
   conditionals, no loops — and anything in braces it does not recognise is left
   exactly as written. No time of day: a card is printed once and read for
   months.
@@ -329,6 +333,14 @@ resize boxes directly, or type exact millimetres.
   It is an SVG over the room the CSS border was already holding, so switching
   it on moves no text and changes no measurement, and it prints and exports
   like anything else on the card.
+- **A stamp** — the **Stamp** border style is a postage stamp's perforated
+  edge: the paper, filled with the area's fill, with a half-round hole bitten
+  out at every perforation, so the page shows through the holes. The width sets
+  the line and the size of the holes; the radius does not apply. It is always
+  drawn as SVG, since no CSS border can draw it, and the pencil decides whether
+  it is punched true or by hand. A `filter: drop-shadow(…)` on the area in the
+  template's CSS follows the perforations, which is how the A5 Starter's stamp
+  sits off the page.
 - **Type without the bar** — <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> and the
   scroll wheel sizes whatever the pointer is over, in points, and the same
   modifiers with the arrows step the alignment of the selection in the direction

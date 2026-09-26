@@ -471,7 +471,9 @@
 	 */
 	function surfaceStyle(box: Box): string {
 		const parts: string[] = [];
-		if (box.background) parts.push(`background:${box.background}`);
+		// A stamp's paper is the SVG's fill, cut to the perforations; a
+		// rectangle of the same color under it would fill the notches back in.
+		if (box.background && !stamped(box)) parts.push(`background:${box.background}`);
 		// A color out of the data fills the area itself, not a panel inside it, so
 		// it reaches under the padding and takes the corner radius with it. After
 		// the declared fill, because the row is the more specific answer.
@@ -493,7 +495,7 @@
 				if (drawnByHand(media.src)) parts.push('image-rendering:pixelated');
 			}
 		}
-		if (box.borderWidth && !box.borderHand) {
+		if (box.borderWidth && !drawnBorder(box)) {
 			const { top, right, bottom, left } = sidesOf(box.borderWidth);
 			parts.push(
 				`border-width:${top}mm ${right}mm ${bottom}mm ${left}mm`,
@@ -642,6 +644,11 @@
 
 	const borderColorOf = (box: Box) => box.borderColor ?? box.color ?? template.defaults.color;
 
+	/** A stamp, which no CSS border can draw: its perforations are always SVG. */
+	const stamped = (box: Box) => !!box.borderWidth && box.borderStyle === 'stamp';
+	/** A border the SVG layer draws rather than CSS — by hand, or a stamp. */
+	const drawnBorder = (box: Box) => !!box.borderWidth && (!!box.borderHand || stamped(box));
+
 	/**
 	 * The strokes of a hand-drawn border, in the millimetres of the box's own
 	 * border box — its declared width, and the height the layout resolved, which
@@ -651,14 +658,15 @@
 	 * and does not redraw itself as the words underneath it are typed.
 	 */
 	function handStrokes(box: Box): HandStroke[] {
-		if (!box.borderHand || !box.borderWidth) return [];
+		if (!drawnBorder(box)) return [];
 		return handBorder({
 			w: box.w,
 			h: layout.heights[box.id] ?? box.h,
 			widths: sidesOf(box.borderWidth),
 			radius: box.borderRadius ?? 0,
 			style: box.borderStyle ?? 'solid',
-			seed: box.id
+			seed: box.id,
+			steady: !box.borderHand
 		});
 	}
 	/**
@@ -1789,6 +1797,7 @@
 								stroke-width={stroke.width}
 								stroke-dasharray={stroke.dash ?? 'none'}
 								stroke-linecap={stroke.cap ?? 'butt'}
+								fill={stroke.closed ? (box.background ?? 'none') : 'none'}
 							/>
 						{/each}
 					</svg>
