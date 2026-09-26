@@ -734,13 +734,13 @@
 				class="minor"
 				class:dot={gridArt.dots}
 				d={gridArt.minorPath}
-				stroke-width={gridArt.dots ? 1.1 : GRID_HAIRLINE}
+				stroke-width={gridArt.dots ? 0.7 : GRID_HAIRLINE}
 			/>
 			<path
 				class="major"
 				class:dot={gridArt.dots}
 				d={gridArt.majorPath}
-				stroke-width={gridArt.dots ? 2 : GRID_HAIRLINE}
+				stroke-width={gridArt.dots ? 1.1 : GRID_HAIRLINE}
 			/>
 		</svg>
 	{/if}
@@ -1369,9 +1369,11 @@
 	}
 
 	/* Dots carry less ink than rules at the same value, so both weights come up
-	   to stay legible against the paper they are drawn on. */
+	   to stay legible against the paper they are drawn on — the minor ones most,
+	   at under a pixel across (0.7 screen px, the majors 1.1), where a lighter
+	   ink would leave only the majors visible and the subgrid would vanish. */
 	.grid-overlay .minor.dot {
-		stroke: rgba(var(--grid-ink), 0.22);
+		stroke: rgba(var(--grid-ink), 0.32);
 	}
 
 	.grid-overlay .major.dot {

@@ -20,6 +20,12 @@ describe('tipPlacement', () => {
 		expect(at.y + size.h).toBeLessThan(400 - TIP_GAP);
 	});
 
+	it('centres a finger\'s tip across the screen, the same room either side', () => {
+		const at = tipPlacement({ x: 40, y: 400 }, { w: 300, h: 30 }, { w: 390, h: 800 }, true);
+		expect(at.x).toBe(45);
+		expect(390 - (at.x + 300)).toBe(at.x);
+	});
+
 	it('goes under a finger at the top of the window, where above has no room', () => {
 		expect(tipPlacement({ x: 100, y: 20 }, size, view, true).y).toBeGreaterThan(20);
 	});

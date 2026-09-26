@@ -220,7 +220,9 @@
 	.tip {
 		position: fixed;
 		z-index: 1000;
-		max-width: min(320px, calc(100vw - 12px));
+		/* The margin either side on a phone is the same as the one a centred
+		   tip keeps from the edges — see tipPlacement. */
+		max-width: min(320px, calc(100vw - 32px));
 		padding: 5px 8px;
 		background: #1f1f1f;
 		color: #fff;
