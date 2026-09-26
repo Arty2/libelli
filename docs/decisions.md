@@ -379,10 +379,14 @@ for that context.
 style menu beside dashed and dotted because it is one more way of drawing the
 same edge, but no CSS border can draw it, so it is the one style that always
 goes to the SVG layer — `borderHand` only decides whether it wobbles. It is
-one closed path filled with the area's background, and the surface paints no
-background under it: a rectangle of the same color would fill the holes back
-in, and a `drop-shadow()` would trace the rectangle instead of the
-perforations. One width for all four edges, the heaviest, because a stamp is
+one closed path filled with the *border* color, which is the paper, and the
+area's fill is the field printed on it, inside the padding, which is the
+margin. That is how a stamp is made, and it gives both colors a job: it
+started as the fill on the paper alone, which left no way to have a white
+margin round a colored picture. The paper is drawn under the fill, the one
+drawn border that is — every other goes over, as a CSS border would. Spread to
+the border box, the fill would fill the holes back in, and a `drop-shadow()`
+would trace the rectangle instead of the perforations. One width for all four edges, the heaviest, because a stamp is
 torn along one row of holes; the radius is ignored, as on every perforated
 stamp. The holes are sized to the line, not the area, and spaced to fit each
 edge exactly, half a gap from each corner, so all four corners come out alike.

@@ -339,10 +339,11 @@ resize boxes directly, or type exact millimetres.
   brings stray areas back leaves it alone — a locked area *wholly* off the
   paper is parked, not lost. Half off still counts as stray, locked or not,
   because the half on the paper still prints cut.
-- **A stamp** — the **Stamp** border style is a postage stamp's perforated
-  edge: the paper, filled with the area's fill, with a half-round hole bitten
-  out at every perforation, so the page shows through the holes. The width sets
-  the line and the size of the holes; the radius does not apply. It is always
+- **A stamp** — the **Stamp** border style is a postage stamp: perforated
+  paper in the **border color**, with a half-round hole bitten out at every
+  perforation so the page shows through, and the area's **fill** printed on it
+  as a field inside the padding — the padding is the stamp's margin. The width
+  sets the size of the holes; the radius does not apply. It is always
   drawn as SVG, since no CSS border can draw it, and the pencil decides whether
   it is punched true or by hand. A `filter: drop-shadow(…)` on the area in the
   template's CSS follows the perforations, which is how the A5 Starter's stamp

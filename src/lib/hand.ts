@@ -30,8 +30,8 @@ export interface HandStroke {
 	cap?: 'round';
 	/**
 	 * A closed outline rather than a line along one edge — a stamp's paper,
-	 * which the renderer fills with the area's background so that what is
-	 * under the perforations shows through them.
+	 * which the renderer fills with the border color so that what is under
+	 * the perforations shows through them.
 	 */
 	closed?: boolean;
 }
@@ -217,8 +217,9 @@ export function handBorder({ w, h, widths, radius, style, seed, steady }: HandBo
  * bitten out of it at every perforation.
  *
  * One closed path rather than four strokes, because it is a shape and not a
- * line — the renderer fills it with the area's background, so the page shows
- * through the notches, and a `drop-shadow()` on the area follows them. One
+ * line — the renderer fills it with the border color, the paper, and prints
+ * the area's background as a field inside the padding, so the page shows
+ * through the notches and a `drop-shadow()` on the area follows them. One
  * width, the heaviest edge's: a sheet of stamps is torn along a single row of
  * holes. The radius is ignored, as it is on every stamp that was ever
  * perforated.
