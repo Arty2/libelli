@@ -148,3 +148,93 @@ export function line(from: { x: number; y: number }, to: { x: number; y: number 
 		}
 	}
 }
+
+type Point = { x: number; y: number };
+
+/**
+ * The far corner pulled in so the drag is a square — for the square and the
+ * circle. The longer side wins, so the shape reaches the pointer on the axis
+ * it was dragged furthest along, and each side keeps the direction it was
+ * dragged in.
+ */
+export function squareFrom(from: Point, to: Point): Point {
+	const side = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+	return { x: from.x + side * Math.sign(to.x - from.x || 1), y: from.y + side * Math.sign(to.y - from.y || 1) };
+}
+
+/** Every pixel of a rectangle's outline between two opposite corners, corners included, once each. */
+export function rectOutline(a: Point, b: Point): Point[] {
+	const x0 = Math.min(a.x, b.x);
+	const x1 = Math.max(a.x, b.x);
+	const y0 = Math.min(a.y, b.y);
+	const y1 = Math.max(a.y, b.y);
+	const points: Point[] = [];
+	for (let x = x0; x <= x1; x++) {
+		points.push({ x, y: y0 });
+		if (y1 !== y0) points.push({ x, y: y1 });
+	}
+	for (let y = y0 + 1; y < y1; y++) {
+		points.push({ x: x0, y });
+		if (x1 !== x0) points.push({ x: x1, y });
+	}
+	return points;
+}
+
+/**
+ * Every pixel of the ellipse inscribed in the rectangle between two opposite
+ * corners, once each. Zingl's midpoint ellipse in a rectangle: unlike the
+ * centre-and-radius form it handles an even width or height, where the centre
+ * falls between two pixels, so a 16-pixel circle is 16 pixels across and not
+ * 15 or 17. Pixel-exact rather than a canvas `ellipse()`, which would
+ * antialias its edge into colours that were never chosen.
+ */
+export function ellipseOutline(from: Point, to: Point): Point[] {
+	let x0 = Math.min(from.x, to.x);
+	let x1 = Math.max(from.x, to.x);
+	let y0 = Math.min(from.y, to.y);
+	let y1 = Math.max(from.y, to.y);
+	const seen = new Set<string>();
+	const points: Point[] = [];
+	const put = (x: number, y: number) => {
+		const key = `${x},${y}`;
+		if (seen.has(key)) return;
+		seen.add(key);
+		points.push({ x, y });
+	};
+	let a = x1 - x0;
+	const b = y1 - y0;
+	let b1 = b & 1;
+	let dx = 4 * (1 - a) * b * b;
+	let dy = 4 * (b1 + 1) * a * a;
+	let err = dx + dy + b1 * a * a;
+	y0 += (b + 1) >> 1;
+	y1 = y0 - b1;
+	a = 8 * a * a;
+	b1 = 8 * b * b;
+	do {
+		put(x1, y0);
+		put(x0, y0);
+		put(x0, y1);
+		put(x1, y1);
+		const e2 = 2 * err;
+		if (e2 <= dy) {
+			y0++;
+			y1--;
+			err += dy += a;
+		}
+		if (e2 >= dx || 2 * err > dy) {
+			x0++;
+			x1--;
+			err += dx += b1;
+		}
+	} while (x0 <= x1);
+	// A very flat ellipse finishes its tips here: the loop above runs out of
+	// columns before it has climbed the last rows at either end.
+	while (y0 - y1 <= b) {
+		put(x0 - 1, y0);
+		put(x1 + 1, y0++);
+		put(x0 - 1, y1);
+		put(x1 + 1, y1--);
+	}
+	return points;
+}

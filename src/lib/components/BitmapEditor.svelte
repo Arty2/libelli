@@ -8,6 +8,9 @@
 		isDefaultBoard,
 		line,
 		pixelAt,
+		ellipseOutline,
+		rectOutline,
+		squareFrom,
 		MAX_SIDE,
 		MIN_SIDE,
 		type Grid
@@ -36,10 +39,9 @@
 		/** what the area holds now: a data URL to draw on top of, or nothing */
 		value: string;
 		/**
-		 * The one ink, resolved: the area's own colour where it has one, and the
-		 * page default where it inherits. There is no palette here on purpose —
-		 * an area is set to a colour in the bar, and a drawing made in it should
-		 * be that colour rather than a second decision made in a second place.
+		 * The ink the pen starts with: the area's own colour where it has one,
+		 * and the page default where it inherits — so a drawing made in an area
+		 * is that area's colour unless another is picked.
 		 */
 		ink: string;
 		/** The picture, and the board it was made on unless that is the usual one. */
@@ -106,7 +108,56 @@
 	let grid = $state<Grid>(untrack(() => boardSize(box)));
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
-	let tool = $state<'pen' | 'eraser' | 'line'>('pen');
+	type Tool = 'pen' | 'eraser' | 'line' | 'rect' | 'ellipse';
+	let tool = $state<Tool>('pen');
+	/**
+	 * The rectangle drawn as a square, the ellipse as a circle — a second press
+	 * on the tool already up turns it on and off, and Shift does it for one
+	 * drag. Remembered separately, since wanting squares says nothing about
+	 * wanting circles.
+	 */
+	let square = $state(false);
+	let circle = $state(false);
+	let lastPress: { tool: Tool; at: number } | null = null;
+
+	/**
+	 * Pick a tool; press the rectangle or the ellipse twice, quickly, to switch
+	 * it between free and square or circle. Timed here rather than left to
+	 * `dblclick`, which a phone may not send for two taps on a button.
+	 */
+	function pick(next: Tool) {
+		const now = performance.now();
+		const again = lastPress?.tool === next && now - lastPress.at < 400 && tool === next;
+		lastPress = { tool: next, at: now };
+		tool = next;
+		if (!again) return;
+		lastPress = null;
+		if (next === 'rect') square = !square;
+		if (next === 'ellipse') circle = !circle;
+	}
+
+	/**
+	 * Any CSS colour as the #rrggbb a colour input can hold, by way of the
+	 * canvas, which already knows every way a colour can be written. A colour
+	 * it cannot read comes out black, as a canvas would draw it.
+	 */
+	function hexOf(css: string): string {
+		const ctx = document.createElement('canvas').getContext('2d');
+		if (!ctx) return '#000000';
+		ctx.fillStyle = '#000000';
+		ctx.fillStyle = css;
+		const out = String(ctx.fillStyle);
+		if (out.startsWith('#')) return out;
+		const [r, g, b] = out.match(/[\d.]+/g)?.map(Number) ?? [0, 0, 0];
+		return '#' + [r, g, b].map((n) => Math.round(n).toString(16).padStart(2, '0')).join('');
+	}
+
+	/** What the pen draws in: the area's own to start with, anything once picked. */
+	let color = $state(untrack(() => hexOf(ink)));
+
+	/** The nib's three widths, one button: each press is the next. */
+	const NIBS = [1, 2, 4];
+	const nextNib = () => (nib = NIBS[(NIBS.indexOf(nib) + 1) % NIBS.length]);
 	/**
 	 * Which paper the transparent pixels show. An area's ink is its own colour,
 	 * and a drawing in white or a pale yellow is invisible on light checks — the
@@ -474,7 +525,7 @@
 		// off where the pointer was is the one thing a pixel editor cannot do.
 		if (tool === 'eraser') ctx.clearRect(at.x, at.y, nib, nib);
 		else {
-			ctx.fillStyle = ink;
+			ctx.fillStyle = color;
 			ctx.fillRect(at.x, at.y, nib, nib);
 		}
 	}
@@ -498,7 +549,7 @@
 		drawing = true;
 		const at = positionOf(event);
 		last = at;
-		if (tool === 'line') {
+		if (tool === 'line' || tool === 'rect' || tool === 'ellipse') {
 			lineFrom = at;
 			beneath = snapshot();
 		}
@@ -514,11 +565,11 @@
 		}
 		if (!drawing) return;
 		const at = positionOf(event);
-		if (tool === 'line' && lineFrom) {
-			// The board as it was, then this line on top of it: the drag is a
-			// preview of one line, not a trail of them.
+		if (lineFrom && (tool === 'line' || tool === 'rect' || tool === 'ellipse')) {
+			// The board as it was, then this shape on top of it: the drag is a
+			// preview of one shape, not a trail of them.
 			if (beneath) restore(beneath);
-			for (const point of line(lineFrom, at)) paint(point);
+			for (const point of shape(lineFrom, at, event.shiftKey)) paint(point);
 			last = at;
 			return;
 		}
@@ -526,6 +577,14 @@
 		// a handful of points and would otherwise draw as dots.
 		for (const point of line(last ?? at, at)) paint(point);
 		last = at;
+	}
+
+	/** The pixels of the shape the tool draws between where the drag began and now. */
+	function shape(from: { x: number; y: number }, to: { x: number; y: number }, shift: boolean) {
+		if (tool === 'line') return line(from, to);
+		const even = shift !== (tool === 'rect' ? square : circle);
+		const corner = even ? squareFrom(from, to) : to;
+		return tool === 'rect' ? rectOutline(from, corner) : ellipseOutline(from, corner);
 	}
 
 	function up(event: PointerEvent) {
@@ -673,53 +732,81 @@
 		<span class="segmented">
 			<button
 				aria-pressed={tool === 'pen'}
-				title="Draw in this area's own colour"
+				title="Draw"
 				aria-label="Draw"
-				onclick={() => (tool = 'pen')}
+				onclick={() => pick('pen')}
 			>
 				<!-- The pencil the Draw buttons wear, drawn in the ink it puts down:
-				     the tool and the colour in one glyph, since there is only ever one
-				     colour here and it is the area's own. -->
-				<span class="ink" style="color:{ink}"><Icon name="edit" size={16} /></span>
+				     the tool and the colour in one glyph. -->
+				<span class="ink" style="color:{color}"><Icon name="edit" size={16} /></span>
 			</button>
 			<button
 				aria-pressed={tool === 'line'}
 				title="Straight line — press where it starts and let go where it ends"
 				aria-label="Line"
-				onclick={() => (tool = 'line')}
+				onclick={() => pick('line')}
 			>
 				<Icon name="line" size={16} />
+			</button>
+			<!-- The two shapes are drawn on their buttons as what they will draw,
+			     so the button says whether the next one is free or even. -->
+			<button
+				aria-pressed={tool === 'rect'}
+				title={square
+					? 'Square — drag from corner to corner. Press twice for any rectangle; Shift for one'
+					: 'Rectangle — drag from corner to corner. Press twice for squares; Shift for one'}
+				aria-label={square ? 'Square' : 'Rectangle'}
+				onclick={() => pick('rect')}
+			>
+				<span class="outline" class:even={square}></span>
+			</button>
+			<button
+				aria-pressed={tool === 'ellipse'}
+				title={circle
+					? 'Circle — drag across it. Press twice for any ellipse; Shift for one'
+					: 'Ellipse — drag across it. Press twice for circles; Shift for one'}
+				aria-label={circle ? 'Circle' : 'Ellipse'}
+				onclick={() => pick('ellipse')}
+			>
+				<span class="outline round" class:even={circle}></span>
 			</button>
 			<button
 				aria-pressed={tool === 'eraser'}
 				title="Rub out — back to the paper, not to white"
 				aria-label="Erase"
-				onclick={() => (tool = 'eraser')}
+				onclick={() => pick('eraser')}
 			>
 				<Icon name="erase" size={16} />
 			</button>
 		</span>
 
 		<!-- The weight drawn rather than numbered: a nib is a square of pixels, and
-		     a square of pixels is the thing to put on the button. The number is in
-		     the title for anyone who wants it. -->
+		     a square of pixels is the thing to put on the button. One button,
+		     going round the three; the number is in the title. Then the colour,
+		     the same size, which starts as the area's own. -->
 		<span class="segmented">
-			{#each [1, 2, 4] as size (size)}
-				<button
-					aria-pressed={nib === size}
-					title="{size} pixel{size === 1 ? '' : 's'} wide"
-					aria-label="{size} pixel nib"
-					onclick={() => (nib = size)}
-				>
-					<span
-						class="nib"
-						class:hollow={tool === 'eraser'}
-						style="width:{2 + size * 3}px;height:{2 + size * 3}px;{tool === 'eraser'
-							? ''
-							: `background:${ink}`}"
-					></span>
-				</button>
-			{/each}
+			<button
+				title="{nib} pixel{nib === 1 ? '' : 's'} wide — press for {nib === NIBS.at(-1) ? 'the thinnest' : 'wider'}"
+				aria-label="Nib, {nib} pixel{nib === 1 ? '' : 's'}"
+				onclick={nextNib}
+			>
+				<span
+					class="nib"
+					class:hollow={tool === 'eraser'}
+					style="width:{2 + nib * 3}px;height:{2 + nib * 3}px;{tool === 'eraser' ? '' : `background:${color}`}"
+				></span>
+			</button>
+			<input
+				type="color"
+				class="swatch"
+				value={color}
+				oninput={(e) => {
+					color = e.currentTarget.value;
+					if (tool === 'eraser') tool = 'pen';
+				}}
+				title="The colour to draw in — it starts as this area's own"
+				aria-label="Color to draw in"
+			/>
 		</span>
 
 
@@ -916,6 +1003,51 @@
 	.ink {
 		display: grid;
 		place-items: center;
+	}
+
+	/* The shapes on their buttons: a rectangle or an ellipse, or with the
+	   second press a square or a circle. */
+	.outline {
+		display: block;
+		box-sizing: border-box;
+		width: 16px;
+		height: 11px;
+		border: 1.5px solid currentColor;
+	}
+
+	.outline.even {
+		width: 13px;
+		height: 13px;
+	}
+
+	.outline.round {
+		border-radius: 50%;
+	}
+
+	/* The colour, as square as the buttons beside it. */
+	.swatch {
+		box-sizing: border-box;
+		width: 30px;
+		height: 30px;
+		padding: 2px;
+		border: 1px solid #c9cdd4;
+		border-radius: 6px;
+		background: #fff;
+		cursor: pointer;
+	}
+
+	.swatch::-webkit-color-swatch-wrapper {
+		padding: 0;
+	}
+
+	.swatch::-webkit-color-swatch {
+		border: none;
+		border-radius: 3px;
+	}
+
+	.swatch::-moz-color-swatch {
+		border: none;
+		border-radius: 3px;
 	}
 
 	/* The weight, drawn: 1, 2 and 4 pixels as squares that grow with them, in

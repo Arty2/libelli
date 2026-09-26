@@ -415,12 +415,23 @@ to someone. In the cell it travels with the words, and a row's picture is
 exactly as portable as its text. The cost is a long cell, which is why the next
 decision is what it is.
 
-**One ink, and it is the area's own.** There is no palette here. An area is set
-to a colour in the bar, and a drawing made in it should be that colour rather
-than a second decision made in a second place — so the pen is that colour and the
-only other tool is the rubber. The trade-off is that the ink is fixed at the
-moment of drawing: this is a PNG, not a mask, so changing the area's colour
-afterwards does not recolour what was drawn.
+**The ink starts as the area's own.** There was no palette here at first: an
+area is set to a colour in the bar, and a drawing in it should be that colour
+rather than a second decision made in a second place. That held until a drawing
+wanted two colours. The picker is beside the nib now, and it opens on the
+area's colour, so the one-decision case costs nothing. The ink is fixed at the
+moment of drawing either way: this is a PNG, not a mask, so changing the area's
+colour afterwards does not recolour what was drawn.
+
+**Shapes are rasterised by hand, not by the canvas.** `rectOutline` and
+`ellipseOutline` return the pixels, which the nib paints like a stroke's; a
+canvas `ellipse()` would antialias its edge into shades that were never chosen,
+the one thing a pixel drawing cannot have. The ellipse is Zingl's midpoint
+ellipse in a rectangle, because the centre-and-radius form cannot draw an even
+width: a circle dragged 16 pixels across came out 15 or 17. Square and circle
+are a second press on the tool rather than a tool each — the row had to fit a
+phone — timed in the component rather than left to `dblclick`, which a phone
+may not send for two taps; Shift flips it for one drag, as everywhere else.
 
 **Small by default, not by rule.** Every board starts at 64 x 64, where a
 drawing is a kilobyte or two of base64 — a long cell, but one a spreadsheet can

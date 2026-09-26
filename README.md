@@ -853,9 +853,13 @@ at its own size.
   drawing weighs. The board is always drawn as large as the panel has room for,
   so there is never a scrollbar round it. Pull the panel down to its least and
   the tool rows slide under the bottom bar, leaving the board. Under it the tools are two centred
-  rows: the **pencil** — the same one the Draw buttons wear — in the area's own
-  colour, a **line** — press where it starts, let go where it ends — a rubber and
-  three nib widths; then **rotate**, **flip** left to right and upside down,
+  rows: the **pencil** — the same one the Draw buttons wear — in the colour it
+  draws, a **line** — press where it starts, let go where it ends — a
+  **rectangle** and an **ellipse**, dragged corner to corner, a rubber, the
+  **nib** (one button, going round 1, 2 and 4 pixels) and the **colour**, which
+  starts as the area's own. Press the rectangle or the ellipse twice to draw
+  squares or circles instead, and again to go back; Shift does the same for one
+  drag. Shapes are outlines, pixel-exact at the nib's width. Then **rotate**, **flip** left to right and upside down,
   **crop**, **copy** and **paste**. **Undo** and **redo** are at the far left of
   the bar under the panel, and **Delete** and **Save** at its far right; Delete
   is how the board is emptied.

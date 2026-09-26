@@ -10,7 +10,10 @@ import {
 	inkBounds,
 	isDefaultBoard,
 	line,
-	pixelAt
+	pixelAt,
+	rectOutline,
+	ellipseOutline,
+	squareFrom
 } from './bitmap';
 
 describe('clampSide', () => {
@@ -138,5 +141,60 @@ describe('line', () => {
 
 	it('runs backwards as readily as forwards', () => {
 		expect(line({ x: 3, y: 1 }, { x: 0, y: 1 }).map((p) => p.x)).toEqual([3, 2, 1, 0]);
+	});
+});
+
+describe('squareFrom', () => {
+	it('pulls the far corner in to a square on the longer side, keeping direction', () => {
+		expect(squareFrom({ x: 10, y: 10 }, { x: 14, y: 20 })).toEqual({ x: 20, y: 20 });
+		expect(squareFrom({ x: 10, y: 10 }, { x: 2, y: 7 })).toEqual({ x: 2, y: 2 });
+	});
+});
+
+describe('rectOutline', () => {
+	it('is the four edges, each pixel once, whichever way it was dragged', () => {
+		const points = rectOutline({ x: 5, y: 4 }, { x: 1, y: 1 });
+		const keys = new Set(points.map((p) => `${p.x},${p.y}`));
+		expect(keys.size).toBe(points.length);
+		// A 5 x 4 outline: the whole perimeter, less the four corners counted twice.
+		expect(points.length).toBe(2 * 5 + 2 * 4 - 4);
+		expect(keys.has('1,1') && keys.has('5,4') && keys.has('1,4') && keys.has('5,1')).toBe(true);
+		expect(keys.has('3,2')).toBe(false);
+	});
+
+	it('is a line when it has no height, and a dot when it has no size', () => {
+		expect(rectOutline({ x: 0, y: 0 }, { x: 3, y: 0 })).toHaveLength(4);
+		expect(rectOutline({ x: 2, y: 2 }, { x: 2, y: 2 })).toEqual([{ x: 2, y: 2 }]);
+	});
+});
+
+describe('ellipseOutline', () => {
+	const extent = (points: Array<{ x: number; y: number }>) => ({
+		minX: Math.min(...points.map((p) => p.x)),
+		maxX: Math.max(...points.map((p) => p.x)),
+		minY: Math.min(...points.map((p) => p.y)),
+		maxY: Math.max(...points.map((p) => p.y))
+	});
+
+	it('fills its rectangle edge to edge, even or odd, and no further', () => {
+		for (const [w, h] of [[16, 16], [15, 15], [20, 6], [3, 9]]) {
+			const points = ellipseOutline({ x: 2, y: 3 }, { x: 2 + w - 1, y: 3 + h - 1 });
+			expect(extent(points)).toEqual({ minX: 2, maxX: 2 + w - 1, minY: 3, maxY: 3 + h - 1 });
+		}
+	});
+
+	it('is symmetrical, and has no pixel twice', () => {
+		const points = ellipseOutline({ x: 0, y: 0 }, { x: 11, y: 7 });
+		const keys = new Set(points.map((p) => `${p.x},${p.y}`));
+		expect(keys.size).toBe(points.length);
+		for (const p of points) {
+			expect(keys.has(`${11 - p.x},${p.y}`)).toBe(true);
+			expect(keys.has(`${p.x},${7 - p.y}`)).toBe(true);
+		}
+	});
+
+	it('leaves the middle empty', () => {
+		const keys = new Set(ellipseOutline({ x: 0, y: 0 }, { x: 9, y: 9 }).map((p) => `${p.x},${p.y}`));
+		expect(keys.has('4,4')).toBe(false);
 	});
 });
