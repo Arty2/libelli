@@ -236,14 +236,6 @@
 		await apply(next);
 	}
 
-	function clear() {
-		const ctx = context();
-		if (!ctx) return;
-		remember();
-		ctx.clearRect(0, 0, grid.w, grid.h);
-		measure();
-	}
-
 	/**
 	 * A different board, with what has been drawn scaled onto it. Resizing is a
 	 * step like any other, so a board set too small is one undo away — though
@@ -293,6 +285,29 @@
 		// corner first — which is where the old top left lands.
 		ctx.translate(grid.w, 0);
 		ctx.rotate(Math.PI / 2);
+		ctx.drawImage(from, 0, 0);
+		ctx.restore();
+		measure();
+	}
+
+	/**
+	 * The drawing mirrored across the board — left to right, or top to bottom.
+	 * The board keeps its shape, so nothing is resampled: every pixel lands on
+	 * a pixel.
+	 */
+	function flip(axis: 'x' | 'y') {
+		const before = remember();
+		const ctx = context();
+		if (!before || !ctx) return;
+		const from = document.createElement('canvas');
+		from.width = before.image.width;
+		from.height = before.image.height;
+		from.getContext('2d')?.putImageData(before.image, 0, 0);
+		ctx.imageSmoothingEnabled = false;
+		ctx.clearRect(0, 0, grid.w, grid.h);
+		ctx.save();
+		ctx.translate(axis === 'x' ? grid.w : 0, axis === 'y' ? grid.h : 0);
+		ctx.scale(axis === 'x' ? -1 : 1, axis === 'y' ? -1 : 1);
 		ctx.drawImage(from, 0, 0);
 		ctx.restore();
 		measure();
@@ -540,20 +555,9 @@
      which the compiler's list of interactive roles does not count. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="drawer" role="application" aria-label="Drawing" tabindex="-1" onkeydown={onKeydown} use:takeFocus>
-	<header>
-		<!-- Said out loud, because this is going into a cell of the table and a
-		     long cell is the cost of it travelling with the words. -->
-		{#if weight !== null}
-			<span class="weight" title="What this drawing adds to the cell it is written into">{weight} KB</span>
-		{/if}
-		{#if said}
-			<span class="said" role="status">{said}</span>
-		{/if}
-	</header>
-
-	<!-- The board's size, over the board it sizes: 64 by 64 pixels' worth,
-	     spent however you like. Type a side and the other one moves to pay for
-	     it. -->
+	<!-- One row over the board: its size, the paper to see it on, and at the far
+	     end what it weighs. 64 by 64 pixels' worth, spent however you like —
+	     type a side and the other one moves to pay for it. -->
 	<div class="board" title="The board, in pixels — {BUDGET} of them to spend">
 		<input
 			type="number"
@@ -575,6 +579,24 @@
 			onchange={(e) => setSide('h', e.currentTarget.value)}
 		/>
 		<span class="by">pixels</span>
+		<button
+			class="square"
+			aria-pressed={checks === 'dark'}
+			title="Show the transparent squares dark or light — a pale drawing needs the dark ones"
+			aria-label="Dark checkerboard"
+			onclick={() => (checks = checks === 'dark' ? 'light' : 'dark')}
+		>
+			<Icon name="contrast" size={15} />
+		</button>
+		<span class="spacer"></span>
+		{#if said}
+			<span class="said" role="status">{said}</span>
+		{/if}
+		<!-- Said out loud, because this is going into a cell of the table and a
+		     long cell is the cost of it travelling with the words. -->
+		{#if weight !== null}
+			<span class="weight" title="What this drawing adds to the cell it is written into">{weight} KB</span>
+		{/if}
 	</div>
 
 	<!-- The checks show through where nothing has been drawn: an area's fill and
@@ -607,10 +629,10 @@
 				aria-label="Draw"
 				onclick={() => (tool = 'pen')}
 			>
-				<!-- A pen, drawn in the ink it puts down: the tool and the colour in
-				     one glyph, since there is only ever one colour here and it is the
-				     area's own. -->
-				<span class="ink" style="color:{ink}"><Icon name="pen" size={15} /></span>
+				<!-- The pencil the Draw buttons wear, drawn in the ink it puts down:
+				     the tool and the colour in one glyph, since there is only ever one
+				     colour here and it is the area's own. -->
+				<span class="ink" style="color:{ink}"><Icon name="edit" size={15} /></span>
 			</button>
 			<button
 				aria-pressed={tool === 'line'}
@@ -660,25 +682,20 @@
 				<Icon name="redo" size={15} />
 			</button>
 		</span>
-
-		<span class="segmented">
-			<button
-				aria-pressed={checks === 'dark'}
-				title="Show the transparent squares dark or light — a pale drawing needs the dark ones"
-				aria-label="Dark checkerboard"
-				onclick={() => (checks = checks === 'dark' ? 'light' : 'dark')}
-			>
-				<Icon name="contrast" size={15} />
-			</button>
-		</span>
 	</div>
 
 	<div class="tools second" role="toolbar" aria-label="Board">
-		<!-- The two that redraw the whole board rather than a pixel of it. Both
+		<!-- The ones that redraw the whole board rather than a pixel of it. All
 		     are one undo away, board and all. -->
 		<span class="segmented">
 			<button onclick={rotate} title="Turn the drawing a quarter turn clockwise" aria-label="Rotate">
 				<Icon name="rotate" size={15} />
+			</button>
+			<button onclick={() => flip('x')} title="Flip the drawing left to right" aria-label="Flip horizontally">
+				<Icon name="reflect-horizontal" size={15} />
+			</button>
+			<button onclick={() => flip('y')} title="Flip the drawing upside down" aria-label="Flip vertically">
+				<Icon name="reflect-vertical" size={15} />
 			</button>
 			<button onclick={crop} title="Crop the board to what is drawn on it" aria-label="Crop">
 				<Icon name="crop" size={15} />
@@ -698,13 +715,6 @@
 			</button>
 		</span>
 
-		<!-- Clear, as a tool: it empties the board, and undo brings it back.
-		     Deleting the drawing itself is the panel's Delete, beside Save. -->
-		<span class="segmented">
-			<button onclick={clear} title="Clear the board — undo brings it back" aria-label="Clear the board">
-				<Icon name="erase" size={15} />
-			</button>
-		</span>
 	</div>
 </div>
 
@@ -725,12 +735,6 @@
 		-webkit-user-select: none;
 	}
 
-	header {
-		display: flex;
-		align-items: baseline;
-		gap: 8px;
-	}
-
 	.weight {
 		color: #767676;
 		font-size: 12px;
@@ -740,6 +744,30 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
+	}
+
+	.board .spacer {
+		flex: 1;
+	}
+
+	/* The paper toggle, sized and drawn as the tools below are. */
+	.board .square {
+		display: grid;
+		place-items: center;
+		width: 30px;
+		height: 30px;
+		margin-left: 6px;
+		padding: 0;
+		border: 1px solid #c9cdd4;
+		border-radius: 6px;
+		background: #fff;
+		cursor: pointer;
+	}
+
+	.board .square[aria-pressed='true'] {
+		background: var(--accent-tint);
+		border-color: var(--accent);
+		color: var(--accent-strong);
 	}
 
 	.tools {
