@@ -75,6 +75,15 @@ describe('inline', () => {
 		expect(renderInline('~~*both*~~')).toBe('<s><em>both</em></s>');
 	});
 
+	it('highlights a doubled equals sign hugging its words, and nothing else', () => {
+		expect(renderInline('==this==')).toBe('<mark>this</mark>');
+		expect(renderInline('a ==few words== here')).toBe('a <mark>few words</mark> here');
+		expect(renderInline('==x==')).toBe('<mark>x</mark>');
+		expect(renderInline('if a == b == c')).toBe('if a == b == c');
+		expect(renderInline('==*both*==')).toBe('<mark><em>both</em></mark>');
+		expect(renderInline('====')).toBe('====');
+	});
+
 	it('does not let bold be re-read as italic', () => {
 		expect(renderInline('**bold**')).not.toContain('<em>');
 	});

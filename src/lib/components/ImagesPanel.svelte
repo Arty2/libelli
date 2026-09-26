@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import { armDefault } from '$lib/modal';
+	import { downloadUrl, slugify } from '$lib/download';
 	import { editableType, frameBetween, framePixels, isCrop, type Frame } from '$lib/photo';
 	import {
 		chooseImageFolder,
@@ -250,6 +251,17 @@
 	);
 
 	/** Kilobytes under a megabyte, one decimal above it; nobody wants 1483 KB. */
+	/**
+	 * What a drawing is saved as: where it is, and the type its data URL says —
+	 * `link-row-1.png`. The type is read off the URL, which has already been
+	 * through `safeMediaUrl`, so it is one of the picture types or nothing.
+	 */
+	function drawingFile(drawing: { label: string; where: string; src: string }) {
+		const type = drawing.src.match(/^data:image\/([a-z0-9.+-]+)/i)?.[1]?.toLowerCase() ?? 'png';
+		const ext = type === 'jpeg' ? 'jpg' : type === 'svg+xml' ? 'svg' : type;
+		return `${slugify(`${drawing.label} ${drawing.where}`)}.${ext}`;
+	}
+
 	/** A drawing's pixels, read off its thumbnail as it loads. */
 	let drawnSizes = $state<Record<string, { w: number; h: number }>>({});
 
@@ -596,6 +608,16 @@
 							.filter(Boolean)
 							.join(' · ')}</span>
 						{#if !used.has(image.name)}<span class="tag">unused</span>{/if}
+						{#if urls[image.name]}
+							<button
+								class="square save"
+								title="Download {image.name}"
+								aria-label="Download {image.name}"
+								onclick={() => downloadUrl(image.name, urls[image.name])}
+							>
+								<Icon name="download" size={12} />
+							</button>
+						{/if}
 						<button
 							class="square"
 							title="Delete {image.name}"
@@ -645,6 +667,14 @@
 							]
 								.filter(Boolean)
 								.join(' · ')}</span>
+						</button>
+						<button
+							class="square save"
+							title="Download {drawingFile(drawing)}"
+							aria-label="Download {drawing.label}, {drawing.where}"
+							onclick={() => downloadUrl(drawingFile(drawing), drawing.src)}
+						>
+							<Icon name="download" size={12} />
 						</button>
 					</li>
 				{/each}
@@ -1154,6 +1184,12 @@
 	.images li :global(button.square:hover) {
 		color: #b42318;
 		background: #fdf3f2;
+	}
+
+	/* The download, beside Delete: as quiet, and not red on hover. */
+	.images li :global(button.square.save:hover) {
+		color: var(--accent-strong);
+		background: var(--accent-tint);
 	}
 
 	/* The drawings' heading, under the stored pictures. */

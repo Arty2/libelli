@@ -751,7 +751,7 @@ subset renders as literal text, and every leaf text node is escaped.
 
 Supported: `#`/`##`/`###` headings, `-` and `*` bullets with one level of
 nesting, `1.` and `1)` ordered lists, `**bold**`, `*italic*`, `~~strikethrough~~`,
-`` `code` ``, `[text](url)`, blank-line paragraphs, and `---`.
+`==highlight==` (hugging its words, so `a == b` stays as typed), `` `code` ``, `[text](url)`, blank-line paragraphs, and `---`.
 
 - **Ordered lists renumber** — from the source order, so a list that restarts
   part-way through still prints as one sequence.
@@ -961,12 +961,14 @@ rather than a dialog, so the card that uses the images stays in view.
   current table nor the template points at it. With eight or more, a box to
   find one by name appears. That is the whole point: *which of these forty can I
   delete* is not a question browser storage can answer. Deleting is one press,
-  and it says so if something was using it. Hover a line for where it is kept.
+  and it says so if something was using it. The arrow beside Delete downloads
+  it, under its own name. Hover a line for where it is kept.
 - **Drawings** — under the stored images, every picture kept in the table
   itself or on an area with no column: its column and row (or *on the area*),
   its size in pixels and what it weighs. They are not files, so there is
   nothing to delete or carry here; press one and it opens in the drawing
-  editor, in the side panel.
+  editor, in the side panel. The arrow at the end downloads it as a file named
+  for where it is — `link-row-1.png`.
 - **One image, large** — tap a thumbnail, or open a table cell that points
   at a stored image, and it fills the tray, with its size in pixels at the
   head and a **‹ 1 / 5 ›** pager at the foot. Under it is a row of tools, as
