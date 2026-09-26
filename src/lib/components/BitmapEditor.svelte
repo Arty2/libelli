@@ -47,9 +47,17 @@
 		/** The picture, and the board it was made on unless that is the usual one. */
 		onsave: (dataUrl: string, pixels: Grid | undefined) => void;
 		oncancel: () => void;
+		/**
+		 * Drawn inside the table's full-size editor rather than as a dialog over
+		 * the app. There the cell is edited live, as its words are: every change
+		 * goes to `onsave` as it is made, and there is no Done or Cancel — the
+		 * editor's own × and Escape close it, and the app's undo reaches what
+		 * was drawn.
+		 */
+		inline?: boolean;
 	}
 
-	let { box, value, ink, onsave, oncancel }: Props = $props();
+	let { box, value, ink, onsave, oncancel, inline = false }: Props = $props();
 
 	// Read once: the box cannot change while this is up, and the board is the
 	// editor's own state from here on — Done is what writes it back. What the
@@ -388,6 +396,12 @@
 	function measure() {
 		const data = exported();
 		weight = data ? Math.round(data.length / 102.4) / 10 : null;
+		// Live, inline — but only once something has been done: opening a
+		// picture measures it too, and writing that back would re-encode a
+		// photograph as a PNG just for having been looked at.
+		if (inline && data && (history.length || future.length)) {
+			onsave(data, isDefaultBoard(grid) ? undefined : { ...grid });
+		}
 	}
 
 	function paint(at: { x: number; y: number }) {
@@ -460,29 +474,34 @@
 	}
 
 	function onKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape') {
+		if (event.key === 'Escape' && !inline) {
 			event.preventDefault();
 			oncancel();
 		}
+		// Inline, the app's own shortcuts listen on the window behind this, and
+		// a Delete or an arrow meant for the board would delete or nudge an area
+		// of the card. Every key but Escape stops here; Escape goes on to the
+		// full-size editor, which it closes.
+		if (inline && event.key !== 'Escape') event.stopPropagation();
 		if (!(event.metaKey || event.ctrlKey)) return;
 		const key = event.key.toLowerCase();
+		if (key !== 'z' && key !== 'c' && key !== 'v') return;
+		event.preventDefault();
+		// The same chord the app itself uses, shifted for the way back.
 		if (key === 'z') {
-			event.preventDefault();
-			// The same chord the app itself uses, shifted for the way back.
 			if (event.shiftKey) redo();
 			else undo();
 		}
 		// The board is the document while this is open, so the usual two chords
 		// mean the board rather than the page behind it.
-		if (key === 'c') {
-			event.preventDefault();
-			void copy();
-		}
-		if (key === 'v') {
-			event.preventDefault();
-			void paste();
-		}
+		if (key === 'c') void copy();
+		if (key === 'v') void paste();
 	}
+
+	/** Inline, the board takes the focus so its keys are its own from the start. */
+	const takeFocus = (node: HTMLElement) => {
+		if (inline) node.focus({ preventScroll: true });
+	};
 
 	/**
 	 * How large the board is drawn: as large as the room the dialog gives it,
@@ -499,15 +518,30 @@
 	);
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<svelte:window onkeydown={inline ? undefined : onKeydown} />
 
 <!-- A dialog over the app, like the CSS editor, rather than a screen of its
      own: the card it is drawing for stays in view round it, and it can be
-     dragged aside by its title to see the part it covers. -->
-<div class="backdrop" role="presentation"></div>
-<div class="drawer" role="dialog" aria-modal="true" aria-labelledby="draw-title" use:dragByTitle>
-	<header data-drag-handle>
-		<h2 id="draw-title">Draw</h2>
+     dragged aside by its title to see the part it covers. Inline, it is the
+     table's full-size editor for a picture cell, and the editor's head is
+     its title. -->
+{#if !inline}
+	<div class="backdrop" role="presentation"></div>
+{/if}
+<div
+	class="drawer"
+	class:inline
+	role={inline ? 'group' : 'dialog'}
+	aria-modal={inline ? undefined : 'true'}
+	aria-label={inline ? 'Drawing' : undefined}
+	aria-labelledby={inline ? undefined : 'draw-title'}
+	tabindex="-1"
+	onkeydown={inline ? onKeydown : undefined}
+	use:takeFocus
+	use:dragByTitle
+>
+	<header data-drag-handle={inline ? undefined : ''}>
+		{#if !inline}<h2 id="draw-title">Draw</h2>{/if}
 		<!-- Said out loud, because this is going into a cell of the table and a
 		     long cell is the cost of it travelling with the words. -->
 		{#if weight !== null}
@@ -668,13 +702,17 @@
 		<span class="spacer"></span>
 
 		<!-- Delete in words and in red, as every Delete in the app is: it empties
-		     the board, which undo still reaches. Then the two ways out. -->
+		     the board, which undo still reaches. Then the two ways out — which
+		     inline are the full-size editor's own ×, since every stroke is
+		     already in the cell. -->
 		<span class="segmented done">
 			<button class="danger" onclick={clear} title="Clear the whole drawing — undo brings it back">
 				<Icon name="trash" size={15} /> Delete
 			</button>
-			<button onclick={oncancel} title="Leave the cell as it was (Esc)">Cancel</button>
-			<button class="primary" onclick={done} title="Write this drawing into the area">Done</button>
+			{#if !inline}
+				<button onclick={oncancel} title="Leave the cell as it was (Esc)">Cancel</button>
+				<button class="primary" onclick={done} title="Write this drawing into the area">Done</button>
+			{/if}
 		</span>
 	</div>
 </div>
@@ -719,6 +757,27 @@
 		align-items: baseline;
 		gap: 8px;
 		cursor: move;
+	}
+
+	/* In the table's own room: no frame, no shadow, no position of its own —
+	   the full-size editor around it is the frame. */
+	.drawer.inline {
+		position: static;
+		transform: none;
+		z-index: auto;
+		flex: 1;
+		width: auto;
+		height: auto;
+		min-height: 0;
+		padding: 0;
+		border-radius: 0;
+		box-shadow: none;
+		outline: none;
+	}
+
+	.drawer.inline header {
+		cursor: default;
+		min-height: 0;
 	}
 
 	header h2 {

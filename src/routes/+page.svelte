@@ -977,34 +977,58 @@
 	// ---- undo/redo ----------------------------------------------------------
 
 	/**
-	 * A picture opened from the table rather than from an area: the cell is what
-	 * is being drawn, so the drawing goes back into it, whichever area — if any —
-	 * prints that column. The board and the ink are borrowed from the first
-	 * picture area bound to it, which is where a drawing of that column would
-	 * have opened from the card; with none, the usual board and the page's ink.
+	 * A drawing made in the table's full-size editor, as it is drawn — the
+	 * same write a drawing from the modal makes into a cell, live. The board is
+	 * remembered on the picture areas that print the column, as it is when the
+	 * drawing is opened from one of them: where the next row's drawing starts.
 	 */
-	let drawingCell = $state<{ row: number; column: string } | null>(null);
-	const cellArea = $derived.by(() => {
-		const cell = drawingCell;
-		if (!cell) return null;
-		return template.boxes.find((b) => b.mode === 'image' && !!b.slot && mapping[b.slot] === cell.column) ?? null;
-	});
-
-	function drawCell(rowIndex: number, column: string) {
+	function drawIntoCell(rowIndex: number, column: string, dataUrl: string, pixels: { w: number; h: number } | undefined) {
 		if (refuseLockedTable()) return;
-		activeRow = rowIndex;
-		drawingCell = { row: rowIndex, column };
-	}
-
-	function saveCellDrawing(dataUrl: string) {
-		const cell = drawingCell;
-		drawingCell = null;
-		if (!cell || refuseLockedTable()) return;
 		describe('Draw');
 		dataset = {
 			...dataset,
-			rows: dataset.rows.map((r, i) => (i === cell.row ? { ...r, [cell.column]: dataUrl } : r))
+			rows: dataset.rows.map((r, i) => (i === rowIndex ? { ...r, [column]: dataUrl } : r))
 		};
+		for (const box of template.boxes) {
+			if (box.mode !== 'image' || !box.slot || mapping[box.slot] !== column) continue;
+			if (JSON.stringify(pixels ?? null) === JSON.stringify(box.pixels ?? null)) continue;
+			updateBox({ ...($state.snapshot(box) as Box), pixels });
+		}
+	}
+
+	/** The board and ink a drawing in this column is made with — its picture area's. */
+	function drawingFor(column: string) {
+		const area = template.boxes.find((b) => b.mode === 'image' && !!b.slot && mapping[b.slot] === column);
+		return { pixels: area?.pixels, ink: area?.color ?? template.defaults.color };
+	}
+
+	/**
+	 * Drawing, asked for from an area. One bound to a column draws into this
+	 * row's cell, and that is the table's full-size editor — the same room its
+	 * words are edited in, with the pager to step down the rows. An area with
+	 * no column has no cell, and draws in the dialog.
+	 */
+	function drawArea(id: string) {
+		const box = template.boxes.find((b) => b.id === id);
+		const column = box?.slot ? mapping[box.slot] : undefined;
+		if (!box) return;
+		if (!column || !row) {
+			drawing = id;
+			return;
+		}
+		if (refuseLockedTable()) return;
+		dataOpen = true;
+		imagesOpen = false;
+		cellRequest = { row: activeRow, column, draw: true };
+	}
+
+	/** A stored picture, opened large in the Images tray. */
+	let imageFocus = $state<string | null>(null);
+
+	function openImage(name: string) {
+		imageFocus = name;
+		imagesOpen = true;
+		dataOpen = false;
 	}
 
 	/**
@@ -2063,7 +2087,7 @@
 	 * size in the table. The table is opened for it if it was folded away; a
 	 * locked table says so rather than opening an editor it would refuse.
 	 */
-	let cellRequest = $state<{ row: number; column: string } | null>(null);
+	let cellRequest = $state<{ row: number; column: string; draw?: boolean } | null>(null);
 
 	function editCell(id: string) {
 		const box = template.boxes.find((b) => b.id === id);
@@ -2332,6 +2356,7 @@
 			aria-expanded={imagesOpen}
 			onclick={() => {
 				imagesOpen = !imagesOpen;
+				imageFocus = null;
 				if (imagesOpen) dataOpen = false;
 			}}
 			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
@@ -2448,7 +2473,7 @@
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
-						ondraw={(id) => (drawing = id)}
+						ondraw={drawArea}
 						onuploadimage={(id, file) => {
 							const box = template.boxes.find((b) => b.id === id);
 							if (box) void handleImageDrop(box, file);
@@ -2480,7 +2505,7 @@
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
-						ondraw={(id) => (drawing = id)}
+						ondraw={drawArea}
 						onuploadimage={(id, file) => {
 							const box = template.boxes.find((b) => b.id === id);
 							if (box) void handleImageDrop(box, file);
@@ -2609,7 +2634,7 @@
 			onstoppicking={() => (picking = false)}
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
 			onedit={(id) => (editingId = id)}
-			ondraw={(id) => (drawing = id)}
+			ondraw={drawArea}
 			oneditcell={editCell}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
@@ -2622,7 +2647,6 @@
 				deletingTable ||
 				editingId !== null ||
 				drawing !== null ||
-				drawingCell !== null ||
 				magic !== null}
 			{selectedBoxes}
 			onalign={alignSelection}
@@ -2677,6 +2701,8 @@
 					onplacepage={(name, x, y) => void placeImageOnPage(name, x, y)}
 					onnotice={notify}
 					onchanged={() => (imagesVersion += 1)}
+					focus={imageFocus}
+					onfocus={(name) => (imageFocus = name)}
 					ontraydrag={stacked ? dragTray : undefined}
 				/>
 			{:else}
@@ -2716,7 +2742,10 @@
 				onnotice={notify}
 				ongettingstarted={() => void gettingStarted()}
 				openRequest={cellRequest}
-				ondrawcell={drawCell}
+				{images}
+				{drawingFor}
+				ondrawn={drawIntoCell}
+				onopenimage={openImage}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
 					// follows it, so the card keeps rendering what it rendered before.
@@ -3249,14 +3278,6 @@
 		ink={drawingBox.color ?? template.defaults.color}
 		onsave={saveDrawing}
 		oncancel={() => (drawing = null)}
-	/>
-{:else if drawingCell}
-	<BitmapEditor
-		box={cellArea ?? {}}
-		value={String(dataset.rows[drawingCell.row]?.[drawingCell.column] ?? '').trim()}
-		ink={cellArea?.color ?? template.defaults.color}
-		onsave={saveCellDrawing}
-		oncancel={() => (drawingCell = null)}
 	/>
 {/if}
 

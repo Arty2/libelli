@@ -6,7 +6,9 @@
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { armDefault } from '$lib/modal';
-	import { safeMediaUrl } from '$lib/assets';
+	import { localImageName, safeMediaUrl } from '$lib/assets';
+	import type { Grid } from '$lib/bitmap';
+	import BitmapEditor from './BitmapEditor.svelte';
 	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
 	import { countText, dropTarget, indexAfterSort, moveColumn, moveRows, moveRowsTo, sortRows, type SortDirection } from '$lib/table';
 	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
@@ -32,8 +34,18 @@
 		onplacecolumn: (column: string) => void;
 		/** a cell of this column has just been entered, so the card can point at it */
 		oncellfocus: (column: string) => void;
-		/** A picture cell, opened on the drawing surface rather than as text. */
-		ondrawcell: (row: number, column: string) => void;
+		/**
+		 * Stored pictures by name, resolved — what a `local:name` cell shows as
+		 * its thumbnail, and what the drawing surface opens on when asked to
+		 * draw over one.
+		 */
+		images?: Record<string, string>;
+		/** The board and the ink a drawing in this column is made with. */
+		drawingFor: (column: string) => { pixels?: Grid; ink: string };
+		/** A drawing, as it is drawn: every change, live, as typing is. */
+		ondrawn: (row: number, column: string, dataUrl: string, pixels: Grid | undefined) => void;
+		/** A stored picture, opened large in the Images tray to be looked at and edited. */
+		onopenimage: (name: string) => void;
 		/** lock or unlock the whole table; the page owns the dataset */
 		onlock: (locked: boolean) => void;
 		ondeletetable: () => void;
@@ -65,7 +77,7 @@
 		 * a Data Field area. A new object each time, so asking twice for the
 		 * same cell opens it twice.
 		 */
-		openRequest?: { row: number; column: string } | null;
+		openRequest?: { row: number; column: string; draw?: boolean } | null;
 		/** open the Getting Started table, or start one */
 		ongettingstarted: () => void;
 		/**
@@ -86,7 +98,10 @@
 		usedColumns,
 		onplacecolumn,
 		oncellfocus,
-		ondrawcell,
+		images = {},
+		drawingFor,
+		ondrawn,
+		onopenimage,
 		onlock,
 		ondeletetable,
 		onswaptable,
@@ -264,23 +279,30 @@
 	 * field does: the card follows each keystroke, undo reaches every change,
 	 * and there is nothing to confirm — the × or Escape puts the table back.
 	 */
-	let bigCell = $state<{ row: number; column: string } | null>(null);
+	let bigCell = $state<{ row: number; column: string; draw?: boolean } | null>(null);
 	/** The bar's height: the full-size editor stops above it, so the bar stays. */
 	let barHeight = $state(0);
 
-	function openBigCell(rowIndex: number, column: string) {
+	/**
+	 * `draw` is the card asking for the drawing surface on an area bound to
+	 * this column: then an empty cell, or one pointing at a stored picture, is
+	 * drawn on rather than typed in. Without it, a stored picture is not this
+	 * editor's to open at all — it goes to the Images tray, where it can be
+	 * seen large and cropped or turned.
+	 */
+	function openBigCell(rowIndex: number, column: string, draw = false) {
 		const value = dataset.rows[rowIndex]?.[column];
 		if (value === undefined) return false;
-		// A picture is drawn on, not read as text: every way in that would have
-		// opened its base64 full size opens the drawing surface instead.
-		if (cellPicture(value)) {
-			ondrawcell(rowIndex, column);
+		const stored = localImageName(value);
+		if (stored && !draw) {
+			onopenimage(stored);
 			return;
 		}
 		// The small field under the press still has the focus, and would keep
 		// the outline lit behind the editor.
 		(document.activeElement as HTMLElement | null)?.blur();
-		bigCell = { row: rowIndex, column };
+		bigCell = { row: rowIndex, column, draw: draw || undefined };
+		drawnValue = value;
 		onactivate(rowIndex);
 	}
 
@@ -290,7 +312,7 @@
 		const ask = openRequest;
 		if (!ask) return;
 		untrack(() => {
-			if (!locked && dataset.columns.includes(ask.column)) openBigCell(ask.row, ask.column);
+			if (!locked && dataset.columns.includes(ask.column)) openBigCell(ask.row, ask.column, !!ask.draw);
 		});
 	});
 
@@ -299,9 +321,65 @@
 		if (!bigCell) return;
 		const row = Math.max(0, Math.min(dataset.rows.length - 1, bigCell.row + by));
 		if (row === bigCell.row) return;
-		bigCell = { row, column: bigCell.column };
+		bigCell = { ...bigCell, row };
+		drawnValue = dataset.rows[row]?.[bigCell.column] ?? '';
 		onactivate(row);
 	}
+
+	/**
+	 * What the full-size editor is for this cell: the drawing surface for a
+	 * picture, and for any cell at all when it was opened to draw — an area
+	 * showing pictures asked for it, so the column is a column of pictures,
+	 * and whatever a cell holds that cannot be drawn over (an address from
+	 * elsewhere) opens as a blank board, as it always has. Otherwise a stored
+	 * picture's own look with the way to the Images tray, or the words.
+	 */
+	function bigKind(value: string, draw: boolean | undefined): 'drawing' | 'stored' | 'text' {
+		if (draw || cellPicture(value)) return 'drawing';
+		if (localImageName(value)) return 'stored';
+		return 'text';
+	}
+
+	/**
+	 * The drawing surface reads its picture once, when it opens. A cell changed
+	 * underneath it — undo, a paste into the table, the row stepped — has to
+	 * open it again on what is there now; a cell changed *by* it must not, or
+	 * every stroke would start the board afresh and lose its own undo.
+	 * `drawnValue` is the last value the surface knows about, and `drawEpoch`
+	 * the key that remounts it.
+	 */
+	let drawnValue = '';
+	let drawEpoch = $state(0);
+
+	$effect(() => {
+		const open = bigCell;
+		if (!open) return;
+		const now = dataset.rows[open.row]?.[open.column] ?? '';
+		untrack(() => {
+			if (now === drawnValue) return;
+			drawnValue = now;
+			drawEpoch += 1;
+		});
+	});
+
+	function drew(rowIndex: number, column: string, dataUrl: string, pixels: Grid | undefined) {
+		drawnValue = dataUrl;
+		ondrawn(rowIndex, column, dataUrl, pixels);
+	}
+
+	/** What the drawing surface opens on: the picture, or a stored one resolved. */
+	function drawingSource(value: string): string {
+		const picture = cellPicture(value);
+		if (picture) return picture;
+		const stored = localImageName(value);
+		return stored ? (images[stored] ?? '') : '';
+	}
+
+	/** A stored picture's resolved address, for its thumbnail. */
+	const storedPicture = (value: string | undefined) => {
+		const name = localImageName(value);
+		return name ? (images[name] ?? null) : null;
+	};
 
 	/**
 	 * A cell holding a picture — a drawing, or one pasted in as a data URL —
@@ -1391,7 +1469,7 @@
 							</span>
 						</td>
 						{#each dataset.columns as column, c (column)}
-							{@const picture = cellPicture(row[column])}
+							{@const picture = cellPicture(row[column]) ?? storedPicture(row[column])}
 							<!-- The drop line runs down the whole column, not just its
 							     header, so it says which gap the column lands in however
 							     far down the table the eye is. -->
@@ -1411,17 +1489,22 @@
 								class:drop-after={carrying?.on && c === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
 							>
 								{#if picture}
-									<!-- The picture in place of its base64. A press picks the
-									     row, as anywhere else on it; a hold or a double-click
-									     opens it on the drawing surface — never as text. -->
+									<!-- The picture in place of its base64, or of the name of a
+									     stored one. A press picks the row, as anywhere else on
+									     it; a hold or a double-click opens it — a drawing on the
+									     drawing surface, a stored picture large in Images. -->
 									<img
 										class="cell-picture"
 										src={picture}
 										alt="{column}, row {rowLabel(row, i)}"
-										title={locked ? undefined : 'An image — press and hold, or double-click, to draw on it'}
+										title={locked
+											? undefined
+											: localImageName(row[column])
+												? `${localImageName(row[column])} — press and hold, or double-click, to open it in Images`
+												: 'A drawing — press and hold, or double-click, to draw on it'}
 										draggable="false"
-										use:hold={() => !locked && ondrawcell(i, column)}
-										ondblclick={() => !locked && ondrawcell(i, column)}
+										use:hold={() => !locked && openBigCell(i, column)}
+										ondblclick={() => !locked && openBigCell(i, column)}
 									/>
 								{:else}
 								<!-- Press and hold for the whole cell in a dialog of its own. -->
@@ -1528,7 +1611,7 @@
 				><Icon name="chevron-right" size={16} /></button>
 			</span>
 			<span class="spacer"></span>
-			{#if !cellPicture(dataset.rows[bigCell.row]?.[bigCell.column])}
+			{#if bigKind(dataset.rows[bigCell.row]?.[bigCell.column] ?? '', bigCell.draw) === 'text'}
 				<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
 			{/if}
 		{:else}
@@ -1796,6 +1879,7 @@
 	{#if bigCell}
 		{@const open = bigCell}
 		{@const text = dataset.rows[open.row]?.[open.column] ?? ''}
+		{@const kind = bigKind(text, open.draw)}
 		<div class="cell-editor" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
 			<div class="cell-editor-head">
 				<h2 id="cell-editor-title">{open.column}</h2>
@@ -1804,22 +1888,35 @@
 					<Icon name="close" size={18} />
 				</button>
 			</div>
-			<!-- Reached only by the pager: a picture is never opened here, but
-			     stepping down a column can land on one. It shows as itself, and a
-			     press takes it to the drawing surface; its base64 is not offered. -->
-			{#if cellPicture(text)}
+			<!-- One editor for a cell, whatever it holds: words are typed, a
+			     drawing is drawn — on the same surface the card opens, in this
+			     same room, live, with the pager below stepping down the column
+			     through either. Keyed on the cell, so each row's drawing starts
+			     with its own board and its own undo. A locked table shows the
+			     picture and nothing to draw with. -->
+			{#if kind === 'drawing' && !locked}
+				{@const look = drawingFor(open.column)}
+				{#key `${open.row}:${open.column}:${drawEpoch}`}
+					<BitmapEditor
+						inline
+						box={{ pixels: look.pixels }}
+						value={drawingSource(text)}
+						ink={look.ink}
+						onsave={(dataUrl, pixels) => drew(open.row, open.column, dataUrl, pixels)}
+						oncancel={closeBigCell}
+					/>
+				{/key}
+			{:else if kind !== 'text'}
+				<!-- A stored picture landed on by the pager, or any picture in a
+				     locked table: itself, large. A stored one is the Images tray's
+				     to edit, and a press takes it there. -->
+				{@const stored = localImageName(text)}
 				<button
 					class="big-picture"
-					title={locked ? undefined : 'Draw on this image'}
-					disabled={locked}
-					onclick={() => {
-						// Handed over, not stacked: left open behind the drawing
-						// surface, this editor took the Escape meant for that one.
-						const { row, column } = open;
-						closeBigCell();
-						ondrawcell(row, column);
-					}}
-				><img src={cellPicture(text)} alt={open.column} /></button>
+					disabled={!stored}
+					title={stored ? `Open ${stored} in Images` : undefined}
+					onclick={() => stored && onopenimage(stored)}
+				><img src={drawingSource(text)} alt={open.column} /></button>
 			{:else}
 			<textarea
 				value={text}

@@ -514,6 +514,30 @@ surface would open on a photo, take a stroke, and fail to save at the very end.
 Opening blank is the honest version of that, and a `blob:` URL from this
 browser's own store is same-origin and draws in fine.
 
+**In the table it is live, and that is the one exception to the above.** A
+drawing into a cell opens inside the table's full-size editor (`inline`), which
+edits its cell live for words, so it does for strokes too: each change goes to
+the cell as it is made, and the app's debounce folds a burst of strokes into one
+entry, as it does a burst of typing. Only once something has been done — the
+open itself measures the picture, and writing that back would re-encode a
+photograph for having been looked at. The table keys the surface on the cell
+plus an epoch that moves only when the cell changes *under* it (undo, a paste,
+a step of the pager), so a stroke's own write does not remount it and throw its
+undo away. Inline, every key but Escape stops at the board: the app's shortcuts
+listen on the window, and a Delete meant for the board would delete an area.
+An area with no column has no cell, and keeps the dialog above.
+
+## `src/lib/photo.ts` and the Images tray's large view
+
+**Edits to a stored picture wait for Save.** Rotate and crop draw on a canvas
+at the picture's own size; nothing reaches the store until Save, because these
+are the picture's bytes and the app's undo holds template and table only. The
+name is kept — it is what cells point at — and so is the type it promises:
+`editableType` answers PNG, JPEG or WebP from the name and nothing else, and a
+blob that comes back as another type (Safari asked for WebP) is refused rather
+than written as a PNG under a `.webp` name. The crop frame is fractions of the
+picture, so the one rectangle means the same on screen and at full size.
+
 ## `src/lib/history.ts`
 
 **A label rides alongside each state, never inside it.** States are compared by

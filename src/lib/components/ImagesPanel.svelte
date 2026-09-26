@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import { armDefault } from '$lib/modal';
+	import { editableType, frameBetween, framePixels, isCrop, type Frame } from '$lib/photo';
 	import {
 		chooseImageFolder,
 		deleteImage,
@@ -39,9 +40,25 @@
 		onplacepage: (name: string, clientX: number, clientY: number) => void;
 		/** the tray's height pulled by its head, on a phone — the table's own gesture */
 		ontraydrag?: (phase: 'start' | 'move' | 'end', clientY: number) => void;
+		/**
+		 * The picture shown large in place of the list, if any — asked for by a
+		 * table cell that points at it, or by a tap on its thumbnail here.
+		 */
+		focus?: string | null;
+		onfocus?: (name: string | null) => void;
 	}
 
-	let { used, missing = [], onnotice, onchanged, onplace, onplacepage, ontraydrag }: Props = $props();
+	let {
+		used,
+		missing = [],
+		onnotice,
+		onchanged,
+		onplace,
+		onplacepage,
+		ontraydrag,
+		focus = null,
+		onfocus
+	}: Props = $props();
 
 	/**
 	 * A picture the design points at and this browser does not hold — a table
@@ -188,6 +205,8 @@
 		carry = null;
 		if (!on || event.type === 'pointercancel') {
 			aim(-1, -1);
+			// A press that went nowhere is a look, not a carry: the picture large.
+			if (!on && event.type !== 'pointercancel') onfocus?.(name);
 			return;
 		}
 		const area = aim(event.clientX, event.clientY);
@@ -258,6 +277,150 @@
 		await refresh();
 		onchanged();
 	}
+
+	// ---- one picture, large -------------------------------------------------
+
+	/**
+	 * A stored picture, as large as the tray allows, with the few things worth
+	 * doing to a photograph in a card: turn it, crop it. Nothing is written
+	 * until Save — these are the picture's own bytes, which the app's undo
+	 * cannot reach (see the delete, above) — and Revert goes back to what is
+	 * stored. The name stays: it is what cells point at, so every card using
+	 * the picture shows the edit.
+	 *
+	 * Drawn on a canvas at the picture's own size and shown scaled to fit; the
+	 * crop frame is fractions of it, so it means the same at either size.
+	 */
+	let view = $state<HTMLCanvasElement | null>(null);
+	let dims = $state({ w: 0, h: 0 });
+	let room = $state({ w: 0, h: 0 });
+	let dirty = $state(false);
+	let saving = $state(false);
+	let cropping = $state(false);
+	let frame = $state<Frame | null>(null);
+	let framing: { id: number; from: { x: number; y: number } } | null = null;
+
+	const focusType = $derived(focus ? editableType(focus) : null);
+	const focusUrl = $derived(focus ? (urls[focus] ?? null) : null);
+	const scale = $derived(
+		dims.w && dims.h && room.w && room.h ? Math.min(room.w / dims.w, room.h / dims.h) : 0
+	);
+
+	/** Load the stored picture onto the board, forgetting any edit not saved. */
+	function load(src: string) {
+		const image = new Image();
+		image.onload = () => {
+			if (!view) return;
+			view.width = image.naturalWidth;
+			view.height = image.naturalHeight;
+			view.getContext('2d')?.drawImage(image, 0, 0);
+			dims = { w: image.naturalWidth, h: image.naturalHeight };
+			sizes = { ...sizes, [focus ?? '']: { ...dims } };
+			dirty = false;
+			frame = null;
+			cropping = false;
+		};
+		image.src = src;
+	}
+
+	$effect(() => {
+		const src = focusUrl;
+		const canvas = view;
+		if (src && canvas) load(src);
+	});
+
+	/** The board redrawn onto one of a new size — what both edits come down to. */
+	function redraw(w: number, h: number, draw: (ctx: CanvasRenderingContext2D, from: HTMLCanvasElement) => void) {
+		if (!view) return;
+		const from = document.createElement('canvas');
+		from.width = view.width;
+		from.height = view.height;
+		from.getContext('2d')?.drawImage(view, 0, 0);
+		view.width = w;
+		view.height = h;
+		const ctx = view.getContext('2d');
+		if (!ctx) return;
+		draw(ctx, from);
+		dims = { w, h };
+		dirty = true;
+	}
+
+	/** A quarter turn, either way; the picture's sides trade places. */
+	function turn(clockwise: boolean) {
+		if (!view) return;
+		const { width, height } = view;
+		redraw(height, width, (ctx, from) => {
+			ctx.translate(clockwise ? height : 0, clockwise ? 0 : width);
+			ctx.rotate(((clockwise ? 1 : -1) * Math.PI) / 2);
+			ctx.drawImage(from, 0, 0);
+		});
+		frame = null;
+	}
+
+	function applyCrop() {
+		if (!view || !isCrop(frame)) return;
+		const px = framePixels(frame, view.width, view.height);
+		redraw(px.w, px.h, (ctx, from) => ctx.drawImage(from, -px.x, -px.y));
+		frame = null;
+		cropping = false;
+	}
+
+	const fractionAt = (event: PointerEvent) => {
+		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height };
+	};
+
+	function startFrame(event: PointerEvent) {
+		if (!cropping || event.button !== 0) return;
+		event.preventDefault();
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		const from = fractionAt(event);
+		framing = { id: event.pointerId, from };
+		frame = frameBetween(from, from);
+	}
+
+	function moveFrame(event: PointerEvent) {
+		if (framing?.id !== event.pointerId) return;
+		frame = frameBetween(framing.from, fractionAt(event));
+	}
+
+	function endFrame(event: PointerEvent) {
+		if (framing?.id !== event.pointerId) return;
+		framing = null;
+		if (!isCrop(frame)) frame = null;
+	}
+
+	async function save() {
+		if (!view || !focus || !focusType || saving) return;
+		const name = focus;
+		const type = focusType;
+		saving = true;
+		try {
+			const blob = await new Promise<Blob | null>((done) => view!.toBlob(done, type, 0.92));
+			// A browser that cannot write the type asked for hands back a PNG
+			// instead, and a PNG under a .webp name is a file that lies about
+			// itself. Refused rather than written.
+			if (!blob || blob.type !== type) {
+				onnotice(`This browser cannot write ${type.replace('image/', '').toUpperCase()} files, so ${name} was left as it was.`, 'warning');
+				return;
+			}
+			await storeLocalImage(new File([blob], name, { type }), name);
+			dirty = false;
+			await refresh();
+			onchanged();
+			onnotice(`${name} saved — every card showing it shows the edit.`);
+		} finally {
+			saving = false;
+		}
+	}
+
+	/** The stored pictures in the list's order, for the viewer's pager. */
+	const focusIndex = $derived(focus ? shown.findIndex((image) => image.name === focus) : -1);
+
+	function step(by: number) {
+		const next = shown[focusIndex + by];
+		if (next) onfocus?.(next.name);
+	}
 </script>
 
 <!--
@@ -280,11 +443,29 @@
 		onpointerup={endTrayDrag}
 		onpointercancel={endTrayDrag}
 	>
+		{#if focus}
+			<button
+				class="back"
+				title={dirty ? 'Save or revert the edit first' : 'Back to every picture'}
+				aria-label="Back to every picture"
+				disabled={dirty}
+				onclick={() => onfocus?.(null)}
+			><Icon name="chevron-left" size={14} /></button>
+			<span class="context focus-name" title={focus}>{focus}</span>
+			<!-- The size as it stands, edits and all: a crop is judged by it. -->
+			{#if focusType && dims.w}
+				<span class="total">{dims.w} × {dims.h} px</span>
+			{:else if sizes[focus]}
+				<span class="total">{sizes[focus].w} × {sizes[focus].h} px</span>
+			{/if}
+			{#if dirty}<span class="tag">edited</span>{/if}
+		{:else}
 		<span class="context">Images</span>
-		{#if images.length}
+		{/if}
+		{#if !focus && images.length}
 			<span class="total">{images.length} · {weigh(total)}</span>
 		{/if}
-		{#if folder}
+		{#if folder && !focus}
 			<span class="where">
 				{#if folder.ready}
 					<Icon name="folder" size={12} /> {folder.name}
@@ -293,7 +474,7 @@
 				{/if}
 			</span>
 		{/if}
-		{#if images.length >= FILTER_FROM}
+		{#if images.length >= FILTER_FROM && !focus}
 			<label class="find">
 				<span class="sr-only">Find a picture</span>
 				<input type="search" placeholder="Find…" bind:value={filter} />
@@ -301,6 +482,42 @@
 		{/if}
 	</div>
 
+	{#if focus}
+		<!-- The picture, large, where the list was. -->
+		<div class="viewer" bind:clientWidth={room.w} bind:clientHeight={room.h}>
+			{#if !focusUrl}
+				<p class="empty">
+					{busy ? '…' : `${focus} is not in this browser.`}
+					{#if !busy && missing.includes(focus)}
+						<button class="find" onclick={() => findFor(focus!)}><Icon name="image-reference" size={13} /> Find…</button>
+					{/if}
+				</p>
+			{:else if !focusType}
+				<img class="large" src={focusUrl} alt={focus} />
+			{/if}
+			<!-- Always in the page while an editable picture is open, so the load
+			     has somewhere to draw; sized by hand to fit the room. -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="board"
+				class:cropping
+				hidden={!focusUrl || !focusType}
+				style="width:{dims.w * scale}px;height:{dims.h * scale}px"
+				onpointerdown={startFrame}
+				onpointermove={moveFrame}
+				onpointerup={endFrame}
+				onpointercancel={endFrame}
+			>
+				<canvas bind:this={view}></canvas>
+				{#if cropping && frame}
+					<span
+						class="crop-frame"
+						style="left:{frame.x * 100}%;top:{frame.y * 100}%;width:{frame.w * 100}%;height:{frame.h * 100}%"
+					></span>
+				{/if}
+			</div>
+		</div>
+	{:else}
 	<div class="list">
 		{#if busy}
 			<p class="empty">…</p>
@@ -368,7 +585,43 @@
 			</ul>
 		{/if}
 	</div>
+	{/if}
 
+	{#if focus}
+		<!-- What can be done to it, where the ways in usually are: turn it
+		     either way, crop it to a frame drawn over it, and then keep the
+		     edit or go back to what is stored. The pager steps through the
+		     list in its own order, once nothing is waiting to be saved. -->
+		<div class="actions">
+			<span class="pager" role="group" aria-label="Picture">
+				<button class="step" title={dirty ? 'Save or revert the edit first' : 'Previous picture'} aria-label="Previous picture" disabled={dirty || focusIndex <= 0} onclick={() => step(-1)}><Icon name="chevron-left" size={16} /></button>
+				<span class="count">{focusIndex + 1} / {shown.length}</span>
+				<button class="step" title={dirty ? 'Save or revert the edit first' : 'Next picture'} aria-label="Next picture" disabled={dirty || focusIndex < 0 || focusIndex >= shown.length - 1} onclick={() => step(1)}><Icon name="chevron-right" size={16} /></button>
+			</span>
+			{#if focusType && focusUrl}
+				<button class="square" title="Turn a quarter to the left" aria-label="Rotate left" onclick={() => turn(false)}><span class="mirror"><Icon name="rotate" size={15} /></span></button>
+				<button class="square" title="Turn a quarter to the right" aria-label="Rotate right" onclick={() => turn(true)}><Icon name="rotate" size={15} /></button>
+				<button
+					class="square"
+					aria-pressed={cropping}
+					title={cropping ? 'Stop cropping' : 'Crop — drag a frame over the picture'}
+					aria-label="Crop"
+					onclick={() => {
+						cropping = !cropping;
+						frame = null;
+					}}
+				><Icon name="crop" size={15} /></button>
+				{#if cropping}
+					<button disabled={!isCrop(frame)} title="Keep only what is inside the frame" onclick={applyCrop}>Apply Crop</button>
+				{/if}
+				<span class="spacer"></span>
+				<button disabled={!dirty} title="Back to the picture as it is stored" onclick={() => focusUrl && load(focusUrl)}>Revert</button>
+				<button class="primary" disabled={!dirty || saving} title="Write the edit over {focus}" onclick={save}>Save</button>
+			{:else if focusUrl}
+				<span class="note">Shown only — this browser cannot write {focus.split('.').pop()?.toUpperCase() || 'this kind of'} files.</span>
+			{/if}
+		</div>
+	{:else}
 	<!-- The ways in, where the table keeps its toolbar. Upload is every
 	     browser's, a phone included; the folder is Chromium's. -->
 	<div class="actions">
@@ -388,6 +641,7 @@
 			{/if}
 		{/if}
 	</div>
+	{/if}
 </section>
 
 <input bind:this={fileInput} type="file" accept="image/*" multiple hidden onchange={upload} />
@@ -532,6 +786,140 @@
 		background: #111;
 		border-color: #111;
 		color: #fff;
+	}
+
+	.actions button:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+
+	.actions button.square {
+		width: 30px;
+		height: 28px;
+		padding: 0;
+		justify-content: center;
+	}
+
+	.actions button[aria-pressed='true'] {
+		border-color: #2563eb;
+		color: #2563eb;
+		background: #eaf1fe;
+	}
+
+	.actions .spacer {
+		flex: 1;
+	}
+
+	.note {
+		color: #767676;
+	}
+
+	/* Carbon draws the one turn; the other way is its mirror. */
+	.mirror {
+		display: grid;
+		transform: scaleX(-1);
+	}
+
+	/* The card's pager, as it is drawn under the sheet. */
+	.actions .pager {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+		margin-right: 4px;
+	}
+
+	.actions .pager .step {
+		border: none;
+		background: none;
+		padding: 2px;
+		color: #555;
+	}
+
+	.actions .pager .count {
+		min-width: 2.75rem;
+		text-align: center;
+		color: #555;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.tray-head .back {
+		display: grid;
+		place-items: center;
+		width: 22px;
+		height: 22px;
+		padding: 0;
+		border: none;
+		background: none;
+		color: #555;
+		cursor: pointer;
+	}
+
+	.tray-head .back:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+
+	.focus-name {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		text-transform: none;
+		letter-spacing: 0;
+		color: #111;
+	}
+
+	/* The room the picture is fitted to, as the drawing surface's stage is:
+	   never scrolls, the scale is worked out from its size. */
+	.viewer {
+		flex: 1;
+		min-height: 0;
+		display: grid;
+		place-items: center;
+		overflow: hidden;
+		padding: 12px;
+		background: #f3f4f6;
+		position: relative;
+	}
+
+	.viewer .large {
+		max-width: 100%;
+		max-height: 100%;
+		object-fit: contain;
+	}
+
+	.viewer .board {
+		position: relative;
+		background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 0 0 / 12px 12px;
+		box-shadow: 0 0 0 1px #c9cdd4;
+		touch-action: none;
+	}
+
+	.viewer .board[hidden] {
+		display: none;
+	}
+
+	.viewer .board.cropping {
+		cursor: crosshair;
+	}
+
+	.viewer canvas {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+
+	/* What stays, lit; what goes, dimmed by the frame's own shadow. */
+	.crop-frame {
+		position: absolute;
+		border: 1px dashed #fff;
+		outline: 1px solid #2563eb;
+		box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+		pointer-events: none;
+	}
+
+	.viewer .board.cropping {
+		overflow: hidden;
 	}
 
 	.sr-only {
