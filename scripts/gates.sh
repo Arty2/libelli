@@ -184,7 +184,7 @@ fi
 #
 # Overridable so the failure path is testable without editing this file:
 # `AGENTS_MAX=10 npm run gates` should fail.
-AGENTS_MAX="${AGENTS_MAX:-253}"
+AGENTS_MAX="${AGENTS_MAX:-212}"
 
 # Counted only if the file can actually be read. A gate that passes when it
 # couldn't do its job is worse than no gate.

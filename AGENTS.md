@@ -1,17 +1,13 @@
 # AGENTS.md
 
-Notes for whoever — human or agent, Claude or otherwise — picks this up next.
-`CLAUDE.md` is a one-line import of this file plus the two Claude Code-specific
-notes; edit this file, not that one.
+Notes for whoever — human or agent — picks this up next. `CLAUDE.md` imports
+this file; edit this one.
 
-`README.md` explains the app to a user and describes most of its behaviour in
-detail. `PLAN.md` holds the original decisions and is historical. `docs/decisions.md`
-holds the why behind each module. **This file is only what you need before
-touching anything**; it is kept short on purpose, because it is read in full
-every session — and because a bloated instructions file trains whoever reads it
-to skim, which defeats the point of writing one. Push detail into
-`docs/decisions.md` rather than growing this file; `npm run gates` holds it to a
-line budget so that stays a number rather than a hope.
+`README.md` is the app as a user meets it, `docs/decisions.md` the why behind
+each module, `PLAN.md` the original decisions (historical). **This file is only
+what you need before touching anything**, read in full every session, so it is
+kept short: push detail into `docs/decisions.md`, and `npm run gates` holds this
+file to a line budget.
 
 ## What this is
 
@@ -22,7 +18,7 @@ that any static host will serve.
 
 ## Shape of the code
 
-Sizes are marked where a file is big enough that opening it is a decision.
+Line counts are marked where a file is big enough that opening it is a decision.
 
 ```
 src/lib/
@@ -35,8 +31,8 @@ src/lib/
   autolayout.ts   reads the columns, writes a first draft of a card
   boxops.ts       box and selection transforms: duplicate, delete, group, lock, nudge
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
-  gestures.ts     swipe and press-and-hold, shared by the components that need them
-  complete.ts     the column names `{{` offers, in any field that holds text
+  gestures.ts     swipe and press-and-hold; haptics.ts the buzz that goes with them
+  complete.ts     the column names `{{` offers; placeholders.ts what `{{name}}` resolves to
   modal.ts        the two-Enter rule every dialog with a default action shares
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
@@ -44,35 +40,32 @@ src/lib/
   hand.ts         a border drawn by hand: seeded wobble -> SVG paths, in mm
   bitmap.ts       the pixel budget a drawn area gets, and pointing at it
   tile.ts         a drawing cropped to its ink, for an area that repeats
+  photo.ts        crop frames and write-back types, for editing a stored picture
   table.ts        column reorder, row sorting
   imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
   download.ts     hand the browser a file; zip.ts packs several into one
-  template.ts     defaults, validation, migration, import/export
+  template.ts     defaults (templates/default-card.json), validation, migration, import/export
   fonts.ts        Google families + local files via FontFace/IndexedDB
   assets.ts       images — page backgrounds and a row's own; bytes in a folder or IndexedDB
   history.ts      undo/redo snapshots
   storage.ts      localStorage + IndexedDB, the template library, the legacy-key migration
-  onboarding.ts   the starter template and sample rows a first run lands on
-  sample-cards.csv  those rows, as a CSV anyone can open in a spreadsheet
+  onboarding.ts   the starter template and sample rows (sample-cards.csv) a first run lands on
   sw-policy.ts    what the service worker does with a request, kept testable
   pwa.ts          worker registration, the update handshake, the install offer
   version.ts      VERSION, and the bumping rule
   components/
-    Card.svelte         the card itself: boxes, handles, drag, snap        (~28k)
-    PagePreview.svelte  the stage: zoom, wheel gestures, the pager         (~23k)
-    DataTable.svelte    the spreadsheet tray                               (~22k)
-    OptionsBar.svelte   shell; picks one of the two bars below
-    PageOptions.svelte  page settings bar
-    BoxOptions.svelte   box settings bar                                   (~19k)
-    options-bar.css     the styles both bars share
+    Card.svelte         the card itself: boxes, handles, drag, snap            (~3k)
+    PagePreview.svelte  the stage: zoom, wheel gestures, the pager             (~1.8k)
+    DataTable.svelte    the side panel: the table, a cell full size, drawing   (~3.2k)
+    OptionsBar.svelte   shell; picks PageOptions or BoxOptions (~1.4k), options-bar.css
     PrintSettingsPanel.svelte  Per Sheet, orientation, sheet background — shared with the print screen
-    PrintSheet.svelte  one physical sheet — used off-screen by PrintRoot and, scaled down, as PrintPreview's sheet thumbnails
-    SheetLightbox.svelte  one sheet full screen; Lightbox's opposite number, on a different ground
-    BitmapEditor.svelte  the drawing surface, full screen; writes a base64 PNG into the row
-    ImagesPanel.svelte  what is stored, what it weighs, and the folder to keep it in instead
-    PrintPreview, PrintRoot, Lightbox, BoxMenu, SelectionTools, MenuSelect, ColorField, Icon
+    PrintSheet.svelte   one physical sheet — off-screen in PrintRoot, thumbnails in PrintPreview
+    Lightbox / SheetLightbox  one card, or one sheet, full screen
+    BitmapEditor.svelte the drawing surface, hosted in DataTable; saves a base64 PNG
+    ImagesPanel.svelte  stored pictures, their weight, the folder; one large, to crop or turn
+    PrintRoot, BoxMenu, SelectionTools, MenuSelect, ColorField, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
-src/routes/+page.svelte   app state and wiring                             (~40k)
+src/routes/+page.svelte   app state and wiring                                 (~4k)
 src/routes/app.css        the :root tokens and app-wide rules
 ```
 
@@ -117,8 +110,7 @@ src/routes/app.css        the :root tokens and app-wide rules
   does not recognise is dropped rather than guessed at; a template's custom CSS
   goes through `css.ts`, which scopes every selector to the card and strips
   `@import` and any non-`data:` `url()`. Tests assert that each renderer *routes*
-  through these, not just that the guards work — keep it that way, and see
-  **Rules that execute** for the gate that holds the chokepoints to three files.
+  through these, not just that the guards work — keep it that way.
 - **A parser reports; the caller decides.** `parse.ts` says what a file holds,
   including "nothing"; whether nothing is acceptable is a policy, and it belongs
   at the one place the destructive decision is made. Two callers each inventing
@@ -148,54 +140,37 @@ to change.
 ## Rules that execute
 
 A rule that only lives in prose gets broken by the first change that does not
-re-read it — including by whoever wrote it, who always has a good reason. So
-every rule above that *can* be checked is: `npm run gates` runs `scripts/gates.sh`
-first in CI and fails the build on injection sinks, `{@html}` outside its three
-renderers, a `fetch` outside `png.ts` and the worker, a runtime dependency, a
-security header gone missing from `vercel.json`, `colour` spelled as a name, a
-`VERSION` out of step with `package.json`, and this file over its line budget.
+re-read it. So every rule above that *can* be checked is, in `scripts/gates.sh`
+(`npm run gates`, first in CI) — injection sinks, `{@html}` outside Card,
+PrintRoot and Icon, `fetch` outside `png.ts` and the worker, runtime
+dependencies, `vercel.json`'s security headers, `colour` as a name, `VERSION`
+against `package.json`, this file's length. ESLint (`npm run lint`, next in CI)
+covers what a linter can; where a rule is off, `eslint.config.js` says why.
 
-`npm run lint` is the other half and runs next in CI: ESLint knows what a
-linter can know, the gates cover what it cannot. Where a rule is off,
-`eslint.config.js` says why beside it — a rule switched off silently is worse
-than one never switched on.
-
-Add the next rule there rather than as a paragraph here. Each run also appends
-one line to the gitignored `.claude/logs/gates.jsonl`, which is how "this gate
-has never once fired" becomes answerable instead of anecdotal.
-`docs/decisions.md` § `scripts/gates.sh` has the conventions for writing one and
-what the log is for.
+Add the next rule to the script, not as a paragraph here — `docs/decisions.md`
+§ `scripts/gates.sh` has the conventions. Each run appends a line to the
+gitignored `.claude/logs/gates.jsonl`, so "this gate never fires" is answerable.
 
 ## Versioning
 
-`src/lib/version.ts` is the source of truth; keep `package.json` in step. Patch
-for a fix, minor for a feature, and **the leading zero never moves** — README
-has the table.
+`src/lib/version.ts` is the source of truth; keep `package.json` and
+`package-lock.json` in step. Patch for a fix, minor for a feature, and **the
+leading zero never moves** — README has the table.
 
-**Bump once per session, not once per change.** A session is one release however
-many commits it takes: set the number when the work starts landing and leave it
-alone, so the follow-ups and corrections that always follow do not each claim a
-version of their own. Size the single bump by the largest change in the session
-— one feature among five fixes still makes it a minor. Bump again within a
-session only when asked to.
-
-**Once the session has a pull request open, every further push bumps the
-patch.** The one-bump rule holds while the work is still the session's own;
-a PR hands it to a reviewer, and from then on each push is something they may
-already have read the last version of. So: no bump until the PR exists, then
-`0.8.0` → `0.8.1` → `0.8.2`, one per push, whatever the push contains.
+**Bump once per session, not once per change**, sized by the largest change in
+it — one feature among five fixes is still a minor. Set it when the work starts
+landing and leave it; bump again only when asked. **Once the session has a pull
+request open, every further push bumps the patch** (`0.8.0` → `0.8.1` → …): a
+reviewer may already have read the last one.
 
 ## How we work
 
-- **Build the risky thing first.** Rendering and printing were proven on day one,
-  before any editor UI existed.
-- **Verify in a real browser, not just in tests.** Every feature here has been
-  driven in headless Chromium — geometry read back in mm, PDFs counted page by
-  page, dialogs opened and dismissed. Say what was actually checked, and say it
-  plainly; if something was not checked, say that too. Scripts and screenshots
-  from that driving go in a scratch directory outside the repository, never in
-  it: read `git status` before any `git add -A`, and commit nothing you did not
-  write on purpose.
+- **Build the risky thing first**, before the UI around it.
+- **Verify in a real browser, not just in tests** — drive it in headless
+  Chromium, and say plainly what was checked and what was not. Scripts and
+  screenshots go in a scratch directory outside the repository: read
+  `git status` before any `git add -A`, and commit nothing you did not write on
+  purpose.
 - **Read what the build emitted, not the config you wrote.** A config option
   that is silently dropped looks exactly like one that works. After a change to
   anything the toolchain rewrites — the service worker's precache list, the
@@ -206,15 +181,11 @@ already have read the last version of. So: no bump until the PR exists, then
   was verified. No model names in anything that lands in the repo.
 - **Comments explain the why.** Not what the line does — why it is that way, and
   what breaks otherwise. Delete a comment that only restates the code.
-- **British spelling in prose and in identifiers** (`normalise`, `centre`,
-  `recognise`) — with one standing exception: **colour is spelled `color`**
-  wherever it is the name of the thing — the CSS property, the custom property,
-  the module, every identifier, and the label on the control in the bar. The web
-  platform spells it that way, `Box.color` and `TextStyle.color` are the format's
-  own field names, and a codebase that said `parseColour` on one line and
-  `color:` on the next was carrying the seam around for no benefit. Ordinary
-  prose keeps its `u` — a tooltip reading "the paper colour" is a sentence, not
-  a name — and that is where the gate draws the line.
+- **British spelling in prose and in identifiers** (`normalise`, `centre`) —
+  except **`color`** wherever it names the thing: the CSS property, the module,
+  every identifier, the control's label, as the web platform and the format's
+  own `Box.color` spell it. Ordinary prose keeps its `u` ("the paper colour"),
+  and that is where the gate draws the line.
 - **Say the trade-off out loud.** If a choice is arguable, note it in the commit
   or in a comment rather than leaving the next reader to rediscover it.
 - **Watch a pull request only when asked.** Never start following CI, and never
@@ -232,22 +203,10 @@ npm run build    # static output in ./build
 npm run verify   # gates, lint, units and types — run this while working
 ```
 
-## Svelte's own agent tooling
+## Svelte
 
-The Svelte team ships skills, a sub-agent and an MCP server for agents working
-in Svelte (`npx sv add ai-tools`, `svelte.dev/docs/ai`), kept current with the
-framework's releases — which prose in this file cannot be. Prefer it over
-anything written here about Svelte itself, and don't vendor a copy of their
-files: a copy of someone else's maintained file is stale the day after it is
-taken. Take the skills, which are lazy-loaded; treat the MCP server as opt-in,
-since its tool definitions cost context every session. `sv add` merges into
-`.claude/settings.json`, which this repo already owns — read the diff and keep
-the allowlist and the `SessionStart` hook.
-
-What stays here is this project's own taste, which no skill knows about:
-Svelte 5 runes, no legacy stores, and everything above.
-
-## Credits
-
-[Dialectic Acheiropoieton](https://heracl.es/libelli) of Heracles Papatheodorou
-and&nbsp;Claude
+Svelte 5 runes, no legacy stores. For Svelte itself, prefer the Svelte team's
+maintained agent docs (`svelte.dev/docs/ai`) over anything written here, and
+don't vendor a copy of them. If you add them with `npx sv add ai-tools`, it
+merges into `.claude/settings.json` — keep the allowlist, the deny and the
+`SessionStart` hook.
