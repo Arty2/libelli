@@ -422,13 +422,15 @@ only other tool is the rubber. The trade-off is that the ink is fixed at the
 moment of drawing: this is a PNG, not a mask, so changing the area's colour
 afterwards does not recolour what was drawn.
 
-**Low resolution is the feature, and it is a budget rather than a shape.** A
-board is 64 by 64 pixels' worth — 4096 of them — spent in any arrangement:
-64 x 64, 128 x 32, 512 x 8. What a cell cares about is how many pixels it is
-being asked to hold, not how they are arranged, so that is the one thing held
-constant; a kilobyte or two of base64 is a long cell but one a spreadsheet can
-hold and a person can scroll past. The header says what the drawing is costing
-as it is drawn, so the limit is visible rather than a rule that bites later.
+**Small by default, not by rule.** Every board starts at 64 x 64, where a
+drawing is a kilobyte or two of base64 — a long cell, but one a spreadsheet can
+hold and a person can scroll past. It was a budget: 64 x 64 pixels' worth,
+spent in any shape (128 x 32, 512 x 8). That was lifted when a banner and a
+detailed drawing both wanted more than it allowed. The title bar says what the
+drawing is costing as it is drawn, so a large board's cost is in view rather
+than forbidden. What is left is `MAX_SIDE`, 2048 a side: not a budget but a
+guard, because a template is a file anyone can hand you and the board it names
+is a canvas the browser allocates, thirty times over in the editor's undo.
 
 **The board does not follow the area.** It did at first — the area's own
 proportions, longest side pinned — and that tied a drawing's cost to the
@@ -441,10 +443,8 @@ rule the rest of the format follows.
 
 **A picture already in the cell opens at its own size.** The thing being edited
 is what is in the cell, and opening it on the board the area remembers would
-resample a picture nobody asked to resize. Only one too big for the budget — a
-photograph dropped on the area, not a drawing — is scaled down to fit, and one
-smaller than the smallest board sits in the corner of it rather than being blown
-up by a fraction.
+resample a picture nobody asked to resize. Only one with a side past
+`MAX_SIDE` is scaled down to fit, keeping its shape.
 
 **A resize scales what is drawn; undo restores the board and the detail.**
 Refusing to resize once anything is drawn would make the size a decision you had
@@ -487,12 +487,14 @@ line around leaves a fan of every line it passed through. The copy is the
 editor's own, not a history entry: the whole drag is one step in undo, the same
 as a stroke.
 
-**Rotate and crop are board transforms, not drawing.** Both could be done by
-hand with the pen and neither should have to be: a quarter turn resamples
-nothing (the same pixels, arranged the other way up, and the budget cannot
-notice because w x h is unchanged), and cropping to the ink is the same
-rectangle a tiled area repeats, made permanent. Each one is a single entry in
-the editor's own stack, board and all, so either is one undo away.
+**Rotate, flip and crop are board transforms, not drawing.** None resamples:
+a quarter turn and a flip are the same pixels rearranged, and a crop keeps the
+ones inside its frame one to one. Crop was a trim to the ink at first, which is
+what a tiled area already does as it is drawn and left no way to keep a margin
+or cut into the drawing; it is now the Images tray's crop — a frame dragged
+over the board, `photo.ts`'s fractions, snapped to whole pixels as it is drawn
+so what is shown is what is kept. Each is one entry in the editor's own stack,
+board and all, so any is one undo away.
 
 **Copy and paste go through the system clipboard as a PNG.** Not an internal
 buffer: the point is to get a drawing out to another program and a picture in
@@ -513,12 +515,18 @@ the board it sizes, which is where the eye already is when it is changed.
 — the fingers that would make one are the fingers drawing — and then
 Ctrl+wheel. With the board always drawn as large as its room, measured off the
 stage itself, a zoom in could only push part of it out of view behind a
-scrollbar, so the one zoom there is is the fit. It steps through whole numbers:
-whole screen pixels per pixel of the board, because a board at 7.5 screen
-pixels a side lands half its pixels on half a screen pixel, and a pixel editor
-that blurs its own edges is no use. It is also what lets the checkerboard be one
-check per pixel, so the pattern that says "nothing painted here" is also the
-grid.
+scrollbar, so the one zoom there is is the fit. It stepped through whole screen
+pixels per board pixel at first, and on a phone that left up to a third of the
+tray empty round a board that could have filled it. It fills now:
+`image-rendering: pixelated` keeps the edges hard, and the cost is that a
+column of pixels here and there is a screen pixel wider than its neighbours,
+which at these sizes reads as nothing. The checkerboard is still one check per
+pixel, so the pattern that says "nothing painted here" is also the grid.
+
+**At its least, the board keeps its room and the tools give way.** The tool
+rows never shrink and the board has a floor, so a tray pulled right down clips
+the rows under the panel's bottom bar instead of squeezing the board to a
+strip: what you pull the tray down to look at is the drawing.
 
 **A dialog, never in place.** Every other kind of area is edited where it sits,
 and this one cannot be: areas are frequently a centimetre across, which is
@@ -557,7 +565,7 @@ otherwise move the focus off the Save just pressed.
 
 ## `src/lib/photo.ts` and the Images tray's large view
 
-**Edits to a stored picture wait for Save.** Rotate and crop draw on a canvas
+**Edits to a stored picture wait for Save.** Rotate, flip and crop draw on a canvas
 at the picture's own size; nothing reaches the store until Save, because these
 are the picture's bytes and the app's undo holds template and table only. The
 name is kept — it is what cells point at — and so is the type it promises:
@@ -565,6 +573,9 @@ name is kept — it is what cells point at — and so is the type it promises:
 blob that comes back as another type (Safari asked for WebP) is refused rather
 than written as a PNG under a `.webp` name. The crop frame is fractions of the
 picture, so the one rectangle means the same on screen and at full size.
+The tools sit in a row under the picture, as the drawing editor's do, and
+rotate is one button, clockwise, as it is there: three presses are the other
+way, and a row that fits a phone is worth the two extra taps.
 
 ## `src/lib/history.ts`
 

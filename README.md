@@ -849,7 +849,8 @@ at its own size.
   to make one. The panel's title bar holds the board's own row, centred: the
   **light or dark checkerboard** to see it on, the size in px, and what the
   drawing weighs. The board is always drawn as large as the panel has room for,
-  so there is never a scrollbar round it. Under it the tools are two centred
+  so there is never a scrollbar round it. Pull the panel down to its least and
+  the tool rows slide under the bottom bar, leaving the board. Under it the tools are two centred
   rows: the **pencil** — the same one the Draw buttons wear — in the area's own
   colour, a **line** — press where it starts, let go where it ends — a rubber and
   three nib widths; then **rotate**, **flip** left to right and upside down,
@@ -857,10 +858,10 @@ at its own size.
   the bar under the panel, and **Delete** and **Save** at its far right; Delete
   is how the board is emptied.
 
-  **Rotate** turns the drawing a quarter turn clockwise, board and all — the
-  budget does not notice, because the same pixels are arranged the other way up.
-  **Flip** mirrors it on the same board, pixel for pixel. **Crop** takes the
-  board down to what is actually drawn on it. **Copy** puts the board on the
+  **Rotate** turns the drawing a quarter turn clockwise, board and all.
+  **Flip** mirrors it on the same board, pixel for pixel. **Crop** works as it
+  does on a stored image: drag a frame over the board — it snaps to whole
+  pixels — and **Apply Crop** keeps what is inside. **Copy** puts the board on the
   clipboard as a PNG and **paste** takes one off it, replacing the board and
   bringing its own size with it; both are on
   <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>C</kbd> and <kbd>V</kbd>, and a browser that
@@ -872,12 +873,10 @@ at its own size.
   stays with the board too, so a Delete or an arrow meant for it never reaches
   an area on the card.
 
-  The board is **64 by 64 pixels' worth**, spent however you like: type a width
-  and the height moves to pay for it, so 64 × 64, 128 × 32 and 512 × 8 are all
-  the same board as far as the cell is concerned. What is fixed is the number of
-  pixels, not the shape — that is the only thing a cell cares about, and it
-  means a banner can be drawn on a banner without a square's worth of empty rows
-  going into the table with it. The board does not follow the area's
+  Every board starts at **64 × 64**, and can be made any size up to 2048 a
+  side: type a width or a height and the other stays. A bigger board is a
+  longer cell, and the weight in the title bar says how much longer as you
+  draw. The board does not follow the area's
   proportions: an area is millimetres on paper, a board is pixels in a cell, and
   tying them together made a drawing's cost change whenever someone resized the
   box it sat in.
@@ -889,9 +888,7 @@ at its own size.
   drawing starts; a row that already holds an image opens at that image's own
   size, because what is in the cell is the thing being edited.
 
-  It is drawn at whole screen pixels each — a pixel editor that blurs its own
-  edges is no use — so the fit steps through whole numbers rather than scaling
-  smoothly. There is no zoom beyond the fit, and no two-finger pinch on the board: the fingers that would make one are the fingers
+  It is drawn hard-edged, filling the room it has. There is no zoom beyond the fit, and no two-finger pinch on the board: the fingers that would make one are the fingers
   drawing on it. A pinch is the page editor's, and stays that.
 
   What comes out is a base64 PNG written **into the row's cell**, which is the
@@ -961,9 +958,10 @@ rather than a dialog, so the card that uses the images stays in view.
   and it says so if something was using it. Hover a line for where it is kept.
 - **One image, large** — tap a thumbnail, or open a table cell that points
   at a stored image, and it fills the tray, with its size in pixels at the
-  head and a **‹ 1 / 5 ›** pager at the foot. **Rotate** turns it a quarter
-  either way; **Crop** lets you drag a frame over it and **Apply Crop** keeps
-  what is inside. **Delete** and **Save** are at the far end of the bar, as a
+  head and a **‹ 1 / 5 ›** pager at the foot. Under it is a row of tools, as
+  the drawing editor has: **Rotate** turns it a quarter clockwise, **Flip**
+  mirrors it left to right or upside down, and **Crop** lets you drag a frame
+  over it and **Apply Crop** keeps what is inside. **Delete** and **Save** are at the far end of the bar, as a
   drawing's are; Delete asks first. Nothing is written until **Save**, which puts the edit over
   the stored file under the same name — so every card and every cell pointing
   at it shows the change — and **Revert** goes back to what is stored. Undo

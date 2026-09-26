@@ -5,15 +5,14 @@
 		boardFor,
 		boardSize,
 		fitBoard,
-		inkBounds,
 		isDefaultBoard,
 		line,
 		pixelAt,
-		BUDGET,
 		MAX_SIDE,
 		MIN_SIDE,
 		type Grid
 	} from '$lib/bitmap';
+	import { frameBetween, framePixels, isCrop, type Frame } from '$lib/photo';
 	import type { Box } from '$lib/types';
 
 	/**
@@ -21,8 +20,8 @@
 	 *
 	 * Large on purpose, and never in place: an area on the card is often a
 	 * centimetre across, which is somewhere to *show* a drawing and nowhere to
-	 * make one. The board is 64 by 64 pixels' worth, spent in whatever shape is
-	 * asked for — see `bitmap.ts` — and what comes out is a PNG data URL, which
+	 * make one. The board starts at 64 by 64 and can be made any size — see
+	 * `bitmap.ts` — and what comes out is a PNG data URL, which
 	 * goes into the row's cell, so the picture travels with the table rather than
 	 * living beside it; an area with no column keeps it on the area.
 	 *
@@ -166,8 +165,8 @@
 		image.onload = async () => {
 			// The picture's own size wins over the board the area remembers: what
 			// is in the cell is the thing being edited, and opening it on another
-			// board would resample a picture nobody asked to resize. Only one too
-			// big for the budget — a photograph, not a drawing — is scaled.
+			// board would resample a picture nobody asked to resize. Only one with
+			// a side past the largest board is scaled.
 			const own = boardFor(image.naturalWidth, image.naturalHeight);
 			if (own.w !== grid.w || own.h !== grid.h) {
 				grid = own;
@@ -237,6 +236,7 @@
 	}
 
 	async function undo() {
+		frame = null;
 		const previous = history.at(-1);
 		const current = shot();
 		if (!previous || !current) return;
@@ -247,6 +247,7 @@
 	}
 
 	async function redo() {
+		frame = null;
 		const next = future.at(-1);
 		const current = shot();
 		if (!next || !current) return;
@@ -263,6 +264,7 @@
 	 * of drawing at eight pixels and asking for sixteen back.
 	 */
 	async function setSize(next: Grid) {
+		frame = null;
 		if (next.w === grid.w && next.h === grid.h) return;
 		const before = remember();
 		grid = next;
@@ -271,23 +273,17 @@
 		measure();
 	}
 
-	/**
-	 * A side, typed. `fitBoard` keeps the side it is given first, so the number
-	 * that was typed is the number that stays and the other one moves to pay for
-	 * it — a board is a fixed handful of pixels, not a fixed shape.
-	 */
-	const setSide = (axis: 'w' | 'h', raw: unknown) => {
-		const fitted = axis === 'w' ? fitBoard(raw, grid.h) : fitBoard(raw, grid.w);
-		setSize(axis === 'w' ? fitted : { w: fitted.h, h: fitted.w });
-	};
+	/** A side, typed; the other one stays as it is. */
+	const setSide = (axis: 'w' | 'h', raw: unknown) =>
+		setSize(axis === 'w' ? fitBoard(raw, grid.h) : fitBoard(grid.w, raw));
 
 	/**
 	 * A quarter turn clockwise. The board turns with the drawing — a landscape
 	 * board rotated onto a portrait one would have to crop or letterbox, and
-	 * neither is what "rotate" means — and the pixel budget does not notice,
-	 * because w x h is the same number either way.
+	 * neither is what "rotate" means.
 	 */
 	async function rotate() {
+		frame = null;
 		const before = remember();
 		if (!before) return;
 		grid = { w: grid.h, h: grid.w };
@@ -316,6 +312,7 @@
 	 * a pixel.
 	 */
 	function flip(axis: 'x' | 'y') {
+		frame = null;
 		const before = remember();
 		const ctx = context();
 		if (!before || !ctx) return;
@@ -334,23 +331,33 @@
 	}
 
 	/**
-	 * The board down to what is drawn on it. The same rectangle a tiled area
-	 * repeats — see `tile.ts` — made permanent: useful when the drawing found
-	 * its own size somewhere inside the board it started on.
+	 * A crop, as the Images tray does one: press Crop, drag a frame over the
+	 * board, Apply. It used to trim the board to what was drawn on it, which
+	 * is what a repeating area already does as it is drawn (see `tile.ts`) and
+	 * left no way to keep a margin or cut into the drawing. The frame snaps to
+	 * whole pixels as it is dragged, so what is shown is what is kept.
 	 */
-	async function crop() {
-		const before = remember();
-		const bounds = before && inkBounds(before.image);
-		if (!before || !bounds) {
-			say('Nothing drawn to crop to', 'warning');
-			return;
-		}
-		const next = fitBoard(Math.max(MIN_SIDE, bounds.w), Math.max(MIN_SIDE, bounds.h));
-		if (next.w === grid.w && next.h === grid.h) {
-			say('Already cropped');
-			return;
-		}
-		grid = next;
+	let cropping = $state(false);
+	let frame = $state<Frame | null>(null);
+	let framing: { id: number; from: { x: number; y: number } } | null = null;
+	/** The frame in the board's own pixels, and as fractions of it again for drawing. */
+	const cropPixels = $derived(isCrop(frame) ? framePixels(frame, grid.w, grid.h) : null);
+
+	function toggleCrop() {
+		cropping = !cropping;
+		frame = null;
+	}
+
+	const fractionAt = (event: PointerEvent) => {
+		const rect = canvas!.getBoundingClientRect();
+		return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height };
+	};
+
+	async function applyCrop() {
+		const px = cropPixels;
+		const before = px && remember();
+		if (!px || !before) return;
+		grid = { w: px.w, h: px.h };
 		await tick();
 		const ctx = context();
 		if (!ctx) return;
@@ -360,9 +367,11 @@
 		from.width = before.image.width;
 		from.height = before.image.height;
 		from.getContext('2d')?.putImageData(before.image, 0, 0);
-		// One to one, offset so the ink lands at the origin: cropping must not
-		// resample what it keeps.
-		ctx.drawImage(from, -bounds.x, -bounds.y);
+		// One to one, offset so the frame's corner lands at the origin: cropping
+		// must not resample what it keeps.
+		ctx.drawImage(from, -px.x, -px.y);
+		frame = null;
+		cropping = false;
 		measure();
 	}
 
@@ -473,6 +482,13 @@
 	function down(event: PointerEvent) {
 		if (event.button !== 0 || !canvas) return;
 		event.preventDefault();
+		if (cropping) {
+			canvas.setPointerCapture(event.pointerId);
+			const from = fractionAt(event);
+			framing = { id: event.pointerId, from };
+			frame = frameBetween(from, from);
+			return;
+		}
 		// The press is held back from the page, so it would not move the focus:
 		// after Save in the panel's bar, the next Ctrl/Cmd+Z or S would go to
 		// the app instead of the board being drawn on.
@@ -492,6 +508,10 @@
 	}
 
 	function move(event: PointerEvent) {
+		if (framing?.id === event.pointerId) {
+			frame = frameBetween(framing.from, fractionAt(event));
+			return;
+		}
 		if (!drawing) return;
 		const at = positionOf(event);
 		if (tool === 'line' && lineFrom) {
@@ -509,6 +529,11 @@
 	}
 
 	function up(event: PointerEvent) {
+		if (framing?.id === event.pointerId) {
+			framing = null;
+			if (!isCrop(frame)) frame = null;
+			return;
+		}
 		if (!drawing) return;
 		drawing = false;
 		last = null;
@@ -553,18 +578,18 @@
 	const takeFocus = (node: HTMLElement) => node.focus({ preventScroll: true });
 
 	/**
-	 * How large the board is drawn: as large as the room the dialog gives it,
-	 * always, so there is never a scrollbar round the board. Whole screen
-	 * pixels per pixel of the board, so the drawing never lands on half a
-	 * screen pixel and blurs its own edges — the one thing a pixel editor must
-	 * not do. That is why it steps through whole numbers rather than scaling
-	 * smoothly. There was a Ctrl+wheel zoom as well; with the board always
-	 * filling its room, a zoom in could only ever push part of it out of view.
+	 * How large the board is drawn: as large as the room gives it, always, so
+	 * there is never a scrollbar round the board and never a margin of unused
+	 * room. It used to step in whole screen pixels per board pixel, which kept
+	 * every pixel exactly the same width but left up to a board-pixel's worth
+	 * of room empty on each side — on a phone, a third of the tray. Now it
+	 * fills: `image-rendering: pixelated` keeps the edges hard, and at the
+	 * cost of a column of pixels here and there being a screen pixel wider
+	 * than its neighbours, which reads as nothing at these sizes.
 	 */
 	let room = $state({ w: 0, h: 0 });
-	const zoom = $derived(
-		Math.max(1, Math.min(48, Math.floor(Math.min(room.w / grid.w, room.h / grid.h)) || 1))
-	);
+	// Less a pixel each side, for the board's hairline border.
+	const zoom = $derived(Math.max(0, Math.min((room.w - 2) / grid.w, (room.h - 2) / grid.h)) || 1);
 </script>
 
 <!-- In the side panel, where a cell is edited full size: the card it is
@@ -574,10 +599,9 @@
      which the compiler's list of interactive roles does not count. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="drawer" role="application" aria-label="Drawing" tabindex="-1" onkeydown={onKeydown} use:takeFocus>
-	<!-- One row over the board: its size, the paper to see it on, and at the far
-	     end what it weighs. 64 by 64 pixels' worth, spent however you like —
-	     type a side and the other one moves to pay for it. -->
-	<div class="board" title="The board, in pixels — {BUDGET} of them to spend" use:portal={head}>
+	<!-- One row over the board: the paper to see it on, its size, and what it
+	     weighs — which grows with the size, and is why it is in view. -->
+	<div class="board" use:portal={head}>
 		<button
 			class="square"
 			aria-pressed={checks === 'dark'}
@@ -620,17 +644,26 @@
 	     pattern is also the grid. The stage is measured, and the board drawn as
 	     large as fits in it. -->
 	<div class="stage" bind:clientWidth={room.w} bind:clientHeight={room.h}>
-		<canvas
-			class:dark={checks === 'dark'}
-			use:start
-			width={grid.w}
-			height={grid.h}
-			style="width:{grid.w * zoom}px;height:{grid.h * zoom}px;--check:{zoom}px"
-			onpointerdown={down}
-			onpointermove={move}
-			onpointerup={up}
-			onpointercancel={up}
-		></canvas>
+		<div class="sheet" style="width:{grid.w * zoom}px;height:{grid.h * zoom}px">
+			<canvas
+				class:dark={checks === 'dark'}
+				class:cropping
+				use:start
+				width={grid.w}
+				height={grid.h}
+				style="--check:{zoom}px"
+				onpointerdown={down}
+				onpointermove={move}
+				onpointerup={up}
+				onpointercancel={up}
+			></canvas>
+			{#if cropping && cropPixels}
+				<span
+					class="crop-frame"
+					style="left:{(cropPixels.x / grid.w) * 100}%;top:{(cropPixels.y / grid.h) * 100}%;width:{(cropPixels.w / grid.w) * 100}%;height:{(cropPixels.h / grid.h) * 100}%"
+				></span>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Two rows. What you draw with — the tool, the nib, undo, and the paper
@@ -715,10 +748,20 @@
 			<button onclick={() => flip('y')} title="Flip the drawing upside down" aria-label="Flip vertically">
 				<Icon name="reflect-vertical" size={16} />
 			</button>
-			<button onclick={crop} title="Crop the board to what is drawn on it" aria-label="Crop">
+			<button
+				aria-pressed={cropping}
+				onclick={toggleCrop}
+				title={cropping ? 'Stop cropping' : 'Crop — drag a frame over the board'}
+				aria-label="Crop"
+			>
 				<Icon name="crop" size={16} />
 			</button>
 		</span>
+		{#if cropping}
+			<button class="apply" disabled={!cropPixels} onclick={applyCrop} title="Keep only what is inside the frame">
+				Apply Crop
+			</button>
+		{/if}
 
 		<span class="segmented">
 			<button onclick={copy} title="Copy the drawing as an image (Ctrl/Cmd+C)" aria-label="Copy">
@@ -743,7 +786,7 @@
 		min-height: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
+		gap: 6px;
 		font: 13px ui-sans-serif, system-ui, sans-serif;
 		outline: none;
 		/* The board takes the pointer for drawing; a downward drag read as
@@ -764,12 +807,20 @@
 		gap: 4px;
 	}
 
+	/* None of the row gives way: a narrow head squeezed the paper toggle into
+	   a tall, thin button. The weight, last, is what runs out of room. */
+	.board > :global(*) {
+		flex: none;
+	}
+
 	/* The paper toggle, sized and drawn as the tools below are. */
 	.board .square {
 		display: grid;
 		place-items: center;
-		width: 30px;
-		height: 30px;
+		box-sizing: border-box;
+		width: 28px;
+		height: 28px;
+		aspect-ratio: 1;
 		margin-right: 6px;
 		padding: 0;
 		border: 1px solid #c9cdd4;
@@ -791,6 +842,14 @@
 		justify-content: center;
 		gap: 8px;
 		flex-wrap: wrap;
+		/* Never squeezed: when the tray is pulled down, the board keeps its
+		   least and the rows slide under the panel's bottom bar instead. */
+		flex: none;
+	}
+
+	.tools .apply {
+		width: auto;
+		padding: 0 10px;
 	}
 
 	/* Square, all of them: every one holds a glyph of the same size, and a row of
@@ -829,8 +888,8 @@
 
 	.board input {
 		font: 13px ui-sans-serif, system-ui, sans-serif;
-		width: 42px;
-		height: 30px;
+		width: 48px;
+		height: 28px;
 		box-sizing: border-box;
 		border: 1px solid #c9cdd4;
 		border-radius: 6px;
@@ -877,20 +936,42 @@
 	   header, the size and the tools are placed. Never scrolls — the zoom is
 	   worked out from this box's own size so the board always fits. */
 	.stage {
-		flex: 1;
-		min-height: 0;
+		flex: 1 1 0;
+		min-height: 96px;
 		display: grid;
 		place-items: center;
 		overflow: hidden;
 		line-height: 0;
 	}
 
-	.stage canvas {
+	.sheet {
+		position: relative;
+		overflow: hidden;
 		box-shadow: 0 0 0 1px #c9cdd4;
 	}
 
+	.sheet canvas {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+
+	canvas.cropping {
+		cursor: crosshair;
+	}
+
+	/* What stays, lit; what goes, dimmed by the frame's own shadow — as the
+	   Images tray draws its crop. Clipped to the board by the stage. */
+	.crop-frame {
+		position: absolute;
+		border: 1px dashed #fff;
+		outline: 1px solid var(--accent);
+		box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+		pointer-events: none;
+	}
+
 	canvas {
-		/* Whole screen pixels per grid pixel, drawn hard: a smoothed pixel is a
+		/* Drawn hard: a smoothed pixel is a
 		   different drawing from the one that will print. */
 		image-rendering: pixelated;
 		cursor: crosshair;

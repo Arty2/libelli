@@ -654,9 +654,9 @@ export function normaliseRotation(raw: unknown): number | undefined {
 /**
  * The board a drawing gets, if this box names one. Both sides or neither: half
  * a size is not a size, and the board every drawing starts on is a better
- * answer than one measurement paired with a guess. Held to the pixel budget
+ * answer than one measurement paired with a guess. Held to the largest side
  * here as well as in the editor, because a template is a file someone can hand
- * you and a board of a million pixels is a cell nobody can open.
+ * you and the board it names is a canvas this browser allocates.
  */
 export function normalisePixels(raw: unknown): { w: number; h: number } | undefined {
 	if (!raw || typeof raw !== 'object') return undefined;

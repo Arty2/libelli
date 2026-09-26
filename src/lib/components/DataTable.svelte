@@ -1980,7 +1980,7 @@
 	     Cancel. -->
 	{#if drawingArea}
 		{@const area = drawingArea}
-		<div class="cell-editor" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
+		<div class="cell-editor drawing" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
 			<!-- The editor's head is the tray's grip too, as the table's header row
 			     is: the editor covers that row, and on a phone a drawing wants
 			     more of the height than the tray opened with. -->
@@ -2018,7 +2018,7 @@
 		{@const open = bigCell}
 		{@const text = dataset.rows[open.row]?.[open.column] ?? ''}
 		{@const kind = bigKind(text, open.draw)}
-		<div class="cell-editor" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
+		<div class="cell-editor" class:drawing={boardShown(bigCell)} role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
 			<!-- The editor's head is the tray's grip too, as the table's header row
 			     is: the editor covers that row, and on a phone a drawing wants
 			     more of the height than the tray opened with. -->
@@ -3158,6 +3158,15 @@
 		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
 	}
 
+	/* A drawing wants every pixel of the room: a thinner margin, and what does
+	   not fit — the tool rows, when the tray is pulled right down — slides
+	   under the bottom bar rather than squeezing the board. */
+	.cell-editor.drawing {
+		gap: 6px;
+		padding: 6px 8px 8px;
+		overflow: hidden;
+	}
+
 	.cell-editor-head {
 		display: flex;
 		align-items: center;
@@ -3191,6 +3200,11 @@
 		margin: -12px -12px 0;
 		padding: 12px 12px 4px;
 		cursor: ns-resize;
+	}
+
+	.cell-editor.drawing .cell-editor-head.draggable {
+		margin: -6px -8px 0;
+		padding: 6px 8px 2px;
 	}
 
 	.cell-editor-head.draggable :global(button) {

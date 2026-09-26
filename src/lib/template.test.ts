@@ -477,9 +477,9 @@ describe('newBox board size', () => {
 		expect(newBox({ pixels: { w: 64, h: 64 } }).pixels).toEqual({ w: 64, h: 64 });
 	});
 
-	it('spends a template down to the budget rather than trusting it', () => {
-		expect(newBox({ pixels: { w: 128, h: 128 } }).pixels).toEqual({ w: 128, h: 32 });
-		expect(newBox({ pixels: { w: 9999, h: 9999 } }).pixels).toEqual({ w: 512, h: 8 });
+	it('keeps a board of any size, but holds a template to the largest side', () => {
+		expect(newBox({ pixels: { w: 128, h: 128 } }).pixels).toEqual({ w: 128, h: 128 });
+		expect(newBox({ pixels: { w: 99999, h: 9999 } }).pixels).toEqual({ w: 2048, h: 2048 });
 	});
 
 	it('drops half a size rather than pairing it with a guess', () => {

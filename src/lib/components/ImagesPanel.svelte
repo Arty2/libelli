@@ -347,13 +347,29 @@
 		dirty = true;
 	}
 
-	/** A quarter turn, either way; the picture's sides trade places. */
-	function turn(clockwise: boolean) {
+	/**
+	 * A quarter turn clockwise; the picture's sides trade places. One way only,
+	 * as the drawing editor turns: three presses are the other way, and one
+	 * button fewer is a row that fits a phone.
+	 */
+	function turn() {
 		if (!view) return;
 		const { width, height } = view;
 		redraw(height, width, (ctx, from) => {
-			ctx.translate(clockwise ? height : 0, clockwise ? 0 : width);
-			ctx.rotate(((clockwise ? 1 : -1) * Math.PI) / 2);
+			ctx.translate(height, 0);
+			ctx.rotate(Math.PI / 2);
+			ctx.drawImage(from, 0, 0);
+		});
+		frame = null;
+	}
+
+	/** Mirrored left to right, or top to bottom; the size stays. */
+	function flip(axis: 'x' | 'y') {
+		if (!view) return;
+		const { width, height } = view;
+		redraw(width, height, (ctx, from) => {
+			ctx.translate(axis === 'x' ? width : 0, axis === 'y' ? height : 0);
+			ctx.scale(axis === 'x' ? -1 : 1, axis === 'y' ? -1 : 1);
 			ctx.drawImage(from, 0, 0);
 		});
 		frame = null;
@@ -592,10 +608,33 @@
 	</div>
 	{/if}
 
+	{#if focus && focusType && focusUrl}
+		<!-- What can be done to it, in a row under it as the drawing editor has
+		     its tools: turn it, mirror it, crop it to a frame drawn over it. -->
+		<div class="tools" role="toolbar" aria-label="Image tools">
+			<span class="segmented">
+				<button title="Turn a quarter turn clockwise" aria-label="Rotate" onclick={turn}><Icon name="rotate" size={16} /></button>
+				<button title="Flip left to right" aria-label="Flip horizontally" onclick={() => flip('x')}><Icon name="reflect-horizontal" size={16} /></button>
+				<button title="Flip upside down" aria-label="Flip vertically" onclick={() => flip('y')}><Icon name="reflect-vertical" size={16} /></button>
+				<button
+					aria-pressed={cropping}
+					title={cropping ? 'Stop cropping' : 'Crop — drag a frame over the image'}
+					aria-label="Crop"
+					onclick={() => {
+						cropping = !cropping;
+						frame = null;
+					}}
+				><Icon name="crop" size={16} /></button>
+			</span>
+			{#if cropping}
+				<button class="apply" disabled={!isCrop(frame)} title="Keep only what is inside the frame" onclick={applyCrop}>Apply Crop</button>
+			{/if}
+		</div>
+	{/if}
+
 	{#if focus}
-		<!-- What can be done to it, where the ways in usually are: turn it
-		     either way, crop it to a frame drawn over it, and then keep the
-		     edit or go back to what is stored. The pager steps through the
+		<!-- Then, where the ways in usually are, the pager, and keeping the edit
+		     or going back to what is stored. The pager steps through the
 		     list in its own order, once nothing is waiting to be saved. -->
 		<div class="actions">
 			<span class="pager" role="group" aria-label="Image">
@@ -604,21 +643,6 @@
 				<button class="step" title={dirty ? 'Save or revert the edit first' : 'Next image'} aria-label="Next image" disabled={dirty || focusIndex < 0 || focusIndex >= shown.length - 1} onclick={() => step(1)}><Icon name="chevron-right" size={16} /></button>
 			</span>
 			{#if focusType && focusUrl}
-				<button class="square" title="Turn a quarter to the left" aria-label="Rotate left" onclick={() => turn(false)}><span class="mirror"><Icon name="rotate" size={15} /></span></button>
-				<button class="square" title="Turn a quarter to the right" aria-label="Rotate right" onclick={() => turn(true)}><Icon name="rotate" size={15} /></button>
-				<button
-					class="square"
-					aria-pressed={cropping}
-					title={cropping ? 'Stop cropping' : 'Crop — drag a frame over the image'}
-					aria-label="Crop"
-					onclick={() => {
-						cropping = !cropping;
-						frame = null;
-					}}
-				><Icon name="crop" size={15} /></button>
-				{#if cropping}
-					<button disabled={!isCrop(frame)} title="Keep only what is inside the frame" onclick={applyCrop}>Apply Crop</button>
-				{/if}
 				<span class="spacer"></span>
 				<button disabled={!dirty} title="Back to the image as it is stored" onclick={() => focusUrl && load(focusUrl)}>Revert</button>
 			{:else if focusUrl}
@@ -819,31 +843,12 @@
 		cursor: default;
 	}
 
-	.actions button.square {
-		width: 30px;
-		height: 28px;
-		padding: 0;
-		justify-content: center;
-	}
-
-	.actions button[aria-pressed='true'] {
-		border-color: var(--accent);
-		color: var(--accent);
-		background: var(--accent-tint);
-	}
-
 	.actions .spacer {
 		flex: 1;
 	}
 
 	.note {
 		color: #767676;
-	}
-
-	/* Carbon draws the one turn; the other way is its mirror. */
-	.mirror {
-		display: grid;
-		transform: scaleX(-1);
 	}
 
 	/* The card's pager, as it is drawn under the sheet. */
@@ -933,6 +938,52 @@
 		display: block;
 		width: 100%;
 		height: 100%;
+	}
+
+	/* Under the picture, centred, square buttons as the drawing editor's. */
+	.tools {
+		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 6px 8px;
+		background: #f3f4f6;
+	}
+
+	.tools .segmented {
+		display: flex;
+		gap: 4px;
+	}
+
+	.tools button {
+		display: grid;
+		place-items: center;
+		box-sizing: border-box;
+		width: 30px;
+		height: 30px;
+		padding: 0;
+		font: 600 13px ui-sans-serif, system-ui, sans-serif;
+		background: #fff;
+		border: 1px solid #c9cdd4;
+		border-radius: 6px;
+		cursor: pointer;
+	}
+
+	.tools button[aria-pressed='true'] {
+		background: var(--accent-tint);
+		border-color: var(--accent);
+		color: var(--accent-strong);
+	}
+
+	.tools button:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+
+	.tools .apply {
+		width: auto;
+		padding: 0 10px;
 	}
 
 	/* What stays, lit; what goes, dimmed by the frame's own shadow. */
