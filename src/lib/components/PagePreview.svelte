@@ -21,6 +21,8 @@
 		grid: boolean;
 		/** the page margins, drawn and snapped to */
 		guides: boolean;
+		/** the temporary guides a drag shows as it lines up — see Card's `smartGuides` */
+		smartGuides: boolean;
 		/** ruled lines, or a dot at every intersection */
 		gridStyle: GridStyle;
 		selectedIds: string[];
@@ -53,7 +55,8 @@
 		onaction?: (what: string) => void;
 		onbounds: (show: boolean) => void;
 		ongrid: (show: boolean) => void;
-		onguides: (show: boolean) => void;
+		/** the margins and the temporary guides, together — the Guides box's three states */
+		onguides: (margins: boolean, smart: boolean) => void;
 		/** press and hold the Grid toggle: the same grid, drawn the other way */
 		ongridstyle: (style: GridStyle) => void;
 		onzoom: (zoom: 'fit' | 'actual' | number) => void;
@@ -105,6 +108,7 @@
 		loadingFonts = [],
 		grid,
 		guides,
+		smartGuides,
 		gridStyle,
 		selectedIds,
 		zoom,
@@ -533,7 +537,7 @@
 		// on the stage is typed with a pipe.
 		if (event.key === '|' && !event.ctrlKey && !event.metaKey && !event.altKey) {
 			event.preventDefault();
-			onguides(!guides);
+			cycleGuides();
 			return;
 		}
 		if (!event.ctrlKey && !event.metaKey) return;
@@ -567,7 +571,7 @@
 			case ';':
 			case ':':
 				event.preventDefault();
-				onguides(!guides);
+				cycleGuides();
 				return;
 			case "'":
 			case '"':
@@ -702,6 +706,19 @@
 	 * than in the markup; a click clears it natively, and the next update puts
 	 * back whatever the grid is then.
 	 */
+	/**
+	 * The Guides box's three states, one press apart: ticked draws the page
+	 * margins and shows the temporary guides a drag lines up on; the dash keeps
+	 * the temporary guides with no margins drawn; off is neither. Temporary
+	 * guides are what most people mean by guides, so they are what the middle
+	 * state keeps. The keys go round the same way.
+	 */
+	function cycleGuides() {
+		if (guides) onguides(false, true);
+		else if (smartGuides) onguides(false, false);
+		else onguides(true, true);
+	}
+
 	function mixed(node: HTMLInputElement, on: boolean) {
 		node.indeterminate = on;
 		return { update: (next: boolean) => (node.indeterminate = next) };
@@ -798,6 +815,7 @@
 				{loadingFonts}
 				{grid}
 				{guides}
+				{smartGuides}
 				{scale}
 				{pageNumber}
 				{background}
@@ -1081,12 +1099,27 @@
 			<span class="wide">{grid && gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
 			<span class="narrow" aria-hidden="true">#</span>
 		</label>
-		<label title={withKey('The page margins, drawn and snapped to — screen only, never printed', 'guides')}>
+		<label
+			title={withKey(
+				guides
+					? 'Page margins and alignment guides — press for alignment guides only'
+					: smartGuides
+						? 'Alignment guides only: a drag lines up on other areas\' edges and middles, and the page\'s centre — press to turn guides off'
+						: 'No guides — press for the page margins and alignment guides',
+				'guides'
+			)}
+		>
 			<input
 				type="checkbox"
 				aria-label="Guides"
-				checked={guides}
-				onchange={(e) => onguides(e.currentTarget.checked)}
+				checked={guides || smartGuides}
+				use:mixed={!guides && smartGuides}
+				onchange={(e) => {
+					// The box's own toggle is overruled by the three states: what it
+					// shows is set from them on the next update.
+					e.currentTarget.checked = !(guides === false && smartGuides);
+					cycleGuides();
+				}}
 			/>
 			<span class="wide">Guides</span>
 			<span class="narrow" aria-hidden="true">|</span>

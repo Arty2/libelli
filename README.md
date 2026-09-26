@@ -1351,14 +1351,25 @@ towards it and down is away. They repeat on a hold like the arrows do.
 The arrow keys and the pad both move every area in the selection, not only a
 lone one.
 
-Dragging snaps in this order: with **Guides** on the page **margins** show as a
-solid guide in the inverse of the accent (amber against the default blue outlines) — over the grid and under every area — and an edge that comes within reach of one lands on it
-— the left and top edges, and the right and bottom when those are the edges
-being moved; then, with **Grid** on, the 5mm subgrid of a 10mm grid takes
-everything else; otherwise a box latches onto the edges and centres of its
-neighbours as it passes them, and a guide shows what it caught. There is no key
-to hold for free movement — switch **Grid**, **Guides** and **Boxes** off and
-nothing latches, because a box should never snap to a guide you cannot see.
+The **Guides** box has three states. **Ticked**: the page **margins** show as a
+solid guide in the inverse of the accent (amber against the default blue
+outlines), over the grid and under every area, and the temporary guides below
+are on too. **The dash**: the temporary guides only, with no margins drawn.
+**Off**: neither.
+
+Dragging snaps in this order. With the margins drawn, an edge that comes within
+reach of one lands on it — the left and top edges, and the right and bottom
+when those are the edges being moved. Then the **temporary guides**: a moving
+box tries its left edge, its **middle** and its right edge (top, middle,
+bottom going down) against the edges and middles of the other areas and the
+page's own centre lines, takes whichever is nearest, and a line shows what it
+caught — so areas line up by their middles as well as their edges, and one can
+be centred on the card by dragging alone. A handle, which moves one edge, tries
+that edge. An alignment within reach beats the grid, because it is the more
+specific thing to have meant; past that, with **Grid** on, the 5mm subgrid of a
+10mm grid takes everything else. There is no key to hold for free movement —
+switch **Grid** and **Guides** off and nothing latches, because a box should
+never snap to a guide you cannot see.
 
 The grid is drawn in black on a light paper and in white on a dark one, at
 the same strengths, so it can be seen on a navy or black card as well as on

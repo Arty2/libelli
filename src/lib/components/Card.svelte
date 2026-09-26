@@ -20,6 +20,7 @@
 		pxToMm,
 		mmToPx,
 		resolveLayout,
+		latchSpan,
 		snapTo,
 		snapToEdges
 	} from '$lib/layout';
@@ -38,10 +39,17 @@
 		bounds?: boolean;
 		/** families still arriving, so an area can say so rather than sit in the fallback */
 		loadingFonts?: string[];
-		/** snap drags to the 5mm subgrid rather than to sibling edges */
+		/** snap drags to the 5mm subgrid */
 		grid?: boolean;
 		/** draw the page margins, and snap to them */
 		guides?: boolean;
+		/**
+		 * The temporary guides: while a box is dragged it latches onto another
+		 * box's edges and middle, and onto the page's centre lines, and a line
+		 * shows what it caught. On a switch of its own, apart from the margins,
+		 * so they can be had without the margins drawn.
+		 */
+		smartGuides?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
 		scale?: number;
 		interactive?: boolean;
@@ -116,6 +124,7 @@
 		loadingFonts = [],
 		grid = false,
 		guides = false,
+		smartGuides = false,
 		scale = 1,
 		interactive = false,
 		selectedIds = [],
@@ -907,15 +916,20 @@
 	}
 
 	/**
-	 * Snapping, strongest first: the page margins when the guides are on, then
-	 * an enabled grid, and otherwise a box latches onto a sibling's edge when it
-	 * comes within `SNAP_TOLERANCE`. Sibling edges come from the resolved
-	 * layout, so a box snaps to where a grown box really ends.
+	 * Snapping, strongest first: the page margins when they are drawn, then the
+	 * temporary guides — another box's edges and middle, and the page's centre
+	 * lines, within `SNAP_TOLERANCE` — then an enabled grid. A box being moved
+	 * tries its left, middle and right (top, middle, bottom) and takes whichever
+	 * is nearest, so boxes line up by their middles as well as their edges; a
+	 * handle, which moves one edge, tries that edge. Sibling edges come from the
+	 * resolved layout, so a box snaps to where a grown box really ends. An
+	 * alignment in reach beats the grid, because it is the more specific thing
+	 * to have meant.
 	 *
 	 * There is no modifier to hold: the toggles under the page are the whole
-	 * control. Grid, Guides and Boxes all off is free movement, because a box cannot
-	 * latch onto a guide that is not being drawn — a snap to an invisible edge is
-	 * indistinguishable from a bug.
+	 * control. Grid and Guides both off is free movement; every latch draws the
+	 * line it caught, because a snap to an invisible edge is indistinguishable
+	 * from a bug.
 	 */
 	const SNAP_TOLERANCE = 1.5;
 
@@ -949,8 +963,13 @@
 
 	function moveDrag(event: PointerEvent) {
 		if (!drag) return;
-		const latch = !grid && bounds;
-		const edges = latch ? boxEdges(template.boxes, layout, drag.id) : { x: [], y: [] };
+		const edges = smartGuides ? boxEdges(template.boxes, layout, drag.id) : { x: [], y: [] };
+		// The page's own centre lines too: a box centred on the card is the
+		// alignment most cards want, and there may be no box there to line up with.
+		if (smartGuides) {
+			edges.x.push(template.page.w / 2);
+			edges.y.push(template.page.h / 2);
+		}
 		const latched = { x: null as number | null, y: null as number | null };
 
 		// With the guides on, the margins win over a grid line or a sibling's
@@ -960,7 +979,8 @@
 			x: [margins.left, template.page.w - margins.right],
 			y: [margins.top, template.page.h - margins.bottom]
 		};
-		const place = (value: number, axis: 'x' | 'y'): number => {
+		/** `length` is the box's extent on this axis when the whole box is moving. */
+		const place = (value: number, axis: 'x' | 'y', length?: number): number => {
 			if (guides) {
 				const hit = snapToEdges(value, marginEdges[axis], SNAP_TOLERANCE);
 				if (hit !== null) {
@@ -968,11 +988,20 @@
 					return hit;
 				}
 			}
-			if (grid) return snapTo(value, GRID_MINOR);
-			const hit = latch ? snapToEdges(value, edges[axis], SNAP_TOLERANCE) : null;
-			if (hit === null) return snapTo(value, FREE_STEP);
-			latched[axis] = hit;
-			return hit;
+			if (length !== undefined) {
+				const hit = latchSpan(value, length, edges[axis], SNAP_TOLERANCE);
+				if (hit) {
+					latched[axis] = hit.edge;
+					return round2(hit.start);
+				}
+			} else {
+				const hit = snapToEdges(value, edges[axis], SNAP_TOLERANCE);
+				if (hit !== null) {
+					latched[axis] = hit;
+					return hit;
+				}
+			}
+			return snapTo(value, grid ? GRID_MINOR : FREE_STEP);
 		};
 		// A size is not a position: it rounds, but it never latches onto an edge.
 		const size = (value: number) => snapTo(value, grid ? GRID_MINOR : FREE_STEP);
@@ -1019,13 +1048,13 @@
 		const mode = flip ? MIRRORED_MODE[drag.mode] : drag.mode;
 		const next: Box = { ...origin };
 
-		const setTop = (deltaY: number) => {
+		const setTop = (deltaY: number, length?: number) => {
 			// An anchored box has no independent top: move its gap instead, so the
 			// relationship the template author set up survives being dragged. No
 			// floor under it — dragged up past the area it follows, it overlaps
 			// that area, with a negative gap, rather than stopping dead.
 			if (origin.anchor) next.anchor = { ...origin.anchor, gap: size(origin.anchor.gap + deltaY) };
-			else next.y = place(origin.y + deltaY, 'y');
+			else next.y = place(origin.y + deltaY, 'y', length);
 		};
 
 		switch (mode) {
@@ -1075,8 +1104,8 @@
 				break;
 			}
 			case 'move':
-				next.x = place(origin.x + dx, 'x');
-				setTop(dy);
+				next.x = place(origin.x + dx, 'x', origin.w);
+				setTop(dy, layout.heights[origin.id] ?? origin.h);
 				break;
 			case 'e':
 				next.w = Math.max(4, size(origin.w + dx));

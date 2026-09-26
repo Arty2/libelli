@@ -13,7 +13,8 @@ import {
 	pageSide,
 	resolveLayout,
 	snapTo,
-	snapToEdges
+	snapToEdges,
+	latchSpan
 } from './layout';
 import { newBox } from './template';
 import type { Box } from './types';
@@ -286,3 +287,24 @@ describe('actualScale', () => {
 		expect(actualScale({ width: 1111, height: 777, ratio: 1 })).toEqual({ scale: 1, panel: null, estimate: true });
 	});
 });
+
+describe('latchSpan', () => {
+	it('lines a box up by its middle', () => {
+		// A 20mm box whose middle is 0.5mm off a 74mm centre line.
+		expect(latchSpan(63.5, 20, [74], 1.5)).toEqual({ start: 64, edge: 74 });
+	});
+
+	it('lines a box up by its far edge', () => {
+		expect(latchSpan(79, 20, [100], 1.5)).toEqual({ start: 80, edge: 100 });
+	});
+
+	it('takes the nearest of the three when more than one is in reach', () => {
+		// Left edge 1mm from 10, middle 0.2mm from 20.8.
+		expect(latchSpan(11, 10, [10, 16.2], 1.5)).toEqual({ start: 11.2, edge: 16.2 });
+	});
+
+	it('is nothing when no line is in reach', () => {
+		expect(latchSpan(30, 10, [0, 100], 1.5)).toBeNull();
+	});
+});
+

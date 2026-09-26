@@ -441,6 +441,12 @@ export interface UiState {
 	showGrid: boolean;
 	/** the page margins, drawn and snapped to; screen furniture, never printed */
 	showGuides: boolean;
+	/**
+	 * The temporary guides a drag lines up on — other areas' edges and middles,
+	 * the page's centre. With the margins off and these on, the Guides box shows
+	 * its dash.
+	 */
+	smartGuides: boolean;
 	/** how the grid draws itself: ruled lines, or a dot at every intersection */
 	gridStyle: GridStyle;
 	/**

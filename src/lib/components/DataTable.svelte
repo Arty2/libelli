@@ -1414,6 +1414,19 @@
 								onchange={(e) => renameColumn(i, e.currentTarget.value, e.currentTarget)}
 							/>
 							<span class="column-tools">
+								<!-- Only on hover or while the header has the focus: three
+								     buttons in every header, always, were the name's room. The
+								     keyboard still reaches them, since a focused name shows them. -->
+								{#if !locked}
+									<span class="column-move">
+										<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
+										<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
+										<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
+									</span>
+								{/if}
+								<!-- Sort last, at the header's far edge: the move and delete
+								     buttons come and go before it, so it stays on the same
+								     spot whether they are showing or not. -->
 								<!-- Three states on the one control: A-Z, Z-A, and the order the
 								     rows came in. The icon says which of the three it is on. -->
 								<button
@@ -1437,16 +1450,6 @@
 										size={14}
 									/>
 								</button>
-								<!-- Only on hover or while the header has the focus: three
-								     buttons in every header, always, were the name's room. The
-								     keyboard still reaches them, since a focused name shows them. -->
-								{#if !locked}
-									<span class="column-move">
-										<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
-										<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
-										<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
-									</span>
-								{/if}
 							</span>
 							</span>
 							<!-- The right edge of the header is the grip, which is where

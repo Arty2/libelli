@@ -600,6 +600,17 @@ would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
 
+**The temporary guides are the Guides box's middle state, and a box moves by
+its middle too.** They were tied to Boxes being on and the grid being off, so
+turning the grid on — or the margins off — took them away without a word, and a
+moving box only ever tried its left and top edges, so nothing lined up by its
+middle. Now Guides goes round three states (margins and temporary guides, the
+temporary guides alone as the dash, neither), the temporary guides include the
+page's centre lines, a moving box tries start, middle and end (`latchSpan`),
+and an alignment in reach beats the grid. The margins still win over both,
+because a margin that is not a whole number of grid steps would otherwise have
+an edge nothing could be placed against.
+
 **An empty area's name is part of the bounds.** It used to appear only where an
 area had nothing to draw from at all, in grey. It now stands in whenever an area
 is empty, in the accent and the area's own type, because an empty area is
