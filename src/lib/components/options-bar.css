@@ -167,6 +167,18 @@
 	border-bottom-color: var(--border-control-hover);
 }
 
+/* Focused, the line under the value is the whole of the sign: it turns the
+   accent and doubles (a shadow under the border, so nothing moves), where the
+   app-wide focus ring would draw a box round a field that has none — the one
+   frame these fields went without a frame to avoid. The table's name field
+   and its column headers do the same. */
+.options input:not([type='checkbox']):not([type='color']):focus,
+.options select:focus {
+	outline: none;
+	border-bottom-color: var(--accent);
+	box-shadow: 0 1px 0 var(--accent);
+}
+
 /* Nothing to fill in, so nothing to underline: a disabled field is a value
    being reported rather than one being asked for. */
 .options input:disabled,

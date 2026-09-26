@@ -609,10 +609,11 @@ a notice can appear.
   row with it: the `+` that adds rows lives under the row numbers, so until there
   is a column there is nowhere for it to be, and a column with no row under it is
   a table you cannot type in.
-- **Rename in place** — click a column header's name and type; it is a field
-  with a rule under it, like those in the bars. A press that travels instead
-  drags the header — the tray, or the column — rather than selecting the name,
-  until the name is being edited. The cells and any slot bound to
+- **Rename in place** — click or tap a column header's name and type; it is a
+  field with a rule under it, like those in the bars, and while it is being
+  edited the rule turns the accent — no box round it, no ground under it. Until
+  then the name is part of the header, so a press that travels drags the
+  header — the tray, or the column — rather than touching the text. The cells and any slot bound to
   that column follow the rename. A column name has **no spaces and no special
   characters** — spaces become dashes and the rest is dropped as you commit it,
   and headers imported from a file or a paste are cleaned the same way — because

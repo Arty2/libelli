@@ -725,25 +725,24 @@
 	}
 
 	/**
-	 * A press on a name that is not being edited is a press on the header.
+	 * A name that is not being edited is not there for the pointer.
 	 *
 	 * The name field fills most of each header, so most drags of the header —
-	 * the tray pulled up, the column carried sideways — begin inside it, and a
-	 * text field answers a press by taking the focus and starting a selection.
-	 * Past a few pixels that selection is the browser's own drag, and a name
-	 * that was already selected went further and started dragging its text,
-	 * which cancels the pointer outright. So until the field has the focus, the
-	 * press is held back from it, and the click that follows — only when it
-	 * went nowhere, since a drag swallows its click — hands the focus over.
-	 * Once the field has it, a press is left alone to place the caret.
+	 * the tray pulled up, the column carried sideways — begin on it, and a text
+	 * field answers a press with gestures of its own: a selection, the browser
+	 * dragging selected text, and on a phone its own text handling, which the
+	 * page cannot hold back from a pointerdown at all. Holding the press back
+	 * worked in every browser here and not on the phones it was for. So an
+	 * unfocused name takes no pointer events (see `.column-name` in the styles):
+	 * a press lands on the header, which drags, and a tap that went nowhere —
+	 * a drag swallows its own click — puts the name into editing, caret at the
+	 * end. Focused, the field takes the pointer back, to place the caret. The
+	 * keyboard reaches it by Tab as it always did.
 	 */
-	function holdName(event: PointerEvent) {
-		if (event.button === 0 && document.activeElement !== event.currentTarget) event.preventDefault();
-	}
-
 	function takeName(event: MouseEvent) {
-		const field = event.currentTarget as HTMLInputElement;
-		if (document.activeElement === field) return;
+		if ((event.target as Element).closest('button')) return;
+		const field = (event.currentTarget as HTMLElement).querySelector<HTMLInputElement>('input.column-name');
+		if (!field || document.activeElement === field) return;
 		field.focus();
 		field.setSelectionRange(field.value.length, field.value.length);
 	}
@@ -1388,7 +1387,12 @@
 							onpointerdown={(e) => startCarry(e, i)}
 							data-no-hold-tip
 						>
-							<span class="column-head">
+							<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+							<span
+								class="column-head"
+								title={locked ? column : 'Rename this column — drag it sideways to move it'}
+								onclick={takeName}
+							>
 							<!-- Data nothing on the card prints: no area is bound to it and
 							     nothing names it as {{column}}. Worth saying, because it is
 							     either a column still to be placed or one that can go. -->
@@ -1407,9 +1411,6 @@
 								value={column}
 								readonly={locked}
 								aria-label="Rename column {column}"
-								title={locked ? column : 'Rename this column — drag it sideways to move it'}
-								onpointerdown={holdName}
-								onclick={takeName}
 								onchange={(e) => renameColumn(i, e.currentTarget.value, e.currentTarget)}
 							/>
 							<span class="column-tools">
@@ -2200,6 +2201,20 @@
 	   because it is the same act: typing a name into something. A white box
 	   popping up over the header on hover read as a different kind of control
 	   from every other field in the app. */
+	/* Not the pointer's until it has the focus — see `takeName`. The header
+	   under it is, so a press here drags the tray or the column. */
+	.column-name:not(:focus) {
+		pointer-events: none;
+	}
+
+	.column-head {
+		cursor: text;
+	}
+
+	.column-head :global(button) {
+		cursor: pointer;
+	}
+
 	.column-name {
 		border: none;
 		border-bottom: 1px solid transparent;
@@ -2211,12 +2226,16 @@
 		padding: 3px 2px;
 	}
 
-	.column-name:not([readonly]):hover {
+	.column-head:hover .column-name:not([readonly]) {
 		border-bottom-color: var(--border-control-hover);
 	}
 
-	.column-name:not([readonly]):focus {
-		border-bottom-color: var(--border-control-hover);
+	/* Editing: the underline turns the accent and doubles, as the bars' fields
+	   do — no ring round it and no ground under it. */
+	.column-head .column-name:not([readonly]):focus {
+		outline: none;
+		border-bottom-color: var(--accent);
+		box-shadow: 0 1px 0 var(--accent);
 	}
 
 	.column-tools,
@@ -2825,6 +2844,7 @@
 	.picker input:focus {
 		outline: none;
 		border-bottom-color: var(--accent);
+		box-shadow: 0 1px 0 var(--accent);
 	}
 
 	.picker .caret {
