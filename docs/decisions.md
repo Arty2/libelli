@@ -1779,6 +1779,12 @@ variable across the whole weight range, which is the one request `fonts.ts`
 tries first — a static humanist family (Alegreya Sans, Fira Sans) would arrive
 with 400 and 700 only, and the light cut would silently be regular.
 
+Off the page's outer edge sits a post-it, bound to a `notes` column: an area
+on the pasteboard never prints, so it is the place for a note to yourself. Set
+in Patrick Hand — the one hand face left, on the one thing written by hand —
+with a `box-shadow` curl and a glue strip from `::after` in the CSS, locked so
+the rescue button leaves it where it is (see `boxops.ts`).
+
 The rest is chosen to show one of each thing the tour mentions, without a
 paragraph of its own: the kicker is a per-edge border (a hairline under it)
 with uppercase and tracking; the drawing is a stamp, hand-perforated, with a
@@ -2862,6 +2868,15 @@ change — press, nothing moves, button still lit. So an anchored box is judged 
 x alone; its vertical position is the Gap field in the bar. For the same reason
 the handler counts the *unlocked* strays: a locked area is not this button's to
 move, and when every stray is locked it says so rather than doing nothing.
+
+**A locked area wholly off the paper is parked, not stray.** The pasteboard is
+a place to keep things — the A5 Starter keeps a post-it of the row's `notes`
+there — and an area put there on purpose lit the rescue button for good, and
+pressing it dragged the note onto the card. Both conditions are needed: wholly
+off alone is exactly what a shrunk page leaves behind, the case the button is
+for, and a locked area half off the edge is still cut in half by every print.
+The cost is that a parked note is locked, so it is typed into from the table,
+not on the card.
 
 ## `src/lib/placeholders.ts`
 

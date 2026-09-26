@@ -333,6 +333,12 @@ resize boxes directly, or type exact millimetres.
   It is an SVG over the room the CSS border was already holding, so switching
   it on moves no text and changes no measurement, and it prints and exports
   like anything else on the card.
+- **Off the page** — an area can sit beside the page, on the pasteboard, where
+  it is drawn in the editor and never printed or exported: the A5 Starter
+  keeps a post-it of each row's `notes` there. Lock it and the button that
+  brings stray areas back leaves it alone — a locked area *wholly* off the
+  paper is parked, not lost. Half off still counts as stray, locked or not,
+  because the half on the paper still prints cut.
 - **A stamp** — the **Stamp** border style is a postage stamp's perforated
   edge: the paper, filled with the area's fill, with a half-round hole bitten
   out at every perforation, so the page shows through the holes. The width sets

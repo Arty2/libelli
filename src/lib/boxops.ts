@@ -251,12 +251,24 @@ export function applyStyle(box: Box, style: BoxStyle): Box {
  * box on a number nothing will write is a button that lights up and then does
  * nothing when pressed. The Gap field in the bar is where that box's vertical
  * position lives.
+ *
+ * One exception: a *locked* box *wholly* off the paper is parked, not lost —
+ * a note beside the page, on the pasteboard where it will never print. Both
+ * halves of that are needed. Wholly off alone is exactly the box a shrunk page
+ * leaves behind, the case this exists for; locked alone is not a reason, since
+ * a locked box half off the edge is still being cut in half by every print.
+ * Together they are somebody saying "here, and on purpose", and a rescue
+ * button lit for good over a note is a button nobody believes any more.
  */
 export function strayBoxes(boxes: Box[], page: PageSpec, bleed = 0): Box[] {
 	const off = (start: number, size: number, limit: number) =>
 		start < -bleed || start + size > limit + bleed;
+	const clear = (start: number, size: number, limit: number) =>
+		start + size <= -bleed || start >= limit + bleed;
+	const parked = (box: Box) =>
+		!!box.locked && (clear(box.x, box.w, page.w) || (!box.anchor && clear(box.y, box.h, page.h)));
 	return boxes.filter(
-		(box) => off(box.x, box.w, page.w) || (!box.anchor && off(box.y, box.h, page.h))
+		(box) => !parked(box) && (off(box.x, box.w, page.w) || (!box.anchor && off(box.y, box.h, page.h)))
 	);
 }
 

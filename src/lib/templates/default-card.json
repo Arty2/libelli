@@ -39,6 +39,10 @@
     {
       "family": "IBM Plex Mono",
       "source": "google"
+    },
+    {
+      "family": "Patrick Hand",
+      "source": "google"
     }
   ],
   "defaults": {
@@ -57,7 +61,8 @@
     "category",
     "link",
     "accent",
-    "sketch"
+    "sketch",
+    "notes"
   ],
   "boxes": [
     {
@@ -278,8 +283,38 @@
       "qr": {
         "level": "M"
       }
+    },
+    {
+      "id": "b_notes",
+      "slot": "notes",
+      "x": 156,
+      "y": 14,
+      "w": 46,
+      "h": 46,
+      "font": "Patrick Hand",
+      "size": 13,
+      "lineHeight": 1.15,
+      "color": "#3b3522",
+      "background": "#fdf08a",
+      "padding": {
+        "top": 7,
+        "right": 5,
+        "bottom": 4,
+        "left": 5
+      },
+      "rotation": 2.5,
+      "mode": "markdown",
+      "overflow": "clip",
+      "hideWhenEmpty": true,
+      "mirror": false,
+      "locked": true,
+      "md": {
+        "paragraph": {
+          "spaceAfter": 2
+        }
+      }
     }
   ],
   "facing": true,
-  "css": "/* The page number takes the page's own face; this sets it in the mono of the footer. */\n.page-number {\n  font-family: 'IBM Plex Mono', monospace !important;\n  font-size: 6.5pt !important;\n  letter-spacing: 0.3mm;\n  color: #8a857b !important;\n}\n\n/* Headings inside the body in the title's serif. */\n#body h1, #body h2, #body h3 {\n  font-family: 'Fraunces', serif;\n  letter-spacing: -0.1mm;\n}\n\n/* `code` in the footer's mono, on a faint chip. */\n#body code {\n  font-family: 'IBM Plex Mono', monospace;\n  font-size: 0.86em;\n  background: #efece4;\n  padding: 0 0.6mm;\n  border-radius: 0.6mm;\n}\n\n/* The drawing's stamp, lifted off the page. A drop-shadow follows what is\n   painted, so it traces the perforations; a box-shadow would be a rectangle. */\n#sketch {\n  filter: drop-shadow(0.4mm 0.7mm 0.6mm rgba(40, 30, 10, 0.28));\n}\n\n#body mark {\n  background: #f6e27a;\n  padding: 0 0.4mm;\n}\n"
+  "css": "/* The page number takes the page's own face; this sets it in the mono of the footer. */\n.page-number {\n  font-family: 'IBM Plex Mono', monospace !important;\n  font-size: 6.5pt !important;\n  letter-spacing: 0.3mm;\n  color: #8a857b !important;\n}\n\n/* Headings inside the body in the title's serif. */\n#body h1, #body h2, #body h3 {\n  font-family: 'Fraunces', serif;\n  letter-spacing: -0.1mm;\n}\n\n/* `code` in the footer's mono, on a faint chip. */\n#body code {\n  font-family: 'IBM Plex Mono', monospace;\n  font-size: 0.86em;\n  background: #efece4;\n  padding: 0 0.6mm;\n  border-radius: 0.6mm;\n}\n\n/* The drawing's stamp, lifted off the page. A drop-shadow follows what is\n   painted, so it traces the perforations; a box-shadow would be a rectangle. */\n#sketch {\n  filter: drop-shadow(0.4mm 0.7mm 0.6mm rgba(40, 30, 10, 0.28));\n}\n\n/* The post-it off the page's edge: a curl of shadow under its lower corners,\n   and a strip of darker yellow where the glue is. Never printed — it is off\n   the paper — so it is only ever the editor's. */\n#notes {\n  box-shadow: 0 1.6mm 2.2mm -1mm rgba(60, 45, 0, 0.35);\n}\n#notes::after {\n  content: '';\n  position: absolute;\n  inset: 0 0 auto 0;\n  height: 4mm;\n  background: rgba(190, 160, 0, 0.14);\n}\n\n#body mark {\n  background: #f6e27a;\n  padding: 0 0.4mm;\n}\n"
 }
