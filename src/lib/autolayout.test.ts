@@ -316,3 +316,72 @@ describe('autoLayout', () => {
 		for (const box of small.boxes) expect(box.x + box.w).toBeLessThanOrEqual(74);
 	});
 });
+
+describe('an exhibition label', () => {
+	const rows: Row[] = [
+		{
+			Artist: 'Ada Example',
+			'Artwork title': 'Tide Line',
+			Medium: 'Oil on linen',
+			Description: 'A long horizon painted over a week of low tides, '.repeat(4),
+			Duration: '90',
+			Credits: 'Courtesy of the artist and Example Gallery'
+		},
+		{
+			Artist: 'Bo Sample',
+			'Artwork title': 'Night Shift',
+			Medium: 'Single-channel video',
+			Description: 'Twelve hours of a harbour crane, cut to the length of one song. '.repeat(3),
+			Duration: '12',
+			Credits: 'Collection of the Example Foundation'
+		}
+	];
+	const columns = ['Artist', 'Artwork title', 'Medium', 'Description', 'Duration', 'Credits'];
+	const kinds = () => Object.fromEntries(guessRoles(columns, rows).map((g) => [g.column, g.kind]));
+
+	it('takes the artist for the title and the work for the subtitle', () => {
+		const k = kinds();
+		expect(k.Artist).toBe('title');
+		expect(k['Artwork title']).toBe('subtitle');
+	});
+
+	it('reads the medium and the duration as detail lines, the credits as the credit line', () => {
+		const k = kinds();
+		expect(k.Medium).toBe('detail');
+		// A Duration of plain numbers is still a detail, by its heading.
+		expect(k.Duration).toBe('detail');
+		expect(k.Description).toBe('body');
+		expect(k.Credits).toBe('credit');
+	});
+
+	it('does the same for a plain Title beside a person', () => {
+		const k = Object.fromEntries(
+			guessRoles(['Title', 'Author'], [{ Title: 'A Book', Author: 'Cy Writer' }]).map((g) => [g.column, g.kind])
+		);
+		expect(k).toEqual({ Title: 'subtitle', Author: 'title' });
+	});
+
+	it('stacks the details under the subtitle and puts the credit at the very bottom', () => {
+		const { boxes } = autoLayout({ page, defaults, columns, rows });
+		const by = Object.fromEntries(boxes.map((b) => [b.slot, b]));
+		const id = (slot: string) => by[slot].id;
+		expect(by['Artwork title'].anchor?.to).toBe(id('Artist'));
+		expect(by.Medium.anchor?.to).toBe(id('Artwork title'));
+		expect(by.Duration.anchor?.to).toBe(id('Medium'));
+		expect(by.Description.anchor?.to).toBe(id('Duration'));
+		const lowest = Math.max(...boxes.map((b) => b.y + b.h));
+		expect(by.Credits.y + by.Credits.h).toBeCloseTo(lowest, 6);
+		expect(by.Credits.anchor).toBeNull();
+	});
+
+	it('keeps the credit line when the foot runs out of room', () => {
+		const many = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].map((c) => `Tag ${c}`);
+		const cols = [...many, 'Credits'];
+		const row = Object.fromEntries(cols.map((c) => [c, c === 'Credits' ? 'Courtesy of someone' : 'x']));
+		const roles: FieldGuess[] = cols.map((c) => ({ column: c, kind: c === 'Credits' ? 'credit' : 'label', sure: true, sample: '' }));
+		const { boxes, left } = autoLayout({ page, defaults, columns: cols, rows: [row], roles });
+		expect(boxes.some((b) => b.slot === 'Credits')).toBe(true);
+		expect(left).not.toContain('Credits');
+	});
+});
+

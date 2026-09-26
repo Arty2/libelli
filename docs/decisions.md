@@ -110,6 +110,19 @@ English heading ends on the noun it is about — `Product image` is an image and
 first word names. A hint found inside a word comes last, and only for hints of
 four letters or more.
 
+**Two small lines have a place of their own: `detail` and `credit`.** A
+medium, a duration, a size belong to the heading they describe, so a detail
+stacks under the subtitle, anchored like the rest of the head; a credit line
+is owed rather than chosen, so it is the foot's last line and the one kept
+when the foot is full. Both are roles, but a heading naming one beats a
+column of numbers — a Duration of 90 is a detail, not a figure in the foot.
+
+**A person takes the title over a Title column.** Where a heading names a
+person (`PEOPLE`) and another is plain Title, the card is about the person and
+the Title column is the name of their work, so it becomes the subtitle, ahead
+of a column that only called itself one; a second subtitle becomes a detail
+line. Without a person, Title keeps the title, as before.
+
 **An image is known by its cells before its heading.** A column whose every
 filled cell is a `data:image` URL, a `local:name` or an address ending in an
 image file is an image whatever it is called — and that test runs before the
