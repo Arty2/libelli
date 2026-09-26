@@ -109,7 +109,9 @@ resize boxes directly, or type exact millimetres.
   always walking from the link to the buoy, the way the tie runs, wherever on
   the card they are. Pointing at a buoy threads it to what follows *that*
   area, never to what it follows itself. It
-  is still while you have asked for less motion. Selecting either end lights
+  is still while you have asked for less motion. To see every tie at once,
+  press **Boxes** until it shows its dash: every tied area wears its link and
+  buoy and every thread is drawn, without pointing at anything. Selecting either end lights
   the *mark* on the other — the glyph only, never a fill, because those badges
   are on areas you have not selected and a filled badge reads as a second
   selection. The one fill is on the area you do have: what is moored to it, which
@@ -1472,7 +1474,8 @@ than it has to.
   stay lowercase beside the number, and buttons keep their frames because a
   button is a thing you press.
 - **View** — in the bottom corners of the page itself, not the toolbar: **Grid**,
-  **Guides** (the page margins) and **Boxes** (each area's bounds) at the left (screen only, never printed), zoom at the right;
+  **Guides** (the page margins) and **Boxes** (each area's bounds; its dash
+  adds every tie's thread) at the left (screen only, never printed), zoom at the right;
   between them, under the sheet, which card of how many you are looking at.
   The zoom menu puts the number first — *66% — Fit*, *133% — Actual* — and its
   field sits on the corner's chip with no rule under it. **Fit** says the

@@ -16,6 +16,8 @@
 		row: Row | null;
 		mapping: Mapping;
 		bounds: boolean;
+		/** every tie's thread drawn without pointing at it — the Boxes box's dash */
+		ties: boolean;
 		/** families still arriving, passed through so an area can pulse while it waits */
 		loadingFonts?: string[];
 		grid: boolean;
@@ -53,7 +55,7 @@
 		onimagepagedrop?: (file: File, clientX: number, clientY: number) => void;
 		/** forwarded to the card: what a drag is about to do, for the undo label */
 		onaction?: (what: string) => void;
-		onbounds: (show: boolean) => void;
+		onbounds: (show: boolean, ties: boolean) => void;
 		ongrid: (show: boolean) => void;
 		/** the margins and the temporary guides, together — the Guides box's three states */
 		onguides: (margins: boolean, smart: boolean) => void;
@@ -105,6 +107,7 @@
 		row,
 		mapping,
 		bounds,
+		ties,
 		loadingFonts = [],
 		grid,
 		guides,
@@ -566,7 +569,7 @@
 			case 'h':
 			case 'H':
 				event.preventDefault();
-				onbounds(!bounds);
+				cycleBounds();
 				return;
 			case ';':
 			case ':':
@@ -719,6 +722,19 @@
 		else onguides(true, true);
 	}
 
+	/**
+	 * The Boxes box's three states: ticked is the bounds and badges; the dash
+	 * adds every tie drawn as its thread, as pointing at a tie badge draws one;
+	 * off is none of it. The dash comes after the tick here, not before as on
+	 * Guides, because it is more rather than less: the threads are about the
+	 * boxes, and mean nothing without them.
+	 */
+	function cycleBounds() {
+		if (!bounds) onbounds(true, false);
+		else if (!ties) onbounds(true, true);
+		else onbounds(false, false);
+	}
+
 	function mixed(node: HTMLInputElement, on: boolean) {
 		node.indeterminate = on;
 		return { update: (next: boolean) => (node.indeterminate = next) };
@@ -812,6 +828,7 @@
 				{row}
 				{mapping}
 				{bounds}
+				{ties}
 				{loadingFonts}
 				{grid}
 				{guides}
@@ -1124,12 +1141,26 @@
 			<span class="wide">Guides</span>
 			<span class="narrow" aria-hidden="true">|</span>
 		</label>
-		<label title={withKey("Each area's dashed bounds, its badges and the trim edge — screen only, never printed", 'boxes')}>
+		<label
+			title={withKey(
+				!bounds
+					? "No boxes — press for each area's dashed bounds, its badges and the trim edge (screen only, never printed)"
+					: ties
+						? 'Boxes, and every tie between areas drawn as its thread — press to turn boxes off'
+						: "Each area's dashed bounds, its badges and the trim edge, screen only — press to draw every tie as well",
+				'boxes'
+			)}
+		>
 			<input
 				type="checkbox"
 				aria-label="Boxes"
 				checked={bounds}
-				onchange={(e) => onbounds(e.currentTarget.checked)}
+				use:mixed={bounds && ties}
+				onchange={(e) => {
+					// Overruled by the three states, as Guides is.
+					e.currentTarget.checked = !(bounds && ties);
+					cycleBounds();
+				}}
 			/>
 			<span class="wide">Boxes</span>
 			<span class="narrow" aria-hidden="true">B</span>

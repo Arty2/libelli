@@ -131,7 +131,7 @@
 		if (barHeight > barFloor) barFloor = barHeight;
 	});
 
-	let ui = $state<UiState>({ showBounds: true, showGrid: false, showGuides: true, smartGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
+	let ui = $state<UiState>({ showBounds: true, showTies: false, showGrid: false, showGuides: true, smartGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
 	let activeRow = $state(0);
 	let selectedIds = $state<string[]>([]);
 	let ready = $state(false);
@@ -2612,6 +2612,7 @@
 			{row}
 			{mapping}
 			bounds={ui.showBounds}
+			ties={ui.showTies}
 			grid={ui.showGrid}
 			guides={ui.showGuides}
 			smartGuides={ui.smartGuides}
@@ -2630,7 +2631,7 @@
 			onimagedrop={(box, file) => void handleImageDrop(box, file)}
 			onimagepagedrop={(file, x, y) => void (async () => placeImageOnPage(await storeLocalImage(file), x, y, file))()}
 			onaction={describe}
-			onbounds={(show) => (ui = { ...ui, showBounds: show })}
+			onbounds={(show, ties) => (ui = { ...ui, showBounds: show, showTies: ties })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
 			onguides={(margins, smart) => (ui = { ...ui, showGuides: margins, smartGuides: smart })}
 			ongridstyle={(gridStyle) => {

@@ -631,6 +631,17 @@ and an alignment in reach beats the grid. The margins still win over both,
 because a margin that is not a whole number of grid steps would otherwise have
 an edge nothing could be placed against.
 
+**Every tie at once is the Boxes box's dash.** A thread was only ever drawn
+while a tie badge was pointed at, and the badges only on the selected area's
+chain, so there was no way to see how a card's areas hang together short of
+pointing at each one. Boxes now goes round on, the dash, off: the dash shows the
+tie badges on every tied area and draws every thread, measured off the badges a
+frame after each layout, zoom or selection change (an anchored area's place is
+only known once what it hangs from is measured). It is after the tick rather
+than before it, as Guides' dash is, because it is more rather than less, and the
+threads mean nothing without the boxes they join. A locked template still shows
+none of it, as it shows no badges.
+
 **An empty area's name is part of the bounds.** It used to appear only where an
 area had nothing to draw from at all, in grey. It now stands in whenever an area
 is empty, in the accent and the area's own type, because an empty area is

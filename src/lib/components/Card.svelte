@@ -37,6 +37,8 @@
 		mapping?: Mapping;
 		/** dashed box bounds and the bleed marker; screen only, never printed */
 		bounds?: boolean;
+		/** every tie drawn as its thread, not only the one pointed at — with the bounds */
+		ties?: boolean;
 		/** families still arriving, so an area can say so rather than sit in the fallback */
 		loadingFonts?: string[];
 		/** snap drags to the 5mm subgrid */
@@ -121,6 +123,7 @@
 		row = null,
 		mapping = {},
 		bounds = false,
+		ties = false,
 		loadingFonts = [],
 		grid = false,
 		guides = false,
@@ -1425,29 +1428,25 @@
 	}
 	let threads = $state<string[]>([]);
 
-	function showThreads(box: Box, kind: 'tied' | 'moored') {
-		if (!trimEl) return;
+	/** A tie badge, or its area where the badge is not drawn. */
+	function badgeOf(attr: 'tie' | 'moor', id: string): HTMLElement | null {
 		const el = trimEl;
-		const badge = (attr: 'tie' | 'moor', id: string) =>
+		if (!el) return null;
+		return (
 			el.querySelector<HTMLElement>(`[data-${attr}="${CSS.escape(id)}"]`) ??
-			el.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`);
-		// By the badge pointed at, not by what the area happens to be: an area in
-		// the middle of a chain wears both, and pointing at its buoy used to draw
-		// the thread up to its own parent instead of down to what follows it.
-		// Every pair is tie first, buoy second, whichever end is pointed at: the
-		// dots always walk from the area that follows to the one it is tied to.
-		const pairs: Array<[HTMLElement | null, HTMLElement | null]> =
-			kind === 'tied'
-				? box.anchor
-					? [[badge('tie', box.id), badge('moor', box.anchor.to)]]
-					: []
-				: template.boxes.filter((b) => b.anchor?.to === box.id).map((b) => [badge('tie', b.id), badge('moor', box.id)]);
-		const origin = el.getBoundingClientRect();
+			el.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`)
+		);
+	}
+
+	/** Each pair, tie first and buoy second, as a path in the trim's own pixels. */
+	function threadPaths(pairs: Array<[HTMLElement | null, HTMLElement | null]>): string[] {
+		if (!trimEl) return [];
+		const origin = trimEl.getBoundingClientRect();
 		const at = (node: HTMLElement) => {
 			const r = node.getBoundingClientRect();
 			return { x: (r.left + r.width / 2 - origin.left) / scale, y: (r.top + r.height / 2 - origin.top) / scale };
 		};
-		threads = pairs
+		return pairs
 			.filter((pair): pair is [HTMLElement, HTMLElement] => !!pair[0] && !!pair[1])
 			.map(([tie, buoy]) => {
 				const a = at(tie);
@@ -1465,6 +1464,52 @@
 				return `M${a.x} ${a.y}C${a.x - bow} ${mid + sag} ${b.x - bow} ${mid + sag} ${b.x} ${b.y}`;
 			});
 	}
+
+	function showThreads(box: Box, kind: 'tied' | 'moored') {
+		// By the badge pointed at, not by what the area happens to be: an area in
+		// the middle of a chain wears both, and pointing at its buoy used to draw
+		// the thread up to its own parent instead of down to what follows it.
+		// Every pair is tie first, buoy second, whichever end is pointed at: the
+		// dots always walk from the area that follows to the one it is tied to.
+		threads = threadPaths(
+			kind === 'tied'
+				? box.anchor
+					? [[badgeOf('tie', box.id), badgeOf('moor', box.anchor.to)]]
+					: []
+				: template.boxes
+						.filter((b) => b.anchor?.to === box.id)
+						.map((b) => [badgeOf('tie', b.id), badgeOf('moor', box.id)])
+		);
+	}
+
+	/**
+	 * With the Boxes box at its dash, every tie on the card, all the time.
+	 * Measured after the card has laid out — an anchored area's place is only
+	 * known once what it hangs from has been measured — and again whenever the
+	 * layout, the zoom or the selection (which moves badges) changes.
+	 */
+	let allThreads = $state<string[]>([]);
+	const showsAllTies = $derived(ties && bounds && !template.locked);
+
+	$effect(() => {
+		if (!showsAllTies) {
+			allThreads = [];
+			return;
+		}
+		// Read so the effect runs again when any of them changes.
+		void [layout, scale, template.boxes, selectedIds];
+		const frame = requestAnimationFrame(() => {
+			allThreads = threadPaths(
+				template.boxes
+					.filter((b) => b.anchor && !hidden.has(b.id))
+					.map((b) => [badgeOf('tie', b.id), badgeOf('moor', b.anchor!.to)])
+			);
+		});
+		return () => cancelAnimationFrame(frame);
+	});
+
+	/** What is drawn: every tie while they are all on show, else the one pointed at. */
+	const drawnThreads = $derived(showsAllTies ? allThreads : threads);
 
 	/**
 	 * Whether this area's badges are on show at all. Only on the area you are
@@ -1875,7 +1920,7 @@
 				     buttons that would be refused anyway. The overflow mark below is
 				     not one of these: it is about what will print, which a lock does
 				     not change. -->
-				{#if bounds && !template.locked && showsBadges(box) && (box.anchor || anchorTargets.has(box.id))}
+				{#if bounds && !template.locked && (showsBadges(box) || showsAllTies) && (box.anchor || anchorTargets.has(box.id))}
 					<!-- The anchor's two ends, in a column of their own off the top-left
 					     corner: the tie on an area that follows another, and under it the
 					     buoy on one that others follow — a middle link in a chain wears
@@ -2078,9 +2123,9 @@
 			</div>
 		{/if}
 
-		{#if threads.length}
+		{#if drawnThreads.length}
 			<svg class="chrome threads" aria-hidden="true">
-				{#each threads as d, i (i)}<path {d} />{/each}
+				{#each drawnThreads as d, i (i)}<path {d} />{/each}
 			</svg>
 		{/if}
 
