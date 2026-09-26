@@ -31,7 +31,7 @@ src/lib/
   autolayout.ts   reads the columns, writes a first draft of a card
   boxops.ts       box and selection transforms: duplicate, delete, group, lock, nudge
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
-  gestures.ts     swipe and press-and-hold; haptics.ts the buzz that goes with them
+  gestures.ts     swipe; tooltip.ts where a tip goes; haptics.ts the buzz for a press
   complete.ts     the column names `{{` offers; placeholders.ts what `{{name}}` resolves to
   modal.ts        the two-Enter rule every dialog with a default action shares
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
@@ -63,6 +63,7 @@ src/lib/
     Lightbox / SheetLightbox  one card, or one sheet, full screen
     BitmapEditor.svelte the drawing surface, hosted in DataTable; saves a base64 PNG
     ImagesPanel.svelte  stored pictures, their weight, the folder; one large, to crop or turn
+    Tooltip.svelte      every `title` as a tip: hover, or press and hold on touch
     PrintRoot, BoxMenu, SelectionTools, MenuSelect, ColorField, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   app state and wiring                                 (~4k)
@@ -165,7 +166,6 @@ reviewer may already have read the last one.
 
 ## How we work
 
-- **Build the risky thing first**, before the UI around it.
 - **Verify in a real browser, not just in tests** — drive it in headless
   Chromium, and say plainly what was checked and what was not. Scripts and
   screenshots go in a scratch directory outside the repository: read
@@ -176,7 +176,7 @@ reviewer may already have read the last one.
   anything the toolchain rewrites — the service worker's precache list, the
   prerendered HTML, the static output — open the file in `build/` and check the
   change is actually in it.
-- **Tests cover the pure logic**; components are verified by driving them.
+- **Build the risky thing first.** **Tests cover the pure logic**; components are verified by driving them.
 - **Small commits with real messages.** What changed, why that shape, and what
   was verified. No model names in anything that lands in the repo.
 - **Comments explain the why.** Not what the line does — why it is that way, and

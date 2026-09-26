@@ -1,5 +1,3 @@
-import { HOLD_MS, vibrate } from './haptics';
-
 /**
  * Pointer gestures that more than one component needs.
  *
@@ -34,98 +32,15 @@ export function swipeStep(dx: number, dy: number): -1 | 0 | 1 {
 	return dx < 0 ? 1 : -1;
 }
 
-/** How long a button has to be held before the second action fires. */
-export const HOLD_DELAY = 600;
-
 /**
- * How far the pointer may wander during a hold before it stops being one.
+ * How far a finger may wander during a press before it is a drag.
  *
  * A finger is never still, so this cannot be zero; it is small enough that a
- * deliberate drag clears it in the first few pixels. It matters wherever a hold
- * shares an element with a drag — the pivot and the rotation lever on an area
- * both reset on a hold and both move on a drag — because there the alternative
- * is a slow drag quietly firing the reset it was trying to avoid.
+ * deliberate drag clears it in the first few pixels. The area menu uses it: a
+ * long press opens the menu, and a finger that then carries on was dragging the
+ * area all along, so the menu goes.
  */
 export const HOLD_SLOP = 8;
-
-/**
- * Press and hold, as a second action on a button that already has one.
- *
- * Where a button's two actions are the same *kind* of thing — import a file or
- * import the samples, add an area or add all of them — a hold is cheaper than a
- * second button, and both bars here are already fighting for width. It is
- * always the *bigger* of the two actions, and always one undo away, because a
- * gesture nobody was taught has to be survivable when it fires by accident.
- *
- * A held mouse button and a held finger are the same pointer events, so there
- * is no separate touch path. The click that follows a completed hold has to be
- * swallowed, or the tap action runs straight after the hold action — a file
- * picker opening on top of the rows just loaded.
- *
- * An action that returns `false` is saying it found nothing to do — a hold on a
- * key whose second action is not available right now. Nothing buzzes for that:
- * the vibration below is the only thing that says the hold fired, and saying so
- * when nothing happened is worse than saying nothing.
- */
-export function hold(node: HTMLElement, action: () => unknown) {
-	let timer: ReturnType<typeof setTimeout> | null = null;
-	let fired = false;
-	let handler = action;
-	let from: { x: number; y: number } | null = null;
-
-	const cancel = () => {
-		if (timer) clearTimeout(timer);
-		timer = null;
-		from = null;
-	};
-	const down = (event: PointerEvent) => {
-		// Only the primary button: a right-click opens a menu, not a hold.
-		if (event.button !== 0) return;
-		fired = false;
-		from = { x: event.clientX, y: event.clientY };
-		const touch = event.pointerType === 'touch';
-		timer = setTimeout(() => {
-			timer = null;
-			fired = true;
-			// A hold fires with nothing let go of and nothing on screen to say so —
-			// the whole gesture is invisible until its action happens. On a phone
-			// this is the only thing that says the wait is over.
-			if (handler() !== false && touch) vibrate(HOLD_MS);
-		}, HOLD_DELAY);
-	};
-	// Moving off is how you change your mind, and on an element that is also a
-	// drag target it is how you say you meant to drag.
-	const move = (event: PointerEvent) => {
-		if (!from) return;
-		if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > HOLD_SLOP) cancel();
-	};
-	const click = (event: MouseEvent) => {
-		if (!fired) return;
-		event.preventDefault();
-		event.stopPropagation();
-		fired = false;
-	};
-
-	node.addEventListener('pointerdown', down);
-	node.addEventListener('pointermove', move);
-	// Moving off the button is how you change your mind mid-press.
-	node.addEventListener('pointerup', cancel);
-	node.addEventListener('pointerleave', cancel);
-	node.addEventListener('pointercancel', cancel);
-	node.addEventListener('click', click, true);
-	return {
-		update: (next: () => unknown) => (handler = next),
-		destroy: () => {
-			cancel();
-			node.removeEventListener('pointerdown', down);
-			node.removeEventListener('pointermove', move);
-			node.removeEventListener('pointerup', cancel);
-			node.removeEventListener('pointerleave', cancel);
-			node.removeEventListener('pointercancel', cancel);
-			node.removeEventListener('click', click, true);
-		}
-	};
-}
 
 /**
  * Turn horizontal flicks over a node into steps.

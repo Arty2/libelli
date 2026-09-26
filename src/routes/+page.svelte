@@ -4,6 +4,7 @@
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
 	import ImagesPanel from '$lib/components/ImagesPanel.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Lightbox from '$lib/components/Lightbox.svelte';
@@ -2294,6 +2295,8 @@
      answer to a dropped image is to navigate to it, which leaves the design
      behind — and the one place a drop means something is the card, which takes
      it before this ever sees it. -->
+<Tooltip />
+
 <svelte:window
 	onkeydown={onWindowKeydown}
 	onafterprint={onAfterPrint}
@@ -2930,8 +2933,8 @@
 		</ul>
 		<!-- Only where there is something to lose. The button says OK either way, so
 		     without this the destructive case and the harmless one read identically
-		     — and on a template with areas the only way in is a press and hold,
-		     which is easy to trigger without meaning to. -->
+		     — and the button that opens this is always there, even over a card
+		     somebody has built. -->
 		{#if template.boxes.length}
 			<p class="magic-warning" role="status">
 				<Icon name="warning" size={13} />
@@ -2961,207 +2964,17 @@
 			</button>
 		</header>
 
+		<!-- Brief on purpose: every control explains itself — rest the pointer
+		     on it, or press and hold it on a phone — and the README has the
+		     rest at length. What cannot be discovered by pointing is the keys. -->
 		<p>Rows of a spreadsheet in, print-ready cards out.</p>
 		<p>
-			All of it happens in this browser. Your rows, your template, the fonts and images you add — none of it is
-			uploaded, because there is no server to upload it to and no account to make. It works with the network off, a
-			template is a small file you can hand to somebody, and closing the tab is the only thing that deletes anything.
-			Where your browser offers it, <strong>Install</strong> gives libelli its own window; when a new version has
-			downloaded the status bar says so and waits for <strong>Update</strong>, because a restart nobody asked
-				for would take undo with it.
-		</p>
-
-		<h3>Areas</h3>
-		<p>
-			<em>+ Area</em> beside the page adds one. <strong>Content</strong> says where it gets what it shows:
-			<strong>Data Field</strong> binds it to a column, so it changes card to card, and <strong>Static Text</strong>
-			is typed into the template and says the same on every card. An area's <strong>Name</strong> is the template's own
-			word for what it holds — <em>title</em>, <em>body</em> — and <strong>Column</strong> beside it says which
-			spreadsheet column fills that. Rebinding the columns is how one template serves another spreadsheet.
+			Paste or import a table, put areas on the page and bind them to its columns, and print one card per row. It
+			all stays in this browser — nothing is uploaded, and it works offline.
 		</p>
 		<p>
-			The button under it — the one wearing three shapes — writes a whole card from your columns: a title, a
-			body, a picture, a footer and a QR code, sized for the page. It shows you what it took each column for
-			before it moves anything, and marks the ones it reached by guesswork. On an empty template it is that
-			button; on a template that already has areas it is <strong>press and hold</strong> on <em>+ Area</em>,
-			since it replaces every area you have. One Ctrl/Cmd+Z puts the old design back.
-		</p>
-		<p>
-			Double-click an area, or press <strong>Enter</strong> with one selected, to type into it on the card itself.
-			Bound areas write to the cell, static ones to the template. Selecting an area points the table at the cells that
-			fill it.
-		</p>
-		<p>
-			<strong>Content</strong> is where an area gets what it shows: a Data Field, Static Text, a Bitmap drawn
-			here, or an Image. A field then takes a <strong>Mode</strong> — Plain Text, Markdown, Bitmap, Image, Color
-			or QR Code. Color fills the area with what the cell says and ignores anything that is not one, in hex,
-			<code>rgb()</code>, <code>hsl()</code> or by name; Image shows a picture, and still accepts a color.
-		</p>
-		<p>
-			<code>&#123;&#123;date&#125;&#125;</code> anywhere in an area or a cell prints today's date, and
-			<code>&#123;&#123;date:YYYY-MM-DD&#125;&#125;</code> prints it your way — <code>YYYY</code>, <code>MM</code>,
-			<code>DD</code> for the numbers, <code>MMMM</code> and <code>dddd</code> for the names. Anything else in braces
-			is left as written.
-		</p>
-
-		<h3>Placing them</h3>
-		<p>
-			Drag areas on the page or type exact millimetres. An area latches onto the edges and centres of its neighbours as
-			it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid instead. Grid off and
-			<strong>Bounds</strong> off is free movement, because an area should never latch onto a guide that is not drawn.
-			Press and <em>hold</em> the Grid box for a <strong>dot grid</strong> — the same grid and the same snapping,
-			drawn as a dot at each intersection rather than as ruled lines, which is quieter under a page of type. The
-			word beside the box says which of the two you are on.
-		</p>
-		<p>
-			<strong>Rotation</strong> has two marks on a selected area, because they do two different things. The
-			<strong>crosshair</strong> is the pivot: drag it to move the point the area turns about. The <strong>knob</strong>
-			on the arm below it is the lever: swing it to turn the area, holding <strong>Shift</strong> for 15° steps. The
-			<strong>X</strong> and <strong>Y</strong> beside the rotation place the pivot exactly, as a percentage of the
-			area's own size. A turned area still occupies the space it would have upright, so one rotation does not shuffle
-			the card.
-		</p>
-		<p>
-			Stacking order is the column beside the page: areas paint in the order they are listed, so <em>Bring to Front</em>
-			is a move to the end of that list. If an area ends up off the sheet — all of it, or a corner of it — a
-			button appears under <em>Area</em> to bring that area back on, and only that area: everything already on
-			the paper stays where it was put. Crossing into the bleed does not count, because that is what bleed is
-			for.
-		</p>
-
-		<h3>Marks on an area</h3>
-		<p>
-			A red corner means the content does not fit and the print will clip it. The <strong>plug</strong> says the area
-			carries its own words rather than a column's. The <strong>link</strong> and the <strong>buoy</strong> are the
-			two ends of an anchor — an anchored area takes its top from another area's rendered bottom, so dragging it
-			changes the gap rather than breaking the tie — and the <strong>padlock</strong> says the area is locked. All
-			three are buttons, and each undoes what it says: the link breaks this area's tie, the buoy casts off everything
-			moored to this one, the padlock unlocks the area. Neither anchor button moves anything. Each shows the icon of
-			its own undoing as you reach for it, so no two of them answer with the same mark. Selecting either end of an
-			anchor lights up the other — filled on what follows this area directly, outlined further down the chain, so a
-			stack of tied areas says how far the tie reaches. <strong>Bounds</strong> takes all of it away.
-		</p>
-
-		<h3>Several at once</h3>
-		<p>
-			Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them; on a touchscreen,
-			<strong>Select Multiple</strong> in the right-click menu makes every press add or drop, with a chip beside
-			<em>+ Area</em> saying so until you press it or <strong>Esc</strong>. Dragging any one moves the
-			set, and a column of icons appears beside the page to line them up against the box enclosing them all, and to
-			group, lock, duplicate or delete the lot. <strong>Group</strong> makes a selection stick until you ungroup it. An
-			anchored area sits out of a vertical align, because an anchor would move it straight back.
-		</p>
-		<p>
-			<strong>Copy Style</strong> and <strong>Paste Style</strong> carry type, fill, border, padding and radius from one
-			area to any number of others. A paste is "make this look like that", so it takes away what the source did not have.
-		</p>
-
-		<h3>Templates</h3>
-		<p>
-			The <strong>Template</strong> field names the one you are working on; the caret beside it lists every
-			template saved in this browser, with <em>New template…</em> and <em>Delete this template…</em> under a rule.
-			Renaming is typing in the field. Deleting takes the loaded template and opens the next one — or a new empty
-			template, if it was the last — where <strong>Reset</strong>, in the row of buttons below, puts the starter
-			card back under the same name. Both ask first, and both are one Ctrl/Cmd+Z away. The list lives
-			in this browser only; <strong>Export</strong> is how a template leaves, and an import joins the list rather
-			than replacing what is open.
-		</p>
-
-		<h3>The sheet</h3>
-		<p>
-			<strong>Size</strong> has A6, A5, A4, A3 and a 4 × 6 inch postcard; picking one keeps the orientation you are
-			in, and <strong>⇄</strong> turns the page over. Neither moves anything on the card — coordinates are
-			measured from the trim edge, so trying a design the other way round costs nothing. Bleed is an outset on the
-			sheet, never an offset on the content — so it is also how you widen a card evenly without moving anything on
-			it, with <strong>Crop Marks</strong> left unticked.
-		</p>
-		<p>
-			Page setup holds the type defaults — family, size, leading, spacing, color. An area that leaves those fields
-			blank inherits them. It also sets the paper color and a background image, and can print a page number, optionally
-			as <em>3 / 12</em>.
-		</p>
-		<p>
-			<strong>CSS</strong> holds styles saved inside the template. Selectors are scoped to the card, and
-			<code>@import</code> and any <code>url()</code> pointing off this machine are stripped, so a template's
-			CSS cannot reach the network. What a template <em>can</em> ask for is a Google font by family name and a
-			background image by address — both only as names it is allowed to write, never as arbitrary requests.
-		</p>
-
-		<h3>Locking</h3>
-		<p>
-			<strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page
-			lock covers every area and the page settings, greys every bound and says so above the sheet. The same button
-			unlocks.
-		</p>
-
-		<h3>Data</h3>
-		<p>
-			Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column.
-			Drag the right edge of a header to set that column's width, or double-click that edge to hand it back the
-			default; the widths stay in this browser and follow a column through a rename.
-			Clicking a row previews it; the tick in the gutter chooses several, and <strong>Copy</strong> and delete for
-			those appear at the head of the buttons below. The row numbers travel with their rows through a
-			sort, and a column header sorts A-Z, then Z-A, then back to the order the rows arrived in.
-		</p>
-		<p>
-			<strong>Table</strong> at the left of that row names the table you are in; the caret opens the rest, with
-			<strong>New table…</strong> and <strong>Delete…</strong> under a rule at the bottom. The
-			<strong>⇄</strong> beside it goes back to the table you were on before, and back again — the two you are
-			working between, one press apart. A design and a table are kept apart on purpose: switching either leaves the
-			other exactly where it was, and bindings that still name a column that exists are kept across the switch.
-		</p>
-		<p>
-			<strong>Paste</strong> takes a block of cells off a spreadsheet with no header row and lands it in the columns
-			you already have. <strong>Import CSV…</strong> takes a whole file; press and <em>hold</em> it and the four sample
-			cards come back. <strong>Export CSV</strong> hands the table back as a file. Deleting a column asks, because it is
-			a field of every card at once; the red <strong>Delete</strong> empties the whole table. All of it is undoable, and
-			none of it touches the template — as <strong>Reset</strong> in page setup does not touch the data.
-		</p>
-
-		<h3>Getting cards out</h3>
-		<p>
-			<strong>Export</strong>, or <strong>Ctrl/Cmd+P</strong>, opens every card as a small page. The browser's own print
-			dialog is intercepted rather than left to fire, because it would print the editor. Untick any card you do not
-			want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The checklist under the
-			pages is four settings that decide whether what you saw is what comes out; a PNG needs none of them.
-		</p>
-		<p>
-			The count under the sheet — <em>3 / 12</em> — opens that card on its own, big, over everything; so does a
-			thumbnail on the export screen. The arrows either side, the left and right arrow keys, and a swipe step through
-			the run. Nothing is printed from there.
-		</p>
-
-		<h3>Dialogs</h3>
-		<p>
-			A dialog opens with nothing pressed. <strong>Enter</strong> moves onto the action it suggests, and a second
-			Enter presses it — so a stray Return arriving a beat late cannot delete a template or replace every row on its
-			own. <strong>Esc</strong> closes the dialog at any point — in the CSS dialog, which has a
-			<strong>Cancel</strong>, closing that way cancels, and the CSS that was there when it opened comes back.
-		</p>
-
-		<h3>On a touchscreen</h3>
-		<p>
-			<strong>Pinch to zoom</strong> the page, anywhere over the stage — over the areas as well as the ground
-			around them. A second finger never drags: an area that was moving goes back where it was, so a pinch zooms
-			and leaves the card alone. Every button answers a press with a few milliseconds of vibration, where the
-			device has it.
-		</p>
-		<p>
-			The <strong>cross of arrows</strong> by the page nudges the selection; its middle button cycles the step, and
-			holding it moves the pad out of the way. When the selection is <em>tied</em> to another area, the two vertical
-			arrows wear a link instead: <strong>hold</strong> one and you take hold of the area it hangs from, which is
-			the one that can still move up and down — or <strong>tap</strong> it three times to break the tie and leave the
-			area exactly where it sits.
-		</p>
-		<p>
-			<strong>Press and hold an area</strong> for its menu — and if the finger carries on, the menu goes and the
-			area moves with it: it was being dragged under the menu the whole time. Under the page, the data tray opens
-			at about half the screen and is <strong>dragged taller by the table's header</strong>; a press that goes
-			nowhere still presses the button underneath it.
-		</p>
-		<p>
-			A card opened <strong>full screen</strong> is the one place a pinch zooms the card itself, up to six times, with
-			a drag to move around it. Pinch back and it settles; a flick pages the run again.
+			To learn what something does, <strong>rest the pointer on it</strong>, or <strong>press and hold</strong> it on
+			a touchscreen. Double-click an area to type in it or draw in it; right-click it, or long-press it, for its menu.
 		</p>
 
 		<h3>Keys</h3>
@@ -3189,13 +3002,14 @@
 			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page</dd>
 			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
-			<dt>Ctrl/Cmd + ;<span>Ctrl/Cmd + H</span></dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off (hold the Grid box for dots)</dd>
+			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
+			<dt>Ctrl/Cmd + ;<span>|</span></dt><dd>Guides on or off</dd>
+			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + S</dt><dd>Save the drawing, while drawing</dd>
 			<dt>Ctrl/Cmd + P</dt><dd>Export — press again from that screen to print</dd>
 			<dt>Ctrl/Cmd + Shift + S</dt><dd>Export, for the fingers that reach for that instead</dd>
 			<dt>?<span>/</span></dt><dd>This panel</dd>
 		</dl>
-
 
 		<!-- Where else the app lives, in the README's order: what it is, where
 		     to use it, and how it is made. Links a person follows, so none of
@@ -3746,14 +3560,6 @@
 	   ring. */
 	.modal:focus {
 		outline: none;
-	}
-
-	.modal code {
-		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-		font-size: 11.5px;
-		background: #f3f3f3;
-		padding: 1px 4px;
-		border-radius: 3px;
 	}
 
 	.credit a {

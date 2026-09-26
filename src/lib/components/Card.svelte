@@ -7,7 +7,7 @@
 	import { cssIdent, scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
-	import { HOLD_SLOP, hold } from '$lib/gestures';
+	import { HOLD_SLOP } from '$lib/gestures';
 	import {
 		FREE_STEP,
 		GRID_MINOR,
@@ -1463,15 +1463,14 @@
 	}
 
 	/**
-	 * Press and hold the pivot, or the knob on its arm, to put it back.
+	 * Double-click the pivot, or the knob on its arm, to put it back.
 	 *
 	 * Both marks are dragged to a value with no number written anywhere on the
 	 * card, and both have a resting state that is the only one most cards want:
 	 * the middle, and upright. Getting back to either by dragging is a game of
-	 * pixel-hunting, and the two fields in the bar are three clicks away and only
-	 * there for a single selection. A hold on the mark itself is the shortest
-	 * line back, and `hold` gives up the moment the pointer moves, so the drag
-	 * these share an element with is never mistaken for one.
+	 * pixel-hunting; the fields in the bar do it exactly, and a double-click on
+	 * the mark itself is the shortest line back. It was a press and hold, until
+	 * a hold came to mean "what is this?" everywhere in the app.
 	 *
 	 * The drag in flight is dropped along with it: it snapshotted the old value
 	 * at pointerdown, and a move arriving afterwards would write that snapshot
@@ -1957,9 +1956,13 @@
 						     has to be there before there is any rotation to show. -->
 						<span
 							class="pivot"
-							use:hold={() => resetPivot(box)}
+							ondblclick={(e) => {
+								// Not also a double-click on the area, which opens it for typing.
+								e.stopPropagation();
+								resetPivot(box);
+							}}
 							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
-							title="The point this area turns about — drag it, or type it in the bar. Press and hold to put it back in the middle."
+							title="The point this area turns about — drag it, or type it in the bar. Double-click to put it back in the middle."
 							onpointerdown={(e) => startDrag(e, box, 'centre')}
 							onpointermove={moveDrag}
 							onpointerup={endDrag}
@@ -1970,9 +1973,12 @@
 							></span>
 						<span
 							class="lever"
-							use:hold={() => resetRotation(box)}
+							ondblclick={(e) => {
+								e.stopPropagation();
+								resetRotation(box);
+							}}
 							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
-							title="Drag to turn this area — hold Shift for 15° steps. Press and hold to set it upright."
+							title="Drag to turn this area — hold Shift for 15° steps. Double-click to set it upright."
 							onpointerdown={(e) => startDrag(e, box, 'rotate')}
 							onpointermove={moveDrag}
 							onpointerup={endDrag}

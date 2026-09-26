@@ -264,13 +264,9 @@ resize boxes directly, or type exact millimetres.
   <kbd>⇧</kbd> while you swing snaps to 15°. Both are drawn whether or not there
   is any rotation yet, because the lever is the rotation control and has to be
   there before there is a rotation to show; the **X** and **Y** in the bar place
-  the pivot exactly, as a percentage of the area's own width and height. Press
-  and *hold* either mark to put it back: the crosshair to the middle, the knob
-  upright. Both are dragged to a value with no number written anywhere on the
-  card, and both have a resting state most cards want — getting back to either
-  by dragging is pixel-hunting, and the two fields in the bar are only there for
-  a single selection. The hold gives up the moment the pointer moves, so the
-  drag it shares a mark with is never mistaken for one. A
+  the pivot exactly, as a percentage of the area's own width and height.
+  **Double-click** either mark to put it back: the crosshair to the middle, the
+  knob upright — getting back to either by dragging is pixel-hunting. A
   turned area still occupies the space it would have upright, so anchored areas
   below it do not move — turning one thing never shuffles the card.
 - **Overflow** — a box whose content is taller than the box will let it be draws
@@ -513,12 +509,11 @@ loaded.
 **Position areas automagically.** The button below *+ Area* — the one wearing
 three shapes — reads your columns and writes a first draft of a card:
 title, subtitle, body, a picture, a footer of small lines and a QR code, sized
-and placed for the page you are on. It appears on an empty template, where it is
-the answer to *now what?*; on a template that already has areas it is a **press
-and hold** on *+ Area* instead, because a control that replaces a whole design
-should not sit one mis-tap away from one you have built.
+and placed for the page you are on. It is always there, and it never acts on
+the first press: it shows you what it thinks first, and says how many areas it
+would replace, with **Cancel** beside **OK**.
 
-Either way it shows you what it thinks first: one line per column, the kind it
+That first look is one line per column, the kind it
 took the column for, and a sample cell to check it against. That list is nearly
 the whole of the dialog — no paragraph explaining it, because the rows say it
 better. Change anything it has read wrongly, or untick a column to leave it off
@@ -633,7 +628,7 @@ a notice can appear.
   what was chosen stays chosen.
 - **Which area it feeds** — entering a cell flashes the areas on the card that
   print it, in the bounds' blue, for a moment.
-- **A cell full size** — press **Edit**, press and hold a cell, press the
+- **A cell full size** — press **Edit** in the bar while typing in a cell, press the
   **[...]** on a cell that holds more than it shows, or press the edit badge on
   a Data Field area, and the whole of it opens in the table's own space — over
   the rows, with the card still in view beside or above it. Its column's name
@@ -1197,8 +1192,8 @@ it used to land on a focused button and delete a template or replace every row.
 has a Cancel, closing that way cancels — and a textarea inside one still takes
 <kbd>Enter</kbd> as a newline.
 
-The right-click menu cannot be selected as text, and on a touchscreen it gets
-out of the way of the gesture that opened it: the long press that opens it is
+The right-click menu cannot be selected as text, and on a touchscreen — where a
+long press on an area opens it — it gets out of the way of the gesture that opened it: the long press that opens it is
 the beginning of the press-and-drag that moves the area, so carrying on and
 dragging takes the menu off and moves the area, which was under your finger the
 whole time.
@@ -1223,6 +1218,21 @@ nothing — the page stays where it is and the fitted zoom does not change. It
 never shrinks below the tallest bar it has held at this window size either. The
 cost is a band of the bar's own colour under the page bar; the floor follows
 the window as both bars wrap differently at different widths.
+
+## Tooltips
+
+Every control says what it does in a tooltip: **rest the pointer** on it, or
+**press and hold** it on a touchscreen — the tip appears above your finger, and
+letting go does not press the control, because you were asking, not pressing.
+The tip is the app's own, a plain square box an em from the pointer, not the
+browser's: the browser's arrives late, cannot be styled, and on a phone never
+arrives at all, which left every hint in the app out of reach there. It is
+drawn from each control's `title`, so there is one place to write a hint. A
+press and hold means nothing else anywhere in the app, with three exceptions
+that are drags rather than holds — a column header or a row number lifts under
+a still finger before it can be carried, the nudge pad's arrows repeat, and a
+long press on an area opens its menu — and text fields, where a long press is
+how a phone pastes.
 
 ## Keyboard shortcuts
 
@@ -1249,10 +1259,11 @@ name a key the app does not listen for.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>v</kbd> | Paste plain text as a new area |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>c</kbd> | Copy the area's style |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>v</kbd> | Paste that style onto the selection |
-| <kbd>?</kbd> or <kbd>/</kbd> | The help panel |
+| <kbd>?</kbd> or <kbd>/</kbd> | The help panel — a few lines, and these keys |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>h</kbd> | Boxes on or off — bounds, badges and the lock band |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>;</kbd> or <kbd>\|</kbd> | Guides on or off — Photoshop's key and Inkscape's |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> or <kbd>#</kbd> | Grid on or off (press and hold the Grid box for dots) |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> or <kbd>#</kbd> | Grid on or off |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>s</kbd> | Save the drawing, while drawing |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>p</kbd> | Export — again from that screen to print |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>p</kbd> / <kbd>s</kbd> | Export, for the fingers that reach for those |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + arrows | Step the alignment — left, right, top, bottom |
@@ -1274,8 +1285,8 @@ under a press — because on a touch screen it is the one control with no cursor
 to tell you it is a control. The middle is round and set in a shallow well: it
 is not a direction, it is the step and the grip, and it should not read as a
 fifth arm. The pad parks over the bottom-right corner of the page, which is
-exactly the corner you may have reached for it to nudge — press and hold that
-middle chip and the pad comes with your finger. It can be pushed off the edge of
+exactly the corner you may have reached for it to nudge — drag that middle chip
+and the pad comes with your finger; a tap still cycles the step. It can be pushed off the edge of
 the stage to get that corner back, as far as the middle chip: the arm you are
 not using goes out of sight, the chip you pick it up by never does. It is not
 drawn at all when nothing it could move is selected. On an area whose top comes
@@ -1309,9 +1320,8 @@ towards it and down is away. They repeat on a hold like the arrows do.
   it, pull it back down to see the card. A press that goes nowhere is still the
   header button underneath being pressed.
 - **Buttons answer.** A press on any control gives a few milliseconds of
-  vibration where the device has it, and a press-and-hold gives a firmer one as
-  it fires — the only thing that says a gesture nobody can see is over. A hold
-  that finds nothing to do stays quiet.
+  vibration where the device has it, and a tooltip arriving under a held finger
+  gives a firmer one.
 
 The arrow keys and the pad both move every area in the selection, not only a
 lone one.
@@ -1327,9 +1337,10 @@ nothing latches, because a box should never snap to a guide you cannot see.
 
 The grid is drawn in black on a light paper and in white on a dark one, at
 the same strengths, so it can be seen on a navy or black card as well as on
-white. Press and *hold* the **Grid** box and the ruling becomes a **dot grid**: the same
-millimetres and the same snapping, marked with a dot at each intersection instead
-of a line through the card. The word beside the box says which it is drawing. Both
+white. The **Grid** box goes round three states — off, ruled, and a **dot grid**:
+the same millimetres and the same snapping, marked with a dot at each
+intersection instead of a line through the card. The word beside the box says
+which it is drawing. Both
 are placed as geometry rather than as a tiled background, so every line is where
 its millimetre is at any zoom — a repeating gradient rounds its tile to whole
 device pixels and drops whichever lines fall inside the rounding, which is why the
@@ -1536,7 +1547,7 @@ npm run build    # static output in ./build, deployable anywhere
   with `?raw`, so a first run works offline and cannot land on an empty table
   because a request failed. It is a plain CSV precisely so the walkthrough can be
   edited in a spreadsheet rather than in a string literal. The four rows are a walkthrough of the app rather
-  than filler; pressing and holding *Import CSV…* brings them back at any time.
+  than filler; **Getting Started** in the Table menu brings them back at any time.
 - **Reset** — puts the template back to the starter card and leaves the data,
   the mapping and any uploaded fonts alone. Undo reaches it — one snapshot
   carries the template and the data together — but it asks first anyway, because

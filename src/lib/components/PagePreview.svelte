@@ -7,7 +7,7 @@
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
-	import { hold, swipe } from '$lib/gestures';
+	import { swipe } from '$lib/gestures';
 	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
@@ -622,27 +622,23 @@
 	 *
 	 * It has to be movable because it is parked over the one corner of the page
 	 * a right-aligned area lives in, and on a phone that is exactly the area you
-	 * reached for the pad to nudge. Press and hold its middle button — the one
-	 * that is not already a press-and-hold, because the arrows repeat — and it
-	 * comes with your finger.
+	 * reached for the pad to nudge. Drag its middle button — the one the arrows
+	 * are arranged round — and the pad comes with it; a tap still cycles the
+	 * step. It was a press and hold, until a hold came to mean "what is this?".
 	 */
 	const PAD_HOME = { right: 12, bottom: 52 };
+	/** How far the middle button travels before a press is a drag of the pad. */
+	const PAD_SLOP = 6;
 	let padAt = $state({ ...PAD_HOME });
 	let padDrag = $state<{ x: number; y: number; from: { right: number; bottom: number } } | null>(null);
 	let padHeld = $state(false);
-	let padHold: ReturnType<typeof setTimeout> | null = null;
+	let padPress: { x: number; y: number; from: { right: number; bottom: number } } | null = null;
 
 	function padPickup(event: PointerEvent) {
 		if (event.button !== 0) return;
-		const from = { ...padAt };
-		const { clientX: x, clientY: y } = event;
-		const target = event.currentTarget as HTMLElement;
-		padHold = setTimeout(() => {
-			padHold = null;
-			padHeld = true;
-			padDrag = { x, y, from };
-			target.setPointerCapture(event.pointerId);
-		}, 450);
+		padPress = { x: event.clientX, y: event.clientY, from: { ...padAt } };
+		// Captured now, so a quick drag that leaves the button still brings the pad.
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 	}
 
 	/**
@@ -654,6 +650,11 @@
 	const PAD_SIZE = PAD_CELL * 3;
 
 	function padMove(event: PointerEvent) {
+		if (!padDrag && padPress) {
+			if (Math.hypot(event.clientX - padPress.x, event.clientY - padPress.y) < PAD_SLOP) return;
+			padDrag = padPress;
+			padHeld = true;
+		}
 		if (!padDrag || !host) return;
 		event.preventDefault();
 		const stage = host.getBoundingClientRect();
@@ -694,10 +695,9 @@
 	}
 
 	function padDrop() {
-		if (padHold) clearTimeout(padHold);
-		padHold = null;
+		padPress = null;
 		padDrag = null;
-		// Cleared on the next tick, so the click that follows the hold — which is
+		// Cleared on the next tick, so the click that follows the drag — which is
 		// what would otherwise cycle the step — has already been swallowed.
 		setTimeout(() => (padHeld = false), 0);
 	}
@@ -975,9 +975,8 @@
 		<button
 			class="square"
 			onclick={onaddbox}
-			use:hold={onmagiclayout}
 			disabled={!!template.locked}
-			title="Add an area to the page — press and hold to position every area from the columns instead"
+			title="Add an area to the page"
 		>
 			<Icon name="shapes" size={16} /><span class="sr-only">Area</span>
 		</button>
@@ -992,22 +991,21 @@
 				<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
 			</button>
 		{/if}
-		{#if !template.boxes.length}
-			<!-- Only on an empty page, where it is the answer to "now what?" and
-			     there is nothing for it to destroy. Once there are areas it is the
-			     hold on the button above: a control that replaces the whole design
-			     should not sit one mis-tap away from a page somebody has built. -->
-			<button
-				class="square"
-				onclick={onmagiclayout}
-				disabled={!!template.locked}
-				title={hasColumns
-					? 'Position areas automagically — a card worked out from your headings and your data'
-					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
-			>
-				<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
-			</button>
-		{/if}
+		<!-- Always there. It used to show only on an empty page, and be a press
+		     and hold on Area otherwise, so that a control replacing the design
+		     was not one mis-tap away — but it opens a dialog that says how many
+		     areas it would replace, with Cancel, which is the guard; and a hold
+		     is now how anything here explains itself. -->
+		<button
+			class="square"
+			onclick={onmagiclayout}
+			disabled={!!template.locked}
+			title={hasColumns
+				? 'Position areas automagically — a card worked out from your headings and your data'
+				: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
+		>
+			<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
+		</button>
 		{#if picking}
 			<!-- A mode with no visible sign is a trap: every press is doing something
 			     other than what it usually does, and the only place that was said is
@@ -1050,25 +1048,33 @@
 	     already say whether they are on. The full word stays the accessible name either way, so nothing
 	     read aloud is reduced to a single letter. -->
 	<div class="corner left">
-		<!-- Press and hold swaps the ruling for a dot at every intersection: the
-		     same grid and the same snapping, drawn quietly enough to lay type
-		     over. A hold rather than a second control, because the corner has two
-		     words in it and the grid already has a checkbox — and the label says
-		     which of the two it is currently drawing. -->
+		<!-- Three presses round: off, ruled, dots — a dot at every intersection,
+		     the same grid and the same snapping, drawn quietly enough to lay type
+		     over. One box rather than a second control, because the corner has
+		     two words in it already, and the label says which it is drawing. It
+		     was a press and hold, until a hold came to mean "what is this?". -->
 		<label
-			use:hold={() => ongridstyle(gridStyle === 'dots' ? 'lines' : 'dots')}
-			title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it ({SHORTCUTS.grid}). Press and hold for {gridStyle ===
-			'dots'
-				? 'ruled lines'
-				: 'a dot grid'}."
+			title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it ({SHORTCUTS.grid}). Press again for {grid &&
+			gridStyle === 'lines'
+				? 'a dot grid'
+				: grid
+					? 'no grid'
+					: 'ruled lines'}."
 		>
 			<input
 				type="checkbox"
-				aria-label={gridStyle === 'dots' ? 'Dots' : 'Grid'}
+				aria-label={grid && gridStyle === 'dots' ? 'Dots' : 'Grid'}
 				checked={grid}
-				onchange={(e) => ongrid(e.currentTarget.checked)}
+				onchange={(e) => {
+					if (!grid) ongridstyle('lines');
+					else if (gridStyle === 'lines') {
+						// Ruled to dots: still on, so the box stays ticked.
+						e.currentTarget.checked = true;
+						ongridstyle('dots');
+					} else ongrid(false);
+				}}
 			/>
-			<span class="wide">{gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
+			<span class="wide">{grid && gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
 			<span class="narrow" aria-hidden="true">#</span>
 		</label>
 		<label title={withKey('The page margins, drawn and snapped to — screen only, never printed', 'guides')}>
@@ -1111,9 +1117,11 @@
 	{#if padUsable}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
 		     hopeless. Shown only where there is no keyboard to fall back on, and
-		     only while there is something it could actually move. -->
+		     only while there is something it could actually move. Its arrows
+		     repeat while held, so a hold here is never a request for a tip. -->
 		<div
 			class="pad"
+			data-no-hold-tip
 			class:moving={!!padDrag}
 			class:push-up={pushed === 'up'}
 			class:push-down={pushed === 'down'}
@@ -1138,12 +1146,11 @@
 				<Icon name={verticalTied ? 'skip-back-filled' : 'caret-up'} size={verticalTied ? 16 : 30} />
 			</button>
 			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
-			<!-- The middle button carries the second gesture, because the arrows
-			     already use press-and-hold to repeat: hold this one and the pad
+			<!-- The middle button carries the second gesture: drag it and the pad
 			     comes with your finger. A tap still cycles the step. -->
 			<button
 				class="step"
-				title="Step size — 1, 5 or 10mm. Press and hold to move the pad."
+				title="Step size — 1, 5 or 10mm. Drag it to move the pad."
 				onpointerdown={(e) => {
 					pushed = 'centre';
 					padPickup(e);

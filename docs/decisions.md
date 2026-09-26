@@ -939,7 +939,10 @@ is empty and its glyph comes from CSS, precisely so a template's own stylesheet
 can reach it — `content: ' of '`, or nothing. A literal `" / "` in the markup
 would have been unaddressable.
 
-**Press and hold the pivot or the lever to put it back.** Both marks are dragged
+**Double-click the pivot or the lever to put it back.** (It was a press and
+hold, until a hold came to mean "show me the tooltip" — see `Tooltip.svelte`.
+The double-click stops at the mark, or it would also open the area for typing.)
+Both marks are dragged
 to a value with no number written anywhere on the card, and both have a resting
 state that is the only one most cards want — the middle, and upright. Dragging
 back to either is pixel-hunting, and the fields in the bar are three clicks away
@@ -1200,8 +1203,9 @@ changed a number the pad does not show was the worse of the two.
 
 **The nudge pad can be picked up.** It parks over the bottom-right corner of the
 page, which on a phone is exactly the corner of the card you reached for it to
-nudge. The second gesture goes on the middle button because the four arrows
-already use press-and-hold to repeat, and the pad is clamped to the stage — a
+nudge. The second gesture goes on the middle button: a tap cycles the step, a
+drag past a few pixels carries the pad (it was a hold, before holds became
+tooltips), and the pad is clamped to the stage — a
 control dragged off the edge of a phone is a control you do not get back.
 
 **Controls sit next to what they act on.** Undo and redo are a column at the
@@ -1240,14 +1244,14 @@ between the measurement and the mark. The SVG sits outside the card's transform,
 so the hairline is in screen pixels and does not thicken with the zoom, the same
 bargain the trim line makes.
 
-**Press and hold the Grid box for a dot grid.** Same millimetres, same snapping,
-a dot at each intersection instead of a line across the card — quieter to lay
-type over. Dots are one path too: a zero-length subpath with a round cap is a
-dot, so an A3 page is one `d` string rather than five thousand circles. The
-gesture is `hold` on the label, so the click it swallows does not toggle the
-checkbox under it; the word beside the box changes to *Dots*, because a mode with
-no visible sign is a trap, and the hold turns the grid *on* if it was off — there
-is no answering "which way is it drawn" about something invisible.
+**The Grid box goes round three states: off, ruled, dots.** Same millimetres,
+same snapping, a dot at each intersection instead of a line across the card —
+quieter to lay type over. Dots are one path too: a zero-length subpath with a
+round cap is a dot, so an A3 page is one `d` string rather than five thousand
+circles. It was a hold on the box until a hold came to mean "show me the
+tooltip"; a third state costs a press but no gesture nobody was taught. The
+word beside the box says *Dots* while dots are drawn, because a mode with no
+visible sign is a trap; the keyboard's grid key still toggles on and off.
 
 **A major line is drawn once.** Every major tick is also a minor one; drawing
 both would double the ink exactly where the grid must stay quietest, so the minor
@@ -1426,9 +1430,9 @@ edit badge opens it from the card, through an `openRequest` the page hands the
 table; only the request is tracked, so a dataset changing under an old request
 does not open the cell again.
 
-**A lock closes the full-size editor too.** Edit, the press and hold and the
-ellipsis all open it, and it is a way to type: on a locked table all three are
-off. The ellipsis stays drawn, disabled, because it still says a cell holds
+**A lock closes the full-size editor too.** Edit and the ellipsis open it (a
+press and hold did too, until holds became tooltips), and it is a way to type:
+on a locked table both are off. The ellipsis stays drawn, disabled, because it still says a cell holds
 more than it shows.
 
 **Overflow is measured, because a textarea cannot say it.** `text-overflow`
@@ -1494,8 +1498,8 @@ draft, which made it the one place in the table where typing did not show on
 the card until confirmed. Now it writes through like the small field, undo
 covers it the same way, and closing is all that is left to do — an × and Esc.
 While the small field has the focus, the bar under the table is about that
-cell: its count, where the in-cell count used to sit over the words, and an
-Edit button for anyone who never learnt the press and hold.
+cell: its count, where the in-cell count used to sit over the words, and the
+Edit button that opens it whole.
 
 **A cell opened whole takes the table's room, not the screen's.** It was a
 modal over everything, the third layer after the page and the table, and it
@@ -1508,8 +1512,7 @@ area gets, on every area bound to the cell's column or naming it as
 `{{column}}`: a pointer from the cell to the card, not a selection, so it
 changes nothing about what is selected.
 
-**The overflow mark is a button.** It opens the full-size editor, the one
-action a hold gave, for anyone who never learnt the hold. It hides while the
+**The overflow mark is a button.** It opens the full-size editor. It hides while the
 field is focused through `:has(textarea:focus)` rather than `:focus-within`,
 which the mark itself sets the instant it is pressed — hiding it before its own
 click could land.
@@ -1622,7 +1625,9 @@ inside what `markdown.ts` actually supports, and the QR URLs are decoded by an
 independent decoder in the verification pass, because a QR that does not scan
 looks exactly like one that does.
 
-**Press and hold Import to bring them back.** The actions bar is deliberately one
+**Press and hold Import to bring them back** (since replaced by *Getting
+Started* in the Table menu — kept as the reason the samples are one step
+away). The actions bar is deliberately one
 line, so a fifth button would cost the table a row of its own height every time
 the tray narrowed; the gesture hangs off the button whose job is closest. A held
 mouse button and a held finger are the same pointer events, so there is no
@@ -2740,20 +2745,13 @@ that press *is* the second one.
 
 ## `src/lib/gestures.ts`
 
-**A hold is always the bigger of a button's two actions, and always one undo
-away.** `hold` exists because both bars are fighting for width and a second
-button costs a row; it is only ever used where the two actions are the same
-*kind* of thing — import a file or import the samples, add an area or lay every
-area out. A gesture nobody was taught has to be survivable when it fires by
-accident, which is what the undo entry is for. The click behind a completed hold
-is swallowed, or the tap action runs straight after the hold action.
-
-**A hold gives up as soon as the pointer moves.** It used to end only on
-pointerup or pointerleave, which is enough for a button but not for a mark that
-is also a drag target: the pivot and the rotation lever both reset on a hold and
-both move on a drag, and a slow drag would sit still long enough to fire the
-reset it was trying to avoid. A few pixels of slop, because a finger is never
-still and a deliberate drag clears it in the first moment.
+**There is no `hold` any more.** It was a second action on a button — import
+or import the samples, add an area or lay them all out, reset the pivot, dots
+for the grid — until a press and hold came to mean one thing everywhere: *what
+is this?* (see `Tooltip.svelte` below). Each second action found another way:
+a double-click, a third state, a visible button, a drag. What is left here is
+`HOLD_SLOP`, the few pixels a finger may wander and still be pressing rather
+than dragging, which the area menu uses.
 
 **Reading a swipe is a pure function; feeding it events is an action.** A flick
 has to beat both a minimum distance and a slope, because a drag at 45 degrees is
@@ -2762,10 +2760,29 @@ under them is worse than doing nothing. Touch only: a mouse has a wheel and two
 arrows either side of the count, and treating a click-drag as a swipe would page
 the cards every time somebody tried to select the counter's text.
 
-**A hold buzzes as it fires.** A hold is the one gesture with nothing on screen
-to say it has happened until its action does, and on touch that vibration is the
-whole of the feedback. Touch only: a mouse hold on a touchscreen laptop should
-not shake the machine.
+## `src/lib/components/Tooltip.svelte` and `src/lib/tooltip.ts`
+
+**One tooltip, for every `title`.** The browser's own cannot be styled, arrives
+late, and on a touchscreen never arrives at all — so every hint written into a
+title was out of reach on a phone. This one is mounted once and listens on the
+document, so the hundreds of `title`s already written need nothing more, and
+there stays one place to write a hint. While the pointer is on an element its
+title is moved into `data-tip`, which is what keeps the native tip from
+appearing under this one, and put back when the pointer leaves; a title Svelte
+sets again under the pointer is taken up on the next move. Disabled buttons get
+theirs too — Chromium dispatches pointer events to them.
+
+**A press and hold is a question, not a press.** On touch, a still finger shows
+the tip above itself (the finger covers what is under it), gives the firmer
+buzz, and the click its release would make is dropped — you were asking. It is
+not offered in text fields, where a long press is how a phone pastes, or where
+a hold already means something: `data-no-hold-tip` on the nudge pad (its arrows
+repeat), a column header and a row number (they lift before a drag). Areas have
+no title, so a long press on one still reaches the browser's context menu.
+
+**Square, an em from the pointer.** Below and right of a mouse, flipped where
+it would leave the window, clamped where neither side has room — a tip half off
+the screen says half of what it says. The placement is `tooltip.ts`, tested.
 
 ## `src/lib/haptics.ts`
 

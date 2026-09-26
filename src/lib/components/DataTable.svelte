@@ -2,7 +2,6 @@
 	import { untrack } from 'svelte';
 	import Icon from './Icon.svelte';
 	import { download } from '$lib/download';
-	import { hold } from '$lib/gestures';
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { armDefault } from '$lib/modal';
@@ -283,7 +282,7 @@
 	};
 
 	/**
-	 * A cell opened full size — press and hold it, or press Edit in the bar
+	 * A cell opened full size — its [...], or Edit in the bar
 	 * under the table while it is being typed in. A cell of a long body of
 	 * Markdown is a keyhole at the height a table row can spare, so the whole
 	 * of it gets the table's room. It edits the cell itself, live, as the small
@@ -1387,6 +1386,7 @@
 							class:drop-after={carrying?.on && i === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
 							aria-sort={sortedBy?.column === column ? (sortedBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
 							onpointerdown={(e) => startCarry(e, i)}
+							data-no-hold-tip
 						>
 							<span class="column-head">
 							<!-- Data nothing on the card prints: no area is bound to it and
@@ -1520,6 +1520,7 @@
 							<span
 								class="number"
 								class:grip={!locked}
+								data-no-hold-tip
 								role="presentation"
 								title={locked
 									? undefined
@@ -1558,7 +1559,7 @@
 								{#if picture}
 									<!-- The picture in place of its base64, or of the name of a
 									     stored one. A press picks the row, as anywhere else on
-									     it; a hold or a double-click opens it — a drawing on the
+									     it; a double-click opens it — a drawing on the
 									     drawing surface, a stored picture large in Images. -->
 									<img
 										class="cell-picture"
@@ -1567,21 +1568,21 @@
 										title={locked
 											? undefined
 											: localImageName(row[column])
-												? `${localImageName(row[column])} — press and hold, or double-click, to open it in Images`
-												: 'A drawing — press and hold, or double-click, to draw on it'}
+												? `${localImageName(row[column])} — double-click to open it in Images`
+												: 'A drawing — double-click to draw on it'}
 										draggable="false"
-										use:hold={() => !locked && openBigCell(i, column)}
 										ondblclick={() => !locked && openBigCell(i, column)}
 									/>
 								{:else}
-								<!-- Press and hold for the whole cell in a dialog of its own. -->
+								<!-- The whole cell, full size, is Edit in the bar while this is
+								     typed in, or the [...] when it holds more than it shows. It
+								     was a press and hold too, until a hold came to mean "what is
+								     this?" everywhere. -->
 								<textarea
 									rows="1"
 									aria-label="{column}, row {rowLabel(row, i)}"
-									title={locked ? undefined : 'Press and hold to open this cell full size'}
 									value={row[column] ?? ''}
 									readonly={locked}
-									use:hold={() => !locked && openBigCell(i, column)}
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
 									use:completePlaceholders={dataset.columns}
@@ -1596,8 +1597,7 @@
 								></textarea>
 								<!-- Drawn only when the cell holds more than it shows (see
 								     `overflowMark`), and a way into the rest: the same full-size
-								     editor a press and hold opens, for anybody who never learnt
-								     the hold. Out of the tab order — the field before it is where
+								     editor Edit opens. Out of the tab order — the field before it is where
 								     the keyboard is, and it can scroll. -->
 								<button
 									class="more"
@@ -1707,7 +1707,7 @@
 			     whole of it. Mousedown is held off, or the field would lose its
 			     focus, and with it this button, before the click. -->
 			<button
-				title="Open this cell in the table's full room — the same as pressing and holding it"
+				title="Open this cell in the table's full room"
 				disabled={locked}
 				onmousedown={(e) => e.preventDefault()}
 				onclick={() => editing && openBigCell(editing.row, editing.column)}
@@ -1888,8 +1888,7 @@
 		<span class="spacer"></span>
 		{#if editing && dataset.rows[editing.row]}
 			<!-- While a cell is being typed in, the bar is about that cell: how
-			     long it is, and the way into the whole of it — the button a press
-			     and hold is the shortcut for. The row actions come back when the
+			     long it is, and the way into the whole of it. The row actions come back when the
 			     cell is left. Mousedown is held off the Edit button, or the field
 			     would lose its focus, and with it this bar, before the click. -->
 			{@const cell = editing}
