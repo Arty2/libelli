@@ -263,13 +263,21 @@ export function applyStyle(box: Box, style: BoxStyle): Box {
 export function strayBoxes(boxes: Box[], page: PageSpec, bleed = 0): Box[] {
 	const off = (start: number, size: number, limit: number) =>
 		start < -bleed || start + size > limit + bleed;
+	return boxes.filter(
+		(box) =>
+			!isParked(box, page, bleed) && (off(box.x, box.w, page.w) || (!box.anchor && off(box.y, box.h, page.h)))
+	);
+}
+
+/**
+ * A locked box wholly off the paper — see `strayBoxes`. Also why the card
+ * draws no dashed bound round it: the bound says where on the page an area
+ * sits, and a parked note is not on the page; its own fill is its edge.
+ */
+export function isParked(box: Box, page: PageSpec, bleed = 0): boolean {
 	const clear = (start: number, size: number, limit: number) =>
 		start + size <= -bleed || start >= limit + bleed;
-	const parked = (box: Box) =>
-		!!box.locked && (clear(box.x, box.w, page.w) || (!box.anchor && clear(box.y, box.h, page.h)));
-	return boxes.filter(
-		(box) => !parked(box) && (off(box.x, box.w, page.w) || (!box.anchor && off(box.y, box.h, page.h)))
-	);
+	return !!box.locked && (clear(box.x, box.w, page.w) || (!box.anchor && clear(box.y, box.h, page.h)));
 }
 
 /**

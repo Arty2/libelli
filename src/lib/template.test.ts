@@ -36,13 +36,14 @@ describe('the built-in template', () => {
 	const template = builtinTemplate();
 
 	it('loads with its boxes, anchors and bleed intact', () => {
-		expect(template.name).toBe('A5 Starter');
+		expect(template.name).toBe('A5 Starter Booklet');
 		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff', margin: { top: 11, right: 14, bottom: 8, left: 14 } });
 		expect(template.boxes.map((b) => b.id)).toEqual(['b_accent', 'b_category', 'b_title', 'b_subtitle', 'b_body', 'b_sketch', 'b_link', 'b_date', 'b_qr', 'b_notes']);
 		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 8 });
 		expect(template.boxes.find((b) => b.id === 'b_title')?.anchor).toEqual({ to: 'b_category', gap: 5 });
 		expect(template.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });
-		expect(template.print.enabled).toBe(false);
+		// Printed as it says on card 4: two to an A4 sheet, in a zine's order.
+		expect(template.print).toMatchObject({ enabled: true, count: 2, order: 'zine', sheet: { w: 210, h: 297 } });
 	});
 
 	it('keeps the markdown metrics on the body box', () => {

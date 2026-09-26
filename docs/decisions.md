@@ -1789,6 +1789,11 @@ in Patrick Hand — the one hand face left, on the one thing written by hand —
 with a `box-shadow` curl and a glue strip from `::after` in the CSS, locked so
 the rescue button leaves it where it is (see `boxops.ts`).
 
+It prints as card 4 says to: two to an A4 sheet, in a zine's order, so
+Export opens on the booklet rather than on four loose pages — hence the name.
+The accent band on card 2 and the stamp share one green, so the one color the
+set has reads as a decision rather than as two.
+
 The rest is chosen to show one of each thing the tour mentions, without a
 paragraph of its own: the kicker is a per-edge border (a hairline under it)
 with uppercase and tracking; the drawing is a stamp, hand-perforated, with a
@@ -1799,9 +1804,9 @@ shows what a template's stylesheet can reach (`#body h2`, `.page-number`).
 The page number is the one small line with no area of its own, so the CSS sets
 it with `!important` over the inline style it takes from the page defaults.
 
-**A5 Starter in the template menu, beside Reset.** The table has had Getting
+**A5 Starter Booklet in the template menu, beside Reset.** The table has had Getting
 Started since there was more than one table; the template had only Reset, which
-puts the starter over whatever is open. A5 Starter is the non-destructive twin:
+puts the starter over whatever is open. A5 Starter Booklet is the non-destructive twin:
 it opens a copy of the starter nobody has changed if the library has one, and
 otherwise adds a fresh one. "Nobody has changed" ignores the name and the
 padlock (`isStarterTemplate`) — a first run lands on it locked — and nothing
@@ -2874,7 +2879,7 @@ the handler counts the *unlocked* strays: a locked area is not this button's to
 move, and when every stray is locked it says so rather than doing nothing.
 
 **A locked area wholly off the paper is parked, not stray.** The pasteboard is
-a place to keep things — the A5 Starter keeps a post-it of the row's `notes`
+a place to keep things — the A5 Starter Booklet keeps a post-it of the row's `notes`
 there — and an area put there on purpose lit the rescue button for good, and
 pressing it dragged the note onto the card. Both conditions are needed: wholly
 off alone is exactly what a shrunk page leaves behind, the case the button is

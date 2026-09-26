@@ -7,6 +7,7 @@
 	import { cssIdent, scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
+	import { isParked } from '$lib/boxops';
 	import { HOLD_SLOP } from '$lib/gestures';
 	import {
 		FREE_STEP,
@@ -1904,7 +1905,7 @@
 				     rounded, so var(--line) lands exactly whatever the zoom. -->
 				<!-- Not on a selected area: the selection is its outline, and a dashed
 				     bound drawn under a solid one doubled every edge. -->
-				{#if bounds && !empty && !(interactive && isSelected(box))}
+				{#if bounds && !empty && !(interactive && isSelected(box)) && !isParked(box, template.page, bleed)}
 					<svg class="chrome bounds" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 				{/if}
 				{#if interactive && isSelected(box)}

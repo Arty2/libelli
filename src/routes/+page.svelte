@@ -1501,7 +1501,7 @@
 		template = starterTemplate();
 		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
-		notify('Template reset to the A5 Starter. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
+		notify('Template reset to the A5 Starter Booklet. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
 	}
 
 	// ---- the template library -----------------------------------------------
@@ -1585,7 +1585,7 @@
 	}
 
 	/**
-	 * A5 Starter: the design a first run lands on, as it came — the template
+	 * A5 Starter Booklet: the design a first run lands on, as it came — the template
 	 * library's Getting Started.
 	 *
 	 * Never over the loaded template, and never over a copy anybody has changed:
@@ -1602,7 +1602,7 @@
 			}
 		};
 		if (untouched($state.snapshot(template))) {
-			notify(`This is the A5 Starter, as it came.`);
+			notify(`This is the A5 Starter Booklet, as it came.`);
 			return;
 		}
 		for (const entry of library) {
@@ -1615,7 +1615,7 @@
 		}
 		settleProvisional();
 		await flushTemplate();
-		describe('A5 Starter');
+		describe('A5 Starter Booklet');
 		templateId = nextTemplateId();
 		saveTemplateId(templateId);
 		// Named after the new id is in place: `freeName` skips the loaded
@@ -2937,8 +2937,15 @@
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
 	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
-		<!-- Dragged by its title, so the card it is styling can be seen beside it. -->
-		<h2 id="css-title" class="drag-title" data-drag-handle>CSS</h2>
+		<!-- The help dialog's header, and like it dragged by the title, so the
+		     card being styled can be seen beside it. The × is Cancel, as Esc
+		     and the backdrop are: only Done keeps what was typed. -->
+		<header class="modal-header drag-title" data-drag-handle>
+			<h2 id="css-title">CSS</h2>
+			<button class="icon" onclick={cancelCss} title="Close without keeping changes" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
 		<!-- The placeholder is the documentation. It used to be two lines of
 		     example and two paragraphs of prose above and below it; what an author
 		     actually needs is the names of the things they can reach, and a
@@ -2971,7 +2978,7 @@
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the template?" use:armDefault>
 		<h2>Reset the template?</h2>
 		<p>
-			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the A5 Starter. Your rows are
+			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the A5 Starter Booklet. Your rows are
 			not touched.
 		</p>
 		<div class="modal-actions">
@@ -3092,10 +3099,11 @@
 
 {#if helpOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (helpOpen = false)}></div>
-	<div class="modal help" role="dialog" aria-modal="true" aria-labelledby="help-title">
+	<div class="modal help" role="dialog" aria-modal="true" aria-labelledby="help-title" use:dragByTitle>
 		<!-- The header stays put while the rest scrolls: the way out of a long
-		     dialog should not be at the bottom of it. -->
-		<header class="modal-header">
+		     dialog should not be at the bottom of it. Dragged by it, as the CSS
+		     dialog is. -->
+		<header class="modal-header drag-title" data-drag-handle>
 			<h2 id="help-title">libelli</h2>
 			<button class="icon" use:focusOnOpen onclick={() => (helpOpen = false)} title="Close" aria-label="Close">
 				<Icon name="close" size={16} />

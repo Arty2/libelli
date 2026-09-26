@@ -1,6 +1,6 @@
 {
   "schema": 5,
-  "name": "A5 Starter",
+  "name": "A5 Starter Booklet",
   "page": {
     "w": 148,
     "h": 210,
@@ -120,7 +120,7 @@
       "font": "Fraunces",
       "size": 30,
       "weight": 360,
-      "lineHeight": 1.04,
+      "lineHeight": 0.95,
       "letterSpacing": -0.25,
       "mode": "plain",
       "overflow": "grow",
@@ -129,7 +129,8 @@
         "gap": 5
       },
       "hideWhenEmpty": true,
-      "mirror": false
+      "mirror": false,
+      "valign": "bottom"
     },
     {
       "id": "b_subtitle",
@@ -167,22 +168,22 @@
       },
       "md": {
         "h1": {
-          "size": 1.6,
+          "size": 2.05,
           "spaceBefore": 5,
           "spaceAfter": 1.5,
-          "weight": 500
+          "weight": 400
         },
         "h2": {
-          "size": 1.4,
+          "size": 1.85,
           "spaceBefore": 5,
           "spaceAfter": 1.2,
-          "weight": 500
+          "weight": 400
         },
         "h3": {
-          "size": 1.15,
+          "size": 1.6,
           "spaceBefore": 4,
           "spaceAfter": 1,
-          "weight": 500
+          "weight": 400
         },
         "paragraph": {
           "spaceAfter": 3
@@ -230,7 +231,7 @@
     {
       "id": "b_link",
       "slot": null,
-      "x": 26,
+      "x": 34,
       "y": 194,
       "w": 80,
       "h": 4,
@@ -250,7 +251,7 @@
     {
       "id": "b_date",
       "slot": null,
-      "x": 26,
+      "x": 34,
       "y": 198.5,
       "w": 80,
       "h": 4,
@@ -270,10 +271,10 @@
     {
       "id": "b_qr",
       "slot": "link",
-      "x": 110,
-      "y": 181,
-      "w": 21,
-      "h": 21,
+      "x": 118,
+      "y": 186,
+      "w": 16,
+      "h": 16,
       "mode": "qr",
       "overflow": "clip",
       "hideWhenEmpty": true,
@@ -316,5 +317,20 @@
     }
   ],
   "facing": true,
-  "css": "/* The page number takes the page's own face; this sets it in the mono of the footer. */\n.page-number {\n  font-family: 'IBM Plex Mono', monospace !important;\n  font-size: 6.5pt !important;\n  letter-spacing: 0.3mm;\n  color: #8a857b !important;\n}\n\n/* Headings inside the body in the title's serif. */\n#body h1, #body h2, #body h3 {\n  font-family: 'Fraunces', serif;\n  letter-spacing: -0.1mm;\n}\n\n/* `code` in the footer's mono, on a faint chip. */\n#body code {\n  font-family: 'IBM Plex Mono', monospace;\n  font-size: 0.86em;\n  background: #efece4;\n  padding: 0 0.6mm;\n  border-radius: 0.6mm;\n}\n\n/* The drawing's stamp, lifted off the page. A drop-shadow follows what is\n   painted, so it traces the perforations; a box-shadow would be a rectangle. */\n#sketch {\n  filter: drop-shadow(1.1mm 1.5mm 0.2mm rgba(40, 30, 10, 0.3));\n}\n\n/* The post-it off the page's edge: a curl of shadow under its lower corners,\n   and a strip of darker yellow where the glue is. Never printed — it is off\n   the paper — so it is only ever the editor's. */\n#notes {\n  box-shadow: 0 1.6mm 2.2mm -1mm rgba(60, 45, 0, 0.35);\n}\n#notes::after {\n  content: '';\n  position: absolute;\n  inset: 0 0 auto 0;\n  height: 4mm;\n  background: rgba(190, 160, 0, 0.14);\n}\n\n#body mark {\n  background: #f6e27a;\n  padding: 0 0.4mm;\n}\n"
+  "css": "/* The page number takes the page's own face; this sets it in the mono of the footer. */\n.page-number {\n  font-family: 'IBM Plex Mono', monospace !important;\n  font-size: 6.5pt !important;\n  letter-spacing: 0.3mm;\n  color: #8a857b !important;\n}\n\n/* Headings inside the body in the title's serif. */\n#body h1, #body h2, #body h3 {\n  font-family: 'Fraunces', serif;\n  letter-spacing: -0.1mm;\n}\n\n/* `code` in the footer's mono, on a faint chip. */\n#body code {\n  font-family: 'IBM Plex Mono', monospace;\n  font-size: 0.86em;\n  background: #efece4;\n  padding: 0 0.6mm;\n  border-radius: 0.6mm;\n}\n\n/* The drawing's stamp, lifted off the page. A drop-shadow follows what is\n   painted, so it traces the perforations; a box-shadow would be a rectangle.\n   The first four are a 1px hairline all round — white paper on white paper\n   needs an edge — and the last is the shadow, cast by paper and hairline\n   together, since each filter works on what the one before it drew. */\n#sketch {\n  filter:\n    drop-shadow(1px 0 0 #eee) drop-shadow(-1px 0 0 #eee)\n    drop-shadow(0 1px 0 #eee) drop-shadow(0 -1px 0 #eee)\n    drop-shadow(0.5mm 0.7mm 0.2mm rgba(40, 30, 10, 0.3));\n}\n\n/* The post-it off the page's edge: a curl of shadow under its lower corners,\n   and a strip of darker yellow where the glue is. Never printed — it is off\n   the paper — so it is only ever the editor's. */\n#notes {\n  box-shadow: 0 1.6mm 2.2mm -1mm rgba(60, 45, 0, 0.35);\n}\n#notes::after {\n  content: '';\n  position: absolute;\n  inset: 0 0 auto 0;\n  height: 4mm;\n  background: rgba(190, 160, 0, 0.14);\n}\n\n#body mark {\n  background: #f6e27a;\n  padding: 0 0.4mm;\n}\n",
+  "print": {
+    "enabled": true,
+    "count": 2,
+    "order": "zine",
+    "sheet": {
+      "w": 210,
+      "h": 297
+    },
+    "orientation": "auto",
+    "bleed": {
+      "enabled": false,
+      "amount": 3,
+      "cropMarks": false
+    }
+  }
 }

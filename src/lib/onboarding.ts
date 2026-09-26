@@ -27,7 +27,7 @@ export const sampleDataset = (): Dataset => ({ ...parseTable(SAMPLE_CSV), name: 
 export const starterTemplate = (): Template => builtinTemplate();
 
 /**
- * Whether a template is the starter as it came — the question A5 Starter asks
+ * Whether a template is the starter as it came — the question A5 Starter Booklet asks
  * of every template in the library before it adds another copy, the way
  * Getting Started asks it of every table.
  *
