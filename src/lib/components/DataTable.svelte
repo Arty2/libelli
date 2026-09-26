@@ -590,19 +590,24 @@
 		traying = null;
 		watchTray(false);
 		if (!dragged) return;
-		trayClick = true;
+		trayClick = performance.now() + 400;
 		ontraydrag('end', event.clientY);
 	}
 
 	/** The press that resized the tray is not also a press on what it started on. */
 	function swallowClick(event: MouseEvent) {
-		if (!trayClick) return;
-		trayClick = false;
+		if (performance.now() > trayClick) return;
+		trayClick = 0;
 		event.preventDefault();
 		event.stopPropagation();
 	}
 
-	let trayClick = false;
+	/**
+	 * Until when a click is the tail of a drag rather than a press. A moment,
+	 * not a flag: a finger's drag makes no click at all, and a flag left set by
+	 * one ate the next real tap — the × on the full-size editor, a header's sort.
+	 */
+	let trayClick = 0;
 
 	/**
 	 * Drag a header sideways to move its column.
@@ -730,7 +735,7 @@
 		if (!on || event.type === 'pointercancel') return;
 		// The press that carried the column is not also a press on the name
 		// field or the button it was let go over.
-		trayClick = true;
+		trayClick = performance.now() + 400;
 		const to = dropTarget(from, before);
 		if (to !== from) onchange(moveColumn(dataset, from, to));
 	}
@@ -1967,7 +1972,16 @@
 	{#if drawingArea}
 		{@const area = drawingArea}
 		<div class="cell-editor" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
-			<div class="cell-editor-head">
+			<!-- The editor's head is the tray's grip too, as the table's header row
+			     is: the editor covers that row, and on a phone a drawing wants
+			     more of the height than the tray opened with. -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="cell-editor-head"
+				class:draggable={trayDraggable}
+				onpointerdown={startTrayDrag}
+				onclickcapture={swallowClick}
+			>
 				<h2 id="cell-editor-title">{area.name}</h2>
 				<span class="spacer"></span>
 				<button class="icon close" title={boardDirty ? 'Close — the drawing not saved is dropped (Esc)' : 'Back to the table (Esc)'} aria-label="Close" onclick={closeBigCell}>
@@ -1990,7 +2004,16 @@
 		{@const text = dataset.rows[open.row]?.[open.column] ?? ''}
 		{@const kind = bigKind(text, open.draw)}
 		<div class="cell-editor" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
-			<div class="cell-editor-head">
+			<!-- The editor's head is the tray's grip too, as the table's header row
+			     is: the editor covers that row, and on a phone a drawing wants
+			     more of the height than the tray opened with. -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="cell-editor-head"
+				class:draggable={trayDraggable}
+				onpointerdown={startTrayDrag}
+				onclickcapture={swallowClick}
+			>
 				<h2 id="cell-editor-title">{open.column}</h2>
 				<span class="spacer"></span>
 				<button class="icon close" title={boardShown(open) && boardDirty ? 'Close — the drawing not saved is dropped (Esc)' : 'Back to the table (Esc)'} aria-label="Close" onclick={closeBigCell}>
@@ -3116,6 +3139,19 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
+	}
+
+	/* The same bargain as the table's header row: the drag is the tray's, so
+	   the browser's own scroll gives way. Padding lends it a finger's height. */
+	.cell-editor-head.draggable {
+		touch-action: none;
+		margin: -12px -12px 0;
+		padding: 12px 12px 4px;
+		cursor: ns-resize;
+	}
+
+	.cell-editor-head.draggable :global(button) {
+		cursor: pointer;
 	}
 
 	.cell-editor h2 {

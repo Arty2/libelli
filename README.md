@@ -1345,7 +1345,9 @@ towards it and down is away. They repeat on a hold like the arrows do.
   picked the area up.
 - **Drag the table's header to size the tray.** Stacked under the page it opens
   at a little under half the screen; pull the header up to fill the screen with
-  it, pull it back down to see the card. A press that goes nowhere is still the
+  it, pull it back down to see the card. The full-size editor's head — a cell, or a
+  drawing — is the same grip while it covers the table, and so is the head of
+  the Images tray, list or large view. A press that goes nowhere is still the
   header button underneath being pressed.
 - **Buttons answer.** A press on any control gives a few milliseconds of
   vibration where the device has it, and a tooltip arriving under a held finger
