@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
 	import Icon from './Icon.svelte';
-	import { dragByTitle } from '$lib/modal';
 	import {
 		boardFor,
 		boardSize,
@@ -18,18 +17,18 @@
 	import type { Box } from '$lib/types';
 
 	/**
-	 * A small drawing surface, full screen.
+	 * A small drawing surface, in the side panel.
 	 *
-	 * Full screen on purpose, and never in place: an area on the card is often a
+	 * Large on purpose, and never in place: an area on the card is often a
 	 * centimetre across, which is somewhere to *show* a drawing and nowhere to
 	 * make one. The board is 64 by 64 pixels' worth, spent in whatever shape is
 	 * asked for — see `bitmap.ts` — and what comes out is a PNG data URL, which
 	 * goes into the row's cell, so the picture travels with the table rather than
-	 * living beside it.
+	 * living beside it; an area with no column keeps it on the area.
 	 *
-	 * Nothing is written until Done. Cancel leaves the cell as it was, and the
-	 * whole drawing is one entry in the app's own undo, however many strokes it
-	 * took — the undo in here is the editor's own and goes no further.
+	 * Nothing is written until the panel's Save, and each save is one entry in
+	 * the app's own undo, however many strokes it took — the undo in here is
+	 * the editor's own and goes no further.
 	 */
 
 	interface Props {
@@ -46,18 +45,41 @@
 		ink: string;
 		/** The picture, and the board it was made on unless that is the usual one. */
 		onsave: (dataUrl: string, pixels: Grid | undefined) => void;
-		oncancel: () => void;
 		/**
-		 * Drawn inside the table's full-size editor rather than as a dialog over
-		 * the app. There the cell is edited live, as its words are: every change
-		 * goes to `onsave` as it is made, and there is no Done or Cancel — the
-		 * editor's own × and Escape close it, and the app's undo reaches what
-		 * was drawn.
+		 * Whether there is drawing not yet saved — the side panel's Save lights
+		 * up on it, and its pager waits for it.
 		 */
-		inline?: boolean;
+		ondirty?: (dirty: boolean) => void;
 	}
 
-	let { box, value, ink, onsave, oncancel, inline = false }: Props = $props();
+	let { box, value, ink, onsave, ondirty }: Props = $props();
+
+	/**
+	 * Changes made, and how many of them the last save had seen. A count rather
+	 * than the length of `history`, which is capped: past the cap a new stroke
+	 * leaves the length where it was, and would have looked like no change.
+	 */
+	let edits = $state(0);
+	let savedEdits = $state(0);
+	const dirty = $derived(edits !== savedEdits);
+
+	$effect(() => {
+		ondirty?.(dirty);
+	});
+
+	/**
+	 * Write the board. Called by the side panel's Save rather than by a button
+	 * in here: Save and Delete sit in the panel's own bar, where every picture's
+	 * do, so the board's rows are only what you draw with.
+	 */
+	export function save() {
+		const data = exported();
+		if (!data) return;
+		// The usual board is the absence of the field, the same rule the rest of
+		// the format follows.
+		onsave(data, isDefaultBoard(grid) ? undefined : { ...grid });
+		savedEdits = edits;
+	}
 
 	// Read once: the box cannot change while this is up, and the board is the
 	// editor's own state from here on — Done is what writes it back. What the
@@ -176,6 +198,7 @@
 	function remember(): Shot | null {
 		const taken = shot();
 		if (!taken) return null;
+		edits += 1;
 		history = [...history.slice(-29), taken];
 		future = [];
 		return taken;
@@ -199,6 +222,7 @@
 		if (!previous || !current) return;
 		history = history.slice(0, -1);
 		future = [...future, current];
+		edits += 1;
 		await apply(previous);
 	}
 
@@ -208,6 +232,7 @@
 		if (!next || !current) return;
 		future = future.slice(0, -1);
 		history = [...history, current];
+		edits += 1;
 		await apply(next);
 	}
 
@@ -396,12 +421,6 @@
 	function measure() {
 		const data = exported();
 		weight = data ? Math.round(data.length / 102.4) / 10 : null;
-		// Live, inline — but only once something has been done: opening a
-		// picture measures it too, and writing that back would re-encode a
-		// photograph as a PNG just for having been looked at.
-		if (inline && data && (history.length || future.length)) {
-			onsave(data, isDefaultBoard(grid) ? undefined : { ...grid });
-		}
 	}
 
 	function paint(at: { x: number; y: number }) {
@@ -420,6 +439,10 @@
 	function down(event: PointerEvent) {
 		if (event.button !== 0 || !canvas) return;
 		event.preventDefault();
+		// The press is held back from the page, so it would not move the focus:
+		// after Save in the panel's bar, the next Ctrl/Cmd+Z or S would go to
+		// the app instead of the board being drawn on.
+		canvas.closest<HTMLElement>('.drawer')?.focus({ preventScroll: true });
 		canvas.setPointerCapture(event.pointerId);
 		remember();
 		drawing = true;
@@ -466,25 +489,19 @@
 		return pixelAt(event.clientX - rect.left, event.clientY - rect.top, rect, grid);
 	}
 
-	function done() {
-		const data = exported();
-		// The usual board is the absence of the field, the same rule the rest of
-		// the format follows.
-		if (data) onsave(data, isDefaultBoard(grid) ? undefined : { ...grid });
-	}
-
 	function onKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape' && !inline) {
-			event.preventDefault();
-			oncancel();
-		}
-		// Inline, the app's own shortcuts listen on the window behind this, and
-		// a Delete or an arrow meant for the board would delete or nudge an area
-		// of the card. Every key but Escape stops here; Escape goes on to the
-		// full-size editor, which it closes.
-		if (inline && event.key !== 'Escape') event.stopPropagation();
+		// The app's own shortcuts listen on the window behind this, and a Delete
+		// or an arrow meant for the board would delete or nudge an area of the
+		// card. Every key but Escape stops here; Escape goes on to the side
+		// panel, which it closes.
+		if (event.key !== 'Escape') event.stopPropagation();
 		if (!(event.metaKey || event.ctrlKey)) return;
 		const key = event.key.toLowerCase();
+		if (key === 's') {
+			event.preventDefault();
+			save();
+			return;
+		}
 		if (key !== 'z' && key !== 'c' && key !== 'v') return;
 		event.preventDefault();
 		// The same chord the app itself uses, shifted for the way back.
@@ -498,10 +515,8 @@
 		if (key === 'v') void paste();
 	}
 
-	/** Inline, the board takes the focus so its keys are its own from the start. */
-	const takeFocus = (node: HTMLElement) => {
-		if (inline) node.focus({ preventScroll: true });
-	};
+	/** The board takes the focus so its keys are its own from the start. */
+	const takeFocus = (node: HTMLElement) => node.focus({ preventScroll: true });
 
 	/**
 	 * How large the board is drawn: as large as the room the dialog gives it,
@@ -518,30 +533,14 @@
 	);
 </script>
 
-<svelte:window onkeydown={inline ? undefined : onKeydown} />
-
-<!-- A dialog over the app, like the CSS editor, rather than a screen of its
-     own: the card it is drawing for stays in view round it, and it can be
-     dragged aside by its title to see the part it covers. Inline, it is the
-     table's full-size editor for a picture cell, and the editor's head is
-     its title. -->
-{#if !inline}
-	<div class="backdrop" role="presentation"></div>
-{/if}
-<div
-	class="drawer"
-	class:inline
-	role={inline ? 'group' : 'dialog'}
-	aria-modal={inline ? undefined : 'true'}
-	aria-label={inline ? 'Drawing' : undefined}
-	aria-labelledby={inline ? undefined : 'draw-title'}
-	tabindex="-1"
-	onkeydown={inline ? onKeydown : undefined}
-	use:takeFocus
-	use:dragByTitle
->
-	<header data-drag-handle={inline ? undefined : ''}>
-		{#if !inline}<h2 id="draw-title">Draw</h2>{/if}
+<!-- In the side panel, where a cell is edited full size: the card it is
+     drawing for stays in view beside it, and the panel's head is its title.
+     It was a dialog over the app until the table's own editor could hold it. -->
+<!-- An application in the ARIA sense: a surface that takes its own keys,
+     which the compiler's list of interactive roles does not count. -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div class="drawer" role="application" aria-label="Drawing" tabindex="-1" onkeydown={onKeydown} use:takeFocus>
+	<header>
 		<!-- Said out loud, because this is going into a cell of the table and a
 		     long cell is the cost of it travelling with the words. -->
 		{#if weight !== null}
@@ -699,52 +698,26 @@
 			</button>
 		</span>
 
-		<span class="spacer"></span>
-
-		<!-- Delete in words and in red, as every Delete in the app is: it empties
-		     the board, which undo still reaches. Then the two ways out — which
-		     inline are the full-size editor's own ×, since every stroke is
-		     already in the cell. -->
-		<span class="segmented done">
-			<button class="danger" onclick={clear} title="Clear the whole drawing — undo brings it back">
-				<Icon name="trash" size={15} /> Delete
+		<!-- Clear, as a tool: it empties the board, and undo brings it back.
+		     Deleting the drawing itself is the panel's Delete, beside Save. -->
+		<span class="segmented">
+			<button onclick={clear} title="Clear the board — undo brings it back" aria-label="Clear the board">
+				<Icon name="erase" size={15} />
 			</button>
-			{#if !inline}
-				<button onclick={oncancel} title="Leave the cell as it was (Esc)">Cancel</button>
-				<button class="primary" onclick={done} title="Write this drawing into the area">Done</button>
-			{/if}
 		</span>
 	</div>
 </div>
 
 <style>
-	.backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 70;
-		background: rgba(0, 0, 0, 0.35);
-	}
-
-	/* The CSS editor's shape: a white dialog centred over the app, moved by its
-	   title. As large as the window allows, because the board is drawn as large
-	   as fits in it. */
+	/* In the side panel's room: no frame, no shadow — the panel is the frame. */
 	.drawer {
-		position: fixed;
-		z-index: 71;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		width: min(760px, calc(100vw - 32px));
-		height: min(820px, calc(100dvh - 32px));
-		box-sizing: border-box;
+		flex: 1;
+		min-height: 0;
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
-		padding: 16px 18px;
-		background: #fff;
-		border-radius: 10px;
-		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
 		font: 13px ui-sans-serif, system-ui, sans-serif;
+		outline: none;
 		/* The board takes the pointer for drawing; a downward drag read as
 		   pull-to-refresh would take the undo history with it. */
 		touch-action: none;
@@ -756,33 +729,6 @@
 		display: flex;
 		align-items: baseline;
 		gap: 8px;
-		cursor: move;
-	}
-
-	/* In the table's own room: no frame, no shadow, no position of its own —
-	   the full-size editor around it is the frame. */
-	.drawer.inline {
-		position: static;
-		transform: none;
-		z-index: auto;
-		flex: 1;
-		width: auto;
-		height: auto;
-		min-height: 0;
-		padding: 0;
-		border-radius: 0;
-		box-shadow: none;
-		outline: none;
-	}
-
-	.drawer.inline header {
-		cursor: default;
-		min-height: 0;
-	}
-
-	header h2 {
-		margin: 0;
-		font-size: 16px;
 	}
 
 	.weight {
@@ -801,10 +747,6 @@
 		align-items: center;
 		gap: 8px;
 		flex-wrap: wrap;
-	}
-
-	.spacer {
-		flex: 1;
 	}
 
 	/* Square, all of them: every one holds a glyph of the same size, and a row of
@@ -932,36 +874,11 @@
 		--check-b: #2b313c;
 	}
 
-	/* The only two that carry words, so the only two that are not squares. */
-	.tools .done button {
-		width: auto;
-		padding: 0 12px;
-	}
-
-	.tools .done button.primary {
-		background: #2563eb;
-		border-color: #2563eb;
-		color: #fff;
-	}
-
 	.said {
 		color: #333;
 		font-size: 12px;
 		background: #eef2f7;
 		border-radius: 999px;
 		padding: 1px 10px;
-	}
-
-	/* Red in words, as every Delete in the app is. */
-	.tools .done button.danger {
-		display: inline-flex;
-		gap: 5px;
-		align-items: center;
-		color: #b42318;
-		border-color: #e4a9a3;
-	}
-
-	.tools .done button.danger:hover {
-		background: #fdecea;
 	}
 </style>

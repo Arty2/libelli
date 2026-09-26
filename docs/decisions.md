@@ -502,11 +502,15 @@ stays in view round it — and like that editor it is dragged by its title
 (`dragByTitle` in modal.ts), clamped so a strip of the title always stays on
 screen to drag it back by.
 
-**Nothing is written until Done, and it is one undo entry.** The editor keeps
-its own stack of whole canvases — at this size a canvas is nothing — so undo in
-there is strokes, and undo out here is the drawing. Mixing the two would have
-made a fifty-stroke drawing fifty steps of the app's history, and the app's
-undo is snapshots of the whole editable state.
+**Nothing is written until Save, and each save is one undo entry.** The editor
+keeps its own stack of whole canvases — at this size a canvas is nothing — so
+undo in there is strokes, and undo out here is the drawing. Mixing the two would
+have made a fifty-stroke drawing fifty steps of the app's history, and the app's
+undo is snapshots of the whole editable state. Save and Delete are the side
+panel's, in its bar, not the board's: the board calls `save()` when asked, and
+reports whether it holds anything unsaved so the bar can light Save and hold the
+pager. Unsaved is a count of edits against the count at the last save, not the
+length of `history`, which is capped and stops growing.
 
 **A picture from off this machine opens blank.** Drawing a cross-origin image
 onto a canvas taints it, and a tainted canvas refuses `toDataURL` — so the
@@ -514,18 +518,15 @@ surface would open on a photo, take a stroke, and fail to save at the very end.
 Opening blank is the honest version of that, and a `blob:` URL from this
 browser's own store is same-origin and draws in fine.
 
-**In the table it is live, and that is the one exception to the above.** A
-drawing into a cell opens inside the table's full-size editor (`inline`), which
-edits its cell live for words, so it does for strokes too: each change goes to
-the cell as it is made, and the app's debounce folds a burst of strokes into one
-entry, as it does a burst of typing. Only once something has been done — the
-open itself measures the picture, and writing that back would re-encode a
-photograph for having been looked at. The table keys the surface on the cell
-plus an epoch that moves only when the cell changes *under* it (undo, a paste,
-a step of the pager), so a stroke's own write does not remount it and throw its
-undo away. Inline, every key but Escape stops at the board: the app's shortcuts
-listen on the window, and a Delete meant for the board would delete an area.
-An area with no column has no cell, and keeps the dialog above.
+**Always in the side panel.** It was a dialog; it now lives in the table's
+full-size editor, for a cell and for an area with no column alike (the second
+has no row, so no pager, and writes onto the area). The table keys the surface
+on the cell plus an epoch that moves only when the cell changes *under* it —
+undo, a paste, Delete — so a save's own write does not remount it and throw its
+undo away. Every key but Escape stops at the board: the app's shortcuts listen
+on the window, and a Delete meant for the board would delete an area. A stroke
+focuses the board, because its press is held back from the page and would not
+otherwise move the focus off the Save just pressed.
 
 ## `src/lib/photo.ts` and the Images tray's large view
 

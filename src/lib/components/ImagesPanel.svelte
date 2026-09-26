@@ -270,6 +270,8 @@
 
 	async function remove(image: ImageRecord) {
 		await deleteImage(image.name, image.where);
+		// Deleted from its own large view: there is nothing left to look at.
+		if (image.name === focus) onfocus?.(null);
 		onnotice(
 			`${image.name} deleted.` +
 				(used.has(image.name) ? ' The areas pointing at it will draw nothing until it is put back.' : '')
@@ -413,6 +415,9 @@
 			saving = false;
 		}
 	}
+
+	/** What the large view is showing, as the list holds it — for its Delete. */
+	const focusRecord = $derived(focus ? (images.find((image) => image.name === focus) ?? null) : null);
 
 	/** The stored pictures in the list's order, for the viewer's pager. */
 	const focusIndex = $derived(focus ? shown.findIndex((image) => image.name === focus) : -1);
@@ -616,9 +621,20 @@
 				{/if}
 				<span class="spacer"></span>
 				<button disabled={!dirty} title="Back to the picture as it is stored" onclick={() => focusUrl && load(focusUrl)}>Revert</button>
-				<button class="primary" disabled={!dirty || saving} title="Write the edit over {focus}" onclick={save}>Save</button>
 			{:else if focusUrl}
 				<span class="note">Shown only — this browser cannot write {focus.split('.').pop()?.toUpperCase() || 'this kind of'} files.</span>
+				<span class="spacer"></span>
+			{:else}
+				<span class="spacer"></span>
+			{/if}
+			<!-- Delete and Save at the far end, as a drawing has them in the
+			     table: the two things done to the picture itself. Delete asks
+			     first, as it does from the list. -->
+			<button class="danger" disabled={!focusRecord} title="Delete {focus}" onclick={() => focusRecord && (confirming = focusRecord)}>
+				<Icon name="trash" size={15} /> Delete
+			</button>
+			{#if focusType && focusUrl}
+				<button class="primary" disabled={!dirty || saving} title="Write the edit over {focus}" onclick={save}>Save</button>
 			{/if}
 		</div>
 	{:else}
@@ -786,6 +802,16 @@
 		background: #111;
 		border-color: #111;
 		color: #fff;
+	}
+
+	/* Red in words, as every Delete in the app is. */
+	.actions button.danger {
+		color: #b42318;
+		border-color: #e4a9a3;
+	}
+
+	.actions button.danger:hover:not(:disabled) {
+		background: #fdecea;
 	}
 
 	.actions button:disabled {

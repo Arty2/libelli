@@ -42,8 +42,16 @@
 		images?: Record<string, string>;
 		/** The board and the ink a drawing in this column is made with. */
 		drawingFor: (column: string) => { pixels?: Grid; ink: string };
-		/** A drawing, as it is drawn: every change, live, as typing is. */
+		/** A drawing saved into a cell, from the side panel's Save. */
 		ondrawn: (row: number, column: string, dataUrl: string, pixels: Grid | undefined) => void;
+		/**
+		 * An area with no column, asked to be drawn in: it has no cell, but it
+		 * draws in the same side panel, and its drawing goes onto the area. A
+		 * new object each time, as `openRequest` is.
+		 */
+		areaRequest?: { id: string; name: string; value: string; pixels?: Grid; ink: string } | null;
+		onsavearea: (id: string, dataUrl: string, pixels: Grid | undefined) => void;
+		ondeletearea: (id: string) => void;
 		/** A stored picture, opened large in the Images tray to be looked at and edited. */
 		onopenimage: (name: string) => void;
 		/** lock or unlock the whole table; the page owns the dataset */
@@ -101,6 +109,9 @@
 		images = {},
 		drawingFor,
 		ondrawn,
+		areaRequest = null,
+		onsavearea,
+		ondeletearea,
 		onopenimage,
 		onlock,
 		ondeletetable,
@@ -301,6 +312,7 @@
 		// The small field under the press still has the focus, and would keep
 		// the outline lit behind the editor.
 		(document.activeElement as HTMLElement | null)?.blur();
+		drawingArea = null;
 		bigCell = { row: rowIndex, column, draw: draw || undefined };
 		drawnValue = value;
 		onactivate(rowIndex);
@@ -334,6 +346,10 @@
 	 * elsewhere) opens as a blank board, as it always has. Otherwise a stored
 	 * picture's own look with the way to the Images tray, or the words.
 	 */
+	/** Whether the panel shows the drawing board for this open cell. */
+	const boardShown = (open: { row: number; column: string; draw?: boolean }) =>
+		!locked && bigKind(dataset.rows[open.row]?.[open.column] ?? '', open.draw) === 'drawing';
+
 	function bigKind(value: string, draw: boolean | undefined): 'drawing' | 'stored' | 'text' {
 		if (draw || cellPicture(value)) return 'drawing';
 		if (localImageName(value)) return 'stored';
@@ -367,6 +383,56 @@
 		ondrawn(rowIndex, column, dataUrl, pixels);
 	}
 
+	/**
+	 * The board in the panel, and whether it holds drawing not yet saved. Its
+	 * Save and Delete are in the panel's bar, beside the pager — where every
+	 * picture's are, the Images tray's included — so the bar asks the board.
+	 * Closing with drawing unsaved drops it, as Cancel did; the pager waits
+	 * instead, because stepping away is not a way of saying "never mind".
+	 */
+	let board = $state<ReturnType<typeof BitmapEditor> | null>(null);
+	let boardDirty = $state(false);
+
+	/** A drawing in the cell gone: the cell emptied, which the app's undo reaches. */
+	function deleteDrawing() {
+		if (!bigCell) return;
+		setCell(bigCell.row, bigCell.column, '');
+		// Still a board: an empty cell opened without asking to draw is words,
+		// and deleting a drawing is not a request to start typing.
+		bigCell = { ...bigCell, draw: true };
+		// Opened afresh even when the cell was already empty — a drawing not yet
+		// saved is on the board, not in the cell, and Delete means that too.
+		drawnValue = '';
+		drawEpoch += 1;
+	}
+
+	/** An area with no column, being drawn in — see `areaRequest`. */
+	let drawingArea = $state<{ id: string; name: string; value: string; pixels?: Grid; ink: string } | null>(null);
+	let areaEpoch = $state(0);
+
+	$effect(() => {
+		const ask = areaRequest;
+		if (!ask) return;
+		untrack(() => {
+			bigCell = null;
+			drawingArea = { ...ask };
+			areaEpoch += 1;
+		});
+	});
+
+	function saveArea(dataUrl: string, pixels: Grid | undefined) {
+		if (!drawingArea) return;
+		drawingArea = { ...drawingArea, value: dataUrl, pixels };
+		onsavearea(drawingArea.id, dataUrl, pixels);
+	}
+
+	function deleteArea() {
+		if (!drawingArea) return;
+		ondeletearea(drawingArea.id);
+		drawingArea = { ...drawingArea, value: '' };
+		areaEpoch += 1;
+	}
+
 	/** What the drawing surface opens on: the picture, or a stored one resolved. */
 	function drawingSource(value: string): string {
 		const picture = cellPicture(value);
@@ -396,6 +462,7 @@
 
 	function closeBigCell() {
 		bigCell = null;
+		drawingArea = null;
 	}
 
 	const focusOnOpen = (node: HTMLElement) => node.focus();
@@ -785,7 +852,7 @@
 			// and closes something behind this.
 			event.stopPropagation();
 			pickerOpen = false;
-		} else if (bigCell) {
+		} else if (bigCell || drawingArea) {
 			event.stopPropagation();
 			closeBigCell();
 		} else if (confirmColumn !== null) {
@@ -1584,7 +1651,12 @@
 	<!-- One line, always: this bar wrapping was costing the table a row of its
 	     own height every time the tray narrowed. -->
 	<div class="actions" bind:offsetHeight={barHeight}>
-		{#if bigCell}
+		{#if drawingArea}
+			<!-- An area's own drawing has no row to step to: only its Delete and
+			     its Save, where a cell's drawing has them. -->
+			<span class="spacer"></span>
+			{@render drawingButtons(!!drawingArea.value, deleteArea)}
+		{:else if bigCell}
 			<!-- With a cell open full size the bar is about that cell, as it is
 			     while one is typed in: which row it is at the start, where the
 			     table's name usually is, and its count at the end, where the count
@@ -1596,22 +1668,24 @@
 			<span class="big-pager" role="group" aria-label="Row">
 				<button
 					class="icon step"
-					disabled={at <= 0}
-					title="Previous row"
+					disabled={at <= 0 || boardShown(bigCell) && boardDirty}
+					title={boardShown(bigCell) && boardDirty ? 'Save the drawing first' : 'Previous row'}
 					aria-label="Previous row"
 					onclick={() => stepBigCell(-1)}
 				><Icon name="chevron-left" size={16} /></button>
 				<span class="big-row">{at + 1} / {dataset.rows.length}</span>
 				<button
 					class="icon step"
-					disabled={at >= dataset.rows.length - 1}
-					title="Next row"
+					disabled={at >= dataset.rows.length - 1 || boardShown(bigCell) && boardDirty}
+					title={boardShown(bigCell) && boardDirty ? 'Save the drawing first' : 'Next row'}
 					aria-label="Next row"
 					onclick={() => stepBigCell(1)}
 				><Icon name="chevron-right" size={16} /></button>
 			</span>
 			<span class="spacer"></span>
-			{#if bigKind(dataset.rows[bigCell.row]?.[bigCell.column] ?? '', bigCell.draw) === 'text'}
+			{#if boardShown(bigCell)}
+				{@render drawingButtons(!!(dataset.rows[bigCell.row]?.[bigCell.column] ?? '').trim(), deleteDrawing)}
+			{:else if bigKind(dataset.rows[bigCell.row]?.[bigCell.column] ?? '', bigCell.draw) === 'text'}
 				<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
 			{/if}
 		{:else}
@@ -1876,7 +1950,28 @@
 	     table hid the card the words are for. It takes exactly the table's
 	     room — the rows and the bar under them — and gives it back on Done or
 	     Cancel. -->
-	{#if bigCell}
+	{#if drawingArea}
+		{@const area = drawingArea}
+		<div class="cell-editor" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
+			<div class="cell-editor-head">
+				<h2 id="cell-editor-title">{area.name}</h2>
+				<span class="spacer"></span>
+				<button class="icon close" title={boardDirty ? 'Close — the drawing not saved is dropped (Esc)' : 'Back to the table (Esc)'} aria-label="Close" onclick={closeBigCell}>
+					<Icon name="close" size={18} />
+				</button>
+			</div>
+			{#key `${area.id}:${areaEpoch}`}
+				<BitmapEditor
+					bind:this={board}
+					box={{ pixels: area.pixels }}
+					value={area.value}
+					ink={area.ink}
+					onsave={saveArea}
+					ondirty={(d) => (boardDirty = d)}
+				/>
+			{/key}
+		</div>
+	{:else if bigCell}
 		{@const open = bigCell}
 		{@const text = dataset.rows[open.row]?.[open.column] ?? ''}
 		{@const kind = bigKind(text, open.draw)}
@@ -1884,26 +1979,26 @@
 			<div class="cell-editor-head">
 				<h2 id="cell-editor-title">{open.column}</h2>
 				<span class="spacer"></span>
-				<button class="icon close" title="Back to the table (Esc)" aria-label="Close" onclick={closeBigCell}>
+				<button class="icon close" title={boardShown(open) && boardDirty ? 'Close — the drawing not saved is dropped (Esc)' : 'Back to the table (Esc)'} aria-label="Close" onclick={closeBigCell}>
 					<Icon name="close" size={18} />
 				</button>
 			</div>
 			<!-- One editor for a cell, whatever it holds: words are typed, a
 			     drawing is drawn — on the same surface the card opens, in this
-			     same room, live, with the pager below stepping down the column
-			     through either. Keyed on the cell, so each row's drawing starts
+			     same room, with the pager below stepping down the column through
+			     either, and the drawing's Delete and Save beside it. Keyed on the cell, so each row's drawing starts
 			     with its own board and its own undo. A locked table shows the
 			     picture and nothing to draw with. -->
 			{#if kind === 'drawing' && !locked}
 				{@const look = drawingFor(open.column)}
 				{#key `${open.row}:${open.column}:${drawEpoch}`}
 					<BitmapEditor
-						inline
+						bind:this={board}
 						box={{ pixels: look.pixels }}
 						value={drawingSource(text)}
 						ink={look.ink}
 						onsave={(dataUrl, pixels) => drew(open.row, open.column, dataUrl, pixels)}
-						oncancel={closeBigCell}
+						ondirty={(d) => (boardDirty = d)}
 					/>
 				{/key}
 			{:else if kind !== 'text'}
@@ -1974,6 +2069,18 @@
 		</div>
 	</div>
 {/if}
+
+<!-- A picture's two acts, at the far end of the panel's bar as they are in
+     the Images tray: Delete in red, then Save, lit while there is drawing to
+     keep. -->
+{#snippet drawingButtons(present: boolean, remove: () => void)}
+	<button class="danger" disabled={!present && !boardDirty} title="Delete this drawing" onclick={remove}>
+		<Icon name="trash" size={15} /> Delete
+	</button>
+	<button class="primary" disabled={!boardDirty} title="Save this drawing (Ctrl/Cmd+S)" onclick={() => board?.save()}>
+		Save
+	</button>
+{/snippet}
 
 <style>
 	.data {

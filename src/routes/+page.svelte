@@ -2,7 +2,6 @@
 	import { tick, untrack } from 'svelte';
 	import { base } from '$app/paths';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
-	import BitmapEditor from '$lib/components/BitmapEditor.svelte';
 	import ImagesPanel from '$lib/components/ImagesPanel.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
@@ -915,12 +914,8 @@
 		return true;
 	}
 
-	/** the area whose picture is being drawn, if any — full screen, never in place */
-	let drawing = $state<string | null>(null);
-	const drawingBox = $derived(drawing ? (template.boxes.find((b) => b.id === drawing) ?? null) : null);
-
 	/**
-	 * What the drawing surface opens on.
+	 * What an area with no column is drawn on top of.
 	 *
 	 * A data URL, or one of this browser's own images, can be drawn on top of.
 	 * An address from somewhere else cannot: drawing a cross-origin picture onto
@@ -928,57 +923,44 @@
 	 * drawn — so the drawing could never be saved. That one case opens blank
 	 * rather than opening on something it would lose.
 	 */
-	const drawingValue = $derived.by(() => {
-		const box = drawingBox;
-		if (!box) return '';
-		const column = box.slot ? mapping[box.slot] : undefined;
-		const written = column ? (row?.[column] ?? '') : (box.static?.dataUrl ?? box.static?.url ?? '');
-		const value = String(written).trim();
+	function areaDrawingValue(box: Box): string {
+		const value = String(box.static?.dataUrl ?? box.static?.url ?? '').trim();
 		if (value.startsWith('data:image/')) return value;
 		const name = localImageName(value);
 		return name ? (images[name] ?? '') : '';
-	});
+	}
+
+	/** An area with no column, asked to be drawn in the side panel. */
+	let areaRequest = $state<{ id: string; name: string; value: string; pixels?: { w: number; h: number }; ink: string } | null>(null);
 
 	/**
-	 * A drawing goes where the words of that area go: into the row's cell when it
-	 * is bound to a column, so every row can have its own picture and it travels
-	 * with the table, and onto the area itself when it is not. One undo entry
-	 * however many strokes it took — the editor's own undo goes no further than
-	 * the editor.
+	 * A drawing onto an area with no column: it has no cell, so it goes onto
+	 * the area, replacing an address the area was showing — the same "last one
+	 * in is shown" the bar's Source field follows.
 	 */
-	function saveDrawing(dataUrl: string, pixels: { w: number; h: number } | undefined) {
-		const box = drawingBox;
-		drawing = null;
+	function saveAreaDrawing(id: string, dataUrl: string, pixels: { w: number; h: number } | undefined) {
+		const box = template.boxes.find((b) => b.id === id);
 		if (!box) return;
 		describe('Draw');
-		const column = box.slot ? mapping[box.slot] : undefined;
 		const current = $state.snapshot(box) as Box;
-		if (column && row) {
-			if (refuseLockedTable()) return;
-			dataset = {
-				...dataset,
-				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: dataUrl } : r))
-			};
-			// The drawing goes in the cell, but the board is remembered on the
-			// area: it is where the next row's drawing starts. A row that already
-			// holds a picture of another size still opens at that size — what is
-			// in the cell wins over what the area remembers.
-			if (JSON.stringify(pixels ?? null) !== JSON.stringify(box.pixels ?? null)) {
-				updateBox({ ...current, pixels });
-			}
-		} else {
-			// The drawing replaces an address the area was showing, the same
-			// "last one in is shown" the bar's Source field follows.
-			const { url: _address, ...kept } = box.static ?? {};
-			updateBox({ ...current, pixels, static: { ...kept, dataUrl } });
-		}
+		const { url: _address, ...kept } = current.static ?? {};
+		updateBox({ ...current, pixels, static: { ...kept, dataUrl } });
+	}
+
+	/** The area's picture gone, drawn or pointed at; its board size stays. */
+	function deleteAreaDrawing(id: string) {
+		const box = template.boxes.find((b) => b.id === id);
+		if (!box) return;
+		describe('Delete the drawing');
+		const current = $state.snapshot(box) as Box;
+		const { url: _address, dataUrl: _drawn, ...kept } = current.static ?? {};
+		updateBox({ ...current, static: Object.keys(kept).length ? kept : undefined });
 	}
 
 	// ---- undo/redo ----------------------------------------------------------
 
 	/**
-	 * A drawing made in the table's full-size editor, as it is drawn — the
-	 * same write a drawing from the modal makes into a cell, live. The board is
+	 * A drawing saved from the side panel into a cell. The board is
 	 * remembered on the picture areas that print the column, as it is when the
 	 * drawing is opened from one of them: where the next row's drawing starts.
 	 */
@@ -1003,23 +985,30 @@
 	}
 
 	/**
-	 * Drawing, asked for from an area. One bound to a column draws into this
-	 * row's cell, and that is the table's full-size editor — the same room its
-	 * words are edited in, with the pager to step down the rows. An area with
-	 * no column has no cell, and draws in the dialog.
+	 * Drawing, asked for from an area — always in the side panel. One bound to
+	 * a column draws into this row's cell, in the table's full-size editor,
+	 * with the pager to step down the rows. One with no column has no cell,
+	 * but draws in the same place, onto the area; a locked table is no reason
+	 * to refuse that, since nothing in the table changes.
 	 */
 	function drawArea(id: string) {
 		const box = template.boxes.find((b) => b.id === id);
 		const column = box?.slot ? mapping[box.slot] : undefined;
 		if (!box) return;
-		if (!column || !row) {
-			drawing = id;
-			return;
-		}
-		if (refuseLockedTable()) return;
+		if (column && row && refuseLockedTable()) return;
 		dataOpen = true;
 		imagesOpen = false;
-		cellRequest = { row: activeRow, column, draw: true };
+		if (column && row) {
+			cellRequest = { row: activeRow, column, draw: true };
+			return;
+		}
+		areaRequest = {
+			id,
+			name: box.slot?.trim() || 'Drawing',
+			value: areaDrawingValue(box),
+			pixels: box.pixels,
+			ink: box.color ?? template.defaults.color
+		};
 	}
 
 	/** A stored picture, opened large in the Images tray. */
@@ -2646,7 +2635,6 @@
 				boxMenu !== null ||
 				deletingTable ||
 				editingId !== null ||
-				drawing !== null ||
 				magic !== null}
 			{selectedBoxes}
 			onalign={alignSelection}
@@ -2745,6 +2733,9 @@
 				{images}
 				{drawingFor}
 				ondrawn={drawIntoCell}
+				{areaRequest}
+				onsavearea={saveAreaDrawing}
+				ondeletearea={deleteAreaDrawing}
 				onopenimage={openImage}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
@@ -3268,16 +3259,6 @@
 		onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 		onnotice={notify}
 		onclose={() => (previewOpen = false)}
-	/>
-{/if}
-
-{#if drawingBox}
-	<BitmapEditor
-		box={drawingBox}
-		value={drawingValue}
-		ink={drawingBox.color ?? template.defaults.color}
-		onsave={saveDrawing}
-		oncancel={() => (drawing = null)}
 	/>
 {/if}
 

@@ -645,8 +645,9 @@ a notice can appear.
   **drawing surface** rather than as text: the same board and tools the card
   opens, in this same room, and the pager steps down the column through words
   and drawings alike. A cell pointing at a stored picture (`local:name`) shows
-  that picture too, and opens it large in **Images** instead — see below. It
-  edits the cell itself, live — every stroke as every keystroke — so the
+  that picture too, and opens it large in **Images** instead — see below. A
+  drawing is kept with **Save** in the bar, beside **Delete** — see *Drawing
+  one* below. Words are edited live, so the
   card follows as you type and undo reaches every change; the **×** at the top
   right, Esc or Ctrl/Cmd+Enter put the table back. The words are set at twice
   the table's size, for reading at length. On a locked table none of
@@ -811,24 +812,28 @@ at its own size.
   twice — they share one store, because an image is an image. Which store that is, and how to
   empty it, is **Images** in the toolbar — see below.
 - **Drawing one** — double-click an image area, press the **pen** beside the
-  page, or press **Draw…** in the area bar. An area bound to a column draws into
-  this row's cell, so the drawing surface opens in the table's **full-size
-  editor**, over the rows: the card stays in view beside it, the pager under it
-  steps to the same cell in the next row, and every stroke goes into the cell as
-  it is made — there is no Done or Cancel, the **×** or Escape closes it and the
-  app's undo reaches what was drawn. An area with no column has no cell, and
-  draws in a **dialog**, like the CSS editor's — the card stays in view round
-  it, and the dialog can be **dragged by its title** to see what it covers. The pen appears
+  page, or press **Draw…** in the area bar, and the drawing surface opens in the
+  **side panel**, in the table's room, with the card in view beside it. An area
+  bound to a column draws into this row's cell, and the pager under it steps to
+  the same cell in the next row; an area with no column draws onto the area
+  itself, in the same place — a locked table does not stop that, since nothing
+  in the table changes. **Save** and **Delete** are at the far end of the
+  panel's bar, where the Images tray has them: Save (or
+  <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>S</kbd>) writes the drawing, and each save
+  is one entry in the app's undo however many strokes it took; Delete takes the
+  drawing out of the cell or off the area, and undo brings it back. While there
+  is drawing not yet saved, Save is lit and the pager waits; the **×** or
+  Escape closes the panel and drops it. The pen appears
   under **Area** whenever the one area you have selected is one a drawing can go
   in, which is the same rule the bar follows. Never in place: an area on a card
   is often a centimetre across, which is somewhere to show a drawing and nowhere
   to make one. The board's size sits above it, and the board is always drawn as
-  large as the dialog has room for, so there is never a scrollbar round it.
+  large as the panel has room for, so there is never a scrollbar round it.
   Under it the tools are two rows: a pen in the area's own colour, a **line** —
   press where it starts, let go where it ends — a rubber, three nib widths, undo
   and redo, and a **light or dark checkerboard**; then **rotate** and **crop**,
-  **copy** and **paste**, and at the far end **Delete** (in red, as everywhere),
-  and in the dialog **Cancel** and **Done**.
+  **copy** and **paste**, and a rubber for the whole board, **clear**, which
+  undo brings back.
 
   **Rotate** turns the drawing a quarter turn clockwise, board and all — the
   budget does not notice, because the same pixels are arranged the other way up.
@@ -839,11 +844,10 @@ at its own size.
   refuses the clipboard says so in the header rather than failing quietly. All
   four are one undo away, board and all.
 
-  In the dialog, Escape or **Cancel** leaves the area as it was, and the whole
-  drawing is *one* entry in the app's own undo however many strokes it took.
-  <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Z</kbd> steps back inside the surface,
-  either way — in the table it is the board's own while the board has the
-  focus, and the cell follows it.
+  <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Z</kbd> steps back inside the surface while
+  the board has the focus, which a stroke gives it; every other key but Escape
+  stays with the board too, so a Delete or an arrow meant for it never reaches
+  an area on the card.
 
   The board is **64 by 64 pixels' worth**, spent however you like: type a width
   and the height moves to pay for it, so 64 × 64, 128 × 32 and 512 × 8 are all
@@ -936,7 +940,8 @@ rather than a dialog, so the card that uses the pictures stays in view.
   at a stored picture, and it fills the tray, with its size in pixels at the
   head and a **‹ 1 / 5 ›** pager at the foot. **Rotate** turns it a quarter
   either way; **Crop** lets you drag a frame over it and **Apply Crop** keeps
-  what is inside. Nothing is written until **Save**, which puts the edit over
+  what is inside. **Delete** and **Save** are at the far end of the bar, as a
+  drawing's are; Delete asks first. Nothing is written until **Save**, which puts the edit over
   the stored file under the same name — so every card and every cell pointing
   at it shows the change — and **Revert** goes back to what is stored. Undo
   does not reach a saved edit: the bytes are not in it. While an edit is
