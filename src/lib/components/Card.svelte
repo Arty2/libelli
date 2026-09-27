@@ -364,6 +364,10 @@
 				// An unbound one says what it is waiting for.
 				(box.slot && mapping[box.slot]) ||
 				box.slot ||
+				// Its own words, where they are a placeholder that came back empty
+				// on this row: `{{link}}` says what will be here, which "Area" did
+				// not — and shows the template to someone who has to fix it.
+				(!box.slot && box.static?.text?.includes('{{') ? box.static.text.trim() : '') ||
 				(pictureKind(box) ? 'Image' : 'Area')
 			: '';
 
