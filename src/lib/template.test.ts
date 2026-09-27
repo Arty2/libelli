@@ -36,20 +36,21 @@ describe('the built-in template', () => {
 	const template = builtinTemplate();
 
 	it('loads with its boxes, anchors and bleed intact', () => {
-		expect(template.name).toBe('A5 Starter Template');
-		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff' });
-		expect(template.boxes.map((b) => b.id)).toEqual(['b_accent', 'b_title', 'b_subtitle', 'b_body', 'b_sketch', 'b_category', 'b_date', 'b_qr']);
-		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 8 });
-		expect(template.boxes.find((b) => b.id === 'b_category')?.anchor).toBeNull();
+		expect(template.name).toBe('A5 Starter Booklet');
+		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff', margin: { top: 11, right: 14, bottom: 8, left: 14 } });
+		expect(template.boxes.map((b) => b.id)).toEqual(['b_accent', 'b_category', 'b_title', 'b_subtitle', 'b_body', 'b_sketch', 'b_link', 'b_date', 'b_qr', 'b_notes']);
+		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 6 });
+		expect(template.boxes.find((b) => b.id === 'b_title')?.anchor).toEqual({ to: 'b_category', gap: 5 });
 		expect(template.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });
-		expect(template.print.enabled).toBe(false);
+		// Printed as it says on card 4: two to an A4 sheet, in a zine's order.
+		expect(template.print).toMatchObject({ enabled: true, count: 2, order: 'zine', sheet: { w: 210, h: 297 } });
 	});
 
 	it('keeps the markdown metrics on the body box', () => {
 		expect(template.boxes.find((b) => b.id === 'b_body')?.md?.list).toEqual({
-			indent: 7,
-			markerGap: 4,
-			itemSpacing: 1.5
+			indent: 6,
+			markerGap: 3,
+			itemSpacing: 1.2
 		});
 	});
 });
@@ -142,7 +143,7 @@ describe('normaliseTemplate', () => {
 		expect(t.boxes[0]).toMatchObject({
 			padding: 2,
 			borderWidth: 0.4,
-			borderColor: '#b42318',
+			borderColor: '#ff0000',
 			borderRadius: 1.5,
 			background: '#eee8d5'
 		});
@@ -215,7 +216,7 @@ describe('normaliseTemplate', () => {
 
 	it('falls back to the default text color when a template names an unusable one', () => {
 		expect(normaliseTemplate({ schema: 2, defaults: { color: 'burnt sienna' }, boxes: [] }).defaults.color).toBe('#000000');
-		expect(normaliseTemplate({ schema: 2, defaults: { color: 'navy' }, boxes: [] }).defaults.color).toBe('#14306b');
+		expect(normaliseTemplate({ schema: 2, defaults: { color: 'navy' }, boxes: [] }).defaults.color).toBe('#000080');
 	});
 
 	it('falls back to white for a page color it cannot parse', () => {

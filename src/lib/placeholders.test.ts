@@ -128,3 +128,45 @@ describe('typing a placeholder', () => {
 		expect(placeholderChoices('', ['a'])).toEqual(['a', 'date']);
 	});
 });
+
+describe('find and replace after a column', () => {
+	const row = { title: 'Cells can do more than words', city: 'New York', date: 'yesterday' };
+
+	it('replaces every occurrence, literally and case-sensitively', () => {
+		expect(applyPlaceholders('{{title:words:that}}', { row })).toBe('Cells can do more than that');
+		expect(applyPlaceholders('{{title: :-}}', { row })).toBe('Cells-can-do-more-than-words');
+		expect(applyPlaceholders('{{title:Words:that}}', { row })).toBe('Cells can do more than words');
+		expect(applyPlaceholders('{{city:.:!}}', { row })).toBe('New York');
+	});
+
+	it('deletes on an empty replacement, keeps colons in the replacement, and ignores an empty find', () => {
+		expect(applyPlaceholders('{{title: words:}}', { row })).toBe('Cells can do more than');
+		expect(applyPlaceholders('{{city:New :at: }}', { row })).toBe('at: York');
+		expect(applyPlaceholders('{{city::x}}', { row })).toBe('New York');
+	});
+
+	it('reads \\: as a colon in either part, and splits only at one that is not escaped', () => {
+		const times = { time: '9:30', ratio: 'a:b:c', path: 'C:\\temp' };
+		expect(applyPlaceholders('{{time:\\:: h }}', { row: times })).toBe('9 h 30');
+		expect(applyPlaceholders('{{ratio:\\::\\:\\:}}', { row: times })).toBe('a::b::c');
+		expect(applyPlaceholders('{{ratio:\\:: to }}', { row: times })).toBe('a to b to c');
+		// A backslash before anything else is only a backslash.
+		expect(applyPlaceholders('{{path:\\t:/t}}', { row: times })).toBe('C:/temp');
+		// One escaped colon and no other is still one part: not a find and replace.
+		expect(applyPlaceholders('{{time:\\:}}', { row: times })).toBe('{{time:\\:}}');
+	});
+
+	it('takes both colons to mean it: one part after a column is still not a column', () => {
+		expect(applyPlaceholders('{{city:York}}', { row })).toBe('{{city:York}}');
+		// …and a single part after `date` is still a date format, column or no column.
+		expect(applyPlaceholders('{{date:YYYY}}', { row, now: DAY })).toBe('2026');
+	});
+
+	it('is never a way for a cell to quote itself', () => {
+		expect(applyPlaceholders('{{title:a:b}}', { row, self: 'title' })).toBe('{{title:a:b}}');
+	});
+
+	it('counts as naming the column', () => {
+		expect(referencedColumns('{{city: :_}} and {{date:YYYY}}', ['city', 'title'])).toEqual(['city']);
+	});
+});

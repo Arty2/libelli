@@ -28,6 +28,12 @@ export interface HandStroke {
 	dash?: string;
 	/** round, so that a dotted border is drawn as dots rather than as flecks */
 	cap?: 'round';
+	/**
+	 * A closed outline rather than a line along one edge — a stamp's paper,
+	 * which the renderer fills with the border color so that what is under
+	 * the perforations shows through them.
+	 */
+	closed?: boolean;
 }
 
 export interface HandBorderSpec {
@@ -41,6 +47,11 @@ export interface HandBorderSpec {
 	style: BorderStyle;
 	/** anything stable and distinct per box — its id */
 	seed: string;
+	/**
+	 * Drawn true rather than by hand. Only a stamp is ever asked for this way:
+	 * every other style drawn straight is a CSS border, and never reaches here.
+	 */
+	steady?: boolean;
 }
 
 /**
@@ -126,7 +137,7 @@ const EDGES: Edge[] = ['top', 'right', 'bottom', 'left'];
  * border would; a double border is two thirds-width lines with a third between
  * them, which is what a browser draws and so what this has to match.
  */
-const PASSES: Record<BorderStyle, Array<{ inset: number; width: number }>> = {
+const PASSES: Record<Exclude<BorderStyle, 'stamp'>, Array<{ inset: number; width: number }>> = {
 	solid: [{ inset: 0.5, width: 1 }],
 	dashed: [{ inset: 0.5, width: 1 }],
 	dotted: [{ inset: 0.5, width: 1 }],
@@ -137,7 +148,7 @@ const PASSES: Record<BorderStyle, Array<{ inset: number; width: number }>> = {
 };
 
 /** The dash pattern for a style, in multiples of the stroke's own width. */
-function dashFor(style: BorderStyle, width: number): Pick<HandStroke, 'dash' | 'cap'> {
+function dashFor(style: Exclude<BorderStyle, 'stamp'>, width: number): Pick<HandStroke, 'dash' | 'cap'> {
 	if (style === 'dashed') return { dash: `${round(width * 3)} ${round(width * 2)}` };
 	// A zero-length dash with a round cap is a dot; a butt cap would draw
 	// nothing at all, which is how a dotted border disappears.
@@ -152,8 +163,9 @@ function dashFor(style: BorderStyle, width: number): Pick<HandStroke, 'dash' | '
  * how an area with only a bottom border comes out as an underline rather than
  * as three quarters of a box.
  */
-export function handBorder({ w, h, widths, radius, style, seed }: HandBorderSpec): HandStroke[] {
+export function handBorder({ w, h, widths, radius, style, seed, steady }: HandBorderSpec): HandStroke[] {
 	const rng = seeded(seed);
+	if (style === 'stamp') return stamp(w, h, widths, steady ? null : rng);
 	const strokes: HandStroke[] = [];
 	// Never more than half the shorter side, the same limit CSS puts on a
 	// radius: past that the two corners of an edge would cross each other.
@@ -198,4 +210,63 @@ export function handBorder({ w, h, widths, radius, style, seed }: HandBorderSpec
 		}
 	}
 	return strokes;
+}
+
+/**
+ * A postage stamp's edge: the outline of the paper, with a half-round notch
+ * bitten out of it at every perforation.
+ *
+ * One closed path rather than four strokes, because it is a shape and not a
+ * line — the renderer fills it with the border color, the paper, and prints
+ * the area's background as a field inside the padding, so the page shows
+ * through the notches and a `drop-shadow()` on the area follows them. One
+ * width, the heaviest edge's: a sheet of stamps is torn along a single row of
+ * holes. The radius is ignored, as it is on every stamp that was ever
+ * perforated.
+ *
+ * The holes are spaced to fit each edge exactly, half a gap from each corner,
+ * so the corners come out alike rather than one ending mid-notch. Drawn by hand
+ * (`rng`), the corners wander and each hole is punched a little off true;
+ * steady, every hole is the same.
+ */
+function stamp(w: number, h: number, widths: Sides, rng: (() => number) | null): HandStroke[] {
+	const width = Math.max(widths.top, widths.right, widths.bottom, widths.left);
+	if (width <= 0 || w <= 0 || h <= 0) return [];
+	// The line runs down the middle of the border's room, as every other
+	// style's does, so the paper ends where a CSS border would.
+	const inset = width / 2;
+	// Holes sized to the line rather than to the area: a stamp's perforations
+	// are the same size on a large stamp as on a small one.
+	const hole = Math.min(0.7 + width, Math.min(w, h) / 6);
+	const pitch = hole * 2.8;
+	const jitter = (amount: number) => (rng ? (rng() - 0.5) * 2 * amount : 0);
+	const corners: Point[] = [
+		{ x: inset, y: inset },
+		{ x: w - inset, y: inset },
+		{ x: w - inset, y: h - inset },
+		{ x: inset, y: h - inset }
+	].map((p) => ({ x: p.x + jitter(WOBBLE / 2), y: p.y + jitter(WOBBLE / 2) }));
+
+	let d = `M${pt(corners[0])}`;
+	for (let i = 0; i < 4; i++) {
+		const from = corners[i];
+		const to = corners[(i + 1) % 4];
+		const length = Math.hypot(to.x - from.x, to.y - from.y);
+		const count = Math.max(1, Math.round(length / pitch));
+		const step = length / count;
+		const at = (along: number): Point => ({
+			x: from.x + ((to.x - from.x) * along) / length,
+			y: from.y + ((to.y - from.y) * along) / length
+		});
+		for (let k = 0; k < count; k++) {
+			// Never so wide that two holes meet, or a hole reaches the corner.
+			const r = Math.min(hole * (1 + jitter(0.12)), step * 0.4);
+			const centre = (k + 0.5) * step + jitter(step * 0.06);
+			// Sweep 0: going round clockwise, that is the half circle that bites
+			// into the paper rather than bulging out of it.
+			d += `L${pt(at(centre - r))}A${round(r)} ${round(r)} 0 0 0 ${pt(at(centre + r))}`;
+		}
+		d += `L${pt(to)}`;
+	}
+	return [{ d: `${d}Z`, width: round(width), closed: true }];
 }

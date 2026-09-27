@@ -41,13 +41,17 @@ import type { Box, Defaults, Mapping, PageSpec, Row } from './types';
  * Two roles are small lines with a place of their own. A `detail` stacks under
  * the subtitle — the medium of a work, a film's duration, a size — because it
  * belongs to the heading it describes. A `credit` is the very last line of the
- * card, under the rest of the foot, where a credit line is printed.
+ * card, under the rest of the foot, where a credit line is printed. A
+ * `footnote` is small type straight under the body — Markdown, like the body,
+ * since a note is often a sentence with a link in it — and the body leaves it
+ * room above the foot rather than running down to it.
  */
 export type FieldKind =
 	| 'title'
 	| 'subtitle'
 	| 'detail'
 	| 'body'
+	| 'footnote'
 	| 'label'
 	| 'credit'
 	| 'number'
@@ -83,6 +87,7 @@ export const FIELD_KINDS: FieldKind[] = [
 	'subtitle',
 	'detail',
 	'body',
+	'footnote',
 	'label',
 	'number',
 	'date',
@@ -95,15 +100,16 @@ export const FIELD_KINDS: FieldKind[] = [
 export const KIND_LABELS: Record<FieldKind, string> = {
 	title: 'Title',
 	subtitle: 'Subtitle',
-	detail: 'Detail line',
+	detail: 'Detail',
 	body: 'Body',
-	label: 'Small line',
+	footnote: 'Footnote',
+	label: 'Byline',
 	number: 'Number',
 	date: 'Date',
 	image: 'Image',
 	link: 'QR code',
 	code: 'Code',
-	credit: 'Credit line'
+	credit: 'Credit'
 };
 
 // ---- reading a column ------------------------------------------------------
@@ -136,6 +142,7 @@ const NAME_HINTS: Array<[FieldKind, string[]]> = [
 	// `detail` and `credit` first: they are the most specific, and a heading
 	// that names one — Running time, Photo credit — is sure of it.
 	['detail', ['medium', 'media', 'material', 'materials', 'technique', 'dimensions', 'duration', 'runtime', 'runningtime', 'length', 'edition', 'format', 'instrumentation', 'ingredients']],
+	['footnote', ['footnote', 'footnotes', 'endnote', 'endnotes', 'annotation', 'annotations', 'sidenote', 'aside', 'fn']],
 	['credit', ['credit', 'credits', 'photocredit', 'copyright', 'courtesy', 'acknowledgement', 'acknowledgements', 'acknowledgment', 'rights', 'license', 'licence', 'collection', 'lender', 'provenance', 'source', 'sponsor', 'sponsors', 'funding']],
 	['title', ['title', 'name', 'heading', 'header', 'headline', 'card', 'product', 'item', 'term', 'word', 'question', ...PEOPLE]],
 	['subtitle', ['subtitle', 'sub', 'tagline', 'caption', 'role', 'byline', 'strapline', 'summary', 'artwork', 'work', 'piece', 'series', 'album', 'track', 'song', 'film', 'book', 'show', 'project', 'position', 'jobtitle', 'affiliation', 'organisation', 'organization', 'company']],
@@ -255,6 +262,11 @@ export function classifyColumn(column: string, values: string[]): FieldGuess {
 	// what it becomes if it is let back in and then filled.
 	if (stats.filled === 0) return { column, kind: 'label', sure: false, sample, include: false };
 
+	// A footnote is named, never measured: it is prose by nature, and the
+	// heading is the one thing that tells it from the body it sits under.
+	if (named === 'footnote' && shape !== 'image' && shape !== 'link') {
+		return { column, kind: 'footnote', sure: true, sample };
+	}
 	// Prose is the one thing that overrules a shape: a column of long text is a
 	// body even where every cell happens to parse as something else.
 	const prose = stats.median > BODY_LENGTH || values.some((v) => MARKUP.test(v ?? ''));
@@ -534,6 +546,9 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	const subtitleField = pick('subtitle');
 	const bodyField = pick('body');
 	const imageField = pick('image');
+	const footnotes = guesses.filter((g) => g.kind === 'footnote');
+	/** A line each, and a gap above them — what the body leaves room for. */
+	const footnoteRoom = footnotes.length ? footnotes.length * smallH + gap : 0;
 
 	let previous: Box | null = null;
 	/**
@@ -646,7 +661,7 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 			// Whole steps, rounded down: where the footer sits off the grid — on a
 			// bottom margin that is not a grid line — the gap above it takes the
 			// difference, not the body's height.
-			down(footTop - gap - (previous ? cursor + gap : top))
+			down(footTop - gap - footnoteRoom - (previous ? cursor + gap : top))
 		);
 		stack(
 			{
@@ -672,6 +687,26 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 			gap
 		);
 	}
+
+	// Footnotes, straight under the body, in column order: small, grey and
+	// Markdown, like the body they annotate. They grow, so the line each was
+	// given above is a starting height, not a limit.
+	footnotes.forEach((field, index) => {
+		stack(
+			{
+				slot: field.column,
+				x: margin,
+				w: contentW,
+				h: smallH,
+				size: smallSize,
+				lineHeight: 1.3,
+				color: '#555555',
+				mode: 'markdown',
+				overflow: 'grow'
+			},
+			index === 0 && previous ? gap : 0
+		);
+	});
 
 	// Anything left that is neither foot nor head — a second picture, a second
 	// thing to scan — follows the body as a small line, so it is on the card and

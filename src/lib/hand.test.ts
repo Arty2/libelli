@@ -105,3 +105,34 @@ describe('handBorder', () => {
 		expect(long).toBeGreaterThan(short);
 	});
 });
+
+describe('a stamp', () => {
+	const stamp = (over: Partial<Parameters<typeof handBorder>[0]> = {}) => border({ style: 'stamp', ...over });
+
+	it('is one closed outline, as wide as the heaviest edge', () => {
+		const strokes = stamp({ widths: { top: 0.2, right: 0.5, bottom: 0, left: 0.3 } });
+		expect(strokes).toHaveLength(1);
+		expect(strokes[0].closed).toBe(true);
+		expect(strokes[0].width).toBe(0.5);
+		expect(strokes[0].d.endsWith('Z')).toBe(true);
+	});
+
+	it('bites a hole out of every edge, spaced to fit it', () => {
+		const holes = (d: string) => (d.match(/A/g) ?? []).length;
+		const steady = stamp({ steady: true })[0].d;
+		// 60 by 40 at 0.5mm: holes of 1.2mm on a 3.36mm pitch — 18 and 12 a side.
+		expect(holes(steady)).toBe(2 * 18 + 2 * 12);
+		// Drawn by hand the holes wander, but there are as many of them.
+		expect(holes(stamp()[0].d)).toBe(holes(steady));
+		expect(stamp()[0].d).not.toBe(steady);
+	});
+
+	it('is drawn true when steady, whatever the seed', () => {
+		expect(stamp({ steady: true, seed: 'a' })).toEqual(stamp({ steady: true, seed: 'b' }));
+		expect(start(stamp({ steady: true })[0].d)).toBe('0.25 0.25');
+	});
+
+	it('draws nothing without a width', () => {
+		expect(stamp({ widths: even(0) })).toEqual([]);
+	});
+});

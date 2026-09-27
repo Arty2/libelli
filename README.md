@@ -219,7 +219,12 @@ resize boxes directly, or type exact millimetres.
   `{{date}}` prints today's date, and `{{date:YYYY-MM-DD}}` prints it in a
   format of your own: `YYYY`, `YY`, `MM`, `DD` for the numbers, `MMMM`, `MMM`,
   `dddd`, `ddd` for the names. A column called `date` wins over the date; a
-  format after the colon only ever means the date. Deliberately small — no
+  format after the colon only ever means the date. After a column, a find and
+  a replace change it on the way in: `{{title:words:that}}` swaps every
+  `words` for `that`, `{{title: :-}}` puts hyphens for spaces, and an empty
+  replacement deletes. Literal and case-sensitive, never a pattern; the find
+  ends at the first colon, so the replacement may hold colons, and a colon to
+  *find* is written `\:` — `{{time:\:: h }}` turns `9:30` into `9 h 30`. Deliberately small — no
   conditionals, no loops — and anything in braces it does not recognise is left
   exactly as written. No time of day: a card is printed once and read for
   months.
@@ -317,7 +322,7 @@ resize boxes directly, or type exact millimetres.
 - **Colors with alpha** — every color field is a swatch and an opacity in
   percent beside it: text, paper, fill, border and a QR's background alike.
   Opaque, a color is stored as the hex it always was; otherwise as `rgba()`.
-- **A border drawn by hand** — the pencil beside the border color draws it
+- **A border drawn by hand** — **Draft**, beside the border color, draws it
   wobbling, as a line rather than a rule. Width, style and radius all still
   mean what they meant: a dashed 1mm hand border is dashed, 1mm and hand-drawn,
   and a dotted one is dots. Each edge is drawn with its own width, so an area
@@ -329,6 +334,21 @@ resize boxes directly, or type exact millimetres.
   It is an SVG over the room the CSS border was already holding, so switching
   it on moves no text and changes no measurement, and it prints and exports
   like anything else on the card.
+- **Off the page** — an area can sit beside the page, on the pasteboard, where
+  it is drawn in the editor and never printed or exported: the A5 Starter Booklet
+  keeps a post-it of each row's `notes` there. Lock it and the button that
+  brings stray areas back leaves it alone — a locked area *wholly* off the
+  paper is parked, not lost. Half off still counts as stray, locked or not,
+  because the half on the paper still prints cut.
+- **A stamp** — the **Stamp** border style is a postage stamp: perforated
+  paper in the **border color**, with a half-round hole bitten out at every
+  perforation so the page shows through, and the area's **fill** printed on it
+  as a field inside the padding — the padding is the stamp's margin. The width
+  sets the size of the holes; the radius does not apply. It is always
+  drawn as SVG, since no CSS border can draw it, and **Draft** decides whether
+  it is punched true or by hand. A `filter: drop-shadow(…)` on the area in the
+  template's CSS follows the perforations, which is how the A5 Starter Booklet's stamp
+  sits off the page.
 - **Type without the bar** — <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> and the
   scroll wheel sizes whatever the pointer is over, in points, and the same
   modifiers with the arrows step the alignment of the selection in the direction
@@ -432,7 +452,10 @@ resize boxes directly, or type exact millimetres.
   alignment you *chose* mirrors with it, so text pushed against one edge hugs
   the other edge on the facing page, while an alignment inherited from the page
   defaults is left alone — body text reads the same way on both sides of a
-  spread. And **Outer**/**Inner** page numbers know which edge they are on.
+  spread. An area turned a quarter — 90° or -90°, words running up or down an
+  edge — is turned the opposite way on the facing page, so it faces that
+  page's outer edge; a smaller tilt is the same on both pages. And
+  **Outer**/**Inner** page numbers know which edge they are on.
   Mirroring is worked out as the page is drawn: the template stores one set of
   millimetres, measured on the right-hand page, so nothing is duplicated and
   turning the setting off puts everything back. Page through the rows and the
@@ -445,7 +468,10 @@ resize boxes directly, or type exact millimetres.
   and the page settings as well. A padlock appears on a locked area while it is selected, and it is a
   button: pressing it unlocks that area, the way the two anchor badges beside it
   undo what they say. Words can still be typed into an area on a locked page,
-  and a drawing opened and drawn on: those are content, not the design. A locked
+  and a drawing opened and drawn on: those are content, not the design. The
+  same holds for a locked *area* bound to a column — its words are the row's,
+  and only a locked **table** refuses them; an area holding its own words is
+  the design's, and its lock covers them too. A locked
   *page* shows a **padlock** at the head of the column beside the page, above
   *+ Area* — a button with no word on it, which unlocks the page when pressed —
   keeps the area bar closed when an area is selected (every field in it would
@@ -469,7 +495,7 @@ resize boxes directly, or type exact millimetres.
   A page lock is on the design, not on what it holds: **double-click an area**
   and its words can still be typed into, as can a cell. An area's own lock
   still refuses it, and so does a locked table for a bound area.
-- **CSS** — page setup has a CSS button; what you write there is saved
+- **CSS** — page setup has a CSS button, just left of the template's name; what you write there is saved
   inside the template and travels with it. Selectors are scoped to the card, so
   nothing in a template can restyle the editor around it, and `@import` and any
   `url()` pointing off this machine are stripped, so a template's CSS cannot
@@ -493,15 +519,17 @@ resize boxes directly, or type exact millimetres.
 **Several templates, one browser.** The **Template** field in page setup names the
 loaded template; the caret beside it opens every template this browser has saved,
 the open one ticked, with everything that acts on the template as a whole under a
-rule: **New Template…**, **Import…**, **Export**, and in red **Reset…** and
+rule: **New Template…**, **A5 Starter Booklet**, **Import…**, **Export**, and in red **Reset…** and
 **Delete…** (whose dialog still says **Delete Template**, so the button you
 confirm with names what goes). An export is named for the template and the
-day — `a5-starter-template_2026-09-25.json` — so a folder of them sorts by
+day — `a5-starter-booklet_2026-09-25.json` — so a folder of them sorts by
 date. **Lock** stays outside the menu, beside the field,
 because it is a state you need to see rather than an errand. Renaming is typing
 in the field — the template keeps its identity, so two of them may share a name
-without sharing anything else. Reset puts the starter card back under the same
-name; Delete removes the template and opens the next one, or a new empty
+without sharing anything else. **A5 Starter Booklet** opens the design a first run
+lands on, as it came: a copy nobody has changed if you have one, or a new one
+beside the rest — it never touches the template that is open. Reset puts the
+starter card back over the open template, under the same name; Delete removes the template and opens the next one, or a new empty
 template when it was the last one, so the card a first run lands on can be
 deleted like any other. Both ask first, and both are one Ctrl/Cmd+Z away — an
 undone delete is written back out under the id it had. The menu opens over the
@@ -538,19 +566,24 @@ has areas, a line above the buttons says how many are about to be replaced.
   `local:` images, colors, numbers, dates, Markdown, how long the text runs).
   Facts about the cells beat the heading; the heading beats mere length — except
   that a heading naming a detail or a credit beats a column of numbers.
-- **The kinds** — **Title**, **Subtitle**, **Detail line** (a small line stacked
+- **The kinds** — **Title**, **Subtitle**, **Detail** (a small line stacked
   under the subtitle: *Medium*, *Duration*, *Dimensions*, *Edition*),
-  **Body**, **Small line**, **Number** and **Date** (the foot), **Image**,
-  **QR code**, **Code**, and **Credit line** (*Credits*, *Courtesy*,
-  *Copyright*, *Collection*), which is always the foot's last line and is the
-  one kept when the foot runs out of room.
+  **Body**, **Footnote** (small Markdown straight under the body — *Footnote*,
+  *Endnote*, *Annotation*, *Aside* — read by its heading however long it runs,
+  with room left for it above the foot), **Byline**, **Number** and **Date**
+  (the foot), **Image**, **QR code**, **Code**, and **Credit** (*Credits*,
+  *Courtesy*, *Copyright*, *Collection*), which is always the foot's last line
+  and is the one kept when the foot runs out of room.
+- **The dialog** — dragged by its title, closed by its ×; a row left out stays
+  listed at half strength, its menu still yours to set, and **Guess** before a
+  menu marks a kind worked out from nothing but the length of the cells.
 - **A person over their work** — a heading that names a person (*Artist*,
   *Author*, *Director*, *Speaker*, *Designer* and the like) takes the title, and
   a column called *Title* beside it — the name of the work — becomes the
   subtitle. So *Artist, Artwork title, Medium, Description, Duration, Credits*
   comes out as the artist's name, the work's title under it, the medium and the
   duration as detail lines, the description as the body, and the credits at
-  the very bottom. A second subtitle becomes a detail line rather than a line
+  the very bottom. A second subtitle becomes a detail rather than a line
   in the foot.
 - **What it never reads** — what a cell *says*. It measures and matches patterns;
   it does not write your cards.
@@ -763,10 +796,9 @@ nesting, `1.` and `1)` ordered lists, `**bold**`, `*italic*`, `~~strikethrough~~
   and clicking a word to pick up the area it is in should not navigate away from
   a design that lives only in this tab.
 - **Per-word color** — `[a few words]{red}` or `[…]{#b42318}` colors just that
-  run. Hex, `rgb()`, `hsl()` and the CSS color keywords all work; seventeen
-  common names — `red`, `green`, `blue` and their neighbours — are deliberately
-  shadowed by a print-sensible palette, because CSS `red` is a screen color and
-  comes off a press as a shout. Write the hex if you want that exact value.
+  run. Hex, `rgb()`, `hsl()` and every HTML color name work, each name meaning
+  exactly what it means in a browser — `red` is `#ff0000` — plus `amber`, which
+  HTML lacks. Write a hex for a softer red on paper.
 - **Three levels of color** — a default text color for the card, a color for
   any single box, and the inline form above. A box's color beats the default;
   the inline form beats both.
@@ -1303,6 +1335,8 @@ name a key the app does not listen for.
 | <kbd>⇧</kbd> / <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + click | Add an area to the selection, or drop it |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>a</kbd> | Select every area |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>d</kbd> | Duplicate the selected areas |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>l</kbd> | Lock or unlock the selected areas |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>l</kbd> | Lock or unlock the design |
 | <kbd>Delete</kbd> / <kbd>Backspace</kbd> | Remove the selected areas |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>c</kbd> | Copy the selected area's words |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>v</kbd> | Paste plain text as a new area |
@@ -1317,7 +1351,7 @@ name a key the app does not listen for.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>p</kbd> / <kbd>s</kbd> | Export, for the fingers that reach for those |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + arrows | Step the alignment — left, right, top, bottom |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + scroll | Size the type in the area under the pointer |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll, pinch | Zoom the page |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll, pinch | Zoom the page — about the selected area, if there is one |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> | Zoom the page in or out |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>0</kbd> | Fit the page (<kbd>⇧</kbd> for 100%) |
 | <kbd>←</kbd> / <kbd>→</kbd> | Step through the cards, with one open full screen |
@@ -1326,7 +1360,7 @@ While a text field has focus, undo is left to the browser's own text history and
 <kbd>Delete</kbd> deletes characters — the app keeps its hands off both.
 Otherwise the arrow keys move the selected box wherever you are on the page. On
 a touch screen the same job is done by the four-way pad that appears beside the
-card — one cross with one outline, not five tiles in the shape of a cross — with
+card in **zoom and pan** (the button under Position Automagically) — one cross with one outline, not five tiles in the shape of a cross — with
 a chip in the middle cycling between 1mm, 5mm and 10mm; holding an arrow keeps
 it moving. The cross is drawn as a raised thing — lit from the top left, thicker
 along the bottom and right, casting one shadow of its own, and it goes down
@@ -1351,9 +1385,24 @@ towards it and down is away. They repeat on a hold like the arrows do.
   in the gaps between them — which is most of the page on a card that has been
   laid out. Type size is the **Size** field in the bar, or Ctrl/Cmd+Shift+scroll
   with a mouse: a pinch is how a phone zooms, and it means that here too.
+- **Zoom and pan** — the button under Position Automagically turns it on and
+  off; it wears **Move** while areas drag and the zoom-and-pan glyph while they
+  do not. On, an area no longer moves under a finger or the
+  mouse: one finger scrolls the page and two pinch it, a tap still chooses an
+  area and a second opens it, and the **nudge pad** appears to move the chosen
+  one — it shows only in this mode, at any width; hold its middle to put it
+  away, and the cross that appears under zoom and pan brings it back. The resize handles and the
+  lever still drag; they are small and grabbed on purpose. It starts **on**
+  where the main pointer is a finger — a phone or a tablet — and off with a
+  mouse; the button is the choice from then on.
 - **A second finger is never a drag.** An area that was moving under one finger
   goes back where it started the moment a second one lands, so a pinch zooms and
-  leaves the card alone.
+  leaves the card alone — the selection too: what the first finger touched is
+  not chosen by it.
+- **Zooming holds the chosen area in place.** With an area selected, a pinch,
+  Ctrl/Cmd+scroll or Ctrl/Cmd +/− zooms about it: it stays where it is on
+  screen and the page grows or shrinks around it, as far as the page can scroll.
+  With nothing selected the page zooms as it always has.
 - **Full screen, a pinch zooms the card** — up to six times, with a drag to move
   around it and a flick to page the run once it is back at rest. That is the one
   screen where zooming means what a phone means by it: the card is already as
@@ -1479,9 +1528,13 @@ than it has to.
   carries the six alignments as one icon row.
 
 - **Beside the page** — undo and redo at the top left, *+ Area* at the top
-  right, with the button that lays every area out from the columns (on an empty
-  template), the button that rescues stray areas, and the chip for Select
-  Multiple appearing under it when any of them has something to say. Next to the
+  right, with the button that lays every area out from the columns, the Move /
+  zoom-and-pan toggle, the button that rescues stray areas (Data collection's
+  arrows, all pointing in) and the chip for Select Multiple appearing under it
+  when any of them has something to say. On a locked page the column is the
+  padlock alone — nothing that would change the design is offered — and the
+  rescue button, greyed out, if something is off the page: still the sign
+  that it is, and unlocking is the way to act on it. Next to the
   thing they act on, rather than in the window's toolbar. None of it scrolls:
   the page moves inside the stage and every control stays where you left it,
   because a tool you have to scroll back to find is a tool that is not to hand.
@@ -1502,8 +1555,10 @@ than it has to.
   for every Mac (in any of its scaled modes), iPad and iPhone the app knows,
   and the commonest monitor for grids several share (marked as an estimate).
   A screen it does not know gets the browser's own millimetre. Hover it to see
-  which it was. The other steps follow under a rule. The menu is drawn like the
-  template picker's, as are the font menus. On a phone the two left-hand toggles keep their row and lose
+  which it was. The other steps follow under a rule. **Double-click or
+  double-tap** the zoom to go to **Fit** and a second time to come back to the
+  zoom you were at — or, from Fit with nothing to come back to, to Actual. The
+  menu is drawn like the template picker's, as are the font menus. On a phone the two left-hand toggles keep their row and lose
   their words — a **#** for the grid, a **|** for the guides and a **B** for
   the boxes, beside ticks
   that already say whether they are on — rather than stacking into a two-line

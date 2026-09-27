@@ -51,7 +51,7 @@
 	} from '$lib/boxops';
 	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport, withKey } from '$lib/keys';
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
-	import { sampleDataset, starterTemplate } from '$lib/onboarding';
+	import { isStarterTemplate, sampleDataset, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { cssIdent } from '$lib/css';
@@ -564,9 +564,9 @@
 		const storedTemplate = await loadTemplate();
 		// A first visit lands on the starter card locked: it is the tour, read
 		// before it is edited, and a stray drag on a phone should not rearrange
-		// it. The padlock above Area unlocks it. Only here — Reset and a new
-		// template are asked for by somebody who means to design.
-		if (!storedTemplate) template = { ...starterTemplate(), locked: true };
+		// it. The padlock above Area unlocks it. The lock is the template's own
+		// now, so Reset and A5 Starter Booklet bring it back locked too.
+		if (!storedTemplate) template = starterTemplate();
 		if (storedTemplate) {
 			try {
 				template = normaliseTemplate(storedTemplate);
@@ -831,11 +831,15 @@
 	function placeStoredImage(boxId: string, name: string) {
 		const box = template.boxes.find((b) => b.id === boxId);
 		if (!box) return;
-		if (template.locked || box.locked) {
+		// A bound area's picture goes into the row's cell, which answers to the
+		// table's lock rather than the area's or the design's; one holding its
+		// own picture is the design's, and a lock on either refuses it.
+		const bound = !!box.slot && !!mapping[box.slot];
+		if (!bound && (template.locked || box.locked)) {
 			notify('That area is locked — unlock it to put an image in it.', 'warning');
 			return;
 		}
-		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
+		if (bound && refuseLockedTable()) return;
 		placeImage(box, name);
 	}
 
@@ -927,6 +931,24 @@
 		if (!dataset.locked) return false;
 		notify('The table is locked — unlock it under the table to change its cells.', 'warning');
 		return true;
+	}
+
+	/**
+	 * Open an area for typing — unless what it would type into is a cell of a
+	 * locked table. Refused at the door, not at the first keystroke: the field
+	 * used to open and then turn every key away, which looks broken. An area of
+	 * its own words is the design's, not the table's, and still opens. Null is
+	 * the card closing it, which is never refused.
+	 */
+	function beginEditing(id: string | null) {
+		if (id === null) {
+			editingId = null;
+			return;
+		}
+		const box = template.boxes.find((b) => b.id === id);
+		if (!box) return;
+		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
+		editingId = id;
 	}
 
 	/**
@@ -1314,7 +1336,7 @@
 	 *
 	 * It used to arrive carrying the literal word "Text", so abandoning one left a
 	 * box on the card that said Text and had to be found and deleted. It starts
-	 * empty now, with the cursor already in the Text field — and it is provisional
+	 * empty now, its first typed character going into the Text field — and it is provisional
 	 * until it is given something: any text, a column to bind to, or any change to
 	 * how it looks. Moving and resizing do not count, because placing a box is
 	 * what you do while deciding whether you want it at all.
@@ -1336,9 +1358,12 @@
 		template = { ...template, boxes: [...template.boxes, box] };
 		selectedIds = [box.id];
 		provisional = box.id;
-		// After the bar has rendered for the new selection, or there is no field
-		// to put the cursor in yet.
-		void tick().then(() => boxBar?.focusText());
+		// The flash a cell's areas get when it is entered in the table: a new
+		// area is an empty frame, and on a busy page it is easy to lose.
+		flash([box.id]);
+		// No cursor in the Text field yet: the first key decides. Delete takes
+		// the area away and the arrows move it, as they would any area; a
+		// character goes into its Text field (see `onWindowKeydown`).
 	}
 
 	/**
@@ -1501,7 +1526,7 @@
 		template = starterTemplate();
 		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
-		notify('Template reset to the starter card. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
+		notify('Template reset to the A5 Starter Booklet. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
 	}
 
 	// ---- the template library -----------------------------------------------
@@ -1582,6 +1607,54 @@
 		await saveTemplateDoc(templateId, $state.snapshot(template));
 		await refreshLibrary();
 		notify(`“${next.name}” started. Your rows are untouched — press ${dataset.columns.length ? 'the shapes button beside the page to lay them out' : 'Import under the table to bring some in'}.`);
+	}
+
+	/**
+	 * A5 Starter Booklet: the design a first run lands on, as it came — the template
+	 * library's Getting Started.
+	 *
+	 * Never over the loaded template, and never over a copy anybody has changed:
+	 * it opens a copy of the starter already in the library untouched, if there
+	 * is one, and otherwise adds a fresh one beside the rest. Reset is the one
+	 * that puts the starter over what is open, and it asks first.
+	 */
+	async function a5Starter() {
+		const untouched = (raw: unknown) => {
+			try {
+				return isStarterTemplate(normaliseTemplate(raw));
+			} catch {
+				return false;
+			}
+		};
+		if (untouched($state.snapshot(template))) {
+			notify(`This is the A5 Starter Booklet, as it came.`);
+			return;
+		}
+		for (const entry of library) {
+			if (entry.id === templateId) continue;
+			const doc = await loadTemplateDoc(entry.id);
+			if (doc && untouched(doc)) {
+				await switchTemplate(entry.id);
+				return;
+			}
+		}
+		settleProvisional();
+		await flushTemplate();
+		describe('A5 Starter Booklet');
+		templateId = nextTemplateId();
+		saveTemplateId(templateId);
+		// Named after the new id is in place: `freeName` skips the loaded
+		// template's own entry, and the one being left keeps its name.
+		const next = starterTemplate();
+		next.name = freeName(next.name);
+		template = next;
+		selectedIds = [];
+		editingId = null;
+		mapping = autoMap(usedSlots(next), dataset.columns);
+		missingFonts = await ensureTemplateFonts(next);
+		await saveTemplateDoc(templateId, $state.snapshot(template));
+		await refreshLibrary();
+		notify(`“${next.name}” added to your templates, as it came. Your other templates and your rows are untouched.`);
 	}
 
 	/**
@@ -1890,6 +1963,14 @@
 		notify(`Style pasted onto ${targets.length} area${targets.length === 1 ? '' : 's'}.`);
 	}
 
+	/** The design's own lock, from the keyboard: the padlock above Area. */
+	function toggleDesignLock() {
+		const locking = !template.locked;
+		describe(locking ? 'Lock the design' : 'Unlock the design');
+		template = stripUndefined({ ...$state.snapshot(template), locked: locking ? true : undefined }) as Template;
+		notify(locking ? 'Design locked — nothing moves until it is unlocked.' : 'Design unlocked.');
+	}
+
 	function lockSelection() {
 		if (template.locked || !selectedBoxes.length) return;
 		describe(selectedBoxes.every((b) => b.locked) ? 'Unlock' : 'Lock');
@@ -2013,6 +2094,24 @@
 		// The lightbox is in front of everything and takes Escape and the arrows
 		// for itself; nothing back here should answer them underneath it.
 		if (lightboxOpen) return;
+		// A new area waits for its first key. Delete, the arrows and every chord
+		// keep their meaning — remove it, move it, undo it — and anything that
+		// types a character puts the cursor in its Text field first, where the
+		// browser then types that same character. Focus moved during keydown
+		// takes the keypress with it, so nothing has to be re-inserted.
+		if (
+			!typing &&
+			provisional &&
+			selected?.id === provisional &&
+			!selected.static?.text &&
+			event.key.length === 1 &&
+			!event.ctrlKey &&
+			!event.metaKey &&
+			!event.altKey
+		) {
+			boxBar?.focusText(false);
+			return;
+		}
 		// While a field has focus, leave undo to the browser's own text history.
 		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
 			event.preventDefault();
@@ -2064,7 +2163,7 @@
 		// spreadsheet. A double-click on the area does the same thing.
 		if (event.key === 'Enter' && selected && !editingId) {
 			event.preventDefault();
-			editingId = selected.id;
+			beginEditing(selected.id);
 			return;
 		}
 		// The first-run notice tells people to press ? for the tour, and for a
@@ -2074,6 +2173,22 @@
 			event.preventDefault();
 			helpOpen = true;
 			return;
+		}
+		// L for lock: with Shift the page, without it the chosen areas. Taken
+		// from the browser's own Ctrl/Cmd+L — the address bar — only where it
+		// means something here: never while typing, where the field keeps it.
+		if (!typing && (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'l') {
+			if (event.shiftKey) {
+				event.preventDefault();
+				toggleDesignLock();
+				return;
+			}
+			if (selectedIds.length) {
+				event.preventDefault();
+				if (template.locked) notify('The design is locked — unlock it (Ctrl/Cmd+Shift+L) to lock or unlock its areas.', 'warning');
+				else lockSelection();
+				return;
+			}
 		}
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd' && selectedIds.length) {
 			event.preventDefault();
@@ -2160,7 +2275,9 @@
 	function editCell(id: string) {
 		const box = template.boxes.find((b) => b.id === id);
 		const column = box?.slot ? mapping[box.slot] : undefined;
-		if (!box || box.locked || !column || !row) return;
+		// Not refused for the area's own lock: the cell is the row's, and the
+		// table's lock is the one that guards it.
+		if (!box || !column || !row) return;
 		if (refuseLockedTable()) return;
 		dataOpen = true;
 		cellRequest = { row: activeRow, column };
@@ -2502,6 +2619,7 @@
 					{editorFonts}
 					onselecttemplate={() => {}}
 					onnewtemplate={() => {}}
+					onstartertemplate={() => {}}
 					ondeletetemplate={() => {}}
 					onuploadfont={() => {}}
 					onuploadbackground={() => {}}
@@ -2535,6 +2653,7 @@
 						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
+						onstartertemplate={() => void a5Starter()}
 						ondeletetemplate={() => (deleting = true)}
 						onuploadfont={(file) => handleFontUpload(file)}
 						onuploadbackground={(file) => void handleBackgroundUpload(file)}
@@ -2567,6 +2686,7 @@
 						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
+						onstartertemplate={() => void a5Starter()}
 						ondeletetemplate={() => (deleting = true)}
 						onuploadfont={(file) => handleFontUpload(file)}
 						onuploadbackground={(file) => void handleBackgroundUpload(file)}
@@ -2705,7 +2825,8 @@
 			{flashIds}
 			onstoppicking={() => (picking = false)}
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
-			onedit={(id) => (editingId = id)}
+			onrelock={() => applyTemplate({ ...$state.snapshot(template), locked: true } as Template)}
+			onedit={beginEditing}
 			ondraw={drawArea}
 			oneditcell={editCell}
 			ontext={setBoxText}
@@ -2886,8 +3007,15 @@
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
 	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
-		<!-- Dragged by its title, so the card it is styling can be seen beside it. -->
-		<h2 id="css-title" class="drag-title" data-drag-handle>CSS</h2>
+		<!-- The help dialog's header, and like it dragged by the title, so the
+		     card being styled can be seen beside it. The × is Cancel, as Esc
+		     and the backdrop are: only Done keeps what was typed. -->
+		<header class="modal-header drag-title" data-drag-handle>
+			<h2 id="css-title">CSS</h2>
+			<button class="icon" onclick={cancelCss} title="Close without keeping changes" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
 		<!-- The placeholder is the documentation. It used to be two lines of
 		     example and two paragraphs of prose above and below it; what an author
 		     actually needs is the names of the things they can reach, and a
@@ -2920,7 +3048,7 @@
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the template?" use:armDefault>
 		<h2>Reset the template?</h2>
 		<p>
-			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the starter card. Your rows are
+			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the A5 Starter Booklet. Your rows are
 			not touched.
 		</p>
 		<div class="modal-actions">
@@ -2979,8 +3107,15 @@
      every row can be corrected, and a column unticked gets no area. -->
 {#if magic}
 	<div class="modal-backdrop" role="presentation" onclick={() => (magic = null)}></div>
-	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title" use:armDefault>
-		<h2 id="magic-title">Position Areas Automagically</h2>
+	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title" use:armDefault use:dragByTitle>
+		<!-- The CSS dialog's header: a rule under the title, a × that cancels,
+		     and dragged by it, so the card it would replace can be seen. -->
+		<header class="modal-header drag-title" data-drag-handle>
+			<h2 id="magic-title">Position Areas Automagically</h2>
+			<button class="icon" onclick={() => (magic = null)} title="Close without laying anything out" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
 		<ul class="magic-list">
 			{#each magic as guess, index (guess.column)}
 				<li class:left-out={guess.include === false}>
@@ -2998,9 +3133,18 @@
 					/>
 					<span class="magic-column" title={guess.column}>{guess.column}</span>
 					<span class="magic-sample" title={guess.sample}>{guess.sample.slice(0, 60) || '—'}</span>
+					<!-- Before the choice it qualifies, and a cell of its own either
+					     way, so the menus line up whether or not a row was guessed. -->
+					<span class="magic-guess">
+						{#if !guess.sure}
+							<span class="magic-unsure" title="Nothing but the length of the cells pointed at this">Guess</span>
+						{/if}
+					</span>
+					<!-- Not disabled when left out: a greyed native menu read as broken,
+					     and choosing what a column is before letting it back in is
+					     harmless — it keeps whatever it was taken for. -->
 					<select
 						aria-label="What {guess.column} is"
-						disabled={guess.include === false}
 						value={guess.kind}
 						onchange={(e) => {
 							const kind = e.currentTarget.value as FieldGuess['kind'];
@@ -3012,9 +3156,6 @@
 							<option value={kind}>{KIND_LABELS[kind]}</option>
 						{/each}
 					</select>
-					{#if !guess.sure}
-						<span class="magic-unsure" title="Nothing but the length of the cells pointed at this">guess</span>
-					{/if}
 				</li>
 			{/each}
 		</ul>
@@ -3041,10 +3182,11 @@
 
 {#if helpOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (helpOpen = false)}></div>
-	<div class="modal help" role="dialog" aria-modal="true" aria-labelledby="help-title">
+	<div class="modal help" role="dialog" aria-modal="true" aria-labelledby="help-title" use:dragByTitle>
 		<!-- The header stays put while the rest scrolls: the way out of a long
-		     dialog should not be at the bottom of it. -->
-		<header class="modal-header">
+		     dialog should not be at the bottom of it. Dragged by it, as the CSS
+		     dialog is. -->
+		<header class="modal-header drag-title" data-drag-handle>
 			<h2 id="help-title">libelli</h2>
 			<button class="icon" use:focusOnOpen onclick={() => (helpOpen = false)} title="Close" aria-label="Close">
 				<Icon name="close" size={16} />
@@ -3079,6 +3221,8 @@
 			<dt>Shift + click<span>Ctrl / ⌘ + click</span></dt><dd>Add an area to the selection, or drop it</dd>
 			<dt>Ctrl/Cmd + A</dt><dd>Select every area</dd>
 			<dt>Ctrl/Cmd + D</dt><dd>Duplicate the selected areas</dd>
+			<dt>Ctrl/Cmd + L</dt><dd>Lock or unlock the selected areas</dd>
+			<dt>Ctrl/Cmd + Shift + L</dt><dd>Lock or unlock the design</dd>
 			<dt>Delete<span>Backspace</span></dt><dd>Remove the selected areas</dd>
 			<dt>Ctrl/Cmd + C</dt><dd>Copy the selected area's words</dd>
 			<dt>Ctrl/Cmd + V</dt><dd>Paste plain text as a new area</dd>
@@ -3086,7 +3230,7 @@
 			<dt>Ctrl/Cmd + Shift + V</dt><dd>Paste that style onto the selection</dd>
 			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
 			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
-			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page</dd>
+			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page — about the selected area, if there is one</dd>
 			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
 			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
@@ -3703,16 +3847,16 @@
 
 	.magic-list li {
 		display: grid;
-		grid-template-columns: auto minmax(4.5rem, auto) minmax(0, 1fr) 8.5rem auto;
+		grid-template-columns: auto minmax(4.5rem, auto) minmax(0, 1fr) auto 8.5rem;
 		align-items: center;
 		gap: 10px;
 	}
 
-	/* Out, but still listed: greyed, so the tick is the thing that reads. */
-	.magic-list li.left-out .magic-column,
-	.magic-list li.left-out .magic-sample {
-		color: #aaa;
-		text-decoration: line-through;
+	/* Out, but still listed: faded as a whole, so the tick is the thing that
+	   reads and the row is still legible — struck through and grey, it looked
+	   deleted rather than set aside. */
+	.magic-list li.left-out > :not(input) {
+		opacity: 0.5;
 	}
 
 	.magic-column {
@@ -3784,7 +3928,7 @@
 		/* The sample is the first thing to go: it is there to check a guess, and
 		   on a phone the name and the control are what have to fit. */
 		.magic-list li {
-			grid-template-columns: auto minmax(0, 1fr) 8.5rem auto;
+			grid-template-columns: auto minmax(0, 1fr) auto 8.5rem;
 		}
 
 		.magic-sample {

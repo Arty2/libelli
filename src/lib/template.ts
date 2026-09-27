@@ -499,7 +499,7 @@ function normaliseFonts(raw: any): FontRef[] {
 	return out;
 }
 
-export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'double'];
+export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'double', 'stamp'];
 
 export const BLEND_MODES: BlendMode[] = [
 	'multiply',

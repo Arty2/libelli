@@ -251,6 +251,15 @@ describe('strayBoxes', () => {
 		expect(strayBoxes(boxes, page, 5)).toEqual([]);
 	});
 
+	it('leaves a locked box wholly off the paper where it was parked, and nothing else', () => {
+		const boxes = [
+			box('note', { x: 160, y: 10, w: 40, h: 40, locked: true }),
+			box('lost', { x: 160, y: 10, w: 40, h: 40 }),
+			box('cut', { x: 90, y: 10, w: 40, h: 40, locked: true })
+		];
+		expect(strayBoxes(boxes, page).map((b) => b.id)).toEqual(['lost', 'cut']);
+	});
+
 	it('judges an anchored box on x alone, because nothing will write its y', () => {
 		const anchored = { anchor: { to: 'b', gap: 4 } };
 		expect(strayBoxes([box('a', { x: 10, y: 400, w: 30, h: 20, ...anchored })], page)).toEqual([]);

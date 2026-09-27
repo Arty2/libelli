@@ -7,6 +7,7 @@
 	import { cssIdent, scopeCss, styleTag } from '$lib/css';
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
+	import { isParked } from '$lib/boxops';
 	import { HOLD_SLOP } from '$lib/gestures';
 	import {
 		FREE_STEP,
@@ -15,6 +16,8 @@
 		boxEdges,
 		facingPosition,
 		mirrorBox,
+		quarterTurn,
+		facingRotation,
 		mirrors,
 		pageSide,
 		pxToMm,
@@ -35,6 +38,12 @@
 		template: Template;
 		row?: Row | null;
 		mapping?: Mapping;
+		/**
+		 * Zoom and pan: a press on an area is left to the page — one finger
+		 * scrolls it, two pinch it — and never moves it; a tap still chooses it.
+		 * See PagePreview's `panning`.
+		 */
+		panning?: boolean;
 		/** dashed box bounds and the bleed marker; screen only, never printed */
 		bounds?: boolean;
 		/** every tie drawn as its thread, not only the one pointed at — with the bounds */
@@ -130,6 +139,7 @@
 		smartGuides = false,
 		scale = 1,
 		interactive = false,
+		panning = false,
 		selectedIds = [],
 		pageNumber = null,
 		background = null,
@@ -354,6 +364,10 @@
 				// An unbound one says what it is waiting for.
 				(box.slot && mapping[box.slot]) ||
 				box.slot ||
+				// Its own words, where they are a placeholder that came back empty
+				// on this row: `{{link}}` says what will be here, which "Area" did
+				// not — and shows the template to someone who has to fix it.
+				(!box.slot && box.static?.text?.includes('{{') ? box.static.text.trim() : '') ||
 				(pictureKind(box) ? 'Image' : 'Area')
 			: '';
 
@@ -472,6 +486,14 @@
 	function surfaceStyle(box: Box): string {
 		const parts: string[] = [];
 		if (box.background) parts.push(`background:${box.background}`);
+		// On a stamp the fill is the field printed on the paper, not the paper:
+		// inside the padding, which is the stamp's margin. Spread to the border
+		// box it would fill the perforations back in, and a drop-shadow would
+		// trace the rectangle rather than the holes.
+		if (stamped(box)) {
+			const pad = sidesOf(box.padding ?? 0);
+			parts.push(`top:${pad.top}mm`, `right:${pad.right}mm`, `bottom:${pad.bottom}mm`, `left:${pad.left}mm`);
+		}
 		// A color out of the data fills the area itself, not a panel inside it, so
 		// it reaches under the padding and takes the corner radius with it. After
 		// the declared fill, because the row is the more specific answer.
@@ -493,7 +515,7 @@
 				if (drawnByHand(media.src)) parts.push('image-rendering:pixelated');
 			}
 		}
-		if (box.borderWidth && !box.borderHand) {
+		if (box.borderWidth && !drawnBorder(box)) {
 			const { top, right, bottom, left } = sidesOf(box.borderWidth);
 			parts.push(
 				`border-width:${top}mm ${right}mm ${bottom}mm ${left}mm`,
@@ -585,9 +607,11 @@
 		// what anchored boxes below follow. That is the intended bargain: turning a
 		// box does not shove the rest of the card around. Snapping sees the upright
 		// rectangle too.
-		if (box.rotation) {
-			const centre = box.centre ?? { x: 50, y: 50 };
-			parts.push(`transform:rotate(${box.rotation}deg)`, `transform-origin:${centre.x}% ${centre.y}%`);
+		// As drawn: on a facing page a quarter turn is the opposite one, about
+		// the mirrored pivot — see `mirrorBox`.
+		if (drawn.rotation) {
+			const centre = drawn.centre ?? { x: 50, y: 50 };
+			parts.push(`transform:rotate(${drawn.rotation}deg)`, `transform-origin:${centre.x}% ${centre.y}%`);
 		}
 		if (hidden.has(box.id)) {
 			parts.push('height:0', 'overflow:hidden', 'visibility:hidden');
@@ -642,6 +666,11 @@
 
 	const borderColorOf = (box: Box) => box.borderColor ?? box.color ?? template.defaults.color;
 
+	/** A stamp, which no CSS border can draw: its perforations are always SVG. */
+	const stamped = (box: Box) => !!box.borderWidth && box.borderStyle === 'stamp';
+	/** A border the SVG layer draws rather than CSS — by hand, or a stamp. */
+	const drawnBorder = (box: Box) => !!box.borderWidth && (!!box.borderHand || stamped(box));
+
 	/**
 	 * The strokes of a hand-drawn border, in the millimetres of the box's own
 	 * border box — its declared width, and the height the layout resolved, which
@@ -651,14 +680,15 @@
 	 * and does not redraw itself as the words underneath it are typed.
 	 */
 	function handStrokes(box: Box): HandStroke[] {
-		if (!box.borderHand || !box.borderWidth) return [];
+		if (!drawnBorder(box)) return [];
 		return handBorder({
 			w: box.w,
 			h: layout.heights[box.id] ?? box.h,
 			widths: sidesOf(box.borderWidth),
 			radius: box.borderRadius ?? 0,
 			style: box.borderStyle ?? 'solid',
-			seed: box.id
+			seed: box.id,
+			steady: !box.borderHand
 		});
 	}
 	/**
@@ -725,6 +755,9 @@
 	// ---- direct manipulation -------------------------------------------------
 
 	type DragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | 'centre' | 'rotate';
+	/** A Shift+click on a chosen area, held back until it is known not to be a drag. */
+	let pendingToggle: string | null = null;
+
 	let drag: {
 		id: string;
 		mode: DragMode;
@@ -874,6 +907,21 @@
 		// A second finger is a pinch, not a second drag — and not a selection
 		// either: the area under it is not being picked, it is being pinched.
 		if (event.pointerType === 'touch' && touching.size > 1) return;
+		// Zoom and pan: a press on the area itself is left to the page, which
+		// scrolls under it — nothing prevented, nothing captured — and is only
+		// a choice if it comes back up where it went down (`endDrag`). The
+		// handles and the lever are not the area, and still drag.
+		if (panning && mode === 'move') {
+			panTap = {
+				id: box.id,
+				pointer: event.pointerId,
+				x: event.clientX,
+				y: event.clientY,
+				additive: event.shiftKey || event.metaKey || event.ctrlKey,
+				touch: event.pointerType === 'touch'
+			};
+			return;
+		}
 		event.preventDefault();
 		event.stopPropagation();
 		if (event.pointerType === 'touch' && mode === 'move') {
@@ -894,7 +942,13 @@
 		// is a modifier of their own — resizing from the aligned edge, turning
 		// in 15° steps — which used to toggle the area out of the selection on
 		// the same press.
-		onselect?.(box.id, mode === 'move' && (event.shiftKey || event.metaKey || event.ctrlKey));
+		const additive = mode === 'move' && (event.shiftKey || event.metaKey || event.ctrlKey);
+		// Shift on an area already chosen is either Shift+click — take it out of
+		// the selection — or Shift+drag, which moves on a straight line. Which
+		// one is not known until the pointer moves, so the toggle waits for the
+		// release (`endDrag`) and happens only if it did not.
+		if (additive && event.shiftKey && isSelected(box) && editable(box)) pendingToggle = box.id;
+		else onselect?.(box.id, additive);
 		if (!editable(box)) return;
 		drag = {
 			id: box.id,
@@ -1039,7 +1093,10 @@
 		// rotation is read from where the pointer *is* rather than how far it has
 		// come. Every new mode lands in the un-rotating branch by default, which
 		// is why this reads as a list rather than a single comparison.
-		const turn = drag.mode === 'move' || drag.mode === 'rotate' ? 0 : ((origin.rotation ?? 0) * Math.PI) / 180;
+		// The turn as drawn, which on a facing page may be the opposite quarter
+		// turn: the handles are where it put them.
+		const drawnOrigin = placed(origin);
+		const turn = drag.mode === 'move' || drag.mode === 'rotate' ? 0 : ((drawnOrigin.rotation ?? 0) * Math.PI) / 180;
 		const cos = Math.cos(turn);
 		const sin = Math.sin(turn);
 		// On a left-hand page a mirrored box is drawn at its facing position, so
@@ -1048,7 +1105,12 @@
 		// stored box. Undoing both here keeps every case below in one frame — the
 		// one the template is written in. The pivot and the rotation handle are
 		// exempt: mirroring places a box, it does not flip what is inside it.
-		const flip = mirroredDrag(origin) && drag.mode !== 'centre' && drag.mode !== 'rotate';
+		// A quarter-turned box is the exception for the pivot: its pivot *is*
+		// mirrored, so a pointer moving it right moved the stored one left.
+		const flip =
+			mirroredDrag(origin) &&
+			drag.mode !== 'rotate' &&
+			(drag.mode !== 'centre' || quarterTurn(origin.rotation));
 		const dx = (screenX * cos + screenY * sin) * (flip ? -1 : 1);
 		const dy = -screenX * sin + screenY * cos;
 		const mode = flip ? MIRRORED_MODE[drag.mode] : drag.mode;
@@ -1081,7 +1143,7 @@
 				// is the transform origin, so it is the one point that does not move
 				// when the rotation changes — which is what makes this valid.
 				const trim = trimEl.getBoundingClientRect();
-				const c = origin.centre ?? { x: 50, y: 50 };
+				const c = drawnOrigin.centre ?? { x: 50, y: 50 };
 				const pivotX = trim.left + (boxEl.offsetLeft + (boxEl.offsetWidth * c.x) / 100) * scale;
 				const pivotY = trim.top + (boxEl.offsetTop + (boxEl.offsetHeight * c.y) / 100) * scale;
 				// The lever is grabbed at arm's length from the pivot, so the angle is
@@ -1090,17 +1152,23 @@
 				// nothing to measure and a pixel of movement swings the box wildly.
 				const now = Math.atan2(event.clientY - pivotY, event.clientX - pivotX);
 				const then = Math.atan2(drag.startY - pivotY, drag.startX - pivotX);
-				let deg = (origin.rotation ?? 0) + ((now - then) * 180) / Math.PI;
+				// Turned from the angle as drawn, which on a facing page may be the
+				// opposite quarter turn, and written back through the same mirror:
+				// a box dragged to -90° there is stored as 90°.
+				let deg = (drawnOrigin.rotation ?? 0) + ((now - then) * 180) / Math.PI;
 				// Whole degrees, or a quarter turn with Shift — the same bargain the
 				// grid makes for position: coarse by default, exact when typed.
 				deg = event.shiftKey ? Math.round(deg / 15) * 15 : Math.round(deg);
-				next.rotation = normaliseRotation(deg) ?? 0;
+				const turned = normaliseRotation(deg) ?? 0;
+				next.rotation = mirroredDrag(origin) ? facingRotation(turned) : turned;
 				break;
 			}
 			case 'centre': {
 				// Percent of the box, not millimetres, because that is how the pivot
 				// is stored — and clamped to the box, so it can never be dragged
 				// somewhere the marker cannot be picked up again.
+				// In the stored frame: `dx` has already been flipped back for a
+				// quarter-turned box on a facing page, whose pivot is mirrored.
 				const was = origin.centre ?? { x: 50, y: 50 };
 				const pct = (value: number) => Math.round(Math.max(0, Math.min(100, value)) * 10) / 10;
 				next.centre = {
@@ -1109,10 +1177,18 @@
 				};
 				break;
 			}
-			case 'move':
-				next.x = place(origin.x + dx, 'x', origin.w);
-				setTop(dy, layout.heights[origin.id] ?? origin.h);
+			case 'move': {
+				// Shift keeps it on a line through where it started: whichever axis
+				// the pointer has gone further along, and none of the other. Read on
+				// every move, so it can be pressed or let go mid-drag.
+				const along = event.shiftKey ? (Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y') : null;
+				// The held axis is left exactly where it was, not re-placed: placing
+				// snaps, and a snap on the axis that is meant to stand still is a
+				// line that is not straight.
+				if (along !== 'y') next.x = place(origin.x + dx, 'x', origin.w);
+				if (along !== 'x') setTop(dy, layout.heights[origin.id] ?? origin.h);
 				break;
+			}
 			case 'e':
 				next.w = Math.max(4, size(origin.w + dx));
 				break;
@@ -1229,7 +1305,43 @@
 
 	const round2 = (v: number) => Math.round(v * 100) / 100;
 
+	/**
+	 * A press on an area in zoom and pan, waiting to learn whether it is a tap.
+	 * Chosen on the way up, not down: a finger that lands on an area to scroll
+	 * the page is not choosing it, and a scroll ends in a pointercancel, not a
+	 * pointerup, so it never gets here with the finger still in place.
+	 */
+	let panTap: { id: string; pointer: number; x: number; y: number; additive: boolean; touch: boolean } | null = null;
+
+	function endPanTap(event: PointerEvent) {
+		const tap = panTap;
+		panTap = null;
+		if (!tap || tap.pointer !== event.pointerId || event.type !== 'pointerup') return;
+		if (Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > HOLD_SLOP) return;
+		const box = template.boxes.find((b) => b.id === tap.id);
+		if (!box) return;
+		// The second of two taps opens the area, as it does out of this mode.
+		if (tap.touch) {
+			const now = event.timeStamp || Date.now();
+			if (lastTap && lastTap.id === box.id && now - lastTap.at < DOUBLE_TAP) {
+				lastTap = null;
+				onselect?.(box.id, false);
+				beginEdit(box);
+				return;
+			}
+			lastTap = { id: box.id, at: now };
+		}
+		onselect?.(box.id, tap.additive);
+	}
+
 	function endDrag(event: PointerEvent) {
+		if (panTap) endPanTap(event);
+		if (pendingToggle) {
+			const id = pendingToggle;
+			pendingToggle = null;
+			const still = !drag || Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) <= HOLD_SLOP;
+			if (still && event.type === 'pointerup') onselect?.(id, true);
+		}
 		if (!drag) return;
 		try {
 			(event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
@@ -1622,14 +1734,24 @@
 	 * the page writes it.
 	 */
 	const canEdit = (box: Box) =>
-		interactive && !box.locked && (box.mode === 'plain' || box.mode === 'markdown');
+		interactive && contentOpen(box) && (box.mode === 'plain' || box.mode === 'markdown');
+
+	/**
+	 * Whether what an area holds can be changed from the card. An area's own
+	 * lock is on the area — where it is, how it looks — and on its own words,
+	 * which are part of it; but the words of an area bound to a column are the
+	 * row's, and the row answers to the table's lock, not the area's. So a
+	 * locked data field still opens for typing or drawing, and the page refuses
+	 * the edit if the table is locked (`refuseLockedTable`).
+	 */
+	const contentOpen = (box: Box) => !box.locked || (!!box.slot && !!mapping[box.slot]);
 
 	function beginEdit(box: Box) {
 		// A picture is the one thing not edited in place: an area on a card is
 		// often a centimetre across, which is somewhere to show a drawing and
 		// nowhere to make one. The same double-click opens it full screen —
 		// on a locked page too, like typing: a drawing is content, not layout.
-		if (interactive && !box.locked && takesADrawing(box.mode)) {
+		if (interactive && contentOpen(box) && takesADrawing(box.mode)) {
 			ondraw?.(box.id);
 			return;
 		}
@@ -1654,6 +1776,32 @@
 		}
 	}
 </script>
+
+<!-- Drawn over the room the transparent CSS border is holding, so it covers
+     exactly what that border would have painted. Sized in millimetres against
+     a viewBox of the same numbers, which makes one user unit one millimetre
+     and the stroke widths literal. A closed outline is a stamp's paper, filled
+     in the border color: the perforated sheet the field is printed on. -->
+{#snippet drawnEdge(box: Box, strokes: HandStroke[])}
+	<svg
+		class="hand-border"
+		aria-hidden="true"
+		viewBox="0 0 {box.w} {layout.heights[box.id] ?? box.h}"
+		style="width:{box.w}mm;height:{layout.heights[box.id] ?? box.h}mm"
+		fill="none"
+		stroke={borderColorOf(box)}
+	>
+		{#each strokes as stroke, i (i)}
+			<path
+				d={stroke.d}
+				stroke-width={stroke.width}
+				stroke-dasharray={stroke.dash ?? 'none'}
+				stroke-linecap={stroke.cap ?? 'butt'}
+				fill={stroke.closed ? borderColorOf(box) : 'none'}
+			/>
+		{/each}
+	</svg>
+{/snippet}
 
 <!-- Plain text with any unknown `{{name}}` in it marked — see `shownTextOf`.
      Written on one line: the text is `white-space: pre-wrap`, and a newline
@@ -1693,6 +1841,7 @@
 	class="card"
 	class:editing={interactive}
 	class:frozen={interactive && !!template.locked}
+	class:panning={interactive && panning}
 	style={cardStyle()}
 	lang="en"
 >
@@ -1766,32 +1915,16 @@
 				ondrop={(e) => drop(e, box)}
 				role="presentation"
 			>
+				<!-- A stamp's paper goes under the field printed on it; every other
+				     border drawn in SVG goes over the fill, as a CSS border would. -->
+				{#if strokes.length && stamped(box)}
+					{@render drawnEdge(box, strokes)}
+				{/if}
 				{#if surfaceStyle(box)}
 					<div class="surface" aria-hidden="true" style={surfaceStyle(box)}></div>
 				{/if}
-				{#if strokes.length}
-					<!-- Drawn over the room the transparent CSS border is holding, so
-					     it covers exactly what that border would have painted. Sized
-					     in millimetres against a viewBox of the same numbers, which
-					     makes one user unit one millimetre and the stroke widths
-					     literal. -->
-					<svg
-						class="hand-border"
-						aria-hidden="true"
-						viewBox="0 0 {box.w} {layout.heights[box.id] ?? box.h}"
-						style="width:{box.w}mm;height:{layout.heights[box.id] ?? box.h}mm"
-						fill="none"
-						stroke={borderColorOf(box)}
-					>
-						{#each strokes as stroke, i (i)}
-							<path
-								d={stroke.d}
-								stroke-width={stroke.width}
-								stroke-dasharray={stroke.dash ?? 'none'}
-								stroke-linecap={stroke.cap ?? 'butt'}
-							/>
-						{/each}
-					</svg>
+				{#if strokes.length && !stamped(box)}
+					{@render drawnEdge(box, strokes)}
 				{/if}
 				<div
 					class="content"
@@ -1880,7 +2013,7 @@
 				     rounded, so var(--line) lands exactly whatever the zoom. -->
 				<!-- Not on a selected area: the selection is its outline, and a dashed
 				     bound drawn under a solid one doubled every edge. -->
-				{#if bounds && !empty && !(interactive && isSelected(box))}
+				{#if bounds && !empty && !(interactive && isSelected(box)) && !isParked(box, template.page, bleed)}
 					<svg class="chrome bounds" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 				{/if}
 				{#if interactive && isSelected(box)}
@@ -2000,10 +2133,7 @@
 						{#if editsCell(box)}
 							<button
 								class="badge action"
-								disabled={!!box.locked}
-								title={box.locked
-									? 'This area is locked — unlock it to edit the cell it prints'
-									: `Edit “${mapping[box.slot!]}” for this row, full size in the table`}
+								title={`Edit “${mapping[box.slot!]}” for this row, full size in the table`}
 								aria-label="Edit this area's cell"
 								onpointerdown={(e) => e.stopPropagation()}
 								onclick={() => oneditcell?.(box.id)}
@@ -2073,7 +2203,7 @@
 								e.stopPropagation();
 								resetPivot(box);
 							}}
-							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
+							style="left:{(placed(box).centre ?? { x: 50, y: 50 }).x}%;top:{(placed(box).centre ?? { x: 50, y: 50 }).y}%"
 							title="The point this area turns about — drag it, or type it in the bar. Double-click to put it back in the middle."
 							onpointerdown={(e) => startDrag(e, box, 'centre')}
 							onpointermove={moveDrag}
@@ -2089,7 +2219,7 @@
 								e.stopPropagation();
 								resetRotation(box);
 							}}
-							style="left:{(box.centre ?? { x: 50, y: 50 }).x}%;top:{(box.centre ?? { x: 50, y: 50 }).y}%"
+							style="left:{(placed(box).centre ?? { x: 50, y: 50 }).x}%;top:{(placed(box).centre ?? { x: 50, y: 50 }).y}%"
 							title="Drag to turn this area — hold Shift for 15° steps. Double-click to set it upright."
 							onpointerdown={(e) => startDrag(e, box, 'rotate')}
 							onpointermove={moveDrag}
@@ -2409,6 +2539,14 @@
 		touch-action: none;
 	}
 
+	/* Zoom and pan: the areas hand a finger back to the page, which scrolls
+	   under it and pinches under two, instead of holding it for a drag. The
+	   handles keep their own touch-action: none, and so still drag. */
+	.card.panning .box {
+		cursor: grab;
+		touch-action: pan-x pan-y;
+	}
+
 	/* A link in a Markdown body is a link on paper: it says where to go, it does
 	   not go there. In the editor it was live, so clicking a word to select the
 	   area it is in navigated away from the app instead — and the app is the
@@ -2441,7 +2579,11 @@
 		   screen pixels thick. A shadow keeps the fraction. */
 		border: none;
 		box-shadow: inset 0 0 0 var(--line, 1px) var(--accent);
-		border-radius: var(--radius-button);
+		/* 2px on screen, whatever the zoom — undone like the size is. The app's
+		   button radius, taken in the card's own frame, was scaled with the page:
+		   at 400% the corners met in the middle and a square handle read as a
+		   dot. The pivot and the lever set their own shapes below. */
+		border-radius: calc(2px * var(--ui-scale, 1));
 		box-sizing: border-box;
 		z-index: 3;
 		touch-action: none;

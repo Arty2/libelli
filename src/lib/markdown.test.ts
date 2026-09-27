@@ -95,7 +95,7 @@ describe('inline', () => {
 	});
 
 	it('colors a run of words by name or hex', () => {
-		expect(renderInline('[danger]{red} ahead')).toContain('<span style="color:#b42318">danger</span>');
+		expect(renderInline('[danger]{red} ahead')).toContain('<span style="color:#ff0000">danger</span>');
 		expect(renderInline('[x]{#0af}')).toContain('color:#0af');
 		expect(renderInline('[bold and red]{red}')).toContain('>bold and red</span>');
 	});

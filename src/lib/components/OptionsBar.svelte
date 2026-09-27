@@ -31,6 +31,8 @@
 		templateId: string;
 		onselecttemplate: (id: string) => void;
 		onnewtemplate: () => void;
+		/** open the A5 Starter Booklet as it came, or add it to the library */
+		onstartertemplate: () => void;
 		ondeletetemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
@@ -50,8 +52,8 @@
 	let boxBar = $state<BoxOptions | null>(null);
 
 	/** Forwarded so the page can put the cursor in a new area's Text field. */
-	export function focusText() {
-		boxBar?.focusText();
+	export function focusText(select = true) {
+		boxBar?.focusText(select);
 	}
 </script>
 

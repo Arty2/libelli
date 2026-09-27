@@ -8,6 +8,7 @@
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { swipe } from '$lib/gestures';
+	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
@@ -100,6 +101,8 @@
 		onstoppicking?: () => void;
 		/** unlock the design, from the band that says it is locked */
 		onunlock?: () => void;
+		/** lock it again, from the same button while it still shows the open padlock */
+		onrelock?: () => void;
 	}
 
 	let {
@@ -160,6 +163,7 @@
 		onrescue,
 		onstoppicking,
 		onunlock,
+		onrelock,
 		flashIds = []
 	}: Props = $props();
 
@@ -408,8 +412,59 @@
 	 */
 	function zoomTo(next: number) {
 		const clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, next));
-		onzoom(Math.round(clamped * 1000) / 1000);
+		const rounded = Math.round(clamped * 1000) / 1000;
+		if (rounded === scale) return;
+		holdSelection();
+		onzoom(rounded);
 	}
+
+	/**
+	 * Zooming about the selection. With an area chosen, that area is what is
+	 * being looked at, so it stays where it is on screen and the page grows or
+	 * shrinks around it — rather than about the top left, where the scroll
+	 * offsets happen to hold still, which sent a chosen area off the edge in
+	 * two steps of a pinch. With nothing chosen the page zooms as it always has.
+	 *
+	 * Where it was is taken before the scale changes, and put back once the
+	 * page has been drawn at the new one (the effect below). A pinch is a
+	 * stream of steps faster than a frame, so the first step's position is kept
+	 * until one has landed — held to each step's own, the selection would creep
+	 * by a rounding error a step. Only where the page can scroll: a page smaller
+	 * than the stage is centred in it, and there is nothing to move.
+	 */
+	let held: { x: number; y: number } | null = null;
+
+	/** Where the chosen areas' middle is on screen — the middle of their union. */
+	function selectionMiddle(ids: string[] = pinchIds ?? selectedIds): { x: number; y: number } | null {
+		if (!host || !ids.length) return null;
+		const rects = ids
+			.map((id) => host!.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`)?.getBoundingClientRect())
+			.filter((r): r is DOMRect => !!r && (r.width > 0 || r.height > 0));
+		if (!rects.length) return null;
+		const left = Math.min(...rects.map((r) => r.left));
+		const right = Math.max(...rects.map((r) => r.right));
+		const top = Math.min(...rects.map((r) => r.top));
+		const bottom = Math.max(...rects.map((r) => r.bottom));
+		return { x: (left + right) / 2, y: (top + bottom) / 2 };
+	}
+
+	function holdSelection() {
+		held ??= selectionMiddle();
+	}
+
+	$effect(() => {
+		void scale;
+		if (!held || !host) return;
+		// A pinch steers every step back to where the selection was when it
+		// began: early steps, near Fit, have almost no room to scroll and cannot
+		// hold it, and a target re-taken each step would keep what they lost.
+		const was = pinchTarget ?? held;
+		held = null;
+		const now = selectionMiddle();
+		if (!now) return;
+		host.scrollLeft += now.x - was.x;
+		host.scrollTop += now.y - was.y;
+	});
 
 	const zoomBy = (factor: number) => zoomTo(scale * factor);
 
@@ -461,17 +516,67 @@
 	 * well sizes the type under the pointer instead of the page — still
 	 * prevented, or the browser would zoom itself underneath it.
 	 */
+	/**
+	 * Fit, and back. The zoom before Fit is remembered as it is left, so a
+	 * double tap on the zoom goes out to see the whole page and a second one
+	 * comes back to where you were working. With nothing to go back to — Fit
+	 * from the start — it goes to the paper's real size, the other named zoom.
+	 */
+	let beforeFit: number | 'actual' | null = null;
+	$effect(() => {
+		if (zoom !== 'fit') beforeFit = zoom;
+	});
+
+	function toggleFit() {
+		if (zoom !== 'fit') onzoom('fit');
+		else onzoom(beforeFit ?? 'actual');
+	}
+
+	/** When the last zooming wheel arrived — see the Safari gesture below. */
+	let lastWheel = -Infinity;
+
 	$effect(() => {
 		if (!host) return;
 		const node = host;
 		const onWheel = (event: WheelEvent) => {
 			if (!event.ctrlKey && !event.metaKey) return;
 			event.preventDefault();
+			lastWheel = performance.now();
 			if (event.shiftKey) resizeType(event);
 			else zoomBy(Math.exp(-event.deltaY / 220));
 		};
 		node.addEventListener('wheel', onWheel, { passive: false });
 		return () => node.removeEventListener('wheel', onWheel);
+	});
+
+	/**
+	 * Safari's own pinch. It zooms the app from its `gesture*` events whatever
+	 * `touch-action` says, so they are refused here. On a touchscreen the pinch
+	 * below has already zoomed the page from the pointers; a trackpad in desktop
+	 * Safari may send no Ctrl+wheel for its pinch, so there the gesture's own
+	 * scale zooms the page — unless a wheel or two fingers just did, which
+	 * would zoom it twice.
+	 */
+	$effect(() => {
+		if (!host) return;
+		const node = host;
+		let from = 1;
+		const onStart = (event: Event) => {
+			event.preventDefault();
+			from = scale;
+		};
+		const onChange = (event: Event) => {
+			event.preventDefault();
+			if (pinch.size > 0 || performance.now() - lastWheel < 150) return;
+			const ratio = (event as Event & { scale?: number }).scale;
+			if (ratio) zoomTo(from * ratio);
+		};
+		node.addEventListener('gesturestart', onStart);
+		node.addEventListener('gesturechange', onChange);
+		return () => {
+			node.removeEventListener('gesturestart', onStart);
+			node.removeEventListener('gesturechange', onChange);
+		};
 	});
 
 	/** Two fingers on the page. Tracked by pointer id, so a stray third does nothing. */
@@ -483,10 +588,35 @@
 		return Math.hypot(a.x - b.x, a.y - b.y);
 	};
 
+	/**
+	 * The selection as it was before the first finger landed. That finger lands
+	 * on something, and pressing an area chooses it — so by the time the second
+	 * arrives and it is a pinch, the selection is whatever the first happened to
+	 * touch, and the page zoomed about the body text rather than the area that
+	 * was chosen. A pinch is a way of looking, not a choice: it zooms about what
+	 * was chosen before it, and puts that choice back.
+	 */
+	let beforeTouch: string[] = [];
+	let pinchIds: string[] | null = null;
+	let pinchTarget: { x: number; y: number } | null = null;
+
 	function onPinchDown(event: PointerEvent) {
 		if (event.pointerType !== 'touch') return;
+		if (pinch.size === 0) beforeTouch = [...selectedIds];
 		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
-		if (pinch.size === 2) pinchStart = { spread: spread(), scale };
+		if (pinch.size === 2) {
+			pinchStart = { spread: spread(), scale };
+			pinchIds = beforeTouch;
+			pinchTarget = selectionMiddle(beforeTouch);
+			restoreSelection(beforeTouch);
+		}
+	}
+
+	/** Choose exactly these again, if the first finger changed what was chosen. */
+	function restoreSelection(ids: string[]) {
+		if (ids.length === selectedIds.length && ids.every((id) => selectedIds.includes(id))) return;
+		onselect(ids[0] ?? null);
+		for (const id of ids.slice(1)) onselect(id, true);
 	}
 
 	function onPinchMove(event: PointerEvent) {
@@ -500,6 +630,10 @@
 	function onPinchUp(event: PointerEvent) {
 		pinch.delete(event.pointerId);
 		if (pinch.size < 2) pinchStart = null;
+		if (pinch.size === 0) {
+			pinchIds = null;
+			pinchTarget = null;
+		}
 	}
 
 	/**
@@ -529,9 +663,30 @@
 	 * for the page rather than the app. Ctrl/Cmd+H is swallowed by macOS itself
 	 * before a page ever sees it — that is the platform's, not ours to fix.
 	 */
+	/**
+	 * The arrow keys lean the pad the way they are moving the area, while it is
+	 * showing — the keyboard and the pad are one control, and a pad that sat
+	 * still while the area went left looked like it had nothing to do with it.
+	 * Only the lean: the page's own key handler does the nudging, as ever.
+	 */
+	const ARROW_LEAN: Record<string, 'up' | 'down' | 'left' | 'right'> = {
+		ArrowUp: 'up',
+		ArrowDown: 'down',
+		ArrowLeft: 'left',
+		ArrowRight: 'right'
+	};
+	const padShowing = () => padUsable && panning && !padHidden;
+
+	function onKeyup(event: KeyboardEvent) {
+		if (ARROW_LEAN[event.key] && pushed === ARROW_LEAN[event.key]) pushed = null;
+	}
+
 	function onKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
 		if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+		if (ARROW_LEAN[event.key] && padShowing() && !event.ctrlKey && !event.metaKey && !modalOpen) {
+			pushed = ARROW_LEAN[event.key];
+		}
 		// This listener is on the window, so it fires while a dialog is up too —
 		// and zooming the page you cannot see behind Help is not what Ctrl+0 was
 		// asked for.
@@ -634,11 +789,61 @@
 	let padHeld = $state(false);
 	let padPress: { x: number; y: number; from: { right: number; bottom: number } } | null = null;
 
+	/**
+	 * Zoom and pan. On a phone a finger that lands on an area picks it up, and a
+	 * card that has been laid out is mostly areas — so there was nowhere left to
+	 * put a finger down to scroll the page, zoomed in, without moving something.
+	 * With this on, an area no longer moves under a finger: one finger scrolls,
+	 * two pinch, and a tap still chooses an area (and a second opens it), which
+	 * the nudge pad — shown only while this is on — then moves. The resize
+	 * handles and the lever still work: they are small, and grabbed on purpose.
+	 * Its button is always above Area, and is the one way in and out.
+	 *
+	 * On by default where the main pointer is a finger: there, a page you can
+	 * scroll without knocking things over, with the pad to move what you chose,
+	 * is the editor that works, and dragging is the thing to ask for. Read once
+	 * when the stage mounts rather than followed, so the choice made with the
+	 * button is not undone by a keyboard being plugged in; and on the mount, not
+	 * in the initialiser, because the page is prerendered where there is no
+	 * pointer to ask about.
+	 */
+	let panning = $state(false);
+
+	/**
+	 * The pad put away. It covers a corner of the page, and zoomed in that can
+	 * be the corner you are working on; held on its middle it goes, and a
+	 * button under zoom and pan brings it back. The middle, because the arrows
+	 * already repeat while held, and the middle's tap (the step) and drag (move
+	 * the pad) are taken — a hold was the gesture it had left.
+	 */
+	let padHidden = $state(false);
+	const PAD_HIDE_MS = 500;
+	let padHideTimer: ReturnType<typeof setTimeout> | null = null;
+	function cancelPadHide() {
+		if (padHideTimer) clearTimeout(padHideTimer);
+		padHideTimer = null;
+	}
+
+	$effect(() => {
+		if (window.matchMedia('(pointer: coarse)').matches) panning = true;
+	});
+
 	function padPickup(event: PointerEvent) {
 		if (event.button !== 0) return;
 		padPress = { x: event.clientX, y: event.clientY, from: { ...padAt } };
 		// Captured now, so a quick drag that leaves the button still brings the pad.
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		cancelPadHide();
+		padHideTimer = setTimeout(() => {
+			padHideTimer = null;
+			if (padDrag) return;
+			// Held, so the click that ends the press does not also cycle the step.
+			padHeld = true;
+			padPress = null;
+			padHidden = true;
+			pushed = null;
+			vibrate(HOLD_MS);
+		}, PAD_HIDE_MS);
 	}
 
 	/**
@@ -654,6 +859,7 @@
 			if (Math.hypot(event.clientX - padPress.x, event.clientY - padPress.y) < PAD_SLOP) return;
 			padDrag = padPress;
 			padHeld = true;
+			cancelPadHide();
 		}
 		if (!padDrag || !host) return;
 		event.preventDefault();
@@ -687,7 +893,15 @@
 	let unlockTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function unlock() {
-		if (unlocking) return;
+		// Pressed again while it still shows the open padlock: that was a
+		// mistake being taken back, so it locks again rather than doing nothing.
+		if (unlocking) {
+			if (unlockTimer) clearTimeout(unlockTimer);
+			unlockTimer = null;
+			unlocking = false;
+			onrelock?.();
+			return;
+		}
 		unlocking = true;
 		if (unlockTimer) clearTimeout(unlockTimer);
 		unlockTimer = setTimeout(() => (unlocking = false), 700);
@@ -695,6 +909,7 @@
 	}
 
 	function padDrop() {
+		cancelPadHide();
 		padPress = null;
 		padDrag = null;
 		// Cleared on the next tick, so the click that follows the drag — which is
@@ -741,7 +956,7 @@
 	}
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} onkeyup={onKeyup} onblur={() => (pushed = null)} />
 
 <!--
 	The stage is two elements: an outer one that does not scroll and holds every
@@ -838,6 +1053,7 @@
 				{background}
 				{images}
 				interactive={true}
+				{panning}
 				pageCount={rowCount}
 				{editingId}
 				{flashIds}
@@ -949,7 +1165,9 @@
 		<!-- Stacking order is about the page, not about type or color, so it sits
 		     beside the page with undo and redo rather than in the options bar,
 		     where it shoved every other control sideways. -->
-		{#if selectedIds.length}
+		<!-- Not on a locked page, where nothing can be restacked: a column of
+		     dead buttons says only what the padlock already does. -->
+		{#if selectedIds.length && !template.locked}
 			<div class="corner stack" role="toolbar" aria-label="Stacking order" aria-orientation="vertical">
 				{#each ARRANGEMENTS as option (option.value)}
 					<button
@@ -997,53 +1215,91 @@
 		     pressing it unlocks, and for a moment afterwards it wears the open
 		     padlock (`unlocking`), or it would vanish on the same frame and the
 		     press would go unanswered. It was a "Locked" band over the sheet,
-		     which took a band's height off the page at Fit. Screen furniture:
-		     Boxes takes it away with the rest. -->
-		{#if (template.locked || unlocking) && bounds}
+		     which took a band's height off the page at Fit. Not screen furniture,
+		     whatever Boxes says: it is the one way to unlock from beside the page,
+		     and with the outlines off it vanished and Area stood greyed out with
+		     nothing above it to say why. -->
+		{#if template.locked || unlocking}
 			<button
 				class="square page-lock"
 				aria-pressed={!unlocking}
-				title={unlocking ? 'Unlocked' : 'The design is locked — press to unlock it'}
-				aria-label={unlocking ? 'Unlocked' : 'Unlock the design'}
+				title={unlocking ? 'Unlocked — press again to lock it' : withKey('The design is locked — press to unlock it', 'lockPage')}
+				aria-label={unlocking ? 'Lock the design again' : 'Unlock the design'}
 				onclick={unlock}
 			>
 				<Icon name={unlocking ? 'unlocked' : 'locked'} size={16} />
 			</button>
 		{/if}
-		<button
-			class="square"
-			onclick={onaddbox}
-			disabled={!!template.locked}
-			title="Add an area to the page"
-		>
-			<Icon name="shapes" size={16} /><span class="sr-only">Area</span>
-		</button>
-		{#if drawTarget}
-			<!-- Under Area, because it is the same kind of thing: Area makes one,
-			     this draws in the one you have. -->
+		<!-- Nothing that changes the design on a locked page, not even greyed
+		     out: the padlock above is the one thing to press, and a column of
+		     dead buttons under it only said the same thing four more times. -->
+		{#if !template.locked}
 			<button
 				class="square"
-				onclick={() => ondraw?.(drawTarget)}
-				title="Draw this area's image"
+				onclick={onaddbox}
+				title="Add an area to the page"
 			>
-				<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
+				<Icon name="shapes" size={16} /><span class="sr-only">Area</span>
 			</button>
+			{#if drawTarget}
+				<!-- Under Area, because it is the same kind of thing: Area makes one,
+				     this draws in the one you have. -->
+				<button
+					class="square"
+					onclick={() => ondraw?.(drawTarget)}
+					title="Draw this area's image"
+				>
+					<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
+				</button>
+			{/if}
+			<!-- Always there. It used to show only on an empty page, and be a press
+			     and hold on Area otherwise, so that a control replacing the design
+			     was not one mis-tap away — but it opens a dialog that says how many
+			     areas it would replace, with Cancel, which is the guard; and a hold
+			     is now how anything here explains itself. -->
+			<button
+				class="square"
+				onclick={onmagiclayout}
+				title={hasColumns
+					? 'Position areas automagically — a card worked out from your headings and your data'
+					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
+			>
+				<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
+			</button>
+			<!-- Zoom and pan, on and off, under the two that make areas: those
+			     put things on the page, this is how you get about it. Always here
+			     on an unlocked page, so the way in is not a gesture to be found.
+			     It wears what a press on an area does now — Move, or zoom and
+			     pan — and pressed it is the sign areas are not being dragged,
+			     with the nudge pad beside it. -->
+			<button
+				class="square"
+				aria-pressed={panning}
+				onclick={() => (panning = !panning)}
+				title={panning
+					? 'Zoom and pan — a finger scrolls, areas stay put; tap one and nudge it with the pad. Press to drag areas again.'
+					: 'Move — areas drag where you press them. Press for zoom and pan: scroll and pinch without dragging, and nudge with a pad.'}
+			>
+				<Icon name={panning ? 'zoom-pan' : 'move'} size={16} /><span class="sr-only">Zoom and pan</span>
+			</button>
+			{#if panning && padHidden}
+				<!-- The pad, put away by holding its middle: this is where it is,
+				     under the mode it belongs to. -->
+				<button
+					class="square"
+					onclick={() => {
+						padHidden = false;
+						// The hold that hid it ended with the pad gone, so its release
+						// never arrived to clear this — and the first tap on the step
+						// would be swallowed.
+						padHeld = false;
+					}}
+					title="Show the nudge pad"
+				>
+					<Icon name="health-cross" size={16} /><span class="sr-only">Show the nudge pad</span>
+				</button>
+			{/if}
 		{/if}
-		<!-- Always there. It used to show only on an empty page, and be a press
-		     and hold on Area otherwise, so that a control replacing the design
-		     was not one mis-tap away — but it opens a dialog that says how many
-		     areas it would replace, with Cancel, which is the guard; and a hold
-		     is now how anything here explains itself. -->
-		<button
-			class="square"
-			onclick={onmagiclayout}
-			disabled={!!template.locked}
-			title={hasColumns
-				? 'Position areas automagically — a card worked out from your headings and your data'
-				: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
-		>
-			<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
-		</button>
 		{#if picking}
 			<!-- A mode with no visible sign is a trap: every press is doing something
 			     other than what it usually does, and the only place that was said is
@@ -1069,9 +1325,11 @@
 				class="square"
 				onclick={onrescue}
 				disabled={!!template.locked}
-				title="{strayIds.length} area{strayIds.length === 1 ? ' is' : 's are'} not wholly on the page — bring {strayIds.length === 1 ? 'it' : 'them'} back on, and nothing else"
+				title={template.locked
+					? `${strayIds.length} area${strayIds.length === 1 ? ' is' : 's are'} not wholly on the page — unlock the design to bring ${strayIds.length === 1 ? 'it' : 'them'} back`
+					: `${strayIds.length} area${strayIds.length === 1 ? ' is' : 's are'} not wholly on the page — bring ${strayIds.length === 1 ? 'it' : 'them'} back on, and nothing else`}
 			>
-				<Icon name="move" size={16} /><span class="sr-only">Bring stray areas back onto the page</span>
+				<Icon name="data-collection" size={16} /><span class="sr-only">Bring stray areas back onto the page</span>
 			</button>
 		{/if}
 	</div>
@@ -1174,15 +1432,16 @@
 	<div class="corner right">
 		<MenuSelect
 			label="Zoom"
-			title={withKey('Zoom', 'zoom')}
+			title={withKey('Zoom — double-click to go between Fit and the zoom before it', 'zoom')}
 			bare
 			value={typeof zoom === 'number' ? String(zoom) : zoom}
 			items={zoomItems}
 			onselect={(value) => onzoom(value === 'fit' || value === 'actual' ? value : Number(value))}
+			ondouble={toggleFit}
 		/>
 	</div>
 
-	{#if padUsable}
+	{#if padUsable && panning && !padHidden}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
 		     hopeless. Shown only where there is no keyboard to fall back on, and
 		     only while there is something it could actually move. Its arrows
@@ -1203,43 +1462,49 @@
 			onpointercancel={stopNudge}
 			onpointerleave={stopNudge}
 		>
-			<!-- On an anchored area the vertical keys change the Gap — see
-			     `verticalTied`. -->
-			<button
-				class="up"
-				class:tied={verticalTied}
-				title={verticalTied ? `Gap ${padStep}mm smaller — closer to the area this one follows` : `Up ${padStep}mm`}
-				onpointerdown={() => startNudge(0, -padStep)}
-			>
-				<Icon name={verticalTied ? 'skip-back-filled' : 'caret-up'} size={verticalTied ? 16 : 30} />
-			</button>
-			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
-			<!-- The middle button carries the second gesture: drag it and the pad
-			     comes with your finger. A tap still cycles the step. -->
-			<button
-				class="step"
-				title="Step size — 1, 5 or 10mm. Drag it to move the pad."
-				onpointerdown={(e) => {
-					pushed = 'centre';
-					padPickup(e);
-				}}
-				onpointermove={padMove}
-				onpointerup={padDrop}
-				onpointercancel={padDrop}
-				onclick={() => {
-					if (padHeld) return;
-					padStep = PAD_STEPS[(PAD_STEPS.indexOf(padStep) + 1) % PAD_STEPS.length];
-				}}>{padStep}</button
-			>
-			<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={30} /></button>
-			<button
-				class="down"
-				class:tied={verticalTied}
-				title={verticalTied ? `Gap ${padStep}mm larger — further from the area this one follows` : `Down ${padStep}mm`}
-				onpointerdown={() => startNudge(0, padStep)}
-			>
-				<Icon name={verticalTied ? 'skip-back-filled' : 'caret-down'} size={verticalTied ? 16 : 30} />
-			</button>
+			<!-- The tilt is its own element, under the pad that casts the shadow:
+			     a 3D transform and a filter on one element is a pairing Firefox
+			     draws badly, and on the two presses that tip the lit edges away it
+			     drew the bevel as thick dark bars. -->
+			<div class="tilt">
+				<!-- On an anchored area the vertical keys change the Gap — see
+				     `verticalTied`. -->
+				<button
+					class="up"
+					class:tied={verticalTied}
+					title={verticalTied ? `Gap ${padStep}mm smaller — closer to the area this one follows` : `Up ${padStep}mm`}
+					onpointerdown={() => startNudge(0, -padStep)}
+				>
+					<Icon name={verticalTied ? 'skip-back-filled' : 'caret-up'} size={verticalTied ? 16 : 30} />
+				</button>
+				<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
+				<!-- The middle button carries the second gesture: drag it and the pad
+				     comes with your finger. A tap still cycles the step. -->
+				<button
+					class="step"
+					title="Step size — 1, 5 or 10mm. Drag it to move the pad; hold it to put the pad away."
+					onpointerdown={(e) => {
+						pushed = 'centre';
+						padPickup(e);
+					}}
+					onpointermove={padMove}
+					onpointerup={padDrop}
+					onpointercancel={padDrop}
+					onclick={() => {
+						if (padHeld) return;
+						padStep = PAD_STEPS[(PAD_STEPS.indexOf(padStep) + 1) % PAD_STEPS.length];
+					}}>{padStep}</button
+				>
+				<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={30} /></button>
+				<button
+					class="down"
+					class:tied={verticalTied}
+					title={verticalTied ? `Gap ${padStep}mm larger — further from the area this one follows` : `Down ${padStep}mm`}
+					onpointerdown={() => startNudge(0, padStep)}
+				>
+					<Icon name={verticalTied ? 'skip-back-filled' : 'caret-down'} size={verticalTied ? 16 : 30} />
+				</button>
+			</div>
 		</div>
 	{/if}
 </div>
@@ -1265,6 +1530,11 @@
 		/* A flick that runs past the end of the page must not become the
 		   browser's pull-to-refresh — see app.css. */
 		overscroll-behavior: contain;
+		/* One finger scrolls; two are the page's own pinch (see `onPinchMove`)
+		   and never the browser's, which zoomed the whole app — bars, table and
+		   all — around a page that was zooming itself as well. Pinch is the one
+		   gesture left out of the list, which is exactly what this says. */
+		touch-action: pan-x pan-y;
 		/* The stage is measured to work out the Fit scale, and the scale decides
 		   how tall the sheet is, and the sheet's height decides whether a vertical
 		   scrollbar appears — which takes ~15px off the width the measurement
@@ -1625,15 +1895,22 @@
 		--arrow: 30px;
 		--arrow-centre: calc(var(--arrow) / 32);
 		position: absolute;
-		display: none;
-		grid-template-columns: repeat(3, var(--cell));
-		grid-template-rows: repeat(3, var(--cell));
-		gap: 0;
+		/* Shown at any width: whether it is here at all is zoom and pan's call —
+		   see `panning`. It used to be a phone's alone, under 900px. */
+		display: block;
 		/* A drop shadow rather than a box shadow on each key: this one follows
 		   the painted shape, so the cross casts one shadow and the seams between
 		   its arms cast none. It is there all the time now — a thing that stands
 		   up off the page casts a shadow whether or not it is being moved. */
 		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.16));
+	}
+
+	/* The cross itself, and what tilts: see the note in the markup. */
+	.pad .tilt {
+		display: grid;
+		grid-template-columns: repeat(3, var(--cell));
+		grid-template-rows: repeat(3, var(--cell));
+		gap: 0;
 		/* Short, because a pad that takes a tenth of a second to answer a tap
 		   does not feel like a button. */
 		transition: transform 80ms ease-out;
@@ -1647,30 +1924,30 @@
 	   say this at a glance; with a long perspective and a small angle it read as
 	   a rendering artefact. The axis is the one the press tips it about: from
 	   the side, the vertical axis. */
-	.pad.push-left {
+	.pad.push-left .tilt {
 		transform: perspective(220px) rotateY(-14deg) translateX(-1px);
 	}
 
-	.pad.push-right {
+	.pad.push-right .tilt {
 		transform: perspective(220px) rotateY(14deg) translateX(1px);
 	}
 
-	.pad.push-up {
+	.pad.push-up .tilt {
 		transform: perspective(220px) rotateX(14deg) translateY(-1px);
 	}
 
-	.pad.push-down {
+	.pad.push-down .tilt {
 		transform: perspective(220px) rotateX(-14deg) translateY(1px);
 	}
 
 	/* The middle is not a direction, so it goes straight down. */
-	.pad.push-centre {
+	.pad.push-centre .tilt {
 		transform: scale(0.97);
 	}
 
 	/* While it is being carried it follows the finger and nothing else: a pad
 	   skewed and moving at once reads as a bug in the drag. */
-	.pad.moving {
+	.pad.moving .tilt {
 		transform: none;
 	}
 
@@ -1836,10 +2113,6 @@
 	@media (max-width: 900px) {
 		.stage {
 			padding: 8px;
-		}
-
-		.pad {
-			display: grid;
 		}
 	}
 

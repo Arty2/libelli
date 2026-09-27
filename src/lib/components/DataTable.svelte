@@ -1647,6 +1647,15 @@
 									onblur={() => (editing = null)}
 									onclick={(e) => e.stopPropagation()}
 									oninput={(e) => setCell(i, column, e.currentTarget.value)}
+									onkeydown={(e) => {
+										// Out of the cell, keeping what was typed (each key is already
+										// written): Escape leaves the field as it leaves every other.
+										// Stopped here so the page does not read it as "deselect" too.
+										if (e.key === 'Escape') {
+											e.stopPropagation();
+											e.currentTarget.blur();
+										}
+									}}
 								></textarea>
 								<!-- Drawn only when the cell holds more than it shows (see
 								     `overflowMark`), and a way into the rest: the same full-size
@@ -2595,15 +2604,21 @@
 
 
 	td textarea:focus {
-		outline: 2px solid var(--accent);
-		outline-offset: -2px;
+		outline: none;
 		max-height: 18rem;
 		position: relative;
 	}
 
+	/* The ring goes round the cell, not the field in it: the field is only as
+	   tall as its own text, and a row made taller by a neighbour left a ring
+	   round the top of the cell and a band of unmarked cell under it. */
+	tbody td:has(> textarea:focus) {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+	}
+
 	/* Row height, from the toggle under the table — see `rowHeight`. Short is
-	   one line and padding, and stays one line while typed in: a row that
-	   grew on focus would move every row under it. Full lifts the cap, so a
+	   one line and padding, and opens like medium while typed in. Full lifts the cap, so a
 	   row is as tall as its longest cell; where there is no `field-sizing`
 	   the `autosize` action does that measuring by hand. Medium is the
 	   stylesheet as it stands above. */
@@ -2615,9 +2630,11 @@
 		}
 	}
 
-	/* Short is the first line and the same sliver under it as medium. */
-	.data.rows-short td textarea,
-	.data.rows-short td textarea:focus {
+	/* Short is the first line and the same sliver under it as medium — at
+	   rest. The cell being typed in opens as medium's does, to its text up to
+	   18rem: a one-line field is no place to edit a paragraph, and the row it
+	   pushes down is one row, while you are in it. */
+	.data.rows-short td textarea:not(:focus) {
 		height: calc(var(--cell-line) + 7px);
 		max-height: calc(var(--cell-line) + 7px);
 	}
@@ -3103,6 +3120,19 @@
 	@media (max-width: 900px) {
 		.row-height .label {
 			display: none;
+		}
+
+		/* An icon alone, so a square — as tall as it is wide, like every other
+		   icon-only button; it kept the padding it had for the word, and read as
+		   a button with its label missing. */
+		.row-height {
+			box-sizing: border-box;
+			/* The bar's buttons are 29px tall; aspect-ratio cannot say so here,
+			   since the height is the content's and the width would follow the
+			   icon down to 17px instead. */
+			width: 29px;
+			padding-inline: 0;
+			justify-content: center;
 		}
 
 		/* The field says it is a table by what is in it; the word is the room. */

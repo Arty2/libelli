@@ -137,17 +137,40 @@ const FACING_ALIGN: Partial<Record<Align, Align>> = { left: 'right', right: 'lef
  * area deliberately pushed against one edge is the other case, and it hugs the
  * outer edge on both pages.
  *
- * Placement only: rotation and the pivot are left alone, so turning a box does
- * not also flip it on the facing page. A mirror of the *appearance* would put
+ * Placement, and a quarter turn. A tilt is left alone: a sticker at -7° is
+ * the same sticker on either page, and a mirror of the *appearance* would put
  * a signature or a corner flourish on its head, which is never what a spread
- * wants. This is derived at render time and never stored — the template holds
- * one set of millimetres, measured on the right-hand page.
+ * wants. A quarter turn is not a tilt but a direction — words run up the
+ * outer edge, their tops towards it — and the facing page's outer edge is the
+ * other one, so 90° there is -90°, turned about the mirrored pivot. The words
+ * themselves still read forwards; only which way they face changes.
+ *
+ * Derived at render time and never stored — the template holds one set of
+ * millimetres, measured on the right-hand page. Its own inverse, which is what
+ * lets a drag on the facing page be written back through it.
  */
 export function mirrorBox(box: Box, pageW: number): Box {
 	const x = Math.round((pageW - box.x - box.w) * 1000) / 1000;
 	const align = box.align ? FACING_ALIGN[box.align] : undefined;
-	return align ? { ...box, x, align } : { ...box, x };
+	const mirrored: Box = align ? { ...box, x, align } : { ...box, x };
+	if (!quarterTurn(box.rotation)) return mirrored;
+	mirrored.rotation = -box.rotation!;
+	if (box.centre) mirrored.centre = { x: Math.round((100 - box.centre.x) * 10) / 10, y: box.centre.y };
+	return mirrored;
 }
+
+/** 90° or -90°, however it is written: the turns `mirrorBox` reverses. */
+export function quarterTurn(rotation: number | undefined): boolean {
+	if (!rotation) return false;
+	const turn = ((rotation % 360) + 360) % 360;
+	return turn === 90 || turn === 270;
+}
+
+/**
+ * A rotation as drawn on a facing page, back to the one stored — and the
+ * other way, since reversing a quarter turn twice is where it started.
+ */
+export const facingRotation = (rotation: number): number => (quarterTurn(rotation) ? -rotation : rotation);
 
 /**
  * An `outer`/`inner` page-number position resolved to the edge it lands on.

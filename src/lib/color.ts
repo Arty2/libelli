@@ -14,30 +14,18 @@
 const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
 /**
- * A short, print-sensible set of names, so `[warning]{red}` works without a hex.
+ * Names that are not CSS keywords, so a cell can say them anyway. The CSS
+ * keywords below are the names: `red` is #ff0000, as in any browser, so a
+ * color named in a cell is the same color as that name anywhere else.
  *
- * These deliberately shadow the CSS keywords of the same name below: CSS `red`
- * is #ff0000, which is a screen color and comes off a press as a shout. Anyone
- * who wants that exact value can write the hex.
+ * There used to be a print palette here that shadowed the CSS names — `red`
+ * as a press red, `green` a darker one — on the reasoning that screen colors
+ * come off a press as a shout. It made a name mean something different here
+ * from everywhere else, which is the worse surprise; a softer red is a hex
+ * away, and says so.
  */
 export const NAMED_COLORS: Record<string, string> = {
-	black: '#000000',
-	white: '#ffffff',
-	grey: '#767676',
-	gray: '#767676',
-	silver: '#b3b3b3',
-	red: '#b42318',
-	orange: '#c4520a',
-	amber: '#b25e09',
-	yellow: '#a88600',
-	green: '#177245',
-	teal: '#0f6f70',
-	blue: '#1d4ed8',
-	navy: '#14306b',
-	purple: '#6b21a8',
-	magenta: '#a4176b',
-	pink: '#c2477f',
-	brown: '#6b4423'
+	amber: '#b25e09'
 };
 
 function expand(packed: string): Record<string, string> {
@@ -57,8 +45,8 @@ function expand(packed: string): Record<string, string> {
  *
  * Here at all because an area can take its fill from a spreadsheet column, and
  * a spreadsheet that holds colors holds them the way people write them:
- * `crimson`, `cornflowerblue`, `rebeccapurple`. The print palette above still
- * wins on the seventeen names it defines.
+ * `crimson`, `cornflowerblue`, `rebeccapurple`. They are the names; the one
+ * above is only for what CSS does not name.
  */
 const CSS_KEYWORDS = expand(
 	"aliceblue f0f8ff antiquewhite faebd7 aqua 00ffff aquamarine 7fffd4 azure f0ffff " +
@@ -140,8 +128,8 @@ export function parseColor(raw: string | undefined | null): string | null {
 	if (!raw) return null;
 	const value = raw.trim().toLowerCase();
 	if (HEX.test(value)) return value;
-	if (NAMED_COLORS[value]) return NAMED_COLORS[value];
 	if (CSS_KEYWORDS[value]) return CSS_KEYWORDS[value];
+	if (NAMED_COLORS[value]) return NAMED_COLORS[value];
 	return parseFunctional(value);
 }
 
