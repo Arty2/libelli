@@ -8,6 +8,7 @@
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { swipe } from '$lib/gestures';
+	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
@@ -764,11 +765,39 @@
 	let padHeld = $state(false);
 	let padPress: { x: number; y: number; from: { right: number; bottom: number } } | null = null;
 
+	/**
+	 * Zoom and pan. On a phone a finger that lands on an area picks it up, and a
+	 * card that has been laid out is mostly areas — so there was nowhere left to
+	 * put a finger down to scroll the page, zoomed in, without moving something.
+	 * Held on the pad's middle button this turns areas inert to a press: one
+	 * finger scrolls, two pinch, nothing is moved, chosen or opened. The middle
+	 * button, because its arrows already repeat while held and its tap and drag
+	 * are taken; a hold was the gesture it had left. Off from the button that
+	 * says it is on, above Area.
+	 */
+	let panning = $state(false);
+	const PAN_HOLD_MS = 500;
+	let panTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function cancelPanHold() {
+		if (panTimer) clearTimeout(panTimer);
+		panTimer = null;
+	}
+
 	function padPickup(event: PointerEvent) {
 		if (event.button !== 0) return;
 		padPress = { x: event.clientX, y: event.clientY, from: { ...padAt } };
 		// Captured now, so a quick drag that leaves the button still brings the pad.
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		cancelPanHold();
+		panTimer = setTimeout(() => {
+			panTimer = null;
+			if (padDrag) return;
+			panning = true;
+			// Held, so the click that ends the press does not also cycle the step.
+			padHeld = true;
+			vibrate(HOLD_MS);
+		}, PAN_HOLD_MS);
 	}
 
 	/**
@@ -784,6 +813,7 @@
 			if (Math.hypot(event.clientX - padPress.x, event.clientY - padPress.y) < PAD_SLOP) return;
 			padDrag = padPress;
 			padHeld = true;
+			cancelPanHold();
 		}
 		if (!padDrag || !host) return;
 		event.preventDefault();
@@ -825,6 +855,7 @@
 	}
 
 	function padDrop() {
+		cancelPanHold();
 		padPress = null;
 		padDrag = null;
 		// Cleared on the next tick, so the click that follows the drag — which is
@@ -968,6 +999,7 @@
 				{background}
 				{images}
 				interactive={true}
+				{panning}
 				pageCount={rowCount}
 				{editingId}
 				{flashIds}
@@ -1140,6 +1172,18 @@
 				onclick={unlock}
 			>
 				<Icon name={unlocking ? 'unlocked' : 'locked'} size={16} />
+			</button>
+		{/if}
+		{#if panning}
+			<!-- The sign that areas are not answering a press, and the way out:
+			     below the page's padlock, which outranks it, and above Area. -->
+			<button
+				class="square"
+				aria-pressed="true"
+				onclick={() => (panning = false)}
+				title="Zoom and pan — areas stay put while you scroll and pinch. Press to move them again."
+			>
+				<Icon name="zoom-pan" size={16} /><span class="sr-only">Stop zoom and pan</span>
 			</button>
 		{/if}
 		<button
@@ -1351,7 +1395,7 @@
 			     comes with your finger. A tap still cycles the step. -->
 			<button
 				class="step"
-				title="Step size — 1, 5 or 10mm. Drag it to move the pad."
+				title="Step size — 1, 5 or 10mm. Drag it to move the pad; hold it to zoom and pan without moving areas."
 				onpointerdown={(e) => {
 					pushed = 'centre';
 					padPickup(e);

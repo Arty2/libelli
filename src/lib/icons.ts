@@ -100,6 +100,8 @@ export const ICONS: Record<string, string> = {
 
 	'unlink': '<path d="M5 3.59H7V8.42H5z" transform="rotate(-45.01 5.996 6.005)"/><path d="M25 23.58H27V28.409999999999997H25z" transform="rotate(-44.99 25.995 25.999)"/><path d="M11 2H13V6H11z"/><path d="M2 11H6V13H2z"/><path d="M26 19H30V21H26z"/><path d="M19 26H21V30H19z"/><path d="M16.58,21.07l-3.71,3.72a4,4,0,1,1-5.66-5.66l3.72-3.72L9.51,14,5.8,17.72a6,6,0,0,0-.06,8.54A6,6,0,0,0,10,28a6.07,6.07,0,0,0,4.32-1.8L18,22.49Z"/><path d="M15.41,10.93l3.72-3.72a4,4,0,1,1,5.66,5.66l-3.72,3.72L22.49,18l3.71-3.72a6,6,0,0,0,.06-8.54A6,6,0,0,0,22,4a6.07,6.07,0,0,0-4.32,1.8L14,9.51Z"/>',
 	/* A harbour buoy: what an area other areas are moored to wears. */
+	// Carbon files it under watson-health, as `zoom-pan`.
+	'zoom-pan': '<path d="M27.01 12 25.6 13.41 28.18 16 25.59 18.59 27.01 20 31.01 16 27.01 12z"/><path d="M6.41 13.42 5 12 1 16 5 20 6.42 18.59 3.83 16 6.41 13.42z"/><path d="M16 28.17 13.41 25.58 12 27 16 31 20 27 18.59 25.59 16 28.17z"/><path d="M16 3.83 18.58 6.41 20 5 16 1 12 5 13.41 6.42 16 3.83z"/><path d="M22,16a6,6,0,1,0-2.53,4.89l3.82,3.82,1.42-1.42-3.82-3.82A6,6,0,0,0,22,16Zm-6,4a4,4,0,1,1,4-4A4,4,0,0,1,16,20Z"/>',
 	'harbor': '<path d="M27,17A11.0109,11.0109,0,0,1,17,27.9492V14h6V12H17V9.8579a4,4,0,1,0-2,0V12H9v2h6V27.9492A11.0109,11.0109,0,0,1,5,17H3a13,13,0,0,0,26,0ZM14,6a2,2,0,1,1,2,2A2.0023,2.0023,0,0,1,14,6Z"/>',
 	/* A plug pulled out of its socket: an area carrying its own words rather
 	   than a column's is not plugged into the data at all. */

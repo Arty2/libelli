@@ -38,6 +38,12 @@
 		template: Template;
 		row?: Row | null;
 		mapping?: Mapping;
+		/**
+		 * Zoom and pan: a press on an area is left to the page — one finger
+		 * scrolls it, two pinch it — and moves, picks or opens nothing. Set from
+		 * the pad; see PagePreview's `panning`.
+		 */
+		panning?: boolean;
 		/** dashed box bounds and the bleed marker; screen only, never printed */
 		bounds?: boolean;
 		/** every tie drawn as its thread, not only the one pointed at — with the bounds */
@@ -133,6 +139,7 @@
 		smartGuides = false,
 		scale = 1,
 		interactive = false,
+		panning = false,
 		selectedIds = [],
 		pageNumber = null,
 		background = null,
@@ -890,6 +897,9 @@
 		// and its non-additive select collapses a multi-selection to one box
 		// before the context menu it opened has a chance to act on the rest.
 		if (event.button !== 0 || !interactive) return;
+		// Not even a selection: the press belongs to the page, which scrolls.
+		// Nothing prevented, so the browser still sees the gesture.
+		if (panning) return;
 		// A second finger is a pinch, not a second drag — and not a selection
 		// either: the area under it is not being picked, it is being pinched.
 		if (event.pointerType === 'touch' && touching.size > 1) return;
@@ -1752,6 +1762,7 @@
 	class="card"
 	class:editing={interactive}
 	class:frozen={interactive && !!template.locked}
+	class:panning={interactive && panning}
 	style={cardStyle()}
 	lang="en"
 >
@@ -1805,7 +1816,7 @@
 				use:measure={box.id}
 				onpointerdown={(e) => startDrag(e, box, 'move')}
 				ondblclick={(e) => {
-					if (!interactive) return;
+					if (!interactive || panning) return;
 					e.preventDefault();
 					beginEdit(box);
 				}}
@@ -2450,6 +2461,13 @@
 	.box.interactive {
 		cursor: move;
 		touch-action: none;
+	}
+
+	/* Zoom and pan: the areas hand a finger back to the page, which scrolls
+	   under it and pinches under two, instead of holding it for a drag. */
+	.card.panning .box {
+		cursor: grab;
+		touch-action: pan-x pan-y;
 	}
 
 	/* A link in a Markdown body is a link on paper: it says where to go, it does
