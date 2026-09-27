@@ -18,6 +18,21 @@
     "amount": 3,
     "cropMarks": false
   },
+  "print": {
+    "enabled": true,
+    "count": 2,
+    "order": "zine",
+    "sheet": {
+      "w": 210,
+      "h": 297
+    },
+    "orientation": "auto",
+    "bleed": {
+      "enabled": false,
+      "amount": 3,
+      "cropMarks": false
+    }
+  },
   "pageNumber": {
     "enabled": true,
     "position": "bottom-outer",
@@ -48,11 +63,15 @@
   "defaults": {
     "font": "Instrument Sans",
     "size": 10,
-    "lineHeight": 1.45,
+    "lineHeight": 1.6,
     "weight": 400,
     "color": "#1c1b19",
     "align": "left",
-    "letterSpacing": 0
+    "letterSpacing": 0,
+    "paragraph": {
+      "mode": "indent",
+      "amount": 1
+    }
   },
   "slots": [
     "title",
@@ -84,13 +103,16 @@
       "y": 11,
       "w": 90,
       "h": 5,
+      "mode": "plain",
+      "overflow": "clip",
       "font": "IBM Plex Mono",
       "size": 6.5,
       "lineHeight": 1.2,
-      "letterSpacing": 0.35,
-      "textCase": "uppercase",
       "color": "#6b675f",
       "valign": "bottom",
+      "letterSpacing": 0.35,
+      "textCase": "uppercase",
+      "hideWhenEmpty": true,
       "padding": {
         "top": 0,
         "right": 0,
@@ -105,9 +127,6 @@
       },
       "borderStyle": "solid",
       "borderColor": "#b9b4a8",
-      "mode": "plain",
-      "overflow": "clip",
-      "hideWhenEmpty": true,
       "mirror": false
     },
     {
@@ -117,20 +136,20 @@
       "y": 21,
       "w": 90,
       "h": 14,
+      "mode": "plain",
+      "overflow": "grow",
       "font": "Fraunces",
       "size": 30,
       "weight": 200,
       "lineHeight": 0.95,
+      "valign": "bottom",
       "letterSpacing": -0.25,
-      "mode": "plain",
-      "overflow": "grow",
       "anchor": {
         "to": "b_category",
         "gap": 5
       },
       "hideWhenEmpty": true,
       "mirror": false,
-      "valign": "bottom",
       "color": "#6f9479"
     },
     {
@@ -138,15 +157,15 @@
       "slot": "subtitle",
       "x": 14,
       "y": 37,
-      "w": 90,
-      "h": 7,
+      "w": 120,
+      "h": 5,
+      "mode": "plain",
+      "overflow": "clip",
       "font": "Ysabeau Office",
       "size": 13,
       "weight": 300,
       "lineHeight": 1.25,
       "color": "#55514a",
-      "mode": "plain",
-      "overflow": "grow",
       "anchor": {
         "to": "b_title",
         "gap": 2.5
@@ -160,12 +179,11 @@
       "x": 14,
       "y": 52,
       "w": 120,
-      "h": 120,
+      "h": 135,
       "mode": "markdown",
-      "overflow": "grow",
-      "anchor": {
-        "to": "b_subtitle",
-        "gap": 8
+      "overflow": "clip",
+      "list": {
+        "marker": "emdash"
       },
       "md": {
         "h1": {
@@ -200,13 +218,11 @@
           "color": "#cfcabe"
         }
       },
-      "paragraph": {
-        "mode": "indent",
-        "amount": 1
+      "anchor": {
+        "to": "b_subtitle",
+        "gap": 6
       },
-      "list": {
-        "marker": "emdash"
-      }
+      "locked": true
     },
     {
       "id": "b_sketch",
@@ -217,73 +233,73 @@
       "h": 32,
       "mode": "image",
       "overflow": "clip",
-      "fit": "contain",
-      "hideWhenEmpty": true,
+      "color": "#1c1b19",
       "rotation": -7,
+      "hideWhenEmpty": true,
       "padding": 2.2,
       "borderWidth": 0.3,
       "borderStyle": "stamp",
+      "borderColor": "#ffffff",
       "borderHand": true,
-      "color": "#1c1b19",
-      "mirror": false,
-      "borderColor": "#ffffff"
+      "fit": "contain",
+      "mirror": false
     },
     {
       "id": "b_link",
       "slot": null,
-      "x": 34,
-      "y": 194,
+      "x": 54,
+      "y": 198,
       "w": 80,
       "h": 4,
+      "mode": "plain",
+      "overflow": "clip",
       "font": "IBM Plex Mono",
       "size": 6.5,
       "lineHeight": 1.2,
       "color": "#1c1b19",
-      "valign": "bottom",
-      "mode": "plain",
-      "overflow": "clip",
+      "align": "right",
+      "valign": "middle",
       "hideWhenEmpty": true,
       "static": {
-        "text": "{{link}}"
-      },
-      "align": "right"
+        "text": "{{link:https\\://:}}"
+      }
     },
     {
       "id": "b_date",
       "slot": null,
-      "x": 34,
-      "y": 198.5,
+      "x": 14,
+      "y": 197.5,
       "w": 80,
       "h": 4,
+      "mode": "plain",
+      "overflow": "clip",
       "font": "IBM Plex Mono",
       "size": 6.5,
       "lineHeight": 1.2,
       "color": "#8a857b",
+      "align": "left",
+      "valign": "middle",
       "letterSpacing": 0.15,
-      "valign": "bottom",
-      "mode": "plain",
-      "overflow": "clip",
+      "textCase": "uppercase",
       "static": {
         "text": "Printed {{date:YYYY-MM-DD}}"
-      },
-      "align": "right"
+      }
     },
     {
       "id": "b_qr",
       "slot": "link",
       "x": 118,
-      "y": 186,
+      "y": 181,
       "w": 16,
       "h": 16,
       "mode": "qr",
       "overflow": "clip",
-      "hideWhenEmpty": true,
-      "fit": "contain",
       "color": "#1c1b19",
-      "padding": 1,
       "qr": {
         "level": "M"
-      }
+      },
+      "hideWhenEmpty": true,
+      "fit": "contain"
     },
     {
       "id": "b_notes",
@@ -292,10 +308,19 @@
       "y": 35,
       "w": 46,
       "h": 46,
+      "mode": "markdown",
+      "overflow": "clip",
       "font": "Patrick Hand",
       "size": 13,
       "lineHeight": 1.15,
       "color": "#3b3522",
+      "md": {
+        "paragraph": {
+          "spaceAfter": 2
+        }
+      },
+      "rotation": 2.5,
+      "hideWhenEmpty": true,
       "background": "#fdf08a",
       "padding": {
         "top": 7,
@@ -303,34 +328,10 @@
         "bottom": 4,
         "left": 5
       },
-      "rotation": 2.5,
-      "mode": "markdown",
-      "overflow": "clip",
-      "hideWhenEmpty": true,
-      "mirror": false,
       "locked": true,
-      "md": {
-        "paragraph": {
-          "spaceAfter": 2
-        }
-      }
+      "mirror": false
     }
   ],
   "facing": true,
-  "css": "/* The set's one color, for the stamp's field. The title sets the same green\n   in its own area, and card 2's band in its cell. */\n:root {\n  --accent-color: #6f9479;\n}\n\n/* The stamp's field: the area's fill layer, inset to the padding. */\n#sketch .surface {\n  background: var(--accent-color);\n}\n\n/* The page number takes the page's own face; this sets it in the mono of the footer. */\n.page-number {\n  font-family: 'IBM Plex Mono', monospace !important;\n  font-size: 6.5pt !important;\n  letter-spacing: 0.3mm;\n  color: #8a857b !important;\n}\n\n/* Headings inside the body in the title's serif. */\n#body h1, #body h2, #body h3 {\n  font-family: 'Fraunces', serif;\n  letter-spacing: -0.1mm;\n}\n\n/* `code` in the footer's mono, on a faint chip. */\n#body code {\n  font-family: 'IBM Plex Mono', monospace;\n  font-size: 0.86em;\n  background: #efece4;\n  padding: 0 0.6mm;\n  border-radius: 0.6mm;\n}\n\n/* The drawing's stamp, lifted off the page. A drop-shadow follows what is\n   painted, so it traces the perforations; a box-shadow would be a rectangle.\n   The first four are a 1px hairline all round — white paper on white paper\n   needs an edge — and the last is the shadow, cast by paper and hairline\n   together, since each filter works on what the one before it drew. */\n#sketch {\n  filter:\n    drop-shadow(1px 0 0 #eee) drop-shadow(-1px 0 0 #eee)\n    drop-shadow(0 1px 0 #eee) drop-shadow(0 -1px 0 #eee)\n    drop-shadow(0.5mm 0.7mm 0.2mm rgba(40, 30, 10, 0.3));\n}\n\n/* The post-it off the page's edge: a curl of shadow under its lower corners,\n   and a strip of darker yellow where the glue is. Never printed — it is off\n   the paper — so it is only ever the editor's. */\n#notes {\n  box-shadow: 0 1.6mm 2.2mm -1mm rgba(60, 45, 0, 0.35);\n}\n#notes::after {\n  content: '';\n  position: absolute;\n  inset: 0 0 auto 0;\n  height: 6mm;\n  background: rgba(190, 160, 0, 0.08);\n}\n\n#body mark {\n  background: #f6e27a;\n  padding: 0 0.4mm;\n}\n",
-  "print": {
-    "enabled": true,
-    "count": 2,
-    "order": "zine",
-    "sheet": {
-      "w": 210,
-      "h": 297
-    },
-    "orientation": "auto",
-    "bleed": {
-      "enabled": false,
-      "amount": 3,
-      "cropMarks": false
-    }
-  }
+  "css": "/* The set's one color, for the stamp's field. The title sets the same green\n   in its own area, and card 2's band in its cell. */\n:root {\n  --accent-color: #6f9479;\n}\n\n/* The stamp's field: the area's fill layer, inset to the padding. */\n#sketch .surface {\n  background: var(--accent-color);\n}\n\n/* The page number takes the page's own face; this sets it in the mono of the footer. */\n.page-number {\n  font-family: 'IBM Plex Mono', monospace !important;\n  font-size: 6.5pt !important;\n  letter-spacing: 0.3mm;\n  color: #8a857b !important;\n}\n\n/* Headings inside the body in the title's serif. */\n#body h1, #body h2, #body h3 {\n  font-family: 'Fraunces', serif;\n  letter-spacing: -0.1mm;\n}\n\n/* `code` in the footer's mono, on a faint chip. */\n#body code {\n  font-family: 'IBM Plex Mono', monospace;\n  font-size: 0.86em;\n  background: #efece4;\n  padding: 0 0.6mm;\n  border-radius: 0.6mm;\n}\n\n/* The drawing's stamp, lifted off the page. A drop-shadow follows what is\n   painted, so it traces the perforations; a box-shadow would be a rectangle.\n   The first four are a 1px hairline all round — white paper on white paper\n   needs an edge — and the last is the shadow, cast by paper and hairline\n   together, since each filter works on what the one before it drew. */\n#sketch {\n  filter:\n    drop-shadow(1px 0 0 #eee) drop-shadow(-1px 0 0 #eee)\n    drop-shadow(0 1px 0 #eee) drop-shadow(0 -1px 0 #eee)\n    drop-shadow(0.5mm 0.7mm 0.2mm rgba(40, 30, 10, 0.3));\n}\n\n/* The post-it off the page's edge: a curl of shadow under its lower corners,\n   and a strip of darker yellow where the glue is. Never printed — it is off\n   the paper — so it is only ever the editor's. */\n#notes {\n  box-shadow: 0 1.6mm 2.2mm -1mm rgba(60, 45, 0, 0.35);\n}\n#notes::after {\n  content: '';\n  position: absolute;\n  inset: 0 0 auto 0;\n  height: 6mm;\n  background: rgba(190, 160, 0, 0.08);\n}\n\n#body mark {\n  background: #f6e27a;\n  padding: 0 0.4mm;\n}\n"
 }
