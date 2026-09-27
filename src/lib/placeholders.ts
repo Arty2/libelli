@@ -120,7 +120,8 @@ export function formatDate(date: Date, format: string = DEFAULT_DATE_FORMAT): st
  * the find in a spreadsheet — no patterns, so nothing typed into a cell can be
  * read as one. Neither part is trimmed, since a space is the commonest thing
  * to replace; the find ends at the first colon after the name, so the
- * replacement may hold colons and the find may not. An empty replacement
+ * replacement may hold colons as they are, and the find holds one written
+ * `\:` — `{{time:\:: h }}` turns `9:30` into `9 h 30`. An empty replacement
  * deletes. It takes both colons to mean this: `{{date:YYYY}}` is still a date,
  * and a single part after a column's name still means nothing, as it always
  * has, rather than quietly becoming a deletion.
@@ -156,11 +157,17 @@ export function referencedColumns(text: string, columns: readonly string[]): str
 	return [...found];
 }
 
-/** `find:replace` split at its first colon, or null when there is no colon. */
+/**
+ * `find:replace` split at its first colon that is not written `\:`, or null
+ * when there is none. `\:` is a colon in either part — the only escape, so a
+ * backslash before anything else is a backslash, and a Windows path or a
+ * regex someone meant literally survives being searched for.
+ */
 function findReplace(spec: string): { find: string; replace: string } | null {
-	const colon = spec.indexOf(':');
+	const colon = spec.search(/(?<!\\):/);
 	if (colon === -1) return null;
-	return { find: spec.slice(0, colon), replace: spec.slice(colon + 1) };
+	const unescape = (part: string) => part.replaceAll('\\:', ':');
+	return { find: unescape(spec.slice(0, colon)), replace: unescape(spec.slice(colon + 1)) };
 }
 
 export function applyPlaceholders(text: string, context: PlaceholderContext = {}): string {

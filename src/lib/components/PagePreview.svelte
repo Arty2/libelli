@@ -997,9 +997,11 @@
 		     pressing it unlocks, and for a moment afterwards it wears the open
 		     padlock (`unlocking`), or it would vanish on the same frame and the
 		     press would go unanswered. It was a "Locked" band over the sheet,
-		     which took a band's height off the page at Fit. Screen furniture:
-		     Boxes takes it away with the rest. -->
-		{#if (template.locked || unlocking) && bounds}
+		     which took a band's height off the page at Fit. Not screen furniture,
+		     whatever Boxes says: it is the one way to unlock from beside the page,
+		     and with the outlines off it vanished and Area stood greyed out with
+		     nothing above it to say why. -->
+		{#if template.locked || unlocking}
 			<button
 				class="square page-lock"
 				aria-pressed={!unlocking}

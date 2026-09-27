@@ -930,6 +930,24 @@
 	}
 
 	/**
+	 * Open an area for typing — unless what it would type into is a cell of a
+	 * locked table. Refused at the door, not at the first keystroke: the field
+	 * used to open and then turn every key away, which looks broken. An area of
+	 * its own words is the design's, not the table's, and still opens. Null is
+	 * the card closing it, which is never refused.
+	 */
+	function beginEditing(id: string | null) {
+		if (id === null) {
+			editingId = null;
+			return;
+		}
+		const box = template.boxes.find((b) => b.id === id);
+		if (!box) return;
+		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
+		editingId = id;
+	}
+
+	/**
 	 * What an area with no column is drawn on top of.
 	 *
 	 * A data URL, or one of this browser's own images, can be drawn on top of.
@@ -2112,7 +2130,7 @@
 		// spreadsheet. A double-click on the area does the same thing.
 		if (event.key === 'Enter' && selected && !editingId) {
 			event.preventDefault();
-			editingId = selected.id;
+			beginEditing(selected.id);
 			return;
 		}
 		// The first-run notice tells people to press ? for the tour, and for a
@@ -2756,7 +2774,7 @@
 			{flashIds}
 			onstoppicking={() => (picking = false)}
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
-			onedit={(id) => (editingId = id)}
+			onedit={beginEditing}
 			ondraw={drawArea}
 			oneditcell={editCell}
 			ontext={setBoxText}

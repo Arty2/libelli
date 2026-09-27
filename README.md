@@ -223,7 +223,8 @@ resize boxes directly, or type exact millimetres.
   a replace change it on the way in: `{{title:words:that}}` swaps every
   `words` for `that`, `{{title: :-}}` puts hyphens for spaces, and an empty
   replacement deletes. Literal and case-sensitive, never a pattern; the find
-  ends at the first colon, so the replacement may hold colons. Deliberately small — no
+  ends at the first colon, so the replacement may hold colons, and a colon to
+  *find* is written `\:` — `{{time:\:: h }}` turns `9:30` into `9 h 30`. Deliberately small — no
   conditionals, no loops — and anything in braces it does not recognise is left
   exactly as written. No time of day: a card is printed once and read for
   months.
