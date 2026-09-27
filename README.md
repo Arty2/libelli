@@ -1351,7 +1351,7 @@ While a text field has focus, undo is left to the browser's own text history and
 <kbd>Delete</kbd> deletes characters — the app keeps its hands off both.
 Otherwise the arrow keys move the selected box wherever you are on the page. On
 a touch screen the same job is done by the four-way pad that appears beside the
-card in **zoom and pan** (the button above Area) — one cross with one outline, not five tiles in the shape of a cross — with
+card in **zoom and pan** (the button under Position Automagically) — one cross with one outline, not five tiles in the shape of a cross — with
 a chip in the middle cycling between 1mm, 5mm and 10mm; holding an arrow keeps
 it moving. The cross is drawn as a raised thing — lit from the top left, thicker
 along the bottom and right, casting one shadow of its own, and it goes down
@@ -1376,8 +1376,9 @@ towards it and down is away. They repeat on a hold like the arrows do.
   in the gaps between them — which is most of the page on a card that has been
   laid out. Type size is the **Size** field in the bar, or Ctrl/Cmd+Shift+scroll
   with a mouse: a pinch is how a phone zooms, and it means that here too.
-- **Zoom and pan** — the button above Area (under the padlock, when there is
-  one) turns it on and off. On, an area no longer moves under a finger or the
+- **Zoom and pan** — the button under Position Automagically turns it on and
+  off; it wears **Move** while areas drag and the zoom-and-pan glyph while they
+  do not. On, an area no longer moves under a finger or the
   mouse: one finger scrolls the page and two pinch it, a tap still chooses an
   area and a second opens it, and the **nudge pad** appears to move the chosen
   one — it shows only in this mode, at any width. The resize handles and the
@@ -1517,9 +1518,13 @@ than it has to.
   carries the six alignments as one icon row.
 
 - **Beside the page** — undo and redo at the top left, *+ Area* at the top
-  right, with the button that lays every area out from the columns (on an empty
-  template), the button that rescues stray areas, and the chip for Select
-  Multiple appearing under it when any of them has something to say. Next to the
+  right, with the button that lays every area out from the columns, the Move /
+  zoom-and-pan toggle, the button that rescues stray areas (Data collection's
+  arrows, all pointing in) and the chip for Select Multiple appearing under it
+  when any of them has something to say. On a locked page the column is the
+  padlock alone — nothing that would change the design is offered — and the
+  rescue button, greyed out, if something is off the page: still the sign
+  that it is, and unlocking is the way to act on it. Next to the
   thing they act on, rather than in the window's toolbar. None of it scrolls:
   the page moves inside the stage and every control stays where you left it,
   because a tool you have to scroll back to find is a tool that is not to hand.

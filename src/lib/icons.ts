@@ -102,6 +102,7 @@ export const ICONS: Record<string, string> = {
 	/* A harbour buoy: what an area other areas are moored to wears. */
 	// Carbon files it under watson-health, as `zoom-pan`.
 	'zoom-pan': '<path d="M27.01 12 25.6 13.41 28.18 16 25.59 18.59 27.01 20 31.01 16 27.01 12z"/><path d="M6.41 13.42 5 12 1 16 5 20 6.42 18.59 3.83 16 6.41 13.42z"/><path d="M16 28.17 13.41 25.58 12 27 16 31 20 27 18.59 25.59 16 28.17z"/><path d="M16 3.83 18.58 6.41 20 5 16 1 12 5 13.41 6.42 16 3.83z"/><path d="M22,16a6,6,0,1,0-2.53,4.89l3.82,3.82,1.42-1.42-3.82-3.82A6,6,0,0,0,22,16Zm-6,4a4,4,0,1,1,4-4A4,4,0,0,1,16,20Z"/>',
+	'data-collection': '<circle cx="16" cy="16" r="2"/><path d="M30 17 30 15 23.83 15 26.41 12.41 25 11 20 16 25 21 26.41 19.59 23.83 17 30 17z"/><path d="M15 23.83 15 30 17 30 17 23.83 19.59 26.41 21 25 16 20 11 25 12.41 26.41 15 23.83z"/><path d="M7 11 5.59 12.41 8.17 15 2 15 2 17 8.17 17 5.59 19.59 7 21 12 16 7 11z"/><path d="M17 8.17 17 2 15 2 15 8.17 12.41 5.59 11 7 16 12 21 7 19.59 5.59 17 8.17z"/>',
 	'harbor': '<path d="M27,17A11.0109,11.0109,0,0,1,17,27.9492V14h6V12H17V9.8579a4,4,0,1,0-2,0V12H9v2h6V27.9492A11.0109,11.0109,0,0,1,5,17H3a13,13,0,0,0,26,0ZM14,6a2,2,0,1,1,2,2A2.0023,2.0023,0,0,1,14,6Z"/>',
 	/* A plug pulled out of its socket: an area carrying its own words rather
 	   than a column's is not plugged into the data at all. */

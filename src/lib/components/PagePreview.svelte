@@ -1166,54 +1166,59 @@
 				<Icon name={unlocking ? 'unlocked' : 'locked'} size={16} />
 			</button>
 		{/if}
-		<!-- Zoom and pan, on and off: below the page's padlock, which outranks
-		     it, and above Area. Always here, so the way in is not a gesture to
-		     be found; pressed, it is the sign that areas are not being dragged,
-		     and the nudge pad comes with it. -->
-		<button
-			class="square"
-			aria-pressed={panning}
-			onclick={() => (panning = !panning)}
-			title={panning
-				? 'Zoom and pan — a finger scrolls, areas stay put; tap one and nudge it with the pad. Press to drag areas again.'
-				: 'Zoom and pan — scroll and pinch without dragging areas, and nudge the chosen one with a pad'}
-		>
-			<Icon name="zoom-pan" size={16} /><span class="sr-only">Zoom and pan</span>
-		</button>
-		<button
-			class="square"
-			onclick={onaddbox}
-			disabled={!!template.locked}
-			title="Add an area to the page"
-		>
-			<Icon name="shapes" size={16} /><span class="sr-only">Area</span>
-		</button>
-		{#if drawTarget}
-			<!-- Under Area, because it is the same kind of thing: Area makes one,
-			     this draws in the one you have. -->
+		<!-- Nothing that changes the design on a locked page, not even greyed
+		     out: the padlock above is the one thing to press, and a column of
+		     dead buttons under it only said the same thing four more times. -->
+		{#if !template.locked}
 			<button
 				class="square"
-				onclick={() => ondraw?.(drawTarget)}
-				title="Draw this area's image"
+				onclick={onaddbox}
+				title="Add an area to the page"
 			>
-				<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
+				<Icon name="shapes" size={16} /><span class="sr-only">Area</span>
+			</button>
+			{#if drawTarget}
+				<!-- Under Area, because it is the same kind of thing: Area makes one,
+				     this draws in the one you have. -->
+				<button
+					class="square"
+					onclick={() => ondraw?.(drawTarget)}
+					title="Draw this area's image"
+				>
+					<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
+				</button>
+			{/if}
+			<!-- Always there. It used to show only on an empty page, and be a press
+			     and hold on Area otherwise, so that a control replacing the design
+			     was not one mis-tap away — but it opens a dialog that says how many
+			     areas it would replace, with Cancel, which is the guard; and a hold
+			     is now how anything here explains itself. -->
+			<button
+				class="square"
+				onclick={onmagiclayout}
+				title={hasColumns
+					? 'Position areas automagically — a card worked out from your headings and your data'
+					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
+			>
+				<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
+			</button>
+			<!-- Zoom and pan, on and off, under the two that make areas: those
+			     put things on the page, this is how you get about it. Always here
+			     on an unlocked page, so the way in is not a gesture to be found.
+			     It wears what a press on an area does now — Move, or zoom and
+			     pan — and pressed it is the sign areas are not being dragged,
+			     with the nudge pad beside it. -->
+			<button
+				class="square"
+				aria-pressed={panning}
+				onclick={() => (panning = !panning)}
+				title={panning
+					? 'Zoom and pan — a finger scrolls, areas stay put; tap one and nudge it with the pad. Press to drag areas again.'
+					: 'Move — areas drag where you press them. Press for zoom and pan: scroll and pinch without dragging, and nudge with a pad.'}
+			>
+				<Icon name={panning ? 'zoom-pan' : 'move'} size={16} /><span class="sr-only">Zoom and pan</span>
 			</button>
 		{/if}
-		<!-- Always there. It used to show only on an empty page, and be a press
-		     and hold on Area otherwise, so that a control replacing the design
-		     was not one mis-tap away — but it opens a dialog that says how many
-		     areas it would replace, with Cancel, which is the guard; and a hold
-		     is now how anything here explains itself. -->
-		<button
-			class="square"
-			onclick={onmagiclayout}
-			disabled={!!template.locked}
-			title={hasColumns
-				? 'Position areas automagically — a card worked out from your headings and your data'
-				: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
-		>
-			<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
-		</button>
 		{#if picking}
 			<!-- A mode with no visible sign is a trap: every press is doing something
 			     other than what it usually does, and the only place that was said is
@@ -1239,9 +1244,11 @@
 				class="square"
 				onclick={onrescue}
 				disabled={!!template.locked}
-				title="{strayIds.length} area{strayIds.length === 1 ? ' is' : 's are'} not wholly on the page — bring {strayIds.length === 1 ? 'it' : 'them'} back on, and nothing else"
+				title={template.locked
+					? `${strayIds.length} area${strayIds.length === 1 ? ' is' : 's are'} not wholly on the page — unlock the design to bring ${strayIds.length === 1 ? 'it' : 'them'} back`
+					: `${strayIds.length} area${strayIds.length === 1 ? ' is' : 's are'} not wholly on the page — bring ${strayIds.length === 1 ? 'it' : 'them'} back on, and nothing else`}
 			>
-				<Icon name="move" size={16} /><span class="sr-only">Bring stray areas back onto the page</span>
+				<Icon name="data-collection" size={16} /><span class="sr-only">Bring stray areas back onto the page</span>
 			</button>
 		{/if}
 	</div>
