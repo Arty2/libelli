@@ -1532,8 +1532,10 @@ than it has to.
   for every Mac (in any of its scaled modes), iPad and iPhone the app knows,
   and the commonest monitor for grids several share (marked as an estimate).
   A screen it does not know gets the browser's own millimetre. Hover it to see
-  which it was. The other steps follow under a rule. The menu is drawn like the
-  template picker's, as are the font menus. On a phone the two left-hand toggles keep their row and lose
+  which it was. The other steps follow under a rule. **Double-click or
+  double-tap** the zoom to go to **Fit** and a second time to come back to the
+  zoom you were at — or, from Fit with nothing to come back to, to Actual. The
+  menu is drawn like the template picker's, as are the font menus. On a phone the two left-hand toggles keep their row and lose
   their words — a **#** for the grid, a **|** for the guides and a **B** for
   the boxes, beside ticks
   that already say whether they are on — rather than stacking into a two-line

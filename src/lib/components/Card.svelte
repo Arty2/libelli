@@ -2484,7 +2484,11 @@
 		   screen pixels thick. A shadow keeps the fraction. */
 		border: none;
 		box-shadow: inset 0 0 0 var(--line, 1px) var(--accent);
-		border-radius: var(--radius-button);
+		/* 2px on screen, whatever the zoom — undone like the size is. The app's
+		   button radius, taken in the card's own frame, was scaled with the page:
+		   at 400% the corners met in the middle and a square handle read as a
+		   dot. The pivot and the lever set their own shapes below. */
+		border-radius: calc(2px * var(--ui-scale, 1));
 		box-sizing: border-box;
 		z-index: 3;
 		touch-action: none;

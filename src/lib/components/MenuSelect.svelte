@@ -46,9 +46,26 @@
 		 * value would be a second edge. The rule is the menu's once it opens.
 		 */
 		bare?: boolean;
+		/**
+		 * A second press within a moment of the first: the menu the first
+		 * opened is shut again and this runs instead. The zoom's toggle between
+		 * Fit and the zoom before it.
+		 */
+		ondouble?: () => void;
 	}
 
-	let { items, value, onselect, label, title, disabled = false, onopen, showFamily = false, bare = false }: Props = $props();
+	let {
+		items,
+		value,
+		onselect,
+		label,
+		title,
+		disabled = false,
+		onopen,
+		showFamily = false,
+		bare = false,
+		ondouble
+	}: Props = $props();
 
 	let open = $state(false);
 	let root = $state<HTMLElement | null>(null);
@@ -81,6 +98,27 @@
 			below >= 240 || below >= above
 				? { ...side, top: box.bottom + 4, maxHeight: Math.max(120, below) }
 				: { ...side, bottom: window.innerHeight - box.top + 4, maxHeight: Math.max(120, above) };
+	}
+
+	/**
+	 * Timed here rather than left to `dblclick`: a phone may not send one for
+	 * two taps, and may zoom the whole page on them instead (the trigger's
+	 * `touch-action` says not to). Two presses the same distance apart are one
+	 * double on a mouse and a finger alike.
+	 */
+	const DOUBLE_MS = 350;
+	let lastPress = -Infinity;
+
+	async function press() {
+		const now = performance.now();
+		if (ondouble && now - lastPress < DOUBLE_MS) {
+			lastPress = -Infinity;
+			open = false;
+			ondouble();
+			return;
+		}
+		lastPress = now;
+		await toggle();
 	}
 
 	async function toggle() {
@@ -151,7 +189,7 @@
 		aria-label="{label}: {current?.label ?? value}"
 		title={title ?? current?.title}
 		{disabled}
-		onclick={toggle}
+		onclick={press}
 		onkeydown={onTriggerKey}
 	>
 		<span class="value" style={showFamily && current?.family ? `font-family:${fontStack(current.family, '')}` : ''}
@@ -220,6 +258,11 @@
 		color: #111;
 		cursor: pointer;
 		text-align: left;
+	}
+
+	/* Two taps are the control's own double, not the browser's zoom. */
+	.trigger {
+		touch-action: manipulation;
 	}
 
 	.trigger:hover:not(:disabled) {

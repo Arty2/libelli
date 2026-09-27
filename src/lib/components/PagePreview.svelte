@@ -512,6 +512,22 @@
 	 * well sizes the type under the pointer instead of the page — still
 	 * prevented, or the browser would zoom itself underneath it.
 	 */
+	/**
+	 * Fit, and back. The zoom before Fit is remembered as it is left, so a
+	 * double tap on the zoom goes out to see the whole page and a second one
+	 * comes back to where you were working. With nothing to go back to — Fit
+	 * from the start — it goes to the paper's real size, the other named zoom.
+	 */
+	let beforeFit: number | 'actual' | null = null;
+	$effect(() => {
+		if (zoom !== 'fit') beforeFit = zoom;
+	});
+
+	function toggleFit() {
+		if (zoom !== 'fit') onzoom('fit');
+		else onzoom(beforeFit ?? 'actual');
+	}
+
 	/** When the last zooming wheel arrived — see the Safari gesture below. */
 	let lastWheel = -Infinity;
 
@@ -1290,11 +1306,12 @@
 	<div class="corner right">
 		<MenuSelect
 			label="Zoom"
-			title={withKey('Zoom', 'zoom')}
+			title={withKey('Zoom — double-click to go between Fit and the zoom before it', 'zoom')}
 			bare
 			value={typeof zoom === 'number' ? String(zoom) : zoom}
 			items={zoomItems}
 			onselect={(value) => onzoom(value === 'fit' || value === 'actual' ? value : Number(value))}
+			ondouble={toggleFit}
 		/>
 	</div>
 
