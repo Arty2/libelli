@@ -751,6 +751,9 @@
 	// ---- direct manipulation -------------------------------------------------
 
 	type DragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | 'centre' | 'rotate';
+	/** A Shift+click on a chosen area, held back until it is known not to be a drag. */
+	let pendingToggle: string | null = null;
+
 	let drag: {
 		id: string;
 		mode: DragMode;
@@ -935,7 +938,13 @@
 		// is a modifier of their own — resizing from the aligned edge, turning
 		// in 15° steps — which used to toggle the area out of the selection on
 		// the same press.
-		onselect?.(box.id, mode === 'move' && (event.shiftKey || event.metaKey || event.ctrlKey));
+		const additive = mode === 'move' && (event.shiftKey || event.metaKey || event.ctrlKey);
+		// Shift on an area already chosen is either Shift+click — take it out of
+		// the selection — or Shift+drag, which moves on a straight line. Which
+		// one is not known until the pointer moves, so the toggle waits for the
+		// release (`endDrag`) and happens only if it did not.
+		if (additive && event.shiftKey && isSelected(box) && editable(box)) pendingToggle = box.id;
+		else onselect?.(box.id, additive);
 		if (!editable(box)) return;
 		drag = {
 			id: box.id,
@@ -1164,10 +1173,18 @@
 				};
 				break;
 			}
-			case 'move':
-				next.x = place(origin.x + dx, 'x', origin.w);
-				setTop(dy, layout.heights[origin.id] ?? origin.h);
+			case 'move': {
+				// Shift keeps it on a line through where it started: whichever axis
+				// the pointer has gone further along, and none of the other. Read on
+				// every move, so it can be pressed or let go mid-drag.
+				const along = event.shiftKey ? (Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y') : null;
+				// The held axis is left exactly where it was, not re-placed: placing
+				// snaps, and a snap on the axis that is meant to stand still is a
+				// line that is not straight.
+				if (along !== 'y') next.x = place(origin.x + dx, 'x', origin.w);
+				if (along !== 'x') setTop(dy, layout.heights[origin.id] ?? origin.h);
 				break;
+			}
 			case 'e':
 				next.w = Math.max(4, size(origin.w + dx));
 				break;
@@ -1315,6 +1332,12 @@
 
 	function endDrag(event: PointerEvent) {
 		if (panTap) endPanTap(event);
+		if (pendingToggle) {
+			const id = pendingToggle;
+			pendingToggle = null;
+			const still = !drag || Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) <= HOLD_SLOP;
+			if (still && event.type === 'pointerup') onselect?.(id, true);
+		}
 		if (!drag) return;
 		try {
 			(event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);

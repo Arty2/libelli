@@ -143,7 +143,7 @@ describe('normaliseTemplate', () => {
 		expect(t.boxes[0]).toMatchObject({
 			padding: 2,
 			borderWidth: 0.4,
-			borderColor: '#b42318',
+			borderColor: '#ff0000',
 			borderRadius: 1.5,
 			background: '#eee8d5'
 		});
@@ -216,7 +216,7 @@ describe('normaliseTemplate', () => {
 
 	it('falls back to the default text color when a template names an unusable one', () => {
 		expect(normaliseTemplate({ schema: 2, defaults: { color: 'burnt sienna' }, boxes: [] }).defaults.color).toBe('#000000');
-		expect(normaliseTemplate({ schema: 2, defaults: { color: 'navy' }, boxes: [] }).defaults.color).toBe('#14306b');
+		expect(normaliseTemplate({ schema: 2, defaults: { color: 'navy' }, boxes: [] }).defaults.color).toBe('#000080');
 	});
 
 	it('falls back to white for a page color it cannot parse', () => {

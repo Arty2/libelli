@@ -796,10 +796,9 @@ nesting, `1.` and `1)` ordered lists, `**bold**`, `*italic*`, `~~strikethrough~~
   and clicking a word to pick up the area it is in should not navigate away from
   a design that lives only in this tab.
 - **Per-word color** — `[a few words]{red}` or `[…]{#b42318}` colors just that
-  run. Hex, `rgb()`, `hsl()` and the CSS color keywords all work; seventeen
-  common names — `red`, `green`, `blue` and their neighbours — are deliberately
-  shadowed by a print-sensible palette, because CSS `red` is a screen color and
-  comes off a press as a shout. Write the hex if you want that exact value.
+  run. Hex, `rgb()`, `hsl()` and every HTML color name work, each name meaning
+  exactly what it means in a browser — `red` is `#ff0000` — plus `amber`, which
+  HTML lacks. Write a hex for a softer red on paper.
 - **Three levels of color** — a default text color for the card, a color for
   any single box, and the inline form above. A box's color beats the default;
   the inline form beats both.

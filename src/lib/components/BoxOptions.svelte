@@ -96,9 +96,10 @@
 	 * already here, so it can be typed into without going looking for the field —
 	 * and so leaving without typing is a decision rather than an oversight.
 	 */
-	export function focusText() {
+	/** Into the Text field; `select` false puts the caret at the end instead. */
+	export function focusText(select = true) {
 		textInput?.focus();
-		textInput?.select();
+		if (select) textInput?.select();
 	}
 	/** whether the border is being edited edge by edge rather than all round */
 	let perSide = $state(false);
@@ -661,6 +662,14 @@
 						title="Text saved in the template, not in the data — the same on every card"
 						disabled={boxFrozen}
 						onchange={(e) => setStatic({ text: e.currentTarget.value })}
+						onkeydown={(e) => {
+							// Out of the field, keeping what was typed — blurring commits
+							// it through `change` — and back to keys that act on the area.
+							if (e.key === 'Escape') {
+								e.stopPropagation();
+								e.currentTarget.blur();
+							}
+						}}
 					/>
 				</label>
 			{/if}

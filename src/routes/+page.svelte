@@ -1336,7 +1336,7 @@
 	 *
 	 * It used to arrive carrying the literal word "Text", so abandoning one left a
 	 * box on the card that said Text and had to be found and deleted. It starts
-	 * empty now, with the cursor already in the Text field — and it is provisional
+	 * empty now, its first typed character going into the Text field — and it is provisional
 	 * until it is given something: any text, a column to bind to, or any change to
 	 * how it looks. Moving and resizing do not count, because placing a box is
 	 * what you do while deciding whether you want it at all.
@@ -1361,9 +1361,9 @@
 		// The flash a cell's areas get when it is entered in the table: a new
 		// area is an empty frame, and on a busy page it is easy to lose.
 		flash([box.id]);
-		// After the bar has rendered for the new selection, or there is no field
-		// to put the cursor in yet.
-		void tick().then(() => boxBar?.focusText());
+		// No cursor in the Text field yet: the first key decides. Delete takes
+		// the area away and the arrows move it, as they would any area; a
+		// character goes into its Text field (see `onWindowKeydown`).
 	}
 
 	/**
@@ -2094,6 +2094,24 @@
 		// The lightbox is in front of everything and takes Escape and the arrows
 		// for itself; nothing back here should answer them underneath it.
 		if (lightboxOpen) return;
+		// A new area waits for its first key. Delete, the arrows and every chord
+		// keep their meaning — remove it, move it, undo it — and anything that
+		// types a character puts the cursor in its Text field first, where the
+		// browser then types that same character. Focus moved during keydown
+		// takes the keypress with it, so nothing has to be re-inserted.
+		if (
+			!typing &&
+			provisional &&
+			selected?.id === provisional &&
+			!selected.static?.text &&
+			event.key.length === 1 &&
+			!event.ctrlKey &&
+			!event.metaKey &&
+			!event.altKey
+		) {
+			boxBar?.focusText(false);
+			return;
+		}
 		// While a field has focus, leave undo to the browser's own text history.
 		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
 			event.preventDefault();

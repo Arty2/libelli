@@ -1647,6 +1647,15 @@
 									onblur={() => (editing = null)}
 									onclick={(e) => e.stopPropagation()}
 									oninput={(e) => setCell(i, column, e.currentTarget.value)}
+									onkeydown={(e) => {
+										// Out of the cell, keeping what was typed (each key is already
+										// written): Escape leaves the field as it leaves every other.
+										// Stopped here so the page does not read it as "deselect" too.
+										if (e.key === 'Escape') {
+											e.stopPropagation();
+											e.currentTarget.blur();
+										}
+									}}
 								></textarea>
 								<!-- Drawn only when the cell holds more than it shows (see
 								     `overflowMark`), and a way into the rest: the same full-size
@@ -2595,10 +2604,17 @@
 
 
 	td textarea:focus {
-		outline: 2px solid var(--accent);
-		outline-offset: -2px;
+		outline: none;
 		max-height: 18rem;
 		position: relative;
+	}
+
+	/* The ring goes round the cell, not the field in it: the field is only as
+	   tall as its own text, and a row made taller by a neighbour left a ring
+	   round the top of the cell and a band of unmarked cell under it. */
+	tbody td:has(> textarea:focus) {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
 	}
 
 	/* Row height, from the toggle under the table — see `rowHeight`. Short is

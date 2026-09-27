@@ -8,16 +8,15 @@ describe('parseColor', () => {
 		expect(parseColor('#11223344')).toBe('#11223344');
 	});
 
-	it('resolves the named set', () => {
-		expect(parseColor('Red')).toBe(NAMED_COLORS.red);
-		expect(parseColor(' green ')).toBe(NAMED_COLORS.green);
-	});
-
-	it('resolves the CSS keywords, without the print palette losing its own names', () => {
+	it('reads a name as the CSS keyword it is, the way any browser does', () => {
+		expect(parseColor('Red')).toBe('#ff0000');
+		expect(parseColor(' green ')).toBe('#008000');
 		expect(parseColor('cornflowerblue')).toBe('#6495ed');
 		expect(parseColor('RebeccaPurple')).toBe('#663399');
-		// CSS red is #ff0000; the print palette shadows it on purpose.
-		expect(parseColor('red')).toBe('#b42318');
+	});
+
+	it('keeps the one name of its own that CSS has not got', () => {
+		expect(parseColor('amber')).toBe(NAMED_COLORS.amber);
 	});
 
 	it('accepts rgb and hsl, and hands back its own rendering of them', () => {

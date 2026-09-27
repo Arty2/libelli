@@ -663,9 +663,30 @@
 	 * for the page rather than the app. Ctrl/Cmd+H is swallowed by macOS itself
 	 * before a page ever sees it — that is the platform's, not ours to fix.
 	 */
+	/**
+	 * The arrow keys lean the pad the way they are moving the area, while it is
+	 * showing — the keyboard and the pad are one control, and a pad that sat
+	 * still while the area went left looked like it had nothing to do with it.
+	 * Only the lean: the page's own key handler does the nudging, as ever.
+	 */
+	const ARROW_LEAN: Record<string, 'up' | 'down' | 'left' | 'right'> = {
+		ArrowUp: 'up',
+		ArrowDown: 'down',
+		ArrowLeft: 'left',
+		ArrowRight: 'right'
+	};
+	const padShowing = () => padUsable && panning && !padHidden;
+
+	function onKeyup(event: KeyboardEvent) {
+		if (ARROW_LEAN[event.key] && pushed === ARROW_LEAN[event.key]) pushed = null;
+	}
+
 	function onKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
 		if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+		if (ARROW_LEAN[event.key] && padShowing() && !event.ctrlKey && !event.metaKey && !modalOpen) {
+			pushed = ARROW_LEAN[event.key];
+		}
 		// This listener is on the window, so it fires while a dialog is up too —
 		// and zooming the page you cannot see behind Help is not what Ctrl+0 was
 		// asked for.
@@ -935,7 +956,7 @@
 	}
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} onkeyup={onKeyup} onblur={() => (pushed = null)} />
 
 <!--
 	The stage is two elements: an outer one that does not scroll and holds every
@@ -1441,43 +1462,49 @@
 			onpointercancel={stopNudge}
 			onpointerleave={stopNudge}
 		>
-			<!-- On an anchored area the vertical keys change the Gap — see
-			     `verticalTied`. -->
-			<button
-				class="up"
-				class:tied={verticalTied}
-				title={verticalTied ? `Gap ${padStep}mm smaller — closer to the area this one follows` : `Up ${padStep}mm`}
-				onpointerdown={() => startNudge(0, -padStep)}
-			>
-				<Icon name={verticalTied ? 'skip-back-filled' : 'caret-up'} size={verticalTied ? 16 : 30} />
-			</button>
-			<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
-			<!-- The middle button carries the second gesture: drag it and the pad
-			     comes with your finger. A tap still cycles the step. -->
-			<button
-				class="step"
-				title="Step size — 1, 5 or 10mm. Drag it to move the pad; hold it to put the pad away."
-				onpointerdown={(e) => {
-					pushed = 'centre';
-					padPickup(e);
-				}}
-				onpointermove={padMove}
-				onpointerup={padDrop}
-				onpointercancel={padDrop}
-				onclick={() => {
-					if (padHeld) return;
-					padStep = PAD_STEPS[(PAD_STEPS.indexOf(padStep) + 1) % PAD_STEPS.length];
-				}}>{padStep}</button
-			>
-			<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={30} /></button>
-			<button
-				class="down"
-				class:tied={verticalTied}
-				title={verticalTied ? `Gap ${padStep}mm larger — further from the area this one follows` : `Down ${padStep}mm`}
-				onpointerdown={() => startNudge(0, padStep)}
-			>
-				<Icon name={verticalTied ? 'skip-back-filled' : 'caret-down'} size={verticalTied ? 16 : 30} />
-			</button>
+			<!-- The tilt is its own element, under the pad that casts the shadow:
+			     a 3D transform and a filter on one element is a pairing Firefox
+			     draws badly, and on the two presses that tip the lit edges away it
+			     drew the bevel as thick dark bars. -->
+			<div class="tilt">
+				<!-- On an anchored area the vertical keys change the Gap — see
+				     `verticalTied`. -->
+				<button
+					class="up"
+					class:tied={verticalTied}
+					title={verticalTied ? `Gap ${padStep}mm smaller — closer to the area this one follows` : `Up ${padStep}mm`}
+					onpointerdown={() => startNudge(0, -padStep)}
+				>
+					<Icon name={verticalTied ? 'skip-back-filled' : 'caret-up'} size={verticalTied ? 16 : 30} />
+				</button>
+				<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
+				<!-- The middle button carries the second gesture: drag it and the pad
+				     comes with your finger. A tap still cycles the step. -->
+				<button
+					class="step"
+					title="Step size — 1, 5 or 10mm. Drag it to move the pad; hold it to put the pad away."
+					onpointerdown={(e) => {
+						pushed = 'centre';
+						padPickup(e);
+					}}
+					onpointermove={padMove}
+					onpointerup={padDrop}
+					onpointercancel={padDrop}
+					onclick={() => {
+						if (padHeld) return;
+						padStep = PAD_STEPS[(PAD_STEPS.indexOf(padStep) + 1) % PAD_STEPS.length];
+					}}>{padStep}</button
+				>
+				<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={30} /></button>
+				<button
+					class="down"
+					class:tied={verticalTied}
+					title={verticalTied ? `Gap ${padStep}mm larger — further from the area this one follows` : `Down ${padStep}mm`}
+					onpointerdown={() => startNudge(0, padStep)}
+				>
+					<Icon name={verticalTied ? 'skip-back-filled' : 'caret-down'} size={verticalTied ? 16 : 30} />
+				</button>
+			</div>
 		</div>
 	{/if}
 </div>
@@ -1870,15 +1897,20 @@
 		position: absolute;
 		/* Shown at any width: whether it is here at all is zoom and pan's call —
 		   see `panning`. It used to be a phone's alone, under 900px. */
-		display: grid;
-		grid-template-columns: repeat(3, var(--cell));
-		grid-template-rows: repeat(3, var(--cell));
-		gap: 0;
+		display: block;
 		/* A drop shadow rather than a box shadow on each key: this one follows
 		   the painted shape, so the cross casts one shadow and the seams between
 		   its arms cast none. It is there all the time now — a thing that stands
 		   up off the page casts a shadow whether or not it is being moved. */
 		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.16));
+	}
+
+	/* The cross itself, and what tilts: see the note in the markup. */
+	.pad .tilt {
+		display: grid;
+		grid-template-columns: repeat(3, var(--cell));
+		grid-template-rows: repeat(3, var(--cell));
+		gap: 0;
 		/* Short, because a pad that takes a tenth of a second to answer a tap
 		   does not feel like a button. */
 		transition: transform 80ms ease-out;
@@ -1892,30 +1924,30 @@
 	   say this at a glance; with a long perspective and a small angle it read as
 	   a rendering artefact. The axis is the one the press tips it about: from
 	   the side, the vertical axis. */
-	.pad.push-left {
+	.pad.push-left .tilt {
 		transform: perspective(220px) rotateY(-14deg) translateX(-1px);
 	}
 
-	.pad.push-right {
+	.pad.push-right .tilt {
 		transform: perspective(220px) rotateY(14deg) translateX(1px);
 	}
 
-	.pad.push-up {
+	.pad.push-up .tilt {
 		transform: perspective(220px) rotateX(14deg) translateY(-1px);
 	}
 
-	.pad.push-down {
+	.pad.push-down .tilt {
 		transform: perspective(220px) rotateX(-14deg) translateY(1px);
 	}
 
 	/* The middle is not a direction, so it goes straight down. */
-	.pad.push-centre {
+	.pad.push-centre .tilt {
 		transform: scale(0.97);
 	}
 
 	/* While it is being carried it follows the finger and nothing else: a pad
 	   skewed and moving at once reads as a bug in the drag. */
-	.pad.moving {
+	.pad.moving .tilt {
 		transform: none;
 	}
 

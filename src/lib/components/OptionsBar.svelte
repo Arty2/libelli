@@ -52,8 +52,8 @@
 	let boxBar = $state<BoxOptions | null>(null);
 
 	/** Forwarded so the page can put the cursor in a new area's Text field. */
-	export function focusText() {
-		boxBar?.focusText();
+	export function focusText(select = true) {
+		boxBar?.focusText(select);
 	}
 </script>
 
