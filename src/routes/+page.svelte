@@ -831,11 +831,15 @@
 	function placeStoredImage(boxId: string, name: string) {
 		const box = template.boxes.find((b) => b.id === boxId);
 		if (!box) return;
-		if (template.locked || box.locked) {
+		// A bound area's picture goes into the row's cell, which answers to the
+		// table's lock rather than the area's or the design's; one holding its
+		// own picture is the design's, and a lock on either refuses it.
+		const bound = !!box.slot && !!mapping[box.slot];
+		if (!bound && (template.locked || box.locked)) {
 			notify('That area is locked — unlock it to put an image in it.', 'warning');
 			return;
 		}
-		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
+		if (bound && refuseLockedTable()) return;
 		placeImage(box, name);
 	}
 
@@ -1354,6 +1358,9 @@
 		template = { ...template, boxes: [...template.boxes, box] };
 		selectedIds = [box.id];
 		provisional = box.id;
+		// The flash a cell's areas get when it is entered in the table: a new
+		// area is an empty frame, and on a busy page it is easy to lose.
+		flash([box.id]);
 		// After the bar has rendered for the new selection, or there is no field
 		// to put the cursor in yet.
 		void tick().then(() => boxBar?.focusText());
@@ -2250,7 +2257,9 @@
 	function editCell(id: string) {
 		const box = template.boxes.find((b) => b.id === id);
 		const column = box?.slot ? mapping[box.slot] : undefined;
-		if (!box || box.locked || !column || !row) return;
+		// Not refused for the area's own lock: the cell is the row's, and the
+		// table's lock is the one that guards it.
+		if (!box || !column || !row) return;
 		if (refuseLockedTable()) return;
 		dataOpen = true;
 		cellRequest = { row: activeRow, column };

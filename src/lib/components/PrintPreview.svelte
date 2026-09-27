@@ -359,7 +359,7 @@
 	     it is what turns the pages above into the sheets below, and standing
 	     there it separates them without a heading of its own. -->
 	<div class="options settings-strip">
-		<PrintSettingsPanel {template} {pageFrozen} {ontemplatechange} onuploadbackground={onuploadprintbackground} {onnotice} />
+		<PrintSettingsPanel {template} {pageFrozen} {ontemplatechange} onuploadbackground={onuploadprintbackground} {onnotice} showFacing />
 	</div>
 
 	{#if imposed}
@@ -772,15 +772,9 @@
 		border-radius: var(--radius-button);
 	}
 
-	figcaption label:hover {
-		background: rgba(0, 0, 0, 0.05);
-	}
-
-	.dropped figcaption label {
-		/* Unticked, the row is still the way back: it stays a target, and only
-		   the page above it dims. */
-		background: rgba(0, 0, 0, 0.03);
-	}
+	/* No fill on hover or when unticked: the pages above are what change, and
+	   a row that shaded itself under the pointer read as a second button. It is
+	   still the whole target. */
 
 	figcaption input[type='checkbox'] {
 		/* Bigger than the browser default, to match the row it now sits in. */

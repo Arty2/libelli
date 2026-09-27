@@ -1707,14 +1707,24 @@
 	 * the page writes it.
 	 */
 	const canEdit = (box: Box) =>
-		interactive && !box.locked && (box.mode === 'plain' || box.mode === 'markdown');
+		interactive && contentOpen(box) && (box.mode === 'plain' || box.mode === 'markdown');
+
+	/**
+	 * Whether what an area holds can be changed from the card. An area's own
+	 * lock is on the area — where it is, how it looks — and on its own words,
+	 * which are part of it; but the words of an area bound to a column are the
+	 * row's, and the row answers to the table's lock, not the area's. So a
+	 * locked data field still opens for typing or drawing, and the page refuses
+	 * the edit if the table is locked (`refuseLockedTable`).
+	 */
+	const contentOpen = (box: Box) => !box.locked || (!!box.slot && !!mapping[box.slot]);
 
 	function beginEdit(box: Box) {
 		// A picture is the one thing not edited in place: an area on a card is
 		// often a centimetre across, which is somewhere to show a drawing and
 		// nowhere to make one. The same double-click opens it full screen —
 		// on a locked page too, like typing: a drawing is content, not layout.
-		if (interactive && !box.locked && takesADrawing(box.mode)) {
+		if (interactive && contentOpen(box) && takesADrawing(box.mode)) {
 			ondraw?.(box.id);
 			return;
 		}
@@ -2096,10 +2106,7 @@
 						{#if editsCell(box)}
 							<button
 								class="badge action"
-								disabled={!!box.locked}
-								title={box.locked
-									? 'This area is locked — unlock it to edit the cell it prints'
-									: `Edit “${mapping[box.slot!]}” for this row, full size in the table`}
+								title={`Edit “${mapping[box.slot!]}” for this row, full size in the table`}
 								aria-label="Edit this area's cell"
 								onpointerdown={(e) => e.stopPropagation()}
 								onclick={() => oneditcell?.(box.id)}

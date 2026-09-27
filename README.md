@@ -468,7 +468,10 @@ resize boxes directly, or type exact millimetres.
   and the page settings as well. A padlock appears on a locked area while it is selected, and it is a
   button: pressing it unlocks that area, the way the two anchor badges beside it
   undo what they say. Words can still be typed into an area on a locked page,
-  and a drawing opened and drawn on: those are content, not the design. A locked
+  and a drawing opened and drawn on: those are content, not the design. The
+  same holds for a locked *area* bound to a column — its words are the row's,
+  and only a locked **table** refuses them; an area holding its own words is
+  the design's, and its lock covers them too. A locked
   *page* shows a **padlock** at the head of the column beside the page, above
   *+ Area* — a button with no word on it, which unlocks the page when pressed —
   keeps the area bar closed when an area is selected (every field in it would

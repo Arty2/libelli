@@ -30,9 +30,16 @@
 		ontemplatechange: (template: Template) => void;
 		onuploadbackground: (file: File) => void;
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
+		/**
+		 * Left & Right, the page setting, repeated here. Only on the print screen:
+		 * it decides which edge is outer, and so the order a zine folds in, and
+		 * that is where it is found wanting — in page setup it is already beside
+		 * the page size.
+		 */
+		showFacing?: boolean;
 	}
 
-	let { template, pageFrozen, ontemplatechange, onuploadbackground, onnotice }: Props = $props();
+	let { template, pageFrozen, ontemplatechange, onuploadbackground, onnotice, showFacing = false }: Props = $props();
 
 	let imageInput = $state<HTMLInputElement | null>(null);
 	let perSheetSelect = $state<HTMLSelectElement | null>(null);
@@ -279,6 +286,18 @@
 </span>
 
 <span class="group" role="group" aria-label="Print Settings">
+	{#if showFacing}
+		<label class="check">
+			<input
+				type="checkbox"
+				checked={!!template.facing}
+				title="Odd rows are right-hand pages and even rows their facing left-hand pages — the same setting as Left & Right in page setup"
+				disabled={pageFrozen}
+				onchange={(e) => ontemplatechange({ ...template, facing: e.currentTarget.checked || undefined })}
+			/>
+			Left &amp; Right
+		</label>
+	{/if}
 	<label class="field">
 		<span>Pages per Sheet</span>
 		<select

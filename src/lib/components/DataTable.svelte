@@ -2602,8 +2602,7 @@
 	}
 
 	/* Row height, from the toggle under the table — see `rowHeight`. Short is
-	   one line and padding, and stays one line while typed in: a row that
-	   grew on focus would move every row under it. Full lifts the cap, so a
+	   one line and padding, and opens like medium while typed in. Full lifts the cap, so a
 	   row is as tall as its longest cell; where there is no `field-sizing`
 	   the `autosize` action does that measuring by hand. Medium is the
 	   stylesheet as it stands above. */
@@ -2615,9 +2614,11 @@
 		}
 	}
 
-	/* Short is the first line and the same sliver under it as medium. */
-	.data.rows-short td textarea,
-	.data.rows-short td textarea:focus {
+	/* Short is the first line and the same sliver under it as medium — at
+	   rest. The cell being typed in opens as medium's does, to its text up to
+	   18rem: a one-line field is no place to edit a paragraph, and the row it
+	   pushes down is one row, while you are in it. */
+	.data.rows-short td textarea:not(:focus) {
 		height: calc(var(--cell-line) + 7px);
 		max-height: calc(var(--cell-line) + 7px);
 	}

@@ -160,7 +160,7 @@
       "w": 120,
       "h": 5,
       "mode": "plain",
-      "overflow": "clip",
+      "overflow": "grow",
       "font": "Ysabeau Office",
       "size": 13,
       "weight": 300,
