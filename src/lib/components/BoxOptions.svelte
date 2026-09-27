@@ -81,7 +81,6 @@
 		onboxchange,
 		ontemplatechange,
 		onmappingchange,
-		onduplicate,
 		ondelete,
 		onuploadfont,
 		onnotice,
@@ -543,7 +542,7 @@
 				<button
 					class="lock-toggle"
 					aria-pressed={!!selected.locked}
-					title={selected.locked ? 'Unlock this area' : 'Lock this area — no dragging, no resizing, no option changes'}
+					title={withKey(selected.locked ? 'Unlock this area' : 'Lock this area — no dragging, no resizing, no option changes', 'lockArea')}
 					disabled={pageFrozen}
 					onclick={() => patch({ locked: selected.locked ? undefined : true })}
 				>
@@ -563,7 +562,6 @@
 						/>
 					</label>
 				{/if}
-				<button onclick={onduplicate} disabled={pageFrozen} title={withKey('Duplicate this area', 'duplicate')}><Icon name="replicate" size={14} /> Duplicate</button>
 				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen} title={withKey('Delete this area', 'delete')}>
 					<Icon name="trash" size={14} /> Delete
 				</button>

@@ -6,6 +6,7 @@
 	import { safeImageUrl } from '$lib/assets';
 	import { fontChoices, previewFamilies } from '$lib/fonts';
 	import MenuSelect from './MenuSelect.svelte';
+	import { withKey } from '$lib/keys';
 	import {
 		MAX_PARAGRAPH,
 		MIN_LEADING,
@@ -369,7 +370,7 @@
 				<button
 					class="lock-toggle"
 					aria-pressed={pageFrozen}
-					title={pageFrozen ? 'Unlock the design' : 'Lock the design — no dragging, no option changes'}
+					title={withKey(pageFrozen ? 'Unlock the design' : 'Lock the design — no dragging, no option changes', 'lockPage')}
 					onclick={() => patchTemplate({ locked: pageFrozen ? undefined : true })}
 				>
 					<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />

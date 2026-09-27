@@ -1956,6 +1956,14 @@
 		notify(`Style pasted onto ${targets.length} area${targets.length === 1 ? '' : 's'}.`);
 	}
 
+	/** The design's own lock, from the keyboard: the padlock above Area. */
+	function toggleDesignLock() {
+		const locking = !template.locked;
+		describe(locking ? 'Lock the design' : 'Unlock the design');
+		template = stripUndefined({ ...$state.snapshot(template), locked: locking ? true : undefined }) as Template;
+		notify(locking ? 'Design locked — nothing moves until it is unlocked.' : 'Design unlocked.');
+	}
+
 	function lockSelection() {
 		if (template.locked || !selectedBoxes.length) return;
 		describe(selectedBoxes.every((b) => b.locked) ? 'Unlock' : 'Lock');
@@ -2140,6 +2148,22 @@
 			event.preventDefault();
 			helpOpen = true;
 			return;
+		}
+		// L for lock: with Shift the page, without it the chosen areas. Taken
+		// from the browser's own Ctrl/Cmd+L — the address bar — only where it
+		// means something here: never while typing, where the field keeps it.
+		if (!typing && (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'l') {
+			if (event.shiftKey) {
+				event.preventDefault();
+				toggleDesignLock();
+				return;
+			}
+			if (selectedIds.length) {
+				event.preventDefault();
+				if (template.locked) notify('The design is locked — unlock it (Ctrl/Cmd+Shift+L) to lock or unlock its areas.', 'warning');
+				else lockSelection();
+				return;
+			}
 		}
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd' && selectedIds.length) {
 			event.preventDefault();
@@ -3156,6 +3180,8 @@
 			<dt>Shift + click<span>Ctrl / ⌘ + click</span></dt><dd>Add an area to the selection, or drop it</dd>
 			<dt>Ctrl/Cmd + A</dt><dd>Select every area</dd>
 			<dt>Ctrl/Cmd + D</dt><dd>Duplicate the selected areas</dd>
+			<dt>Ctrl/Cmd + L</dt><dd>Lock or unlock the selected areas</dd>
+			<dt>Ctrl/Cmd + Shift + L</dt><dd>Lock or unlock the design</dd>
 			<dt>Delete<span>Backspace</span></dt><dd>Remove the selected areas</dd>
 			<dt>Ctrl/Cmd + C</dt><dd>Copy the selected area's words</dd>
 			<dt>Ctrl/Cmd + V</dt><dd>Paste plain text as a new area</dd>

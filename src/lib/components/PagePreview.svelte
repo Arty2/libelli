@@ -8,6 +8,7 @@
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { swipe } from '$lib/gestures';
+	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
@@ -783,6 +784,22 @@
 	 * pointer to ask about.
 	 */
 	let panning = $state(false);
+
+	/**
+	 * The pad put away. It covers a corner of the page, and zoomed in that can
+	 * be the corner you are working on; held on its middle it goes, and a
+	 * button under zoom and pan brings it back. The middle, because the arrows
+	 * already repeat while held, and the middle's tap (the step) and drag (move
+	 * the pad) are taken — a hold was the gesture it had left.
+	 */
+	let padHidden = $state(false);
+	const PAD_HIDE_MS = 500;
+	let padHideTimer: ReturnType<typeof setTimeout> | null = null;
+	function cancelPadHide() {
+		if (padHideTimer) clearTimeout(padHideTimer);
+		padHideTimer = null;
+	}
+
 	$effect(() => {
 		if (window.matchMedia('(pointer: coarse)').matches) panning = true;
 	});
@@ -792,6 +809,17 @@
 		padPress = { x: event.clientX, y: event.clientY, from: { ...padAt } };
 		// Captured now, so a quick drag that leaves the button still brings the pad.
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		cancelPadHide();
+		padHideTimer = setTimeout(() => {
+			padHideTimer = null;
+			if (padDrag) return;
+			// Held, so the click that ends the press does not also cycle the step.
+			padHeld = true;
+			padPress = null;
+			padHidden = true;
+			pushed = null;
+			vibrate(HOLD_MS);
+		}, PAD_HIDE_MS);
 	}
 
 	/**
@@ -807,6 +835,7 @@
 			if (Math.hypot(event.clientX - padPress.x, event.clientY - padPress.y) < PAD_SLOP) return;
 			padDrag = padPress;
 			padHeld = true;
+			cancelPadHide();
 		}
 		if (!padDrag || !host) return;
 		event.preventDefault();
@@ -848,6 +877,7 @@
 	}
 
 	function padDrop() {
+		cancelPadHide();
 		padPress = null;
 		padDrag = null;
 		// Cleared on the next tick, so the click that follows the drag — which is
@@ -1103,7 +1133,9 @@
 		<!-- Stacking order is about the page, not about type or color, so it sits
 		     beside the page with undo and redo rather than in the options bar,
 		     where it shoved every other control sideways. -->
-		{#if selectedIds.length}
+		<!-- Not on a locked page, where nothing can be restacked: a column of
+		     dead buttons says only what the padlock already does. -->
+		{#if selectedIds.length && !template.locked}
 			<div class="corner stack" role="toolbar" aria-label="Stacking order" aria-orientation="vertical">
 				{#each ARRANGEMENTS as option (option.value)}
 					<button
@@ -1159,7 +1191,7 @@
 			<button
 				class="square page-lock"
 				aria-pressed={!unlocking}
-				title={unlocking ? 'Unlocked' : 'The design is locked — press to unlock it'}
+				title={unlocking ? 'Unlocked' : withKey('The design is locked — press to unlock it', 'lockPage')}
 				aria-label={unlocking ? 'Unlocked' : 'Unlock the design'}
 				onclick={unlock}
 			>
@@ -1218,6 +1250,23 @@
 			>
 				<Icon name={panning ? 'zoom-pan' : 'move'} size={16} /><span class="sr-only">Zoom and pan</span>
 			</button>
+			{#if panning && padHidden}
+				<!-- The pad, put away by holding its middle: this is where it is,
+				     under the mode it belongs to. -->
+				<button
+					class="square"
+					onclick={() => {
+						padHidden = false;
+						// The hold that hid it ended with the pad gone, so its release
+						// never arrived to clear this — and the first tap on the step
+						// would be swallowed.
+						padHeld = false;
+					}}
+					title="Show the nudge pad"
+				>
+					<Icon name="health-cross" size={16} /><span class="sr-only">Show the nudge pad</span>
+				</button>
+			{/if}
 		{/if}
 		{#if picking}
 			<!-- A mode with no visible sign is a trap: every press is doing something
@@ -1360,7 +1409,7 @@
 		/>
 	</div>
 
-	{#if padUsable && panning}
+	{#if padUsable && panning && !padHidden}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
 		     hopeless. Shown only where there is no keyboard to fall back on, and
 		     only while there is something it could actually move. Its arrows
@@ -1396,7 +1445,7 @@
 			     comes with your finger. A tap still cycles the step. -->
 			<button
 				class="step"
-				title="Step size — 1, 5 or 10mm. Drag it to move the pad."
+				title="Step size — 1, 5 or 10mm. Drag it to move the pad; hold it to put the pad away."
 				onpointerdown={(e) => {
 					pushed = 'centre';
 					padPickup(e);

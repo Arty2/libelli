@@ -1328,6 +1328,8 @@ name a key the app does not listen for.
 | <kbd>⇧</kbd> / <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + click | Add an area to the selection, or drop it |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>a</kbd> | Select every area |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>d</kbd> | Duplicate the selected areas |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>l</kbd> | Lock or unlock the selected areas |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>l</kbd> | Lock or unlock the design |
 | <kbd>Delete</kbd> / <kbd>Backspace</kbd> | Remove the selected areas |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>c</kbd> | Copy the selected area's words |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>v</kbd> | Paste plain text as a new area |
@@ -1381,7 +1383,8 @@ towards it and down is away. They repeat on a hold like the arrows do.
   do not. On, an area no longer moves under a finger or the
   mouse: one finger scrolls the page and two pinch it, a tap still chooses an
   area and a second opens it, and the **nudge pad** appears to move the chosen
-  one — it shows only in this mode, at any width. The resize handles and the
+  one — it shows only in this mode, at any width; hold its middle to put it
+  away, and the cross that appears under zoom and pan brings it back. The resize handles and the
   lever still drag; they are small and grabbed on purpose. It starts **on**
   where the main pointer is a finger — a phone or a tablet — and off with a
   mouse; the button is the choice from then on.

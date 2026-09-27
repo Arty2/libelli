@@ -66,6 +66,8 @@ export const SHORTCUTS = {
 	undo: 'Ctrl/Cmd+Z',
 	redo: 'Ctrl/Cmd+Y',
 	duplicate: 'Ctrl/Cmd+D',
+	lockArea: 'Ctrl/Cmd+L',
+	lockPage: 'Ctrl/Cmd+Shift+L',
 	delete: 'Delete',
 	copyStyle: 'Ctrl/Cmd+Shift+C',
 	pasteStyle: 'Ctrl/Cmd+Shift+V',
