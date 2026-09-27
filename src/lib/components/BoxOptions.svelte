@@ -1168,16 +1168,20 @@
 						onchange={(v) => patch({ borderColor: v })}
 					/>
 				</span>
-				<button
-					class="square"
-					aria-pressed={!!selected.borderHand}
-					aria-label="Hand-drawn border"
-					title="Draw the border by hand: the same width, style and radius, wobbling. The line is the same on every card — it is drawn from this area's own name, not from chance"
-					disabled={boxFrozen}
-					onclick={() => patch({ borderHand: selected?.borderHand ? undefined : true })}
-				>
-					<Icon name="edit" size={14} />
-				</button>
+				<!-- A setting that is on or off, so a checkbox, like Mirror and Hide
+				     When Empty: a pencil that stayed pressed was a button nobody
+				     could tell was a state. Draft, because that is what it looks
+				     like — the border as a rough, before it was ruled. -->
+				<label class="check">
+					<input
+						type="checkbox"
+						checked={!!selected.borderHand}
+						title="Draw the border by hand: the same width, style and radius, wobbling. The line is the same on every card — it is drawn from this area's own name, not from chance"
+						disabled={boxFrozen}
+						onchange={(e) => patch({ borderHand: e.currentTarget.checked ? true : undefined })}
+					/>
+					Draft
+				</label>
 			{/if}
 
 			<label class="field">

@@ -461,17 +461,51 @@
 	 * well sizes the type under the pointer instead of the page — still
 	 * prevented, or the browser would zoom itself underneath it.
 	 */
+	/** When the last zooming wheel arrived — see the Safari gesture below. */
+	let lastWheel = -Infinity;
+
 	$effect(() => {
 		if (!host) return;
 		const node = host;
 		const onWheel = (event: WheelEvent) => {
 			if (!event.ctrlKey && !event.metaKey) return;
 			event.preventDefault();
+			lastWheel = performance.now();
 			if (event.shiftKey) resizeType(event);
 			else zoomBy(Math.exp(-event.deltaY / 220));
 		};
 		node.addEventListener('wheel', onWheel, { passive: false });
 		return () => node.removeEventListener('wheel', onWheel);
+	});
+
+	/**
+	 * Safari's own pinch. It zooms the app from its `gesture*` events whatever
+	 * `touch-action` says, so they are refused here. On a touchscreen the pinch
+	 * below has already zoomed the page from the pointers; a trackpad in desktop
+	 * Safari may send no Ctrl+wheel for its pinch, so there the gesture's own
+	 * scale zooms the page — unless a wheel or two fingers just did, which
+	 * would zoom it twice.
+	 */
+	$effect(() => {
+		if (!host) return;
+		const node = host;
+		let from = 1;
+		const onStart = (event: Event) => {
+			event.preventDefault();
+			from = scale;
+		};
+		const onChange = (event: Event) => {
+			event.preventDefault();
+			if (pinch.size > 0 || performance.now() - lastWheel < 150) return;
+			const ratio = (event as Event & { scale?: number }).scale;
+			if (ratio) zoomTo(from * ratio);
+		};
+		node.addEventListener('gesturestart', onStart);
+		node.addEventListener('gesturechange', onChange);
+		return () => {
+			node.removeEventListener('gesturestart', onStart);
+			node.removeEventListener('gesturechange', onChange);
+		};
 	});
 
 	/** Two fingers on the page. Tracked by pointer id, so a stray third does nothing. */
@@ -1267,6 +1301,11 @@
 		/* A flick that runs past the end of the page must not become the
 		   browser's pull-to-refresh — see app.css. */
 		overscroll-behavior: contain;
+		/* One finger scrolls; two are the page's own pinch (see `onPinchMove`)
+		   and never the browser's, which zoomed the whole app — bars, table and
+		   all — around a page that was zooming itself as well. Pinch is the one
+		   gesture left out of the list, which is exactly what this says. */
+		touch-action: pan-x pan-y;
 		/* The stage is measured to work out the Fit scale, and the scale decides
 		   how tall the sheet is, and the sheet's height decides whether a vertical
 		   scrollbar appears — which takes ~15px off the width the measurement
