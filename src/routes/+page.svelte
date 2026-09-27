@@ -2798,6 +2798,7 @@
 			{flashIds}
 			onstoppicking={() => (picking = false)}
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
+			onrelock={() => applyTemplate({ ...$state.snapshot(template), locked: true } as Template)}
 			onedit={beginEditing}
 			ondraw={drawArea}
 			oneditcell={editCell}
@@ -3079,8 +3080,15 @@
      every row can be corrected, and a column unticked gets no area. -->
 {#if magic}
 	<div class="modal-backdrop" role="presentation" onclick={() => (magic = null)}></div>
-	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title" use:armDefault>
-		<h2 id="magic-title">Position Areas Automagically</h2>
+	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title" use:armDefault use:dragByTitle>
+		<!-- The CSS dialog's header: a rule under the title, a × that cancels,
+		     and dragged by it, so the card it would replace can be seen. -->
+		<header class="modal-header drag-title" data-drag-handle>
+			<h2 id="magic-title">Position Areas Automagically</h2>
+			<button class="icon" onclick={() => (magic = null)} title="Close without laying anything out" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
 		<ul class="magic-list">
 			{#each magic as guess, index (guess.column)}
 				<li class:left-out={guess.include === false}>
@@ -3098,9 +3106,18 @@
 					/>
 					<span class="magic-column" title={guess.column}>{guess.column}</span>
 					<span class="magic-sample" title={guess.sample}>{guess.sample.slice(0, 60) || '—'}</span>
+					<!-- Before the choice it qualifies, and a cell of its own either
+					     way, so the menus line up whether or not a row was guessed. -->
+					<span class="magic-guess">
+						{#if !guess.sure}
+							<span class="magic-unsure" title="Nothing but the length of the cells pointed at this">Guess</span>
+						{/if}
+					</span>
+					<!-- Not disabled when left out: a greyed native menu read as broken,
+					     and choosing what a column is before letting it back in is
+					     harmless — it keeps whatever it was taken for. -->
 					<select
 						aria-label="What {guess.column} is"
-						disabled={guess.include === false}
 						value={guess.kind}
 						onchange={(e) => {
 							const kind = e.currentTarget.value as FieldGuess['kind'];
@@ -3112,9 +3129,6 @@
 							<option value={kind}>{KIND_LABELS[kind]}</option>
 						{/each}
 					</select>
-					{#if !guess.sure}
-						<span class="magic-unsure" title="Nothing but the length of the cells pointed at this">guess</span>
-					{/if}
 				</li>
 			{/each}
 		</ul>
@@ -3806,16 +3820,16 @@
 
 	.magic-list li {
 		display: grid;
-		grid-template-columns: auto minmax(4.5rem, auto) minmax(0, 1fr) 8.5rem auto;
+		grid-template-columns: auto minmax(4.5rem, auto) minmax(0, 1fr) auto 8.5rem;
 		align-items: center;
 		gap: 10px;
 	}
 
-	/* Out, but still listed: greyed, so the tick is the thing that reads. */
-	.magic-list li.left-out .magic-column,
-	.magic-list li.left-out .magic-sample {
-		color: #aaa;
-		text-decoration: line-through;
+	/* Out, but still listed: faded as a whole, so the tick is the thing that
+	   reads and the row is still legible — struck through and grey, it looked
+	   deleted rather than set aside. */
+	.magic-list li.left-out > :not(input) {
+		opacity: 0.5;
 	}
 
 	.magic-column {
@@ -3887,7 +3901,7 @@
 		/* The sample is the first thing to go: it is there to check a guess, and
 		   on a phone the name and the control are what have to fit. */
 		.magic-list li {
-			grid-template-columns: auto minmax(0, 1fr) 8.5rem auto;
+			grid-template-columns: auto minmax(0, 1fr) auto 8.5rem;
 		}
 
 		.magic-sample {

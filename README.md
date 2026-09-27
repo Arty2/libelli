@@ -563,19 +563,24 @@ has areas, a line above the buttons says how many are about to be replaced.
   `local:` images, colors, numbers, dates, Markdown, how long the text runs).
   Facts about the cells beat the heading; the heading beats mere length — except
   that a heading naming a detail or a credit beats a column of numbers.
-- **The kinds** — **Title**, **Subtitle**, **Detail line** (a small line stacked
+- **The kinds** — **Title**, **Subtitle**, **Detail** (a small line stacked
   under the subtitle: *Medium*, *Duration*, *Dimensions*, *Edition*),
-  **Body**, **Small line**, **Number** and **Date** (the foot), **Image**,
-  **QR code**, **Code**, and **Credit line** (*Credits*, *Courtesy*,
-  *Copyright*, *Collection*), which is always the foot's last line and is the
-  one kept when the foot runs out of room.
+  **Body**, **Footnote** (small Markdown straight under the body — *Footnote*,
+  *Endnote*, *Annotation*, *Aside* — read by its heading however long it runs,
+  with room left for it above the foot), **Byline**, **Number** and **Date**
+  (the foot), **Image**, **QR code**, **Code**, and **Credit** (*Credits*,
+  *Courtesy*, *Copyright*, *Collection*), which is always the foot's last line
+  and is the one kept when the foot runs out of room.
+- **The dialog** — dragged by its title, closed by its ×; a row left out stays
+  listed at half strength, its menu still yours to set, and **Guess** before a
+  menu marks a kind worked out from nothing but the length of the cells.
 - **A person over their work** — a heading that names a person (*Artist*,
   *Author*, *Director*, *Speaker*, *Designer* and the like) takes the title, and
   a column called *Title* beside it — the name of the work — becomes the
   subtitle. So *Artist, Artwork title, Medium, Description, Duration, Credits*
   comes out as the artist's name, the work's title under it, the medium and the
   duration as detail lines, the description as the body, and the credits at
-  the very bottom. A second subtitle becomes a detail line rather than a line
+  the very bottom. A second subtitle becomes a detail rather than a line
   in the foot.
 - **What it never reads** — what a cell *says*. It measures and matches patterns;
   it does not write your cards.

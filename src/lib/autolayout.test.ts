@@ -29,6 +29,12 @@ describe('columnStats', () => {
 });
 
 describe('classifyColumn', () => {
+	it('reads a footnote by its heading, however long its cells', () => {
+		const long = 'A note that runs on for long enough to be taken for a body anywhere else. '.repeat(3);
+		expect(kindOf('Footnote', [long, long])).toBe('footnote');
+		expect(kindOf('Notes', [long, long])).toBe('body');
+	});
+
 	it('reads a column of links', () => {
 		expect(kindOf('Where', ['https://example.com/a', 'https://example.com/b'])).toBe('link');
 	});
@@ -235,6 +241,20 @@ describe('autoLayout', () => {
 
 	it('is the same twice over', () => {
 		expect(run()).toEqual(run());
+	});
+
+	it('puts a footnote under the body, in small Markdown, and leaves it room above the foot', () => {
+		const withNote = sample.map((r, i) => ({ ...r, footnote: i ? 'See [the guide](https://example.com).' : 'Printed on recycled paper.' }));
+		const { boxes } = autoLayout({ page, defaults, columns: [...columns, 'footnote'], rows: withNote });
+		const bySlot = Object.fromEntries(boxes.map((b) => [b.slot, b]));
+		const note = bySlot.footnote;
+		expect(note.mode).toBe('markdown');
+		expect(note.anchor?.to).toBe(bySlot.body.id);
+		expect(note.size).toBeLessThan(bySlot.body.size!);
+		// The body stops short of the foot by the note's line and a gap, so the
+		// note lands above the foot rather than over it.
+		const footTop = Math.min(...boxes.filter((b) => !b.anchor && b.y > bySlot.body.y).map((b) => b.y));
+		expect(bySlot.body.y + bySlot.body.h + GRID_MINOR + note.h).toBeLessThanOrEqual(footTop);
 	});
 
 	it('takes the roles it is given over the ones it would guess', () => {

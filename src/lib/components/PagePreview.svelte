@@ -101,6 +101,8 @@
 		onstoppicking?: () => void;
 		/** unlock the design, from the band that says it is locked */
 		onunlock?: () => void;
+		/** lock it again, from the same button while it still shows the open padlock */
+		onrelock?: () => void;
 	}
 
 	let {
@@ -161,6 +163,7 @@
 		onrescue,
 		onstoppicking,
 		onunlock,
+		onrelock,
 		flashIds = []
 	}: Props = $props();
 
@@ -869,7 +872,15 @@
 	let unlockTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function unlock() {
-		if (unlocking) return;
+		// Pressed again while it still shows the open padlock: that was a
+		// mistake being taken back, so it locks again rather than doing nothing.
+		if (unlocking) {
+			if (unlockTimer) clearTimeout(unlockTimer);
+			unlockTimer = null;
+			unlocking = false;
+			onrelock?.();
+			return;
+		}
 		unlocking = true;
 		if (unlockTimer) clearTimeout(unlockTimer);
 		unlockTimer = setTimeout(() => (unlocking = false), 700);
@@ -1191,8 +1202,8 @@
 			<button
 				class="square page-lock"
 				aria-pressed={!unlocking}
-				title={unlocking ? 'Unlocked' : withKey('The design is locked — press to unlock it', 'lockPage')}
-				aria-label={unlocking ? 'Unlocked' : 'Unlock the design'}
+				title={unlocking ? 'Unlocked — press again to lock it' : withKey('The design is locked — press to unlock it', 'lockPage')}
+				aria-label={unlocking ? 'Lock the design again' : 'Unlock the design'}
 				onclick={unlock}
 			>
 				<Icon name={unlocking ? 'unlocked' : 'locked'} size={16} />
