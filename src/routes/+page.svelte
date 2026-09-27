@@ -564,9 +564,9 @@
 		const storedTemplate = await loadTemplate();
 		// A first visit lands on the starter card locked: it is the tour, read
 		// before it is edited, and a stray drag on a phone should not rearrange
-		// it. The padlock above Area unlocks it. Only here — Reset and a new
-		// template are asked for by somebody who means to design.
-		if (!storedTemplate) template = { ...starterTemplate(), locked: true };
+		// it. The padlock above Area unlocks it. The lock is the template's own
+		// now, so Reset and A5 Starter Booklet bring it back locked too.
+		if (!storedTemplate) template = starterTemplate();
 		if (storedTemplate) {
 			try {
 				template = normaliseTemplate(storedTemplate);
