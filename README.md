@@ -1351,7 +1351,7 @@ While a text field has focus, undo is left to the browser's own text history and
 <kbd>Delete</kbd> deletes characters — the app keeps its hands off both.
 Otherwise the arrow keys move the selected box wherever you are on the page. On
 a touch screen the same job is done by the four-way pad that appears beside the
-card — one cross with one outline, not five tiles in the shape of a cross — with
+card in **zoom and pan** (the button above Area) — one cross with one outline, not five tiles in the shape of a cross — with
 a chip in the middle cycling between 1mm, 5mm and 10mm; holding an arrow keeps
 it moving. The cross is drawn as a raised thing — lit from the top left, thicker
 along the bottom and right, casting one shadow of its own, and it goes down
@@ -1376,11 +1376,12 @@ towards it and down is away. They repeat on a hold like the arrows do.
   in the gaps between them — which is most of the page on a card that has been
   laid out. Type size is the **Size** field in the bar, or Ctrl/Cmd+Shift+scroll
   with a mouse: a pinch is how a phone zooms, and it means that here too.
-- **Zoom and pan** — press and hold the middle of the nudge pad (where the step
-  size is) and areas stop answering a press: one finger scrolls the page, two
-  pinch it, and nothing is moved, chosen or opened. A zoom-and-pan button above
-  Area (under the padlock, when there is one) says it is on; press it to go
-  back to moving areas.
+- **Zoom and pan** — the button above Area (under the padlock, when there is
+  one) turns it on and off. On, an area no longer moves under a finger or the
+  mouse: one finger scrolls the page and two pinch it, a tap still chooses an
+  area and a second opens it, and the **nudge pad** appears to move the chosen
+  one — it shows only in this mode, at any width. The resize handles and the
+  lever still drag; they are small and grabbed on purpose.
 - **A second finger is never a drag.** An area that was moving under one finger
   goes back where it started the moment a second one lands, so a pinch zooms and
   leaves the card alone — the selection too: what the first finger touched is

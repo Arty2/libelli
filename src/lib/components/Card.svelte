@@ -40,8 +40,8 @@
 		mapping?: Mapping;
 		/**
 		 * Zoom and pan: a press on an area is left to the page — one finger
-		 * scrolls it, two pinch it — and moves, picks or opens nothing. Set from
-		 * the pad; see PagePreview's `panning`.
+		 * scrolls it, two pinch it — and never moves it; a tap still chooses it.
+		 * See PagePreview's `panning`.
 		 */
 		panning?: boolean;
 		/** dashed box bounds and the bleed marker; screen only, never printed */
@@ -897,12 +897,24 @@
 		// and its non-additive select collapses a multi-selection to one box
 		// before the context menu it opened has a chance to act on the rest.
 		if (event.button !== 0 || !interactive) return;
-		// Not even a selection: the press belongs to the page, which scrolls.
-		// Nothing prevented, so the browser still sees the gesture.
-		if (panning) return;
 		// A second finger is a pinch, not a second drag — and not a selection
 		// either: the area under it is not being picked, it is being pinched.
 		if (event.pointerType === 'touch' && touching.size > 1) return;
+		// Zoom and pan: a press on the area itself is left to the page, which
+		// scrolls under it — nothing prevented, nothing captured — and is only
+		// a choice if it comes back up where it went down (`endDrag`). The
+		// handles and the lever are not the area, and still drag.
+		if (panning && mode === 'move') {
+			panTap = {
+				id: box.id,
+				pointer: event.pointerId,
+				x: event.clientX,
+				y: event.clientY,
+				additive: event.shiftKey || event.metaKey || event.ctrlKey,
+				touch: event.pointerType === 'touch'
+			};
+			return;
+		}
 		event.preventDefault();
 		event.stopPropagation();
 		if (event.pointerType === 'touch' && mode === 'move') {
@@ -1272,7 +1284,37 @@
 
 	const round2 = (v: number) => Math.round(v * 100) / 100;
 
+	/**
+	 * A press on an area in zoom and pan, waiting to learn whether it is a tap.
+	 * Chosen on the way up, not down: a finger that lands on an area to scroll
+	 * the page is not choosing it, and a scroll ends in a pointercancel, not a
+	 * pointerup, so it never gets here with the finger still in place.
+	 */
+	let panTap: { id: string; pointer: number; x: number; y: number; additive: boolean; touch: boolean } | null = null;
+
+	function endPanTap(event: PointerEvent) {
+		const tap = panTap;
+		panTap = null;
+		if (!tap || tap.pointer !== event.pointerId || event.type !== 'pointerup') return;
+		if (Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > HOLD_SLOP) return;
+		const box = template.boxes.find((b) => b.id === tap.id);
+		if (!box) return;
+		// The second of two taps opens the area, as it does out of this mode.
+		if (tap.touch) {
+			const now = event.timeStamp || Date.now();
+			if (lastTap && lastTap.id === box.id && now - lastTap.at < DOUBLE_TAP) {
+				lastTap = null;
+				onselect?.(box.id, false);
+				beginEdit(box);
+				return;
+			}
+			lastTap = { id: box.id, at: now };
+		}
+		onselect?.(box.id, tap.additive);
+	}
+
 	function endDrag(event: PointerEvent) {
+		if (panTap) endPanTap(event);
 		if (!drag) return;
 		try {
 			(event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
@@ -1816,7 +1858,7 @@
 				use:measure={box.id}
 				onpointerdown={(e) => startDrag(e, box, 'move')}
 				ondblclick={(e) => {
-					if (!interactive || panning) return;
+					if (!interactive) return;
 					e.preventDefault();
 					beginEdit(box);
 				}}
@@ -2464,7 +2506,8 @@
 	}
 
 	/* Zoom and pan: the areas hand a finger back to the page, which scrolls
-	   under it and pinches under two, instead of holding it for a drag. */
+	   under it and pinches under two, instead of holding it for a drag. The
+	   handles keep their own touch-action: none, and so still drag. */
 	.card.panning .box {
 		cursor: grab;
 		touch-action: pan-x pan-y;

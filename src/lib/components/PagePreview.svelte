@@ -8,7 +8,6 @@
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { swipe } from '$lib/gestures';
-	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
@@ -769,35 +768,19 @@
 	 * Zoom and pan. On a phone a finger that lands on an area picks it up, and a
 	 * card that has been laid out is mostly areas — so there was nowhere left to
 	 * put a finger down to scroll the page, zoomed in, without moving something.
-	 * Held on the pad's middle button this turns areas inert to a press: one
-	 * finger scrolls, two pinch, nothing is moved, chosen or opened. The middle
-	 * button, because its arrows already repeat while held and its tap and drag
-	 * are taken; a hold was the gesture it had left. Off from the button that
-	 * says it is on, above Area.
+	 * With this on, an area no longer moves under a finger: one finger scrolls,
+	 * two pinch, and a tap still chooses an area (and a second opens it), which
+	 * the nudge pad — shown only while this is on — then moves. The resize
+	 * handles and the lever still work: they are small, and grabbed on purpose.
+	 * Its button is always above Area, and is the one way in and out.
 	 */
 	let panning = $state(false);
-	const PAN_HOLD_MS = 500;
-	let panTimer: ReturnType<typeof setTimeout> | null = null;
-
-	function cancelPanHold() {
-		if (panTimer) clearTimeout(panTimer);
-		panTimer = null;
-	}
 
 	function padPickup(event: PointerEvent) {
 		if (event.button !== 0) return;
 		padPress = { x: event.clientX, y: event.clientY, from: { ...padAt } };
 		// Captured now, so a quick drag that leaves the button still brings the pad.
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-		cancelPanHold();
-		panTimer = setTimeout(() => {
-			panTimer = null;
-			if (padDrag) return;
-			panning = true;
-			// Held, so the click that ends the press does not also cycle the step.
-			padHeld = true;
-			vibrate(HOLD_MS);
-		}, PAN_HOLD_MS);
 	}
 
 	/**
@@ -813,7 +796,6 @@
 			if (Math.hypot(event.clientX - padPress.x, event.clientY - padPress.y) < PAD_SLOP) return;
 			padDrag = padPress;
 			padHeld = true;
-			cancelPanHold();
 		}
 		if (!padDrag || !host) return;
 		event.preventDefault();
@@ -855,7 +837,6 @@
 	}
 
 	function padDrop() {
-		cancelPanHold();
 		padPress = null;
 		padDrag = null;
 		// Cleared on the next tick, so the click that follows the drag — which is
@@ -1174,18 +1155,20 @@
 				<Icon name={unlocking ? 'unlocked' : 'locked'} size={16} />
 			</button>
 		{/if}
-		{#if panning}
-			<!-- The sign that areas are not answering a press, and the way out:
-			     below the page's padlock, which outranks it, and above Area. -->
-			<button
-				class="square"
-				aria-pressed="true"
-				onclick={() => (panning = false)}
-				title="Zoom and pan — areas stay put while you scroll and pinch. Press to move them again."
-			>
-				<Icon name="zoom-pan" size={16} /><span class="sr-only">Stop zoom and pan</span>
-			</button>
-		{/if}
+		<!-- Zoom and pan, on and off: below the page's padlock, which outranks
+		     it, and above Area. Always here, so the way in is not a gesture to
+		     be found; pressed, it is the sign that areas are not being dragged,
+		     and the nudge pad comes with it. -->
+		<button
+			class="square"
+			aria-pressed={panning}
+			onclick={() => (panning = !panning)}
+			title={panning
+				? 'Zoom and pan — a finger scrolls, areas stay put; tap one and nudge it with the pad. Press to drag areas again.'
+				: 'Zoom and pan — scroll and pinch without dragging areas, and nudge the chosen one with a pad'}
+		>
+			<Icon name="zoom-pan" size={16} /><span class="sr-only">Zoom and pan</span>
+		</button>
 		<button
 			class="square"
 			onclick={onaddbox}
@@ -1359,7 +1342,7 @@
 		/>
 	</div>
 
-	{#if padUsable}
+	{#if padUsable && panning}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
 		     hopeless. Shown only where there is no keyboard to fall back on, and
 		     only while there is something it could actually move. Its arrows
@@ -1395,7 +1378,7 @@
 			     comes with your finger. A tap still cycles the step. -->
 			<button
 				class="step"
-				title="Step size — 1, 5 or 10mm. Drag it to move the pad; hold it to zoom and pan without moving areas."
+				title="Step size — 1, 5 or 10mm. Drag it to move the pad."
 				onpointerdown={(e) => {
 					pushed = 'centre';
 					padPickup(e);
@@ -1807,7 +1790,9 @@
 		--arrow: 30px;
 		--arrow-centre: calc(var(--arrow) / 32);
 		position: absolute;
-		display: none;
+		/* Shown at any width: whether it is here at all is zoom and pan's call —
+		   see `panning`. It used to be a phone's alone, under 900px. */
+		display: grid;
 		grid-template-columns: repeat(3, var(--cell));
 		grid-template-rows: repeat(3, var(--cell));
 		gap: 0;
@@ -2018,10 +2003,6 @@
 	@media (max-width: 900px) {
 		.stage {
 			padding: 8px;
-		}
-
-		.pad {
-			display: grid;
 		}
 	}
 
