@@ -1381,7 +1381,9 @@ towards it and down is away. They repeat on a hold like the arrows do.
   mouse: one finger scrolls the page and two pinch it, a tap still chooses an
   area and a second opens it, and the **nudge pad** appears to move the chosen
   one — it shows only in this mode, at any width. The resize handles and the
-  lever still drag; they are small and grabbed on purpose.
+  lever still drag; they are small and grabbed on purpose. It starts **on**
+  where the main pointer is a finger — a phone or a tablet — and off with a
+  mouse; the button is the choice from then on.
 - **A second finger is never a drag.** An area that was moving under one finger
   goes back where it started the moment a second one lands, so a pinch zooms and
   leaves the card alone — the selection too: what the first finger touched is

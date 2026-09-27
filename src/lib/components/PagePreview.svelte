@@ -773,8 +773,19 @@
 	 * the nudge pad — shown only while this is on — then moves. The resize
 	 * handles and the lever still work: they are small, and grabbed on purpose.
 	 * Its button is always above Area, and is the one way in and out.
+	 *
+	 * On by default where the main pointer is a finger: there, a page you can
+	 * scroll without knocking things over, with the pad to move what you chose,
+	 * is the editor that works, and dragging is the thing to ask for. Read once
+	 * when the stage mounts rather than followed, so the choice made with the
+	 * button is not undone by a keyboard being plugged in; and on the mount, not
+	 * in the initialiser, because the page is prerendered where there is no
+	 * pointer to ask about.
 	 */
 	let panning = $state(false);
+	$effect(() => {
+		if (window.matchMedia('(pointer: coarse)').matches) panning = true;
+	});
 
 	function padPickup(event: PointerEvent) {
 		if (event.button !== 0) return;
