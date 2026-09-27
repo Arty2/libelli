@@ -408,8 +408,59 @@
 	 */
 	function zoomTo(next: number) {
 		const clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, next));
-		onzoom(Math.round(clamped * 1000) / 1000);
+		const rounded = Math.round(clamped * 1000) / 1000;
+		if (rounded === scale) return;
+		holdSelection();
+		onzoom(rounded);
 	}
+
+	/**
+	 * Zooming about the selection. With an area chosen, that area is what is
+	 * being looked at, so it stays where it is on screen and the page grows or
+	 * shrinks around it — rather than about the top left, where the scroll
+	 * offsets happen to hold still, which sent a chosen area off the edge in
+	 * two steps of a pinch. With nothing chosen the page zooms as it always has.
+	 *
+	 * Where it was is taken before the scale changes, and put back once the
+	 * page has been drawn at the new one (the effect below). A pinch is a
+	 * stream of steps faster than a frame, so the first step's position is kept
+	 * until one has landed — held to each step's own, the selection would creep
+	 * by a rounding error a step. Only where the page can scroll: a page smaller
+	 * than the stage is centred in it, and there is nothing to move.
+	 */
+	let held: { x: number; y: number } | null = null;
+
+	/** Where the chosen areas' middle is on screen — the middle of their union. */
+	function selectionMiddle(ids: string[] = pinchIds ?? selectedIds): { x: number; y: number } | null {
+		if (!host || !ids.length) return null;
+		const rects = ids
+			.map((id) => host!.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`)?.getBoundingClientRect())
+			.filter((r): r is DOMRect => !!r && (r.width > 0 || r.height > 0));
+		if (!rects.length) return null;
+		const left = Math.min(...rects.map((r) => r.left));
+		const right = Math.max(...rects.map((r) => r.right));
+		const top = Math.min(...rects.map((r) => r.top));
+		const bottom = Math.max(...rects.map((r) => r.bottom));
+		return { x: (left + right) / 2, y: (top + bottom) / 2 };
+	}
+
+	function holdSelection() {
+		held ??= selectionMiddle();
+	}
+
+	$effect(() => {
+		void scale;
+		if (!held || !host) return;
+		// A pinch steers every step back to where the selection was when it
+		// began: early steps, near Fit, have almost no room to scroll and cannot
+		// hold it, and a target re-taken each step would keep what they lost.
+		const was = pinchTarget ?? held;
+		held = null;
+		const now = selectionMiddle();
+		if (!now) return;
+		host.scrollLeft += now.x - was.x;
+		host.scrollTop += now.y - was.y;
+	});
 
 	const zoomBy = (factor: number) => zoomTo(scale * factor);
 
@@ -517,10 +568,35 @@
 		return Math.hypot(a.x - b.x, a.y - b.y);
 	};
 
+	/**
+	 * The selection as it was before the first finger landed. That finger lands
+	 * on something, and pressing an area chooses it — so by the time the second
+	 * arrives and it is a pinch, the selection is whatever the first happened to
+	 * touch, and the page zoomed about the body text rather than the area that
+	 * was chosen. A pinch is a way of looking, not a choice: it zooms about what
+	 * was chosen before it, and puts that choice back.
+	 */
+	let beforeTouch: string[] = [];
+	let pinchIds: string[] | null = null;
+	let pinchTarget: { x: number; y: number } | null = null;
+
 	function onPinchDown(event: PointerEvent) {
 		if (event.pointerType !== 'touch') return;
+		if (pinch.size === 0) beforeTouch = [...selectedIds];
 		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
-		if (pinch.size === 2) pinchStart = { spread: spread(), scale };
+		if (pinch.size === 2) {
+			pinchStart = { spread: spread(), scale };
+			pinchIds = beforeTouch;
+			pinchTarget = selectionMiddle(beforeTouch);
+			restoreSelection(beforeTouch);
+		}
+	}
+
+	/** Choose exactly these again, if the first finger changed what was chosen. */
+	function restoreSelection(ids: string[]) {
+		if (ids.length === selectedIds.length && ids.every((id) => selectedIds.includes(id))) return;
+		onselect(ids[0] ?? null);
+		for (const id of ids.slice(1)) onselect(id, true);
 	}
 
 	function onPinchMove(event: PointerEvent) {
@@ -534,6 +610,10 @@
 	function onPinchUp(event: PointerEvent) {
 		pinch.delete(event.pointerId);
 		if (pinch.size < 2) pinchStart = null;
+		if (pinch.size === 0) {
+			pinchIds = null;
+			pinchTarget = null;
+		}
 	}
 
 	/**

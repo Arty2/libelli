@@ -1342,7 +1342,7 @@ name a key the app does not listen for.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>p</kbd> / <kbd>s</kbd> | Export, for the fingers that reach for those |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + arrows | Step the alignment — left, right, top, bottom |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + scroll | Size the type in the area under the pointer |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll, pinch | Zoom the page |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll, pinch | Zoom the page — about the selected area, if there is one |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> | Zoom the page in or out |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>0</kbd> | Fit the page (<kbd>⇧</kbd> for 100%) |
 | <kbd>←</kbd> / <kbd>→</kbd> | Step through the cards, with one open full screen |
@@ -1378,7 +1378,12 @@ towards it and down is away. They repeat on a hold like the arrows do.
   with a mouse: a pinch is how a phone zooms, and it means that here too.
 - **A second finger is never a drag.** An area that was moving under one finger
   goes back where it started the moment a second one lands, so a pinch zooms and
-  leaves the card alone.
+  leaves the card alone — the selection too: what the first finger touched is
+  not chosen by it.
+- **Zooming holds the chosen area in place.** With an area selected, a pinch,
+  Ctrl/Cmd+scroll or Ctrl/Cmd +/− zooms about it: it stays where it is on
+  screen and the page grows or shrinks around it, as far as the page can scroll.
+  With nothing selected the page zooms as it always has.
 - **Full screen, a pinch zooms the card** — up to six times, with a drag to move
   around it and a flick to page the run once it is back at rest. That is the one
   screen where zooming means what a phone means by it: the card is already as
