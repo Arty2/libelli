@@ -1354,6 +1354,8 @@ name a key the app does not listen for.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll, pinch | Zoom the page — about the selected area, if there is one |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> | Zoom the page in or out |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>0</kbd> | Fit the page (<kbd>⇧</kbd> for 100%) |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll, pinch, off the page | The interface's text size |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd>, in a field or a dialog | The text size in steps, or back to the default |
 | <kbd>←</kbd> / <kbd>→</kbd> | Step through the cards, with one open full screen |
 
 While a text field has focus, undo is left to the browser's own text history and
@@ -1380,6 +1382,13 @@ towards it and down is away. They repeat on a hold like the arrows do.
 
 ### Touch gestures
 
+- **The interface itself never zooms.** A pinch anywhere off the stage — the
+  bars, the table — makes the interface's *text* larger or smaller instead, and
+  the layout keeps the width of the screen; Ctrl/Cmd+scroll does the same on a
+  desk, and so does Ctrl/Cmd +/− from inside a field, where the browser would
+  otherwise have zoomed the lot. **Text size** in Help sets it in steps, from
+  80% to 200% of the browser's own default font size, and remembers it. The
+  cards are unaffected: their type is set in points by the design.
 - **Pinch to zoom the page**, anywhere over the stage. The gesture listens on
   the way down to whatever was touched, so it works over the areas and not only
   in the gaps between them — which is most of the page on a card that has been

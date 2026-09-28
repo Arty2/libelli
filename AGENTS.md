@@ -50,8 +50,8 @@ src/lib/
   history.ts      undo/redo snapshots
   storage.ts      localStorage + IndexedDB, the template library, the legacy-key migration
   onboarding.ts   the starter template and sample rows (sample-cards.csv) a first run lands on
-  sw-policy.ts    what the service worker does with a request, kept testable
-  pwa.ts          worker registration, the update handshake, the install offer
+  sw-policy.ts    the worker's answer to a request; pwa.ts registration, updates, install
+  textsize.ts     no browser zoom: a pinch off the stage sizes the interface's text
   version.ts      VERSION, and the bumping rule
   components/
     Card.svelte         the card itself: boxes, handles, drag, snap            (~3k)
@@ -145,7 +145,7 @@ re-read it. So every rule above that *can* be checked is, in `scripts/gates.sh`
 (`npm run gates`, first in CI) — injection sinks, `{@html}` outside Card,
 PrintRoot and Icon, `fetch` outside `png.ts` and the worker, runtime
 dependencies, `vercel.json`'s security headers, `colour` as a name, `VERSION`
-against `package.json`, this file's length. ESLint (`npm run lint`, next in CI)
+against `package.json`, this file's length, type in `px`. ESLint (`npm run lint`, next in CI)
 covers what a linter can; where a rule is off, `eslint.config.js` says why.
 
 Add the next rule to the script, not as a paragraph here — `docs/decisions.md`

@@ -58,6 +58,7 @@
 	import { watchPresses } from '$lib/haptics';
 	import { formatDate, referencedColumns } from '$lib/placeholders';
 	import { VERSION } from '$lib/version';
+	import { TEXT_MAX, TEXT_MIN, applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
 		autoMap,
 		blankTemplate,
@@ -159,6 +160,14 @@
 	 */
 	let excludedSheets = $state<Set<number>>(new Set());
 	let helpOpen = $state(false);
+
+	/** The interface's text size, as a multiple of the browser's default — see textsize.ts. */
+	let textSize = $state(1);
+	function setTextSize(scale: number) {
+		textSize = scale;
+		applyTextSize(scale);
+		saveTextSize(scale);
+	}
 	let cssOpen = $state(false);
 	/**
 	 * The CSS as it stood when the dialog opened, so Cancel has something to put
@@ -717,6 +726,15 @@
 
 	// No reactive reads, so this runs once and its return value is the cleanup.
 	$effect(() => watchInstall((available) => (installable = available)));
+
+	// Read once and put on the root before anything else is measured. Until
+	// then the interface is at the browser's default, so a larger stored size
+	// shows as one reflow on load — the price of keeping the script out of
+	// app.html, where it would need its own exception in a policy.
+	$effect(() => {
+		untrack(() => setTextSize(loadTextSize()));
+		return zoomAsText(() => untrack(() => textSize), setTextSize);
+	});
 
 	async function install() {
 		const outcome = await promptInstall();
@@ -2082,6 +2100,19 @@
 		notify('Pasted as a new area, holding its own words. Ctrl/Cmd+Z takes it away.');
 	}
 
+	/** Something in front of the stage, which then leaves the keys alone. */
+	const stageModalOpen = $derived(
+		helpOpen ||
+			statusOpen ||
+			cssOpen ||
+			previewOpen ||
+			lightboxOpen ||
+			boxMenu !== null ||
+			deletingTable ||
+			editingId !== null ||
+			magic !== null
+	);
+
 	function onWindowKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
 		const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
@@ -2089,6 +2120,16 @@
 			event.preventDefault();
 			// The preview has the key while it is open: a second press prints.
 			if (!previewOpen && !printing) requestPrint();
+			return;
+		}
+		// Ctrl +/− zooms the page on the stage; PagePreview answers it, except
+		// in a field or behind a dialog, where the browser would have zoomed the
+		// whole app. There it is the text size instead — the same conditions
+		// PagePreview steps aside on, so exactly one of the two answers.
+		const chord = textChord(event);
+		if (chord !== null && (typing || stageModalOpen)) {
+			event.preventDefault();
+			setTextSize(chord === 0 ? 1 : stepText(textSize, chord));
 			return;
 		}
 		// The lightbox is in front of everything and takes Escape and the arrows
@@ -2831,15 +2872,7 @@
 			oneditcell={editCell}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
-			modalOpen={helpOpen ||
-				statusOpen ||
-				cssOpen ||
-				previewOpen ||
-				lightboxOpen ||
-				boxMenu !== null ||
-				deletingTable ||
-				editingId !== null ||
-				magic !== null}
+			modalOpen={stageModalOpen}
 			{selectedBoxes}
 			onalign={alignSelection}
 			onarrange={arrange}
@@ -3206,6 +3239,29 @@
 			a touchscreen. Double-click an area to type in it or draw in it; right-click it, or long-press it, for its menu.
 		</p>
 
+		<div class="text-size" role="group" aria-labelledby="text-size-label">
+			<span id="text-size-label">Text size</span>
+			<button
+				onclick={() => setTextSize(stepText(textSize, -1))}
+				disabled={textSize <= TEXT_MIN}
+				title="Smaller text"
+				aria-label="Smaller text">A−</button
+			>
+			<button
+				class="amount"
+				onclick={() => setTextSize(1)}
+				disabled={textSize === 1}
+				title="Back to the browser's own size"
+				aria-label="Text size {Math.round(textSize * 100)}%, reset">{Math.round(textSize * 100)}%</button
+			>
+			<button
+				onclick={() => setTextSize(stepText(textSize, 1))}
+				disabled={textSize >= TEXT_MAX}
+				title="Larger text"
+				aria-label="Larger text">A+</button
+			>
+		</div>
+
 		<h3>Keys</h3>
 		<dl class="keys">
 			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
@@ -3230,9 +3286,11 @@
 			<dt>Ctrl/Cmd + Shift + V</dt><dd>Paste that style onto the selection</dd>
 			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
 			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
-			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page — about the selected area, if there is one</dd>
+			<dt>Ctrl/Cmd + scroll, pinch<span>on the page</span></dt><dd>Zoom the page — about the selected area, if there is one</dd>
 			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
+			<dt>Pinch, Ctrl/Cmd + scroll<span>off the page</span></dt><dd>Text size — the interface itself never zooms</dd>
+			<dt>Ctrl/Cmd + +<span>in a field or here</span></dt><dd>Text size, in steps; Ctrl/Cmd + 0 puts it back</dd>
 			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
 			<dt>Ctrl/Cmd + ;<span>|</span></dt><dd>Guides on or off</dd>
 			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off</dd>
@@ -3354,7 +3412,7 @@
 		padding: 8px 16px;
 		background: #fff;
 		border-bottom: 1px solid #ddd;
-		font-size: 12px;
+		font-size: 0.75rem;
 		flex-wrap: wrap;
 	}
 
@@ -3483,7 +3541,7 @@
 		padding: 8px 12px;
 		background: #fff8e1;
 		border-bottom: 1px solid #f0e0a8;
-		font-size: 12px;
+		font-size: 0.75rem;
 	}
 
 	.status-bar {
@@ -3491,7 +3549,7 @@
 		align-items: center;
 		gap: 12px;
 		padding: 5px 12px;
-		font-size: 11px;
+		font-size: 0.6875rem;
 		color: #555;
 		background: #fff;
 		border-top: 1px solid #eee;
@@ -3545,7 +3603,7 @@
 		align-items: flex-start;
 		gap: 6px;
 		margin: 0 0 4px;
-		font-size: 13px;
+		font-size: 0.8125rem;
 		line-height: 1.5;
 		color: #222;
 	}
@@ -3559,11 +3617,11 @@
 
 	.status-bar .reload {
 		padding: 2px 8px;
-		font-size: 11px;
+		font-size: 0.6875rem;
 	}
 
 	.status-bar .version {
-		font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+		font: 400 0.6875rem ui-monospace, SFMono-Regular, Menlo, monospace;
 		color: #999;
 	}
 
@@ -3577,7 +3635,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-button);
@@ -3608,7 +3666,7 @@
 	}
 
 	select {
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		padding: 4px 5px;
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-input);
@@ -3645,13 +3703,13 @@
 		border-radius: 10px;
 		padding: 20px 22px;
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
-		font-size: 13px;
+		font-size: 0.8125rem;
 		line-height: 1.55;
 	}
 
 	.modal h2 {
 		margin: 0 0 6px;
-		font-size: 16px;
+		font-size: 1rem;
 	}
 
 	/* A dialog's title is where it is moved from — see `dragByTitle`. */
@@ -3697,7 +3755,7 @@
 
 	.modal h3 {
 		margin: 16px 0 4px;
-		font-size: 11px;
+		font-size: 0.6875rem;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		color: #767676;
@@ -3711,11 +3769,30 @@
 	.modal textarea.code {
 		width: 100%;
 		box-sizing: border-box;
-		font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+		font: 0.75rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
 		padding: 8px;
 		border: 1px solid #ccc;
 		border-radius: var(--radius-input);
 		resize: vertical;
+	}
+
+	/* Above the keys, because it is the one thing in Help that is a setting. */
+	.text-size {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin: 12px 0 4px;
+		color: #333;
+	}
+
+	.text-size span {
+		margin-right: auto;
+	}
+
+	.text-size .amount {
+		min-width: 4.5em;
+		justify-content: center;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.keys {
@@ -3739,7 +3816,7 @@
 
 	.keys dt {
 		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-		font-size: 11px;
+		font-size: 0.6875rem;
 		color: #111;
 		white-space: nowrap;
 	}
@@ -3780,7 +3857,7 @@
 	}
 
 	.version {
-		font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+		font: 400 0.6875rem ui-monospace, SFMono-Regular, Menlo, monospace;
 		color: #767676;
 		vertical-align: 2px;
 		user-select: none;
@@ -3806,7 +3883,7 @@
 		padding: 12px 0 0;
 		border-top: 1px solid #eee;
 		list-style: none;
-		font-size: 13px;
+		font-size: 0.8125rem;
 	}
 
 	.elsewhere a {
@@ -3870,7 +3947,7 @@
 	   because a body column would otherwise be a paragraph in a dialog. */
 	.magic-sample {
 		color: #767676;
-		font-size: 12px;
+		font-size: 0.75rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -3879,7 +3956,7 @@
 	.magic-list select {
 		width: 100%;
 		font: inherit;
-		font-size: 12px;
+		font-size: 0.75rem;
 		padding: 3px 4px;
 		border: 1px solid #d5d5d5;
 		border-radius: 4px;
@@ -3902,7 +3979,7 @@
 		border-radius: 5px;
 		background: #fdf4dc;
 		color: #8a6d1f;
-		font-size: 12px;
+		font-size: 0.75rem;
 		line-height: 1.45;
 	}
 
@@ -3915,7 +3992,7 @@
 	/* Says which rows were reached by length alone. Quiet: it is a caveat on a
 	   choice you can already see and change, not a warning. */
 	.magic-unsure {
-		font-size: 10px;
+		font-size: 0.625rem;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		color: #8a6d1f;

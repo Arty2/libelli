@@ -874,7 +874,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
-		font: 13px ui-sans-serif, system-ui, sans-serif;
+		font: 0.8125rem ui-sans-serif, system-ui, sans-serif;
 		outline: none;
 		/* The board takes the pointer for drawing; a downward drag read as
 		   pull-to-refresh would take the undo history with it. */
@@ -885,7 +885,7 @@
 
 	.weight {
 		color: #767676;
-		font-size: 12px;
+		font-size: 0.75rem;
 	}
 
 	.board {
@@ -944,7 +944,7 @@
 	   Undo and redo too, which live in the panel's bottom bar. */
 	.tools button,
 	.undo button {
-		font: 600 13px ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.8125rem ui-sans-serif, system-ui, sans-serif;
 		background: #fff;
 		border: 1px solid #c9cdd4;
 		border-radius: 6px;
@@ -974,7 +974,7 @@
 	}
 
 	.board input {
-		font: 13px ui-sans-serif, system-ui, sans-serif;
+		font: 0.8125rem ui-sans-serif, system-ui, sans-serif;
 		width: 48px;
 		height: 28px;
 		box-sizing: border-box;
@@ -995,7 +995,7 @@
 
 	.by {
 		color: #767676;
-		font: 13px ui-sans-serif, system-ui, sans-serif;
+		font: 0.8125rem ui-sans-serif, system-ui, sans-serif;
 	}
 
 	/* The pencil, in the ink. No shadow round it: a half-pixel drop shadow is a

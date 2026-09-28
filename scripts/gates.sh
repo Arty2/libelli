@@ -203,6 +203,22 @@ else
 		"instructions-file-budget"
 fi
 
+# ── 9. The interface's type is in rem ────────────────────────────────────────
+# A zoom does not magnify the app; it sets the root font size (textsize.ts),
+# and only type written in `rem` follows it. One label left in `px` stays small
+# while everything round it grows — the one field nobody at 150% can read. The
+# card's type is in `pt`, set from the template, and is not what this is about.
+# Matches a `font:` shorthand or a `font-size:` whose size is a pixel length;
+# `font: inherit` and a pixel line-height after the slash are left alone.
+pxtype=$(grep -rnE --include='*.svelte' --include='*.css' \
+	'font(-size)?[[:space:]]*:[^;/]*[^-a-z0-9.][0-9.]+px' src 2>/dev/null)
+
+if [ -n "$pxtype" ]; then
+	fail "interface type sized in px — write it in rem, 16px to the rem" "$pxtype" "type-in-rem"
+else
+	pass "interface type sized in rem" "type-in-rem"
+fi
+
 # ── local, gitignored log — see the header comment ───────────────────────────
 mkdir -p .claude/logs
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)

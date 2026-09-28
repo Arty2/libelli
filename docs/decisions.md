@@ -3011,6 +3011,53 @@ not at all. The true inverse needs relative colour syntax, which is Baseline
 Newly, so it is behind `@supports`; without it the guides are `#da9c14`, the
 inverse of the fallback blue, worked out by hand.
 
+## `src/lib/textsize.ts`, the viewport, and type in `rem`
+
+**The interface does not zoom; its text does.** On a phone, touching a cell at
+the right of the table slid the interface left and made the whole app larger.
+Two things were doing it. iOS zooms in on any focused field whose text is under
+16px, and every field here is 12px. And the document was wider than the phone:
+the label a screen reader reads for the paragraph field is `.sr-only`,
+`position: absolute`, and its containing block was the bar row *outside* the
+options bar's scroller — an absolute box is clipped only by a scroller that is
+also its containing block's ancestor, so at its static position, 900px along a
+row scrolled out of sight, it stretched the document to 905px on a 412px
+screen. A phone then lets a finger pan sideways and zooms out to show it.
+`.sr-only` is pinned to `top: 0; left: 0` now, which keeps it inside whatever
+holds it; ImagesPanel's private copy of the rule is gone for the shared one.
+
+The viewport says `minimum-scale=1, maximum-scale=1, user-scalable=no`, and the
+root says `touch-action: pan-x pan-y`. The first stops iOS's leap into a field
+and Android's pinch; the second stops the pinch everywhere a browser honours it;
+Safari ignores `user-scalable` for a pinch, so `textsize.ts` also refuses its
+`gesture*` events. **The trade-off, said out loud:** refusing zoom is what an
+accessibility audit flags, because zoom is how people who need larger text get
+it. So the zoom is not taken away, it is redirected: a pinch off the stage, a
+Ctrl+wheel off the stage, Ctrl +/− in a field or a dialog, and **Text size** in
+Help all set `--text-scale`, which multiplies the root font size. The browser's
+own default font size is the 100%, so a larger default set there still counts.
+The stage and the full-screen lightbox mark themselves `data-own-pinch` and
+keep their own pinch, which zooms the page or the card as before.
+
+**Every size of interface type is in `rem`**, 16px to the rem, so it follows the
+root; gate 9 in `scripts/gates.sh` fails a `px` one. A card's type is `pt` from
+the template and never reads the root. Boxes are mostly padded round their
+labels and grow with them; the few that were a fixed width with a word in them
+are part fixed, part `rem` — the Lock button (`calc(44px + 2.5rem)`, the width
+of "Unlock"), the table's row-number gutter (digits in `rem`) — and an options
+bar group wraps inside itself once it is wider than the bar, which on a desk it
+now can be. Icons stay their pixel size: they are drawings, not words.
+
+A pinch arrives as a ratio of the spread at its start, so it is snapped to 5%
+each time without drifting. A wheel arrives as dozens of small deltas, and each
+one snapped on its own would round back to where it began, so the wheel keeps
+its own unsnapped total. Its rate is 600 per e-fold against the stage's 220:
+the stage's rate took the interface from 100% to the ceiling in two notches.
+
+The stored size is applied from the page's first effect rather than from a
+script in `app.html`, so a larger size shows as one reflow on load. A script in
+the head would need its own exception in any script policy, for a flash.
+
 ## `src/lib/components/Tooltip.svelte` and `src/lib/tooltip.ts`
 
 **One tooltip, for every `title`.** The browser's own cannot be styled, arrives

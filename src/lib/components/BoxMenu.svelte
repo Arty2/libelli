@@ -201,7 +201,7 @@
 		border-radius: var(--radius-button);
 		background: transparent;
 		color: #111;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		text-align: left;
 		cursor: pointer;
 	}

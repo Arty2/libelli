@@ -842,8 +842,12 @@
 
 	const widthOf = (column: string) => columnWidths[column] ?? COLUMN_DEFAULT;
 
-	/** As narrow as the widest row number it has to hold, and no narrower. */
-	const gutterWidth = $derived(36 + String(Math.max(dataset.rows.length, 1)).length * 7);
+	/**
+	 * As narrow as the widest row number it has to hold, and no narrower. The
+	 * tick and the padding are fixed; a digit is text, so it is in `rem` and
+	 * grows with the interface's text size — 7px a digit at the default size.
+	 */
+	const gutterWidth = $derived(`calc(36px + ${String(Math.max(dataset.rows.length, 1)).length * 0.4375}rem)`);
 
 	/**
 	 * How wide the table has to be for every column to get what it asked for.
@@ -857,7 +861,7 @@
 	 */
 	const GHOST_COLUMN = 40;
 	const tableWidth = $derived(
-		gutterWidth + dataset.columns.reduce((sum, c) => sum + widthOf(c), 0) + GHOST_COLUMN
+		`calc(${dataset.columns.reduce((sum, c) => sum + widthOf(c), 0) + GHOST_COLUMN}px + ${gutterWidth})`
 	);
 
 	let resizing = $state<{ column: string; from: number; x: number } | null>(null);
@@ -1365,12 +1369,12 @@
 	aria-label="Card data"
 >
 	<div class="scroll" bind:this={scrollEl}>
-		<table style="min-width:{tableWidth}px">
+		<table style="min-width:{tableWidth}">
 			<!-- Widths belong to the columns, not to the cells: one place to set
 			     them, and `table-layout: fixed` above means they are obeyed rather
 			     than treated as a suggestion the widest cell can overrule. -->
 			<colgroup>
-				<col style="width:{gutterWidth}px" />
+				<col style="width:{gutterWidth}" />
 				{#each dataset.columns as column (column)}
 					<col style="width:{widthOf(column)}px" />
 				{/each}
@@ -2202,7 +2206,7 @@
 		position: relative;
 		/* One line of a cell's text: its size times its leading. The gutter
 		   and the row-height modes are measured in it. */
-		--cell-line: calc(12px * 1.45);
+		--cell-line: calc(0.75rem * 1.45);
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
@@ -2245,7 +2249,7 @@
 		table-layout: fixed;
 		/* The floor is set inline, from the columns themselves — see tableWidth. */
 		width: 100%;
-		font: 12px/1.4 ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem/1.4 ui-sans-serif, system-ui, sans-serif;
 	}
 
 	th,
@@ -2334,7 +2338,7 @@
 		border-bottom: 1px solid transparent;
 		border-radius: 0;
 		background: transparent;
-		font: 600 12px ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.75rem ui-sans-serif, system-ui, sans-serif;
 		flex: 1 1 auto;
 		min-width: 0;
 		padding: 3px 2px;
@@ -2514,7 +2518,7 @@
 		   A handle that sized one field inside a row sized by another was a
 		   control that could only ever make the two disagree. */
 		resize: none;
-		font: 12px/1.45 ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem/1.45 ui-sans-serif, system-ui, sans-serif;
 		/* No bottom padding, and a height of whole lines plus a sliver: a cell
 		   that holds more than it shows then stops on a line's edge, rather
 		   than showing the tops of the next line's letters in its padding. */
@@ -2572,7 +2576,7 @@
 		   mark rather than being cut by a box. */
 		background: linear-gradient(to right, transparent, var(--cell-bg) 1.2em);
 		color: #555;
-		font: 12px/var(--cell-line) ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem/var(--cell-line) ui-sans-serif, system-ui, sans-serif;
 		cursor: pointer;
 		z-index: 1;
 	}
@@ -2797,7 +2801,7 @@
 	.gutter .number {
 		min-width: 1.2em;
 		text-align: right;
-		font-size: 12px;
+		font-size: 0.75rem;
 		line-height: var(--cell-line);
 	}
 
@@ -2913,7 +2917,7 @@
 	   of what the two buttons beside it are about to act on, and at 11px it read
 	   as a footnote to them rather than as their subject. */
 	.actions .chosen-count {
-		font: 600 13px ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.8125rem ui-sans-serif, system-ui, sans-serif;
 		color: var(--accent-strong);
 		padding: 0 2px;
 		white-space: nowrap;
@@ -2944,7 +2948,7 @@
 	   stylesheet rather than in the markup, so what a screen reader announces
 	   stays in sentence case. */
 	.picker > span {
-		font-size: 10px;
+		font-size: 0.625rem;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
 		white-space: nowrap;
@@ -2959,7 +2963,7 @@
 		border: none;
 		border-bottom: 1px solid var(--border-control);
 		background: none;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		color: #111;
 	}
 
@@ -3013,7 +3017,7 @@
 		background: none;
 		padding: 5px 8px;
 		border-radius: 4px;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		text-align: left;
 		/* A long name wraps rather than widening the menu past its cap. */
 		overflow-wrap: anywhere;
@@ -3064,7 +3068,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-button);
@@ -3192,7 +3196,7 @@
 		border-radius: 10px;
 		padding: 18px;
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
-		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+		font: 0.8125rem/1.5 ui-sans-serif, system-ui, sans-serif;
 	}
 
 	/* Focused as it opens so its first Enter is caught — see modal.ts — and not
@@ -3203,7 +3207,7 @@
 
 	.modal h2 {
 		margin: 0 0 6px;
-		font-size: 15px;
+		font-size: 0.9375rem;
 	}
 
 	.modal p {
@@ -3214,7 +3218,7 @@
 	.modal textarea {
 		width: 100%;
 		box-sizing: border-box;
-		font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+		font: 0.75rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
 		padding: 8px;
 		border: 1px solid #ccc;
 		border-radius: var(--radius-input);
@@ -3230,7 +3234,7 @@
 		gap: 8px;
 		padding: 12px;
 		background: #fff;
-		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+		font: 0.8125rem/1.5 ui-sans-serif, system-ui, sans-serif;
 	}
 
 	/* A drawing wants every pixel of the room: a thinner margin, and what does
@@ -3295,7 +3299,7 @@
 
 	.cell-editor h2 {
 		margin: 0;
-		font-size: 13px;
+		font-size: 0.8125rem;
 		font-weight: 600;
 		min-width: 0;
 		overflow: hidden;
@@ -3311,7 +3315,7 @@
 	}
 
 	.actions .big-row {
-		font: 500 12px ui-sans-serif, system-ui, sans-serif;
+		font: 500 0.75rem ui-sans-serif, system-ui, sans-serif;
 		color: #555;
 		white-space: nowrap;
 		min-width: 2.75rem;
@@ -3343,7 +3347,7 @@
 
 	/* The count of the cell being typed in, where the row actions were. */
 	.actions .cell-count {
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		color: #555;
 		white-space: nowrap;
 		font-variant-numeric: tabular-nums;
@@ -3386,7 +3390,7 @@
 		border-radius: var(--radius-input);
 		/* Twice the table's: this is where a long cell is read and written at
 		   length, with the whole tray to do it in. */
-		font: 26px/1.5 ui-sans-serif, system-ui, sans-serif;
+		font: 1.625rem/1.5 ui-sans-serif, system-ui, sans-serif;
 		resize: none;
 	}
 

@@ -503,6 +503,7 @@
 <div
 	class="full"
 	role="presentation"
+	data-own-pinch
 	onclick={() => {
 		// A drag that ends over the ground either side of the card is a drag, not
 		// a click on the backdrop, and must not put the card away.
@@ -719,7 +720,7 @@
 
 	.counter {
 		color: #fff;
-		font: 24px ui-sans-serif, system-ui, sans-serif;
+		font: 1.5rem ui-sans-serif, system-ui, sans-serif;
 		min-width: 6rem;
 		text-align: center;
 	}

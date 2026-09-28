@@ -90,7 +90,7 @@
 	}
 
 	.count {
-		font: 600 10px ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.625rem ui-sans-serif, system-ui, sans-serif;
 		color: #767676;
 		padding: 1px 0 3px;
 	}

@@ -1003,6 +1003,7 @@
 <div
 	class="viewport"
 	bind:this={host}
+	data-own-pinch
 	style="--pager-band:{pagerHeight ? pagerHeight + PAGE_GAP : 0}px"
 	onpointerdown={(e) => {
 		// Bare paper counts as empty space, not just the grey around the sheet:
@@ -1620,7 +1621,7 @@
 	/* A control, not a readout, so it says so on hover — but no chip and no
 	   border, because it still has to read as the count first. */
 	.pager .count {
-		font: 500 12px ui-sans-serif, system-ui, sans-serif;
+		font: 500 0.75rem ui-sans-serif, system-ui, sans-serif;
 		min-width: 2.75rem;
 		text-align: center;
 		border: none;
@@ -1756,7 +1757,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 10px;
-		font: 500 11px/1 ui-sans-serif, system-ui, sans-serif;
+		font: 500 0.6875rem/1 ui-sans-serif, system-ui, sans-serif;
 		color: #555;
 		background: rgba(255, 255, 255, 0.85);
 		padding: 5px 7px;
@@ -1839,7 +1840,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		padding: 5px 9px;
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-button);
@@ -1981,7 +1982,7 @@
 		border-color: transparent;
 		background: var(--pad-face);
 		color: #333;
-		font: 600 12px ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.75rem ui-sans-serif, system-ui, sans-serif;
 		cursor: pointer;
 		padding: 0;
 		touch-action: none;

@@ -102,6 +102,6 @@
 
 	.unit {
 		color: #767676;
-		font-size: 11px;
+		font-size: 0.6875rem;
 	}
 </style>
