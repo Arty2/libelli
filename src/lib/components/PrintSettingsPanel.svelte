@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import PageBleedFields from './PageBleedFields.svelte';
 	import { safeImageUrl } from '$lib/assets';
 	import { IMPOSITION_COUNTS, foldsIntoAZine, resolveImposition } from '$lib/imposition';
 	import { bleedFor } from '$lib/layout';
@@ -37,9 +38,11 @@
 		 * the page size.
 		 */
 		showFacing?: boolean;
+		/** the card's own bleed too; off where the page's settings already ask it */
+		pageBleed?: boolean;
 	}
 
-	let { template, pageFrozen, ontemplatechange, onuploadbackground, onnotice, showFacing = false }: Props = $props();
+	let { template, pageFrozen, ontemplatechange, onuploadbackground, onnotice, showFacing = false, pageBleed = true }: Props = $props();
 
 	let imageInput = $state<HTMLInputElement | null>(null);
 	let perSheetSelect = $state<HTMLSelectElement | null>(null);
@@ -47,10 +50,6 @@
 
 	const patchPrint = (change: Partial<PrintSettings>) =>
 		ontemplatechange({ ...template, print: { ...template.print, ...change } });
-
-	/** The card's own bleed, which lives on the template beside `print`, not inside it. */
-	const patchBleed = (change: Partial<Template['bleed']>) =>
-		ontemplatechange({ ...template, bleed: { ...template.bleed, ...change } });
 
 	const patchSheetBleed = (change: Partial<Template['bleed']>) =>
 		patchPrint({ bleed: { ...template.print.bleed, ...change } });
@@ -198,43 +197,15 @@
 	}
 </script>
 
-<!-- The card's own bleed, here rather than only in the Card size group: it is a
+<!-- The card's own bleed, here rather than only in Page Setup: it is a
      print decision, and the print screen is where you are when you notice the
-     cards need one. -->
-<span class="group" role="group" aria-label="Page bleed">
-	<label class="check">
-		<input
-			type="checkbox"
-			checked={template.bleed.enabled}
-			disabled={pageFrozen}
-			title="Also the gap between cards, and the crop marks between them, when several are printed to a sheet"
-			onchange={(e) => patchBleed({ enabled: e.currentTarget.checked })}
-		/>
-		Page Bleed
-	</label>
-	{#if template.bleed.enabled}
-		<label class="field">
-			<input
-				class="n-2"
-				type="number"
-				step="0.5"
-				min="0"
-				aria-label="Page bleed amount"
-				value={template.bleed.amount}
-				disabled={pageFrozen}
-				onchange={(e) => patchBleed({ amount: distance(e, template.bleed.amount) })}
-			/>
-			<span class="unit">mm</span>
-		</label>
-		<label class="check">
-			<input
-				type="checkbox"
-				checked={template.bleed.cropMarks}
-				disabled={pageFrozen}
-				onchange={(e) => patchBleed({ cropMarks: e.currentTarget.checked })}
-			/>
-			Crop Marks
-		</label>
+     cards need one. In Page Setup's Printing tab it is left out, because the
+     Page tab already asks it beside the page size. -->
+{#if pageBleed || template.print.enabled}
+<fieldset class="group">
+	<legend>Bleed</legend>
+	{#if pageBleed}
+		<PageBleedFields {template} {pageFrozen} {ontemplatechange} />
 	{/if}
 
 	<!-- The sheet's own, beside the page's rather than further down the bar:
@@ -283,9 +254,11 @@
 			</label>
 		{/if}
 	{/if}
-</span>
+</fieldset>
+{/if}
 
-<span class="group" role="group" aria-label="Print Settings">
+<fieldset class="group sheet-group">
+	<legend>Sheets</legend>
 	{#if showFacing}
 		<label class="check">
 			<input
@@ -447,6 +420,6 @@
 			>
 		{/if}
 	{/if}
-</span>
+</fieldset>
 
 <input bind:this={imageInput} type="file" accept="image/*" hidden onchange={uploadBackground} />

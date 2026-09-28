@@ -57,7 +57,7 @@ src/lib/
     Card.svelte         the card itself: boxes, handles, drag, snap            (~3k)
     PagePreview.svelte  the stage: zoom, wheel gestures, the pager             (~1.8k)
     DataTable.svelte    the side panel: the table, a cell full size, drawing   (~3.2k)
-    OptionsBar.svelte   shell; picks PageOptions or BoxOptions (~1.4k), options-bar.css
+    OptionsBar.svelte   shell; picks PageOptions or BoxOptions (~1.4k), options-bar.css; both tabbed (bar-tabs.svelte.ts)
     PrintSettingsPanel.svelte  Per Sheet, orientation, sheet background — shared with the print screen
     PrintSheet.svelte   one physical sheet — off-screen in PrintRoot, thumbnails in PrintPreview
     Lightbox / SheetLightbox  one card, or one sheet, full screen
