@@ -237,16 +237,16 @@ resize boxes directly, or type exact millimetres.
   first — a heading or a list before it included, since on a card most
   paragraphs follow one, and the book rule of indenting only a paragraph after
   another meant it hardly ever showed.
-- **Lists** — **List** picks a Markdown bullet list's marker, **• Bullet**,
+- **Lists** — **Marker** picks a Markdown bullet list's marker, **• Bullet**,
   **● Disc**, **– Dash**, **— Em Dash** or **None**, each set in the area's own
   font like the words beside it (a font without the glyph falls back as for any
-  missing character); **List Indent** is the space from the area's edge to
-  the markers, in em, and **List Spacing** the space between one item and the
+  missing character); **Indent** is the space from the area's edge to
+  the markers, in em, and **Spacing** the space between one item and the
   next, in lines of the leading — the units the paragraph settings use. All
   three are a group of their own in page setup and, for a Markdown area, in the
   area bar, where each on its own overrides the page's; left blank, a list is
   set as it always was.
-- **Baseline** — just after Leading: raises an area's text by a share of its size, in em, or lowers
+- **Baseline** — just after Line Height: raises an area's text by a share of its size, in em, or lowers
   it below 0: for a face that sits high or low on its line. Page setup's
   applies only to areas in the page's font — it corrects a face, and would be
   wrong for any other — and an area's own applies whatever it is set in. It
@@ -322,7 +322,7 @@ resize boxes directly, or type exact millimetres.
 - **Colors with alpha** — every color field is a swatch and an opacity in
   percent beside it: text, paper, fill, border and a QR's background alike.
   Opaque, a color is stored as the hex it always was; otherwise as `rgba()`.
-- **A border drawn by hand** — **Draft**, beside the border color, draws it
+- **A border drawn by hand** — **Hand-Drawn**, beside the border color, draws it
   wobbling, as a line rather than a rule. Width, style and radius all still
   mean what they meant: a dashed 1mm hand border is dashed, 1mm and hand-drawn,
   and a dotted one is dots. Each edge is drawn with its own width, so an area
@@ -345,7 +345,7 @@ resize boxes directly, or type exact millimetres.
   perforation so the page shows through, and the area's **fill** printed on it
   as a field inside the padding — the padding is the stamp's margin. The width
   sets the size of the holes; the radius does not apply. It is always
-  drawn as SVG, since no CSS border can draw it, and **Draft** decides whether
+  drawn as SVG, since no CSS border can draw it, and **Hand-Drawn** decides whether
   it is punched true or by hand. A `filter: drop-shadow(…)` on the area in the
   template's CSS follows the perforations, which is how the A5 Starter Booklet's stamp
   sits off the page.
@@ -435,7 +435,7 @@ resize boxes directly, or type exact millimetres.
   rather than rendering a blank page — the same bargain as an uploaded font.
 - **Page numbers** — off by default; six corners to choose from, an adjustable
   margin, and the template's default type. The number is the row's position, so
-  the editor, the print preview and the print all agree. **of Total** prints it
+  the editor, the print preview and the print all agree. **Show Total** prints it
   as *3 / 12*; the slash is an element of its own, `.page-number .of`, so a
   template's CSS can set its content to anything or take it away. With **Left
   &amp; Right** on, four more positions appear: **Top**/**Bottom Outer** and

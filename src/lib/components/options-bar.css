@@ -97,12 +97,16 @@
 	color: #b42318;
 }
 
-/* Related controls are one group with a rule either side, so the bar reads as
-   a handful of subjects rather than thirty loose fields. */
-/* A group wraps inside itself once it is wider than the bar. At the default
-   text size that is only ever a phone, which used to scroll its widest groups
-   sideways; at a larger text size it is a desk too, where an unwrapped group
-   ran off the window and widened the whole document to follow it. */
+/* Each subject is one run: its name in bold, then its controls, with a wider
+   gap before the next run than between two fields. The name is the only thing
+   in the bar set heavier than the labels, so it marks where a run starts. No
+   rule between runs: the bar wraps, and a rule lands wherever the wrap does —
+   dangling at the end of a line, or between two runs that have nothing to do
+   with each other.
+
+   A group wraps inside itself once it is wider than the bar. At the default
+   text size that is only ever a phone; at a larger text size it is a desk too,
+   where an unwrapped group ran off the window and widened the document. */
 .options .group {
 	display: inline-flex;
 	flex-wrap: wrap;
@@ -110,124 +114,18 @@
 	gap: 8px;
 	max-width: 100%;
 	box-sizing: border-box;
-	padding: 2px 8px;
-	border-left: 1px solid #ddd;
-	border-right: 1px solid #ddd;
-}
-
-.box-options .group {
-	border-color: var(--accent-line);
-}
-
-/* A group is a fieldset now, which brings the browser's own frame, margin and
-   min-content floor with it — the last of which is what would stop a group
-   wrapping inside itself on a phone. All three go; the bars draw their own. */
-.options fieldset.group {
 	margin: 0;
+	/* A fieldset brings a min-content floor, which is what would stop a group
+	   wrapping inside itself on a phone; it goes, with the browser's frame. */
 	min-inline-size: 0;
-	border-top: none;
-	border-bottom: none;
-}
-
-/* Where a fieldset turns up outside a tabbed bar — the print screen's strip,
-   which shares these groups — its name is for a screen reader only, as the
-   aria-label it replaced was. */
-.options:not(.tabbed) fieldset.group > legend {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	overflow: hidden;
-	clip-path: inset(50%);
-	white-space: nowrap;
-}
-
-/* The tabbed bars: the subject and its tabs on top, one tab's fieldsets
-   under them. Every setting at once was four or five wrapped rows of forty
-   controls, all the same weight; a tab is one subject, a press away. */
-.options.tabbed {
-	flex-direction: column;
-	flex-wrap: nowrap;
-	align-items: stretch;
-	gap: 8px;
-}
-
-.options .bar-top {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 8px 14px;
-}
-
-.options .panel {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 8px 12px;
-}
-
-/* Words, underlined when showing — not a second row of buttons. The bar is
-   already a dense row of pressable things; tabs drawn as buttons were one
-   more, and a grey track behind them was one more surface. */
-.options .tabs {
-	display: inline-flex;
-	gap: 2px;
-}
-
-.options .tabs .tab {
-	gap: 6px;
-	padding: 4px 10px;
+	padding: 2px 0;
 	border: none;
-	border-bottom: 2px solid transparent;
-	border-radius: 0;
-	background: transparent;
-	color: #666;
-	font-weight: 500;
-}
-
-.options .tabs .tab:hover:not([aria-pressed='true']) {
-	color: #111;
-	border-bottom-color: #ccc;
-}
-
-.options .tabs .tab[aria-pressed='true'] {
-	background: transparent;
-	color: #111;
-	border-bottom-color: var(--accent);
-}
-
-.options .tabs .dot {
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background: var(--accent);
-}
-
-/* A subject inside a tab is one run: its name, then its controls, then a rule
-   before the next. They were small bordered panels with the name above, which
-   put boxes inside a bar and a fourth size of text over the labels, and a
-   panel as wide as its row rather than as its fields. The name is the only
-   thing set heavier than the labels, so it reads as where a run starts. */
-.options.tabbed fieldset.group {
-	display: inline-flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 8px;
-	padding: 0 12px 0 0;
-	border: none;
-	border-right: 1px solid #e0e0e0;
-}
-
-.box-options.tabbed fieldset.group {
-	border-right-color: var(--accent-line);
-}
-
-.options.tabbed fieldset.group:last-of-type {
-	border-right: none;
+	margin-right: 12px;
 }
 
 /* Floated, a legend is no longer the one drawn into the fieldset's border but
    an ordinary child — here the first item of the run. */
-.options.tabbed fieldset.group > legend {
+.options .group > legend {
 	float: left;
 	padding: 0;
 	margin: 0;
@@ -650,49 +548,20 @@
 		padding-right: 0;
 	}
 
-	/* The tabs stay in reach while the tab's fields scroll under them — the
-	   bar is capped at a quarter of the screen, so a tab longer than that
-	   would otherwise scroll its own tabs away. The ground is the bar's own
-	   colour, set here because the row it sits in makes the bar transparent. */
-	.options .bar-top {
-		position: sticky;
-		top: -6px;
-		z-index: 2;
-		margin: -6px -8px 0;
-		padding: 6px 8px;
-		background: #f7f7f7;
-	}
-
-	.box-options .bar-top {
-		background: var(--accent-wash);
-	}
-
-	/* A full-width strip, each tab an equal share of it: four targets as wide
-	   as a thumb, rather than four words bunched at the left. */
-	.options .tabs {
-		flex: 1 0 100%;
-	}
-
-	.options .tabs .tab {
-		flex: 1;
-		justify-content: center;
-		padding: 8px 4px;
-	}
-
 	/* One run to a line, ruled underneath rather than at the side, where a
 	   rule would stand at the end of a line of nothing. */
-	.options.tabbed fieldset.group {
+	.options .group {
 		flex: 1 1 100%;
-		padding: 0 0 8px;
+		padding: 0 0 6px;
 		border-right: none;
 		border-bottom: 1px solid #e0e0e0;
 	}
 
-	.box-options.tabbed fieldset.group {
+	.box-options .group {
 		border-bottom-color: var(--accent-line);
 	}
 
-	.options.tabbed fieldset.group:last-of-type {
+	.options .group:last-of-type {
 		border-bottom: none;
 		padding-bottom: 0;
 	}

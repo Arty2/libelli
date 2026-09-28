@@ -2169,13 +2169,8 @@ send you back to the editor before you can print. Both pass the same
 `template`/`ontemplatechange` shape the rest of the page-setup bar uses; the
 panel itself does not know or care which screen it is in.
 
-**In Page Setup it is the Printing tab, less the page's bleed.** The card's
-bleed is a decision about the card as much as about printing, so Page Setup
-asks it on the Page tab, beside the size; `pageBleed={false}` leaves it out of
-the Printing tab rather than asking it twice on neighbouring tabs. The print
-screen keeps it, for the reason above. Both screens mount `PageBleedFields`,
-so the two cannot drift. The groups are fieldsets, whose legends show only in
-a tabbed bar: on the print screen the strip reads as it always did.
+**Its groups are fieldsets, with their names showing on both screens**, Bleed
+and Printing — the same as every other group in the page bar.
 
 **A `<select>`'s `value=` binding loses a selection that is not the first
 option, on a fresh mount.** The browser applies `<select>.value` against
@@ -2750,52 +2745,38 @@ next thing you press is usually the next thing you meant to do.
 
 ## `src/lib/components/OptionsBar.svelte`
 
-**Both option bars are tabs of named fieldsets.** Every setting at once was four
-or five wrapped rows of forty controls, all set at one weight, with the groups
-told apart by a faint rule that landed wherever the wrap did — Width had the same
-standing as Blend. Now the head (the lock, the name, what you do to the whole
-thing) sits beside a strip of tabs, and one tab's settings sit under them, each
-subject one run — its name in bold, its controls, a rule before the next:
+**Both option bars are one bar of named groups, most-used first.** Every setting
+stays in view — a tabbed version was tried and read as messier, not calmer: a
+press to reach anything, and a bar whose height changed with the tab. What
+changed is the grouping and the order:
 
-- Page Setup: **Page** (size, margin and left & right, bleed, page number),
-  **Text** (type, paragraph, lists), **Paper** (color, image), **Printing**.
-- An area: **Content** (what it holds, hide when empty, a QR code's settings),
-  **Text** (type, lines, lists, alignment), **Box** (fill, border, effects,
-  overflow — the box is what clips or grows), **Position** (position, size,
-  padding, rotation — padding moves where the content starts).
+- Page Setup: the template, then **Page** (size, margin, left & right),
+  **Text**, **Paragraphs**, **Lists**, **Paper**, **Page Number**, and the
+  print panel's **Bleed** and **Printing**.
+- An area: the name, then **Content**, **QR Code** when it is one, **Text**
+  (font, size, weight, color), **Align** — beside the type, because it is set
+  as often — **Position** (X, Y, W, H, anchor), **Lines**, **Lists** for
+  Markdown, **Box** (fill, border, padding, overflow), **Effects** (blend,
+  opacity, rotation).
 
-A new control goes in the fieldset it belongs to rather than on the end. Printing
-stays a tab, not a move to the print screen alone: it is a setting of the
-template like the rest. The chosen tabs live in `bar-tabs.svelte.ts`, outside
-both bars, because neither bar lives long enough to remember one — the area bar
-is new for every selection — and are not saved: a bar that reopens on last
-week's tab, with nothing saying why, is the confusing half of that trade.
+Each group is a fieldset whose legend, floated, is the first item of the run and
+the only text set heavier than the labels; a wider gap separates runs, and no
+rule, because the bar wraps and a rule lands wherever the wrap does. A label that
+only repeated its group's name is left to screen readers. A new control goes in
+the group it belongs to rather than on the end.
 
-**No boxes inside the bar.** The first cut drew each fieldset as a small bordered
-panel with its name above: boxes inside a tinted bar, a fourth size of text over
-the labels, and panels as wide as their row rather than their fields. It read as
-messier than the flat bar it replaced. A run is quieter: the legend floated, which
-makes it an ordinary first item rather than the one drawn into the border, and a
-label that only repeated the legend (Size's *Preset*, Page Number's *Position*)
-is left to screen readers. Tabs are underlined words, not a second row of buttons.
-
-**On a phone the bar stays at the top, and its tabs stay put.** A bottom sheet
-was considered and left for now. The bar is still capped at a quarter of the
-screen and scrolls; the tab strip is sticky inside it, full width, each tab an
-equal share, so a long tab never scrolls its own tabs away.
+**Labels say what the thing is in plain words.** *Line Height* rather than
+Leading, *Letter Spacing* rather than a bare Spacing, *Hand-Drawn* rather than
+Draft, *Show Total* rather than of Total, W and H on the page and sheet as on an
+area. The ones the tour and the README teach by name — Hide When Empty, Pages
+per Sheet, Left & Right, Page Bleed — kept theirs.
 
 **A value taken from the page looks taken; one set here has an ×.** Blank was
 always how an area's field inherited, and nothing on screen said which ones
 were doing it. A placeholder or a *Default: …* option is set in italics, in a
 grey that still reads; a set value is upright, with a `ResetButton` beside it
 that removes the key — "back to the page's" is an absent key, as everywhere
-else. The Text tab carries a dot while the area sets any of its own type, so
-that shows from the other tabs. Only the Text tab: it is the one where
-"default" means something set somewhere else.
-
-**A new area's first keystroke switches to Content.** The Text field it types
-into is on that tab, and the switch is `flushSync`ed inside the keydown, because
-focus moved after the event would leave the first character behind.
+else.
 
 **A right-click menu on a box carries the same actions its bar does** — neither is
 the only way to reach them. Only the primary pointer button drags: a right-click
