@@ -3062,6 +3062,11 @@ once. The script repeats the storage key and the bounds, and
 app's one inline script; the CSP is `frame-ancestors` only, so nothing refuses
 it — a `script-src` added later has to allow it by hash.
 
+Without JavaScript there is nothing to size: the app renders in the browser
+only, so `app.html` carries a `<noscript>` that says *JavaScript required*,
+centred over the whole viewport and styled inline, since app.css arrives with
+the scripts.
+
 **The full-size cell editor's type does not scale.** It is 26px, twice the
 table's, already large; at 200% it was 52px, a few words a line on a phone. It
 is the one `px` size gate 9 lets through, marked `/* fixed type */` on its line.
