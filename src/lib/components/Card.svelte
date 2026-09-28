@@ -1833,7 +1833,7 @@
 	>
 		<!-- Shut while the pointer is on them, like the other badges that are
 		     buttons: the act of pressing — a cut made, or one let go of. -->
-		<Icon name={badgeArmed(`${box.id}:cut`) && editable(box) ? 'cut-closed' : 'cut'} size={11} />
+		<Icon name={badgeArmed(`${box.id}:cut`) && editable(box) ? 'cut-closed' : 'cut'} size={11} fixed />
 	</button>
 {/snippet}
 
@@ -2089,7 +2089,7 @@
 								breakAnchor(box);
 							}}
 						>
-							<Icon name={badgeArmed(`${box.id}:tied`) ? 'unlink' : 'link'} size={11} />
+							<Icon name={badgeArmed(`${box.id}:tied`) ? 'unlink' : 'link'} size={11} fixed />
 						</button>
 						{/if}
 						{#if anchorTargets.has(box.id)}
@@ -2115,7 +2115,7 @@
 									releaseDependents(box);
 								}}
 							>
-								<Icon name={badgeArmed(`${box.id}:moored`) ? 'sailboat' : 'harbor'} size={11} />
+								<Icon name={badgeArmed(`${box.id}:moored`) ? 'sailboat' : 'harbor'} size={11} fixed />
 							</button>
 						{/if}
 					</span>
@@ -2138,12 +2138,12 @@
 								onpointerdown={(e) => e.stopPropagation()}
 								onclick={() => oneditcell?.(box.id)}
 							>
-								<Icon name="task-edit" size={11} />
+								<Icon name="task-edit" size={11} fixed />
 							</button>
 						{/if}
 						{#if isStatic(box)}
 							<span class="badge" title="Static text — this says the same on every card, because it is not plugged into a column">
-								<Icon name="text-creation" size={11} />
+								<Icon name="text-creation" size={11} fixed />
 							</span>
 						{/if}
 						<!-- What a picture area holds, beside the static text's mark. The
@@ -2158,11 +2158,11 @@
 								onpointerdown={(e) => e.stopPropagation()}
 								onclick={() => ondraw?.(box.id)}
 							>
-								<Icon name="edit" size={11} />
+								<Icon name="edit" size={11} fixed />
 							</button>
 						{:else if pictureKind(box) === 'picture'}
 							<span class="badge" title={box.slot ? 'An image, from this row\'s cell — double-click to draw instead' : 'An image, the same on every card — double-click to draw instead'}>
-								<Icon name="image" size={11} />
+								<Icon name="image" size={11} fixed />
 							</span>
 						{/if}
 						{#if box.locked}
@@ -2178,7 +2178,7 @@
 									unlockBox(box);
 								}}
 							>
-								<Icon name={badgeArmed(`${box.id}:locked`) ? 'unlocked' : 'locked'} size={11} />
+								<Icon name={badgeArmed(`${box.id}:locked`) ? 'unlocked' : 'locked'} size={11} fixed />
 							</button>
 						{/if}
 					</span>

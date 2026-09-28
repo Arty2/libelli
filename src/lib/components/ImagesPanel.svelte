@@ -829,7 +829,7 @@
 		padding: 8px 10px;
 		border-bottom: 1px solid #eee;
 		background: #fafafa;
-		min-height: 20px;
+		min-height: 1.25rem;
 	}
 
 	.tray-head.grip {
@@ -951,8 +951,8 @@
 	.tray-head .back {
 		display: grid;
 		place-items: center;
-		width: 22px;
-		height: 22px;
+		width: 1.375rem;
+		height: 1.375rem;
 		padding: 0;
 		border: none;
 		background: none;
@@ -1035,8 +1035,8 @@
 		display: grid;
 		place-items: center;
 		box-sizing: border-box;
-		width: 30px;
-		height: 30px;
+		width: 1.875rem;
+		height: 1.875rem;
 		padding: 0;
 		font: 600 0.8125rem ui-sans-serif, system-ui, sans-serif;
 		background: #fff;
@@ -1119,8 +1119,8 @@
 		flex: none;
 		display: grid;
 		place-items: center;
-		width: 48px;
-		height: 36px;
+		width: 3rem;
+		height: 2.25rem;
 		border: 1px solid #ddd;
 		border-radius: 2px;
 		background:
@@ -1164,8 +1164,8 @@
 
 	.images li :global(button.square) {
 		border: none;
-		width: 22px;
-		height: 22px;
+		width: 1.375rem;
+		height: 1.375rem;
 		padding: 0;
 		justify-content: center;
 		color: #767676;
@@ -1319,8 +1319,8 @@
 	.ghost {
 		position: fixed;
 		z-index: 60;
-		width: 56px;
-		height: 56px;
+		width: 3.5rem;
+		height: 3.5rem;
 		object-fit: contain;
 		margin: -64px 0 0 8px;
 		pointer-events: none;

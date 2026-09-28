@@ -168,12 +168,12 @@ html, body {
    width of "Unlock": it said Lock at 68px and Unlock at 82, so pressing it
    shoved everything after it along the bar, and the three were three sizes.
    Its padlock and word start at the left, as every other button's do, so
-   the icon does not step sideways when the word changes. The padding, border,
-   padlock and gap are fixed and the word is text, so the width is the two
-   added — 84px at the default text size, and room for "Unlock" at any other. */
+   the icon does not step sideways when the word changes. In `rem`, padlock
+   and all: the icon grows with the text as the word does (Icon.svelte), so
+   84px at the default size keeps room for "Unlock" at any other. */
 .lock-toggle {
 	box-sizing: border-box;
-	width: calc(44px + 2.5rem);
+	width: 5.25rem;
 	justify-content: flex-start;
 }
 
@@ -190,8 +190,8 @@ html, body {
 .icon-checkboxes input[type='checkbox'] {
 	appearance: none;
 	flex: none;
-	width: 16px;
-	height: 16px;
+	width: 1rem;
+	height: 1rem;
 	margin: 0;
 	vertical-align: middle;
 	background: #555;

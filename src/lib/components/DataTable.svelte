@@ -843,11 +843,12 @@
 	const widthOf = (column: string) => columnWidths[column] ?? COLUMN_DEFAULT;
 
 	/**
-	 * As narrow as the widest row number it has to hold, and no narrower. The
-	 * tick and the padding are fixed; a digit is text, so it is in `rem` and
-	 * grows with the interface's text size — 7px a digit at the default size.
+	 * As narrow as the widest row number it has to hold, and no narrower: 36px
+	 * of tick, gap and padding and 7px a digit at the default size. All of it
+	 * in `rem`, since the tick is an icon and grows with the text as the digits
+	 * do — see textsize.ts.
 	 */
-	const gutterWidth = $derived(`calc(36px + ${String(Math.max(dataset.rows.length, 1)).length * 0.4375}rem)`);
+	const gutterWidth = $derived(`${2.25 + String(Math.max(dataset.rows.length, 1)).length * 0.4375}rem`);
 
 	/**
 	 * How wide the table has to be for every column to get what it asked for.
@@ -2381,8 +2382,8 @@
 	/* No area prints this column. Quiet, because it is a fact about the data
 	   and not a fault: a column held back for later is a legitimate thing. */
 	.icon.unused {
-		width: 18px;
-		height: 18px;
+		width: 1.125rem;
+		height: 1.125rem;
 		flex: none;
 		color: #b26a00;
 	}
@@ -2739,8 +2740,8 @@
 		position: absolute;
 		top: 50%;
 		right: 1px;
-		width: 18px;
-		height: 18px;
+		width: 1.125rem;
+		height: 1.125rem;
 		transform: translateY(-50%);
 		color: var(--accent-strong);
 	}
@@ -2813,8 +2814,8 @@
 	.tick {
 		display: grid;
 		place-items: center;
-		width: 14px;
-		height: 14px;
+		width: 0.875rem;
+		height: 0.875rem;
 		flex: none;
 		padding: 0;
 		border: none;
@@ -2855,7 +2856,7 @@
 	}
 
 	.ghost .icon.add {
-		width: 22px;
+		width: 1.375rem;
 	}
 
 	th.ghost {
@@ -2867,8 +2868,8 @@
 	.icon {
 		display: inline-grid;
 		place-items: center;
-		width: 22px;
-		height: 22px;
+		width: 1.375rem;
+		height: 1.375rem;
 		border: none;
 		background: transparent;
 		cursor: pointer;
@@ -2926,8 +2927,8 @@
 	.actions .icon {
 		display: grid;
 		place-items: center;
-		width: 28px;
-		height: 28px;
+		width: 1.75rem;
+		height: 1.75rem;
 		padding: 0;
 	}
 
@@ -3134,7 +3135,7 @@
 			/* The bar's buttons are 29px tall; aspect-ratio cannot say so here,
 			   since the height is the content's and the width would follow the
 			   icon down to 17px instead. */
-			width: 29px;
+			width: 1.8125rem;
 			padding-inline: 0;
 			justify-content: center;
 		}
@@ -3266,8 +3267,8 @@
 	   board's row between them is centred on the panel. */
 	.cell-editor .back {
 		flex: none;
-		width: 28px;
-		height: 28px;
+		width: 1.75rem;
+		height: 1.75rem;
 	}
 
 	.board-bar {
@@ -3341,8 +3342,8 @@
 
 	.cell-editor .close {
 		flex: none;
-		width: 28px;
-		height: 28px;
+		width: 1.75rem;
+		height: 1.75rem;
 	}
 
 	/* The count of the cell being typed in, where the row actions were. */

@@ -584,8 +584,8 @@
 	header .close {
 		display: grid;
 		place-items: center;
-		width: 32px;
-		height: 32px;
+		width: 2rem;
+		height: 2rem;
 		padding: 0;
 		border: none;
 		background: none;
@@ -778,8 +778,8 @@
 
 	figcaption input[type='checkbox'] {
 		/* Bigger than the browser default, to match the row it now sits in. */
-		width: 17px;
-		height: 17px;
+		width: 1.0625rem;
+		height: 1.0625rem;
 	}
 
 	/* A dropped page stays legible — you are deciding about it, not deleting it. */

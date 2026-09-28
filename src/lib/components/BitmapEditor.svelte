@@ -905,8 +905,8 @@
 		display: grid;
 		place-items: center;
 		box-sizing: border-box;
-		width: 28px;
-		height: 28px;
+		width: 1.75rem;
+		height: 1.75rem;
 		aspect-ratio: 1;
 		margin-right: 6px;
 		padding: 0;
@@ -952,8 +952,8 @@
 		cursor: pointer;
 		display: grid;
 		place-items: center;
-		width: 30px;
-		height: 30px;
+		width: 1.875rem;
+		height: 1.875rem;
 	}
 
 	.tools button[aria-pressed='true'] {
@@ -975,8 +975,8 @@
 
 	.board input {
 		font: 0.8125rem ui-sans-serif, system-ui, sans-serif;
-		width: 48px;
-		height: 28px;
+		width: 3rem;
+		height: 1.75rem;
 		box-sizing: border-box;
 		border: 1px solid #c9cdd4;
 		border-radius: 6px;
@@ -1027,8 +1027,8 @@
 	/* The colour, as square as the buttons beside it. */
 	.swatch {
 		box-sizing: border-box;
-		width: 30px;
-		height: 30px;
+		width: 1.875rem;
+		height: 1.875rem;
 		padding: 2px;
 		border: 1px solid #c9cdd4;
 		border-radius: 6px;

@@ -88,8 +88,16 @@ export function saveTextSize(scale: number): void {
 }
 
 /** Sets the root font size — see `html` in app.css for what reads it. */
+/**
+ * Sets the root font size — see `html` in app.css for what reads it — and
+ * says on the root whether the text is larger than the default, for the few
+ * layouts that are only right at the default: the phone toolbar centres its
+ * mark over a row that has room for it only while the buttons are small.
+ */
 export function applyTextSize(scale: number): void {
-	document.documentElement.style.setProperty('--text-scale', String(scale));
+	const root = document.documentElement;
+	root.style.setProperty('--text-scale', String(scale));
+	root.toggleAttribute('data-text-larger', scale > 1);
 }
 
 /**
