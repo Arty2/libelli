@@ -16,7 +16,7 @@
 	padding: 8px 12px;
 	border-bottom: 1px solid #ddd;
 	background: #f7f7f7;
-	font: 12px ui-sans-serif, system-ui, sans-serif;
+	font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 }
 
 .box-options {
@@ -29,7 +29,7 @@
 	color: #767676;
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
-	font-size: 10px;
+	font-size: 0.625rem;
 }
 
 .options .field {
@@ -46,7 +46,7 @@
    setting them small and grey was that they read as an annotation rather than
    as a second label. */
 .options .field > span:not(.unit):not(.menu-select) {
-	font-size: 10px;
+	font-size: 0.625rem;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	white-space: nowrap;
@@ -55,7 +55,7 @@
 /* A checkbox's words are its label too, and a bar where half the labels shout
    and half do not looks broken rather than considered. */
 .options .check {
-	font-size: 10px;
+	font-size: 0.625rem;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 }
@@ -66,21 +66,21 @@
 
 .options .edge {
 	color: #999;
-	font-size: 10px;
+	font-size: 0.625rem;
 	width: 0.7rem;
 	text-align: right;
 }
 
 .options .unit {
 	color: #999;
-	font-size: 10px;
+	font-size: 0.625rem;
 }
 
 /* A label with no field of its own to sit inside — the background image is two
    buttons or a name and a menu, depending on whether there is one. Set like
    every other label in the bar, which is what it is. */
 .options .field-label {
-	font-size: 10px;
+	font-size: 0.625rem;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	white-space: nowrap;
@@ -99,10 +99,17 @@
 
 /* Related controls are one group with a rule either side, so the bar reads as
    a handful of subjects rather than thirty loose fields. */
+/* A group wraps inside itself once it is wider than the bar. At the default
+   text size that is only ever a phone, which used to scroll its widest groups
+   sideways; at a larger text size it is a desk too, where an unwrapped group
+   ran off the window and widened the whole document to follow it. */
 .options .group {
 	display: inline-flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
+	max-width: 100%;
+	box-sizing: border-box;
 	padding: 2px 8px;
 	border-left: 1px solid #ddd;
 	border-right: 1px solid #ddd;
@@ -122,7 +129,7 @@
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
-	font-size: 11px;
+	font-size: 0.6875rem;
 	color: #555;
 }
 
@@ -149,7 +156,7 @@
    has to look like one. */
 .options input,
 .options select {
-	font: 12px ui-sans-serif, system-ui, sans-serif;
+	font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 	padding: 3px 2px;
 	border: none;
 	border-bottom: 1px solid var(--border-control);
@@ -237,7 +244,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	font: 12px ui-sans-serif, system-ui, sans-serif;
+	font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 	padding: 5px 10px;
 	border: 1px solid var(--border-control);
 	border-radius: var(--radius-button);
@@ -402,7 +409,7 @@
 	padding: 5px 8px;
 	border-radius: 4px;
 	font: inherit;
-	font-size: 12px;
+	font-size: 0.75rem;
 	text-align: left;
 	cursor: pointer;
 	/* A long template name wraps rather than widening the menu past its cap. */

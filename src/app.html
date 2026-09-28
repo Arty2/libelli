@@ -2,7 +2,18 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!--
+			No browser zoom: a pinch or a Ctrl+wheel off the stage sizes the
+			interface's text instead (src/lib/textsize.ts), and the layout keeps
+			the device's width. `maximum-scale` is also what stops iOS leaping in
+			on a focused field whose text is under 16px. Safari ignores
+			`user-scalable` for a pinch, which is why textsize.ts refuses its
+			`gesture*` events and app.css sets `touch-action` on the root.
+		-->
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no"
+		/>
 		<meta name="description" content="libelli — turn spreadsheet rows into print-ready cards, entirely in your browser." />
 		<meta name="theme-color" content="#ffffff" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
@@ -19,9 +30,40 @@
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 		<meta name="apple-mobile-web-app-title" content="libelli" />
+		<!--
+			The stored text size, on the root before the first paint. Applied from
+			the app's own script instead, a larger size arrived after the page had
+			drawn at 100%, and everything jumped once. Key and bounds are
+			textsize.ts's; textsize.test.ts fails if the two drift apart. Anything
+			unreadable is left alone, which is the default size.
+		-->
+		<script>
+			try {
+				var s = JSON.parse(localStorage.getItem('libelli:ui:text-size'));
+				if (typeof s === 'number' && s >= 0.8 && s <= 2) {
+					document.documentElement.style.setProperty('--text-scale', String(s));
+				}
+			} catch (e) {}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
+		<!--
+			The app renders in the browser only (`ssr = false`), so without
+			JavaScript the page is otherwise blank. Styled inline, and fixed over
+			the whole viewport: app.css arrives with the scripts, if at all.
+		-->
+		<noscript>
+			<div
+				style="position: fixed; inset: 0; display: grid; place-content: center; gap: 12px; padding: 16px; background: #eee; color: #111; font: 1rem/1.5 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; text-align: center"
+			>
+				<strong style="font-size: 1.5rem">libelli</strong>
+				<span>
+					This app runs entirely in your browser — please switch on JavaScript to use it.
+				</span>
+				<a href="https://heracl.es/libelli" style="color: inherit">heracl.es/libelli</a>
+			</div>
+		</noscript>
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>

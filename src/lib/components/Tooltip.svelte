@@ -226,7 +226,7 @@
 		padding: 5px 8px;
 		background: #1f1f1f;
 		color: #fff;
-		font: 12px/1.4 ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem/1.4 ui-sans-serif, system-ui, sans-serif;
 		white-space: pre-line;
 		overflow-wrap: anywhere;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);

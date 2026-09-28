@@ -254,7 +254,7 @@
 		border-bottom: 1px solid var(--border-control);
 		border-radius: 0;
 		background: transparent;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		color: #111;
 		cursor: pointer;
 		text-align: left;
@@ -317,7 +317,7 @@
 		background: none;
 		padding: 5px 8px;
 		border-radius: 4px;
-		font: 13px ui-sans-serif, system-ui, sans-serif;
+		font: 0.8125rem ui-sans-serif, system-ui, sans-serif;
 		color: #111;
 		text-align: left;
 		cursor: pointer;

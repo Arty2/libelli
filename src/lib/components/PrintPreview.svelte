@@ -504,12 +504,12 @@
 
 	h2 {
 		margin: 0;
-		font: 600 14px ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.875rem ui-sans-serif, system-ui, sans-serif;
 	}
 
 	.counts {
 		margin: 0;
-		font: 600 14px ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.875rem ui-sans-serif, system-ui, sans-serif;
 		color: #111;
 	}
 
@@ -571,7 +571,7 @@
 		color: #111;
 		border-radius: var(--radius-button);
 		cursor: pointer;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
 	}
 
@@ -631,13 +631,13 @@
 
 	.checklist {
 		padding: 12px 18px 24px;
-		font: 12px/1.55 ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem/1.55 ui-sans-serif, system-ui, sans-serif;
 		color: #333;
 	}
 
 	.checklist h3 {
 		margin: 0 0 6px;
-		font-size: 11px;
+		font-size: 0.6875rem;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		color: #767676;
@@ -748,7 +748,7 @@
 	   thing about the same pages — 11px grey read as a caption under a picture
 	   rather than as the switch that decides whether the picture goes. */
 	figcaption {
-		font: 600 14px ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.875rem ui-sans-serif, system-ui, sans-serif;
 		color: #555;
 		margin-top: 6px;
 		/* Its width is set inline, from the thumbnail's; centred so a caption

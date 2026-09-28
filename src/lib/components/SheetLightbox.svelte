@@ -211,7 +211,7 @@
 
 	.counter {
 		color: #fff;
-		font: 24px ui-sans-serif, system-ui, sans-serif;
+		font: 1.5rem ui-sans-serif, system-ui, sans-serif;
 		min-width: 9rem;
 		text-align: center;
 	}

@@ -818,7 +818,7 @@
 		height: 100%;
 		min-height: 0;
 		background: #fff;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		color: #111;
 	}
 
@@ -837,7 +837,7 @@
 	}
 
 	.context {
-		font: 700 11px ui-sans-serif, system-ui, sans-serif;
+		font: 700 0.6875rem ui-sans-serif, system-ui, sans-serif;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		color: #555;
@@ -884,7 +884,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		padding: 5px 10px;
 		border: 1px solid #ccc;
 		border-radius: var(--radius-button);
@@ -1038,7 +1038,7 @@
 		width: 30px;
 		height: 30px;
 		padding: 0;
-		font: 600 13px ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.8125rem ui-sans-serif, system-ui, sans-serif;
 		background: #fff;
 		border: 1px solid #c9cdd4;
 		border-radius: 6px;
@@ -1072,15 +1072,6 @@
 
 	.viewer .board.cropping {
 		overflow: hidden;
-	}
-
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
 	}
 
 	.where {
@@ -1165,7 +1156,7 @@
 	}
 
 	.tag {
-		font: 600 9px/1 ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.5625rem/1 ui-sans-serif, system-ui, sans-serif;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		color: #b26a00;
@@ -1198,7 +1189,7 @@
 		align-items: baseline;
 		gap: 8px;
 		margin: 12px 4px 4px;
-		font: 600 11px ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.6875rem ui-sans-serif, system-ui, sans-serif;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		color: #555;
@@ -1262,7 +1253,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 4px;
-		font: 11px ui-sans-serif, system-ui, sans-serif;
+		font: 0.6875rem ui-sans-serif, system-ui, sans-serif;
 		padding: 2px 8px;
 		border: 1px solid #ccc;
 		border-radius: var(--radius-button);
@@ -1290,12 +1281,12 @@
 		background: #fff;
 		border-radius: 10px;
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
-		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+		font: 0.8125rem/1.5 ui-sans-serif, system-ui, sans-serif;
 	}
 
 	.confirm h2 {
 		margin: 0 0 6px;
-		font-size: 16px;
+		font-size: 1rem;
 		overflow-wrap: anywhere;
 	}
 
@@ -1311,7 +1302,7 @@
 	}
 
 	.confirm-actions button {
-		font: 13px ui-sans-serif, system-ui, sans-serif;
+		font: 0.8125rem ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 12px;
 		border: 1px solid #ccc;
 		border-radius: var(--radius-button);
