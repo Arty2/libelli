@@ -353,7 +353,7 @@
 		</label>
 		{#if showSize}
 			<label class="field">
-				<span>W</span>
+				<span>Width</span>
 				<input
 					class="n-3"
 					type="number"
@@ -366,7 +366,7 @@
 				<span class="unit">mm</span>
 			</label>
 			<label class="field">
-				<span>H</span>
+				<span>Height</span>
 				<input
 					class="n-3"
 					type="number"

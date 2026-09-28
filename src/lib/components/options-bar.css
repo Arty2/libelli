@@ -130,8 +130,10 @@
 	padding: 0;
 	margin: 0;
 	white-space: nowrap;
-	font-size: 0.6875rem;
-	font-weight: 600;
+	font-size: 0.625rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 	color: #222;
 }
 

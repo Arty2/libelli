@@ -955,7 +955,7 @@
 		<fieldset class="group">
 			<legend>Lines</legend>
 			<label class="field">
-				<span>Line Height</span>
+				<span>Leading</span>
 				<input
 					class="n-3"
 					type="number"
@@ -995,7 +995,7 @@
 				</label>
 			{/if}
 			<label class="field">
-				<span>Letter Spacing</span>
+				<span>Spacing</span>
 				<input
 					class="n-3"
 					type="number"
@@ -1227,7 +1227,7 @@
 						disabled={boxFrozen}
 						onchange={(e) => patch({ borderHand: e.currentTarget.checked ? true : undefined })}
 					/>
-					Hand-Drawn
+					Draft
 				</label>
 			{/if}
 

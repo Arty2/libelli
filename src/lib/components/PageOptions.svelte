@@ -375,13 +375,6 @@
 					<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
 					{pageFrozen ? 'Unlock' : 'Lock'}
 				</button>
-				<!-- Beside the template's name rather than at the far end of the
-				     bar: the stylesheet is part of the template, travels with it, and
-				     is the last thing anyone would think to look for among page
-				     sizes and margins. -->
-				<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
-					<Icon name="code" size={14} /> CSS{template.css ? ' •' : ''}
-				</button>
 				<label class="field picker" bind:this={pickerEl}>
 					<span>Template</span>
 					<input
@@ -483,6 +476,13 @@
 						</ul>
 					{/if}
 				</label>
+				<!-- After the template's name and its menu rather than at the far end
+				     of the bar: the stylesheet is part of the template, travels with it, and
+				     is the last thing anyone would think to look for among page
+				     sizes and margins. -->
+				<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
+					<Icon name="code" size={14} /> CSS{template.css ? ' •' : ''}
+				</button>
 			</span>
 		</span>
 		<fieldset class="group">
@@ -502,7 +502,7 @@
 				</select>
 			</label>
 			<label class="field">
-				<span>W</span>
+				<span>Width</span>
 				<input
 					class="n-3"
 					type="number"
@@ -516,7 +516,7 @@
 				<span class="unit">mm</span>
 			</label>
 			<label class="field">
-				<span>H</span>
+				<span>Height</span>
 				<input
 					class="n-3"
 					type="number"
@@ -647,7 +647,7 @@
 				/>
 			</span>
 			<label class="field">
-				<span>Line Height</span>
+				<span>Leading</span>
 				<input
 					class="n-3"
 					type="number"
@@ -679,7 +679,7 @@
 				<span class="unit">em</span>
 			</label>
 			<label class="field">
-				<span>Letter Spacing</span>
+				<span>Spacing</span>
 				<input
 					class="n-3"
 					type="number"

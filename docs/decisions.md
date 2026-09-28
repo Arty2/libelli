@@ -2760,16 +2760,16 @@ changed is the grouping and the order:
   opacity, rotation).
 
 Each group is a fieldset whose legend, floated, is the first item of the run and
-the only text set heavier than the labels; a wider gap separates runs, and no
+set in bold capitals, heavier than the labels; a wider gap separates runs, and no
 rule, because the bar wraps and a rule lands wherever the wrap does. A label that
 only repeated its group's name is left to screen readers. A new control goes in
 the group it belongs to rather than on the end.
 
-**Labels say what the thing is in plain words.** *Line Height* rather than
-Leading, *Letter Spacing* rather than a bare Spacing, *Hand-Drawn* rather than
-Draft, *Show Total* rather than of Total, W and H on the page and sheet as on an
-area. The ones the tour and the README teach by name — Hide When Empty, Pages
-per Sheet, Left & Right, Page Bleed — kept theirs.
+**Labels stay one word where one word was there.** Leading, Spacing, Draft,
+Width and Height were tried as longer, plainer phrases and put back: in a bar
+this dense a second word costs more than it explains, and the tip on each field
+says the rest. The group names are set in capitals like the labels, bold, which
+is what tells a group's name from a field's.
 
 **A value taken from the page looks taken; one set here has an ×.** Blank was
 always how an area's field inherited, and nothing on screen said which ones
