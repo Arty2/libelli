@@ -511,7 +511,7 @@
 				<fieldset class="group">
 					<legend>Size</legend>
 					<label class="field">
-						<span>Preset</span>
+						<span class="sr-only">Preset</span>
 						<select
 							value={preset}
 							title="A size worth having to hand, or set the two numbers yourself"
@@ -633,7 +633,7 @@
 				<fieldset class="group">
 					<legend>Page Number</legend>
 					<label class="field">
-						<span>Position</span>
+						<span class="sr-only">Position</span>
 						<select
 							value={template.pageNumber.enabled ? template.pageNumber.position : ''}
 							disabled={pageFrozen}
@@ -783,7 +783,7 @@
 				<fieldset class="group">
 					<legend>Paragraph</legend>
 					<label class="field">
-						<span>Style</span>
+						<span class="sr-only">Paragraph style</span>
 						<select
 							value={template.defaults.paragraph?.mode ?? ''}
 							title="Space after each paragraph, or the first line of the next indented — for every area that sets none of its own. Every line of plain text is a paragraph"

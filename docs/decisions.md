@@ -2755,7 +2755,7 @@ or five wrapped rows of forty controls, all set at one weight, with the groups
 told apart by a faint rule that landed wherever the wrap did — Width had the same
 standing as Blend. Now the head (the lock, the name, what you do to the whole
 thing) sits beside a strip of tabs, and one tab's settings sit under them, each
-subject a small panel with its name over it:
+subject one run — its name in bold, its controls, a rule before the next:
 
 - Page Setup: **Page** (size, margin and left & right, bleed, page number),
   **Text** (type, paragraph, lists), **Paper** (color, image), **Printing**.
@@ -2771,11 +2771,13 @@ both bars, because neither bar lives long enough to remember one — the area ba
 is new for every selection — and are not saved: a bar that reopens on last
 week's tab, with nothing saying why, is the confusing half of that trade.
 
-**The legend is positioned, not floated onto a line of its own.** A floated
-legend is a flex item in a flex fieldset, and a wrapping flex container is as
-wide as all its items side by side, so every fieldset came out one legend
-wider than its contents. Absolutely positioned in the fieldset's top padding,
-the legend adds nothing to the width.
+**No boxes inside the bar.** The first cut drew each fieldset as a small bordered
+panel with its name above: boxes inside a tinted bar, a fourth size of text over
+the labels, and panels as wide as their row rather than their fields. It read as
+messier than the flat bar it replaced. A run is quieter: the legend floated, which
+makes it an ordinary first item rather than the one drawn into the border, and a
+label that only repeated the legend (Size's *Preset*, Page Number's *Position*)
+is left to screen readers. Tabs are underlined words, not a second row of buttons.
 
 **On a phone the bar stays at the top, and its tabs stay put.** A bottom sheet
 was considered and left for now. The bar is still capped at a quarter of the

@@ -161,42 +161,38 @@
 .options .panel {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: stretch;
-	gap: 8px;
+	align-items: center;
+	gap: 8px 12px;
 }
 
-/* One segmented strip: the tab showing is the pressed one, which is how every
-   other either-or in these bars already looks. */
+/* Words, underlined when showing — not a second row of buttons. The bar is
+   already a dense row of pressable things; tabs drawn as buttons were one
+   more, and a grey track behind them was one more surface. */
 .options .tabs {
 	display: inline-flex;
 	gap: 2px;
-	padding: 2px;
-	border-radius: calc(var(--radius-button) + 2px);
-	background: #e9e9e9;
-}
-
-.box-options .tabs {
-	background: var(--accent-soft);
 }
 
 .options .tabs .tab {
 	gap: 6px;
-	padding: 4px 14px;
-	border-color: transparent;
+	padding: 4px 10px;
+	border: none;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
 	background: transparent;
-	color: #444;
+	color: #666;
 	font-weight: 500;
 }
 
 .options .tabs .tab:hover:not([aria-pressed='true']) {
-	border-color: transparent;
-	background: rgba(255, 255, 255, 0.55);
+	color: #111;
+	border-bottom-color: #ccc;
 }
 
 .options .tabs .tab[aria-pressed='true'] {
-	background: #fff;
-	border-color: var(--border-control);
+	background: transparent;
 	color: #111;
+	border-bottom-color: var(--accent);
 }
 
 .options .tabs .dot {
@@ -206,40 +202,39 @@
 	background: var(--accent);
 }
 
-/* Each subject inside a tab is a fieldset with its name above it: a small
-   panel of its own, so where one group ends and the next begins no longer
-   depends on where a wrap happened to fall. The name is set in sentence case
-   and heavier than the uppercase field labels, so it reads as a heading over
-   them rather than as one more label. */
+/* A subject inside a tab is one run: its name, then its controls, then a rule
+   before the next. They were small bordered panels with the name above, which
+   put boxes inside a bar and a fourth size of text over the labels, and a
+   panel as wide as its row rather than as its fields. The name is the only
+   thing set heavier than the labels, so it reads as where a run starts. */
 .options.tabbed fieldset.group {
-	position: relative;
-	display: flex;
-	align-content: flex-start;
-	padding: 22px 10px 6px;
-	border: 1px solid #e2e2e2;
-	border-radius: 6px;
-	background: rgba(255, 255, 255, 0.6);
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	padding: 0 12px 0 0;
+	border: none;
+	border-right: 1px solid #e0e0e0;
 }
 
 .box-options.tabbed fieldset.group {
-	border-color: var(--accent-line);
+	border-right-color: var(--accent-line);
 }
 
-/* Positioned, a legend stops being the one drawn into the fieldset's border
-   and sits in the room the padding leaves over the controls. Not floated onto
-   a line of its own as a flex item, which reads the same: a wrapping flex
-   container is as wide as all its items side by side, so every fieldset came
-   out one legend wider than what was in it. */
+.options.tabbed fieldset.group:last-of-type {
+	border-right: none;
+}
+
+/* Floated, a legend is no longer the one drawn into the fieldset's border but
+   an ordinary child — here the first item of the run. */
 .options.tabbed fieldset.group > legend {
-	position: absolute;
-	top: 4px;
-	left: 10px;
+	float: left;
 	padding: 0;
 	margin: 0;
 	white-space: nowrap;
 	font-size: 0.6875rem;
 	font-weight: 600;
-	color: #333;
+	color: #222;
 }
 
 /* A value taken from somewhere else — the page's size, its font, its list
@@ -681,10 +676,24 @@
 	.options .tabs .tab {
 		flex: 1;
 		justify-content: center;
-		padding: 6px 4px;
+		padding: 8px 4px;
 	}
 
+	/* One run to a line, ruled underneath rather than at the side, where a
+	   rule would stand at the end of a line of nothing. */
 	.options.tabbed fieldset.group {
 		flex: 1 1 100%;
+		padding: 0 0 8px;
+		border-right: none;
+		border-bottom: 1px solid #e0e0e0;
+	}
+
+	.box-options.tabbed fieldset.group {
+		border-bottom-color: var(--accent-line);
+	}
+
+	.options.tabbed fieldset.group:last-of-type {
+		border-bottom: none;
+		padding-bottom: 0;
 	}
 }
