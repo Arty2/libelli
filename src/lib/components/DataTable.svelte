@@ -3389,8 +3389,10 @@
 		border: 1px solid #ccc;
 		border-radius: var(--radius-input);
 		/* Twice the table's: this is where a long cell is read and written at
-		   length, with the whole tray to do it in. */
-		font: 1.625rem/1.5 ui-sans-serif, system-ui, sans-serif;
+		   length, with the whole tray to do it in. In px, not rem, and the one
+		   type in the interface that is: it is already large, and at twice the
+		   text size it was 52px, a few words a line across a phone. */
+		font: 26px/1.5 ui-sans-serif, system-ui, sans-serif; /* fixed type */
 		resize: none;
 	}
 

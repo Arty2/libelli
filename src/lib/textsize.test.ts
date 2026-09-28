@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { TEXT_MAX, TEXT_MIN, clampText, stepText, textChord } from './textsize';
+import { STORE_KEY, TEXT_MAX, TEXT_MIN, clampText, stepText, textChord } from './textsize';
+// Through Vite rather than `node:fs`, as card-interactive.test.ts explains.
+import html from '../app.html?raw';
+
+describe('the pre-paint script in app.html', () => {
+	it('reads the key the app writes', () => {
+		expect(html).toContain(`localStorage.getItem('libelli:${STORE_KEY}')`);
+	});
+
+	it('accepts exactly the range the app clamps to', () => {
+		expect(html).toContain(`s >= ${TEXT_MIN} && s <= ${TEXT_MAX}`);
+	});
+});
 
 const chord = (key: string, over: Partial<KeyboardEvent> = {}) =>
 	({ key, ctrlKey: true, metaKey: false, altKey: false, ...over }) as KeyboardEvent;

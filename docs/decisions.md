@@ -3054,9 +3054,17 @@ one snapped on its own would round back to where it began, so the wheel keeps
 its own unsnapped total. Its rate is 600 per e-fold against the stage's 220:
 the stage's rate took the interface from 100% to the ceiling in two notches.
 
-The stored size is applied from the page's first effect rather than from a
-script in `app.html`, so a larger size shows as one reflow on load. A script in
-the head would need its own exception in any script policy, for a flash.
+The stored size goes on the root from a few lines of inline script in
+`app.html`, before the first paint. Applied from the app's own first effect, a
+larger size arrived after the page had drawn at 100% and everything jumped
+once. The script repeats the storage key and the bounds, and
+`textsize.test.ts` reads `app.html` to hold them to `textsize.ts`'s. It is the
+app's one inline script; the CSP is `frame-ancestors` only, so nothing refuses
+it — a `script-src` added later has to allow it by hash.
+
+**The full-size cell editor's type does not scale.** It is 26px, twice the
+table's, already large; at 200% it was 52px, a few words a line on a phone. It
+is the one `px` size gate 9 lets through, marked `/* fixed type */` on its line.
 
 ## `src/lib/components/Tooltip.svelte` and `src/lib/tooltip.ts`
 

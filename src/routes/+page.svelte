@@ -727,10 +727,9 @@
 	// No reactive reads, so this runs once and its return value is the cleanup.
 	$effect(() => watchInstall((available) => (installable = available)));
 
-	// Read once and put on the root before anything else is measured. Until
-	// then the interface is at the browser's default, so a larger stored size
-	// shows as one reflow on load — the price of keeping the script out of
-	// app.html, where it would need its own exception in a policy.
+	// Read once into the state Help shows. The root already has it: the
+	// script in app.html put it there before the first paint, so setting it
+	// again here changes nothing on screen.
 	$effect(() => {
 		untrack(() => setTextSize(loadTextSize()));
 		return zoomAsText(() => untrack(() => textSize), setTextSize);

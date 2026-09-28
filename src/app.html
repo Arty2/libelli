@@ -30,6 +30,21 @@
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 		<meta name="apple-mobile-web-app-title" content="libelli" />
+		<!--
+			The stored text size, on the root before the first paint. Applied from
+			the app's own script instead, a larger size arrived after the page had
+			drawn at 100%, and everything jumped once. Key and bounds are
+			textsize.ts's; textsize.test.ts fails if the two drift apart. Anything
+			unreadable is left alone, which is the default size.
+		-->
+		<script>
+			try {
+				var s = JSON.parse(localStorage.getItem('libelli:ui:text-size'));
+				if (typeof s === 'number' && s >= 0.8 && s <= 2) {
+					document.documentElement.style.setProperty('--text-scale', String(s));
+				}
+			} catch (e) {}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

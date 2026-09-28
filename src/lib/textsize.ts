@@ -27,7 +27,12 @@ export const TEXT_STEPS = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] as const;
 export const TEXT_MIN = TEXT_STEPS[0];
 export const TEXT_MAX = TEXT_STEPS[TEXT_STEPS.length - 1];
 
-const STORE_KEY = 'ui:text-size';
+/**
+ * Where the size is kept, under storage.ts's `libelli:` prefix. The inline
+ * script in app.html reads the same key and the same bounds before the first
+ * paint — textsize.test.ts holds the two together.
+ */
+export const STORE_KEY = 'ui:text-size';
 
 /**
  * A scale brought into range and onto a 5% grid.
