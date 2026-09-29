@@ -2924,25 +2924,48 @@ conditionals and no loops, and substitution is a single `replace`: the value a
 placeholder becomes is never scanned again. That one pass is the whole of the
 guard against recursion — a cell naming itself, or two naming each other,
 cannot loop because there is no second pass to loop in — and it is simpler to
-trust than a depth limit, which would print a half-expanded chain. A column
-called `date` beats the date, because naming a column that is a choice; a format
-after the colon only means the date. Names are matched as written, then in
+trust than a depth limit, which would print a half-expanded chain. Names are matched as written, then in
 column-name shape (`columnName` in parse.ts), then ignoring case, so a template
 written against `Artist Name` keeps working after the header is normalised.
 Anything unrecognised is returned exactly as written, which is what stops a
 cell that happens to contain braces being eaten. No time of day either — a card is printed
 once and read for months, and a timestamp on paper is stale before the ink dries.
 
-**A lookup names a row by its place, not by a key.** `{{lookup:3:price}}` is
-the third row of the table as it now stands — the order the cards print in —
-because a value to search for could sit in any column and in several rows, and
-a lookup that silently took the first match would print the wrong price with
-nothing to mark it. It is still one pass, so what it finds is never read for
+**Keywords beat columns.** `date` and `lookup` always mean themselves, and a
+column that happens to be called either cannot be reached as `{{name}}`. It
+used to be the other way — a column called `date` was the more specific
+answer — but that made what a template says depend on the table under it: the
+same `{{date}}` printed today on one table and a cell on the next. A keyword
+now reads the same everywhere, and the cost, a column that cannot be quoted by
+name, is made loud instead of silent: DataTable titles it red, and the app
+says why in the status line once each time the set of such columns changes,
+not on every edit. It is still reachable from another row, `{{lookup:N:date}}`,
+and bound to an area it prints as ever.
+
+**A lookup names a row by its number, not by a key.** `{{lookup:3:price}}` is
+the row wearing 3 in the table, because a value to search for could sit in any
+column and in several rows, and a lookup that silently took the first match
+would print the wrong price with nothing to mark it. The number, not the
+place: sorting rewrites `dataset.rows`, and a sort done to read the table must
+not change what every card quotes. So the numbers are stored with the table,
+as `Dataset.order` — one arrival number per position — rather than as the
+array of row objects DataTable used to keep in the session (`unsorted`).
+That array found rows by identity, and every edit that rebuilds rows (a
+column renamed, a cell written from the card, an undo) made new objects, so
+the numbers quietly fell back to positions and the lookups moved with them.
+By position, an edit in place keeps them for free; the edits that do move
+rows say what happens to the numbers, in table.ts: a sort carries them, new
+rows take the next ones, a delete closes the gap, and a move by hand or a
+replaced table forgets them, since where rows are put by hand is their order.
+Being part of the dataset, the order is saved, reloaded and undone with it.
+`orderOf` checks it fits before anything believes it, and an order that
+says nothing the positions do not is left off. `rowNumber` is the one rule
+the row labels and `inArrivalOrder`, which the lookups read, both use, so the
+two cannot drift apart. It is still one pass, so what a lookup finds is never read for
 placeholders, and reaching a cell's own column in its own row is marked the
-way `{{self}}` is. It sits after the column check, like the date, so a column
-called `lookup` keeps its find and replace. `Card` takes `rows` as a required
-prop rather than a defaulted one: a renderer that forgot it would print braces
-on paper while the editor showed the value.
+way `{{self}}` is. `Card` takes `rows` as a required prop rather than a
+defaulted one: a renderer that forgot it would print braces on paper while
+the editor showed the value.
 
 Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
 mode; `rawContentOf` beside it is what the inline editor shows, because typing

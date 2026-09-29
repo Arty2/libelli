@@ -56,7 +56,8 @@
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { cssIdent } from '$lib/css';
 	import { watchPresses } from '$lib/haptics';
-	import { formatDate, referencedColumns } from '$lib/placeholders';
+	import { KEYWORDS, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
+	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
 	import { TEXT_MAX, TEXT_MIN, applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
@@ -552,6 +553,33 @@
 			}
 		}
 		return used;
+	});
+
+	/**
+	 * The rows in the order of the numbers the table shows them with — where
+	 * they arrived, not where a sort has put them — which is what
+	 * `{{lookup:N:…}}` counts in. See `Dataset.order`.
+	 */
+	const lookupRows = $derived(inArrivalOrder(dataset));
+
+	/**
+	 * Columns a keyword has taken — `date`, `lookup` — which `{{name}}` can
+	 * never reach. The table colours them; the status line says why, once per
+	 * set of them, so it is said when one appears and not on every keystroke.
+	 */
+	const keywordColumns = $derived(dataset.columns.filter(isKeyword));
+	let keywordsSaid = '';
+	$effect(() => {
+		const said = keywordColumns.join('\n');
+		if (said === keywordsSaid) return;
+		keywordsSaid = said;
+		if (!keywordColumns.length) return;
+		const names = keywordColumns.map((c) => `“${c}”`).join(' and ');
+		const words = KEYWORDS.map((k) => `{{${k}}}`).join(' and ');
+		notify(
+			`${names} ${keywordColumns.length === 1 ? 'is a name' : 'are names'} the template keeps for itself: ${words} never mean a column, so rename ${keywordColumns.length === 1 ? 'it' : 'them'} to print ${keywordColumns.length === 1 ? 'it' : 'them'} with {{…}}.`,
+			'warning'
+		);
 	});
 
 	// ---- boot ---------------------------------------------------------------
@@ -1846,7 +1874,9 @@
 	function renameDataset(name: string) {
 		const wanted = name.trim();
 		describe('Rename the table');
-		dataset = wanted ? { ...dataset, name: wanted } : { columns: dataset.columns, rows: dataset.rows };
+		// Clearing the name removes it, and only it: the lock and the rows' order stay.
+		const { name: _name, ...unnamed } = dataset;
+		dataset = wanted ? { ...dataset, name: wanted } : unnamed;
 	}
 
 	/**
@@ -2838,7 +2868,7 @@
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
 			{activeRow}
 			rowCount={dataset.rows.length}
-			rows={dataset.rows}
+			rows={lookupRows}
 			onactivate={(i) => (activeRow = i)}
 			onlightbox={() => (lightboxOpen = true)}
 			{background}
@@ -3351,6 +3381,7 @@
 	<PrintPreview
 		{template}
 		{dataset}
+		{lookupRows}
 		{mapping}
 		{activeRow}
 		{background}
@@ -3378,6 +3409,7 @@
 	<Lightbox
 		{template}
 		{dataset}
+		{lookupRows}
 		{mapping}
 		{background}
 		{images}
@@ -3391,6 +3423,7 @@
 	<PrintRoot
 		{template}
 		{dataset}
+		{lookupRows}
 		{mapping}
 		{background}
 		{images}

@@ -2,11 +2,13 @@
 	import PrintSheet from './PrintSheet.svelte';
 	import { planSheets, resolveImposition } from '$lib/imposition';
 	import { bleedFor } from '$lib/layout';
-	import type { Dataset, Mapping, Template } from '$lib/types';
+	import type { Dataset, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
 		dataset: Dataset;
+		/** the rows in the order the table numbers them, for a card's `{{lookup:…}}` */
+		lookupRows: readonly Row[];
 		mapping: Mapping;
 		background: string | null;
 		/** stored images by name, for the areas whose cells point at one */
@@ -22,6 +24,7 @@
 	let {
 		template,
 		dataset,
+		lookupRows,
 		mapping,
 		background,
 		images = {},
@@ -82,7 +85,7 @@
 			{printBackground}
 			{cells}
 			pageCount={dataset.rows.length}
-			rows={dataset.rows}
+			rows={lookupRows}
 		/>
 	{/each}
 </div>

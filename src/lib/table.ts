@@ -39,8 +39,11 @@ export function compareCells(a: string, b: string): number {
 export function sortRows(dataset: Dataset, column: string, direction: SortDirection): Dataset {
 	if (!dataset.columns.includes(column)) return dataset;
 	const sign = direction === 'desc' ? -1 : 1;
-	const rows = dataset.rows
-		.map((row, index) => ({ row, index }))
+	const order = orderOf(dataset);
+	const sorted = dataset.rows
+		// Each row carries its number with it; the first sort of a table is
+		// what writes one down.
+		.map((row, index) => ({ row, index, number: order?.[index] ?? index }))
 		.sort((a, b) => {
 			const compared = compareCells(a.row[column] ?? '', b.row[column] ?? '');
 			// Blanks stay at the bottom in both directions, and equal cells keep
@@ -48,9 +51,11 @@ export function sortRows(dataset: Dataset, column: string, direction: SortDirect
 			if (compared === 0) return a.index - b.index;
 			const bothPresent = (a.row[column] ?? '').trim() !== '' && (b.row[column] ?? '').trim() !== '';
 			return bothPresent ? compared * sign : compared;
-		})
-		.map((entry) => entry.row);
-	return { ...dataset, rows };
+		});
+	return settle(
+		{ ...dataset, rows: sorted.map((entry) => entry.row) },
+		sorted.map((entry) => entry.number)
+	);
 }
 
 /** Where a row ends up after a sort, so the previewed card can follow it. */
@@ -59,6 +64,84 @@ export function indexAfterSort(dataset: Dataset, sorted: Dataset, index: number)
 	if (!row) return 0;
 	const moved = sorted.rows.indexOf(row);
 	return moved === -1 ? 0 : moved;
+}
+
+/**
+ * The order the rows arrived in, when the dataset carries one that fits — see
+ * `Dataset.order`. Checked rather than trusted: it is read back out of
+ * storage, and an order that no longer matches its rows is worse than none,
+ * because it would put wrong numbers on rows and send lookups to them.
+ */
+export function orderOf(dataset: Dataset): number[] | null {
+	const order = dataset.order;
+	if (!order || order.length !== dataset.rows.length) return null;
+	const seen = new Set(order);
+	if (seen.size !== order.length || order.some((n) => !Number.isInteger(n) || n < 0 || n >= order.length)) return null;
+	return order;
+}
+
+/**
+ * An order that says nothing the positions do not is left off, so a table
+ * that was sorted and put back is stored exactly as one never sorted.
+ */
+function settle(dataset: Dataset, order: number[] | undefined): Dataset {
+	const { order: _old, ...rest } = dataset;
+	return order && order.some((n, i) => n !== i) ? { ...rest, order } : rest;
+}
+
+/** Ranks, so an order with gaps in it (rows deleted) counts 0, 1, 2… again. */
+function compact(order: number[]): number[] {
+	const ranked = [...order].sort((a, b) => a - b);
+	return order.map((n) => ranked.indexOf(n));
+}
+
+/**
+ * The number a row wears in the table: where it arrived, not where a sort
+ * has put it, so sorting carries every number along with its row.
+ */
+export function rowNumber(dataset: Dataset, index: number): number {
+	return (orderOf(dataset)?.[index] ?? index) + 1;
+}
+
+/**
+ * The rows put back in the order of their numbers, so that the third of them
+ * is the row labelled 3 — what `{{lookup:3:…}}` means. A lookup follows the
+ * number rather than the place because sorting a table to read it must not
+ * change what every card quotes.
+ */
+export function inArrivalOrder(dataset: Dataset): Row[] {
+	const order = orderOf(dataset);
+	if (!order) return [...dataset.rows];
+	const rows: Row[] = new Array(order.length);
+	order.forEach((n, i) => (rows[n] = dataset.rows[i]));
+	return rows;
+}
+
+/** The table back in the order it arrived in: what "unsort" does. */
+export function unsortRows(dataset: Dataset): Dataset {
+	return settle({ ...dataset, rows: inArrivalOrder(dataset) }, undefined);
+}
+
+/**
+ * Rows moved by hand, or a table replaced: the order they now stand in is
+ * the order from here on, and the numbers follow it.
+ */
+export function withoutOrder(dataset: Dataset): Dataset {
+	return settle(dataset, undefined);
+}
+
+/** New rows at the end, taking the next numbers. */
+export function appendRows(dataset: Dataset, rows: Row[]): Dataset {
+	const order = orderOf(dataset);
+	const next = { ...dataset, rows: [...dataset.rows, ...rows] };
+	return settle(next, order ? [...order, ...rows.map((_, i) => order.length + i)] : undefined);
+}
+
+/** Rows taken out; the rest close up, keeping the order they had between them. */
+export function deleteRows(dataset: Dataset, gone: ReadonlySet<number>): Dataset {
+	const order = orderOf(dataset);
+	const next = { ...dataset, rows: dataset.rows.filter((_, i) => !gone.has(i)) };
+	return settle(next, order ? compact(order.filter((_, i) => !gone.has(i))) : undefined);
 }
 
 /**

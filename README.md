@@ -218,18 +218,23 @@ resize boxes directly, or type exact millimetres.
   would otherwise print as the literal braces.
   `{{date}}` prints today's date, and `{{date:YYYY-MM-DD}}` prints it in a
   format of your own: `YYYY`, `YY`, `MM`, `DD` for the numbers, `MMMM`, `MMM`,
-  `dddd`, `ddd` for the names. A column called `date` wins over the date; a
-  format after the colon only ever means the date. After a column, a find and
+  `dddd`, `ddd` for the names. After a column, a find and
   a replace change it on the way in: `{{title:words:that}}` swaps every
   `words` for `that`, `{{title: :-}}` puts hyphens for spaces, and an empty
   replacement deletes. Literal and case-sensitive, never a pattern; the find
   ends at the first colon, so the replacement may hold colons, and a colon to
   *find* is written `\:` — `{{time:\:: h }}` turns `9:30` into `9 h 30`.
-  `{{lookup:3:price}}` reaches past the card's own row: the `price` of the
-  table's third row, counting from 1 in the order the cards print — one row of
-  prices or a legend that every card quotes. A row is named by its place, never
-  by what it holds; one that is not there is underlined like any unknown name.
-  A column called `lookup` wins, as one called `date` does. Deliberately small — no
+  `{{lookup:3:price}}` reaches past the card's own row: the `price` of the row
+  **numbered 3** in the table — one row of prices or a legend that every card
+  quotes. The number, not the place: sorting the table carries its numbers
+  along — they are saved with the table — and a lookup follows them, so
+  sorting to read the table never changes what the cards say. Moving rows by
+  hand renumbers them. A row is named by its number, never by what it holds; one
+  that is not there is underlined like any unknown name.
+  `date` and `lookup` are the template's own words and always mean themselves:
+  a column called either is **titled in red** in the table, with a note in the
+  status line, because `{{date}}` will print the date and never that column —
+  rename it, or reach it from another row with `{{lookup:3:date}}`. Deliberately small — no
   conditionals, no loops — and anything in braces it does not recognise is left
   exactly as written. No time of day: a card is printed once and read for
   months.

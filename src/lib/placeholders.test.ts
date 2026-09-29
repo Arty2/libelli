@@ -3,6 +3,7 @@ import {
 	UNKNOWN_CLOSE,
 	UNKNOWN_OPEN,
 	applyPlaceholders,
+	isKeyword,
 	findColumn,
 	formatDate,
 	openPlaceholder,
@@ -76,10 +77,17 @@ describe('applyPlaceholders', () => {
 		);
 	});
 
-	it('lets a column called date win, but a format always means the date', () => {
-		const row = { date: 'Spring' };
-		expect(applyPlaceholders('{{date}}', { row, now: DAY })).toBe('Spring');
-		expect(applyPlaceholders('{{date:YYYY}}', { row, now: DAY })).toBe('2026');
+	it('means the date even where a column is called date', () => {
+		const row = { Date: 'Spring' };
+		expect(applyPlaceholders('{{date}}', { row, now: DAY })).toBe('7 September 2026');
+		expect(applyPlaceholders('{{DATE:YYYY}}', { row, now: DAY })).toBe('2026');
+		expect(applyPlaceholders('{{date:a:b}}', { row, now: DAY })).toBe('a:b');
+		expect(referencedColumns('{{date}}', ['Date'])).toEqual([]);
+	});
+
+	it('knows which column names a keyword takes', () => {
+		expect(['date', 'Date', 'LOOKUP', ' lookup '].every(isKeyword)).toBe(true);
+		expect(['dates', 'look-up', 'title'].some(isKeyword)).toBe(false);
 	});
 });
 
@@ -126,6 +134,10 @@ describe('typing a placeholder', () => {
 	it('offers columns that start with it first, then ones that contain it, and the date', () => {
 		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual(['title', 'subtitle', 'date']);
 		expect(placeholderChoices('', ['a'])).toEqual(['a', 'date']);
+		// A column a keyword has taken is not offered as itself…
+		expect(placeholderChoices('', ['Date', 'lookup', 'a'])).toEqual(['a', 'date']);
+		// …but is, after a lookup, which is the one way to reach it.
+		expect(placeholderChoices('lookup:2:', ['Date'])).toEqual(['lookup:2:Date']);
 	});
 });
 
@@ -201,9 +213,11 @@ describe('a lookup into another row', () => {
 		expect(applyPlaceholders('{{lookup:1:note}}', { row: rows[1], rows, self: 'note' })).toBe('{{title}}');
 	});
 
-	it('gives way to a column somebody called lookup', () => {
-		const row = { lookup: 'a2b' };
-		expect(applyPlaceholders('{{lookup:2:-}}', { row, rows: [row] })).toBe('a-b');
+	it('does not give way to a column somebody called lookup, but can reach it', () => {
+		const row = { Lookup: 'a2b' };
+		expect(applyPlaceholders('{{lookup:2:-}}', { row, rows: [row] })).toBe('{{lookup:2:-}}');
+		expect(applyPlaceholders('{{lookup}}', { row, rows: [row] })).toBe('{{lookup}}');
+		expect(applyPlaceholders('{{lookup:1:lookup}}', { row: null, rows: [row] })).toBe('a2b');
 	});
 
 	it('counts as naming the column it looks up', () => {

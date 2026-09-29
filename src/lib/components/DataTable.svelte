@@ -9,7 +9,23 @@
 	import type { Grid } from '$lib/bitmap';
 	import BitmapEditor from './BitmapEditor.svelte';
 	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
-	import { countText, dropTarget, indexAfterSort, moveColumn, moveRows, moveRowsTo, sortRows, type SortDirection } from '$lib/table';
+	import { isKeyword } from '$lib/placeholders';
+	import {
+		appendRows,
+		countText,
+		deleteRows,
+		dropTarget,
+		indexAfterSort,
+		moveColumn,
+		moveRows,
+		moveRowsTo,
+		orderOf,
+		rowNumber,
+		sortRows,
+		unsortRows,
+		withoutOrder,
+		type SortDirection
+	} from '$lib/table';
 	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
 	import type { Dataset, Row, RowHeight } from '$lib/types';
 
@@ -548,7 +564,6 @@
 		if (tableId === shown) return;
 		shown = tableId;
 		sortedBy = null;
-		unsorted = null;
 		selectedRows = new Set();
 		expanded = new Set();
 	});
@@ -812,13 +827,6 @@
 	// Which column the rows were last sorted by, so the header can show it and
 	// a second click can turn it round.
 	let sortedBy = $state<{ column: string; direction: SortDirection } | null>(null);
-	/**
-	 * The order the rows were in before any of that. Sorting rewrites the array,
-	 * so "unsort" has nowhere to go unless the order is kept: this is taken once,
-	 * when an unsorted table is sorted, and handed back by the button in the
-	 * row-number header.
-	 */
-	let unsorted = $state<Row[] | null>(null);
 	let pasteText = $state('');
 	/** Two rows of two tab-separated cells: what comes off a spreadsheet. */
 	const PASTE_EXAMPLE = 'Bellwether\tA quiet start\nCatalogue\tThe second card';
@@ -922,28 +930,12 @@
 		if (locked) return;
 		const before = dataset.rows[rowIndex];
 		const after = { ...before, [column]: value };
-		// The label a row wears comes from finding it in `unsorted`, and rows are
-		// found there by identity — editing a cell makes a new object, so the copy
-		// held there has to be swapped for it or the number would fall back to the
-		// row's position and the labels would silently start renumbering again.
-		if (unsorted) unsorted = unsorted.map((r) => (r === before ? after : r));
 		onchange({ ...dataset, rows: dataset.rows.map((r, i) => (i === rowIndex ? after : r)) });
 	}
 
-	/**
-	 * The number a row wears.
-	 *
-	 * Its place in the order the rows arrived in, not its place in the table, so
-	 * sorting carries every number along with the row it belongs to and you can
-	 * see where a row came from. Falls back to the position whenever the row
-	 * cannot be found in that order — which is what makes this safe against every
-	 * structural edit, including the ones below that keep `unsorted` in step.
-	 */
-	function rowLabel(row: Row, index: number): number {
-		if (!unsorted) return index + 1;
-		const at = unsorted.indexOf(row);
-		return at === -1 ? index + 1 : at + 1;
-	}
+	/** The number a row wears — see `rowNumber`. */
+	const rowLabel = (index: number): number => rowNumber(dataset, index);
+
 
 	function renameColumn(index: number, name: string, field?: HTMLInputElement) {
 		const from = dataset.columns[index];
@@ -964,7 +956,7 @@
 			for (const c of dataset.columns) next[c === from ? to : c] = row[c] ?? '';
 			return next;
 		});
-		onchange({ columns, rows });
+		onchange({ ...dataset, columns, rows });
 		onrenamecolumn(from, to);
 		// A width belongs to the column, not to the name it had at the time.
 		if (from in columnWidths) {
@@ -1000,7 +992,6 @@
 		const sorted = sortRows(dataset, column, direction);
 		// The previewed card follows its row rather than staying on a position.
 		const previewed = indexAfterSort(dataset, sorted, activeRow);
-		if (!sortedBy) unsorted = dataset.rows;
 		sortedBy = { column, direction };
 		selectedRows = new Set();
 		expanded = new Set();
@@ -1010,11 +1001,10 @@
 
 	/** Back to the order the rows arrived in, wherever the sorting took them. */
 	function clearSort() {
-		if (!unsorted || locked) return;
-		const restored = { ...dataset, rows: unsorted };
+		if (!orderOf(dataset) || locked) return;
+		const restored = unsortRows(dataset);
 		const previewed = indexAfterSort(dataset, restored, activeRow);
 		sortedBy = null;
-		unsorted = null;
 		selectedRows = new Set();
 		expanded = new Set();
 		onchange(restored);
@@ -1047,6 +1037,7 @@
 		// had one + in the header, and using it left you exactly as stuck.
 		const filling = !dataset.rows.length;
 		onchange({
+			...dataset,
 			columns,
 			rows: filling ? [emptyRow(columns)] : dataset.rows.map((r) => ({ ...r, [column]: '' }))
 		});
@@ -1070,6 +1061,7 @@
 		const column = dataset.columns[index];
 		if (column === undefined) return;
 		onchange({
+			...dataset,
 			columns: dataset.columns.filter((_, i) => i !== index),
 			rows: dataset.rows.map((row) => {
 				const next = { ...row };
@@ -1092,8 +1084,7 @@
 		if (column) row[column] = value;
 		// Appended to the arrival order too, so it takes the next number rather
 		// than inheriting whichever row happens to sit where it landed.
-		if (unsorted) unsorted = [...unsorted, row];
-		onchange({ ...dataset, rows: [...dataset.rows, row] });
+		onchange(appendRows(dataset, [row]));
 		onactivate(dataset.rows.length);
 	}
 
@@ -1182,9 +1173,9 @@
 		// carrying an unchosen row does not tick it.
 		const picked = new Set(chosenRows.map((i) => dataset.rows[i]));
 		sortedBy = null;
-		unsorted = null;
 		selectedRows = new Set(rows.flatMap((row, i) => (picked.has(row) ? [i] : [])));
-		onchange({ ...dataset, rows });
+		// Moved by hand: where they now stand is their order, numbers included.
+		onchange(withoutOrder({ ...dataset, rows }));
 		const at = rows.indexOf(active);
 		if (at !== -1 && at !== activeRow) onactivate(at);
 	}
@@ -1232,9 +1223,8 @@
 		if (rows === dataset.rows) return;
 		const active = dataset.rows[activeRow];
 		sortedBy = null;
-		unsorted = null;
 		selectedRows = new Set(chosen);
-		onchange({ ...dataset, rows });
+		onchange(withoutOrder({ ...dataset, rows }));
 		const at = rows.indexOf(active);
 		if (at !== -1 && at !== activeRow) onactivate(at);
 	}
@@ -1243,11 +1233,10 @@
 		if (locked) return;
 		const gone = new Set(chosenRows);
 		if (!gone.size) return;
-		const rows = dataset.rows.filter((_, i) => !gone.has(i));
-		const dropped = dataset.rows.filter((_, i) => gone.has(i));
-		if (unsorted) unsorted = unsorted.filter((r) => !dropped.includes(r));
+		const next = deleteRows(dataset, gone);
+		const rows = next.rows;
 		selectedRows = new Set();
-		onchange({ ...dataset, rows });
+		onchange(next);
 		if (activeRow >= rows.length) onactivate(Math.max(0, rows.length - 1));
 		onnotice(`Deleted ${gone.size} row${gone.size === 1 ? '' : 's'}. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`);
 	}
@@ -1289,13 +1278,12 @@
 		const rows = dataset.columns.length ? realign(parsed) : parsed.rows;
 		const columns = dataset.columns.length ? dataset.columns : parsed.columns;
 		if (mode === 'append') {
-			onchange({ columns, rows: [...dataset.rows, ...rows] });
+			onchange(appendRows({ ...dataset, columns }, rows));
 		} else {
 			onchange({ columns, rows });
 			onactivate(0);
 		}
 		sortedBy = null;
-		unsorted = null;
 		selectedRows = new Set();
 		onnotice(`${rows.length} row${rows.length === 1 ? '' : 's'} ${mode === 'append' ? 'added' : 'loaded'}.`);
 	}
@@ -1416,10 +1404,12 @@
 								onclick={toggleAll}
 							><Icon name={allChosen ? 'checkbox-checked' : someChosen ? 'checkbox-indeterminate' : 'checkbox'} size={14} /></button>
 						{/if}
-						{#if sortedBy}
+						{#if sortedBy || orderOf(dataset)}
+							<!-- A sort survives a reload, as the numbers it left on the rows;
+							     which column did it is only remembered for the session. -->
 							<button
 								class="icon unsort"
-								title="Sorted by “{sortedBy.column}” — press to put the rows back in the order they arrived in"
+								title="{sortedBy ? `Sorted by “${sortedBy.column}”` : 'Sorted'} — press to put the rows back in the order they arrived in"
 								aria-label="Clear the sorting"
 								disabled={locked}
 								onclick={clearSort}
@@ -1455,13 +1445,17 @@
 								     to the column, where a new area goes. -->
 								<button
 									class="icon unused"
-									title="No area uses “{column}” — press to place it on the card, or write {`{{${column}}}`} in an area"
+									title="No area uses “{column}” — press to place it on the card{isKeyword(column) ? '' : `, or write {{${column}}} in an area`}"
 									aria-label="Place {column} on the card"
 									onclick={() => onplacecolumn(column)}
 								><Icon name="unlink" size={12} /></button>
 							{/if}
 							<input
 								class="column-name"
+								class:keyword={isKeyword(column)}
+								title={isKeyword(column)
+									? `{{${column.toLowerCase()}}} is the template’s own word, so it never means this column — rename it to print it with {{…}}`
+									: undefined}
 								value={column}
 								readonly={locked}
 								aria-label="Rename column {column}"
@@ -1559,7 +1553,7 @@
 								role="checkbox"
 								aria-checked={selectedRows.has(i)}
 								title="Choose this row as well"
-								aria-label="Choose row {rowLabel(row, i)}"
+								aria-label="Choose row {rowLabel(i)}"
 								onclick={(e) => {
 									// Not the row's own click: the tick builds a set without
 									// moving the preview off the card you are looking at.
@@ -1591,7 +1585,7 @@
 									e.stopPropagation();
 									toggleExpanded(i);
 								}}
-							>{rowLabel(row, i)}</span>
+							>{rowLabel(i)}</span>
 							</span>
 						</td>
 						{#each dataset.columns as column, c (column)}
@@ -1622,7 +1616,7 @@
 									<img
 										class="cell-picture"
 										src={picture}
-										alt="{column}, row {rowLabel(row, i)}"
+										alt="{column}, row {rowLabel(i)}"
 										title={locked
 											? undefined
 											: localImageName(row[column])
@@ -1638,7 +1632,7 @@
 								     this?" everywhere. -->
 								<textarea
 									rows="1"
-									aria-label="{column}, row {rowLabel(row, i)}"
+									aria-label="{column}, row {rowLabel(i)}"
 									value={row[column] ?? ''}
 									readonly={locked}
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
@@ -1671,7 +1665,7 @@
 									tabindex="-1"
 									disabled={locked}
 									title="Show all of this cell"
-									aria-label="Show all of {column}, row {rowLabel(row, i)}"
+									aria-label="Show all of {column}, row {rowLabel(i)}"
 									onclick={(e) => {
 										e.stopPropagation();
 										openBigCell(i, column);
@@ -2343,6 +2337,13 @@
 		flex: 1 1 auto;
 		min-width: 0;
 		padding: 3px 2px;
+	}
+
+	/* A name a keyword has taken: `{{date}}` will never print this column,
+	   and nothing else would say so — the template reads fine and prints the
+	   date. The warning red the status line and the card's marks use. */
+	.column-name.keyword {
+		color: #b42318;
 	}
 
 	.column-head:hover .column-name:not([readonly]) {

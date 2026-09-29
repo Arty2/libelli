@@ -9,8 +9,16 @@
  * every row the next time.
  *
  * And `{{lookup:3:title}}` reaches past the card's own row: the title of the
- * table's third row, counting from 1 in the order the cards print. A price list, a
- * legend, a "next up" — one row that every card quotes.
+ * row numbered 3 in the table. A price list, a legend, a "next up" — one row
+ * that every card quotes.
+ *
+ * `date` and `lookup` are keywords, and a keyword always wins: a column that
+ * happens to be called either cannot be written as `{{date}}` or `{{lookup}}`,
+ * only reached from another row by a lookup. The table marks such a column,
+ * because a template that meant it would otherwise print the date instead,
+ * silently. The other way round — the column winning — made what `{{date}}`
+ * means depend on the table under it, so a template could not be read on its
+ * own.
  *
  * Deliberately small. There are no conditionals, no loops and no arithmetic,
  * and substitution happens once: what a placeholder is replaced with is never
@@ -35,8 +43,10 @@ export interface PlaceholderContext {
 	/** the row the card is drawing; its columns are the names `{{…}}` can use */
 	row?: Row | null;
 	/**
-	 * Every row of the table, for `{{lookup:ROW:COLUMN}}`. Without them a
-	 * lookup names nothing, and is left as written like any other.
+	 * Every row of the table, for `{{lookup:ROW:COLUMN}}`, in the order of the
+	 * numbers the table shows — where rows arrived, not where a sort has put
+	 * them — so `lookup:3` is the row labelled 3. See `inArrivalOrder` in
+	 * table.ts. Without them a lookup names nothing, and is left as written.
 	 */
 	rows?: readonly Row[];
 	/**
@@ -117,11 +127,9 @@ export function formatDate(date: Date, format: string = DEFAULT_DATE_FORMAT): st
 }
 
 /**
- * The placeholders themselves. `{{name}}` is a column when the row has one by
- * that name, and `{{date}}` or `{{date:FORMAT}}` otherwise. A column wins over
- * the date because it is the more specific of the two — somebody who named a
- * column `date` meant that column — but a format after the colon only ever
- * means the date, since a column has nothing to format.
+ * The placeholders themselves. `{{date}}` or `{{date:FORMAT}}` is the date and
+ * `{{lookup:ROW:COLUMN}}` a lookup, whatever the table holds; any other
+ * `{{name}}` is a column when the row has one by that name.
  *
  * After a column, two more parts are a find and a replace:
  * `{{title:words:that}}` is the title with every `words` made `that`, and
@@ -143,14 +151,13 @@ export function formatDate(date: Date, format: string = DEFAULT_DATE_FORMAT): st
 const PLACEHOLDER = /\{\{\s*([^{}:]+?)\s*(?::([^{}]*))?\}\}/gu;
 
 /**
- * `{{lookup:ROW:COLUMN}}`, read out of what follows `lookup:` — the row's
- * place in the table, from 1, which is the order the cards print in, and a
- * column's name as `{{name}}` would write it. Straight after a sort the
- * numbers the table shows are where rows came from, not where they are now;
- * a lookup follows the rows as they now stand, the same as the cards do. Null when the first part is not a number: a row is named
- * by where it is, never by what it holds, because a value to search for
- * could be in any column and in more than one row, and a card that quietly
- * picked the first would print the wrong one without a mark.
+ * `{{lookup:ROW:COLUMN}}`, read out of what follows `lookup:` — the number
+ * the row wears in the table, from 1, and a column's name as `{{name}}`
+ * would write it. The number, not the place: sorting the table to read it
+ * must not change what every card quotes. Null when the first part is not a
+ * number: a row is named by its number, never by what it holds, because a
+ * value to search for could be in any column and in more than one row, and
+ * a card that quietly picked the first would print the wrong one unmarked.
  */
 function lookupOf(spec: string): { index: number; name: string } | null {
 	const colon = spec.indexOf(':');
@@ -160,7 +167,16 @@ function lookupOf(spec: string): { index: number; name: string } | null {
 	return { index: Number(number) - 1, name: spec.slice(colon + 1).trim() };
 }
 
-const isLookup = (name: string) => name.toLowerCase() === 'lookup';
+/** The words `{{…}}` means before it means any column. */
+export const KEYWORDS = ['date', 'lookup'] as const;
+
+/**
+ * A column whose name a keyword takes: `{{name}}` can never reach it,
+ * because names are matched ignoring case and the keyword is tried first.
+ */
+export const isKeyword = (name: string) => (KEYWORDS as readonly string[]).includes(name.trim().toLowerCase());
+
+const isLookup = (name: string) => name.trim().toLowerCase() === 'lookup';
 
 /** The column a written name refers to, or undefined when there is none. */
 export function findColumn(name: string, columns: readonly string[]): string | undefined {
@@ -179,14 +195,14 @@ export function referencedColumns(text: string, columns: readonly string[]): str
 	if (!text || !text.includes('{{')) return [];
 	const found = new Set<string>();
 	for (const match of text.matchAll(PLACEHOLDER)) {
-		const column = findColumn(match[1], columns);
+		const column = isKeyword(match[1]) ? undefined : findColumn(match[1], columns);
 		const swap = match[2] === undefined ? null : findReplace(match[2]);
 		if (column && (match[2] === undefined || swap)) {
 			found.add(column);
 			continue;
 		}
 		// A lookup uses its column in some other row — still a use of it.
-		const lookup = !column && isLookup(match[1]) && match[2] !== undefined ? lookupOf(match[2]) : null;
+		const lookup = isLookup(match[1]) && match[2] !== undefined ? lookupOf(match[2]) : null;
 		const looked = lookup && findColumn(lookup.name, columns);
 		if (looked) found.add(looked);
 	}
@@ -217,6 +233,20 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 	// One `replace`, one pass: the callback's return value is never scanned
 	// again, which is what keeps a cell quoting itself from going anywhere.
 	return text.replace(PLACEHOLDER, (whole, name: string, format?: string) => {
+		// Keywords before columns — see the top of this file.
+		if (isLookup(name)) {
+			const lookup = format === undefined ? null : lookupOf(format);
+			const target = lookup ? context.rows?.[lookup.index] : undefined;
+			const column = target && lookup ? findColumn(lookup.name, Object.keys(target)) : undefined;
+			// Its own cell, reached the long way round, is still a cell quoting
+			// itself — see `self`.
+			if (!target || !column || (target === row && column === context.self)) return unknown(whole);
+			return String(target[column] ?? '');
+		}
+		if (name.toLowerCase() === 'date') {
+			now ??= context.now ?? new Date();
+			return formatDate(now, format?.trim() || DEFAULT_DATE_FORMAT);
+		}
 		const swap = format === undefined ? null : findReplace(format);
 		if ((format === undefined || swap) && row) {
 			const column = findColumn(name, columns);
@@ -225,23 +255,8 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 				// An empty find would put the replacement between every letter.
 				return swap && swap.find ? value.split(swap.find).join(swap.replace) : value;
 			}
-			if (column) return unknown(whole);
 		}
-		// After the column, for the same reason the date is: a column somebody
-		// called `lookup` is the more specific of the two.
-		if (isLookup(name) && format !== undefined) {
-			const lookup = lookupOf(format);
-			const target = lookup ? context.rows?.[lookup.index] : undefined;
-			const column = target && lookup ? findColumn(lookup.name, Object.keys(target)) : undefined;
-			// Its own cell, reached the long way round, is still a cell quoting
-			// itself — see `self`.
-			if (!target || !column || (target === row && column === context.self)) return unknown(whole);
-			return String(target[column] ?? '');
-		}
-		if (name.toLowerCase() !== 'date') return unknown(whole);
-		now ??= context.now ?? new Date();
-		const wanted = format?.trim();
-		return formatDate(now, wanted || DEFAULT_DATE_FORMAT);
+		return unknown(whole);
 	});
 }
 
@@ -269,7 +284,8 @@ export function placeholderChoices(query: string, columns: readonly string[]): s
 	// has to keep the row it was typed with.
 	const lookup = /^(\s*lookup\s*:[^:]*:)([^:]*)$/i.exec(query);
 	if (lookup) return ranked(lookup[2], columns).map((name) => lookup[1] + name);
-	return ranked(query, [...columns, ...(columns.some((c) => c.toLowerCase() === 'date') ? [] : ['date'])]);
+	// A column a keyword has taken is not offered: choosing it would print the keyword.
+	return ranked(query, [...columns.filter((c) => !isKeyword(c)), 'date']);
 }
 
 function ranked(query: string, names: readonly string[]): string[] {

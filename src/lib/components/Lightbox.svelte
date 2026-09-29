@@ -3,11 +3,13 @@
 	import Icon from './Icon.svelte';
 	import { swipe } from '$lib/gestures';
 	import { bleedFor, mmToPx } from '$lib/layout';
-	import type { Dataset, Mapping, Template } from '$lib/types';
+	import type { Dataset, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
 		dataset: Dataset;
+		/** the rows in the order the table numbers them, for a card's `{{lookup:…}}` */
+		lookupRows: readonly Row[];
 		mapping: Mapping;
 		/** which row is shown, and what the arrows step through */
 		index: number;
@@ -18,7 +20,7 @@
 		onclose: () => void;
 	}
 
-	let { template, dataset, mapping, index, background, images = {}, onactivate, onclose }: Props =
+	let { template, dataset, lookupRows, mapping, index, background, images = {}, onactivate, onclose }: Props =
 		$props();
 
 	let viewport = $state({ w: 1200, h: 800 });
@@ -561,7 +563,7 @@
 				{mapping}
 				pageNumber={index + 1}
 				pageCount={dataset.rows.length}
-				rows={dataset.rows}
+				rows={lookupRows}
 				{background}
 				{images}
 			/>

@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { compareCells, countText, dropTarget, indexAfterSort, moveColumn, moveRows, moveRowsTo, sortRows } from './table';
+import {
+	appendRows,
+	compareCells,
+	countText,
+	deleteRows,
+	dropTarget,
+	inArrivalOrder,
+	indexAfterSort,
+	moveColumn,
+	moveRows,
+	moveRowsTo,
+	orderOf,
+	rowNumber,
+	sortRows,
+	unsortRows,
+	withoutOrder
+} from './table';
 import type { Dataset } from './types';
 
 const data = (): Dataset => ({
@@ -129,5 +145,53 @@ describe('moveRowsTo', () => {
 		expect(same.rows).toBe(rows);
 		expect(same.chosen).toEqual([2]);
 		expect(moveRowsTo(rows, [2], 2).rows).toBe(rows);
+	});
+});
+
+describe('row numbers and the arrival order', () => {
+	const a = { t: 'a' };
+	const b = { t: 'b' };
+	const c = { t: 'c' };
+	const table = (rows: Dataset['rows'], order?: number[]): Dataset => ({ columns: ['t'], rows, ...(order ? { order } : {}) });
+
+	it('writes the order down on the first sort, and carries it through the next', () => {
+		const once = sortRows(table([b, c, a]), 't', 'asc');
+		expect(once.rows).toEqual([a, b, c]);
+		expect(once.order).toEqual([2, 0, 1]);
+		const twice = sortRows(once, 't', 'desc');
+		expect(twice.rows).toEqual([c, b, a]);
+		expect(twice.order).toEqual([1, 0, 2]);
+		expect([0, 1, 2].map((i) => rowNumber(twice, i))).toEqual([2, 1, 3]);
+	});
+
+	it('leaves no order on a table that stands where it arrived', () => {
+		expect('order' in sortRows(table([a, b, c]), 't', 'asc')).toBe(false);
+		expect('order' in unsortRows(sortRows(table([b, a]), 't', 'asc'))).toBe(false);
+	});
+
+	it('puts the rows back in the order of their numbers, for a lookup and for unsort', () => {
+		const sorted = sortRows(table([b, c, a]), 't', 'desc');
+		expect(inArrivalOrder(sorted)).toEqual([b, c, a]);
+		expect(unsortRows(sorted).rows).toEqual([b, c, a]);
+		// An edit that rebuilds every row keeps the numbers, being by position.
+		const renamed = { ...sorted, rows: sorted.rows.map((r) => ({ ...r })) };
+		expect(inArrivalOrder(renamed).map((r) => r.t)).toEqual(['b', 'c', 'a']);
+	});
+
+	it('ignores an order that does not fit its rows', () => {
+		expect(orderOf(table([a, b], [0]))).toBeNull();
+		expect(orderOf(table([a, b], [1, 1]))).toBeNull();
+		expect(orderOf(table([a, b], [0, 2]))).toBeNull();
+		expect(rowNumber(table([a, b], [5, 0]), 0)).toBe(1);
+	});
+
+	it('numbers new rows next, closes up after a delete, and forgets on a move', () => {
+		const sorted = table([c, a, b], [2, 0, 1]);
+		const added = appendRows(sorted, [{ t: 'd' }]);
+		expect(added.order).toEqual([2, 0, 1, 3]);
+		const deleted = deleteRows(added, new Set([1]));
+		expect(deleted.rows.map((r) => r.t)).toEqual(['c', 'b', 'd']);
+		expect(deleted.order).toEqual([1, 0, 2]);
+		expect('order' in withoutOrder(sorted)).toBe(false);
 	});
 });
