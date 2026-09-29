@@ -889,6 +889,23 @@
 					<ResetButton to="the page's text color" disabled={boxFrozen} onclick={() => patch({ color: undefined })} />
 				{/if}
 			</span>
+			<label class="field">
+				<span>Spacing</span>
+				<input
+					class="n-3"
+					type="number"
+					step="0.05"
+					placeholder={String(template.defaults.letterSpacing)}
+					title="Letter spacing; blank inherits the page's"
+					value={selected.letterSpacing ?? ''}
+					disabled={boxFrozen}
+					onchange={(e) => patch({ letterSpacing: inherited(e) })}
+				/>
+				<span class="unit">mm</span>
+				{#if selected.letterSpacing !== undefined}
+					<ResetButton to="the page's {template.defaults.letterSpacing}mm" disabled={boxFrozen} onclick={() => patch({ letterSpacing: undefined })} />
+				{/if}
+			</label>
 		</fieldset>
 		<fieldset class="group">
 			<legend>Position</legend>
@@ -1045,23 +1062,6 @@
 					{/if}
 				</label>
 			{/if}
-			<label class="field">
-				<span>Spacing</span>
-				<input
-					class="n-3"
-					type="number"
-					step="0.05"
-					placeholder={String(template.defaults.letterSpacing)}
-					title="Letter spacing; blank inherits the page's"
-					value={selected.letterSpacing ?? ''}
-					disabled={boxFrozen}
-					onchange={(e) => patch({ letterSpacing: inherited(e) })}
-				/>
-				<span class="unit">mm</span>
-				{#if selected.letterSpacing !== undefined}
-					<ResetButton to="the page's {template.defaults.letterSpacing}mm" disabled={boxFrozen} onclick={() => patch({ letterSpacing: undefined })} />
-				{/if}
-			</label>
 			<!-- How one paragraph is told from the next: a space in lines of this
 			     leading, or an indent in em. -->
 			<label class="field">
