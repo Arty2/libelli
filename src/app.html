@@ -42,6 +42,7 @@
 				var s = JSON.parse(localStorage.getItem('libelli:ui:text-size'));
 				if (typeof s === 'number' && s >= 0.8 && s <= 2) {
 					document.documentElement.style.setProperty('--text-scale', String(s));
+					if (s > 1) document.documentElement.setAttribute('data-text-larger', '');
 				}
 			} catch (e) {}
 		</script>

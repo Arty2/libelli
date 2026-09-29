@@ -1859,8 +1859,8 @@
 	}
 
 	.corner button.square {
-		width: 28px;
-		height: 28px;
+		width: 1.75rem;
+		height: 1.75rem;
 		padding: 0;
 		justify-content: center;
 	}

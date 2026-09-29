@@ -1402,7 +1402,9 @@ towards it and down is away. They repeat on a hold like the arrows do.
   the layout keeps the width of the screen; Ctrl/Cmd+scroll does the same on a
   desk, and so does Ctrl/Cmd +/− from inside a field, where the browser would
   otherwise have zoomed the lot. **Text size** in Help sets it in steps, from
-  80% to 200% of the browser's own default font size, and remembers it. The
+  80% to 200% of the browser's own default font size, and remembers it; the
+  buttons and their icons grow with it, and **pressing the logo** puts it back
+  to 100%. The
   cards are unaffected: their type is set in points by the design.
 - **Pinch to zoom the page**, anywhere over the stage. The gesture listens on
   the way down to whatever was touched, so it works over the areas and not only

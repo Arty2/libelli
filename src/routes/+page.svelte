@@ -2575,7 +2575,16 @@
 
 <div class="app">
 	<header class="toolbar">
-		<img class="brand" src="{base}/logo.svg" alt="libelli" width="389" height="314" />
+		<!-- The mark is where the interface comes back to its own size: one press,
+		     after a pinch left the words larger than meant — see textsize.ts. -->
+		<button
+			class="brand"
+			onclick={() => setTextSize(1)}
+			title="libelli — press for the default text size"
+			aria-label="libelli — back to the default text size"
+		>
+			<img src="{base}/logo.svg" alt="" width="389" height="314" />
+		</button>
 		<span class="spacer"></span>
 		{#if installable}
 			<button class="install" onclick={() => void install()} title="Install libelli on this device">
@@ -3333,7 +3342,7 @@
 			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
 			<dt>Pinch, Ctrl/Cmd + scroll<span>off the page</span></dt><dd>Text size — the interface itself never zooms</dd>
-			<dt>Ctrl/Cmd + +<span>in a field or here</span></dt><dd>Text size, in steps; Ctrl/Cmd + 0 puts it back</dd>
+			<dt>Ctrl/Cmd + +<span>in a field or here</span></dt><dd>Text size, in steps; Ctrl/Cmd + 0, or the logo, puts it back</dd>
 			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
 			<dt>Ctrl/Cmd + ;<span>|</span></dt><dd>Guides on or off</dd>
 			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off</dd>
@@ -3497,10 +3506,19 @@
 	   buttons do not shuffle sideways on load. */
 	/* The mark and the version are labels, not text anyone copies; a
 	   double-click near them should not paint them blue. */
-	.brand {
-		height: 29px;
-		width: auto;
+	button.brand {
+		display: block;
+		height: 1.8125rem;
+		padding: 0;
+		border: none;
+		background: none;
 		user-select: none;
+	}
+
+	.brand img {
+		display: block;
+		height: 100%;
+		width: auto;
 	}
 
 	.spacer {
@@ -3785,8 +3803,8 @@
 	.modal-header .icon {
 		display: grid;
 		place-items: center;
-		width: 26px;
-		height: 26px;
+		width: 1.625rem;
+		height: 1.625rem;
 		padding: 0;
 		border-color: transparent;
 		color: #555;
@@ -4114,8 +4132,8 @@
 		   condition itself: exactly the buttons that lost their words. Install
 		   keeps its own, because an offer nobody recognises needs the word. */
 		.toolbar button:has(.label) {
-			width: 29px;
-			height: 29px;
+			width: 1.8125rem;
+			height: 1.8125rem;
 			padding: 0;
 			display: grid;
 			place-items: center;
@@ -4169,9 +4187,6 @@
 			left: 50%;
 			top: 50%;
 			transform: translate(-50%, -50%);
-			/* Nothing to press, and it sits over the middle of the row: a tap that
-			   lands on it belongs to whatever is underneath. */
-			pointer-events: none;
 		}
 	}
 
@@ -4180,6 +4195,33 @@
 	   would be under one of them. Out of the centre, back into the row, at its
 	   left end as on a desk, with every button to the right of the space. The
 	   controls win the row, because they are the ones you press. */
+	/* Larger text makes larger buttons, and at 150% on a 412px phone Page Setup
+	   ran under a mark centred over the row — which, now that pressing it puts
+	   the text size back, took the press meant for the button. Back into the
+	   row, as at 320px below, for as long as the text is larger than default. */
+	@media (max-width: 900px) {
+		:global(html[data-text-larger]) .brand {
+			position: static;
+			transform: none;
+			order: 3;
+			/* The one thing in the row that can give up width: at 200% the
+			   buttons alone nearly fill a phone, and wrapping put Export on a row
+			   of its own. The mark shrinks inside its box instead. */
+			flex: 0 1 auto;
+			min-width: 0;
+		}
+
+		:global(html[data-text-larger]) .brand img {
+			max-width: 100%;
+			object-fit: contain;
+			object-position: left center;
+		}
+
+		:global(html[data-text-larger]) .toolbar {
+			flex-wrap: nowrap;
+		}
+	}
+
 	@media (max-width: 320px) {
 		.brand {
 			position: static;

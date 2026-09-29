@@ -98,8 +98,8 @@
 	button {
 		display: grid;
 		place-items: center;
-		width: 28px;
-		height: 28px;
+		width: 1.75rem;
+		height: 1.75rem;
 		padding: 0;
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-button);
@@ -134,7 +134,7 @@
 	}
 
 	hr {
-		width: 18px;
+		width: 1.125rem;
 		margin: 3px 0;
 		border: none;
 		border-top: 1px solid #ddd;

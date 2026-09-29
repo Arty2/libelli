@@ -8,6 +8,10 @@ describe('the pre-paint script in app.html', () => {
 		expect(html).toContain(`localStorage.getItem('libelli:${STORE_KEY}')`);
 	});
 
+	it('marks larger text as applyTextSize does', () => {
+		expect(html).toContain("if (s > 1) document.documentElement.setAttribute('data-text-larger', '')");
+	});
+
 	it('accepts exactly the range the app clamps to', () => {
 		expect(html).toContain(`s >= ${TEXT_MIN} && s <= ${TEXT_MAX}`);
 	});

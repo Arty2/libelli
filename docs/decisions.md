@@ -3122,11 +3122,21 @@ keep their own pinch, which zooms the page or the card as before.
 **Every size of interface type is in `rem`**, 16px to the rem, so it follows the
 root; gate 9 in `scripts/gates.sh` fails a `px` one. A card's type is `pt` from
 the template and never reads the root. Boxes are mostly padded round their
-labels and grow with them; the few that were a fixed width with a word in them
-are part fixed, part `rem` — the Lock button (`calc(44px + 2.5rem)`, the width
-of "Unlock"), the table's row-number gutter (digits in `rem`) — and an options
-bar group wraps inside itself once it is wider than the bar, which on a desk it
-now can be. Icons stay their pixel size: they are drawings, not words.
+labels and grow with them, and so do the icons: `Icon.svelte` sizes itself in
+`rem`, so the toolbar, the stage's corner buttons, the table bar's and every
+other icon button grow with their labels, and their fixed boxes are in `rem`
+too (the Lock buttons, the row-number gutter, the square icon buttons). The
+exception is the badges drawn on an area, which belong to the page they sit
+on and pass `fixed`. An options bar group wraps inside itself once it is wider
+than the bar, which on a desk it now can be.
+
+**The mark resets the text size.** Pressing the logo sets it back to 100%, the
+way out after a pinch that went further than meant. On a phone the mark is
+centred over the toolbar, which only has room for it while the buttons are
+small; with the text larger than default, `applyTextSize` (and the pre-paint
+script) set `data-text-larger` on the root, and the mark goes back into the
+row, shrinking before anything wraps — at 150% on a 412px phone it had sat
+over Page Setup and taken its press.
 
 A pinch arrives as a ratio of the spread at its start, so it is snapped to 5%
 each time without drifting. A wheel arrives as dozens of small deltas, and each
