@@ -9,6 +9,7 @@
 	import { completePlaceholders } from '$lib/complete';
 	import { availableWeights, fontChoices, previewFamilies } from '$lib/fonts';
 	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
+	import ResetButton from './ResetButton.svelte';
 	import {
 		BLEND_MODES,
 		BORDER_STYLES,
@@ -25,6 +26,7 @@
 		MIN_LEADING,
 		MIN_SIZE,
 		normaliseCentre,
+		normaliseColorFrom,
 		normaliseRotation,
 		normaliseSides,
 		shownAsMedia,
@@ -37,9 +39,11 @@
 		BorderStyle,
 		Box,
 		Centre,
+		ColorSources,
 		Dataset,
 		FontRef,
 		Mapping,
+		Row,
 		QrSettings,
 		Sides,
 		Template,
@@ -50,6 +54,8 @@
 		template: Template;
 		dataset: Dataset;
 		mapping: Mapping;
+		/** the row the page is showing: a color linked to a column previews its cell */
+		row?: Row | null;
 		selected: Box;
 		onboxchange: (box: Box) => void;
 		ontemplatechange: (template: Template) => void;
@@ -77,6 +83,7 @@
 		editorFonts,
 		dataset,
 		mapping,
+		row = null,
 		selected,
 		onboxchange,
 		ontemplatechange,
@@ -360,6 +367,40 @@
 		patch({ list: normaliseList({ ...selected?.list, ...change }) });
 	}
 
+	/** What a list here is set in when it names no leading: the page's for lists, else the area's own. */
+	const listLeadingFallback = $derived(
+		template.defaults.list?.leading ?? selected?.lineHeight ?? template.defaults.lineHeight
+	);
+
+	/**
+	 * A color taken from a column of the row. `linking` holds the picker open
+	 * after the link is pressed and before a column is chosen: the choice is
+	 * stored only once there is a column to store.
+	 */
+	type ColorKey = keyof ColorSources;
+	let linking = $state<Record<ColorKey, boolean>>({ text: false, fill: false, border: false });
+	const linkShown = (key: ColorKey) => linking[key] || !!selected?.colorFrom?.[key];
+
+	/**
+	 * What a linked swatch shows: the color in the shown row's cell, or nothing
+	 * — and then the swatch shows the area's own, which is what that card draws.
+	 */
+	const previewOf = (key: ColorKey): string | undefined => {
+		const column = selected?.colorFrom?.[key];
+		return (column && row ? parseColor(row[column]) : null) ?? undefined;
+	};
+
+	function setColorFrom(key: ColorKey, column: string | undefined) {
+		patch({ colorFrom: normaliseColorFrom({ ...selected?.colorFrom, [key]: column }) });
+		if (!column) linking[key] = false;
+	}
+
+	/** The link button: open the picker, or — when it is open — unlink and close it. */
+	function toggleLink(key: ColorKey) {
+		if (linkShown(key)) setColorFrom(key, undefined);
+		else linking[key] = true;
+	}
+
 	/** Whether the page's baseline reaches this area — only in the page's own face. */
 	const pageBaselineApplies = $derived((selected?.font ?? template.defaults.font) === template.defaults.font);
 
@@ -527,12 +568,52 @@
 </script>
 
 <!--
-	The area settings bar: what the box holds, how its type is set, where that
-	type sits, what the box looks like, where it is, and only then what you can
-	do to it. Same outward ordering as the page bar.
+	A color from a column: the link beside a swatch, and once pressed, which
+	column. Beside the swatch rather than in place of it, because the swatch is
+	still what an area shows on a row whose cell is not a color. One pattern for
+	all three colors, so it is learnt once.
 -->
-	<!-- Same idea: what the box holds, how its type is set, where that type sits,
-	     what the box looks like, where it is, and only then what you can do to it. -->
+{#snippet fromColumn(key: ColorKey, what: string)}
+	{@const column = selected.colorFrom?.[key]}
+	<button
+		class="square"
+		aria-pressed={linkShown(key)}
+		title={linkShown(key)
+			? `Stop taking the ${what} from a column`
+			: `Take the ${what} from a column of the row, where its cell is a color — #c0392b, teal, rgb(…)`}
+		aria-label="{what} from a column"
+		disabled={boxFrozen}
+		onclick={() => toggleLink(key)}
+	><Icon name="link" size={14} /></button>
+	{#if linkShown(key)}
+		<select
+			class:inherits={!column}
+			value={column ?? ''}
+			title="The column whose cell is this area's {what}; a cell that is not a color leaves the swatch's"
+			aria-label="Column for the {what}"
+			disabled={boxFrozen}
+			onchange={(e) => setColorFrom(key, e.currentTarget.value || undefined)}
+		>
+			<option value="">— Column —</option>
+			{#each dataset.columns as name (name)}
+				<option value={name}>{name}</option>
+			{/each}
+			<!-- Kept in the list when this table has no such column, rather
+			     than showing the menu blank: the template still names it, and
+			     another table may have it. -->
+			{#if column && !dataset.columns.includes(column)}
+				<option value={column}>{column} (not in this table)</option>
+			{/if}
+		</select>
+	{/if}
+{/snippet}
+
+<!--
+	The area settings bar: what this area is, then one tab at a time — what it
+	holds, how its type is set, how the box looks, and where it sits. Inside a
+	tab, each subject is a fieldset with its name on it. Same shape as the page
+	bar; see docs/decisions.md.
+-->
 	<div class="options box-options" aria-label="Area settings">
 		<!-- The lock, what this is and what it is called, and the two things you
 		     do to it, on one line. Lock first, as in the page bar and under the
@@ -553,7 +634,7 @@
 				<span class="context">Area</span>
 				{#if source === 'field'}
 					<label class="field">
-						<span>Name</span>
+						<span class="sr-only">Name</span>
 						<input
 							class="w-5"
 							value={selected.slot ?? ''}
@@ -568,10 +649,14 @@
 				</button>
 			</span>
 		</span>
-
-		<span class="group" role="group" aria-label="Content">
+		<!-- Most-used first, after what the area holds: its alignment and its
+		     type, then where it sits and how big, then how its lines are set,
+		     then the box around it. A value the area takes from the page shows in
+		     italics; one it sets for itself has an × that takes it back. -->
+		<fieldset class="group">
+			<legend>Content</legend>
 			<label class="field">
-				<span>Content</span>
+				<span class="sr-only">Content</span>
 				<select
 					value={source}
 					title="Where this area gets what it shows"
@@ -721,7 +806,27 @@
 					<Icon name="edit" size={14} /> Draw…
 				</button>
 			{/if}
-			{#if selected.mode === 'qr'}
+
+			<label class="check">
+				<!-- Off, not hidden, for an area holding its own words and none of
+				     them: it is empty on every card, and the editor keeps it drawn
+				     with its placeholder so it can still be selected — the setting is
+				     kept, and says it does not apply. -->
+				<input
+					type="checkbox"
+					checked={!!selected.hideWhenEmpty}
+					disabled={boxFrozen || emptyStatic}
+					title={emptyStatic
+						? 'Does not apply to an area holding its own words and none of them — it stays in view so it can be selected'
+						: undefined}
+					onchange={(e) => patch({ hideWhenEmpty: e.currentTarget.checked })}
+				/>
+				Hide When Empty
+			</label>
+		</fieldset>
+		{#if selected.mode === 'qr'}
+			<fieldset class="group">
+				<legend>QR Code</legend>
 				<label class="field">
 					<span>Correction</span>
 					<select
@@ -760,11 +865,43 @@
 						/>
 					</span>
 				{/if}
+			</fieldset>
+		{/if}
+		<fieldset class="group">
+			<legend>Align</legend>
+			<span class="segmented" role="group" aria-label="Horizontal alignment">
+				{#each ALIGNMENTS as option (option.value)}
+					<button
+						aria-pressed={(selected.align ?? template.defaults.align) === option.value}
+						title="Align {option.label}"
+						aria-label="Align {option.label}"
+						disabled={boxFrozen}
+						onclick={() => patch({ align: option.value })}
+					>
+						<Icon name={option.icon} size={15} />
+					</button>
+				{/each}
+			</span>
+			{#if selected.align}
+				<ResetButton to="the page's alignment" disabled={boxFrozen} onclick={() => patch({ align: undefined })} />
 			{/if}
-		</span>
-
-		<span class="group" role="group" aria-label="Type">
-			<span class="field">
+			<span class="segmented" role="group" aria-label="Vertical alignment">
+				{#each VERTICALS as option (option.value)}
+					<button
+						aria-pressed={(selected.valign ?? 'top') === option.value}
+						title="Align {option.label}"
+						aria-label="Align {option.label}"
+						disabled={boxFrozen}
+						onclick={() => patch({ valign: option.value })}
+					>
+						<Icon name={option.icon} size={15} />
+					</button>
+				{/each}
+			</span>
+		</fieldset>
+		<fieldset class="group">
+			<legend>Text</legend>
+			<span class="field" class:inherits={!selected.font}>
 				<span>Font</span>
 				<MenuSelect
 					label="Font"
@@ -775,6 +912,9 @@
 					onopen={() => previewFamilies([...families.used, ...families.others], editorFonts, template.fonts)}
 					onselect={setFont}
 				/>
+				{#if selected.font}
+					<ResetButton to="the page's {template.defaults.font}" disabled={boxFrozen} onclick={() => patch({ font: undefined })} />
+				{/if}
 			</span>
 			<label class="field">
 				<span>Size</span>
@@ -790,10 +930,14 @@
 					onchange={(e) => patch({ size: inherited(e, MIN_SIZE) })}
 				/>
 				<span class="unit">pt</span>
+				{#if selected.size !== undefined}
+					<ResetButton to="the page's {template.defaults.size}pt" disabled={boxFrozen} onclick={() => patch({ size: undefined })} />
+				{/if}
 			</label>
 			<label class="field">
 				<span>Weight</span>
 				<select
+					class:inherits={selected.weight === undefined}
 					value={selected.weight === undefined ? '' : String(selected.weight)}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ weight: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
@@ -803,23 +947,168 @@
 						<option value={String(weight)}>{weight}</option>
 					{/each}
 				</select>
+				{#if selected.weight !== undefined}
+					<ResetButton to="the page's {template.defaults.weight}" disabled={boxFrozen} onclick={() => patch({ weight: undefined })} />
+				{/if}
 			</label>
-			<span class="field">
+			<span class="field" class:inherits={!selected.color}>
 				<span>Color</span>
 				<ColorField
 					value={selected.color}
 					fallback={template.defaults.color}
 					label="Text color"
+					hueFrom={selected.colorFrom?.text}
+					preview={previewOf('text')}
+					title={selected.color ? undefined : "The page's text color"}
 					disabled={boxFrozen}
 					onchange={(v) => patch({ color: v })}
 				/>
+				{#if selected.color}
+					<ResetButton to="the page's text color" disabled={boxFrozen} onclick={() => patch({ color: undefined })} />
+				{/if}
+				{@render fromColumn('text', 'text color')}
 			</span>
-		</span>
-
-		<!-- The face, its size, its weight and its color are one choice; how the
-		     lines are set is another. They were one group of seven controls, which
-		     is the point at which a group stops naming a subject. -->
-		<span class="group" role="group" aria-label="Setting">
+			<label class="field">
+				<span>Spacing</span>
+				<input
+					class="n-3"
+					type="number"
+					step="0.05"
+					placeholder={String(template.defaults.letterSpacing)}
+					title="Letter spacing; blank inherits the page's"
+					value={selected.letterSpacing ?? ''}
+					disabled={boxFrozen}
+					onchange={(e) => patch({ letterSpacing: inherited(e) })}
+				/>
+				<span class="unit">mm</span>
+				{#if selected.letterSpacing !== undefined}
+					<ResetButton to="the page's {template.defaults.letterSpacing}mm" disabled={boxFrozen} onclick={() => patch({ letterSpacing: undefined })} />
+				{/if}
+			</label>
+			<label class="field">
+				<span>Case</span>
+				<select value={selected.textCase ?? 'none'} disabled={boxFrozen} onchange={(e) => patch({ textCase: e.currentTarget.value as Box['textCase'] })}>
+					<option value="none">As Typed</option>
+					<option value="smallcaps">Small Caps</option>
+					<option value="uppercase">Uppercase</option>
+				</select>
+			</label>
+		</fieldset>
+		<fieldset class="group">
+			<legend>Position</legend>
+			<label class="field"><span>X</span>
+				<input class="n-4" type="number" step="0.5" value={selected.x} disabled={boxFrozen} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
+				<span class="unit">mm</span>
+			</label>
+			<label class="field"><span>Y</span>
+				<input
+					class="n-4"
+					type="number"
+					step="0.5"
+					value={selected.y}
+					disabled={boxFrozen || !!selected.anchor}
+					title={selected.anchor ? 'Anchored: the gap sets the top edge' : ''}
+					onchange={(e) => patch({ y: numeric(e, selected.y) })}
+				/>
+				<span class="unit">mm</span>
+			</label>
+			<label class="field"><span>W</span>
+				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.w} disabled={boxFrozen} onchange={(e) => resize('w', e)} />
+				<span class="unit">mm</span>
+			</label>
+			<label class="field"><span>H</span>
+				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.h} disabled={boxFrozen} onchange={(e) => resize('h', e)} />
+				<span class="unit">mm</span>
+			</label>
+			<label class="field">
+				<span>Anchor</span>
+				<select value={selected.anchor?.to ?? ''} disabled={boxFrozen} onchange={(e) => setAnchor(e.currentTarget.value)}>
+					<option value="">— Fixed Y —</option>
+					{#each anchorOptions as box (box.id)}
+						<option value={box.id}>{box.slot ?? box.id}</option>
+					{/each}
+				</select>
+			</label>
+			{#if selected.anchor}
+				<label class="field">
+					<span>Gap</span>
+					<!-- No floor: a negative gap tucks this area up under the one it
+					     follows, overlapping it, which is a layout people want. -->
+					<input
+						class="n-3"
+						type="number"
+						step="0.5"
+						title="Between that area's bottom and this one's top; below 0 overlaps it"
+						value={selected.anchor.gap}
+						disabled={boxFrozen}
+						onchange={(e) => patch({ anchor: { to: selected.anchor!.to, gap: numeric(e, selected.anchor!.gap) } })}
+					/>
+					<span class="unit">mm</span>
+				</label>
+			{/if}
+			<!-- Only where there is a fold to mirror across: on a run of identical
+			     pages this control would have nothing to do. -->
+			{#if template.facing}
+				<label class="check">
+					<input
+						type="checkbox"
+						checked={selected.mirror !== false}
+						title="Mirror this area onto left-hand pages, so it keeps its distance from the outer edge. Off pins it to the same millimetres on every page"
+						disabled={boxFrozen}
+						onchange={(e) => patch({ mirror: e.currentTarget.checked ? undefined : false })}
+					/>
+					Recto / Verso
+				</label>
+			{/if}
+			<label class="field">
+				<span>Rotation</span>
+				<input
+					class="n-3"
+					type="number"
+					step="1"
+					title="Degrees clockwise; the box turns about the centre marked on it"
+					value={selected.rotation ?? 0}
+					disabled={boxFrozen}
+					onchange={(e) => patch({ rotation: normaliseRotation(numeric(e, 0)) })}
+				/>
+				<span class="unit">°</span>
+			</label>
+			{#if selected.rotation}
+				<label class="field tight">
+					<span class="edge">X</span>
+					<input
+						class="n-3"
+						type="number"
+						step="5"
+						min="0"
+						max="100"
+						aria-label="Centre X"
+						title="The pivot across the box, as a percentage of its width"
+						value={selected.centre?.x ?? 50}
+						disabled={boxFrozen}
+						onchange={(e) => setCentre({ x: numeric(e, 50) })}
+					/>
+				</label>
+				<label class="field tight">
+					<span class="edge">Y</span>
+					<input
+						class="n-3"
+						type="number"
+						step="5"
+						min="0"
+						max="100"
+						aria-label="Centre Y"
+						title="The pivot down the box, as a percentage of its height"
+						value={selected.centre?.y ?? 50}
+						disabled={boxFrozen}
+						onchange={(e) => setCentre({ y: numeric(e, 50) })}
+					/>
+				</label>
+				<span class="unit">%</span>
+			{/if}
+		</fieldset>
+		<fieldset class="group">
+			<legend>Lines</legend>
 			<label class="field">
 				<span>Leading</span>
 				<input
@@ -833,6 +1122,9 @@
 					disabled={boxFrozen}
 					onchange={(e) => patch({ lineHeight: inherited(e, MIN_LEADING) })}
 				/>
+				{#if selected.lineHeight !== undefined}
+					<ResetButton to="the page's {template.defaults.lineHeight}" disabled={boxFrozen} onclick={() => patch({ lineHeight: undefined })} />
+				{/if}
 			</label>
 			{#if selected.mode === 'plain' || selected.mode === 'markdown'}
 				<label class="field">
@@ -852,27 +1144,17 @@
 						onchange={(e) => patch({ baseline: normaliseBaseline(e.currentTarget.value) })}
 					/>
 					<span class="unit">em</span>
+					{#if selected.baseline !== undefined}
+						<ResetButton to="the page's baseline" disabled={boxFrozen} onclick={() => patch({ baseline: undefined })} />
+					{/if}
 				</label>
 			{/if}
-			<label class="field">
-				<span>Spacing</span>
-				<input
-					class="n-3"
-					type="number"
-					step="0.05"
-					placeholder={String(template.defaults.letterSpacing)}
-					title="Letter spacing; blank inherits the page's"
-					value={selected.letterSpacing ?? ''}
-					disabled={boxFrozen}
-					onchange={(e) => patch({ letterSpacing: inherited(e) })}
-				/>
-				<span class="unit">mm</span>
-			</label>
 			<!-- How one paragraph is told from the next: a space in lines of this
-		     leading, or an indent in em. -->
+			     leading, or an indent in em. -->
 			<label class="field">
 				<span>Paragraph</span>
 				<select
+					class:inherits={!selected.paragraph}
 					value={selected.paragraph?.mode ?? ''}
 					title="Space after each paragraph, or the first line of the next indented. Every line of plain text is a paragraph"
 					disabled={boxFrozen}
@@ -898,24 +1180,17 @@
 						onchange={(e) => setParagraph(selected.paragraph!.mode, numeric(e, selected.paragraph!.amount))}
 					/>
 					<span class="unit">{selected.paragraph.mode === 'space' ? 'lines' : 'em'}</span>
+					<ResetButton to="the page's paragraphs" disabled={boxFrozen} onclick={() => patch({ paragraph: undefined })} />
 				</label>
 			{/if}
-			<label class="field">
-				<span>Case</span>
-				<select value={selected.textCase ?? 'none'} disabled={boxFrozen} onchange={(e) => patch({ textCase: e.currentTarget.value as Box['textCase'] })}>
-					<option value="none">As Typed</option>
-					<option value="smallcaps">Small Caps</option>
-					<option value="uppercase">Uppercase</option>
-				</select>
-			</label>
-		</span>
-
+		</fieldset>
 		{#if selected.mode === 'markdown'}
-			<!-- A Markdown area's lists, a group of their own as in page setup. -->
-			<span class="group" role="group" aria-label="Lists">
+			<fieldset class="group">
+				<legend>Lists</legend>
 				<label class="field">
-					<span>List</span>
+					<span>Marker</span>
 					<select
+						class:inherits={!selected.list?.marker}
 						value={selected.list?.marker ?? ''}
 						title="What each item of a list is marked with"
 						disabled={boxFrozen}
@@ -926,11 +1201,14 @@
 							<option value={marker}>{LIST_MARKER_LABELS[marker]}</option>
 						{/each}
 					</select>
+					{#if selected.list?.marker}
+						<ResetButton to="the page's list marker" disabled={boxFrozen} onclick={() => setList({ marker: undefined })} />
+					{/if}
 				</label>
 				<label class="field">
-					<span>List Indent</span>
+					<span>Indent</span>
 					<input
-						class="n-2"
+						class="n-3"
 						type="number"
 						step="0.25"
 						min="0"
@@ -942,56 +1220,34 @@
 						onchange={(e) => setList({ indent: e.currentTarget.value })}
 					/>
 					<span class="unit">em</span>
+					{#if selected.list?.indent !== undefined}
+						<ResetButton to="the page's list indent" disabled={boxFrozen} onclick={() => setList({ indent: '' })} />
+					{/if}
 				</label>
 				<label class="field">
-					<span>List Spacing</span>
+					<span>Leading</span>
+					<!-- A multiple of the size, like the area's own leading, which is
+					     where a list with none of its own takes it from. -->
 					<input
-						class="n-2"
+						class="n-3"
 						type="number"
-						step="0.25"
-						min="0"
-						max={MAX_LIST}
-						placeholder={template.defaults.list?.spacing !== undefined ? String(template.defaults.list.spacing) : 'auto'}
-						title="Between one list item and the next, in lines of this area's leading; blank takes the page's"
-						value={selected.list?.spacing ?? ''}
+						step="0.05"
+						min={MIN_LEADING}
+						max="3"
+						placeholder={String(listLeadingFallback)}
+						title="The list's own leading. Blank takes {template.defaults.list?.leading !== undefined ? "the page's for lists" : "this area's"}"
+						value={selected.list?.leading ?? ''}
 						disabled={boxFrozen}
-						onchange={(e) => setList({ spacing: e.currentTarget.value })}
+						onchange={(e) => setList({ leading: e.currentTarget.value })}
 					/>
-					<span class="unit">lines</span>
+					{#if selected.list?.leading !== undefined}
+						<ResetButton to={template.defaults.list?.leading !== undefined ? "the page's list leading" : "this area's leading"} disabled={boxFrozen} onclick={() => setList({ leading: '' })} />
+					{/if}
 				</label>
-			</span>
+			</fieldset>
 		{/if}
-
-		<span class="group" role="group" aria-label="Alignment">
-			<span class="segmented" role="group" aria-label="Horizontal alignment">
-				{#each ALIGNMENTS as option (option.value)}
-					<button
-						aria-pressed={(selected.align ?? template.defaults.align) === option.value}
-						title="Align {option.label}"
-						aria-label="Align {option.label}"
-						disabled={boxFrozen}
-						onclick={() => patch({ align: option.value })}
-					>
-						<Icon name={option.icon} size={15} />
-					</button>
-				{/each}
-			</span>
-			<span class="segmented" role="group" aria-label="Vertical alignment">
-				{#each VERTICALS as option (option.value)}
-					<button
-						aria-pressed={(selected.valign ?? 'top') === option.value}
-						title="Align {option.label}"
-						aria-label="Align {option.label}"
-						disabled={boxFrozen}
-						onclick={() => patch({ valign: option.value })}
-					>
-						<Icon name={option.icon} size={15} />
-					</button>
-				{/each}
-			</span>
-		</span>
-
-		<span class="group" role="group" aria-label="Box surface">
+		<fieldset class="group">
+			<legend>Box</legend>
 			<label class="field">
 				<span>Fill</span>
 				<select
@@ -1011,96 +1267,14 @@
 						value={selected.background}
 						fallback="#ffffff"
 						label="Fill color"
+						hueFrom={selected.colorFrom?.fill}
+						preview={previewOf('fill')}
 						disabled={boxFrozen}
 						onchange={(v) => patch({ background: v })}
 					/>
 				</span>
 			{/if}
-			<label class="field">
-				<span>Blend</span>
-				<select
-					value={selected.blend ?? ''}
-					title="How this area meets what is under it — the paper, its own background image, and any area it overlaps. Multiply is ink on paper. Prints only with background graphics on, like the paper colour"
-					disabled={boxFrozen}
-					onchange={(e) => patch({ blend: (e.currentTarget.value || undefined) as Box['blend'] })}
-				>
-					<option value="">Normal</option>
-					{#each BLEND_MODES as mode (mode)}
-						<option value={mode}>{BLEND_LABELS[mode]}</option>
-					{/each}
-				</select>
-			</label>
-
-			<label class="field">
-				<span>Opacity</span>
-				<input
-					class="n-3"
-					type="number"
-					step="5"
-					min="0"
-					max="100"
-					title="How much of what is under this area shows through it. Fades the fill, the border and the content together"
-					value={Math.round((selected.opacity ?? 1) * 100)}
-					disabled={boxFrozen}
-					onchange={(e) => {
-						const percent = Math.max(0, Math.min(100, numeric(e, 100)));
-						// Opaque is the absence of the field, not a stored 1 — the same
-						// rule every other "inherit or nothing" setting in here follows.
-						patch({ opacity: percent >= 100 ? undefined : percent / 100 });
-					}}
-				/>
-				<span class="unit">%</span>
-			</label>
-
-			<span class="field">
-				<span>Padding</span>
-				{#if showPadSides}
-					{#each EDGES as edge (edge.key)}
-						<label class="field tight">
-							<span class="edge">{edge.label}</span>
-							<input
-								class="n-2"
-								type="number"
-								step="0.5"
-								min="0"
-								aria-label="{edge.label} padding"
-								value={padSides[edge.key]}
-								disabled={boxFrozen}
-								onchange={(e) => setPadEdge(edge.key, numeric(e, 0))}
-							/>
-						</label>
-					{/each}
-				{:else}
-					<input
-						class="n-3"
-						type="number"
-						step="0.5"
-						min="0"
-						aria-label="Padding"
-						title="Space between the border and the content, inside the box's millimetres"
-						value={typeof selected.padding === 'number' ? selected.padding : 0}
-						disabled={boxFrozen}
-						onchange={(e) => setPadding(numeric(e, 0))}
-					/>
-				{/if}
-				<span class="unit">mm</span>
-				<button
-					class="square"
-					aria-pressed={showPadSides}
-					title={showPadSides ? 'One padding all round' : 'A padding per edge'}
-					aria-label="Per-edge padding"
-					disabled={boxFrozen}
-					onclick={() => {
-						// Same bargain as the border: collapse to the top edge rather
-						// than silently discarding three uneven values.
-						if (showPadSides && typeof selected?.padding === 'object') setPadding(padSides.top);
-						perSidePadding = !showPadSides;
-					}}
-				>
-					<Icon name={showPadSides ? 'caret-up' : 'caret-down'} size={14} />
-				</button>
-			</span>
-
+			<span class="field">{@render fromColumn('fill', 'fill')}</span>
 			<span class="field">
 				<span>Border</span>
 				{#if showSides}
@@ -1170,10 +1344,13 @@
 						value={selected.borderColor}
 						fallback={selected.color ?? template.defaults.color}
 						label="Border color"
+						hueFrom={selected.colorFrom?.border}
+						preview={previewOf('border')}
 						title="Border color; follows the text color until you set one"
 						disabled={boxFrozen}
 						onchange={(v) => patch({ borderColor: v })}
 					/>
+					{@render fromColumn('border', 'border color')}
 				</span>
 				<!-- A setting that is on or off, so a checkbox, like Mirror and Hide
 				     When Empty: a pencil that stayed pressed was a button nobody
@@ -1205,158 +1382,102 @@
 				/>
 				<span class="unit">mm</span>
 			</label>
-		</span>
-
-		<!-- Where the box starts and where it takes that start from: an anchored
-		     box reads its top off another box's rendered bottom, so Y and Anchor
-		     are two answers to one question and belong on one line. -->
-		<span class="group" role="group" aria-label="Position">
-			<label class="field"><span>X</span>
-				<input class="n-4" type="number" step="0.5" value={selected.x} disabled={boxFrozen} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
-				<span class="unit">mm</span>
-			</label>
-			<label class="field"><span>Y</span>
-				<input
-					class="n-4"
-					type="number"
-					step="0.5"
-					value={selected.y}
-					disabled={boxFrozen || !!selected.anchor}
-					title={selected.anchor ? 'Anchored: the gap sets the top edge' : ''}
-					onchange={(e) => patch({ y: numeric(e, selected.y) })}
-				/>
-				<span class="unit">mm</span>
-			</label>
-			<label class="field">
-				<span>Anchor</span>
-				<select value={selected.anchor?.to ?? ''} disabled={boxFrozen} onchange={(e) => setAnchor(e.currentTarget.value)}>
-					<option value="">— Fixed Y —</option>
-					{#each anchorOptions as box (box.id)}
-						<option value={box.id}>{box.slot ?? box.id}</option>
+			<span class="field">
+				<span>Padding</span>
+				{#if showPadSides}
+					{#each EDGES as edge (edge.key)}
+						<label class="field tight">
+							<span class="edge">{edge.label}</span>
+							<input
+								class="n-2"
+								type="number"
+								step="0.5"
+								min="0"
+								aria-label="{edge.label} padding"
+								value={padSides[edge.key]}
+								disabled={boxFrozen}
+								onchange={(e) => setPadEdge(edge.key, numeric(e, 0))}
+							/>
+						</label>
 					{/each}
-				</select>
-			</label>
-			{#if selected.anchor}
-				<label class="field">
-					<span>Gap</span>
-					<!-- No floor: a negative gap tucks this area up under the one it
-					     follows, overlapping it, which is a layout people want. -->
+				{:else}
 					<input
 						class="n-3"
 						type="number"
 						step="0.5"
-						title="Between that area's bottom and this one's top; below 0 overlaps it"
-						value={selected.anchor.gap}
+						min="0"
+						aria-label="Padding"
+						title="Space between the border and the content, inside the box's millimetres"
+						value={typeof selected.padding === 'number' ? selected.padding : 0}
 						disabled={boxFrozen}
-						onchange={(e) => patch({ anchor: { to: selected.anchor!.to, gap: numeric(e, selected.anchor!.gap) } })}
+						onchange={(e) => setPadding(numeric(e, 0))}
 					/>
-					<span class="unit">mm</span>
-				</label>
-			{/if}
-		</span>
-
-		<!-- And how big it ends up: the declared millimetres, whether content may
-		     push past them, and whether an empty one shows at all. -->
-		<span class="group" role="group" aria-label="Size">
-			<label class="field"><span>W</span>
-				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.w} disabled={boxFrozen} onchange={(e) => resize('w', e)} />
+				{/if}
 				<span class="unit">mm</span>
-			</label>
-			<label class="field"><span>H</span>
-				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.h} disabled={boxFrozen} onchange={(e) => resize('h', e)} />
-				<span class="unit">mm</span>
-			</label>
+				<button
+					class="square"
+					aria-pressed={showPadSides}
+					title={showPadSides ? 'One padding all round' : 'A padding per edge'}
+					aria-label="Per-edge padding"
+					disabled={boxFrozen}
+					onclick={() => {
+						// Same bargain as the border: collapse to the top edge rather
+						// than silently discarding three uneven values.
+						if (showPadSides && typeof selected?.padding === 'object') setPadding(padSides.top);
+						perSidePadding = !showPadSides;
+					}}
+				>
+					<Icon name={showPadSides ? 'caret-up' : 'caret-down'} size={14} />
+				</button>
+			</span>
 			<label class="field">
 				<span>Overflow</span>
-				<select value={selected.overflow} disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
+				<select
+					value={selected.overflow}
+					title="Clip cuts off what does not fit in the box's millimetres; Grow lets the box get taller to hold it" disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
 					<option value="clip">Clip</option>
 					<option value="grow">Grow</option>
 				</select>
 			</label>
-			<label class="check">
-				<!-- Off, not hidden, for an area holding its own words and none of
-				     them: it is empty on every card, and the editor keeps it drawn
-				     with its placeholder so it can still be selected — the setting is
-				     kept, and says it does not apply. -->
-				<input
-					type="checkbox"
-					checked={!!selected.hideWhenEmpty}
-					disabled={boxFrozen || emptyStatic}
-					title={emptyStatic
-						? 'Does not apply to an area holding its own words and none of them — it stays in view so it can be selected'
-						: undefined}
-					onchange={(e) => patch({ hideWhenEmpty: e.currentTarget.checked })}
-				/>
-				Hide When Empty
-			</label>
-			<!-- Only where there is a fold to mirror across: on a run of identical
-			     pages this control would have nothing to do. -->
-			{#if template.facing}
-				<label class="check">
-					<input
-						type="checkbox"
-						checked={selected.mirror !== false}
-						title="Mirror this area onto left-hand pages, so it keeps its distance from the outer edge. Off pins it to the same millimetres on every page"
-						disabled={boxFrozen}
-						onchange={(e) => patch({ mirror: e.currentTarget.checked ? undefined : false })}
-					/>
-					Mirror
-				</label>
-			{/if}
-		</span>
-
-		<!-- How the box is turned, and the point it turns about. The pivot appears
-		     with a rotation, because on an upright box it has nothing to show for
-		     itself — the same rule Gap follows with Anchor. -->
-		<span class="group" role="group" aria-label="Rotation">
+		</fieldset>
+		<fieldset class="group">
+			<legend>Effects</legend>
 			<label class="field">
-				<span>Rotation</span>
+				<span>Blend</span>
+				<select
+					value={selected.blend ?? ''}
+					title="How this area meets what is under it — the paper, its own background image, and any area it overlaps. Multiply is ink on paper. Prints only with background graphics on, like the paper colour"
+					disabled={boxFrozen}
+					onchange={(e) => patch({ blend: (e.currentTarget.value || undefined) as Box['blend'] })}
+				>
+					<option value="">Normal</option>
+					{#each BLEND_MODES as mode (mode)}
+						<option value={mode}>{BLEND_LABELS[mode]}</option>
+					{/each}
+				</select>
+			</label>
+
+			<label class="field">
+				<span>Opacity</span>
 				<input
 					class="n-3"
 					type="number"
-					step="1"
-					title="Degrees clockwise; the box turns about the centre marked on it"
-					value={selected.rotation ?? 0}
+					step="5"
+					min="0"
+					max="100"
+					title="How much of what is under this area shows through it. Fades the fill, the border and the content together"
+					value={Math.round((selected.opacity ?? 1) * 100)}
 					disabled={boxFrozen}
-					onchange={(e) => patch({ rotation: normaliseRotation(numeric(e, 0)) })}
+					onchange={(e) => {
+						const percent = Math.max(0, Math.min(100, numeric(e, 100)));
+						// Opaque is the absence of the field, not a stored 1 — the same
+						// rule every other "inherit or nothing" setting in here follows.
+						patch({ opacity: percent >= 100 ? undefined : percent / 100 });
+					}}
 				/>
-				<span class="unit">°</span>
-			</label>
-			{#if selected.rotation}
-				<label class="field tight">
-					<span class="edge">X</span>
-					<input
-						class="n-3"
-						type="number"
-						step="5"
-						min="0"
-						max="100"
-						aria-label="Centre X"
-						title="The pivot across the box, as a percentage of its width"
-						value={selected.centre?.x ?? 50}
-						disabled={boxFrozen}
-						onchange={(e) => setCentre({ x: numeric(e, 50) })}
-					/>
-				</label>
-				<label class="field tight">
-					<span class="edge">Y</span>
-					<input
-						class="n-3"
-						type="number"
-						step="5"
-						min="0"
-						max="100"
-						aria-label="Centre Y"
-						title="The pivot down the box, as a percentage of its height"
-						value={selected.centre?.y ?? 50}
-						disabled={boxFrozen}
-						onchange={(e) => setCentre({ y: numeric(e, 50) })}
-					/>
-				</label>
 				<span class="unit">%</span>
-			{/if}
-		</span>
-
+			</label>
+		</fieldset>
 	</div>
 
 <!-- As above: this bar's own picker, not one shared with the page bar. -->

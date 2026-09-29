@@ -53,6 +53,9 @@
 		library: TemplateEntry[];
 		templateId: string;
 		onselecttemplate: (id: string) => void;
+		/** the template the swap goes back to, or '' while there is none */
+		previousTemplate?: string;
+		onswaptemplate?: () => void;
 		onnewtemplate: () => void;
 		/** open the A5 Starter Booklet as it came, or add it to the library */
 		onstartertemplate: () => void;
@@ -80,6 +83,8 @@
 		library,
 		templateId,
 		onselecttemplate,
+		previousTemplate = '',
+		onswaptemplate,
 		onnewtemplate,
 		onstartertemplate,
 		ondeletetemplate,
@@ -159,8 +164,14 @@
 	 */
 	const families = $derived(fontChoices(template, editorFonts));
 
+	/** The other end of the swap, while it is still in the library. */
+	const previousEntry = $derived(
+		previousTemplate && previousTemplate !== templateId ? library.find((e) => e.id === previousTemplate) : undefined
+	);
+
 	/** A locked design is read-only everywhere; a locked box only locks itself. */
 	const pageFrozen = $derived(!!template.locked);
+
 
 	const POSITION_LABELS: Record<PageNumberPosition, string> = {
 		'top-left': 'Top Left',
@@ -348,16 +359,14 @@
 <svelte:window onpointerdown={onWindowPointer} onkeydown={onWindowKey} />
 
 <!--
-	The page settings bar: what the sheet is, how big, what it is made of, then
-	what is printed on top and what you can do to it. Ordered outwards from the
-	subject — see docs/decisions.md.
+	The page settings bar: the template it is, then its settings as named
+	groups, most-used first — the page, its type, its paper, its page number,
+	then bleed and printing. See docs/decisions.md.
 
 	Split out of OptionsBar.svelte, which was two independent bars in one file.
 	They share options-bar.css rather than a <style> block, because Svelte would
 	otherwise scope a copy of the same 240 lines to each.
 -->
-	<!-- Ordered outwards from the thing itself: what it is, how big the sheet is,
-	     what it is made of, then what is printed on top and what you can do to it. -->
 	<div class="options" aria-label="Page setup">
 		<!-- The lock, then what this is called, with everything that acts on the
 		     template as a whole behind the caret — the lock outside the menu,
@@ -375,13 +384,6 @@
 				>
 					<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
 					{pageFrozen ? 'Unlock' : 'Lock'}
-				</button>
-				<!-- Beside the template's name rather than at the far end of the
-				     bar: the stylesheet is part of the template, travels with it, and
-				     is the last thing anyone would think to look for among page
-				     sizes and margins. -->
-				<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
-					<Icon name="code" size={14} /> CSS{template.css ? ' •' : ''}
 				</button>
 				<label class="field picker" bind:this={pickerEl}>
 					<span>Template</span>
@@ -484,12 +486,32 @@
 						</ul>
 					{/if}
 				</label>
+				<!-- The pair you are working between, one press apart — the same
+				     button, and the same bargain, as beside the table's name. Not
+				     frozen by the lock: opening another template changes nothing in
+				     this one, and the menu beside it is not frozen either. -->
+				<button
+					class="square"
+					disabled={!previousEntry}
+					title={previousEntry
+						? `Back to “${previousEntry.name}”`
+						: 'Nothing to swap back to yet — this is the only template you have opened'}
+					aria-label="Swap to the previous template"
+					onclick={() => onswaptemplate?.()}
+				><Icon name="compare" size={14} /></button>
+				<!-- After the template's name and its menu rather than at the far end
+				     of the bar: the stylesheet is part of the template, travels with it, and
+				     is the last thing anyone would think to look for among page
+				     sizes and margins. -->
+				<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
+					<Icon name="code" size={14} /> <span class="label">CSS</span>{template.css ? ' •' : ''}
+				</button>
 			</span>
 		</span>
-
-		<span class="group" role="group" aria-label="Card size">
+		<fieldset class="group">
+			<legend>Page</legend>
 			<label class="field">
-				<span>Size</span>
+				<span class="sr-only">Preset</span>
 				<select
 					value={preset}
 					title="A size worth having to hand, or set the two numbers yourself"
@@ -539,16 +561,6 @@
 			>
 				<Icon name="arrows-horizontal" size={14} />
 			</button>
-			<label class="check">
-				<input
-					type="checkbox"
-					checked={!!template.facing}
-					title="Odd rows are right-hand pages and even rows their facing left-hand pages. Areas mirror across the fold unless an area says otherwise, and Outer and Inner page numbers know which edge they are on"
-					disabled={pageFrozen}
-					onchange={(e) => patchTemplate({ facing: e.currentTarget.checked || undefined })}
-				/>
-				Left &amp; Right
-			</label>
 			<!-- The frame the page is worked inside: drawn as a guide with the grid,
 			     snapped to, and where Position Automagically lays out. -->
 			<span class="field">
@@ -599,17 +611,21 @@
 					<Icon name={showMarginSides ? 'caret-up' : 'caret-down'} size={14} />
 				</button>
 			</span>
-		</span>
-
-		<PrintSettingsPanel
-			{template}
-			{pageFrozen}
-			{ontemplatechange}
-			onuploadbackground={onuploadprintbackground}
-			{onnotice}
-		/>
-
-		<span class="group" role="group" aria-label="Type defaults">
+			<!-- With the margin, because it is what turns Left and Right into
+			     Inner and Outer. -->
+			<label class="check">
+				<input
+					type="checkbox"
+					checked={!!template.facing}
+					title="Odd rows are right-hand pages and even rows their facing left-hand pages. Areas mirror across the fold unless an area says otherwise, and Outer and Inner page numbers know which edge they are on"
+					disabled={pageFrozen}
+					onchange={(e) => patchTemplate({ facing: e.currentTarget.checked || undefined })}
+				/>
+				Recto / Verso
+			</label>
+		</fieldset>
+		<fieldset class="group">
+			<legend>Text</legend>
 			<span class="field">
 				<span>Font</span>
 				<!-- The template's families, then under a rule this browser's others,
@@ -701,8 +717,11 @@
 				/>
 				<span class="unit">mm</span>
 			</label>
+		</fieldset>
+		<fieldset class="group">
+			<legend>Paragraphs</legend>
 			<label class="field">
-				<span>Paragraph</span>
+				<span class="sr-only">Paragraph style</span>
 				<select
 					value={template.defaults.paragraph?.mode ?? ''}
 					title="Space after each paragraph, or the first line of the next indented — for every area that sets none of its own. Every line of plain text is a paragraph"
@@ -731,13 +750,11 @@
 					<span class="unit">{template.defaults.paragraph.mode === 'space' ? 'lines' : 'em'}</span>
 				</label>
 			{/if}
-		</span>
-
-		<!-- Markdown lists, a group of their own: three settings about one thing,
-		     which in among the type settings read as three more type settings. -->
-		<span class="group" role="group" aria-label="Lists">
+		</fieldset>
+		<fieldset class="group">
+			<legend>Lists</legend>
 			<label class="field">
-				<span>List</span>
+				<span>Marker</span>
 				<select
 					value={template.defaults.list?.marker ?? 'bullet'}
 					title="What each item of a Markdown list is marked with"
@@ -750,9 +767,9 @@
 				</select>
 			</label>
 			<label class="field">
-				<span>List Indent</span>
+				<span>Indent</span>
 				<input
-					class="n-2"
+					class="n-3"
 					type="number"
 					step="0.25"
 					min="0"
@@ -766,26 +783,25 @@
 				<span class="unit">em</span>
 			</label>
 			<label class="field">
-				<span>List Spacing</span>
+				<span>Leading</span>
 				<input
-					class="n-2"
+					class="n-3"
 					type="number"
-					step="0.25"
-					min="0"
-					max={MAX_LIST}
-					placeholder="auto"
-					title="Between one list item and the next, in lines of the leading"
-					value={template.defaults.list?.spacing ?? ''}
+					step="0.05"
+					min={MIN_LEADING}
+					max="3"
+					placeholder={String(template.defaults.lineHeight)}
+					title="The leading every list is set in, where an area names none of its own. Blank takes the text's"
+					value={template.defaults.list?.leading ?? ''}
 					disabled={pageFrozen}
-					onchange={(e) => setDefaultList({ spacing: e.currentTarget.value })}
+					onchange={(e) => setDefaultList({ leading: e.currentTarget.value })}
 				/>
-				<span class="unit">lines</span>
 			</label>
-		</span>
-
-		<span class="group" role="group" aria-label="Page surface">
+		</fieldset>
+		<fieldset class="group">
+			<legend>Paper</legend>
 			<span class="field">
-				<span>Paper</span>
+				<span>Color</span>
 				<ColorField
 					value={template.page.background}
 					fallback="#ffffff"
@@ -828,11 +844,11 @@
 				>
 				<button disabled={pageFrozen} title="An http(s) address the template will carry as written" onclick={linkBackground}><Icon name="copy-link" size={14} /> URL…</button>
 			{/if}
-		</span>
-
-		<span class="group" role="group" aria-label="Page number">
+		</fieldset>
+		<fieldset class="group">
+			<legend>Page Number</legend>
 			<label class="field">
-				<span>Page Number</span>
+				<span class="sr-only">Position</span>
 				<select
 					value={template.pageNumber.enabled ? template.pageNumber.position : ''}
 					disabled={pageFrozen}
@@ -883,7 +899,16 @@
 					<span class="unit">mm</span>
 				</label>
 			{/if}
-		</span>
+		</fieldset>
+		<!-- Bleed, then the sheets the cards print onto — the same panel the print
+		     screen shows. -->
+		<PrintSettingsPanel
+			{template}
+			{pageFrozen}
+			{ontemplatechange}
+			onuploadbackground={onuploadprintbackground}
+			{onnotice}
+		/>
 	</div>
 
 <!-- The bar's own file picker. Both bars are mounted at once, so an input

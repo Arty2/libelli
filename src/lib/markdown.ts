@@ -35,8 +35,11 @@ export interface MarkdownOptions {
 export const LIST_GLYPHS: Record<ListMarker, string | null> = {
 	bullet: '•',
 	disc: '●',
+	circle: '○',
+	square: '■',
 	dash: '–',
 	emdash: '—',
+	arrow: '→',
 	none: null
 };
 
@@ -229,11 +232,12 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 	const list = options.list;
 	const leading = options.lineHeight ?? 1;
 	// An area's list style is in type units, as its paragraphs are: the indent
-	// in em of its size, the spacing in lines of its leading. `md.list` is mm,
-	// and stays what a list is set by where neither page nor area names one.
+	// in em of its size, the leading a multiple of it. `md.list` is mm, and
+	// stays what a list is set by where neither page nor area names one.
 	const look: ListLook = {
 		indent: list?.indent !== undefined ? `${round(list.indent)}em` : mm(md.list.indent ?? 0),
-		item: list?.spacing !== undefined ? `${round(list.spacing * leading)}em` : mm(md.list.itemSpacing ?? 0),
+		leading: list?.leading,
+		item: mm(md.list.itemSpacing ?? 0),
 		gap: mm(md.list.markerGap ?? 0),
 		bullet: LIST_GLYPHS[list?.marker ?? 'bullet']
 	};
@@ -298,6 +302,8 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 /** How a list is set, already in CSS lengths; `bullet` null is no marker. */
 interface ListLook {
 	indent: string;
+	/** the list's own line height, on the <ul> so its items and nested lists inherit it */
+	leading?: number;
 	item: string;
 	gap: string;
 	bullet: string | null;
@@ -308,7 +314,8 @@ function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, 
 	const style = [
 		'list-style:none',
 		`margin:0 0 ${mm(top ? (md.list.spaceAfter ?? md.paragraph.spaceAfter ?? 0) : 0)}`,
-		`padding:0 0 0 ${look.indent}`
+		`padding:0 0 0 ${look.indent}`,
+		...(top && look.leading !== undefined ? [`line-height:${round(look.leading)}`] : [])
 	].join(';');
 
 	const items = list.items

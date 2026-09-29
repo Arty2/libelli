@@ -1,10 +1,12 @@
 import { safeImageUrl } from './assets';
 import { clampSide, fitBoard } from './bitmap';
-import { parseColor } from './color';
+import { fromRgba, parseColor, toRgba } from './color';
 import defaultCard from './templates/default-card.json';
 import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
 import type {
 	Anchor,
+	ColorSources,
+	Row,
 	BackgroundFit,
 	BlendMode,
 	BorderStyle,
@@ -135,18 +137,21 @@ export function normaliseParagraph(raw: unknown): ParagraphStyle | undefined {
 	return { mode, amount: Math.round(Math.max(0, Math.min(MAX_PARAGRAPH, n)) * 100) / 100 };
 }
 
-export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'dash', 'emdash', 'none'];
+export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'circle', 'square', 'dash', 'emdash', 'arrow', 'none'];
 
 /** Said with the glyph, since the glyph is the choice. */
 export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
 	bullet: '• Bullet',
 	disc: '● Disc',
+	circle: '○ Circle',
+	square: '■ Square',
 	dash: '– Dash',
 	emdash: '— Em Dash',
+	arrow: '→ Arrow',
 	none: 'None'
 };
 
-/** How far a list may be indented (em) or its items spaced (lines). */
+/** How far a list may be indented, in em. */
 export const MAX_LIST = 10;
 
 /** How far the baseline may move, in em: past a line either way is no correction. */
@@ -155,18 +160,63 @@ export const MAX_BASELINE = 1;
 /** A list style with only the fields that make sense; none of them, nothing. */
 export function normaliseList(raw: unknown): ListStyle | undefined {
 	if (!raw || typeof raw !== 'object') return undefined;
-	const { marker, indent, spacing } = raw as Record<string, unknown>;
-	const length = (v: unknown) => {
+	const { marker, indent, leading } = raw as Record<string, unknown>;
+	const number = (v: unknown, floor: number, ceiling: number) => {
 		if (v === undefined || v === null || v === '') return undefined;
 		const n = Number(v);
-		return Number.isFinite(n) ? Math.round(Math.max(0, Math.min(MAX_LIST, n)) * 100) / 100 : undefined;
+		return Number.isFinite(n) ? Math.round(Math.max(floor, Math.min(ceiling, n)) * 100) / 100 : undefined;
 	};
 	const list = stripUndefined({
 		marker: LIST_MARKERS.includes(marker as ListMarker) ? (marker as ListMarker) : undefined,
-		indent: length(indent),
-		spacing: length(spacing)
+		indent: number(indent, 0, MAX_LIST),
+		// The same floor an area's own leading has; past 3 lines is not leading.
+		leading: number(leading, MIN_LEADING, 3)
 	});
 	return Object.keys(list).length ? list : undefined;
+}
+
+/** Column names only, trimmed; an empty one is no source, and no sources is none. */
+export function normaliseColorFrom(raw: unknown): ColorSources | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const name = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+	const { text, fill, border } = raw as Record<string, unknown>;
+	const from = stripUndefined({ text: name(text), fill: name(fill), border: name(border) });
+	return Object.keys(from).length ? from : undefined;
+}
+
+/**
+ * The area as this row draws it: each color with a column behind it replaced
+ * by the row's cell, where the cell is a color. Everything else — the area's
+ * own color where a cell is empty or is words, and every field that is not a
+ * color — is the area's. Only ever drawn from, never written back: the row's
+ * color is the row's, and storing it would put one card's color on all of them.
+ *
+ * The cell goes through `parseColor`, the one door a color has to a style
+ * attribute, like every other color the card draws.
+ */
+export function colorsFromRow(box: Box, row: Row | null | undefined): Box {
+	const from = box.colorFrom;
+	if (!from || !row) return box;
+	// The hue is the row's; the opacity is still the area's, so a fill linked to
+	// a column can be a tint. The two multiply: a cell with an alpha of its own
+	// keeps it, faded further by the area's.
+	const cell = (column: string | undefined, own: string | undefined) => {
+		const hue = column ? parseColor(row[column]) : null;
+		if (!hue) return null;
+		const alpha = toRgba(own)?.a ?? 1;
+		const channels = toRgba(hue);
+		return alpha < 1 && channels ? fromRgba({ ...channels, a: channels.a * alpha }) : hue;
+	};
+	const text = cell(from.text, box.color);
+	const fill = cell(from.fill, box.background);
+	const border = cell(from.border, box.borderColor);
+	if (!text && !fill && !border) return box;
+	return {
+		...box,
+		...(text ? { color: text } : {}),
+		...(fill ? { background: fill } : {}),
+		...(border ? { borderColor: border } : {})
+	};
 }
 
 /** A baseline shift in em, negative allowed; zero is no shift and is dropped. */
@@ -332,6 +382,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
 			background: color(partial.background),
+			colorFrom: normaliseColorFrom(partial.colorFrom),
 			// A blend mode is written straight into a style attribute, so nothing
 			// but one of these thirteen words may reach it.
 			blend: BLEND_MODES.includes(partial.blend as BlendMode) ? partial.blend : undefined,
