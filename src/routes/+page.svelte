@@ -56,7 +56,8 @@
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { cssIdent } from '$lib/css';
 	import { watchPresses } from '$lib/haptics';
-	import { formatDate, referencedColumns } from '$lib/placeholders';
+	import { GONE_ROW, carryLookups, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
+	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
 	import { TEXT_MAX, TEXT_MIN, applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
@@ -559,6 +560,43 @@
 		}
 		return used;
 	});
+
+	/**
+	 * The rows in the order of the numbers the table shows them with — where
+	 * they arrived, not where a sort has put them — which is what
+	 * `{{lookup:N:…}}` counts in. See `Dataset.order`.
+	 */
+	const lookupRows = $derived(inArrivalOrder(dataset));
+
+	/**
+	 * Columns a keyword has taken — `today`, `lookup` — which `{{name}}` can
+	 * never reach. The table colours them; the status line says why, once per
+	 * set of them, so it is said when one appears and not on every keystroke.
+	 */
+	const keywordColumns = $derived(dataset.columns.filter(isKeyword));
+	let keywordsSaid = '';
+	$effect(() => {
+		const said = keywordColumns.join('\n');
+		if (said === keywordsSaid) return;
+		keywordsSaid = said;
+		if (!keywordColumns.length) return;
+		notify(
+			keywordColumns
+				.map((c) => `“${c}” is a reserved keyword. Rename the column to enable the {{${c.trim().toLowerCase()}}} placeholder.`)
+				.join(' '),
+			'warning'
+		);
+	});
+
+	/** What moving the lookups along did, in a sentence for the status line. */
+	function lookupNote({ renumbered, orphaned }: { renumbered: number; orphaned: number }) {
+		const n = (k: number) => `${k} lookup${k === 1 ? '' : 's'}`;
+		const parts = [
+			renumbered ? `${n(renumbered)} renumbered to follow ${renumbered === 1 ? 'its row' : 'their rows'}.` : '',
+			orphaned ? `${n(orphaned)} named a deleted row and now ${orphaned === 1 ? 'reads' : 'read'} {{lookup:${GONE_ROW}:…}}.` : ''
+		];
+		return { note: parts.filter(Boolean).join(' '), warning: orphaned > 0 };
+	}
 
 	// ---- boot ---------------------------------------------------------------
 
@@ -1875,7 +1913,9 @@
 	function renameDataset(name: string) {
 		const wanted = name.trim();
 		describe('Rename the table');
-		dataset = wanted ? { ...dataset, name: wanted } : { columns: dataset.columns, rows: dataset.rows };
+		// Clearing the name removes it, and only it: the lock and the rows' order stay.
+		const { name: _name, ...unnamed } = dataset;
+		dataset = wanted ? { ...dataset, name: wanted } : unnamed;
 	}
 
 	/**
@@ -2871,6 +2911,7 @@
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
 			{activeRow}
 			rowCount={dataset.rows.length}
+			rows={lookupRows}
 			onactivate={(i) => (activeRow = i)}
 			onlightbox={() => (lightboxOpen = true)}
 			{background}
@@ -3040,7 +3081,7 @@
 						};
 					}
 				}}
-				onchange={(next) => {
+				onchange={(next, moved) => {
 					// Every structural edit in the tray builds a fresh dataset, and most
 					// of them have no reason to think about what the table is called.
 					// Carried across here, where all of them arrive, rather than in each
@@ -3049,8 +3090,18 @@
 					// The lock the same way: it is the table's, and no edit in the
 					// tray means to change it — there is a button for that.
 					const named = next.name === undefined && dataset.name ? { ...next, name: dataset.name } : next;
-					dataset = dataset.locked ? { ...named, locked: true } : named;
+					let kept = dataset.locked ? { ...named, locked: true } : named;
+					// Rows deleted or moved by hand are renumbered, and every lookup
+					// that named one follows it — in the template and in the cells,
+					// in the same edit, so one undo puts both back.
+					const carried = moved ? carryLookups(template, kept, moved) : null;
+					if (carried) {
+						kept = carried.dataset;
+						if (carried.template !== template) template = carried.template;
+					}
+					dataset = kept;
 					if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), next.columns);
+					return carried && (carried.renumbered || carried.orphaned) ? lookupNote(carried) : undefined;
 				}}
 			/>
 			{/if}
@@ -3394,6 +3445,7 @@
 	<PrintPreview
 		{template}
 		{dataset}
+		{lookupRows}
 		{mapping}
 		{activeRow}
 		{background}
@@ -3421,6 +3473,7 @@
 	<Lightbox
 		{template}
 		{dataset}
+		{lookupRows}
 		{mapping}
 		{background}
 		{images}
@@ -3434,6 +3487,7 @@
 	<PrintRoot
 		{template}
 		{dataset}
+		{lookupRows}
 		{mapping}
 		{background}
 		{images}

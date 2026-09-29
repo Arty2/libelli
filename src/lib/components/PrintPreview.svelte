@@ -12,11 +12,13 @@
 	import { elementToPng, ratioForDpi } from '$lib/png';
 	import { bleedFor, mmToPx } from '$lib/layout';
 	import { planSheets, resolveImposition } from '$lib/imposition';
-	import type { Dataset, Mapping, Template } from '$lib/types';
+	import type { Dataset, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
 		dataset: Dataset;
+		/** the rows in the order the table numbers them, for a card's `{{lookup:…}}` */
+		lookupRows: readonly Row[];
 		mapping: Mapping;
 		activeRow: number;
 		background: string | null;
@@ -41,6 +43,7 @@
 	let {
 		template,
 		dataset,
+		lookupRows,
 		mapping,
 		activeRow,
 		background,
@@ -328,6 +331,7 @@
 							{mapping}
 							pageNumber={i + 1}
 							pageCount={dataset.rows.length}
+							rows={lookupRows}
 							{background}
 							{images}
 						/>
@@ -392,6 +396,7 @@
 									{printBackground}
 									{cells}
 									pageCount={dataset.rows.length}
+									rows={lookupRows}
 									previewScale={sheetThumbScale}
 								/>
 							</span>
@@ -437,6 +442,7 @@
 	{#if fullscreen !== null}
 		<Lightbox
 			{template}
+			{lookupRows}
 			{dataset}
 			{mapping}
 			{background}
@@ -460,6 +466,7 @@
 			sheets={sheetGroups}
 			index={Math.min(sheetFullscreen, sheetGroups.length - 1)}
 			pageCount={dataset.rows.length}
+			rows={lookupRows}
 			sheetW={printSheetW}
 			sheetH={printSheetH}
 			onactivate={(i) => (sheetFullscreen = i)}

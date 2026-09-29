@@ -445,6 +445,14 @@ export interface Dataset {
 	 * still be chosen. Absent is unlocked.
 	 */
 	locked?: boolean;
+	/**
+	 * Where each row arrived, 0-based, by position: `order[i]` is the number,
+	 * less one, the row at `rows[i]` wears. Written by a sort, which rewrites
+	 * `rows` (row order is print order) but must not renumber them, since
+	 * `{{lookup:N:…}}` names a row by its number. Stored with the table so a
+	 * reload, and undo, keep it. Absent means the rows stand where they arrived.
+	 */
+	order?: number[];
 }
 
 export type Row = Record<string, string>;
