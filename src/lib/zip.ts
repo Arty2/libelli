@@ -13,6 +13,7 @@
  * No ZIP64: an archive over 4 GB of cards is not a thing this app makes, and
  * `zipStore` refuses one rather than writing a file that would not open.
  */
+import { t } from './strings';
 
 export interface ZipEntry {
 	name: string;
@@ -98,7 +99,7 @@ export function zipStore(entries: ZipEntry[]): Uint8Array<ArrayBuffer> {
 
 	const directorySize = centrals.reduce((sum, part) => sum + part.length, 0);
 	if (offset + directorySize > 0xffffffff || entries.length > 0xffff) {
-		throw new Error('Too much for one archive — export fewer cards at a time.');
+		throw new Error(t.errors.archiveTooBig);
 	}
 	const end = new Uint8Array(22);
 	const e = new DataView(end.buffer);

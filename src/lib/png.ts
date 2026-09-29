@@ -1,4 +1,5 @@
 import { STORE_FONTS, idbGet, idbKeys } from './storage';
+import { t } from './strings';
 import type { StoredFont } from './fonts';
 
 /**
@@ -228,7 +229,7 @@ export async function elementToPng(
 ): Promise<PngResult> {
 	const width = node.offsetWidth;
 	const height = node.offsetHeight;
-	if (!width || !height) throw new Error('Nothing to export.');
+	if (!width || !height) throw new Error(t.errors.nothingToExport);
 
 	const clone = node.cloneNode(true) as HTMLElement;
 	clone.setAttribute('xmlns', XHTML);
@@ -254,12 +255,12 @@ export async function elementToPng(
 	canvas.width = Math.round(width * pixelRatio);
 	canvas.height = Math.round(height * pixelRatio);
 	const context = canvas.getContext('2d');
-	if (!context) throw new Error('This browser will not give a canvas to draw on.');
+	if (!context) throw new Error(t.errors.noCanvas);
 	context.scale(pixelRatio, pixelRatio);
 	context.drawImage(image, 0, 0);
 
 	const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-	if (!blob) throw new Error('The image could not be encoded.');
+	if (!blob) throw new Error(t.errors.notEncoded);
 	return { blob, missingFonts: families.filter((f) => f && !embedded.has(f.toLowerCase())) };
 }
 
@@ -272,7 +273,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 	return new Promise((resolve, reject) => {
 		const image = new Image();
 		image.onload = () => resolve(image);
-		image.onerror = () => reject(new Error('The card could not be rasterised.'));
+		image.onerror = () => reject(new Error(t.errors.notRasterised));
 		image.src = src;
 	});
 }

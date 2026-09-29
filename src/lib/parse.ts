@@ -1,4 +1,5 @@
 import type { Dataset, Row } from './types';
+import { fmt, t } from './strings';
 
 /**
  * Delimiter-separated parsing for spreadsheet paste (TSV) and CSV files.
@@ -124,7 +125,7 @@ export function columnName(raw: string): string {
 export function normaliseHeaders(raw: string[]): string[] {
 	const taken = new Set<string>();
 	return raw.map((h, idx) => {
-		const base = columnName(h) || `Column-${idx + 1}`;
+		const base = columnName(h) || fmt(t.defaults.column, { n: idx + 1 });
 		let name = base;
 		for (let n = 2; taken.has(name); n++) name = `${base}-${n}`;
 		taken.add(name);
@@ -172,7 +173,7 @@ export function parseTable(text: string, options: ParseOptions = {}): Dataset {
 	const width = grid.reduce((m, r) => Math.max(m, r.length), 0);
 	const columns = useHeader
 		? normaliseHeaders(pad(grid[0], width))
-		: Array.from({ length: width }, (_, i) => `Column-${i + 1}`);
+		: Array.from({ length: width }, (_, i) => fmt(t.defaults.column, { n: i + 1 }));
 
 	const body = useHeader ? grid.slice(1) : grid;
 	const rows: Row[] = body.map((cells) => {

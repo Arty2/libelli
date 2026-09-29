@@ -15,6 +15,7 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import { fontStack } from '$lib/fonts';
+	import { fmt, t } from '$lib/strings';
 
 	/**
 	 * A select, drawn the way the template picker is drawn: the value on a
@@ -186,7 +187,7 @@
 		type="button"
 		aria-haspopup="menu"
 		aria-expanded={open}
-		aria-label="{label}: {current?.label ?? value}"
+		aria-label={fmt(t.menuSelect.current, { label, value: current?.label ?? value })}
 		title={title ?? current?.title}
 		{disabled}
 		onclick={press}

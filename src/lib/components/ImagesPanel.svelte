@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { fmt, plural, t } from '$lib/strings';
 	import { armDefault } from '$lib/modal';
 	import { downloadUrl, slugify } from '$lib/download';
 	import { editableType, frameBetween, framePixels, isCrop, type Frame } from '$lib/photo';
@@ -95,7 +96,7 @@
 		await storeLocalImage(file, name);
 		await refresh();
 		onchanged();
-		onnotice(`${name} is back, from ${file.name}.`);
+		onnotice(fmt(t.images.putBack, { name, file: file.name }));
 	}
 
 	/**
@@ -162,9 +163,7 @@
 		for (const file of files) names.push(await storeLocalImage(file));
 		await refresh();
 		onchanged();
-		onnotice(
-			`${names.length === 1 ? names[0] : `${names.length} images`} added. Drag ${names.length === 1 ? 'it' : 'one'} onto an area to put it there, or onto the page for an area of its own.`
-		);
+		onnotice(plural(t.images.added, names.length, { name: names[0] }));
 	}
 
 	/**
@@ -225,7 +224,7 @@
 		if (area?.dataset.boxId) onplace(area.dataset.boxId, name);
 		else if (document.elementFromPoint(event.clientX, event.clientY)?.closest('.viewport .sheet'))
 			onplacepage(name, event.clientX, event.clientY);
-		else onnotice('Let go over the page to put the image on it — over an area to put it in that one.');
+		else onnotice(t.images.dropMissed);
 	}
 
 	$effect(() => {
@@ -266,12 +265,14 @@
 	let drawnSizes = $state<Record<string, { w: number; h: number }>>({});
 
 	const weigh = (bytes: number) =>
-		bytes >= 1024 * 1024 ? `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+		bytes >= 1024 * 1024
+			? fmt(t.units.mb, { n: Math.round((bytes / 1024 / 1024) * 10) / 10 })
+			: fmt(t.units.kb, { n: Math.max(1, Math.round(bytes / 1024)) });
 
 	async function choose() {
 		const chosen = await chooseImageFolder();
 		if (!chosen) return;
-		onnotice(`Images go into ${chosen.name} from now on. The ones already in this browser stay where they are.`);
+		onnotice(fmt(t.images.folderChosen, { folder: chosen.name }));
 		await refresh();
 		onchanged();
 	}
@@ -279,7 +280,7 @@
 	async function reopen() {
 		const state = await reopenImageFolder();
 		if (!state?.ready) {
-			onnotice('That folder was not opened, so images are coming from this browser.', 'warning');
+			onnotice(t.images.folderNotOpened, 'warning');
 			return;
 		}
 		await refresh();
@@ -288,7 +289,7 @@
 
 	async function forget() {
 		await forgetImageFolder();
-		onnotice('Let go of the folder. Nothing in it was deleted — this app has simply stopped reading it.');
+		onnotice(t.images.folderForgotten);
 		await refresh();
 		onchanged();
 	}
@@ -298,8 +299,7 @@
 		// Deleted from its own large view: there is nothing left to look at.
 		if (image.name === focus) onfocus?.(null);
 		onnotice(
-			`${image.name} deleted.` +
-				(used.has(image.name) ? ' The areas pointing at it will draw nothing until it is put back.' : '')
+			fmt(t.images.deleted, { name: image.name }) + (used.has(image.name) ? t.images.deletedWasUsed : '')
 		);
 		await refresh();
 		onchanged();
@@ -444,14 +444,14 @@
 			// instead, and a PNG under a .webp name is a file that lies about
 			// itself. Refused rather than written.
 			if (!blob || blob.type !== type) {
-				onnotice(`This browser cannot write ${type.replace('image/', '').toUpperCase()} files, so ${name} was left as it was.`, 'warning');
+				onnotice(fmt(t.images.cannotWrite, { type: type.replace('image/', '').toUpperCase(), name }), 'warning');
 				return;
 			}
 			await storeLocalImage(new File([blob], name, { type }), name);
 			dirty = false;
 			await refresh();
 			onchanged();
-			onnotice(`${name} saved — every card showing it shows the edit.`);
+			onnotice(fmt(t.images.saved, { name }));
 		} finally {
 			saving = false;
 		}
@@ -477,7 +477,7 @@
 	is stored and what it weighs at the top, the ways in at the foot, where
 	the table keeps its own.
 -->
-<section class="images-tray" aria-label="Images">
+<section class="images-tray" aria-label={t.images.title}>
 	<!-- The head is also the tray's grip on a phone, as the table's header
 	     row is: pulled up or down, it shares the height with the page. -->
 	<div
@@ -492,21 +492,21 @@
 		{#if focus}
 			<button
 				class="back"
-				title={dirty ? 'Save or revert the edit first' : 'Back to every image'}
-				aria-label="Back to every image"
+				title={dirty ? t.images.saveFirst : t.images.back}
+				aria-label={t.images.back}
 				disabled={dirty}
 				onclick={() => onfocus?.(null)}
 			><Icon name="chevron-left" size={14} /></button>
 			<span class="context focus-name" title={focus}>{focus}</span>
 			<!-- The size as it stands, edits and all: a crop is judged by it. -->
 			{#if focusType && dims.w}
-				<span class="total">{dims.w} × {dims.h} px</span>
+				<span class="total">{fmt(t.units.pixels, { w: dims.w, h: dims.h })}</span>
 			{:else if sizes[focus]}
-				<span class="total">{sizes[focus].w} × {sizes[focus].h} px</span>
+				<span class="total">{fmt(t.units.pixels, { w: sizes[focus].w, h: sizes[focus].h })}</span>
 			{/if}
-			{#if dirty}<span class="tag">edited</span>{/if}
+			{#if dirty}<span class="tag">{t.images.edited}</span>{/if}
 		{:else}
-		<span class="context">Images</span>
+		<span class="context">{t.images.title}</span>
 		{/if}
 		{#if !focus && images.length}
 			<span class="total">{images.length} · {weigh(total)}</span>
@@ -516,14 +516,14 @@
 				{#if folder.ready}
 					<Icon name="folder" size={12} /> {folder.name}
 				{:else}
-					{folder.name} — not opened
+					{fmt(t.images.folderNotOpenedTag, { folder: folder.name })}
 				{/if}
 			</span>
 		{/if}
 		{#if images.length >= FILTER_FROM && !focus}
 			<label class="find">
-				<span class="sr-only">Find an image</span>
-				<input type="search" placeholder="Find…" bind:value={filter} />
+				<span class="sr-only">{t.images.findLabel}</span>
+				<input type="search" placeholder={t.images.findPlaceholder} bind:value={filter} />
 			</label>
 		{/if}
 	</div>
@@ -533,9 +533,9 @@
 		<div class="viewer" bind:clientWidth={room.w} bind:clientHeight={room.h}>
 			{#if !focusUrl}
 				<p class="empty">
-					{busy ? '…' : `${focus} is not in this browser.`}
+					{busy ? '…' : fmt(t.images.notHere, { name: focus })}
 					{#if !busy && missing.includes(focus)}
-						<button class="find" onclick={() => findFor(focus!)}><Icon name="image-reference" size={13} /> Find…</button>
+						<button class="find" onclick={() => findFor(focus!)}><Icon name="image-reference" size={13} /> {t.images.find}</button>
 					{/if}
 				</p>
 			{:else if !focusType}
@@ -568,21 +568,25 @@
 		{#if busy}
 			<p class="empty">…</p>
 		{:else if !images.length && !missing.length && !drawings.length}
-			<p class="empty">Nothing here yet.</p>
+			<p class="empty">{t.images.empty}</p>
 		{:else}
 			<!-- One picture a line: what it looks like, what it is called, how big
 			     it is in pixels and in bytes, and whether anything uses it. The
 			     thumbnail is also the handle it is carried onto an area by. -->
 			<ul class="images">
 				{#each shown as image (image.where + image.name)}
-					<li class:unused={!used.has(image.name)} title="{image.name} — {image.where === 'folder' ? 'in the folder' : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}">
+					<li class:unused={!used.has(image.name)} title={fmt(t.images.itemTitle, {
+						name: image.name,
+						where: image.where === 'folder' ? t.images.inFolder : t.images.inBrowser,
+						use: used.has(image.name) ? t.images.inUse : t.images.unused
+					})}>
 						<span
 							class="thumb"
 							class:carrying={carry?.on && carry.name === image.name}
 							role="button"
 							tabindex="-1"
-							aria-label="Drag {image.name} onto an area"
-							title="Drag onto an area, or onto the page for an area of its own"
+							aria-label={fmt(t.images.dragLabel, { name: image.name })}
+							title={t.images.dragTitle}
 							onpointerdown={(e) => startCarry(e, image.name)}
 							onpointermove={moveCarry}
 							onpointerup={endCarry}
@@ -602,17 +606,17 @@
 						</span>
 						<span class="name">{image.name}</span>
 						<span class="size">{[
-							sizes[image.name] ? `${sizes[image.name].w} × ${sizes[image.name].h} px` : '',
+							sizes[image.name] ? fmt(t.units.pixels, { w: sizes[image.name].w, h: sizes[image.name].h }) : '',
 							weigh(image.bytes)
 						]
 							.filter(Boolean)
 							.join(' · ')}</span>
-						{#if !used.has(image.name)}<span class="tag">unused</span>{/if}
+						{#if !used.has(image.name)}<span class="tag">{t.images.unused}</span>{/if}
 						{#if urls[image.name]}
 							<button
 								class="square save"
-								title="Download {image.name}"
-								aria-label="Download {image.name}"
+								title={fmt(t.images.download, { name: image.name })}
+								aria-label={fmt(t.images.download, { name: image.name })}
 								onclick={() => downloadUrl(image.name, urls[image.name])}
 							>
 								<Icon name="download" size={12} />
@@ -620,8 +624,8 @@
 						{/if}
 						<button
 							class="square"
-							title="Delete {image.name}"
-							aria-label="Delete {image.name}"
+							title={fmt(t.images.deleteItem, { name: image.name })}
+							aria-label={fmt(t.images.deleteItem, { name: image.name })}
 							onclick={() => (confirming = image)}
 						>
 							<Icon name="trash" size={12} />
@@ -629,12 +633,12 @@
 					</li>
 				{/each}
 				{#each missing as name (name)}
-					<li class="missing" title="{name} — pointed at, but not in this browser">
+					<li class="missing" title={fmt(t.images.missingTitle, { name })}>
 						<span class="thumb empty-thumb" aria-hidden="true"><Icon name="image" size={16} /></span>
 						<span class="name">{name}</span>
-						<span class="tag missing-tag">missing</span>
-						<button class="find" title="Choose the file to use for {name}" onclick={() => findFor(name)}>
-							<Icon name="image-reference" size={13} /> Find…
+						<span class="tag missing-tag">{t.images.missing}</span>
+						<button class="find" title={fmt(t.images.findTitle, { name })} onclick={() => findFor(name)}>
+							<Icon name="image-reference" size={13} /> {t.images.find}
 						</button>
 					</li>
 				{/each}
@@ -644,11 +648,11 @@
 			<!-- The pictures kept in the table itself, and on areas with no
 			     column: not files, so nothing to delete or carry here — a press
 			     opens one to draw on, in the side panel. -->
-			<h3 class="section">Drawings <span class="total">{drawings.length} · {weigh(drawings.reduce((sum, d) => sum + d.src.length * 0.75, 0))}</span></h3>
+			<h3 class="section">{t.images.drawings} <span class="total">{drawings.length} · {weigh(drawings.reduce((sum, d) => sum + d.src.length * 0.75, 0))}</span></h3>
 			<ul class="images">
 				{#each drawings as drawing (drawing.key)}
 					<li>
-						<button class="drawing" title="Open {drawing.label}, {drawing.where}, to draw on" onclick={() => onopendrawing?.(drawing.key)}>
+						<button class="drawing" title={fmt(t.images.openDrawing, { label: drawing.label, where: drawing.where })} onclick={() => onopendrawing?.(drawing.key)}>
 							<span class="thumb pixels">
 								<img
 									src={drawing.src}
@@ -662,7 +666,7 @@
 							</span>
 							<span class="name">{drawing.label} <span class="where-in">{drawing.where}</span></span>
 							<span class="size">{[
-								drawnSizes[drawing.key] ? `${drawnSizes[drawing.key].w} × ${drawnSizes[drawing.key].h} px` : '',
+								drawnSizes[drawing.key] ? fmt(t.units.pixels, { w: drawnSizes[drawing.key].w, h: drawnSizes[drawing.key].h }) : '',
 								weigh(drawing.src.length * 0.75)
 							]
 								.filter(Boolean)
@@ -670,8 +674,8 @@
 						</button>
 						<button
 							class="square save"
-							title="Download {drawingFile(drawing)}"
-							aria-label="Download {drawing.label}, {drawing.where}"
+							title={fmt(t.images.download, { name: drawingFile(drawing) })}
+							aria-label={fmt(t.images.downloadDrawing, { label: drawing.label, where: drawing.where })}
 							onclick={() => downloadUrl(drawingFile(drawing), drawing.src)}
 						>
 							<Icon name="download" size={12} />
@@ -686,15 +690,15 @@
 	{#if focus && focusType && focusUrl}
 		<!-- What can be done to it, in a row under it as the drawing editor has
 		     its tools: turn it, mirror it, crop it to a frame drawn over it. -->
-		<div class="tools" role="toolbar" aria-label="Image tools">
+		<div class="tools" role="toolbar" aria-label={t.images.tools}>
 			<span class="segmented">
-				<button title="Turn a quarter turn clockwise" aria-label="Rotate" onclick={turn}><Icon name="rotate" size={16} /></button>
-				<button title="Flip left to right" aria-label="Flip horizontally" onclick={() => flip('x')}><Icon name="reflect-horizontal" size={16} /></button>
-				<button title="Flip upside down" aria-label="Flip vertically" onclick={() => flip('y')}><Icon name="reflect-vertical" size={16} /></button>
+				<button title={t.images.rotateTitle} aria-label={t.images.rotate} onclick={turn}><Icon name="rotate" size={16} /></button>
+				<button title={t.images.flipXTitle} aria-label={t.images.flipX} onclick={() => flip('x')}><Icon name="reflect-horizontal" size={16} /></button>
+				<button title={t.images.flipYTitle} aria-label={t.images.flipY} onclick={() => flip('y')}><Icon name="reflect-vertical" size={16} /></button>
 				<button
 					aria-pressed={cropping}
-					title={cropping ? 'Stop cropping' : 'Crop — drag a frame over the image'}
-					aria-label="Crop"
+					title={cropping ? t.images.stopCropping : t.images.cropTitle}
+					aria-label={t.images.crop}
 					onclick={() => {
 						cropping = !cropping;
 						frame = null;
@@ -702,7 +706,7 @@
 				><Icon name="crop" size={16} /></button>
 			</span>
 			{#if cropping}
-				<button class="apply" disabled={!isCrop(frame)} title="Keep only what is inside the frame" onclick={applyCrop}>Apply Crop</button>
+				<button class="apply" disabled={!isCrop(frame)} title={t.images.applyCropTitle} onclick={applyCrop}>{t.images.applyCrop}</button>
 			{/if}
 		</div>
 	{/if}
@@ -712,16 +716,16 @@
 		     or going back to what is stored. The pager steps through the
 		     list in its own order, once nothing is waiting to be saved. -->
 		<div class="actions">
-			<span class="pager" role="group" aria-label="Image">
-				<button class="step" title={dirty ? 'Save or revert the edit first' : 'Previous image'} aria-label="Previous image" disabled={dirty || focusIndex <= 0} onclick={() => step(-1)}><Icon name="chevron-left" size={16} /></button>
-				<span class="count">{focusIndex + 1} / {shown.length}</span>
-				<button class="step" title={dirty ? 'Save or revert the edit first' : 'Next image'} aria-label="Next image" disabled={dirty || focusIndex < 0 || focusIndex >= shown.length - 1} onclick={() => step(1)}><Icon name="chevron-right" size={16} /></button>
+			<span class="pager" role="group" aria-label={t.images.image}>
+				<button class="step" title={dirty ? t.images.saveFirst : t.images.previous} aria-label={t.images.previous} disabled={dirty || focusIndex <= 0} onclick={() => step(-1)}><Icon name="chevron-left" size={16} /></button>
+				<span class="count">{fmt(t.images.counter, { n: focusIndex + 1, total: shown.length })}</span>
+				<button class="step" title={dirty ? t.images.saveFirst : t.images.next} aria-label={t.images.next} disabled={dirty || focusIndex < 0 || focusIndex >= shown.length - 1} onclick={() => step(1)}><Icon name="chevron-right" size={16} /></button>
 			</span>
 			{#if focusType && focusUrl}
 				<span class="spacer"></span>
-				<button disabled={!dirty} title="Back to the image as it is stored" onclick={() => focusUrl && load(focusUrl)}>Revert</button>
+				<button disabled={!dirty} title={t.images.revertTitle} onclick={() => focusUrl && load(focusUrl)}>{t.images.revert}</button>
 			{:else if focusUrl}
-				<span class="note">Shown only — this browser cannot write {focus.split('.').pop()?.toUpperCase() || 'this kind of'} files.</span>
+				<span class="note">{fmt(t.images.shownOnly, { type: focus.split('.').pop()?.toUpperCase() || t.images.thisKind })}</span>
 				<span class="spacer"></span>
 			{:else}
 				<span class="spacer"></span>
@@ -729,30 +733,30 @@
 			<!-- Delete and Save at the far end, as a drawing has them in the
 			     table: the two things done to the picture itself. Delete asks
 			     first, as it does from the list. -->
-			<button class="danger" disabled={!focusRecord} title="Delete {focus}" onclick={() => focusRecord && (confirming = focusRecord)}>
-				<Icon name="trash" size={15} /> Delete
+			<button class="danger" disabled={!focusRecord} title={fmt(t.images.deleteItem, { name: focus })} onclick={() => focusRecord && (confirming = focusRecord)}>
+				<Icon name="trash" size={15} /> {t.common.delete}
 			</button>
 			{#if focusType && focusUrl}
-				<button class="primary" disabled={!dirty || saving} title="Write the edit over {focus}" onclick={save}>Save</button>
+				<button class="primary" disabled={!dirty || saving} title={fmt(t.images.saveTitle, { name: focus })} onclick={save}>{t.images.save}</button>
 			{/if}
 		</div>
 	{:else}
 	<!-- The ways in, where the table keeps its toolbar. Upload is every
 	     browser's, a phone included; the folder is Chromium's. -->
 	<div class="actions">
-		<button title="Add images from this device" onclick={() => fileInput?.click()}>
-			<Icon name="image-reference" size={15} /> Upload…
+		<button title={t.images.uploadTitle} onclick={() => fileInput?.click()}>
+			<Icon name="image-reference" size={15} /> {t.images.upload}
 		</button>
 		{#if available}
 			{#if folder && !folder.ready}
-				<button class="primary" onclick={reopen}>Open {folder.name}</button>
+				<button class="primary" onclick={reopen}>{fmt(t.images.openFolder, { folder: folder.name })}</button>
 			{/if}
 			<button
-				title="Keep images as ordinary files in a folder of your own, rather than in this browser's storage"
-				onclick={choose}><Icon name="folder" size={15} /> {folder ? 'Another Folder…' : 'Folder…'}</button
+				title={t.images.chooseFolderTitle}
+				onclick={choose}><Icon name="folder" size={15} /> {folder ? t.images.anotherFolder : t.images.chooseFolder}</button
 			>
 			{#if folder}
-				<button title="Stop reading the folder. Nothing in it is deleted" onclick={forget}>Forget</button>
+				<button title={t.images.forgetTitle} onclick={forget}>{t.images.forget}</button>
 			{/if}
 		{/if}
 	</div>
@@ -779,15 +783,15 @@
 			if (e.key === 'Escape') confirming = null;
 		}}
 	>
-		<h2 id="delete-image-title">Delete “{image.name}”?</h2>
+		<h2 id="delete-image-title">{fmt(t.images.confirmTitle, { name: image.name })}</h2>
 		<p>
-			It is removed from {image.where === 'folder' ? 'the folder' : 'this browser'}, and this cannot be undone.
+			{image.where === 'folder' ? t.images.confirmFolder : t.images.confirmBrowser}
 			{#if used.has(image.name)}
-				Something on this card or in this table uses it, and will draw nothing until it is put back.
+				{t.images.confirmUsed}
 			{/if}
 		</p>
 		<div class="confirm-actions">
-			<button onclick={() => (confirming = null)}>Cancel</button>
+			<button onclick={() => (confirming = null)}>{t.common.cancel}</button>
 			<button
 				class="danger-solid"
 				data-default
@@ -797,7 +801,7 @@
 					const doomed = image;
 					confirming = null;
 					void remove(doomed);
-				}}>Delete Image</button
+				}}>{t.images.confirmDelete}</button
 			>
 		</div>
 	</div>

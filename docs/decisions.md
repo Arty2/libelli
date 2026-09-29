@@ -2983,6 +2983,62 @@ for, and a locked area half off the edge is still cut in half by every print.
 The cost is that a parked note is locked, so it is typed into from the table,
 not on the card.
 
+## `src/lib/strings/`
+
+**One catalogue, read by everything.** Every label, tooltip, heading, notice,
+dialog, undo-history name and screen-reader name is a key in `en.ts`, grouped
+by the part of the screen that says it. That file is the thing to review — the
+whole voice of the app in one read — and a translation is a copy of it typed as
+`Strings`, so a missing key fails `npm run check` instead of showing a blank.
+`index.ts` picks a catalogue once, from `navigator.languages`, and sets
+`<html lang>`; there is no switch in the app, because the platform has one and
+`ssr = false` means nothing was rendered in another language to be undone.
+Modules as well as components read it — `template.ts`, `layout.ts`, `qr.ts`
+and the rest — because their words reach the screen too, as an error in the
+status bar, a starter's name, a screen in the zoom menu. `template.ts` imports
+it as `ui`, since `t` is already its name for a template being read.
+
+**Whole sentences, with holes.** `fmt` fills `{name}`, and a hole with no value
+stays visible, so a translation that names the wrong variable shows the mistake.
+`plural` picks a form by `Intl.PluralRules`, so a language with four forms gets
+four. Sentences are not glued from fragments where it can be helped — a
+fragment fixes the word order of English into every other language — which is
+why the right-click menu has "Duplicate {n} Boxes" whole rather than a
+" {n} Boxes" appended, why ResetButton takes its whole tip rather than the
+end of "Back to …", and why taking a color from a column is said three times
+over, once per color. Where a sentence wraps an element — the bold file name
+in the missing-image banner — it is split into the text before and after, and
+the catalogue says so beside it.
+
+**Three marks, not HTML.** The Help panel is prose with a bold word here and
+there. `rich.ts` reads `**bold**`, `_italic_` and `` `code` `` into runs the
+page draws as elements, so a translator can move the emphasis with the word and
+nothing in a catalogue can become markup — raw HTML stays in the three files
+gate 2 allows. The keys list is data too, a row per chord, with the second way
+to press it in `alt`.
+
+**Dates and sizes are the catalogue's too.** A `%%today%%` prints the month and
+day names in the interface's language, with the short forms written out, since
+three letters of a month is not an abbreviation in every language; the default
+format is a key as well, because day-month-year is not everybody's order.
+`PAGE_PRESETS` gained a `label` for the menus; `name` stays the key a size is
+matched and stored by, so a template saved in one language opens in another.
+
+**What stays out.** The walkthrough's rows, `sample-cards.csv`: they are data,
+edited in a spreadsheet like any other table, and a table does not change
+language when the interface does. Everything around them is in — the starter
+template's name, the Getting Started table's name and notices, the first-run
+notice. Left out as well: names that are names in every language — `libelli`
+on the logo and in the Help panel's head, the font families — and the service
+worker's one error, which fails a fetch and never reaches a person.
+
+**The gate.** `gates.sh` § 10 fails a `title`, `aria-label`, `placeholder`,
+`alt` or component `label` written as a literal in a `.svelte` file. Text
+between tags is not checked: too much of it is a variable for a grep to tell
+apart, so that half is on review. Two traps for whoever adds the next string:
+a local `t` shadows the import (`storage.ts` and DataTable have `(t) =>`
+arrow parameters), and a comment that spells out the raw-HTML tag trips gate 2.
+
 ## `src/lib/placeholders.ts`
 
 **Find and replace is two parts after a column, never a pattern.**

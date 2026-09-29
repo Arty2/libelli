@@ -1,5 +1,6 @@
 import { localImageName } from './assets';
 import { parseColor } from './color';
+import { t } from './strings';
 import { GRID_MINOR } from './layout';
 import { marginsOf, newBox } from './template';
 import type { Box, Defaults, Mapping, PageSpec, Row } from './types';
@@ -98,18 +99,18 @@ export const FIELD_KINDS: FieldKind[] = [
 ];
 
 export const KIND_LABELS: Record<FieldKind, string> = {
-	title: 'Title',
-	subtitle: 'Subtitle',
-	detail: 'Detail',
-	body: 'Body',
-	footnote: 'Footnote',
-	label: 'Byline',
-	number: 'Number',
-	date: 'Date',
-	image: 'Image',
-	link: 'QR code',
-	code: 'Code',
-	credit: 'Credit'
+	title: t.magic.kinds.title,
+	subtitle: t.magic.kinds.subtitle,
+	detail: t.magic.kinds.detail,
+	body: t.magic.kinds.body,
+	footnote: t.magic.kinds.footnote,
+	label: t.magic.kinds.label,
+	number: t.magic.kinds.number,
+	date: t.magic.kinds.date,
+	image: t.magic.kinds.image,
+	link: t.magic.kinds.link,
+	code: t.magic.kinds.code,
+	credit: t.magic.kinds.credit
 };
 
 // ---- reading a column ------------------------------------------------------

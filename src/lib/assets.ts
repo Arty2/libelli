@@ -1,4 +1,5 @@
 import { STORE_ASSETS, idbDelete, idbGet, idbKeys, idbSet } from './storage';
+import { t } from './strings';
 import type { PageBackgroundImage } from './types';
 
 /**
@@ -303,7 +304,7 @@ async function fileIn(folder: PickedFolder, name: string): Promise<File | null> 
 }
 
 /** A root directory has no name of its own, and "goes into ." is not a sentence. */
-const folderName = (handle: PickedFolder) => handle.name || 'the folder you chose';
+const folderName = (handle: PickedFolder) => handle.name || t.images.folderFallback;
 
 export interface FolderState {
 	name: string;

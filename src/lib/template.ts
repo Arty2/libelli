@@ -1,4 +1,5 @@
 import { safeImageUrl } from './assets';
+import { fmt, t as ui } from './strings';
 import { clampSide, fitBoard } from './bitmap';
 import { fromRgba, parseColor, toRgba } from './color';
 import defaultCard from './templates/default-card.json';
@@ -141,14 +142,14 @@ export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'circle', 'square',
 
 /** Said with the glyph, since the glyph is the choice. */
 export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
-	bullet: '• Bullet',
-	disc: '● Disc',
-	circle: '○ Circle',
-	square: '■ Square',
-	dash: '– Dash',
-	emdash: '— Em Dash',
-	arrow: '→ Arrow',
-	none: 'None'
+	bullet: ui.listMarkers.bullet,
+	disc: ui.listMarkers.disc,
+	circle: ui.listMarkers.circle,
+	square: ui.listMarkers.square,
+	dash: ui.listMarkers.dash,
+	emdash: ui.listMarkers.emdash,
+	arrow: ui.listMarkers.arrow,
+	none: ui.listMarkers.none
 };
 
 /** How far a list may be indented, in em. */
@@ -291,7 +292,9 @@ export const FACING_PAGE_NUMBER_POSITIONS: PageNumberPosition[] = [
 const ALL_PAGE_NUMBER_POSITIONS = [...PAGE_NUMBER_POSITIONS, ...FACING_PAGE_NUMBER_POSITIONS];
 
 export function builtinTemplate(): Template {
-	return normaliseTemplate(BUILTIN_TEMPLATE_JSON);
+	// The starter's name is interface, not design: it is what the picker calls
+	// the card a first run lands on, so it comes from the catalogue.
+	return { ...normaliseTemplate(BUILTIN_TEMPLATE_JSON), name: ui.onboarding.starterTemplate };
 }
 
 /**
@@ -306,7 +309,7 @@ export function builtinTemplate(): Template {
 export function blankTemplate(): Template {
 	return {
 		schema: SCHEMA_VERSION,
-		name: 'Untitled card',
+		name: ui.defaults.untitledCard,
 		page: { w: 148, h: 210, unit: 'mm', background: '#ffffff' },
 		bleed: { enabled: false, amount: 3, cropMarks: false },
 		print: { ...DEFAULT_PRINT_SETTINGS },
@@ -410,14 +413,14 @@ export function newBox(partial: Partial<Box> = {}): Box {
  * half-read.
  */
 export function normaliseTemplate(raw: unknown): Template {
-	if (!raw || typeof raw !== 'object') throw new Error('Not a template file.');
+	if (!raw || typeof raw !== 'object') throw new Error(ui.errors.notTemplate);
 	const t = raw as Record<string, any>;
 	const schema = Number(t.schema ?? SCHEMA_VERSION);
-	if (!Number.isFinite(schema)) throw new Error('Template is missing a schema version.');
+	if (!Number.isFinite(schema)) throw new Error(ui.errors.noSchema);
 	if (schema > SCHEMA_VERSION) {
-		throw new Error(`This template needs a newer version of the app (schema ${schema}).`);
+		throw new Error(fmt(ui.errors.newerSchema, { schema }));
 	}
-	if (!Array.isArray(t.boxes)) throw new Error('Template has no boxes.');
+	if (!Array.isArray(t.boxes)) throw new Error(ui.errors.noBoxes);
 
 	const boxes: Box[] = t.boxes.map((b: any) => newBox(b));
 	const ids = new Set(boxes.map((b) => b.id));
@@ -432,7 +435,7 @@ export function normaliseTemplate(raw: unknown): Template {
 
 	return {
 		schema: SCHEMA_VERSION,
-		name: typeof t.name === 'string' && t.name.trim() ? t.name.trim() : 'Untitled card',
+		name: typeof t.name === 'string' && t.name.trim() ? t.name.trim() : ui.defaults.untitledCard,
 		page: {
 			w: paper(t.page?.w, 148),
 			h: paper(t.page?.h, 210),
@@ -632,12 +635,13 @@ export function arrangeBoxes(boxes: Box[], ids: string[], where: Arrange): Box[]
  * closest this list can safely go — a Postcard at 105 x 148 would be A6 turned
  * on its side, and the Size menu would name it wrongly rather than offer both.
  */
-export const PAGE_PRESETS: Array<{ name: string; w: number; h: number }> = [
-	{ name: 'A6', w: 105, h: 148 },
-	{ name: 'A5', w: 148, h: 210 },
-	{ name: 'A4', w: 210, h: 297 },
-	{ name: 'A3', w: 297, h: 420 },
-	{ name: 'Postcard', w: 102, h: 152 }
+/** `name` is the key a size is matched and stored by; `label` is what the menus say. */
+export const PAGE_PRESETS: Array<{ name: string; label: string; w: number; h: number }> = [
+	{ name: 'A6', label: ui.pagePresets.a6, w: 105, h: 148 },
+	{ name: 'A5', label: ui.pagePresets.a5, w: 148, h: 210 },
+	{ name: 'A4', label: ui.pagePresets.a4, w: 210, h: 297 },
+	{ name: 'A3', label: ui.pagePresets.a3, w: 297, h: 420 },
+	{ name: 'Postcard', label: ui.pagePresets.postcard, w: 102, h: 152 }
 ];
 
 const close = (a: number, b: number) => Math.abs(a - b) < 0.05;

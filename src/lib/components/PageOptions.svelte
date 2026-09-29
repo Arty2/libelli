@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { fmt, plural, t } from '$lib/strings';
 	import ColorField from './ColorField.svelte';
 	import PrintSettingsPanel from './PrintSettingsPanel.svelte';
 	import './options-bar.css';
@@ -174,16 +175,16 @@
 
 
 	const POSITION_LABELS: Record<PageNumberPosition, string> = {
-		'top-left': 'Top Left',
-		'top-center': 'Top Centre',
-		'top-right': 'Top Right',
-		'bottom-left': 'Bottom Left',
-		'bottom-center': 'Bottom Centre',
-		'bottom-right': 'Bottom Right',
-		'top-outer': 'Top Outer',
-		'top-inner': 'Top Inner',
-		'bottom-outer': 'Bottom Outer',
-		'bottom-inner': 'Bottom Inner'
+		'top-left': t.pageOptions.positions.topLeft,
+		'top-center': t.pageOptions.positions.topCentre,
+		'top-right': t.pageOptions.positions.topRight,
+		'bottom-left': t.pageOptions.positions.bottomLeft,
+		'bottom-center': t.pageOptions.positions.bottomCentre,
+		'bottom-right': t.pageOptions.positions.bottomRight,
+		'top-outer': t.pageOptions.positions.topOuter,
+		'top-inner': t.pageOptions.positions.topInner,
+		'bottom-outer': t.pageOptions.positions.bottomOuter,
+		'bottom-inner': t.pageOptions.positions.bottomInner
 	};
 
 	/**
@@ -293,16 +294,16 @@
 	const MARGIN_EDGES = $derived<Array<{ key: 'top' | 'right' | 'bottom' | 'left'; label: string; name: string }>>(
 		template.facing
 			? [
-					{ key: 'top', label: 'T', name: 'Top' },
-					{ key: 'right', label: 'O', name: 'Outer' },
-					{ key: 'bottom', label: 'B', name: 'Bottom' },
-					{ key: 'left', label: 'I', name: 'Inner' }
+					{ key: 'top', label: t.edges.topShort, name: t.edges.top },
+					{ key: 'right', label: t.edges.outerShort, name: t.edges.outer },
+					{ key: 'bottom', label: t.edges.bottomShort, name: t.edges.bottom },
+					{ key: 'left', label: t.edges.innerShort, name: t.edges.inner }
 				]
 			: [
-					{ key: 'top', label: 'T', name: 'Top' },
-					{ key: 'right', label: 'R', name: 'Right' },
-					{ key: 'bottom', label: 'B', name: 'Bottom' },
-					{ key: 'left', label: 'L', name: 'Left' }
+					{ key: 'top', label: t.edges.topShort, name: t.edges.top },
+					{ key: 'right', label: t.edges.rightShort, name: t.edges.right },
+					{ key: 'bottom', label: t.edges.bottomShort, name: t.edges.bottom },
+					{ key: 'left', label: t.edges.leftShort, name: t.edges.left }
 				]
 	);
 
@@ -316,7 +317,9 @@
 		const size = presetSize(name, template.page.w > template.page.h);
 		if (!size) return;
 		patchTemplate({ page: { ...template.page, ...size } });
-		onnotice(`${name} — ${size.w} × ${size.h}mm. Every box keeps the millimetres it had.`);
+		onnotice(
+			fmt(t.pageOptions.sizeChosen, { name: PAGE_PRESETS.find((p) => p.name === name)?.label ?? name, w: size.w, h: size.h })
+		);
 	}
 
 	/**
@@ -327,7 +330,7 @@
 	function swapPage() {
 		const { w, h } = template.page;
 		patchTemplate({ page: { ...template.page, w: h, h: w } });
-		onnotice(`Page turned — ${h} × ${w}mm. Every box keeps the millimetres it had.`);
+		onnotice(fmt(t.pageOptions.pageTurned, { w: h, h: w }));
 	}
 
 	function setBackground(image: PageBackgroundImage | undefined) {
@@ -335,14 +338,14 @@
 	}
 
 	function linkBackground() {
-		const url = window.prompt('Address of the background image', template.page.image?.src ?? 'https://');
+		const url = window.prompt(t.pageOptions.imageAddressPrompt, template.page.image?.src ?? 'https://');
 		if (url === null) return;
 		// Checked here as well as on load: normalisation only runs when a template
 		// is read, so without this an unusable address would sit in the editor
 		// looking accepted until the next reload quietly dropped it.
 		const safe = safeImageUrl(url);
 		if (!safe) {
-			onnotice('A background image has to be an http or https address.', 'warning');
+			onnotice(t.printSettings.imageAddressInvalid, 'warning');
 			return;
 		}
 		setBackground({ src: safe, source: 'url', fit: template.page.image?.fit ?? 'cover' });
@@ -367,7 +370,7 @@
 	They share options-bar.css rather than a <style> block, because Svelte would
 	otherwise scope a copy of the same 240 lines to each.
 -->
-	<div class="options" aria-label="Page setup">
+	<div class="options" aria-label={t.pageOptions.label}>
 		<!-- The lock, then what this is called, with everything that acts on the
 		     template as a whole behind the caret — the lock outside the menu,
 		     because it is a state you need to see, not an errand. -->
@@ -379,18 +382,18 @@
 				<button
 					class="lock-toggle"
 					aria-pressed={pageFrozen}
-					title={withKey(pageFrozen ? 'Unlock the design' : 'Lock the design — no dragging, no option changes', 'lockPage')}
+					title={withKey(pageFrozen ? t.pageOptions.unlockDesign : t.pageOptions.lockDesign, 'lockPage')}
 					onclick={() => patchTemplate({ locked: pageFrozen ? undefined : true })}
 				>
 					<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
-					{pageFrozen ? 'Unlock' : 'Lock'}
+					{pageFrozen ? t.common.unlock : t.common.lock}
 				</button>
 				<label class="field picker" bind:this={pickerEl}>
-					<span>Template</span>
+					<span>{t.pageOptions.template}</span>
 					<input
 						class="w-8"
 						value={template.name}
-						placeholder="Untitled card"
+						placeholder={t.defaults.untitledCard}
 						disabled={pageFrozen}
 						onchange={(e) => patchTemplate({ name: e.currentTarget.value })}
 					/>
@@ -398,8 +401,8 @@
 						class="caret"
 						aria-haspopup="menu"
 						aria-expanded={pickerOpen}
-						title="{library.length} saved template{library.length === 1 ? '' : 's'} in this browser, and what you can do to this one"
-						aria-label="Saved templates"
+						title={plural(t.pageOptions.libraryTitle, library.length)}
+						aria-label={t.pageOptions.library}
 						onclick={togglePicker}
 					>
 						<Icon name="caret-down" size={18} />
@@ -428,7 +431,7 @@
 							<li role="none">
 								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onnewtemplate)}>
 									<span class="tick" aria-hidden="true"><Icon name="add" size={14} /></span>
-									New Template…
+									{t.pageOptions.newTemplate}
 								</button>
 							</li>
 							<!-- Never over the loaded design: it opens a copy of the starter that
@@ -437,23 +440,23 @@
 							<li role="none">
 								<button
 									role="menuitem"
-									title="The design the tour is set in, as it came — your templates are untouched"
+									title={t.pageOptions.starterTitle}
 									onclick={fromMenu(onstartertemplate)}
 								>
 									<span class="tick" aria-hidden="true"><Icon name="information-square" size={14} /></span>
-									A5 Starter Booklet
+									{t.onboarding.starterTemplate}
 								</button>
 							</li>
 							<li role="none">
 								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onimporttemplate)}>
 									<span class="tick" aria-hidden="true"><Icon name="document-import" size={14} /></span>
-									Import…
+									{t.pageOptions.import}
 								</button>
 							</li>
 							<li role="none">
 								<button role="menuitem" onclick={fromMenu(onexporttemplate)}>
 									<span class="tick" aria-hidden="true"><Icon name="document-download" size={14} /></span>
-									Export
+									{t.pageOptions.export}
 								</button>
 							</li>
 							<li role="separator"><hr /></li>
@@ -464,11 +467,11 @@
 									class="danger"
 									role="menuitem"
 									disabled={pageFrozen}
-									title="Put the A5 Starter Booklet over this design. Your rows are not touched."
+									title={fmt(t.pageOptions.resetTitle, { name: t.onboarding.starterTemplate })}
 									onclick={fromMenu(onresettemplate)}
 								>
 									<span class="tick" aria-hidden="true"><Icon name="reset" size={14} /></span>
-									Reset…
+									{t.pageOptions.reset}
 								</button>
 							</li>
 							<li role="none">
@@ -476,11 +479,11 @@
 									class="danger"
 									role="menuitem"
 									disabled={pageFrozen}
-									title="Delete this template from this browser. Your rows are not touched."
+									title={t.pageOptions.deleteTitle}
 									onclick={fromMenu(ondeletetemplate)}
 								>
 									<span class="tick" aria-hidden="true"><Icon name="trash" size={14} /></span>
-									Delete…
+									{t.pageOptions.delete}
 								</button>
 							</li>
 						</ul>
@@ -494,38 +497,38 @@
 					class="square"
 					disabled={!previousEntry}
 					title={previousEntry
-						? `Back to “${previousEntry.name}”`
-						: 'Nothing to swap back to yet — this is the only template you have opened'}
-					aria-label="Swap to the previous template"
+						? fmt(t.pageOptions.swapTo, { name: previousEntry.name })
+						: t.pageOptions.swapNothing}
+					aria-label={t.pageOptions.swapTemplate}
 					onclick={() => onswaptemplate?.()}
 				><Icon name="compare" size={14} /></button>
 				<!-- After the template's name and its menu rather than at the far end
 				     of the bar: the stylesheet is part of the template, travels with it, and
 				     is the last thing anyone would think to look for among page
 				     sizes and margins. -->
-				<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
-					<Icon name="code" size={14} /> <span class="label">CSS</span>{template.css ? ' •' : ''}
+				<button onclick={oneditcss} disabled={pageFrozen} title={t.pageOptions.cssTitle}>
+					<Icon name="code" size={14} /> <span class="label">{t.pageOptions.css}</span>{template.css ? ' •' : ''}
 				</button>
 			</span>
 		</span>
 		<fieldset class="group">
-			<legend>Page</legend>
+			<legend>{t.pageOptions.page}</legend>
 			<label class="field">
-				<span class="sr-only">Preset</span>
+				<span class="sr-only">{t.pageOptions.preset}</span>
 				<select
 					value={preset}
-					title="A size worth having to hand, or set the two numbers yourself"
+					title={t.pageOptions.sizeTitle}
 					disabled={pageFrozen}
 					onchange={(e) => setPreset(e.currentTarget.value)}
 				>
-					<option value="">Custom</option>
+					<option value="">{t.printSettings.custom}</option>
 					{#each PAGE_PRESETS as option (option.name)}
-						<option value={option.name}>{option.name}</option>
+						<option value={option.name}>{option.label}</option>
 					{/each}
 				</select>
 			</label>
 			<label class="field">
-				<span>Width</span>
+				<span>{t.fields.width}</span>
 				<input
 					class="n-3"
 					type="number"
@@ -536,10 +539,10 @@
 					disabled={pageFrozen}
 					onchange={(e) => patchTemplate({ page: { ...template.page, w: paper(e, template.page.w) } })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 			</label>
 			<label class="field">
-				<span>Height</span>
+				<span>{t.fields.height}</span>
 				<input
 					class="n-3"
 					type="number"
@@ -550,12 +553,12 @@
 					disabled={pageFrozen}
 					onchange={(e) => patchTemplate({ page: { ...template.page, h: paper(e, template.page.h) } })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 			</label>
 			<button
 				class="square"
-				title="Swap width and height — turn the page over"
-				aria-label="Swap width and height"
+				title={t.pageOptions.swapTitle}
+				aria-label={t.pageOptions.swap}
 				disabled={pageFrozen}
 				onclick={swapPage}
 			>
@@ -564,7 +567,7 @@
 			<!-- The frame the page is worked inside: drawn as a guide with the grid,
 			     snapped to, and where Position Automagically lays out. -->
 			<span class="field">
-				<span>Margin</span>
+				<span>{t.fields.margin}</span>
 				{#if showMarginSides}
 					{#each MARGIN_EDGES as edge (edge.key)}
 						<label class="field tight">
@@ -574,7 +577,7 @@
 								type="number"
 								step="0.5"
 								min="0"
-								aria-label="{edge.name} margin"
+								aria-label={fmt(t.pageOptions.edgeMargin, { edge: edge.name })}
 								value={margins[edge.key]}
 								disabled={pageFrozen}
 								onchange={(e) => setMargin({ ...margins, [edge.key]: floored(e, 0, margins[edge.key]) })}
@@ -587,19 +590,19 @@
 						type="number"
 						step="0.5"
 						min="0"
-						aria-label="Margin"
-						title="The page margin, every edge — drawn with the grid, snapped to, and where Position Automagically lays out"
+						aria-label={t.fields.margin}
+						title={t.pageOptions.marginTitle}
 						value={margins.top}
 						disabled={pageFrozen}
 						onchange={(e) => setMargin(floored(e, 0, margins.top))}
 					/>
 				{/if}
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 				<button
 					class="square"
 					aria-pressed={showMarginSides}
-					title={showMarginSides ? 'One margin all round' : 'A margin per edge'}
-					aria-label="Per-edge margins"
+					title={showMarginSides ? t.pageOptions.oneMargin : t.pageOptions.marginPerEdge}
+					aria-label={t.pageOptions.perEdgeMargins}
 					disabled={pageFrozen}
 					onclick={() => {
 						// Back to one number from the top edge, rather than silently
@@ -617,21 +620,21 @@
 				<input
 					type="checkbox"
 					checked={!!template.facing}
-					title="Odd rows are right-hand pages and even rows their facing left-hand pages. Areas mirror across the fold unless an area says otherwise, and Outer and Inner page numbers know which edge they are on"
+					title={t.pageOptions.facingTitle}
 					disabled={pageFrozen}
 					onchange={(e) => patchTemplate({ facing: e.currentTarget.checked || undefined })}
 				/>
-				Recto / Verso
+				{t.pageOptions.facing}
 			</label>
 		</fieldset>
 		<fieldset class="group">
-			<legend>Text</legend>
+			<legend>{t.pageOptions.text}</legend>
 			<span class="field">
-				<span>Font</span>
+				<span>{t.fields.font}</span>
 				<!-- The template's families, then under a rule this browser's others,
 				     each name in its own face. -->
 				<MenuSelect
-					label="Font"
+					label={t.fields.font}
 					value={template.defaults.font}
 					items={[
 						...families.used.map((family) => ({ value: family, label: family, family })),
@@ -645,7 +648,7 @@
 				/>
 			</span>
 			<label class="field">
-				<span>Size</span>
+				<span>{t.fields.size}</span>
 				<input
 					class="n-3"
 					type="number"
@@ -657,20 +660,20 @@
 					onchange={(e) =>
 						patchTemplate({ defaults: { ...template.defaults, size: floored(e, MIN_SIZE, template.defaults.size) } })}
 				/>
-				<span class="unit">pt</span>
+				<span class="unit">{t.units.pt}</span>
 			</label>
 			<span class="field">
-				<span>Color</span>
+				<span>{t.fields.color}</span>
 				<ColorField
 					value={template.defaults.color}
-					label="Text color"
-					title="Default text color for every box that does not set its own"
+					label={t.fields.textColor}
+					title={t.pageOptions.textColorTitle}
 					disabled={pageFrozen}
 					onchange={(v) => patchTemplate({ defaults: { ...template.defaults, color: v } })}
 				/>
 			</span>
 			<label class="field">
-				<span>Leading</span>
+				<span>{t.fields.leading}</span>
 				<input
 					class="n-3"
 					type="number"
@@ -686,7 +689,7 @@
 				/>
 			</label>
 			<label class="field">
-				<span>Baseline</span>
+				<span>{t.fields.baseline}</span>
 				<input
 					class="n-3"
 					type="number"
@@ -694,15 +697,15 @@
 					min={-MAX_BASELINE}
 					max={MAX_BASELINE}
 					placeholder="0"
-					title="Raise the text by this much of its size, or lower it below 0 — for a face that sits high or low on its line. Applies to areas in the page's font only"
+					title={t.pageOptions.baselineTitle}
 					value={template.defaults.baseline ?? ''}
 					disabled={pageFrozen}
 					onchange={(e) => setDefaultBaseline(e.currentTarget.value)}
 				/>
-				<span class="unit">em</span>
+				<span class="unit">{t.units.em}</span>
 			</label>
 			<label class="field">
-				<span>Spacing</span>
+				<span>{t.fields.spacing}</span>
 				<input
 					class="n-3"
 					type="number"
@@ -715,49 +718,49 @@
 							defaults: { ...template.defaults, letterSpacing: numeric(e, template.defaults.letterSpacing) }
 						})}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 			</label>
 		</fieldset>
 		<fieldset class="group">
-			<legend>Paragraphs</legend>
+			<legend>{t.pageOptions.paragraphs}</legend>
 			<label class="field">
-				<span class="sr-only">Paragraph style</span>
+				<span class="sr-only">{t.pageOptions.paragraphStyle}</span>
 				<select
 					value={template.defaults.paragraph?.mode ?? ''}
-					title="Space after each paragraph, or the first line of the next indented — for every area that sets none of its own. Every line of plain text is a paragraph"
+					title={t.pageOptions.paragraphTitle}
 					disabled={pageFrozen}
 					onchange={(e) => setParagraph(e.currentTarget.value)}
 				>
-					<option value="">Continuous</option>
-					<option value="space">Space After</option>
-					<option value="indent">Indent</option>
+					<option value="">{t.fields.continuous}</option>
+					<option value="space">{t.fields.spaceAfter}</option>
+					<option value="indent">{t.fields.indent}</option>
 				</select>
 			</label>
 			{#if template.defaults.paragraph}
 				<label class="field">
-					<span class="sr-only">Paragraph amount</span>
+					<span class="sr-only">{t.fields.paragraphAmount}</span>
 					<input
 						class="n-2"
 						type="number"
 						step="0.25"
 						min="0"
 						max={MAX_PARAGRAPH}
-						title={template.defaults.paragraph.mode === 'space' ? 'In lines of the leading' : 'In em of the type size'}
+						title={template.defaults.paragraph.mode === 'space' ? t.fields.inLines : t.fields.inEm}
 						value={template.defaults.paragraph.amount}
 						disabled={pageFrozen}
 						onchange={(e) => setParagraph(template.defaults.paragraph!.mode, numeric(e, template.defaults.paragraph!.amount))}
 					/>
-					<span class="unit">{template.defaults.paragraph.mode === 'space' ? 'lines' : 'em'}</span>
+					<span class="unit">{template.defaults.paragraph.mode === 'space' ? t.units.lines : t.units.em}</span>
 				</label>
 			{/if}
 		</fieldset>
 		<fieldset class="group">
-			<legend>Lists</legend>
+			<legend>{t.fields.lists}</legend>
 			<label class="field">
-				<span>Marker</span>
+				<span>{t.fields.marker}</span>
 				<select
 					value={template.defaults.list?.marker ?? 'bullet'}
-					title="What each item of a Markdown list is marked with"
+					title={t.fields.listTitle}
 					disabled={pageFrozen}
 					onchange={(e) => setDefaultList({ marker: e.currentTarget.value })}
 				>
@@ -767,23 +770,23 @@
 				</select>
 			</label>
 			<label class="field">
-				<span>Indent</span>
+				<span>{t.fields.listIndent}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.25"
 					min="0"
 					max={MAX_LIST}
-					placeholder="auto"
-					title="From the area's edge to a list's markers, in em of the type size"
+					placeholder={t.fields.auto}
+					title={t.fields.listIndentTitle}
 					value={template.defaults.list?.indent ?? ''}
 					disabled={pageFrozen}
 					onchange={(e) => setDefaultList({ indent: e.currentTarget.value })}
 				/>
-				<span class="unit">em</span>
+				<span class="unit">{t.units.em}</span>
 			</label>
 			<label class="field">
-				<span>Leading</span>
+				<span>{t.fields.leading}</span>
 				<input
 					class="n-3"
 					type="number"
@@ -791,7 +794,7 @@
 					min={MIN_LEADING}
 					max="3"
 					placeholder={String(template.defaults.lineHeight)}
-					title="The leading every list is set in, where an area names none of its own. Blank takes the text's"
+					title={t.pageOptions.listLeadingTitle}
 					value={template.defaults.list?.leading ?? ''}
 					disabled={pageFrozen}
 					onchange={(e) => setDefaultList({ leading: e.currentTarget.value })}
@@ -799,19 +802,19 @@
 			</label>
 		</fieldset>
 		<fieldset class="group">
-			<legend>Paper</legend>
+			<legend>{t.pageOptions.paper}</legend>
 			<span class="field">
-				<span>Color</span>
+				<span>{t.fields.color}</span>
 				<ColorField
 					value={template.page.background}
 					fallback="#ffffff"
-					label="Paper color"
-					title="Page color — prints only with background graphics enabled"
+					label={t.pageOptions.paperColor}
+					title={t.pageOptions.paperColorTitle}
 					disabled={pageFrozen}
 					onchange={(v) => patchTemplate({ page: { ...template.page, background: v } })}
 				/>
 			</span>
-			<span class="field-label">Image</span>
+			<span class="field-label">{t.pageOptions.image}</span>
 			{#if template.page.image}
 				<span class="asset" title={template.page.image.src}>
 					<Icon name={template.page.image.source === 'url' ? 'link' : 'image'} size={12} />
@@ -819,18 +822,18 @@
 				</span>
 				<select
 					value={template.page.image.fit}
-					title="How the image fills the sheet, bleed included"
+					title={t.pageOptions.fitTitle}
 					disabled={pageFrozen}
 					onchange={(e) => setBackground({ ...template.page.image!, fit: e.currentTarget.value as BackgroundFit })}
 				>
-					<option value="cover">Cover</option>
-					<option value="contain">Contain</option>
-					<option value="repeat">Tile</option>
+					<option value="cover">{t.imageFit.cover}</option>
+					<option value="contain">{t.imageFit.contain}</option>
+					<option value="repeat">{t.imageFit.tile}</option>
 				</select>
 				<button
 					class="square"
-					title="Remove the background image"
-					aria-label="Remove the background image"
+					title={t.pageOptions.removeImage}
+					aria-label={t.pageOptions.removeImage}
 					disabled={pageFrozen}
 					onclick={() => setBackground(undefined)}
 				>
@@ -839,16 +842,16 @@
 			{:else}
 				<button
 					disabled={pageFrozen}
-					title="A file from this machine; the image stays in this browser, the template only names it"
-					onclick={() => imageInput?.click()}><Icon name="image-reference" size={14} /> Upload…</button
+					title={t.printSettings.uploadTitle}
+					onclick={() => imageInput?.click()}><Icon name="image-reference" size={14} /> {t.printSettings.upload}</button
 				>
-				<button disabled={pageFrozen} title="An http(s) address the template will carry as written" onclick={linkBackground}><Icon name="copy-link" size={14} /> URL…</button>
+				<button disabled={pageFrozen} title={t.printSettings.urlTitle} onclick={linkBackground}><Icon name="copy-link" size={14} /> {t.printSettings.url}</button>
 			{/if}
 		</fieldset>
 		<fieldset class="group">
-			<legend>Page Number</legend>
+			<legend>{t.pageOptions.pageNumber}</legend>
 			<label class="field">
-				<span class="sr-only">Position</span>
+				<span class="sr-only">{t.pageOptions.position}</span>
 				<select
 					value={template.pageNumber.enabled ? template.pageNumber.position : ''}
 					disabled={pageFrozen}
@@ -863,7 +866,7 @@
 						});
 					}}
 				>
-					<option value="">Off</option>
+					<option value="">{t.printSettings.off}</option>
 					{#each positions as position (position)}
 						<option value={position}>{POSITION_LABELS[position]}</option>
 					{/each}
@@ -874,17 +877,17 @@
 					<input
 						type="checkbox"
 						checked={!!template.pageNumber.showTotal}
-						title="Print it as 3 / 12 rather than as 3. The slash is an element of its own — .page-number .of — so this template's CSS can set its content to anything, or take it away"
+						title={t.pageOptions.ofTotalTitle}
 						disabled={pageFrozen}
 						onchange={(e) =>
 							patchTemplate({
 								pageNumber: { ...template.pageNumber, showTotal: e.currentTarget.checked || undefined }
 							})}
 					/>
-					of Total
+					{t.pageOptions.ofTotal}
 				</label>
 				<label class="field">
-					<span>Margin</span>
+					<span>{t.fields.margin}</span>
 					<input
 						class="n-2"
 						type="number"
@@ -896,7 +899,7 @@
 						onchange={(e) =>
 							patchTemplate({ pageNumber: { ...template.pageNumber, margin: floored(e, 0, template.pageNumber.margin) } })}
 					/>
-					<span class="unit">mm</span>
+					<span class="unit">{t.units.mm}</span>
 				</label>
 			{/if}
 		</fieldset>

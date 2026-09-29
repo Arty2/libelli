@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { plural as countPlural, t, type Plural } from '$lib/strings';
 	import type { AlignEdge } from '$lib/layout';
 	import type { Box, Template } from '$lib/types';
 
@@ -47,19 +48,20 @@
 	}: Props = $props();
 
 	const many = $derived(selectedBoxes.length > 1);
-	const plural = $derived(many ? ` ${selectedBoxes.length} Boxes` : '');
+	/** An action's name, or with several chosen the whole phrase with the count in it. */
+	const label = (one: string, several: Plural) => (many ? countPlural(several, selectedBoxes.length) : one);
 	const grouped = $derived(
 		many && selectedBoxes.every((b) => b.group) && new Set(selectedBoxes.map((b) => b.group)).size === 1
 	);
 
 	/** The same six the selection bar offers, as one row rather than six lines. */
 	const ALIGN_EDGES: Array<{ value: AlignEdge; icon: string; label: string }> = [
-		{ value: 'left', icon: 'obj-left', label: 'Align Left' },
-		{ value: 'centre-x', icon: 'obj-centre-x', label: 'Centre Horizontally' },
-		{ value: 'right', icon: 'obj-right', label: 'Align Right' },
-		{ value: 'top', icon: 'obj-top', label: 'Align Top' },
-		{ value: 'centre-y', icon: 'obj-centre-y', label: 'Centre Vertically' },
-		{ value: 'bottom', icon: 'obj-bottom', label: 'Align Bottom' }
+		{ value: 'left', icon: 'obj-left', label: t.align.left },
+		{ value: 'centre-x', icon: 'obj-centre-x', label: t.align.centreX },
+		{ value: 'right', icon: 'obj-right', label: t.align.right },
+		{ value: 'top', icon: 'obj-top', label: t.align.top },
+		{ value: 'centre-y', icon: 'obj-centre-y', label: t.align.centreY },
+		{ value: 'bottom', icon: 'obj-bottom', label: t.align.bottom }
 	];
 
 	const frozen = $derived(!!template.locked);
@@ -95,7 +97,7 @@
 	class="menu"
 	bind:this={menu}
 	role="menu"
-	aria-label="Area actions"
+	aria-label={t.boxMenu.label}
 	tabindex="-1"
 	style="left:{position.left}px;top:{position.top}px"
 >
@@ -103,7 +105,7 @@
 	     alignments as an icon row, because six of them as six lines would bury
 	     everything else. -->
 	{#if many}
-		<div class="align-row" role="group" aria-label="Align">
+		<div class="align-row" role="group" aria-label={t.boxMenu.align}>
 			{#each ALIGN_EDGES as option (option.value)}
 				<button
 					title={option.label}
@@ -129,14 +131,14 @@
 		onclick={() => run(() => onpicking(!picking))}
 	>
 		<Icon name={picking ? 'checkbox-checked' : 'checkbox'} size={15} />
-		{picking ? 'Stop Selecting Multiple' : 'Select Multiple'}
+		{picking ? t.boxMenu.stopSelectingMultiple : t.boxMenu.selectMultiple}
 	</button>
 
 	<hr />
 
 	<button role="menuitem" disabled={frozen} onclick={() => run(() => onlock(!box.locked))}>
 		<Icon name={box.locked ? 'unlocked' : 'locked'} size={15} />
-		{box.locked ? 'Unlock' : 'Lock'}{plural}
+		{box.locked ? label(t.common.unlock, t.boxMenu.unlockMany) : label(t.common.lock, t.boxMenu.lockMany)}
 	</button>
 
 	<hr />
@@ -146,10 +148,10 @@
 	     and it wants to be pressed four times in a row rather than reopened from
 	     a menu between each press. -->
 	<button role="menuitem" onclick={() => run(oncopystyle)}>
-		<Icon name="copy" size={15} /> Copy Style
+		<Icon name="copy" size={15} /> {t.boxMenu.copyStyle}
 	</button>
 	<button role="menuitem" disabled={frozen || !hasStyle} onclick={() => run(onpastestyle)}>
-		<Icon name="paste" size={15} /> Paste Style{plural}
+		<Icon name="paste" size={15} /> {label(t.boxMenu.pasteStyle, t.boxMenu.pasteStyleMany)}
 	</button>
 
 	<hr />
@@ -157,14 +159,14 @@
 	{#if many}
 		<button role="menuitem" disabled={frozen} onclick={() => run(ongroup)}>
 			<Icon name={grouped ? 'ungroup-objects' : 'group-objects'} size={15} />
-			{grouped ? 'Ungroup' : 'Group'}
+			{grouped ? t.common.ungroup : t.common.group}
 		</button>
 	{/if}
 	<button role="menuitem" disabled={frozen} onclick={() => run(onduplicate)}>
-		<Icon name="replicate" size={15} /> Duplicate{plural}
+		<Icon name="replicate" size={15} /> {label(t.common.duplicate, t.boxMenu.duplicateMany)}
 	</button>
 	<button class="danger" role="menuitem" disabled={frozen || (!many && !!box.locked)} onclick={() => run(ondelete)}>
-		<Icon name="trash" size={15} /> Delete{plural}
+		<Icon name="trash" size={15} /> {label(t.common.delete, t.boxMenu.deleteMany)}
 	</button>
 </div>
 

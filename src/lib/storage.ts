@@ -1,4 +1,5 @@
 import type { Dataset, FontRef, Mapping, Template, UiState } from './types';
+import { t } from './strings';
 
 /**
  * Client-side persistence. Nothing here ever leaves the browser.
@@ -248,7 +249,7 @@ export async function listTemplates(): Promise<TemplateEntry[]> {
 	for (const id of ids) {
 		const doc = await loadTemplateDoc(id);
 		if (!doc) continue;
-		const name = typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : 'Untitled card';
+		const name = typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : t.defaults.untitledCard;
 		entries.push({ id, name });
 	}
 	return entries.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
@@ -276,7 +277,7 @@ export interface DatasetEntry {
 }
 
 /** What a table with no name of its own is called, everywhere it is listed. */
-export const UNTITLED_TABLE = 'Untitled table';
+export const UNTITLED_TABLE = t.defaults.untitledTable;
 
 export const loadDatasetId = (): string => local.get<string>('dataset:id', '');
 export const saveDatasetId = (id: string) => local.set('dataset:id', id);

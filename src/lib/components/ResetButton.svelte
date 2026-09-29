@@ -8,15 +8,15 @@
 	 * select had no blank to clear to.
 	 */
 	interface Props {
-		/** what pressing it goes back to, for the tip — "the page's 10pt" */
-		to: string;
+		/** the tip, whole, from the catalogue — “Back to the page's 10pt” */
+		title: string;
 		onclick: () => void;
 		disabled?: boolean;
 	}
 
-	let { to, onclick, disabled = false }: Props = $props();
+	let { title, onclick, disabled = false }: Props = $props();
 </script>
 
-<button class="reset" title="Back to {to}" aria-label="Back to {to}" {disabled} {onclick}>
+<button class="reset" {title} aria-label={title} {disabled} {onclick}>
 	<Icon name="close" size={12} />
 </button>

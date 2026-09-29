@@ -142,11 +142,11 @@ to change.
 
 A rule that only lives in prose gets broken by the first change that does not
 re-read it. So every rule above that *can* be checked is, in `scripts/gates.sh`
-(`npm run gates`, first in CI) — injection sinks, `{@html}` outside Card,
-PrintRoot and Icon, `fetch` outside `png.ts` and the worker, runtime
-dependencies, `vercel.json`'s security headers, `colour` as a name, `VERSION`
-against `package.json`, this file's length, type in `px`. ESLint (`npm run lint`, next in CI)
-covers what a linter can; where a rule is off, `eslint.config.js` says why.
+(`npm run gates`, first in CI) — injection sinks, `{@html}` outside Card, PrintRoot
+and Icon, `fetch` outside `png.ts` and the worker, runtime dependencies,
+`vercel.json`'s security headers, `colour` as a name, `VERSION` against
+`package.json`, this file's length, type in `px`, a label not read from `strings/`.
+ESLint (`npm run lint`, next in CI) covers the rest; `eslint.config.js` says why a rule is off.
 
 Add the next rule to the script, not as a paragraph here — `docs/decisions.md`
 § `scripts/gates.sh` has the conventions. Each run appends a line to the

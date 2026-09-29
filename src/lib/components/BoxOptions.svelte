@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { fmt, t } from '$lib/strings';
 	import ColorField from './ColorField.svelte';
 	import { withKey } from '$lib/keys';
 	import './options-bar.css';
@@ -125,13 +126,13 @@
 	 * that is in neither list. Each name in its own face.
 	 */
 	const fontItems = $derived.by((): MenuItem[] => [
-		{ value: '', label: `Default: ${template.defaults.font}` },
+		{ value: '', label: fmt(t.boxOptions.inherit, { value: template.defaults.font }) },
 		...families.used.map((family) => ({ value: family, label: family, family })),
 		{ rule: true },
 		...families.others.map((family) => ({ value: family, label: family, family })),
 		{ rule: true },
-		{ value: '__custom', label: 'Other Family…' },
-		{ value: '__upload', label: 'Upload a Font File…' }
+		{ value: '__custom', label: t.boxOptions.otherFamily },
+		{ value: '__upload', label: t.boxOptions.uploadFont }
 	]);
 
 	const anchorOptions = $derived(template.boxes.filter((b) => b.id !== selected?.id));
@@ -149,34 +150,34 @@
 
 	/** Title case, and Carbon's own words where CSS's are hyphenated. */
 	const BLEND_LABELS: Record<BlendMode, string> = {
-		multiply: 'Multiply',
-		screen: 'Screen',
-		overlay: 'Overlay',
-		darken: 'Darken',
-		lighten: 'Lighten',
-		difference: 'Difference',
-		exclusion: 'Exclusion',
-		'hard-light': 'Hard Light',
-		'soft-light': 'Soft Light',
-		hue: 'Hue',
-		saturation: 'Saturation',
-		color: 'Color',
-		luminosity: 'Luminosity'
+		multiply: t.blend.multiply,
+		screen: t.blend.screen,
+		overlay: t.blend.overlay,
+		darken: t.blend.darken,
+		lighten: t.blend.lighten,
+		difference: t.blend.difference,
+		exclusion: t.blend.exclusion,
+		'hard-light': t.blend.hardLight,
+		'soft-light': t.blend.softLight,
+		hue: t.blend.hue,
+		saturation: t.blend.saturation,
+		color: t.blend.color,
+		luminosity: t.blend.luminosity
 	};
 
 	const STYLE_LABELS: Record<BorderStyle, string> = {
-		solid: 'Solid',
-		dashed: 'Dashed',
-		dotted: 'Dotted',
-		double: 'Double',
-		stamp: 'Stamp'
+		solid: t.borderStyles.solid,
+		dashed: t.borderStyles.dashed,
+		dotted: t.borderStyles.dotted,
+		double: t.borderStyles.double,
+		stamp: t.borderStyles.stamp
 	};
 
 	const ALIGNMENTS: Array<{ value: Align; icon: string; label: string }> = [
-		{ value: 'left', icon: 'align-left', label: 'Left' },
-		{ value: 'center', icon: 'align-center', label: 'Centre' },
-		{ value: 'right', icon: 'align-right', label: 'Right' },
-		{ value: 'justify', icon: 'align-justify', label: 'Justified' }
+		{ value: 'left', icon: 'align-left', label: t.boxOptions.alignLeft },
+		{ value: 'center', icon: 'align-center', label: t.boxOptions.alignCentre },
+		{ value: 'right', icon: 'align-right', label: t.boxOptions.alignRight },
+		{ value: 'justify', icon: 'align-justify', label: t.boxOptions.alignJustify }
 	];
 
 	const setStatic = (change: Partial<NonNullable<Box['static']>>) =>
@@ -256,11 +257,11 @@
 	/** An address, asked for the way the page's background asks for one. */
 	function linkPicture() {
 		const was = selected?.static?.url && !pictureColor ? selected.static.url : 'https://';
-		const url = window.prompt('Address of the image', was);
+		const url = window.prompt(t.boxOptions.imageAddressPrompt, was);
 		if (url === null) return;
 		const safe = safeImageUrl(url);
 		if (!safe) {
-			onnotice('An image address has to be an http or https address.', 'warning');
+			onnotice(t.boxOptions.imageAddressInvalid, 'warning');
 			return;
 		}
 		setPictureAddress(safe);
@@ -273,16 +274,16 @@
 	const drawable = $derived(!!selected && takesADrawing(selected.mode));
 
 	const VERTICALS: Array<{ value: VAlign; icon: string; label: string }> = [
-		{ value: 'top', icon: 'valign-top', label: 'Top' },
-		{ value: 'middle', icon: 'valign-middle', label: 'Middle' },
-		{ value: 'bottom', icon: 'valign-bottom', label: 'Bottom' }
+		{ value: 'top', icon: 'valign-top', label: t.boxOptions.alignTop },
+		{ value: 'middle', icon: 'valign-middle', label: t.boxOptions.alignMiddle },
+		{ value: 'bottom', icon: 'valign-bottom', label: t.boxOptions.alignBottom }
 	];
 
-	const EDGES: Array<{ key: keyof Sides; label: string }> = [
-		{ key: 'top', label: 'T' },
-		{ key: 'right', label: 'R' },
-		{ key: 'bottom', label: 'B' },
-		{ key: 'left', label: 'L' }
+	const EDGES: Array<{ key: keyof Sides; label: string; name: string }> = [
+		{ key: 'top', label: t.edges.topShort, name: t.edges.top },
+		{ key: 'right', label: t.edges.rightShort, name: t.edges.right },
+		{ key: 'bottom', label: t.edges.bottomShort, name: t.edges.bottom },
+		{ key: 'left', label: t.edges.leftShort, name: t.edges.left }
 	];
 
 	const patch = (change: Partial<Box>) => {
@@ -343,7 +344,7 @@
 	}
 
 	/** The page's paragraph style, said in the words the select uses. */
-	const PARAGRAPH_LABELS = { space: 'Space After', indent: 'Indent' } as const;
+	const PARAGRAPH_LABELS = { space: t.fields.spaceAfter, indent: t.fields.indent } as const;
 
 	function setParagraph(mode: string, amount?: number) {
 		if (mode !== 'space' && mode !== 'indent') {
@@ -414,7 +415,7 @@
 			return;
 		}
 		if (value === '__custom') {
-			const family = window.prompt('Font family name (as Google Fonts spells it)');
+			const family = window.prompt(t.boxOptions.familyPrompt);
 			if (!family) return;
 			registerFamily(family);
 			patch({ font: family });
@@ -509,7 +510,7 @@
 		if (clash) {
 			putBack();
 			onnotice(
-				`Another area is already called “${clash.slot}”. A name is that area's CSS id, so no two can share one.`,
+				fmt(t.boxOptions.nameTaken, { name: clash.slot ?? '' }),
 				'warning'
 			);
 			return;
@@ -573,15 +574,14 @@
 	still what an area shows on a row whose cell is not a color. One pattern for
 	all three colors, so it is learnt once.
 -->
-{#snippet fromColumn(key: ColorKey, what: string)}
+{#snippet fromColumn(key: ColorKey)}
 	{@const column = selected.colorFrom?.[key]}
+	{@const words = t.boxOptions.fromColumn[key]}
 	<button
 		class="square"
 		aria-pressed={linkShown(key)}
-		title={linkShown(key)
-			? `Stop taking the ${what} from a column`
-			: `Take the ${what} from a column of the row, where its cell is a color — #c0392b, teal, rgb(…)`}
-		aria-label="{what} from a column"
+		title={linkShown(key) ? words.stop : words.take}
+		aria-label={words.label}
 		disabled={boxFrozen}
 		onclick={() => toggleLink(key)}
 	><Icon name="link" size={14} /></button>
@@ -589,12 +589,12 @@
 		<select
 			class:inherits={!column}
 			value={column ?? ''}
-			title="The column whose cell is this area's {what}; a cell that is not a color leaves the swatch's"
-			aria-label="Column for the {what}"
+			title={words.columnTitle}
+			aria-label={words.columnLabel}
 			disabled={boxFrozen}
 			onchange={(e) => setColorFrom(key, e.currentTarget.value || undefined)}
 		>
-			<option value="">— Column —</option>
+			<option value="">{t.boxOptions.columnNone}</option>
 			{#each dataset.columns as name (name)}
 				<option value={name}>{name}</option>
 			{/each}
@@ -602,7 +602,7 @@
 			     than showing the menu blank: the template still names it, and
 			     another table may have it. -->
 			{#if column && !dataset.columns.includes(column)}
-				<option value={column}>{column} (not in this table)</option>
+				<option value={column}>{fmt(t.boxOptions.notInTable, { column })}</option>
 			{/if}
 		</select>
 	{/if}
@@ -614,7 +614,7 @@
 	tab, each subject is a fieldset with its name on it. Same shape as the page
 	bar; see docs/decisions.md.
 -->
-	<div class="options box-options" aria-label="Area settings">
+	<div class="options box-options" aria-label={t.boxOptions.label}>
 		<!-- The lock, what this is and what it is called, and the two things you
 		     do to it, on one line. Lock first, as in the page bar and under the
 		     table: it is the state of the thing named beside it, not an errand,
@@ -624,28 +624,30 @@
 				<button
 					class="lock-toggle"
 					aria-pressed={!!selected.locked}
-					title={withKey(selected.locked ? 'Unlock this area' : 'Lock this area — no dragging, no resizing, no option changes', 'lockArea')}
+					title={withKey(selected.locked ? t.boxOptions.unlockArea : t.boxOptions.lockArea, 'lockArea')}
 					disabled={pageFrozen}
 					onclick={() => patch({ locked: selected.locked ? undefined : true })}
 				>
 					<Icon name={selected.locked ? 'unlocked' : 'locked'} size={14} />
-					{selected.locked ? 'Unlock' : 'Lock'}
+					{selected.locked ? t.common.unlock : t.common.lock}
 				</button>
-				<span class="context">Area</span>
+				<span class="context">{t.boxOptions.area}</span>
 				{#if source === 'field'}
 					<label class="field">
-						<span class="sr-only">Name</span>
+						<span class="sr-only">{t.boxOptions.name}</span>
 						<input
 							class="w-5"
 							value={selected.slot ?? ''}
-							title={`The template's own name for what this area holds; the column beside it says which spreadsheet column fills it. It is also this area's CSS id${cssIdent(selected.slot ?? '') ? ` — #${cssIdent(selected.slot ?? '')}` : ''}, so no two areas may share a name.`}
+							title={fmt(t.boxOptions.nameTitle, {
+								id: cssIdent(selected.slot ?? '') ? fmt(t.boxOptions.nameTitleId, { id: cssIdent(selected.slot ?? '') }) : ''
+							})}
 							disabled={boxFrozen}
 							onchange={(e) => setSlot(e.currentTarget.value, e.currentTarget)}
 						/>
 					</label>
 				{/if}
-				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen} title={withKey('Delete this area', 'delete')}>
-					<Icon name="trash" size={14} /> Delete
+				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen} title={withKey(t.boxOptions.deleteTitle, 'delete')}>
+					<Icon name="trash" size={14} /> {t.common.delete}
 				</button>
 			</span>
 		</span>
@@ -654,34 +656,34 @@
 		     then the box around it. A value the area takes from the page shows in
 		     italics; one it sets for itself has an × that takes it back. -->
 		<fieldset class="group">
-			<legend>Content</legend>
+			<legend>{t.boxOptions.content}</legend>
 			<label class="field">
-				<span class="sr-only">Content</span>
+				<span class="sr-only">{t.boxOptions.content}</span>
 				<select
 					value={source}
-					title="Where this area gets what it shows"
+					title={t.boxOptions.contentTitle}
 					disabled={boxFrozen}
 					onchange={(e) => setSource(e.currentTarget.value as Source)}
 				>
-					<option value="field">Data Field</option>
-					<option value="static">Static Text</option>
-					<option value="image">Image</option>
+					<option value="field">{t.boxOptions.dataField}</option>
+					<option value="static">{t.boxOptions.staticText}</option>
+					<option value="image">{t.boxOptions.image}</option>
 				</select>
 			</label>
 			{#if selected.slot}
 				<label class="field">
-					<span>Column</span>
+					<span>{t.boxOptions.column}</span>
 					<!-- Frozen with the rest of them. Which column an area draws from is an
 					     option like any other — it changes what the area shows — and this
 					     was the one control in the bar a lock did not reach, so a locked
 					     area sat there with eight fields gone quiet and one still lit. -->
 					<select
 						value={mapping[selected.slot] ?? ''}
-						title="Which spreadsheet column fills this field"
+						title={t.boxOptions.columnTitle}
 						disabled={boxFrozen}
 						onchange={(e) => onmappingchange({ ...mapping, [selected.slot as string]: e.currentTarget.value })}
 					>
-						<option value="">— None —</option>
+						<option value="">{t.boxOptions.noColumn}</option>
 						{#each dataset.columns as column (column)}
 							<option value={column}>{column}</option>
 						{/each}
@@ -694,32 +696,32 @@
 				     the address and the color both, which nobody guessed took a color. -->
 				<button
 					disabled={boxFrozen}
-					title="An image from this device — kept in this browser (or your images folder), the template only names it"
+					title={t.boxOptions.uploadTitle}
 					onclick={() => pictureInput?.click()}
 				>
-					<Icon name="image-reference" size={14} /> Upload…
+					<Icon name="image-reference" size={14} /> {t.printSettings.upload}
 				</button>
 				<button
 					disabled={boxFrozen}
-					title={selected.static?.url && !pictureColor ? `Now: ${selected.static.url}` : 'An http(s) address the template will carry as written'}
+					title={selected.static?.url && !pictureColor ? fmt(t.boxOptions.urlNow, { url: selected.static.url }) : t.printSettings.urlTitle}
 					onclick={linkPicture}
 				>
-					<Icon name="copy-link" size={14} /> URL…
+					<Icon name="copy-link" size={14} /> {t.printSettings.url}
 				</button>
 				<button
 					disabled={boxFrozen}
-					title="Draw a small image for this area, saved in the template — over the one it shows, where the browser allows"
+					title={t.boxOptions.drawStaticTitle}
 					onclick={() => ondraw?.(selected.id)}
 				>
-					<Icon name="edit" size={14} /> {selected.static?.dataUrl ? 'Edit…' : 'Draw…'}
+					<Icon name="edit" size={14} /> {selected.static?.dataUrl ? t.boxOptions.edit : t.boxOptions.draw}
 				</button>
 				<span class="field">
-					<span class="sr-only">Color</span>
+					<span class="sr-only">{t.fields.color}</span>
 					<ColorField
 						value={pictureColor ?? undefined}
 						fallback="#ffffff"
-						label="Area color"
-						title="Fill the area with a color instead of an image"
+						label={t.boxOptions.areaColor}
+						title={t.boxOptions.areaColorTitle}
 						disabled={boxFrozen}
 						onchange={(v) => setPictureAddress(v)}
 					/>
@@ -737,14 +739,14 @@
 				/>
 			{:else}
 				<label class="field">
-					<span>Text</span>
+					<span>{t.boxOptions.text}</span>
 					<input
 						bind:this={textInput}
 						use:completePlaceholders={dataset.columns}
 						class="w-8"
 						value={selected.static?.text ?? ''}
-						placeholder="Text — the same on every card"
-						title="Text saved in the template, not in the data — the same on every card"
+						placeholder={t.boxOptions.textPlaceholder}
+						title={t.boxOptions.textTitle}
 						disabled={boxFrozen}
 						onchange={(e) => setStatic({ text: e.currentTarget.value })}
 						onkeydown={(e) => {
@@ -763,32 +765,32 @@
 			     "Content: Bitmap" is the same fact twice. -->
 			{#if source === 'field' || source === 'static'}
 				<label class="field">
-					<span>Mode</span>
+					<span>{t.boxOptions.mode}</span>
 					<select value={selected.mode} disabled={boxFrozen} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
-						<option value="plain">Plain Text</option>
-						<option value="markdown">Markdown</option>
+						<option value="plain">{t.boxOptions.plain}</option>
+						<option value="markdown">{t.boxOptions.markdown}</option>
 						<!-- A column can hold a picture — a drawing, an address, a
 						     stored name — or a color, so a field offers both. Words
 						     typed into the template cannot be either: that is what
 						     the Image content type is for. -->
 						{#if source === 'field'}
-							<option value="image">Image</option>
-							<option value="color">Color</option>
+							<option value="image">{t.boxOptions.image}</option>
+							<option value="color">{t.fields.color}</option>
 						{/if}
-						<option value="qr">QR Code</option>
+						<option value="qr">{t.boxOptions.qr}</option>
 					</select>
 				</label>
 			{/if}
 			{#if takesADrawing(selected.mode) || selected.mode === 'qr'}
 				<label class="field">
-					<span>Fit</span>
+					<span>{t.boxOptions.fit}</span>
 					<select value={selected.fit ?? 'contain'} disabled={boxFrozen} onchange={(e) => patch({ fit: e.currentTarget.value as Box['fit'] })}>
-						<option value="contain">Fit</option>
-						<option value="cover">Cover</option>
-						<option value="fill">Stretch</option>
+						<option value="contain">{t.boxOptions.fit}</option>
+						<option value="cover">{t.imageFit.cover}</option>
+						<option value="fill">{t.boxOptions.stretch}</option>
 						<!-- Pictures only. A tiled QR code is not a QR code. -->
 						{#if takesADrawing(selected.mode)}
-							<option value="repeat">Tile</option>
+							<option value="repeat">{t.imageFit.tile}</option>
 						{/if}
 					</select>
 				</label>
@@ -800,10 +802,10 @@
 				     page. -->
 				<button
 					disabled={boxFrozen}
-					title="Draw a small image for this area. It is written into this row's cell, so every row can have its own"
+					title={t.boxOptions.drawFieldTitle}
 					onclick={() => ondraw?.(selected.id)}
 				>
-					<Icon name="edit" size={14} /> Draw…
+					<Icon name="edit" size={14} /> {t.boxOptions.draw}
 				</button>
 			{/if}
 
@@ -817,49 +819,49 @@
 					checked={!!selected.hideWhenEmpty}
 					disabled={boxFrozen || emptyStatic}
 					title={emptyStatic
-						? 'Does not apply to an area holding its own words and none of them — it stays in view so it can be selected'
+						? t.boxOptions.hideWhenEmptyNA
 						: undefined}
 					onchange={(e) => patch({ hideWhenEmpty: e.currentTarget.checked })}
 				/>
-				Hide When Empty
+				{t.boxOptions.hideWhenEmpty}
 			</label>
 		</fieldset>
 		{#if selected.mode === 'qr'}
 			<fieldset class="group">
-				<legend>QR Code</legend>
+				<legend>{t.boxOptions.qr}</legend>
 				<label class="field">
-					<span>Correction</span>
+					<span>{t.boxOptions.correction}</span>
 					<select
 						value={selected.qr?.level ?? DEFAULT_QR.level}
-						title="How much of the code can be damaged and still scan"
+						title={t.boxOptions.correctionTitle}
 						disabled={boxFrozen}
 						onchange={(e) => setQr({ level: e.currentTarget.value as QrSettings['level'] })}
 					>
-						<option value="L">L — 7%</option>
-						<option value="M">M — 15%</option>
-						<option value="Q">Q — 25%</option>
-						<option value="H">H — 30%</option>
+						<option value="L">{t.boxOptions.levels.L}</option>
+						<option value="M">{t.boxOptions.levels.M}</option>
+						<option value="Q">{t.boxOptions.levels.Q}</option>
+						<option value="H">{t.boxOptions.levels.H}</option>
 					</select>
 				</label>
 				<label class="field">
-					<span>Background</span>
+					<span>{t.boxOptions.background}</span>
 					<select
 						value={selected.qr?.background ? 'opaque' : 'transparent'}
-						title="Transparent lets the paper show through; a scanner needs contrast either way"
+						title={t.boxOptions.qrBackgroundTitle}
 						disabled={boxFrozen}
 						onchange={(e) => setQrBackground(e.currentTarget.value === 'opaque')}
 					>
-						<option value="transparent">Transparent</option>
-						<option value="opaque">Solid</option>
+						<option value="transparent">{t.boxOptions.transparent}</option>
+						<option value="opaque">{t.boxOptions.solid}</option>
 					</select>
 				</label>
 				{#if selected.qr?.background}
 					<span class="field">
-						<span class="sr-only">QR Background Color</span>
+						<span class="sr-only">{t.boxOptions.qrBackgroundColor}</span>
 						<ColorField
 							value={selected.qr.background}
 							fallback="#ffffff"
-							label="QR background color"
+							label={t.boxOptions.qrBackgroundColor}
 							disabled={boxFrozen}
 							onchange={(v) => setQr({ background: v })}
 						/>
@@ -868,13 +870,13 @@
 			</fieldset>
 		{/if}
 		<fieldset class="group">
-			<legend>Align</legend>
-			<span class="segmented" role="group" aria-label="Horizontal alignment">
+			<legend>{t.boxOptions.align}</legend>
+			<span class="segmented" role="group" aria-label={t.boxOptions.horizontal}>
 				{#each ALIGNMENTS as option (option.value)}
 					<button
 						aria-pressed={(selected.align ?? template.defaults.align) === option.value}
-						title="Align {option.label}"
-						aria-label="Align {option.label}"
+						title={option.label}
+						aria-label={option.label}
 						disabled={boxFrozen}
 						onclick={() => patch({ align: option.value })}
 					>
@@ -883,14 +885,14 @@
 				{/each}
 			</span>
 			{#if selected.align}
-				<ResetButton to="the page's alignment" disabled={boxFrozen} onclick={() => patch({ align: undefined })} />
+				<ResetButton title={t.boxOptions.reset.alignment} disabled={boxFrozen} onclick={() => patch({ align: undefined })} />
 			{/if}
-			<span class="segmented" role="group" aria-label="Vertical alignment">
+			<span class="segmented" role="group" aria-label={t.boxOptions.vertical}>
 				{#each VERTICALS as option (option.value)}
 					<button
 						aria-pressed={(selected.valign ?? 'top') === option.value}
-						title="Align {option.label}"
-						aria-label="Align {option.label}"
+						title={option.label}
+						aria-label={option.label}
 						disabled={boxFrozen}
 						onclick={() => patch({ valign: option.value })}
 					>
@@ -900,11 +902,11 @@
 			</span>
 		</fieldset>
 		<fieldset class="group">
-			<legend>Text</legend>
+			<legend>{t.boxOptions.text}</legend>
 			<span class="field" class:inherits={!selected.font}>
-				<span>Font</span>
+				<span>{t.fields.font}</span>
 				<MenuSelect
-					label="Font"
+					label={t.fields.font}
 					value={selected.font ?? ''}
 					items={fontItems}
 					disabled={boxFrozen}
@@ -913,117 +915,117 @@
 					onselect={setFont}
 				/>
 				{#if selected.font}
-					<ResetButton to="the page's {template.defaults.font}" disabled={boxFrozen} onclick={() => patch({ font: undefined })} />
+					<ResetButton title={fmt(t.boxOptions.reset.value, { value: template.defaults.font })} disabled={boxFrozen} onclick={() => patch({ font: undefined })} />
 				{/if}
 			</span>
 			<label class="field">
-				<span>Size</span>
+				<span>{t.fields.size}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.5"
 					min="1"
 					placeholder={String(template.defaults.size)}
-					title="Blank inherits the page's {template.defaults.size}pt"
+					title={fmt(t.boxOptions.sizeTitle, { size: template.defaults.size })}
 					value={selected.size ?? ''}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ size: inherited(e, MIN_SIZE) })}
 				/>
-				<span class="unit">pt</span>
+				<span class="unit">{t.units.pt}</span>
 				{#if selected.size !== undefined}
-					<ResetButton to="the page's {template.defaults.size}pt" disabled={boxFrozen} onclick={() => patch({ size: undefined })} />
+					<ResetButton title={fmt(t.boxOptions.reset.size, { value: template.defaults.size })} disabled={boxFrozen} onclick={() => patch({ size: undefined })} />
 				{/if}
 			</label>
 			<label class="field">
-				<span>Weight</span>
+				<span>{t.boxOptions.weight}</span>
 				<select
 					class:inherits={selected.weight === undefined}
 					value={selected.weight === undefined ? '' : String(selected.weight)}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ weight: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
 				>
-					<option value="">Default: {template.defaults.weight}</option>
+					<option value="">{fmt(t.boxOptions.inherit, { value: template.defaults.weight })}</option>
 					{#each weights as weight (weight)}
 						<option value={String(weight)}>{weight}</option>
 					{/each}
 				</select>
 				{#if selected.weight !== undefined}
-					<ResetButton to="the page's {template.defaults.weight}" disabled={boxFrozen} onclick={() => patch({ weight: undefined })} />
+					<ResetButton title={fmt(t.boxOptions.reset.value, { value: template.defaults.weight })} disabled={boxFrozen} onclick={() => patch({ weight: undefined })} />
 				{/if}
 			</label>
 			<span class="field" class:inherits={!selected.color}>
-				<span>Color</span>
+				<span>{t.fields.color}</span>
 				<ColorField
 					value={selected.color}
 					fallback={template.defaults.color}
-					label="Text color"
+					label={t.fields.textColor}
 					hueFrom={selected.colorFrom?.text}
 					preview={previewOf('text')}
-					title={selected.color ? undefined : "The page's text color"}
+					title={selected.color ? undefined : t.boxOptions.pageTextColor}
 					disabled={boxFrozen}
 					onchange={(v) => patch({ color: v })}
 				/>
 				{#if selected.color}
-					<ResetButton to="the page's text color" disabled={boxFrozen} onclick={() => patch({ color: undefined })} />
+					<ResetButton title={t.boxOptions.reset.textColor} disabled={boxFrozen} onclick={() => patch({ color: undefined })} />
 				{/if}
-				{@render fromColumn('text', 'text color')}
+				{@render fromColumn('text')}
 			</span>
 			<label class="field">
-				<span>Spacing</span>
+				<span>{t.fields.spacing}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.05"
 					placeholder={String(template.defaults.letterSpacing)}
-					title="Letter spacing; blank inherits the page's"
+					title={t.boxOptions.spacingTitle}
 					value={selected.letterSpacing ?? ''}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ letterSpacing: inherited(e) })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 				{#if selected.letterSpacing !== undefined}
-					<ResetButton to="the page's {template.defaults.letterSpacing}mm" disabled={boxFrozen} onclick={() => patch({ letterSpacing: undefined })} />
+					<ResetButton title={fmt(t.boxOptions.reset.spacing, { value: template.defaults.letterSpacing })} disabled={boxFrozen} onclick={() => patch({ letterSpacing: undefined })} />
 				{/if}
 			</label>
 			<label class="field">
-				<span>Case</span>
+				<span>{t.boxOptions.case}</span>
 				<select value={selected.textCase ?? 'none'} disabled={boxFrozen} onchange={(e) => patch({ textCase: e.currentTarget.value as Box['textCase'] })}>
-					<option value="none">As Typed</option>
-					<option value="smallcaps">Small Caps</option>
-					<option value="uppercase">Uppercase</option>
+					<option value="none">{t.boxOptions.asTyped}</option>
+					<option value="smallcaps">{t.boxOptions.smallCaps}</option>
+					<option value="uppercase">{t.boxOptions.uppercase}</option>
 				</select>
 			</label>
 		</fieldset>
 		<fieldset class="group">
-			<legend>Position</legend>
-			<label class="field"><span>X</span>
+			<legend>{t.boxOptions.position}</legend>
+			<label class="field"><span>{t.boxOptions.x}</span>
 				<input class="n-4" type="number" step="0.5" value={selected.x} disabled={boxFrozen} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 			</label>
-			<label class="field"><span>Y</span>
+			<label class="field"><span>{t.boxOptions.y}</span>
 				<input
 					class="n-4"
 					type="number"
 					step="0.5"
 					value={selected.y}
 					disabled={boxFrozen || !!selected.anchor}
-					title={selected.anchor ? 'Anchored: the gap sets the top edge' : ''}
+					title={selected.anchor ? t.boxOptions.anchoredTitle : ''}
 					onchange={(e) => patch({ y: numeric(e, selected.y) })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 			</label>
-			<label class="field"><span>W</span>
+			<label class="field"><span>{t.boxOptions.w}</span>
 				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.w} disabled={boxFrozen} onchange={(e) => resize('w', e)} />
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 			</label>
-			<label class="field"><span>H</span>
+			<label class="field"><span>{t.boxOptions.h}</span>
 				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.h} disabled={boxFrozen} onchange={(e) => resize('h', e)} />
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 			</label>
 			<label class="field">
-				<span>Anchor</span>
+				<span>{t.boxOptions.anchor}</span>
 				<select value={selected.anchor?.to ?? ''} disabled={boxFrozen} onchange={(e) => setAnchor(e.currentTarget.value)}>
-					<option value="">— Fixed Y —</option>
+					<option value="">{t.boxOptions.fixedY}</option>
 					{#each anchorOptions as box (box.id)}
 						<option value={box.id}>{box.slot ?? box.id}</option>
 					{/each}
@@ -1031,19 +1033,19 @@
 			</label>
 			{#if selected.anchor}
 				<label class="field">
-					<span>Gap</span>
+					<span>{t.boxOptions.gap}</span>
 					<!-- No floor: a negative gap tucks this area up under the one it
 					     follows, overlapping it, which is a layout people want. -->
 					<input
 						class="n-3"
 						type="number"
 						step="0.5"
-						title="Between that area's bottom and this one's top; below 0 overlaps it"
+						title={t.boxOptions.gapTitle}
 						value={selected.anchor.gap}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ anchor: { to: selected.anchor!.to, gap: numeric(e, selected.anchor!.gap) } })}
 					/>
-					<span class="unit">mm</span>
+					<span class="unit">{t.units.mm}</span>
 				</label>
 			{/if}
 			<!-- Only where there is a fold to mirror across: on a run of identical
@@ -1053,82 +1055,82 @@
 					<input
 						type="checkbox"
 						checked={selected.mirror !== false}
-						title="Mirror this area onto left-hand pages, so it keeps its distance from the outer edge. Off pins it to the same millimetres on every page"
+						title={t.boxOptions.mirrorTitle}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ mirror: e.currentTarget.checked ? undefined : false })}
 					/>
-					Recto / Verso
+					{t.pageOptions.facing}
 				</label>
 			{/if}
 			<label class="field">
-				<span>Rotation</span>
+				<span>{t.boxOptions.rotation}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="1"
-					title="Degrees clockwise; the box turns about the centre marked on it"
+					title={t.boxOptions.rotationTitle}
 					value={selected.rotation ?? 0}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ rotation: normaliseRotation(numeric(e, 0)) })}
 				/>
-				<span class="unit">°</span>
+				<span class="unit">{t.units.degrees}</span>
 			</label>
 			{#if selected.rotation}
 				<label class="field tight">
-					<span class="edge">X</span>
+					<span class="edge">{t.boxOptions.x}</span>
 					<input
 						class="n-3"
 						type="number"
 						step="5"
 						min="0"
 						max="100"
-						aria-label="Centre X"
-						title="The pivot across the box, as a percentage of its width"
+						aria-label={t.boxOptions.centreX}
+						title={t.boxOptions.centreXTitle}
 						value={selected.centre?.x ?? 50}
 						disabled={boxFrozen}
 						onchange={(e) => setCentre({ x: numeric(e, 50) })}
 					/>
 				</label>
 				<label class="field tight">
-					<span class="edge">Y</span>
+					<span class="edge">{t.boxOptions.y}</span>
 					<input
 						class="n-3"
 						type="number"
 						step="5"
 						min="0"
 						max="100"
-						aria-label="Centre Y"
-						title="The pivot down the box, as a percentage of its height"
+						aria-label={t.boxOptions.centreY}
+						title={t.boxOptions.centreYTitle}
 						value={selected.centre?.y ?? 50}
 						disabled={boxFrozen}
 						onchange={(e) => setCentre({ y: numeric(e, 50) })}
 					/>
 				</label>
-				<span class="unit">%</span>
+				<span class="unit">{t.units.percent}</span>
 			{/if}
 		</fieldset>
 		<fieldset class="group">
-			<legend>Lines</legend>
+			<legend>{t.boxOptions.lines}</legend>
 			<label class="field">
-				<span>Leading</span>
+				<span>{t.fields.leading}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.05"
 					min="0.8"
 					placeholder={String(template.defaults.lineHeight)}
-					title="Blank inherits the page's {template.defaults.lineHeight}"
+					title={fmt(t.boxOptions.leadingTitle, { leading: template.defaults.lineHeight })}
 					value={selected.lineHeight ?? ''}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ lineHeight: inherited(e, MIN_LEADING) })}
 				/>
 				{#if selected.lineHeight !== undefined}
-					<ResetButton to="the page's {template.defaults.lineHeight}" disabled={boxFrozen} onclick={() => patch({ lineHeight: undefined })} />
+					<ResetButton title={fmt(t.boxOptions.reset.value, { value: template.defaults.lineHeight })} disabled={boxFrozen} onclick={() => patch({ lineHeight: undefined })} />
 				{/if}
 			</label>
 			{#if selected.mode === 'plain' || selected.mode === 'markdown'}
 				<label class="field">
-					<span>Baseline</span>
+					<span>{t.fields.baseline}</span>
 					<input
 						class="n-3"
 						type="number"
@@ -1137,95 +1139,99 @@
 						max={MAX_BASELINE}
 						placeholder={String(baselineOf({ font: selected.font }, template.defaults))}
 						title={pageBaselineApplies
-							? 'Raise the text by this much of its size, or lower it below 0. Blank takes the page\'s'
-							: 'Raise the text by this much of its size, or lower it below 0. The page\'s is for its own font, so an area in another starts at 0'}
+							? t.boxOptions.baselineTitle
+							: t.boxOptions.baselineOtherFontTitle}
 						value={selected.baseline ?? ''}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ baseline: normaliseBaseline(e.currentTarget.value) })}
 					/>
-					<span class="unit">em</span>
+					<span class="unit">{t.units.em}</span>
 					{#if selected.baseline !== undefined}
-						<ResetButton to="the page's baseline" disabled={boxFrozen} onclick={() => patch({ baseline: undefined })} />
+						<ResetButton title={t.boxOptions.reset.baseline} disabled={boxFrozen} onclick={() => patch({ baseline: undefined })} />
 					{/if}
 				</label>
 			{/if}
 			<!-- How one paragraph is told from the next: a space in lines of this
 			     leading, or an indent in em. -->
 			<label class="field">
-				<span>Paragraph</span>
+				<span>{t.fields.paragraph}</span>
 				<select
 					class:inherits={!selected.paragraph}
 					value={selected.paragraph?.mode ?? ''}
-					title="Space after each paragraph, or the first line of the next indented. Every line of plain text is a paragraph"
+					title={t.boxOptions.paragraphTitle}
 					disabled={boxFrozen}
 					onchange={(e) => setParagraph(e.currentTarget.value)}
 				>
-					<option value="">Default: {template.defaults.paragraph ? PARAGRAPH_LABELS[template.defaults.paragraph.mode] : 'Continuous'}</option>
-					<option value="space">Space After</option>
-					<option value="indent">Indent</option>
+					<option value=""
+						>{fmt(t.boxOptions.inherit, {
+							value: template.defaults.paragraph ? PARAGRAPH_LABELS[template.defaults.paragraph.mode] : t.fields.continuous
+						})}</option
+					>
+					<option value="space">{t.fields.spaceAfter}</option>
+					<option value="indent">{t.fields.indent}</option>
 				</select>
 			</label>
 			{#if selected.paragraph}
 				<label class="field">
-					<span class="sr-only">Paragraph amount</span>
+					<span class="sr-only">{t.fields.paragraphAmount}</span>
 					<input
 						class="n-2"
 						type="number"
 						step="0.25"
 						min="0"
 						max={MAX_PARAGRAPH}
-						title={selected.paragraph.mode === 'space' ? "In lines of this area's leading" : 'In em of the type size'}
+						title={selected.paragraph.mode === 'space' ? t.boxOptions.inAreaLines : t.fields.inEm}
 						value={selected.paragraph.amount}
 						disabled={boxFrozen}
 						onchange={(e) => setParagraph(selected.paragraph!.mode, numeric(e, selected.paragraph!.amount))}
 					/>
-					<span class="unit">{selected.paragraph.mode === 'space' ? 'lines' : 'em'}</span>
-					<ResetButton to="the page's paragraphs" disabled={boxFrozen} onclick={() => patch({ paragraph: undefined })} />
+					<span class="unit">{selected.paragraph.mode === 'space' ? t.units.lines : t.units.em}</span>
+					<ResetButton title={t.boxOptions.reset.paragraphs} disabled={boxFrozen} onclick={() => patch({ paragraph: undefined })} />
 				</label>
 			{/if}
 		</fieldset>
 		{#if selected.mode === 'markdown'}
 			<fieldset class="group">
-				<legend>Lists</legend>
+				<legend>{t.fields.lists}</legend>
 				<label class="field">
-					<span>Marker</span>
+					<span>{t.fields.marker}</span>
 					<select
 						class:inherits={!selected.list?.marker}
 						value={selected.list?.marker ?? ''}
-						title="What each item of a list is marked with"
+						title={t.boxOptions.listTitle}
 						disabled={boxFrozen}
 						onchange={(e) => setList({ marker: e.currentTarget.value || undefined })}
 					>
-						<option value="">Default: {LIST_MARKER_LABELS[template.defaults.list?.marker ?? 'bullet']}</option>
+						<option value="">{fmt(t.boxOptions.inherit, { value: LIST_MARKER_LABELS[template.defaults.list?.marker ?? 'bullet'] })}</option>
 						{#each LIST_MARKERS as marker (marker)}
 							<option value={marker}>{LIST_MARKER_LABELS[marker]}</option>
 						{/each}
 					</select>
 					{#if selected.list?.marker}
-						<ResetButton to="the page's list marker" disabled={boxFrozen} onclick={() => setList({ marker: undefined })} />
+						<ResetButton title={t.boxOptions.reset.listMarker} disabled={boxFrozen} onclick={() => setList({ marker: undefined })} />
 					{/if}
 				</label>
 				<label class="field">
-					<span>Indent</span>
+					<span>{t.fields.listIndent}</span>
 					<input
 						class="n-3"
 						type="number"
 						step="0.25"
 						min="0"
 						max={MAX_LIST}
-						placeholder={template.defaults.list?.indent !== undefined ? String(template.defaults.list.indent) : 'auto'}
-						title="From the area's edge to a list's markers, in em of the type size; blank takes the page's"
+						placeholder={template.defaults.list?.indent !== undefined ? String(template.defaults.list.indent) : t.fields.auto}
+						title={t.boxOptions.listIndentTitle}
 						value={selected.list?.indent ?? ''}
 						disabled={boxFrozen}
 						onchange={(e) => setList({ indent: e.currentTarget.value })}
 					/>
-					<span class="unit">em</span>
+					<span class="unit">{t.units.em}</span>
 					{#if selected.list?.indent !== undefined}
-						<ResetButton to="the page's list indent" disabled={boxFrozen} onclick={() => setList({ indent: '' })} />
+						<ResetButton title={t.boxOptions.reset.listIndent} disabled={boxFrozen} onclick={() => setList({ indent: '' })} />
 					{/if}
 				</label>
 				<label class="field">
-					<span>Leading</span>
+					<span>{t.fields.leading}</span>
 					<!-- A multiple of the size, like the area's own leading, which is
 					     where a list with none of its own takes it from. -->
 					<input
@@ -1235,38 +1241,38 @@
 						min={MIN_LEADING}
 						max="3"
 						placeholder={String(listLeadingFallback)}
-						title="The list's own leading. Blank takes {template.defaults.list?.leading !== undefined ? "the page's for lists" : "this area's"}"
+						title={template.defaults.list?.leading !== undefined ? t.boxOptions.listLeadingPageTitle : t.boxOptions.listLeadingAreaTitle}
 						value={selected.list?.leading ?? ''}
 						disabled={boxFrozen}
 						onchange={(e) => setList({ leading: e.currentTarget.value })}
 					/>
 					{#if selected.list?.leading !== undefined}
-						<ResetButton to={template.defaults.list?.leading !== undefined ? "the page's list leading" : "this area's leading"} disabled={boxFrozen} onclick={() => setList({ leading: '' })} />
+						<ResetButton title={template.defaults.list?.leading !== undefined ? t.boxOptions.reset.listLeadingPage : t.boxOptions.reset.listLeadingArea} disabled={boxFrozen} onclick={() => setList({ leading: '' })} />
 					{/if}
 				</label>
 			</fieldset>
 		{/if}
 		<fieldset class="group">
-			<legend>Box</legend>
+			<legend>{t.boxOptions.box}</legend>
 			<label class="field">
-				<span>Fill</span>
+				<span>{t.boxOptions.fill}</span>
 				<select
 					value={selected.background ? 'solid' : 'none'}
-					title="A fill behind this box; transparent lets the paper through"
+					title={t.boxOptions.fillTitle}
 					disabled={boxFrozen}
 					onchange={(e) => setFill(e.currentTarget.value === 'solid')}
 				>
-					<option value="none">None</option>
-					<option value="solid">Solid</option>
+					<option value="none">{t.common.none}</option>
+					<option value="solid">{t.boxOptions.solid}</option>
 				</select>
 			</label>
 			{#if selected.background}
 				<span class="field">
-					<span class="sr-only">Fill Color</span>
+					<span class="sr-only">{t.boxOptions.fillColor}</span>
 					<ColorField
 						value={selected.background}
 						fallback="#ffffff"
-						label="Fill color"
+						label={t.boxOptions.fillColor}
 						hueFrom={selected.colorFrom?.fill}
 						preview={previewOf('fill')}
 						disabled={boxFrozen}
@@ -1274,9 +1280,9 @@
 					/>
 				</span>
 			{/if}
-			<span class="field">{@render fromColumn('fill', 'fill')}</span>
+			<span class="field">{@render fromColumn('fill')}</span>
 			<span class="field">
-				<span>Border</span>
+				<span>{t.boxOptions.border}</span>
 				{#if showSides}
 					{#each EDGES as edge (edge.key)}
 						<label class="field tight">
@@ -1286,7 +1292,7 @@
 								type="number"
 								step="0.1"
 								min="0"
-								aria-label="{edge.label} border width"
+								aria-label={fmt(t.boxOptions.edgeBorder, { edge: edge.name })}
 								value={sides[edge.key]}
 								disabled={boxFrozen}
 								onchange={(e) => setEdge(edge.key, numeric(e, 0))}
@@ -1299,19 +1305,19 @@
 						type="number"
 						step="0.1"
 						min="0"
-						aria-label="Border width"
-						title="The border sits inside the box's millimetres, not outside them"
+						aria-label={t.boxOptions.borderWidth}
+						title={t.boxOptions.borderWidthTitle}
 						value={typeof selected.borderWidth === 'number' ? selected.borderWidth : 0}
 						disabled={boxFrozen}
 						onchange={(e) => setBorder(numeric(e, 0))}
 					/>
 				{/if}
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 				<button
 					class="square"
 					aria-pressed={showSides}
-					title={showSides ? 'One thickness all round' : 'A thickness per edge'}
-					aria-label="Per-edge border widths"
+					title={showSides ? t.boxOptions.oneBorder : t.boxOptions.borderPerEdge}
+					aria-label={t.boxOptions.perEdgeBorders}
 					disabled={boxFrozen}
 					onclick={() => {
 						// Leaving per-edge mode with uneven edges would silently discard
@@ -1326,9 +1332,9 @@
 
 			{#if selected.borderWidth}
 				<label class="field">
-					<span class="sr-only">Border Style</span>
+					<span class="sr-only">{t.boxOptions.borderStyle}</span>
 					<select
-						title="Border style, for the whole box"
+						title={t.boxOptions.borderStyleTitle}
 						value={selected.borderStyle ?? 'solid'}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ borderStyle: e.currentTarget.value as BorderStyle })}
@@ -1339,18 +1345,18 @@
 					</select>
 				</label>
 				<span class="field">
-					<span class="sr-only">Border Color</span>
+					<span class="sr-only">{t.boxOptions.borderColor}</span>
 					<ColorField
 						value={selected.borderColor}
 						fallback={selected.color ?? template.defaults.color}
-						label="Border color"
+						label={t.boxOptions.borderColor}
 						hueFrom={selected.colorFrom?.border}
 						preview={previewOf('border')}
-						title="Border color; follows the text color until you set one"
+						title={t.boxOptions.borderColorTitle}
 						disabled={boxFrozen}
 						onchange={(v) => patch({ borderColor: v })}
 					/>
-					{@render fromColumn('border', 'border color')}
+					{@render fromColumn('border')}
 				</span>
 				<!-- A setting that is on or off, so a checkbox, like Mirror and Hide
 				     When Empty: a pencil that stayed pressed was a button nobody
@@ -1360,30 +1366,30 @@
 					<input
 						type="checkbox"
 						checked={!!selected.borderHand}
-						title="Draw the border by hand: the same width, style and radius, wobbling. The line is the same on every card — it is drawn from this area's own name, not from chance"
+						title={t.boxOptions.handBorderTitle}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ borderHand: e.currentTarget.checked ? true : undefined })}
 					/>
-					Draft
+					{t.boxOptions.draft}
 				</label>
 			{/if}
 
 			<label class="field">
-				<span>Radius</span>
+				<span>{t.boxOptions.radius}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.5"
 					min="0"
-					title="Corner radius, for the whole box"
+					title={t.boxOptions.radiusTitle}
 					value={selected.borderRadius ?? 0}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ borderRadius: Math.max(0, numeric(e, 0)) || undefined })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 			</label>
 			<span class="field">
-				<span>Padding</span>
+				<span>{t.boxOptions.padding}</span>
 				{#if showPadSides}
 					{#each EDGES as edge (edge.key)}
 						<label class="field tight">
@@ -1393,7 +1399,7 @@
 								type="number"
 								step="0.5"
 								min="0"
-								aria-label="{edge.label} padding"
+								aria-label={fmt(t.boxOptions.edgePadding, { edge: edge.name })}
 								value={padSides[edge.key]}
 								disabled={boxFrozen}
 								onchange={(e) => setPadEdge(edge.key, numeric(e, 0))}
@@ -1406,19 +1412,19 @@
 						type="number"
 						step="0.5"
 						min="0"
-						aria-label="Padding"
-						title="Space between the border and the content, inside the box's millimetres"
+						aria-label={t.boxOptions.padding}
+						title={t.boxOptions.paddingTitle}
 						value={typeof selected.padding === 'number' ? selected.padding : 0}
 						disabled={boxFrozen}
 						onchange={(e) => setPadding(numeric(e, 0))}
 					/>
 				{/if}
-				<span class="unit">mm</span>
+				<span class="unit">{t.units.mm}</span>
 				<button
 					class="square"
 					aria-pressed={showPadSides}
-					title={showPadSides ? 'One padding all round' : 'A padding per edge'}
-					aria-label="Per-edge padding"
+					title={showPadSides ? t.boxOptions.onePadding : t.boxOptions.paddingPerEdge}
+					aria-label={t.boxOptions.perEdgePadding}
 					disabled={boxFrozen}
 					onclick={() => {
 						// Same bargain as the border: collapse to the top edge rather
@@ -1431,26 +1437,26 @@
 				</button>
 			</span>
 			<label class="field">
-				<span>Overflow</span>
+				<span>{t.boxOptions.overflow}</span>
 				<select
 					value={selected.overflow}
-					title="Clip cuts off what does not fit in the box's millimetres; Grow lets the box get taller to hold it" disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
-					<option value="clip">Clip</option>
-					<option value="grow">Grow</option>
+					title={t.boxOptions.overflowTitle} disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
+					<option value="clip">{t.boxOptions.clip}</option>
+					<option value="grow">{t.boxOptions.grow}</option>
 				</select>
 			</label>
 		</fieldset>
 		<fieldset class="group">
-			<legend>Effects</legend>
+			<legend>{t.boxOptions.effects}</legend>
 			<label class="field">
-				<span>Blend</span>
+				<span>{t.boxOptions.blend}</span>
 				<select
 					value={selected.blend ?? ''}
-					title="How this area meets what is under it — the paper, its own background image, and any area it overlaps. Multiply is ink on paper. Prints only with background graphics on, like the paper colour"
+					title={t.boxOptions.blendTitle}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ blend: (e.currentTarget.value || undefined) as Box['blend'] })}
 				>
-					<option value="">Normal</option>
+					<option value="">{t.blend.normal}</option>
 					{#each BLEND_MODES as mode (mode)}
 						<option value={mode}>{BLEND_LABELS[mode]}</option>
 					{/each}
@@ -1458,14 +1464,14 @@
 			</label>
 
 			<label class="field">
-				<span>Opacity</span>
+				<span>{t.boxOptions.opacity}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="5"
 					min="0"
 					max="100"
-					title="How much of what is under this area shows through it. Fades the fill, the border and the content together"
+					title={t.boxOptions.opacityTitle}
 					value={Math.round((selected.opacity ?? 1) * 100)}
 					disabled={boxFrozen}
 					onchange={(e) => {
@@ -1475,7 +1481,7 @@
 						patch({ opacity: percent >= 100 ? undefined : percent / 100 });
 					}}
 				/>
-				<span class="unit">%</span>
+				<span class="unit">{t.units.percent}</span>
 			</label>
 		</fieldset>
 	</div>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { fromRgba, toRgba } from '$lib/color';
+	import { fmt, t } from '$lib/strings';
 
 	/**
 	 * A color with an opacity: the platform's swatch for the hue, and a number
@@ -80,8 +81,8 @@
 		disabled={disabled || !!fromRow}
 		title={hueFrom
 			? fromRow
-				? `This row's ${hueFrom} — the color comes from that column`
-				: `This row's ${hueFrom} holds no color, so this one is used`
+				? fmt(t.colorField.fromRow, { column: hueFrom })
+				: fmt(t.colorField.notInRow, { column: hueFrom })
 			: undefined}
 		aria-label={label}
 		onchange={(e) => setHue(e.currentTarget.value)}
@@ -94,8 +95,8 @@
 		step="5"
 		value={percent}
 		{disabled}
-		aria-label="{label} opacity, percent"
-		title="Opacity, in percent"
+		aria-label={fmt(t.colorField.opacityLabel, { label })}
+		title={t.colorField.opacityTitle}
 		onchange={(e) => setAlpha(e.currentTarget)}
 	/>
 	<span class="unit" aria-hidden="true">%</span>

@@ -1,3 +1,4 @@
+import { t } from './strings';
 import type { Align, Box, PageNumberPosition, PageSide } from './types';
 
 /**
@@ -376,33 +377,33 @@ interface Panel {
 const inch = (px: number, ppi: number) => px / ppi;
 
 const PANELS: Panel[] = [
-	{ name: '13-inch MacBook', inches: inch(2560, 227), looks: [[1024, 640], [1280, 800], [1440, 900], [1680, 1050]] },
-	{ name: '13-inch MacBook Air', inches: inch(2560, 224), looks: [[1024, 665], [1280, 832], [1470, 956], [1710, 1112]] },
-	{ name: '15-inch MacBook Air', inches: inch(2880, 224), looks: [[1440, 932], [1710, 1107], [1920, 1243]] },
-	{ name: '14-inch MacBook Pro', inches: inch(3024, 254), looks: [[1147, 745], [1352, 878], [1512, 982], [1800, 1169]] },
-	{ name: '16-inch MacBook Pro', inches: inch(3456, 254), looks: [[1312, 848], [1496, 967], [1728, 1117], [2056, 1329]] },
-	{ name: '15-inch MacBook Pro', inches: inch(2880, 220), looks: [[1680, 1050], [1920, 1200]] },
-	{ name: '27-inch iMac or Studio Display', inches: inch(5120, 218), looks: [[2048, 1152], [2304, 1296], [2560, 1440], [2880, 1620], [3200, 1800]], ratio: [2, 2] },
-	{ name: '24-inch iMac', inches: inch(4480, 218), looks: [[2240, 1260]], ratio: [2, 2] },
-	{ name: '12.9-inch iPad Pro', inches: inch(2732, 264), grid: [2732, 2048] },
-	{ name: '11-inch iPad Pro', inches: inch(2388, 264), grid: [2388, 1668] },
-	{ name: '10.9-inch iPad', inches: inch(2360, 264), grid: [2360, 1640] },
-	{ name: 'iPad mini', inches: inch(2266, 326), grid: [2266, 1488] },
-	{ name: '6.1-inch iPhone', inches: inch(2556, 460), grid: [2556, 1179] },
-	{ name: '6.7-inch iPhone', inches: inch(2796, 460), grid: [2796, 1290] },
-	{ name: '6.1-inch iPhone', inches: inch(2532, 460), grid: [2532, 1170] },
-	{ name: '6.7-inch iPhone', inches: inch(2778, 458), grid: [2778, 1284] },
-	{ name: '5.8-inch iPhone', inches: inch(2436, 458), grid: [2436, 1125] },
-	{ name: '6.1-inch iPhone', inches: inch(1792, 326), grid: [1792, 828] },
-	{ name: '4.7-inch iPhone', inches: inch(1334, 326), grid: [1334, 750] },
+	{ name: t.screens.macbook13, inches: inch(2560, 227), looks: [[1024, 640], [1280, 800], [1440, 900], [1680, 1050]] },
+	{ name: t.screens.macbookAir13, inches: inch(2560, 224), looks: [[1024, 665], [1280, 832], [1470, 956], [1710, 1112]] },
+	{ name: t.screens.macbookAir15, inches: inch(2880, 224), looks: [[1440, 932], [1710, 1107], [1920, 1243]] },
+	{ name: t.screens.macbookPro14, inches: inch(3024, 254), looks: [[1147, 745], [1352, 878], [1512, 982], [1800, 1169]] },
+	{ name: t.screens.macbookPro16, inches: inch(3456, 254), looks: [[1312, 848], [1496, 967], [1728, 1117], [2056, 1329]] },
+	{ name: t.screens.macbookPro15, inches: inch(2880, 220), looks: [[1680, 1050], [1920, 1200]] },
+	{ name: t.screens.imac27, inches: inch(5120, 218), looks: [[2048, 1152], [2304, 1296], [2560, 1440], [2880, 1620], [3200, 1800]], ratio: [2, 2] },
+	{ name: t.screens.imac24, inches: inch(4480, 218), looks: [[2240, 1260]], ratio: [2, 2] },
+	{ name: t.screens.ipadPro129, inches: inch(2732, 264), grid: [2732, 2048] },
+	{ name: t.screens.ipadPro11, inches: inch(2388, 264), grid: [2388, 1668] },
+	{ name: t.screens.ipad109, inches: inch(2360, 264), grid: [2360, 1640] },
+	{ name: t.screens.ipadMini, inches: inch(2266, 326), grid: [2266, 1488] },
+	{ name: t.screens.iphone61, inches: inch(2556, 460), grid: [2556, 1179] },
+	{ name: t.screens.iphone67, inches: inch(2796, 460), grid: [2796, 1290] },
+	{ name: t.screens.iphone61, inches: inch(2532, 460), grid: [2532, 1170] },
+	{ name: t.screens.iphone67, inches: inch(2778, 458), grid: [2778, 1284] },
+	{ name: t.screens.iphone58, inches: inch(2436, 458), grid: [2436, 1125] },
+	{ name: t.screens.iphone61, inches: inch(1792, 326), grid: [1792, 828] },
+	{ name: t.screens.iphone47, inches: inch(1334, 326), grid: [1334, 750] },
 	// Grids shared by screens of several sizes: the commonest, marked. A 1080p
 	// grid drawn at a ratio of 1 is nearly always a desk monitor; drawn larger,
 	// a laptop scaling its panel up.
-	{ name: '24-inch monitor', inches: inch(1920, 92), grid: [1920, 1080], ratio: [0, 1], estimate: true },
-	{ name: '15.6-inch laptop', inches: inch(1920, 141), grid: [1920, 1080], ratio: [1.1, 4], estimate: true },
-	{ name: '27-inch monitor', inches: inch(2560, 109), grid: [2560, 1440], ratio: [0, 1], estimate: true },
-	{ name: '27-inch 4K monitor', inches: inch(3840, 163), grid: [3840, 2160], estimate: true },
-	{ name: '34-inch ultrawide', inches: inch(3440, 110), grid: [3440, 1440], estimate: true }
+	{ name: t.screens.monitor24, inches: inch(1920, 92), grid: [1920, 1080], ratio: [0, 1], estimate: true },
+	{ name: t.screens.laptop156, inches: inch(1920, 141), grid: [1920, 1080], ratio: [1.1, 4], estimate: true },
+	{ name: t.screens.monitor27, inches: inch(2560, 109), grid: [2560, 1440], ratio: [0, 1], estimate: true },
+	{ name: t.screens.monitor274k, inches: inch(3840, 163), grid: [3840, 2160], estimate: true },
+	{ name: t.screens.ultrawide34, inches: inch(3440, 110), grid: [3440, 1440], estimate: true }
 ];
 
 /** How far a measured size may be off a listed one — fractional ratios round. */
