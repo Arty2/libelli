@@ -97,12 +97,16 @@
 	color: #b42318;
 }
 
-/* Related controls are one group with a rule either side, so the bar reads as
-   a handful of subjects rather than thirty loose fields. */
-/* A group wraps inside itself once it is wider than the bar. At the default
-   text size that is only ever a phone, which used to scroll its widest groups
-   sideways; at a larger text size it is a desk too, where an unwrapped group
-   ran off the window and widened the whole document to follow it. */
+/* Each subject is one run: its name in bold, then its controls, with a wider
+   gap before the next run than between two fields. The name is the only thing
+   in the bar set heavier than the labels, so it marks where a run starts. No
+   rule between runs: the bar wraps, and a rule lands wherever the wrap does —
+   dangling at the end of a line, or between two runs that have nothing to do
+   with each other.
+
+   A group wraps inside itself once it is wider than the bar. At the default
+   text size that is only ever a phone; at a larger text size it is a desk too,
+   where an unwrapped group ran off the window and widened the document. */
 .options .group {
 	display: inline-flex;
 	flex-wrap: wrap;
@@ -110,13 +114,62 @@
 	gap: 8px;
 	max-width: 100%;
 	box-sizing: border-box;
-	padding: 2px 8px;
-	border-left: 1px solid #ddd;
-	border-right: 1px solid #ddd;
+	margin: 0;
+	/* A fieldset brings a min-content floor, which is what would stop a group
+	   wrapping inside itself on a phone; it goes, with the browser's frame. */
+	min-inline-size: 0;
+	padding: 2px 0;
+	border: none;
+	margin-right: 12px;
 }
 
-.box-options .group {
-	border-color: var(--accent-line);
+/* Floated, a legend is no longer the one drawn into the fieldset's border but
+   an ordinary child — here the first item of the run. */
+.options .group > legend {
+	float: left;
+	padding: 0;
+	margin: 0;
+	white-space: nowrap;
+	font-size: 0.625rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: #222;
+}
+
+/* A value taken from somewhere else — the page's size, its font, its list
+   marker — is shown in italics, in a grey that still reads, where a value
+   set here is upright and black and has an × beside it. The placeholder rule
+   covers every blank-inherits field at once, and a real placeholder elsewhere
+   in the bar (a width, a template name) reads as the suggestion it is. */
+.options input::placeholder {
+	color: #6b6b6b;
+	font-style: italic;
+	opacity: 1;
+}
+
+.options select.inherits,
+.options .inherits .menu-select .value,
+.options .inherits .color-field .alpha {
+	font-style: italic;
+	color: #6b6b6b;
+}
+
+.options button.reset {
+	flex: none;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: none;
+	color: #767676;
+}
+
+.options button.reset:hover:not(:disabled) {
+	background: #e3e3e3;
+	color: #111;
 }
 
 /* The image is named, not shown: a thumbnail in a toolbar this dense reads as
@@ -490,10 +543,35 @@
 		border-bottom: 1px solid #ddd;
 	}
 
+	/* The CSS button keeps its glyph and its dot and loses the word, as the
+	   app's own toolbar buttons do at this width: the head has to hold a lock,
+	   a name, its menu and two buttons on one line. */
+	.options .head-row .label {
+		display: none;
+	}
+
 	/* On a phone the bar is one column of wrapped controls anyway, so the head's
 	   rule would be a line down the left of nothing. */
 	.options .head {
 		border-right: none;
 		padding-right: 0;
+	}
+
+	/* One run to a line, ruled underneath rather than at the side, where a
+	   rule would stand at the end of a line of nothing. */
+	.options .group {
+		flex: 1 1 100%;
+		padding: 0 0 6px;
+		border-right: none;
+		border-bottom: 1px solid #e0e0e0;
+	}
+
+	.box-options .group {
+		border-bottom-color: var(--accent-line);
+	}
+
+	.options .group:last-of-type {
+		border-bottom: none;
+		padding-bottom: 0;
 	}
 }

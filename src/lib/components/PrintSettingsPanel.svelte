@@ -31,7 +31,7 @@
 		onuploadbackground: (file: File) => void;
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
 		/**
-		 * Left & Right, the page setting, repeated here. Only on the print screen:
+		 * Recto / Verso, the page setting, repeated here. Only on the print screen:
 		 * it decides which edge is outer, and so the order a zine folds in, and
 		 * that is where it is found wanting — in page setup it is already beside
 		 * the page size.
@@ -198,10 +198,11 @@
 	}
 </script>
 
-<!-- The card's own bleed, here rather than only in the Card size group: it is a
-     print decision, and the print screen is where you are when you notice the
-     cards need one. -->
-<span class="group" role="group" aria-label="Page bleed">
+<!-- The card's own bleed, here as well as in Page Setup: it is a print
+     decision, and the print screen is where you are when you notice the cards
+     need one. -->
+<fieldset class="group">
+	<legend>Bleed</legend>
 	<label class="check">
 		<input
 			type="checkbox"
@@ -283,19 +284,20 @@
 			</label>
 		{/if}
 	{/if}
-</span>
+</fieldset>
 
-<span class="group" role="group" aria-label="Print Settings">
+<fieldset class="group sheet-group">
+	<legend>Printing</legend>
 	{#if showFacing}
 		<label class="check">
 			<input
 				type="checkbox"
 				checked={!!template.facing}
-				title="Odd rows are right-hand pages and even rows their facing left-hand pages — the same setting as Left & Right in page setup"
+				title="Odd rows are right-hand pages and even rows their facing left-hand pages — the same setting as Recto / Verso in page setup"
 				disabled={pageFrozen}
 				onchange={(e) => ontemplatechange({ ...template, facing: e.currentTarget.checked || undefined })}
 			/>
-			Left &amp; Right
+			Recto / Verso
 		</label>
 	{/if}
 	<label class="field">
@@ -410,7 +412,7 @@
 				Scaled to {Math.round(fit.scale * 100)}%
 			</span>
 		{/if}
-		<span class="field-label">Sheet Image</span>
+		<span class="field-label">Image</span>
 		{#if template.print.background}
 			<span class="asset" title={template.print.background.src}>
 				<Icon name={template.print.background.source === 'url' ? 'link' : 'image'} size={12} />
@@ -447,6 +449,6 @@
 			>
 		{/if}
 	{/if}
-</span>
+</fieldset>
 
 <input bind:this={imageInput} type="file" accept="image/*" hidden onchange={uploadBackground} />

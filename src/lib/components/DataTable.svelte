@@ -1773,21 +1773,8 @@
 				<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
 			{/if}
 		{:else}
-		<!-- How tall a row may be: one line, a few, or all of its longest cell.
-		     First in the bar and always there: it is about how the table is
-		     read whatever else is going on. The label says the height the rows
-		     are at; the title, the next. -->
-		<button
-			class="row-height"
-			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
-			aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
-			onclick={() => onrowheight(nextRowHeight)}
-		>
-			<Icon name={ROW_HEIGHT_ICONS[rowHeight]} size={15} />
-			<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
-		</button>
 		{#if editing && dataset.rows[editing.row]}
-			<!-- Beside the row height while a cell is typed in: the way into the
+			<!-- First in the bar while a cell is typed in: the way into the
 			     whole of it. Mousedown is held off, or the field would lose its
 			     focus, and with it this button, before the click. -->
 			<button
@@ -2019,6 +2006,20 @@
 				onclick={deleteChosen}
 			><Icon name="trash" size={15} /> Delete</button>
 		{/if}
+		<!-- How tall a row may be: one line, a few, or all of its longest cell.
+		     Last in the bar, at its far end, and always there: it is about how
+		     the table is read, not about what is in it, so it stands apart from
+		     the things that act on the table and its rows. The label says the height the rows
+		     are at; the title, the next. -->
+		<button
+			class="row-height"
+			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
+			aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
+			onclick={() => onrowheight(nextRowHeight)}
+		>
+			<Icon name={ROW_HEIGHT_ICONS[rowHeight]} size={15} />
+			<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
+		</button>
 		{/if}
 		<input
 			bind:this={fileInput}

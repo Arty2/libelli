@@ -1802,13 +1802,16 @@ the rescue button leaves it where it is (see `boxops.ts`).
 
 It prints as card 4 says to: two to an A4 sheet, in a zine's order, so
 Export opens on the booklet rather than on four loose pages — hence the name.
-The accent band on card 2, every title and the stamp's field share one green,
-`#6f9479`. The title sets it in its own area, where the bar shows it and a
-color field changes it; the stamp's field takes it from `--accent-color` in the
-template's CSS, reached through its `.surface`, inset to the padding; the band
-is a cell, because card 2's lesson is that typing `orange` there changes it.
-Titles and body headings both at weight 200: in a light green,
-Fraunces' hairline cuts are the whole of the color there is.
+The accent band on card 2, every title and the stamp's field share one
+printer's red, `#d0362b` — a warm, slightly orange red, the kind a press
+carries as a second ink; it was a sage green. The title sets it in its own area,
+where the bar shows it and a color field changes it, and takes its text color
+from the `accent` column too, so on card 2 the band and the title answer to the
+same cell: typing `orange` there, which is that card's lesson, changes both. On
+the other cards the cell is empty and the title keeps its own red. The stamp's
+field takes it from `--accent-color` in the template's CSS, reached through its
+`.surface`, inset to the padding. Titles and body headings both at weight 200:
+with one ink, Fraunces' hairline cuts are the whole of the color there is.
 
 The rest is chosen to show one of each thing the tour mentions, without a
 paragraph of its own: the kicker is a per-edge border (a hairline under it)
@@ -2168,6 +2171,9 @@ and `PrintPreview.svelte`, so a sheet size or count picked wrong does not
 send you back to the editor before you can print. Both pass the same
 `template`/`ontemplatechange` shape the rest of the page-setup bar uses; the
 panel itself does not know or care which screen it is in.
+
+**Its groups are fieldsets, with their names showing on both screens**, Bleed
+and Printing — the same as every other group in the page bar.
 
 **A `<select>`'s `value=` binding loses a selection that is not the first
 option, on a fresh mount.** The browser applies `<select>.value` against
@@ -2585,15 +2591,22 @@ line left as a border; it has no SVG cousin yet.
 
 ## Lists and the baseline
 
-`TextStyle.list` is a marker (`bullet`, `disc`, `dash`, `emdash`, `none`), an
-indent and an item spacing, each optional and each merged over the page's on
-its own, so an area can change its indent and keep the page's marker. They are
-type units — the indent in em, the spacing in lines of the leading — as a
-paragraph's are: a space in lines, an indent in em. They were mm for a round,
-which was the one pair of type settings that did not scale with the type. Left
-blank, `md.list` (mm) still sets the list, so a template that never named one
-renders as it did. No migration: both arrived in the same unreleased run of
-work that changed their unit.
+`TextStyle.list` is a marker (`bullet`, `disc`, `circle`, `square`, `dash`,
+`emdash`, `arrow`, `none`), an indent and a leading, each optional and each
+merged over the page's on its own, so an area can change its indent and keep the
+page's marker. They are type units — the indent in em, the leading a bare
+multiple of the size — as a paragraph's are. They were mm for a round, which was
+the one pair of type settings that did not scale with the type. Left blank,
+`md.list` (mm) still sets the indent and the gap between items, and a list with
+no leading takes the area's, so a template that never named one renders as it
+did.
+
+**Leading replaced an item spacing, and was not migrated.** The spacing was
+lines of the leading between one item and the next; it lived four days, no
+shipped template used it, and the two do not convert — a gap between items is
+not a line height. So `normaliseList` drops a stored `spacing` rather than
+carrying a field nothing on screen can edit or clear. The leading goes on the
+top `<ul>` as `line-height`, which the items and any nested list inherit.
 
 The marker is a text node in the item, so it is set in the area's face; a
 face without the glyph falls back through the area's stack like any missing
@@ -2719,6 +2732,15 @@ full-width first line ruled off in the bar's border grey. On a desk the same
 line cost the bar a whole row and pushed the page down for the sake of a rule,
 so there the head wraps in with the groups.
 
+**The head reads Lock, the template and its menu, the swap, then CSS.** The swap
+is the table's, for templates: the one open before this one, one press away and
+kept across a reload, because working between two designs — the real one and a
+variation — is the case that happens, and a menu each time is its whole cost.
+Every way the open template changes remembers the one left behind, except undo,
+which puts back a state rather than choosing one. The lock does not disable it:
+opening another template changes nothing in this one. On a phone CSS keeps its
+glyph and its dot and loses the word, as the window toolbar's buttons do.
+
 **Everything that acts on the template as a whole is in the picker's menu;
 Lock is not.** Import, Export and Reset were a row of buttons under the name,
 which is a second line of chrome in a bar that already wraps. They are errands —
@@ -2742,9 +2764,67 @@ next thing you press is usually the next thing you meant to do.
 
 ## `src/lib/components/OptionsBar.svelte`
 
-**Both option bars read in groups**, outward from the subject: what the thing is,
-then its type, then how it looks, then where it sits, then what you can do to it.
-A new control goes in the group it belongs to rather than on the end.
+**Both option bars are one bar of named groups, most-used first.** Every setting
+stays in view — a tabbed version was tried and read as messier, not calmer: a
+press to reach anything, and a bar whose height changed with the tab. What
+changed is the grouping and the order:
+
+- Page Setup: the template, then **Page** (size, margin, left & right),
+  **Text**, **Paragraphs**, **Lists**, **Paper**, **Page Number**, and the
+  print panel's **Bleed** and **Printing**.
+- An area: the name, then **Content**, **QR Code** when it is one, **Align**
+  — ahead of the type, because it is what is reached for most — **Text** (font,
+  size, weight, color, letter spacing, case), **Position** (X, Y, W, H, anchor, recto / verso,
+  rotation), **Lines**, **Lists** for Markdown, **Box** (fill, border, padding,
+  overflow), **Effects** (blend, opacity).
+
+Each group is a fieldset whose legend, floated, is the first item of the run and
+set in bold capitals, heavier than the labels; a wider gap separates runs, and no
+rule, because the bar wraps and a rule lands wherever the wrap does. A label that
+only repeated its group's name is left to screen readers. A new control goes in
+the group it belongs to rather than on the end.
+
+**Recto / Verso, not Left & Right or Mirror.** The page's switch and the area's
+say the same thing in the same words, the book's own: a right-hand page and the
+left-hand page facing it. On an area it reads as "this area follows the
+spread"; off, it keeps its millimetres on both.
+
+**A color from a column is a link beside the swatch, not a mode.** Text color,
+fill and border color each get the same small link button; pressed, a column
+picker appears beside it. The swatch stays: it is what a row whose cell is not a
+color still shows, so the link reads as "this, unless the row says otherwise".
+One pattern for all three, and nothing new in the bar until it is asked for. While
+linked, the swatch previews the shown row: that cell's color at full strength and
+without a frame — a sample, not a control, and never faded, since faded it would
+show the wrong color — or, where the cell holds no color, the area's own, framed
+and settable, because that is what that card draws. The opacity stays live and
+applies to the row's color, multiplied with any alpha the cell has of its own, so
+a linked fill can still be a tint.
+
+The link names a column, not a slot, as `{{column}}` does — it is the row's
+value, not a field the area is bound to — so a rename rewrites it, and the table
+counts the column as used. Only the cell's *color* is read, through
+`parseColor`, the same door every color has to a style attribute; there is no
+value-to-color list (Late → red). That was offered and left for later: a
+spreadsheet can already turn a word into a color in a column of its own.
+
+`colorsFromRow` resolves the area per row where Card paints it — the style, the
+surface, a hand-drawn edge, a QR — and nowhere else. Everything that measures,
+drags or writes the area back holds the stored one, so one card's color can
+never be saved as the template's.
+
+**Labels stay one word where one word was there.** Leading, Spacing, Draft,
+Width and Height were tried as longer, plainer phrases and put back: in a bar
+this dense a second word costs more than it explains, and the tip on each field
+says the rest. The group names are set in capitals like the labels, bold, which
+is what tells a group's name from a field's.
+
+**A value taken from the page looks taken; one set here has an ×.** Blank was
+always how an area's field inherited, and nothing on screen said which ones
+were doing it. A placeholder or a *Default: …* option is set in italics, in a
+grey that still reads; a set value is upright, with a `ResetButton` beside it
+that removes the key — "back to the page's" is an absent key, as everywhere
+else.
 
 **A right-click menu on a box carries the same actions its bar does** — neither is
 the only way to reach them. Only the primary pointer button drags: a right-click

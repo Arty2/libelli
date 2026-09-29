@@ -10,7 +10,7 @@
 	import BoxOptions from './BoxOptions.svelte';
 	import PageOptions from './PageOptions.svelte';
 	import type { TemplateEntry } from '$lib/storage';
-	import type { Box, Dataset, FontRef, Mapping, Template } from '$lib/types';
+	import type { Box, Dataset, FontRef, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
 		/** which half of the editor this instance is: the two never share a row */
@@ -18,6 +18,8 @@
 		template: Template;
 		dataset: Dataset;
 		mapping: Mapping;
+		/** the row the page is showing, for what a linked color previews */
+		row?: Row | null;
 		selected: Box | null;
 		onboxchange: (box: Box) => void;
 		ontemplatechange: (template: Template) => void;
@@ -30,6 +32,9 @@
 		editorFonts: FontRef[];
 		templateId: string;
 		onselecttemplate: (id: string) => void;
+		/** the template the swap goes back to, or '' while there is none */
+		previousTemplate?: string;
+		onswaptemplate?: () => void;
 		onnewtemplate: () => void;
 		/** open the A5 Starter Booklet as it came, or add it to the library */
 		onstartertemplate: () => void;

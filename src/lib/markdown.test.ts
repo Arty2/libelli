@@ -145,12 +145,16 @@ describe('flagUnknown', () => {
 });
 
 describe('list style', () => {
-	it('marks items with the chosen glyph and sets indent and spacing', () => {
-		const html = renderMarkdown('- a\n- b', { size: 10, lineHeight: 1.5, list: { marker: 'dash', indent: 3, spacing: 2 } });
+	it('marks items with the chosen glyph and sets indent and leading', () => {
+		const html = renderMarkdown('- a\n- b', { size: 10, lineHeight: 1.5, list: { marker: 'dash', indent: 3, leading: 1.2 } });
 		expect(html).toContain('>–</span>');
-		// Indent in em, spacing in lines of the leading.
-		expect(html).toContain('padding:0 0 0 3em');
-		expect(html).toContain('margin:0 0 3em');
+		// Indent in em, leading a bare multiple on the list itself.
+		expect(html).toContain('padding:0 0 0 3em;line-height:1.2');
+		// No leading of its own, and the list says nothing: it takes the area's.
+		expect(renderMarkdown('- a', { size: 10, lineHeight: 1.5 })).not.toContain('line-height:');
+		expect(renderMarkdown('- a', { size: 10, list: { marker: 'circle' } })).toContain('>○</span>');
+		expect(renderMarkdown('- a', { size: 10, list: { marker: 'square' } })).toContain('>■</span>');
+		expect(renderMarkdown('- a', { size: 10, list: { marker: 'arrow' } })).toContain('>→</span>');
 		expect(renderMarkdown('- a', { size: 10 })).toContain('>•</span>');
 		expect(renderMarkdown('- a', { size: 10, list: { marker: 'disc' } })).toContain('>●</span>');
 	});

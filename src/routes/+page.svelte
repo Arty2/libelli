@@ -82,6 +82,7 @@
 		loadDatasetDoc,
 		loadDatasetId,
 		loadPreviousDatasetId,
+		loadPreviousTemplateId,
 		loadMapping,
 		loadTemplate,
 		loadTemplateDoc,
@@ -96,6 +97,7 @@
 		saveDatasetDoc,
 		saveDatasetId,
 		savePreviousDatasetId,
+		savePreviousTemplateId,
 		saveMapping,
 		saveTemplate,
 		saveTemplateDoc,
@@ -105,7 +107,7 @@
 		type DatasetEntry,
 		type TemplateEntry
 	} from '$lib/storage';
-	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
+	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
@@ -235,6 +237,8 @@
 	 * without waiting on the database.
 	 */
 	let templateId = $state('');
+	/** the template the swap in Page Setup goes back to, or '' while there is none */
+	let previousTemplate = $state('');
 	let library = $state<TemplateEntry[]>([]);
 
 	/** The order both pickers list in, and the order the two listings return. */
@@ -546,6 +550,8 @@
 			const bound = box.slot ? mapping[box.slot] : undefined;
 			if (bound && columns.includes(bound)) used.add(bound);
 			for (const named of referencedColumns(box.static?.text ?? '', columns)) used.add(named);
+			// A column an area takes a color from is printed too, as a color.
+			for (const column of Object.values(box.colorFrom ?? {})) if (columns.includes(column)) used.add(column);
 		}
 		for (const column of [...used]) {
 			for (const r of dataset.rows) {
@@ -662,6 +668,7 @@
 		// ever had one template acquires a library containing exactly that one.
 		templateId = loadTemplateId() || nextTemplateId();
 		saveTemplateId(templateId);
+		previousTemplate = loadPreviousTemplateId();
 		void refreshLibrary();
 
 		const storedMapping = loadMapping(templateId, template.name);
@@ -1622,6 +1629,9 @@
 			return;
 		}
 		describe(`Load “${next.name}”`);
+		// Not when there is nothing to come back to — deleting switches away
+		// from an id that is already gone.
+		if (templateId) rememberTemplate(templateId);
 		templateId = id;
 		saveTemplateId(id);
 		template = next;
@@ -1631,6 +1641,22 @@
 		mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(next), dataset.columns);
 		missingFonts = await ensureTemplateFonts(next);
 		notify(`“${next.name}” loaded. Your rows are untouched.`);
+	}
+
+	/**
+	 * The template being left behind is the one the swap in Page Setup comes
+	 * back to — the same pair the table keeps. '' says there is no pair any more.
+	 */
+	function rememberTemplate(id: string) {
+		if (id === previousTemplate) return;
+		previousTemplate = id;
+		savePreviousTemplateId(id);
+	}
+
+	/** Back to the template before this one, and from there back again. */
+	function swapTemplate() {
+		if (!previousTemplate || previousTemplate === templateId) return;
+		void switchTemplate(previousTemplate);
 	}
 
 	/** A name nothing else in the library is already using. */
@@ -1653,6 +1679,7 @@
 		describe('New template');
 		const next = blankTemplate();
 		next.name = freeName(next.name);
+		rememberTemplate(templateId);
 		templateId = nextTemplateId();
 		saveTemplateId(templateId);
 		template = next;
@@ -1696,6 +1723,7 @@
 		settleProvisional();
 		await flushTemplate();
 		describe('A5 Starter Booklet');
+		rememberTemplate(templateId);
 		templateId = nextTemplateId();
 		saveTemplateId(templateId);
 		// Named after the new id is in place: `freeName` skips the loaded
@@ -1724,6 +1752,7 @@
 		const gone = templateId;
 		const name = template.name;
 		await deleteTemplateDoc(gone);
+		if (previousTemplate === gone) rememberTemplate('');
 		const rest = library.filter((entry) => entry.id !== gone);
 		describe(`Delete “${name}”`);
 		if (rest.length) {
@@ -2434,6 +2463,7 @@
 			// An import joins the library rather than replacing what is loaded:
 			// a file someone handed you is a template you now have, not a
 			// correction to the one you were working on.
+			rememberTemplate(templateId);
 			templateId = nextTemplateId();
 			saveTemplateId(templateId);
 			// Never assume the mapping: a template is shared between spreadsheets.
@@ -2730,6 +2760,7 @@
 						{template}
 						{dataset}
 						{mapping}
+						{row}
 						selected={barBox}
 						onboxchange={updateBox}
 						ontemplatechange={applyTemplate}
@@ -2760,6 +2791,8 @@
 				{:else}
 					<OptionsBar
 						section="page"
+						{previousTemplate}
+						onswaptemplate={swapTemplate}
 						{template}
 						{dataset}
 						{mapping}
@@ -3036,6 +3069,17 @@
 					mapping = Object.fromEntries(
 						Object.entries(mapping).map(([slot, column]) => [slot, column === from ? to : column])
 					);
+					// And every color an area takes from it, which names the column
+					// itself rather than a slot. Only when one does, so a rename
+					// that touches no color leaves the template alone.
+					const renamed = (sources: ColorSources) =>
+						Object.fromEntries(Object.entries(sources).map(([k, c]) => [k, c === from ? to : c]));
+					if (template.boxes.some((b) => Object.values(b.colorFrom ?? {}).includes(from))) {
+						template = {
+							...template,
+							boxes: template.boxes.map((b) => (b.colorFrom ? { ...b, colorFrom: renamed(b.colorFrom) } : b))
+						};
+					}
 				}}
 				onchange={(next, moved) => {
 					// Every structural edit in the tray builds a fresh dataset, and most
@@ -4202,8 +4246,8 @@
 
 	/* 320px with an Install button in the row is where the two groups of
 	   controls meet in the middle, and a mark held in the centre of the bar
-	   would be under one of them. Out of the centre, back into the row: it keeps
-	   its place in the order, sitting against the left-hand group instead. The
+	   would be under one of them. Out of the centre, back into the row, at its
+	   left end as on a desk, with every button to the right of the space. The
 	   controls win the row, because they are the ones you press. */
 	/* Larger text makes larger buttons, and at 150% on a 412px phone Page Setup
 	   ran under a mark centred over the row — which, now that pressing it puts
@@ -4236,8 +4280,21 @@
 		.brand {
 			position: static;
 			transform: none;
-			/* Level with the spacer, and first in the markup, so it lands between
-			   the left-hand group and the space that pushes the rest right. */
+			/* First, where a mark on the left sits on a desk — and with it on the
+			   left, Install and Help go back to where the wide bar has them: after
+			   the space, in front of Page Setup, in that order. */
+			order: 0;
+		}
+
+		.toolbar .spacer {
+			order: 1;
+		}
+
+		.toolbar .install {
+			order: 2;
+		}
+
+		.toolbar .help {
 			order: 3;
 		}
 	}

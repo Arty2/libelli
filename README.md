@@ -255,12 +255,13 @@ resize boxes directly, or type exact millimetres.
   first — a heading or a list before it included, since on a card most
   paragraphs follow one, and the book rule of indenting only a paragraph after
   another meant it hardly ever showed.
-- **Lists** — **List** picks a Markdown bullet list's marker, **• Bullet**,
-  **● Disc**, **– Dash**, **— Em Dash** or **None**, each set in the area's own
+- **Lists** — **Marker** picks a Markdown bullet list's marker, **• Bullet**,
+  **● Disc**, **○ Circle**, **■ Square**, **– Dash**, **— Em Dash**, **→ Arrow**
+  or **None**, each set in the area's own
   font like the words beside it (a font without the glyph falls back as for any
-  missing character); **List Indent** is the space from the area's edge to
-  the markers, in em, and **List Spacing** the space between one item and the
-  next, in lines of the leading — the units the paragraph settings use. All
+  missing character); **Indent** is the space from the area's edge to
+  the markers, in em, and **Leading** the list's own line height, a multiple of
+  the size like the text's; left blank, a list takes the text's leading. All
   three are a group of their own in page setup and, for a Markdown area, in the
   area bar, where each on its own overrides the page's; left blank, a list is
   set as it always was.
@@ -340,6 +341,17 @@ resize boxes directly, or type exact millimetres.
 - **Colors with alpha** — every color field is a swatch and an opacity in
   percent beside it: text, paper, fill, border and a QR's background alike.
   Opaque, a color is stored as the hex it always was; otherwise as `rgba()`.
+- **Colors from a column** — the link button beside an area's text color, its
+  fill and its border color takes that color from a column of the row instead:
+  press it and pick the column. A cell that is a color — `#c0392b`, `teal`,
+  `rgb(…)`, anything a color field takes — paints that card; an empty cell, or
+  one holding words, leaves the area's own color, which is why the swatch stays
+  beside it. The swatch previews the row the page is showing: its cell's color,
+  borderless, as a sample rather than a control — or, where the cell holds no
+  color, the area's own, framed and settable as usual. Its opacity is the area's:
+  set it and the row's color is laid on at that strength. A fill of *None*
+  linked to a column fills only the cards whose cell says so. The link names the column, like `{{column}}`, follows it through a
+  rename, and marks it as used in the table; press the link again to let go.
 - **A border drawn by hand** — **Draft**, beside the border color, draws it
   wobbling, as a line rather than a rule. Width, style and radius all still
   mean what they meant: a dashed 1mm hand border is dashed, 1mm and hand-drawn,
@@ -455,18 +467,18 @@ resize boxes directly, or type exact millimetres.
   margin, and the template's default type. The number is the row's position, so
   the editor, the print preview and the print all agree. **of Total** prints it
   as *3 / 12*; the slash is an element of its own, `.page-number .of`, so a
-  template's CSS can set its content to anything or take it away. With **Left
-  &amp; Right** on, four more positions appear: **Top**/**Bottom Outer** and
+  template's CSS can set its content to anything or take it away. With **Recto
+  / Verso** on, four more positions appear: **Top**/**Bottom Outer** and
   **Inner**, which are the right edge on a right-hand page and the left edge on
   a left-hand one, or the other way about. Outer is where a page number goes in
   anything that is bound, because it is the corner a thumb turns the page by.
-- **Left &amp; Right** — beside the page size, and off by default: a run of
+- **Recto / Verso** — beside the page margin, and off by default: a run of
   identical pages is what a deck of cards is. On, the run is a booklet — odd
   rows are right-hand pages, even rows the left-hand pages facing them — and
   three things follow. Areas **mirror** across the fold, keeping the distance
   from the *outer* trim edge they were given rather than from the left one, so
   a wide inner margin stays a wide inner margin on both sides of a spread; an
-  area that should stay put says so with **Mirror** off in its own bar. An
+  area that should stay put says so with **Recto / Verso** off in its own bar. An
   alignment you *chose* mirrors with it, so text pushed against one edge hugs
   the other edge on the facing page, while an alignment inherited from the page
   defaults is left alone — body text reads the same way on both sides of a
@@ -687,8 +699,8 @@ a notice can appear.
   column no area is bound to and no area's words or printed cells name as
   `{{column}}`: data no card will show. Press it to put the column on the card:
   a new area, named after the column and bound to it, where a new area goes.
-- **Counting** — while a cell is being typed in, **Edit** appears just right of
-  the row height, and opens it full size; its characters and words are at the
+- **Counting** — while a cell is being typed in, **Edit** appears at the start
+  of the bar, and opens it full size; its characters and words are at the
   right-hand end, and the lock, the table and the swap step aside until the cell
   is left. With rows chosen they step aside too, for the row actions — the count, *3 rows* (nothing for one, whose tick says
   it), the up and down chevrons, **Copy** and **Delete** — and come back when
@@ -721,8 +733,8 @@ a notice can appear.
   right, Esc or Ctrl/Cmd+Enter put the table back. The words are set at twice
   the table's size, for reading at length. On a locked table none of
   the three opens it: the full-size editor is a way to type.
-- **Lock** — the padlock in the bar under the table, after the row height and
-  before the picker, freezes it: no typing, no new, moved,
+- **Lock** — the padlock at the start of the bar under the table, before the
+  picker, freezes it: no typing, no new, moved,
   renamed or deleted rows and columns, no paste or import — and nothing typed,
   dropped or drawn on the card reaches a cell either. Nor does sorting, since
   row order is print order; choosing rows still works. The cells are ruled in
@@ -736,7 +748,7 @@ a notice can appear.
 - **Cells fill their row** — a row is as tall as its tallest cell, and a press
   anywhere in a cell, the band under a short field included, is a press on its
   field, so the target you click is the cell you can see.
-- **Row height** — the button at the left-hand end of the bar, always there and
+- **Row height** — the button at the right-hand end of the bar, always there and
   the same width in every mode, cycles three heights:
   **Short**, one line per row; **Long**, up to five lines, which is where a
   table starts; and **Full**, every row as tall as its longest cell — Carbon's
@@ -783,6 +795,9 @@ a notice can appear.
   one you are trying something on — and reaching the second through a menu every
   time is the whole cost of having split them up. The pair survives a reload.
   Switching is undoable like everything else that replaces what is on screen.
+  Page Setup has the same button for templates, between the template's menu
+  and **CSS**: it goes back to the template open before this one — opened from
+  the menu, started new, imported or added as the starter — and back again.
 - **Deleting a column asks** — it is a field of every card at once, it takes
   cells under a header you may not have scrolled to, and any area bound to it
   goes blank on every card. Undo still covers it; the question is only so that a
@@ -1044,7 +1059,7 @@ rather than a dialog, so the card that uses the images stays in view.
   area is bound to a column and onto the area otherwise. The area under the
   pointer is outlined while you carry it. It works with a finger as well as a
   mouse.
-- **A folder of your own** — press **Choose Folder…** and images are written
+- **A folder of your own** — press **Folder…** and images are written
   there as ordinary files from then on: replace one from a photo editor and the
   card follows, back them up with the rest of your work, and clear them out with
   your file manager rather than through this app. The folder is remembered
@@ -1597,15 +1612,15 @@ than it has to.
   surface: flick left or right anywhere across them, including over the count
   and over an arrow that has greyed out at the end of the run, and the card
   steps. Up and down still scroll.
-- **The table's own row** — under the table: what acts on the rows you have
-  chosen, then at the far end the **Table** picker — whose menu holds paste,
-  import, export, new and delete — the swap beside it, and last the lock.
+- **The table's own row** — under the table: the lock, the **Table** picker —
+  whose menu holds paste, import, export, new and delete — and the swap beside
+  it; what acts on the rows you have chosen; and at the far end the row height.
 - **Images** — a tray in the table's place, at the table's width on a wide
   screen and its height on a phone, and only one of the two open at a time:
   **Images** and **Data** in the window toolbar each close the other. At its
   head *Images*, how many and how much they weigh; a line for every image,
   filling the height; and at its foot, where the table keeps its toolbar,
-  **Upload…** and **Choose Folder…**. On a phone its head is the grip that
+  **Upload…** and **Folder…**. On a phone its head is the grip that
   shares the height with the page, as the table's header row is. Carry one onto an area to put it there, or onto the **page** between
   areas for a new image area of its own, centred where it was let go, 40mm
   across and in the image's proportions; an image file dragged in from

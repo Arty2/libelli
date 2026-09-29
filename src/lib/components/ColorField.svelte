@@ -24,12 +24,33 @@
 		title?: string;
 		/** what a screen reader calls it */
 		label: string;
+		/**
+		 * The hue is decided elsewhere — a column of the row — so only the
+		 * opacity is this field's to set. The swatch goes quiet and says why.
+		 */
+		hueFrom?: string;
+		/**
+		 * With `hueFrom`, the color the shown row's cell holds: the swatch
+		 * previews it. Absent — an empty cell, or words — the swatch shows the
+		 * field's own color, which is what that card draws instead.
+		 */
+		preview?: string;
 	}
 
-	let { value, fallback = '#000000', onchange, disabled = false, title, label }: Props = $props();
+	let { value, fallback = '#000000', onchange, disabled = false, title, label, hueFrom, preview }: Props = $props();
 
 	const rgba = $derived(toRgba(value) ?? toRgba(fallback) ?? { r: 0, g: 0, b: 0, a: 1 });
 	const hex = $derived(fromRgba({ ...rgba, a: 1 }));
+	/**
+	 * The row's hue, while linked and the cell holds one. Then the swatch is a
+	 * preview of that card, not a control. Without one — an empty cell, or words
+	 * — it is the field's own color again, bordered and settable, because that
+	 * is the color that card draws.
+	 */
+	const fromRow = $derived.by(() => {
+		const row = hueFrom ? toRgba(preview) : null;
+		return row ? fromRgba({ ...row, a: 1 }) : null;
+	});
 	const percent = $derived(Math.round(rgba.a * 100));
 
 	function setHue(next: string) {
@@ -54,8 +75,14 @@
 	<input
 		class="swatch"
 		type="color"
-		value={hex}
-		{disabled}
+		class:linked={!!fromRow}
+		value={fromRow ?? hex}
+		disabled={disabled || !!fromRow}
+		title={hueFrom
+			? fromRow
+				? `This row's ${hueFrom} — the color comes from that column`
+				: `This row's ${hueFrom} holds no color, so this one is used`
+			: undefined}
 		aria-label={label}
 		onchange={(e) => setHue(e.currentTarget.value)}
 	/>
@@ -86,6 +113,18 @@
 		padding: 2px;
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-input);
+	}
+
+	/* Showing the row's color: a sample, not a control. At full strength,
+	   because faded it would show the wrong color, and without the frame that
+	   says "press me" — the frame comes back when the cell holds no color and
+	   the swatch is the area's own again. The browser greys a disabled color
+	   input, so that is undone here too. The number beside it keeps its rule. */
+	.swatch.linked,
+	.swatch.linked:disabled {
+		border-color: transparent;
+		opacity: 1;
+		cursor: default;
 	}
 
 	/* Three digits and no more: 100 is the widest it ever holds. */

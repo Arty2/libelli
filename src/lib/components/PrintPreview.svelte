@@ -632,7 +632,7 @@
 	   goes on it on the second. The bleeds are one decision asked twice and
 	   belong together; giving the sheet group its own full-width line is what
 	   keeps them from being separated by a wrap that lands anywhere. */
-	.settings-strip :global(.group[aria-label='Print Settings']) {
+	.settings-strip :global(.sheet-group) {
 		flex-basis: 100%;
 	}
 
