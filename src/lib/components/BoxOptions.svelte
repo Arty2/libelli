@@ -906,6 +906,14 @@
 					<ResetButton to="the page's {template.defaults.letterSpacing}mm" disabled={boxFrozen} onclick={() => patch({ letterSpacing: undefined })} />
 				{/if}
 			</label>
+			<label class="field">
+				<span>Case</span>
+				<select value={selected.textCase ?? 'none'} disabled={boxFrozen} onchange={(e) => patch({ textCase: e.currentTarget.value as Box['textCase'] })}>
+					<option value="none">As Typed</option>
+					<option value="smallcaps">Small Caps</option>
+					<option value="uppercase">Uppercase</option>
+				</select>
+			</label>
 		</fieldset>
 		<fieldset class="group">
 			<legend>Position</legend>
@@ -1096,14 +1104,6 @@
 					<ResetButton to="the page's paragraphs" disabled={boxFrozen} onclick={() => patch({ paragraph: undefined })} />
 				</label>
 			{/if}
-			<label class="field">
-				<span>Case</span>
-				<select value={selected.textCase ?? 'none'} disabled={boxFrozen} onchange={(e) => patch({ textCase: e.currentTarget.value as Box['textCase'] })}>
-					<option value="none">As Typed</option>
-					<option value="smallcaps">Small Caps</option>
-					<option value="uppercase">Uppercase</option>
-				</select>
-			</label>
 		</fieldset>
 		{#if selected.mode === 'markdown'}
 			<fieldset class="group">

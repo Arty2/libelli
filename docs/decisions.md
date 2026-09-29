@@ -2762,7 +2762,7 @@ changed is the grouping and the order:
   print panel's **Bleed** and **Printing**.
 - An area: the name, then **Content**, **QR Code** when it is one, **Align**
   — ahead of the type, because it is what is reached for most — **Text** (font,
-  size, weight, color, letter spacing), **Position** (X, Y, W, H, anchor, recto / verso,
+  size, weight, color, letter spacing, case), **Position** (X, Y, W, H, anchor, recto / verso,
   rotation), **Lines**, **Lists** for Markdown, **Box** (fill, border, padding,
   overflow), **Effects** (blend, opacity).
 
