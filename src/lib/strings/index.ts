@@ -53,6 +53,16 @@ export function fmt(template: string, vars: Record<string, string | number> = {}
 	return template.replace(/\{(\w+)\}/g, (hole, name: string) => (name in vars ? String(vars[name]) : hole));
 }
 
+/**
+ * Sentences that are said together but chosen apart — a count and what a press
+ * on it does, a notice and the warning after it — one after another. Empty ones
+ * drop out. The space between them lives here rather than on the ends of the
+ * catalogue's strings, where it was invisible to a translator, and this is the
+ * one place a language that sets sentences without one would change.
+ */
+export const sentences = (...parts: Array<string | false | null | undefined>): string =>
+	parts.filter(Boolean).join(' ');
+
 const rules = new Intl.PluralRules(locale);
 
 /**

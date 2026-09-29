@@ -61,26 +61,9 @@ export function isAlignChord(event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey' | 
  * by hand drifted from the key actually listened for — Redo's title said
  * Ctrl+Shift+Z, which is the A/B toggle, while Redo is Ctrl+Y — so a title
  * that names a key takes it from here, and the README's table is the other
- * copy to keep in step.
+ * copy to keep in step — with the Help panel's list in strings/en.ts.
  */
-export const SHORTCUTS = {
-	undo: t.keys.undo,
-	redo: t.keys.redo,
-	duplicate: t.keys.duplicate,
-	lockArea: t.keys.lockArea,
-	lockPage: t.keys.lockPage,
-	delete: t.keys.delete,
-	copyStyle: t.keys.copyStyle,
-	pasteStyle: t.keys.pasteStyle,
-	export: t.keys.export,
-	help: t.keys.help,
-	grid: t.keys.grid,
-	guides: t.keys.guides,
-	boxes: t.keys.boxes,
-	zoom: t.keys.zoom,
-	cards: t.keys.cards,
-	type: t.keys.type
-} as const;
+export const SHORTCUTS = t.shortcuts;
 
 /** A title with its shortcut after it, in brackets, the way every tooltip says one. */
-export const withKey = (title: string, key: keyof typeof SHORTCUTS) => fmt(t.keys.withKey, { title, key: SHORTCUTS[key] });
+export const withKey = (title: string, key: keyof typeof SHORTCUTS) => fmt(t.common.withKey, { title, key: SHORTCUTS[key] });

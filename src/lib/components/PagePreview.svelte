@@ -303,7 +303,7 @@
 			value: 'actual',
 			label: fmt(t.stage.zoomActual, { percent: Math.round(actual.scale * 100) }),
 			title: actual.panel
-				? fmt(t.stage.zoomActualTitle, { panel: actual.panel }) + (actual.estimate ? t.stage.zoomActualEstimate : '')
+				? fmt(actual.estimate ? t.stage.zoomActualEstimateTitle : t.stage.zoomActualTitle, { panel: actual.panel })
 				: t.stage.zoomActualUnknown
 		},
 		{ rule: true },
@@ -1141,7 +1141,7 @@
 					class="count"
 					title={t.stage.fullScreen}
 					onclick={onlightbox}
-				>{fmt(t.lightbox.counter, { n: activeRow + 1, total: rowCount })}</button>
+				>{fmt(t.common.counter, { n: activeRow + 1, total: rowCount })}</button>
 				{#if rowCount > 1}
 					<button
 						class="step"

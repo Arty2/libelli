@@ -826,24 +826,24 @@
 			<button onclick={rotate} title={t.draw.rotateTitle} aria-label={t.draw.rotate}>
 				<Icon name="rotate" size={16} />
 			</button>
-			<button onclick={() => flip('x')} title={t.draw.flipXTitle} aria-label={t.images.flipX}>
+			<button onclick={() => flip('x')} title={t.draw.flipXTitle} aria-label={t.common.flipX}>
 				<Icon name="reflect-horizontal" size={16} />
 			</button>
-			<button onclick={() => flip('y')} title={t.draw.flipYTitle} aria-label={t.images.flipY}>
+			<button onclick={() => flip('y')} title={t.draw.flipYTitle} aria-label={t.common.flipY}>
 				<Icon name="reflect-vertical" size={16} />
 			</button>
 			<button
 				aria-pressed={cropping}
 				onclick={toggleCrop}
-				title={cropping ? t.images.stopCropping : t.draw.cropTitle}
-				aria-label={t.images.crop}
+				title={cropping ? t.common.stopCropping : t.draw.cropTitle}
+				aria-label={t.common.crop}
 			>
 				<Icon name="crop" size={16} />
 			</button>
 		</span>
 		{#if cropping}
-			<button class="apply" disabled={!cropPixels} onclick={applyCrop} title={t.images.applyCropTitle}>
-				{t.images.applyCrop}
+			<button class="apply" disabled={!cropPixels} onclick={applyCrop} title={t.common.applyCropTitle}>
+				{t.common.applyCrop}
 			</button>
 		{/if}
 

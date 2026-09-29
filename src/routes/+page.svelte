@@ -3200,7 +3200,7 @@
 {#if deleting}
 	<div class="modal-backdrop" role="presentation" onclick={() => (deleting = false)}></div>
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label={t.app.deleteTemplateConfirm} use:armDefault>
-		<h2>{fmt(t.images.confirmTitle, { name: template.name })}</h2>
+		<h2>{fmt(t.common.deleteNamed, { name: template.name })}</h2>
 		<p>
 			{plural(t.app.deleteTemplateBody, template.boxes.length)}
 			{library.length > 1 ? t.app.deleteTemplateNext : t.app.deleteTemplateLast}
@@ -3221,7 +3221,7 @@
 {#if deletingTable}
 	<div class="modal-backdrop" role="presentation" onclick={() => (deletingTable = false)}></div>
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="delete-table-title" use:armDefault>
-		<h2 id="delete-table-title">{fmt(t.images.confirmTitle, { name: tableName })}</h2>
+		<h2 id="delete-table-title">{fmt(t.common.deleteNamed, { name: tableName })}</h2>
 		<p>
 			{plural(t.app.deleteTableBody, dataset.rows.length)}
 		</p>

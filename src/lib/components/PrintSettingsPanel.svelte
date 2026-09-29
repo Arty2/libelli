@@ -295,7 +295,7 @@
 				disabled={pageFrozen}
 				onchange={(e) => ontemplatechange({ ...template, facing: e.currentTarget.checked || undefined })}
 			/>
-			{t.printSettings.facing}
+			{t.common.facing}
 		</label>
 	{/if}
 	<label class="field">
@@ -439,11 +439,11 @@
 		{:else}
 			<button
 				disabled={pageFrozen}
-				title={t.printSettings.uploadTitle}
-				onclick={() => imageInput?.click()}><Icon name="image-reference" size={14} /> {t.printSettings.upload}</button
+				title={t.common.uploadImageTitle}
+				onclick={() => imageInput?.click()}><Icon name="image-reference" size={14} /> {t.common.upload}</button
 			>
-			<button disabled={pageFrozen} title={t.printSettings.urlTitle} onclick={linkBackground}
-				><Icon name="copy-link" size={14} /> {t.printSettings.url}</button
+			<button disabled={pageFrozen} title={t.common.urlTitle} onclick={linkBackground}
+				><Icon name="copy-link" size={14} /> {t.common.url}</button
 			>
 		{/if}
 	{/if}

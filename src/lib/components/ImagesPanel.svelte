@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
-	import { fmt, plural, t } from '$lib/strings';
+	import { fmt, plural, sentences, t } from '$lib/strings';
 	import { armDefault } from '$lib/modal';
 	import { downloadUrl, slugify } from '$lib/download';
 	import { editableType, frameBetween, framePixels, isCrop, type Frame } from '$lib/photo';
@@ -299,7 +299,7 @@
 		// Deleted from its own large view: there is nothing left to look at.
 		if (image.name === focus) onfocus?.(null);
 		onnotice(
-			fmt(t.images.deleted, { name: image.name }) + (used.has(image.name) ? t.images.deletedWasUsed : '')
+			sentences(fmt(t.images.deleted, { name: image.name }), used.has(image.name) && t.images.deletedWasUsed)
 		);
 		await refresh();
 		onchanged();
@@ -693,12 +693,12 @@
 		<div class="tools" role="toolbar" aria-label={t.images.tools}>
 			<span class="segmented">
 				<button title={t.images.rotateTitle} aria-label={t.images.rotate} onclick={turn}><Icon name="rotate" size={16} /></button>
-				<button title={t.images.flipXTitle} aria-label={t.images.flipX} onclick={() => flip('x')}><Icon name="reflect-horizontal" size={16} /></button>
-				<button title={t.images.flipYTitle} aria-label={t.images.flipY} onclick={() => flip('y')}><Icon name="reflect-vertical" size={16} /></button>
+				<button title={t.images.flipXTitle} aria-label={t.common.flipX} onclick={() => flip('x')}><Icon name="reflect-horizontal" size={16} /></button>
+				<button title={t.images.flipYTitle} aria-label={t.common.flipY} onclick={() => flip('y')}><Icon name="reflect-vertical" size={16} /></button>
 				<button
 					aria-pressed={cropping}
-					title={cropping ? t.images.stopCropping : t.images.cropTitle}
-					aria-label={t.images.crop}
+					title={cropping ? t.common.stopCropping : t.images.cropTitle}
+					aria-label={t.common.crop}
 					onclick={() => {
 						cropping = !cropping;
 						frame = null;
@@ -706,7 +706,7 @@
 				><Icon name="crop" size={16} /></button>
 			</span>
 			{#if cropping}
-				<button class="apply" disabled={!isCrop(frame)} title={t.images.applyCropTitle} onclick={applyCrop}>{t.images.applyCrop}</button>
+				<button class="apply" disabled={!isCrop(frame)} title={t.common.applyCropTitle} onclick={applyCrop}>{t.common.applyCrop}</button>
 			{/if}
 		</div>
 	{/if}
@@ -718,7 +718,7 @@
 		<div class="actions">
 			<span class="pager" role="group" aria-label={t.images.image}>
 				<button class="step" title={dirty ? t.images.saveFirst : t.images.previous} aria-label={t.images.previous} disabled={dirty || focusIndex <= 0} onclick={() => step(-1)}><Icon name="chevron-left" size={16} /></button>
-				<span class="count">{fmt(t.images.counter, { n: focusIndex + 1, total: shown.length })}</span>
+				<span class="count">{fmt(t.common.counter, { n: focusIndex + 1, total: shown.length })}</span>
 				<button class="step" title={dirty ? t.images.saveFirst : t.images.next} aria-label={t.images.next} disabled={dirty || focusIndex < 0 || focusIndex >= shown.length - 1} onclick={() => step(1)}><Icon name="chevron-right" size={16} /></button>
 			</span>
 			{#if focusType && focusUrl}
@@ -745,7 +745,7 @@
 	     browser's, a phone included; the folder is Chromium's. -->
 	<div class="actions">
 		<button title={t.images.uploadTitle} onclick={() => fileInput?.click()}>
-			<Icon name="image-reference" size={15} /> {t.images.upload}
+			<Icon name="image-reference" size={15} /> {t.common.upload}
 		</button>
 		{#if available}
 			{#if folder && !folder.ready}
@@ -783,7 +783,7 @@
 			if (e.key === 'Escape') confirming = null;
 		}}
 	>
-		<h2 id="delete-image-title">{fmt(t.images.confirmTitle, { name: image.name })}</h2>
+		<h2 id="delete-image-title">{fmt(t.common.deleteNamed, { name: image.name })}</h2>
 		<p>
 			{image.where === 'folder' ? t.images.confirmFolder : t.images.confirmBrowser}
 			{#if used.has(image.name)}

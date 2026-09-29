@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { en, type Plural } from './en';
-import { fmt, plural } from './index';
+import { fmt, plural, sentences } from './index';
 import { rich } from './rich';
 
 describe('fmt', () => {
@@ -24,6 +24,12 @@ describe('plural', () => {
 
 	it('falls back to other for a form the catalogue leaves out', () => {
 		expect(plural({ other: '{n} x' }, 1)).toBe('1 x');
+	});
+});
+
+describe('sentences', () => {
+	it('puts one space between the sentences it is given, and drops the empty ones', () => {
+		expect(sentences('One.', false, '', 'Two.', undefined)).toBe('One. Two.');
 	});
 });
 
@@ -57,6 +63,15 @@ describe('the English catalogue', () => {
 		// The one deliberate blank is a key with no second chord.
 		const empty = [...leaves(en, '')].filter(([path, text]) => !text && !path.endsWith('.alt'));
 		expect(empty).toEqual([]);
+	});
+
+	it('keeps no space on the ends of a string, where a translator cannot see it', () => {
+		// The words either side of a bold file name are the deliberate exception:
+		// they are halves of one sentence around an element. Everything else that
+		// is said together is joined by `sentences`, or is one string with a hole.
+		const wrapping = /^(app\.missing\w*Image(Before|After)|printPreview\.paperSize(Before|After)|css\.of)$/;
+		const padded = [...leaves(en, '')].filter(([path, text]) => text !== text.trim() && !wrapping.test(path));
+		expect(padded).toEqual([]);
 	});
 
 	it('closes every hole and every mark it opens', () => {

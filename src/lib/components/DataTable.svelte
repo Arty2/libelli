@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { fmt, plural, t } from '$lib/strings';
+	import { fmt, plural, sentences, t } from '$lib/strings';
 	import Icon from './Icon.svelte';
 	import { download } from '$lib/download';
 	import { completePlaceholders } from '$lib/complete';
@@ -1595,8 +1595,10 @@
 								role="presentation"
 								title={locked
 									? undefined
-									: (selectedRows.has(i) && selectedRows.size > 1 ? t.table.dragRows : t.table.dragRow) +
-										(expanded.has(i) ? t.table.collapseRow : t.table.expandRow)}
+									: sentences(
+											selectedRows.has(i) && selectedRows.size > 1 ? t.table.dragRows : t.table.dragRow,
+											expanded.has(i) ? t.table.collapseRow : t.table.expandRow
+										)}
 								onpointerdown={(e) => startRowDrag(e, i)}
 								onpointermove={moveRowDrag}
 								onpointerup={endRowDrag}
@@ -1759,7 +1761,7 @@
 					aria-label={t.table.previousRow}
 					onclick={() => stepBigCell(-1)}
 				><Icon name="chevron-left" size={16} /></button>
-				<span class="big-row">{fmt(t.table.rowCounter, { n: at + 1, total: dataset.rows.length })}</span>
+				<span class="big-row">{fmt(t.common.counter, { n: at + 1, total: dataset.rows.length })}</span>
 				<button
 					class="icon step"
 					disabled={at >= dataset.rows.length - 1 || boardShown(bigCell) && boardDirty}
@@ -2168,9 +2170,12 @@
 	{@const column = dataset.columns[confirmColumn]}
 	<div class="modal-backdrop" role="presentation" onclick={() => (confirmColumn = null)}></div>
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label={t.table.confirmColumnLabel} use:armDefault>
-		<h2>{fmt(t.table.confirmColumnTitle, { name: column })}</h2>
+		<h2>{fmt(t.common.deleteNamed, { name: column })}</h2>
 		<p>
-			{plural(t.table.filledCells, filledCells(column))}{plural(t.table.acrossRows, dataset.rows.length)}
+			{fmt(t.table.columnContents, {
+				cells: plural(t.table.filledCells, filledCells(column)),
+				rows: plural(t.table.rows, dataset.rows.length)
+			})}
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>

@@ -39,12 +39,30 @@ export const en = {
 		group: 'Group',
 		ungroup: 'Ungroup',
 		none: 'None',
-		done: 'Done'
+		done: 'Done',
+		/** a tooltip with its shortcut after it: “Undo (Ctrl/Cmd+Z)” */
+		withKey: '{title} ({key})',
+		/** the question every delete that asks puts: a template, a table, a column, an image */
+		deleteNamed: 'Delete “{name}”?',
+		/** where a pager is: card, image or row `{n}` of `{total}` */
+		counter: '{n} / {total}',
+		/** facing pages, in page setup, on the print screen and on an area */
+		facing: 'Recto / Verso',
+		upload: 'Upload…',
+		url: 'URL…',
+		urlTitle: 'An http(s) address the template will carry as written',
+		uploadImageTitle: 'A file from this machine; the image stays in this browser, the template only names it',
+		/** the image tools the Images tray and the drawing board share */
+		flipX: 'Flip horizontally',
+		flipY: 'Flip vertically',
+		crop: 'Crop',
+		stopCropping: 'Stop cropping',
+		applyCrop: 'Apply Crop',
+		applyCropTitle: 'Keep only what is inside the frame'
 	},
 
-	/** Keys as tooltips name them. `withKey` puts one in brackets after a title. */
-	keys: {
-		withKey: '{title} ({key})',
+	/** Keys as tooltips name them, after the title in brackets — `common.withKey`. */
+	shortcuts: {
 		undo: 'Ctrl/Cmd+Z',
 		redo: 'Ctrl/Cmd+Y',
 		duplicate: 'Ctrl/Cmd+D',
@@ -120,8 +138,8 @@ export const en = {
 		/** `{n}` is the whole run, `{chosen}` how many of it are ticked */
 		pagesGoing: p({ one: '{chosen} of {n} page going.', other: '{chosen} of {n} pages going.' }),
 		sheetsGoing: p({ one: '{chosen} of {n} sheet going.', other: '{chosen} of {n} sheets going.' }),
-		pressToClear: ' Press to clear them and choose.',
-		pressToTakeAll: ' Press to take all of them.',
+		pressToClear: 'Press to clear them and choose.',
+		pressToTakeAll: 'Press to take all of them.',
 		exporting: 'Exporting…',
 		exportingOf: 'Exporting {n}/{total}…',
 		png: 'PNG',
@@ -136,9 +154,8 @@ export const en = {
 		paperSizeBefore: 'the one matching ',
 		paperSizeValue: '{w} × {h} mm',
 		paperSizeAfter: ', or a larger sheet you trim.',
-		perSheet: '{count} cards per sheet',
-		perSheetScaled: ', scaled to {percent}%',
-		perSheetEnd: '.',
+		perSheet: '{count} cards per sheet.',
+		perSheetScaled: '{count} cards per sheet, scaled to {percent}%.',
 		margins: 'Margins',
 		marginsValue: 'None',
 		headers: 'Headers and footers',
@@ -147,11 +164,12 @@ export const en = {
 		backgroundsValue: 'on, or the browser drops the paper color.',
 		pngNote: 'A PNG export needs none of this — it comes out at 300 dpi whatever the print dialog says.',
 		/** the status-bar line after a PNG export, built from the next four */
-		exportedPages: p({ one: '{n} PNG exported at 300 dpi, one per page', other: '{n} PNGs exported at 300 dpi, one per page' }),
-		exportedSheets: p({ one: '{n} PNG exported at 300 dpi, one per sheet', other: '{n} PNGs exported at 300 dpi, one per sheet' }),
-		exportedZip: ', in {file}',
-		exportedEnd: '.',
-		fontsNotEmbedded: ' {fonts} could not be embedded — upload the font file to export it as itself.',
+		exportedPages: p({ one: '{n} PNG exported at 300 dpi, one per page.', other: '{n} PNGs exported at 300 dpi, one per page.' }),
+		exportedSheets: p({ one: '{n} PNG exported at 300 dpi, one per sheet.', other: '{n} PNGs exported at 300 dpi, one per sheet.' }),
+		/** the same, when several files went into one archive, `{file}` */
+		exportedPagesZip: p({ one: '{n} PNG exported at 300 dpi, one per page, in {file}.', other: '{n} PNGs exported at 300 dpi, one per page, in {file}.' }),
+		exportedSheetsZip: p({ one: '{n} PNG exported at 300 dpi, one per sheet, in {file}.', other: '{n} PNGs exported at 300 dpi, one per sheet, in {file}.' }),
+		fontsNotEmbedded: '{fonts} could not be embedded — upload the font file to export it as itself.',
 		exportFailed: 'That could not be exported.'
 	},
 
@@ -209,8 +227,8 @@ export const en = {
 		addRow: 'Add a row',
 		chooseRow: 'Choose row {n}',
 		chooseRowTitle: 'Choose this row as well',
-		dragRow: 'Drag to move this row. ',
-		dragRows: 'Drag to move this row and the other chosen rows. ',
+		dragRow: 'Drag to move this row.',
+		dragRows: 'Drag to move this row and the other chosen rows.',
 		expandRow: 'Double-click to show this whole row',
 		collapseRow: 'Double-click to put this row back',
 		cell: '{column}, row {n}',
@@ -229,9 +247,9 @@ export const en = {
 		copyTitle: 'Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet',
 		deleteRowsTitle: 'Delete the chosen rows',
 		confirmColumnLabel: 'Delete this column?',
-		confirmColumnTitle: 'Delete “{name}”?',
 		filledCells: p({ one: '{n} filled cell', other: '{n} filled cells' }),
-		acrossRows: p({ one: ', across {n} row.', other: ', across {n} rows.' }),
+		/** `{cells}` is `filledCells` and `{rows}` is `rows`, each counted */
+		columnContents: '{cells}, across {rows}.',
 		confirmColumnDelete: 'Delete Column',
 		pasteDialog: 'Paste from Sheet',
 		pasteFirstLine: 'The first line names the columns — there is nothing else here to name them with yet.',
@@ -264,7 +282,6 @@ export const en = {
 		saveDrawingFirst: 'Save the drawing first',
 		previousRow: 'Previous row',
 		nextRow: 'Next row',
-		rowCounter: '{n} / {total}',
 		openInImages: 'Open {name} in Images',
 		deleteDrawing: 'Delete this drawing',
 		saveDrawing: 'Save this drawing (Ctrl/Cmd+S)'
@@ -371,7 +388,7 @@ export const en = {
 		zoomFit: '{percent}% — Fit',
 		zoomActual: '{percent}% — Actual',
 		zoomActualTitle: 'The paper at its real size, measured for a {panel}',
-		zoomActualEstimate: ' — the commonest screen of this resolution, so it may be off',
+		zoomActualEstimateTitle: 'The paper at its real size, measured for a {panel} — the commonest screen of this resolution, so it may be off',
 		zoomActualUnknown: 'This screen is not one the app knows, so this is the browser’s own millimetre, which may not match a ruler',
 		zoomPercent: '{percent}%',
 		lockedTitle: 'The design is locked — press to unlock it',
@@ -431,7 +448,6 @@ export const en = {
 	lightbox: {
 		previous: 'Previous card',
 		next: 'Next card',
-		counter: '{n} / {total}'
 	},
 
 	/** One printed sheet, full screen. */
@@ -548,7 +564,6 @@ export const en = {
 		swap: 'Swap width and height',
 		swapTitle: 'Swap width and height — turn the page over',
 		pageTurned: 'Page turned — {w} × {h}mm. Every box keeps the millimetres it had.',
-		facing: 'Recto / Verso',
 		facingTitle:
 			'Odd rows are right-hand pages and even rows their facing left-hand pages. Areas mirror across the fold unless an area says otherwise, and Outer and Inner page numbers know which edge they are on',
 		edgeMargin: '{edge} margin',
@@ -612,7 +627,6 @@ export const en = {
 		sheetCropMarks: 'Sheet Crop Marks',
 		sheetCropMarksTitle: 'Marks at the corners of the tiled block, for the cut that takes it off the sheet',
 		printing: 'Printing',
-		facing: 'Recto / Verso',
 		facingTitle:
 			'Odd rows are right-hand pages and even rows their facing left-hand pages — the same setting as Recto / Verso in page setup',
 		perSheet: 'Pages per Sheet',
@@ -650,10 +664,6 @@ export const en = {
 		sheetImage: 'Image',
 		fitTitle: 'How the image fills the sheet',
 		removeImage: 'Remove the sheet background image',
-		upload: 'Upload…',
-		uploadTitle: 'A file from this machine; the image stays in this browser, the template only names it',
-		url: 'URL…',
-		urlTitle: 'An http(s) address the template will carry as written',
 		imageAddressPrompt: 'Address of the sheet background image',
 		imageAddressInvalid: 'A background image has to be an http or https address.'
 	},
@@ -669,7 +679,7 @@ export const en = {
 		folderForgotten: 'Let go of the folder. Nothing in it was deleted — this app has simply stopped reading it.',
 		deleted: '{name} deleted.',
 		putBack: '{name} is back, from {file}.',
-		deletedWasUsed: ' The areas pointing at it will draw nothing until it is put back.',
+		deletedWasUsed: 'The areas pointing at it will draw nothing until it is put back.',
 		folderNotOpenedTag: '{folder} — not opened',
 		findLabel: 'Find an image',
 		findPlaceholder: 'Find…',
@@ -686,7 +696,6 @@ export const en = {
 		missingTitle: '{name} — pointed at, but not in this browser',
 		find: 'Find…',
 		findTitle: 'Choose the file to use for {name}',
-		upload: 'Upload…',
 		uploadTitle: 'Add images from this device',
 		openFolder: 'Open {folder}',
 		chooseFolder: 'Folder…',
@@ -694,7 +703,6 @@ export const en = {
 		chooseFolderTitle: "Keep images as ordinary files in a folder of your own, rather than in this browser's storage",
 		forget: 'Forget',
 		forgetTitle: 'Stop reading the folder. Nothing in it is deleted',
-		confirmTitle: 'Delete “{name}”?',
 		confirmFolder: 'It is removed from the folder, and this cannot be undone.',
 		confirmBrowser: 'It is removed from this browser, and this cannot be undone.',
 		confirmUsed: 'Something on this card or in this table uses it, and will draw nothing until it is put back.',
@@ -714,19 +722,12 @@ export const en = {
 		tools: 'Image tools',
 		rotate: 'Rotate',
 		rotateTitle: 'Turn a quarter turn clockwise',
-		flipX: 'Flip horizontally',
 		flipXTitle: 'Flip left to right',
-		flipY: 'Flip vertically',
 		flipYTitle: 'Flip upside down',
-		crop: 'Crop',
 		cropTitle: 'Crop — drag a frame over the image',
-		stopCropping: 'Stop cropping',
-		applyCrop: 'Apply Crop',
-		applyCropTitle: 'Keep only what is inside the frame',
 		image: 'Image',
 		previous: 'Previous image',
 		next: 'Next image',
-		counter: '{n} / {total}',
 		revert: 'Revert',
 		revertTitle: 'Back to the image as it is stored',
 		shownOnly: 'Shown only — this browser cannot write {type} files.',
@@ -800,8 +801,8 @@ export const en = {
 		lighten: 'Lighten',
 		difference: 'Difference',
 		exclusion: 'Exclusion',
-		hardLight: 'Hard Light',
-		softLight: 'Soft Light',
+		'hard-light': 'Hard Light',
+		'soft-light': 'Soft Light',
 		hue: 'Hue',
 		saturation: 'Saturation',
 		color: 'Color',
@@ -823,10 +824,11 @@ export const en = {
 		lockArea: 'Lock this area — no dragging, no resizing, no option changes',
 		unlockArea: 'Unlock this area',
 		name: 'Name',
-		/** `{id}` is the next entry, or nothing when the name makes no CSS id */
 		nameTitle:
-			"The template's own name for what this area holds; the column beside it says which spreadsheet column fills it. It is also this area's CSS id{id}, so no two areas may share a name.",
-		nameTitleId: ' — #{id}',
+			"The template's own name for what this area holds; the column beside it says which spreadsheet column fills it. It is also this area's CSS id, so no two areas may share a name.",
+		/** the same, once the name makes a CSS id to show */
+		nameTitleId:
+			"The template's own name for what this area holds; the column beside it says which spreadsheet column fills it. It is also this area's CSS id — #{id} — so no two areas may share a name.",
 		nameTaken: "Another area is already called “{name}”. A name is that area's CSS id, so no two can share one.",
 		deleteTitle: 'Delete this area',
 		content: 'Content',

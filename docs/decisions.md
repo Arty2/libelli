@@ -3005,10 +3005,29 @@ four. Sentences are not glued from fragments where it can be helped — a
 fragment fixes the word order of English into every other language — which is
 why the right-click menu has "Duplicate {n} Boxes" whole rather than a
 " {n} Boxes" appended, why ResetButton takes its whole tip rather than the
-end of "Back to …", and why taking a color from a column is said three times
+end of "Back to …", why an export's notice has a form with the archive's name
+and one without, and why taking a color from a column is said three times
 over, once per color. Where a sentence wraps an element — the bold file name
 in the missing-image banner — it is split into the text before and after, and
 the catalogue says so beside it.
+
+**Two sentences side by side are joined in code, never glued in the catalogue.**
+A count and what a press on it does, a notice and the warning after it:
+`sentences()` puts them one after another. The space used to sit on the ends
+of the strings, where a translator could not see it and a language that sets
+sentences without one could not drop it; a test now refuses a catalogue string
+with space on its ends, save the halves either side of a bold word.
+
+**Shared words once, in `common`, and a label map is the catalogue's.** A delete
+question, a pager's count, Upload… and the image tools each have one key that
+every screen reads, rather than one section borrowing another's. The rest of
+the duplicates are left duplicated on purpose: Export on a menu and Export as a
+screen's title, or Image as a placeholder and as a choice, are one word in
+English and may be two elsewhere. Where a code-side map only restated the
+catalogue — `SHORTCUTS`, `KIND_LABELS`, `LIST_MARKER_LABELS`, the blend and
+border-style labels — it *is* the catalogue section now, typed as a `Record`
+over the code's own union, so a key the code gains and the catalogue lacks
+fails `npm run check`.
 
 **Three marks, not HTML.** The Help panel is prose with a bold word here and
 there. `rich.ts` reads `**bold**`, `_italic_` and `` `code` `` into runs the

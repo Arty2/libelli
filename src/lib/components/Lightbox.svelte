@@ -587,7 +587,7 @@
 		<button class="plain" disabled={index === 0} onclick={() => step(index - 1)} aria-label={t.lightbox.previous}>
 			<Icon name="chevron-left" size={26} />
 		</button>
-		<span class="counter">{fmt(t.lightbox.counter, { n: index + 1, total: dataset.rows.length })}</span>
+		<span class="counter">{fmt(t.common.counter, { n: index + 1, total: dataset.rows.length })}</span>
 		<button
 			class="plain"
 			disabled={index === dataset.rows.length - 1}

@@ -141,16 +141,7 @@ export function normaliseParagraph(raw: unknown): ParagraphStyle | undefined {
 export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'circle', 'square', 'dash', 'emdash', 'arrow', 'none'];
 
 /** Said with the glyph, since the glyph is the choice. */
-export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
-	bullet: ui.listMarkers.bullet,
-	disc: ui.listMarkers.disc,
-	circle: ui.listMarkers.circle,
-	square: ui.listMarkers.square,
-	dash: ui.listMarkers.dash,
-	emdash: ui.listMarkers.emdash,
-	arrow: ui.listMarkers.arrow,
-	none: ui.listMarkers.none
-};
+export const LIST_MARKER_LABELS: Record<ListMarker, string> = ui.listMarkers;
 
 /** How far a list may be indented, in em. */
 export const MAX_LIST = 10;

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Card from './Card.svelte';
-	import { fmt, plural, t } from '$lib/strings';
+	import { fmt, plural, sentences, t } from '$lib/strings';
 	import Icon from './Icon.svelte';
 	import Lightbox from './Lightbox.svelte';
 	import PrintSettingsPanel from './PrintSettingsPanel.svelte';
@@ -129,10 +129,12 @@
 			if (files.length) downloadBlob(`${stem}.zip`, new Blob([zipStore(files)], { type: 'application/zip' }));
 			const s = t.printPreview;
 			onnotice(
-				plural(imposed ? s.exportedSheets : s.exportedPages, written) +
-					(files.length ? fmt(s.exportedZip, { file: `${stem}.zip` }) : '') +
-					s.exportedEnd +
-					(missing.size ? fmt(s.fontsNotEmbedded, { fonts: [...missing].join(', ') }) : '')
+				sentences(
+					files.length
+						? plural(imposed ? s.exportedSheetsZip : s.exportedPagesZip, written, { file: `${stem}.zip` })
+						: plural(imposed ? s.exportedSheets : s.exportedPages, written),
+					missing.size > 0 && fmt(s.fontsNotEmbedded, { fonts: [...missing].join(', ') })
+				)
 			);
 		} catch (error) {
 			const reason = error instanceof Error ? error.message : t.printPreview.exportFailed;
@@ -269,8 +271,10 @@
 			<p class="counts">
 				<button
 					class="count"
-					title={plural(t.printPreview.pagesGoing, dataset.rows.length, { chosen }) +
-						(allChosen ? t.printPreview.pressToClear : t.printPreview.pressToTakeAll)}
+					title={sentences(
+						plural(t.printPreview.pagesGoing, dataset.rows.length, { chosen }),
+						allChosen ? t.printPreview.pressToClear : t.printPreview.pressToTakeAll
+					)}
 					onclick={() => setAll(!allChosen)}
 				>
 					{plural(t.printPreview.pages, chosen)}
@@ -279,8 +283,10 @@
 					<span class="divider">/</span>
 					<button
 						class="count"
-						title={plural(t.printPreview.sheetsGoing, sheetGroups.length, { chosen: chosenSheets }) +
-							(allSheetsChosen ? t.printPreview.pressToClear : t.printPreview.pressToTakeAll)}
+						title={sentences(
+							plural(t.printPreview.sheetsGoing, sheetGroups.length, { chosen: chosenSheets }),
+							allSheetsChosen ? t.printPreview.pressToClear : t.printPreview.pressToTakeAll
+						)}
 						onclick={() => setAllSheets(!allSheetsChosen)}
 					>
 						{plural(t.printPreview.sheets, chosenSheets)}
@@ -429,9 +435,10 @@
 				<strong>{t.printPreview.paperSize}</strong> — {t.printPreview.paperSizeBefore}<strong
 					>{fmt(t.printPreview.paperSizeValue, { w: printSheetW, h: printSheetH })}</strong
 				>{t.printPreview.paperSizeAfter}
-				{#if imposed}{fmt(t.printPreview.perSheet, { count: template.print.count })}{imposed.scale < 0.999
-						? fmt(t.printPreview.perSheetScaled, { percent: Math.round(imposed.scale * 100) })
-						: ''}{t.printPreview.perSheetEnd}{/if}
+				{#if imposed}{fmt(imposed.scale < 0.999 ? t.printPreview.perSheetScaled : t.printPreview.perSheet, {
+						count: template.print.count,
+						percent: Math.round(imposed.scale * 100)
+					})}{/if}
 			</li>
 			<li><strong>{t.printPreview.margins}</strong> — <em>{t.printPreview.marginsValue}</em>.</li>
 			<li><strong>{t.printPreview.headers}</strong> — {t.printPreview.headersValue}</li>

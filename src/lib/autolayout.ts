@@ -98,20 +98,7 @@ export const FIELD_KINDS: FieldKind[] = [
 	'credit'
 ];
 
-export const KIND_LABELS: Record<FieldKind, string> = {
-	title: t.magic.kinds.title,
-	subtitle: t.magic.kinds.subtitle,
-	detail: t.magic.kinds.detail,
-	body: t.magic.kinds.body,
-	footnote: t.magic.kinds.footnote,
-	label: t.magic.kinds.label,
-	number: t.magic.kinds.number,
-	date: t.magic.kinds.date,
-	image: t.magic.kinds.image,
-	link: t.magic.kinds.link,
-	code: t.magic.kinds.code,
-	credit: t.magic.kinds.credit
-};
+export const KIND_LABELS: Record<FieldKind, string> = t.magic.kinds;
 
 // ---- reading a column ------------------------------------------------------
 

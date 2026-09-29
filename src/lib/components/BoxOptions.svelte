@@ -149,29 +149,9 @@
 	const showPadSides = $derived(perSidePadding || typeof selected?.padding === 'object');
 
 	/** Title case, and Carbon's own words where CSS's are hyphenated. */
-	const BLEND_LABELS: Record<BlendMode, string> = {
-		multiply: t.blend.multiply,
-		screen: t.blend.screen,
-		overlay: t.blend.overlay,
-		darken: t.blend.darken,
-		lighten: t.blend.lighten,
-		difference: t.blend.difference,
-		exclusion: t.blend.exclusion,
-		'hard-light': t.blend.hardLight,
-		'soft-light': t.blend.softLight,
-		hue: t.blend.hue,
-		saturation: t.blend.saturation,
-		color: t.blend.color,
-		luminosity: t.blend.luminosity
-	};
+	const BLEND_LABELS: Record<BlendMode, string> = t.blend;
 
-	const STYLE_LABELS: Record<BorderStyle, string> = {
-		solid: t.borderStyles.solid,
-		dashed: t.borderStyles.dashed,
-		dotted: t.borderStyles.dotted,
-		double: t.borderStyles.double,
-		stamp: t.borderStyles.stamp
-	};
+	const STYLE_LABELS: Record<BorderStyle, string> = t.borderStyles;
 
 	const ALIGNMENTS: Array<{ value: Align; icon: string; label: string }> = [
 		{ value: 'left', icon: 'align-left', label: t.boxOptions.alignLeft },
@@ -638,9 +618,9 @@
 						<input
 							class="w-5"
 							value={selected.slot ?? ''}
-							title={fmt(t.boxOptions.nameTitle, {
-								id: cssIdent(selected.slot ?? '') ? fmt(t.boxOptions.nameTitleId, { id: cssIdent(selected.slot ?? '') }) : ''
-							})}
+							title={cssIdent(selected.slot ?? '')
+								? fmt(t.boxOptions.nameTitleId, { id: cssIdent(selected.slot ?? '') })
+								: t.boxOptions.nameTitle}
 							disabled={boxFrozen}
 							onchange={(e) => setSlot(e.currentTarget.value, e.currentTarget)}
 						/>
@@ -699,14 +679,14 @@
 					title={t.boxOptions.uploadTitle}
 					onclick={() => pictureInput?.click()}
 				>
-					<Icon name="image-reference" size={14} /> {t.printSettings.upload}
+					<Icon name="image-reference" size={14} /> {t.common.upload}
 				</button>
 				<button
 					disabled={boxFrozen}
-					title={selected.static?.url && !pictureColor ? fmt(t.boxOptions.urlNow, { url: selected.static.url }) : t.printSettings.urlTitle}
+					title={selected.static?.url && !pictureColor ? fmt(t.boxOptions.urlNow, { url: selected.static.url }) : t.common.urlTitle}
 					onclick={linkPicture}
 				>
-					<Icon name="copy-link" size={14} /> {t.printSettings.url}
+					<Icon name="copy-link" size={14} /> {t.common.url}
 				</button>
 				<button
 					disabled={boxFrozen}
@@ -1059,7 +1039,7 @@
 						disabled={boxFrozen}
 						onchange={(e) => patch({ mirror: e.currentTarget.checked ? undefined : false })}
 					/>
-					{t.pageOptions.facing}
+					{t.common.facing}
 				</label>
 			{/if}
 			<label class="field">
