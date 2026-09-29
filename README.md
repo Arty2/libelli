@@ -238,11 +238,12 @@ resize boxes directly, or type exact millimetres.
   paragraphs follow one, and the book rule of indenting only a paragraph after
   another meant it hardly ever showed.
 - **Lists** — **Marker** picks a Markdown bullet list's marker, **• Bullet**,
-  **● Disc**, **– Dash**, **— Em Dash** or **None**, each set in the area's own
+  **● Disc**, **○ Circle**, **■ Square**, **– Dash**, **— Em Dash**, **→ Arrow**
+  or **None**, each set in the area's own
   font like the words beside it (a font without the glyph falls back as for any
   missing character); **Indent** is the space from the area's edge to
-  the markers, in em, and **Spacing** the space between one item and the
-  next, in lines of the leading — the units the paragraph settings use. All
+  the markers, in em, and **Leading** the list's own line height, a multiple of
+  the size like the text's; left blank, a list takes the text's leading. All
   three are a group of their own in page setup and, for a Markdown area, in the
   area bar, where each on its own overrides the page's; left blank, a list is
   set as it always was.
@@ -435,20 +436,20 @@ resize boxes directly, or type exact millimetres.
   rather than rendering a blank page — the same bargain as an uploaded font.
 - **Page numbers** — off by default; six corners to choose from, an adjustable
   margin, and the template's default type. The number is the row's position, so
-  the editor, the print preview and the print all agree. **Show Total** prints it
+  the editor, the print preview and the print all agree. **of Total** prints it
   as *3 / 12*; the slash is an element of its own, `.page-number .of`, so a
-  template's CSS can set its content to anything or take it away. With **Left
-  &amp; Right** on, four more positions appear: **Top**/**Bottom Outer** and
+  template's CSS can set its content to anything or take it away. With **Recto
+  / Verso** on, four more positions appear: **Top**/**Bottom Outer** and
   **Inner**, which are the right edge on a right-hand page and the left edge on
   a left-hand one, or the other way about. Outer is where a page number goes in
   anything that is bound, because it is the corner a thumb turns the page by.
-- **Left &amp; Right** — beside the page size, and off by default: a run of
+- **Recto / Verso** — beside the page margin, and off by default: a run of
   identical pages is what a deck of cards is. On, the run is a booklet — odd
   rows are right-hand pages, even rows the left-hand pages facing them — and
   three things follow. Areas **mirror** across the fold, keeping the distance
   from the *outer* trim edge they were given rather than from the left one, so
   a wide inner margin stays a wide inner margin on both sides of a spread; an
-  area that should stay put says so with **Mirror** off in its own bar. An
+  area that should stay put says so with **Recto / Verso** off in its own bar. An
   alignment you *chose* mirrors with it, so text pushed against one edge hugs
   the other edge on the facing page, while an alignment inherited from the page
   defaults is left alone — body text reads the same way on both sides of a

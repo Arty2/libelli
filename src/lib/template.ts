@@ -135,18 +135,21 @@ export function normaliseParagraph(raw: unknown): ParagraphStyle | undefined {
 	return { mode, amount: Math.round(Math.max(0, Math.min(MAX_PARAGRAPH, n)) * 100) / 100 };
 }
 
-export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'dash', 'emdash', 'none'];
+export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'circle', 'square', 'dash', 'emdash', 'arrow', 'none'];
 
 /** Said with the glyph, since the glyph is the choice. */
 export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
 	bullet: '• Bullet',
 	disc: '● Disc',
+	circle: '○ Circle',
+	square: '■ Square',
 	dash: '– Dash',
 	emdash: '— Em Dash',
+	arrow: '→ Arrow',
 	none: 'None'
 };
 
-/** How far a list may be indented (em) or its items spaced (lines). */
+/** How far a list may be indented, in em. */
 export const MAX_LIST = 10;
 
 /** How far the baseline may move, in em: past a line either way is no correction. */
@@ -155,16 +158,17 @@ export const MAX_BASELINE = 1;
 /** A list style with only the fields that make sense; none of them, nothing. */
 export function normaliseList(raw: unknown): ListStyle | undefined {
 	if (!raw || typeof raw !== 'object') return undefined;
-	const { marker, indent, spacing } = raw as Record<string, unknown>;
-	const length = (v: unknown) => {
+	const { marker, indent, leading } = raw as Record<string, unknown>;
+	const number = (v: unknown, floor: number, ceiling: number) => {
 		if (v === undefined || v === null || v === '') return undefined;
 		const n = Number(v);
-		return Number.isFinite(n) ? Math.round(Math.max(0, Math.min(MAX_LIST, n)) * 100) / 100 : undefined;
+		return Number.isFinite(n) ? Math.round(Math.max(floor, Math.min(ceiling, n)) * 100) / 100 : undefined;
 	};
 	const list = stripUndefined({
 		marker: LIST_MARKERS.includes(marker as ListMarker) ? (marker as ListMarker) : undefined,
-		indent: length(indent),
-		spacing: length(spacing)
+		indent: number(indent, 0, MAX_LIST),
+		// The same floor an area's own leading has; past 3 lines is not leading.
+		leading: number(leading, MIN_LEADING, 3)
 	});
 	return Object.keys(list).length ? list : undefined;
 }

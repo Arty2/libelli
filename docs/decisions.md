@@ -2588,15 +2588,22 @@ line left as a border; it has no SVG cousin yet.
 
 ## Lists and the baseline
 
-`TextStyle.list` is a marker (`bullet`, `disc`, `dash`, `emdash`, `none`), an
-indent and an item spacing, each optional and each merged over the page's on
-its own, so an area can change its indent and keep the page's marker. They are
-type units — the indent in em, the spacing in lines of the leading — as a
-paragraph's are: a space in lines, an indent in em. They were mm for a round,
-which was the one pair of type settings that did not scale with the type. Left
-blank, `md.list` (mm) still sets the list, so a template that never named one
-renders as it did. No migration: both arrived in the same unreleased run of
-work that changed their unit.
+`TextStyle.list` is a marker (`bullet`, `disc`, `circle`, `square`, `dash`,
+`emdash`, `arrow`, `none`), an indent and a leading, each optional and each
+merged over the page's on its own, so an area can change its indent and keep the
+page's marker. They are type units — the indent in em, the leading a bare
+multiple of the size — as a paragraph's are. They were mm for a round, which was
+the one pair of type settings that did not scale with the type. Left blank,
+`md.list` (mm) still sets the indent and the gap between items, and a list with
+no leading takes the area's, so a template that never named one renders as it
+did.
+
+**Leading replaced an item spacing, and was not migrated.** The spacing was
+lines of the leading between one item and the next; it lived four days, no
+shipped template used it, and the two do not convert — a gap between items is
+not a line height. So `normaliseList` drops a stored `spacing` rather than
+carrying a field nothing on screen can edit or clear. The leading goes on the
+top `<ul>` as `line-height`, which the items and any nested list inherit.
 
 The marker is a text node in the item, so it is set in the area's face; a
 face without the glyph falls back through the area's stack like any missing
@@ -2753,17 +2760,22 @@ changed is the grouping and the order:
 - Page Setup: the template, then **Page** (size, margin, left & right),
   **Text**, **Paragraphs**, **Lists**, **Paper**, **Page Number**, and the
   print panel's **Bleed** and **Printing**.
-- An area: the name, then **Content**, **QR Code** when it is one, **Text**
-  (font, size, weight, color), **Align** — beside the type, because it is set
-  as often — **Position** (X, Y, W, H, anchor), **Lines**, **Lists** for
-  Markdown, **Box** (fill, border, padding, overflow), **Effects** (blend,
-  opacity, rotation).
+- An area: the name, then **Content**, **QR Code** when it is one, **Align**
+  — ahead of the type, because it is what is reached for most — **Text** (font,
+  size, weight, color), **Position** (X, Y, W, H, anchor, recto / verso,
+  rotation), **Lines**, **Lists** for Markdown, **Box** (fill, border, padding,
+  overflow), **Effects** (blend, opacity).
 
 Each group is a fieldset whose legend, floated, is the first item of the run and
 set in bold capitals, heavier than the labels; a wider gap separates runs, and no
 rule, because the bar wraps and a rule lands wherever the wrap does. A label that
 only repeated its group's name is left to screen readers. A new control goes in
 the group it belongs to rather than on the end.
+
+**Recto / Verso, not Left & Right or Mirror.** The page's switch and the area's
+say the same thing in the same words, the book's own: a right-hand page and the
+left-hand page facing it. On an area it reads as "this area follows the
+spread"; off, it keeps its millimetres on both.
 
 **Labels stay one word where one word was there.** Leading, Spacing, Draft,
 Width and Height were tried as longer, plainer phrases and put back: in a bar

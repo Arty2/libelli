@@ -220,7 +220,7 @@ export interface ParagraphStyle {
 }
 
 /** What a Markdown bullet list is marked with: `•`, `●`, `–`, `—`, or nothing. */
-export type ListMarker = 'bullet' | 'disc' | 'dash' | 'emdash' | 'none';
+export type ListMarker = 'bullet' | 'disc' | 'circle' | 'square' | 'dash' | 'emdash' | 'arrow' | 'none';
 
 /**
  * How a Markdown list is set. Each field on its own: an area can take the
@@ -231,8 +231,13 @@ export interface ListStyle {
 	marker?: ListMarker;
 	/** em of the area's size, from its edge to the marker */
 	indent?: number;
-	/** lines of the area's leading between one item and the next */
-	spacing?: number;
+	/**
+	 * the list's own leading, as a multiple of its size like the area's; absent,
+	 * a list is set in the area's leading. It replaced a spacing between items,
+	 * in lines, which lived four days and was dropped rather than migrated —
+	 * the two do not convert, and the items keep the gap `md.list` gives them.
+	 */
+	leading?: number;
 }
 
 export interface TextStyle {

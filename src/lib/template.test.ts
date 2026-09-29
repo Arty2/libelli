@@ -572,7 +572,10 @@ describe('page margins', () => {
 
 describe('list style and baseline', () => {
 	it('keeps only the list fields that make sense', () => {
-		expect(normaliseList({ marker: 'dash', indent: '4', spacing: -2 })).toEqual({ marker: 'dash', indent: 4, spacing: 0 });
+		expect(normaliseList({ marker: 'dash', indent: '4', leading: 0.1 })).toEqual({ marker: 'dash', indent: 4, leading: MIN_LEADING });
+		expect(normaliseList({ marker: 'arrow', leading: '1.25' })).toEqual({ marker: 'arrow', leading: 1.25 });
+		// The spacing a list briefly had is not carried: it does not convert.
+		expect(normaliseList({ spacing: 2 })).toBeUndefined();
 		expect(normaliseList({ marker: 'star', indent: 'x' })).toBeUndefined();
 		expect(normaliseList(null)).toBeUndefined();
 	});
@@ -601,12 +604,12 @@ describe('list style and baseline', () => {
 	it('survives a load on the page and on an area', () => {
 		const t = builtinTemplate();
 		const raw = JSON.parse(JSON.stringify({ ...t, defaults: { ...t.defaults, list: { marker: 'dash' }, baseline: 0.04 } }));
-		raw.boxes[0].list = { spacing: 2 };
+		raw.boxes[0].list = { leading: 1.1 };
 		raw.boxes[0].baseline = -0.1;
 		const back = normaliseTemplate(raw);
 		expect(back.defaults.list).toEqual({ marker: 'dash' });
 		expect(back.defaults.baseline).toBe(0.04);
-		expect(back.boxes[0].list).toEqual({ spacing: 2 });
+		expect(back.boxes[0].list).toEqual({ leading: 1.1 });
 		expect(back.boxes[0].baseline).toBe(-0.1);
 	});
 });

@@ -361,6 +361,11 @@
 		patch({ list: normaliseList({ ...selected?.list, ...change }) });
 	}
 
+	/** What a list here is set in when it names no leading: the page's for lists, else the area's own. */
+	const listLeadingFallback = $derived(
+		template.defaults.list?.leading ?? selected?.lineHeight ?? template.defaults.lineHeight
+	);
+
 	/** Whether the page's baseline reaches this area — only in the page's own face. */
 	const pageBaselineApplies = $derived((selected?.font ?? template.defaults.font) === template.defaults.font);
 
@@ -553,7 +558,7 @@
 				<span class="context">Area</span>
 				{#if source === 'field'}
 					<label class="field">
-						<span>Name</span>
+						<span class="sr-only">Name</span>
 						<input
 							class="w-5"
 							value={selected.slot ?? ''}
@@ -568,8 +573,8 @@
 				</button>
 			</span>
 		</span>
-		<!-- Most-used first, after what the area holds: its type and its
-		     alignment, then where it sits and how big, then how its lines are set,
+		<!-- Most-used first, after what the area holds: its alignment and its
+		     type, then where it sits and how big, then how its lines are set,
 		     then the box around it. A value the area takes from the page shows in
 		     italics; one it sets for itself has an × that takes it back. -->
 		<fieldset class="group">
@@ -787,6 +792,38 @@
 			</fieldset>
 		{/if}
 		<fieldset class="group">
+			<legend>Align</legend>
+			<span class="segmented" role="group" aria-label="Horizontal alignment">
+				{#each ALIGNMENTS as option (option.value)}
+					<button
+						aria-pressed={(selected.align ?? template.defaults.align) === option.value}
+						title="Align {option.label}"
+						aria-label="Align {option.label}"
+						disabled={boxFrozen}
+						onclick={() => patch({ align: option.value })}
+					>
+						<Icon name={option.icon} size={15} />
+					</button>
+				{/each}
+			</span>
+			{#if selected.align}
+				<ResetButton to="the page's alignment" disabled={boxFrozen} onclick={() => patch({ align: undefined })} />
+			{/if}
+			<span class="segmented" role="group" aria-label="Vertical alignment">
+				{#each VERTICALS as option (option.value)}
+					<button
+						aria-pressed={(selected.valign ?? 'top') === option.value}
+						title="Align {option.label}"
+						aria-label="Align {option.label}"
+						disabled={boxFrozen}
+						onclick={() => patch({ valign: option.value })}
+					>
+						<Icon name={option.icon} size={15} />
+					</button>
+				{/each}
+			</span>
+		</fieldset>
+		<fieldset class="group">
 			<legend>Text</legend>
 			<span class="field" class:inherits={!selected.font}>
 				<span>Font</span>
@@ -854,38 +891,6 @@
 			</span>
 		</fieldset>
 		<fieldset class="group">
-			<legend>Align</legend>
-			<span class="segmented" role="group" aria-label="Horizontal alignment">
-				{#each ALIGNMENTS as option (option.value)}
-					<button
-						aria-pressed={(selected.align ?? template.defaults.align) === option.value}
-						title="Align {option.label}"
-						aria-label="Align {option.label}"
-						disabled={boxFrozen}
-						onclick={() => patch({ align: option.value })}
-					>
-						<Icon name={option.icon} size={15} />
-					</button>
-				{/each}
-			</span>
-			{#if selected.align}
-				<ResetButton to="the page's alignment" disabled={boxFrozen} onclick={() => patch({ align: undefined })} />
-			{/if}
-			<span class="segmented" role="group" aria-label="Vertical alignment">
-				{#each VERTICALS as option (option.value)}
-					<button
-						aria-pressed={(selected.valign ?? 'top') === option.value}
-						title="Align {option.label}"
-						aria-label="Align {option.label}"
-						disabled={boxFrozen}
-						onclick={() => patch({ valign: option.value })}
-					>
-						<Icon name={option.icon} size={15} />
-					</button>
-				{/each}
-			</span>
-		</fieldset>
-		<fieldset class="group">
 			<legend>Position</legend>
 			<label class="field"><span>X</span>
 				<input class="n-4" type="number" step="0.5" value={selected.x} disabled={boxFrozen} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
@@ -948,8 +953,54 @@
 						disabled={boxFrozen}
 						onchange={(e) => patch({ mirror: e.currentTarget.checked ? undefined : false })}
 					/>
-					Mirror
+					Recto / Verso
 				</label>
+			{/if}
+			<label class="field">
+				<span>Rotation</span>
+				<input
+					class="n-3"
+					type="number"
+					step="1"
+					title="Degrees clockwise; the box turns about the centre marked on it"
+					value={selected.rotation ?? 0}
+					disabled={boxFrozen}
+					onchange={(e) => patch({ rotation: normaliseRotation(numeric(e, 0)) })}
+				/>
+				<span class="unit">°</span>
+			</label>
+			{#if selected.rotation}
+				<label class="field tight">
+					<span class="edge">X</span>
+					<input
+						class="n-3"
+						type="number"
+						step="5"
+						min="0"
+						max="100"
+						aria-label="Centre X"
+						title="The pivot across the box, as a percentage of its width"
+						value={selected.centre?.x ?? 50}
+						disabled={boxFrozen}
+						onchange={(e) => setCentre({ x: numeric(e, 50) })}
+					/>
+				</label>
+				<label class="field tight">
+					<span class="edge">Y</span>
+					<input
+						class="n-3"
+						type="number"
+						step="5"
+						min="0"
+						max="100"
+						aria-label="Centre Y"
+						title="The pivot down the box, as a percentage of its height"
+						value={selected.centre?.y ?? 50}
+						disabled={boxFrozen}
+						onchange={(e) => setCentre({ y: numeric(e, 50) })}
+					/>
+				</label>
+				<span class="unit">%</span>
 			{/if}
 		</fieldset>
 		<fieldset class="group">
@@ -1095,22 +1146,23 @@
 					{/if}
 				</label>
 				<label class="field">
-					<span>Spacing</span>
+					<span>Leading</span>
+					<!-- A multiple of the size, like the area's own leading, which is
+					     where a list with none of its own takes it from. -->
 					<input
 						class="n-3"
 						type="number"
-						step="0.25"
-						min="0"
-						max={MAX_LIST}
-						placeholder={template.defaults.list?.spacing !== undefined ? String(template.defaults.list.spacing) : 'auto'}
-						title="Between one list item and the next, in lines of this area's leading; blank takes the page's"
-						value={selected.list?.spacing ?? ''}
+						step="0.05"
+						min={MIN_LEADING}
+						max="3"
+						placeholder={String(listLeadingFallback)}
+						title="The list's own leading. Blank takes {template.defaults.list?.leading !== undefined ? "the page's for lists" : "this area's"}"
+						value={selected.list?.leading ?? ''}
 						disabled={boxFrozen}
-						onchange={(e) => setList({ spacing: e.currentTarget.value })}
+						onchange={(e) => setList({ leading: e.currentTarget.value })}
 					/>
-					<span class="unit">lines</span>
-					{#if selected.list?.spacing !== undefined}
-						<ResetButton to="the page's list spacing" disabled={boxFrozen} onclick={() => setList({ spacing: '' })} />
+					{#if selected.list?.leading !== undefined}
+						<ResetButton to={template.defaults.list?.leading !== undefined ? "the page's list leading" : "this area's leading"} disabled={boxFrozen} onclick={() => setList({ leading: '' })} />
 					{/if}
 				</label>
 			</fieldset>
@@ -1340,52 +1392,6 @@
 				/>
 				<span class="unit">%</span>
 			</label>
-			<label class="field">
-				<span>Rotation</span>
-				<input
-					class="n-3"
-					type="number"
-					step="1"
-					title="Degrees clockwise; the box turns about the centre marked on it"
-					value={selected.rotation ?? 0}
-					disabled={boxFrozen}
-					onchange={(e) => patch({ rotation: normaliseRotation(numeric(e, 0)) })}
-				/>
-				<span class="unit">°</span>
-			</label>
-			{#if selected.rotation}
-				<label class="field tight">
-					<span class="edge">X</span>
-					<input
-						class="n-3"
-						type="number"
-						step="5"
-						min="0"
-						max="100"
-						aria-label="Centre X"
-						title="The pivot across the box, as a percentage of its width"
-						value={selected.centre?.x ?? 50}
-						disabled={boxFrozen}
-						onchange={(e) => setCentre({ x: numeric(e, 50) })}
-					/>
-				</label>
-				<label class="field tight">
-					<span class="edge">Y</span>
-					<input
-						class="n-3"
-						type="number"
-						step="5"
-						min="0"
-						max="100"
-						aria-label="Centre Y"
-						title="The pivot down the box, as a percentage of its height"
-						value={selected.centre?.y ?? 50}
-						disabled={boxFrozen}
-						onchange={(e) => setCentre({ y: numeric(e, 50) })}
-					/>
-				</label>
-				<span class="unit">%</span>
-			{/if}
 		</fieldset>
 	</div>
 

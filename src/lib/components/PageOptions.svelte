@@ -598,7 +598,7 @@
 					disabled={pageFrozen}
 					onchange={(e) => patchTemplate({ facing: e.currentTarget.checked || undefined })}
 				/>
-				Left &amp; Right
+				Recto / Verso
 			</label>
 		</fieldset>
 		<fieldset class="group">
@@ -760,20 +760,19 @@
 				<span class="unit">em</span>
 			</label>
 			<label class="field">
-				<span>Spacing</span>
+				<span>Leading</span>
 				<input
 					class="n-3"
 					type="number"
-					step="0.25"
-					min="0"
-					max={MAX_LIST}
-					placeholder="auto"
-					title="Between one list item and the next, in lines of the leading"
-					value={template.defaults.list?.spacing ?? ''}
+					step="0.05"
+					min={MIN_LEADING}
+					max="3"
+					placeholder={String(template.defaults.lineHeight)}
+					title="The leading every list is set in, where an area names none of its own. Blank takes the text's"
+					value={template.defaults.list?.leading ?? ''}
 					disabled={pageFrozen}
-					onchange={(e) => setDefaultList({ spacing: e.currentTarget.value })}
+					onchange={(e) => setDefaultList({ leading: e.currentTarget.value })}
 				/>
-				<span class="unit">lines</span>
 			</label>
 		</fieldset>
 		<fieldset class="group">
@@ -859,7 +858,7 @@
 								pageNumber: { ...template.pageNumber, showTotal: e.currentTarget.checked || undefined }
 							})}
 					/>
-					Show Total
+					of Total
 				</label>
 				<label class="field">
 					<span>Margin</span>
