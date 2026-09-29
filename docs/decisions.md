@@ -1802,13 +1802,16 @@ the rescue button leaves it where it is (see `boxops.ts`).
 
 It prints as card 4 says to: two to an A4 sheet, in a zine's order, so
 Export opens on the booklet rather than on four loose pages — hence the name.
-The accent band on card 2, every title and the stamp's field share one green,
-`#6f9479`. The title sets it in its own area, where the bar shows it and a
-color field changes it; the stamp's field takes it from `--accent-color` in the
-template's CSS, reached through its `.surface`, inset to the padding; the band
-is a cell, because card 2's lesson is that typing `orange` there changes it.
-Titles and body headings both at weight 200: in a light green,
-Fraunces' hairline cuts are the whole of the color there is.
+The accent band on card 2, every title and the stamp's field share one
+printer's red, `#d0362b` — a warm, slightly orange red, the kind a press
+carries as a second ink; it was a sage green. The title sets it in its own area,
+where the bar shows it and a color field changes it, and takes its text color
+from the `accent` column too, so on card 2 the band and the title answer to the
+same cell: typing `orange` there, which is that card's lesson, changes both. On
+the other cards the cell is empty and the title keeps its own red. The stamp's
+field takes it from `--accent-color` in the template's CSS, reached through its
+`.surface`, inset to the padding. Titles and body headings both at weight 200:
+with one ink, Fraunces' hairline cuts are the whole of the color there is.
 
 The rest is chosen to show one of each thing the tour mentions, without a
 paragraph of its own: the kicker is a per-edge border (a hairline under it)
