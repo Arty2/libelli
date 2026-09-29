@@ -355,13 +355,13 @@ function mergeStyle(md: MarkdownStyle | undefined): Required<MarkdownStyle> {
 }
 
 /**
- * Turn the editor's marks around an unknown `%name%` (see `markUnknown` in
+ * Turn the editor's marks around an unknown `%%name%%` (see `markUnknown` in
  * placeholders.ts) into a span it can underline, in rendered HTML.
  *
  * Here, beside the escaping, because this writes markup: only into text
  * between tags, where the name has already been escaped at its leaf, and never
  * into an attribute — a mark that ended up inside a link's address is put back
- * as the percent sign it was, rather than a span being written into the middle of
+ * as the `%%` it was, rather than a span being written into the middle of
  * an `href`.
  */
 const MARKED = new RegExp(`${UNKNOWN_OPEN}([^${UNKNOWN_OPEN}${UNKNOWN_CLOSE}<>]*)${UNKNOWN_CLOSE}`, 'g');
@@ -371,7 +371,7 @@ export function flagUnknown(html: string): string {
 	if (!html.includes(UNKNOWN_OPEN)) return html;
 	return html
 		.replace(/(^|>)([^<]*)/g, (_whole, gt: string, text: string) =>
-			gt + text.replace(MARKED, '<span class="unknown-placeholder">%$1%</span>')
+			gt + text.replace(MARKED, '<span class="unknown-placeholder">%%$1%%</span>')
 		)
-		.replace(STRAY, '%');
+		.replace(STRAY, '%%');
 }

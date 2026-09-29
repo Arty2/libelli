@@ -99,9 +99,9 @@ export function sniffDelimiter(text: string): string {
  * A column's name, in the one shape a column name may have: no spaces, spaces
  * become dashes, and nothing but letters, digits, dashes and underscores.
  *
- * Because a column name is also a word in a card — `%title%` is written into
+ * Because a column name is also a word in a card — `%%title%%` is written into
  * a cell or an area and filled from the column of that name — and a name with a
- * space in it is one nobody can write between two percent signs.
+ * space or a `%` in it is one nobody can be expected to write the same twice.
  * Letters are any script's letters, not ASCII's: a column called `τίτλος` is as
  * writable as `title`, and stripping it to nothing would be the opposite of the
  * point. Empty after all that is empty; the caller names it.
@@ -118,7 +118,7 @@ export function columnName(raw: string): string {
 
 /**
  * Headers made into column names, non-empty and unique, so they can safely key
- * a row object — and be written as `%name%`. A duplicate takes a number after
+ * a row object — and be written as `%%name%%`. A duplicate takes a number after
  * a dash, the same shape a typed name is given.
  */
 export function normaliseHeaders(raw: string[]): string[] {

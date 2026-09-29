@@ -105,7 +105,7 @@ export function rowNumber(dataset: Dataset, index: number): number {
 
 /**
  * The rows put back in the order of their numbers, so that the third of them
- * is the row labelled 3 — what `%lookup:3:…%` means. A lookup follows the
+ * is the row labelled 3 — what `%%lookup:3:…%%` means. A lookup follows the
  * number rather than the place because sorting a table to read it must not
  * change what every card quotes.
  */

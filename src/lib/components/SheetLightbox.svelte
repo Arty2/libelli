@@ -33,7 +33,7 @@
 		index: number;
 		/** total rows in the dataset, for "n / total" numbering on each card */
 		pageCount: number;
-		/** every row, for a card's `%lookup:…%` */
+		/** every row, for a card's `%%lookup:…%%` */
 		rows: readonly Row[];
 		sheetW: number;
 		sheetH: number;

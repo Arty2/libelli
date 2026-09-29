@@ -31,7 +31,7 @@
 		cells: PlacedPage<{ row: Row; index: number }>[];
 		/** total rows in the dataset, for "n / total" numbering on each card */
 		pageCount: number;
-		/** every row, for a card's `%lookup:…%` — not only the ones on this sheet */
+		/** every row, for a card's `%%lookup:…%%` — not only the ones on this sheet */
 		rows: readonly Row[];
 		/**
 		 * What a preview is scaling this sheet down by, if one is.

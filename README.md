@@ -201,30 +201,30 @@ resize boxes directly, or type exact millimetres.
   <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>Enter</kbd> leaves, and a plain
   <kbd>Enter</kbd> is a line break. Selecting an area also points the data table
   at the cells that fill it.
-- **Placeholders** — a column's name between percent signs prints that column of
-  the card's row: an area's own words can say `**%title%**, %artist%`, and
+- **Placeholders** — a column's name between double percent signs prints that column of
+  the card's row: an area's own words can say `**%%title%%**, %%artist%%`, and
   so can a cell, quoting another cell of its own row. Markdown around them works
-  in a Markdown area. `%artist-name%` finds the column `Artist-Name`: case
+  in a Markdown area. `%%Artist Name%%` finds the column `Artist-Name`, and case
   does not matter. Substitution happens **once**: what a placeholder is replaced
   with is never read for placeholders itself, so two cells that name each
   other print what they hold rather than looping. A cell that names **its own
   column** is not filled in at all: it is left as written and, on the card,
   underlined in wavy red like a name nothing answers to, because it is the
   same mistake. Type
-  `%` in any field that takes text — a cell, the area's Text, the card
+  `%%` in any field that takes text — a cell, the area's Text, the card
   itself — and the columns are offered; arrows move, Enter or Tab takes one,
   Esc leaves what you typed. A placeholder that names no column is
   **underlined in wavy red** on the card while the bounds are on, since it
   would otherwise print as written.
-  `%today%` prints today's date, and `%today:YYYY-MM-DD%` prints it in a
+  `%%today%%` prints today's date, and `%%today:YYYY-MM-DD%%` prints it in a
   format of your own: `YYYY`, `YY`, `MM`, `DD` for the numbers, `MMMM`, `MMM`,
   `dddd`, `ddd` for the names. After a column, a find and
-  a replace change it on the way in: `%title:words:that%` swaps every
-  `words` for `that`, `%title: :-%` puts hyphens for spaces, and an empty
+  a replace change it on the way in: `%%title:words:that%%` swaps every
+  `words` for `that`, `%%title: :-%%` puts hyphens for spaces, and an empty
   replacement deletes. Literal and case-sensitive, never a pattern; the find
   ends at the first colon, so the replacement may hold colons, and a colon to
-  *find* is written `\:` — `%time:\:: h%` turns `9:30` into `9 h 30`.
-  `%lookup:3:price%` reaches past the card's own row: the `price` of the row
+  *find* is written `\:` — `%%time:\:: h%%` turns `9:30` into `9 h 30`.
+  `%%lookup:3:price%%` reaches past the card's own row: the `price` of the row
   **numbered 3** in the table — one row of prices or a legend that every card
   quotes. The number, not the place: sorting the table carries its numbers
   along — they are saved with the table — and a lookup follows them, so
@@ -232,20 +232,18 @@ resize boxes directly, or type exact millimetres.
   closes the numbers up and moving rows by hand renumbers them; either way
   every lookup in the template and the cells is **rewritten to follow its
   row**, in the same undo step, and one whose row was deleted becomes
-  `%lookup:?:…%`, underlined, rather than quoting whichever row took its
+  `%%lookup:?:…%%`, underlined, rather than quoting whichever row took its
   number. Other templates in the library are not rewritten — templates are
   not tied to a table. A row is named by its number, never by what it holds;
   one that is not there is underlined like any unknown name.
   `today` and `lookup` are reserved keywords and always mean themselves: a
   column called either is **titled in red** in the table, with a note in the
   status line — rename it to quote it by name, or reach it from another row
-  with `%lookup:3:today%`. A percent sign in ordinary text is left alone:
-  a name has no spaces, and a `%` straight after a letter or a digit, or
-  straight before a digit, opens nothing — so `50% off, 20% more` and a
-  `%20` in an address print as typed. (Double braces are not used because
-  they are Hugo's own templates.)
+  with `%%lookup:3:today%%`. A single percent sign is ordinary text —
+  `50% off, 20% more` prints as typed; it takes two to open a placeholder.
+  (Not double braces, because those are Hugo's own templates.)
   Deliberately small — no
-  conditionals, no loops — and anything between percent signs it does not recognise is left
+  conditionals, no loops — and anything between `%%` marks it does not recognise is left
   exactly as written. No time of day: a card is printed once and read for
   months.
 - **Paragraphs** — **Paragraph** in the area bar, with a page-wide default in
@@ -352,7 +350,7 @@ resize boxes directly, or type exact millimetres.
   borderless, as a sample rather than a control — or, where the cell holds no
   color, the area's own, framed and settable as usual. Its opacity is the area's:
   set it and the row's color is laid on at that strength. A fill of *None*
-  linked to a column fills only the cards whose cell says so. The link names the column, like `%column%`, follows it through a
+  linked to a column fills only the cards whose cell says so. The link names the column, like `%%column%%`, follows it through a
   rename, and marks it as used in the table; press the link again to let go.
 - **A border drawn by hand** — **Draft**, beside the border color, draws it
   wobbling, as a line rather than a rule. Width, style and radius all still
@@ -685,7 +683,7 @@ a notice can appear.
   that column follow the rename. A column name has **no spaces and no special
   characters** — spaces become dashes and the rest is dropped as you commit it,
   and headers imported from a file or a paste are cleaned the same way — because
-  a column name is also something written between percent signs: `%Artist-Name%`.
+  a column name is also something written between `%%` marks: `%%Artist-Name%%`.
   Letters of any script are letters.
 - **Reorder** — drag a header sideways and drop it where the blue line shows —
   drawn down the whole height of the table, not only the header, so the gap it
@@ -699,7 +697,7 @@ a notice can appear.
   moving a column changes the view and nothing else.
 - **Columns nothing prints** — a small broken link in front of a header marks a
   column no area is bound to and no area's words or printed cells name as
-  `%column%`: data no card will show. Press it to put the column on the card:
+  `%%column%%`: data no card will show. Press it to put the column on the card:
   a new area, named after the column and bound to it, where a new area goes.
 - **Counting** — while a cell is being typed in, **Edit** appears at the start
   of the bar, and opens it full size; its characters and words are at the

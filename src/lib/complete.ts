@@ -1,12 +1,12 @@
 import { openPlaceholder, placeholderChoices } from './placeholders';
 
 /**
- * Column names offered as `%` is typed, in any field that can hold one.
+ * Column names offered as `%%` is typed, in any field that can hold one.
  *
- * `%title%` only works if you know the column is called `title`, and the
+ * `%%title%%` only works if you know the column is called `title`, and the
  * table is often folded away or scrolled off while you type into an area. So
- * typing `%` opens a short list of the columns — narrowed as you go on — and
- * choosing one writes the whole `%name%` in. The arrow keys move through it,
+ * typing `%%` opens a short list of the columns — narrowed as you go on — and
+ * choosing one writes the whole `%%name%%` in. The arrow keys move through it,
  * Enter or Tab takes one, Escape closes it and leaves what was typed.
  *
  * An action rather than a component, because the fields it serves are four
@@ -36,10 +36,10 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 		if (!open) return;
 		const caret = node.selectionStart ?? node.value.length;
 		const after = node.value.slice(caret);
-		// Swallow a closing `%` that is already there, so choosing inside
-		// `%ti%` does not leave `%title%%`.
-		const rest = after.startsWith('%') ? after.slice(1) : after;
-		const inserted = `%${name}%`;
+		// Swallow a closing `%%` that is already there, so choosing inside
+		// `%%ti%%` does not leave `%%title%%%%`.
+		const rest = after.startsWith('%%') ? after.slice(2) : after;
+		const inserted = `%%${name}%%`;
 		node.value = node.value.slice(0, open.start) + inserted + rest;
 		const at = open.start + inserted.length;
 		node.setSelectionRange(at, at);
@@ -75,7 +75,7 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 				item.setAttribute('role', 'option');
 				item.setAttribute('aria-selected', String(i === active));
 				item.dataset.name = name;
-				item.textContent = `%${name}%`;
+				item.textContent = `%%${name}%%`;
 				return item;
 			})
 		);
