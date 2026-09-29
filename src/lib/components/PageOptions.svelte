@@ -53,6 +53,9 @@
 		library: TemplateEntry[];
 		templateId: string;
 		onselecttemplate: (id: string) => void;
+		/** the template the swap goes back to, or '' while there is none */
+		previousTemplate?: string;
+		onswaptemplate?: () => void;
 		onnewtemplate: () => void;
 		/** open the A5 Starter Booklet as it came, or add it to the library */
 		onstartertemplate: () => void;
@@ -80,6 +83,8 @@
 		library,
 		templateId,
 		onselecttemplate,
+		previousTemplate = '',
+		onswaptemplate,
 		onnewtemplate,
 		onstartertemplate,
 		ondeletetemplate,
@@ -158,6 +163,11 @@
 	 * this browser knows — see `fontChoices`.
 	 */
 	const families = $derived(fontChoices(template, editorFonts));
+
+	/** The other end of the swap, while it is still in the library. */
+	const previousEntry = $derived(
+		previousTemplate && previousTemplate !== templateId ? library.find((e) => e.id === previousTemplate) : undefined
+	);
 
 	/** A locked design is read-only everywhere; a locked box only locks itself. */
 	const pageFrozen = $derived(!!template.locked);
@@ -476,12 +486,25 @@
 						</ul>
 					{/if}
 				</label>
+				<!-- The pair you are working between, one press apart — the same
+				     button, and the same bargain, as beside the table's name. Not
+				     frozen by the lock: opening another template changes nothing in
+				     this one, and the menu beside it is not frozen either. -->
+				<button
+					class="square"
+					disabled={!previousEntry}
+					title={previousEntry
+						? `Back to “${previousEntry.name}”`
+						: 'Nothing to swap back to yet — this is the only template you have opened'}
+					aria-label="Swap to the previous template"
+					onclick={() => onswaptemplate?.()}
+				><Icon name="compare" size={14} /></button>
 				<!-- After the template's name and its menu rather than at the far end
 				     of the bar: the stylesheet is part of the template, travels with it, and
 				     is the last thing anyone would think to look for among page
 				     sizes and margins. -->
 				<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
-					<Icon name="code" size={14} /> CSS{template.css ? ' •' : ''}
+					<Icon name="code" size={14} /> <span class="label">CSS</span>{template.css ? ' •' : ''}
 				</button>
 			</span>
 		</span>

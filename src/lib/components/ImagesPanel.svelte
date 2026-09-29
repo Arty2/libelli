@@ -749,7 +749,7 @@
 			{/if}
 			<button
 				title="Keep images as ordinary files in a folder of your own, rather than in this browser's storage"
-				onclick={choose}><Icon name="folder" size={15} /> {folder ? 'Another Folder…' : 'Choose Folder…'}</button
+				onclick={choose}><Icon name="folder" size={15} /> {folder ? 'Another Folder…' : 'Folder…'}</button
 			>
 			{#if folder}
 				<button title="Stop reading the folder. Nothing in it is deleted" onclick={forget}>Forget</button>

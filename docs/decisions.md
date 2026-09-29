@@ -2729,6 +2729,15 @@ full-width first line ruled off in the bar's border grey. On a desk the same
 line cost the bar a whole row and pushed the page down for the sake of a rule,
 so there the head wraps in with the groups.
 
+**The head reads Lock, the template and its menu, the swap, then CSS.** The swap
+is the table's, for templates: the one open before this one, one press away and
+kept across a reload, because working between two designs — the real one and a
+variation — is the case that happens, and a menu each time is its whole cost.
+Every way the open template changes remembers the one left behind, except undo,
+which puts back a state rather than choosing one. The lock does not disable it:
+opening another template changes nothing in this one. On a phone CSS keeps its
+glyph and its dot and loses the word, as the window toolbar's buttons do.
+
 **Everything that acts on the template as a whole is in the picker's menu;
 Lock is not.** Import, Export and Reset were a row of buttons under the name,
 which is a second line of chrome in a bar that already wraps. They are errands —

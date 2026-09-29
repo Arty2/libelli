@@ -543,6 +543,13 @@
 		border-bottom: 1px solid #ddd;
 	}
 
+	/* The CSS button keeps its glyph and its dot and loses the word, as the
+	   app's own toolbar buttons do at this width: the head has to hold a lock,
+	   a name, its menu and two buttons on one line. */
+	.options .head-row .label {
+		display: none;
+	}
+
 	/* On a phone the bar is one column of wrapped controls anyway, so the head's
 	   rule would be a line down the left of nothing. */
 	.options .head {

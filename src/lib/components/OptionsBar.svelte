@@ -30,6 +30,9 @@
 		editorFonts: FontRef[];
 		templateId: string;
 		onselecttemplate: (id: string) => void;
+		/** the template the swap goes back to, or '' while there is none */
+		previousTemplate?: string;
+		onswaptemplate?: () => void;
 		onnewtemplate: () => void;
 		/** open the A5 Starter Booklet as it came, or add it to the library */
 		onstartertemplate: () => void;
