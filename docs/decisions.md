@@ -1772,14 +1772,14 @@ title to the right.
 
 The template also carries what a row cannot: two areas of its own text in the
 footer — `{{link}}`, which empties and so hides on a row with no link, beside
-the QR that hides with it, and `{{date:YYYY-MM-DD}}` — and a paragraph indent
+the QR that hides with it, and `{{today:YYYY-MM-DD}}` — and a paragraph indent
 on the body. The band, the QR and the page number follow the fold to the outer
 edge; the link and date follow with them, set right-aligned against the code so
 that the mirror, which flips alignment too, sets them left-aligned against it on
 a left-hand page rather than stranded mid-page. Card 2 shows `{{title}}` filled in inside a cell and `{{column}}`
 left as written, which is the literal form for free — no column is called
 `column`, and an unrecognised name is never eaten. A date cannot be shown that
-way, since `{{date…}}` is always replaced, so the card points at the footer
+way, since `{{today…}}` is always replaced, so the card points at the footer
 instead of spelling it out.
 
 Four families, each with a job, as a book would set them: Fraunces for titles
@@ -2931,16 +2931,25 @@ Anything unrecognised is returned exactly as written, which is what stops a
 cell that happens to contain braces being eaten. No time of day either — a card is printed
 once and read for months, and a timestamp on paper is stale before the ink dries.
 
-**Keywords beat columns.** `date` and `lookup` always mean themselves, and a
-column that happens to be called either cannot be reached as `{{name}}`. It
-used to be the other way — a column called `date` was the more specific
-answer — but that made what a template says depend on the table under it: the
-same `{{date}}` printed today on one table and a cell on the next. A keyword
-now reads the same everywhere, and the cost, a column that cannot be quoted by
-name, is made loud instead of silent: DataTable titles it red, and the app
-says why in the status line once each time the set of such columns changes,
-not on every edit. It is still reachable from another row, `{{lookup:N:date}}`,
-and bound to an area it prints as ever.
+**Keywords beat columns.** `today` and `lookup` always mean themselves, and a
+column that happens to be called either cannot be reached as `{{name}}`. The
+date used to give way to a column of its name, which made what a template
+says depend on the table under it: the same placeholder printed today on one
+table and a cell on the next. A keyword now reads the same everywhere, and
+the cost, a column that cannot be quoted by name, is made loud instead of
+silent: DataTable titles it red, and the app says so in the status line once
+each time the set of such columns changes, not on every edit. It is still
+reachable from another row, `{{lookup:N:today}}`, and bound to an area it
+prints as ever.
+
+**`{{today}}`, and `{{date}}` kept as it was.** The date is today's, and the
+name now says so. The old `{{date}}` is not rewritten on load: a template
+cannot tell whether it meant the date or a column called `date`, since for
+most of its life a column of that name won. So it keeps exactly its old
+reading — a column first, the date where there is none — is no keyword, and
+is not offered by `{{`. No schema bump, for the reason in § template.ts: an
+older build reads `{{today}}` as a name it does not know and prints the
+braces, which degrades quietly.
 
 **A lookup names a row by its number, not by a key.** `{{lookup:3:price}}` is
 the row wearing 3 in the table, because a value to search for could sit in any
@@ -2966,6 +2975,22 @@ placeholders, and reaching a cell's own column in its own row is marked the
 way `{{self}}` is. `Card` takes `rows` as a required prop rather than a
 defaulted one: a renderer that forgot it would print braces on paper while
 the editor showed the value.
+
+**A delete or a move rewrites the lookups that followed it.** Numbers close
+up after a delete, and a move by hand makes the positions the numbers, so a
+lookup naming row 7 would quietly start quoting a neighbour. The table says
+how the numbers moved (`renumbering`, by row identity — only the edits that
+keep their row objects may ask, since a cell edit makes a new one and would
+read as a deletion), and the page rewrites every lookup in the current
+template's areas and in every cell in the same assignment, so one undo puts
+table and template back together. Rewriting is one regex pass per text that
+contains `{{`, and anything unchanged is handed back as the same object. A
+lookup whose row was deleted becomes `{{lookup:?:…}}` rather than keeping a
+number that now belongs to another row: marked as naming nothing beats
+printing the wrong row. Keeping numbers stable instead (gaps after a delete)
+would have spared the rewrite, but the table would show 1, 2, 4, and a moved
+row would still need one. Only the open template is rewritten — templates
+and tables are not paired — which the README says.
 
 Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
 mode; `rawContentOf` beside it is what the inline editor shows, because typing

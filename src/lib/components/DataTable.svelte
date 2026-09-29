@@ -20,6 +20,7 @@
 		moveRows,
 		moveRowsTo,
 		orderOf,
+		renumbering,
 		rowNumber,
 		sortRows,
 		unsortRows,
@@ -101,7 +102,16 @@
 		/** the column the selected area draws from, so its cells can be pointed at */
 		selectedColumn?: string | null;
 		onactivate: (index: number) => void;
-		onchange: (dataset: Dataset) => void;
+		/**
+		 * `moved` is set by the edits that renumber rows — a delete, a move by
+		 * hand — so the app can carry every `{{lookup:N:…}}` along with its row;
+		 * what comes back is a sentence about that, to say with the edit's own,
+		 * and whether it is a warning (a lookup lost its row).
+		 */
+		onchange: (
+			dataset: Dataset,
+			moved?: Map<number, number | null> | null
+		) => { note: string; warning: boolean } | void;
 		/** so bindings can follow a renamed column instead of pointing at a ghost */
 		onrenamecolumn: (from: string, to: string) => void;
 		/**
@@ -1175,7 +1185,9 @@
 		sortedBy = null;
 		selectedRows = new Set(rows.flatMap((row, i) => (picked.has(row) ? [i] : [])));
 		// Moved by hand: where they now stand is their order, numbers included.
-		onchange(withoutOrder({ ...dataset, rows }));
+		const next = withoutOrder({ ...dataset, rows });
+		const said = onchange(next, renumbering(dataset, next));
+		if (said) onnotice(said.note, said.warning ? 'warning' : 'info');
 		const at = rows.indexOf(active);
 		if (at !== -1 && at !== activeRow) onactivate(at);
 	}
@@ -1224,7 +1236,9 @@
 		const active = dataset.rows[activeRow];
 		sortedBy = null;
 		selectedRows = new Set(chosen);
-		onchange(withoutOrder({ ...dataset, rows }));
+		const next = withoutOrder({ ...dataset, rows });
+		const said = onchange(next, renumbering(dataset, next));
+		if (said) onnotice(said.note, said.warning ? 'warning' : 'info');
 		const at = rows.indexOf(active);
 		if (at !== -1 && at !== activeRow) onactivate(at);
 	}
@@ -1236,9 +1250,12 @@
 		const next = deleteRows(dataset, gone);
 		const rows = next.rows;
 		selectedRows = new Set();
-		onchange(next);
+		const said = onchange(next, renumbering(dataset, next));
 		if (activeRow >= rows.length) onactivate(Math.max(0, rows.length - 1));
-		onnotice(`Deleted ${gone.size} row${gone.size === 1 ? '' : 's'}. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`);
+		onnotice(
+			`Deleted ${gone.size} row${gone.size === 1 ? '' : 's'}.${said ? ` ${said.note}` : ''} Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`,
+			said?.warning ? 'warning' : 'info'
+		);
 	}
 
 	/**
@@ -1454,7 +1471,7 @@
 								class="column-name"
 								class:keyword={isKeyword(column)}
 								title={isKeyword(column)
-									? `{{${column.toLowerCase()}}} is the template’s own word, so it never means this column — rename it to print it with {{…}}`
+									? `“${column}” is a reserved keyword. Rename the column to enable the {{${column.trim().toLowerCase()}}} placeholder.`
 									: undefined}
 								value={column}
 								readonly={locked}
@@ -2339,7 +2356,7 @@
 		padding: 3px 2px;
 	}
 
-	/* A name a keyword has taken: `{{date}}` will never print this column,
+	/* A name a keyword has taken: `{{today}}` will never print this column,
 	   and nothing else would say so — the template reads fine and prints the
 	   date. The warning red the status line and the card's marks use. */
 	.column-name.keyword {

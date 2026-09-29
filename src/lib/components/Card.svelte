@@ -193,7 +193,7 @@
 	};
 
 	/**
-	 * The same text as it is drawn, with `{{date}}` and any `{{column}}` of this
+	 * The same text as it is drawn, with `{{today}}` and any `{{column}}` of this
 	 * row filled in — in a cell and in an area's own words alike, once.
 	 */
 	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box) });

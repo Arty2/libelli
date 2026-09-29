@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
 	UNKNOWN_CLOSE,
+	GONE_ROW,
 	UNKNOWN_OPEN,
 	applyPlaceholders,
+	carryLookups,
+	renumberLookups,
 	isKeyword,
 	findColumn,
 	formatDate,
@@ -10,6 +13,7 @@ import {
 	placeholderChoices,
 	referencedColumns
 } from './placeholders';
+import { normaliseTemplate } from './template';
 
 // Midday, so no timezone the test could run in can push it onto another day.
 const DAY = new Date(2026, 8, 7, 12, 0, 0); // Monday 7 September 2026
@@ -33,14 +37,14 @@ describe('formatDate', () => {
 
 describe('applyPlaceholders', () => {
 	it('fills the date, with or without a format', () => {
-		expect(applyPlaceholders('Printed {{date}}', { now: DAY })).toBe('Printed 7 September 2026');
-		expect(applyPlaceholders('{{date:YYYY-MM-DD}}', { now: DAY })).toBe('2026-09-07');
+		expect(applyPlaceholders('Printed {{today}}', { now: DAY })).toBe('Printed 7 September 2026');
+		expect(applyPlaceholders('{{today:YYYY-MM-DD}}', { now: DAY })).toBe('2026-09-07');
 	});
 
 	it('ignores case in the name but not in the format', () => {
-		expect(applyPlaceholders('{{DATE}}', { now: DAY })).toBe('7 September 2026');
+		expect(applyPlaceholders('{{TODAY}}', { now: DAY })).toBe('7 September 2026');
 		// `mm` is not a token, so it survives; `DD` is.
-		expect(applyPlaceholders('{{date:DD mm}}', { now: DAY })).toBe('07 mm');
+		expect(applyPlaceholders('{{today:DD mm}}', { now: DAY })).toBe('07 mm');
 	});
 
 	it('leaves anything it does not recognise exactly as written', () => {
@@ -77,17 +81,27 @@ describe('applyPlaceholders', () => {
 		);
 	});
 
-	it('means the date even where a column is called date', () => {
-		const row = { Date: 'Spring' };
-		expect(applyPlaceholders('{{date}}', { row, now: DAY })).toBe('7 September 2026');
-		expect(applyPlaceholders('{{DATE:YYYY}}', { row, now: DAY })).toBe('2026');
-		expect(applyPlaceholders('{{date:a:b}}', { row, now: DAY })).toBe('a:b');
-		expect(referencedColumns('{{date}}', ['Date'])).toEqual([]);
+	it('means the date even where a column is called today', () => {
+		const row = { Today: 'Spring' };
+		expect(applyPlaceholders('{{today}}', { row, now: DAY })).toBe('7 September 2026');
+		expect(applyPlaceholders('{{TODAY:YYYY}}', { row, now: DAY })).toBe('2026');
+		expect(applyPlaceholders('{{today:a:b}}', { row, now: DAY })).toBe('a:b');
+		expect(referencedColumns('{{today}}', ['Today'])).toEqual([]);
+	});
+
+	it('still reads the old {{date}}, as it always did: a column first, then the date', () => {
+		expect(applyPlaceholders('{{date}} {{date:YYYY}}', { now: DAY })).toBe('7 September 2026 2026');
+		const row = { date: 'Spring' };
+		expect(applyPlaceholders('{{date}}', { row, now: DAY })).toBe('Spring');
+		expect(applyPlaceholders('{{date:YYYY}}', { row, now: DAY })).toBe('2026');
+		expect(referencedColumns('{{date}}', ['date'])).toEqual(['date']);
+		// A cell quoting its own column called date is a mistake, not the date.
+		expect(applyPlaceholders('{{date}}', { row, self: 'date', now: DAY })).toBe('{{date}}');
 	});
 
 	it('knows which column names a keyword takes', () => {
-		expect(['date', 'Date', 'LOOKUP', ' lookup '].every(isKeyword)).toBe(true);
-		expect(['dates', 'look-up', 'title'].some(isKeyword)).toBe(false);
+		expect(['today', 'Today', 'LOOKUP', ' lookup '].every(isKeyword)).toBe(true);
+		expect(['date', 'dates', 'look-up', 'title'].some(isKeyword)).toBe(false);
 	});
 });
 
@@ -131,13 +145,13 @@ describe('typing a placeholder', () => {
 		expect(openPlaceholder('{{a\nb', 5)).toBeNull();
 	});
 
-	it('offers columns that start with it first, then ones that contain it, and the date', () => {
-		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual(['title', 'subtitle', 'date']);
-		expect(placeholderChoices('', ['a'])).toEqual(['a', 'date']);
+	it('offers columns that start with it first, then ones that contain it, and today', () => {
+		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual(['title', 'today', 'subtitle']);
+		expect(placeholderChoices('', ['a', 'date'])).toEqual(['a', 'date', 'today']);
 		// A column a keyword has taken is not offered as itself…
-		expect(placeholderChoices('', ['Date', 'lookup', 'a'])).toEqual(['a', 'date']);
+		expect(placeholderChoices('', ['Today', 'lookup', 'a'])).toEqual(['a', 'today']);
 		// …but is, after a lookup, which is the one way to reach it.
-		expect(placeholderChoices('lookup:2:', ['Date'])).toEqual(['lookup:2:Date']);
+		expect(placeholderChoices('lookup:2:', ['Today'])).toEqual(['lookup:2:Today']);
 	});
 });
 
@@ -170,8 +184,8 @@ describe('find and replace after a column', () => {
 
 	it('takes both colons to mean it: one part after a column is still not a column', () => {
 		expect(applyPlaceholders('{{city:York}}', { row })).toBe('{{city:York}}');
-		// …and a single part after `date` is still a date format, column or no column.
-		expect(applyPlaceholders('{{date:YYYY}}', { row, now: DAY })).toBe('2026');
+		// …and a single part after `today` is still a date format, column or no column.
+		expect(applyPlaceholders('{{today:YYYY}}', { row, now: DAY })).toBe('2026');
 	});
 
 	it('is never a way for a cell to quote itself', () => {
@@ -179,7 +193,7 @@ describe('find and replace after a column', () => {
 	});
 
 	it('counts as naming the column', () => {
-		expect(referencedColumns('{{city: :_}} and {{date:YYYY}}', ['city', 'title'])).toEqual(['city']);
+		expect(referencedColumns('{{city: :_}} and {{today:YYYY}}', ['city', 'title'])).toEqual(['city']);
 	});
 });
 
@@ -222,6 +236,40 @@ describe('a lookup into another row', () => {
 
 	it('counts as naming the column it looks up', () => {
 		expect(referencedColumns('{{lookup:2:price}} {{lookup:x:title}}', ['title', 'price'])).toEqual(['price']);
+	});
+
+	it('follows its row when rows are renumbered, and names no row when its row is gone', () => {
+		const moved = new Map<number, number | null>([
+			[1, 1],
+			[2, null],
+			[3, 2]
+		]);
+		const out = renumberLookups('{{lookup:3:title}}, {{ lookup : 2 : price }}, {{lookup:1:title}}, {{title}}', moved);
+		expect(out.text).toBe(`{{lookup:2:title}}, {{ lookup : ${GONE_ROW} : price }}, {{lookup:1:title}}, {{title}}`);
+		expect(out).toMatchObject({ renumbered: 1, orphaned: 1 });
+		// What it now reads names nothing, and is marked like any unknown name.
+		expect(applyPlaceholders(`{{lookup:${GONE_ROW}:price}}`, { rows, markUnknown: true })).toContain(UNKNOWN_OPEN);
+		expect(renumberLookups('{{lookup:x:title}} {{lookup:9:title}}', moved).text).toBe('{{lookup:x:title}} {{lookup:9:title}}');
+	});
+
+	it('carries lookups in the template and the cells, and leaves untouched objects alone', () => {
+		const template = normaliseTemplate({
+			boxes: [
+				{ id: 'a', static: { text: 'Price {{lookup:3:price}}' } },
+				{ id: 'b', static: { text: 'no lookups' } }
+			]
+		});
+		const dataset = { columns: ['note'], rows: [{ note: '{{lookup:3:title}}' }, { note: 'plain' }] };
+		const moved = new Map<number, number | null>([[3, 2]]);
+		const out = carryLookups(template, dataset, moved);
+		expect(out.template.boxes[0].static?.text).toBe('Price {{lookup:2:price}}');
+		expect(out.template.boxes[1]).toBe(template.boxes[1]);
+		expect(out.dataset.rows[0].note).toBe('{{lookup:2:title}}');
+		expect(out.dataset.rows[1]).toBe(dataset.rows[1]);
+		expect(out.renumbered).toBe(2);
+		const none = carryLookups(template, dataset, new Map([[9, 1]]));
+		expect(none.template).toBe(template);
+		expect(none.dataset).toBe(dataset);
 	});
 
 	it('offers columns once the row is typed, keeping the row', () => {

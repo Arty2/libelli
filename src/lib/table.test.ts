@@ -11,6 +11,7 @@ import {
 	moveRows,
 	moveRowsTo,
 	orderOf,
+	renumbering,
 	rowNumber,
 	sortRows,
 	unsortRows,
@@ -193,5 +194,26 @@ describe('row numbers and the arrival order', () => {
 		expect(deleted.rows.map((r) => r.t)).toEqual(['c', 'b', 'd']);
 		expect(deleted.order).toEqual([1, 0, 2]);
 		expect('order' in withoutOrder(sorted)).toBe(false);
+	});
+
+	it('says how numbers moved on a delete or a move, and nothing when none did', () => {
+		const t = table([a, b, c]);
+		expect(renumbering(t, deleteRows(t, new Set([1])))).toEqual(
+			new Map([
+				[1, 1],
+				[2, null],
+				[3, 2]
+			])
+		);
+		const sorted = sortRows(table([b, c, a]), 't', 'asc');
+		expect(renumbering(table([b, c, a]), sorted)).toBeNull();
+		// Moved by hand while sorted: the positions become the numbers.
+		expect(renumbering(sorted, withoutOrder(sorted))).toEqual(
+			new Map([
+				[3, 1],
+				[1, 2],
+				[2, 3]
+			])
+		);
 	});
 });

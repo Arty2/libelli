@@ -216,7 +216,7 @@ resize boxes directly, or type exact millimetres.
   Esc leaves what you typed. A placeholder that names no column is
   **underlined in wavy red** on the card while the bounds are on, since it
   would otherwise print as the literal braces.
-  `{{date}}` prints today's date, and `{{date:YYYY-MM-DD}}` prints it in a
+  `{{today}}` prints today's date, and `{{today:YYYY-MM-DD}}` prints it in a
   format of your own: `YYYY`, `YY`, `MM`, `DD` for the numbers, `MMMM`, `MMM`,
   `dddd`, `ddd` for the names. After a column, a find and
   a replace change it on the way in: `{{title:words:that}}` swaps every
@@ -228,13 +228,20 @@ resize boxes directly, or type exact millimetres.
   **numbered 3** in the table — one row of prices or a legend that every card
   quotes. The number, not the place: sorting the table carries its numbers
   along — they are saved with the table — and a lookup follows them, so
-  sorting to read the table never changes what the cards say. Moving rows by
-  hand renumbers them. A row is named by its number, never by what it holds; one
-  that is not there is underlined like any unknown name.
-  `date` and `lookup` are the template's own words and always mean themselves:
-  a column called either is **titled in red** in the table, with a note in the
-  status line, because `{{date}}` will print the date and never that column —
-  rename it, or reach it from another row with `{{lookup:3:date}}`. Deliberately small — no
+  sorting to read the table never changes what the cards say. Deleting rows
+  closes the numbers up and moving rows by hand renumbers them; either way
+  every lookup in the template and the cells is **rewritten to follow its
+  row**, in the same undo step, and one whose row was deleted becomes
+  `{{lookup:?:…}}`, underlined, rather than quoting whichever row took its
+  number. Other templates in the library are not rewritten — templates are
+  not tied to a table. A row is named by its number, never by what it holds;
+  one that is not there is underlined like any unknown name.
+  `today` and `lookup` are reserved keywords and always mean themselves: a
+  column called either is **titled in red** in the table, with a note in the
+  status line — rename it to quote it by name, or reach it from another row
+  with `{{lookup:3:today}}`. `{{date}}`, the old name for `{{today}}`, still
+  works in templates written with it: a column called `date` first, as it
+  always was, and the date where there is none. Deliberately small — no
   conditionals, no loops — and anything in braces it does not recognise is left
   exactly as written. No time of day: a card is printed once and read for
   months.

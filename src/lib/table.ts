@@ -145,6 +145,27 @@ export function deleteRows(dataset: Dataset, gone: ReadonlySet<number>): Dataset
 }
 
 /**
+ * How each row's number changed between two versions of a table in which
+ * rows were deleted or moved, but not rebuilt: before -> after, from 1, null
+ * for a row that is gone. Found by identity, which is why only an edit that
+ * keeps its row objects may ask — a cell edit makes a new one, and would read
+ * as a deletion. Null when no number changed, so the caller has nothing to do.
+ */
+export function renumbering(before: Dataset, after: Dataset): Map<number, number | null> | null {
+	const at = new Map(after.rows.map((row, i) => [row, i]));
+	const moved = new Map<number, number | null>();
+	let changed = false;
+	before.rows.forEach((row, i) => {
+		const from = rowNumber(before, i);
+		const j = at.get(row);
+		const to = j === undefined ? null : rowNumber(after, j);
+		if (to !== from) changed = true;
+		moved.set(from, to);
+	});
+	return changed ? moved : null;
+}
+
+/**
  * Characters and words in a cell, for the count shown while one is edited.
  *
  * Characters are code points rather than UTF-16 units, so an emoji or a

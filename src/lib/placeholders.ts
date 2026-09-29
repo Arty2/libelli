@@ -1,10 +1,10 @@
 /**
- * `{{title}}`, `{{date}}` and friends: words in a card filled in as it is drawn.
+ * `{{title}}`, `{{today}}` and friends: words in a card filled in as it is drawn.
  *
  * Two kinds. A column's name is replaced by what this row holds in that column,
  * so an area can say `**{{title}}**, {{artist}}` — one area, several columns,
  * Markdown around them — and a cell can quote another cell of its own row. And
- * `{{date}}` is what no spreadsheet column can be: a run of cards printed on a
+ * `{{today}}` is what no spreadsheet column can be: a run of cards printed on a
  * Tuesday wants to say Tuesday, and typing it into every row means reprinting
  * every row the next time.
  *
@@ -12,13 +12,19 @@
  * row numbered 3 in the table. A price list, a legend, a "next up" — one row
  * that every card quotes.
  *
- * `date` and `lookup` are keywords, and a keyword always wins: a column that
- * happens to be called either cannot be written as `{{date}}` or `{{lookup}}`,
- * only reached from another row by a lookup. The table marks such a column,
- * because a template that meant it would otherwise print the date instead,
- * silently. The other way round — the column winning — made what `{{date}}`
- * means depend on the table under it, so a template could not be read on its
- * own.
+ * `today` and `lookup` are keywords, and a keyword always wins: a column that
+ * happens to be called either cannot be written as `{{today}}` or
+ * `{{lookup}}`, only reached from another row by a lookup. The table marks
+ * such a column, because a template that meant it would otherwise print the
+ * date instead, silently. The other way round — the column winning — made
+ * what a placeholder means depend on the table under it.
+ *
+ * `{{date}}` is what `{{today}}` was called first, and still works the way it
+ * always did, for the templates written then: a column called `date` wins,
+ * and only where there is none is it today's date. It is not offered and not
+ * a keyword, so a column called `date` is an ordinary column. Kept rather
+ * than rewritten on load, because a rewrite cannot tell a template that
+ * meant the date from one that meant a column of that name.
  *
  * Deliberately small. There are no conditionals, no loops and no arithmetic,
  * and substitution happens once: what a placeholder is replaced with is never
@@ -35,7 +41,7 @@
  */
 
 import { columnName } from './parse';
-import type { Row } from './types';
+import type { Dataset, Row, Template } from './types';
 
 /** The one thing that changes between calls, injected so this stays testable. */
 export interface PlaceholderContext {
@@ -113,7 +119,7 @@ const TOKENS: Array<[string, (d: Date) => string]> = [
 
 const TOKEN_PATTERN = new RegExp(TOKENS.map(([token]) => token).join('|'), 'g');
 
-/** The default when `{{date}}` is written with no format of its own. */
+/** The default when `{{today}}` is written with no format of its own. */
 export const DEFAULT_DATE_FORMAT = 'D MMMM YYYY';
 
 /**
@@ -127,9 +133,10 @@ export function formatDate(date: Date, format: string = DEFAULT_DATE_FORMAT): st
 }
 
 /**
- * The placeholders themselves. `{{date}}` or `{{date:FORMAT}}` is the date and
- * `{{lookup:ROW:COLUMN}}` a lookup, whatever the table holds; any other
- * `{{name}}` is a column when the row has one by that name.
+ * The placeholders themselves. `{{today}}` or `{{today:FORMAT}}` is the date
+ * and `{{lookup:ROW:COLUMN}}` a lookup, whatever the table holds; any other
+ * `{{name}}` is a column when the row has one by that name, and `{{date}}`
+ * falls back to the date where there is none.
  *
  * After a column, two more parts are a find and a replace:
  * `{{title:words:that}}` is the title with every `words` made `that`, and
@@ -139,7 +146,7 @@ export function formatDate(date: Date, format: string = DEFAULT_DATE_FORMAT): st
  * to replace; the find ends at the first colon after the name, so the
  * replacement may hold colons as they are, and the find holds one written
  * `\:` — `{{time:\:: h }}` turns `9:30` into `9 h 30`. An empty replacement
- * deletes. It takes both colons to mean this: `{{date:YYYY}}` is still a date,
+ * deletes. It takes both colons to mean this: `{{today:YYYY}}` is still a date,
  * and a single part after a column's name still means nothing, as it always
  * has, rather than quietly becoming a deletion.
  *
@@ -168,7 +175,7 @@ function lookupOf(spec: string): { index: number; name: string } | null {
 }
 
 /** The words `{{…}}` means before it means any column. */
-export const KEYWORDS = ['date', 'lookup'] as const;
+export const KEYWORDS = ['today', 'lookup'] as const;
 
 /**
  * A column whose name a keyword takes: `{{name}}` can never reach it,
@@ -209,6 +216,91 @@ export function referencedColumns(text: string, columns: readonly string[]): str
 	return [...found];
 }
 
+/** What a lookup whose row was deleted is left pointing at: no row, visibly. */
+export const GONE_ROW = '?';
+
+/**
+ * The row numbers in a text's lookups, moved to follow their rows: `moved`
+ * maps a number before (from 1) to the number after, or null when that row
+ * was deleted. Deleting rows closes the numbers up, and moving rows by hand
+ * numbers them afresh, so without this every `{{lookup:N:…}}` past the
+ * change would quietly start quoting a neighbour.
+ *
+ * A lookup of a deleted row gets `?` for its number rather than keeping it:
+ * the number it had now belongs to another row, and a lookup that is marked
+ * as naming nothing is better than one printing the wrong row. Only the
+ * number is touched — the spacing and the column are left as written — and a
+ * number the map does not mention is left alone, which is what makes this a
+ * no-op on text with no lookups, and cheap: anything without `{{` is skipped.
+ */
+export function renumberLookups(
+	text: string,
+	moved: ReadonlyMap<number, number | null>
+): { text: string; renumbered: number; orphaned: number } {
+	let renumbered = 0;
+	let orphaned = 0;
+	if (!text || !text.includes('{{')) return { text, renumbered, orphaned };
+	const next = text.replace(PLACEHOLDER, (whole, name: string, format?: string) => {
+		if (!isLookup(name) || format === undefined || !lookupOf(format)) return whole;
+		const digits = /\d+/.exec(format)!;
+		const to = moved.get(Number(digits[0]));
+		if (to === undefined || to === Number(digits[0])) return whole;
+		if (to === null) orphaned++;
+		else renumbered++;
+		const at = whole.length - 2 - format.length + digits.index;
+		return whole.slice(0, at) + (to === null ? GONE_ROW : String(to)) + whole.slice(at + digits[0].length);
+	});
+	return { text: next, renumbered, orphaned };
+}
+
+/**
+ * `renumberLookups` over everything a lookup can be written in: the areas'
+ * own words and every cell. What did not change is handed back as the same
+ * object, so an edit with no lookups in it costs a scan and nothing else.
+ */
+export function carryLookups(
+	template: Template,
+	dataset: Dataset,
+	moved: ReadonlyMap<number, number | null>
+): { template: Template; dataset: Dataset; renumbered: number; orphaned: number } {
+	let renumbered = 0;
+	let orphaned = 0;
+	const carry = (text: string) => {
+		const done = renumberLookups(text, moved);
+		renumbered += done.renumbered;
+		orphaned += done.orphaned;
+		return done.text;
+	};
+	let boxesChanged = false;
+	const boxes = template.boxes.map((box) => {
+		const text = box.static?.text;
+		if (text === undefined) return box;
+		const next = carry(text);
+		if (next === text) return box;
+		boxesChanged = true;
+		return { ...box, static: { ...box.static, text: next } };
+	});
+	let rowsChanged = false;
+	const rows = dataset.rows.map((row) => {
+		let copy: Row | null = null;
+		for (const column of Object.keys(row)) {
+			const next = carry(row[column]);
+			if (next === row[column]) continue;
+			copy ??= { ...row };
+			copy[column] = next;
+		}
+		if (!copy) return row;
+		rowsChanged = true;
+		return copy;
+	});
+	return {
+		template: boxesChanged ? { ...template, boxes } : template,
+		dataset: rowsChanged ? { ...dataset, rows } : dataset,
+		renumbered,
+		orphaned
+	};
+}
+
 /**
  * `find:replace` split at its first colon that is not written `\:`, or null
  * when there is none. `\:` is a colon in either part — the only escape, so a
@@ -243,10 +335,11 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 			if (!target || !column || (target === row && column === context.self)) return unknown(whole);
 			return String(target[column] ?? '');
 		}
-		if (name.toLowerCase() === 'date') {
+		const today = () => {
 			now ??= context.now ?? new Date();
 			return formatDate(now, format?.trim() || DEFAULT_DATE_FORMAT);
-		}
+		};
+		if (name.toLowerCase() === 'today') return today();
 		const swap = format === undefined ? null : findReplace(format);
 		if ((format === undefined || swap) && row) {
 			const column = findColumn(name, columns);
@@ -255,7 +348,10 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 				// An empty find would put the replacement between every letter.
 				return swap && swap.find ? value.split(swap.find).join(swap.replace) : value;
 			}
+			if (column) return unknown(whole);
 		}
+		// The old name, after the columns, as it always was — see the top.
+		if (name.toLowerCase() === 'date') return today();
 		return unknown(whole);
 	});
 }
@@ -276,7 +372,7 @@ export function openPlaceholder(text: string, caret: number): { start: number; q
 }
 
 /**
- * What to offer for a query: the columns, then `date`, those starting with
+ * What to offer for a query: the columns, then `today`, those starting with
  * what was typed ahead of those merely containing it, ignoring case.
  */
 export function placeholderChoices(query: string, columns: readonly string[]): string[] {
@@ -285,7 +381,7 @@ export function placeholderChoices(query: string, columns: readonly string[]): s
 	const lookup = /^(\s*lookup\s*:[^:]*:)([^:]*)$/i.exec(query);
 	if (lookup) return ranked(lookup[2], columns).map((name) => lookup[1] + name);
 	// A column a keyword has taken is not offered: choosing it would print the keyword.
-	return ranked(query, [...columns.filter((c) => !isKeyword(c)), 'date']);
+	return ranked(query, [...columns.filter((c) => !isKeyword(c)), 'today']);
 }
 
 function ranked(query: string, names: readonly string[]): string[] {

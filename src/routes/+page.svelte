@@ -56,7 +56,7 @@
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { cssIdent } from '$lib/css';
 	import { watchPresses } from '$lib/haptics';
-	import { KEYWORDS, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
+	import { GONE_ROW, carryLookups, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
 	import { TEXT_MAX, TEXT_MIN, applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
@@ -563,7 +563,7 @@
 	const lookupRows = $derived(inArrivalOrder(dataset));
 
 	/**
-	 * Columns a keyword has taken — `date`, `lookup` — which `{{name}}` can
+	 * Columns a keyword has taken — `today`, `lookup` — which `{{name}}` can
 	 * never reach. The table colours them; the status line says why, once per
 	 * set of them, so it is said when one appears and not on every keystroke.
 	 */
@@ -574,13 +574,23 @@
 		if (said === keywordsSaid) return;
 		keywordsSaid = said;
 		if (!keywordColumns.length) return;
-		const names = keywordColumns.map((c) => `“${c}”`).join(' and ');
-		const words = KEYWORDS.map((k) => `{{${k}}}`).join(' and ');
 		notify(
-			`${names} ${keywordColumns.length === 1 ? 'is a name' : 'are names'} the template keeps for itself: ${words} never mean a column, so rename ${keywordColumns.length === 1 ? 'it' : 'them'} to print ${keywordColumns.length === 1 ? 'it' : 'them'} with {{…}}.`,
+			keywordColumns
+				.map((c) => `“${c}” is a reserved keyword. Rename the column to enable the {{${c.trim().toLowerCase()}}} placeholder.`)
+				.join(' '),
 			'warning'
 		);
 	});
+
+	/** What moving the lookups along did, in a sentence for the status line. */
+	function lookupNote({ renumbered, orphaned }: { renumbered: number; orphaned: number }) {
+		const n = (k: number) => `${k} lookup${k === 1 ? '' : 's'}`;
+		const parts = [
+			renumbered ? `${n(renumbered)} renumbered to follow ${renumbered === 1 ? 'its row' : 'their rows'}.` : '',
+			orphaned ? `${n(orphaned)} named a deleted row and now ${orphaned === 1 ? 'reads' : 'read'} {{lookup:${GONE_ROW}:…}}.` : ''
+		];
+		return { note: parts.filter(Boolean).join(' '), warning: orphaned > 0 };
+	}
 
 	// ---- boot ---------------------------------------------------------------
 
@@ -3027,7 +3037,7 @@
 						Object.entries(mapping).map(([slot, column]) => [slot, column === from ? to : column])
 					);
 				}}
-				onchange={(next) => {
+				onchange={(next, moved) => {
 					// Every structural edit in the tray builds a fresh dataset, and most
 					// of them have no reason to think about what the table is called.
 					// Carried across here, where all of them arrive, rather than in each
@@ -3036,8 +3046,18 @@
 					// The lock the same way: it is the table's, and no edit in the
 					// tray means to change it — there is a button for that.
 					const named = next.name === undefined && dataset.name ? { ...next, name: dataset.name } : next;
-					dataset = dataset.locked ? { ...named, locked: true } : named;
+					let kept = dataset.locked ? { ...named, locked: true } : named;
+					// Rows deleted or moved by hand are renumbered, and every lookup
+					// that named one follows it — in the template and in the cells,
+					// in the same edit, so one undo puts both back.
+					const carried = moved ? carryLookups(template, kept, moved) : null;
+					if (carried) {
+						kept = carried.dataset;
+						if (carried.template !== template) template = carried.template;
+					}
+					dataset = kept;
 					if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), next.columns);
+					return carried && (carried.renumbered || carried.orphaned) ? lookupNote(carried) : undefined;
 				}}
 			/>
 			{/if}
