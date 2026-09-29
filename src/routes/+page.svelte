@@ -2711,6 +2711,7 @@
 						{template}
 						{dataset}
 						{mapping}
+						{row}
 						selected={barBox}
 						onboxchange={updateBox}
 						ontemplatechange={applyTemplate}

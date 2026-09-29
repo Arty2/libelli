@@ -43,6 +43,7 @@
 		Dataset,
 		FontRef,
 		Mapping,
+		Row,
 		QrSettings,
 		Sides,
 		Template,
@@ -53,6 +54,8 @@
 		template: Template;
 		dataset: Dataset;
 		mapping: Mapping;
+		/** the row the page is showing: a color linked to a column previews its cell */
+		row?: Row | null;
 		selected: Box;
 		onboxchange: (box: Box) => void;
 		ontemplatechange: (template: Template) => void;
@@ -80,6 +83,7 @@
 		editorFonts,
 		dataset,
 		mapping,
+		row = null,
 		selected,
 		onboxchange,
 		ontemplatechange,
@@ -376,6 +380,15 @@
 	type ColorKey = keyof ColorSources;
 	let linking = $state<Record<ColorKey, boolean>>({ text: false, fill: false, border: false });
 	const linkShown = (key: ColorKey) => linking[key] || !!selected?.colorFrom?.[key];
+
+	/**
+	 * What a linked swatch shows: the color in the shown row's cell, or nothing
+	 * — and then the swatch shows the area's own, which is what that card draws.
+	 */
+	const previewOf = (key: ColorKey): string | undefined => {
+		const column = selected?.colorFrom?.[key];
+		return (column && row ? parseColor(row[column]) : null) ?? undefined;
+	};
 
 	function setColorFrom(key: ColorKey, column: string | undefined) {
 		patch({ colorFrom: normaliseColorFrom({ ...selected?.colorFrom, [key]: column }) });
@@ -945,6 +958,7 @@
 					fallback={template.defaults.color}
 					label="Text color"
 					hueFrom={selected.colorFrom?.text}
+					preview={previewOf('text')}
 					title={selected.color ? undefined : "The page's text color"}
 					disabled={boxFrozen}
 					onchange={(v) => patch({ color: v })}
@@ -1254,6 +1268,7 @@
 						fallback="#ffffff"
 						label="Fill color"
 						hueFrom={selected.colorFrom?.fill}
+						preview={previewOf('fill')}
 						disabled={boxFrozen}
 						onchange={(v) => patch({ background: v })}
 					/>
@@ -1330,6 +1345,7 @@
 						fallback={selected.color ?? template.defaults.color}
 						label="Border color"
 						hueFrom={selected.colorFrom?.border}
+						preview={previewOf('border')}
 						title="Border color; follows the text color until you set one"
 						disabled={boxFrozen}
 						onchange={(v) => patch({ borderColor: v })}

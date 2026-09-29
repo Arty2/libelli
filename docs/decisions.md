@@ -2791,9 +2791,12 @@ fill and border color each get the same small link button; pressed, a column
 picker appears beside it. The swatch stays: it is what a row whose cell is not a
 color still shows, so the link reads as "this, unless the row says otherwise".
 One pattern for all three, and nothing new in the bar until it is asked for. While
-linked, the swatch is disabled and faded, since its hue is not what most cards
-show; its opacity stays live and applies to the row's color, multiplied with any
-alpha the cell has of its own — so a linked fill can still be a tint.
+linked, the swatch previews the shown row: that cell's color at full strength and
+without a frame — a sample, not a control, and never faded, since faded it would
+show the wrong color — or, where the cell holds no color, the area's own, framed
+and settable, because that is what that card draws. The opacity stays live and
+applies to the row's color, multiplied with any alpha the cell has of its own, so
+a linked fill can still be a tint.
 
 The link names a column, not a slot, as `{{column}}` does — it is the row's
 value, not a field the area is bound to — so a rename rewrites it, and the table
