@@ -38,8 +38,8 @@
 		template: Template;
 		row?: Row | null;
 		/**
-		 * The whole table, for `{{lookup:ROW:COLUMN}}`. Required, not defaulted:
-		 * a renderer that forgot it would print the braces on paper while the
+		 * The whole table, for `%lookup:ROW:COLUMN%`. Required, not defaulted:
+		 * a renderer that forgot it would print the placeholder on paper while the
 		 * editor showed the value, and nothing would have failed.
 		 */
 		rows: readonly Row[];
@@ -193,7 +193,7 @@
 	};
 
 	/**
-	 * The same text as it is drawn, with `{{today}}` and any `{{column}}` of this
+	 * The same text as it is drawn, with `%today%` and any `%column%` of this
 	 * row filled in — in a cell and in an area's own words alike, once.
 	 */
 	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box) });
@@ -202,9 +202,9 @@
 	const selfOf = (box: Box): string | undefined => (box.slot ? mapping[box.slot] : undefined);
 
 	/**
-	 * The text as the editor draws it: `contentOf`, except that a `{{name}}`
+	 * The text as the editor draws it: `contentOf`, except that a `%name%`
 	 * nothing answers to is marked so it can be underlined — a typo in a
-	 * column name otherwise prints as the literal braces, and is found on
+	 * column name otherwise prints as written, and is found on
 	 * paper. Only for words drawn as words, and only with the bounds on, with
 	 * the rest of the screen furniture; never in anything that is printed,
 	 * measured for emptiness, or encoded into a QR.
@@ -222,7 +222,7 @@
 				if (part) out.push({ text: part, unknown: false });
 				continue;
 			}
-			out.push({ text: `{{${part.slice(0, end)}}}`, unknown: true });
+			out.push({ text: `%${part.slice(0, end)}%`, unknown: true });
 			if (end + 1 < part.length) out.push({ text: part.slice(end + 1), unknown: false });
 		}
 		return out;
@@ -372,9 +372,9 @@
 				(box.slot && mapping[box.slot]) ||
 				box.slot ||
 				// Its own words, where they are a placeholder that came back empty
-				// on this row: `{{link}}` says what will be here, which "Area" did
+				// on this row: `%link%` says what will be here, which "Area" did
 				// not — and shows the template to someone who has to fix it.
-				(!box.slot && box.static?.text?.includes('{{') ? box.static.text.trim() : '') ||
+				(!box.slot && box.static?.text?.includes('%') ? box.static.text.trim() : '') ||
 				(pictureKind(box) ? 'Image' : 'Area')
 			: '';
 
@@ -1810,7 +1810,7 @@
 	</svg>
 {/snippet}
 
-<!-- Plain text with any unknown `{{name}}` in it marked — see `shownTextOf`.
+<!-- Plain text with any unknown `%name%` in it marked — see `shownTextOf`.
      Written on one line: the text is `white-space: pre-wrap`, and a newline
      between these tags would be drawn. -->
 {#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.unknown}<span class="unknown-placeholder" title="No column called this in the table — or the cell naming its own column">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
@@ -2507,7 +2507,7 @@
 		background-color: color-mix(in srgb, var(--accent) 8%, transparent);
 	}
 
-	/* A `{{name}}` no column answers to, in the editor: underlined in the
+	/* A `%name%` no column answers to, in the editor: underlined in the
 	   wavy red a spelling mistake wears, which is what it usually is. */
 	.content :global(.unknown-placeholder) {
 		text-decoration: underline wavy #d92d20;

@@ -135,12 +135,12 @@ describe('flagUnknown', () => {
 
 	it('underlines an unknown placeholder in text, escaped as it was', () => {
 		const html = renderMarkdown(`Hi **${mark('a<b')}**`, { size: 10 });
-		expect(flagUnknown(html)).toBe('<p style="margin:0 0 3mm">Hi <strong><span class="unknown-placeholder">{{a&lt;b}}</span></strong></p>');
+		expect(flagUnknown(html)).toBe('<p style="margin:0 0 3mm">Hi <strong><span class="unknown-placeholder">%a&lt;b%</span></strong></p>');
 	});
 
 	it('never writes a span into an attribute', () => {
 		const html = `<a href="https://x.example/${mark('q')}">t</a>`;
-		expect(flagUnknown(html)).toBe('<a href="https://x.example/{{q}}">t</a>');
+		expect(flagUnknown(html)).toBe('<a href="https://x.example/%q%">t</a>');
 	});
 });
 

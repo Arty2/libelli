@@ -131,7 +131,7 @@ html, body {
 	white-space: nowrap;
 }
 
-/* The column names `{{` offers — see complete.ts. Appended to the body, so
+/* The column names `%` offers — see complete.ts. Appended to the body, so
    styled here rather than in any one of the components whose fields use it,
    and fixed, so no scroller or dialog clips it. */
 .placeholder-complete {

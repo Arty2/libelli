@@ -355,7 +355,7 @@ export interface Box extends TextStyle {
 	 * Colors this area takes from the row it is drawing: for each, the name of a
 	 * column whose cell holds a color. A cell that is not one — empty, or words —
 	 * leaves the area's own color, which is why the swatch stays beside it. By
-	 * column name, as `{{column}}` is: it is the row's value, not a bound field.
+	 * column name, as `%column%` is: it is the row's value, not a bound field.
 	 */
 	colorFrom?: ColorSources;
 	/** mm, applied to the whole box */
@@ -449,7 +449,7 @@ export interface Dataset {
 	 * Where each row arrived, 0-based, by position: `order[i]` is the number,
 	 * less one, the row at `rows[i]` wears. Written by a sort, which rewrites
 	 * `rows` (row order is print order) but must not renumber them, since
-	 * `{{lookup:N:…}}` names a row by its number. Stored with the table so a
+	 * `%lookup:N:…%` names a row by its number. Stored with the table so a
 	 * reload, and undo, keep it. Absent means the rows stand where they arrived.
 	 */
 	order?: number[];

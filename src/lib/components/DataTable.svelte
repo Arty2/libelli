@@ -45,7 +45,7 @@
 		onnewtable: () => void;
 		/**
 		 * Columns something on the card draws from — bound to an area, or named
-		 * as `{{column}}` in an area's words or a cell it shows. A column not in
+		 * as `%column%` in an area's words or a cell it shows. A column not in
 		 * here is marked, because it is data no card will print.
 		 */
 		usedColumns: Set<string>;
@@ -104,7 +104,7 @@
 		onactivate: (index: number) => void;
 		/**
 		 * `moved` is set by the edits that renumber rows — a delete, a move by
-		 * hand — so the app can carry every `{{lookup:N:…}}` along with its row;
+		 * hand — so the app can carry every `%lookup:N:…%` along with its row;
 		 * what comes back is a sentence about that, to say with the edit's own,
 		 * and whether it is a warning (a lookup lost its row).
 		 */
@@ -949,7 +949,7 @@
 
 	function renameColumn(index: number, name: string, field?: HTMLInputElement) {
 		const from = dataset.columns[index];
-		// A column name is also a word written between braces — see columnName.
+		// A column name is also a word written between percent signs — see columnName.
 		const to = columnName(name) || from;
 		// The field shows what was taken, not what was typed: Svelte will not
 		// rewrite a value whose state did not change, so a name reduced to the
@@ -1455,14 +1455,14 @@
 								onclick={takeName}
 							>
 							<!-- Data nothing on the card prints: no area is bound to it and
-							     nothing names it as {{column}}. Worth saying, because it is
+							     nothing names it as %column%. Worth saying, because it is
 							     either a column still to be placed or one that can go. -->
 							{#if !usedColumns.has(column)}
 								<!-- And the way to put it there: one press adds an area bound
 								     to the column, where a new area goes. -->
 								<button
 									class="icon unused"
-									title="No area uses “{column}” — press to place it on the card{isKeyword(column) ? '' : `, or write {{${column}}} in an area`}"
+									title="No area uses “{column}” — press to place it on the card{isKeyword(column) ? '' : `, or write %${column}% in an area`}"
 									aria-label="Place {column} on the card"
 									onclick={() => onplacecolumn(column)}
 								><Icon name="unlink" size={12} /></button>
@@ -1471,7 +1471,7 @@
 								class="column-name"
 								class:keyword={isKeyword(column)}
 								title={isKeyword(column)
-									? `“${column}” is a reserved keyword. Rename the column to enable the {{${column.trim().toLowerCase()}}} placeholder.`
+									? `“${column}” is a reserved keyword. Rename the column to enable the %${column.trim().toLowerCase()}% placeholder.`
 									: undefined}
 								value={column}
 								readonly={locked}
@@ -2357,7 +2357,7 @@
 		padding: 3px 2px;
 	}
 
-	/* A name a keyword has taken: `{{today}}` will never print this column,
+	/* A name a keyword has taken: `%today%` will never print this column,
 	   and nothing else would say so — the template reads fine and prints the
 	   date. The warning red the status line and the card's marks use. */
 	.column-name.keyword {

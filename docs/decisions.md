@@ -1594,11 +1594,11 @@ Delete; what is left in the bar is what acts on chosen rows, the name of the
 table, and its lock — last, after the name it qualifies, the same reason the
 page bar keeps its Lock outside its menu.
 
-**A column name is a word you can write between braces.** Spaces become dashes
+**A column name is a word you can write between percent signs.** Spaces become dashes
 and anything but letters, digits, `-` and `_` is dropped — on a typed rename, a
 new column, and every header a file or a paste brings in — because since
-`{{column}}` a header is also something written inside an area's words, and
-`{{Year (est.)}}` is not something anybody can be expected to get right twice.
+`%column%` a header is also something written inside an area's words, and
+`%Year (est.)%` is not something anybody can be expected to get right twice.
 Letters are Unicode letters: a Greek header is as writable as an English one.
 Stored tables are not rewritten on load — that would silently break the
 mappings that name their columns — and `findColumn` reads an old spaced name
@@ -1645,7 +1645,7 @@ the flash below, and the card itself, can be watched while typing.
 
 **Entering a cell flashes what it feeds.** The same short blue flash a rescued
 area gets, on every area bound to the cell's column or naming it as
-`{{column}}`: a pointer from the cell to the card, not a selection, so it
+`%column%`: a pointer from the cell to the card, not a selection, so it
 changes nothing about what is selected.
 
 **The overflow mark is a button.** It opens the full-size editor. It hides while the
@@ -1771,15 +1771,15 @@ subtitle and sticker opt out of the mirror so a left-hand page does not push its
 title to the right.
 
 The template also carries what a row cannot: two areas of its own text in the
-footer — `{{link}}`, which empties and so hides on a row with no link, beside
-the QR that hides with it, and `{{today:YYYY-MM-DD}}` — and a paragraph indent
+footer — `%link%`, which empties and so hides on a row with no link, beside
+the QR that hides with it, and `%today:YYYY-MM-DD%` — and a paragraph indent
 on the body. The band, the QR and the page number follow the fold to the outer
 edge; the link and date follow with them, set right-aligned against the code so
 that the mirror, which flips alignment too, sets them left-aligned against it on
-a left-hand page rather than stranded mid-page. Card 2 shows `{{title}}` filled in inside a cell and `{{column}}`
+a left-hand page rather than stranded mid-page. Card 2 shows `%title%` filled in inside a cell and `%column%`
 left as written, which is the literal form for free — no column is called
 `column`, and an unrecognised name is never eaten. A date cannot be shown that
-way, since `{{today…}}` is always replaced, so the card points at the footer
+way, since `%today…%` is always replaced, so the card points at the footer
 instead of spelling it out.
 
 Four families, each with a job, as a book would set them: Fraunces for titles
@@ -2613,7 +2613,7 @@ face without the glyph falls back through the area's stack like any missing
 character — which in practice is `●` in a handwriting face.
 
 A cell that quotes its own column (`self` in `applyPlaceholders`) is not
-filled in: once was always the limit, and once only printed the braces back.
+filled in: once was always the limit, and once only printed the placeholder back.
 It is marked in the editor as an unknown name is, since it is the same mistake.
 
 `TextStyle.baseline` is em of the area's size, either sign. The page's is a
@@ -2801,7 +2801,7 @@ and settable, because that is what that card draws. The opacity stays live and
 applies to the row's color, multiplied with any alpha the cell has of its own, so
 a linked fill can still be a tint.
 
-The link names a column, not a slot, as `{{column}}` does — it is the row's
+The link names a column, not a slot, as `%column%` does — it is the row's
 value, not a field the area is bound to — so a rename rewrites it, and the table
 counts the column as used. Only the cell's *color* is read, through
 `parseColor`, the same door every color has to a style attribute; there is no
@@ -2986,17 +2986,16 @@ not on the card.
 ## `src/lib/placeholders.ts`
 
 **Find and replace is two parts after a column, never a pattern.**
-`{{column:find:replace}}` is a literal, case-sensitive swap of every
+`%column:find:replace%` is a literal, case-sensitive swap of every
 occurrence — the spreadsheet's Find, not a regex, so nothing typed into a cell
 can become a pattern that runs away. It takes both colons: a single part after
-a column meant nothing before and still does, rather than quietly becoming a
-deletion, and `{{date:FORMAT}}` keeps its meaning whether or not a column is
-called `date`. The find ends at the first colon, so the replacement may hold
+a column means nothing, rather than quietly becoming a deletion, and
+`%today:FORMAT%` is a date format whether or not it holds a colon. The find ends at the first colon, so the replacement may hold
 one; neither part is trimmed, since a space is the commonest thing to replace.
 It runs inside the same single pass, so a replacement is never read for
 placeholders either.
 
-**A column by name, once, and nothing more.** `{{title}}` fills from the row the
+**A column by name, once, and nothing more.** `%title%` fills from the row the
 card is drawing, in an area's own words and in a cell alike — a card still
 depends on nothing but its row, which was the reason this refused field
 references before; the row is exactly what it now reads. There are still no
@@ -3008,33 +3007,36 @@ trust than a depth limit, which would print a half-expanded chain. Names are mat
 column-name shape (`columnName` in parse.ts), then ignoring case, so a template
 written against `Artist Name` keeps working after the header is normalised.
 Anything unrecognised is returned exactly as written, which is what stops a
-cell that happens to contain braces being eaten. No time of day either — a card is printed
+cell that happens to contain percent signs being eaten. No time of day either — a card is printed
 once and read for months, and a timestamp on paper is stale before the ink dries.
 
 **Keywords beat columns.** `today` and `lookup` always mean themselves, and a
-column that happens to be called either cannot be reached as `{{name}}`. The
+column that happens to be called either cannot be reached as `%name%`. The
 date used to give way to a column of its name, which made what a template
 says depend on the table under it: the same placeholder printed today on one
 table and a cell on the next. A keyword now reads the same everywhere, and
 the cost, a column that cannot be quoted by name, is made loud instead of
 silent: DataTable titles it red, and the app says so in the status line once
 each time the set of such columns changes, not on every edit. It is still
-reachable from another row, `{{lookup:N:today}}`, and bound to an area it
+reachable from another row, `%lookup:N:today%`, and bound to an area it
 prints as ever.
 
-**`{{today}}`, and `{{date}}` let go.** The date is today's, and the name now
-says so. The old `{{date}}` is an ordinary column name, with no fallback to
-the date: two names for one thing, one of them sometimes a column, was the
-ambiguity the keyword rule exists to remove. It is not rewritten on load
-either, since a template cannot say whether it meant the date or a column
-called `date` — for most of its life a column of that name won. So an old
-template that meant the date shows `{{date}}` underlined as naming nothing,
-in the editor, which is where it gets fixed; on paper it prints the braces.
-That is the price, taken knowingly. No schema bump, for the reason in
-§ template.ts: an older build reads `{{today}}` as a name it does not know
-and prints the braces, which degrades quietly.
+**Percent signs, not double braces.** Placeholders were `{{name}}` until
+0.23, and double braces are Hugo's own template syntax (Jinja's and
+Mustache's too): text written for a Hugo site and for a card could not share
+a placeholder, because whichever read it first ate it. So `%name%`, with no
+reading of the old form — no template in use was written with it, so there
+was nothing to carry, and a migration would have had to guess which `{{…}}`
+in a cell was meant for Hugo. A percent sign is ordinary prose, though, so
+the pattern is narrow: the name has no spaces, the opening `%` follows no
+letter or digit and precedes no digit, and nothing spans a line. `50% off,
+20% more` and a percent-encoded address stay text, and the autocomplete
+does not open on typing `50%`. The cost is a column whose name starts with a
+digit, which cannot be quoted by name, and `%Artist Name%`, which has to be
+written as the column is stored, `%Artist-Name%`. `today` is the date's only
+name; `date` is a column like any other.
 
-**A lookup names a row by its number, not by a key.** `{{lookup:3:price}}` is
+**A lookup names a row by its number, not by a key.** `%lookup:3:price%` is
 the row wearing 3 in the table, because a value to search for could sit in any
 column and in several rows, and a lookup that silently took the first match
 would print the wrong price with nothing to mark it. The number, not the
@@ -3055,8 +3057,8 @@ says nothing the positions do not is left off. `rowNumber` is the one rule
 the row labels and `inArrivalOrder`, which the lookups read, both use, so the
 two cannot drift apart. It is still one pass, so what a lookup finds is never read for
 placeholders, and reaching a cell's own column in its own row is marked the
-way `{{self}}` is. `Card` takes `rows` as a required prop rather than a
-defaulted one: a renderer that forgot it would print braces on paper while
+way `%self%` is. `Card` takes `rows` as a required prop rather than a
+defaulted one: a renderer that forgot it would print the placeholder on paper while
 the editor showed the value.
 
 **A delete or a move rewrites the lookups that followed it.** Numbers close
@@ -3067,8 +3069,8 @@ keep their row objects may ask, since a cell edit makes a new one and would
 read as a deletion), and the page rewrites every lookup in the current
 template's areas and in every cell in the same assignment, so one undo puts
 table and template back together. Rewriting is one regex pass per text that
-contains `{{`, and anything unchanged is handed back as the same object. A
-lookup whose row was deleted becomes `{{lookup:?:…}}` rather than keeping a
+contains `%`, and anything unchanged is handed back as the same object. A
+lookup whose row was deleted becomes `%lookup:?:…%` rather than keeping a
 number that now belongs to another row: marked as naming nothing beats
 printing the wrong row. Keeping numbers stable instead (gaps after a delete)
 would have spared the rewrite, but the table would show 1, 2, 4, and a moved
@@ -3081,7 +3083,7 @@ over a substituted date would mean typing over yesterday's.
 
 ## `src/lib/complete.ts`
 
-**One action for four fields.** The column list that `{{` opens is needed in a
+**One action for four fields.** The column list that `%` opens is needed in a
 table cell, the full-size cell dialog, the area's Text in the bar and the
 editor laid over the card — four elements in three components, each with
 handlers of its own. An action attaches to any of them, builds its list with
@@ -3091,7 +3093,7 @@ each field's own handler sees it as typed. Its keys stop propagating only while
 the list is open, so Escape closes the list and not the dialog behind it.
 
 **Unknown names are marked in the render, by sentinels.** `applyPlaceholders`
-can wrap a `{{name}}` nothing answers to in two Private Use characters, and
+can wrap a `%name%` nothing answers to in two Private Use characters, and
 `flagUnknown` in markdown.ts turns those into a span — in text between tags
 only, after the leaf has been escaped, and never inside an attribute. Plain
 text splits on the same characters and lets Svelte escape each piece. Only the

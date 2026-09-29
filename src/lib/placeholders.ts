@@ -1,39 +1,38 @@
 /**
- * `{{title}}`, `{{today}}` and friends: words in a card filled in as it is drawn.
+ * `%title%`, `%today%` and friends: words in a card filled in as it is drawn.
  *
  * Two kinds. A column's name is replaced by what this row holds in that column,
- * so an area can say `**{{title}}**, {{artist}}` — one area, several columns,
+ * so an area can say `**%title%**, %artist%` — one area, several columns,
  * Markdown around them — and a cell can quote another cell of its own row. And
- * `{{today}}` is what no spreadsheet column can be: a run of cards printed on a
+ * `%today%` is what no spreadsheet column can be: a run of cards printed on a
  * Tuesday wants to say Tuesday, and typing it into every row means reprinting
  * every row the next time.
  *
- * And `{{lookup:3:title}}` reaches past the card's own row: the title of the
+ * And `%lookup:3:title%` reaches past the card's own row: the title of the
  * row numbered 3 in the table. A price list, a legend, a "next up" — one row
  * that every card quotes.
  *
  * `today` and `lookup` are keywords, and a keyword always wins: a column that
- * happens to be called either cannot be written as `{{today}}` or
- * `{{lookup}}`, only reached from another row by a lookup. The table marks
+ * happens to be called either cannot be written as `%today%` or
+ * `%lookup%`, only reached from another row by a lookup. The table marks
  * such a column, because a template that meant it would otherwise print the
  * date instead, silently. The other way round — the column winning — made
  * what a placeholder means depend on the table under it.
  *
- * `{{date}}` is what `{{today}}` was called first. It means nothing now but a
- * column called `date`, like any other name, and where there is none it is
- * marked as naming nothing — which is how an old template shows what to
- * change. Not rewritten on load: a rewrite cannot tell a template that meant
- * the date from one that meant a column of that name.
+ * Written between percent signs, not double braces, because double braces
+ * are Hugo's (and Jinja's, and Mustache's): text meant to pass through a Hugo
+ * site as well as onto a card could not use both. `PLACEHOLDER` says how a
+ * percent sign in prose is told apart from one that opens a placeholder.
  *
  * Deliberately small. There are no conditionals, no loops and no arithmetic,
  * and substitution happens once: what a placeholder is replaced with is never
  * read for placeholders itself. That is the whole of the defence against a
  * cell that names itself, or two cells that name each other — there is no
  * second pass for either to loop in — and it is also what a person reading a
- * card expects: a cell holding the literal text `{{x}}` prints `{{x}}` when it
+ * card expects: a cell holding the literal text `%x%` prints `%x%` when it
  * is quoted by another. Anything unrecognised is left exactly as it was
- * written, which is what stops a cell that happens to contain braces being
- * eaten.
+ * written, which is what stops a cell that happens to contain percent signs
+ * being eaten.
  *
  * No time of day. A card is printed once and read for months, and a timestamp
  * on paper is stale before the ink is dry.
@@ -45,10 +44,10 @@ import type { Dataset, Row, Template } from './types';
 /** The one thing that changes between calls, injected so this stays testable. */
 export interface PlaceholderContext {
 	now?: Date;
-	/** the row the card is drawing; its columns are the names `{{…}}` can use */
+	/** the row the card is drawing; its columns are the names `%…%` can use */
 	row?: Row | null;
 	/**
-	 * Every row of the table, for `{{lookup:ROW:COLUMN}}`, in the order of the
+	 * Every row of the table, for `%lookup:ROW:COLUMN%`, in the order of the
 	 * numbers the table shows — where rows arrived, not where a sort has put
 	 * them — so `lookup:3` is the row labelled 3. See `inArrivalOrder` in
 	 * table.ts. Without them a lookup names nothing, and is left as written.
@@ -63,7 +62,7 @@ export interface PlaceholderContext {
 	/**
 	 * The column the text itself came out of, when it is a cell. A placeholder
 	 * naming it is a cell quoting itself: it is not filled in — once was always
-	 * the limit, and once only ever printed the braces back — and it is marked
+	 * the limit, and once only ever printed the placeholder back — and it is marked
 	 * like a name nothing answers to, because it is the same mistake.
 	 */
 	self?: string;
@@ -118,7 +117,7 @@ const TOKENS: Array<[string, (d: Date) => string]> = [
 
 const TOKEN_PATTERN = new RegExp(TOKENS.map(([token]) => token).join('|'), 'g');
 
-/** The default when `{{today}}` is written with no format of its own. */
+/** The default when `%today%` is written with no format of its own. */
 export const DEFAULT_DATE_FORMAT = 'D MMMM YYYY';
 
 /**
@@ -132,32 +131,41 @@ export function formatDate(date: Date, format: string = DEFAULT_DATE_FORMAT): st
 }
 
 /**
- * The placeholders themselves. `{{today}}` or `{{today:FORMAT}}` is the date
- * and `{{lookup:ROW:COLUMN}}` a lookup, whatever the table holds; any other
- * `{{name}}` is a column when the row has one by that name.
+ * The placeholders themselves. `%today%` or `%today:FORMAT%` is the date
+ * and `%lookup:ROW:COLUMN%` a lookup, whatever the table holds; any other
+ * `%name%` is a column when the row has one by that name.
  *
  * After a column, two more parts are a find and a replace:
- * `{{title:words:that}}` is the title with every `words` made `that`, and
- * `{{title: :-}}` puts hyphens for its spaces. Literal and case-sensitive, like
+ * `%title:words:that%` is the title with every `words` made `that`, and
+ * `%title: :-%` puts hyphens for its spaces. Literal and case-sensitive, like
  * the find in a spreadsheet — no patterns, so nothing typed into a cell can be
  * read as one. Neither part is trimmed, since a space is the commonest thing
  * to replace; the find ends at the first colon after the name, so the
  * replacement may hold colons as they are, and the find holds one written
- * `\:` — `{{time:\:: h }}` turns `9:30` into `9 h 30`. An empty replacement
- * deletes. It takes both colons to mean this: `{{today:YYYY}}` is still a date,
+ * `\:` — `%time:\:: h %` turns `9:30` into `9 h 30`. An empty replacement
+ * deletes. It takes both colons to mean this: `%today:YYYY%` is still a date,
  * and a single part after a column's name still means nothing, as it always
  * has, rather than quietly becoming a deletion.
  *
  * A name is matched as written, then in the shape column names are stored in
- * (`{{Artist Name}}` finds `Artist-Name`), then ignoring case. The date's
- * tokens are case-sensitive by design, the same way every date library spells
- * them — `MM` is the month, `DD` the day of the month, `dddd` the day's name.
+ * (`columnName`), then ignoring case: `%artist-name%` finds `Artist-Name`. The date's tokens are case-sensitive by design, the
+ * same way every date library spells them — `MM` is the month, `DD` the day
+ * of the month, `dddd` the day's name.
+ *
+ * A percent sign is something prose uses too, so where one may open a
+ * placeholder is narrow enough to leave prose alone: the name has no spaces
+ * (column names never do — see `columnName` in parse.ts), the `%` does not
+ * follow a letter or a digit (`50%`, `a%b`), and it is not followed by a digit
+ * (`%20`, an address with its spaces encoded), and nothing spans a line.
+ * `50% off, 20% more` stays text; only `%word%` or `%word:…%` is read. The
+ * cost, taken knowingly: a column whose name starts with a digit (`2024`)
+ * cannot be written by name, only reached by binding an area to it.
  */
-const PLACEHOLDER = /\{\{\s*([^{}:]+?)\s*(?::([^{}]*))?\}\}/gu;
+const PLACEHOLDER = /(?<![\p{L}\p{N}])%(?!\p{N})([^\s%:]+)(?::([^%\n]*))?%/gu;
 
 /**
- * `{{lookup:ROW:COLUMN}}`, read out of what follows `lookup:` — the number
- * the row wears in the table, from 1, and a column's name as `{{name}}`
+ * `%lookup:ROW:COLUMN%`, read out of what follows `lookup:` — the number
+ * the row wears in the table, from 1, and a column's name as `%name%`
  * would write it. The number, not the place: sorting the table to read it
  * must not change what every card quotes. Null when the first part is not a
  * number: a row is named by its number, never by what it holds, because a
@@ -172,11 +180,11 @@ function lookupOf(spec: string): { index: number; name: string } | null {
 	return { index: Number(number) - 1, name: spec.slice(colon + 1).trim() };
 }
 
-/** The words `{{…}}` means before it means any column. */
+/** The words `%…%` means before it means any column. */
 export const KEYWORDS = ['today', 'lookup'] as const;
 
 /**
- * A column whose name a keyword takes: `{{name}}` can never reach it,
+ * A column whose name a keyword takes: `%name%` can never reach it,
  * because names are matched ignoring case and the keyword is tried first.
  */
 export const isKeyword = (name: string) => (KEYWORDS as readonly string[]).includes(name.trim().toLowerCase());
@@ -197,7 +205,7 @@ export function findColumn(name: string, columns: readonly string[]): string | u
  * mark. Only names that resolve count; the date is not a column.
  */
 export function referencedColumns(text: string, columns: readonly string[]): string[] {
-	if (!text || !text.includes('{{')) return [];
+	if (!text || !text.includes('%')) return [];
 	const found = new Set<string>();
 	for (const match of text.matchAll(PLACEHOLDER)) {
 		const column = isKeyword(match[1]) ? undefined : findColumn(match[1], columns);
@@ -221,7 +229,7 @@ export const GONE_ROW = '?';
  * The row numbers in a text's lookups, moved to follow their rows: `moved`
  * maps a number before (from 1) to the number after, or null when that row
  * was deleted. Deleting rows closes the numbers up, and moving rows by hand
- * numbers them afresh, so without this every `{{lookup:N:…}}` past the
+ * numbers them afresh, so without this every `%lookup:N:…%` past the
  * change would quietly start quoting a neighbour.
  *
  * A lookup of a deleted row gets `?` for its number rather than keeping it:
@@ -229,7 +237,7 @@ export const GONE_ROW = '?';
  * as naming nothing is better than one printing the wrong row. Only the
  * number is touched — the spacing and the column are left as written — and a
  * number the map does not mention is left alone, which is what makes this a
- * no-op on text with no lookups, and cheap: anything without `{{` is skipped.
+ * no-op on text with no lookups, and cheap: anything without `%` is skipped.
  */
 export function renumberLookups(
 	text: string,
@@ -237,7 +245,7 @@ export function renumberLookups(
 ): { text: string; renumbered: number; orphaned: number } {
 	let renumbered = 0;
 	let orphaned = 0;
-	if (!text || !text.includes('{{')) return { text, renumbered, orphaned };
+	if (!text || !text.includes('%')) return { text, renumbered, orphaned };
 	const next = text.replace(PLACEHOLDER, (whole, name: string, format?: string) => {
 		if (!isLookup(name) || format === undefined || !lookupOf(format)) return whole;
 		const digits = /\d+/.exec(format)!;
@@ -245,7 +253,7 @@ export function renumberLookups(
 		if (to === undefined || to === Number(digits[0])) return whole;
 		if (to === null) orphaned++;
 		else renumbered++;
-		const at = whole.length - 2 - format.length + digits.index;
+		const at = whole.length - 1 - format.length + digits.index;
 		return whole.slice(0, at) + (to === null ? GONE_ROW : String(to)) + whole.slice(at + digits[0].length);
 	});
 	return { text: next, renumbered, orphaned };
@@ -313,13 +321,13 @@ function findReplace(spec: string): { find: string; replace: string } | null {
 }
 
 export function applyPlaceholders(text: string, context: PlaceholderContext = {}): string {
-	if (!text || !text.includes('{{')) return text;
+	if (!text || !text.includes('%')) return text;
 	// A cell cannot smuggle a mark in: the characters are the editor's.
 	if (context.markUnknown) text = text.replace(UNKNOWN_CHARS, '');
 	const row = context.row ?? null;
 	const columns = row ? Object.keys(row) : [];
 	let now: Date | undefined;
-	const unknown = (whole: string) => (context.markUnknown ? `${UNKNOWN_OPEN}${whole.slice(2, -2)}${UNKNOWN_CLOSE}` : whole);
+	const unknown = (whole: string) => (context.markUnknown ? `${UNKNOWN_OPEN}${whole.slice(1, -1)}${UNKNOWN_CLOSE}` : whole);
 	// One `replace`, one pass: the callback's return value is never scanned
 	// again, which is what keeps a cell quoting itself from going anywhere.
 	return text.replace(PLACEHOLDER, (whole, name: string, format?: string) => {
@@ -351,18 +359,28 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 }
 
 /**
- * The placeholder being typed at the caret, if one is: an opened `{{` with no
- * `}}` after it yet on the way to the caret, and what has been typed since.
- * `start` is where the `{{` begins, so a choice can replace from there.
+ * The placeholder being typed at the caret, if one is: a `%` that could open
+ * one, with no closing `%` after it yet on the way to the caret, and what has
+ * been typed since. `start` is where the `%` is, so a choice can replace from
+ * there.
+ *
+ * The same shape `PLACEHOLDER` reads, or the list would open on every
+ * percentage typed: the `%` of `50%` follows a digit, and one followed by a
+ * space or a digit opens nothing. Placeholders already closed on the line are
+ * blanked out first, because their closing `%` would otherwise look like an
+ * opening one, and `%title: :-%` would offer the columns again.
  */
 export function openPlaceholder(text: string, caret: number): { start: number; query: string } | null {
-	const before = text.slice(0, caret);
-	const start = before.lastIndexOf('{{');
-	if (start === -1) return null;
-	const query = before.slice(start + 2);
-	// Closed already, or run across a line or another brace: not one being typed.
-	if (/[{}\n]/.test(query) || query.length > 40) return null;
-	return { start, query };
+	const lineStart = text.lastIndexOf('\n', caret - 1) + 1;
+	const line = text.slice(lineStart, caret).replace(PLACEHOLDER, (whole) => ' '.repeat(whole.length));
+	const at = line.lastIndexOf('%');
+	if (at === -1) return null;
+	if (at > 0 && /[\p{L}\p{N}]/u.test(line[at - 1])) return null;
+	const query = line.slice(at + 1);
+	// The name has no spaces and does not start with a digit; past a colon,
+	// anything but another `%` may follow.
+	if (!/^(?!\p{N})[^\s%:]*(?::[^%]*)?$/u.test(query) || query.length > 40) return null;
+	return { start: lineStart + at, query };
 }
 
 /**
