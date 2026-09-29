@@ -328,6 +328,7 @@
 							{mapping}
 							pageNumber={i + 1}
 							pageCount={dataset.rows.length}
+							rows={dataset.rows}
 							{background}
 							{images}
 						/>
@@ -392,6 +393,7 @@
 									{printBackground}
 									{cells}
 									pageCount={dataset.rows.length}
+									rows={dataset.rows}
 									previewScale={sheetThumbScale}
 								/>
 							</span>
@@ -460,6 +462,7 @@
 			sheets={sheetGroups}
 			index={Math.min(sheetFullscreen, sheetGroups.length - 1)}
 			pageCount={dataset.rows.length}
+			rows={dataset.rows}
 			sheetW={printSheetW}
 			sheetH={printSheetH}
 			onactivate={(i) => (sheetFullscreen = i)}

@@ -561,6 +561,7 @@
 				{mapping}
 				pageNumber={index + 1}
 				pageCount={dataset.rows.length}
+				rows={dataset.rows}
 				{background}
 				{images}
 			/>

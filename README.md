@@ -224,7 +224,12 @@ resize boxes directly, or type exact millimetres.
   `words` for `that`, `{{title: :-}}` puts hyphens for spaces, and an empty
   replacement deletes. Literal and case-sensitive, never a pattern; the find
   ends at the first colon, so the replacement may hold colons, and a colon to
-  *find* is written `\:` — `{{time:\:: h }}` turns `9:30` into `9 h 30`. Deliberately small — no
+  *find* is written `\:` — `{{time:\:: h }}` turns `9:30` into `9 h 30`.
+  `{{lookup:3:price}}` reaches past the card's own row: the `price` of the
+  table's third row, counting from 1 in the order the cards print — one row of
+  prices or a legend that every card quotes. A row is named by its place, never
+  by what it holds; one that is not there is underlined like any unknown name.
+  A column called `lookup` wins, as one called `date` does. Deliberately small — no
   conditionals, no loops — and anything in braces it does not recognise is left
   exactly as written. No time of day: a card is printed once and read for
   months.

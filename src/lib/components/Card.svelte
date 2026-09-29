@@ -37,6 +37,12 @@
 	interface Props {
 		template: Template;
 		row?: Row | null;
+		/**
+		 * The whole table, for `{{lookup:ROW:COLUMN}}`. Required, not defaulted:
+		 * a renderer that forgot it would print the braces on paper while the
+		 * editor showed the value, and nothing would have failed.
+		 */
+		rows: readonly Row[];
 		mapping?: Mapping;
 		/**
 		 * Zoom and pan: a press on an area is left to the page — one finger
@@ -130,6 +136,7 @@
 	let {
 		template,
 		row = null,
+		rows,
 		mapping = {},
 		bounds = false,
 		ties = false,
@@ -189,7 +196,7 @@
 	 * The same text as it is drawn, with `{{date}}` and any `{{column}}` of this
 	 * row filled in — in a cell and in an area's own words alike, once.
 	 */
-	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, self: selfOf(box) });
+	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box) });
 
 	/** The column a bound area's words come out of — the one they may not quote. */
 	const selfOf = (box: Box): string | undefined => (box.slot ? mapping[box.slot] : undefined);
@@ -203,7 +210,7 @@
 	 * measured for emptiness, or encoded into a QR.
 	 */
 	const shownTextOf = (box: Box): string =>
-		applyPlaceholders(rawContentOf(box), { row, self: selfOf(box), markUnknown: interactive && bounds });
+		applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box), markUnknown: interactive && bounds });
 
 	/** Text split around the marks, for plain text, which Svelte escapes itself. */
 	function segments(text: string): Array<{ text: string; unknown: boolean }> {

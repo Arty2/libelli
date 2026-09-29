@@ -41,6 +41,8 @@
 		/** which row is previewed, and how many there are, for the pager */
 		activeRow: number;
 		rowCount: number;
+		/** every row, for a card's `{{lookup:…}}` */
+		rows: readonly Row[];
 		onactivate: (index: number) => void;
 		/** open the card full screen; the count under the page is the door */
 		onlightbox: () => void;
@@ -124,6 +126,7 @@
 		picking = false,
 		activeRow,
 		rowCount,
+		rows,
 		onactivate,
 		onlightbox,
 		background,
@@ -1042,6 +1045,7 @@
 			<Card
 				{template}
 				{row}
+				{rows}
 				{mapping}
 				{bounds}
 				{ties}

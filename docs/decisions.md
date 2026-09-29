@@ -2933,6 +2933,17 @@ Anything unrecognised is returned exactly as written, which is what stops a
 cell that happens to contain braces being eaten. No time of day either — a card is printed
 once and read for months, and a timestamp on paper is stale before the ink dries.
 
+**A lookup names a row by its place, not by a key.** `{{lookup:3:price}}` is
+the third row of the table as it now stands — the order the cards print in —
+because a value to search for could sit in any column and in several rows, and
+a lookup that silently took the first match would print the wrong price with
+nothing to mark it. It is still one pass, so what it finds is never read for
+placeholders, and reaching a cell's own column in its own row is marked the
+way `{{self}}` is. It sits after the column check, like the date, so a column
+called `lookup` keeps its find and replace. `Card` takes `rows` as a required
+prop rather than a defaulted one: a renderer that forgot it would print braces
+on paper while the editor showed the value.
+
 Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
 mode; `rawContentOf` beside it is what the inline editor shows, because typing
 over a substituted date would mean typing over yesterday's.

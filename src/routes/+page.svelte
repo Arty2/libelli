@@ -2838,6 +2838,7 @@
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
 			{activeRow}
 			rowCount={dataset.rows.length}
+			rows={dataset.rows}
 			onactivate={(i) => (activeRow = i)}
 			onlightbox={() => (lightboxOpen = true)}
 			{background}

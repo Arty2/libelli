@@ -170,3 +170,48 @@ describe('find and replace after a column', () => {
 		expect(referencedColumns('{{city: :_}} and {{date:YYYY}}', ['city', 'title'])).toEqual(['city']);
 	});
 });
+
+describe('a lookup into another row', () => {
+	const rows = [
+		{ title: 'First', price: '3', note: '{{title}}' },
+		{ title: 'Second', price: '5', note: '' },
+		{ title: 'Third', price: '8', note: '' }
+	];
+
+	it('prints a column of the row at that place, counting from 1', () => {
+		expect(applyPlaceholders('{{lookup:1:title}}', { row: rows[2], rows })).toBe('First');
+		expect(applyPlaceholders('€{{ lookup : 2 : price }}', { row: rows[0], rows })).toBe('€5');
+		expect(applyPlaceholders('{{Lookup:3:Title}}', { rows })).toBe('Third');
+	});
+
+	it('leaves as written a row that is not there, a column that is not, and a row that is not a number', () => {
+		for (const text of ['{{lookup:0:title}}', '{{lookup:4:title}}', '{{lookup:2:nope}}', '{{lookup:Second:price}}', '{{lookup:2}}', '{{lookup}}']) {
+			expect(applyPlaceholders(text, { row: rows[0], rows })).toBe(text);
+		}
+		expect(applyPlaceholders('{{lookup:1:title}}', { row: rows[0] })).toBe('{{lookup:1:title}}');
+		expect(applyPlaceholders('{{lookup:9:title}}', { rows, markUnknown: true })).toBe(`${UNKNOWN_OPEN}lookup:9:title${UNKNOWN_CLOSE}`);
+	});
+
+	it('substitutes once: what it finds is not read for placeholders', () => {
+		expect(applyPlaceholders('{{lookup:1:note}}', { row: rows[1], rows })).toBe('{{title}}');
+	});
+
+	it('is no way round for a cell to quote itself, but may quote its column in another row', () => {
+		expect(applyPlaceholders('{{lookup:1:note}}', { row: rows[0], rows, self: 'note' })).toBe('{{lookup:1:note}}');
+		expect(applyPlaceholders('{{lookup:1:note}}', { row: rows[1], rows, self: 'note' })).toBe('{{title}}');
+	});
+
+	it('gives way to a column somebody called lookup', () => {
+		const row = { lookup: 'a2b' };
+		expect(applyPlaceholders('{{lookup:2:-}}', { row, rows: [row] })).toBe('a-b');
+	});
+
+	it('counts as naming the column it looks up', () => {
+		expect(referencedColumns('{{lookup:2:price}} {{lookup:x:title}}', ['title', 'price'])).toEqual(['price']);
+	});
+
+	it('offers columns once the row is typed, keeping the row', () => {
+		expect(placeholderChoices('lookup:3:pr', ['title', 'price'])).toEqual(['lookup:3:price']);
+		expect(placeholderChoices('lookup:3:', ['title'])).toEqual(['lookup:3:title']);
+	});
+});

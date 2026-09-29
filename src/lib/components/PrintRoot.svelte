@@ -82,6 +82,7 @@
 			{printBackground}
 			{cells}
 			pageCount={dataset.rows.length}
+			rows={dataset.rows}
 		/>
 	{/each}
 </div>
