@@ -156,7 +156,8 @@ gitignored `.claude/logs/gates.jsonl`, so "this gate never fires" is answerable.
 
 `src/lib/version.ts` is the source of truth; keep `package.json` and
 `package-lock.json` in step, and head `CHANGELOG.md` with it, in a user's words.
-Patch for a fix, minor for a feature, and **the leading zero never moves**.
+Patch for a fix, minor for a feature, and **the leading zero never moves** —
+README has the table.
 
 **Bump once per session, not once per change**, sized by the largest change in
 it — one feature among five fixes is still a minor. Set it when the work starts
