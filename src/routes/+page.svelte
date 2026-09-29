@@ -59,6 +59,7 @@
 	import { GONE_ROW, carryLookups, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
+	import { hasUnread, RELEASES } from '$lib/changelog';
 	import { TEXT_MAX, TEXT_MIN, applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
 		autoMap,
@@ -103,6 +104,7 @@
 		saveTemplateDoc,
 		saveTemplateId,
 		storageAvailable,
+		local,
 		saveUi,
 		type DatasetEntry,
 		type TemplateEntry
@@ -163,6 +165,17 @@
 	 */
 	let excludedSheets = $state<Set<number>>(new Set());
 	let helpOpen = $state(false);
+	let whatsNewOpen = $state(false);
+	/**
+	 * The last version whose What's new was opened. A first run counts as read
+	 * — see `hasUnread` — so the dot only ever means an update brought news.
+	 */
+	let seenVersion = $state<string | null>(null);
+	function openWhatsNew() {
+		whatsNewOpen = true;
+		seenVersion = VERSION;
+		local.set('whatsnew:seen', VERSION);
+	}
 
 	/** The interface's text size, as a multiple of the browser's default — see textsize.ts. */
 	let textSize = $state(1);
@@ -192,6 +205,7 @@
 	// cannot both have the screen, so the data tray starts folded away.
 	let dataOpen = $state(true);
 	let firstRun = $state(false);
+	const whatsNewUnread = $derived(hasUnread(seenVersion, VERSION, firstRun));
 	let boxMenu = $state<{ id: string; x: number; y: number } | null>(null);
 	/**
 	 * The area whose words are being typed straight into the card. Held here
@@ -656,9 +670,11 @@
 			// rows of sample data rather than on an empty page.
 			dataset = sampleDataset();
 			firstRun = true;
+			local.set('whatsnew:seen', VERSION);
 			datasetId = nextDatasetId();
 		}
 		saveDatasetId(datasetId);
+		seenVersion = local.get<string | null>('whatsnew:seen', null);
 		previousTable = loadPreviousDatasetId();
 		void refreshTables();
 
@@ -2171,6 +2187,7 @@
 	/** Something in front of the stage, which then leaves the keys alone. */
 	const stageModalOpen = $derived(
 		helpOpen ||
+			whatsNewOpen ||
 			statusOpen ||
 			cssOpen ||
 			previewOpen ||
@@ -2233,8 +2250,9 @@
 			redo();
 			return;
 		}
-		if (event.key === 'Escape' && (helpOpen || statusOpen || cssOpen || boxMenu || resetting || deleting || deletingTable || magic)) {
+		if (event.key === 'Escape' && (helpOpen || whatsNewOpen || statusOpen || cssOpen || boxMenu || resetting || deleting || deletingTable || magic)) {
 			helpOpen = false;
+			whatsNewOpen = false;
 			statusOpen = false;
 			if (cssOpen) cancelCss();
 			resetting = false;
@@ -3122,7 +3140,14 @@
 		{#if updateReady}
 			<button class="reload" onclick={applyUpdate}>Update</button>
 		{/if}
-		<span class="version">v{VERSION}</span>
+		<!-- The version is the way to what it brought: where someone who has just
+		     pressed Update looks, and a dot there until they have. -->
+		<button
+			class="version"
+			class:unread={whatsNewUnread}
+			onclick={openWhatsNew}
+			title={whatsNewUnread ? "What's new — not read yet" : "What's new"}>v{VERSION}</button
+		>
 	</footer>
 </div>
 
@@ -3313,6 +3338,31 @@
 			<button onclick={() => (magic = null)}>Cancel</button>
 			<button class="primary" data-default onclick={applyMagic}>OK</button>
 		</div>
+	</div>
+{/if}
+
+{#if whatsNewOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (whatsNewOpen = false)}></div>
+	<div class="modal whats-new" role="dialog" aria-modal="true" aria-labelledby="whats-new-title" use:dragByTitle>
+		<header class="modal-header drag-title" data-drag-handle>
+			<h2 id="whats-new-title">What's new</h2>
+			<button class="icon" use:focusOnOpen onclick={() => (whatsNewOpen = false)} title="Close" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
+		{#each RELEASES as release (release.version)}
+			<h3>
+				{release.version}{#if release.version === VERSION}<span class="current">· this one</span>{/if}
+				<time datetime={release.date}>{release.date}</time>
+			</h3>
+			<ul>
+				{#each release.items as item, i (i)}
+					<li>
+						{#each item as run, j (j)}{#if run.code}<code>{run.text}</code>{:else}{run.text}{/if}{/each}
+					</li>
+				{/each}
+			</ul>
+		{/each}
 	</div>
 {/if}
 
@@ -3736,8 +3786,55 @@
 	}
 
 	.status-bar .version {
+		position: relative;
+		padding: 2px 4px;
+		border-color: transparent;
+		background: none;
 		font: 400 0.6875rem ui-monospace, SFMono-Regular, Menlo, monospace;
 		color: #999;
+	}
+
+	.status-bar .version:hover {
+		color: #555;
+	}
+
+	/* In the accent, not the warning red: something to read, not something
+	   wrong. */
+	.status-bar .version.unread::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		right: -4px;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--accent);
+	}
+
+	.whats-new h3 {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+	}
+
+	.whats-new h3 time {
+		margin-left: auto;
+		font-weight: 400;
+	}
+
+	.whats-new .current {
+		text-transform: none;
+		letter-spacing: 0;
+	}
+
+	.whats-new ul {
+		margin: 0 0 8px;
+		padding-left: 1.2em;
+		color: #333;
+	}
+
+	.whats-new li + li {
+		margin-top: 2px;
 	}
 
 	.check {

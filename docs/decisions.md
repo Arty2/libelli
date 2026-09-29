@@ -2360,6 +2360,27 @@ was asked for — a PNG of the *sheet* is, so the export switches to reading
 `stem-sheet_N.png` rather than `stem_N.png` so the two exports are never
 confused for each other in a directory listing.
 
+## `src/lib/changelog.ts` and `CHANGELOG.md`
+
+**The changelog is for the person using the app; git is the history.** One
+section per minor, in a user's words, headed by the last version that minor
+shipped as — the early numbering was reset twice, and the backfill follows the
+numbers that stuck. It does not repeat commit messages, and this file does not
+repeat it: a decision is written here as it stands now, and how it came to be is
+in the commits that made it.
+
+**The top heading is the version being shipped** (gate 10), so a patch rewrites
+its minor's heading rather than adding a section. Stricter than one entry per
+minor, and just as simple to check.
+
+**Parsed, not rendered.** An entry is plain text with `code` spans, split into
+runs the page prints as text. Rendering it through `markdown.ts` would need a
+fourth file allowed raw markup, for a document we write ourselves.
+
+**The dot is for updates only.** A first run marks the current version read —
+the starter card is the introduction — and a returning visitor who has never
+opened the list has news. Opening it marks this version read.
+
 ## `src/lib/sw-policy.ts` and `src/service-worker.ts`
 
 **The worker only ever touches same-origin GETs.** `sw-policy.ts` decides, and it

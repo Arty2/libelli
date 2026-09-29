@@ -1519,7 +1519,8 @@ The copy is replaced a whole build at a time. When a new version has downloaded,
 the status bar says *New version — keep undo history or update now to restart
 this session* and offers **Update** rather than swapping it in underneath you:
 undo history lives in memory, and a restart you did not ask for would throw it
-away.
+away. After an update the version number in the status bar wears a dot; press
+it for what the new version brought.
 
 None of this changes what leaves the browser, because nothing does. The cache
 holds this app's own files and nothing else — a font from Google or a background
@@ -1734,13 +1735,15 @@ npm run build    # static output in ./build, deployable anywhere
   `{@html}` only in the three renderers that have earned it, `fetch` only in
   `png.ts` and the service worker, no runtime dependencies, the security
   headers still in `vercel.json`, `color` never spelled with a `u` where it
-  names something, `VERSION` in step with `package.json`, and `AGENTS.md`
-  inside its line budget. A rule that only lives
+  names something, `VERSION` in step with `package.json` and heading
+  `CHANGELOG.md`, and `AGENTS.md` inside its line budget. A rule that only lives
   in prose is broken by the first change that does not re-read it, so the ones
   that can execute do. Add the next one there rather than as a paragraph.
 - **Version** — `src/lib/version.ts` is the source of truth, kept in step with
   `package.json` (and the gate above fails the build if they drift apart). A fix is a patch (0.1.0 → 0.1.1), a feature is a minor
-  (0.1.1 → 0.2.0), and the leading zero never moves.
+  (0.1.1 → 0.2.0), and the leading zero never moves. `CHANGELOG.md` says what
+  each version brought, and the app shows it: press the version number in the
+  status bar.
 - **Deploying** — `npm run build` writes a static site to `build/`; any static
   host serves it. `vercel.json` states the build command and output directory
   outright and turns the framework preset off, because Vercel reads this as a

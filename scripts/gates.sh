@@ -222,6 +222,22 @@ else
 	pass "interface type sized in rem" "type-in-rem"
 fi
 
+# ── 10. Every version says what changed ──────────────────────────────────────
+# CHANGELOG.md is what a person reads under What's new, and a list that stops a
+# few versions back reads as a list of everything. So the top release heading
+# has to be the version being shipped: a bump, patch or minor, is not done
+# until the changelog says what it brought. A patch rewrites its minor's
+# heading rather than adding one — the file keeps one section per minor.
+top_release=$(sed -n 's/^## \([0-9][0-9.]*\) .*/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)
+
+if [ "$top_release" != "$src_version" ]; then
+	fail "CHANGELOG.md does not open with version $src_version" \
+		"its top release heading is '${top_release:-none}' — add a line to the $src_version section, heading it '## $src_version — $(date -u +%Y-%m-%d)'" \
+		"changelog-current"
+else
+	pass "CHANGELOG.md opens with $src_version" "changelog-current"
+fi
+
 # ── local, gitignored log — see the header comment ───────────────────────────
 mkdir -p .claude/logs
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
