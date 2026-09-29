@@ -538,7 +538,7 @@
 
 	/**
 	 * The columns something on the card prints: bound to an area, named as
-	 * `{{column}}` in an area's own words, or named in a cell of a column that
+	 * `%%column%%` in an area's own words, or named in a cell of a column that
 	 * is itself printed. One level and no further, because that is how far
 	 * substitution goes — see placeholders.ts — so a column named only from a
 	 * column nobody prints is still a column nobody prints.
@@ -564,12 +564,12 @@
 	/**
 	 * The rows in the order of the numbers the table shows them with — where
 	 * they arrived, not where a sort has put them — which is what
-	 * `{{lookup:N:…}}` counts in. See `Dataset.order`.
+	 * `%%lookup:N:…%%` counts in. See `Dataset.order`.
 	 */
 	const lookupRows = $derived(inArrivalOrder(dataset));
 
 	/**
-	 * Columns a keyword has taken — `today`, `lookup` — which `{{name}}` can
+	 * Columns a keyword has taken — `today`, `lookup` — which `%%name%%` can
 	 * never reach. The table colours them; the status line says why, once per
 	 * set of them, so it is said when one appears and not on every keystroke.
 	 */
@@ -582,7 +582,7 @@
 		if (!keywordColumns.length) return;
 		notify(
 			keywordColumns
-				.map((c) => `“${c}” is a reserved keyword. Rename the column to enable the {{${c.trim().toLowerCase()}}} placeholder.`)
+				.map((c) => `“${c}” is a reserved keyword. Rename the column to enable the %%${c.trim().toLowerCase()}%% placeholder.`)
 				.join(' '),
 			'warning'
 		);
@@ -593,7 +593,7 @@
 		const n = (k: number) => `${k} lookup${k === 1 ? '' : 's'}`;
 		const parts = [
 			renumbered ? `${n(renumbered)} renumbered to follow ${renumbered === 1 ? 'its row' : 'their rows'}.` : '',
-			orphaned ? `${n(orphaned)} named a deleted row and now ${orphaned === 1 ? 'reads' : 'read'} {{lookup:${GONE_ROW}:…}}.` : ''
+			orphaned ? `${n(orphaned)} named a deleted row and now ${orphaned === 1 ? 'reads' : 'read'} %%lookup:${GONE_ROW}:…%%.` : ''
 		];
 		return { note: parts.filter(Boolean).join(' '), warning: orphaned > 0 };
 	}
@@ -1460,7 +1460,7 @@
 
 	/**
 	 * Entering a cell flashes the areas on the card that print it — bound to
-	 * its column, or naming it as `{{column}}` in their own words — in the
+	 * its column, or naming it as `%%column%%` in their own words — in the
 	 * bounds' blue, briefly. The table and the card are side by side, and
 	 * which area a cell feeds is the question typing into it always raises.
 	 * The same flash a rescued area gets, so it reads as "here", not as a

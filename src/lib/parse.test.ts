@@ -50,7 +50,7 @@ describe('normaliseHeaders', () => {
 		expect(normaliseHeaders(['title', '', 'title'])).toEqual(['title', 'Column-2', 'title-2']);
 	});
 
-	it('makes every header a name that can be written between braces', () => {
+	it('makes every header a name that can be written between `%%` marks', () => {
 		expect(normaliseHeaders(['Artist Name', ' Year (est.) ', 'τίτλος', '#!'])).toEqual([
 			'Artist-Name',
 			'Year-est',
@@ -63,7 +63,7 @@ describe('normaliseHeaders', () => {
 describe('columnName', () => {
 	it('turns spaces into single dashes and drops everything else', () => {
 		expect(columnName('  a  b -- c ')).toBe('a-b-c');
-		expect(columnName('{{x}}')).toBe('x');
+		expect(columnName('%%x%%')).toBe('x');
 		expect(columnName('under_score')).toBe('under_score');
 	});
 });

@@ -8,7 +8,7 @@
 	interface Props {
 		template: Template;
 		dataset: Dataset;
-		/** the rows in the order the table numbers them, for a card's `{{lookup:…}}` */
+		/** the rows in the order the table numbers them, for a card's `%%lookup:…%%` */
 		lookupRows: readonly Row[];
 		mapping: Mapping;
 		/** which row is shown, and what the arrows step through */
