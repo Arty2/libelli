@@ -351,6 +351,13 @@ export interface Box extends TextStyle {
 	borderStyle?: BorderStyle;
 	/** absent falls back to the box's own text color */
 	borderColor?: string;
+	/**
+	 * Colors this area takes from the row it is drawing: for each, the name of a
+	 * column whose cell holds a color. A cell that is not one — empty, or words —
+	 * leaves the area's own color, which is why the swatch stays beside it. By
+	 * column name, as `{{column}}` is: it is the row's value, not a bound field.
+	 */
+	colorFrom?: ColorSources;
 	/** mm, applied to the whole box */
 	borderRadius?: number;
 	/**
@@ -441,6 +448,13 @@ export interface Dataset {
 }
 
 export type Row = Record<string, string>;
+
+/** Which column each of an area's colors comes from; see `Box.colorFrom`. */
+export interface ColorSources {
+	text?: string;
+	fill?: string;
+	border?: string;
+}
 
 /** slot name -> column name */
 export type Mapping = Record<string, string>;

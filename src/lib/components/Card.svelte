@@ -30,7 +30,7 @@
 	import { flagUnknown, renderMarkdown } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
-	import { baselineOf, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
+	import { baselineOf, colorsFromRow, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -1875,7 +1875,12 @@
 
 		{#each template.boxes as box (box.id)}
 			{@const empty = hidden.has(box.id)}
-			{@const strokes = handStrokes(box)}
+			<!-- The area as this row colors it — see `colorsFromRow`. Only what
+			     is painted reads it; everything that moves, measures or writes
+			     the area back keeps the stored one, so a row's color can never be
+			     saved as the template's. -->
+			{@const look = colorsFromRow(box, row)}
+			{@const strokes = handStrokes(look)}
 			<div
 				class="box content-{box.slot ? 'field' : shownAsMedia(box.mode) ? 'image' : 'static'} mode-{box.mode}"
 				class:outlined={bounds && !empty}
@@ -1889,7 +1894,7 @@
 				class:font-loading={interactive && waitingFor(box)}
 				class:flashing={flashIds.includes(box.id)}
 				class:dropping={dropId === box.id}
-				style={boxStyle(box)}
+				style={boxStyle(look)}
 				{...idFor(box)}
 				data-box-id={box.id}
 				use:measure={box.id}
@@ -1918,13 +1923,13 @@
 				<!-- A stamp's paper goes under the field printed on it; every other
 				     border drawn in SVG goes over the fill, as a CSS border would. -->
 				{#if strokes.length && stamped(box)}
-					{@render drawnEdge(box, strokes)}
+					{@render drawnEdge(look, strokes)}
 				{/if}
-				{#if surfaceStyle(box)}
-					<div class="surface" aria-hidden="true" style={surfaceStyle(box)}></div>
+				{#if surfaceStyle(look)}
+					<div class="surface" aria-hidden="true" style={surfaceStyle(look)}></div>
 				{/if}
 				{#if strokes.length && !stamped(box)}
-					{@render drawnEdge(box, strokes)}
+					{@render drawnEdge(look, strokes)}
 				{/if}
 				<div
 					class="content"
@@ -1945,7 +1950,7 @@
 					{:else if box.mode === 'qr'}
 						<span class="media" style="height:{mediaHeight(box)}">
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
-							{@html qrFor(box)}
+							{@html qrFor(look)}
 						</span>
 					{:else if shownAsMedia(box.mode)}
 						{@const media = mediaOf(box)}

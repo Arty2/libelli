@@ -2786,6 +2786,24 @@ say the same thing in the same words, the book's own: a right-hand page and the
 left-hand page facing it. On an area it reads as "this area follows the
 spread"; off, it keeps its millimetres on both.
 
+**A color from a column is a link beside the swatch, not a mode.** Text color,
+fill and border color each get the same small link button; pressed, a column
+picker appears beside it. The swatch stays: it is what a row whose cell is not a
+color still shows, so the link reads as "this, unless the row says otherwise".
+One pattern for all three, and nothing new in the bar until it is asked for.
+
+The link names a column, not a slot, as `{{column}}` does — it is the row's
+value, not a field the area is bound to — so a rename rewrites it, and the table
+counts the column as used. Only the cell's *color* is read, through
+`parseColor`, the same door every color has to a style attribute; there is no
+value-to-color list (Late → red). That was offered and left for later: a
+spreadsheet can already turn a word into a color in a column of its own.
+
+`colorsFromRow` resolves the area per row where Card paints it — the style, the
+surface, a hand-drawn edge, a QR — and nowhere else. Everything that measures,
+drags or writes the area back holds the stored one, so one card's color can
+never be saved as the template's.
+
 **Labels stay one word where one word was there.** Leading, Spacing, Draft,
 Width and Height were tried as longer, plainer phrases and put back: in a bar
 this dense a second word costs more than it explains, and the tip on each field

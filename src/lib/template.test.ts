@@ -5,6 +5,8 @@ import {
 	MAX_PARAGRAPH,
 	MIN_BOX,
 	MIN_LEADING,
+	colorsFromRow,
+	normaliseColorFrom,
 	MIN_PAPER,
 	MIN_SIZE,
 	DEFAULT_MARGIN,
@@ -611,5 +613,43 @@ describe('list style and baseline', () => {
 		expect(back.defaults.baseline).toBe(0.04);
 		expect(back.boxes[0].list).toEqual({ leading: 1.1 });
 		expect(back.boxes[0].baseline).toBe(-0.1);
+	});
+});
+
+describe('colors from a column', () => {
+	const box = { ...builtinTemplate().boxes[0], color: '#111111', colorFrom: { text: 'ink', fill: 'paper', border: 'edge' } };
+
+	it('keeps only named columns, and none is no field', () => {
+		expect(normaliseColorFrom({ text: ' ink ', fill: '', border: 3 })).toEqual({ text: 'ink' });
+		expect(normaliseColorFrom({ text: '  ' })).toBeUndefined();
+		expect(normaliseColorFrom('ink')).toBeUndefined();
+	});
+
+	it("paints each color from the row's cell where the cell is a color", () => {
+		const drawn = colorsFromRow(box, { ink: '#c0392b', paper: 'teal', edge: 'rgb(0, 0, 255)' });
+		expect(drawn.color).toBe('#c0392b');
+		expect(drawn.background).toBe('#008080');
+		expect(drawn.borderColor).toBe('rgb(0, 0, 255)');
+	});
+
+	it("leaves the area's own color where a cell is empty, words, or missing", () => {
+		const drawn = colorsFromRow(box, { ink: 'urgent', paper: '' });
+		expect(drawn.color).toBe('#111111');
+		expect(drawn.background).toBe(box.background);
+		expect(drawn.borderColor).toBe(box.borderColor);
+		expect(colorsFromRow(box, null)).toBe(box);
+	});
+
+	it('lets nothing but a color out of a cell', () => {
+		// A cell is untrusted: this must not reach a style attribute as written.
+		const drawn = colorsFromRow(box, { ink: 'red;background:url(https://x.example/)' });
+		expect(drawn.color).toBe('#111111');
+	});
+
+	it('survives a load', () => {
+		const t = builtinTemplate();
+		const raw = JSON.parse(JSON.stringify(t));
+		raw.boxes[0].colorFrom = { fill: 'status', text: '' };
+		expect(normaliseTemplate(raw).boxes[0].colorFrom).toEqual({ fill: 'status' });
 	});
 });

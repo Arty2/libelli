@@ -5,6 +5,8 @@ import defaultCard from './templates/default-card.json';
 import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
 import type {
 	Anchor,
+	ColorSources,
+	Row,
 	BackgroundFit,
 	BlendMode,
 	BorderStyle,
@@ -173,6 +175,41 @@ export function normaliseList(raw: unknown): ListStyle | undefined {
 	return Object.keys(list).length ? list : undefined;
 }
 
+/** Column names only, trimmed; an empty one is no source, and no sources is none. */
+export function normaliseColorFrom(raw: unknown): ColorSources | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const name = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+	const { text, fill, border } = raw as Record<string, unknown>;
+	const from = stripUndefined({ text: name(text), fill: name(fill), border: name(border) });
+	return Object.keys(from).length ? from : undefined;
+}
+
+/**
+ * The area as this row draws it: each color with a column behind it replaced
+ * by the row's cell, where the cell is a color. Everything else — the area's
+ * own color where a cell is empty or is words, and every field that is not a
+ * color — is the area's. Only ever drawn from, never written back: the row's
+ * color is the row's, and storing it would put one card's color on all of them.
+ *
+ * The cell goes through `parseColor`, the one door a color has to a style
+ * attribute, like every other color the card draws.
+ */
+export function colorsFromRow(box: Box, row: Row | null | undefined): Box {
+	const from = box.colorFrom;
+	if (!from || !row) return box;
+	const cell = (column: string | undefined) => (column ? parseColor(row[column]) : null);
+	const text = cell(from.text);
+	const fill = cell(from.fill);
+	const border = cell(from.border);
+	if (!text && !fill && !border) return box;
+	return {
+		...box,
+		...(text ? { color: text } : {}),
+		...(fill ? { background: fill } : {}),
+		...(border ? { borderColor: border } : {})
+	};
+}
+
 /** A baseline shift in em, negative allowed; zero is no shift and is dropped. */
 export function normaliseBaseline(raw: unknown): number | undefined {
 	if (raw === undefined || raw === null || raw === '') return undefined;
@@ -336,6 +373,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
 			background: color(partial.background),
+			colorFrom: normaliseColorFrom(partial.colorFrom),
 			// A blend mode is written straight into a style attribute, so nothing
 			// but one of these thirteen words may reach it.
 			blend: BLEND_MODES.includes(partial.blend as BlendMode) ? partial.blend : undefined,

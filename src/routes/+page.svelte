@@ -106,7 +106,7 @@
 		type DatasetEntry,
 		type TemplateEntry
 	} from '$lib/storage';
-	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
+	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
@@ -549,6 +549,8 @@
 			const bound = box.slot ? mapping[box.slot] : undefined;
 			if (bound && columns.includes(bound)) used.add(bound);
 			for (const named of referencedColumns(box.static?.text ?? '', columns)) used.add(named);
+			// A column an area takes a color from is printed too, as a color.
+			for (const column of Object.values(box.colorFrom ?? {})) if (columns.includes(column)) used.add(column);
 		}
 		for (const column of [...used]) {
 			for (const r of dataset.rows) {
@@ -3016,6 +3018,17 @@
 					mapping = Object.fromEntries(
 						Object.entries(mapping).map(([slot, column]) => [slot, column === from ? to : column])
 					);
+					// And every color an area takes from it, which names the column
+					// itself rather than a slot. Only when one does, so a rename
+					// that touches no color leaves the template alone.
+					const renamed = (sources: ColorSources) =>
+						Object.fromEntries(Object.entries(sources).map(([k, c]) => [k, c === from ? to : c]));
+					if (template.boxes.some((b) => Object.values(b.colorFrom ?? {}).includes(from))) {
+						template = {
+							...template,
+							boxes: template.boxes.map((b) => (b.colorFrom ? { ...b, colorFrom: renamed(b.colorFrom) } : b))
+						};
+					}
 				}}
 				onchange={(next) => {
 					// Every structural edit in the tray builds a fresh dataset, and most

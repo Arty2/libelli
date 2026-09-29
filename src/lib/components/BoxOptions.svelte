@@ -26,6 +26,7 @@
 		MIN_LEADING,
 		MIN_SIZE,
 		normaliseCentre,
+		normaliseColorFrom,
 		normaliseRotation,
 		normaliseSides,
 		shownAsMedia,
@@ -38,6 +39,7 @@
 		BorderStyle,
 		Box,
 		Centre,
+		ColorSources,
 		Dataset,
 		FontRef,
 		Mapping,
@@ -366,6 +368,26 @@
 		template.defaults.list?.leading ?? selected?.lineHeight ?? template.defaults.lineHeight
 	);
 
+	/**
+	 * A color taken from a column of the row. `linking` holds the picker open
+	 * after the link is pressed and before a column is chosen: the choice is
+	 * stored only once there is a column to store.
+	 */
+	type ColorKey = keyof ColorSources;
+	let linking = $state<Record<ColorKey, boolean>>({ text: false, fill: false, border: false });
+	const linkShown = (key: ColorKey) => linking[key] || !!selected?.colorFrom?.[key];
+
+	function setColorFrom(key: ColorKey, column: string | undefined) {
+		patch({ colorFrom: normaliseColorFrom({ ...selected?.colorFrom, [key]: column }) });
+		if (!column) linking[key] = false;
+	}
+
+	/** The link button: open the picker, or — when it is open — unlink and close it. */
+	function toggleLink(key: ColorKey) {
+		if (linkShown(key)) setColorFrom(key, undefined);
+		else linking[key] = true;
+	}
+
 	/** Whether the page's baseline reaches this area — only in the page's own face. */
 	const pageBaselineApplies = $derived((selected?.font ?? template.defaults.font) === template.defaults.font);
 
@@ -531,6 +553,47 @@
 		input.value = '';
 	}
 </script>
+
+<!--
+	A color from a column: the link beside a swatch, and once pressed, which
+	column. Beside the swatch rather than in place of it, because the swatch is
+	still what an area shows on a row whose cell is not a color. One pattern for
+	all three colors, so it is learnt once.
+-->
+{#snippet fromColumn(key: ColorKey, what: string)}
+	{@const column = selected.colorFrom?.[key]}
+	<button
+		class="square"
+		aria-pressed={linkShown(key)}
+		title={linkShown(key)
+			? `Stop taking the ${what} from a column`
+			: `Take the ${what} from a column of the row, where its cell is a color — #c0392b, teal, rgb(…)`}
+		aria-label="{what} from a column"
+		disabled={boxFrozen}
+		onclick={() => toggleLink(key)}
+	><Icon name="link" size={14} /></button>
+	{#if linkShown(key)}
+		<select
+			class:inherits={!column}
+			value={column ?? ''}
+			title="The column whose cell is this area's {what}; a cell that is not a color leaves the swatch's"
+			aria-label="Column for the {what}"
+			disabled={boxFrozen}
+			onchange={(e) => setColorFrom(key, e.currentTarget.value || undefined)}
+		>
+			<option value="">— Column —</option>
+			{#each dataset.columns as name (name)}
+				<option value={name}>{name}</option>
+			{/each}
+			<!-- Kept in the list when this table has no such column, rather
+			     than showing the menu blank: the template still names it, and
+			     another table may have it. -->
+			{#if column && !dataset.columns.includes(column)}
+				<option value={column}>{column} (not in this table)</option>
+			{/if}
+		</select>
+	{/if}
+{/snippet}
 
 <!--
 	The area settings bar: what this area is, then one tab at a time — what it
@@ -888,6 +951,7 @@
 				{#if selected.color}
 					<ResetButton to="the page's text color" disabled={boxFrozen} onclick={() => patch({ color: undefined })} />
 				{/if}
+				{@render fromColumn('text', 'text color')}
 			</span>
 			<label class="field">
 				<span>Spacing</span>
@@ -1193,6 +1257,7 @@
 					/>
 				</span>
 			{/if}
+			<span class="field">{@render fromColumn('fill', 'fill')}</span>
 			<span class="field">
 				<span>Border</span>
 				{#if showSides}
@@ -1266,6 +1331,7 @@
 						disabled={boxFrozen}
 						onchange={(v) => patch({ borderColor: v })}
 					/>
+					{@render fromColumn('border', 'border color')}
 				</span>
 				<!-- A setting that is on or off, so a checkbox, like Mirror and Hide
 				     When Empty: a pencil that stayed pressed was a button nobody
