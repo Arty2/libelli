@@ -2942,14 +2942,17 @@ each time the set of such columns changes, not on every edit. It is still
 reachable from another row, `{{lookup:N:today}}`, and bound to an area it
 prints as ever.
 
-**`{{today}}`, and `{{date}}` kept as it was.** The date is today's, and the
-name now says so. The old `{{date}}` is not rewritten on load: a template
-cannot tell whether it meant the date or a column called `date`, since for
-most of its life a column of that name won. So it keeps exactly its old
-reading — a column first, the date where there is none — is no keyword, and
-is not offered by `{{`. No schema bump, for the reason in § template.ts: an
-older build reads `{{today}}` as a name it does not know and prints the
-braces, which degrades quietly.
+**`{{today}}`, and `{{date}}` let go.** The date is today's, and the name now
+says so. The old `{{date}}` is an ordinary column name, with no fallback to
+the date: two names for one thing, one of them sometimes a column, was the
+ambiguity the keyword rule exists to remove. It is not rewritten on load
+either, since a template cannot say whether it meant the date or a column
+called `date` — for most of its life a column of that name won. So an old
+template that meant the date shows `{{date}}` underlined as naming nothing,
+in the editor, which is where it gets fixed; on paper it prints the braces.
+That is the price, taken knowingly. No schema bump, for the reason in
+§ template.ts: an older build reads `{{today}}` as a name it does not know
+and prints the braces, which degrades quietly.
 
 **A lookup names a row by its number, not by a key.** `{{lookup:3:price}}` is
 the row wearing 3 in the table, because a value to search for could sit in any

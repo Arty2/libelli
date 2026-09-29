@@ -239,9 +239,10 @@ resize boxes directly, or type exact millimetres.
   `today` and `lookup` are reserved keywords and always mean themselves: a
   column called either is **titled in red** in the table, with a note in the
   status line — rename it to quote it by name, or reach it from another row
-  with `{{lookup:3:today}}`. `{{date}}`, the old name for `{{today}}`, still
-  works in templates written with it: a column called `date` first, as it
-  always was, and the date where there is none. Deliberately small — no
+  with `{{lookup:3:today}}`. `{{date}}`, the old name for `{{today}}`, is now
+  an ordinary column name: in a template written with it, and no `date`
+  column, it is underlined as naming nothing — change it to `{{today}}`.
+  Deliberately small — no
   conditionals, no loops — and anything in braces it does not recognise is left
   exactly as written. No time of day: a card is printed once and read for
   months.

@@ -89,14 +89,13 @@ describe('applyPlaceholders', () => {
 		expect(referencedColumns('{{today}}', ['Today'])).toEqual([]);
 	});
 
-	it('still reads the old {{date}}, as it always did: a column first, then the date', () => {
-		expect(applyPlaceholders('{{date}} {{date:YYYY}}', { now: DAY })).toBe('7 September 2026 2026');
+	it('reads the old {{date}} as a column like any other, and never as the date', () => {
+		expect(applyPlaceholders('{{date}} {{date:YYYY}}', { now: DAY })).toBe('{{date}} {{date:YYYY}}');
+		expect(applyPlaceholders('{{date}}', { now: DAY, markUnknown: true })).toBe(`${UNKNOWN_OPEN}date${UNKNOWN_CLOSE}`);
 		const row = { date: 'Spring' };
 		expect(applyPlaceholders('{{date}}', { row, now: DAY })).toBe('Spring');
-		expect(applyPlaceholders('{{date:YYYY}}', { row, now: DAY })).toBe('2026');
+		expect(applyPlaceholders('{{date:YYYY}}', { row, now: DAY })).toBe('{{date:YYYY}}');
 		expect(referencedColumns('{{date}}', ['date'])).toEqual(['date']);
-		// A cell quoting its own column called date is a mistake, not the date.
-		expect(applyPlaceholders('{{date}}', { row, self: 'date', now: DAY })).toBe('{{date}}');
 	});
 
 	it('knows which column names a keyword takes', () => {

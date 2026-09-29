@@ -19,12 +19,11 @@
  * date instead, silently. The other way round — the column winning — made
  * what a placeholder means depend on the table under it.
  *
- * `{{date}}` is what `{{today}}` was called first, and still works the way it
- * always did, for the templates written then: a column called `date` wins,
- * and only where there is none is it today's date. It is not offered and not
- * a keyword, so a column called `date` is an ordinary column. Kept rather
- * than rewritten on load, because a rewrite cannot tell a template that
- * meant the date from one that meant a column of that name.
+ * `{{date}}` is what `{{today}}` was called first. It means nothing now but a
+ * column called `date`, like any other name, and where there is none it is
+ * marked as naming nothing — which is how an old template shows what to
+ * change. Not rewritten on load: a rewrite cannot tell a template that meant
+ * the date from one that meant a column of that name.
  *
  * Deliberately small. There are no conditionals, no loops and no arithmetic,
  * and substitution happens once: what a placeholder is replaced with is never
@@ -135,8 +134,7 @@ export function formatDate(date: Date, format: string = DEFAULT_DATE_FORMAT): st
 /**
  * The placeholders themselves. `{{today}}` or `{{today:FORMAT}}` is the date
  * and `{{lookup:ROW:COLUMN}}` a lookup, whatever the table holds; any other
- * `{{name}}` is a column when the row has one by that name, and `{{date}}`
- * falls back to the date where there is none.
+ * `{{name}}` is a column when the row has one by that name.
  *
  * After a column, two more parts are a find and a replace:
  * `{{title:words:that}}` is the title with every `words` made `that`, and
@@ -335,11 +333,10 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 			if (!target || !column || (target === row && column === context.self)) return unknown(whole);
 			return String(target[column] ?? '');
 		}
-		const today = () => {
+		if (name.toLowerCase() === 'today') {
 			now ??= context.now ?? new Date();
 			return formatDate(now, format?.trim() || DEFAULT_DATE_FORMAT);
-		};
-		if (name.toLowerCase() === 'today') return today();
+		}
 		const swap = format === undefined ? null : findReplace(format);
 		if ((format === undefined || swap) && row) {
 			const column = findColumn(name, columns);
@@ -348,10 +345,7 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 				// An empty find would put the replacement between every letter.
 				return swap && swap.find ? value.split(swap.find).join(swap.replace) : value;
 			}
-			if (column) return unknown(whole);
 		}
-		// The old name, after the columns, as it always was — see the top.
-		if (name.toLowerCase() === 'date') return today();
 		return unknown(whole);
 	});
 }
