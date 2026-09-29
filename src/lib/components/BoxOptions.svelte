@@ -944,6 +944,7 @@
 					value={selected.color}
 					fallback={template.defaults.color}
 					label="Text color"
+					hueFrom={selected.colorFrom?.text}
 					title={selected.color ? undefined : "The page's text color"}
 					disabled={boxFrozen}
 					onchange={(v) => patch({ color: v })}
@@ -1252,6 +1253,7 @@
 						value={selected.background}
 						fallback="#ffffff"
 						label="Fill color"
+						hueFrom={selected.colorFrom?.fill}
 						disabled={boxFrozen}
 						onchange={(v) => patch({ background: v })}
 					/>
@@ -1327,6 +1329,7 @@
 						value={selected.borderColor}
 						fallback={selected.color ?? template.defaults.color}
 						label="Border color"
+						hueFrom={selected.colorFrom?.border}
 						title="Border color; follows the text color until you set one"
 						disabled={boxFrozen}
 						onchange={(v) => patch({ borderColor: v })}

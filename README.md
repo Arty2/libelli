@@ -328,8 +328,9 @@ resize boxes directly, or type exact millimetres.
   press it and pick the column. A cell that is a color — `#c0392b`, `teal`,
   `rgb(…)`, anything a color field takes — paints that card; an empty cell, or
   one holding words, leaves the area's own color, which is why the swatch stays
-  beside it. A fill of *None* linked to a column fills only the cards whose cell
-  says so. The link names the column, like `{{column}}`, follows it through a
+  beside it, greyed out while the link holds. Its opacity is still the area's:
+  set it and the row's color is laid on at that strength. A fill of *None*
+  linked to a column fills only the cards whose cell says so. The link names the column, like `{{column}}`, follows it through a
   rename, and marks it as used in the table; press the link again to let go.
 - **A border drawn by hand** — **Draft**, beside the border color, draws it
   wobbling, as a line rather than a rule. Width, style and radius all still

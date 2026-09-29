@@ -24,9 +24,14 @@
 		title?: string;
 		/** what a screen reader calls it */
 		label: string;
+		/**
+		 * The hue is decided elsewhere — a column of the row — so only the
+		 * opacity is this field's to set. The swatch goes quiet and says why.
+		 */
+		hueFrom?: string;
 	}
 
-	let { value, fallback = '#000000', onchange, disabled = false, title, label }: Props = $props();
+	let { value, fallback = '#000000', onchange, disabled = false, title, label, hueFrom }: Props = $props();
 
 	const rgba = $derived(toRgba(value) ?? toRgba(fallback) ?? { r: 0, g: 0, b: 0, a: 1 });
 	const hex = $derived(fromRgba({ ...rgba, a: 1 }));
@@ -55,7 +60,8 @@
 		class="swatch"
 		type="color"
 		value={hex}
-		{disabled}
+		disabled={disabled || !!hueFrom}
+		title={hueFrom ? `From the ${hueFrom} column, where its cell is a color; this one shows where it is not` : undefined}
 		aria-label={label}
 		onchange={(e) => setHue(e.currentTarget.value)}
 	/>
@@ -86,6 +92,15 @@
 		padding: 2px;
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-input);
+	}
+
+	/* A swatch that cannot be changed has to look it: the platform draws a
+	   disabled color input exactly like a live one. Faded, like a disabled
+	   button in the bars — and the number beside it stays at full strength
+	   when it is still the field's to set. */
+	.swatch:disabled {
+		opacity: 0.4;
+		cursor: default;
 	}
 
 	/* Three digits and no more: 100 is the widest it ever holds. */

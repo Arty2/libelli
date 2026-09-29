@@ -1,6 +1,6 @@
 import { safeImageUrl } from './assets';
 import { clampSide, fitBoard } from './bitmap';
-import { parseColor } from './color';
+import { fromRgba, parseColor, toRgba } from './color';
 import defaultCard from './templates/default-card.json';
 import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
 import type {
@@ -197,10 +197,19 @@ export function normaliseColorFrom(raw: unknown): ColorSources | undefined {
 export function colorsFromRow(box: Box, row: Row | null | undefined): Box {
 	const from = box.colorFrom;
 	if (!from || !row) return box;
-	const cell = (column: string | undefined) => (column ? parseColor(row[column]) : null);
-	const text = cell(from.text);
-	const fill = cell(from.fill);
-	const border = cell(from.border);
+	// The hue is the row's; the opacity is still the area's, so a fill linked to
+	// a column can be a tint. The two multiply: a cell with an alpha of its own
+	// keeps it, faded further by the area's.
+	const cell = (column: string | undefined, own: string | undefined) => {
+		const hue = column ? parseColor(row[column]) : null;
+		if (!hue) return null;
+		const alpha = toRgba(own)?.a ?? 1;
+		const channels = toRgba(hue);
+		return alpha < 1 && channels ? fromRgba({ ...channels, a: channels.a * alpha }) : hue;
+	};
+	const text = cell(from.text, box.color);
+	const fill = cell(from.fill, box.background);
+	const border = cell(from.border, box.borderColor);
 	if (!text && !fill && !border) return box;
 	return {
 		...box,

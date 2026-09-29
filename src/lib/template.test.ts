@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fromRgba } from './color';
 import {
 	BOX_MODES,
 	DEFAULT_DEFAULTS,
@@ -638,6 +639,13 @@ describe('colors from a column', () => {
 		expect(drawn.background).toBe(box.background);
 		expect(drawn.borderColor).toBe(box.borderColor);
 		expect(colorsFromRow(box, null)).toBe(box);
+	});
+
+	it("keeps the area's opacity on the row's color", () => {
+		const faded = { ...box, background: 'rgba(255, 255, 255, 0.5)' };
+		expect(colorsFromRow(faded, { paper: '#ff0000' }).background).toBe(fromRgba({ r: 255, g: 0, b: 0, a: 0.5 }));
+		// Opaque stays exactly the cell as parsed.
+		expect(colorsFromRow(box, { ink: 'teal' }).color).toBe('#008080');
 	});
 
 	it('lets nothing but a color out of a cell', () => {
