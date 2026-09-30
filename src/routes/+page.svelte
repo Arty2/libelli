@@ -59,6 +59,7 @@
 	import { GONE_ROW, carryLookups, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
+	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
 	import { TEXT_MAX, TEXT_MIN, applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
 		autoMap,
@@ -163,6 +164,20 @@
 	 */
 	let excludedSheets = $state<Set<number>>(new Set());
 	let helpOpen = $state(false);
+	let whatsNewOpen = $state(false);
+	/**
+	 * The last version whose What's new was opened — see `seenAtBoot`. Starts as
+	 * this version, not null: boot learns the real value only after its storage
+	 * round trips, and a dot there until then would flash on every first paint,
+	 * a first visit's included.
+	 */
+	let seenVersion = $state<string | null>(VERSION);
+	const whatsNewUnread = $derived(seenVersion !== VERSION);
+	function openWhatsNew() {
+		whatsNewOpen = true;
+		seenVersion = VERSION;
+		saveSeenVersion(VERSION);
+	}
 
 	/** The interface's text size, as a multiple of the browser's default — see textsize.ts. */
 	let textSize = $state(1);
@@ -659,6 +674,8 @@
 			datasetId = nextDatasetId();
 		}
 		saveDatasetId(datasetId);
+		seenVersion = seenAtBoot(loadSeenVersion(), firstRun, VERSION);
+		if (firstRun) saveSeenVersion(VERSION);
 		previousTable = loadPreviousDatasetId();
 		void refreshTables();
 
@@ -2168,18 +2185,17 @@
 		notify('Pasted as a new area, holding its own words. Ctrl/Cmd+Z takes it away.');
 	}
 
-	/** Something in front of the stage, which then leaves the keys alone. */
-	const stageModalOpen = $derived(
-		helpOpen ||
-			statusOpen ||
-			cssOpen ||
-			previewOpen ||
-			lightboxOpen ||
-			boxMenu !== null ||
-			deletingTable ||
-			editingId !== null ||
-			magic !== null
+	/**
+	 * A dialog of this page's own is up. Each handles its own keys on its own
+	 * element (modal.ts), so the page's handler stands down entirely, Escape
+	 * aside: otherwise Delete, Ctrl/Cmd+D or Enter acts on the card behind it,
+	 * where nobody can see what it did.
+	 */
+	const dialogOpen = $derived(
+		helpOpen || whatsNewOpen || statusOpen || cssOpen || resetting || deleting || deletingTable || magic !== null
 	);
+	/** Something in front of the stage, which then leaves the keys alone. */
+	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
 
 	function onWindowKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
@@ -2203,6 +2219,19 @@
 		// The lightbox is in front of everything and takes Escape and the arrows
 		// for itself; nothing back here should answer them underneath it.
 		if (lightboxOpen) return;
+		if (event.key === 'Escape' && (dialogOpen || boxMenu)) {
+			helpOpen = false;
+			whatsNewOpen = false;
+			statusOpen = false;
+			if (cssOpen) cancelCss();
+			resetting = false;
+			deleting = false;
+			deletingTable = false;
+			magic = null;
+			boxMenu = null;
+			return;
+		}
+		if (dialogOpen) return;
 		// A new area waits for its first key. Delete, the arrows and every chord
 		// keep their meaning — remove it, move it, undo it — and anything that
 		// types a character puts the cursor in its Text field first, where the
@@ -2231,17 +2260,6 @@
 		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
 			event.preventDefault();
 			redo();
-			return;
-		}
-		if (event.key === 'Escape' && (helpOpen || statusOpen || cssOpen || boxMenu || resetting || deleting || deletingTable || magic)) {
-			helpOpen = false;
-			statusOpen = false;
-			if (cssOpen) cancelCss();
-			resetting = false;
-			deleting = false;
-			deletingTable = false;
-			magic = null;
-			boxMenu = null;
 			return;
 		}
 		// The style clipboard, before the plain Ctrl/Cmd+C below sees the same key.
@@ -3122,7 +3140,14 @@
 		{#if updateReady}
 			<button class="reload" onclick={applyUpdate}>Update</button>
 		{/if}
-		<span class="version">v{VERSION}</span>
+		<!-- The version is the way to what it brought: where someone who has just
+		     pressed Update looks, and a dot there until they have. -->
+		<button
+			class="version"
+			class:unread={whatsNewUnread}
+			onclick={openWhatsNew}
+			title={whatsNewUnread ? "What's new — not read yet" : "What's new"}>v{VERSION}</button
+		>
 	</footer>
 </div>
 
@@ -3313,6 +3338,31 @@
 			<button onclick={() => (magic = null)}>Cancel</button>
 			<button class="primary" data-default onclick={applyMagic}>OK</button>
 		</div>
+	</div>
+{/if}
+
+{#if whatsNewOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (whatsNewOpen = false)}></div>
+	<div class="modal whats-new" role="dialog" aria-modal="true" aria-labelledby="whats-new-title" use:dragByTitle>
+		<header class="modal-header drag-title" data-drag-handle>
+			<h2 id="whats-new-title">What's new</h2>
+			<button class="icon" use:focusOnOpen onclick={() => (whatsNewOpen = false)} title="Close" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
+		{#each RELEASES as release (release.version)}
+			<h3>
+				{release.version}{#if release.version === VERSION}<span class="current">· this one</span>{/if}
+				<time datetime={release.date}>{release.date}</time>
+			</h3>
+			<ul>
+				{#each release.items as item, i (i)}
+					<li>
+						{#each item as run, j (j)}{#if run.code}<code>{run.text}</code>{:else}{run.text}{/if}{/each}
+					</li>
+				{/each}
+			</ul>
+		{/each}
 	</div>
 {/if}
 
@@ -3736,8 +3786,64 @@
 	}
 
 	.status-bar .version {
+		position: relative;
+		padding: 2px 4px;
+		border-color: transparent;
+		background: none;
 		font: 400 0.6875rem ui-monospace, SFMono-Regular, Menlo, monospace;
 		color: #999;
+	}
+
+	.status-bar .version:hover {
+		color: #555;
+	}
+
+	/* A finger's target without a taller bar: the padding grows, and the same
+	   margin taken back keeps the row the height it was. */
+	@media (pointer: coarse) {
+		.status-bar .version {
+			margin: -6px -4px -6px 0;
+			padding: 8px 8px;
+		}
+	}
+
+	/* In the accent, not the warning red: something to read, not something
+	   wrong. */
+	.status-bar .version.unread::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		right: -4px;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--accent);
+	}
+
+	.whats-new h3 {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+	}
+
+	.whats-new h3 time {
+		margin-left: auto;
+		font-weight: 400;
+	}
+
+	.whats-new .current {
+		text-transform: none;
+		letter-spacing: 0;
+	}
+
+	.whats-new ul {
+		margin: 0 0 8px;
+		padding-left: 1.2em;
+		color: #333;
+	}
+
+	.whats-new li + li {
+		margin-top: 2px;
 	}
 
 	.check {

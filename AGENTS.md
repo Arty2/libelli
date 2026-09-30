@@ -3,11 +3,11 @@
 Notes for whoever — human or agent — picks this up next. `CLAUDE.md` imports
 this file; edit this one.
 
-`README.md` is the app as a user meets it, `docs/decisions.md` the why behind
-each module, `PLAN.md` the original decisions (historical). **This file is only
+`README.md` is the app as a user meets it, `CHANGELOG.md` what each version
+brought it, `docs/decisions.md` the why behind each module as it stands (history
+is git's), `PLAN.md` the original decisions. **This file is only
 what you need before touching anything**, read in full every session, so it is
-kept short: push detail into `docs/decisions.md`, and `npm run gates` holds this
-file to a line budget.
+kept short: push detail into `docs/decisions.md`; `npm run gates` holds the line budget.
 
 ## What this is
 
@@ -52,7 +52,7 @@ src/lib/
   onboarding.ts   the starter template and sample rows (sample-cards.csv) a first run lands on
   sw-policy.ts    the worker's answer to a request; pwa.ts registration, updates, install
   textsize.ts     no browser zoom: a pinch off the stage sizes the interface's text
-  version.ts      VERSION, and the bumping rule
+  version.ts      VERSION, and the bumping rule; changelog.ts reads CHANGELOG.md
   components/
     Card.svelte         the card itself: boxes, handles, drag, snap            (~3k)
     PagePreview.svelte  the stage: zoom, wheel gestures, the pager             (~1.8k)
@@ -145,7 +145,7 @@ re-read it. So every rule above that *can* be checked is, in `scripts/gates.sh`
 (`npm run gates`, first in CI) — injection sinks, `{@html}` outside Card,
 PrintRoot and Icon, `fetch` outside `png.ts` and the worker, runtime
 dependencies, `vercel.json`'s security headers, `colour` as a name, `VERSION`
-against `package.json`, this file's length, type in `px`. ESLint (`npm run lint`, next in CI)
+against `package.json` and `CHANGELOG.md`, this file's length, type in `px`. ESLint (`npm run lint`, next in CI)
 covers what a linter can; where a rule is off, `eslint.config.js` says why.
 
 Add the next rule to the script, not as a paragraph here — `docs/decisions.md`
@@ -155,8 +155,10 @@ gitignored `.claude/logs/gates.jsonl`, so "this gate never fires" is answerable.
 ## Versioning
 
 `src/lib/version.ts` is the source of truth; keep `package.json` and
-`package-lock.json` in step. Patch for a fix, minor for a feature, and **the
-leading zero never moves** — README has the table.
+`package-lock.json` in step, and head `CHANGELOG.md` with it, in a user's words:
+a patch rewrites its minor's heading to the new number, never adds a section.
+Patch for a fix, minor for a feature, and **the leading zero never moves** —
+README has the table.
 
 **Bump once per session, not once per change**, sized by the largest change in
 it — one feature among five fixes is still a minor. Set it when the work starts

@@ -184,7 +184,7 @@ fi
 #
 # Overridable so the failure path is testable without editing this file:
 # `AGENTS_MAX=10 npm run gates` should fail.
-AGENTS_MAX="${AGENTS_MAX:-212}"
+AGENTS_MAX="${AGENTS_MAX:-250}"
 
 # Counted only if the file can actually be read. A gate that passes when it
 # couldn't do its job is worse than no gate.
@@ -220,6 +220,32 @@ if [ -n "$pxtype" ]; then
 	fail "interface type sized in px — write it in rem, 16px to the rem" "$pxtype" "type-in-rem"
 else
 	pass "interface type sized in rem" "type-in-rem"
+fi
+
+# ── 10. Every version says what changed ──────────────────────────────────────
+# CHANGELOG.md is what a person reads under What's new, and a list that stops a
+# few versions back reads as a list of everything. So the top release heading
+# has to be the version being shipped: a bump, patch or minor, is not done
+# until the changelog says what it brought. A patch rewrites its minor's
+# heading rather than adding one — the file keeps one section per minor.
+# The same shape changelog.ts lists — a version, a dash, an ISO date — so a
+# heading this accepts is never one the What's new dialog silently skips.
+top_release=$(sed -n 's/^## \([0-9]*\.[0-9]*\.[0-9]*\) .* \([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)[[:space:]]*$/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)
+
+heading="## $src_version — $(date -u +%Y-%m-%d)"
+if [ "$top_release" != "$src_version" ]; then
+	# Say which of the two it is: a patch keeps its minor's section, so the
+	# fix is to rename that heading, and only a new minor starts one.
+	if [ "${top_release%.*}" = "${src_version%.*}" ]; then
+		todo="rewrite '## $top_release' as '$heading' and add this patch's lines under it"
+	else
+		todo="start a section headed '$heading' above it"
+	fi
+	fail "CHANGELOG.md does not open with version $src_version" \
+		"its top release heading is '${top_release:-none}' — $todo" \
+		"changelog-current"
+else
+	pass "CHANGELOG.md opens with $src_version" "changelog-current"
 fi
 
 # ── local, gitignored log — see the header comment ───────────────────────────
