@@ -858,10 +858,10 @@ overlays are `pointer-events: none` and hidden in print — as elements they no
 longer fail safe by being inside `@media screen`, and a line on the paper is a
 printing error rather than a cosmetic one.
 
-The grid is finer still — a half-pixel hairline in both rules, with the 10mm
+The grid is finer still — one device pixel in both rules, with the 10mm
 rhythm carried by darkness rather than thickness — and keeps its weight for a
-different reason: it sits outside the transform and was always measured in screen
-pixels.
+different reason: it is drawn in device pixels to begin with (see
+`PagePreview.svelte`).
 
 **A badge is an annotation, not a control.** They are grey on white, smaller than
 the blue chrome, and clear of the box rather than straddling its corner, where
@@ -1344,11 +1344,25 @@ mark. The SVG sits outside the card's transform, so the hairline is in screen
 pixels and does not thicken with the zoom, the same bargain the trim line
 makes.
 
+**Every grid mark sits on a device pixel.** A line between two device pixels is
+drawn as two at half strength, so the half-pixel hairline the grid used to be
+read as a grey smear, and a round dot under a pixel across as a faint blur —
+measured, the rules came out 243–248 on white at a ratio of 1, next to nothing.
+The viewBox now counts device pixels; where the SVG's corner falls inside a pixel
+is measured off `getBoundingClientRect` (the page is centred and scaled, so it
+can be anywhere) and every tick is snapped to the pixel it falls in: a rule is
+one device pixel down its middle, a dot a filled square of whole pixels, under
+`crispEdges`. Re-measured on a zoom, a resize, a scroll and a change of screen,
+and set only on a change, so drawing from the measurement cannot loop. The rules
+keep their strengths, which on one pixel rather than two reads darker than
+before; the dots are solid ink, black or white, told apart by size, because a
+dot is too little ink for any strength less than full to survive every screen.
+
 **The Grid box goes round three states: off, ruled, dots.** Same millimetres,
 same snapping, a dot at each intersection instead of a line across the card —
-quieter to lay type over. Dots are one path too: a zero-length subpath with a
-round cap is a dot, so an A3 page is one `d` string rather than five thousand
-circles. It was a hold on the box until a hold came to mean "show me the
+quieter to lay type over. Dots are one path too: each filled square is a
+four-step subpath, so an A3 page is one `d` string rather than five thousand
+rectangles. It was a hold on the box until a hold came to mean "show me the
 tooltip"; a third state costs a press but no gesture nobody was taught. The
 word beside the box says *Dots* while dots are drawn, because a mode with no
 visible sign is a trap; the keyboard's grid key still toggles on and off.
