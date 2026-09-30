@@ -536,7 +536,7 @@ resize boxes directly, or type exact millimetres.
   `.content-static` or `.content-image` — and its mode — `.mode-plain`,
   `.mode-markdown`, `.mode-image`, `.mode-color` or `.mode-qr`. The empty
   field's placeholder lists this template's own ids and these classes, and
-  **Edit Starter** puts that same sheet into the editor, to edit rather than
+  **Starter** puts that same sheet into the editor, to edit rather than
   read. The dialog can be dragged by its title, to see the card it is styling,
   and says beside its name how many lines the sheet is and what it weighs.
   The editor numbers its lines and colours them as you type. It indents with

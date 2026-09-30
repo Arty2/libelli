@@ -335,7 +335,7 @@ on the card yet".
 
 **A locked template opens here to read.** The lock is on writing, and a sheet
 somebody else wrote is the thing in a locked template most worth reading. The
-three buttons that write — Edit Starter, Apply, Save — are not rendered rather
+three buttons that write — Starter, Apply, Save — are not rendered rather
 than disabled: on a row this short a line of greyed buttons reads as something
 broken, and the field itself is `readonly`, which is the honest signal.
 

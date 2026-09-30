@@ -3208,8 +3208,8 @@
 		     example and two paragraphs of prose above and below it; what an author
 		     actually needs is the names of the things they can reach, and a
 		     placeholder is where they will look for them. The prose that was here
-		     is in the README, where prose belongs. Edit Starter puts that same
-		     text into the editor, where it can be edited rather than read. -->
+		     is in the README, where prose belongs. Starter puts that same text
+		     into the editor, where it can be edited rather than read. -->
 		<CssEditor
 			bind:this={cssEditor}
 			bind:value={cssDraft}
@@ -3228,7 +3228,7 @@
 					onclick={() => cssEditor?.insert(cssPlaceholder)}
 					title="Put the starter sheet into the editor, to edit rather than read"
 				>
-					Edit Starter
+					Starter
 				</button>
 			{/if}
 			<span class="spacer"></span>
