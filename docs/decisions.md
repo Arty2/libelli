@@ -1263,6 +1263,17 @@ accumulated and spent a point at a time: a mouse notch is one fat event and a
 trackpad is a stream of small ones, so reading them one-for-one would make the
 same flick one step on one machine and forty on another.
 
+**Past Fit, the page can be scrolled clear of every toolbar.** The toolbars
+float over the stage and the scroller's padding is a flat 24px, so scrolled to an
+edge a zoomed page had its corner under undo, the view toggles or the zoom — the
+part you had scrolled there to see. Each fixed toolbar is measured and cleared by
+whichever stage edge it is nearer to, each side takes its deepest toolbar plus a
+16px gap, and that is a margin on the page rather than padding on the scroller:
+Fit is measured off the scroller's content box, and padding would have shrunk Fit
+to clear toolbars that a centred page at Fit is already clear of. Watched with a
+`ResizeObserver`, since the selection's tools grow the column under undo. The
+nudge pad is left out: it can be dragged off whatever it covers.
+
 **The pager reserves its own height.** The sheet and the pager are one column, so
 `fit` subtracts the pager's measured height and the column gap before it sizes
 the page — otherwise the count is the first thing off the bottom of a short

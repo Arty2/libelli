@@ -274,6 +274,73 @@
 	});
 
 	/**
+	 * Room to pan past the page's edges, once it is zoomed past Fit.
+	 *
+	 * The toolbars float over the stage, and the scroller's own padding is a
+	 * flat 24px, so scrolled to an edge the page's corner sat under undo and
+	 * the zoom, which are 48px and more in from it: the one part of the page
+	 * you had scrolled there to see was the part you could not. Each toolbar
+	 * is cleared by whichever edge it is nearer to — undo's column by the left,
+	 * the view toggles and the zoom by the bottom — and each side gets as much
+	 * room as its deepest toolbar needs, plus a gap, as a margin on the page.
+	 *
+	 * A margin rather than more padding on the scroller: Fit is measured off
+	 * the scroller's content box, so padding would shrink Fit to make room it
+	 * does not need. Fit leaves the page clear of the toolbars on its own — it
+	 * is centred, with the corners in the band around it — and only a page
+	 * larger than the stage can be scrolled under them. The nudge pad is left
+	 * out: it can be dragged anywhere, off whatever it happens to cover.
+	 */
+	let stage = $state<HTMLDivElement | null>(null);
+	let clearance = $state({ top: 0, right: 0, bottom: 0, left: 0 });
+	const CLEAR_GAP = 16;
+
+	function measureClearance() {
+		if (!stage || !host) return;
+		const box = stage.getBoundingClientRect();
+		const need = { top: 0, right: 0, bottom: 0, left: 0 };
+		for (const el of stage.querySelectorAll<HTMLElement>(':scope > .rail, :scope > .corner, .pager .controls')) {
+			const r = el.getBoundingClientRect();
+			if (!r.width || !r.height) continue;
+			const ways = {
+				top: r.bottom - box.top,
+				right: box.right - r.left,
+				bottom: box.bottom - r.top,
+				left: r.right - box.left
+			};
+			const side = (Object.keys(ways) as (keyof typeof ways)[]).reduce((a, b) => (ways[b] < ways[a] ? b : a));
+			need[side] = Math.max(need[side], ways[side] + CLEAR_GAP);
+		}
+		// The scroller's padding already gives some of it.
+		const pad = getComputedStyle(host);
+		const next = {
+			top: Math.max(0, Math.round(need.top - parseFloat(pad.paddingTop))),
+			right: Math.max(0, Math.round(need.right - parseFloat(pad.paddingRight))),
+			bottom: Math.max(0, Math.round(need.bottom - parseFloat(pad.paddingBottom))),
+			left: Math.max(0, Math.round(need.left - parseFloat(pad.paddingLeft)))
+		};
+		const was = clearance;
+		if (next.top !== was.top || next.right !== was.right || next.bottom !== was.bottom || next.left !== was.left) {
+			clearance = next;
+		}
+	}
+
+	$effect(() => {
+		if (!stage) return;
+		const node = stage;
+		// The toolbars change size with what they offer — the selection's own
+		// tools come and go under undo — so they are watched, not read once.
+		void selectedIds.length;
+		void hostSize;
+		const observer = new ResizeObserver(() => measureClearance());
+		for (const el of node.querySelectorAll<HTMLElement>(':scope > .rail, :scope > .corner, .pager .controls')) {
+			observer.observe(el);
+		}
+		measureClearance();
+		return () => observer.disconnect();
+	});
+
+	/**
 	 * The zoom at which the paper is its real size here — see `actualScale`.
 	 * Read again whenever the window changes, because moving it to another
 	 * screen, or zooming the browser, changes what the screen reports.
@@ -289,6 +356,9 @@
 	});
 
 	const scale = $derived(typeof zoom === 'number' ? zoom : zoom === 'actual' ? actual.scale : fitScale);
+
+	/** Past Fit, where the page can be larger than the stage — see `clearance`. */
+	const zoomedIn = $derived(scale > fitScale + 0.001);
 
 	/**
 	 * The zoom menu. Actual is the paper at its real size on this screen,
@@ -1089,7 +1159,7 @@
 	{/if}
 {/snippet}
 
-<div class="stage">
+<div class="stage" bind:this={stage}>
 <div
 	class="viewport"
 	bind:this={host}
@@ -1107,7 +1177,12 @@
 	aria-label="Card preview"
 	tabindex="-1"
 >
-	<div class="page">
+	<div
+		class="page"
+		style={zoomedIn
+			? `margin:${clearance.top}px ${clearance.right}px ${clearance.bottom}px ${clearance.left}px`
+			: undefined}
+	>
 	<!-- A picture file dropped on the page itself, rather than on an area,
 	     becomes an area of its own there. An area's own drop stops the event
 	     before it reaches this, so this only ever sees the ground between them. -->

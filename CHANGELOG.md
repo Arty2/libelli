@@ -6,7 +6,7 @@ heading to the new number and adds its lines there, never a section of its own.
 The app shows this file under **What's new** — press the version number in the
 status bar.
 
-## 0.24.4 — 2026-09-30
+## 0.24.5 — 2026-09-30
 
 - What's new: press the version number in the status bar for this list. A dot
   on it after an update means there is something you have not read yet.
@@ -19,6 +19,8 @@ status bar.
   area in view when you zoom from beside it.
 - The grid is sharp: every line is one screen pixel, and the dot grid is
   solid black (white on a dark card) rather than a faint grey.
+- Zoomed in, there is room to scroll past every edge of the page, so no
+  corner of it has to sit under the toolbars.
 
 ## 0.23.0 — 2026-09-29
 
