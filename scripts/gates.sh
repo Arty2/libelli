@@ -248,6 +248,43 @@ else
 	pass "CHANGELOG.md opens with $src_version" "changelog-current"
 fi
 
+# ── 11. A version says what it brought, briefly ──────────────────────────────
+# What's new is read in a dialog on a phone by somebody who has just updated,
+# and it is the one thing here written for them rather than for us. A section
+# that runs to a screenful is a release note nobody finishes, and it grows the
+# same way AGENTS.md does: every line individually defensible. So it is a
+# budget — the lines between one release heading and the next, blank lines and
+# all. Say what changed and what it means, and leave how it works to the README.
+#
+# Overridable so the failure path is testable: `CHANGELOG_MAX=2 npm run gates`
+# should fail.
+CHANGELOG_MAX="${CHANGELOG_MAX:-12}"
+
+if [ -r CHANGELOG.md ]; then
+	long=$(awk -v max="$CHANGELOG_MAX" '
+		/^## / {
+			if (name != "" && len > max) printf "%s — %d lines\n", name, len
+			name = $0
+			len = 0
+			next
+		}
+		name != "" { len++ }
+		END { if (name != "" && len > max) printf "%s — %d lines\n", name, len }
+	' CHANGELOG.md)
+	if [ -n "$long" ]; then
+		fail "a CHANGELOG.md section is over $CHANGELOG_MAX lines" \
+			"$long
+cut it to what a user needs to know, or raise CHANGELOG_MAX on purpose" \
+			"changelog-section-budget"
+	else
+		pass "every CHANGELOG.md section is $CHANGELOG_MAX lines or fewer" "changelog-section-budget"
+	fi
+else
+	fail "CHANGELOG.md is missing or unreadable" \
+		"the release it heads is what the app shows under What's new" \
+		"changelog-section-budget"
+fi
+
 # ── local, gitignored log — see the header comment ───────────────────────────
 mkdir -p .claude/logs
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)

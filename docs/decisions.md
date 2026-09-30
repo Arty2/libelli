@@ -3478,12 +3478,15 @@ Three conventions for adding one:
   believed. The list is the decision, written down where adding to it is a
   commit.
 
-**The threshold on `AGENTS.md` is a budget, not a request.** The file opens by
+**Two budgets, and they are budgets rather than requests.** The file opens by
 asking to be kept short, which is worth nothing on its own: every addition is
 individually defensible, and a session can grow it by half without any one of
 them looking wrong. A budget makes that growth a decision — raise the number
 deliberately, in the commit that earns it, or move the detail into this file,
-where nobody pays for it on every turn.
+where nobody pays for it on every turn. `CHANGELOG_MAX` is the same bargain
+pointed the other way: a release section is read in a dialog on a phone by
+somebody who has just updated, so it is capped at what they will finish —
+what changed and what it means, with how it works left to the README.
 
 **Test a pattern against the mistake it is for.** A `colour` check that wants a
 non-letter before the word and allows no `?` passes `fillColour: string` and
