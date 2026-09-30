@@ -1366,10 +1366,10 @@ one device pixel down its middle, a dot a filled square of whole pixels, under
 `crispEdges`. Re-measured on a zoom, a resize, a scroll and a change of screen,
 and set only on a change, so drawing from the measurement cannot loop. The rules
 keep their strengths, which on one pixel rather than two reads darker than
-before. The dots are one size, about a CSS pixel, at 80% of the ink (black, or
-white on a dark paper): a grey any lighter is too little ink in a dot to survive
-every screen, and full black was the heaviest thing on the card at a desktop's
-density. They were told apart by size once, a 2x2 at every 10mm, and that was
+before. The dots are one size, about a CSS pixel, at 60% of the ink (#666 on
+white, or white at 60% on a dark paper): much lighter is too little ink in a dot
+to survive every screen, and full black — then 80% — was the heaviest thing on
+the card at a desktop's density. They were told apart by size once, a 2x2 at every 10mm, and that was
 four times the ink of the rest; on the dots the 10mm rhythm is given up, and the
 ruled grid is the one that carries it.
 

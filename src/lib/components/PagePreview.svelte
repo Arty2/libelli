@@ -1832,7 +1832,7 @@
 	   against, not looked at, and a colored one competed with the card. Both
 	   rules are one device pixel, sat on one — the finest line a screen draws
 	   sharp — and the 10mm rhythm is carried by the majors being darker rather
-	   than thicker. The dots are the exception, near full ink; see gridArt. This overlay sits outside the card's transform
+	   than thicker. The dots are the exception, far stronger; see gridArt. This overlay sits outside the card's transform
 	   and is already sized in screen pixels, so its weight does not move with the
 	   zoom, which is the same promise the card's own --line makes. */
 	.grid-overlay {
@@ -1850,11 +1850,11 @@
 		shape-rendering: crispEdges;
 	}
 
-	/* Four fifths of the ink rather than all of it: solid black read as
-	   heavier than anything on the card at a desktop's density, and a dot is
-	   little enough ink that much less than this and some screens lose it. */
+	/* Three fifths of the ink: solid black read as heavier than anything on
+	   the card at a desktop's density, and four fifths still stood out. A dot
+	   is little enough ink that much less than this and some screens lose it. */
 	.grid-overlay path.dot {
-		fill: rgba(var(--grid-ink), 0.8);
+		fill: rgba(var(--grid-ink), 0.6);
 		stroke: none;
 	}
 
