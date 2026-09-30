@@ -2359,9 +2359,12 @@ minor, and just as simple to check.
 runs the page prints as text. Rendering it through `markdown.ts` would need a
 fourth file allowed raw markup, for a document we write ourselves.
 
-**The dot is for updates only.** A first run marks the current version read —
-the starter card is the introduction — and a returning visitor who has never
-opened the list has news. Opening it marks this version read.
+**After an update the list opens by itself, once.** A dot on the version
+asking to be pressed was easy to miss, and what changed is most worth reading
+the first time the new version is open. A first run marks the current version
+read — the starter card is the introduction — and a returning visitor who has
+never opened the list has news. Opening it, by hand or at start, marks this
+version read, so it does not open again.
 
 ## `src/lib/sw-policy.ts` and `src/service-worker.ts`
 
@@ -3143,6 +3146,19 @@ A named `blue` in `color.ts` is content, not chrome, and stays a fixed colour.
 `color-mix` is Widely available; relative colour syntax is not yet, which is
 why the tints are mixes rather than `rgb(from …)`.
 
+**A button's words are capitals, unless they are data.** `button` is
+`text-transform: uppercase` with a little tracking, the way the bars' own labels
+already were: LOCK, SAVE, CANCEL. Not where the words are something written
+rather than a command — a menu's items and the value a menu button shows
+(`[role^='menuitem']`, `[aria-haspopup]`: a font, a template, a table), the
+notice in the status bar, the version, the text size and a drawing's row in
+Images, which carry `as-typed`. Capitals there would misstate what was written.
+A command that names something, *Choose Inter File…*, takes the capitals with
+it: rare, and a name in capitals is still the name. Capitals are inherited, and
+the Export screen's thumbnails are buttons, so a card sets its own type back
+(`button :where(.card)`, at a type selector's weight so a template's CSS still
+wins) — without it every card there came out in capitals.
+
 **The guides are the accent's inverse.** The page margins and the snap guides
 are drawn over the areas' outlines, which are the accent, so they take
 `--accent-inverse` — the colour furthest from it — rather than a fixed magenta
@@ -3152,6 +3168,18 @@ Newly, so it is behind `@supports`; without it the guides are `#da9c14`, the
 inverse of the fallback blue, worked out by hand.
 
 ## `src/lib/textsize.ts`, the viewport, and type in `rem`
+
+**The app is pinned to the window, not given a height.** `.app` is
+`position: fixed; inset: 0` rather than `height: 100dvh`. `dvh` was chosen over
+`vh` so a phone's address bar did not hide the status bar, but Chrome on
+Android, starting the installed app cold, can work `dvh` out before the window
+has settled and keep that shorter height until something resizes it — a strip of
+bare page under the status bar, on some launches and not others. A fixed box
+with no offsets is the window's own size whenever it is asked. Taking the app
+out of the flow costs nothing: the document never scrolled, and every dialog is
+fixed already. A fixed box is also a stacking context; nothing inside the app
+has to paint over a dialog, and the dialogs, the tooltip and the `%%` list all
+sit outside it.
 
 **The interface does not zoom; its text does.** On a phone, touching a cell at
 the right of the table slid the interface left and made the whole app larger.
@@ -3190,13 +3218,21 @@ exception is the badges drawn on an area, which belong to the page they sit
 on and pass `fixed`. An options bar group wraps inside itself once it is wider
 than the bar, which on a desk it now can be.
 
-**The mark resets the text size.** Pressing the logo sets it back to 100%, the
-way out after a pinch that went further than meant. On a phone the mark is
-centred over the toolbar, which only has room for it while the buttons are
-small; with the text larger than default, `applyTextSize` (and the pre-paint
-script) set `data-text-larger` on the root, and the mark goes back into the
-row, shrinking before anything wraps — at 150% on a 412px phone it had sat
-over Page Setup and taken its press.
+**The size says itself, and that is how it goes back.** Away from 100%, the
+percentage sits to the right of the version in the status bar, and pressing it
+puts the size back. It used to be the logo that did that, which nobody could
+have guessed and a pinch gave no hint of; a number in the corner is both the
+sign that something changed and the way out. Help no longer has size buttons
+either — the keys list says what the chords do, like every other chord.
+
+On a phone the mark is centred over the toolbar, which only has room for it
+while the buttons are small; with the text larger than default,
+`applyTextSize` (and the pre-paint script) set `data-text-larger` on the root,
+and the row is laid out as at 320px: the mark at the left, shrinking before
+anything wraps, and every button after the space — Install and Help in front of
+Page Setup. At 150% on a 412px phone a centred mark had sat over Page Setup;
+and with Help and Install left where they were, the logo split the controls in
+two.
 
 A pinch arrives as a ratio of the spread at its start, so it is snapped to 5%
 each time without drifting. A wheel arrives as dozens of small deltas, and each

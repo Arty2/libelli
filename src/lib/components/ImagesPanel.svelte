@@ -648,7 +648,7 @@
 			<ul class="images">
 				{#each drawings as drawing (drawing.key)}
 					<li>
-						<button class="drawing" title="Open {drawing.label}, {drawing.where}, to draw on" onclick={() => onopendrawing?.(drawing.key)}>
+						<button class="drawing as-typed" title="Open {drawing.label}, {drawing.where}, to draw on" onclick={() => onopendrawing?.(drawing.key)}>
 							<span class="thumb pixels">
 								<img
 									src={drawing.src}

@@ -6,10 +6,10 @@ heading to the new number and adds its lines there, never a section of its own.
 The app shows this file under **What's new** — press the version number in the
 status bar.
 
-## 0.24.7 — 2026-09-30
+## 0.24.8 — 2026-09-30
 
-- What's new: press the version number in the status bar for this list. A dot
-  on it after an update means there is something you have not read yet.
+- What's new: this list opens by itself the first time an update is running,
+  and the version number in the status bar opens it again.
 - Keys no longer reach the card behind an open dialog: Delete, Ctrl/Cmd + D or
   Enter with the help panel up used to change areas you could not see.
 - An area's badges keep the same size, icon and rounded corners at any zoom,
@@ -21,6 +21,14 @@ status bar.
   small, even, mid-grey dots (light on a dark card) rather than a faint blur.
 - Zoomed in, there is room to scroll past every edge of the page, so no
   corner of it has to sit under the toolbars.
+- With the text made larger on a phone, the logo moves to the left and every
+  button to the right of it.
+- The text size shows beside the version number when it is not 100%; press it
+  to put the size back. The logo no longer does, and Help no longer has size
+  buttons — the keys are listed there as before.
+- Buttons are labelled in capitals: LOCK, SAVE, CANCEL.
+- Fixed a strip of empty space that could appear under the status bar when the
+  installed app was started on Android.
 
 ## 0.23.0 — 2026-09-29
 
