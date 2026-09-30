@@ -254,9 +254,11 @@ fi
 # that runs to a screenful is a release note nobody finishes, and it grows the
 # same way AGENTS.md does: every line individually defensible. So it is a
 # budget of lines that say something — blank ones are not counted, because
-# wrapping is the writer's business and the reading is not. Three is the usual
-# shape; six is the most a release has ever needed. Say what changed and what
-# it means, and leave how it works to the README.
+# wrapping is the writer's business and the reading is not. A line is a group
+# of related changes rather than one change, so a feature and the five switches
+# that came with it are one line. Three is the usual shape; six is the most a
+# release has ever needed. Say what changed and what it means, and leave how it
+# works to the README.
 #
 # Overridable so the failure path is testable: `CHANGELOG_MAX=2 npm run gates`
 # should fail.
@@ -285,6 +287,28 @@ else
 	fail "CHANGELOG.md is missing or unreadable" \
 		"the release it heads is what the app shows under What's new" \
 		"changelog-section-budget"
+fi
+
+# ── 12. A release's lines are plain text ────────────────────────────────────
+# The What's new dialog parses this file rather than rendering it — raw markup
+# stays in the three renderers that earn it (§ 2) — and reads plain text with
+# `code` spans and nothing else. So a `**bold**` written here is shown with its
+# asterisks to everybody who opens the dialog, which is the one audience the
+# file has. Bullets only: the preamble above the first release is for whoever
+# opens the file, and never reaches the dialog.
+markup=$(awk '
+	/^## [0-9]/ { release = 1; next }
+	/^## / { release = 0; next }
+	release && /^- / && (/\*\*/ || /\[[^]]*\]\(/ || /^- #/) { printf "%d: %s\n", NR, $0 }
+' CHANGELOG.md 2>/dev/null)
+
+if [ -n "$markup" ]; then
+	fail "CHANGELOG.md markup the What's new dialog cannot read" \
+		"$markup
+it shows as typed — plain text and \`code\` spans are all that dialog reads" \
+		"changelog-plain-text"
+else
+	pass "CHANGELOG.md entries are plain text and code spans" "changelog-plain-text"
 fi
 
 # ── local, gitignored log — see the header comment ───────────────────────────

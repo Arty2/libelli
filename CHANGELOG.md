@@ -3,19 +3,17 @@
 What changed for someone using libelli, newest first. One section per minor
 version, headed by the last version it shipped as: a patch rewrites its minor's
 heading to the new number and adds its lines there, never a section of its own,
-and a section stays short: three lines of what changed, six at the very most,
-with how it works left to the README.
-The app shows this file under **What's new** — press the version number in the
-status bar.
+and a section stays short: one line per group of related changes, not one per
+change — three lines to a release, six at the very most, with how it works left
+to the README. The dialog reads plain text and `code` spans and nothing else,
+so any other markup shows as typed. The app shows this file under **What's
+new** — press the version number in the status bar.
 
-## 0.25.3 — 2026-09-30
+## 0.25.4 — 2026-09-30
 
-- The CSS dialog is an editor: numbered lines, colour as you type, and tabs
-  that indent — Tab and Shift + Tab, and Enter keeping the indent.
-- Nothing you type there reaches the card until **Apply** (Ctrl/Cmd + Enter) or
-  **Save**; **Cancel** puts back what was there. **Starter** fills the editor
-  with the example sheet.
-- A locked template's CSS opens to read.
+- The template's CSS gets a real editor: numbered lines, colour as you type,
+  tabs that indent, nothing reaching the card until you apply it, and a locked
+  template's sheet open to read.
 
 ## 0.24.0 — 2026-09-29
 

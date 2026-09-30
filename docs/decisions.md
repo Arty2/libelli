@@ -3487,8 +3487,18 @@ where nobody pays for it on every turn. `CHANGELOG_MAX` is the same bargain
 pointed the other way: a release section is read in a dialog on a phone by
 somebody who has just updated, so it is capped at what they will finish — six
 lines that say something, three being the usual shape, with how it works left
-to the README. Blank lines are not counted: where a line wraps is the writer's
-business, how much there is to read is not.
+to the README. A line is a group of related changes rather than one change: a
+feature and the five switches that came with it are one line. Blank lines are
+not counted, because where a line wraps is the writer's business and how much
+there is to read is not.
+
+**And the dialog reads the file rather than rendering it.** `changelog.ts`
+parses bullets into plain text and `code` spans, because raw markup stays in
+the three renderers that earn it — so a `**bold**` written in the changelog is
+shown with its asterisks to the only audience the file has.
+`changelog-plain-text` catches that, on release bullets only: the preamble
+above the first release is for whoever opens the file and never reaches the
+dialog.
 
 **Test a pattern against the mistake it is for.** A `colour` check that wants a
 non-letter before the word and allows no `?` passes `fillColour: string` and
