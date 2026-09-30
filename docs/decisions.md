@@ -1366,8 +1366,12 @@ one device pixel down its middle, a dot a filled square of whole pixels, under
 `crispEdges`. Re-measured on a zoom, a resize, a scroll and a change of screen,
 and set only on a change, so drawing from the measurement cannot loop. The rules
 keep their strengths, which on one pixel rather than two reads darker than
-before; the dots are solid ink, black or white, told apart by size, because a
-dot is too little ink for any strength less than full to survive every screen.
+before. The dots are one size, about a CSS pixel, at 80% of the ink (black, or
+white on a dark paper): a grey any lighter is too little ink in a dot to survive
+every screen, and full black was the heaviest thing on the card at a desktop's
+density. They were told apart by size once, a 2x2 at every 10mm, and that was
+four times the ink of the rest; on the dots the 10mm rhythm is given up, and the
+ruled grid is the one that carries it.
 
 **The Grid box goes round three states: off, ruled, dots.** Same millimetres,
 same snapping, a dot at each intersection instead of a line across the card —
@@ -1380,9 +1384,8 @@ visible sign is a trap; the keyboard's grid key still toggles on and off.
 
 **A major line is drawn once.** Every major tick is also a minor one; drawing
 both would double the ink exactly where the grid must stay quietest, so the minor
-path has the major positions taken out of it. In dot mode that subtraction is of
-*intersections*, not of coordinates: a minor dot sitting on a major column is
-still a minor dot unless its row is major too.
+path has the major positions taken out of it. The dots, all one size, have no
+majors to take out: the minor ticks are every intersection.
 
 **The nudge pad is one cross, not five tiles.** Five rounded rectangles with a
 gap between them read as five buttons that happen to be arranged in a plus. The
