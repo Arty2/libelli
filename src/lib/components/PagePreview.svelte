@@ -413,11 +413,11 @@
 	 * Zooming starts from what is on screen, not from the last number typed: a
 	 * step out of `fit` picks up the fitted scale, so the page does not jump.
 	 */
-	function zoomTo(next: number) {
+	function zoomTo(next: number, at?: { x: number; y: number }) {
 		const clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, next));
 		const rounded = Math.round(clamped * 1000) / 1000;
 		if (rounded === scale) return;
-		holdSelection();
+		holdSelection(at);
 		onzoom(rounded);
 	}
 
@@ -428,6 +428,14 @@
 	 * offsets happen to hold still, which sent a chosen area off the edge in
 	 * two steps of a pinch. With nothing chosen the page zooms as it always has.
 	 *
+	 * The point held still is where the zoom was asked for — the pointer under
+	 * a wheel, the middle of a pinch — brought inside the selection if it lies
+	 * outside it. Held to the selection's own middle, a wheel over one end of a
+	 * long area zoomed about the other end: what was under the pointer slid
+	 * away from it. Brought inside, the area still cannot leave: a pointer off
+	 * to one side holds the nearest edge still. The keys have no position, and
+	 * zoom about the middle.
+	 *
 	 * Where it was is taken before the scale changes, and put back once the
 	 * page has been drawn at the new one (the effect below). A pinch is a
 	 * stream of steps faster than a frame, so the first step's position is kept
@@ -435,24 +443,43 @@
 	 * by a rounding error a step. Only where the page can scroll: a page smaller
 	 * than the stage is centred in it, and there is nothing to move.
 	 */
-	let held: { x: number; y: number } | null = null;
+	type Hold = { x: number; y: number; fx: number; fy: number };
+	let held: Hold | null = null;
 
-	/** Where the chosen areas' middle is on screen — the middle of their union. */
-	function selectionMiddle(ids: string[] = pinchIds ?? selectedIds): { x: number; y: number } | null {
+	/** The chosen areas' union on screen. */
+	function selectionRect(ids: string[] = pinchIds ?? selectedIds) {
 		if (!host || !ids.length) return null;
 		const rects = ids
 			.map((id) => host!.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`)?.getBoundingClientRect())
 			.filter((r): r is DOMRect => !!r && (r.width > 0 || r.height > 0));
 		if (!rects.length) return null;
 		const left = Math.min(...rects.map((r) => r.left));
-		const right = Math.max(...rects.map((r) => r.right));
 		const top = Math.min(...rects.map((r) => r.top));
-		const bottom = Math.max(...rects.map((r) => r.bottom));
-		return { x: (left + right) / 2, y: (top + bottom) / 2 };
+		return {
+			left,
+			top,
+			w: Math.max(...rects.map((r) => r.right)) - left,
+			h: Math.max(...rects.map((r) => r.bottom)) - top
+		};
 	}
 
-	function holdSelection() {
-		held ??= selectionMiddle();
+	/**
+	 * The point of the selection to hold still: `at`, clamped into it, kept as
+	 * a fraction of the selection so the same point can be found again at the
+	 * next scale. No `at`, its middle.
+	 */
+	function holdAt(at?: { x: number; y: number }, ids?: string[]): Hold | null {
+		const r = selectionRect(ids);
+		if (!r) return null;
+		const fraction = (v: number | undefined, from: number, size: number) =>
+			v === undefined || size === 0 ? 0.5 : Math.min(1, Math.max(0, (v - from) / size));
+		const fx = fraction(at?.x, r.left, r.w);
+		const fy = fraction(at?.y, r.top, r.h);
+		return { x: r.left + fx * r.w, y: r.top + fy * r.h, fx, fy };
+	}
+
+	function holdSelection(at?: { x: number; y: number }) {
+		held ??= holdAt(at);
 	}
 
 	$effect(() => {
@@ -463,13 +490,13 @@
 		// hold it, and a target re-taken each step would keep what they lost.
 		const was = pinchTarget ?? held;
 		held = null;
-		const now = selectionMiddle();
-		if (!now) return;
-		host.scrollLeft += now.x - was.x;
-		host.scrollTop += now.y - was.y;
+		const r = selectionRect();
+		if (!r) return;
+		host.scrollLeft += r.left + was.fx * r.w - was.x;
+		host.scrollTop += r.top + was.fy * r.h - was.y;
 	});
 
-	const zoomBy = (factor: number) => zoomTo(scale * factor);
+	const zoomBy = (factor: number, at?: { x: number; y: number }) => zoomTo(scale * factor, at);
 
 	/**
 	 * Type size under the pointer, in points.
@@ -546,7 +573,7 @@
 			event.preventDefault();
 			lastWheel = performance.now();
 			if (event.shiftKey) resizeType(event);
-			else zoomBy(Math.exp(-event.deltaY / 220));
+			else zoomBy(Math.exp(-event.deltaY / 220), { x: event.clientX, y: event.clientY });
 		};
 		node.addEventListener('wheel', onWheel, { passive: false });
 		return () => node.removeEventListener('wheel', onWheel);
@@ -571,8 +598,9 @@
 		const onChange = (event: Event) => {
 			event.preventDefault();
 			if (pinch.size > 0 || performance.now() - lastWheel < 150) return;
-			const ratio = (event as Event & { scale?: number }).scale;
-			if (ratio) zoomTo(from * ratio);
+			const gesture = event as Event & { scale?: number; clientX?: number; clientY?: number };
+			const at = gesture.clientX === undefined || gesture.clientY === undefined ? undefined : { x: gesture.clientX, y: gesture.clientY };
+			if (gesture.scale) zoomTo(from * gesture.scale, at);
 		};
 		node.addEventListener('gesturestart', onStart);
 		node.addEventListener('gesturechange', onChange);
@@ -601,7 +629,7 @@
 	 */
 	let beforeTouch: string[] = [];
 	let pinchIds: string[] | null = null;
-	let pinchTarget: { x: number; y: number } | null = null;
+	let pinchTarget: Hold | null = null;
 
 	function onPinchDown(event: PointerEvent) {
 		if (event.pointerType !== 'touch') return;
@@ -610,7 +638,8 @@
 		if (pinch.size === 2) {
 			pinchStart = { spread: spread(), scale };
 			pinchIds = beforeTouch;
-			pinchTarget = selectionMiddle(beforeTouch);
+			const [a, b] = [...pinch.values()];
+			pinchTarget = holdAt({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, beforeTouch);
 			restoreSelection(beforeTouch);
 		}
 	}

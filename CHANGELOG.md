@@ -6,7 +6,7 @@ heading to the new number and adds its lines there, never a section of its own.
 The app shows this file under **What's new** — press the version number in the
 status bar.
 
-## 0.24.2 — 2026-09-30
+## 0.24.3 — 2026-09-30
 
 - What's new: press the version number in the status bar for this list. A dot
   on it after an update means there is something you have not read yet.
@@ -14,6 +14,9 @@ status bar.
   Enter with the help panel up used to change areas you could not see.
 - An area's badges keep the same size, icon and rounded corners at any zoom,
   like the corner handles, instead of growing and shrinking with the page.
+- Zooming with a selected area holds it where you zoom — under the pointer,
+  or between your fingers — rather than about its middle, and still keeps the
+  area in view when you zoom from beside it.
 
 ## 0.23.0 — 2026-09-29
 
