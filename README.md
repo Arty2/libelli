@@ -535,14 +535,20 @@ resize boxes directly, or type exact millimetres.
   two classes: where its content comes from — `.content-field`,
   `.content-static` or `.content-image` — and its mode — `.mode-plain`,
   `.mode-markdown`, `.mode-image`, `.mode-color` or `.mode-qr`. The empty
-  field's placeholder lists this template's own ids and these classes. The
-  dialog can be dragged by its title, to see the card it is styling. The dialog has a
-  **Cancel** beside its **Done**, and Cancel puts back the CSS that was there
-  when it opened — <kbd>Esc</kbd> and a click on the ground behind do the same,
-  because with a Cancel on the row the other two ways out that are not Done have
-  to mean what it means. What you type is applied as the field loses the focus,
-  so the card behind the dialog shows it before you decide; Cancel takes it off
-  again.
+  field's placeholder lists this template's own ids and these classes, and
+  **Starter** puts that same sheet into the editor, to edit rather than
+  read. The dialog can be dragged by its title, to see the card it is styling,
+  and says beside its name how many lines the sheet is and what it weighs.
+  The editor numbers its lines and colours them as you type. It indents with
+  tabs: <kbd>Tab</kbd> and <kbd>Shift</kbd>+<kbd>Tab</kbd> move the line or the
+  whole selection, <kbd>Enter</kbd> carries the indent of the line above and
+  steps in after a `{`, and a `}` typed on a line of its own steps back out.
+  Nothing reaches the card until you press something: **Apply**
+  (<kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd>) puts the sheet on the card and leaves
+  the dialog open, **Save** does both, and **Cancel** puts back the CSS that was
+  there when it opened — <kbd>Esc</kbd> and a click on the ground behind do the
+  same. A **locked** template opens here to read: the sheet is there, and the
+  three buttons that would write to it are not.
 
 ## Templates, and laying one out
 

@@ -491,7 +491,7 @@
 				     frozen by the lock: opening another template changes nothing in
 				     this one, and the menu beside it is not frozen either. -->
 				<button
-					class="square"
+					class="square swap"
 					disabled={!previousEntry}
 					title={previousEntry
 						? `Back to “${previousEntry.name}”`
@@ -503,7 +503,15 @@
 				     of the bar: the stylesheet is part of the template, travels with it, and
 				     is the last thing anyone would think to look for among page
 				     sizes and margins. -->
-				<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
+				<!-- Not frozen by the lock: a locked template's sheet can still be
+				     read, which is the one thing here that is worth reading — the
+				     editor opens without the buttons that would write to it. -->
+				<button
+					onclick={oneditcss}
+					title={pageFrozen
+						? 'Styles for this card — locked, so this opens to read'
+						: 'Styles for this card, saved inside the template'}
+				>
 					<Icon name="code" size={14} /> <span class="label">CSS</span>{template.css ? ' •' : ''}
 				</button>
 			</span>
