@@ -6,14 +6,14 @@ heading to the new number and adds its lines there, never a section of its own.
 The app shows this file under **What's new** — press the version number in the
 status bar.
 
-## 0.24.1 — 2026-09-30
+## 0.24.2 — 2026-09-30
 
 - What's new: press the version number in the status bar for this list. A dot
   on it after an update means there is something you have not read yet.
 - Keys no longer reach the card behind an open dialog: Delete, Ctrl/Cmd + D or
   Enter with the help panel up used to change areas you could not see.
-- The icons in an area's badges stay the same size at any zoom, like the
-  corner handles, instead of growing and shrinking with the page.
+- An area's badges keep the same size, icon and rounded corners at any zoom,
+  like the corner handles, instead of growing and shrinking with the page.
 
 ## 0.23.0 — 2026-09-29
 
