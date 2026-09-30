@@ -39,6 +39,11 @@ export function parseChangelog(src: string): Release[] {
 			flush();
 			current = { version: heading[1], date: heading[2], items: [] };
 			releases.push(current);
+		} else if (line.startsWith('## ')) {
+			// A heading this cannot read ends the release above it, or its bullets
+			// would be listed under a version that never brought them.
+			flush();
+			current = null;
 		} else if (!current) {
 			// The preamble above the first release is for someone reading the file.
 		} else if (line.startsWith('- ')) {

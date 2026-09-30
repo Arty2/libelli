@@ -27,6 +27,12 @@ describe('parseChangelog', () => {
 		expect(releases[0].items.map((i) => i.map((s) => s.text).join(''))).toEqual(['One thing, wrapped.', 'Another.']);
 	});
 
+	it('keeps the bullets under a heading it cannot read out of the release above', () => {
+		const releases = parseChangelog('## 1.0.0 — 2026-01-01\n- Kept.\n## 1.1.0 (unreleased)\n- Not 1.0.0.');
+		expect(releases).toHaveLength(1);
+		expect(releases[0].items).toHaveLength(1);
+	});
+
 	it('ignores a paragraph that is not a bullet', () => {
 		const [release] = parseChangelog('## 1.0.0 — 2026-01-01\n\nProse.\n- Item.');
 		expect(release.items).toHaveLength(1);

@@ -73,7 +73,6 @@ under **What's new** — press the version number in the status bar.
 ## 0.16.33 — 2026-09-25
 
 - Placeholders inside an area's words, and a lockable table.
-- More than one table, with a picker to swap between them.
 - Page margins: a setting, a guide beside the grid, and something to snap to.
 - Images as a tray, with uploads that carry onto areas.
 - A table menu with Import and Export; drag rows by their number.

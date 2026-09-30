@@ -169,8 +169,11 @@
 	/**
 	 * The last version whose What's new was opened. A first run counts as read
 	 * — see `hasUnread` — so the dot only ever means an update brought news.
+	 * Starts as this version, not null: boot reads the real value only after
+	 * its storage round trips, and until then `firstRun` is still false, so a
+	 * null here put the dot up on every first paint, a first visit's included.
 	 */
-	let seenVersion = $state<string | null>(null);
+	let seenVersion = $state<string | null>(VERSION);
 	function openWhatsNew() {
 		whatsNewOpen = true;
 		seenVersion = VERSION;
@@ -3796,6 +3799,15 @@
 
 	.status-bar .version:hover {
 		color: #555;
+	}
+
+	/* A finger's target without a taller bar: the padding grows, and the same
+	   margin taken back keeps the row the height it was. */
+	@media (pointer: coarse) {
+		.status-bar .version {
+			margin: -6px -4px -6px 0;
+			padding: 8px 8px;
+		}
 	}
 
 	/* In the accent, not the warning red: something to read, not something
