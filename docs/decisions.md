@@ -2741,9 +2741,12 @@ kept across a reload, because working between two designs — the real one and a
 variation — is the case that happens, and a menu each time is its whole cost.
 Every way the open template changes remembers the one left behind, except undo,
 which puts back a state rather than choosing one. The lock does not disable it:
-opening another template changes nothing in this one. On a phone CSS keeps its
-glyph and loses the word, as the window toolbar's buttons do, and is square like
-the swap beside it. A template with styles of its own is said by the border in
+opening another template changes nothing in this one. The swap is drawn as the
+table's is — a bare glyph in the tools' grey, filled on hover, faded to 30% with
+nothing to go back to — because it is the same control for the other half of
+the work, and a bordered square beside one and a bare glyph beside the other
+read as two. On a phone CSS keeps its glyph and loses the word, as the window
+toolbar's buttons do, and is square. A template with styles of its own is said by the border in
 full ink rather than a dot after the word: the dot went with the word on a phone,
 and it was the only sign there.
 

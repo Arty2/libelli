@@ -491,14 +491,14 @@
 				     frozen by the lock: opening another template changes nothing in
 				     this one, and the menu beside it is not frozen either. -->
 				<button
-					class="square"
+					class="swap"
 					disabled={!previousEntry}
 					title={previousEntry
 						? `Back to “${previousEntry.name}”`
 						: 'Nothing to swap back to yet — this is the only template you have opened'}
 					aria-label="Swap to the previous template"
 					onclick={() => onswaptemplate?.()}
-				><Icon name="compare" size={14} /></button>
+				><Icon name="compare" size={15} /></button>
 				<!-- After the template's name and its menu rather than at the far end
 				     of the bar: the stylesheet is part of the template, travels with it, and
 				     is the last thing anyone would think to look for among page

@@ -6,7 +6,7 @@ heading to the new number and adds its lines there, never a section of its own.
 The app shows this file under **What's new** — press the version number in the
 status bar.
 
-## 0.24.9 — 2026-09-30
+## 0.24.10 — 2026-09-30
 
 - What's new: this list opens by itself the first time an update is running,
   and the version number in the status bar opens it again.
@@ -32,6 +32,7 @@ status bar.
   is an icon too, so the row still fits.
 - The CSS button shows a template has styles of its own with a black border,
   instead of a dot after the word.
+- The template's swap button looks and behaves like the table's.
 - Fixed a strip of empty space that could appear under the status bar when the
   installed app was started on Android.
 
