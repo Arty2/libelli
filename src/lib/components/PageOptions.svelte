@@ -503,8 +503,19 @@
 				     of the bar: the stylesheet is part of the template, travels with it, and
 				     is the last thing anyone would think to look for among page
 				     sizes and margins. -->
-				<button onclick={oneditcss} disabled={pageFrozen} title="Styles for this card, saved inside the template">
-					<Icon name="code" size={14} /> <span class="label">CSS</span>{template.css ? ' •' : ''}
+				<!-- A template with styles of its own says so in the button's border,
+				     not in a dot after the word: the dot went with the word on a
+				     phone, where the word is hidden, and was the only sign there. -->
+				<button
+					class="css"
+					class:has-css={!!template.css}
+					onclick={oneditcss}
+					disabled={pageFrozen}
+					title={template.css
+						? 'Styles for this card, saved inside the template — this one has some'
+						: 'Styles for this card, saved inside the template'}
+				>
+					<Icon name="code" size={14} /> <span class="label">CSS</span>
 				</button>
 			</span>
 		</span>

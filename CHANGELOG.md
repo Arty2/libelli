@@ -6,7 +6,7 @@ heading to the new number and adds its lines there, never a section of its own.
 The app shows this file under **What's new** — press the version number in the
 status bar.
 
-## 0.24.8 — 2026-09-30
+## 0.24.9 — 2026-09-30
 
 - What's new: this list opens by itself the first time an update is running,
   and the version number in the status bar opens it again.
@@ -27,6 +27,11 @@ status bar.
   to put the size back. The logo no longer does, and Help no longer has size
   buttons — the keys are listed there as before.
 - Buttons are labelled in capitals: LOCK, SAVE, CANCEL.
+- Buttons that show only an icon are square, and the toolbar's buttons are
+  one height, at every text size. With the text enlarged on a phone, Install
+  is an icon too, so the row still fits.
+- The CSS button shows a template has styles of its own with a black border,
+  instead of a dot after the word.
 - Fixed a strip of empty space that could appear under the status bar when the
   installed app was started on Android.
 

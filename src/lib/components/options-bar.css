@@ -315,10 +315,24 @@
 	cursor: default;
 }
 
+/* Square at every text size: the 14px icon (in rem), 5px of padding either
+   side and a 1px border, the sum the button's height already comes to. A
+   width of 1.6875rem matched it at 100% only — 27 by 26 there, and 40.5 by 33
+   at 150%. */
 .options button.square {
+	--square: calc(0.875rem + 12px);
 	padding: 5px;
-	width: 1.6875rem;
+	width: var(--square);
+	height: var(--square);
 	justify-content: center;
+	flex: none;
+}
+
+/* The template carries styles of its own: the border in full ink, the way a
+   field with something in it reads darker than an empty one. */
+.options button.css.has-css,
+.options button.css.has-css:hover:not(:disabled) {
+	border-color: #111;
 }
 
 .options button[aria-pressed='true'] {
@@ -543,11 +557,21 @@
 		border-bottom: 1px solid #ddd;
 	}
 
-	/* The CSS button keeps its glyph and its dot and loses the word, as the
-	   app's own toolbar buttons do at this width: the head has to hold a lock,
-	   a name, its menu and two buttons on one line. */
+	/* The CSS button keeps its glyph and loses the word, as the app's own
+	   toolbar buttons do at this width: the head has to hold a lock, a name,
+	   its menu and two buttons on one line. Square without it, like the swap
+	   button beside it, rather than a box drawn for a word that is not there. */
 	.options .head-row .label {
 		display: none;
+	}
+
+	.options .head-row button.css {
+		--square: calc(0.875rem + 12px);
+		padding: 5px;
+		width: var(--square);
+		height: var(--square);
+		justify-content: center;
+		flex: none;
 	}
 
 	/* On a phone the bar is one column of wrapped controls anyway, so the head's

@@ -2742,7 +2742,19 @@ variation — is the case that happens, and a menu each time is its whole cost.
 Every way the open template changes remembers the one left behind, except undo,
 which puts back a state rather than choosing one. The lock does not disable it:
 opening another template changes nothing in this one. On a phone CSS keeps its
-glyph and its dot and loses the word, as the window toolbar's buttons do.
+glyph and loses the word, as the window toolbar's buttons do, and is square like
+the swap beside it. A template with styles of its own is said by the border in
+full ink rather than a dot after the word: the dot went with the word on a phone,
+and it was the only sign there.
+
+**A square button is square at every text size.** Its side is worked out the way
+its height is — the icon, in rem, plus padding and border in px — and not written
+as one rem value, which matched only at 100%: the bar's squares were 40.5 by 33
+at 150%, and the window toolbar's 34 by 43.5, squeezed by a row that would not
+give up anything else first. The toolbar has one height for every button in it,
+`--tool`, words or not, and the squares do not shrink. With the text enlarged on
+a phone, Install drops its word too: at 150% on a 360px phone the worded button
+pushed the row off the screen.
 
 **Everything that acts on the template as a whole is in the picker's menu;
 Lock is not.** Import, Export and Reset were a row of buttons under the name,

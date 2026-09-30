@@ -2637,8 +2637,13 @@
 		</span>
 		<span class="spacer"></span>
 		{#if installable}
-			<button class="install" onclick={() => void install()} title="Install libelli on this device">
-				<Icon name="package" size={15} /> Install
+			<button
+				class="install"
+				onclick={() => void install()}
+				title="Install libelli on this device"
+				aria-label="Install libelli"
+			>
+				<Icon name="package" size={15} /> <span class="install-word">Install</span>
 			</button>
 		{/if}
 		<button class="help" onclick={() => (helpOpen = true)} title={withKey("How this works, and the keys", "help")}>
@@ -3554,6 +3559,18 @@
 		border-bottom: 1px solid #ddd;
 		font-size: 0.75rem;
 		flex-wrap: wrap;
+		/* One height for every button in the row, with words or without: the
+		   15px icon, 6px of padding either side and a 1px border. The icon is
+		   in rem and the padding is not, so this is worked out rather than
+		   written as one rem value — a square set at 1.8125rem matched the
+		   labelled buttons at 100% only, and at 150% text stood 7px taller
+		   than Install beside it. */
+		--tool: calc(0.9375rem + 14px);
+	}
+
+	.toolbar > button {
+		box-sizing: border-box;
+		height: var(--tool);
 	}
 
 	/* The row the two option bars share. It owns the ground and the rule under
@@ -4247,11 +4264,13 @@
 		   condition itself: exactly the buttons that lost their words. Install
 		   keeps its own, because an offer nobody recognises needs the word. */
 		.toolbar button:has(.label) {
-			width: 1.8125rem;
-			height: 1.8125rem;
+			width: var(--tool);
 			padding: 0;
 			display: grid;
 			place-items: center;
+			/* Or the row squeezes them before it gives up anything else, and a
+			   square at 200% text came out 32px wide and 58px tall. */
+			flex: none;
 		}
 
 		/* Phone order: what the app is on the left — Help first, because it is the
@@ -4345,6 +4364,23 @@
 
 		:global(html[data-text-larger]) .toolbar .install {
 			order: 2;
+		}
+
+		/* Install keeps its word on a phone, because an offer nobody recognises
+		   needs one — but not with the text enlarged: at 150% on a 360px phone,
+		   and at 200% on a 412px one, the worded button pushed the row off the
+		   edge of the screen. There it is a square like its neighbours, and its
+		   tip says what it is. */
+		:global(html[data-text-larger]) .toolbar .install-word {
+			display: none;
+		}
+
+		:global(html[data-text-larger]) .toolbar .install {
+			width: var(--tool);
+			padding: 0;
+			display: grid;
+			place-items: center;
+			flex: none;
 		}
 
 		:global(html[data-text-larger]) .toolbar .help {
