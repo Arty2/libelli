@@ -228,7 +228,9 @@ fi
 # has to be the version being shipped: a bump, patch or minor, is not done
 # until the changelog says what it brought. A patch rewrites its minor's
 # heading rather than adding one — the file keeps one section per minor.
-top_release=$(sed -n 's/^## \([0-9][0-9.]*\) .*/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)
+# The same shape changelog.ts lists — a version, a dash, an ISO date — so a
+# heading this accepts is never one the What's new dialog silently skips.
+top_release=$(sed -n 's/^## \([0-9]*\.[0-9]*\.[0-9]*\) .* \([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)[[:space:]]*$/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)
 
 if [ "$top_release" != "$src_version" ]; then
 	fail "CHANGELOG.md does not open with version $src_version" \

@@ -1,4 +1,5 @@
 import source from '../../CHANGELOG.md?raw';
+import { local } from './storage';
 
 /**
  * CHANGELOG.md, read into what the What's new dialog lists.
@@ -22,8 +23,12 @@ export interface Segment {
 	code: boolean;
 }
 
-/** `## 0.23.0 — 2026-09-29`; the dash may be an en or em dash or a hyphen. */
-const HEADING = /^##\s+(\d+\.\d+\.\d+)\s*[—–-]\s*(\S+)\s*$/;
+/**
+ * `## 0.23.0 — 2026-09-29`; the dash may be an en or em dash or a hyphen. The
+ * date is ISO because it becomes a `<time datetime>`; scripts/gates.sh § 10
+ * reads the same shape, so a heading the gate accepts is one this lists.
+ */
+const HEADING = /^##\s+(\d+\.\d+\.\d+)\s*[—–-]\s*(\d{4}-\d{2}-\d{2})\s*$/;
 
 export function parseChangelog(src: string): Release[] {
 	const releases: Release[] = [];
@@ -68,13 +73,23 @@ export function segments(text: string): Segment[] {
 
 export const RELEASES = parseChangelog(source);
 
+const SEEN_KEY = 'whatsnew:seen';
+
 /**
- * Whether there is something here the person has not seen. Nothing on a first
- * run — everything is new then, and the starter card is the introduction — and
- * nothing once the version they last read is this one. A returning visitor who
- * has never opened the list (`seen` is null) has unread news: that is everyone
- * the version that brought the list reaches.
+ * The version whose list counts as read when the app starts. A first run has
+ * read this one — everything is new then, and the starter card is the
+ * introduction. Anyone else has read what they last opened, and a returning
+ * visitor who never has (`stored` is null) has news: that is everyone the
+ * version that brought the list reaches.
  */
-export function hasUnread(seen: string | null, current: string, firstRun: boolean): boolean {
-	return !firstRun && seen !== current;
+export function seenAtBoot(stored: string | null, firstRun: boolean, current: string): string | null {
+	return firstRun ? current : stored;
+}
+
+export function loadSeenVersion(): string | null {
+	return local.get<string | null>(SEEN_KEY, null);
+}
+
+export function saveSeenVersion(version: string): void {
+	local.set(SEEN_KEY, version);
 }

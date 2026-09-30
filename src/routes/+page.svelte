@@ -59,7 +59,7 @@
 	import { GONE_ROW, carryLookups, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
-	import { hasUnread, RELEASES } from '$lib/changelog';
+	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
 	import { TEXT_MAX, TEXT_MIN, applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
 		autoMap,
@@ -104,7 +104,6 @@
 		saveTemplateDoc,
 		saveTemplateId,
 		storageAvailable,
-		local,
 		saveUi,
 		type DatasetEntry,
 		type TemplateEntry
@@ -167,17 +166,17 @@
 	let helpOpen = $state(false);
 	let whatsNewOpen = $state(false);
 	/**
-	 * The last version whose What's new was opened. A first run counts as read
-	 * — see `hasUnread` — so the dot only ever means an update brought news.
-	 * Starts as this version, not null: boot reads the real value only after
-	 * its storage round trips, and until then `firstRun` is still false, so a
-	 * null here put the dot up on every first paint, a first visit's included.
+	 * The last version whose What's new was opened — see `seenAtBoot`. Starts as
+	 * this version, not null: boot learns the real value only after its storage
+	 * round trips, and a dot there until then would flash on every first paint,
+	 * a first visit's included.
 	 */
 	let seenVersion = $state<string | null>(VERSION);
+	const whatsNewUnread = $derived(seenVersion !== VERSION);
 	function openWhatsNew() {
 		whatsNewOpen = true;
 		seenVersion = VERSION;
-		local.set('whatsnew:seen', VERSION);
+		saveSeenVersion(VERSION);
 	}
 
 	/** The interface's text size, as a multiple of the browser's default — see textsize.ts. */
@@ -208,7 +207,6 @@
 	// cannot both have the screen, so the data tray starts folded away.
 	let dataOpen = $state(true);
 	let firstRun = $state(false);
-	const whatsNewUnread = $derived(hasUnread(seenVersion, VERSION, firstRun));
 	let boxMenu = $state<{ id: string; x: number; y: number } | null>(null);
 	/**
 	 * The area whose words are being typed straight into the card. Held here
@@ -673,11 +671,11 @@
 			// rows of sample data rather than on an empty page.
 			dataset = sampleDataset();
 			firstRun = true;
-			local.set('whatsnew:seen', VERSION);
 			datasetId = nextDatasetId();
 		}
 		saveDatasetId(datasetId);
-		seenVersion = local.get<string | null>('whatsnew:seen', null);
+		seenVersion = seenAtBoot(loadSeenVersion(), firstRun, VERSION);
+		if (firstRun) saveSeenVersion(VERSION);
 		previousTable = loadPreviousDatasetId();
 		void refreshTables();
 
@@ -2187,19 +2185,17 @@
 		notify('Pasted as a new area, holding its own words. Ctrl/Cmd+Z takes it away.');
 	}
 
-	/** Something in front of the stage, which then leaves the keys alone. */
-	const stageModalOpen = $derived(
-		helpOpen ||
-			whatsNewOpen ||
-			statusOpen ||
-			cssOpen ||
-			previewOpen ||
-			lightboxOpen ||
-			boxMenu !== null ||
-			deletingTable ||
-			editingId !== null ||
-			magic !== null
+	/**
+	 * A dialog of this page's own is up. Each handles its own keys on its own
+	 * element (modal.ts), so the page's handler stands down entirely, Escape
+	 * aside: otherwise Delete, Ctrl/Cmd+D or Enter acts on the card behind it,
+	 * where nobody can see what it did.
+	 */
+	const dialogOpen = $derived(
+		helpOpen || whatsNewOpen || statusOpen || cssOpen || resetting || deleting || deletingTable || magic !== null
 	);
+	/** Something in front of the stage, which then leaves the keys alone. */
+	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
 
 	function onWindowKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
@@ -2223,6 +2219,19 @@
 		// The lightbox is in front of everything and takes Escape and the arrows
 		// for itself; nothing back here should answer them underneath it.
 		if (lightboxOpen) return;
+		if (event.key === 'Escape' && (dialogOpen || boxMenu)) {
+			helpOpen = false;
+			whatsNewOpen = false;
+			statusOpen = false;
+			if (cssOpen) cancelCss();
+			resetting = false;
+			deleting = false;
+			deletingTable = false;
+			magic = null;
+			boxMenu = null;
+			return;
+		}
+		if (dialogOpen) return;
 		// A new area waits for its first key. Delete, the arrows and every chord
 		// keep their meaning — remove it, move it, undo it — and anything that
 		// types a character puts the cursor in its Text field first, where the
@@ -2251,18 +2260,6 @@
 		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
 			event.preventDefault();
 			redo();
-			return;
-		}
-		if (event.key === 'Escape' && (helpOpen || whatsNewOpen || statusOpen || cssOpen || boxMenu || resetting || deleting || deletingTable || magic)) {
-			helpOpen = false;
-			whatsNewOpen = false;
-			statusOpen = false;
-			if (cssOpen) cancelCss();
-			resetting = false;
-			deleting = false;
-			deletingTable = false;
-			magic = null;
-			boxMenu = null;
 			return;
 		}
 		// The style clipboard, before the plain Ctrl/Cmd+C below sees the same key.

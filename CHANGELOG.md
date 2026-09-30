@@ -8,6 +8,8 @@ under **What's new** — press the version number in the status bar.
 
 - What's new: press the version number in the status bar for this list. A dot
   on it after an update means there is something you have not read yet.
+- Keys no longer reach the card behind an open dialog: Delete, Ctrl/Cmd + D or
+  Enter with the help panel up used to change areas you could not see.
 
 ## 0.23.0 — 2026-09-29
 

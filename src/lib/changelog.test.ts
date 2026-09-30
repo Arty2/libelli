@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasUnread, parseChangelog, RELEASES, segments } from './changelog';
+import { parseChangelog, RELEASES, seenAtBoot, segments } from './changelog';
 import { VERSION } from './version';
 
 describe('parseChangelog', () => {
@@ -33,6 +33,10 @@ describe('parseChangelog', () => {
 		expect(releases[0].items).toHaveLength(1);
 	});
 
+	it('does not take a heading without an ISO date as a release', () => {
+		expect(parseChangelog('## 1.0.0 — soon\n- Item.')).toEqual([]);
+	});
+
 	it('ignores a paragraph that is not a bullet', () => {
 		const [release] = parseChangelog('## 1.0.0 — 2026-01-01\n\nProse.\n- Item.');
 		expect(release.items).toHaveLength(1);
@@ -53,15 +57,15 @@ describe('segments', () => {
 	});
 });
 
-describe('hasUnread', () => {
-	it('is quiet on a first run and once this version has been read', () => {
-		expect(hasUnread(null, '0.24.0', true)).toBe(false);
-		expect(hasUnread('0.24.0', '0.24.0', false)).toBe(false);
+describe('seenAtBoot', () => {
+	it('counts this version read on a first run, whatever was stored', () => {
+		expect(seenAtBoot(null, true, '0.24.0')).toBe('0.24.0');
+		expect(seenAtBoot('0.1.0', true, '0.24.0')).toBe('0.24.0');
 	});
 
-	it('flags an update, and a returning visitor who has never opened it', () => {
-		expect(hasUnread('0.23.0', '0.24.0', false)).toBe(true);
-		expect(hasUnread(null, '0.24.0', false)).toBe(true);
+	it('keeps what a returning visitor last read, or nothing', () => {
+		expect(seenAtBoot('0.23.0', false, '0.24.0')).toBe('0.23.0');
+		expect(seenAtBoot(null, false, '0.24.0')).toBeNull();
 	});
 });
 
