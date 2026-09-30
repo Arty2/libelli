@@ -3,11 +3,12 @@
 What changed for someone using libelli, newest first. One section per minor
 version, headed by the last version it shipped as: a patch rewrites its minor's
 heading to the new number and adds its lines there, never a section of its own,
-and a section stays short — what changed and what it means, not how it works.
+and a section stays short: three lines of what changed, six at the very most,
+with how it works left to the README.
 The app shows this file under **What's new** — press the version number in the
 status bar.
 
-## 0.25.2 — 2026-09-30
+## 0.25.3 — 2026-09-30
 
 - The CSS dialog is an editor: numbered lines, colour as you type, and tabs
   that indent — Tab and Shift + Tab, and Enter keeping the indent.
@@ -58,26 +59,19 @@ status bar.
 
 - A5 Starter Booklet: a designed starter template that prints as a zine, and a
   way back to it as it came.
-- A Stamp border style, and `find:replace` inside a placeholder.
-- Zoom about the selected area; double-tap the zoom for Fit and back.
-- A pan button with the nudge pad inside it; hold its middle to make areas
-  ignore a press.
-- Ctrl/Cmd + L locks the selection, Ctrl/Cmd + Shift + L the design.
-- A new area waits for its first key and flashes as it arrives.
-- Color names mean what they mean in HTML.
+- A Stamp border, `find:replace` inside a placeholder, and color names that
+  mean what they mean in HTML.
+- Zoom about the selected area, a pan button with the nudge pad inside it, and
+  Ctrl/Cmd + L to lock the selection.
 
 ## 0.18.23 — 2026-09-26
 
 - Drawing happens in the full-size editor: a pencil, a nib, rectangle and
-  ellipse, flips, a true crop and a color picker.
-- Every drawing is listed in the Images tray, with download buttons.
-- `==highlight==` in Markdown.
-- Every blue in the app comes from one accent, the system's where it is known.
-- A tooltip for every control; press and hold on a touchscreen.
-- Automagic layout reads headings word by word, knows an image column by its
-  cells, and places detail and credit lines.
-- Guides go round three states, and Boxes gets a third that draws every tie.
-- A first visit opens the starter card locked.
+  ellipse, flips, a true crop and a color picker, with every drawing listed in
+  the Images tray.
+- Automagic layout reads headings word by word, and knows an image column.
+- A tooltip for every control, `==highlight==` in Markdown, one accent behind
+  every blue.
 
 ## 0.17.0 — 2026-09-26
 
@@ -88,11 +82,9 @@ status bar.
 
 - Placeholders inside an area's words, and a lockable table.
 - Page margins: a setting, a guide beside the grid, and something to snap to.
-- Images as a tray, with uploads that carry onto areas.
+- Images as a tray, with uploads that carry onto areas; every PNG in one ZIP.
 - A table menu with Import and Export; drag rows by their number.
-- Every PNG in one ZIP.
 - Color with alpha; a QR's quiet zone is the area's padding.
-- The drawing editor opens as a dialog.
 
 ## 0.15.0 — 2026-09-22
 
@@ -113,13 +105,9 @@ status bar.
 ## 0.12.12 — 2026-09-19
 
 - Left and right pages, and a sheet order that folds into a zine.
-- A border drawn by hand.
-- A picture from this machine in the row that needs it, and in the export.
-- A drawing surface; the drawing goes into the row.
-- Pictures can live in a folder of your own, with a panel that empties it.
-- Opacity on an area.
-- An area's name is its CSS id.
-- Copy joins the row actions.
+- A picture from this machine in the row that needs it, and in the export; a
+  drawing surface, and a folder of your own to keep pictures in.
+- A border drawn by hand, opacity on an area, and an area's name as its CSS id.
 
 ## 0.11.0 — 2026-09-11
 
@@ -127,13 +115,12 @@ status bar.
 
 ## 0.10.1 — 2026-09-11
 
-- Carbon icons on twelve more controls.
-- A grid placed in millimetres, and a dot grid.
+- A grid placed in millimetres, and a dot grid; Crop Marks on the sheet, where
+  there is room for them.
 - Drag the table's columns to reorder them.
-- Enter twice in a dialog takes its default.
-- Ctrl/Cmd + Shift + Z holds the last change up against the page.
+- Enter twice in a dialog takes its default; Ctrl/Cmd + Shift + Z holds the
+  last change up against the page.
 - The nudge pad, drawn as one cross, and stashable.
-- Crop Marks on the sheet, where there is room for them.
 
 ## 0.9.0 — 2026-09-11
 

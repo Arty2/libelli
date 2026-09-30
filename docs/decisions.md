@@ -3485,8 +3485,10 @@ them looking wrong. A budget makes that growth a decision — raise the number
 deliberately, in the commit that earns it, or move the detail into this file,
 where nobody pays for it on every turn. `CHANGELOG_MAX` is the same bargain
 pointed the other way: a release section is read in a dialog on a phone by
-somebody who has just updated, so it is capped at what they will finish —
-what changed and what it means, with how it works left to the README.
+somebody who has just updated, so it is capped at what they will finish — six
+lines that say something, three being the usual shape, with how it works left
+to the README. Blank lines are not counted: where a line wraps is the writer's
+business, how much there is to read is not.
 
 **Test a pattern against the mistake it is for.** A `colour` check that wants a
 non-letter before the word and allows no `?` passes `fillColour: string` and

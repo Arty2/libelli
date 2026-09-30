@@ -253,12 +253,14 @@ fi
 # and it is the one thing here written for them rather than for us. A section
 # that runs to a screenful is a release note nobody finishes, and it grows the
 # same way AGENTS.md does: every line individually defensible. So it is a
-# budget — the lines between one release heading and the next, blank lines and
-# all. Say what changed and what it means, and leave how it works to the README.
+# budget of lines that say something — blank ones are not counted, because
+# wrapping is the writer's business and the reading is not. Three is the usual
+# shape; six is the most a release has ever needed. Say what changed and what
+# it means, and leave how it works to the README.
 #
 # Overridable so the failure path is testable: `CHANGELOG_MAX=2 npm run gates`
 # should fail.
-CHANGELOG_MAX="${CHANGELOG_MAX:-12}"
+CHANGELOG_MAX="${CHANGELOG_MAX:-6}"
 
 if [ -r CHANGELOG.md ]; then
 	long=$(awk -v max="$CHANGELOG_MAX" '
@@ -268,7 +270,7 @@ if [ -r CHANGELOG.md ]; then
 			len = 0
 			next
 		}
-		name != "" { len++ }
+		name != "" && $0 != "" { len++ }
 		END { if (name != "" && len > max) printf "%s — %d lines\n", name, len }
 	' CHANGELOG.md)
 	if [ -n "$long" ]; then
