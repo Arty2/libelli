@@ -232,9 +232,17 @@ fi
 # heading this accepts is never one the What's new dialog silently skips.
 top_release=$(sed -n 's/^## \([0-9]*\.[0-9]*\.[0-9]*\) .* \([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)[[:space:]]*$/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)
 
+heading="## $src_version — $(date -u +%Y-%m-%d)"
 if [ "$top_release" != "$src_version" ]; then
+	# Say which of the two it is: a patch keeps its minor's section, so the
+	# fix is to rename that heading, and only a new minor starts one.
+	if [ "${top_release%.*}" = "${src_version%.*}" ]; then
+		todo="rewrite '## $top_release' as '$heading' and add this patch's lines under it"
+	else
+		todo="start a section headed '$heading' above it"
+	fi
 	fail "CHANGELOG.md does not open with version $src_version" \
-		"its top release heading is '${top_release:-none}' — add a line to the $src_version section, heading it '## $src_version — $(date -u +%Y-%m-%d)'" \
+		"its top release heading is '${top_release:-none}' — $todo" \
 		"changelog-current"
 else
 	pass "CHANGELOG.md opens with $src_version" "changelog-current"

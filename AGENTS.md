@@ -155,7 +155,8 @@ gitignored `.claude/logs/gates.jsonl`, so "this gate never fires" is answerable.
 ## Versioning
 
 `src/lib/version.ts` is the source of truth; keep `package.json` and
-`package-lock.json` in step, and head `CHANGELOG.md` with it, in a user's words.
+`package-lock.json` in step, and head `CHANGELOG.md` with it, in a user's words:
+a patch rewrites its minor's heading to the new number, never adds a section.
 Patch for a fix, minor for a feature, and **the leading zero never moves** —
 README has the table.
 

@@ -1,8 +1,10 @@
 # Changelog
 
 What changed for someone using libelli, newest first. One section per minor
-version, headed by the last version it shipped as. The app shows this file
-under **What's new** — press the version number in the status bar.
+version, headed by the last version it shipped as: a patch rewrites its minor's
+heading to the new number and adds its lines there, never a section of its own.
+The app shows this file under **What's new** — press the version number in the
+status bar.
 
 ## 0.24.0 — 2026-09-29
 
