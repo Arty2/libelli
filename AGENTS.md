@@ -145,7 +145,7 @@ re-read it. So every rule above that *can* be checked is, in `scripts/gates.sh`
 (`npm run gates`, first in CI) — injection sinks, `{@html}` outside Card,
 PrintRoot and Icon, `fetch` outside `png.ts` and the worker, runtime
 dependencies, `vercel.json`'s security headers, `colour` as a name, `VERSION`
-against `package.json`, its minor atop `CHANGELOG.md`, this file's length, type in `px`. ESLint (`npm run lint`, next in CI)
+against `package.json` and `CHANGELOG.md`, this file's length, type in `px`. ESLint (`npm run lint`, next in CI)
 covers what a linter can; where a rule is off, `eslint.config.js` says why.
 
 Add the next rule to the script, not as a paragraph here — `docs/decisions.md`
@@ -155,8 +155,7 @@ gitignored `.claude/logs/gates.jsonl`, so "this gate never fires" is answerable.
 ## Versioning
 
 `src/lib/version.ts` is the source of truth; keep `package.json` and
-`package-lock.json` in step. A minor starts a `CHANGELOG.md` section; a patch
-adds to it, in a user's words, and never makes one.
+`package-lock.json` in step, and head `CHANGELOG.md` with it, in a user's words.
 Patch for a fix, minor for a feature, and **the leading zero never moves** —
 README has the table.
 

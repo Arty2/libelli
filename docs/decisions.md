@@ -2317,28 +2317,23 @@ confused for each other in a directory listing.
 ## `src/lib/changelog.ts` and `CHANGELOG.md`
 
 **The changelog is for the person using the app; git is the history.** One
-section per minor, in a user's words, headed by the minor alone — the early
-numbering was reset twice, and the backfill follows the numbers that stuck. It does not repeat commit messages, and this file does not
+section per minor, in a user's words, headed by the last version that minor
+shipped as — the early numbering was reset twice, and the backfill follows the
+numbers that stuck. It does not repeat commit messages, and this file does not
 repeat it: a decision is written here as it stands now, and how it came to be is
 in the commits that made it.
 
-**Patches are lines, not sections.** A list with a heading per patch reads as
-thirty releases where there were two, and most patches are nothing a user would
-look for. So gate 10 holds the top heading to the minor being shipped: a new
-minor must start its section, and a patch adds a line to it when it brings
-something worth reading, or nothing. The trade-off is that a patch can ship
-without a word; the rule it replaced, a heading rewritten on every bump, made
-every fix write something whether or not anyone would want to read it.
+**The top heading is the version being shipped** (gate 10), so a patch rewrites
+its minor's heading rather than adding a section. Stricter than one entry per
+minor, and just as simple to check.
 
 **Parsed, not rendered.** An entry is plain text with `code` spans, split into
 runs the page prints as text. Rendering it through `markdown.ts` would need a
 fourth file allowed raw markup, for a document we write ourselves.
 
-**The dot is for a new minor only.** A first run marks the current minor read —
+**The dot is for updates only.** A first run marks the current version read —
 the starter card is the introduction — and a returning visitor who has never
-opened the list has news. Opening it marks this minor read. Kept by minor
-because a patch may add nothing to the list, and a dot that leads to nothing new
-teaches people to ignore it.
+opened the list has news. Opening it marks this version read.
 
 ## `src/lib/sw-policy.ts` and `src/service-worker.ts`
 

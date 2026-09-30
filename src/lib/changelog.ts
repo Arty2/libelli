@@ -12,7 +12,6 @@ import { local } from './storage';
  */
 
 export interface Release {
-	/** A minor, `0.24`: its patches are lines in its section, not sections. */
 	version: string;
 	date: string;
 	/** Each bullet as runs of plain text and `code`, so the page needs no markup. */
@@ -25,16 +24,11 @@ export interface Segment {
 }
 
 /**
- * `## 0.23 — 2026-09-29`; the dash may be an en or em dash or a hyphen. The
+ * `## 0.23.0 — 2026-09-29`; the dash may be an en or em dash or a hyphen. The
  * date is ISO because it becomes a `<time datetime>`; scripts/gates.sh § 10
  * reads the same shape, so a heading the gate accepts is one this lists.
  */
-const HEADING = /^##\s+(\d+\.\d+)\s*[—–-]\s*(\d{4}-\d{2}-\d{2})\s*$/;
-
-/** `0.24.1` → `0.24`: the section a version's changes are listed under. */
-export function minorOf(version: string): string {
-	return version.split('.').slice(0, 2).join('.');
-}
+const HEADING = /^##\s+(\d+\.\d+\.\d+)\s*[—–-]\s*(\d{4}-\d{2}-\d{2})\s*$/;
 
 export function parseChangelog(src: string): Release[] {
 	const releases: Release[] = [];
@@ -82,17 +76,14 @@ export const RELEASES = parseChangelog(source);
 const SEEN_KEY = 'whatsnew:seen';
 
 /**
- * The minor whose section counts as read when the app starts. A first run has
+ * The version whose list counts as read when the app starts. A first run has
  * read this one — everything is new then, and the starter card is the
  * introduction. Anyone else has read what they last opened, and a returning
  * visitor who never has (`stored` is null) has news: that is everyone the
- * version that brought the list reaches. Kept by minor, so a patch — which may
- * add nothing to the list — does not put the dot back; a stored full version
- * (`0.24.0`, from before sections were minors) reads as its minor.
+ * version that brought the list reaches.
  */
 export function seenAtBoot(stored: string | null, firstRun: boolean, current: string): string | null {
-	if (firstRun) return minorOf(current);
-	return stored === null ? null : minorOf(stored);
+	return firstRun ? current : stored;
 }
 
 export function loadSeenVersion(): string | null {
@@ -100,5 +91,5 @@ export function loadSeenVersion(): string | null {
 }
 
 export function saveSeenVersion(version: string): void {
-	local.set(SEEN_KEY, minorOf(version));
+	local.set(SEEN_KEY, version);
 }
