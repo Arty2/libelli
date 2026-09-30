@@ -25,6 +25,7 @@ src/lib/
   types.ts        template + runtime types; every coordinate is mm, font sizes are pt
   color.ts       the only place a color string is allowed to become CSS
   css.ts          scopes the template's own CSS to the card; strips @import and remote url()
+  csscode.ts      the CSS editor's colouring, and what Tab and Enter do to the text
   parse.ts        CSV / TSV parsing (quoted fields, embedded newlines, delimiter sniffing)
   markdown.ts     hand-written Markdown subset -> HTML, escaping at the leaves
   layout.ts       mm geometry, anchors, snapping, and the left/right page mirror
@@ -61,6 +62,7 @@ src/lib/
     PrintSettingsPanel.svelte  Per Sheet, orientation, sheet background — shared with the print screen
     PrintSheet.svelte   one physical sheet — off-screen in PrintRoot, thumbnails in PrintPreview
     Lightbox / SheetLightbox  one card, or one sheet, full screen
+    CssEditor.svelte    the template's stylesheet: numbers, colour, tabs — over a real textarea
     BitmapEditor.svelte the drawing surface, hosted in DataTable; saves a base64 PNG
     ImagesPanel.svelte  stored pictures, their weight, the folder; one large, to crop or turn
     Tooltip.svelte      every `title` as a tip: hover, or press and hold on touch

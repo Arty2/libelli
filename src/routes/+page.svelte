@@ -2,6 +2,7 @@
 	import { tick, untrack } from 'svelte';
 	import { base } from '$app/paths';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
+	import CssEditor from '$lib/components/CssEditor.svelte';
 	import ImagesPanel from '$lib/components/ImagesPanel.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -55,6 +56,7 @@
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { cssIdent } from '$lib/css';
+	import { codeStats } from '$lib/csscode';
 	import { watchPresses } from '$lib/haptics';
 	import { GONE_ROW, carryLookups, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
 	import { inArrivalOrder } from '$lib/table';
@@ -188,18 +190,22 @@
 	}
 	let cssOpen = $state(false);
 	/**
-	 * The CSS as it stood when the dialog opened, so Cancel has something to put
-	 * back.
+	 * The sheet being edited, and the sheet the card is drawn with.
 	 *
-	 * The textarea commits on `change`, which fires as the focus leaves it — so
-	 * by the time a click reaches Cancel the edit is already in the template and
-	 * on the card behind. Cancel is therefore an undo of one known value rather
-	 * than a refusal to apply anything, which is also why Escape and the
-	 * backdrop go the same way: with a Cancel button on the row, the two other
-	 * ways out of the dialog that are not Done have to mean what it means.
+	 * The two are separate on purpose: the editor holds a draft, Apply puts it on
+	 * the card without closing the dialog, and Save does both and leaves. Nothing
+	 * reaches the template until one of those is pressed, so Cancel — and the ×,
+	 * the backdrop and Escape, which mean what it means — is a matter of closing
+	 * the dialog and putting back whatever was there when it opened.
+	 *
+	 * `cssBefore` is that value, kept out of `$state` because nothing renders it.
 	 */
+	let cssDraft = $state('');
 	let cssBefore: string | undefined;
-	let cssField = $state<HTMLTextAreaElement | null>(null);
+	let cssEditor = $state<{ insert: (text: string) => void } | null>(null);
+	/** The draft says something the card is not showing yet. */
+	const cssDirty = $derived((cssDraft.trim() || undefined) !== (template.css ?? undefined));
+	const cssCount = $derived(codeStats(cssDraft));
 	// Page setup is a panel, not a mode: it opens on wide screens and stays out of
 	// the way on a phone, where it would eat the preview it is there to serve.
 	let pageSetupOpen = $state(true);
@@ -478,22 +484,33 @@
 
 	function openCss() {
 		cssBefore = template.css;
+		cssDraft = template.css ?? '';
 		cssOpen = true;
+	}
+
+	/** Put the draft on the card, leaving the dialog where it is. */
+	function applyCss() {
+		if (template.locked) return;
+		writeCss(cssDraft.trim() || undefined);
+	}
+
+	/** Apply, and leave. */
+	function saveCss() {
+		applyCss();
+		cssOpen = false;
 	}
 
 	/** Put back what was there when the dialog opened, and close it. */
 	function cancelCss() {
-		// First, because the field commits on `change` and `change` fires as the
-		// focus leaves it. Blurring here puts that commit *before* the restore;
-		// without it, Escape closed the dialog, the textarea was unmounted, its
-		// change landed on the way out, and the CSS being cancelled was applied
-		// a moment after it had been put back.
-		cssField?.blur();
 		cssOpen = false;
 		if (template.css === cssBefore) return;
+		writeCss(cssBefore);
+	}
+
+	function writeCss(css: string | undefined) {
 		// Through stripUndefined for the usual reason: a template with no CSS has
 		// no `css` key, not a key holding undefined.
-		template = stripUndefined({ ...$state.snapshot(template), css: cssBefore }) as Template;
+		template = stripUndefined({ ...$state.snapshot(template), css }) as Template;
 	}
 
 	const snapshot = (): Snapshot => ({
@@ -3167,12 +3184,22 @@
 
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
+	<div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
 		<!-- The help dialog's header, and like it dragged by the title, so the
 		     card being styled can be seen beside it. The × is Cancel, as Esc
-		     and the backdrop are: only Done keeps what was typed. -->
+		     and the backdrop are: only Apply and Save put anything on the card.
+
+		     What the sheet is, beside its name: how many lines, and what it
+		     weighs. A template is meant to stay small enough to paste into a
+		     message, and its CSS is the part of it that grows without anybody
+		     noticing. -->
 		<header class="modal-header drag-title" data-drag-handle>
 			<h2 id="css-title">CSS</h2>
+			<span class="css-stats">
+				{cssCount.lines} line{cssCount.lines === 1 ? '' : 's'} · {cssCount.bytes < 1024
+					? `${cssCount.bytes} bytes`
+					: `${Math.round((cssCount.bytes / 1024) * 10) / 10} KB`}
+			</span>
 			<button class="icon" onclick={cancelCss} title="Close without keeping changes" aria-label="Close">
 				<Icon name="close" size={16} />
 			</button>
@@ -3181,21 +3208,37 @@
 		     example and two paragraphs of prose above and below it; what an author
 		     actually needs is the names of the things they can reach, and a
 		     placeholder is where they will look for them. The prose that was here
-		     is in the README, where prose belongs. -->
-		<textarea
-			bind:this={cssField}
-			class="code"
-			rows="14"
-			spellcheck="false"
-			use:focusOnOpen
+		     is in the README, where prose belongs. Edit Starter puts that same
+		     text into the editor, where it can be edited rather than read. -->
+		<CssEditor
+			bind:this={cssEditor}
+			bind:value={cssDraft}
 			placeholder={cssPlaceholder}
-			value={template.css ?? ''}
-			onchange={(e) => (template = { ...template, css: e.currentTarget.value.trim() || undefined })}
-		></textarea>
+			readonly={!!template.locked}
+			onapply={applyCss}
+		/>
+		<!-- Left to right: the one button that puts text in, then the three ways
+		     out in the order of how much they do — nothing, the card, the card and
+		     the door. A locked template can be read and not written, so the three
+		     that write are not here at all: disabled buttons on a row this short
+		     read as something broken rather than as something withheld. -->
 		<div class="modal-actions">
+			{#if !template.locked}
+				<button
+					onclick={() => cssEditor?.insert(cssPlaceholder)}
+					title="Put the starter sheet into the editor, to edit rather than read"
+				>
+					Edit Starter
+				</button>
+			{/if}
 			<span class="spacer"></span>
-			<button onclick={cancelCss}>Cancel</button>
-			<button class="primary" onclick={() => (cssOpen = false)}>Done</button>
+			<button onclick={cancelCss}>{template.locked ? 'Close' : 'Cancel'}</button>
+			{#if !template.locked}
+				<button onclick={applyCss} disabled={!cssDirty} title="Put this on the card and stay here — Ctrl/Cmd + Enter">
+					Apply
+				</button>
+				<button class="primary" onclick={saveCss}>{cssDirty ? 'Save' : 'Done'}</button>
+			{/if}
 		</div>
 	</div>
 {/if}
@@ -3987,14 +4030,20 @@
 		color: #333;
 	}
 
-	.modal textarea.code {
-		width: 100%;
-		box-sizing: border-box;
-		font: 0.75rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-		padding: 8px;
-		border: 1px solid #ccc;
-		border-radius: var(--radius-input);
-		resize: vertical;
+	/* The CSS dialog is the one that holds an editor rather than a paragraph, and
+	   a stylesheet wrapped at 560px is a stylesheet nobody can read. */
+	.modal.wide {
+		width: min(760px, calc(100vw - 32px));
+	}
+
+	/* Beside the title, in the header's own small print: what the sheet is, not
+	   something to press. */
+	.css-stats {
+		margin-right: auto;
+		align-self: center;
+		font-size: 0.6875rem;
+		color: #767676;
+		white-space: nowrap;
 	}
 
 	/* Above the keys, because it is the one thing in Help that is a setting. */

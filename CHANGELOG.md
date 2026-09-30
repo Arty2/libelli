@@ -6,6 +6,23 @@ heading to the new number and adds its lines there, never a section of its own.
 The app shows this file under **What's new** — press the version number in the
 status bar.
 
+## 0.25.0 — 2026-09-30
+
+- The CSS dialog is a proper little editor: numbered lines, colour as you type,
+  and indenting with tabs — Tab and Shift + Tab move the line or the selection,
+  Enter carries the indent and steps in after a `{`, and a `}` on a line of its
+  own steps back out.
+- Nothing you type there reaches the card until you say so. **Apply**
+  (Ctrl/Cmd + Enter) puts it on the card and leaves the dialog open, **Save**
+  does both, **Cancel** puts back what was there when it opened. **Edit
+  Starter** puts the starter sheet into the editor, to edit rather than read.
+- The dialog says how many lines the sheet is and what it weighs, beside its
+  name.
+- A locked template's CSS can be opened and read; the buttons that would write
+  to it are not there.
+- The swap-back button beside the template's name is an icon on the bar now,
+  without a frame of its own — the same as the one beside the table's name.
+
 ## 0.24.0 — 2026-09-29
 
 - What's new: press the version number in the status bar for this list. A dot

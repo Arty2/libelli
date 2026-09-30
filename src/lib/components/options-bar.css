@@ -172,6 +172,21 @@
 	color: #111;
 }
 
+/* The swap back to the last template, and the table's own swap beside its
+   name, are the same button doing the same thing — so they look the same: an
+   icon on the bar, no frame. A border here made it read as the third control in
+   a row of two fields, when what it is is a shortcut. */
+.options button.swap {
+	border: none;
+	background: none;
+	color: #767676;
+}
+
+.options button.swap:hover:not(:disabled) {
+	background: #eee;
+	color: #111;
+}
+
 /* The image is named, not shown: a thumbnail in a toolbar this dense reads as
    clutter, and the name is what the template actually carries. */
 .options .asset {
