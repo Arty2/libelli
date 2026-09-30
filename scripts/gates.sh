@@ -222,22 +222,23 @@ else
 	pass "interface type sized in rem" "type-in-rem"
 fi
 
-# ── 10. Every version says what changed ──────────────────────────────────────
+# ── 10. Every minor says what changed ────────────────────────────────────────
 # CHANGELOG.md is what a person reads under What's new, and a list that stops a
-# few versions back reads as a list of everything. So the top release heading
-# has to be the version being shipped: a bump, patch or minor, is not done
-# until the changelog says what it brought. A patch rewrites its minor's
-# heading rather than adding one — the file keeps one section per minor.
-# The same shape changelog.ts lists — a version, a dash, an ISO date — so a
+# few versions back reads as a list of everything. It keeps one section per
+# minor, so the top heading has to be the minor being shipped: a new minor is
+# not done until it has a section. A patch adds a line to that section when it
+# brings something a user would notice, and needs no heading of its own.
+# The same shape changelog.ts lists — a minor, a dash, an ISO date — so a
 # heading this accepts is never one the What's new dialog silently skips.
-top_release=$(sed -n 's/^## \([0-9]*\.[0-9]*\.[0-9]*\) .* \([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)[[:space:]]*$/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)
+src_minor=$(printf '%s' "$src_version" | cut -d. -f1-2)
+top_release=$(sed -n 's/^## \([0-9]*\.[0-9]*\) .* \([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)[[:space:]]*$/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)
 
-if [ "$top_release" != "$src_version" ]; then
-	fail "CHANGELOG.md does not open with version $src_version" \
-		"its top release heading is '${top_release:-none}' — add a line to the $src_version section, heading it '## $src_version — $(date -u +%Y-%m-%d)'" \
+if [ -z "$src_version" ] || [ "$top_release" != "$src_minor" ]; then
+	fail "CHANGELOG.md does not open with minor ${src_minor:-?}" \
+		"its top section is '${top_release:-none}' — start one headed '## $src_minor — $(date -u +%Y-%m-%d)'" \
 		"changelog-current"
 else
-	pass "CHANGELOG.md opens with $src_version" "changelog-current"
+	pass "CHANGELOG.md opens with $src_minor" "changelog-current"
 fi
 
 # ── local, gitignored log — see the header comment ───────────────────────────

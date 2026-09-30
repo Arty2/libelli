@@ -59,7 +59,7 @@
 	import { GONE_ROW, carryLookups, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
-	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
+	import { loadSeenVersion, minorOf, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
 	import { TEXT_MAX, TEXT_MIN, applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
 		autoMap,
@@ -166,16 +166,17 @@
 	let helpOpen = $state(false);
 	let whatsNewOpen = $state(false);
 	/**
-	 * The last version whose What's new was opened — see `seenAtBoot`. Starts as
-	 * this version, not null: boot learns the real value only after its storage
-	 * round trips, and a dot there until then would flash on every first paint,
-	 * a first visit's included.
+	 * The minor whose What's new section was last opened — see `seenAtBoot`.
+	 * Starts as this one, not null: boot learns the real value only after its
+	 * storage round trips, and a dot there until then would flash on every
+	 * first paint, a first visit's included.
 	 */
-	let seenVersion = $state<string | null>(VERSION);
-	const whatsNewUnread = $derived(seenVersion !== VERSION);
+	const currentMinor = minorOf(VERSION);
+	let seenMinor = $state<string | null>(currentMinor);
+	const whatsNewUnread = $derived(seenMinor !== currentMinor);
 	function openWhatsNew() {
 		whatsNewOpen = true;
-		seenVersion = VERSION;
+		seenMinor = currentMinor;
 		saveSeenVersion(VERSION);
 	}
 
@@ -674,7 +675,7 @@
 			datasetId = nextDatasetId();
 		}
 		saveDatasetId(datasetId);
-		seenVersion = seenAtBoot(loadSeenVersion(), firstRun, VERSION);
+		seenMinor = seenAtBoot(loadSeenVersion(), firstRun, VERSION);
 		if (firstRun) saveSeenVersion(VERSION);
 		previousTable = loadPreviousDatasetId();
 		void refreshTables();
@@ -3352,7 +3353,7 @@
 		</header>
 		{#each RELEASES as release (release.version)}
 			<h3>
-				{release.version}{#if release.version === VERSION}<span class="current">· this one</span>{/if}
+				{release.version}{#if release.version === currentMinor}<span class="current">· this one</span>{/if}
 				<time datetime={release.date}>{release.date}</time>
 			</h3>
 			<ul>
