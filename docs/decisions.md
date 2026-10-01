@@ -919,10 +919,10 @@ overlays are `pointer-events: none` and hidden in print — as elements they no
 longer fail safe by being inside `@media screen`, and a line on the paper is a
 printing error rather than a cosmetic one.
 
-The grid is finer still — a half-pixel hairline in both rules, with the 10mm
+The grid is finer still — one device pixel in both rules, with the 10mm
 rhythm carried by darkness rather than thickness — and keeps its weight for a
-different reason: it sits outside the transform and was always measured in screen
-pixels.
+different reason: it is drawn in device pixels to begin with (see
+`PagePreview.svelte`).
 
 **A badge is an annotation, not a control.** They are grey on white, smaller than
 the blue chrome, and clear of the box rather than straddling its corner, where
@@ -1324,6 +1324,17 @@ accumulated and spent a point at a time: a mouse notch is one fat event and a
 trackpad is a stream of small ones, so reading them one-for-one would make the
 same flick one step on one machine and forty on another.
 
+**Past Fit, the page can be scrolled clear of every toolbar.** The toolbars
+float over the stage and the scroller's padding is a flat 24px, so scrolled to an
+edge a zoomed page had its corner under undo, the view toggles or the zoom — the
+part you had scrolled there to see. Each fixed toolbar is measured and cleared by
+whichever stage edge it is nearer to, each side takes its deepest toolbar plus a
+16px gap, and that is a margin on the page rather than padding on the scroller:
+Fit is measured off the scroller's content box, and padding would have shrunk Fit
+to clear toolbars that a centred page at Fit is already clear of. Watched with a
+`ResizeObserver`, since the selection's tools grow the column under undo. The
+nudge pad is left out: it can be dragged off whatever it covers.
+
 **The pager reserves its own height.** The sheet and the pager are one column, so
 `fit` subtracts the pager's measured height and the column gap before it sizes
 the page — otherwise the count is the first thing off the bottom of a short
@@ -1405,20 +1416,37 @@ mark. The SVG sits outside the card's transform, so the hairline is in screen
 pixels and does not thicken with the zoom, the same bargain the trim line
 makes.
 
+**Every grid mark sits on a device pixel.** A line between two device pixels is
+drawn as two at half strength, so the half-pixel hairline the grid used to be
+read as a grey smear, and a round dot under a pixel across as a faint blur —
+measured, the rules came out 243–248 on white at a ratio of 1, next to nothing.
+The viewBox now counts device pixels; where the SVG's corner falls inside a pixel
+is measured off `getBoundingClientRect` (the page is centred and scaled, so it
+can be anywhere) and every tick is snapped to the pixel it falls in: a rule is
+one device pixel down its middle, a dot a filled square of whole pixels, under
+`crispEdges`. Re-measured on a zoom, a resize, a scroll and a change of screen,
+and set only on a change, so drawing from the measurement cannot loop. The rules
+keep their strengths, which on one pixel rather than two reads darker than
+before. The dots are one size, about a CSS pixel, at 60% of the ink (#666 on
+white, or white at 60% on a dark paper): much lighter is too little ink in a dot
+to survive every screen, and full black — then 80% — was the heaviest thing on
+the card at a desktop's density. They were told apart by size once, a 2x2 at every 10mm, and that was
+four times the ink of the rest; on the dots the 10mm rhythm is given up, and the
+ruled grid is the one that carries it.
+
 **The Grid box goes round three states: off, ruled, dots.** Same millimetres,
 same snapping, a dot at each intersection instead of a line across the card —
-quieter to lay type over. Dots are one path too: a zero-length subpath with a
-round cap is a dot, so an A3 page is one `d` string rather than five thousand
-circles. It was a hold on the box until a hold came to mean "show me the
+quieter to lay type over. Dots are one path too: each filled square is a
+four-step subpath, so an A3 page is one `d` string rather than five thousand
+rectangles. It was a hold on the box until a hold came to mean "show me the
 tooltip"; a third state costs a press but no gesture nobody was taught. The
 word beside the box says *Dots* while dots are drawn, because a mode with no
 visible sign is a trap; the keyboard's grid key still toggles on and off.
 
 **A major line is drawn once.** Every major tick is also a minor one; drawing
 both would double the ink exactly where the grid must stay quietest, so the minor
-path has the major positions taken out of it. In dot mode that subtraction is of
-*intersections*, not of coordinates: a minor dot sitting on a major column is
-still a minor dot unless its row is major too.
+path has the major positions taken out of it. The dots, all one size, have no
+majors to take out: the minor ticks are every intersection.
 
 **The nudge pad is one cross, not five tiles.** Five rounded rectangles with a
 gap between them read as five buttons that happen to be arranged in a plus. The
@@ -2392,9 +2420,12 @@ minor, and just as simple to check.
 runs the page prints as text. Rendering it through `markdown.ts` would need a
 fourth file allowed raw markup, for a document we write ourselves.
 
-**The dot is for updates only.** A first run marks the current version read —
-the starter card is the introduction — and a returning visitor who has never
-opened the list has news. Opening it marks this version read.
+**After an update the list opens by itself, once.** A dot on the version
+asking to be pressed was easy to miss, and what changed is most worth reading
+the first time the new version is open. A first run marks the current version
+read — the starter card is the introduction — and a returning visitor who has
+never opened the list has news. Opening it, by hand or at start, marks this
+version read, so it does not open again.
 
 ## `src/lib/sw-policy.ts` and `src/service-worker.ts`
 
@@ -2771,8 +2802,23 @@ kept across a reload, because working between two designs — the real one and a
 variation — is the case that happens, and a menu each time is its whole cost.
 Every way the open template changes remembers the one left behind, except undo,
 which puts back a state rather than choosing one. The lock does not disable it:
-opening another template changes nothing in this one. On a phone CSS keeps its
-glyph and its dot and loses the word, as the window toolbar's buttons do.
+opening another template changes nothing in this one. The swap is drawn as the
+table's is — a bare glyph in the tools' grey, filled on hover, faded to 30% with
+nothing to go back to — because it is the same control for the other half of
+the work, and a bordered square beside one and a bare glyph beside the other
+read as two. On a phone CSS keeps its glyph and loses the word, as the window
+toolbar's buttons do, and is square. A template with styles of its own is said by the border in
+full ink rather than a dot after the word: the dot went with the word on a phone,
+and it was the only sign there.
+
+**A square button is square at every text size.** Its side is worked out the way
+its height is — the icon, in rem, plus padding and border in px — and not written
+as one rem value, which matched only at 100%: the bar's squares were 40.5 by 33
+at 150%, and the window toolbar's 34 by 43.5, squeezed by a row that would not
+give up anything else first. The toolbar has one height for every button in it,
+`--tool`, words or not, and the squares do not shrink. With the text enlarged on
+a phone, Install drops its word too: at 150% on a 360px phone the worded button
+pushed the row off the screen.
 
 **Everything that acts on the template as a whole is in the picker's menu;
 Lock is not.** Import, Export and Reset were a row of buttons under the name,
@@ -3176,6 +3222,19 @@ A named `blue` in `color.ts` is content, not chrome, and stays a fixed colour.
 `color-mix` is Widely available; relative colour syntax is not yet, which is
 why the tints are mixes rather than `rgb(from …)`.
 
+**A button's words are capitals, unless they are data.** `button` is
+`text-transform: uppercase` with a little tracking, the way the bars' own labels
+already were: LOCK, SAVE, CANCEL. Not where the words are something written
+rather than a command — a menu's items and the value a menu button shows
+(`[role^='menuitem']`, `[aria-haspopup]`: a font, a template, a table), the
+notice in the status bar, the version, the text size and a drawing's row in
+Images, which carry `as-typed`. Capitals there would misstate what was written.
+A command that names something, *Choose Inter File…*, takes the capitals with
+it: rare, and a name in capitals is still the name. Capitals are inherited, and
+the Export screen's thumbnails are buttons, so a card sets its own type back
+(`button :where(.card)`, at a type selector's weight so a template's CSS still
+wins) — without it every card there came out in capitals.
+
 **The guides are the accent's inverse.** The page margins and the snap guides
 are drawn over the areas' outlines, which are the accent, so they take
 `--accent-inverse` — the colour furthest from it — rather than a fixed magenta
@@ -3185,6 +3244,18 @@ Newly, so it is behind `@supports`; without it the guides are `#da9c14`, the
 inverse of the fallback blue, worked out by hand.
 
 ## `src/lib/textsize.ts`, the viewport, and type in `rem`
+
+**The app is pinned to the window, not given a height.** `.app` is
+`position: fixed; inset: 0` rather than `height: 100dvh`. `dvh` was chosen over
+`vh` so a phone's address bar did not hide the status bar, but Chrome on
+Android, starting the installed app cold, can work `dvh` out before the window
+has settled and keep that shorter height until something resizes it — a strip of
+bare page under the status bar, on some launches and not others. A fixed box
+with no offsets is the window's own size whenever it is asked. Taking the app
+out of the flow costs nothing: the document never scrolled, and every dialog is
+fixed already. A fixed box is also a stacking context; nothing inside the app
+has to paint over a dialog, and the dialogs, the tooltip and the `%%` list all
+sit outside it.
 
 **The interface does not zoom; its text does.** On a phone, touching a cell at
 the right of the table slid the interface left and made the whole app larger.
@@ -3223,13 +3294,21 @@ exception is the badges drawn on an area, which belong to the page they sit
 on and pass `fixed`. An options bar group wraps inside itself once it is wider
 than the bar, which on a desk it now can be.
 
-**The mark resets the text size.** Pressing the logo sets it back to 100%, the
-way out after a pinch that went further than meant. On a phone the mark is
-centred over the toolbar, which only has room for it while the buttons are
-small; with the text larger than default, `applyTextSize` (and the pre-paint
-script) set `data-text-larger` on the root, and the mark goes back into the
-row, shrinking before anything wraps — at 150% on a 412px phone it had sat
-over Page Setup and taken its press.
+**The size says itself, and that is how it goes back.** Away from 100%, the
+percentage sits to the right of the version in the status bar, and pressing it
+puts the size back. It used to be the logo that did that, which nobody could
+have guessed and a pinch gave no hint of; a number in the corner is both the
+sign that something changed and the way out. Help no longer has size buttons
+either — the keys list says what the chords do, like every other chord.
+
+On a phone the mark is centred over the toolbar, which only has room for it
+while the buttons are small; with the text larger than default,
+`applyTextSize` (and the pre-paint script) set `data-text-larger` on the root,
+and the row is laid out as at 320px: the mark at the left, shrinking before
+anything wraps, and every button after the space — Install and Help in front of
+Page Setup. At 150% on a 412px phone a centred mark had sat over Page Setup;
+and with Help and Install left where they were, the logo split the controls in
+two.
 
 A pinch arrives as a ratio of the spread at its start, so it is snapped to 5%
 each time without drifting. A wheel arrives as dozens of small deltas, and each

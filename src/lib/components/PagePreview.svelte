@@ -274,6 +274,73 @@
 	});
 
 	/**
+	 * Room to pan past the page's edges, once it is zoomed past Fit.
+	 *
+	 * The toolbars float over the stage, and the scroller's own padding is a
+	 * flat 24px, so scrolled to an edge the page's corner sat under undo and
+	 * the zoom, which are 48px and more in from it: the one part of the page
+	 * you had scrolled there to see was the part you could not. Each toolbar
+	 * is cleared by whichever edge it is nearer to — undo's column by the left,
+	 * the view toggles and the zoom by the bottom — and each side gets as much
+	 * room as its deepest toolbar needs, plus a gap, as a margin on the page.
+	 *
+	 * A margin rather than more padding on the scroller: Fit is measured off
+	 * the scroller's content box, so padding would shrink Fit to make room it
+	 * does not need. Fit leaves the page clear of the toolbars on its own — it
+	 * is centred, with the corners in the band around it — and only a page
+	 * larger than the stage can be scrolled under them. The nudge pad is left
+	 * out: it can be dragged anywhere, off whatever it happens to cover.
+	 */
+	let stage = $state<HTMLDivElement | null>(null);
+	let clearance = $state({ top: 0, right: 0, bottom: 0, left: 0 });
+	const CLEAR_GAP = 16;
+
+	function measureClearance() {
+		if (!stage || !host) return;
+		const box = stage.getBoundingClientRect();
+		const need = { top: 0, right: 0, bottom: 0, left: 0 };
+		for (const el of stage.querySelectorAll<HTMLElement>(':scope > .rail, :scope > .corner, .pager .controls')) {
+			const r = el.getBoundingClientRect();
+			if (!r.width || !r.height) continue;
+			const ways = {
+				top: r.bottom - box.top,
+				right: box.right - r.left,
+				bottom: box.bottom - r.top,
+				left: r.right - box.left
+			};
+			const side = (Object.keys(ways) as (keyof typeof ways)[]).reduce((a, b) => (ways[b] < ways[a] ? b : a));
+			need[side] = Math.max(need[side], ways[side] + CLEAR_GAP);
+		}
+		// The scroller's padding already gives some of it.
+		const pad = getComputedStyle(host);
+		const next = {
+			top: Math.max(0, Math.round(need.top - parseFloat(pad.paddingTop))),
+			right: Math.max(0, Math.round(need.right - parseFloat(pad.paddingRight))),
+			bottom: Math.max(0, Math.round(need.bottom - parseFloat(pad.paddingBottom))),
+			left: Math.max(0, Math.round(need.left - parseFloat(pad.paddingLeft)))
+		};
+		const was = clearance;
+		if (next.top !== was.top || next.right !== was.right || next.bottom !== was.bottom || next.left !== was.left) {
+			clearance = next;
+		}
+	}
+
+	$effect(() => {
+		if (!stage) return;
+		const node = stage;
+		// The toolbars change size with what they offer — the selection's own
+		// tools come and go under undo — so they are watched, not read once.
+		void selectedIds.length;
+		void hostSize;
+		const observer = new ResizeObserver(() => measureClearance());
+		for (const el of node.querySelectorAll<HTMLElement>(':scope > .rail, :scope > .corner, .pager .controls')) {
+			observer.observe(el);
+		}
+		measureClearance();
+		return () => observer.disconnect();
+	});
+
+	/**
 	 * The zoom at which the paper is its real size here — see `actualScale`.
 	 * Read again whenever the window changes, because moving it to another
 	 * screen, or zooming the browser, changes what the screen reports.
@@ -289,6 +356,9 @@
 	});
 
 	const scale = $derived(typeof zoom === 'number' ? zoom : zoom === 'actual' ? actual.scale : fitScale);
+
+	/** Past Fit, where the page can be larger than the stage — see `clearance`. */
+	const zoomedIn = $derived(scale > fitScale + 0.001);
 
 	/**
 	 * The zoom menu. Actual is the paper at its real size on this screen,
@@ -331,9 +401,55 @@
 	 * directions: coordinates are measured from the trim edge, so turning bleed
 	 * on must not slide the grid sideways under the boxes it is there to measure.
 	 */
-	const GRID_HAIRLINE = 0.5;
+	/**
+	 * Where the grid's own corner falls on the device's pixels. Every mark is
+	 * snapped to them, because a line between two device pixels is drawn as
+	 * two half-strength ones: the grid read as a grey smear rather than as a
+	 * rule, and a round dot under a pixel across as a faint blur. Only the
+	 * fraction matters — a whole number of pixels further on is the same grid —
+	 * and it is measured, not worked out, because the page is centred in the
+	 * stage and scaled inside it, and either can leave it anywhere in a pixel.
+	 */
+	let gridSvg = $state<SVGSVGElement | null>(null);
+	let pixels = $state({ ratio: 1, x: 0, y: 0 });
 
-	/** Two decimals is finer than a device pixel and keeps the path strings short. */
+	function measurePixels() {
+		if (!gridSvg) return;
+		const ratio = window.devicePixelRatio || 1;
+		const r = gridSvg.getBoundingClientRect();
+		const frac = (v: number) => v * ratio - Math.floor(v * ratio);
+		const next = { ratio, x: frac(r.left), y: frac(r.top) };
+		// Set only on a change: the grid is drawn from this, and measuring what
+		// was just drawn from it must not draw it again.
+		const same = (a: number, b: number) => Math.abs(a - b) < 0.01;
+		if (next.ratio !== pixels.ratio || !same(next.x, pixels.x) || !same(next.y, pixels.y)) pixels = next;
+	}
+
+	$effect(() => {
+		// Whatever moves the sheet inside a pixel: the zoom, the stage's size
+		// (the page is centred in it) and the page's own size.
+		void gridArt;
+		void hostSize;
+		measurePixels();
+	});
+
+	$effect(() => {
+		if (!host || !gridSvg) return;
+		const node = host;
+		// A scroll is whole device pixels in most browsers, but not at every
+		// ratio in every one; and a window dragged to another screen changes
+		// the ratio without resizing anything.
+		const onScroll = () => measurePixels();
+		node.addEventListener('scroll', onScroll, { passive: true });
+		const query = matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+		query.addEventListener('change', onScroll);
+		return () => {
+			node.removeEventListener('scroll', onScroll);
+			query.removeEventListener('change', onScroll);
+		};
+	});
+
+	/** Two decimals of a device pixel keeps the path strings short and loses nothing. */
 	const round = (v: number) => Math.round(v * 100) / 100;
 
 	/** Where the lines fall along one axis, in screen px from the sheet corner. */
@@ -347,12 +463,15 @@
 
 	const gridArt = $derived.by(() => {
 		if (!grid) return null;
+		const { ratio } = pixels;
 		const originMm = bleed;
 		const w = mmToPx(outerW) * scale;
 		const h = mmToPx(outerH) * scale;
+		// Device pixels from here on: the viewBox is drawn in them, so a whole
+		// number is a pixel edge and a half is a pixel's middle.
 		const at = (stepMm: number) => ({
-			xs: gridTicks(outerW, stepMm, originMm),
-			ys: gridTicks(outerH, stepMm, originMm)
+			xs: gridTicks(outerW, stepMm, originMm).map((v) => v * ratio),
+			ys: gridTicks(outerH, stepMm, originMm).map((v) => v * ratio)
 		});
 		const major = at(GRID_MAJOR);
 		const minor = at(GRID_MINOR);
@@ -360,29 +479,43 @@
 		// where they coincide, which is the one place the grid must stay quiet.
 		const onMajor = new Set([...major.xs, ...major.ys].map((v) => Math.round(v * 100)));
 		const notMajor = (v: number) => !onMajor.has(Math.round(v * 100));
+		// The pixel a tick falls in, as the edge it starts at in the viewBox.
+		const cellX = (v: number) => Math.floor(v + pixels.x) - pixels.x;
+		const cellY = (v: number) => Math.floor(v + pixels.y) - pixels.y;
+		const base = { w, h, vw: w * ratio, vh: h * ratio };
 
 		if (gridStyle === 'dots') {
-			// A zero-length subpath with a round cap is a dot — one path for the
-			// lot rather than several thousand circles.
-			const dots = (xs: number[], ys: number[]) =>
-				xs.map((x) => ys.map((y) => `M${round(x)} ${round(y)}h0`).join('')).join('');
+			// Squares of whole device pixels, filled rather than stroked: a round
+			// dot under a pixel across was antialiased down to a grey that some
+			// screens barely showed. One size for every dot, about a CSS pixel —
+			// a larger dot at every 10mm was four times the ink of the rest, and
+			// on a desktop screen it was the grid that stood out, not the 10mm
+			// rhythm. The dots give that rhythm up; the ruled grid keeps it.
+			const size = Math.max(1, Math.round(ratio * 0.75));
+			// Centred on the tick's pixel: for an even size the square leans a
+			// pixel right and down, which no one will ever see.
+			const lead = Math.floor((size - 1) / 2);
+			const row = minor.ys.map((y) => round(cellY(y) - lead));
 			return {
-				w,
-				h,
+				...base,
 				dots: true,
-				majorPath: dots(major.xs, major.ys),
-				// Every intersection that is not a major one: the minor dots at a
-				// major column still belong to the minor grid.
-				minorPath:
-					dots(minor.xs.filter(notMajor), minor.ys) + dots(minor.xs.filter((v) => !notMajor(v)), minor.ys.filter(notMajor))
+				majorPath: '',
+				// Every major tick is a minor one too, so the minor ticks alone
+				// are every intersection.
+				minorPath: minor.xs
+					.map((x) => {
+						const left = round(cellX(x) - lead);
+						return row.map((top) => `M${left} ${top}h${size}v${size}h-${size}z`).join('');
+					})
+					.join('')
 			};
 		}
+		// One device pixel wide, down the middle of the pixel the tick falls in.
 		const rules = (xs: number[], ys: number[]) =>
-			xs.map((x) => `M${round(x)} 0V${round(h)}`).join('') +
-			ys.map((y) => `M0 ${round(y)}H${round(w)}`).join('');
+			xs.map((x) => `M${round(cellX(x) + 0.5)} 0V${round(base.vh)}`).join('') +
+			ys.map((y) => `M0 ${round(cellY(y) + 0.5)}H${round(base.vw)}`).join('');
 		return {
-			w,
-			h,
+			...base,
 			dots: false,
 			majorPath: rules(major.xs, major.ys),
 			minorPath: rules(minor.xs.filter(notMajor), minor.ys.filter(notMajor))
@@ -413,11 +546,11 @@
 	 * Zooming starts from what is on screen, not from the last number typed: a
 	 * step out of `fit` picks up the fitted scale, so the page does not jump.
 	 */
-	function zoomTo(next: number) {
+	function zoomTo(next: number, at?: { x: number; y: number }) {
 		const clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, next));
 		const rounded = Math.round(clamped * 1000) / 1000;
 		if (rounded === scale) return;
-		holdSelection();
+		holdSelection(at);
 		onzoom(rounded);
 	}
 
@@ -428,6 +561,14 @@
 	 * offsets happen to hold still, which sent a chosen area off the edge in
 	 * two steps of a pinch. With nothing chosen the page zooms as it always has.
 	 *
+	 * The point held still is where the zoom was asked for — the pointer under
+	 * a wheel, the middle of a pinch — brought inside the selection if it lies
+	 * outside it. Held to the selection's own middle, a wheel over one end of a
+	 * long area zoomed about the other end: what was under the pointer slid
+	 * away from it. Brought inside, the area still cannot leave: a pointer off
+	 * to one side holds the nearest edge still. The keys have no position, and
+	 * zoom about the middle.
+	 *
 	 * Where it was is taken before the scale changes, and put back once the
 	 * page has been drawn at the new one (the effect below). A pinch is a
 	 * stream of steps faster than a frame, so the first step's position is kept
@@ -435,24 +576,43 @@
 	 * by a rounding error a step. Only where the page can scroll: a page smaller
 	 * than the stage is centred in it, and there is nothing to move.
 	 */
-	let held: { x: number; y: number } | null = null;
+	type Hold = { x: number; y: number; fx: number; fy: number };
+	let held: Hold | null = null;
 
-	/** Where the chosen areas' middle is on screen — the middle of their union. */
-	function selectionMiddle(ids: string[] = pinchIds ?? selectedIds): { x: number; y: number } | null {
+	/** The chosen areas' union on screen. */
+	function selectionRect(ids: string[] = pinchIds ?? selectedIds) {
 		if (!host || !ids.length) return null;
 		const rects = ids
 			.map((id) => host!.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`)?.getBoundingClientRect())
 			.filter((r): r is DOMRect => !!r && (r.width > 0 || r.height > 0));
 		if (!rects.length) return null;
 		const left = Math.min(...rects.map((r) => r.left));
-		const right = Math.max(...rects.map((r) => r.right));
 		const top = Math.min(...rects.map((r) => r.top));
-		const bottom = Math.max(...rects.map((r) => r.bottom));
-		return { x: (left + right) / 2, y: (top + bottom) / 2 };
+		return {
+			left,
+			top,
+			w: Math.max(...rects.map((r) => r.right)) - left,
+			h: Math.max(...rects.map((r) => r.bottom)) - top
+		};
 	}
 
-	function holdSelection() {
-		held ??= selectionMiddle();
+	/**
+	 * The point of the selection to hold still: `at`, clamped into it, kept as
+	 * a fraction of the selection so the same point can be found again at the
+	 * next scale. No `at`, its middle.
+	 */
+	function holdAt(at?: { x: number; y: number }, ids?: string[]): Hold | null {
+		const r = selectionRect(ids);
+		if (!r) return null;
+		const fraction = (v: number | undefined, from: number, size: number) =>
+			v === undefined || size === 0 ? 0.5 : Math.min(1, Math.max(0, (v - from) / size));
+		const fx = fraction(at?.x, r.left, r.w);
+		const fy = fraction(at?.y, r.top, r.h);
+		return { x: r.left + fx * r.w, y: r.top + fy * r.h, fx, fy };
+	}
+
+	function holdSelection(at?: { x: number; y: number }) {
+		held ??= holdAt(at);
 	}
 
 	$effect(() => {
@@ -463,13 +623,13 @@
 		// hold it, and a target re-taken each step would keep what they lost.
 		const was = pinchTarget ?? held;
 		held = null;
-		const now = selectionMiddle();
-		if (!now) return;
-		host.scrollLeft += now.x - was.x;
-		host.scrollTop += now.y - was.y;
+		const r = selectionRect();
+		if (!r) return;
+		host.scrollLeft += r.left + was.fx * r.w - was.x;
+		host.scrollTop += r.top + was.fy * r.h - was.y;
 	});
 
-	const zoomBy = (factor: number) => zoomTo(scale * factor);
+	const zoomBy = (factor: number, at?: { x: number; y: number }) => zoomTo(scale * factor, at);
 
 	/**
 	 * Type size under the pointer, in points.
@@ -546,7 +706,7 @@
 			event.preventDefault();
 			lastWheel = performance.now();
 			if (event.shiftKey) resizeType(event);
-			else zoomBy(Math.exp(-event.deltaY / 220));
+			else zoomBy(Math.exp(-event.deltaY / 220), { x: event.clientX, y: event.clientY });
 		};
 		node.addEventListener('wheel', onWheel, { passive: false });
 		return () => node.removeEventListener('wheel', onWheel);
@@ -571,8 +731,9 @@
 		const onChange = (event: Event) => {
 			event.preventDefault();
 			if (pinch.size > 0 || performance.now() - lastWheel < 150) return;
-			const ratio = (event as Event & { scale?: number }).scale;
-			if (ratio) zoomTo(from * ratio);
+			const gesture = event as Event & { scale?: number; clientX?: number; clientY?: number };
+			const at = gesture.clientX === undefined || gesture.clientY === undefined ? undefined : { x: gesture.clientX, y: gesture.clientY };
+			if (gesture.scale) zoomTo(from * gesture.scale, at);
 		};
 		node.addEventListener('gesturestart', onStart);
 		node.addEventListener('gesturechange', onChange);
@@ -601,7 +762,7 @@
 	 */
 	let beforeTouch: string[] = [];
 	let pinchIds: string[] | null = null;
-	let pinchTarget: { x: number; y: number } | null = null;
+	let pinchTarget: Hold | null = null;
 
 	function onPinchDown(event: PointerEvent) {
 		if (event.pointerType !== 'touch') return;
@@ -610,7 +771,8 @@
 		if (pinch.size === 2) {
 			pinchStart = { spread: spread(), scale };
 			pinchIds = beforeTouch;
-			pinchTarget = selectionMiddle(beforeTouch);
+			const [a, b] = [...pinch.values()];
+			pinchTarget = holdAt({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, beforeTouch);
 			restoreSelection(beforeTouch);
 		}
 	}
@@ -974,35 +1136,26 @@
      page margins sit on top of it, as they sit on the paper. Inside the card's
      transform, but in screen pixels all the same — the viewBox is the sheet's
      size on screen and the element the sheet's size before the zoom, so the
-     transform scales one back to the other and a 0.5 hairline is half a screen
-     pixel at any zoom. Editor furniture: only the stage passes it, so it never
+     transform scales one back to the other. The viewBox counts device pixels,
+     so a stroke of 1 is one device pixel at any zoom. Editor furniture: only the stage passes it, so it never
      reaches a print or a contact sheet thumbnail. -->
 {#snippet gridLayer()}
 	{#if gridArt}
 		<svg
+			bind:this={gridSvg}
 			class="grid-overlay"
 			class:on-dark={isDark(template.page.background)}
 			aria-hidden="true"
-			viewBox="0 0 {gridArt.w} {gridArt.h}"
+			viewBox="0 0 {gridArt.vw} {gridArt.vh}"
 			style="width:{gridArt.w / scale}px;height:{gridArt.h / scale}px"
 		>
-			<path
-				class="minor"
-				class:dot={gridArt.dots}
-				d={gridArt.minorPath}
-				stroke-width={gridArt.dots ? 0.7 : GRID_HAIRLINE}
-			/>
-			<path
-				class="major"
-				class:dot={gridArt.dots}
-				d={gridArt.majorPath}
-				stroke-width={gridArt.dots ? 1.1 : GRID_HAIRLINE}
-			/>
+			<path class="minor" class:dot={gridArt.dots} d={gridArt.minorPath} />
+			<path class="major" class:dot={gridArt.dots} d={gridArt.majorPath} />
 		</svg>
 	{/if}
 {/snippet}
 
-<div class="stage">
+<div class="stage" bind:this={stage}>
 <div
 	class="viewport"
 	bind:this={host}
@@ -1020,7 +1173,12 @@
 	aria-label="Card preview"
 	tabindex="-1"
 >
-	<div class="page">
+	<div
+		class="page"
+		style={zoomedIn
+			? `margin:${clearance.top}px ${clearance.right}px ${clearance.bottom}px ${clearance.left}px`
+			: undefined}
+	>
 	<!-- A picture file dropped on the page itself, rather than on an area,
 	     becomes an area of its own there. An area's own drop stops the event
 	     before it reaches this, so this only ever sees the ground between them. -->
@@ -1672,9 +1830,9 @@
 
 	/* Grey, and as thin as a screen will draw: the grid is there to be measured
 	   against, not looked at, and a colored one competed with the card. Both
-	   rules are a half-pixel hairline — finer than any line on the card itself,
-	   which is a whole pixel — and the 10mm rhythm is carried by the majors being
-	   darker rather than thicker. This overlay sits outside the card's transform
+	   rules are one device pixel, sat on one — the finest line a screen draws
+	   sharp — and the 10mm rhythm is carried by the majors being darker rather
+	   than thicker. The dots are the exception, far stronger; see gridArt. This overlay sits outside the card's transform
 	   and is already sized in screen pixels, so its weight does not move with the
 	   zoom, which is the same promise the card's own --line makes. */
 	.grid-overlay {
@@ -1686,8 +1844,18 @@
 
 	.grid-overlay path {
 		fill: none;
-		/* A zero-length subpath draws nothing without this, and a dot with it. */
-		stroke-linecap: round;
+		/* One device pixel, placed on one (see gridArt): nothing to smooth, and
+		   smoothing a snapped edge is only a way to blur it. */
+		stroke-width: 1;
+		shape-rendering: crispEdges;
+	}
+
+	/* Three fifths of the ink: solid black read as heavier than anything on
+	   the card at a desktop's density, and four fifths still stood out. A dot
+	   is little enough ink that much less than this and some screens lose it. */
+	.grid-overlay path.dot {
+		fill: rgba(var(--grid-ink), 0.6);
+		stroke: none;
 	}
 
 	/* Black on a light paper, white on a dark one: grey at these strengths all
@@ -1709,18 +1877,6 @@
 
 	.grid-overlay .major {
 		stroke: rgba(var(--grid-ink), 0.3);
-	}
-
-	/* Dots carry less ink than rules at the same value, so both weights come up
-	   to stay legible against the paper they are drawn on — the minor ones most,
-	   at under a pixel across (0.7 screen px, the majors 1.1), where a lighter
-	   ink would leave only the majors visible and the subgrid would vanish. */
-	.grid-overlay .minor.dot {
-		stroke: rgba(var(--grid-ink), 0.32);
-	}
-
-	.grid-overlay .major.dot {
-		stroke: rgba(var(--grid-ink), 0.42);
 	}
 
 	/* The same half-pixel hairline as the grid, and solid rather than dashed:

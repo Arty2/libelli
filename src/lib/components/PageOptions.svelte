@@ -491,28 +491,37 @@
 				     frozen by the lock: opening another template changes nothing in
 				     this one, and the menu beside it is not frozen either. -->
 				<button
-					class="square swap"
+					class="swap"
 					disabled={!previousEntry}
 					title={previousEntry
 						? `Back to “${previousEntry.name}”`
 						: 'Nothing to swap back to yet — this is the only template you have opened'}
 					aria-label="Swap to the previous template"
 					onclick={() => onswaptemplate?.()}
-				><Icon name="compare" size={14} /></button>
+				><Icon name="compare" size={15} /></button>
 				<!-- After the template's name and its menu rather than at the far end
 				     of the bar: the stylesheet is part of the template, travels with it, and
 				     is the last thing anyone would think to look for among page
 				     sizes and margins. -->
 				<!-- Not frozen by the lock: a locked template's sheet can still be
 				     read, which is the one thing here that is worth reading — the
-				     editor opens without the buttons that would write to it. -->
+				     editor opens without the buttons that would write to it. A
+				     template with styles of its own says so in the button's border,
+				     not in a dot after the word: the dot went with the word on a
+				     phone, where the word is hidden, and was the only sign there. -->
 				<button
+					class="css"
+					class:has-css={!!template.css}
 					onclick={oneditcss}
 					title={pageFrozen
-						? 'Styles for this card — locked, so this opens to read'
-						: 'Styles for this card, saved inside the template'}
+						? template.css
+							? 'Styles for this card — locked, so this opens to read'
+							: 'Styles for this card — none yet, and locked'
+						: template.css
+							? 'Styles for this card, saved inside the template — this one has some'
+							: 'Styles for this card, saved inside the template'}
 				>
-					<Icon name="code" size={14} /> <span class="label">CSS</span>{template.css ? ' •' : ''}
+					<Icon name="code" size={14} /> <span class="label">CSS</span>
 				</button>
 			</span>
 		</span>

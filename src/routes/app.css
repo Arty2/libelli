@@ -73,6 +73,35 @@ textarea {
 	user-select: text;
 }
 
+/* A button's words are set in capitals, as the bars' own labels are: LOCK,
+   SAVE, CANCEL. A little tracking back, because capitals set at the spacing
+   of lower case crowd each other.
+
+   Only where the words are the command. A button whose words are data keeps
+   them as typed: a menu's items and the value a menu button shows (a font, a
+   template, a table — `aria-haspopup`), the notice in the status bar, the
+   version, the text size. Capitals there would misstate what was written;
+   `as-typed` is the way out for any other. */
+button {
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+button:is([role^='menuitem'], [aria-haspopup], .as-typed) {
+	text-transform: none;
+	letter-spacing: normal;
+}
+
+/* Capitals are inherited, so anything drawn inside a button would take them
+   too — and a card is: the Export screen's thumbnails are buttons, and every
+   card in them came out in capitals. A card sets its own type. `:where` keeps
+   this at a single type selector's weight, so a template's own CSS for its
+   card still wins. */
+button :where(.card) {
+	text-transform: none;
+	letter-spacing: normal;
+}
+
 /* The interface's type is in `rem`, so this is its size: the browser's default
    times the scale a pinch, Ctrl+wheel or Help sets — see textsize.ts. Nothing
    on a card reads it; the card's type is in points. `touch-action` takes the

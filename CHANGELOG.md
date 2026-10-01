@@ -9,11 +9,14 @@ to the README. The dialog reads plain text and `code` spans and nothing else,
 so any other markup shows as typed. The app shows this file under **What's
 new** — press the version number in the status bar.
 
-## 0.25.4 — 2026-09-30
+## 0.25.5 — 2026-10-01
 
 - The template's CSS gets a real editor: numbered lines, colour as you type,
   tabs that indent, nothing reaching the card until you apply it, and a locked
   template's sheet open to read.
+- Zoom holds what is under the pointer and leaves room past the page; the
+  grid and badges stay sharp at any zoom. What's new opens after an update,
+  the text size resets beside the version, and Android's bottom gap is gone.
 
 ## 0.24.0 — 2026-09-29
 

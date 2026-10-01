@@ -62,7 +62,7 @@
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
 	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
-	import { TEXT_MAX, TEXT_MIN, applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
+	import { applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
 		autoMap,
 		blankTemplate,
@@ -167,17 +167,9 @@
 	let excludedSheets = $state<Set<number>>(new Set());
 	let helpOpen = $state(false);
 	let whatsNewOpen = $state(false);
-	/**
-	 * The last version whose What's new was opened — see `seenAtBoot`. Starts as
-	 * this version, not null: boot learns the real value only after its storage
-	 * round trips, and a dot there until then would flash on every first paint,
-	 * a first visit's included.
-	 */
-	let seenVersion = $state<string | null>(VERSION);
-	const whatsNewUnread = $derived(seenVersion !== VERSION);
+	/** Open What's new, and count this version's list as read. */
 	function openWhatsNew() {
 		whatsNewOpen = true;
-		seenVersion = VERSION;
 		saveSeenVersion(VERSION);
 	}
 
@@ -691,8 +683,12 @@
 			datasetId = nextDatasetId();
 		}
 		saveDatasetId(datasetId);
-		seenVersion = seenAtBoot(loadSeenVersion(), firstRun, VERSION);
-		if (firstRun) saveSeenVersion(VERSION);
+		// After an update, What's new opens by itself, once: a dot on the
+		// version asking to be pressed was easy to miss, and what changed is
+		// most worth reading the first time the new version is open. A first
+		// run has nothing it could have missed — see `seenAtBoot`.
+		if (seenAtBoot(loadSeenVersion(), firstRun, VERSION) !== VERSION) openWhatsNew();
+		else if (firstRun) saveSeenVersion(VERSION);
 		previousTable = loadPreviousDatasetId();
 		void refreshTables();
 
@@ -2650,20 +2646,21 @@
 
 <div class="app">
 	<header class="toolbar">
-		<!-- The mark is where the interface comes back to its own size: one press,
-		     after a pinch left the words larger than meant — see textsize.ts. -->
-		<button
-			class="brand"
-			onclick={() => setTextSize(1)}
-			title="libelli — press for the default text size"
-			aria-label="libelli — back to the default text size"
-		>
-			<img src="{base}/logo.svg" alt="" width="389" height="314" />
-		</button>
+		<!-- Just the mark. It used to put the text size back when pressed, which
+		     nobody could guess; the size now says itself beside the version, and
+		     that is what puts it back. -->
+		<span class="brand">
+			<img src="{base}/logo.svg" alt="libelli" width="389" height="314" />
+		</span>
 		<span class="spacer"></span>
 		{#if installable}
-			<button class="install" onclick={() => void install()} title="Install libelli on this device">
-				<Icon name="package" size={15} /> Install
+			<button
+				class="install"
+				onclick={() => void install()}
+				title="Install libelli on this device"
+				aria-label="Install libelli"
+			>
+				<Icon name="package" size={15} /> <span class="install-word">Install</span>
 			</button>
 		{/if}
 		<button class="help" onclick={() => (helpOpen = true)} title={withKey("How this works, and the keys", "help")}>
@@ -3150,21 +3147,28 @@
 		     itself, so what a screen reader announces is still the notice. The
 		     `title` stays for a mouse that only wants a glance. -->
 		<span class="status" class:warning={statusTone === 'warning'} role="status">
-			<button class="status-text" title={status} disabled={!status} onclick={() => (statusOpen = true)}>
+			<button class="status-text as-typed" title={status} disabled={!status} onclick={() => (statusOpen = true)}>
 				{#if statusTone === 'warning'}<Icon name="warning" size={12} />{/if}<span>{status}</span>
 			</button>
 		</span>
 		{#if updateReady}
 			<button class="reload" onclick={applyUpdate}>Update</button>
 		{/if}
-		<!-- The version is the way to what it brought: where someone who has just
-		     pressed Update looks, and a dot there until they have. -->
-		<button
-			class="version"
-			class:unread={whatsNewUnread}
-			onclick={openWhatsNew}
-			title={whatsNewUnread ? "What's new — not read yet" : "What's new"}>v{VERSION}</button
-		>
+		<!-- The version is the way to what it brought. After an update the list
+		     opens by itself (see boot), so there is no mark here for unread. -->
+		<button class="version as-typed" onclick={openWhatsNew} title="What's new">v{VERSION}</button>
+		<!-- The interface's text size, when it is not the default: a pinch off the
+		     stage changes it without a word, and this is both where it says so and
+		     how it goes back. -->
+		{#if textSize !== 1}
+			<button
+				class="ui-size as-typed"
+				onclick={() => setTextSize(1)}
+				title="Interface text at {Math.round(textSize * 100)}% — press for the default size"
+				aria-label="Interface text at {Math.round(textSize * 100)}%, back to the default size"
+				>{Math.round(textSize * 100)}%</button
+			>
+		{/if}
 	</footer>
 </div>
 
@@ -3435,29 +3439,6 @@
 			a touchscreen. Double-click an area to type in it or draw in it; right-click it, or long-press it, for its menu.
 		</p>
 
-		<div class="text-size" role="group" aria-labelledby="text-size-label">
-			<span id="text-size-label">Text size</span>
-			<button
-				onclick={() => setTextSize(stepText(textSize, -1))}
-				disabled={textSize <= TEXT_MIN}
-				title="Smaller text"
-				aria-label="Smaller text">A−</button
-			>
-			<button
-				class="amount"
-				onclick={() => setTextSize(1)}
-				disabled={textSize === 1}
-				title="Back to the browser's own size"
-				aria-label="Text size {Math.round(textSize * 100)}%, reset">{Math.round(textSize * 100)}%</button
-			>
-			<button
-				onclick={() => setTextSize(stepText(textSize, 1))}
-				disabled={textSize >= TEXT_MAX}
-				title="Larger text"
-				aria-label="Larger text">A+</button
-			>
-		</div>
-
 		<h3>Keys</h3>
 		<dl class="keys">
 			<dt>Ctrl/Cmd + Z</dt><dd>Undo</dd>
@@ -3486,7 +3467,7 @@
 			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
 			<dt>Pinch, Ctrl/Cmd + scroll<span>off the page</span></dt><dd>Text size — the interface itself never zooms</dd>
-			<dt>Ctrl/Cmd + +<span>in a field or here</span></dt><dd>Text size, in steps; Ctrl/Cmd + 0, or the logo, puts it back</dd>
+			<dt>Ctrl/Cmd + +<span>in a field or here</span></dt><dd>Text size, in steps; Ctrl/Cmd + 0, or the percentage beside the version, puts it back</dd>
 			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
 			<dt>Ctrl/Cmd + ;<span>|</span></dt><dd>Guides on or off</dd>
 			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off</dd>
@@ -3594,9 +3575,17 @@
 	.app {
 		display: flex;
 		flex-direction: column;
-		/* dvh, not vh: a phone's address bar otherwise hides the status bar and
-		   pushes the preview off the bottom of the screen. */
-		height: 100dvh;
+		/* Pinned to the window rather than given a height. `100dvh` was the one
+		   before — `vh` hid the status bar under a phone's address bar — but
+		   Chrome on Android, starting the installed app cold, can work `dvh` out
+		   before the window has settled and keep that shorter height until
+		   something resizes it: a strip of bare page under the status bar on
+		   some launches and not others. A fixed box with no offsets is the
+		   window's own size, whenever it is asked, and follows the address bar
+		   as `dvh` does. Nothing is lost by taking the app out of the flow: the
+		   document never scrolled, and every dialog is fixed already. */
+		position: fixed;
+		inset: 0;
 		min-height: 0;
 	}
 
@@ -3613,6 +3602,18 @@
 		border-bottom: 1px solid #ddd;
 		font-size: 0.75rem;
 		flex-wrap: wrap;
+		/* One height for every button in the row, with words or without: the
+		   15px icon, 6px of padding either side and a 1px border. The icon is
+		   in rem and the padding is not, so this is worked out rather than
+		   written as one rem value — a square set at 1.8125rem matched the
+		   labelled buttons at 100% only, and at 150% text stood 7px taller
+		   than Install beside it. */
+		--tool: calc(0.9375rem + 14px);
+	}
+
+	.toolbar > button {
+		box-sizing: border-box;
+		height: var(--tool);
 	}
 
 	/* The row the two option bars share. It owns the ground and the rule under
@@ -3653,7 +3654,7 @@
 	   buttons do not shuffle sideways on load. */
 	/* The mark and the version are labels, not text anyone copies; a
 	   double-click near them should not paint them blue. */
-	button.brand {
+	.brand {
 		display: block;
 		height: 1.8125rem;
 		padding: 0;
@@ -3828,7 +3829,8 @@
 		font-size: 0.6875rem;
 	}
 
-	.status-bar .version {
+	.status-bar .version,
+	.status-bar .ui-size {
 		position: relative;
 		padding: 2px 4px;
 		border-color: transparent;
@@ -3837,30 +3839,19 @@
 		color: #999;
 	}
 
-	.status-bar .version:hover {
+	.status-bar .version:hover,
+	.status-bar .ui-size:hover {
 		color: #555;
 	}
 
 	/* A finger's target without a taller bar: the padding grows, and the same
 	   margin taken back keeps the row the height it was. */
 	@media (pointer: coarse) {
-		.status-bar .version {
+		.status-bar .version,
+		.status-bar .ui-size {
 			margin: -6px -4px -6px 0;
 			padding: 8px 8px;
 		}
-	}
-
-	/* In the accent, not the warning red: something to read, not something
-	   wrong. */
-	.status-bar .version.unread::after {
-		content: '';
-		position: absolute;
-		top: 0;
-		right: -4px;
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--accent);
 	}
 
 	.whats-new h3 {
@@ -4044,25 +4035,6 @@
 		font-size: 0.6875rem;
 		color: #767676;
 		white-space: nowrap;
-	}
-
-	/* Above the keys, because it is the one thing in Help that is a setting. */
-	.text-size {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		margin: 12px 0 4px;
-		color: #333;
-	}
-
-	.text-size span {
-		margin-right: auto;
-	}
-
-	.text-size .amount {
-		min-width: 4.5em;
-		justify-content: center;
-		font-variant-numeric: tabular-nums;
 	}
 
 	.keys {
@@ -4341,11 +4313,13 @@
 		   condition itself: exactly the buttons that lost their words. Install
 		   keeps its own, because an offer nobody recognises needs the word. */
 		.toolbar button:has(.label) {
-			width: 1.8125rem;
-			height: 1.8125rem;
+			width: var(--tool);
 			padding: 0;
 			display: grid;
 			place-items: center;
+			/* Or the row squeezes them before it gives up anything else, and a
+			   square at 200% text came out 32px wide and 58px tall. */
+			flex: none;
 		}
 
 		/* Phone order: what the app is on the left — Help first, because it is the
@@ -4405,14 +4379,17 @@
 	   left end as on a desk, with every button to the right of the space. The
 	   controls win the row, because they are the ones you press. */
 	/* Larger text makes larger buttons, and at 150% on a 412px phone Page Setup
-	   ran under a mark centred over the row — which, now that pressing it puts
-	   the text size back, took the press meant for the button. Back into the
-	   row, as at 320px below, for as long as the text is larger than default. */
+	   ran under a mark centred over the row. For as long as the text is larger
+	   than default, the row is laid out as at 320px below: the mark at the left
+	   end, then the space, then every button — Install and Help in front of
+	   Page Setup, as the wide bar has them. Help and Install had stayed at the
+	   left, either side of the mark, which split the controls into two groups
+	   with the logo between them. */
 	@media (max-width: 900px) {
 		:global(html[data-text-larger]) .brand {
 			position: static;
 			transform: none;
-			order: 3;
+			order: 0;
 			/* The one thing in the row that can give up width: at 200% the
 			   buttons alone nearly fill a phone, and wrapping put Export on a row
 			   of its own. The mark shrinks inside its box instead. */
@@ -4428,6 +4405,35 @@
 
 		:global(html[data-text-larger]) .toolbar {
 			flex-wrap: nowrap;
+		}
+
+		:global(html[data-text-larger]) .toolbar .spacer {
+			order: 1;
+		}
+
+		:global(html[data-text-larger]) .toolbar .install {
+			order: 2;
+		}
+
+		/* Install keeps its word on a phone, because an offer nobody recognises
+		   needs one — but not with the text enlarged: at 150% on a 360px phone,
+		   and at 200% on a 412px one, the worded button pushed the row off the
+		   edge of the screen. There it is a square like its neighbours, and its
+		   tip says what it is. */
+		:global(html[data-text-larger]) .toolbar .install-word {
+			display: none;
+		}
+
+		:global(html[data-text-larger]) .toolbar .install {
+			width: var(--tool);
+			padding: 0;
+			display: grid;
+			place-items: center;
+			flex: none;
+		}
+
+		:global(html[data-text-larger]) .toolbar .help {
+			order: 3;
 		}
 	}
 

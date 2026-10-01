@@ -1425,10 +1425,10 @@ towards it and down is away. They repeat on a hold like the arrows do.
   bars, the table — makes the interface's *text* larger or smaller instead, and
   the layout keeps the width of the screen; Ctrl/Cmd+scroll does the same on a
   desk, and so does Ctrl/Cmd +/− from inside a field, where the browser would
-  otherwise have zoomed the lot. **Text size** in Help sets it in steps, from
-  80% to 200% of the browser's own default font size, and remembers it; the
-  buttons and their icons grow with it, and **pressing the logo** puts it back
-  to 100%. The
+  otherwise have zoomed the lot. Ctrl/Cmd +/− sets it in steps, from 80% to
+  200% of the browser's own default font size, and it is remembered; the
+  buttons and their icons grow with it. Away from 100%, the size shows to the
+  right of the version in the status bar, and **pressing it** puts it back. The
   cards are unaffected: their type is set in points by the design.
 - **Pinch to zoom the page**, anywhere over the stage. The gesture listens on
   the way down to whatever was touched, so it works over the areas and not only
@@ -1643,6 +1643,8 @@ than it has to.
   buttons drop their words and keep their icons, and the row is read from the
   outside in: Help and, where the browser offers it, Install on the left, the
   mark in the middle, the four that act on what is on screen at the right.
+  With the text larger than default the mark moves to the left end and every
+  button goes to the right, Install and Help in front of Page Setup.
 
 Every number says its unit: mm for geometry, bleed, spacing and gaps, pt for
 type size.

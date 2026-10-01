@@ -2313,6 +2313,10 @@
 		   does something irreversible. Bigger than what it sits beside is also
 		   what stops it reading as a fourth handle. */
 		--badge: calc(var(--handle) * 1.5 * var(--ui-scale, 1));
+		/* The app's button radius, drawn against the zoom like the size is. Taken
+		   in the card's own frame it grew with the page: a hairline of a curve at
+		   50%, a pill at 400%, on a badge that stayed the same size throughout. */
+		--badge-radius: calc(var(--radius-button) * var(--ui-scale, 1));
 		/* Paper color is part of the artwork, not decoration the printer may
 		   drop — though the browser still asks for "background graphics". */
 		print-color-adjust: exact;
@@ -2979,7 +2983,7 @@
 			width: var(--badge);
 			height: var(--badge);
 			box-sizing: border-box;
-			border-radius: var(--radius-button);
+			border-radius: var(--badge-radius);
 			border: none;
 			box-shadow: inset 0 0 0 var(--line) #b42318;
 			background: transparent;
@@ -3067,7 +3071,7 @@
 			/* Or the border is added to the width, and a badge drawn against the
 			   zoom would hold its size everywhere except its own edges. */
 			box-sizing: border-box;
-			border-radius: var(--radius-button);
+			border-radius: var(--badge-radius);
 			background: #fff;
 			/* The edge is an inset shadow, like the handles', and for the same
 			   reason: a border is rounded to whole pixels of the zoomed card, and
