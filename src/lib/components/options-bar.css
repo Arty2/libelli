@@ -331,7 +331,8 @@
 /* The template swap is drawn as the table's is (DataTable's `.icon`): the
    same button, doing the same thing for the other half of the work, and a
    bordered square here beside a bare glyph there read as two different
-   controls. No border, the tools' grey, a fill on hover, and faded further
+   controls — the third control in a row of two fields, when what it is is a
+   shortcut. No border, the tools' grey, a fill on hover, and faded further
    than the bar's other disabled buttons when there is nothing to go back to. */
 .options button.swap {
 	display: inline-grid;

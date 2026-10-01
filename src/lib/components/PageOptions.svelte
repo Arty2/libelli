@@ -503,17 +503,23 @@
 				     of the bar: the stylesheet is part of the template, travels with it, and
 				     is the last thing anyone would think to look for among page
 				     sizes and margins. -->
-				<!-- A template with styles of its own says so in the button's border,
+				<!-- Not frozen by the lock: a locked template's sheet can still be
+				     read, which is the one thing here that is worth reading — the
+				     editor opens without the buttons that would write to it. A
+				     template with styles of its own says so in the button's border,
 				     not in a dot after the word: the dot went with the word on a
 				     phone, where the word is hidden, and was the only sign there. -->
 				<button
 					class="css"
 					class:has-css={!!template.css}
 					onclick={oneditcss}
-					disabled={pageFrozen}
-					title={template.css
-						? 'Styles for this card, saved inside the template — this one has some'
-						: 'Styles for this card, saved inside the template'}
+					title={pageFrozen
+						? template.css
+							? 'Styles for this card — locked, so this opens to read'
+							: 'Styles for this card — none yet, and locked'
+						: template.css
+							? 'Styles for this card, saved inside the template — this one has some'
+							: 'Styles for this card, saved inside the template'}
 				>
 					<Icon name="code" size={14} /> <span class="label">CSS</span>
 				</button>

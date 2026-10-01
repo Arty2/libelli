@@ -278,6 +278,67 @@ name, because a copy that kept its name kept its binding with it, and a rule
 written for `#Job-Title` means both of them — CSS matches every element wearing
 an id, which is exactly the behaviour that case wants.
 
+## `src/lib/csscode.ts` and `src/lib/components/CssEditor.svelte`
+
+**A textarea under a coloured copy of itself.** The editor is three layers on
+one grid: a gutter of line numbers, a `<pre>` holding the coloured text, and the
+real textarea on top with `color: transparent` and a visible `caret-color`. The
+textarea is the only one that scrolls and the other two are moved to match it.
+Nothing replaces a real field — the caret, the selection, an IME, autocomplete
+and every accessibility affordance are the browser's, and a `contenteditable`
+would have to reimplement all of them — so the field stays and the colour goes
+underneath. The cost is that the three layers have to agree on every metric:
+font, line-height, padding and `tab-size` are set once on the wrapper and
+inherited, none of the three may wrap (hence `white-space: pre` and a sideways
+scroll, since a wrapped line would put the numbers out of step with the text),
+and the editor's height is on the wrapper rather than on either layer — a gutter
+tall enough for its own numbers made the row as tall as the sheet.
+
+**A line is a block element, not text and a newline.** The `<pre>` renders each
+line as a `span` with `display: block` and a `min-height` of one line box, so an
+empty line keeps its place and the last line does not get a newline nobody
+asked for. It also keeps the whole thing inside Svelte's escaping: the
+highlighter hands back runs of text, the template writes them as text nodes, and
+`{@html}` — which the gates forbid outside three renderers — never comes into
+it. A highlighter that built a string of markup would be a fourth injection
+sink for the one piece of the app an author types CSS into.
+
+**The highlighter is a colourer, not a parser.** One pass over the source with
+two bits of state — how deep in braces, and whether a colon has been passed —
+and comments and strings taken whole so a brace inside either does not move the
+depth. It is allowed to be wrong: it has no opinion about invalid CSS, and
+`css.ts` is what actually decides what the card will accept. Two things it gets
+wrong knowingly: CSS nesting (`&:hover` inside a declaration block reads as a
+property, because telling a nested selector from a declaration needs a lookahead
+this does not do), and an at-rule nobody listed in `NESTS` is taken to hold
+declarations, which is the commoner shape.
+
+**Edits go in through `execCommand('insertText')`.** It is deprecated and it is
+the only way to change a textarea's text and keep the browser's own undo stack:
+assigning `value` or calling `setRangeText` clears it, so Ctrl/Cmd + Z after a
+Tab would throw away everything typed before it. `setRangeText` is the fallback
+— a browser that drops the call still types, it just forgets. The trade-off
+taken with it: Tab no longer leaves the field. Escape is the way out of the
+dialog, and a code field where Tab moves the focus is one where indenting is
+impossible.
+
+**The dialog holds a draft, and three buttons decide what happens to it.**
+Nothing reaches the template until Apply or Save is pressed, which is what makes
+Cancel — and the ×, the backdrop and Escape, which mean what it means — a matter
+of putting back one known value and closing. It replaced a field that committed
+on `change`, where Cancel had to blur the field first so the commit landed
+*before* the restore rather than after it. Apply exists because a stylesheet is
+written by looking at the card: it puts the draft on the card and stays open.
+The primary button says Save while the draft differs from what the card has and
+Done when it does not, so the one button answers "is there anything of mine not
+on the card yet".
+
+**A locked template opens here to read.** The lock is on writing, and a sheet
+somebody else wrote is the thing in a locked template most worth reading. The
+three buttons that write — Starter, Apply, Save — are not rendered rather
+than disabled: on a row this short a line of greyed buttons reads as something
+broken, and the field itself is `readonly`, which is the honest signal.
+
 ## `src/lib/imposition.ts`
 
 **No second bleed.** Several cards on one sheet need a gap between neighbours
@@ -3496,12 +3557,27 @@ Three conventions for adding one:
   believed. The list is the decision, written down where adding to it is a
   commit.
 
-**The threshold on `AGENTS.md` is a budget, not a request.** The file opens by
+**Two budgets, and they are budgets rather than requests.** The file opens by
 asking to be kept short, which is worth nothing on its own: every addition is
 individually defensible, and a session can grow it by half without any one of
 them looking wrong. A budget makes that growth a decision — raise the number
 deliberately, in the commit that earns it, or move the detail into this file,
-where nobody pays for it on every turn.
+where nobody pays for it on every turn. `CHANGELOG_MAX` is the same bargain
+pointed the other way: a release section is read in a dialog on a phone by
+somebody who has just updated, so it is capped at what they will finish — six
+lines that say something, three being the usual shape, with how it works left
+to the README. A line is a group of related changes rather than one change: a
+feature and the five switches that came with it are one line. Blank lines are
+not counted, because where a line wraps is the writer's business and how much
+there is to read is not.
+
+**And the dialog reads the file rather than rendering it.** `changelog.ts`
+parses bullets into plain text and `code` spans, because raw markup stays in
+the three renderers that earn it — so a `**bold**` written in the changelog is
+shown with its asterisks to the only audience the file has.
+`changelog-plain-text` catches that, on release bullets only: the preamble
+above the first release is for whoever opens the file and never reaches the
+dialog.
 
 **Test a pattern against the mistake it is for.** A `colour` check that wants a
 non-letter before the word and allows no `?` passes `fillColour: string` and
