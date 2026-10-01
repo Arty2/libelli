@@ -2062,12 +2062,16 @@ what says which of the two you are looking at without reading the counter.
 Still dark and still desaturated, because what sits on it is being judged for
 print.
 
-**No drag guard, because there is no drag.** `Lightbox` tracks pointer
-movement so that turning the card and releasing over the ground does not also
-put it away; here a swipe is the only gesture, and Chromium suppresses the
-click after a touch that travels past tap-slop, so the backdrop's close and
-the swipe cannot fire together. Driven and confirmed in a real browser rather
-than assumed.
+**Every zoom is the sheet's.** A pinch, Ctrl + wheel and Ctrl +/− would
+otherwise have reached `textsize.ts` and grown the counter, which is the one
+thing on this screen nobody wants larger. The screen is `data-own-pinch`; the
+wheel is a non-passive listener that cancels it, and the keys are taken on
+the window in the capture phase, because the page's own key handler is on the
+same window and was mounted first. The zoom is `scale` and `translate` on the
+stage about its centre, as in `Lightbox`, so the fit-to-window scale is left
+alone and the paper under the pointer stays there. With a zoom there is a
+drag again — to move about the sheet — so the backdrop's close is guarded the
+way `Lightbox`'s is, and a swipe only pages while the sheet is at rest.
 
 ## `src/lib/components/Lightbox.svelte`
 
@@ -3295,8 +3299,8 @@ on and pass `fixed`. An options bar group wraps inside itself once it is wider
 than the bar, which on a desk it now can be.
 
 **The size says itself, and that is how it goes back.** Away from 100%, the
-percentage sits to the right of the version in the status bar, and pressing it
-puts the size back. It used to be the logo that did that, which nobody could
+percentage sits at the left end of the status bar, where the eye starts, and
+pressing it puts the size back. It used to be the logo that did that, which nobody could
 have guessed and a pinch gave no hint of; a number in the corner is both the
 sign that something changed and the way out. Help no longer has size buttons
 either — the keys list says what the chords do, like every other chord.
@@ -3643,3 +3647,38 @@ Two things worth knowing before trusting a green run:
   needs `Blob`, `URL.createObjectURL` and `indexedDB`. It is the one place where
   "needs no DOM" and "is tested" come apart, and it is why the suite stays on
   `environment: 'node'` without that being a claim of coverage.
+
+## `src/lib/theme.ts` — dark by inversion
+
+**One filter on the root, not a second palette.** The interface's colours are
+written where they are used, across every component; a dark palette would mean
+a token for each of them and a dark value for each token, and anything missed
+stays a white box in a black room. `invert(1) hue-rotate(180deg)` on `html`
+turns everything at once; the hue turn puts the accent and the warning red
+back where they were, since invert and hue-rotate commute and two of each
+cancel — near enough: a filter clamps between steps, so a colour saturated
+past what the turn keeps in gamut comes back a shade duller. On the root because a filter on any lower element becomes the
+containing block of every `position: fixed` inside it, and the menus are
+placed against the window.
+
+**What keeps its own colours is turned back.** Pictures, `<canvas>`, a colour
+input's swatch, the lightboxes (`data-true-color`, which have a dark ground of
+their own already) and the page (`data-page`, on `Card` and `PrintSheet`) —
+each only where nothing around it was turned back already, or a picture on
+the page would be inverted twice. In `dark-page` the page is the one thing
+not turned back, except inside a lightbox, where it is turned over again to
+match the stage.
+
+**The trade-off:** greys come out as exact inverses of the light theme's, not
+chosen for the dark — `#f7f7f7` bars are `#080808` — and the logo goes white
+with the rest, which is what it should do. Screen only; print and PNG never
+see it. No `prefers-color-scheme`: the logo is the switch, and the app is
+light until it is pressed.
+
+**The template and table pickers fold to a glyph.** Each is a size container
+(`container-type: inline-size`, Widely available) with a set natural width,
+so a query can ask how much of it the row has left without the answer
+changing the question; under 10rem (the template's) or 5rem (the table's, on a
+phone) the label and the name go and the toolbar's glyph sits in the caret
+button. A name squeezed further than that was a sliver under its caret, and
+the caret ran over the swap button beside it.

@@ -45,6 +45,15 @@
 					if (s > 1) document.documentElement.setAttribute('data-text-larger', '');
 				}
 			} catch (e) {}
+			// The theme the logo was last left on, for the same reason — and
+			// theme.test.ts for the same check. Anything else is light.
+			try {
+				var t = JSON.parse(localStorage.getItem('libelli:ui:theme'));
+				if (t === 'dark' || t === 'dark-page') {
+					document.documentElement.setAttribute('data-theme', t);
+					document.querySelector('meta[name="theme-color"]').setAttribute('content', '#000000');
+				}
+			} catch (e) {}
 		</script>
 		%sveltekit.head%
 	</head>

@@ -53,6 +53,7 @@ src/lib/
   onboarding.ts   the starter template and sample rows (sample-cards.csv) a first run lands on
   sw-policy.ts    the worker's answer to a request; pwa.ts registration, updates, install
   textsize.ts     no browser zoom: a pinch off the stage sizes the interface's text
+  theme.ts        the logo steps light, dark, dark with the page inverted
   version.ts      VERSION, and the bumping rule; changelog.ts reads CHANGELOG.md
   components/
     Card.svelte         the card itself: boxes, handles, drag, snap            (~3k)

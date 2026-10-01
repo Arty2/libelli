@@ -506,6 +506,7 @@
 	class="full"
 	role="presentation"
 	data-own-pinch
+	data-true-color
 	onclick={() => {
 		// A drag that ends over the ground either side of the card is a drag, not
 		// a click on the backdrop, and must not put the card away.
