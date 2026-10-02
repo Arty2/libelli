@@ -444,11 +444,38 @@
 	box-sizing: border-box;
 }
 .options .head-row .field.picker {
-	min-width: 0;
+	/* Its own natural width — the label, an 8.5rem name and the caret — but
+	   set rather than measured, so the container query below can ask how
+	   much of it the row has left. The floor is the glyph and the caret. */
+	container-type: inline-size;
+	flex: 0 1 auto;
+	width: calc(12.5rem + 26px);
+	min-width: calc(2rem + 4px);
 }
 .options .head-row .field.picker input {
-	flex: 0 1 auto;
-	min-width: 3rem;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* The toolbar's Page Setup glyph, in the caret, for when the name has no room. */
+.options .field.picker .picker-icon {
+	display: none;
+}
+
+/* Too narrow for the label and a name worth reading — a phone, or a large
+   text size — the picker is the glyph and the caret: one button that opens
+   the menu, rather than a sliver of name with the caret run over the swap
+   beside it. Renaming waits for a wider row. */
+@container (max-width: 10rem) {
+	.options .field.picker > span:first-child,
+	.options .field.picker input {
+		display: none;
+	}
+
+	.options .field.picker .picker-icon {
+		display: grid;
+		padding-left: 2px;
+	}
 }
 
 /* The template name and the library behind it. The menu is `position: fixed`
@@ -463,6 +490,7 @@
    would read as a second control rather than as this one's handle. */
 .options .field.picker .caret {
 	display: grid;
+	grid-auto-flow: column;
 	place-items: center;
 	border: none;
 	background: none;

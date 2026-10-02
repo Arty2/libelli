@@ -1846,6 +1846,7 @@
 
 <div
 	class="card"
+	data-page
 	class:editing={interactive}
 	class:frozen={interactive && !!template.locked}
 	class:panning={interactive && panning}

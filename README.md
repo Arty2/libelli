@@ -1135,7 +1135,9 @@ the sheet.
     centre panels, and collapsed into a little book. Half the pages print upside
     down, because that half of the sheet ends up the other way up. Nothing is
     printed on the back.
-  - **2-up** is a stapled booklet: two pages to a side, each sheet coming out as
+  - **2-up** (a *folio*, as the menu calls it, with 4-up a *quarto* and 8-up
+    an *octavo* — the bookbinder's names for a sheet folded once, twice and
+    three times) is a stapled booklet: two pages to a side, each sheet coming out as
     its front and then its back. Print double-sided, flipped on the long edge
     (if a proof comes out with the backs upside down, it is the other flip
     setting), fold the stack in half with each sheet inside the one before it,
@@ -1278,6 +1280,16 @@ a swipe and <kbd>Esc</kbd> doing what they do for cards, and none of the lean,
 foil or dealing — those read as a card in the hand and as nothing at all on an
 A3 sheet of them. The ground behind it is slate rather than near-black, so
 which of the two you are in takes a glance rather than a read of the counter.
+There every zoom is the sheet's — a pinch, Ctrl/Cmd+scroll, <kbd>+</kbd> /
+<kbd>−</kbd> / <kbd>0</kbd> or a double-click — never the interface's text;
+drag to move about a zoomed sheet.
+
+**The theme button** left of Help — a sun, a moon, or half of each — steps the
+theme: light, dark, and dark with the page inverted too, for a white page in a
+dark room. The logo does the same. In either dark, resting the mouse on either
+one or holding a finger on it shows the other dark until you move away or let
+go — the tooltip still comes up with the hold. It is remembered,
+and it is the screen's only — what prints, and what a PNG holds, is the page as designed.
 
 ## Undo and redo
 
@@ -1427,9 +1439,11 @@ towards it and down is away. They repeat on a hold like the arrows do.
   desk, and so does Ctrl/Cmd +/− from inside a field, where the browser would
   otherwise have zoomed the lot. Ctrl/Cmd +/− sets it in steps, from 80% to
   200% of the browser's own default font size, and it is remembered; the
-  buttons and their icons grow with it. Away from 100%, the size shows to the
-  right of the version in the status bar, and **pressing it** puts it back. The
-  cards are unaffected: their type is set in points by the design.
+  buttons and their icons grow with it. Away from 100%, the size shows at the
+  left end of the status bar, and **pressing it** puts it back. The cards are
+  unaffected: their type is set in points by the design. Where the bars run
+  short of room — a phone, a large size — the Template and Table names fold
+  away to the toolbar's Page Setup and Data glyphs beside their menus.
 - **Pinch to zoom the page**, anywhere over the stage. The gesture listens on
   the way down to whatever was touched, so it works over the areas and not only
   in the gaps between them — which is most of the page on a card that has been

@@ -42,6 +42,13 @@
 	let { template, pageFrozen, ontemplatechange, onuploadbackground, onnotice, showFacing = false }: Props = $props();
 
 	let imageInput = $state<HTMLInputElement | null>(null);
+	/**
+	 * The bookbinder's name for a sheet carrying that many pages a side: folded
+	 * once it is a folio, twice a quarto, three times an octavo. Six has no fold
+	 * and so no name.
+	 */
+	const FORMAT_NAMES: Partial<Record<number, string>> = { 2: 'Folio', 4: 'Quarto', 8: 'Octavo' };
+
 	let perSheetSelect = $state<HTMLSelectElement | null>(null);
 	let sheetPresetSelect = $state<HTMLSelectElement | null>(null);
 
@@ -317,7 +324,7 @@
 		>
 			<option value="">Off</option>
 			{#each IMPOSITION_COUNTS as count (count)}
-				<option value={count}>{count}-up</option>
+				<option value={count}>{count}-up{FORMAT_NAMES[count] ? ` · ${FORMAT_NAMES[count]}` : ''}</option>
 			{/each}
 		</select>
 	</label>

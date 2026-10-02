@@ -57,6 +57,40 @@
 	}
 }
 
+/* Dark, by turning the whole interface inside out — see theme.ts for why
+   one filter rather than a second palette. On the root, because a filter
+   anywhere lower would become the containing block of everything fixed
+   inside it, and the menus and dialogs are placed against the window. The
+   hue is turned back half a circle so the accent stays the accent and a red
+   warning stays red: inversion alone sends blue to orange.
+
+   Inverted back, outermost first and once each: what keeps its own colours
+   (`data-true-color`: the lightboxes, a swatch), a picture, and the page
+   (`data-page`) — except in `dark-page`, where the page stays inverted and
+   only a page inside a `data-true-color` screen needs turning over again.
+
+   Screen only: what prints is the page, and it is never inverted. */
+@media screen {
+	:root[data-theme='dark'],
+	:root[data-theme='dark-page'] {
+		filter: invert(1) hue-rotate(180deg);
+	}
+
+	:root[data-theme='dark']
+		:is(img:not(.brand img), video, canvas, input[type='color'], [data-true-color], [data-page]):not(
+			[data-true-color] *,
+			[data-page] *
+		),
+	:root[data-theme='dark-page']
+		:is(img:not(.brand img), video, canvas, input[type='color'], [data-true-color]):not(
+			[data-true-color] *,
+			[data-page] *
+		),
+	:root[data-theme='dark-page'] [data-true-color] [data-page]:not([data-page] *) {
+		filter: invert(1) hue-rotate(180deg);
+	}
+}
+
 /* Chrome is not prose: dragging across a toolbar should not leave half the
    app highlighted. Fields opt back in, because their contents are yours. */
 button,

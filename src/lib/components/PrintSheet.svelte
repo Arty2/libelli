@@ -121,6 +121,7 @@
 <!-- Sized to the paper so nothing can spill sideways into an extra page. -->
 <div
 	class="print-sheet"
+	data-page
 	style="width:{paperW}mm;height:{paperH}mm;padding:{padY}mm {padX}mm;--preview-scale:{previewScale};{sheetBackgroundStyle}"
 >
 	<div

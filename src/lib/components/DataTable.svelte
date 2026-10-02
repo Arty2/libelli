@@ -1822,6 +1822,7 @@
 					aria-label="Saved tables"
 					onclick={togglePicker}
 				>
+					<span class="picker-icon"><Icon name="table-split" size={15} /></span>
 					<Icon name="caret-down" size={18} />
 				</button>
 				{#if pickerOpen}
@@ -2995,6 +2996,7 @@
 
 	.picker .caret {
 		display: grid;
+		grid-auto-flow: column;
 		place-items: center;
 		border: none;
 		background: none;
@@ -3007,6 +3009,28 @@
 	.picker .caret:hover {
 		background: #eaeaea;
 		color: #111;
+	}
+
+	/* The toolbar's Data glyph, in the caret, for when the name has no room. */
+	.picker .picker-icon {
+		display: none;
+	}
+
+	/* Too narrow for a name worth reading, the picker is the toolbar's Data
+	   glyph and its caret: one button that opens the menu, rather than a
+	   sliver of name with the caret run over the swap beside it. Asked of the
+	   picker's own width — a container — because what squeezes it is the text
+	   size as much as the screen. Renaming waits for the menu's room. */
+	@container (max-width: 5rem) {
+		.picker > span:first-child,
+		.picker input {
+			display: none;
+		}
+
+		.picker .picker-icon {
+			display: grid;
+			padding-left: 2px;
+		}
 	}
 
 	/* Fixed, and placed from a measurement: the bar it sits in scrolls sideways,
@@ -3169,14 +3193,18 @@
 		   picker is here it has the bar to itself. Grown far ahead of the
 		   spacer, which would otherwise take half of what is left. */
 		.picker {
-			flex: 100 1 auto;
-			min-width: 0;
+			flex: 100 1 6rem;
+			/* Sized by the bar rather than by its name, so the container query
+			   above can ask it how much room it has. The floor is the glyph
+			   and the caret. */
+			container-type: inline-size;
+			min-width: calc(2rem + 4px);
 		}
 
 		.picker input {
 			flex: 1;
 			width: auto;
-			min-width: 4rem;
+			min-width: 0;
 		}
 	}
 

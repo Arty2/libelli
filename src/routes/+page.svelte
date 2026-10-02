@@ -62,6 +62,8 @@
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
 	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
+	import { applyTheme, loadTheme, nextTheme, peekTheme, saveTheme, THEME_ICONS, THEME_NAMES, type Theme } from '$lib/theme';
+	import { TIP_HOLD } from '$lib/tooltip';
 	import { applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
 		autoMap,
@@ -172,6 +174,84 @@
 		whatsNewOpen = true;
 		saveSeenVersion(VERSION);
 	}
+
+	/** Light or dark — see theme.ts. app.html has already applied it before the first paint. */
+	let theme = $state<Theme>('light');
+	function setTheme(next: Theme) {
+		theme = next;
+		peeking = false;
+		applyTheme(next);
+		saveTheme(next);
+	}
+
+	/**
+	 * The other dark, shown while the logo is hovered or held — see peekTheme.
+	 * Shown, never stored: letting go puts back the theme that was chosen.
+	 */
+	let peeking = false;
+	/** Pressed since the pointer came over: what it shows now is the choice. */
+	let peekSpent = false;
+	let peekTimer: ReturnType<typeof setTimeout> | null = null;
+	function peekStart(after: number) {
+		if (peekTimer) clearTimeout(peekTimer);
+		if (!peekTheme(theme) || peekSpent) return;
+		peekTimer = setTimeout(() => {
+			peekTimer = null;
+			peeking = true;
+			applyTheme(peekTheme(theme) ?? theme);
+		}, after);
+	}
+	function peekEnd() {
+		if (peekTimer) clearTimeout(peekTimer);
+		peekTimer = null;
+		if (!peeking) return;
+		peeking = false;
+		applyTheme(theme);
+	}
+
+	/**
+	 * What the logo and the theme button both do: a press steps the theme, a
+	 * hover or a hold glances at the other dark. Spread on each, so the two
+	 * cannot drift into answering differently.
+	 *
+	 * The hold is the tooltip's own (TIP_HOLD), so the tip still comes up with
+	 * it, and the Tooltip drops the click a held tip ends in — a glance is
+	 * never also a press. A short wait on a mouse, so crossing the control on
+	 * the way to Help does not flash the page. After a click the glance waits
+	 * for the pointer to leave: the theme just chosen is what it wants to see.
+	 */
+	const themeControl = {
+		onclick: () => {
+			// A glance still waiting to start would land on the theme just
+			// chosen and show its pair instead.
+			if (peekTimer) clearTimeout(peekTimer);
+			peekTimer = null;
+			setTheme(nextTheme(theme));
+			peekSpent = true;
+		},
+		onpointerenter: (e: PointerEvent) => {
+			peekSpent = false;
+			if (e.pointerType === 'mouse') peekStart(200);
+		},
+		onpointerleave: (e: PointerEvent) => {
+			if (e.pointerType === 'mouse') peekEnd();
+		},
+		onpointerdown: (e: PointerEvent) => {
+			if (e.pointerType !== 'touch') return;
+			peekSpent = false;
+			peekStart(TIP_HOLD);
+		},
+		onpointerup: (e: PointerEvent) => {
+			if (e.pointerType === 'touch') peekEnd();
+		},
+		onpointercancel: peekEnd
+	};
+
+	const themeTitle = $derived(
+		peekTheme(theme)
+			? `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}; hover or hold for a look at ${THEME_NAMES[peekTheme(theme) ?? theme].toLowerCase()}`
+			: `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}`
+	);
 
 	/** The interface's text size, as a multiple of the browser's default — see textsize.ts. */
 	let textSize = $state(1);
@@ -807,6 +887,7 @@
 	// again here changes nothing on screen.
 	$effect(() => {
 		untrack(() => setTextSize(loadTextSize()));
+		untrack(() => (theme = loadTheme()));
 		return zoomAsText(() => untrack(() => textSize), setTextSize);
 	});
 
@@ -2646,12 +2727,18 @@
 
 <div class="app">
 	<header class="toolbar">
-		<!-- Just the mark. It used to put the text size back when pressed, which
-		     nobody could guess; the size now says itself beside the version, and
-		     that is what puts it back. -->
-		<span class="brand">
-			<img src="{base}/logo.svg" alt="libelli" width="389" height="314" />
-		</span>
+		<!-- The mark, and the theme: each press steps light, dark, dark with the
+		     page inverted (theme.ts), and a hover or a hold glances at the other
+		     dark — the same as the theme button beside Help, see themeControl.
+		     Kept on the mark as well, where it was first. -->
+		<button
+			class="brand"
+			{...themeControl}
+			title={themeTitle}
+			aria-label="libelli — theme: {THEME_NAMES[theme]}, press for {THEME_NAMES[nextTheme(theme)].toLowerCase()}"
+		>
+			<img src="{base}/logo.svg" alt="" width="389" height="314" draggable="false" />
+		</button>
 		<span class="spacer"></span>
 		{#if installable}
 			<button
@@ -2663,6 +2750,17 @@
 				<Icon name="package" size={15} /> <span class="install-word">Install</span>
 			</button>
 		{/if}
+		<!-- The theme, in words-free form: the glyph is the theme it is on.
+		     Left of Help, with the other two buttons about the app rather than
+		     the card. -->
+		<button
+			class="theme"
+			{...themeControl}
+			title={themeTitle}
+			aria-label="Theme: {THEME_NAMES[theme]}, press for {THEME_NAMES[nextTheme(theme)].toLowerCase()}"
+		>
+			<Icon name={THEME_ICONS[theme]} size={15} />
+		</button>
 		<button class="help" onclick={() => (helpOpen = true)} title={withKey("How this works, and the keys", "help")}>
 			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
@@ -3142,6 +3240,19 @@
 	</main>
 
 	<footer class="status-bar">
+		<!-- The interface's text size, when it is not the default: a pinch off the
+		     stage changes it without a word, and this is both where it says so and
+		     how it goes back. First in the bar, where the eye starts, so a size
+		     nobody meant to set is found before anything else is read. -->
+		{#if textSize !== 1}
+			<button
+				class="ui-size as-typed"
+				onclick={() => setTextSize(1)}
+				title="Interface text at {Math.round(textSize * 100)}% — press for the default size"
+				aria-label="Interface text at {Math.round(textSize * 100)}%, back to the default size"
+				>{Math.round(textSize * 100)}%</button
+			>
+		{/if}
 		<!-- One ellipsised row, so a long notice is cut off; a tap opens the
 		     whole of it. A button inside the live region rather than the region
 		     itself, so what a screen reader announces is still the notice. The
@@ -3157,18 +3268,6 @@
 		<!-- The version is the way to what it brought. After an update the list
 		     opens by itself (see boot), so there is no mark here for unread. -->
 		<button class="version as-typed" onclick={openWhatsNew} title="What's new">v{VERSION}</button>
-		<!-- The interface's text size, when it is not the default: a pinch off the
-		     stage changes it without a word, and this is both where it says so and
-		     how it goes back. -->
-		{#if textSize !== 1}
-			<button
-				class="ui-size as-typed"
-				onclick={() => setTextSize(1)}
-				title="Interface text at {Math.round(textSize * 100)}% — press for the default size"
-				aria-label="Interface text at {Math.round(textSize * 100)}%, back to the default size"
-				>{Math.round(textSize * 100)}%</button
-			>
-		{/if}
 	</footer>
 </div>
 
@@ -3399,7 +3498,7 @@
 		</header>
 		{#each RELEASES as release (release.version)}
 			<h3>
-				{release.version}{#if release.version === VERSION}<span class="current">· this one</span>{/if}
+				{release.version}{#if release.version === VERSION}<span class="current">· new</span>{/if}
 				<time datetime={release.date}>{release.date}</time>
 			</h3>
 			<ul>
@@ -3616,6 +3715,15 @@
 		height: var(--tool);
 	}
 
+	/* A glyph with no word at any width: square, as the phone draws the rest. */
+	.toolbar .theme {
+		width: var(--tool);
+		padding: 0;
+		display: grid;
+		place-items: center;
+		flex: none;
+	}
+
 	/* The row the two option bars share. It owns the ground and the rule under
 	   it, so the band left over when the shorter bar is in it reads as part of
 	   the bar rather than as a gap above the stage. */
@@ -3663,10 +3771,22 @@
 		user-select: none;
 	}
 
+	.brand {
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	/* Not text and not a picture to take away: a press-and-hold on a phone
+	   selected it, or offered to save it, instead of changing the theme. */
 	.brand img {
 		display: block;
 		height: 100%;
 		width: auto;
+		user-select: none;
+		-webkit-user-select: none;
+		-webkit-user-drag: none;
+		-webkit-touch-callout: none;
+		pointer-events: none;
 	}
 
 	.spacer {
@@ -3851,6 +3971,11 @@
 		.status-bar .ui-size {
 			margin: -6px -4px -6px 0;
 			padding: 8px 8px;
+		}
+
+		/* At the left end, it gives its spare width back on that side. */
+		.status-bar .ui-size {
+			margin: -6px 0 -6px -8px;
 		}
 	}
 
@@ -4334,6 +4459,7 @@
 		   never the same width, so it would sit off to one side of the bar it is
 		   supposed to be the middle of. Out of the flow it also stops counting
 		   towards the row's height, which is the buttons' to set. */
+		.toolbar .theme,
 		.toolbar .help {
 			order: 1;
 		}
@@ -4432,6 +4558,7 @@
 			flex: none;
 		}
 
+		:global(html[data-text-larger]) .toolbar .theme,
 		:global(html[data-text-larger]) .toolbar .help {
 			order: 3;
 		}
@@ -4455,6 +4582,7 @@
 			order: 2;
 		}
 
+		.toolbar .theme,
 		.toolbar .help {
 			order: 3;
 		}

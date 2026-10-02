@@ -402,6 +402,7 @@
 						aria-label="Saved templates"
 						onclick={togglePicker}
 					>
+						<span class="picker-icon"><Icon name="document-blank" size={15} /></span>
 						<Icon name="caret-down" size={18} />
 					</button>
 					{#if pickerOpen}
