@@ -42,6 +42,18 @@ export function nextTheme(theme: Theme): Theme {
 	return THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
 }
 
+/**
+ * The other dark, for a glance while the logo is hovered or held: dark and
+ * dark with the page inverted are the pair worth comparing — whether the white
+ * page is too bright tonight — and light is a press away anyway. `null` from
+ * light, which has nothing to glance at.
+ */
+export function peekTheme(theme: Theme): Theme | null {
+	if (theme === 'dark') return 'dark-page';
+	if (theme === 'dark-page') return 'dark';
+	return null;
+}
+
 export function loadTheme(): Theme {
 	return readTheme(local.get<string>(THEME_KEY, 'light'));
 }

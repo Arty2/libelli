@@ -1285,8 +1285,10 @@ There every zoom is the sheet's — a pinch, Ctrl/Cmd+scroll, <kbd>+</kbd> /
 drag to move about a zoomed sheet.
 
 **Pressing the logo** steps the theme: light, dark, and dark with the page
-inverted too, for a white page in a dark room. It is remembered, and it is the
-screen's only — what prints, and what a PNG holds, is the page as designed.
+inverted too, for a white page in a dark room. In either dark, resting the
+mouse on the logo or holding a finger on it shows the other one until you move
+away or let go — its tooltip still comes up with the hold. It is remembered,
+and it is the screen's only — what prints, and what a PNG holds, is the page as designed.
 
 ## Undo and redo
 

@@ -9,13 +9,13 @@ to the README. The dialog reads plain text and `code` spans and nothing else,
 so any other markup shows as typed. The app shows this file under **What's
 new** — press the version number in the status bar.
 
-## 0.26.0 — 2026-10-01
+## 0.26.1 — 2026-10-02
 
-- Press the logo for dark, again for dark with the page inverted too, once
-  more for light. Printing and PNGs are never dark.
-- A sheet open full screen zooms itself, not the interface's text.
-- Folio, quarto and octavo name 2, 4 and 8 up. The text size leads the status
-  bar; Template and Table fold to an icon when there is no room for names.
+- Dark theme. Press the logo for dark, again for dark with the page inverted
+  too, once more for light; hover or hold it for a look at the other dark.
+  Printing and PNGs are never dark.
+- A full-screen sheet zooms itself, not the interface's text. Folio, quarto
+  and octavo name 2, 4 and 8 up; Template and Table fold to an icon when cramped.
 
 ## 0.25.5 — 2026-10-01
 

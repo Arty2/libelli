@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { THEMES, THEME_KEY, nextTheme, readTheme } from './theme';
+import { THEMES, THEME_KEY, nextTheme, peekTheme, readTheme } from './theme';
 // Through Vite rather than `node:fs`, as card-interactive.test.ts explains.
 import html from '../app.html?raw';
 
@@ -18,6 +18,14 @@ describe('nextTheme', () => {
 		expect(nextTheme('light')).toBe('dark');
 		expect(nextTheme('dark')).toBe('dark-page');
 		expect(nextTheme('dark-page')).toBe('light');
+	});
+});
+
+describe('peekTheme', () => {
+	it('swaps the two darks, and has nothing for light', () => {
+		expect(peekTheme('dark')).toBe('dark-page');
+		expect(peekTheme('dark-page')).toBe('dark');
+		expect(peekTheme('light')).toBeNull();
 	});
 });
 

@@ -62,7 +62,8 @@
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
 	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
-	import { applyTheme, loadTheme, nextTheme, saveTheme, THEME_NAMES, type Theme } from '$lib/theme';
+	import { applyTheme, loadTheme, nextTheme, peekTheme, saveTheme, THEME_NAMES, type Theme } from '$lib/theme';
+	import { TIP_HOLD } from '$lib/tooltip';
 	import { applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
 		autoMap,
@@ -178,8 +179,34 @@
 	let theme = $state<Theme>('light');
 	function setTheme(next: Theme) {
 		theme = next;
+		peeking = false;
 		applyTheme(next);
 		saveTheme(next);
+	}
+
+	/**
+	 * The other dark, shown while the logo is hovered or held — see peekTheme.
+	 * Shown, never stored: letting go puts back the theme that was chosen.
+	 */
+	let peeking = false;
+	/** Pressed since the pointer came over: what it shows now is the choice. */
+	let peekSpent = false;
+	let peekTimer: ReturnType<typeof setTimeout> | null = null;
+	function peekStart(after: number) {
+		if (peekTimer) clearTimeout(peekTimer);
+		if (!peekTheme(theme) || peekSpent) return;
+		peekTimer = setTimeout(() => {
+			peekTimer = null;
+			peeking = true;
+			applyTheme(peekTheme(theme) ?? theme);
+		}, after);
+	}
+	function peekEnd() {
+		if (peekTimer) clearTimeout(peekTimer);
+		peekTimer = null;
+		if (!peeking) return;
+		peeking = false;
+		applyTheme(theme);
 	}
 
 	/** The interface's text size, as a multiple of the browser's default — see textsize.ts. */
@@ -2658,11 +2685,42 @@
 	<header class="toolbar">
 		<!-- The mark, and the theme: each press steps light, dark, dark with the
 		     page inverted (theme.ts). The one control with no word on it, so
-		     the tooltip names what the next press gives. -->
+		     the tooltip names what the next press gives.
+
+		     In either dark, resting the mouse on it or holding a finger on it
+		     shows the other dark until the pointer leaves or lets go. The hold
+		     is the tooltip's own (TIP_HOLD), so the tip still comes up with it,
+		     and the Tooltip drops the click a held tip ends in — a glance is
+		     never also a press. A short wait on a mouse, so crossing the mark on
+		     the way to Help does not flash the page. After a click the glance
+		     waits for the pointer to leave: the theme just chosen is what it
+		     wants to see. -->
 		<button
 			class="brand"
-			onclick={() => setTheme(nextTheme(theme))}
-			title="{THEME_NAMES[theme]} — press for {THEME_NAMES[nextTheme(theme)].toLowerCase()}"
+			onclick={() => {
+				setTheme(nextTheme(theme));
+				peekSpent = true;
+			}}
+			onpointerenter={(e) => {
+				peekSpent = false;
+				if (e.pointerType === 'mouse') peekStart(200);
+			}}
+			onpointerleave={(e) => {
+				if (e.pointerType === 'mouse') peekEnd();
+			}}
+			onpointerdown={(e) => {
+				if (e.pointerType === 'touch') {
+					peekSpent = false;
+					peekStart(TIP_HOLD);
+				}
+			}}
+			onpointerup={(e) => {
+				if (e.pointerType === 'touch') peekEnd();
+			}}
+			onpointercancel={peekEnd}
+			title={peekTheme(theme)
+				? `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}; hover or hold for a look at ${THEME_NAMES[peekTheme(theme) ?? theme].toLowerCase()}`
+				: `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}`}
 			aria-label="libelli — theme: {THEME_NAMES[theme]}, press for {THEME_NAMES[nextTheme(theme)].toLowerCase()}"
 		>
 			<img src="{base}/logo.svg" alt="" width="389" height="314" draggable="false" />

@@ -3675,6 +3675,15 @@ with the rest, which is what it should do. Screen only; print and PNG never
 see it. No `prefers-color-scheme`: the logo is the switch, and the app is
 light until it is pressed.
 
+**A glance at the other dark, never stored.** Hovering the logo (after
+200ms, so crossing it does not flash the page) or holding it (the tooltip's
+own `TIP_HOLD`, so the tip comes up with it) applies the other dark until the
+pointer leaves or lifts; the stored theme never changes. The Tooltip already
+swallows the click a held tip ends in, so a glance is never also a press. A
+click while the mouse is still over the logo spends the glance until the
+pointer leaves — otherwise the theme just chosen would be hidden under the
+preview of its pair.
+
 **The template and table pickers fold to a glyph.** Each is a size container
 (`container-type: inline-size`, Widely available) with a set natural width,
 so a query can ask how much of it the row has left without the answer
