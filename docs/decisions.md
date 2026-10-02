@@ -2949,7 +2949,10 @@ and smaller, so the row is floored at the tallest bar it has held at this window
 size. The trade-off is a band of the bar's own colour under the shorter of the
 two; it buys a page that does not move when you pick something up. The floor is
 dropped on a resize, because both bars wrap and neither height survives a change
-of width.
+of width — and only a new measurement raises it again. The effect that raised
+it used to read the floor too, so the reset re-ran it at once with the height
+from the old width: a window widened from narrow kept the narrow bar's wrapped
+height, as a band of empty bar.
 
 **The page bar stands at the area bar's height before any area is picked.**
 The row was floored at the tallest bar it had held, so the page stopped jumping
@@ -3262,14 +3265,20 @@ because a shadow drawn inside a scroller scrolls away with it: the bars get a
 `.bar-frame` in `OptionsBar`, the table uses its own section, which holds only
 the scroller and the action bar.
 
-**The table has no shadow under its header or beside its row numbers.** Both
-are frozen, always there whatever has scrolled under them; a shadow there only
-made them look lifted, more important than the rows, without saying anything.
-They get a 2px rule instead — twice the others, as furniture rather than a
-signal. So the table's shadows are the bottom, and on a desk the right, which
-starts below the header. Not the right on a phone: the table is a column or two
-wide there and nearly always scrolls sideways, so it would be a fixture, not a
-hint. The bars wrap and never scroll sideways, so they have top and bottom.
+**The table has no shadow under its header.** It is frozen, always there
+whatever has scrolled under it; a shadow there only made it look lifted, more
+important than the rows, without saying anything. It gets a 2px rule instead —
+twice the others, as furniture rather than a signal — and so do the row
+numbers. Sideways the shadow beside the row numbers stays, though: a column
+scrolled off to the left is otherwise invisible, where a row scrolled up still
+shows in the numbering. So the table's shadows are the bottom and, on a desk,
+left and right, which start below the header. Not the sides on a phone: the
+table is a column or two wide there and nearly always scrolls sideways, so they
+would be a fixture, not a hint. The bars wrap and never scroll sideways, so they
+have top and bottom.
+
+**27px at 18% black.** Started at 10px and 12%, which read as a hairline; grown
+in two steps on asking.
 
 ## `src/lib/textsize.ts`, the viewport, and type in `rem`
 

@@ -137,8 +137,16 @@
 	// The library menu used to make the bar taller on a phone while it was up,
 	// and this had to refuse that height as a floor. The menu is `fixed` now —
 	// see PageOptions — so every height the bar reports is one it stands at.
+	//
+	// Only a new height raises the floor, never the floor changing: reading
+	// `barFloor` here made the resize's reset to 0 re-run this at once, with the
+	// height measured at the old width, so a window widened from a phone kept
+	// the narrow width's wrapped height as its floor — a band of empty bar.
 	$effect(() => {
-		if (barHeight > barFloor) barFloor = barHeight;
+		const height = barHeight;
+		untrack(() => {
+			if (height > barFloor) barFloor = height;
+		});
 	});
 
 	let ui = $state<UiState>({ showBounds: true, showTies: false, showGrid: false, showGuides: true, smartGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
