@@ -590,6 +590,45 @@
 	gap: 8px;
 }
 
+/* The bar's frame, for the shadows below. */
+.bar-frame {
+	position: relative;
+}
+
+/* A bar capped short of its settings scrolls, and one that stops on a row
+   boundary looks finished. A soft shadow on the edge with more past it is the
+   hint — the edges come from scrolledge.ts. Vertical only: the bars wrap, so
+   they never scroll sideways. Over the fields, because a shadow drawn under
+   them is covered by every opaque one; under the pickers' menus, which are
+   fixed at 30, and never in the way of a press. */
+.bar-frame::before,
+.bar-frame::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	z-index: 5;
+	height: 10px;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+
+.bar-frame::before {
+	top: 0;
+	background: linear-gradient(to bottom, rgba(0, 0, 0, 0.12), transparent);
+}
+
+.bar-frame::after {
+	bottom: 0;
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.12), transparent);
+}
+
+.bar-frame[data-more-top]::before,
+.bar-frame[data-more-bottom]::after {
+	opacity: 1;
+}
+
 /* On a phone these bars wrap to a dozen rows and swallow the page they are
    meant to be editing. Capped and scrolled instead, so the preview keeps the
    larger share of the screen. */

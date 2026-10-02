@@ -3274,6 +3274,27 @@ not at all. The true inverse needs relative colour syntax, which is Baseline
 Newly, so it is behind `@supports`; without it the guides are `#da9c14`, the
 inverse of the fallback blue, worked out by hand.
 
+## `src/lib/scrolledge.ts` — the shadow at an edge with more
+
+**A scroller that stops on a row boundary looks finished.** The bars on a phone
+are capped and scroll, and the table scrolls both ways; nothing on screen said
+so. Each edge with more past it gets a soft shadow, gone at the end.
+
+**Script, not CSS.** The old `background-attachment: local` trick paints under
+the content, and every cell and every field here is opaque. Scroll-driven
+animations would do it in CSS alone but are not Baseline Widely available. So
+an action reads the four edges (`overflowEdges`, tested) and marks a frame
+round the scroller with `data-more-*`; the component draws the shadows. A frame
+because a shadow drawn inside a scroller scrolls away with it: the bars get a
+`.bar-frame` in `OptionsBar`, the table uses its own section, which holds only
+the scroller and the action bar.
+
+**The table's shadows start inside its frozen parts** — below the sticky
+header, right of the row numbers — because that is where rows pass under. On a
+phone the table only gets top and bottom: it is a column or two wide there and
+nearly always scrolls sideways, so side shadows would be a fixture, not a hint.
+The bars wrap and never scroll sideways, so they only ever have the two.
+
 ## `src/lib/textsize.ts`, the viewport, and type in `rem`
 
 **The app is pinned to the window, not given a height.** `.app` is

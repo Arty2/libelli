@@ -8,12 +8,13 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.27.0 — 2026-10-06
+## 0.27.1 — 2026-10-06
 
 - Recto ⧘ Verso: the guides draw the fold, dot and dash, beside the page.
 - An area's Recto / Verso is now Fold Follow; its inner edge is dot-dash.
 - A pinch with nothing chosen zooms about where the fingers are.
 - `%%page:current%%` and `%%page:total%%` for the page number in words.
+- A soft shadow where the table or a bar scrolls on.
 
 ## 0.26.3 — 2026-10-02
 

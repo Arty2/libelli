@@ -5,6 +5,7 @@
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { armDefault } from '$lib/modal';
+	import { scrollEdges } from '$lib/scrolledge';
 	import { localImageName, safeMediaUrl } from '$lib/assets';
 	import type { Grid } from '$lib/bitmap';
 	import BitmapEditor from './BitmapEditor.svelte';
@@ -702,6 +703,8 @@
 	} | null>(null);
 	let liftTimer: ReturnType<typeof setTimeout> | null = null;
 	let scrollEl = $state<HTMLElement | null>(null);
+	/** The sticky header's height, so the top shadow falls below it, where rows pass under. */
+	let headHeight = $state(0);
 	let headEls = $state<Array<HTMLElement | null>>([]);
 
 	function watchCarry(on: boolean) {
@@ -1373,6 +1376,8 @@
 	class:rows-full={rowHeight === 'full'}
 	class:locked
 	aria-label="Card data"
+	style="--head-h:{headHeight}px; --gutter-w:{gutterWidth}; --bar-h:{barHeight}px"
+	use:scrollEdges={(section) => section.querySelector<HTMLElement>(':scope > .scroll')}
 >
 	<div class="scroll" bind:this={scrollEl}>
 		<table style="min-width:{tableWidth}">
@@ -1391,6 +1396,7 @@
 			     control: on a phone the Data button opens the tray half way, and
 			     this is how it is pulled up to fill the screen. -->
 			<thead
+				bind:offsetHeight={headHeight}
 				class:draggable={trayDraggable}
 				onpointerdown={startTrayDrag}
 				onclickcapture={swallowClick}
@@ -1725,6 +1731,12 @@
 			</tbody>
 		</table>
 	</div>
+	<!-- The shadows that say there is more past an edge, outside the scroller
+	     because inside it they would scroll away with the rows. -->
+	<span class="edge top" aria-hidden="true"></span>
+	<span class="edge bottom" aria-hidden="true"></span>
+	<span class="edge left" aria-hidden="true"></span>
+	<span class="edge right" aria-hidden="true"></span>
 
 	<!-- One line, always: this bar wrapping was costing the table a row of its
 	     own height every time the tray narrowed. -->
@@ -2229,6 +2241,74 @@
 		   off-centre on a phone. It scrolls sideways on its own instead. */
 		min-width: 0;
 		background: #fff;
+	}
+
+	/* A shadow on each edge of the scroller with more past it — the edges come
+	   from scrolledge.ts, which marks this section. Inside the frozen header
+	   and row numbers rather than over them: those never move, so the shadow
+	   belongs where the rows and columns pass under them, as if the frozen
+	   parts were lifted off the table. Short of the scroller's own bars, where
+	   a classic one takes room, and of the action bar under it. Over the cells
+	   and their sticky parts (z-index 4 at most), under the cell editor. */
+	.edge {
+		position: absolute;
+		z-index: 5;
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 0.15s;
+	}
+
+	.edge.top,
+	.edge.bottom {
+		left: 0;
+		right: var(--scrollbar-y, 0px);
+		height: 10px;
+	}
+
+	.edge.left,
+	.edge.right {
+		top: var(--head-h, 0px);
+		bottom: calc(var(--bar-h, 0px) + var(--scrollbar-x, 0px));
+		width: 10px;
+	}
+
+	.edge.top {
+		top: var(--head-h, 0px);
+		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.12), transparent);
+	}
+
+	.edge.bottom {
+		bottom: calc(var(--bar-h, 0px) + var(--scrollbar-x, 0px));
+		background: linear-gradient(to top, rgba(0, 0, 0, 0.12), transparent);
+	}
+
+	.edge.left {
+		left: var(--gutter-w, 0px);
+		background: linear-gradient(to right, rgba(0, 0, 0, 0.12), transparent);
+	}
+
+	.edge.right {
+		right: var(--scrollbar-y, 0px);
+		background: linear-gradient(to left, rgba(0, 0, 0, 0.12), transparent);
+	}
+
+	/* `:global` only for the marks, which the action sets and the compiler
+	   cannot see. */
+	.data:global([data-more-top]) .edge.top,
+	.data:global([data-more-bottom]) .edge.bottom,
+	.data:global([data-more-left]) .edge.left,
+	.data:global([data-more-right]) .edge.right {
+		opacity: 1;
+	}
+
+	/* Sideways only on a desk. On a phone the table is a column or two wide and
+	   nearly always scrolls sideways, so side shadows would be a fixture rather
+	   than a hint. */
+	@media (max-width: 900px) {
+		.edge.left,
+		.edge.right {
+			display: none;
+		}
 	}
 
 	.scroll {
