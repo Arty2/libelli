@@ -457,7 +457,7 @@
 	min-width: 0;
 }
 
-/* The toolbar's Page Setup glyph, in the caret, for when the name has no room. */
+/* The toolbar's Page glyph, in the caret, for when the name has no room. */
 .options .field.picker .picker-icon {
 	display: none;
 }

@@ -367,7 +367,7 @@
 	They share options-bar.css rather than a <style> block, because Svelte would
 	otherwise scope a copy of the same 240 lines to each.
 -->
-	<div class="options" aria-label="Page setup">
+	<div class="options" aria-label="Page settings">
 		<!-- The lock, then what this is called, with everything that acts on the
 		     template as a whole behind the caret — the lock outside the menu,
 		     because it is a state you need to see, not an errand. -->

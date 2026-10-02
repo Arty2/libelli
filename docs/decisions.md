@@ -1324,7 +1324,7 @@ letter.
 derive the scale, the scale sizes the sheet, the sheet's height decides whether a
 vertical scrollbar appears, and that scrollbar takes about fifteen pixels off the
 width the measurement started from. At a marginal size that oscillates until the
-browser's own resize-observer bail-out stops it, and closing Page Setup landed
+browser's own resize-observer bail-out stops it, and closing the page bar landed
 right in it. `scrollbar-gutter: stable` removes the causal edge rather than
 damping the swing; the observer is also coalesced to a frame and held to whole
 pixels so it cannot start again for some other reason. Reserving the *horizontal*
@@ -2238,7 +2238,7 @@ the orientation, so picking A4 under Auto keeps the sheet the way it is sitting.
 places — `PageOptions.svelte`, where every other page-level setting lives,
 and `PrintPreview.svelte`, so a sheet size or count picked wrong does not
 send you back to the editor before you can print. Both pass the same
-`template`/`ontemplatechange` shape the rest of the page-setup bar uses; the
+`template`/`ontemplatechange` shape the rest of the page bar uses; the
 panel itself does not know or care which screen it is in.
 
 **Its groups are fieldsets, with their names showing on both screens**, Bleed
@@ -2783,7 +2783,7 @@ their filename instead, which says the same thing where it is looked for.
 **Images is a tray, not a bar.** It was a third bar in the options row, where a
 list of pictures had nine rows' height at most and the page bar had to give it
 the row. It takes the table's room now, one of the two at a time, at the same
-width or height, and the options row is page setup and the area bar only.
+width or height, and the options row is the page bar and the area bar only.
 
 **A cell's field is as tall as its words, and the cell is the target.** It
 filled the row by `height: 100%` against a cell of `height: 1px`, which
@@ -2871,7 +2871,7 @@ stays in view — a tabbed version was tried and read as messier, not calmer: a
 press to reach anything, and a bar whose height changed with the tab. The
 grouping and the order:
 
-- Page Setup: the template, then **Page** (size, margin, left & right),
+- The page bar: the template, then **Page** (size, margin, left & right),
   **Text**, **Paragraphs**, **Lists**, **Paper**, **Page Number**, and the
   print panel's **Bleed** and **Printing**.
 - An area: the name, then **Content**, **QR Code** when it is one, **Align**
@@ -2964,8 +2964,8 @@ a boat. No two badges answer with the same mark.
 Stacked, every selection and deselection would add or remove a whole toolbar
 from the top of the window: the stage would lose that much height, the fitted
 scale would change with it, and the page would jump under the pointer. Selecting
-an area gives it the row and Page Setup takes it back, letting go of the area to
-do it — pressing Page Setup means "show me the page", not "stack a second bar".
+an area gives it the row and Page takes it back, letting go of the area to
+do it — pressing Page means "show me the page", not "stack a second bar".
 That leaves the two bars being different heights, which is the same jump again
 and smaller, so the row is floored at the tallest bar it has held at this window
 size. The trade-off is a band of the bar's own colour under the shorter of the
@@ -3358,7 +3358,7 @@ while the buttons are small; with the text larger than default,
 `applyTextSize` (and the pre-paint script) set `data-text-larger` on the root,
 and the row is laid out as at 320px: the mark at the left, shrinking before
 anything wraps, and every button after the space — Install and Help in front of
-Page Setup. At 150% on a 412px phone a centred mark had sat over Page Setup;
+Page. At 150% on a 412px phone a centred mark had sat over Page;
 and with Help and Install left where they were, the logo split the controls in
 two.
 

@@ -357,7 +357,7 @@
 		{/each}
 	</div>
 
-	<!-- The same Print Settings shared with Page Setup, so a sheet size or count
+	<!-- The same Print Settings shared with the page bar, so a sheet size or count
 	     picked wrong does not send you back to the editor to fix it — see
 	     PrintSettingsPanel.svelte and docs/decisions.md. Between the two grids:
 	     it is what turns the pages above into the sheets below, and standing

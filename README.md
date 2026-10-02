@@ -54,8 +54,8 @@ own](#where-the-images-live) instead, where the browser offers one.
 
 ## Cards and boxes
 
-A template is a list of boxes on a page. Page setup and box settings are two
-separate bars: **Page Setup** in the toolbar shows or hides the template's own
+A template is a list of boxes on a page. Page and box settings are two
+separate bars: **Page** in the toolbar shows or hides the template's own
 settings, and a box's bar appears under it whenever a box is selected. Drag and
 resize boxes directly, or type exact millimetres.
 
@@ -253,7 +253,7 @@ resize boxes directly, or type exact millimetres.
   exactly as written. No time of day: a card is printed once and read for
   months.
 - **Paragraphs** — **Paragraph** in the area bar, with a page-wide default in
-  page setup: **Space After** each paragraph, or the next one's first line
+  the page bar: **Space After** each paragraph, or the next one's first line
   **Indented** — or **Continuous**, neither, which is where a template starts. A space in lines of the area's own leading, an indent in em of
   its type size, so either keeps its proportion when the type changes. In plain text every line is a paragraph —
   Return starts a new one, as in a word processor; in Markdown it replaces the
@@ -268,11 +268,11 @@ resize boxes directly, or type exact millimetres.
   missing character); **Indent** is the space from the area's edge to
   the markers, in em, and **Leading** the list's own line height, a multiple of
   the size like the text's; left blank, a list takes the text's leading. All
-  three are a group of their own in page setup and, for a Markdown area, in the
+  three are a group of their own in the page bar and, for a Markdown area, in the
   area bar, where each on its own overrides the page's; left blank, a list is
   set as it always was.
 - **Baseline** — just after Leading: raises an area's text by a share of its size, in em, or lowers
-  it below 0: for a face that sits high or low on its line. Page setup's
+  it below 0: for a face that sits high or low on its line. The page bar's
   applies only to areas in the page's font — it corrects a face, and would be
   wrong for any other — and an area's own applies whatever it is set in. It
   moves the words and nothing else: the area is as tall as it was, and what is
@@ -390,7 +390,7 @@ resize boxes directly, or type exact millimetres.
   modifiers with the arrows step the alignment of the selection in the direction
   pressed. Both give an area a value of its own on the first go, so an area that
   was inheriting stops.
-- **Type defaults** — page setup holds the family, size, leading, spacing and
+- **Type defaults** — the page bar holds the family, size, leading, spacing and
   color. A box that leaves those fields blank inherits them, so changing the
   page moves every box that never overrode it; a new box starts out inheriting
   everything.
@@ -445,7 +445,7 @@ resize boxes directly, or type exact millimetres.
   own background image too — **Upload…** or **URL…**, **Cover**/**Contain**/
   **Tile** — separate from the card's own background and showing only in the
   margin around the tiled cards. This whole group is the one place both
-  **Page Setup** and the print screen change the same settings: see
+  **Page** and the print screen change the same settings: see
   **Print preview** below.
 - **Sheet Bleed** and **Sheet Crop Marks** — the sheet's own, distinct from the
   card's, and set beside them: bleed outsets the paper around the sheet size,
@@ -531,7 +531,7 @@ resize boxes directly, or type exact millimetres.
   A page lock is on the design, not on what it holds: **double-click an area**
   and its words can still be typed into, as can a cell. An area's own lock
   still refuses it, and so does a locked table for a bound area.
-- **CSS** — page setup has a CSS button, just left of the template's name; what you write there is saved
+- **CSS** — the page bar has a CSS button, just left of the template's name; what you write there is saved
   inside the template and travels with it. Selectors are scoped to the card, so
   nothing in a template can restyle the editor around it, and `@import` and any
   `url()` pointing off this machine are stripped, so a template's CSS cannot
@@ -558,7 +558,7 @@ resize boxes directly, or type exact millimetres.
 
 ## Templates, and laying one out
 
-**Several templates, one browser.** The **Template** field in page setup names the
+**Several templates, one browser.** The **Template** field in the page bar names the
 loaded template; the caret beside it opens every template this browser has saved,
 the open one ticked, with everything that acts on the template as a whole under a
 rule: **New Template…**, **A5 Starter Booklet**, **Import…**, **Export**, and in red **Reset…** and
@@ -641,7 +641,7 @@ library is loaded to do it.
 
 The dataset is one row per card, one column per field. It sits beside the page
 on a wide screen and under it on a phone, and **Data** in the toolbar folds it
-away when the page needs the room. Whether it, Page Setup and Images were open
+away when the page needs the room. Whether it, Page and Images were open
 is remembered, so a reload comes back to the screen it left; a first visit on a
 phone starts with all of them folded away. Stacked under the page it opens at a little
 under half the screen and is **dragged taller by its own header** — pull the
@@ -807,7 +807,7 @@ a notice can appear.
   one you are trying something on — and reaching the second through a menu every
   time is the whole cost of having split them up. The pair survives a reload.
   Switching is undoable like everything else that replaces what is on screen.
-  Page Setup has the same button for templates, between the template's menu
+  The page bar has the same button for templates, between the template's menu
   and **CSS**: it goes back to the template open before this one — opened from
   the menu, started new, imported or added as the starter — and back again.
 - **Deleting a column asks** — it is a field of every card at once, it takes
@@ -1171,7 +1171,7 @@ or the imposed sheet's when **Pages per Sheet** is on), set **Margins** to *None
 uncheck **Headers and footers**, and switch on **Background graphics**, which
 Chrome drops along with the paper color. Checking the cards and reading the
 checklist are the same act, so they are the same screen — and **Print
-Settings** itself sits right there too: the same panel Page Setup shows, so a
+Settings** itself sits right there too: the same panel the page bar shows, so a
 sheet size or count picked wrong does not send you back to the editor to fix
 it before you print.
 
@@ -1344,7 +1344,7 @@ all of them.
 ## One options row
 
 The page bar and the area bar share a single row, and only one of them is ever in
-it: selecting an area gives it the row, and **Page Setup** takes it back by
+it: selecting an area gives it the row, and **Page** takes it back by
 letting go of the area. They used to stack, which meant every selection added a
 whole toolbar to the top of the window — the stage lost that much height, the
 fitted scale changed with it, and the page jumped and resized under the pointer.
@@ -1449,7 +1449,7 @@ towards it and down is away. They repeat on a hold like the arrows do.
   left end of the status bar, and **pressing it** puts it back. The cards are
   unaffected: their type is set in points by the design. Where the bars run
   short of room — a phone, a large size — the Template and Table names fold
-  away to the toolbar's Page Setup and Data glyphs beside their menus.
+  away to the toolbar's Page and Data glyphs beside their menus.
 - **Pinch to zoom the page**, anywhere over the stage. The gesture listens on
   the way down to whatever was touched, so it works over the areas and not only
   in the gaps between them — which is most of the page on a card that has been
@@ -1658,13 +1658,13 @@ than it has to.
   browser has no image for stays in the list as a dashed, red *missing* line,
   with **Find…** to put a file back under that very name.
 - **The window toolbar** holds only what is about the whole app: the mark, then
-  Help, Page Setup, Images, Data and Export — the two panels in the order they
+  Help, Page, Images, Data and Export — the two panels in the order they
   sit on screen, settings above the page and the table beside it. On a phone the
   buttons drop their words and keep their icons, and the row is read from the
   outside in: Help and, where the browser offers it, Install on the left, the
   mark in the middle, the four that act on what is on screen at the right.
   With the text larger than default the mark moves to the left end and every
-  button goes to the right, Install and Help in front of Page Setup.
+  button goes to the right, Install and Help in front of Page.
 
 Every number says its unit: mm for geometry, bleed, spacing and gaps, pt for
 type size.
@@ -1674,7 +1674,7 @@ type size.
 A template travels as JSON and carries no data with it — that is the point of
 keeping the column mapping outside it.
 
-- **Export** — in the template menu in page setup: fonts referenced by family name, and a background image
+- **Export** — in the template menu in the page bar: fonts referenced by family name, and a background image
   by file name or address. Small, diffable, git-friendly — no image and no font
   bytes are ever folded into it. Its CSS, page numbers, locks, whether it has
   left and right pages and how its sheets are ordered all travel with it.
