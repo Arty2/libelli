@@ -290,7 +290,7 @@ export const saveDatasetId = (id: string) => local.set('dataset:id', id);
 export const loadPreviousDatasetId = (): string => local.get<string>('dataset:previous', '');
 export const savePreviousDatasetId = (id: string) => local.set('dataset:previous', id);
 
-/** The template that was open before this one, for the same swap in Page Setup. */
+/** The template that was open before this one, for the same swap in the page bar. */
 export const loadPreviousTemplateId = (): string => local.get<string>('template:previous', '');
 export const savePreviousTemplateId = (id: string) => local.set('template:previous', id);
 
