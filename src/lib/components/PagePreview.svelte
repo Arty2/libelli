@@ -1702,7 +1702,7 @@
 		   how tall the sheet is, and the sheet's height decides whether a vertical
 		   scrollbar appears — which takes ~15px off the width the measurement
 		   started from. At a size where the scrollbar is marginal that is a loop,
-		   and closing Page Setup lands right in it. Reserving the gutter whether
+		   and closing the page bar lands right in it. Reserving the gutter whether
 		   or not it is used breaks the cycle at its one causal edge, rather than
 		   damping the oscillation afterwards. */
 		scrollbar-gutter: stable;

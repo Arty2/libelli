@@ -137,8 +137,16 @@
 	// The library menu used to make the bar taller on a phone while it was up,
 	// and this had to refuse that height as a floor. The menu is `fixed` now —
 	// see PageOptions — so every height the bar reports is one it stands at.
+	//
+	// Only a new height raises the floor, never the floor changing: reading
+	// `barFloor` here made the resize's reset to 0 re-run this at once, with the
+	// height measured at the old width, so a window widened from a phone kept
+	// the narrow width's wrapped height as its floor — a band of empty bar.
 	$effect(() => {
-		if (barHeight > barFloor) barFloor = barHeight;
+		const height = barHeight;
+		untrack(() => {
+			if (height > barFloor) barFloor = height;
+		});
 	});
 
 	let ui = $state<UiState>({ showBounds: true, showTies: false, showGrid: false, showGuides: true, smartGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
@@ -278,7 +286,7 @@
 	/** The draft says something the card is not showing yet. */
 	const cssDirty = $derived((cssDraft.trim() || undefined) !== (template.css ?? undefined));
 	const cssCount = $derived(codeStats(cssDraft));
-	// Page setup is a panel, not a mode: it opens on wide screens and stays out of
+	// The page bar is a panel, not a mode: it opens on wide screens and stays out of
 	// the way on a phone, where it would eat the preview it is there to serve.
 	let pageSetupOpen = $state(true);
 	// Same bargain for the table: on a phone the preview and the spreadsheet
@@ -330,7 +338,7 @@
 	 * without waiting on the database.
 	 */
 	let templateId = $state('');
-	/** the template the swap in Page Setup goes back to, or '' while there is none */
+	/** the template the swap in the page bar goes back to, or '' while there is none */
 	let previousTemplate = $state('');
 	let library = $state<TemplateEntry[]>([]);
 
@@ -1755,7 +1763,7 @@
 	}
 
 	/**
-	 * The template being left behind is the one the swap in Page Setup comes
+	 * The template being left behind is the one the swap in the page bar comes
 	 * back to — the same pair the table keeps. '' says there is no pair any more.
 	 */
 	function rememberTemplate(id: string) {
@@ -2777,10 +2785,10 @@
 			aria-pressed={pageSetupOpen && !barBox}
 			aria-expanded={pageSetupOpen && !barBox}
 			title={barBox && pageSetupOpen
-				? 'Page setup — the area bar has the row; this takes it back'
-				: 'Show or hide the page setup'}
+				? 'Page — the area bar has the row; this takes it back'
+				: 'Show or hide the page settings'}
 		>
-			<Icon name="document-blank" size={15} /> <span class="label">Page Setup</span>
+			<Icon name="document-blank" size={15} /> <span class="label">Page</span>
 		</button>
 		<!-- Every stored picture, in a tray of its own in the table's place: the
 		     pictures are the browser's, not the page's — a row's own photograph
@@ -2837,7 +2845,7 @@
 	     whole toolbar from the top of the window: the stage changed height, the
 	     fitted scale changed with it, and the page you were working on jumped and
 	     resized under the pointer. The area bar takes the row while an area is
-	     selected; Page Setup takes it back, and lets go of the area to do it.
+	     selected; Page takes it back, and lets go of the area to do it.
 
 	     That leaves the two bars being different heights, which is the same jump
 	     again, smaller. So the row never shrinks: it is floored at the tallest bar
@@ -4504,11 +4512,11 @@
 	   would be under one of them. Out of the centre, back into the row, at its
 	   left end as on a desk, with every button to the right of the space. The
 	   controls win the row, because they are the ones you press. */
-	/* Larger text makes larger buttons, and at 150% on a 412px phone Page Setup
+	/* Larger text makes larger buttons, and at 150% on a 412px phone Page
 	   ran under a mark centred over the row. For as long as the text is larger
 	   than default, the row is laid out as at 320px below: the mark at the left
 	   end, then the space, then every button — Install and Help in front of
-	   Page Setup, as the wide bar has them. Help and Install had stayed at the
+	   Page, as the wide bar has them. Help and Install had stayed at the
 	   left, either side of the mark, which split the controls into two groups
 	   with the logo between them. */
 	@media (max-width: 900px) {
@@ -4570,7 +4578,7 @@
 			transform: none;
 			/* First, where a mark on the left sits on a desk — and with it on the
 			   left, Install and Help go back to where the wide bar has them: after
-			   the space, in front of Page Setup, in that order. */
+			   the space, in front of Page, in that order. */
 			order: 0;
 		}
 

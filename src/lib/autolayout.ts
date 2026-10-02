@@ -438,7 +438,7 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	);
 
 	/*
-	 * Inside the page's own margins — the ones page setup sets and the guides
+	 * Inside the page's own margins — the ones the page bar sets and the guides
 	 * draw — so a generated card sits in the same frame a hand-placed one snaps
 	 * to, the same distance from every edge unless the margins say otherwise.
 	 * Within that frame, heights and the gaps between areas are whole grid

@@ -8,12 +8,13 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.26.3 — 2026-10-02
+## 0.26.5 — 2026-10-02
 
 - Dark theme: the button left of Help, or the logo, steps light, dark, and
   dark with the page inverted. Hover or hold for a look at the other dark.
 - A full-screen sheet zooms: pinch, Ctrl/Cmd + scroll, + and −, double-click.
 - Folio, quarto and octavo in Pages per Sheet.
+- A soft shadow where the table or a bar scrolls on.
 
 ## 0.25.5 — 2026-10-01
 

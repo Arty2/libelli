@@ -1305,7 +1305,7 @@ letter.
 derive the scale, the scale sizes the sheet, the sheet's height decides whether a
 vertical scrollbar appears, and that scrollbar takes about fifteen pixels off the
 width the measurement started from. At a marginal size that oscillates until the
-browser's own resize-observer bail-out stops it, and closing Page Setup landed
+browser's own resize-observer bail-out stops it, and closing the page bar landed
 right in it. `scrollbar-gutter: stable` removes the causal edge rather than
 damping the swing; the observer is also coalesced to a frame and held to whole
 pixels so it cannot start again for some other reason. Reserving the *horizontal*
@@ -2219,7 +2219,7 @@ the orientation, so picking A4 under Auto keeps the sheet the way it is sitting.
 places — `PageOptions.svelte`, where every other page-level setting lives,
 and `PrintPreview.svelte`, so a sheet size or count picked wrong does not
 send you back to the editor before you can print. Both pass the same
-`template`/`ontemplatechange` shape the rest of the page-setup bar uses; the
+`template`/`ontemplatechange` shape the rest of the page bar uses; the
 panel itself does not know or care which screen it is in.
 
 **Its groups are fieldsets, with their names showing on both screens**, Bleed
@@ -2764,7 +2764,7 @@ their filename instead, which says the same thing where it is looked for.
 **Images is a tray, not a bar.** It was a third bar in the options row, where a
 list of pictures had nine rows' height at most and the page bar had to give it
 the row. It takes the table's room now, one of the two at a time, at the same
-width or height, and the options row is page setup and the area bar only.
+width or height, and the options row is the page bar and the area bar only.
 
 **A cell's field is as tall as its words, and the cell is the target.** It
 filled the row by `height: 100%` against a cell of `height: 1px`, which
@@ -2852,7 +2852,7 @@ stays in view — a tabbed version was tried and read as messier, not calmer: a
 press to reach anything, and a bar whose height changed with the tab. The
 grouping and the order:
 
-- Page Setup: the template, then **Page** (size, margin, left & right),
+- The page bar: the template, then **Page** (size, margin, left & right),
   **Text**, **Paragraphs**, **Lists**, **Paper**, **Page Number**, and the
   print panel's **Bleed** and **Printing**.
 - An area: the name, then **Content**, **QR Code** when it is one, **Align**
@@ -2942,14 +2942,17 @@ a boat. No two badges answer with the same mark.
 Stacked, every selection and deselection would add or remove a whole toolbar
 from the top of the window: the stage would lose that much height, the fitted
 scale would change with it, and the page would jump under the pointer. Selecting
-an area gives it the row and Page Setup takes it back, letting go of the area to
-do it — pressing Page Setup means "show me the page", not "stack a second bar".
+an area gives it the row and Page takes it back, letting go of the area to
+do it — pressing Page means "show me the page", not "stack a second bar".
 That leaves the two bars being different heights, which is the same jump again
 and smaller, so the row is floored at the tallest bar it has held at this window
 size. The trade-off is a band of the bar's own colour under the shorter of the
 two; it buys a page that does not move when you pick something up. The floor is
 dropped on a resize, because both bars wrap and neither height survives a change
-of width.
+of width — and only a new measurement raises it again. The effect that raised
+it used to read the floor too, so the reset re-ran it at once with the height
+from the old width: a window widened from narrow kept the narrow bar's wrapped
+height, as a band of empty bar.
 
 **The page bar stands at the area bar's height before any area is picked.**
 The row was floored at the tallest bar it had held, so the page stopped jumping
@@ -3247,6 +3250,36 @@ not at all. The true inverse needs relative colour syntax, which is Baseline
 Newly, so it is behind `@supports`; without it the guides are `#da9c14`, the
 inverse of the fallback blue, worked out by hand.
 
+## `src/lib/scrolledge.ts` — the shadow at an edge with more
+
+**A scroller that stops on a row boundary looks finished.** The bars on a phone
+are capped and scroll, and the table scrolls both ways; nothing on screen said
+so. Each edge with more past it gets a soft shadow, gone at the end.
+
+**Script, not CSS.** The old `background-attachment: local` trick paints under
+the content, and every cell and every field here is opaque. Scroll-driven
+animations would do it in CSS alone but are not Baseline Widely available. So
+an action reads the four edges (`overflowEdges`, tested) and marks a frame
+round the scroller with `data-more-*`; the component draws the shadows. A frame
+because a shadow drawn inside a scroller scrolls away with it: the bars get a
+`.bar-frame` in `OptionsBar`, the table uses its own section, which holds only
+the scroller and the action bar.
+
+**The table has no shadow under its header.** It is frozen, always there
+whatever has scrolled under it; a shadow there only made it look lifted, more
+important than the rows, without saying anything. It gets a 2px rule instead —
+twice the others, as furniture rather than a signal — and so do the row
+numbers. Sideways the shadow beside the row numbers stays, though: a column
+scrolled off to the left is otherwise invisible, where a row scrolled up still
+shows in the numbering. So the table's shadows are the bottom and, on a desk,
+left and right, which start below the header. Not the sides on a phone: the
+table is a column or two wide there and nearly always scrolls sideways, so they
+would be a fixture, not a hint. The bars wrap and never scroll sideways, so they
+have top and bottom.
+
+**27px at 18% black.** Started at 10px and 12%, which read as a hairline; grown
+in two steps on asking.
+
 ## `src/lib/textsize.ts`, the viewport, and type in `rem`
 
 **The app is pinned to the window, not given a height.** `.app` is
@@ -3310,7 +3343,7 @@ while the buttons are small; with the text larger than default,
 `applyTextSize` (and the pre-paint script) set `data-text-larger` on the root,
 and the row is laid out as at 320px: the mark at the left, shrinking before
 anything wraps, and every button after the space — Install and Help in front of
-Page Setup. At 150% on a 412px phone a centred mark had sat over Page Setup;
+Page. At 150% on a 412px phone a centred mark had sat over Page;
 and with Help and Install left where they were, the logo split the controls in
 two.
 
