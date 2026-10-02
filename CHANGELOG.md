@@ -9,11 +9,11 @@ to the README. The dialog reads plain text and `code` spans and nothing else,
 so any other markup shows as typed. The app shows this file under **What's
 new** — press the version number in the status bar.
 
-## 0.26.1 — 2026-10-02
+## 0.26.2 — 2026-10-02
 
-- Dark theme. Press the logo for dark, again for dark with the page inverted
-  too, once more for light; hover or hold it for a look at the other dark.
-  Printing and PNGs are never dark.
+- Dark theme. The new button left of Help, or the logo, steps light, dark,
+  and dark with the page inverted; hover or hold either for a look at the
+  other dark. Printing and PNGs are never dark.
 - A full-screen sheet zooms itself, not the interface's text. Folio, quarto
   and octavo name 2, 4 and 8 up; Template and Table fold to an icon when cramped.
 

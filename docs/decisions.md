@@ -3675,14 +3675,20 @@ with the rest, which is what it should do. Screen only; print and PNG never
 see it. No `prefers-color-scheme`: the logo is the switch, and the app is
 light until it is pressed.
 
-**A glance at the other dark, never stored.** Hovering the logo (after
+**Two controls, one behaviour.** The theme button left of Help wears the
+theme it is on (Carbon's `light`, `asleep`, `contrast`); the logo, where the
+theme started, keeps working. Both spread one `themeControl` object, so they
+cannot drift apart.
+
+**A glance at the other dark, never stored.** Hovering either (after
 200ms, so crossing it does not flash the page) or holding it (the tooltip's
 own `TIP_HOLD`, so the tip comes up with it) applies the other dark until the
 pointer leaves or lifts; the stored theme never changes. The Tooltip already
 swallows the click a held tip ends in, so a glance is never also a press. A
 click while the mouse is still over the logo spends the glance until the
 pointer leaves — otherwise the theme just chosen would be hidden under the
-preview of its pair.
+preview of its pair; and a click clears a glance still waiting to start,
+which would otherwise land on the new theme a moment later.
 
 **The template and table pickers fold to a glyph.** Each is a size container
 (`container-type: inline-size`, Widely available) with a set natural width,

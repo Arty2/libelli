@@ -34,6 +34,13 @@ export const THEME_NAMES: Record<Theme, string> = {
 	'dark-page': 'Dark, with the page inverted'
 };
 
+/** The Carbon glyph the toolbar's theme button wears for each. */
+export const THEME_ICONS: Record<Theme, string> = {
+	light: 'light',
+	dark: 'asleep',
+	'dark-page': 'contrast'
+};
+
 export function readTheme(value: unknown): Theme {
 	return THEMES.includes(value as Theme) ? (value as Theme) : 'light';
 }

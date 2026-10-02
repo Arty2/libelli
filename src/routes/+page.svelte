@@ -62,7 +62,7 @@
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
 	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
-	import { applyTheme, loadTheme, nextTheme, peekTheme, saveTheme, THEME_NAMES, type Theme } from '$lib/theme';
+	import { applyTheme, loadTheme, nextTheme, peekTheme, saveTheme, THEME_ICONS, THEME_NAMES, type Theme } from '$lib/theme';
 	import { TIP_HOLD } from '$lib/tooltip';
 	import { applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
@@ -208,6 +208,50 @@
 		peeking = false;
 		applyTheme(theme);
 	}
+
+	/**
+	 * What the logo and the theme button both do: a press steps the theme, a
+	 * hover or a hold glances at the other dark. Spread on each, so the two
+	 * cannot drift into answering differently.
+	 *
+	 * The hold is the tooltip's own (TIP_HOLD), so the tip still comes up with
+	 * it, and the Tooltip drops the click a held tip ends in — a glance is
+	 * never also a press. A short wait on a mouse, so crossing the control on
+	 * the way to Help does not flash the page. After a click the glance waits
+	 * for the pointer to leave: the theme just chosen is what it wants to see.
+	 */
+	const themeControl = {
+		onclick: () => {
+			// A glance still waiting to start would land on the theme just
+			// chosen and show its pair instead.
+			if (peekTimer) clearTimeout(peekTimer);
+			peekTimer = null;
+			setTheme(nextTheme(theme));
+			peekSpent = true;
+		},
+		onpointerenter: (e: PointerEvent) => {
+			peekSpent = false;
+			if (e.pointerType === 'mouse') peekStart(200);
+		},
+		onpointerleave: (e: PointerEvent) => {
+			if (e.pointerType === 'mouse') peekEnd();
+		},
+		onpointerdown: (e: PointerEvent) => {
+			if (e.pointerType !== 'touch') return;
+			peekSpent = false;
+			peekStart(TIP_HOLD);
+		},
+		onpointerup: (e: PointerEvent) => {
+			if (e.pointerType === 'touch') peekEnd();
+		},
+		onpointercancel: peekEnd
+	};
+
+	const themeTitle = $derived(
+		peekTheme(theme)
+			? `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}; hover or hold for a look at ${THEME_NAMES[peekTheme(theme) ?? theme].toLowerCase()}`
+			: `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}`
+	);
 
 	/** The interface's text size, as a multiple of the browser's default — see textsize.ts. */
 	let textSize = $state(1);
@@ -2684,43 +2728,13 @@
 <div class="app">
 	<header class="toolbar">
 		<!-- The mark, and the theme: each press steps light, dark, dark with the
-		     page inverted (theme.ts). The one control with no word on it, so
-		     the tooltip names what the next press gives.
-
-		     In either dark, resting the mouse on it or holding a finger on it
-		     shows the other dark until the pointer leaves or lets go. The hold
-		     is the tooltip's own (TIP_HOLD), so the tip still comes up with it,
-		     and the Tooltip drops the click a held tip ends in — a glance is
-		     never also a press. A short wait on a mouse, so crossing the mark on
-		     the way to Help does not flash the page. After a click the glance
-		     waits for the pointer to leave: the theme just chosen is what it
-		     wants to see. -->
+		     page inverted (theme.ts), and a hover or a hold glances at the other
+		     dark — the same as the theme button beside Help, see themeControl.
+		     Kept on the mark as well, where it was first. -->
 		<button
 			class="brand"
-			onclick={() => {
-				setTheme(nextTheme(theme));
-				peekSpent = true;
-			}}
-			onpointerenter={(e) => {
-				peekSpent = false;
-				if (e.pointerType === 'mouse') peekStart(200);
-			}}
-			onpointerleave={(e) => {
-				if (e.pointerType === 'mouse') peekEnd();
-			}}
-			onpointerdown={(e) => {
-				if (e.pointerType === 'touch') {
-					peekSpent = false;
-					peekStart(TIP_HOLD);
-				}
-			}}
-			onpointerup={(e) => {
-				if (e.pointerType === 'touch') peekEnd();
-			}}
-			onpointercancel={peekEnd}
-			title={peekTheme(theme)
-				? `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}; hover or hold for a look at ${THEME_NAMES[peekTheme(theme) ?? theme].toLowerCase()}`
-				: `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}`}
+			{...themeControl}
+			title={themeTitle}
 			aria-label="libelli — theme: {THEME_NAMES[theme]}, press for {THEME_NAMES[nextTheme(theme)].toLowerCase()}"
 		>
 			<img src="{base}/logo.svg" alt="" width="389" height="314" draggable="false" />
@@ -2736,6 +2750,17 @@
 				<Icon name="package" size={15} /> <span class="install-word">Install</span>
 			</button>
 		{/if}
+		<!-- The theme, in words-free form: the glyph is the theme it is on.
+		     Left of Help, with the other two buttons about the app rather than
+		     the card. -->
+		<button
+			class="theme"
+			{...themeControl}
+			title={themeTitle}
+			aria-label="Theme: {THEME_NAMES[theme]}, press for {THEME_NAMES[nextTheme(theme)].toLowerCase()}"
+		>
+			<Icon name={THEME_ICONS[theme]} size={15} />
+		</button>
 		<button class="help" onclick={() => (helpOpen = true)} title={withKey("How this works, and the keys", "help")}>
 			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
@@ -3690,6 +3715,15 @@
 		height: var(--tool);
 	}
 
+	/* A glyph with no word at any width: square, as the phone draws the rest. */
+	.toolbar .theme {
+		width: var(--tool);
+		padding: 0;
+		display: grid;
+		place-items: center;
+		flex: none;
+	}
+
 	/* The row the two option bars share. It owns the ground and the rule under
 	   it, so the band left over when the shorter bar is in it reads as part of
 	   the bar rather than as a gap above the stage. */
@@ -4425,6 +4459,7 @@
 		   never the same width, so it would sit off to one side of the bar it is
 		   supposed to be the middle of. Out of the flow it also stops counting
 		   towards the row's height, which is the buttons' to set. */
+		.toolbar .theme,
 		.toolbar .help {
 			order: 1;
 		}
@@ -4523,6 +4558,7 @@
 			flex: none;
 		}
 
+		:global(html[data-text-larger]) .toolbar .theme,
 		:global(html[data-text-larger]) .toolbar .help {
 			order: 3;
 		}
@@ -4546,6 +4582,7 @@
 			order: 2;
 		}
 
+		.toolbar .theme,
 		.toolbar .help {
 			order: 3;
 		}
