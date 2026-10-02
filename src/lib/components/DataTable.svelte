@@ -703,7 +703,7 @@
 	} | null>(null);
 	let liftTimer: ReturnType<typeof setTimeout> | null = null;
 	let scrollEl = $state<HTMLElement | null>(null);
-	/** The sticky header's height, so the top shadow falls below it, where rows pass under. */
+	/** The sticky header's height, so the right-hand shadow starts below it. */
 	let headHeight = $state(0);
 	let headEls = $state<Array<HTMLElement | null>>([]);
 
@@ -1376,7 +1376,7 @@
 	class:rows-full={rowHeight === 'full'}
 	class:locked
 	aria-label="Card data"
-	style="--head-h:{headHeight}px; --gutter-w:{gutterWidth}; --bar-h:{barHeight}px"
+	style="--head-h:{headHeight}px; --bar-h:{barHeight}px"
 	use:scrollEdges={(section) => section.querySelector<HTMLElement>(':scope > .scroll')}
 >
 	<div class="scroll" bind:this={scrollEl}>
@@ -1732,10 +1732,9 @@
 		</table>
 	</div>
 	<!-- The shadows that say there is more past an edge, outside the scroller
-	     because inside it they would scroll away with the rows. -->
-	<span class="edge top" aria-hidden="true"></span>
+	     because inside it they would scroll away with the rows. Bottom and
+	     right only: see the note on `.edge`. -->
 	<span class="edge bottom" aria-hidden="true"></span>
-	<span class="edge left" aria-hidden="true"></span>
 	<span class="edge right" aria-hidden="true"></span>
 
 	<!-- One line, always: this bar wrapping was costing the table a row of its
@@ -2243,13 +2242,19 @@
 		background: #fff;
 	}
 
-	/* A shadow on each edge of the scroller with more past it — the edges come
-	   from scrolledge.ts, which marks this section. Inside the frozen header
-	   and row numbers rather than over them: those never move, so the shadow
-	   belongs where the rows and columns pass under them, as if the frozen
-	   parts were lifted off the table. Short of the scroller's own bars, where
-	   a classic one takes room, and of the action bar under it. Over the cells
-	   and their sticky parts (z-index 4 at most), under the cell editor. */
+	/* A shadow on the bottom and right edges of the scroller when there is
+	   more past them — the edges come from scrolledge.ts, which marks this
+	   section.
+
+	   None on the top or left. Those edges are the frozen header and row
+	   numbers, which are always there whatever is scrolled under them, so a
+	   shadow would only make them look lifted — more important than the rows
+	   — without telling anybody anything. They get a 2px rule instead, as
+	   furniture: see `thead th` and `.gutter`.
+
+	   Short of the scroller's own bars, where a classic one takes room, of
+	   the action bar under it, and of the header. Over the cells and their
+	   sticky parts (z-index 4 at most), under the cell editor. */
 	.edge {
 		position: absolute;
 		z-index: 5;
@@ -2258,54 +2263,33 @@
 		transition: opacity 0.15s;
 	}
 
-	.edge.top,
 	.edge.bottom {
 		left: 0;
 		right: var(--scrollbar-y, 0px);
-		height: 10px;
-	}
-
-	.edge.left,
-	.edge.right {
-		top: var(--head-h, 0px);
 		bottom: calc(var(--bar-h, 0px) + var(--scrollbar-x, 0px));
-		width: 10px;
-	}
-
-	.edge.top {
-		top: var(--head-h, 0px);
-		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.12), transparent);
-	}
-
-	.edge.bottom {
-		bottom: calc(var(--bar-h, 0px) + var(--scrollbar-x, 0px));
+		height: 18px;
 		background: linear-gradient(to top, rgba(0, 0, 0, 0.12), transparent);
 	}
 
-	.edge.left {
-		left: var(--gutter-w, 0px);
-		background: linear-gradient(to right, rgba(0, 0, 0, 0.12), transparent);
-	}
-
 	.edge.right {
+		top: var(--head-h, 0px);
 		right: var(--scrollbar-y, 0px);
+		bottom: calc(var(--bar-h, 0px) + var(--scrollbar-x, 0px));
+		width: 18px;
 		background: linear-gradient(to left, rgba(0, 0, 0, 0.12), transparent);
 	}
 
 	/* `:global` only for the marks, which the action sets and the compiler
 	   cannot see. */
-	.data:global([data-more-top]) .edge.top,
 	.data:global([data-more-bottom]) .edge.bottom,
-	.data:global([data-more-left]) .edge.left,
 	.data:global([data-more-right]) .edge.right {
 		opacity: 1;
 	}
 
 	/* Sideways only on a desk. On a phone the table is a column or two wide and
-	   nearly always scrolls sideways, so side shadows would be a fixture rather
+	   nearly always scrolls sideways, so a side shadow would be a fixture rather
 	   than a hint. */
 	@media (max-width: 900px) {
-		.edge.left,
 		.edge.right {
 			display: none;
 		}
@@ -2369,8 +2353,11 @@
 		border-left-width: 1px;
 	}
 
+	/* The line the rows slide under, twice the others, in place of a shadow —
+	   see `.edge`. */
 	thead th {
 		border-top-width: 1px;
+		border-bottom-width: 2px;
 	}
 
 	/* Where the tray is dragged taller from. `touch-action: none` because the
@@ -2799,6 +2786,9 @@
 		position: sticky;
 		left: 0;
 		z-index: 2;
+		/* Twice the other rules: the line the columns slide under, in place of
+		   a shadow — see `.edge`. */
+		border-right-width: 2px;
 		white-space: nowrap;
 		padding: 5px 6px 3px;
 		color: #767676;

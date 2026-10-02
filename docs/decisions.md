@@ -3289,11 +3289,14 @@ because a shadow drawn inside a scroller scrolls away with it: the bars get a
 `.bar-frame` in `OptionsBar`, the table uses its own section, which holds only
 the scroller and the action bar.
 
-**The table's shadows start inside its frozen parts** — below the sticky
-header, right of the row numbers — because that is where rows pass under. On a
-phone the table only gets top and bottom: it is a column or two wide there and
-nearly always scrolls sideways, so side shadows would be a fixture, not a hint.
-The bars wrap and never scroll sideways, so they only ever have the two.
+**The table has no shadow under its header or beside its row numbers.** Both
+are frozen, always there whatever has scrolled under them; a shadow there only
+made them look lifted, more important than the rows, without saying anything.
+They get a 2px rule instead — twice the others, as furniture rather than a
+signal. So the table's shadows are the bottom, and on a desk the right, which
+starts below the header. Not the right on a phone: the table is a column or two
+wide there and nearly always scrolls sideways, so it would be a fixture, not a
+hint. The bars wrap and never scroll sideways, so they have top and bottom.
 
 ## `src/lib/textsize.ts`, the viewport, and type in `rem`
 
