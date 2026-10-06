@@ -1594,9 +1594,9 @@ rounding of a few hundredths of a millimetre, from going through pixels and back
 
 ## `src/lib/components/DataTable.svelte`
 
-**Renumber is `withoutOrder` with the lookups carried.** A sort reorders the
+**Reindex is `withoutOrder` with the lookups carried.** A sort reorders the
 rows but keeps their numbers, so that a lookup and the unsort both mean the
-order the table arrived in. Renumber is the way to say the sorted order is the
+order the table arrived in. Reindex is the way to say the sorted order is the
 real one now: it drops the saved order, which numbers the rows from where they
 stand, and goes through the same `renumbering` a move by hand does, so every
 `%%lookup:N:…%%` follows its row in the same undo step. It sits beside the

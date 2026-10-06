@@ -231,7 +231,7 @@ resize boxes directly, or type exact millimetres.
   quotes. The number, not the place: sorting the table carries its numbers
   along — they are saved with the table — and a lookup follows them, so
   sorting to read the table never changes what the cards say. Deleting rows
-  closes the numbers up, and moving rows by hand or pressing **Renumber**
+  closes the numbers up, and moving rows by hand or pressing **Reindex**
   numbers them afresh; either way
   every lookup in the template and the cells is **rewritten to follow its
   row**, in the same undo step, and one whose row was deleted becomes
@@ -785,7 +785,7 @@ a notice can appear.
   rows back — the third press on the header that did the sorting does the same
   thing, but only if you can still find that header, which in a table wide
   enough to scroll you may not be able to.
-- **Renumber** — beside the table's Lock, and pressable while a sort is on:
+- **Reindex** — beside the table's Lock, and pressable while a sort is on:
   the order the rows stand in becomes their own. The numbers are taken afresh
   from 1 down the table, so unsorting comes back to this order rather than
   the one they arrived in, and every `%%lookup:N:…%%` is rewritten to follow

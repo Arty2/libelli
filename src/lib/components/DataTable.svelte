@@ -1033,12 +1033,12 @@
 	 * carried along with its row, the way a move by hand carries it. One edit,
 	 * so one undo puts the old numbers and the lookups back together.
 	 */
-	function renumber() {
+	function reindex() {
 		if (!orderOf(dataset) || locked) return;
 		const next = withoutOrder(dataset);
 		sortedBy = null;
 		const said = onchange(next, renumbering(dataset, next));
-		onnotice(said ? `Renumbered in this order. ${said.note}` : 'Renumbered in this order — undo puts the old numbers back.', said?.warning ? 'warning' : 'info');
+		onnotice(said ? `Reindexed in this order. ${said.note}` : 'Reindexed in this order — undo puts the old numbers back.', said?.warning ? 'warning' : 'info');
 	}
 
 	/**
@@ -1833,18 +1833,18 @@
 			     whole and how it prints, not an errand on some rows. Only does
 			     anything once a sort has moved rows off their numbers. -->
 			<button
-				class="renumber"
+				class="reindex"
 				title={locked
-					? 'The table is locked — unlock it to renumber'
+					? 'The table is locked — unlock it to reindex'
 					: orderOf(dataset)
-						? 'Renumber — make this order the rows\' own: the numbers follow it, and lookups with them'
-						: 'Renumber — the rows are already in the order of their numbers; sort the table first'}
-				aria-label="Renumber"
+						? 'Reindex — make this order the rows\' own: the numbers follow it, and lookups with them'
+						: 'Reindex — the rows are already in the order of their numbers; sort the table first'}
+				aria-label="Reindex"
 				disabled={locked || !orderOf(dataset)}
-				onclick={renumber}
+				onclick={reindex}
 			>
 				<Icon name="array-numbers" size={15} />
-				<span class="label">Renumber</span>
+				<span class="label">Reindex</span>
 			</button>
 			<!-- What table this is, beside its lock: the buttons act on it, and it
 			     is the one control here that is a name rather than an act. One
@@ -3285,11 +3285,11 @@
 	   written first this one never did — the word showed on every phone. */
 	@media (max-width: 900px) {
 		.row-height .label,
-		.renumber .label {
+		.reindex .label {
 			display: none;
 		}
 
-		.renumber {
+		.reindex {
 			box-sizing: border-box;
 			width: 1.8125rem;
 			padding-inline: 0;
