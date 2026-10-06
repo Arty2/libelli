@@ -3000,9 +3000,14 @@
 		/* An area's edge on the fold: dot and dash, where its other sides are
 		   dashes; selected, the dash grows, so the fold still reads against the
 		   solid selection. After every dash it overrides, frozen card included. */
+		/* Its dash the same length as the dashes beside it, so the dot is the
+		   one difference: 3 on a bound, 5 on a locked one's coarser dash. */
 		.bounds line.fold,
-		.box.locked .bounds line.fold,
 		.card.frozen .box.locked .bounds line.fold {
+			stroke-dasharray: var(--line) calc(var(--line) * 2) calc(var(--line) * 3) calc(var(--line) * 2);
+		}
+
+		.box.locked .bounds line.fold {
 			stroke-dasharray: var(--line) calc(var(--line) * 2) calc(var(--line) * 5) calc(var(--line) * 2);
 		}
 
