@@ -8,6 +8,12 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
+## 0.27.0 — 2026-10-06
+
+- Recto ⧘ Verso: the guides draw the fold as a zigzag beside the page.
+- An area's Recto / Verso is now Fold Follow; its inner edge is the zigzag.
+- A pinch with nothing chosen zooms about where the fingers are.
+
 ## 0.26.3 — 2026-10-02
 
 - Dark theme: the button left of Help, or the logo, steps light, dark, and

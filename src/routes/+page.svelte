@@ -33,7 +33,7 @@
 		undo as undoStep,
 		undoLabel
 	} from '$lib/history';
-	import { alignBoxes, bleedFor, type AlignEdge } from '$lib/layout';
+	import { alignBoxes, bleedFor, mirrors, pageSide, type AlignEdge } from '$lib/layout';
 	import {
 		ALIGN_LABELS,
 		applyStyle,
@@ -2201,8 +2201,13 @@
 		// Millimetres: the editor has no pixels, and a status line that invented
 		// them would be describing a different app.
 		describe(`Move ${Math.max(Math.abs(dx), Math.abs(dy))}mm`);
+		// Right is right on screen. On a left-hand page an area that follows the
+		// fold is drawn mirrored, so a step right there is a step left in the
+		// right-hand page's millimetres the template stores — the same undoing a
+		// mirrored drag goes through before it is written.
+		const verso = template.facing === true && pageSide(dataset.rows.length ? activeRow + 1 : null) === 'verso';
 		for (const box of targets) {
-			const next = nudge(box, dx, dy);
+			const next = nudge(box, verso && mirrors(box) ? -dx : dx, dy);
 			if (next) updateBox(next);
 		}
 	}

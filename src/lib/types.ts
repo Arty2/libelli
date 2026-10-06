@@ -14,10 +14,11 @@ export const SCHEMA_VERSION = 5;
  * `image` is a picture, whichever way it was made: a drawing made in the app
  * and kept as base64 in the cell or the template, an address, or a name this
  * browser is holding — what the value is says which, and the renderer reads
- * it. `color` is a fill. `image` also accepts a color, because it used to be
- * the only mode for both and templates written then rely on it; a column of
- * brand colors is better off saying `color`, which refuses anything that is
- * not one.
+ * it. `color` is a fill: templates written with it still draw, but the menu
+ * no longer offers it, because a fill linked to a column (`colorFrom`) does
+ * the same on any area and keeps its words. `image` also accepts a color,
+ * because it used to be the only mode for both and templates written then
+ * rely on it.
  *
  * There was a `bitmap` mode beside `image` for drawings. It was the same
  * picture with a different way in, and switching between the two dropped

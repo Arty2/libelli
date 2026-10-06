@@ -559,7 +559,7 @@
 	 * being looked at, so it stays where it is on screen and the page grows or
 	 * shrinks around it — rather than about the top left, where the scroll
 	 * offsets happen to hold still, which sent a chosen area off the edge in
-	 * two steps of a pinch. With nothing chosen the page zooms as it always has.
+	 * two steps of a pinch. With nothing chosen, the paper itself is held.
 	 *
 	 * The point held still is where the zoom was asked for — the pointer under
 	 * a wheel, the middle of a pinch — brought inside the selection if it lies
@@ -579,9 +579,17 @@
 	type Hold = { x: number; y: number; fx: number; fy: number };
 	let held: Hold | null = null;
 
-	/** The chosen areas' union on screen. */
+	/**
+	 * The chosen areas' union on screen — or, with nothing chosen, the sheet
+	 * itself, so a pinch or a wheel over bare paper zooms about where it
+	 * happened rather than about the top left.
+	 */
 	function selectionRect(ids: string[] = pinchIds ?? selectedIds) {
-		if (!host || !ids.length) return null;
+		if (!host) return null;
+		if (!ids.length) {
+			const r = host.querySelector<HTMLElement>('.sheet')?.getBoundingClientRect();
+			return r ? { left: r.left, top: r.top, w: r.width, h: r.height, page: true } : null;
+		}
 		const rects = ids
 			.map((id) => host!.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`)?.getBoundingClientRect())
 			.filter((r): r is DOMRect => !!r && (r.width > 0 || r.height > 0));
@@ -592,7 +600,8 @@
 			left,
 			top,
 			w: Math.max(...rects.map((r) => r.right)) - left,
-			h: Math.max(...rects.map((r) => r.bottom)) - top
+			h: Math.max(...rects.map((r) => r.bottom)) - top,
+			page: false
 		};
 	}
 
@@ -600,12 +609,21 @@
 	 * The point of the selection to hold still: `at`, clamped into it, kept as
 	 * a fraction of the selection so the same point can be found again at the
 	 * next scale. No `at`, its middle.
+	 *
+	 * The whole sheet is the one thing not clamped: what is under the fingers
+	 * stays under them, even out on the grey past the paper's edge. With no
+	 * position as well — the keys — there is nothing to hold, and the page
+	 * zooms as it always has.
 	 */
 	function holdAt(at?: { x: number; y: number }, ids?: string[]): Hold | null {
 		const r = selectionRect(ids);
-		if (!r) return null;
+		if (!r || (r.page && !at)) return null;
 		const fraction = (v: number | undefined, from: number, size: number) =>
-			v === undefined || size === 0 ? 0.5 : Math.min(1, Math.max(0, (v - from) / size));
+			v === undefined || size === 0
+				? 0.5
+				: r.page
+					? (v - from) / size
+					: Math.min(1, Math.max(0, (v - from) / size));
 		const fx = fraction(at?.x, r.left, r.w);
 		const fy = fraction(at?.y, r.top, r.h);
 		return { x: r.left + fx * r.w, y: r.top + fy * r.h, fx, fy };
@@ -789,7 +807,8 @@
 		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
 		if (pinch.size !== 2 || !pinchStart || pinchStart.spread === 0) return;
 		event.preventDefault();
-		zoomTo(pinchStart.scale * (spread() / pinchStart.spread));
+		const [a, b] = [...pinch.values()];
+		zoomTo(pinchStart.scale * (spread() / pinchStart.spread), { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 	}
 
 	function onPinchUp(event: PointerEvent) {

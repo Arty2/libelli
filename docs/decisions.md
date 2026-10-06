@@ -1248,7 +1248,27 @@ handle sit outside that, because mirroring places a box without flipping what is
 inside it. The latch guide carries a `flip` flag for the same reason: it is
 measured against stored edges and drawn where the eye sees them.
 
+**The fold is a zigzag.** With Recto ⧘ Verso on, the guides draw the fold just
+outside the inner trim edge — past any bleed, so it is never read as artwork —
+and every area that follows the fold draws its inner side as the same zigzag in
+place of a straight bound, so which areas mirror reads off the page. One rule
+for both: a fill under a repeating `mask-image` tile, sized against
+`--ui-scale`, rather than an SVG path, which would need the area's measured
+height. The bound's other three sides become `<line>`s in percentages, like the
+rect they replace. `mask-image` is Baseline Widely available; where it fails the
+edge is a solid 4px bar, which still marks the side.
+
+**`#` is a swatch's placeholder.** An area with no words of its own that takes a
+color from a column shows `#` in the editor rather than "Area", and an area the
+row fills is never hidden as empty — it has something to draw.
+
 ## `src/lib/components/PagePreview.svelte`
+
+**With nothing chosen, a pinch holds the paper.** The zoom's hold — a point kept
+still on screen across a change of scale — falls back to the sheet when no area
+is chosen, unclamped, so what is under the fingers or the wheel stays under
+them even on the grey past the edge. The keys have no position and still zoom
+as they always did.
 
 **Actual is measured, not assumed.** CSS's millimetre is a 96th of an inch per
 3.78 pixels, right for almost no screen sold this decade: a 13-inch MacBook at
@@ -2857,7 +2877,7 @@ grouping and the order:
   print panel's **Bleed** and **Printing**.
 - An area: the name, then **Content**, **QR Code** when it is one, **Align**
   — ahead of the type, because it is what is reached for most — **Text** (font,
-  size, weight, color, letter spacing, case), **Position** (X, Y, W, H, anchor, recto / verso,
+  size, weight, color, letter spacing, case), **Position** (X, Y, W, H, anchor, fold follow,
   rotation), **Lines**, **Lists** for Markdown, **Box** (fill, border, padding,
   overflow), **Effects** (blend, opacity).
 
@@ -2867,10 +2887,13 @@ rule, because the bar wraps and a rule lands wherever the wrap does. A label tha
 only repeated its group's name is left to screen readers. A new control goes in
 the group it belongs to rather than on the end.
 
-**Recto / Verso, not Left & Right or Mirror.** The page's switch and the area's
-say the same thing in the same words, the book's own: a right-hand page and the
-left-hand page facing it. On an area it reads as "this area follows the
-spread"; off, it keeps its millimetres on both.
+**Recto ⧘ Verso on the page, Fold Follow on an area.** The page's switch is the
+book's own words: a right-hand page and the left-hand page facing it, the ⧘ a
+fold between them rather than a slash, which read as "one or the other". The
+area's switch once used the same words and meant something else — not "this is
+a spread" but "this area mirrors across it" — so it is named for what it does:
+it follows the fold, the zigzag the guides draw at the inner edge. Off, the area
+keeps its millimetres on both pages.
 
 **A color from a column is a link beside the swatch, not a mode.** Text color,
 fill and border color each get the same small link button; pressed, a column
@@ -2986,6 +3009,11 @@ what a modifier-click does; `selectBox` treats the mode and the modifier as the
 same thing, so there is one path and not two.
 
 ## `src/lib/boxops.ts` and `src/routes/+page.svelte`
+
+**A nudge is in screen directions.** On a left-hand page an area that follows
+the fold is drawn mirrored, so `nudgeBox` flips `dx` for it before writing the
+stored right-hand frame — the same undoing a mirrored drag goes through. Without
+it, the pad's right arrow moved the area left.
 
 **A new area is provisional until it is given something.** Arriving with the
 literal word "Text" would leave a box that says Text on the card whenever one is

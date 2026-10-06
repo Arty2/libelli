@@ -639,7 +639,7 @@
 					disabled={pageFrozen}
 					onchange={(e) => patchTemplate({ facing: e.currentTarget.checked || undefined })}
 				/>
-				Recto / Verso
+				Recto ⧘ Verso
 			</label>
 		</fieldset>
 		<fieldset class="group">

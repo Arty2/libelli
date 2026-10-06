@@ -79,21 +79,22 @@
     "body",
     "category",
     "link",
-    "accent",
     "sketch",
     "notes"
   ],
   "boxes": [
     {
       "id": "b_accent",
-      "slot": "accent",
+      "slot": null,
       "x": 142,
       "y": 0,
       "w": 6,
       "h": 210,
-      "mode": "color",
+      "mode": "plain",
       "overflow": "clip",
-      "hideWhenEmpty": true,
+      "colorFrom": {
+        "fill": "accent"
+      },
       "blend": "multiply"
     },
     {

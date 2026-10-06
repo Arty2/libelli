@@ -31,7 +31,7 @@
 		onuploadbackground: (file: File) => void;
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
 		/**
-		 * Recto / Verso, the page setting, repeated here. Only on the print screen:
+		 * Recto ⧘ Verso, the page setting, repeated here. Only on the print screen:
 		 * it decides which edge is outer, and so the order a zine folds in, and
 		 * that is where it is found wanting — in page setup it is already beside
 		 * the page size.
@@ -300,11 +300,11 @@
 			<input
 				type="checkbox"
 				checked={!!template.facing}
-				title="Odd rows are right-hand pages and even rows their facing left-hand pages — the same setting as Recto / Verso in page setup"
+				title="Odd rows are right-hand pages and even rows their facing left-hand pages — the same setting as Recto ⧘ Verso in page setup"
 				disabled={pageFrozen}
 				onchange={(e) => ontemplatechange({ ...template, facing: e.currentTarget.checked || undefined })}
 			/>
-			Recto / Verso
+			Recto ⧘ Verso
 		</label>
 	{/if}
 	<label class="field">

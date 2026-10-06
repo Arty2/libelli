@@ -366,7 +366,11 @@
 	 */
 	const placeholderFor = (box: Box): string =>
 		interactive && bounds && isEmpty(box) && (!box.hideWhenEmpty || unsourced(box))
-			? // The column a bound area draws from, since that is what will be in
+			? // An area with no words of its own that takes a color from the row
+				// is a swatch: `#`, a color's own first character, says so — and
+				// keeps one that this row leaves unfilled from vanishing.
+				(!box.slot && linksColor(box) ? '#' : '') ||
+				// The column a bound area draws from, since that is what will be in
 				// it — the area's own name is often a generic word like "field".
 				// An unbound one says what it is waiting for.
 				(box.slot && mapping[box.slot]) ||
@@ -383,10 +387,16 @@
 	 * at all, in the editor — collapsed, it could not be clicked, selected or
 	 * moved, and it would be empty on every card there is. Bounds or no bounds.
 	 */
+	/** Any of an area's colors taken from a column; see `Box.colorFrom`. */
+	const linksColor = (box: Box) => !!(box.colorFrom?.text || box.colorFrom?.fill || box.colorFrom?.border);
+
+	/** The row fills this area: something drawn, even with no words in it. */
+	const filledByRow = (box: Box) => !!(row && box.colorFrom?.fill && parseColor(row[box.colorFrom.fill]));
+
 	const hidden = $derived(
 		new Set(
 			template.boxes
-				.filter((b) => b.hideWhenEmpty && isEmpty(b) && !(interactive && unsourced(b)))
+				.filter((b) => b.hideWhenEmpty && isEmpty(b) && !filledByRow(b) && !(interactive && unsourced(b)))
 				.map((b) => b.id)
 		)
 	);
@@ -481,6 +491,15 @@
 	 * anything back.
 	 */
 	const placed = (box: Box): Box => (verso && mirrors(box) ? mirrorBox(box, template.page.w) : box);
+
+	/**
+	 * The side of an area that faces the fold, for an area that follows it:
+	 * that edge is drawn as the fold's own zigzag, so which areas mirror reads
+	 * off the page without opening the bar. Left on a right-hand page, right on
+	 * a left-hand one.
+	 */
+	const foldSide = (box: Box): 'left' | 'right' | null =>
+		template.facing === true && mirrors(box) ? (verso ? 'right' : 'left') : null;
 
 	/**
 	 * What an area paints under its content — the fill, a fill out of the data,
@@ -1813,6 +1832,26 @@
 <!-- Plain text with any unknown `%%name%%` in it marked — see `shownTextOf`.
      Written on one line: the text is `white-space: pre-wrap`, and a newline
      between these tags would be drawn. -->
+<!-- An area's outline. Following the fold, its inner edge is the fold's
+     zigzag instead of a straight line, so the rect gives way to the other three
+     sides as lines — percentages, like the rect, so nothing is measured. -->
+{#snippet outline(kind: string, fold: 'left' | 'right' | null)}
+	{#if fold}
+		<svg class="chrome {kind}" aria-hidden="true">
+			<line x1="0" y1="0" x2="100%" y2="0" />
+			<line x1="0" y1="100%" x2="100%" y2="100%" />
+			{#if fold === 'left'}
+				<line x1="100%" y1="0" x2="100%" y2="100%" />
+			{:else}
+				<line x1="0" y1="0" x2="0" y2="100%" />
+			{/if}
+		</svg>
+		<span class="zigzag {kind} {fold}" aria-hidden="true"></span>
+	{:else}
+		<svg class="chrome {kind}" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+	{/if}
+{/snippet}
+
 {#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.unknown}<span class="unknown-placeholder" title="No column called this in the table — or the cell naming its own column">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
 
 <!-- The shears, which are also the switch between cutting and growing. Red and
@@ -1879,6 +1918,15 @@
 				aria-hidden="true"
 				style="top:{m.top}mm;right:{m.right}mm;bottom:{m.bottom}mm;left:{m.left}mm"
 			></div>
+			{#if template.facing}
+				<!-- The fold: just outside the inner trim edge, past any bleed, so
+				     it is never taken for something on the paper. -->
+				<span
+					class="zigzag fold-guide {verso ? 'right' : 'left'}"
+					aria-hidden="true"
+					style="--fold-off:{bleed}mm"
+				></span>
+			{/if}
 		{/if}
 
 		{#each template.boxes as box (box.id)}
@@ -2027,14 +2075,14 @@
 				<!-- Not on a selected area: the selection is its outline, and a dashed
 				     bound drawn under a solid one doubled every edge. -->
 				{#if bounds && !empty && !(interactive && isSelected(box)) && !isParked(box, template.page, bleed)}
-					<svg class="chrome bounds" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+					{@render outline('bounds', foldSide(box))}
 				{/if}
 				{#if interactive && isSelected(box)}
 					{#if box.padding}
 						<!-- Where the words actually start. -->
 						<svg class="chrome pad" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 					{/if}
-					<svg class="chrome selection" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+					{@render outline('selection', foldSide(box))}
 				{/if}
 
 				{#if bounds && !empty && box.overflow === 'grow' && (layout.heights[box.id] ?? box.h) > box.h + 0.05}
@@ -2492,6 +2540,49 @@
 		box-shadow: inset 0 0 0 var(--line) color-mix(in srgb, var(--accent-inverse) 55%, transparent);
 	}
 
+	/* The fold, wherever it is drawn: a zigzag, the mark a fold or a tear gets
+	   on a drawing. A mask over a fill rather than an SVG stroke, so one rule
+	   serves the page and every area whatever its height — the tile repeats
+	   down the edge — and the fill takes whichever color the edge would have
+	   had. Tile and stroke are sized against --ui-scale like the rest of the
+	   screen furniture: the same zigzag at any zoom. Its seams fall mid-stroke,
+	   so the repeat leaves no gap at the points. */
+	.zigzag {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: calc(4px * var(--ui-scale, 1));
+		pointer-events: none;
+		z-index: 2;
+		background-color: var(--zigzag-color, var(--accent));
+		mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 6' preserveAspectRatio='none'%3E%3Cpolyline points='2,0 3.4,1.5 0.6,4.5 2,6' fill='none' stroke='%23000' stroke-width='0.9' stroke-linejoin='round'/%3E%3C/svg%3E");
+		mask-size: 100% calc(6px * var(--ui-scale, 1));
+		mask-repeat: repeat-y;
+	}
+
+	/* Centred on the edge it replaces. */
+	.zigzag.left {
+		left: calc(-2px * var(--ui-scale, 1));
+	}
+
+	.zigzag.right {
+		right: calc(-2px * var(--ui-scale, 1));
+	}
+
+	/* The page's fold: outside the trim and any bleed, by a few pixels, in the
+	   margin guide's color — it is a guide, and toggles with them. */
+	.zigzag.fold-guide {
+		--zigzag-color: color-mix(in srgb, var(--accent-inverse) 70%, transparent);
+	}
+
+	.zigzag.fold-guide.left {
+		left: calc(-1 * var(--fold-off, 0mm) - 8px * var(--ui-scale, 1));
+	}
+
+	.zigzag.fold-guide.right {
+		right: calc(-1 * var(--fold-off, 0mm) - 8px * var(--ui-scale, 1));
+	}
+
 	/* The stage's grid, under the trim and everything in it. Positioned from
 	   the card's own corner, bleed included, which is where the grid is
 	   measured from. */
@@ -2865,14 +2956,24 @@
 			z-index: 2;
 		}
 
-		.chrome rect {
+		.chrome rect,
+		.chrome line {
 			fill: none;
 			stroke-width: var(--line);
 		}
 
-		.bounds rect {
+		.bounds rect,
+		.bounds line {
 			stroke: var(--bounds-color, color-mix(in srgb, var(--accent) 45%, transparent));
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
+		}
+
+		.zigzag.bounds {
+			--zigzag-color: var(--bounds-color, color-mix(in srgb, var(--accent) 45%, transparent));
+		}
+
+		.zigzag.selection {
+			--zigzag-color: var(--accent);
 		}
 
 		/* A locked *design* is not a box that happens to be locked: nothing on the
@@ -2894,12 +2995,14 @@
 			--bounds-color: rgba(180, 35, 24, 0.8);
 		}
 
-		.box.locked .bounds rect {
+		.box.locked .bounds rect,
+		.box.locked .bounds line {
 			stroke-width: var(--line-thick);
 			stroke-dasharray: calc(var(--line) * 5) calc(var(--line) * 3);
 		}
 
-		.selection rect {
+		.selection rect,
+		.selection line {
 			stroke: var(--accent);
 		}
 
@@ -2907,13 +3010,19 @@
 			--bounds-color: rgba(0, 0, 0, 0.32);
 		}
 
-		.card.frozen .box.locked .bounds rect {
+		.card.frozen .box.locked .bounds rect,
+		.card.frozen .box.locked .bounds line {
 			stroke-width: var(--line);
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
-		.card.frozen .selection rect {
+		.card.frozen .selection rect,
+		.card.frozen .selection line {
 			stroke: rgba(0, 0, 0, 0.5);
+		}
+
+		.card.frozen .zigzag.selection {
+			--zigzag-color: rgba(0, 0, 0, 0.5);
 		}
 
 		/* Positioned by the padding the box was given, so the guide moves with it

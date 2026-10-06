@@ -768,12 +768,17 @@
 						<option value="plain">Plain Text</option>
 						<option value="markdown">Markdown</option>
 						<!-- A column can hold a picture — a drawing, an address, a
-						     stored name — or a color, so a field offers both. Words
-						     typed into the template cannot be either: that is what
-						     the Image content type is for. -->
+						     stored name — so a field offers it. Words typed into the
+						     template cannot be one: that is what the Image content
+						     type is for. A color from a column is not a mode: it is
+						     the link beside Fill. Color stays listed only for an
+						     area a template made with it, so the menu shows what
+						     the area is. -->
 						{#if source === 'field'}
 							<option value="image">Image</option>
-							<option value="color">Color</option>
+							{#if selected.mode === 'color'}
+								<option value="color">Color</option>
+							{/if}
 						{/if}
 						<option value="qr">QR Code</option>
 					</select>
@@ -1053,11 +1058,11 @@
 					<input
 						type="checkbox"
 						checked={selected.mirror !== false}
-						title="Mirror this area onto left-hand pages, so it keeps its distance from the outer edge. Off pins it to the same millimetres on every page"
+						title="Mirror this area across the fold onto left-hand pages, so it keeps its distance from the outer edge and its inner side stays on the fold. Off pins it to the same millimetres on every page"
 						disabled={boxFrozen}
 						onchange={(e) => patch({ mirror: e.currentTarget.checked ? undefined : false })}
 					/>
-					Recto / Verso
+					Fold Follow
 				</label>
 			{/if}
 			<label class="field">

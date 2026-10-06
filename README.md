@@ -70,8 +70,10 @@ resize boxes directly, or type exact millimetres.
   last is what it shows. Switching the Content keeps only what the new choice
   shows — static words do not ride along into an image or a data field — and
   undo brings back what a switch dropped. The first two then take a **Mode** — plain text, Markdown,
-  or a QR code, and a data field can also be **Image** or **Color**, since a
-  column can hold either. Nothing about the file format changes — the three are
+  or a QR code, and a data field can also be **Image**, since a column can
+  hold a picture. A column of colors is not a mode: link the area's **Fill**
+  to it (the link beside the swatch), and an area with no words of its own
+  shows `#` in the editor so it stays findable. Nothing about the file format changes — the three are
   the slot and the mode, read back as one choice.
 - **Slots** — a box renders the column its slot is bound to. The bar calls it the
   area's **Name**; *slot* is what the file format calls it. The mapping lives
@@ -468,17 +470,17 @@ resize boxes directly, or type exact millimetres.
   the editor, the print preview and the print all agree. **of Total** prints it
   as *3 / 12*; the slash is an element of its own, `.page-number .of`, so a
   template's CSS can set its content to anything or take it away. With **Recto
-  / Verso** on, four more positions appear: **Top**/**Bottom Outer** and
+  ⧘ Verso** on, four more positions appear: **Top**/**Bottom Outer** and
   **Inner**, which are the right edge on a right-hand page and the left edge on
   a left-hand one, or the other way about. Outer is where a page number goes in
   anything that is bound, because it is the corner a thumb turns the page by.
-- **Recto / Verso** — beside the page margin, and off by default: a run of
+- **Recto ⧘ Verso** — beside the page margin, and off by default: a run of
   identical pages is what a deck of cards is. On, the run is a booklet — odd
   rows are right-hand pages, even rows the left-hand pages facing them — and
   three things follow. Areas **mirror** across the fold, keeping the distance
   from the *outer* trim edge they were given rather than from the left one, so
   a wide inner margin stays a wide inner margin on both sides of a spread; an
-  area that should stay put says so with **Recto / Verso** off in its own bar. An
+  area that should stay put says so with **Fold Follow** off in its own bar. An
   alignment you *chose* mirrors with it, so text pushed against one edge hugs
   the other edge on the facing page, while an alignment inherited from the page
   defaults is left alone — body text reads the same way on both sides of a
@@ -852,20 +854,20 @@ functional notation is rebuilt from the numbers it parsed to.
 
 ## Images, colors and QR codes
 
-Three box modes carry something other than text: **Image** is a Content type of
-its own where the template holds the image, and Image, Color or QR is a
-**Mode** where a column supplies the value. Both are framed by the box's
+Two box modes carry something other than text: **Image** is a Content type of
+its own where the template holds the image, and Image or QR is a **Mode**
+where a column supplies the value. Both are framed by the box's
 declared height, and both take a **Fit**: *fit* puts the whole thing inside the
 box, *cover* fills the box and crops the overflow, *stretch* distorts it to the
 box exactly, and *tile* — images only, since a tiled QR is not a QR — repeats it
 at its own size.
 
-- **Image and Color** — two modes, one for each thing a cell can hold.
-  **Color** fills the area with what the cell says and refuses anything that is
+- **Image, and a fill from a column.** A column of colors fills an area
+  through the link beside its **Fill** swatch, which refuses anything that is
   not a color, so an address in a column of colors is ignored rather than
-  fetched; colors are read in hex, `rgb()`, `hsl()` or by name, and they fill the
-  area itself, so the fill reaches under the padding and takes the corner radius
-  with it. **Image** shows an image — a drawing made in the app, an external
+  fetched; colors are read in hex, `rgb()`, `hsl()` or by name. There used to be
+  a **Color** mode for this; the menu no longer offers it, since the link does
+  the same on any area, and a template made with it still draws. **Image** shows an image — a drawing made in the app, an external
   URL, a name this browser is holding, or inline SVG held in the template — and
   still accepts a color, because it was the only mode for both and templates
   written then rely on it. A drawing is written into the cell as base64, so
