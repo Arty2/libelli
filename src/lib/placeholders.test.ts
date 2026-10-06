@@ -269,6 +269,25 @@ describe('a lookup into another row', () => {
 		expect(applyPlaceholders('%%lookup:1:note%%', { row: rows[1], rows, self: 'note' })).toBe('%%title%%');
 	});
 
+	it('reaches the next and the previous row from the card\'s own', () => {
+		expect(applyPlaceholders('Next: %%lookup:next:title%%', { row: rows[0], rows })).toBe('Next: Second');
+		expect(applyPlaceholders('%%lookup:previous:price%%', { row: rows[2], rows })).toBe('5');
+		expect(applyPlaceholders('%% lookup : Next : title %%', { row: rows[1], rows })).toBe('Third');
+		// Past either end, off the table, or with no row of its own: nothing to quote.
+		for (const [text, row] of [
+			['%%lookup:next:title%%', rows[2]],
+			['%%lookup:previous:title%%', rows[0]],
+			['%%lookup:next:title%%', { title: 'stray' }],
+			['%%lookup:next:title%%', null]
+		] as const) {
+			expect(applyPlaceholders(text, { row, rows })).toBe(text);
+		}
+		expect(referencedColumns('%%lookup:next:price%%', ['title', 'price'])).toEqual(['price']);
+		// No number in it, so a renumbering leaves it alone.
+		const moved = new Map<number, number | null>([[1, null]]);
+		expect(renumberLookups('%%lookup:next:title%%', moved)).toMatchObject({ text: '%%lookup:next:title%%', renumbered: 0, orphaned: 0 });
+	});
+
 	it('does not give way to a column somebody called lookup, but can reach it', () => {
 		const row = { Lookup: 'a2b' };
 		expect(applyPlaceholders('%%lookup:2:-%%', { row, rows: [row] })).toBe('%%lookup:2:-%%');

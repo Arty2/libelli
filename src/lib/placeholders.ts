@@ -10,7 +10,9 @@
  *
  * And `%%lookup:3:title%%` reaches past the card's own row: the title of the
  * row numbered 3 in the table. A price list, a legend, a "next up" — one row
- * that every card quotes.
+ * that every card quotes. `%%lookup:next:title%%` and
+ * `%%lookup:previous:title%%` are the rows numbered one after and one before
+ * the card's own, for a "turn over for…" or a running "previously".
  *
  * `%%page:current%%` and `%%page:total%%` are the card's place in the run, the
  * numbers the page number prints, for an area that wants them in words of its
@@ -178,13 +180,34 @@ const PLACEHOLDER = /%%[ \t]*([\p{L}\p{N}_-][\p{L}\p{N}_ \t-]*?)[ \t]*(?::((?:(?
  * number: a row is named by its number, never by what it holds, because a
  * value to search for could be in any column and in more than one row, and
  * a card that quietly picked the first would print the wrong one unmarked.
+ *
+ * Or `next` and `previous`, a `step` from the card's own row rather than a
+ * number: by the same numbers, so "next" is the row numbered one more — the
+ * next page in a table nobody has sorted, and still the same row in one
+ * somebody has, which is the bargain a lookup by number already makes. No
+ * number in it, so nothing for `renumberLookups` to move.
  */
-function lookupOf(spec: string): { index: number; name: string } | null {
+type LookupSpec = { index: number; step?: undefined; name: string } | { index?: undefined; step: 1 | -1; name: string };
+
+const STEPS: Record<string, 1 | -1> = { next: 1, previous: -1 };
+
+function lookupOf(spec: string): LookupSpec | null {
 	const colon = spec.indexOf(':');
 	if (colon === -1) return null;
-	const number = spec.slice(0, colon).trim();
-	if (!/^\d+$/.test(number)) return null;
-	return { index: Number(number) - 1, name: spec.slice(colon + 1).trim() };
+	const which = spec.slice(0, colon).trim();
+	const name = spec.slice(colon + 1).trim();
+	const step = STEPS[which.toLowerCase()];
+	if (step) return { step, name };
+	if (!/^\d+$/.test(which)) return null;
+	return { index: Number(which) - 1, name };
+}
+
+/** The row a lookup lands on, from where the card is: undefined when there is none. */
+function lookupRow(lookup: LookupSpec, rows: readonly Row[] | undefined, row: Row | null): Row | undefined {
+	if (!rows) return undefined;
+	if (lookup.step === undefined) return rows[lookup.index];
+	const own = row ? rows.indexOf(row) : -1;
+	return own === -1 ? undefined : rows[own + lookup.step];
 }
 
 /** The words `%%…%%` means before it means any column. */
@@ -257,7 +280,7 @@ export function renumberLookups(
 	let orphaned = 0;
 	if (!text || !text.includes('%%')) return { text, renumbered, orphaned };
 	const next = text.replace(PLACEHOLDER, (whole, name: string, format?: string) => {
-		if (!isLookup(name) || format === undefined || !lookupOf(format)) return whole;
+		if (!isLookup(name) || format === undefined || lookupOf(format)?.index === undefined) return whole;
 		const digits = /\d+/.exec(format)!;
 		const to = moved.get(Number(digits[0]));
 		if (to === undefined || to === Number(digits[0])) return whole;
@@ -344,7 +367,7 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 		// Keywords before columns — see the top of this file.
 		if (isLookup(name)) {
 			const lookup = format === undefined ? null : lookupOf(format);
-			const target = lookup ? context.rows?.[lookup.index] : undefined;
+			const target = lookup ? lookupRow(lookup, context.rows, row) : undefined;
 			const column = target && lookup ? findColumn(lookup.name, Object.keys(target)) : undefined;
 			// Its own cell, reached the long way round, is still a cell quoting
 			// itself — see `self`.

@@ -238,6 +238,9 @@ resize boxes directly, or type exact millimetres.
   number. Other templates in the library are not rewritten — templates are
   not tied to a table. A row is named by its number, never by what it holds;
   one that is not there is underlined like any unknown name.
+  `%%lookup:next:title%%` and `%%lookup:previous:title%%` quote the row
+  numbered one after or one before the card's own — the next page, in a
+  table nobody has sorted. Past the first or last row they are underlined.
   `%%page:current%%` and `%%page:total%%` print the card's page number and
   how many there are — the same numbers as **Page Number**, for words of
   your own around them: `Page %%page:current%% of %%page:total%%`. With no

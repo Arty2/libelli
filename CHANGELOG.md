@@ -14,6 +14,7 @@ file under **What's new** — press the version number in the status bar.
 - An area's Recto / Verso is now Fold Follow; its inner edge is dot-dash.
 - A pinch with nothing chosen zooms about where the fingers are.
 - `%%page:current%%` and `%%page:total%%` for the page number in words.
+- `%%lookup:next:COLUMN%%` and `%%lookup:previous:COLUMN%%`.
 - A soft shadow where the table or a bar scrolls on.
 
 ## 0.26.3 — 2026-10-02
