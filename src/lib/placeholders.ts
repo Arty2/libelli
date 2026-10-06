@@ -12,9 +12,13 @@
  * row numbered 3 in the table. A price list, a legend, a "next up" — one row
  * that every card quotes.
  *
- * `today` and `lookup` are keywords, and a keyword always wins: a column that
- * happens to be called either cannot be written as `%%today%%` or
- * `%%lookup%%`, only reached from another row by a lookup. The table marks
+ * `%%page:current%%` and `%%page:total%%` are the card's place in the run, the
+ * numbers the page number prints, for an area that wants them in words of its
+ * own — "page 3 of 12", a running head, a folio set in the body face.
+ *
+ * `today`, `lookup` and `page` are keywords, and a keyword always wins: a
+ * column that happens to be called one cannot be written as `%%today%%`,
+ * `%%lookup%%` or `%%page%%`, only reached from another row by a lookup. The table marks
  * such a column, because a template that meant it would otherwise print the
  * date instead, silently. The other way round — the column winning — made
  * what a placeholder means depend on the table under it.
@@ -66,6 +70,10 @@ export interface PlaceholderContext {
 	 * like a name nothing answers to, because it is the same mistake.
 	 */
 	self?: string;
+	/** this card's place in the run, from 1, for `%%page:current%%` */
+	page?: number | null;
+	/** how many cards the run has, for `%%page:total%%` */
+	pageCount?: number | null;
 }
 
 /**
@@ -180,7 +188,10 @@ function lookupOf(spec: string): { index: number; name: string } | null {
 }
 
 /** The words `%%…%%` means before it means any column. */
-export const KEYWORDS = ['today', 'lookup'] as const;
+export const KEYWORDS = ['today', 'lookup', 'page'] as const;
+
+/** What `%%page:…%%` can ask for, as the completion offers them. */
+export const PAGE_PLACEHOLDERS = ['page:current', 'page:total'] as const;
 
 /**
  * A column whose name a keyword takes: `%%name%%` can never reach it,
@@ -340,6 +351,13 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 			if (!target || !column || (target === row && column === context.self)) return unknown(whole);
 			return String(target[column] ?? '');
 		}
+		if (name.toLowerCase() === 'page') {
+			// Left as written, and marked, where there is no run to count — the
+			// editor with no rows — or the part is neither of the two.
+			const part = format?.trim().toLowerCase();
+			const value = part === 'current' ? context.page : part === 'total' ? context.pageCount : null;
+			return value == null ? unknown(whole) : String(value);
+		}
 		if (name.toLowerCase() === 'today') {
 			now ??= context.now ?? new Date();
 			return formatDate(now, format?.trim() || DEFAULT_DATE_FORMAT);
@@ -378,7 +396,7 @@ export function openPlaceholder(text: string, caret: number): { start: number; q
 }
 
 /**
- * What to offer for a query: the columns, then `today`, those starting with
+ * What to offer for a query: the columns, then `today` and the page's two, those starting with
  * what was typed ahead of those merely containing it, ignoring case.
  */
 export function placeholderChoices(query: string, columns: readonly string[]): string[] {
@@ -387,7 +405,7 @@ export function placeholderChoices(query: string, columns: readonly string[]): s
 	const lookup = /^(\s*lookup\s*:[^:]*:)([^:]*)$/i.exec(query);
 	if (lookup) return ranked(lookup[2], columns).map((name) => lookup[1] + name);
 	// A column a keyword has taken is not offered: choosing it would print the keyword.
-	return ranked(query, [...columns.filter((c) => !isKeyword(c)), 'today']);
+	return ranked(query, [...columns.filter((c) => !isKeyword(c)), 'today', ...PAGE_PLACEHOLDERS]);
 }
 
 function ranked(query: string, names: readonly string[]): string[] {

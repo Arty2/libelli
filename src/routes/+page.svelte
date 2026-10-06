@@ -673,7 +673,7 @@
 	const lookupRows = $derived(inArrivalOrder(dataset));
 
 	/**
-	 * Columns a keyword has taken — `today`, `lookup` — which `%%name%%` can
+	 * Columns a keyword has taken — `today`, `lookup`, `page` — which `%%name%%` can
 	 * never reach. The table colours them; the status line says why, once per
 	 * set of them, so it is said when one appears and not on every keystroke.
 	 */

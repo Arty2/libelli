@@ -238,8 +238,12 @@ resize boxes directly, or type exact millimetres.
   number. Other templates in the library are not rewritten — templates are
   not tied to a table. A row is named by its number, never by what it holds;
   one that is not there is underlined like any unknown name.
-  `today` and `lookup` are reserved keywords and always mean themselves: a
-  column called either is **titled in red** in the table, with a note in the
+  `%%page:current%%` and `%%page:total%%` print the card's page number and
+  how many there are — the same numbers as **Page Number**, for words of
+  your own around them: `Page %%page:current%% of %%page:total%%`. With no
+  rows loaded there is nothing to count, and they are underlined.
+  `today`, `lookup` and `page` are reserved keywords and always mean
+  themselves: a column called one is **titled in red** in the table, with a note in the
   status line — rename it to quote it by name, or reach it from another row
   with `%%lookup:3:today%%`. A single percent sign is ordinary text —
   `50% off, 20% more` prints as typed; it takes two to open a placeholder.

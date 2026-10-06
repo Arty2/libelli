@@ -196,7 +196,7 @@
 	 * The same text as it is drawn, with `%%today%%` and any `%%column%%` of this
 	 * row filled in — in a cell and in an area's own words alike, once.
 	 */
-	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box) });
+	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box), page: pageNumber, pageCount });
 
 	/** The column a bound area's words come out of — the one they may not quote. */
 	const selfOf = (box: Box): string | undefined => (box.slot ? mapping[box.slot] : undefined);
@@ -210,7 +210,7 @@
 	 * measured for emptiness, or encoded into a QR.
 	 */
 	const shownTextOf = (box: Box): string =>
-		applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box), markUnknown: interactive && bounds });
+		applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds });
 
 	/** Text split around the marks, for plain text, which Svelte escapes itself. */
 	function segments(text: string): Array<{ text: string; unknown: boolean }> {
