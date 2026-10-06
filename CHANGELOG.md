@@ -10,8 +10,8 @@ file under **What's new** — press the version number in the status bar.
 
 ## 0.27.0 — 2026-10-06
 
-- Recto ⧘ Verso: the guides draw the fold as a zigzag beside the page.
-- An area's Recto / Verso is now Fold Follow; its inner edge is the zigzag.
+- Recto ⧘ Verso: the guides draw the fold, dot and dash, beside the page.
+- An area's Recto / Verso is now Fold Follow; its inner edge is dot-dash.
 - A pinch with nothing chosen zooms about where the fingers are.
 
 ## 0.26.3 — 2026-10-02

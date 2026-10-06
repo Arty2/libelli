@@ -1248,15 +1248,14 @@ handle sit outside that, because mirroring places a box without flipping what is
 inside it. The latch guide carries a `flip` flag for the same reason: it is
 measured against stored edges and drawn where the eye sees them.
 
-**The fold is a zigzag.** With Recto ⧘ Verso on, the guides draw the fold just
-outside the inner trim edge — past any bleed, so it is never read as artwork —
-and every area that follows the fold draws its inner side as the same zigzag in
-place of a straight bound, so which areas mirror reads off the page. One rule
-for both: a fill under a repeating `mask-image` tile, sized against
-`--ui-scale`, rather than an SVG path, which would need the area's measured
-height. The bound's other three sides become `<line>`s in percentages, like the
-rect they replace. `mask-image` is Baseline Widely available; where it fails the
-edge is a solid 4px bar, which still marks the side.
+**The fold is dot and dash.** With Recto ⧘ Verso on, the guides draw the fold
+as a dot-dash line just outside the inner trim edge — past any bleed, so it is
+never read as artwork — the convention for a fold on anything printed to be
+folded. An area that follows the fold draws its inner side in the same rhythm
+in place of a plain dash, and selected, with a longer dash, so the fold still
+reads against the solid selection. So the one side can be styled, the bound is
+four `<line>`s in percentages rather than a rect. A zigzag was tried first and
+read as a tear rather than a fold.
 
 **`#` is a swatch's placeholder.** An area with no words of its own that takes a
 color from a column shows `#` in the editor rather than "Area", and an area the
@@ -2892,7 +2891,7 @@ book's own words: a right-hand page and the left-hand page facing it, the ⧘ a
 fold between them rather than a slash, which read as "one or the other". The
 area's switch once used the same words and meant something else — not "this is
 a spread" but "this area mirrors across it" — so it is named for what it does:
-it follows the fold, the zigzag the guides draw at the inner edge. Off, the area
+it follows the fold, the dot-dash line the guides draw at the inner edge. Off, the area
 keeps its millimetres on both pages.
 
 **A color from a column is a link beside the swatch, not a mode.** Text color,

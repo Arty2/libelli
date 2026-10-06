@@ -494,7 +494,7 @@
 
 	/**
 	 * The side of an area that faces the fold, for an area that follows it:
-	 * that edge is drawn as the fold's own zigzag, so which areas mirror reads
+	 * that edge is drawn as a fold line, dot and dash, so which areas mirror reads
 	 * off the page without opening the bar. Left on a right-hand page, right on
 	 * a left-hand one.
 	 */
@@ -1832,21 +1832,20 @@
 <!-- Plain text with any unknown `%%name%%` in it marked — see `shownTextOf`.
      Written on one line: the text is `white-space: pre-wrap`, and a newline
      between these tags would be drawn. -->
-<!-- An area's outline. Following the fold, its inner edge is the fold's
-     zigzag instead of a straight line, so the rect gives way to the other three
-     sides as lines — percentages, like the rect, so nothing is measured. -->
+<!-- An area's outline. Following the fold, its inner edge is a fold line —
+     dot and dash, the way a fold is marked on anything meant to be folded —
+     so the rect gives way to four lines, in percentages like the rect, so
+     nothing is measured. -->
 {#snippet outline(kind: string, fold: 'left' | 'right' | null)}
 	{#if fold}
+		{@const inner = fold === 'left' ? '0' : '100%'}
+		{@const outer = fold === 'left' ? '100%' : '0'}
 		<svg class="chrome {kind}" aria-hidden="true">
 			<line x1="0" y1="0" x2="100%" y2="0" />
 			<line x1="0" y1="100%" x2="100%" y2="100%" />
-			{#if fold === 'left'}
-				<line x1="100%" y1="0" x2="100%" y2="100%" />
-			{:else}
-				<line x1="0" y1="0" x2="0" y2="100%" />
-			{/if}
+			<line x1={outer} y1="0" x2={outer} y2="100%" />
+			<line class="fold" x1={inner} y1="0" x2={inner} y2="100%" />
 		</svg>
-		<span class="zigzag {kind} {fold}" aria-hidden="true"></span>
 	{:else}
 		<svg class="chrome {kind}" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 	{/if}
@@ -1921,11 +1920,11 @@
 			{#if template.facing}
 				<!-- The fold: just outside the inner trim edge, past any bleed, so
 				     it is never taken for something on the paper. -->
-				<span
-					class="zigzag fold-guide {verso ? 'right' : 'left'}"
+				<svg
+					class="fold-guide {verso ? 'right' : 'left'}"
 					aria-hidden="true"
 					style="--fold-off:{bleed}mm"
-				></span>
+				><line x1="50%" y1="0" x2="50%" y2="100%" /></svg>
 			{/if}
 		{/if}
 
@@ -2540,47 +2539,31 @@
 		box-shadow: inset 0 0 0 var(--line) color-mix(in srgb, var(--accent-inverse) 55%, transparent);
 	}
 
-	/* The fold, wherever it is drawn: a zigzag, the mark a fold or a tear gets
-	   on a drawing. A mask over a fill rather than an SVG stroke, so one rule
-	   serves the page and every area whatever its height — the tile repeats
-	   down the edge — and the fill takes whichever color the edge would have
-	   had. Tile and stroke are sized against --ui-scale like the rest of the
-	   screen furniture: the same zigzag at any zoom. Its seams fall mid-stroke,
-	   so the repeat leaves no gap at the points. */
-	.zigzag {
+	/* The page's fold: a dot-dash line just outside the trim and any bleed,
+	   the margin guide's color — it is a guide, and toggles with them. The
+	   SVG is a hair wide and centred on the line, with the stroke left to
+	   spill out of it. */
+	.fold-guide {
 		position: absolute;
 		top: 0;
-		bottom: 0;
-		width: calc(4px * var(--ui-scale, 1));
+		width: 2px;
+		height: 100%;
+		overflow: visible;
 		pointer-events: none;
-		z-index: 2;
-		background-color: var(--zigzag-color, var(--accent));
-		mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 6' preserveAspectRatio='none'%3E%3Cpolyline points='2,0 3.4,1.5 0.6,4.5 2,6' fill='none' stroke='%23000' stroke-width='0.9' stroke-linejoin='round'/%3E%3C/svg%3E");
-		mask-size: 100% calc(6px * var(--ui-scale, 1));
-		mask-repeat: repeat-y;
 	}
 
-	/* Centred on the edge it replaces. */
-	.zigzag.left {
-		left: calc(-2px * var(--ui-scale, 1));
+	.fold-guide line {
+		stroke: color-mix(in srgb, var(--accent-inverse) 80%, transparent);
+		stroke-width: var(--line);
+		stroke-dasharray: var(--line) calc(var(--line) * 3) calc(var(--line) * 8) calc(var(--line) * 3);
 	}
 
-	.zigzag.right {
-		right: calc(-2px * var(--ui-scale, 1));
+	.fold-guide.left {
+		left: calc(-1 * var(--fold-off, 0mm) - 8px * var(--ui-scale, 1) - 1px);
 	}
 
-	/* The page's fold: outside the trim and any bleed, by a few pixels, in the
-	   margin guide's color — it is a guide, and toggles with them. */
-	.zigzag.fold-guide {
-		--zigzag-color: color-mix(in srgb, var(--accent-inverse) 70%, transparent);
-	}
-
-	.zigzag.fold-guide.left {
-		left: calc(-1 * var(--fold-off, 0mm) - 8px * var(--ui-scale, 1));
-	}
-
-	.zigzag.fold-guide.right {
-		right: calc(-1 * var(--fold-off, 0mm) - 8px * var(--ui-scale, 1));
+	.fold-guide.right {
+		right: calc(-1 * var(--fold-off, 0mm) - 8px * var(--ui-scale, 1) - 1px);
 	}
 
 	/* The stage's grid, under the trim and everything in it. Positioned from
@@ -2968,13 +2951,6 @@
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
-		.zigzag.bounds {
-			--zigzag-color: var(--bounds-color, color-mix(in srgb, var(--accent) 45%, transparent));
-		}
-
-		.zigzag.selection {
-			--zigzag-color: var(--accent);
-		}
 
 		/* A locked *design* is not a box that happens to be locked: nothing on the
 		   card can be moved, so nothing on it is worth coloring for a reason. The
@@ -3021,8 +2997,17 @@
 			stroke: rgba(0, 0, 0, 0.5);
 		}
 
-		.card.frozen .zigzag.selection {
-			--zigzag-color: rgba(0, 0, 0, 0.5);
+		/* An area's edge on the fold: dot and dash, where its other sides are
+		   dashes; selected, the dash grows, so the fold still reads against the
+		   solid selection. After every dash it overrides, frozen card included. */
+		.bounds line.fold,
+		.box.locked .bounds line.fold,
+		.card.frozen .box.locked .bounds line.fold {
+			stroke-dasharray: var(--line) calc(var(--line) * 2) calc(var(--line) * 5) calc(var(--line) * 2);
+		}
+
+		.selection line.fold {
+			stroke-dasharray: var(--line) calc(var(--line) * 2) calc(var(--line) * 10) calc(var(--line) * 2);
 		}
 
 		/* Positioned by the padding the box was given, so the guide moves with it
