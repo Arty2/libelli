@@ -1258,7 +1258,12 @@ them go, so page 4 prints as page 4 even when it is the only one selected.
 With **Recto ⧘ Verso** on, each caption also says which side of the fold the
 page prints on — **R** or **V**, before the box — and that follows the pages
 that are going, not the numbers: untick page 2 and page 3 becomes a verso,
-mirrored to match, so the run still alternates. A page left out shows **–**. A PNG
+mirrored to match, so the run still alternates. A page left out shows **–**.
+The pages are laid out as spreads, too: each left-hand page beside the
+right-hand page after it with only a hairline between them, the fold, and the
+usual gap between one spread and the next. Page 1 is a right-hand page on its
+own, with the place to its left empty. A page left out stays where it is,
+inside the spread around it. On a phone the strip shows a spread at a time. A PNG
 run names its files `stem_01.png`, padded to the width of the run, so a directory
 listing comes back in print order rather than as 1, 10, 2. The
 selection is for one print: reopening the preview starts from every page again,

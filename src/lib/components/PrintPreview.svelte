@@ -10,7 +10,7 @@
 	import { withKey } from '$lib/keys';
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
-	import { bleedFor, mmToPx, withSides } from '$lib/layout';
+	import { bleedFor, mmToPx, pageSide, withSides } from '$lib/layout';
 	import { planSheets, resolveImposition } from '$lib/imposition';
 	import type { Dataset, Mapping, Row, Template } from '$lib/types';
 
@@ -188,7 +188,13 @@
 	const NARROW = 520;
 	const STRIP_SHARE = 0.66;
 	const narrow = $derived(gridWidth > 0 && gridWidth < NARROW);
-	const thumbWidth = $derived(narrow ? Math.max(120, Math.floor(gridWidth * STRIP_SHARE)) : 210);
+	// In spreads on a phone, a whole spread to the screen — two pages and the
+	// fold — rather than two thirds of one page, which put every spread's fold
+	// off the edge of the strip.
+	const SPREAD_SHARE = 0.44;
+	const thumbWidth = $derived(
+		narrow ? Math.max(template.facing ? 90 : 120, Math.floor(gridWidth * (template.facing ? SPREAD_SHARE : STRIP_SHARE))) : 210
+	);
 	const thumbScale = $derived(thumbWidth / mmToPx(outerW));
 
 	// Included rows only, grouped into the same sheets Print and PNG-per-sheet
@@ -199,6 +205,29 @@
 	);
 	/** Each going page's side of the fold, by its row; a page left out has none. */
 	const sideOf = $derived(new Map(includedPages.map((page) => [page.index, page.side])));
+
+	/**
+	 * The pages in spreads, with facing pages on: a new one starts at every
+	 * left-hand page that is going, so a page left out stays where it is, in
+	 * the spread around it, and does not split one. `lone` is a spread that
+	 * opens on a right-hand page — the first — which has an empty place to its
+	 * left. With nothing ticked there are no sides to go by, and the numbers'
+	 * own stand in.
+	 */
+	const spreads = $derived.by(() => {
+		if (!template.facing) return null;
+		const sideAt = (i: number) => (includedPages.length ? sideOf.get(i) : pageSide(i + 1));
+		const out: { pages: number[]; lone: boolean }[] = [];
+		dataset.rows.forEach((_, i) => {
+			if (sideAt(i) === 'verso' || !out.length) out.push({ pages: [], lone: false });
+			out[out.length - 1].pages.push(i);
+		});
+		for (const spread of out) {
+			const first = spread.pages.map(sideAt).find((side) => side);
+			spread.lone = first === 'recto';
+		}
+		return out;
+	});
 	const sheetGroups = $derived(
 		imposed ? planSheets(includedPages, imposed.grid, template.print.order) : []
 	);
@@ -239,6 +268,60 @@
 </script>
 
 <svelte:window onkeydown={onKeydown} />
+
+{#snippet page(i: number)}
+	{@const row = dataset.rows[i]}
+	{@const included = !excluded.has(i)}
+	<figure class:dropped={!included}>
+		<button
+			class="thumb"
+			style="width:{mmToPx(outerW) * thumbScale}px;height:{mmToPx(outerH) * thumbScale}px"
+			class:current={i === activeRow}
+			onclick={() => open(i)}
+			aria-label="Open card {i + 1} full screen"
+		>
+			<span class="scaler" style="transform:scale({thumbScale})">
+				<Card
+					{template}
+					{row}
+					{mapping}
+					pageNumber={i + 1}
+					side={sideOf.get(i)}
+					pageCount={dataset.rows.length}
+					rows={lookupRows}
+					{background}
+					{images}
+				/>
+			</span>
+		</button>
+		<!-- As wide as the page above it, and set like the count in the
+		     header: this row is the one control on this screen that gets
+		     pressed over and over, and it used to be a 15px tick with a
+		     number beside it floating in the middle of a 210px column. The
+		     width is the thumbnail's own, so the target and the thing it is
+		     about are the same shape. -->
+		<figcaption style="width:{mmToPx(outerW) * thumbScale}px">
+			<label>
+				<!-- Which side of the fold it prints on, with facing pages: by its
+				     place among the pages going, so it changes as others are
+				     ticked off. A page left out prints on neither. -->
+				{#if template.facing}
+					{@const side = sideOf.get(i)}
+					<span
+						class="side"
+						title={side === 'recto' ? 'Recto — a right-hand page' : side === 'verso' ? 'Verso — a left-hand page' : 'Not printed, so on neither side'}
+					>{side === 'recto' ? 'R' : side === 'verso' ? 'V' : '–'}</span>
+				{/if}
+				<input
+					type="checkbox"
+					checked={included}
+					onchange={(e) => toggle(i, e.currentTarget.checked)}
+				/>
+				{i + 1}
+			</label>
+		</figcaption>
+	</figure>
+{/snippet}
 
 <div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Export">
 	<!--
@@ -312,62 +395,25 @@
 	<div
 		class="grid"
 		class:narrow
+		class:spreads={!!spreads}
 		bind:this={grid}
 		bind:clientWidth={gridWidth}
 		style="--thumb:{thumbWidth}px"
 	>
-		{#each dataset.rows as row, i (i)}
-			{@const included = !excluded.has(i)}
-			<figure class:dropped={!included}>
-				<button
-					class="thumb"
-					style="width:{mmToPx(outerW) * thumbScale}px;height:{mmToPx(outerH) * thumbScale}px"
-					class:current={i === activeRow}
-					onclick={() => open(i)}
-					aria-label="Open card {i + 1} full screen"
-				>
-					<span class="scaler" style="transform:scale({thumbScale})">
-						<Card
-							{template}
-							{row}
-							{mapping}
-							pageNumber={i + 1}
-							side={sideOf.get(i)}
-							pageCount={dataset.rows.length}
-							rows={lookupRows}
-							{background}
-							{images}
-						/>
-					</span>
-				</button>
-				<!-- As wide as the page above it, and set like the count in the
-				     header: this row is the one control on this screen that gets
-				     pressed over and over, and it used to be a 15px tick with a
-				     number beside it floating in the middle of a 210px column. The
-				     width is the thumbnail's own, so the target and the thing it is
-				     about are the same shape. -->
-				<figcaption style="width:{mmToPx(outerW) * thumbScale}px">
-					<label>
-						<!-- Which side of the fold it prints on, with facing pages: by its
-						     place among the pages going, so it changes as others are
-						     ticked off. A page left out prints on neither. -->
-						{#if template.facing}
-							{@const side = sideOf.get(i)}
-							<span
-								class="side"
-								title={side === 'recto' ? 'Recto — a right-hand page' : side === 'verso' ? 'Verso — a left-hand page' : 'Not printed, so on neither side'}
-							>{side === 'recto' ? 'R' : side === 'verso' ? 'V' : '–'}</span>
-						{/if}
-						<input
-							type="checkbox"
-							checked={included}
-							onchange={(e) => toggle(i, e.currentTarget.checked)}
-						/>
-						{i + 1}
-					</label>
-				</figcaption>
-			</figure>
-		{/each}
+		{#if spreads}
+			<!-- Facing pages as the reader will hold them: a left-hand page beside
+			     its right-hand page with hardly a gap — the fold — and the usual
+			     gap between one spread and the next. The first page is a right-hand
+			     page on its own, the place on its left kept empty. -->
+			{#each spreads as spread, s (s)}
+				<div class="spread">
+					{#if spread.lone}<span class="spread-blank" style="width:{mmToPx(outerW) * thumbScale}px" aria-hidden="true"></span>{/if}
+					{#each spread.pages as i (i)}{@render page(i)}{/each}
+				</div>
+			{/each}
+		{:else}
+			{#each dataset.rows as _, i (i)}{@render page(i)}{/each}
+		{/if}
 	</div>
 
 	<!-- The same Print Settings shared with the page bar, so a sheet size or count
@@ -737,6 +783,37 @@
 	.grid.narrow figure {
 		flex: 0 0 var(--thumb, 210px);
 		scroll-snap-align: center;
+	}
+
+	/* Spreads wrap as a row of their own sizes: two pages to a grid cell, or
+	   three with one left out between them, is not a shape a column of fixed
+	   width holds. */
+	.grid.spreads:not(.narrow) {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 18px 28px;
+	}
+
+	/* The fold: a hairline of a gap, a fraction of the one between spreads,
+	   so the two pages read as one sheet folded rather than two cards. */
+	.spread {
+		display: flex;
+		gap: 3px;
+		align-items: flex-start;
+	}
+
+	.grid.narrow .spread {
+		flex: 0 0 auto;
+		scroll-snap-align: center;
+	}
+
+	.grid.narrow .spread figure {
+		scroll-snap-align: none;
+	}
+
+	.spread-blank {
+		flex: 0 0 auto;
 	}
 
 	figure {

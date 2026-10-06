@@ -2364,6 +2364,14 @@ the table gives it — the rule the run already had. The caption's R or V shows
 the side, so ticking a page off visibly moves every one after it. A page left
 out has no side and shows a dash.
 
+**Spreads split at a going verso.** With facing pages the thumbnails are grouped
+into spreads, a new one at every left-hand page that prints, so an unticked
+page sits inside the spread around it rather than opening one of its own — the
+grouping follows the sides, and the sides follow the pages going. A spread
+that opens on a recto (the first) keeps an empty page-width to its left. The
+grid becomes a wrapping flex row there, because a spread with a page left out
+in it is three pages wide and no fixed column holds that.
+
 **One door to the printer.** Print opens the preview; the preview prints. The
 page selection lives there, keyed by row index and reset every time it opens —
 sorting or deleting a row moves those indices, and a stale exclusion would drop a

@@ -11,7 +11,7 @@ file under **What's new** — press the version number in the status bar.
 ## 0.27.1 — 2026-10-06
 
 - Recto ⧘ Verso: the fold drawn dot-dash; an area's switch is Fold Follow.
-- Print preview marks pages R or V, and keeps them alternating as you untick.
+- Print preview: pages in spreads, marked R or V, alternating as you untick.
 - A pinch with nothing chosen zooms about where the fingers are.
 - `%%page:current%%`, `%%page:total%%`, `%%lookup:next:…%%` and `previous`.
 - Reindex beside the table's Lock; Reset in the menu for Getting Started.
