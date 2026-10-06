@@ -184,6 +184,16 @@ out cannot quietly add a family the template then has to carry.
 
 ## `src/lib/storage.ts`
 
+**A starter is marked, not recognised.** A template or table that began as a
+bundled starter carries `starter: <id>` (`STARTER_TEMPLATES`, `STARTER_TABLES`
+in onboarding.ts), and that alone offers Reset and says what it resets to.
+Comparing against the starter, as `isStarterTemplate` does to avoid adding a
+second untouched copy, cannot answer this: the copy most worth resetting is
+the one somebody has changed. A copy stored before the mark existed is known by
+its name — the starter's, or that numbered by `freeName` — and only when it has
+no mark at all. The mark is kept through a table's import, as its name and
+lock are, so the Getting Started table stays that table.
+
 **`template:current` is still the working copy.** The library did not replace it:
 boot reads it first, every edit writes it, and a browser that has never opened
 the picker behaves exactly as it did before. The library is a *second* place the

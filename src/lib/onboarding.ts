@@ -22,9 +22,43 @@ export const SAMPLE_CSV = sampleCsv;
  * is a worse answer to “what am I looking at” than the four cards themselves
  * give.
  */
-export const sampleDataset = (): Dataset => ({ ...parseTable(SAMPLE_CSV), name: 'Getting Started' });
+export const sampleDataset = (): Dataset => ({ ...parseTable(SAMPLE_CSV), name: 'Getting Started', starter: 'getting-started' });
 
 export const starterTemplate = (): Template => builtinTemplate();
+
+/**
+ * The bundled starters, by the id a copy of one carries in `starter`. One of
+ * each today; a list so that a second is an entry here, and Reset and the
+ * menus that offer it need nothing new.
+ */
+export interface Starter<T> {
+	id: string;
+	name: string;
+	make: () => T;
+}
+
+export const STARTER_TEMPLATES: Starter<Template>[] = [
+	{ id: 'a5-starter-booklet', name: 'A5 Starter Booklet', make: starterTemplate }
+];
+
+export const STARTER_TABLES: Starter<Dataset>[] = [{ id: 'getting-started', name: 'Getting Started', make: sampleDataset }];
+
+/**
+ * A copy made before copies said where they came from has no `starter`, so
+ * it is known by its name instead — the starter's own, or that with the
+ * number `freeName` gives a second copy. Only for those: a template that
+ * names a starter is that starter's, whatever it is called now, and one that
+ * names something else, or that a person renamed, is nobody's.
+ */
+function starterOf<T extends { name?: string; starter?: string }>(item: T, starters: Starter<T>[]): Starter<T> | null {
+	if (item.starter !== undefined) return starters.find((s) => s.id === item.starter) ?? null;
+	const name = item.name?.trim() ?? '';
+	const numbered = (s: Starter<T>) => name.startsWith(`${s.name} `) && /^\d+$/.test(name.slice(s.name.length + 1));
+	return starters.find((s) => name === s.name || numbered(s)) ?? null;
+}
+
+export const starterOfTemplate = (template: Template) => starterOf(template, STARTER_TEMPLATES);
+export const starterOfTable = (dataset: Dataset) => starterOf(dataset, STARTER_TABLES);
 
 /**
  * Whether a template is the starter as it came — the question A5 Starter Booklet asks
@@ -39,6 +73,8 @@ export const starterTemplate = (): Template => builtinTemplate();
  * gained defaults on the way through `normaliseTemplate` still matches.
  */
 export function isStarterTemplate(template: Template): boolean {
-	const design = ({ name: _name, locked: _locked, ...rest }: Template) => JSON.stringify(rest);
+	// Nor the starter mark: a copy stored before there was one is still the
+	// starter as it came.
+	const design = ({ name: _name, locked: _locked, starter: _starter, ...rest }: Template) => JSON.stringify(rest);
 	return design(template) === design(starterTemplate());
 }

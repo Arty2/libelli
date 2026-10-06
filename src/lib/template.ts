@@ -459,7 +459,8 @@ export function normaliseTemplate(raw: unknown): Template {
 		...stripUndefined({
 			facing: t.facing ? true : undefined,
 			css: typeof t.css === 'string' && t.css.trim() ? t.css : undefined,
-			locked: t.locked ? true : undefined
+			locked: t.locked ? true : undefined,
+			starter: typeof t.starter === 'string' && t.starter.trim() ? t.starter.trim() : undefined
 		})
 	};
 }

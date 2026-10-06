@@ -1,6 +1,7 @@
 {
   "schema": 5,
   "name": "A5 Starter Booklet",
+  "starter": "a5-starter-booklet",
   "page": {
     "w": 148,
     "h": 210,

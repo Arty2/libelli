@@ -27,7 +27,8 @@
 		onmappingchange: (mapping: Mapping) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
-		onresettemplate: () => void;
+		/** absent where there is no starter to reset to — see `starterOfTemplate` */
+		onresettemplate?: () => void;
 		library: TemplateEntry[];
 		/** fonts this browser knows that the template is not carrying */
 		editorFonts: FontRef[];

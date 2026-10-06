@@ -48,7 +48,8 @@
 		onmappingchange: (mapping: Mapping) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
-		onresettemplate: () => void;
+		/** absent where there is no starter to reset to — see `starterOfTemplate` */
+		onresettemplate?: () => void;
 		/** every saved template, and which of them is loaded */
 		library: TemplateEntry[];
 		templateId: string;
@@ -429,7 +430,7 @@
 							<li role="none">
 								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onnewtemplate)}>
 									<span class="tick" aria-hidden="true"><Icon name="add" size={14} /></span>
-									New Template…
+									New Template
 								</button>
 							</li>
 							<!-- Never over the loaded design: it opens a copy of the starter that
@@ -445,6 +446,8 @@
 									A5 Starter Booklet
 								</button>
 							</li>
+							<!-- Files in and out, apart from the templates to start. -->
+							<li role="separator"><hr /></li>
 							<li role="none">
 								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onimporttemplate)}>
 									<span class="tick" aria-hidden="true"><Icon name="document-import" size={14} /></span>
@@ -459,19 +462,23 @@
 							</li>
 							<li role="separator"><hr /></li>
 							<!-- The two that lose something, together and in red: one puts the
-							     starter card back, the other takes this template away. -->
-							<li role="none">
-								<button
-									class="danger"
-									role="menuitem"
-									disabled={pageFrozen}
-									title="Put the A5 Starter Booklet over this design. Your rows are not touched."
-									onclick={fromMenu(onresettemplate)}
-								>
-									<span class="tick" aria-hidden="true"><Icon name="reset" size={14} /></span>
-									Reset…
-								</button>
-							</li>
+							     starter back, the other takes this template away. Reset only on
+							     a template that began as a starter: on any other there is
+							     nothing of its own to put back. -->
+							{#if onresettemplate}
+								<li role="none">
+									<button
+										class="danger"
+										role="menuitem"
+										disabled={pageFrozen}
+										title="Put the starter this template began as back over it. Your rows are not touched."
+										onclick={fromMenu(onresettemplate)}
+									>
+										<span class="tick" aria-hidden="true"><Icon name="reset" size={14} /></span>
+										Reset…
+									</button>
+								</li>
+							{/if}
 							<li role="none">
 								<button
 									class="danger"

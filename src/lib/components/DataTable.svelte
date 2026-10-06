@@ -130,6 +130,12 @@
 		/** open the Getting Started table, or start one */
 		ongettingstarted: () => void;
 		/**
+		 * Put the starter this table began as back over it, after asking.
+		 * Absent on a table that began any other way, which has no starter to
+		 * go back to — see `starterOfTable`.
+		 */
+		onresettable?: () => void;
+		/**
 		 * Say something. The table used to have a line of its own under the
 		 * buttons, which meant the app had two places a notice could appear and
 		 * neither of them was where you were looking.
@@ -171,6 +177,7 @@
 		onchange,
 		onrenamecolumn,
 		ongettingstarted,
+		onresettable,
 		openRequest = null,
 		onleave,
 		onnotice
@@ -1905,7 +1912,7 @@
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="add" size={14} /></span>
-								New table…
+								New Table
 							</button>
 						</li>
 						<!-- Never over the open table's rows: it opens a table that already
@@ -1969,6 +1976,26 @@
 								Export
 							</button>
 						</li>
+						<!-- The two that lose something, together and in red, as under the
+						     template's name. Reset only on a table that began as a starter. -->
+						<li role="separator"><hr /></li>
+						{#if onresettable}
+							<li role="none">
+								<button
+									class="danger"
+									role="menuitem"
+									disabled={locked}
+									title="Put the starter this table began as back over it. Your design is not touched."
+									onclick={() => {
+										pickerOpen = false;
+										onresettable();
+									}}
+								>
+									<span class="mark" aria-hidden="true"><Icon name="reset" size={14} /></span>
+									Reset…
+								</button>
+							</li>
+						{/if}
 						<li role="none">
 							<button
 								class="danger"

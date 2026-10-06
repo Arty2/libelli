@@ -52,7 +52,7 @@
 	} from '$lib/boxops';
 	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport, withKey } from '$lib/keys';
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
-	import { isStarterTemplate, sampleDataset, starterTemplate } from '$lib/onboarding';
+	import { isStarterTemplate, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { cssIdent } from '$lib/css';
@@ -324,6 +324,12 @@
 	}
 	/** Reset replaces the design, so it asks first — as deleting the data does. */
 	let resetting = $state(false);
+	/** The table's Reset, asking first like the template's. */
+	let resettingTable = $state(false);
+
+	/** The starters this template and this table began as, if they did — what Reset puts back. */
+	const templateStarter = $derived(starterOfTemplate(template));
+	const tableStarter = $derived(starterOfTable(dataset));
 	/**
 	 * Deleting asks for the same reason and one more: undo reaches what is on
 	 * screen, but the stored copy is gone the moment this runs.
@@ -1703,11 +1709,31 @@
 	 */
 	function resetTemplate() {
 		resetting = false;
+		const starter = templateStarter;
+		if (!starter) return;
 		describe('Reset the template');
-		template = starterTemplate();
+		// Under its own name: it is still this entry in the library, and a
+		// second copy is called "… 2" for a reason.
+		template = { ...starter.make(), name: template.name };
 		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
-		notify('Template reset to the A5 Starter Booklet. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
+		notify(`Template reset to the ${starter.name}. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.`);
+	}
+
+	/**
+	 * The rows only, back to the starter the table began as. The design and
+	 * the name are left where they are; one snapshot is template and data
+	 * together, so one undo brings the rows back.
+	 */
+	function resetTable() {
+		resettingTable = false;
+		const starter = tableStarter;
+		if (!starter || dataset.locked) return;
+		describe('Reset the table');
+		dataset = { ...starter.make(), name: dataset.name };
+		activeRow = 0;
+		mapping = autoMap(usedSlots(template), dataset.columns);
+		notify(`Table reset to ${starter.name}. Your design is untouched, and Ctrl/Cmd+Z brings the old rows back.`);
 	}
 
 	// ---- the template library -----------------------------------------------
@@ -2299,7 +2325,7 @@
 	 * where nobody can see what it did.
 	 */
 	const dialogOpen = $derived(
-		helpOpen || whatsNewOpen || statusOpen || cssOpen || resetting || deleting || deletingTable || magic !== null
+		helpOpen || whatsNewOpen || statusOpen || cssOpen || resetting || resettingTable || deleting || deletingTable || magic !== null
 	);
 	/** Something in front of the stage, which then leaves the keys alone. */
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
@@ -2332,6 +2358,7 @@
 			statusOpen = false;
 			if (cssOpen) cancelCss();
 			resetting = false;
+			resettingTable = false;
 			deleting = false;
 			deletingTable = false;
 			magic = null;
@@ -2910,7 +2937,7 @@
 						onmappingchange={(m) => (mapping = m)}
 						onduplicate={duplicateBox}
 						ondelete={deleteBox}
-						onresettemplate={() => (resetting = true)}
+						onresettemplate={templateStarter ? () => (resetting = true) : undefined}
 						{library}
 						{templateId}
 						{editorFonts}
@@ -2945,7 +2972,7 @@
 						onmappingchange={(m) => (mapping = m)}
 						onduplicate={duplicateBox}
 						ondelete={deleteBox}
-						onresettemplate={() => (resetting = true)}
+						onresettemplate={templateStarter ? () => (resetting = true) : undefined}
 						{library}
 						{templateId}
 						{editorFonts}
@@ -3193,6 +3220,7 @@
 				onactivate={(i) => (activeRow = i)}
 				onnotice={notify}
 				ongettingstarted={() => void gettingStarted()}
+				onresettable={tableStarter ? () => (resettingTable = true) : undefined}
 				openRequest={cellRequest}
 				{images}
 				{drawingFor}
@@ -3234,6 +3262,10 @@
 					// tray means to change it — there is a button for that.
 					const named = next.name === undefined && dataset.name ? { ...next, name: dataset.name } : next;
 					let kept = dataset.locked ? { ...named, locked: true } : named;
+					// And which starter it began as: an import into the Getting
+					// Started table is still that table, and Reset still puts the
+					// tour back in it.
+					if (dataset.starter && kept.starter === undefined) kept = { ...kept, starter: dataset.starter };
 					// Rows deleted or moved by hand are renumbered, and every lookup
 					// that named one follows it — in the template and in the cells,
 					// in the same edit, so one undo puts both back.
@@ -3368,13 +3400,30 @@
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the template?" use:armDefault>
 		<h2>Reset the template?</h2>
 		<p>
-			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the A5 Starter Booklet. Your rows are
+			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the {templateStarter?.name}. Your rows are
 			not touched.
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button onclick={() => (resetting = false)}>Cancel</button>
 			<button class="danger-solid" data-default onclick={resetTemplate}>Reset Template</button>
+		</div>
+	</div>
+{/if}
+
+<!-- The table's Reset, the same shape: a count, and what is left alone. -->
+{#if resettingTable}
+	<div class="modal-backdrop" role="presentation" onclick={() => (resettingTable = false)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the table?" use:armDefault>
+		<h2>Reset the table?</h2>
+		<p>
+			{dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'} go back to {tableStarter?.name}. Your design is
+			not touched.
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (resettingTable = false)}>Cancel</button>
+			<button class="danger-solid" data-default onclick={resetTable}>Reset Table</button>
 		</div>
 	</div>
 {/if}

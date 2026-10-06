@@ -427,6 +427,14 @@ export interface Template {
 	css?: string;
 	/** freezes the whole design: no dragging, no resizing, no option changes */
 	locked?: boolean;
+	/**
+	 * Which of the bundled starters this template began as, by id — see
+	 * `STARTER_TEMPLATES` in onboarding.ts. What offers Reset, and what it
+	 * resets to. Kept through every edit, since a starter somebody has worked
+	 * in is the one most worth being able to put back; absent on anything
+	 * started any other way.
+	 */
+	starter?: string;
 }
 
 /** Runtime state — never written into a template file. */
@@ -454,6 +462,8 @@ export interface Dataset {
 	 * reload, and undo, keep it. Absent means the rows stand where they arrived.
 	 */
 	order?: number[];
+	/** Which bundled starter table this began as; see `Template.starter`. */
+	starter?: string;
 }
 
 export type Row = Record<string, string>;

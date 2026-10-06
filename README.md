@@ -565,8 +565,9 @@ resize boxes directly, or type exact millimetres.
 **Several templates, one browser.** The **Template** field in the page bar names the
 loaded template; the caret beside it opens every template this browser has saved,
 the open one ticked, with everything that acts on the template as a whole under a
-rule: **New Template…**, **A5 Starter Booklet**, **Import…**, **Export**, and in red **Reset…** and
-**Delete…** (whose dialog still says **Delete Template**, so the button you
+rule: **New Template** and **A5 Starter Booklet**; under another, **Import…** and
+**Export**; and under a third, in red, **Reset…** — only on a template that began
+as a starter — and **Delete…** (whose dialog still says **Delete Template**, so the button you
 confirm with names what goes). An export is named for the template and the
 day — `a5-starter-booklet_2026-09-25.json` — so a folder of them sorts by
 date. **Lock** stays outside the menu, beside the field,
@@ -575,7 +576,9 @@ in the field — the template keeps its identity, so two of them may share a nam
 without sharing anything else. **A5 Starter Booklet** opens the design a first run
 lands on, as it came: a copy nobody has changed if you have one, or a new one
 beside the rest — it never touches the template that is open. Reset puts the
-starter card back over the open template, under the same name; Delete removes the template and opens the next one, or a new empty
+starter this template began as back over it, under the same name. A template
+remembers which starter it began as however it is renamed or changed; one made
+with New Template or imported from elsewhere has none, and no Reset; Delete removes the template and opens the next one, or a new empty
 template when it was the last one, so the card a first run lands on can be
 deleted like any other. Both ask first, and both are one Ctrl/Cmd+Z away — an
 undone delete is written back out under the id it had. The menu opens over the
@@ -679,7 +682,7 @@ a notice can appear.
 - **Import…** — in the **Table** menu too, with **Export** beside it, so
   the bar under the table holds only what acts on chosen rows, the picker and
   the lock. The same parser against a whole file, header and all. **Getting
-  Started**, in the same menu under **New table…**, opens the four cards that
+  Started**, in the same menu under **New Table**, opens the four cards that
   walk through the app: the table that holds them untouched if there is one,
   and otherwise a new table of them — never over the rows you are in, so a
   Getting Started table you have edited is kept and a fresh one is made
@@ -802,9 +805,12 @@ a notice can appear.
   was a third mark to tell apart in the smallest bar in the app.
 - **More than one table** — the **Table** field beside the lock names the table
   you are in; the caret beside it opens the rest, the open one first and
-  ticked. Under a rule, **New table…** and **Getting Started**; under another,
-  **Paste…**, **Import…**, **Export** and **Delete Table…** — which is the only
-  way to delete one; there
+  ticked. Under a rule, **New Table** and **Getting Started**; under another,
+  **Paste…**, **Import…** and **Export**; and under a third, in red, **Reset…**
+  and **Delete Table…**. Reset is there only on a table that began as a
+  starter — Getting Started — and puts its rows back, asking first, with the
+  design and the table's name left alone and one Ctrl/Cmd+Z to undo it.
+  Delete is the only way to delete one; there
   is no separate button to empty the table. A design and a table are kept apart on purpose — one design prints
   any number of tables, and one table can be printed by any number of designs —
   so switching either leaves the other exactly where it was. Bindings that still
@@ -1755,7 +1761,7 @@ npm run build    # static output in ./build, deployable anywhere
   rearrange the tour before it has been read; the padlock above *+ Area* unlocks
   it, and it stays unlocked from then on. Reset and a new template start
   unlocked — they are asked for by somebody who means to design.
-- **Reset** — puts the template back to the starter card and leaves the data,
+- **Reset** — puts the template back to the starter it began as and leaves the data,
   the mapping and any uploaded fonts alone. Undo reaches it — one snapshot
   carries the template and the data together — but it asks first anyway, because
   it is the whole design going at once and the table's own Delete asks for less.
