@@ -3,13 +3,19 @@
 	import Icon from './Icon.svelte';
 	import { swipe } from '$lib/gestures';
 	import { bleedFor, mmToPx } from '$lib/layout';
-	import type { Dataset, Mapping, Row, Template } from '$lib/types';
+	import type { Dataset, Mapping, PageSide, Row, Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
 		dataset: Dataset;
 		/** the rows in the order the table numbers them, for a card's `%%lookup:…%%` */
 		lookupRows: readonly Row[];
+		/**
+		 * Each row's side of the fold where that is not its number's to say —
+		 * the print preview, where pages left out shift the rest. See
+		 * `withSides` in layout.ts.
+		 */
+		sides?: ReadonlyMap<number, PageSide>;
 		mapping: Mapping;
 		/** which row is shown, and what the arrows step through */
 		index: number;
@@ -20,7 +26,7 @@
 		onclose: () => void;
 	}
 
-	let { template, dataset, lookupRows, mapping, index, background, images = {}, onactivate, onclose }: Props =
+	let { template, dataset, lookupRows, sides, mapping, index, background, images = {}, onactivate, onclose }: Props =
 		$props();
 
 	let viewport = $state({ w: 1200, h: 800 });
@@ -563,6 +569,7 @@
 				row={dataset.rows[index]}
 				{mapping}
 				pageNumber={index + 1}
+				side={sides?.get(index)}
 				pageCount={dataset.rows.length}
 				rows={lookupRows}
 				{background}

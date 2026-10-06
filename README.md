@@ -1254,7 +1254,11 @@ opposite **PNG** and **Print** — and reads **4 pages**; pressing it clears the
 to **0 pages** so you can choose, and pressing it again takes them all back. It is the same number that counts up as you tick, so what it says and
 what it does are one thing.
 A page keeps the number it has in the table however few of
-them go, so page 4 prints as page 4 even when it is the only one selected. A PNG
+them go, so page 4 prints as page 4 even when it is the only one selected.
+With **Recto ⧘ Verso** on, each caption also says which side of the fold the
+page prints on — **R** or **V**, before the box — and that follows the pages
+that are going, not the numbers: untick page 2 and page 3 becomes a verso,
+mirrored to match, so the run still alternates. A page left out shows **–**. A PNG
 run names its files `stem_01.png`, padded to the width of the run, so a directory
 listing comes back in print order rather than as 1, 10, 2. The
 selection is for one print: reopening the preview starts from every page again,

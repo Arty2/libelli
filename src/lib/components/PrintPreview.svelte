@@ -10,7 +10,7 @@
 	import { withKey } from '$lib/keys';
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
-	import { bleedFor, mmToPx } from '$lib/layout';
+	import { bleedFor, mmToPx, withSides } from '$lib/layout';
 	import { planSheets, resolveImposition } from '$lib/imposition';
 	import type { Dataset, Mapping, Row, Template } from '$lib/types';
 
@@ -195,8 +195,10 @@
 	// will actually produce — so this preview can never show a grouping the
 	// output does not match.
 	const includedPages = $derived(
-		dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index))
+		withSides(dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index)))
 	);
+	/** Each going page's side of the fold, by its row; a page left out has none. */
+	const sideOf = $derived(new Map(includedPages.map((page) => [page.index, page.side])));
 	const sheetGroups = $derived(
 		imposed ? planSheets(includedPages, imposed.grid, template.print.order) : []
 	);
@@ -330,6 +332,7 @@
 							{row}
 							{mapping}
 							pageNumber={i + 1}
+							side={sideOf.get(i)}
 							pageCount={dataset.rows.length}
 							rows={lookupRows}
 							{background}
@@ -345,6 +348,16 @@
 				     about are the same shape. -->
 				<figcaption style="width:{mmToPx(outerW) * thumbScale}px">
 					<label>
+						<!-- Which side of the fold it prints on, with facing pages: by its
+						     place among the pages going, so it changes as others are
+						     ticked off. A page left out prints on neither. -->
+						{#if template.facing}
+							{@const side = sideOf.get(i)}
+							<span
+								class="side"
+								title={side === 'recto' ? 'Recto — a right-hand page' : side === 'verso' ? 'Verso — a left-hand page' : 'Not printed, so on neither side'}
+							>{side === 'recto' ? 'R' : side === 'verso' ? 'V' : '–'}</span>
+						{/if}
 						<input
 							type="checkbox"
 							checked={included}
@@ -443,6 +456,7 @@
 		<Lightbox
 			{template}
 			{lookupRows}
+			sides={sideOf}
 			{dataset}
 			{mapping}
 			{background}
@@ -797,6 +811,15 @@
 
 	.dropped figcaption {
 		color: #aaa;
+	}
+
+	/* A letter's width, whichever letter, so the box and the number beside
+	   it hold still as pages are ticked and the sides move along. */
+	.side {
+		display: inline-block;
+		width: 1ch;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
 	}
 
 	@media (prefers-reduced-motion: no-preference) {

@@ -386,10 +386,12 @@
 					<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
 					{pageFrozen ? 'Unlock' : 'Lock'}
 				</button>
+				<!-- No word before it: the name in it says what it is, and the bar
+				     needed the room more than the label. -->
 				<label class="field picker" bind:this={pickerEl}>
-					<span>Template</span>
 					<input
 						class="w-8"
+						aria-label="Template name"
 						value={template.name}
 						placeholder="Untitled card"
 						disabled={pageFrozen}

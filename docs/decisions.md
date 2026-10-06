@@ -2356,6 +2356,14 @@ paper: the cards keep their places and the sheet grows around them.
 
 ## `src/lib/components/PrintPreview.svelte`
 
+**A page's side of the fold is its place in the run, its number its row's.**
+With pages left out, numbers and sides part company: page 3 printed after page
+1 is the second page of the booklet, so it is a verso and is mirrored as one
+(`withSides` in layout.ts, a `side` prop on Card), while it keeps the number 3
+the table gives it — the rule the run already had. The caption's R or V shows
+the side, so ticking a page off visibly moves every one after it. A page left
+out has no side and shows a dash.
+
 **One door to the printer.** Print opens the preview; the preview prints. The
 page selection lives there, keyed by row index and reset every time it opens —
 sorting or deleting a row moves those indices, and a stale exclusion would drop a

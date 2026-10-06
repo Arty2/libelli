@@ -122,6 +122,16 @@ export function resolveLayout({ boxes, measured, hidden }: LayoutInput): LayoutR
 export const pageSide = (pageNumber: number | null | undefined): PageSide =>
 	pageNumber != null && pageNumber % 2 === 0 ? 'verso' : 'recto';
 
+/**
+ * The pages going to print, each with the side of the fold it lands on: by
+ * its place among them, not by its number in the table. A page left out
+ * leaves no gap in the alternation — the next one takes its side — so the
+ * pages that do print still face each other the right way round.
+ */
+export function withSides<T>(pages: readonly T[]): Array<T & { side: PageSide }> {
+	return pages.map((page, i) => ({ ...page, side: pageSide(i + 1) }));
+}
+
 /** An area follows the fold unless it has said not to. See `Box.mirror`. */
 export const mirrors = (box: Box) => box.mirror !== false;
 

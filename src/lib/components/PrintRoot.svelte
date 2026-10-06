@@ -1,7 +1,7 @@
 <script lang="ts">
 	import PrintSheet from './PrintSheet.svelte';
 	import { planSheets, resolveImposition } from '$lib/imposition';
-	import { bleedFor } from '$lib/layout';
+	import { bleedFor, withSides } from '$lib/layout';
 	import type { Dataset, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
@@ -35,8 +35,9 @@
 
 	// Filtered into a list up front, carrying each row's original index: a page
 	// keeps the number it has in the table however few of them are printed.
+	// Its side of the fold is its place in this list instead — see `withSides`.
 	const pages = $derived(
-		dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index))
+		withSides(dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index)))
 	);
 
 	const bleed = $derived(bleedFor(template.bleed));

@@ -32,7 +32,7 @@
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
 	import { baselineOf, colorsFromRow, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
-	import type { Box, Mapping, Row, Template } from '$lib/types';
+	import type { Box, Mapping, PageSide, Row, Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
@@ -75,6 +75,13 @@
 		pageNumber?: number | null;
 		/** how many cards there are, for the X/Y form of the page number */
 		pageCount?: number | null;
+		/**
+		 * Which side of the fold this page falls on, where that is not the page
+		 * number's to say: a print run that leaves pages out keeps their table
+		 * numbers but must still alternate, or two right-hand pages face each
+		 * other. Absent, the number decides.
+		 */
+		side?: PageSide | null;
 		/** the area whose words are being typed straight into the card, if any */
 		editingId?: string | null;
 		/**
@@ -149,6 +156,7 @@
 		panning = false,
 		selectedIds = [],
 		pageNumber = null,
+		side = null,
 		background = null,
 		images = {},
 		pageCount = null,
@@ -482,7 +490,7 @@
 	 * off the page number the card was handed, so the editor shows the fold as
 	 * it pages through the rows without being told about it separately.
 	 */
-	const verso = $derived(template.facing === true && pageSide(pageNumber) === 'verso');
+	const verso = $derived(template.facing === true && (side ?? pageSide(pageNumber)) === 'verso');
 
 	/**
 	 * A box where it is drawn, which on a left-hand page is its mirror. The
