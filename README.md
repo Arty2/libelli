@@ -231,7 +231,8 @@ resize boxes directly, or type exact millimetres.
   quotes. The number, not the place: sorting the table carries its numbers
   along — they are saved with the table — and a lookup follows them, so
   sorting to read the table never changes what the cards say. Deleting rows
-  closes the numbers up and moving rows by hand renumbers them; either way
+  closes the numbers up, and moving rows by hand or pressing **Renumber**
+  numbers them afresh; either way
   every lookup in the template and the cells is **rewritten to follow its
   row**, in the same undo step, and one whose row was deleted becomes
   `%%lookup:?:…%%`, underlined, rather than quoting whichever row took its
@@ -784,6 +785,12 @@ a notice can appear.
   rows back — the third press on the header that did the sorting does the same
   thing, but only if you can still find that header, which in a table wide
   enough to scroll you may not be able to.
+- **Renumber** — beside the table's Lock, and pressable while a sort is on:
+  the order the rows stand in becomes their own. The numbers are taken afresh
+  from 1 down the table, so unsorting comes back to this order rather than
+  the one they arrived in, and every `%%lookup:N:…%%` is rewritten to follow
+  its row, as a move by hand does. One undo puts it all back. On a phone it
+  is the icon alone.
 - **Add** — the pale row and column at the end of the table are placeholders:
   type into one and it becomes real. There is no separate button, because the
   place you would click is the place you were already typing.

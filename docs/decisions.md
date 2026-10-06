@@ -1594,6 +1594,17 @@ rounding of a few hundredths of a millimetre, from going through pixels and back
 
 ## `src/lib/components/DataTable.svelte`
 
+**Renumber is `withoutOrder` with the lookups carried.** A sort reorders the
+rows but keeps their numbers, so that a lookup and the unsort both mean the
+order the table arrived in. Renumber is the way to say the sorted order is the
+real one now: it drops the saved order, which numbers the rows from where they
+stand, and goes through the same `renumbering` a move by hand does, so every
+`%%lookup:N:…%%` follows its row in the same undo step. It sits beside the
+Lock rather than among the row actions because it is about the whole table and
+how it prints; disabled with nothing sorted, since there would be nothing to
+change, and with the table locked, since a locked table's numbers are part of
+what it promised not to change. Icon only on a phone, like the row height.
+
 **The gutter is set in the cells' own line.** Each row's number and tick sit in a
 box exactly one line of cell text tall — 12px at 1.45, starting the same 5px
 down a field's padding does — so the number lands on the cells' first baseline

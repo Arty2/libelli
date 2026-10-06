@@ -1026,6 +1026,22 @@
 	}
 
 	/**
+	 * The order the rows stand in, sorted or not, becomes their order: the
+	 * numbers are taken afresh from where each row is, so the pages print in
+	 * this order and the third-press unsort comes back here rather than to
+	 * how the table arrived. The numbers move, so every `%%lookup:N:…%%` is
+	 * carried along with its row, the way a move by hand carries it. One edit,
+	 * so one undo puts the old numbers and the lookups back together.
+	 */
+	function renumber() {
+		if (!orderOf(dataset) || locked) return;
+		const next = withoutOrder(dataset);
+		sortedBy = null;
+		const said = onchange(next, renumbering(dataset, next));
+		onnotice(said ? `Renumbered in this order. ${said.note}` : 'Renumbered in this order — undo puts the old numbers back.', said?.warning ? 'warning' : 'info');
+	}
+
+	/**
 	 * There is no "add column" button any more: the trailing placeholder column
 	 * *is* the button, and typing a name into it is what creates it. Called with
 	 * no name it still generates one, which is what an import path wants.
@@ -1812,6 +1828,23 @@
 			>
 				<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
 				{locked ? 'Unlock' : 'Lock'}
+			</button>
+			<!-- Beside the lock, because like it this is about the table as a
+			     whole and how it prints, not an errand on some rows. Only does
+			     anything once a sort has moved rows off their numbers. -->
+			<button
+				class="renumber"
+				title={locked
+					? 'The table is locked — unlock it to renumber'
+					: orderOf(dataset)
+						? 'Renumber — make this order the rows\' own: the numbers follow it, and lookups with them'
+						: 'Renumber — the rows are already in the order of their numbers; sort the table first'}
+				aria-label="Renumber"
+				disabled={locked || !orderOf(dataset)}
+				onclick={renumber}
+			>
+				<Icon name="array-numbers" size={15} />
+				<span class="label">Renumber</span>
 			</button>
 			<!-- What table this is, beside its lock: the buttons act on it, and it
 			     is the one control here that is a name rather than an act. One
@@ -3251,8 +3284,16 @@
 	   before it: the two are equally specific, so the later one wins, and
 	   written first this one never did — the word showed on every phone. */
 	@media (max-width: 900px) {
-		.row-height .label {
+		.row-height .label,
+		.renumber .label {
 			display: none;
+		}
+
+		.renumber {
+			box-sizing: border-box;
+			width: 1.8125rem;
+			padding-inline: 0;
+			justify-content: center;
 		}
 
 		/* An icon alone, so a square — as tall as it is wide, like every other

@@ -13,8 +13,8 @@ file under **What's new** — press the version number in the status bar.
 - Recto ⧘ Verso: the guides draw the fold, dot and dash, beside the page.
 - An area's Recto / Verso is now Fold Follow; its inner edge is dot-dash.
 - A pinch with nothing chosen zooms about where the fingers are.
-- `%%page:current%%` and `%%page:total%%` for the page number in words.
-- `%%lookup:next:COLUMN%%` and `%%lookup:previous:COLUMN%%`.
+- `%%page:current%%`, `%%page:total%%`, `%%lookup:next:…%%` and `previous`.
+- Renumber, beside the table's Lock: the sorted order becomes the order.
 - A soft shadow where the table or a bar scrolls on.
 
 ## 0.26.3 — 2026-10-02
