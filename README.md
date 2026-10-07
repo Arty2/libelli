@@ -247,7 +247,7 @@ resize boxes directly, or type exact millimetres.
   your own around them: `Page %%page:current%% of %%page:total%%`. With no
   rows loaded there is nothing to count, and they are underlined.
   `today`, `lookup` and `page` are reserved keywords and always mean
-  themselves: a column called one is **titled in red** in the table, with a note in the
+  themselves: a column called one is **titled in red** in the table, behind a warning sign that, pressed, opens the reason in full, with a note in the
   status line — rename it to quote it by name, or reach it from another row
   with `%%lookup:3:today%%`. A single percent sign is ordinary text —
   `50% off, 20% more` prints as typed; it takes two to open a placeholder.

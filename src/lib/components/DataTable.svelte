@@ -142,6 +142,11 @@
 		 * neither of them was where you were looking.
 		 */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
+		/**
+		 * Say something worth reading in full: the status line's warning, and
+		 * its dialog open on it. A warning pressed for, not one that turned up.
+		 */
+		onwarn?: (message: string) => void;
 	}
 
 	let {
@@ -181,7 +186,8 @@
 		onresettable,
 		openRequest = null,
 		onleave,
-		onnotice
+		onnotice,
+		onwarn
 	}: Props = $props();
 
 	/**
@@ -335,6 +341,10 @@
 	 * render and follows the value as it is typed.
 	 */
 	let editing = $state<{ row: number; column: string } | null>(null);
+
+	/** What a column a keyword has taken is told, here and in the status line. */
+	const keywordWarning = (column: string) =>
+		`“${column}” is a reserved keyword. Rename the column to enable the %%${column.trim().toLowerCase()}%% placeholder.`;
 
 	const countLabel = (value: string) => {
 		// A picture's words are base64 nobody counts; what it weighs is the
@@ -1509,12 +1519,28 @@
 									onclick={() => onplacecolumn(column)}
 								><Icon name="unlink" size={12} /></button>
 							{/if}
+							<!-- A name a keyword has taken is red, and the red says nothing
+							     by itself — on a phone there is no hover to read the title
+							     by. The sign in front of it says there is something to read,
+							     and pressing it puts the sentence where sentences go. Not
+							     frozen by the lock: it changes nothing. -->
+							{#if isKeyword(column)}
+								<button
+									class="icon reserved"
+									title="Why this column is red"
+									aria-label="“{column}” is a reserved keyword — why"
+									onclick={(e) => {
+										e.stopPropagation();
+										const message = keywordWarning(column);
+										if (onwarn) onwarn(message);
+										else onnotice(message, 'warning');
+									}}
+								><Icon name="warning" size={12} /></button>
+							{/if}
 							<input
 								class="column-name"
 								class:keyword={isKeyword(column)}
-								title={isKeyword(column)
-									? `“${column}” is a reserved keyword. Rename the column to enable the %%${column.trim().toLowerCase()}%% placeholder.`
-									: undefined}
+								title={isKeyword(column) ? keywordWarning(column) : undefined}
 								value={column}
 								readonly={locked}
 								aria-label="Rename column {column}"
@@ -2559,6 +2585,14 @@
 	/* A name a keyword has taken: `%%today%%` will never print this column,
 	   and nothing else would say so — the template reads fine and prints the
 	   date. The warning red the status line and the card's marks use. */
+	/* The sign before a reserved name, in the name's own red. */
+	.column-head .icon.reserved {
+		width: 1.125rem;
+		height: 1.125rem;
+		color: #b42318;
+		flex: none;
+	}
+
 	.column-name.keyword {
 		color: #b42318;
 	}

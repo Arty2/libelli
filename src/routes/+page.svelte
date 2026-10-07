@@ -3221,6 +3221,10 @@
 				{selectedColumn}
 				onactivate={(i) => (activeRow = i)}
 				onnotice={notify}
+				onwarn={(message) => {
+					notify(message, 'warning');
+					statusOpen = true;
+				}}
 				ongettingstarted={() => void gettingStarted()}
 				onresettable={tableStarter ? () => (resettingTable = true) : undefined}
 				openRequest={cellRequest}
