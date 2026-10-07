@@ -494,10 +494,15 @@
 		});
 	});
 
-	function saveArea(dataUrl: string, pixels: Grid | undefined) {
-		if (!drawingArea) return;
-		drawingArea = { ...drawingArea, value: dataUrl, pixels };
-		onsavearea(drawingArea.id, dataUrl, pixels);
+	/**
+	 * By the area it was drawn for, not whichever is open: saving packs the
+	 * board first, which takes a moment, and a Save pressed just before the
+	 * panel closed used to find no area open by the time it landed, and drop
+	 * the drawing.
+	 */
+	function saveArea(id: string, dataUrl: string, pixels: Grid | undefined) {
+		if (drawingArea?.id === id) drawingArea = { ...drawingArea, value: dataUrl, pixels };
+		onsavearea(id, dataUrl, pixels);
 	}
 
 	function deleteArea() {
@@ -530,8 +535,9 @@
 	 * and a prefix is not a shape.
 	 */
 	function cellPicture(value: string | undefined): string | null {
-		const text = value?.trim() ?? '';
-		return text.startsWith('data:image/') ? safeMediaUrl(text) : null;
+		// Asked of every cell on every render: tested in place first, so a
+		// cell of words is not copied whole by a trim just to be told no.
+		return value && /^\s*data:image\//.test(value) ? safeMediaUrl(value) : null;
 	}
 
 	/** Close the editor, back to where it was opened from — or, `toTable`, to the table regardless. */
@@ -2200,7 +2206,7 @@
 					box={{ pixels: area.pixels }}
 					value={area.value}
 					ink={area.ink}
-					onsave={saveArea}
+					onsave={(dataUrl, pixels) => saveArea(area.id, dataUrl, pixels)}
 					ondirty={(d) => (boardDirty = d)}
 					head={boardHead}
 					bar={boardBar}
