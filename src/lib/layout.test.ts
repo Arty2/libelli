@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	FREE_STEP,
 	actualScale,
+	columnGaps,
 	GRID_MAJOR,
 	GRID_MINOR,
 	alignBoxes,
@@ -332,5 +333,22 @@ describe('latchSpan', () => {
 
 	it('is nothing when no line is in reach', () => {
 		expect(latchSpan(30, 10, [0, 100], 1.5)).toBeNull();
+	});
+});
+
+describe('columnGaps', () => {
+	it('places each gap between equal columns, as fractions of the width', () => {
+		// 100mm, three columns, 5mm gaps: columns of 30mm.
+		expect(columnGaps(3, 5, 100)).toEqual([
+			[0.3, 0.35],
+			[0.65, 0.7]
+		]);
+		expect(columnGaps(2, 0, 80)).toEqual([[0.5, 0.5]]);
+	});
+
+	it('has none for one column, no width, or gaps that leave no column', () => {
+		expect(columnGaps(1, 5, 100)).toEqual([]);
+		expect(columnGaps(3, 5, 0)).toEqual([]);
+		expect(columnGaps(3, 60, 100)).toEqual([]);
 	});
 });

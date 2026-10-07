@@ -270,7 +270,8 @@ resize boxes directly, or type exact millimetres.
   one column and the next. Blank or 1 is one column. The columns balance —
   a growing area grows to the longest of them, a fixed one cuts what runs
   past its height, as it would one column — and the area's padding, border
-  and fill stay one frame round all of them.
+  and fill stay one frame round all of them. While the bounds are shown, or
+  the area is chosen, a dotted line marks each side of every gap.
 - **Lists** — **Marker** picks a Markdown bullet list's marker, **• Bullet**,
   **● Disc**, **○ Circle**, **■ Square**, **– Dash**, **— Em Dash**, **→ Arrow**
   or **None**, each set in the area's own

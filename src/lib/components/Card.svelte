@@ -27,7 +27,8 @@
 		resolveLayout,
 		latchSpan,
 		snapTo,
-		snapToEdges
+		snapToEdges,
+		columnGaps
 	} from '$lib/layout';
 	import { flagUnknown, renderMarkdown } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
@@ -557,6 +558,20 @@
 	 * off the page without opening the bar. Left on a right-hand page, right on
 	 * a left-hand one.
 	 */
+	/**
+	 * The gaps between an area's columns, as fractions of the width its words
+	 * have — the area less its borders and its padding, which is what the
+	 * columns divide (see `columnsStyle`). Empty where the words are not in
+	 * columns. Drawn as a dotted line each side of each gap, so the gutters
+	 * read off the page while the bounds are shown or the area is chosen.
+	 */
+	const gapsOf = (box: Box): Array<[number, number]> => {
+		if (!box.columns || (box.mode !== 'plain' && box.mode !== 'markdown')) return [];
+		const pad = sidesOf(box.padding ?? 0);
+		const border = sidesOf(box.borderWidth ?? 0);
+		return columnGaps(box.columns.count, box.columns.gap, box.w - pad.left - pad.right - border.left - border.right);
+	};
+
 	const foldSide = (box: Box): 'left' | 'right' | null =>
 		template.facing === true && mirrors(box) ? (verso ? 'right' : 'left') : null;
 
@@ -2148,6 +2163,16 @@
 				{#if bounds && !empty && !(interactive && isSelected(box)) && !isParked(box, template.page, bleed)}
 					{@render outline('bounds', foldSide(box))}
 				{/if}
+				{#if gapsOf(box).length && ((bounds && !empty && !isParked(box, template.page, bleed)) || (interactive && isSelected(box)))}
+					<!-- Over the words' own box, as the padding guide is: inset by the
+					     padding from the padding box absolute children are placed in. -->
+					<svg class="chrome pad gaps" aria-hidden="true">
+						{#each gapsOf(box) as [left, right], g (g)}
+							<line x1="{left * 100}%" y1="0" x2="{left * 100}%" y2="100%" />
+							<line x1="{right * 100}%" y1="0" x2="{right * 100}%" y2="100%" />
+						{/each}
+					</svg>
+				{/if}
 				{#if interactive && isSelected(box)}
 					{#if box.padding}
 						<!-- Where the words actually start. -->
@@ -3108,6 +3133,16 @@
 		.pad rect {
 			stroke: rgba(8, 145, 178, 0.8);
 			stroke-dasharray: calc(var(--line) * 2) calc(var(--line) * 2);
+		}
+
+		/* The column gaps: dotted — a dash one line long, round-capped into a
+		   dot — so they read as a guide inside the area rather than as another
+		   edge of it. In the bounds' color, a shade firmer, so they show beside
+		   the dashed bounds without matching them. */
+		.gaps line {
+			stroke: var(--bounds-color, color-mix(in srgb, var(--accent) 60%, transparent));
+			stroke-linecap: round;
+			stroke-dasharray: 0 calc(var(--line) * 3);
 		}
 
 		/* Where a grown area's bottom was set. Zero high and positioned by the
