@@ -1016,6 +1016,8 @@
 		node.addEventListener('pointerup', onPinchUp, true);
 		node.addEventListener('pointercancel', onPinchUp, true);
 		return () => {
+			cancelAnimationFrame(pinchFrame);
+			pinchFrame = 0;
 			node.removeEventListener('pointerdown', onPinchDown, true);
 			node.removeEventListener('pointermove', onPinchMove, true);
 			node.removeEventListener('pointerup', onPinchUp, true);

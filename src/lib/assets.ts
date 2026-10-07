@@ -92,7 +92,6 @@ export function safeMediaUrl(raw: unknown): string | null {
 	return safeImageUrl(value);
 }
 
-/** A URL as it can be written inside a `url("…")`, quotes and all. */
 /** Kilobytes under a megabyte, one decimal above it; nobody wants 1483 KB. */
 export const weigh = (bytes: number) =>
 	bytes >= 1024 * 1024 ? `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -112,6 +111,7 @@ export function dataUrlBytes(url: string): number {
 	return Math.max(0, Math.floor((body.length * 3) / 4) - padding);
 }
 
+/** A URL as it can be written inside a `url("…")`, quotes and all. */
 export const cssUrl = (src: string) => `url("${src.replace(/["\\]/g, '\\$&')}")`;
 
 /**

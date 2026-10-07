@@ -1781,8 +1781,9 @@ npm run build    # static output in ./build, deployable anywhere
   than filler; **Getting Started** in the Table menu brings them back at any time.
   A first visit opens the starter card **locked**, so a stray drag cannot
   rearrange the tour before it has been read; the padlock above *+ Area* unlocks
-  it, and it stays unlocked from then on. Reset and a new template start
-  unlocked — they are asked for by somebody who means to design.
+  it, and it stays unlocked from then on. A new template starts unlocked — it
+  is asked for by somebody who means to design; Reset and **A5 Starter
+  Booklet** bring the starter back as it came, padlock and all.
 - **Reset** — puts the template back to the starter it began as and leaves the data,
   the mapping and any uploaded fonts alone. Undo reaches it — one snapshot
   carries the template and the data together — but it asks first anyway, because

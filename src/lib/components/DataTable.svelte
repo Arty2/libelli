@@ -1642,7 +1642,10 @@
 							</span>
 						</td>
 						{#each dataset.columns as column, c (column)}
-							{@const picture = cellPicture(row[column]) ?? storedPicture(row[column])}
+							<!-- Read once: a drawing's cell is a long base64 string, and every
+							     check of it trims and tests the whole of it, on every render. -->
+							{@const drawing = cellPicture(row[column])}
+							{@const picture = drawing ?? storedPicture(row[column])}
 							<!-- The drop line runs down the whole column, not just its
 							     header, so it says which gap the column lands in however
 							     far down the table the eye is. -->
@@ -1678,6 +1681,12 @@
 										}}
 										onblur={() => (editing = null)}
 										onkeydown={(e) => {
+											// Enter opens it, as a double-click does; a button's own
+											// Enter is a click, which here only chooses it.
+											if (e.key === 'Enter' && !locked) {
+												e.preventDefault();
+												openBigCell(i, column);
+											}
 											if (e.key === 'Escape') {
 												e.stopPropagation();
 												e.currentTarget.blur();
@@ -1697,7 +1706,7 @@
 													: 'A drawing — double-click to draw on it'}
 											draggable="false"
 										/>
-										{#if cellPicture(row[column])}
+										{#if drawing}
 											<span class="ink-dot" style="background:{parseColor(drawingFor(column).ink) ?? '#000'}" aria-hidden="true"></span>
 										{/if}
 									</button>
