@@ -1279,6 +1279,18 @@ is chosen, unclamped, so what is under the fingers or the wheel stays under
 them even on the grey past the edge. The keys have no position and still zoom
 as they always did.
 
+**A gesture brings its own room to scroll.** The hold keeps a point still by
+scrolling, and below Fit — and for a while past it — the page is centred and
+there is nothing to scroll: the page grew about its middle, then lurched back
+under the fingers the moment it could scroll (measured: 55px off, put right in
+two steps). For the length of a pinch or a zooming wheel the page has a stage's
+worth of margin on every side, taken on and off with the scroll moved to match,
+so the hold always has room; its removal at the end, which recentres a page
+below Fit, plays as a 0.2s slide. A transform for the shortfall was tried
+first and fails where the scroll is at its end: shifting the page left takes
+its own width off the scroll range and the scroll gives the shift back. Pinch
+steps are also held to one a frame, since phones report fingers at 120Hz.
+
 **Actual is measured, not assumed.** CSS's millimetre is a 96th of an inch per
 3.78 pixels, right for almost no screen sold this decade: a 13-inch MacBook at
 its default scaling holds about 128 CSS pixels to the inch, so "100%" drew an

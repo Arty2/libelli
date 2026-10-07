@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { flushSync, tick } from 'svelte';
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
 	import { isDark } from '$lib/color';
@@ -633,12 +634,72 @@
 		held ??= holdAt(at);
 	}
 
+	/**
+	 * Room to scroll, for the length of a gesture. Below Fit, and for a while
+	 * past it, the page is no wider than the stage and centred in it: there is
+	 * nothing to scroll, so nothing to hold the point under the fingers still
+	 * with, and the page grew about its own middle — until it was wide enough
+	 * to scroll, when the hold took back everything it had lost at once. That
+	 * lurch was the jerk in a pinch from Fit. A transform to make up the
+	 * difference was tried, and fails where the scroll is at its end: moving
+	 * the page left takes its own width off what can be scrolled, and the
+	 * scroll gives back exactly what the transform took.
+	 *
+	 * So while a pinch or a zooming wheel is going on the page has a stage's
+	 * worth of empty margin on every side, and the scroll can always hold.
+	 * Taking it on moves nothing: the hold after the step puts the point back
+	 * where it was, margin and all. Taking it off at the end does move the
+	 * page — below Fit, back to the middle — so that move is played as a short
+	 * slide from where it was rather than a jump.
+	 */
+	let slack = $state(0);
+	let settle = $state<{ x: number; y: number; on: boolean } | null>(null);
+	let gestureEnd: ReturnType<typeof setTimeout> | undefined;
+
+	function beginGesture() {
+		clearTimeout(gestureEnd);
+		if (slack || !host || !pageEl) return;
+		// Drawn at once and scrolled by however far it moved the page, so that
+		// taking the room on is invisible whether or not a step follows.
+		const before = pageEl.getBoundingClientRect();
+		settle = null;
+		slack = Math.ceil(Math.max(host.clientWidth, host.clientHeight));
+		flushSync();
+		const after = pageEl.getBoundingClientRect();
+		host.scrollLeft += after.left - before.left;
+		host.scrollTop += after.top - before.top;
+	}
+
+	async function endGesture() {
+		clearTimeout(gestureEnd);
+		if (!slack || !host || !pageEl) return;
+		const before = pageEl.getBoundingClientRect();
+		const scrolled = { x: host.scrollLeft - slack, y: host.scrollTop - slack };
+		slack = 0;
+		await tick();
+		if (!host || !pageEl) return;
+		host.scrollLeft = scrolled.x;
+		host.scrollTop = scrolled.y;
+		const after = pageEl.getBoundingClientRect();
+		const from = { x: before.left - after.left, y: before.top - after.top };
+		if (Math.abs(from.x) < 1 && Math.abs(from.y) < 1) return;
+		// Drawn where it was, then let go to where it is.
+		settle = { ...from, on: false };
+		await tick();
+		requestAnimationFrame(() => {
+			if (settle) settle = { x: 0, y: 0, on: true };
+			setTimeout(() => (settle = null), 220);
+		});
+	}
+
+	let pageEl = $state<HTMLDivElement | null>(null);
+
 	$effect(() => {
 		void scale;
 		if (!held || !host) return;
 		// A pinch steers every step back to where the selection was when it
-		// began: early steps, near Fit, have almost no room to scroll and cannot
-		// hold it, and a target re-taken each step would keep what they lost.
+		// began, so a step that fell short is made up by the next rather than
+		// kept.
 		const was = pinchTarget ?? held;
 		held = null;
 		const r = selectionRect();
@@ -724,7 +785,12 @@
 			event.preventDefault();
 			lastWheel = performance.now();
 			if (event.shiftKey) resizeType(event);
-			else zoomBy(Math.exp(-event.deltaY / 220), { x: event.clientX, y: event.clientY });
+			else {
+				beginGesture();
+				zoomBy(Math.exp(-event.deltaY / 220), { x: event.clientX, y: event.clientY });
+				// A wheel has no end of its own: a pause is the end.
+				gestureEnd = setTimeout(() => void endGesture(), 250);
+			}
 		};
 		node.addEventListener('wheel', onWheel, { passive: false });
 		return () => node.removeEventListener('wheel', onWheel);
@@ -745,6 +811,7 @@
 		const onStart = (event: Event) => {
 			event.preventDefault();
 			from = scale;
+			beginGesture();
 		};
 		const onChange = (event: Event) => {
 			event.preventDefault();
@@ -753,17 +820,24 @@
 			const at = gesture.clientX === undefined || gesture.clientY === undefined ? undefined : { x: gesture.clientX, y: gesture.clientY };
 			if (gesture.scale) zoomTo(from * gesture.scale, at);
 		};
+		const onEnd = (event: Event) => {
+			event.preventDefault();
+			if (pinch.size === 0) void endGesture();
+		};
 		node.addEventListener('gesturestart', onStart);
 		node.addEventListener('gesturechange', onChange);
+		node.addEventListener('gestureend', onEnd);
 		return () => {
 			node.removeEventListener('gesturestart', onStart);
 			node.removeEventListener('gesturechange', onChange);
+			node.removeEventListener('gestureend', onEnd);
 		};
 	});
 
 	/** Two fingers on the page. Tracked by pointer id, so a stray third does nothing. */
 	let pinch = new Map<number, { x: number; y: number }>();
 	let pinchStart: { spread: number; scale: number } | null = null;
+	let pinchFrame = 0;
 
 	const spread = () => {
 		const [a, b] = [...pinch.values()];
@@ -790,7 +864,11 @@
 			pinchStart = { spread: spread(), scale };
 			pinchIds = beforeTouch;
 			const [a, b] = [...pinch.values()];
+			// Before the room is taken on: the scroll that makes up for it is
+			// whole pixels, and a target read after it would carry the half
+			// pixel it lost, grown by every step of the zoom.
 			pinchTarget = holdAt({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, beforeTouch);
+			beginGesture();
 			restoreSelection(beforeTouch);
 		}
 	}
@@ -807,12 +885,23 @@
 		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
 		if (pinch.size !== 2 || !pinchStart || pinchStart.spread === 0) return;
 		event.preventDefault();
-		const [a, b] = [...pinch.values()];
-		zoomTo(pinchStart.scale * (spread() / pinchStart.spread), { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+		// One step a frame. A touchscreen reports its fingers faster than the
+		// screen draws — 120 times a second on many phones — and every step is
+		// a whole page redrawn at a new scale, so two to a frame was work thrown
+		// away and a frame missed. The last positions of the frame are the ones
+		// used.
+		if (pinchFrame) return;
+		pinchFrame = requestAnimationFrame(() => {
+			pinchFrame = 0;
+			if (pinch.size !== 2 || !pinchStart || pinchStart.spread === 0) return;
+			const [a, b] = [...pinch.values()];
+			zoomTo(pinchStart.scale * (spread() / pinchStart.spread), { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+		});
 	}
 
 	function onPinchUp(event: PointerEvent) {
 		pinch.delete(event.pointerId);
+		if (pinch.size < 2 && pinchStart) void endGesture();
 		if (pinch.size < 2) pinchStart = null;
 		if (pinch.size === 0) {
 			pinchIds = null;
@@ -1194,9 +1283,11 @@
 >
 	<div
 		class="page"
-		style={zoomedIn
-			? `margin:${clearance.top}px ${clearance.right}px ${clearance.bottom}px ${clearance.left}px`
-			: undefined}
+		bind:this={pageEl}
+		class:settling={settle?.on}
+		style="{zoomedIn || slack
+			? `margin:${(zoomedIn ? clearance.top : 0) + slack}px ${(zoomedIn ? clearance.right : 0) + slack}px ${(zoomedIn ? clearance.bottom : 0) + slack}px ${(zoomedIn ? clearance.left : 0) + slack}px;`
+			: ''}{settle ? `transform:translate(${settle.x}px, ${settle.y}px)` : ''}"
 	>
 	<!-- A picture file dropped on the page itself, rather than on an area,
 	     becomes an area of its own there. An area's own drop stops the event
@@ -1747,6 +1838,11 @@
 		/* Kept in step with PAGE_GAP, which takes it out of the height the sheet
 		   is allowed to fill. */
 		gap: 10px;
+	}
+
+	/* The slide back after a gesture's room is taken away — see `slack`. */
+	.page.settling {
+		transition: transform 0.2s ease-out;
 	}
 
 	.sheet {
