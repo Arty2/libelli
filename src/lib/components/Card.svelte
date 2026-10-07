@@ -5,6 +5,7 @@
 	import { parseColor } from '$lib/color';
 	import { UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders } from '$lib/placeholders';
 	import { cssIdent, scopeCss, styleTag } from '$lib/css';
+	import { cardVars } from '$lib/csskit';
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
 	import { isParked } from '$lib/boxops';
@@ -437,6 +438,8 @@
 			// and is deliberately finer than this.
 			`--line:${1 / (scale || 1)}px`,
 			`--line-thick:${1.5 / (scale || 1)}px`,
+			// The page's numbers, for the template's CSS to read — csskit.ts.
+			...cardVars(template).map(([name, value]) => `${name}:${value}`),
 			`background-color:${template.page.background ?? '#ffffff'}`,
 			...backgroundStyle(template.page.image, background)
 		].join(';');

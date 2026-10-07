@@ -52,10 +52,10 @@
 	} from '$lib/boxops';
 	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport, withKey } from '$lib/keys';
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
+	import { cssKit } from '$lib/csskit';
 	import { isStarterTemplate, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault, dragByTitle } from '$lib/modal';
-	import { cssIdent } from '$lib/css';
 	import { codeStats } from '$lib/csscode';
 	import { watchPresses } from '$lib/haptics';
 	import { GONE_ROW, carryLookups, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
@@ -540,47 +540,12 @@
 	const focusOnOpen = (node: HTMLElement) => node.focus();
 
 	/**
-	 * What the CSS box says before anything is typed into it.
-	 *
-	 * The names an author can reach, as working declarations rather than as a
-	 * paragraph describing them. Every selector here is real: `.trim` is the
-	 * card, `.box` is an area, `.page-number .of` is the slash between the count
-	 * and the total. Scoping happens in css.ts, which anchors everything to the
-	 * card, strips `@import` and refuses any `url()` that is not a `data:` one.
+	 * What the CSS box says before anything is typed into it, and what Starter
+	 * puts in it: this template's facts and the selectors it can reach — see
+	 * csskit.ts. The placeholder is the documentation, so it names what this
+	 * template actually has.
 	 */
-	/**
-	 * The placeholder is the documentation — see the dialog below — so it names
-	 * what this template actually has: each area's id, as `cssIdent` writes it,
-	 * and the classes every area carries (see Card's `idFor`).
-	 */
-	const cssPlaceholder = $derived.by(() => {
-		const ids = [...new Set(template.boxes.map((b) => cssIdent(b.slot ?? '')).filter(Boolean))];
-		return [
-			'.box { }              /* every area */',
-			...ids.map((id) => `#${id} { }`),
-			'',
-			'.content-field { }    /* by what fills it: a column, */',
-			'.content-static { }   /* its own words, */',
-			'.content-image { }    /* or an image */',
-			'.mode-plain { }       /* by mode: also .mode-markdown, */',
-			'.mode-qr { }          /* .mode-image, .mode-color */',
-			'',
-			'h1, h2, h3 { }        /* Markdown headings */',
-			'p, ul, li { }         /* Markdown blocks */',
-			'em, strong, code { }',
-			'hr { }',
-			'.page-number { }      /* the number on the card */',
-			".page-number .of::before { content: ' of ' }",
-			'',
-			'#page-1 { }           /* a page by its number */',
-			'.cover { }            /* the first page; also .inside-cover, */',
-			'.back-cover { }       /* .inside-back-cover and the last page */',
-			'.recto { }            /* with Recto / Verso on: also .verso */',
-			'',
-			'.theme-dark { }       /* the editor seen in the dark theme; */',
-			'.theme-dark-page { }  /* the page inverted too; .theme-light */'
-		].join('\n');
-	});
+	const cssPlaceholder = $derived(cssKit(template));
 
 	function openCss() {
 		cssBefore = template.css;

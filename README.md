@@ -559,14 +559,24 @@ resize boxes directly, or type exact millimetres.
   The page in the editor also says which theme it is seen in —
   `.theme-light`, `.theme-dark`, or `.theme-dark-page` when the page is
   inverted too — so something that only the screen shows, like the starter's
-  post-it off the page's edge, can go dark with the rest:
-  `.theme-dark #notes { … }`. Remember that the inverted page turns words,
+  post-it off the page's edge, can keep its daylight colours:
+  `.theme-dark-page #notes { … }`. Remember that the inverted page turns words,
   borders and shadows over but shows an area's fill as written. A printed
   page, an exported picture and a page in the lightbox are always
   `.theme-light`. The
   empty field's placeholder lists this template's own ids and these classes,
   and **Starter** — the code-reference glyph, its word on a desktop — puts
-  that same sheet into the editor, to edit rather than read. The dialog can be dragged by its title, to see the card it is styling,
+  that same sheet into the editor, to edit rather than read. It opens with a
+  comment that says what this template is — the page size and margins, the
+  text defaults, the fonts it loads, every area's id, mode, place and size —
+  and the few rules the card keeps, so the whole sheet can be pasted into a
+  chat with an AI model and come back as CSS for this page. Being a comment,
+  it sets nothing. The card also carries the page's numbers as variables a
+  rule can read: `--page-w`, `--page-h`, `--margin-top` and the other three
+  edges, `--bleed`, `--text-font`, `--text-size`, `--text-leading` and
+  `--text-color` — `width: calc(var(--page-w) - 20mm)` follows the page when
+  its size changes. What the bars set wins over the sheet unless a rule says
+  `!important`. The dialog can be dragged by its title, to see the card it is styling,
   and says beside its name how many lines the sheet is and what it weighs.
   The editor numbers its lines and colours them as you type. It indents with
   tabs: <kbd>Tab</kbd> and <kbd>Shift</kbd>+<kbd>Tab</kbd> move the line or the

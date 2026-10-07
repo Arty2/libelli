@@ -288,6 +288,27 @@ name, because a copy that kept its name kept its binding with it, and a rule
 written for `#Job-Title` means both of them — CSS matches every element wearing
 an id, which is exactly the behaviour that case wants.
 
+## `src/lib/csskit.ts`
+
+**The Starter sheet is generated, never written.** It is what someone pastes
+into a chat with a language model, so it carries the template's facts — page,
+margins, text defaults, fonts, every area's id, mode and frame — under a
+comment, and the selectors under that. All of it is read from the template as
+the sheet is made: a fact written out by hand is one more thing to update
+when the app changes, and the first to be wrong.
+
+**A comment, so pasting it back sets nothing.** The facts are context, not
+rules; a rule restating the page size would fight the bar that sets it. The
+bars' settings are inline styles and win anyway, which is what the sheet's
+rules tell the model: leave them to the bars, `!important` only on purpose.
+
+**The variables are one list, `cardVars`.** Card writes them on the card and
+the header names them from the same function, so the comment cannot promise
+a variable the card does not set. On the card rather than the trim, so a
+template's `:root` (which css.ts maps to `.trim`) can still redefine one for
+its own rules without the card's value overwriting it. Margins are the stored
+right-hand page's: a mirrored left-hand page does not swap them.
+
 ## `src/lib/csscode.ts` and `src/lib/components/CssEditor.svelte`
 
 **A textarea under a coloured copy of itself.** The editor is three layers on
@@ -1986,7 +2007,11 @@ Off the page's outer edge sits a post-it, bound to a `notes` column: an area
 on the pasteboard never prints, so it is the place for a note to yourself. Set
 in Patrick Hand — the one hand face left, on the one thing written by hand —
 with a `box-shadow` curl and a glue strip from `::after` in the CSS, locked so
-the rescue button leaves it where it is (see `boxops.ts`).
+the rescue button leaves it where it is (see `boxops.ts`). In both darks it
+keeps its daylight colours rather than going dark: dark turns the page back
+by itself, and under `.theme-dark-page` the note is turned back as a whole,
+with `filter: none !important` on its `.surface`, which app.css had already
+turned back and a second turn would invert again.
 
 It prints as card 4 says to: two to an A4 sheet, in a zine's order, so
 Export opens on the booklet rather than on four loose pages — hence the name.

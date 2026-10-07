@@ -26,6 +26,7 @@ src/lib/
   color.ts       the only place a color string is allowed to become CSS
   css.ts          scopes the template's own CSS to the card; strips @import and remote url()
   csscode.ts      the CSS editor's colouring, and what Tab and Enter do to the text
+  csskit.ts       the Starter sheet: this template's facts for a model, and the card's vars
   parse.ts        CSV / TSV parsing (quoted fields, embedded newlines, delimiter sniffing)
   markdown.ts     hand-written Markdown subset -> HTML, escaping at the leaves
   layout.ts       mm geometry, anchors, snapping, and the left/right page mirror
