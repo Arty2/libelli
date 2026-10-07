@@ -105,9 +105,11 @@ export const ICONS: Record<string, string> = {
 	// on the ring's outer edge, and that ring — and each half turned 30° about
 	// the pivot onto the axis. So nothing is redrawn: the rings keep their size
 	// (r 5 and 3) and where the blade joins them, and swing in until they
-	// overlap; the blades lie on each other, one 2-unit bar as long as an open
-	// one. Then moved left so the gaps either side are the same, half a unit.
-	'cut-closed': '<path d="M0.49 14.98 26.49 15.01 22.52 17.01 0.49 16.99Z"/><path d="M0.49 17.02 26.49 16.99 22.52 14.99 0.49 15.01Z"/><path fill-rule="evenodd" d="M21.51 20.05a5 5 0 1 0 10 0a5 5 0 1 0-10 0ZM23.51 20.05a3 3 0 1 1 6 0a3 3 0 1 1-6 0Z"/><path fill-rule="evenodd" d="M21.51 11.95a5 5 0 1 0 10 0a5 5 0 1 0-10 0ZM23.51 11.95a3 3 0 1 1 6 0a3 3 0 1 1-6 0Z"/>',
+	// overlap; the blades lie on each other as one 2-unit bar. Moved left so
+	// the rings clear the right edge, and the bar then cut back at its tip to
+	// x 3 — where the open blades start — for the same margin on the left: the
+	// blades give up the room, not the rings, and the pivot stays put.
+	'cut-closed': '<path d="M3 14.98 26.49 15.01 22.52 17.01 3 16.99Z"/><path d="M3 17.02 26.49 16.99 22.52 14.99 3 15.01Z"/><path fill-rule="evenodd" d="M21.51 20.05a5 5 0 1 0 10 0a5 5 0 1 0-10 0ZM23.51 20.05a3 3 0 1 1 6 0a3 3 0 1 1-6 0Z"/><path fill-rule="evenodd" d="M21.51 11.95a5 5 0 1 0 10 0a5 5 0 1 0-10 0ZM23.51 11.95a3 3 0 1 1 6 0a3 3 0 1 1-6 0Z"/>',
 	'cut': '<path d="M26.5,19.63,20.24,16l6.26-3.63a5,5,0,0,0-1.21-9.2A5.19,5.19,0,0,0,24,3a5,5,0,0,0-4.33,7.53,5,5,0,0,0,2.39,2.1l-3.82,2.21L4,6.6,3,8.34,16.24,16,3,23.68l1,1.74,14.24-8.26,3.82,2.21a5,5,0,0,0-2.39,2.1A5,5,0,0,0,24,29a5.19,5.19,0,0,0,1.29-.17,5,5,0,0,0,1.21-9.2ZM21.4,9.53a3,3,0,0,1,1.1-4.12,3,3,0,0,1,4.1,1.11,3,3,0,0,1-1.1,4.11h0A3,3,0,0,1,21.4,9.53Zm5.2,16a3,3,0,0,1-4.1,1.11,3,3,0,0,1-1.1-4.12,3,3,0,0,1,4.1-1.1h0A3,3,0,0,1,26.6,25.48Z"/>',
 
 	'unlink': '<path d="M5 3.59H7V8.42H5z" transform="rotate(-45.01 5.996 6.005)"/><path d="M25 23.58H27V28.409999999999997H25z" transform="rotate(-44.99 25.995 25.999)"/><path d="M11 2H13V6H11z"/><path d="M2 11H6V13H2z"/><path d="M26 19H30V21H26z"/><path d="M19 26H21V30H19z"/><path d="M16.58,21.07l-3.71,3.72a4,4,0,1,1-5.66-5.66l3.72-3.72L9.51,14,5.8,17.72a6,6,0,0,0-.06,8.54A6,6,0,0,0,10,28a6.07,6.07,0,0,0,4.32-1.8L18,22.49Z"/><path d="M15.41,10.93l3.72-3.72a4,4,0,1,1,5.66,5.66l-3.72,3.72L22.49,18l3.71-3.72a6,6,0,0,0,.06-8.54A6,6,0,0,0,22,4a6.07,6.07,0,0,0-4.32,1.8L14,9.51Z"/>',

@@ -1607,11 +1607,21 @@
 						     column and naming it are two things, and the header is
 						     already editable in place. -->
 						<th class="ghost" scope="col">
-							{#if !locked}
-								<button class="icon add" title="Add a column" aria-label="Add a column" onclick={() => addColumn()}>
-									<Icon name="add" size={16} />
-								</button>
-							{/if}
+							<!-- Hidden on a locked table rather than taken away: it is the
+							     tallest thing in the header, and the row was 1.8px shorter
+							     without it, which moved every row under it. Locking should
+							     change the colour of the words and nothing else. -->
+							<button
+								class="icon add"
+								title="Add a column"
+								aria-label="Add a column"
+								disabled={locked}
+								tabindex={locked ? -1 : undefined}
+								style:visibility={locked ? 'hidden' : undefined}
+								onclick={() => addColumn()}
+							>
+								<Icon name="add" size={16} />
+							</button>
 						</th>
 				</tr>
 			</thead>

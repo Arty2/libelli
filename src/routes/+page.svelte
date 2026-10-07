@@ -4060,18 +4060,19 @@
 		color: #555;
 	}
 
-	/* A finger's target without a taller bar: the padding grows, and the same
-	   margin taken back keeps the row the height it was. */
+	/* A finger's target with hardly a taller bar: the padding grows and most
+	   of it is taken back as margin — but not all, or the button ran past the
+	   bar's own padding to its very edge. 2px stays clear above and below. */
 	@media (pointer: coarse) {
 		.status-bar .version,
 		.status-bar .ui-size {
-			margin: -6px -4px -6px 0;
-			padding: 8px 8px;
+			margin: -3px -4px -3px 0;
+			padding: 7px 8px;
 		}
 
 		/* At the left end, it gives its spare width back on that side. */
 		.status-bar .ui-size {
-			margin: -6px 0 -6px -8px;
+			margin: -3px 0 -3px -8px;
 		}
 	}
 
