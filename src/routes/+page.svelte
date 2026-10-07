@@ -1337,7 +1337,7 @@
 
 	/**
 	 * Record what is on screen now, without waiting out the debounce. Undo
-	 * pressed within a third of a second of a change used to find that change
+	 * (and redo) pressed within a third of a second of a change used to find that change
 	 * not yet in the history: it undid the one before it, or — on a fresh
 	 * session, where nothing had been recorded — nothing at all, and the drag
 	 * just made stayed where it was. The debounced recorder cannot record it a
@@ -1391,7 +1391,11 @@
 	}
 
 	function redo() {
-		if (!redoable) return;
+		// Recorded first, as undo does: a change made since the undo, still
+		// inside the debounce, used to be thrown away by the redo that
+		// restored the future it should have cleared.
+		flushHistory();
+		if (!canRedo(history)) return;
 		toggledOff = false;
 		const what = redoLabel(history);
 		history = redoStep(history);
