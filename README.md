@@ -563,7 +563,7 @@ resize boxes directly, or type exact millimetres.
 ## Templates, and laying one out
 
 **Several templates, one browser.** The **Template** field in the page bar names the
-loaded template; the caret beside it opens every template this browser has saved,
+loaded template, ending in … when it is longer than the field; the caret beside it opens every template this browser has saved,
 the open one ticked, with everything that acts on the template as a whole under a
 rule: **New Template** and **A5 Starter Booklet**; under another, **Import…** and
 **Export**; and under a third, in red, **Reset…** — only on a template that began
@@ -588,11 +588,13 @@ The library lives in this browser and travels nowhere. **Export** is still how a
 template leaves; an **Import** joins the library rather than replacing what is
 loaded.
 
-**Position areas automagically.** The button below *+ Area* — the one wearing
-three shapes — reads your columns and writes a first draft of a card:
+**Position areas automagically.** **Layout** in the page bar, right of
+**Lock** — a glyph alone on a phone — reads your columns and writes a first
+draft of a card:
 title, subtitle, detail lines under it, an image, a body, a footer of small
 lines and a QR code, and a credit line at the very bottom, sized and placed for
-the page you are on. It is always there, and it never acts on
+the page you are on. It is pressed once at the start, if at all, so it lives
+with what acts on the template rather than beside the page; it never acts on
 the first press: it shows you what it thinks first, and says how many areas it
 would replace, with **Cancel** beside **OK**.
 
@@ -1458,7 +1460,7 @@ While a text field has focus, undo is left to the browser's own text history and
 <kbd>Delete</kbd> deletes characters — the app keeps its hands off both.
 Otherwise the arrow keys move the selected box wherever you are on the page. On
 a touch screen the same job is done by the four-way pad that appears beside the
-card in **zoom and pan** (the button under Position Automagically) — one cross with one outline, not five tiles in the shape of a cross — with
+card in **zoom and pan** (the button under *+ Area*) — one cross with one outline, not five tiles in the shape of a cross — with
 a chip in the middle cycling between 1mm, 5mm and 10mm; holding an arrow keeps
 it moving. The cross is drawn as a raised thing — lit from the top left, thicker
 along the bottom and right, casting one shadow of its own, and it goes down
@@ -1497,7 +1499,7 @@ towards it and down is away. They repeat on a hold like the arrows do.
   in the gaps between them — which is most of the page on a card that has been
   laid out. Type size is the **Size** field in the bar, or Ctrl/Cmd+Shift+scroll
   with a mouse: a pinch is how a phone zooms, and it means that here too.
-- **Zoom and pan** — the button under Position Automagically turns it on and
+- **Zoom and pan** — the button under *+ Area* turns it on and
   off; it wears **Move** while areas drag and the zoom-and-pan glyph while they
   do not. On, an area no longer moves under a finger or the
   mouse: one finger scrolls the page and two pinch it, a tap still chooses an

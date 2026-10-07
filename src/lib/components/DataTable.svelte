@@ -3215,6 +3215,8 @@
 		background: none;
 		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		color: #111;
+		/* As the template's: an ellipsis, not a cut letter, at the field's end. */
+		text-overflow: ellipsis;
 	}
 
 	.picker input:focus {
@@ -3229,7 +3231,10 @@
 		place-items: center;
 		border: none;
 		background: none;
-		padding: 0;
+		/* As the template's caret: a target, not just the glyph's 18px. */
+		min-width: 1.75rem;
+		min-height: 1.75rem;
+		padding: 0 3px;
 		margin-left: -2px;
 		color: #555;
 		border-radius: 3px;

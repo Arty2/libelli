@@ -2938,6 +2938,8 @@
 						onduplicate={duplicateBox}
 						ondelete={deleteBox}
 						onresettemplate={templateStarter ? () => (resetting = true) : undefined}
+						onmagiclayout={openMagic}
+						hasColumns={dataset.columns.length > 0}
 						{library}
 						{templateId}
 						{editorFonts}
@@ -2973,6 +2975,8 @@
 						onduplicate={duplicateBox}
 						ondelete={deleteBox}
 						onresettemplate={templateStarter ? () => (resetting = true) : undefined}
+						onmagiclayout={openMagic}
+						hasColumns={dataset.columns.length > 0}
 						{library}
 						{templateId}
 						{editorFonts}
@@ -3108,8 +3112,6 @@
 			onundo={undo}
 			onredo={redo}
 			onaddbox={addTextBox}
-			onmagiclayout={openMagic}
-			hasColumns={dataset.columns.length > 0}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
 			onmenuclose={() => (boxMenu = null)}
 			{editingId}

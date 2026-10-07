@@ -72,10 +72,6 @@
 		onundo: () => void;
 		onredo: () => void;
 		onaddbox: () => void;
-		/** position every area from the columns — the button below Area, and its hold */
-		onmagiclayout: () => void;
-		/** whether there is any data to lay out; the button says so rather than hiding */
-		hasColumns: boolean;
 		onmenu: (id: string, x: number, y: number) => void;
 		/** the drag under an open menu has become a drag; see Card's own prop */
 		onmenuclose: () => void;
@@ -148,8 +144,6 @@
 		onundo,
 		onredo,
 		onaddbox,
-		onmagiclayout,
-		hasColumns,
 		onmenu,
 		onmenuclose,
 		modalOpen,
@@ -1612,14 +1606,11 @@
 	     three that come and go belong under it rather than pushing it sideways
 	     every time one of them appears.
 
-	     Area wears `shapes` and the automagic layout wears `blog`: one adds a
-	     shape to the page, the other writes a page out of the columns, and a
-	     glyph of stacked rules is what that second one looks like.
-
-	     16px, not 14: these are Carbon's 32-grid glyphs, and `blog` in
-	     particular carries a bar, two rules and a square — below 16 the three
-	     merge into a smudge. The column moves together, because one button
-	     drawn larger than the four beside it reads as a mistake. -->
+	     16px, not 14: these are Carbon's 32-grid glyphs, and the finer ones
+	     merge into a smudge below it. The column moves together, because one
+	     button drawn larger than the others beside it reads as a mistake. The
+	     automagic layout was here too, and moved to the page bar beside the
+	     lock: it is pressed once at the start, if at all. -->
 	<div class="corner top right stacked">
 		<!-- The page's lock, while it is locked: a padlock and no word, at the
 		     head of the column whose buttons it switches off, so the reason Area
@@ -1664,20 +1655,6 @@
 					<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
 				</button>
 			{/if}
-			<!-- Always there. It used to show only on an empty page, and be a press
-			     and hold on Area otherwise, so that a control replacing the design
-			     was not one mis-tap away — but it opens a dialog that says how many
-			     areas it would replace, with Cancel, which is the guard; and a hold
-			     is now how anything here explains itself. -->
-			<button
-				class="square"
-				onclick={onmagiclayout}
-				title={hasColumns
-					? 'Position areas automagically — a card worked out from your headings and your data'
-					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
-			>
-				<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
-			</button>
 			<!-- Zoom and pan, on and off, under the two that make areas: those
 			     put things on the page, this is how you get about it. Always here
 			     on an unlocked page, so the way in is not a gesture to be found.

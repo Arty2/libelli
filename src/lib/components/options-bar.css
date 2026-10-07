@@ -455,6 +455,9 @@
 .options .head-row .field.picker input {
 	flex: 1 1 auto;
 	min-width: 0;
+	/* A name longer than the field ends in an ellipsis rather than a cut
+	   letter; the whole of it is there to read the moment it is typed in. */
+	text-overflow: ellipsis;
 }
 
 /* The toolbar's Page glyph, in the caret, for when the name has no room. */
@@ -494,7 +497,11 @@
 	place-items: center;
 	border: none;
 	background: none;
-	padding: 0;
+	/* A target worth aiming at: it was the glyph's own 18px, the smallest
+	   thing to press in the bar and the one that opens the most. */
+	min-width: 1.75rem;
+	min-height: 1.75rem;
+	padding: 0 3px;
 	margin-left: -2px;
 	color: #555;
 	cursor: pointer;
@@ -661,7 +668,8 @@
 		display: none;
 	}
 
-	.options .head-row button.css {
+	.options .head-row button.css,
+	.options .head-row button.layout {
 		--square: calc(0.875rem + 12px);
 		padding: 5px;
 		width: var(--square);

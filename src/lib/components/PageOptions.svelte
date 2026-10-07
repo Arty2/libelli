@@ -50,6 +50,10 @@
 		ondelete: () => void;
 		/** absent where there is no starter to reset to — see `starterOfTemplate` */
 		onresettemplate?: () => void;
+		/** Lay the page out from the table's columns — see `openMagic` in the page. */
+		onmagiclayout?: () => void;
+		/** whether there is a table to lay a page out from */
+		hasColumns?: boolean;
 		/** every saved template, and which of them is loaded */
 		library: TemplateEntry[];
 		templateId: string;
@@ -81,6 +85,8 @@
 		editorFonts,
 		ontemplatechange,
 		onresettemplate,
+		onmagiclayout,
+		hasColumns = false,
 		library,
 		templateId,
 		onselecttemplate,
@@ -386,6 +392,25 @@
 					<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
 					{pageFrozen ? 'Unlock' : 'Lock'}
 				</button>
+				<!-- Writing a page out of the columns. Pressed rarely — once, at the
+				     start, if at all — so it lives here with the other things done
+				     to the template as a whole, not in the column beside the page
+				     where it was always in reach and seldom wanted. Its own dialog
+				     says how many areas it would replace, with Cancel. -->
+				{#if onmagiclayout}
+					<button
+						class="css layout"
+						onclick={onmagiclayout}
+						disabled={pageFrozen}
+						title={pageFrozen
+							? 'Lay the page out from your columns — unlock the design first'
+							: hasColumns
+								? 'Lay the page out from your columns — a card worked out from your headings and your data'
+								: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
+					>
+						<Icon name="blog" size={16} /> <span class="label">Layout</span>
+					</button>
+				{/if}
 				<!-- No word before it: the name in it says what it is, and the bar
 				     needed the room more than the label. -->
 				<label class="field picker" bind:this={pickerEl}>

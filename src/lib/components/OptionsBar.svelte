@@ -29,6 +29,8 @@
 		ondelete: () => void;
 		/** absent where there is no starter to reset to — see `starterOfTemplate` */
 		onresettemplate?: () => void;
+		onmagiclayout?: () => void;
+		hasColumns?: boolean;
 		library: TemplateEntry[];
 		/** fonts this browser knows that the template is not carrying */
 		editorFonts: FontRef[];
