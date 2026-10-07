@@ -1002,6 +1002,12 @@ at its own size.
   board is small — the header says what the drawing is costing the cell as you
   draw it, and a couple of hundred bytes is a long cell but a real one.
 
+  In the table a drawing shows as itself, with a dot in its ink at the top left
+  where a text cell's first letter would be, since a faint drawing at row height
+  can pass for an empty cell. Press it to choose it as you would a text cell:
+  the bar under the table then starts with **Draw**, where a text cell has
+  **Edit**, and ends with what the drawing weighs rather than a word count.
+
   An area set to **Repeat** tiles only the pixels that were painted: a tile
   repeats at its own size, so the transparent margin round a drawing would
   repeat as a gap in the pattern. The trimming happens as the card is drawn, not
@@ -1318,7 +1324,10 @@ drag to move about a zoomed sheet.
 
 **The theme button** left of Help — a sun, a moon, or half of each — steps the
 theme: light, dark, and dark with the page inverted too, for a white page in a
-dark room. The logo does the same. In either dark, resting the mouse on either
+dark room. With the page inverted, its pictures and its areas' fills keep their
+own colours; the words, the paper, drawings and QR codes are inverted, since
+those are ink on transparent ground and would vanish into the dark paper
+otherwise. The logo does the same. In either dark, resting the mouse on either
 one or holding a finger on it shows the other dark until you move away or let
 go — the tooltip still comes up with the hold. It is remembered,
 and it is the screen's only — what prints, and what a PNG holds, is the page as designed.

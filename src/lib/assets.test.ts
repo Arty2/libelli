@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backgroundStyle, localImageName, localImageRef, safeImageUrl, safeMediaUrl } from './assets';
+import { backgroundStyle, dataUrlBytes, localImageName, localImageRef, safeImageUrl, safeMediaUrl, weigh } from './assets';
 
 describe('safeImageUrl', () => {
 	it('accepts the two schemes a browser should be pointed at', () => {
@@ -97,5 +97,22 @@ describe('safeImageUrl, on anything that is not an address', () => {
 
 	it('still takes an address that says what it is', () => {
 		expect(safeImageUrl('https://example.com/paper.jpg')).toBe('https://example.com/paper.jpg');
+	});
+});
+
+describe('what a data URL weighs', () => {
+	it('is the base64 decoded, less its padding', () => {
+		// "hello" is 5 bytes, aGVsbG8= in base64.
+		expect(dataUrlBytes('data:text/plain;base64,aGVsbG8=')).toBe(5);
+		expect(dataUrlBytes('data:image/png;base64,AAAA')).toBe(3);
+		expect(dataUrlBytes('data:image/png;base64,AA==')).toBe(1);
+		expect(dataUrlBytes('data:image/svg+xml,%3Csvg%2F%3E')).toBe(6);
+		expect(dataUrlBytes('not a data url')).toBe(0);
+	});
+
+	it('reads as kilobytes, then megabytes', () => {
+		expect(weigh(10)).toBe('1 KB');
+		expect(weigh(1536)).toBe('2 KB');
+		expect(weigh(1.5 * 1024 * 1024)).toBe('1.5 MB');
 	});
 });

@@ -6,7 +6,8 @@
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { armDefault } from '$lib/modal';
 	import { scrollEdges } from '$lib/scrolledge';
-	import { localImageName, safeMediaUrl } from '$lib/assets';
+	import { dataUrlBytes, localImageName, safeMediaUrl, weigh } from '$lib/assets';
+	import { parseColor } from '$lib/color';
 	import type { Grid } from '$lib/bitmap';
 	import BitmapEditor from './BitmapEditor.svelte';
 	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
@@ -336,6 +337,12 @@
 	let editing = $state<{ row: number; column: string } | null>(null);
 
 	const countLabel = (value: string) => {
+		// A picture's words are base64 nobody counts; what it weighs is the
+		// number worth having — a drawing is what makes a table heavy.
+		const picture = cellPicture(value);
+		if (picture) return weigh(dataUrlBytes(picture));
+		const stored = localImageName(value);
+		if (stored) return stored;
 		const { characters, words } = countText(value);
 		return `${characters} character${characters === 1 ? '' : 's'} · ${words} word${words === 1 ? '' : 's'}`;
 	};
@@ -1659,18 +1666,41 @@
 									     stored one. A press picks the row, as anywhere else on
 									     it; a double-click opens it — a drawing on the
 									     drawing surface, a stored picture large in Images. -->
-									<img
-										class="cell-picture"
-										src={picture}
-										alt="{column}, row {rowLabel(i)}"
-										title={locked
-											? undefined
-											: localImageName(row[column])
-												? `${localImageName(row[column])} — double-click to open it in Images`
-												: 'A drawing — double-click to draw on it'}
-										draggable="false"
+									<!-- A button round it, so it can be chosen as a cell is:
+									     the bar then offers Draw and says what it weighs. -->
+									<button
+										class="cell-picture-pick"
+										aria-label="{column}, row {rowLabel(i)}: a picture"
+										onfocus={() => {
+											editing = { row: i, column };
+											onactivate(i);
+											oncellfocus(column);
+										}}
+										onblur={() => (editing = null)}
+										onkeydown={(e) => {
+											if (e.key === 'Escape') {
+												e.stopPropagation();
+												e.currentTarget.blur();
+											}
+										}}
+										onclick={(e) => e.stopPropagation()}
 										ondblclick={() => !locked && openBigCell(i, column)}
-									/>
+									>
+										<img
+											class="cell-picture"
+											src={picture}
+											alt=""
+											title={locked
+												? undefined
+												: localImageName(row[column])
+													? `${localImageName(row[column])} — double-click to open it in Images`
+													: 'A drawing — double-click to draw on it'}
+											draggable="false"
+										/>
+										{#if cellPicture(row[column])}
+											<span class="ink-dot" style="background:{parseColor(drawingFor(column).ink) ?? '#000'}" aria-hidden="true"></span>
+										{/if}
+									</button>
 								{:else}
 								<!-- The whole cell, full size, is Edit in the bar while this is
 								     typed in, or the [...] when it holds more than it shows. It
@@ -1812,12 +1842,24 @@
 			<!-- First in the bar while a cell is typed in: the way into the
 			     whole of it. Mousedown is held off, or the field would lose its
 			     focus, and with it this button, before the click. -->
-			<button
-				title="Open this cell in the table's full room"
-				disabled={locked}
-				onmousedown={(e) => e.preventDefault()}
-				onclick={() => editing && openBigCell(editing.row, editing.column)}
-			><Icon name="task-edit" size={15} /> Edit</button>
+			{@const value = dataset.rows[editing.row]?.[editing.column] ?? ''}
+			{#if cellPicture(value) || localImageName(value)}
+				<!-- A picture is chosen rather than typed in, and the way into it is
+				     the drawing surface — or, for a stored one, the Images tray. -->
+				<button
+					title={localImageName(value) ? 'Open this picture in Images' : 'Draw on this picture'}
+					disabled={locked}
+					onmousedown={(e) => e.preventDefault()}
+					onclick={() => editing && openBigCell(editing.row, editing.column)}
+				><Icon name="edit" size={15} /> {localImageName(value) ? 'Open' : 'Draw'}</button>
+			{:else}
+				<button
+					title="Open this cell in the table's full room"
+					disabled={locked}
+					onmousedown={(e) => e.preventDefault()}
+					onclick={() => editing && openBigCell(editing.row, editing.column)}
+				><Icon name="task-edit" size={15} /> Edit</button>
+			{/if}
 		{/if}
 		<!-- Which table, and its lock, gone while rows are chosen or a cell is
 		     typed in: the row actions or the cell's Edit and count take the bar
@@ -2360,15 +2402,10 @@
 		opacity: 1;
 	}
 
-	/* Sideways only on a desk. On a phone the table is a column or two wide and
-	   nearly always scrolls sideways, so side shadows would be a fixture rather
-	   than a hint. */
-	@media (max-width: 900px) {
-		.edge.left,
-		.edge.right {
-			display: none;
-		}
-	}
+	/* Sideways on a phone too. There the table is a column or two wide and
+	   nearly always scrolls on, so the right-hand shadow is nearly always
+	   there — but it was asked for: without it nothing says the columns go
+	   on, and the left-hand one is the only sign of columns scrolled past. */
 
 	.scroll {
 		flex: 1;
@@ -2827,6 +2864,38 @@
 		object-fit: contain;
 		object-position: left center;
 		cursor: default;
+	}
+
+	/* The picture's button: no chrome of its own, the cell's whole width, and
+	   the focus ring the text fields have. */
+	.cell-picture-pick {
+		display: block;
+		position: relative;
+		width: 100%;
+		padding: 0;
+		border: 0;
+		background: none;
+		text-align: left;
+		cursor: default;
+	}
+
+	.cell-picture-pick:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+	}
+
+	/* A drawing can be faint ink on white at the size a row allows, and read
+	   as an empty cell: a dot in its ink, where the first letter of a text
+	   cell would stand, says something is there. */
+	.ink-dot {
+		position: absolute;
+		top: 5px;
+		left: 6px;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		pointer-events: none;
+		box-shadow: 0 0 0 1px #fff;
 	}
 
 	.data.rows-short .cell-picture {

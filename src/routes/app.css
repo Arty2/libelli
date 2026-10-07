@@ -89,6 +89,17 @@
 	:root[data-theme='dark-page'] [data-true-color] [data-page]:not([data-page] *) {
 		filter: invert(1) hue-rotate(180deg);
 	}
+
+	/* With the page left inverted, what is on it that is a picture or a
+	   colour of its own is turned back: an area's fill (`.surface`, the layer
+	   under its words) and a picture in it. Not a drawing or a QR code: those
+	   are ink on transparent ground, like the words, and turned back they were
+	   black ink on the black of the inverted paper — gone. The words and the
+	   paper stay inverted; they are what a dark page is for. Not inside a
+	   lightbox, whose page is the right way round already. */
+	:root[data-theme='dark-page'] [data-page]:not([data-true-color] *) :is(.surface, .media img:not(.drawn)) {
+		filter: invert(1) hue-rotate(180deg);
+	}
 }
 
 /* Chrome is not prose: dragging across a toolbar should not leave half the

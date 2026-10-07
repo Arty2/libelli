@@ -1604,6 +1604,16 @@ rounding of a few hundredths of a millimetre, from going through pixels and back
 
 ## `src/lib/components/DataTable.svelte`
 
+**A picture cell is a button.** A drawing has no field to focus, so it could
+not be chosen, and the bar under the table had nothing to say about it. Wrapped
+in a button it focuses like a text field, and the bar treats it as the cell
+being worked on: Draw where a text cell has Edit, and its weight (the base64
+decoded, `dataUrlBytes`) where a text cell has its count. A dot in the column's
+ink, through `parseColor` like every colour in a style, marks it, because a
+faint drawing at row height reads as an empty cell. The side shadows now show
+on a phone too: there the right-hand one is nearly always on, but it was the
+only sign the columns go on.
+
 **Reindex is `withoutOrder` with the lookups carried.** A sort reorders the
 rows but keeps their numbers, so that a lookup and the unsort both mean the
 order the table arrived in. Reindex is the way to say the sorted order is the
@@ -3750,6 +3760,13 @@ Two things worth knowing before trusting a green run:
   `environment: 'node'` without that being a claim of coverage.
 
 ## `src/lib/theme.ts` — dark by inversion
+
+**With the page inverted, fills and pictures are turned back.** An area's fill
+layer and a photo in it keep their colours in `dark-page`; the words, the paper,
+drawings and QR codes stay inverted. Turning those back was tried: they are ink
+on transparent ground, and the right way round they were black on the inverted
+black paper — invisible. A drawing is told apart by the `drawn` class Card puts
+on a hand-drawn `<img>`.
 
 **One filter on the root, not a second palette.** The interface's colours are
 written where they are used, across every component; a dark palette would mean

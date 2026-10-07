@@ -15,7 +15,7 @@ file under **What's new** — press the version number in the status bar.
 - A pinch with nothing chosen zooms about where the fingers are.
 - `%%page:current%%`, `%%page:total%%`, `%%lookup:next:…%%` and `previous`.
 - Reindex beside the table's Lock; Reset in the menu for Getting Started.
-- A soft shadow where the table or a bar scrolls on.
+- Scroll shadows; a drawing in the table shows a dot, Draw, and its size.
 
 ## 0.26.3 — 2026-10-02
 

@@ -2028,6 +2028,7 @@
 									<img
 									src={media.src}
 									alt=""
+									class:drawn={drawnByHand(media.src)}
 									style="object-fit:{box.fit ?? 'contain'}{drawnByHand(media.src)
 										? ';image-rendering:pixelated'
 										: ''}"
@@ -2567,11 +2568,11 @@
 	}
 
 	.fold-guide.left {
-		left: calc(-1 * var(--fold-off, 0mm) - 8px * var(--ui-scale, 1) - 1px);
+		left: calc(-1 * var(--fold-off, 0mm) - 4px * var(--ui-scale, 1) - 1px);
 	}
 
 	.fold-guide.right {
-		right: calc(-1 * var(--fold-off, 0mm) - 8px * var(--ui-scale, 1) - 1px);
+		right: calc(-1 * var(--fold-off, 0mm) - 4px * var(--ui-scale, 1) - 1px);
 	}
 
 	/* The stage's grid, under the trim and everything in it. Positioned from
