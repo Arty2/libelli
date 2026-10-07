@@ -744,6 +744,10 @@
 		.settings-strip :global(.sheet-group) {
 			flex: none;
 			flex-wrap: nowrap;
+			/* The bar caps a group at its own width so a group can wrap inside
+			   itself; unwrapped, that cap only made a group narrower than its
+			   contents, which spilled out over the next group's words. */
+			max-width: none;
 			white-space: nowrap;
 			padding: 0 8px 0 0;
 			border-bottom: none;
