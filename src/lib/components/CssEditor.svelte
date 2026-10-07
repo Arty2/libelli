@@ -92,21 +92,20 @@
 	});
 
 	/**
-	 * The dialog has nothing else to focus, and a dialog that opens with the
-	 * focus behind it is one Escape does not reach. Mounted only while it is
-	 * open, so mounting is opening — a locked template focuses a readonly field,
-	 * which is what lets the arrows scroll it.
+	 * Opened at the top, and not focused: on a phone a focused field brings
+	 * the keyboard up over the sheet before anyone has asked to type, and the
+	 * dialog focuses its × instead (+page.svelte), which is what keeps Escape
+	 * and Tab inside it. A tap puts the caret where it lands.
+	 *
+	 * A frame later because the binding writes the field's value after this
+	 * effect runs, and writing a textarea's value scrolls to its end — so a long
+	 * sheet opened at its last line, which is not where anybody starts reading.
+	 * Mounted only while the dialog is open, so mounting is opening.
 	 */
 	$effect(() => {
 		const el = field;
 		if (!el) return;
-		el.focus();
-		// At the top, not at the end. A frame later because the binding writes the
-		// field's value after this effect runs, and writing a textarea's value
-		// puts the caret at its end and scrolls there — so a long sheet opened at
-		// its last line, which is not where anybody starts reading.
 		const frame = requestAnimationFrame(() => {
-			el.setSelectionRange(0, 0);
 			el.scrollTop = 0;
 			sync();
 		});
