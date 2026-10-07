@@ -1289,6 +1289,20 @@ is scrolled into view by the least distance. Only on a resize, never on a
 change of selection alone, so an area dragged off the edge stays where it was
 put.
 
+Both ways. Closing the bar makes the stage taller, which shortens what can be
+scrolled, and the browser clamps the scroll before the resize is heard of — its
+scroll event even comes first, in the same frame. Made up for from that clamped
+value, a page near the bottom moved twice the bar's height on deselect; so a
+scroll in the frame of the resize is taken to be the clamp, and the value
+before it used. What was chosen until a moment ago (a second) is revealed as
+well, so the area deselected, or joined by a second, stays in sight.
+
+**The nudge pad goes somewhere.** Put away by a hold on its middle, or thrown
+24px on past the edge it stops at, it shrinks into the button that brings it
+back, worked out a tick after it starts so that button has been drawn. It used
+to vanish where it stood, and nothing said where it went. A thrown pad comes
+back to its home corner, not hanging off the edge it was thrown at.
+
 **A gesture brings its own room to scroll.** The hold keeps a point still by
 scrolling, and below Fit — and for a while past it — the page is centred and
 there is nothing to scroll: the page grew about its middle, then lurched back

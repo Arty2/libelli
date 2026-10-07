@@ -1465,8 +1465,11 @@ fifth arm. The pad parks over the bottom-right corner of the page, which is
 exactly the corner you may have reached for it to nudge — drag that middle chip
 and the pad comes with your finger; a tap still cycles the step. It can be pushed off the edge of
 the stage to get that corner back, as far as the middle chip: the arm you are
-not using goes out of sight, the chip you pick it up by never does. It is not
-drawn at all when nothing it could move is selected. On an area whose top comes
+not using goes out of sight, the chip you pick it up by never does. Throw it on
+past that, and let go, and it is put away — as holding the middle chip puts it
+away — shrinking into the button under zoom and pan that brings it back; thrown
+away, it comes back to its own corner. It is not drawn at all when nothing it
+could move is selected. On an area whose top comes
 from an anchor, the two vertical keys change the **Gap** instead — the
 millimetres between it and the area it follows — and say so with a stop bar and
 a triangle rather than an arrow: the bar is the edge of that area, so up is

@@ -558,30 +558,69 @@
 	 * margin, so a tall area shows its top. Only when the stage changes size,
 	 * not whenever the selection does: an area dragged off the edge on purpose
 	 * stays there.
+	 *
+	 * Both ways: the bar closing — the area deselected, or a second one
+	 * chosen — reveals what was chosen until a moment ago, as the bar opening
+	 * reveals what is chosen now.
 	 */
 	$effect(() => {
 		if (!host) return;
 		const node = host;
 		let last = node.getBoundingClientRect();
+		// From before the resize. A stage that grows shortens what can be
+		// scrolled, and the browser clamps the scroll back by itself before
+		// this hears of it — added to the edge's own move, a page near the
+		// bottom went twice as far as the bar it was making up for. Its scroll
+		// event even arrives first, in the same frame; so a scroll that
+		// landed in the frame of the resize is taken to be that clamp, and the
+		// one before it is used.
+		let scrolled = { x: node.scrollLeft, y: node.scrollTop };
+		let before = scrolled;
+		let scrolledAt = 0;
+		const onScroll = () => {
+			before = scrolled;
+			scrolled = { x: node.scrollLeft, y: node.scrollTop };
+			scrolledAt = performance.now();
+		};
 		const observer = new ResizeObserver(() => {
 			const now = node.getBoundingClientRect();
 			const moved = { x: now.left - last.left, y: now.top - last.top };
 			last = now;
 			if (moved.x || moved.y) {
-				node.scrollLeft += moved.x;
-				node.scrollTop += moved.y;
+				const from = performance.now() - scrolledAt < 20 ? before : scrolled;
+				node.scrollLeft = from.x + moved.x;
+				node.scrollTop = from.y + moved.y;
 			}
 			revealSelection(now);
+			before = scrolled = { x: node.scrollLeft, y: node.scrollTop };
+			scrolledAt = 0;
 		});
+		node.addEventListener('scroll', onScroll, { passive: true });
 		observer.observe(node);
-		return () => observer.disconnect();
+		return () => {
+			observer.disconnect();
+			node.removeEventListener('scroll', onScroll);
+		};
+	});
+
+	/** What was chosen until a moment ago, and when it stopped being — see `revealSelection`. */
+	let lastChosen: { ids: string[]; until: number } = { ids: [], until: 0 };
+	$effect(() => {
+		if (selectedIds.length) lastChosen = { ids: [...selectedIds], until: Infinity };
+		else if (lastChosen.until === Infinity) lastChosen = { ...lastChosen, until: performance.now() };
 	});
 
 	const REVEAL_MARGIN = 16;
 
 	function revealSelection(view: DOMRect) {
-		if (!host || !selectedIds.length || pinch.size) return;
-		const r = selectionRect(selectedIds);
+		if (!host || pinch.size) return;
+		const ids = selectedIds.length
+			? selectedIds
+			: performance.now() - lastChosen.until < 1000
+				? lastChosen.ids.filter((id) => template.boxes.some((b) => b.id === id))
+				: [];
+		if (!ids.length) return;
+		const r = selectionRect(ids);
 		if (!r || r.page) return;
 		const into = (start: number, size: number, from: number, to: number) => {
 			if (size > to - from - 2 * REVEAL_MARGIN || start < from + REVEAL_MARGIN) return start - (from + REVEAL_MARGIN);
@@ -1168,6 +1207,7 @@
 			padHeld = true;
 			padPress = null;
 			padHidden = true;
+			padThrown = false;
 			pushed = null;
 			vibrate(HOLD_MS);
 		}, PAD_HIDE_MS);
@@ -1201,9 +1241,45 @@
 		 */
 		const stash = (value: number, extent: number) =>
 			Math.max(-PAD_CELL, Math.min(extent - PAD_SIZE + PAD_CELL, value));
-		padAt = {
-			right: stash(padDrag.from.right - (event.clientX - padDrag.x), stage.width),
-			bottom: stash(padDrag.from.bottom - (event.clientY - padDrag.y), stage.height)
+		const wanted = {
+			right: padDrag.from.right - (event.clientX - padDrag.x),
+			bottom: padDrag.from.bottom - (event.clientY - padDrag.y)
+		};
+		padAt = { right: stash(wanted.right, stage.width), bottom: stash(wanted.bottom, stage.height) };
+		// How far the finger has gone on past where the pad stopped: pushed on
+		// far enough, letting go puts it away.
+		padPast = Math.max(Math.abs(wanted.right - padAt.right), Math.abs(wanted.bottom - padAt.bottom));
+	}
+
+	/** Past the edge by this much when let go, the pad is put away rather than parked. */
+	const PAD_THROW = 24;
+	let padPast = 0;
+	/** Put away by throwing it at the edge: it comes back home, not hanging off it. */
+	let padThrown = false;
+
+	/**
+	 * The pad shrinking into the button that brings it back, so it is plain
+	 * where it went — put away by a hold or thrown at the edge, it used to just
+	 * vanish. Worked out a moment after it starts, once the button it is going
+	 * to has been drawn in the same update; nothing to go to, or a reader who
+	 * asked for less motion, and it goes at once as before.
+	 */
+	function stowPad(node: HTMLElement) {
+		return () => {
+			const home = stage?.querySelector<HTMLElement>('[data-pad-home]')?.getBoundingClientRect();
+			if (!home || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return { duration: 0 };
+			const r = node.getBoundingClientRect();
+			const dx = home.left + home.width / 2 - (r.left + r.width / 2);
+			const dy = home.top + home.height / 2 - (r.top + r.height / 2);
+			const size = home.width / Math.max(1, r.width);
+			return {
+				duration: 280,
+				easing: (t: number) => t * t * (3 - 2 * t),
+				// `t` runs 1 to 0 on the way out: at 0 the pad is the button's
+				// size, on the button.
+				css: (t: number, u: number) =>
+					`transform:translate(${dx * u}px, ${dy * u}px) scale(${1 - (1 - size) * u});transform-origin:center;opacity:${Math.min(1, t * 2)}`
+			};
 		};
 	}
 
@@ -1237,6 +1313,13 @@
 
 	function padDrop() {
 		cancelPadHide();
+		if (padDrag && padPast > PAD_THROW) {
+			padHidden = true;
+			padThrown = true;
+			pushed = null;
+			vibrate(HOLD_MS);
+		}
+		padPast = 0;
 		padPress = null;
 		padDrag = null;
 		// Cleared on the next tick, so the click that follows the drag — which is
@@ -1614,8 +1697,11 @@
 				     under the mode it belongs to. -->
 				<button
 					class="square"
+					data-pad-home
 					onclick={() => {
 						padHidden = false;
+						if (padThrown) padAt = { ...PAD_HOME };
+						padThrown = false;
 						// The hold that hid it ended with the pad gone, so its release
 						// never arrived to clear this — and the first tap on the step
 						// would be swallowed.
@@ -1775,6 +1861,7 @@
 		     repeat while held, so a hold here is never a request for a tip. -->
 		<div
 			class="pad"
+			out:stowPad
 			data-no-hold-tip
 			class:moving={!!padDrag}
 			class:push-up={pushed === 'up'}
