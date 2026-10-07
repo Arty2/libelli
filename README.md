@@ -265,6 +265,12 @@ resize boxes directly, or type exact millimetres.
   first — a heading or a list before it included, since on a card most
   paragraphs follow one, and the book rule of indenting only a paragraph after
   another meant it hardly ever showed.
+- **Columns** — in the area bar's Lines, for an area of words: 2 to 6 sets
+  them side by side within the area, with **Gap** the millimetres between
+  one column and the next. Blank or 1 is one column. The columns balance —
+  a growing area grows to the longest of them, a fixed one cuts what runs
+  past its height, as it would one column — and the area's padding, border
+  and fill stay one frame round all of them.
 - **Lists** — **Marker** picks a Markdown bullet list's marker, **• Bullet**,
   **● Disc**, **○ Circle**, **■ Square**, **– Dash**, **— Em Dash**, **→ Arrow**
   or **None**, each set in the area's own
@@ -1265,6 +1271,9 @@ Every checkbox in the app is Carbon's own — an empty square, a ticked one in
 the accent, and a dash for *some but not all* where a box speaks for a set, as
 the table's header tick does.
 
+The settings between the two previews are the page bar's, with its **Lock**
+first — a locked design shows them greyed out, and this is where to unlock it
+without leaving. On a phone they are one line that scrolls sideways.
 Every page has a checkbox under it, and only the ticked ones print — untick the
 three proofs that came out wrong and reprint just those — the whole caption row
 under a thumbnail is the target, not the box in the middle of it. The count is

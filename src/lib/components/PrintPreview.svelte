@@ -437,6 +437,19 @@
 	     it is what turns the pages above into the sheets below, and standing
 	     there it separates them without a heading of its own. -->
 	<div class="options settings-strip">
+		<!-- The design's lock, here as in the page bar: these settings are the
+		     template's, so a locked one shows them greyed out, and this is the
+		     way to change that without leaving the preview. Never disabled by
+		     the lock it sets. -->
+		<button
+			class="lock-toggle"
+			aria-pressed={pageFrozen}
+			title={pageFrozen ? 'Unlock the design' : 'Lock the design — no dragging, no option changes'}
+			onclick={() => ontemplatechange({ ...template, locked: pageFrozen ? undefined : true })}
+		>
+			<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
+			{pageFrozen ? 'Unlock' : 'Lock'}
+		</button>
 		<PrintSettingsPanel {template} {pageFrozen} {ontemplatechange} onuploadbackground={onuploadprintbackground} {onnotice} showFacing />
 	</div>
 
@@ -708,6 +721,34 @@
 	   keeps them from being separated by a wrap that lands anywhere. */
 	.settings-strip :global(.sheet-group) {
 		flex-basis: 100%;
+	}
+
+	/* On a phone, one line that scrolls sideways rather than a stack of a
+	   dozen short rows between the pages and the sheets: the settings are a
+	   thing to reach for, and the two previews are what this screen is. Each
+	   group stays whole on the line, ruled off from the next at its side. */
+	@media (max-width: 900px) {
+		.options.settings-strip {
+			flex-wrap: nowrap;
+			overflow-x: auto;
+			overflow-y: hidden;
+			max-height: none;
+			overscroll-behavior-x: contain;
+		}
+
+		.settings-strip > :global(*) {
+			flex: none;
+		}
+
+		.settings-strip :global(.group),
+		.settings-strip :global(.sheet-group) {
+			flex: none;
+			flex-wrap: nowrap;
+			white-space: nowrap;
+			padding: 0 8px 0 0;
+			border-bottom: none;
+			border-right: 1px solid #e0e0e0;
+		}
 	}
 
 	.checklist {

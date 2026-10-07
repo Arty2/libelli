@@ -21,6 +21,9 @@
 		LIST_MARKERS,
 		baselineOf,
 		normaliseBaseline,
+		normaliseColumns,
+		DEFAULT_COLUMN_GAP,
+		MAX_COLUMNS,
 		normaliseList,
 		MIN_BOX,
 		MIN_LEADING,
@@ -1154,6 +1157,47 @@
 						<ResetButton to="the page's baseline" disabled={boxFrozen} onclick={() => patch({ baseline: undefined })} />
 					{/if}
 				</label>
+			{/if}
+			{#if selected.mode === 'plain' || selected.mode === 'markdown'}
+				<!-- Blank, or 1, is one column — the field gone, as every other
+				     "not set" is. The gap only while there are columns to have one. -->
+				<label class="field">
+					<span>Columns</span>
+					<input
+						class="n-2"
+						type="number"
+						step="1"
+						min="1"
+						max={MAX_COLUMNS}
+						placeholder="1"
+						title="Set the words in 2 to {MAX_COLUMNS} columns side by side; blank or 1 for one"
+						value={selected.columns?.count ?? ''}
+						disabled={boxFrozen}
+						onchange={(e) =>
+							patch({
+								columns: normaliseColumns({
+									count: e.currentTarget.value,
+									gap: selected.columns?.gap ?? DEFAULT_COLUMN_GAP
+								})
+							})}
+					/>
+				</label>
+				{#if selected.columns}
+					<label class="field">
+						<span>Gap</span>
+						<input
+							class="n-3"
+							type="number"
+							step="0.5"
+							min="0"
+							title="Between one column and the next"
+							value={selected.columns.gap}
+							disabled={boxFrozen}
+							onchange={(e) => patch({ columns: normaliseColumns({ count: selected.columns!.count, gap: numeric(e, selected.columns!.gap) }) })}
+						/>
+						<span class="unit">mm</span>
+					</label>
+				{/if}
 			{/if}
 			<!-- How one paragraph is told from the next: a space in lines of this
 			     leading, or an indent in em. -->

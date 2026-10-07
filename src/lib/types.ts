@@ -264,6 +264,18 @@ export interface TextStyle {
 	 * correction for one face is wrong for any other.
 	 */
 	baseline?: number;
+	/**
+	 * The words set in columns, side by side within the area, the gap between
+	 * them in mm. Two to six; absent is one column, which is every area that
+	 * has not asked.
+	 */
+	columns?: TextColumns;
+}
+
+/** See `TextStyle.columns`. */
+export interface TextColumns {
+	count: number;
+	gap: number;
 }
 
 export type Defaults = Required<

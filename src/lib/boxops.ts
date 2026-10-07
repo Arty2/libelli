@@ -197,6 +197,7 @@ export const STYLE_KEYS = [
 	'letterSpacing',
 	'textCase',
 	'md',
+	'columns',
 	'background',
 	'padding',
 	'borderWidth',

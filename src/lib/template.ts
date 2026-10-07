@@ -28,7 +28,8 @@ import type {
 	SheetOrientation,
 	SideValue,
 	Sides,
-	Template
+	Template,
+	TextColumns
 } from './types';
 import { SCHEMA_VERSION } from './types';
 
@@ -220,6 +221,29 @@ export function colorsFromRow(box: Box, row: Row | null | undefined): Box {
 }
 
 /** A baseline shift in em, negative allowed; zero is no shift and is dropped. */
+/** Columns an area's words may be set in: two at least, or it is not columns. */
+export const MIN_COLUMNS = 2;
+export const MAX_COLUMNS = 6;
+/** The gap a fresh pair of columns gets, in mm. */
+export const DEFAULT_COLUMN_GAP = 5;
+
+/**
+ * Columns as a file may write them: a whole count from two to six and a gap of
+ * no less than nothing, in mm. A count under two is one column, which is the
+ * absence of the field; one over six is six.
+ */
+export function normaliseColumns(raw: unknown): TextColumns | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const { count, gap } = raw as { count?: unknown; gap?: unknown };
+	const n = Math.round(Number(count));
+	if (!Number.isFinite(n) || n < MIN_COLUMNS) return undefined;
+	const g = Number(gap);
+	return {
+		count: Math.min(MAX_COLUMNS, n),
+		gap: Number.isFinite(g) ? Math.max(0, Math.round(g * 100) / 100) : DEFAULT_COLUMN_GAP
+	};
+}
+
 export function normaliseBaseline(raw: unknown): number | undefined {
 	if (raw === undefined || raw === null || raw === '') return undefined;
 	const n = Number(raw);
@@ -365,6 +389,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			paragraph: normaliseParagraph(partial.paragraph),
 			list: normaliseList(partial.list),
 			baseline: normaliseBaseline(partial.baseline),
+			columns: normaliseColumns(partial.columns),
 			// Every color on a box goes through the parser before it can reach a
 			// style attribute; one that is not recognised is dropped rather than
 			// guessed at, the same rule the markdown renderer follows.

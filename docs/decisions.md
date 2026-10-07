@@ -744,6 +744,14 @@ would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
 
+**Columns are the browser's.** `Box.columns` (2–6, a gap in mm) is
+`column-count` and `column-gap` on the area's content, not on the box, so the
+padding, border and fill stay one frame round all the columns. Balanced rather
+than filled in turn: a fixed-height area cuts what runs past its height as it
+would one column, and a growing one grows to the longest. Words only — a
+picture or a QR code split into columns is a broken picture. Absent is one
+column; a count under two is read as absent.
+
 **A page's own id and classes sit on a box-less wrapper inside the trim.**
 `#page-N`, `.cover`, `.inside-cover`, `.inside-back-cover`, `.back-cover`,
 `.recto` and `.verso` let a template's CSS style a page as a whole. css.ts
@@ -2435,6 +2443,13 @@ takes the sheet with it. The sheet bleed adds to that padding, because it adds
 paper: the cards keep their places and the sheet grows around them.
 
 ## `src/lib/components/PrintPreview.svelte`
+
+**The settings strip carries the lock, and on a phone is one line.** The print
+settings are the template's, greyed out on a locked design, so the design's
+lock sits at the head of the strip, as in the page bar: unlocking no longer
+means leaving the preview. On a phone the shared bar styles stack every group
+on a line of its own, a dozen rows between the two previews; here they are one
+row that scrolls sideways, each group whole and ruled off at its side.
 
 **A page's side of the fold is its number's, ticked or not.** For a while a page
 left out turned every page after it over — page 3 printed after page 1 became a

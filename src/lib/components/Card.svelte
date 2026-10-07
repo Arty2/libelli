@@ -519,6 +519,18 @@
 		return { id: `page-${n}`, classes: classes.join(' ') };
 	});
 
+	/**
+	 * Words in columns: the browser's own multi-column layout, on the content
+	 * rather than the box, so the box's padding, border and fill stay one
+	 * frame round all of them. Balanced: a fixed height cuts what overflows
+	 * as it cuts a single column, and a growing area grows to the longest.
+	 * Words only — a picture or a QR code in columns is a stretched picture.
+	 */
+	const columnsStyle = (box: Box): string | undefined =>
+		box.columns && (box.mode === 'plain' || box.mode === 'markdown')
+			? `column-count:${box.columns.count};column-gap:${box.columns.gap}mm`
+			: undefined;
+
 	const foldSide = (box: Box): 'left' | 'right' | null =>
 		template.facing === true && mirrors(box) ? (verso ? 'right' : 'left') : null;
 
@@ -2018,6 +2030,7 @@
 				{/if}
 				<div
 					class="content"
+					style={columnsStyle(box)}
 					class:being-edited={editingId === box.id}
 					class:shifted={!!baselineOf(box, template.defaults) && (box.mode === 'plain' || box.mode === 'markdown')}
 				>
