@@ -478,11 +478,11 @@ resize boxes directly, or type exact millimetres.
   the editor, the print preview and the print all agree. **of Total** prints it
   as *3 / 12*; the slash is an element of its own, `.page-number .of`, so a
   template's CSS can set its content to anything or take it away. With **Recto
-  ⧘ Verso** on, four more positions appear: **Top**/**Bottom Outer** and
+  / Verso** on, four more positions appear: **Top**/**Bottom Outer** and
   **Inner**, which are the right edge on a right-hand page and the left edge on
   a left-hand one, or the other way about. Outer is where a page number goes in
   anything that is bound, because it is the corner a thumb turns the page by.
-- **Recto ⧘ Verso** — beside the page margin, and off by default: a run of
+- **Recto / Verso** — beside the page margin, and off by default: a run of
   identical pages is what a deck of cards is. On, the run is a booklet — odd
   rows are right-hand pages, even rows the left-hand pages facing them — and
   three things follow. Areas **mirror** across the fold, keeping the distance
@@ -1255,13 +1255,14 @@ to **0 pages** so you can choose, and pressing it again takes them all back. It 
 what it does are one thing.
 A page keeps the number it has in the table however few of
 them go, so page 4 prints as page 4 even when it is the only one selected.
-With **Recto ⧘ Verso** on, each caption also says which side of the fold the
+With **Recto / Verso** on, each caption also says which side of the fold the
 page prints on — **R** or **V**, before the box — and that follows the pages
 that are going, not the numbers: untick page 2 and page 3 becomes a verso,
 mirrored to match, so the run still alternates. A page left out shows **–**.
 The pages are laid out as spreads, too: each left-hand page beside the
-right-hand page after it with only a hairline between them, the fold, and the
-usual gap between one spread and the next. Page 1 is a right-hand page on its
+right-hand page after it, never split across rows, with a dot-dash line in the
+gap on each printing page's bound side — the fold. A left-hand page and the
+right-hand page after it share one line between them. Page 1 is a right-hand page on its
 own, with the place to its left empty. A page left out stays where it is,
 inside the spread around it. On a phone the strip shows a spread at a time. A PNG
 run names its files `stem_01.png`, padded to the width of the run, so a directory

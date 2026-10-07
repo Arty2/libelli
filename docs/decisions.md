@@ -1258,7 +1258,7 @@ handle sit outside that, because mirroring places a box without flipping what is
 inside it. The latch guide carries a `flip` flag for the same reason: it is
 measured against stored edges and drawn where the eye sees them.
 
-**The fold is dot and dash.** With Recto ⧘ Verso on, the guides draw the fold
+**The fold is dot and dash.** With Recto / Verso on, the guides draw the fold
 as a dot-dash line just outside the inner trim edge — past any bleed, so it is
 never read as artwork — the convention for a fold on anything printed to be
 folded. An area that follows the fold draws its inner side in the same rhythm
@@ -2370,7 +2370,11 @@ page sits inside the spread around it rather than opening one of its own — the
 grouping follows the sides, and the sides follow the pages going. A spread
 that opens on a recto (the first) keeps an empty page-width to its left. The
 grid becomes a wrapping flex row there, because a spread with a page left out
-in it is three pages wide and no fixed column holds that.
+in it is three pages wide and no fixed column holds that. The fold is a
+dot-dash line out in the gap on each going page's bound side, not a narrower
+gap: a narrower gap was tried, and pages that close read as cramped rather than
+bound. A going verso and the going recto right after it would draw their lines
+on the same spot, so the verso draws it for both.
 
 **One door to the printer.** Print opens the preview; the preview prints. The
 page selection lives there, keyed by row index and reset every time it opens —
@@ -2923,10 +2927,10 @@ rule, because the bar wraps and a rule lands wherever the wrap does. A label tha
 only repeated its group's name is left to screen readers. A new control goes in
 the group it belongs to rather than on the end.
 
-**Recto ⧘ Verso on the page, Fold Follow on an area.** The page's switch is the
-book's own words: a right-hand page and the left-hand page facing it, the ⧘ a
-fold between them rather than a slash, which read as "one or the other". The
-area's switch once used the same words and meant something else — not "this is
+**Recto / Verso on the page, Fold Follow on an area.** The page's switch is the
+book's own words: a right-hand page and the left-hand page facing it, with a
+plain slash — a ⧘ for the fold was tried and set too small to read in the bar's
+capitals. The area's switch once used the same words and meant something else — not "this is
 a spread" but "this area mirrors across it" — so it is named for what it does:
 it follows the fold, the dot-dash line the guides draw at the inner edge. Off, the area
 keeps its millimetres on both pages.

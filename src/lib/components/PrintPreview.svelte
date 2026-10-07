@@ -214,6 +214,19 @@
 	 * left. With nothing ticked there are no sides to go by, and the numbers'
 	 * own stand in.
 	 */
+	/**
+	 * Where a page's fold line goes, if it gets one: the left of a going recto,
+	 * the right of a going verso — except a recto right after a going verso,
+	 * whose line is that verso's. Only with facing pages, and only for pages
+	 * that print.
+	 */
+	function foldLineAt(i: number): 'left' | 'right' | null {
+		const side = template.facing ? sideOf.get(i) : undefined;
+		if (side === 'verso') return 'right';
+		if (side !== 'recto') return null;
+		return sideOf.get(i - 1) === 'verso' ? null : 'left';
+	}
+
 	const spreads = $derived.by(() => {
 		if (!template.facing) return null;
 		const sideAt = (i: number) => (includedPages.length ? sideOf.get(i) : pageSide(i + 1));
@@ -272,7 +285,16 @@
 {#snippet page(i: number)}
 	{@const row = dataset.rows[i]}
 	{@const included = !excluded.has(i)}
+	{@const fold = foldLineAt(i)}
 	<figure class:dropped={!included}>
+		{#if fold}
+			<!-- The fold, on the side of the page it is bound at, out in the gap.
+			     A going verso and the going recto after it are one sheet folded,
+			     so they share one line: the verso draws it. -->
+			<svg class="fold-line {fold}" style="height:{mmToPx(outerH) * thumbScale}px" aria-hidden="true"
+				><line x1="50%" y1="0" x2="50%" y2="100%" /></svg
+			>
+		{/if}
 		<button
 			class="thumb"
 			style="width:{mmToPx(outerW) * thumbScale}px;height:{mmToPx(outerH) * thumbScale}px"
@@ -402,9 +424,10 @@
 	>
 		{#if spreads}
 			<!-- Facing pages as the reader will hold them: a left-hand page beside
-			     its right-hand page with hardly a gap — the fold — and the usual
-			     gap between one spread and the next. The first page is a right-hand
-			     page on its own, the place on its left kept empty. -->
+			     its right-hand page, a spread never split across rows. The fold is
+			     the dot-dash line between them; the gaps are the grid's own. The
+			     first page is a right-hand page on its own, the place on its left
+			     kept empty. -->
 			{#each spreads as spread, s (s)}
 				<div class="spread">
 					{#if spread.lone}<span class="spread-blank" style="width:{mmToPx(outerW) * thumbScale}px" aria-hidden="true"></span>{/if}
@@ -788,18 +811,26 @@
 	/* Spreads wrap as a row of their own sizes: two pages to a grid cell, or
 	   three with one left out between them, is not a shape a column of fixed
 	   width holds. */
+	/* Spreads wrap as a row of their own sizes: two pages to a grid cell, or
+	   three with one left out between them, is not a shape a column of fixed
+	   width holds. The gaps are the grid's, inside a spread and between. */
 	.grid.spreads:not(.narrow) {
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: center;
-		gap: 18px 28px;
 	}
 
-	/* The fold: a hairline of a gap, a fraction of the one between spreads,
-	   so the two pages read as one sheet folded rather than two cards. */
+	.grid {
+		--gap: 18px;
+	}
+
+	.grid.narrow {
+		--gap: 12px;
+	}
+
 	.spread {
 		display: flex;
-		gap: 3px;
+		gap: var(--gap);
 		align-items: flex-start;
 	}
 
@@ -812,11 +843,38 @@
 		scroll-snap-align: none;
 	}
 
+	/* Centred in the gap beside the page, so a verso's line and the recto
+	   after it would fall on the same place — which is why only one of them
+	   draws it. Dot and dash, the fold's mark everywhere else in the app. */
+	.fold-line {
+		position: absolute;
+		top: 0;
+		width: 2px;
+		overflow: visible;
+		pointer-events: none;
+	}
+
+	.fold-line.left {
+		left: calc(var(--gap) / -2 - 1px);
+	}
+
+	.fold-line.right {
+		right: calc(var(--gap) / -2 - 1px);
+	}
+
+	.fold-line line {
+		stroke: #8a8a8a;
+		stroke-width: 1.5px;
+		stroke-dasharray: 1.5px 4px 9px 4px;
+	}
+
 	.spread-blank {
 		flex: 0 0 auto;
 	}
 
+	/* Positioned, for the fold line hung off its side. */
 	figure {
+		position: relative;
 		margin: 0;
 		text-align: center;
 	}
