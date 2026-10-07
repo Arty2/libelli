@@ -254,6 +254,20 @@
 	border-radius: var(--radius-input);
 }
 
+/* As tall as the buttons beside it, at every text size: the browser's own
+   color input is a fixed height (27px in Chrome, taller on a phone), so it
+   stood out of the row as soon as the text was sized up or down. A button is
+   one line of its type, its 5px of padding either side and its border; the
+   swatch is given that type and measured the same way, in `lh` — one line of
+   its own — because the line height of `normal` is the font's to round, and a
+   sum in rem came out a pixel short. `lh` is Baseline Widely (2026); without
+   it the declaration drops and the swatch keeps its own height. */
+.options .color-field .swatch {
+	box-sizing: border-box;
+	font: 0.75rem ui-sans-serif, system-ui, sans-serif;
+	height: calc(1lh + 12px);
+}
+
 /* Sized to the widest value each one actually holds, not to a grid: every rem
    saved here is a control that stays on the same row instead of wrapping to the
    next, and a field with room for characters that can never arrive reads as a
