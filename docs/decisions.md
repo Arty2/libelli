@@ -497,6 +497,19 @@ where two strokes should join does not read as hand-drawn — it reads as broken
 
 ## `src/lib/bitmap.ts`, `src/lib/tile.ts` and `src/lib/components/BitmapEditor.svelte`
 
+**Smaller as a palette PNG, not gzipped.** Gzip was asked for and measured: the
+starter's drawing went from 856 bytes to 879, because a PNG's pixels are
+deflated already and a second pass only adds a header. The weight was the
+canvas writing four bytes a pixel for one ink on nothing. `pngpack.ts` writes
+colour type 3 at the fewest bits the palette needs (290 bytes for that
+drawing, 410 characters of base64 against 1,166), with the browser's own
+`CompressionStream` for the deflate and the CRC zip.ts already had. Still a
+PNG, so every reader of a cell is untouched and no stored drawing needs
+migrating; the starter's was re-encoded by hand, pixel for pixel the same.
+Over 256 colours, the canvas's own PNG. Saving and the live weight are
+asynchronous now: the weight is taken 120ms after the last stroke and only
+the latest kept, and Save marks as saved only the edits it actually packed.
+
 **The drawing goes in the cell, as base64.** Not into this browser's store like
 a dropped file: a drawing made here has no existence anywhere else, and a
 picture that lives beside the table would be lost the moment the CSV was handed

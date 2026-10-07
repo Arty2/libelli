@@ -41,6 +41,7 @@ src/lib/
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
   hand.ts         a border drawn by hand: seeded wobble -> SVG paths, in mm
   bitmap.ts       the pixel budget a drawn area gets, and pointing at it
+  pngpack.ts      a drawing saved as a palette PNG, a bit or two a pixel
   tile.ts         a drawing cropped to its ink, for an area that repeats
   photo.ts        crop frames and write-back types, for editing a stored picture
   table.ts        column reorder, row sorting

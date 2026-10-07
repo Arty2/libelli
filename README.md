@@ -1000,7 +1000,12 @@ at its own size.
   point: the image travels with the table, so a CSV carries the drawings with
   the words and a row's image is as portable as its text. That is also why the
   board is small — the header says what the drawing is costing the cell as you
-  draw it, and a couple of hundred bytes is a long cell but a real one.
+  draw it, and a couple of hundred bytes is a long cell but a real one. It is
+  saved as a palette PNG, one or two bits a pixel for a drawing of one or two
+  inks, which is a third of what the browser's own full-colour PNG would be —
+  still an ordinary PNG, which anything that reads the cell can open. A board
+  holding more than 256 colours, a photograph pasted onto it, is saved as the
+  browser saves it.
 
   In the table a drawing shows as itself, with a dot in its ink at the top left
   where a text cell's first letter would be, since a faint drawing at row height
