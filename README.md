@@ -587,7 +587,8 @@ resize boxes directly, or type exact millimetres.
   and says beside its name how many lines the sheet is and what it weighs.
   The button left of its × takes it **full screen** — no margins round it,
   and the editor as tall as the window — and back, as does a double-click on
-  its title. It stays that way for the next time you open it until you
+  its title. Drag its title while it is full screen and it comes out of full
+  screen under your pointer, the way a window does. It stays that way for the next time you open it until you
   reload. On a phone it always opens full screen. **Text Wrap**, beside
   Starter, folds long lines to the editor's width — on by default, the line
   numbers standing as tall as the lines they count; off, a long line scrolls

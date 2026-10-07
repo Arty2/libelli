@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, untrack } from 'svelte';
+	import { flushSync, tick, untrack } from 'svelte';
 	import { base } from '$app/paths';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
 	import CssEditor from '$lib/components/CssEditor.svelte';
@@ -287,6 +287,16 @@
 	 * is all the margin gives back.
 	 */
 	let cssFull = $state(false);
+	/**
+	 * A drag on the title of the full-screen dialog takes it out of full
+	 * screen, as a window's does — see `dragByTitle`. Drawn at once, so the
+	 * drag can measure the dialog at its own size and carry on from there.
+	 */
+	function detachCss(): boolean {
+		if (!cssFull) return false;
+		flushSync(() => (cssFull = false));
+		return true;
+	}
 	/** Long lines in the CSS editor wrap to its width; off, they scroll sideways. For the session. */
 	let cssWrap = $state(true);
 	/**
@@ -3353,7 +3363,14 @@
 
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
-	<div class="modal wide css-dialog" class:full={cssFull} role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
+	<div
+		class="modal wide css-dialog"
+		class:full={cssFull}
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="css-title"
+		use:dragByTitle={{ detach: detachCss }}
+	>
 		<!-- The help dialog's header, and like it dragged by the title, so the
 		     card being styled can be seen beside it. The × is Cancel, as Esc
 		     and the backdrop are: only Save puts anything on the card.
