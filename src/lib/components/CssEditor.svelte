@@ -104,12 +104,16 @@
 		return () => cancelAnimationFrame(frame);
 	});
 
-	/** Put text in at the caret, replacing whatever is selected. */
-	export function insert(text: string) {
+	/**
+	 * Put text in place of the whole sheet, caret and scroll at the top. As an
+	 * edit rather than a new `value`, so Ctrl/Cmd + Z brings the old sheet back.
+	 */
+	export function replaceAll(text: string) {
 		const el = field;
 		if (!el) return;
-		apply({ start: el.selectionStart, end: el.selectionEnd, text, selStart: el.selectionStart + text.length, selEnd: el.selectionStart + text.length });
-		el.focus();
+		apply({ start: 0, end: el.value.length, text, selStart: 0, selEnd: 0 });
+		el.scrollTop = 0;
+		sync();
 	}
 
 	/**

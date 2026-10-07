@@ -301,7 +301,7 @@
 	 */
 	let cssDraft = $state('');
 	let cssBefore: string | undefined;
-	let cssEditor = $state<{ insert: (text: string) => void } | null>(null);
+	let cssEditor = $state<{ replaceAll: (text: string) => void } | null>(null);
 	/** The draft says something the card is not showing yet. */
 	const cssDirty = $derived((cssDraft.trim() || undefined) !== (template.css ?? undefined));
 	const cssCount = $derived(codeStats(cssDraft));
@@ -3406,7 +3406,9 @@
 		     actually needs is the names of the things they can reach, and a
 		     placeholder is where they will look for them. The prose that was here
 		     is in the README, where prose belongs. Starter puts that same text
-		     into the editor, where it can be edited rather than read. -->
+		     in the editor in place of what is there, so the kit is the whole
+		     sheet rather than spliced into the middle of a template's own rules
+		     — undo or Cancel brings them back. -->
 		<CssEditor
 			bind:this={cssEditor}
 			bind:value={cssDraft}
@@ -3424,8 +3426,8 @@
 			{#if !template.locked}
 				<button
 					class="starter"
-					onclick={() => cssEditor?.insert(cssPlaceholder)}
-					title="Put the starter sheet into the editor, to edit rather than read"
+					onclick={() => cssEditor?.replaceAll(cssPlaceholder)}
+					title="Replace the sheet with the starter kit: this template's facts and the selectors it can reach. Ctrl/Cmd + Z or Cancel brings the old sheet back."
 					aria-label="Starter sheet"
 				>
 					<Icon name="code-reference" size={15} /><span class="label">Starter</span>

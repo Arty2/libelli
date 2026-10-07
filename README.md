@@ -566,7 +566,9 @@ resize boxes directly, or type exact millimetres.
   `.theme-light`. The
   empty field's placeholder lists this template's own ids and these classes,
   and **Starter** — the code-reference glyph, its word on a desktop — puts
-  that same sheet into the editor, to edit rather than read. It opens with a
+  that same sheet in the editor **in place of** whatever CSS is there, to
+  edit rather than read; <kbd>Ctrl/Cmd</kbd>+<kbd>Z</kbd> or **Cancel** brings
+  the old sheet back. It opens with a
   comment that says what this template is — the page size and margins, the
   text defaults, the fonts it loads, every area's id, mode, place and size —
   and the few rules the card keeps, so the whole sheet can be pasted into a
