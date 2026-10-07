@@ -1335,6 +1335,25 @@
 		return () => clearTimeout(timer);
 	});
 
+	/**
+	 * Record what is on screen now, without waiting out the debounce. Undo
+	 * pressed within a third of a second of a change used to find that change
+	 * not yet in the history: it undid the one before it, or — on a fresh
+	 * session, where nothing had been recorded — nothing at all, and the drag
+	 * just made stayed where it was. The debounced recorder cannot record it a
+	 * second time: what undo applies changes the state, which cancels its
+	 * timer, and the state it then sees is the present.
+	 */
+	function flushHistory() {
+		if (!ready) return;
+		const before = history;
+		history = record(history, snapshot(), pending);
+		if (history !== before) {
+			toggledOff = false;
+			pending = '';
+		}
+	}
+
 	function applySnapshot(next: Snapshot) {
 		template = structuredClone(next.template);
 		dataset = structuredClone(next.dataset);
@@ -1359,7 +1378,8 @@
 	}
 
 	function undo() {
-		if (!undoable) return;
+		flushHistory();
+		if (!canUndo(history)) return;
 		toggledOff = false;
 		const what = undoLabel(history);
 		history = undoStep(history);
@@ -1401,7 +1421,8 @@
 			redo();
 			return;
 		}
-		if (!undoable) return;
+		flushHistory();
+		if (!canUndo(history)) return;
 		undo();
 		// After undo(), which clears it: the flag says "this chord took the last
 		// change off", and only this chord may put it back.

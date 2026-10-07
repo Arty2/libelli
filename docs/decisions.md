@@ -703,6 +703,15 @@ way, and a row that fits a phone is worth the two extra taps.
 
 ## `src/lib/history.ts`
 
+**Undo records first.** History is written on a 350ms debounce, so Undo pressed
+inside that third of a second used to find the latest change not yet recorded:
+it undid the change before, or on a fresh session nothing, and a drag just made
+stayed put. Undo, and the alternating chord, record what is on screen before
+stepping back. The debounced recorder cannot then record it again, since the
+state undo applies cancels its timer. Two actions inside the debounce are still
+one entry — an unlock and the drag straight after it go back together — which
+is the debounce's own bargain, kept.
+
 **A label rides alongside each state, never inside it.** States are compared by
 value to decide whether anything changed, and that comparison is what stops an
 applied undo recording itself straight back — so a label folded into the snapshot
