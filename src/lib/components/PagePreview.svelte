@@ -10,7 +10,7 @@
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { swipe } from '$lib/gestures';
-	import { HOLD_MS, vibrate } from '$lib/haptics';
+	import { HOLD_MS, TAP_MS, vibrate } from '$lib/haptics';
 	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
@@ -1111,6 +1111,11 @@
 	 * initial delay and then repeats, the same shape as a key repeat, because a
 	 * pad that only moves once per tap is unusable for anything but a final
 	 * millimetre.
+	 *
+	 * Each repeated step buzzes once, a tap's worth, so a hold counts out its
+	 * 1, 5 or 10mm under the thumb the way a ratchet clicks. Not the first
+	 * step: the press that started it already buzzed (haptics.ts), and two on
+	 * one step felt like a stutter.
 	 */
 	let repeat: ReturnType<typeof setTimeout> | null = null;
 
@@ -1126,7 +1131,10 @@
 		pushed = dy < 0 ? 'up' : dy > 0 ? 'down' : dx < 0 ? 'left' : 'right';
 		onnudge(dx, dy);
 		repeat = setTimeout(() => {
-			repeat = setInterval(() => onnudge(dx, dy), 90);
+			repeat = setInterval(() => {
+				onnudge(dx, dy);
+				vibrate(TAP_MS);
+			}, 90);
 		}, 400);
 	}
 
@@ -1194,8 +1202,57 @@
 		if (window.matchMedia('(pointer: coarse)').matches) panning = true;
 	});
 
+	/**
+	 * Momentum: a pad flicked as it is let go carries on and slows to a stop,
+	 * as a thing slid across a table does, rather than stopping dead under the
+	 * fingertip. The speed is the last ~80ms of the drag, so a slow, careful
+	 * placement has none and stays exactly where it was put. It runs through
+	 * the same clamp as the drag, so it can glide to the edge and not past it.
+	 */
+	let padTrail: { x: number; y: number; t: number }[] = [];
+	let padGlide: number | null = null;
+	/** Fraction of the speed kept per millisecond — about 0.32s to slow by two thirds. */
+	const PAD_FRICTION = 0.9965;
+	/** Below this, in px per ms, a release is a placement rather than a flick. */
+	const PAD_FLICK = 0.25;
+
+	function stopGlide() {
+		if (padGlide !== null) cancelAnimationFrame(padGlide);
+		padGlide = null;
+	}
+
+	// A glide still running when the stage goes away has nothing left to move.
+	$effect(() => stopGlide);
+
+	function glidePad(vx: number, vy: number) {
+		if (!host || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+		const stage = host.getBoundingClientRect();
+		let last = performance.now();
+		const frame = (now: number) => {
+			const dt = Math.min(32, now - last);
+			last = now;
+			const keep = Math.pow(PAD_FRICTION, dt);
+			vx *= keep;
+			vy *= keep;
+			// `right` and `bottom` grow towards the top left, the other way to
+			// the pointer's x and y.
+			padAt = {
+				right: stashPad(padAt.right - vx * dt, stage.width),
+				bottom: stashPad(padAt.bottom - vy * dt, stage.height)
+			};
+			if (Math.hypot(vx, vy) < 0.02) {
+				padGlide = null;
+				return;
+			}
+			padGlide = requestAnimationFrame(frame);
+		};
+		padGlide = requestAnimationFrame(frame);
+	}
+
 	function padPickup(event: PointerEvent) {
 		if (event.button !== 0) return;
+		stopGlide();
+		padTrail = [{ x: event.clientX, y: event.clientY, t: event.timeStamp }];
 		padPress = { x: event.clientX, y: event.clientY, from: { ...padAt } };
 		// Captured now, so a quick drag that leaves the button still brings the pad.
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -1221,6 +1278,17 @@
 	const PAD_CELL = 32;
 	const PAD_SIZE = PAD_CELL * 3;
 
+	/**
+	 * The pad may hang off the edge of the stage — a cross parked over the
+	 * corner of the page is still covering the corner, and tucking the far arm
+	 * of it out of sight is the cheapest way to get that corner back. What it
+	 * may not do is take the middle button with it: that button is how the pad
+	 * is picked up again, and a pad you cannot reach is a control you have
+	 * lost. So the far edge may reach the edge of the stage, and stop. The drag
+	 * and the glide after a flick both go through this.
+	 */
+	const stashPad = (value: number, extent: number) => Math.max(-PAD_CELL, Math.min(extent - PAD_SIZE + PAD_CELL, value));
+
 	function padMove(event: PointerEvent) {
 		if (!padDrag && padPress) {
 			if (Math.hypot(event.clientX - padPress.x, event.clientY - padPress.y) < PAD_SLOP) return;
@@ -1231,21 +1299,13 @@
 		if (!padDrag || !host) return;
 		event.preventDefault();
 		const stage = host.getBoundingClientRect();
-		/**
-		 * The pad may hang off the edge of the stage — a cross parked over the
-		 * corner of the page is still covering the corner, and tucking the far arm
-		 * of it out of sight is the cheapest way to get that corner back. What it
-		 * may not do is take the middle button with it: that button is how the pad
-		 * is picked up again, and a pad you cannot reach is a control you have
-		 * lost. So the far edge may reach the edge of the stage, and stop.
-		 */
-		const stash = (value: number, extent: number) =>
-			Math.max(-PAD_CELL, Math.min(extent - PAD_SIZE + PAD_CELL, value));
 		const wanted = {
 			right: padDrag.from.right - (event.clientX - padDrag.x),
 			bottom: padDrag.from.bottom - (event.clientY - padDrag.y)
 		};
-		padAt = { right: stash(wanted.right, stage.width), bottom: stash(wanted.bottom, stage.height) };
+		padAt = { right: stashPad(wanted.right, stage.width), bottom: stashPad(wanted.bottom, stage.height) };
+		padTrail.push({ x: event.clientX, y: event.clientY, t: event.timeStamp });
+		while (padTrail.length > 2 && event.timeStamp - padTrail[0].t > 80) padTrail.shift();
 		// How far the finger has gone on past where the pad stopped: pushed on
 		// far enough, letting go puts it away.
 		padPast = Math.max(Math.abs(wanted.right - padAt.right), Math.abs(wanted.bottom - padAt.bottom));
@@ -1318,7 +1378,17 @@
 			padThrown = true;
 			pushed = null;
 			vibrate(HOLD_MS);
+		} else if (padDrag && padTrail.length > 1) {
+			const first = padTrail[0];
+			const last = padTrail[padTrail.length - 1];
+			const dt = last.t - first.t;
+			if (dt > 0) {
+				const vx = (last.x - first.x) / dt;
+				const vy = (last.y - first.y) / dt;
+				if (Math.hypot(vx, vy) > PAD_FLICK) glidePad(vx, vy);
+			}
 		}
+		padTrail = [];
 		padPast = 0;
 		padPress = null;
 		padDrag = null;
@@ -1859,6 +1929,7 @@
 			onpointerup={stopNudge}
 			onpointercancel={stopNudge}
 			onpointerleave={stopNudge}
+			oncontextmenu={(e) => e.preventDefault()}
 		>
 			<!-- The tilt is its own element, under the pad that casts the shadow:
 			     a 3D transform and a filter on one element is a pairing Firefox
@@ -2304,6 +2375,13 @@
 		   its arms cast none. It is there all the time now — a thing that stands
 		   up off the page casts a shadow whether or not it is being moved. */
 		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.16));
+		/* A held arrow is a repeat, not a long press: no callout, no selection,
+		   and (with the context menu refused in the markup) none of the
+		   browser's own long-press answer — on Android a buzz and a highlight
+		   that came on top of the step's own. */
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
 	}
 
 	/* The cross itself, and what tilts: see the note in the markup. */

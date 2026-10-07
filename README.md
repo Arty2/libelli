@@ -1523,14 +1523,17 @@ Otherwise the arrow keys move the selected box wherever you are on the page. On
 a touch screen the same job is done by the four-way pad that appears beside the
 card in **zoom and pan** (the button under *+ Area*) — one cross with one outline, not five tiles in the shape of a cross — with
 a chip in the middle cycling between 1mm, 5mm and 10mm; holding an arrow keeps
-it moving. The cross is drawn as a raised thing — lit from the top left, thicker
+it moving, with a short buzz for every step it takes — not the long-press
+buzz a held button would otherwise get. The cross is drawn as a raised thing — lit from the top left, thicker
 along the bottom and right, casting one shadow of its own, and it goes down
 under a press — because on a touch screen it is the one control with no cursor
 to tell you it is a control. The middle is round and set in a shallow well: it
 is not a direction, it is the step and the grip, and it should not read as a
 fifth arm. The pad parks over the bottom-right corner of the page, which is
 exactly the corner you may have reached for it to nudge — drag that middle chip
-and the pad comes with your finger; a tap still cycles the step. It can be pushed off the edge of
+and the pad comes with your finger; a tap still cycles the step. Flick it as you
+let go and it slides on and slows to a stop; set it down slowly and it stays
+exactly where it was put. It can be pushed off the edge of
 the stage to get that corner back, as far as the middle chip: the arm you are
 not using goes out of sight, the chip you pick it up by never does. Throw it on
 past that, and let go, and it is put away — as holding the middle chip puts it
