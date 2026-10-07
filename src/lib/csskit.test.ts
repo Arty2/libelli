@@ -43,4 +43,12 @@ describe('cardVars', () => {
 		expect(vars['--margin-left']).toBe('5mm');
 		expect(vars['--bleed']).toBe('0mm');
 	});
+
+	it('routes the text color through color.ts: one it does not read never reaches the card', () => {
+		const t = starterTemplate();
+		t.defaults = { ...t.defaults, color: 'red; background: url(https://example.com/x)' };
+		expect(Object.fromEntries(cardVars(t))['--text-color']).toBe('#000000');
+		t.defaults = { ...t.defaults, color: '#1c1b19' };
+		expect(Object.fromEntries(cardVars(t))['--text-color']).toBe('#1c1b19');
+	});
 });

@@ -391,17 +391,17 @@
 				(pictureKind(box) ? 'Image' : 'Area')
 			: '';
 
-	/**
-	 * An area that hides when empty stays put where it has nothing to draw from
-	 * at all, in the editor — collapsed, it could not be clicked, selected or
-	 * moved, and it would be empty on every card there is. Bounds or no bounds.
-	 */
 	/** Any of an area's colors taken from a column; see `Box.colorFrom`. */
 	const linksColor = (box: Box) => !!(box.colorFrom?.text || box.colorFrom?.fill || box.colorFrom?.border);
 
 	/** The row fills this area: something drawn, even with no words in it. */
 	const filledByRow = (box: Box) => !!(row && box.colorFrom?.fill && parseColor(row[box.colorFrom.fill]));
 
+	/**
+	 * An area that hides when empty stays put where it has nothing to draw from
+	 * at all, in the editor — collapsed, it could not be clicked, selected or
+	 * moved, and it would be empty on every card there is. Bounds or no bounds.
+	 */
 	const hidden = $derived(
 		new Set(
 			template.boxes
@@ -504,12 +504,6 @@
 	const placed = (box: Box): Box => (verso && mirrors(box) ? mirrorBox(box, template.page.w) : box);
 
 	/**
-	 * The side of an area that faces the fold, for an area that follows it:
-	 * that edge is drawn as a fold line, dot and dash, so which areas mirror reads
-	 * off the page without opening the bar. Left on a right-hand page, right on
-	 * a left-hand one.
-	 */
-	/**
 	 * Where this page falls in the run, as an id and classes a template's CSS
 	 * can style: the covers by place — first, last, and the two inside them,
 	 * once there are enough pages for an inside — and, with facing pages, the
@@ -544,6 +538,12 @@
 			? `column-count:${box.columns.count};column-gap:${box.columns.gap}mm`
 			: undefined;
 
+	/**
+	 * The side of an area that faces the fold, for an area that follows it:
+	 * that edge is drawn as a fold line, dot and dash, so which areas mirror reads
+	 * off the page without opening the bar. Left on a right-hand page, right on
+	 * a left-hand one.
+	 */
 	const foldSide = (box: Box): 'left' | 'right' | null =>
 		template.facing === true && mirrors(box) ? (verso ? 'right' : 'left') : null;
 

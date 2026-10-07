@@ -1127,13 +1127,16 @@
 	 */
 	let pushed = $state<'up' | 'down' | 'left' | 'right' | 'centre' | null>(null);
 
-	function startNudge(dx: number, dy: number) {
+	function startNudge(event: PointerEvent, dx: number, dy: number) {
 		pushed = dy < 0 ? 'up' : dy > 0 ? 'down' : dx < 0 ? 'left' : 'right';
 		onnudge(dx, dy);
+		// Touch only, as every buzz in the app is (haptics.ts): a mouse held on
+		// an arrow has the pad going down under a pointer it can see.
+		const buzz = event.pointerType === 'touch' ? TAP_MS : 0;
 		repeat = setTimeout(() => {
 			repeat = setInterval(() => {
 				onnudge(dx, dy);
-				vibrate(TAP_MS);
+				vibrate(buzz);
 			}, 90);
 		}, 400);
 	}
@@ -1942,11 +1945,11 @@
 					class="up"
 					class:tied={verticalTied}
 					title={verticalTied ? `Gap ${padStep}mm smaller — closer to the area this one follows` : `Up ${padStep}mm`}
-					onpointerdown={() => startNudge(0, -padStep)}
+					onpointerdown={(e) => startNudge(e, 0, -padStep)}
 				>
 					<Icon name={verticalTied ? 'skip-back-filled' : 'caret-up'} size={verticalTied ? 16 : 30} />
 				</button>
-				<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
+				<button class="left" title="Left {padStep}mm" onpointerdown={(e) => startNudge(e, -padStep, 0)}><Icon name="caret-left" size={30} /></button>
 				<!-- The middle button carries the second gesture: drag it and the pad
 				     comes with your finger. A tap still cycles the step. -->
 				<button
@@ -1964,12 +1967,12 @@
 						padStep = PAD_STEPS[(PAD_STEPS.indexOf(padStep) + 1) % PAD_STEPS.length];
 					}}>{padStep}</button
 				>
-				<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={30} /></button>
+				<button class="right" title="Right {padStep}mm" onpointerdown={(e) => startNudge(e, padStep, 0)}><Icon name="caret-right" size={30} /></button>
 				<button
 					class="down"
 					class:tied={verticalTied}
 					title={verticalTied ? `Gap ${padStep}mm larger — further from the area this one follows` : `Down ${padStep}mm`}
-					onpointerdown={() => startNudge(0, padStep)}
+					onpointerdown={(e) => startNudge(e, 0, padStep)}
 				>
 					<Icon name={verticalTied ? 'skip-back-filled' : 'caret-down'} size={verticalTied ? 16 : 30} />
 				</button>

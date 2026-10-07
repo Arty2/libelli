@@ -1,3 +1,4 @@
+import { parseColor } from './color';
 import { cssIdent } from './css';
 import { fontStack } from './fonts';
 import { bleedFor } from './layout';
@@ -44,7 +45,10 @@ export function cardVars(template: Template): [string, string][] {
 		['--text-font', fontStack(d.font, d.font)],
 		['--text-size', `${round(d.size)}pt`],
 		['--text-leading', `${round(d.lineHeight)}`],
-		['--text-color', d.color]
+		// Through color.ts like every color that reaches a style attribute; the
+		// template's own was checked when it was read, and this is one more
+		// place it is written out.
+		['--text-color', parseColor(d.color) ?? '#000000']
 	];
 }
 
@@ -94,8 +98,11 @@ function selectors(template: Template): string[] {
 		'.box { }',
 		...areas,
 		'.page-number { }',
-		`${'#page-1 { }'.padEnd(18)} /* one page by its number */`,
-		`${'.cover { }'.padEnd(18)} /* also .back-cover, .recto, .verso */`,
+		// A page's id and classes sit on a box-less wrapper (`display: contents`),
+		// so a rule on the wrapper itself paints nothing: written in front of
+		// what they style, which is the form the kit shows.
+		`${'#page-1 .box { }'.padEnd(18)} /* one page by its number */`,
+		`${'.cover .box { }'.padEnd(18)} /* also .back-cover, .recto, .verso */`,
 		`${'.theme-dark { }'.padEnd(18)} /* screen only; also .theme-dark-page */`
 	];
 }

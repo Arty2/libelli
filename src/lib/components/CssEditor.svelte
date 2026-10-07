@@ -24,6 +24,7 @@
 	 * of that applies — `white-space: pre`, a horizontal scroll, and every line
 	 * one row.
 	 */
+	import { untrack } from 'svelte';
 	import { highlightCss, newlineEdit, tabEdit, braceEdit, type Edit } from '$lib/csscode';
 
 	let {
@@ -63,8 +64,16 @@
 	function measure() {
 		const el = field;
 		if (!el || !view) return;
-		scrollbar = el.offsetWidth - el.clientWidth;
-		heights = wrap ? Array.from(view.children, (line) => (line as HTMLElement).getBoundingClientRect().height) : [];
+		const bar = el.offsetWidth - el.clientWidth;
+		const next = wrap ? Array.from(view.children, (line) => (line as HTMLElement).getBoundingClientRect().height) : [];
+		// Kept when nothing moved, which is most keystrokes: a new array would
+		// redraw every number in the gutter for a line that wrapped exactly as
+		// it did before. The reads are one layout pass, taken once. Untracked,
+		// or the effect that measures would also rerun on its own writes.
+		untrack(() => {
+			if (bar !== scrollbar) scrollbar = bar;
+			if (next.length !== heights.length || next.some((h, i) => h !== heights[i])) heights = next;
+		});
 	}
 
 	$effect(() => {
