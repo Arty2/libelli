@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-	withSides,
 	FREE_STEP,
 	actualScale,
 	GRID_MAJOR,
@@ -333,18 +332,5 @@ describe('latchSpan', () => {
 
 	it('is nothing when no line is in reach', () => {
 		expect(latchSpan(30, 10, [0, 100], 1.5)).toBeNull();
-	});
-});
-
-
-describe('withSides', () => {
-	it('alternates by place among the pages going, not by their numbers', () => {
-		const going = [{ index: 0 }, { index: 2 }, { index: 3 }];
-		expect(withSides(going).map((p) => [p.index, p.side])).toEqual([
-			[0, 'recto'],
-			[2, 'verso'],
-			[3, 'recto']
-		]);
-		expect(withSides([])).toEqual([]);
 	});
 });

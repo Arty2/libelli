@@ -202,12 +202,30 @@ function lookupOf(spec: string): LookupSpec | null {
 	return { index: Number(which) - 1, name };
 }
 
+/**
+ * Each row's place in `rows`, built once per version of the table and shared
+ * by every card drawn from it. Searching the rows for the card's own on every
+ * `next` or `previous` made a run of N cards N² comparisons; the table is a
+ * new array whenever it changes, so the array itself is the key, and an old
+ * version's index goes when nothing holds the array any more.
+ */
+const placesOf = new WeakMap<readonly Row[], Map<Row, number>>();
+
+function placeOf(rows: readonly Row[], row: Row): number | undefined {
+	let places = placesOf.get(rows);
+	if (!places) {
+		places = new Map(rows.map((r, i) => [r, i]));
+		placesOf.set(rows, places);
+	}
+	return places.get(row);
+}
+
 /** The row a lookup lands on, from where the card is: undefined when there is none. */
 function lookupRow(lookup: LookupSpec, rows: readonly Row[] | undefined, row: Row | null): Row | undefined {
 	if (!rows) return undefined;
 	if (lookup.step === undefined) return rows[lookup.index];
-	const own = row ? rows.indexOf(row) : -1;
-	return own === -1 ? undefined : rows[own + lookup.step];
+	const own = row ? placeOf(rows, row) : undefined;
+	return own === undefined ? undefined : rows[own + lookup.step];
 }
 
 /** The words `%%…%%` means before it means any column. */

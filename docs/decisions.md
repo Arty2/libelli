@@ -2402,25 +2402,21 @@ paper: the cards keep their places and the sheet grows around them.
 
 ## `src/lib/components/PrintPreview.svelte`
 
-**A page's side of the fold is its place in the run, its number its row's.**
-With pages left out, numbers and sides part company: page 3 printed after page
-1 is the second page of the booklet, so it is a verso and is mirrored as one
-(`withSides` in layout.ts, a `side` prop on Card), while it keeps the number 3
-the table gives it — the rule the run already had. The caption's R or V shows
-the side, so ticking a page off visibly moves every one after it. A page left
-out has no side and shows a dash.
+**A page's side of the fold is its number's, ticked or not.** For a while a page
+left out turned every page after it over — page 3 printed after page 1 became a
+verso — so the run kept alternating. Taken back: leaving a page out of one
+print is not a request to re-impose the booklet, and whoever wants that
+deletes or moves the row, which renumbers the run. The caption's R or V is the
+number's side.
 
-**Spreads split at a going verso.** With facing pages the thumbnails are grouped
-into spreads, a new one at every left-hand page that prints, so an unticked
-page sits inside the spread around it rather than opening one of its own — the
-grouping follows the sides, and the sides follow the pages going. A spread
-that opens on a recto (the first) keeps an empty page-width to its left. The
-grid becomes a wrapping flex row there, because a spread with a page left out
-in it is three pages wide and no fixed column holds that. The fold is a
-dot-dash line out in the gap on each going page's bound side, not a narrower
+**Spreads are the numbers' pairs.** With facing pages the thumbnails are
+grouped into spreads, page 1 alone with an empty page-width to its left, then
+2 and 3, 4 and 5, so a pair never wraps across two rows. The grid becomes a
+wrapping flex row there, since a pair is two pages wide. The fold is a
+dot-dash line out in the gap on each printing page's bound side, not a narrower
 gap: a narrower gap was tried, and pages that close read as cramped rather than
-bound. A going verso and the going recto right after it would draw their lines
-on the same spot, so the verso draws it for both.
+bound. A verso and the recto after it, both printing, would draw their lines on
+the same spot, so the verso draws it for both.
 
 **One door to the printer.** Print opens the preview; the preview prints. The
 page selection lives there, keyed by row index and reset every time it opens —
@@ -2538,6 +2534,13 @@ never opened the list has news. Opening it, by hand or at start, marks this
 version read, so it does not open again.
 
 ## `src/lib/sw-policy.ts` and `src/service-worker.ts`
+
+**A tab come back to looks for an update.** The browser checks for a new worker
+only when the page loads, and an app left open in a tab can go days without
+one. Coming back to the tab after ten minutes or more (`dueForUpdateCheck`)
+calls `registration.update()`; what it finds is announced in the status bar
+like any update and waits for Reload. Ten minutes so that glancing away and
+back is not a request every time.
 
 **The worker only ever touches same-origin GETs.** `sw-policy.ts` decides, and it
 passes everything cross-origin straight through: the app promises to fetch

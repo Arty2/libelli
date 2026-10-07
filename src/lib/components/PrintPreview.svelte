@@ -10,7 +10,7 @@
 	import { withKey } from '$lib/keys';
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
-	import { bleedFor, mmToPx, pageSide, withSides } from '$lib/layout';
+	import { bleedFor, mmToPx, pageSide } from '$lib/layout';
 	import { planSheets, resolveImposition } from '$lib/imposition';
 	import type { Dataset, Mapping, Row, Template } from '$lib/types';
 
@@ -201,19 +201,17 @@
 	// will actually produce — so this preview can never show a grouping the
 	// output does not match.
 	const includedPages = $derived(
-		withSides(dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index)))
+		dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index))
 	);
-	/** Each going page's side of the fold, by its row; a page left out has none. */
-	const sideOf = $derived(new Map(includedPages.map((page) => [page.index, page.side])));
 
 	/**
-	 * The pages in spreads, with facing pages on: a new one starts at every
-	 * left-hand page that is going, so a page left out stays where it is, in
-	 * the spread around it, and does not split one. `lone` is a spread that
-	 * opens on a right-hand page — the first — which has an empty place to its
-	 * left. With nothing ticked there are no sides to go by, and the numbers'
-	 * own stand in.
+	 * A page's side of the fold is its number's, ticked or not: page 3 is a
+	 * right-hand page whether or not page 2 prints. Leaving a page out is not
+	 * a request to turn every page after it over — whoever wants that deletes
+	 * or moves the row, which renumbers the run.
 	 */
+	const sideAt = (i: number) => pageSide(i + 1);
+
 	/**
 	 * Where a page's fold line goes, if it gets one: the left of a going recto,
 	 * the right of a going verso — except a recto right after a going verso,
@@ -221,24 +219,23 @@
 	 * that print.
 	 */
 	function foldLineAt(i: number): 'left' | 'right' | null {
-		const side = template.facing ? sideOf.get(i) : undefined;
-		if (side === 'verso') return 'right';
-		if (side !== 'recto') return null;
-		return sideOf.get(i - 1) === 'verso' ? null : 'left';
+		if (!template.facing || excluded.has(i)) return null;
+		if (sideAt(i) === 'verso') return 'right';
+		return i > 0 && !excluded.has(i - 1) ? null : 'left';
 	}
 
+	/**
+	 * The pages in spreads, with facing pages on: each left-hand page and the
+	 * right-hand page after it, and the first page, a right-hand page, alone
+	 * with an empty place to its left (`lone`).
+	 */
 	const spreads = $derived.by(() => {
 		if (!template.facing) return null;
-		const sideAt = (i: number) => (includedPages.length ? sideOf.get(i) : pageSide(i + 1));
 		const out: { pages: number[]; lone: boolean }[] = [];
 		dataset.rows.forEach((_, i) => {
-			if (sideAt(i) === 'verso' || !out.length) out.push({ pages: [], lone: false });
+			if (sideAt(i) === 'verso' || !out.length) out.push({ pages: [], lone: sideAt(i) === 'recto' });
 			out[out.length - 1].pages.push(i);
 		});
-		for (const spread of out) {
-			const first = spread.pages.map(sideAt).find((side) => side);
-			spread.lone = first === 'recto';
-		}
 		return out;
 	});
 	const sheetGroups = $derived(
@@ -308,7 +305,6 @@
 					{row}
 					{mapping}
 					pageNumber={i + 1}
-					side={sideOf.get(i)}
 					pageCount={dataset.rows.length}
 					rows={lookupRows}
 					{background}
@@ -324,15 +320,11 @@
 		     about are the same shape. -->
 		<figcaption style="width:{mmToPx(outerW) * thumbScale}px">
 			<label>
-				<!-- Which side of the fold it prints on, with facing pages: by its
-				     place among the pages going, so it changes as others are
-				     ticked off. A page left out prints on neither. -->
+				<!-- Which side of the fold it is, with facing pages: its number's. -->
 				{#if template.facing}
-					{@const side = sideOf.get(i)}
-					<span
-						class="side"
-						title={side === 'recto' ? 'Recto — a right-hand page' : side === 'verso' ? 'Verso — a left-hand page' : 'Not printed, so on neither side'}
-					>{side === 'recto' ? 'R' : side === 'verso' ? 'V' : '–'}</span>
+					<span class="side" title={sideAt(i) === 'recto' ? 'Recto — a right-hand page' : 'Verso — a left-hand page'}
+						>{sideAt(i) === 'recto' ? 'R' : 'V'}</span
+					>
 				{/if}
 				<input
 					type="checkbox"
@@ -525,7 +517,6 @@
 		<Lightbox
 			{template}
 			{lookupRows}
-			sides={sideOf}
 			{dataset}
 			{mapping}
 			{background}
@@ -948,8 +939,8 @@
 		color: #aaa;
 	}
 
-	/* A letter's width, whichever letter, so the box and the number beside
-	   it hold still as pages are ticked and the sides move along. */
+	/* A letter's width, whichever letter, so every caption's box and number
+	   line up whether it says R or V. */
 	.side {
 		display: inline-block;
 		width: 1ch;

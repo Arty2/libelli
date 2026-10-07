@@ -1262,15 +1262,14 @@ what it does are one thing.
 A page keeps the number it has in the table however few of
 them go, so page 4 prints as page 4 even when it is the only one selected.
 With **Recto / Verso** on, each caption also says which side of the fold the
-page prints on — **R** or **V**, before the box — and that follows the pages
-that are going, not the numbers: untick page 2 and page 3 becomes a verso,
-mirrored to match, so the run still alternates. A page left out shows **–**.
-The pages are laid out as spreads, too: each left-hand page beside the
-right-hand page after it, never split across rows, with a dot-dash line in the
-gap on each printing page's bound side — the fold. A left-hand page and the
-right-hand page after it share one line between them. Page 1 is a right-hand page on its
-own, with the place to its left empty. A page left out stays where it is,
-inside the spread around it. On a phone the strip shows a spread at a time. A PNG
+page is — **R** or **V**, before the box — and that is its number's: unticking
+page 2 leaves page 3 a right-hand page. To turn the pages after it over, delete
+or move the row instead, which renumbers them. The pages are laid out as
+spreads, too: each left-hand page beside the right-hand page after it, never
+split across rows, with a dot-dash line in the gap on each printing page's
+bound side — the fold. A left-hand page and the right-hand page after it share
+one line when both print. Page 1 is a right-hand page on its own, with the
+place to its left empty. On a phone the strip shows a spread at a time. A PNG
 run names its files `stem_01.png`, padded to the width of the run, so a directory
 listing comes back in print order rather than as 1, 10, 2. The
 selection is for one print: reopening the preview starts from every page again,
@@ -1579,7 +1578,9 @@ libelli in its own window, with its own icon, off the taskbar or app drawer.
 The button is only there when the browser is actually offering an install, and
 goes once you have taken it.
 
-The copy is replaced a whole build at a time. When a new version has downloaded,
+The copy is replaced a whole build at a time. The app looks for a new one when
+it loads, and again when you come back to its tab after ten minutes or more
+away, so a tab left open for days still hears of one. When a new version has downloaded,
 the status bar says *New version — keep undo history or update now to restart
 this session* and offers **Update** rather than swapping it in underneath you:
 undo history lives in memory, and a restart you did not ask for would throw it

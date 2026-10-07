@@ -3,7 +3,7 @@
 	import { backgroundStyle } from '$lib/assets';
 	import { SHEET_MARK_GAP, SHEET_MARK_MAX, resolveImposition, type PlacedPage } from '$lib/imposition';
 	import { bleedFor } from '$lib/layout';
-	import type { Mapping, PageSide, Row, Template } from '$lib/types';
+	import type { Mapping, Row, Template } from '$lib/types';
 
 	/**
 	 * One physical sheet — the card's own bleed box when printing several to a
@@ -28,7 +28,7 @@
 		 * leave a cell empty and can stand half of them on their heads — see
 		 * `imposition.ts`.
 		 */
-		cells: PlacedPage<{ row: Row; index: number; side?: PageSide }>[];
+		cells: PlacedPage<{ row: Row; index: number }>[];
 		/** total rows in the dataset, for "n / total" numbering on each card */
 		pageCount: number;
 		/** every row, for a card's `%%lookup:…%%` — not only the ones on this sheet */
@@ -149,7 +149,6 @@
 							{rows}
 							{mapping}
 							pageNumber={cell.page.index + 1}
-							side={cell.page.side}
 							{pageCount}
 							{background}
 							{images}

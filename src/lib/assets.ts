@@ -106,7 +106,15 @@ export function dataUrlBytes(url: string): number {
 	if (comma === -1) return 0;
 	const head = url.slice(0, comma);
 	const body = url.slice(comma + 1).replace(/\s/g, '');
-	if (!/;base64$/i.test(head)) return decodeURIComponent(body).length;
+	if (!/;base64$/i.test(head)) {
+		// A stray `%` is enough to make this throw, and a weight is not worth
+		// an error: the text's own length is near enough.
+		try {
+			return decodeURIComponent(body).length;
+		} catch {
+			return body.length;
+		}
+	}
 	const padding = body.endsWith('==') ? 2 : body.endsWith('=') ? 1 : 0;
 	return Math.max(0, Math.floor((body.length * 3) / 4) - padding);
 }
