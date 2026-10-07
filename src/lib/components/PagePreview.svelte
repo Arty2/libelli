@@ -544,6 +544,60 @@
 	});
 
 	/**
+	 * The stage's edges moving under the page. Choosing an area opens its
+	 * options above the stage — on a phone a bar a third of the screen tall —
+	 * and the stage's top came down by that much, taking the page with it:
+	 * the area just tapped near the top slid away down the screen, which read
+	 * as the view jumping to the bar. So when an edge moves, the scroll moves
+	 * with it and the page stays where it was on screen, as far as there is
+	 * scroll to do it with; closing the bar puts it back the same way.
+	 *
+	 * And where that is not enough — a page with no room to scroll, or an area
+	 * already near the bottom — and the chosen area has ended up outside what
+	 * can be seen, it is scrolled to: the least distance that shows it, with a
+	 * margin, so a tall area shows its top. Only when the stage changes size,
+	 * not whenever the selection does: an area dragged off the edge on purpose
+	 * stays there.
+	 */
+	$effect(() => {
+		if (!host) return;
+		const node = host;
+		let last = node.getBoundingClientRect();
+		const observer = new ResizeObserver(() => {
+			const now = node.getBoundingClientRect();
+			const moved = { x: now.left - last.left, y: now.top - last.top };
+			last = now;
+			if (moved.x || moved.y) {
+				node.scrollLeft += moved.x;
+				node.scrollTop += moved.y;
+			}
+			revealSelection(now);
+		});
+		observer.observe(node);
+		return () => observer.disconnect();
+	});
+
+	const REVEAL_MARGIN = 16;
+
+	function revealSelection(view: DOMRect) {
+		if (!host || !selectedIds.length || pinch.size) return;
+		const r = selectionRect(selectedIds);
+		if (!r || r.page) return;
+		const into = (start: number, size: number, from: number, to: number) => {
+			if (size > to - from - 2 * REVEAL_MARGIN || start < from + REVEAL_MARGIN) return start - (from + REVEAL_MARGIN);
+			if (start + size > to - REVEAL_MARGIN) return start + size - (to - REVEAL_MARGIN);
+			return 0;
+		};
+		// The visible part: short of the scroller's own bars.
+		const right = view.left + host.clientWidth;
+		const bottom = view.top + host.clientHeight;
+		const dx = r.left + r.w < view.left || r.left > right ? into(r.left, r.w, view.left, right) : 0;
+		const dy = r.top + r.h < view.top + REVEAL_MARGIN || r.top > bottom - REVEAL_MARGIN ? into(r.top, r.h, view.top, bottom) : 0;
+		if (dx) host.scrollLeft += dx;
+		if (dy) host.scrollTop += dy;
+	}
+
+	/**
 	 * Zooming starts from what is on screen, not from the last number typed: a
 	 * step out of `fit` picks up the fitted scale, so the page does not jump.
 	 */

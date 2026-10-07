@@ -1279,6 +1279,16 @@ is chosen, unclamped, so what is under the fingers or the wheel stays under
 them even on the grey past the edge. The keys have no position and still zoom
 as they always did.
 
+**The page stays put when the stage's edge moves.** Choosing an area opens its
+options above the stage, on a phone a third of the screen, and the stage's top
+coming down carried the page with it: the area just tapped slid down the
+screen, which read as the view jumping to the bar. A resize of the scroller now
+scrolls by however far its top-left corner moved, so the page holds still where
+the scroll allows; and if the chosen area is still out of sight after that, it
+is scrolled into view by the least distance. Only on a resize, never on a
+change of selection alone, so an area dragged off the edge stays where it was
+put.
+
 **A gesture brings its own room to scroll.** The hold keeps a point still by
 scrolling, and below Fit — and for a while past it — the page is centred and
 there is nothing to scroll: the page grew about its middle, then lurched back
