@@ -515,18 +515,24 @@
 	 */
 	const pageHooks = $derived.by(() => {
 		const look = `theme-${theme}`;
-		if (pageNumber == null) return { id: undefined, classes: look };
+		if (pageNumber == null) return { id: undefined, place: undefined, classes: look };
 		const n = pageNumber;
 		const last = pageCount ?? 0;
-		const classes = [
-			n === 1 && 'cover',
-			last >= 4 && n === 2 && 'inside-cover',
-			last >= 4 && n === last - 1 && 'inside-back-cover',
-			last > 1 && n === last && 'back-cover',
-			template.facing === true && (verso ? 'verso' : 'recto'),
-			look
-		].filter(Boolean);
-		return { id: `page-${n}`, classes: classes.join(' ') };
+		// A page's place in the run is an id: there is only one of each, and at
+		// most one per page. On a wrapper of its own inside the page's, since an
+		// element has one id and `#page-N` already has it.
+		const place =
+			n === 1
+				? 'cover'
+				: last > 1 && n === last
+					? 'back-cover'
+					: last >= 4 && n === 2
+						? 'inside-cover'
+						: last >= 4 && n === last - 1
+							? 'inside-back-cover'
+							: undefined;
+		const classes = [template.facing === true && (verso ? 'verso' : 'recto'), look].filter(Boolean);
+		return { id: `page-${n}`, place, classes: classes.join(' ') };
 	});
 
 	/**
@@ -647,7 +653,7 @@
 		if (box.padding) {
 			parts.push(`padding:${pad.top}mm ${pad.right}mm ${pad.bottom}mm ${pad.left}mm`);
 		}
-		// `.box` is border-box, so a border eats into the width rather than adding
+		// `.area` is border-box, so a border eats into the width rather than adding
 		// to it: the box still occupies exactly the millimetres it was given.
 		if (box.borderWidth) {
 			const { top, right, bottom, left } = sidesOf(box.borderWidth);
@@ -1207,7 +1213,7 @@
 				// are measured in the page's own space: the handle turns with the
 				// box, so a delta would chase itself.
 				const node = event.currentTarget as HTMLElement;
-				const boxEl = node.closest('.box') as HTMLElement | null;
+				const boxEl = node.closest('.area') as HTMLElement | null;
 				const trimEl = boxEl?.offsetParent as HTMLElement | null;
 				if (!boxEl || !trimEl) break;
 				// Read the box's *layout* geometry, not its rendered rectangle: once
@@ -1954,14 +1960,16 @@
 			{@html styleTag(customCss)}
 		{/if}
 
-		<!-- The page itself, as a template's CSS can name it: `#page-3`, and
-		     `.cover`, `.inside-cover`, `.inside-back-cover`, `.back-cover`,
-		     `.recto`, `.verso` — see `pageHooks`. Inside the trim rather than on
-		     it, because css.ts scopes every rule to `.trim …`, so `.cover .box`
-		     is `.trim .cover .box` and needs the class between the two. No box
-		     of its own (`display: contents`): every area is still placed against
+		<!-- The page itself, as a template's CSS can name it: `#page-3`, its
+		     place — `#cover`, `#inside-cover`, `#inside-back-cover`,
+		     `#back-cover`, on a second wrapper — and `.recto`, `.verso` and the
+		     theme — see `pageHooks`. Inside the trim rather than on it, because
+		     css.ts scopes every rule to `.trim …`, so `#cover .area` is
+		     `.trim #cover .area` and needs the id between the two. No box of
+		     their own (`display: contents`): every area is still placed against
 		     the trim, and nothing measures differently. -->
 		<div class="page-hooks {pageHooks.classes}" id={pageHooks.id}>
+		<div class="page-hooks" id={pageHooks.place}>
 
 		{#if interactive && guides}
 			<!-- The page margins, as a guide, on a toggle of their own beside the
@@ -1995,7 +2003,7 @@
 			{@const look = colorsFromRow(box, row)}
 			{@const strokes = handStrokes(look)}
 			<div
-				class="box content-{box.slot ? 'field' : shownAsMedia(box.mode) ? 'image' : 'static'} mode-{box.mode}"
+				class="area content-{box.slot ? 'field' : shownAsMedia(box.mode) ? 'image' : 'static'} mode-{box.mode}"
 				class:outlined={bounds && !empty}
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
@@ -2392,6 +2400,7 @@
 			<span class="guide horizontal" style="top:{guide.y}mm"></span>
 		{/if}
 		</div>
+		</div>
 	</div>
 
 	{#if bleed > 0 && template.bleed.cropMarks}
@@ -2451,7 +2460,7 @@
 		display: contents;
 	}
 
-	.box {
+	.area {
 		position: absolute;
 		box-sizing: border-box;
 		overflow-wrap: break-word;
@@ -2509,7 +2518,7 @@
 	   min-height: 0 is load-bearing: a flex item refuses by default to shrink
 	   below its content height, so without it the content would keep spilling out
 	   of the fixed-height box and there would be nothing for overflow to cut. */
-	.box.clipped > .content {
+	.area.clipped > .content {
 		overflow: hidden;
 		min-height: 0;
 	}
@@ -2646,7 +2655,7 @@
 	/* The area a picture carried out of the Images bar would land in. Set by
 	   ImagesPanel as an attribute, so the card's own class handling cannot
 	   take it off mid-drag. */
-	.box:global([data-image-target]) {
+	.area:global([data-image-target]) {
 		outline: calc(2px * var(--ui-scale, 1)) solid var(--accent);
 		outline-offset: calc(1px * var(--ui-scale, 1));
 		background-color: color-mix(in srgb, var(--accent) 8%, transparent);
@@ -2691,7 +2700,7 @@
 		margin-top: 0;
 	}
 
-	.box.interactive {
+	.area.interactive {
 		cursor: move;
 		touch-action: none;
 	}
@@ -2699,7 +2708,7 @@
 	/* Zoom and pan: the areas hand a finger back to the page, which scrolls
 	   under it and pinches under two, instead of holding it for a drag. The
 	   handles keep their own touch-action: none, and so still drag. */
-	.card.panning .box {
+	.card.panning .area {
 		cursor: grab;
 		touch-action: pan-x pan-y;
 	}
@@ -2851,7 +2860,7 @@
 	   and a short area is exactly the one you most often want taller. Turning
 	   still has the lever, whose knob sits out to the side clear of the N and S
 	   handles, and the pivot can still be placed exactly from the bar. */
-	.box.cramped .handle {
+	.area.cramped .handle {
 		z-index: 6;
 	}
 
@@ -2956,7 +2965,7 @@
 		   than letting a slow font read as a broken one. Screen only, and off
 		   entirely for anyone who has asked for less motion. */
 		@media (prefers-reduced-motion: no-preference) {
-			.box.font-loading .content {
+			.area.font-loading .content {
 				animation: font-waiting 1.1s ease-in-out infinite;
 			}
 		}
@@ -3029,16 +3038,16 @@
 		   bounds. Locked wins when a box is both — it is the stronger refusal.
 		   The dash is coarser as well as red, because the overflow corner is
 		   already red and two reds a millimetre apart are one red. */
-		.box.grouped {
+		.area.grouped {
 			--bounds-color: rgba(124, 58, 237, 0.75);
 		}
 
-		.box.locked {
+		.area.locked {
 			--bounds-color: rgba(180, 35, 24, 0.8);
 		}
 
-		.box.locked .bounds rect,
-		.box.locked .bounds line {
+		.area.locked .bounds rect,
+		.area.locked .bounds line {
 			stroke-width: var(--line-thick);
 			stroke-dasharray: calc(var(--line) * 5) calc(var(--line) * 3);
 		}
@@ -3048,12 +3057,12 @@
 			stroke: var(--accent);
 		}
 
-		.card.frozen .box {
+		.card.frozen .area {
 			--bounds-color: rgba(0, 0, 0, 0.32);
 		}
 
-		.card.frozen .box.locked .bounds rect,
-		.card.frozen .box.locked .bounds line {
+		.card.frozen .area.locked .bounds rect,
+		.card.frozen .area.locked .bounds line {
 			stroke-width: var(--line);
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
@@ -3069,11 +3078,11 @@
 		/* Its dash the same length as the dashes beside it, so the dot is the
 		   one difference: 3 on a bound, 5 on a locked one's coarser dash. */
 		.bounds line.fold,
-		.card.frozen .box.locked .bounds line.fold {
+		.card.frozen .area.locked .bounds line.fold {
 			stroke-dasharray: var(--line) calc(var(--line) * 2) calc(var(--line) * 3) calc(var(--line) * 2);
 		}
 
-		.box.locked .bounds line.fold {
+		.area.locked .bounds line.fold {
 			stroke-dasharray: var(--line) calc(var(--line) * 2) calc(var(--line) * 5) calc(var(--line) * 2);
 		}
 
@@ -3118,7 +3127,7 @@
 
 		/* On a selected area the bound is not drawn — the selection is — but the
 		   trim line still is, in the selection's blue so it belongs to it. */
-		.box.selected .original-edge line {
+		.area.selected .original-edge line {
 			stroke: var(--accent);
 		}
 
@@ -3260,7 +3269,7 @@
 		   a flat grey they read as belonging to the card rather than to the area —
 		   which matters most when several areas are close enough for their badges
 		   to be nearer a neighbour's edge than their own. */
-		.box.selected .badge {
+		.area.selected .badge {
 			--edge: var(--bounds-color, var(--accent));
 			color: var(--bounds-color, var(--accent));
 		}
@@ -3270,14 +3279,14 @@
 		   and off entirely for anyone who has asked for less motion, who gets the
 		   status line saying what happened instead. */
 		@media (prefers-reduced-motion: no-preference) {
-			.box.flashing {
+			.area.flashing {
 				animation: found 900ms ease-out;
 			}
 
 			/* Says where a held picture will land. Screen only, like every other
 			   mark on this card, and drawn against the zoom so it is the same
 			   weight at 50% as at 200%. */
-			.box.dropping {
+			.area.dropping {
 				box-shadow: 0 0 0 calc(2px * var(--ui-scale, 1)) color-mix(in srgb, var(--accent) 90%, transparent);
 				background-color: color-mix(in srgb, var(--accent) 8%, transparent);
 			}
@@ -3320,7 +3329,7 @@
 		/* The exception, on the selected area itself: what is moored to it is
 		   filled. That one is the hub of the relationship the other badges are
 		   only pointing at, and it is on the area you already have. */
-		.box.selected .badge.moored {
+		.area.selected .badge.moored {
 			background: var(--accent-tint);
 		}
 

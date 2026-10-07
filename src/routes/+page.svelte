@@ -3392,7 +3392,7 @@
 			>
 				<Icon name={cssFull ? 'minimize' : 'maximize'} size={16} />
 			</button>
-			<button class="icon" onclick={cancelCss} title="Close without keeping changes" aria-label="Close">
+			<button class="icon" use:focusOnOpen onclick={cancelCss} title="Close without keeping changes" aria-label="Close">
 				<Icon name="close" size={16} />
 			</button>
 		</header>

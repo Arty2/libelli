@@ -25,6 +25,11 @@ describe('cssKit', () => {
 		expect(header).toContain('Evil * / body');
 	});
 
+	it('says which areas grow and which follow another', () => {
+		expect(kit).toMatch(/#title \{ \}\s+\/\* plain, [^*]*grows, below #category \*\//);
+		expect(kit).toMatch(/#sketch \{ \}\s+\/\* image, [\d ×,.]+\*\//);
+	});
+
 	it('names every named area once, by the id it wears', () => {
 		expect(kit).toContain('#notes ');
 		expect(kit).toContain('#sketch ');

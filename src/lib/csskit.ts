@@ -93,25 +93,41 @@ function header(template: Template): string[] {
 	];
 }
 
-/** Every named area as an empty rule, with its frame, then the page's hooks. */
+/**
+ * Every named area as an empty rule, with its frame and the two things about
+ * it a rule can be surprised by: that it grows past the height it was given
+ * (`overflow: grow`), and that its top follows another area's bottom (an
+ * anchor), so setting its `top` or `margin-top` fights the layout. A clipped
+ * area that stands where it is put — the usual — says nothing more.
+ */
 function selectors(template: Template): string[] {
 	const seen = new Set<string>();
+	const idOf = (boxId: string) => {
+		const target = template.boxes.find((b) => b.id === boxId);
+		const id = cssIdent(target?.slot ?? '');
+		return id ? `#${id}` : 'an unnamed area';
+	};
 	const areas = template.boxes.flatMap((b) => {
 		const id = cssIdent(b.slot ?? '');
 		if (!id || seen.has(id)) return [];
 		seen.add(id);
-		return [`${`#${id} { }`.padEnd(18)} /* ${b.mode}, ${round(b.x)} ${round(b.y)}, ${round(b.w)} × ${round(b.h)} */`];
+		const notes = [
+			b.overflow === 'grow' && 'grows',
+			b.anchor && `below ${idOf(b.anchor.to)}`
+		].filter(Boolean);
+		const frame = `${b.mode}, ${round(b.x)} ${round(b.y)}, ${round(b.w)} × ${round(b.h)}${notes.length ? `; ${notes.join(', ')}` : ''}`;
+		return [`${`#${id} { }`.padEnd(21)} /* ${inComment(frame)} */`];
 	});
 	return [
-		'.box { }',
+		'.area { }',
 		...areas,
 		'.page-number { }',
-		// A page's id and classes sit on a box-less wrapper (`display: contents`),
-		// so a rule on the wrapper itself paints nothing: written in front of
+		// A page's id and classes sit on box-less wrappers (`display: contents`),
+		// so a rule on one of them itself paints nothing: written in front of
 		// what they style, which is the form the kit shows.
-		`${'#page-1 .box { }'.padEnd(18)} /* one page by its number */`,
-		`${'.cover .box { }'.padEnd(18)} /* also .back-cover, .recto, .verso */`,
-		`${'.theme-dark .box { }'.padEnd(18)} /* screen only; also .theme-dark-page */`
+		`${'#page-1 .area { }'.padEnd(21)} /* one page by its number */`,
+		`${'#cover .area { }'.padEnd(21)} /* also #back-cover, .recto, .verso */`,
+		`${'.theme-dark .area { }'.padEnd(21)} /* screen only; also .theme-dark-page */`
 	];
 }
 

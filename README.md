@@ -547,15 +547,15 @@ resize boxes directly, or type exact millimetres.
   `url()` pointing off this machine are stripped, so a template's CSS cannot
   reach the network at all.
   Each area wears its own **Name** as an id, so `#Job-Title { … }` reaches that
-  one area and nothing else; `.box` reaches all of them. Every area also wears
+  one area and nothing else; `.area` reaches all of them. Every area also wears
   two classes: where its content comes from — `.content-field`,
   `.content-static` or `.content-image` — and its mode — `.mode-plain`,
   `.mode-markdown`, `.mode-image`, `.mode-color` or `.mode-qr`. A page can
-  be reached as a whole too: `#page-3` by its number; `.cover` and
-  `.back-cover` for the first and last pages, and, once there are four or
-  more, `.inside-cover` and `.inside-back-cover` for the two just inside
+  be reached as a whole too: `#page-3` by its number; `#cover` and
+  `#back-cover` for the first and last pages, and, once there are four or
+  more, `#inside-cover` and `#inside-back-cover` for the two just inside
   them; and with **Recto / Verso** on, `.recto` and `.verso`. Write them in
-  front of what they style — `.cover .box { … }`, `.verso #Title { … }`.
+  front of what they style — `#cover .area { … }`, `.verso #Title { … }`.
   The page in the editor also says which theme it is seen in —
   `.theme-light`, `.theme-dark`, or `.theme-dark-page` when the page is
   inverted too — so something that only the screen shows, like the starter's
@@ -1538,8 +1538,9 @@ is not a direction, it is the step and the grip, and it should not read as a
 fifth arm. The pad parks over the bottom-right corner of the page, which is
 exactly the corner you may have reached for it to nudge — drag that middle chip
 and the pad comes with your finger; a tap still cycles the step. Flick it as you
-let go and it slides on and slows to a stop; set it down slowly and it stays
-exactly where it was put. It can be pushed off the edge of
+let go and it slides on — heavily — and slows to a stop; set it down slowly
+and it stays exactly where it was put. Meeting the edge of the stage, by a
+drag or a slide, it buzzes once. It can be pushed off the edge of
 the stage to get that corner back, as far as the middle chip: the arm you are
 not using goes out of sight, the chip you pick it up by never does. Throw it on
 past that, and let go, and it is put away — as holding the middle chip puts it

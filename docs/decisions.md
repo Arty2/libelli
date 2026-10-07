@@ -272,7 +272,7 @@ already existed, rather than a third state to keep in step.
 
 **An area's name is its CSS id, and `cssIdent` is the one place a name becomes
 one.** A template's own CSS is the escape hatch for everything the bar does not
-offer, and it was reaching areas by nothing but `.box` — all of them at once.
+offer, and it was reaching areas by nothing but `.box` (now `.area`) — all of them at once.
 Naming one needs a selector, and the area already has a name the author typed;
 `cssIdent` is what turns that name into something a selector can carry. Case is
 kept, because the name as typed is what the author is looking at while writing
@@ -774,11 +774,14 @@ would one column, and a growing one grows to the longest. Words only — a
 picture or a QR code split into columns is a broken picture. Absent is one
 column; a count under two is read as absent.
 
-**A page's own id and classes sit on a box-less wrapper inside the trim.**
-`#page-N`, `.cover`, `.inside-cover`, `.inside-back-cover`, `.back-cover`,
-`.recto` and `.verso` let a template's CSS style a page as a whole. css.ts
-scopes every rule to `.trim …`, so `.cover .box` becomes `.trim .cover .box`,
-and the class has to be on something between the two: classes on the trim
+**A page's own ids and classes sit on box-less wrappers inside the trim.**
+`#page-N`, `#cover`, `#inside-cover`, `#inside-back-cover`, `#back-cover`,
+`.recto` and `.verso` let a template's CSS style a page as a whole. The places
+are ids, not classes, because there is one of each and at most one a page; an
+element has one id and `#page-N` holds the outer wrapper's, so the place is on
+a second wrapper inside it. css.ts scopes every rule to `.trim …`, so
+`#cover .area` becomes `.trim #cover .area`, and the hook has to be on
+something between the two: classes on the trim
 itself would never match, and moving the scope out to the card would have
 changed what `:root` means in every stylesheet already written. The wrapper is
 `display: contents`, so nothing is laid out or measured against it. Inside
@@ -882,7 +885,7 @@ its old behaviour there.
 
 **The area's name is the element's `id`.** That is the whole point of a name you
 can type: `#Job-Title { … }` in the template's own CSS reaches one area, where
-`.box` reaches all of them. It is spread as an object rather than written as
+`.area` reaches all of them. It is spread as an object rather than written as
 `id={…}` so an unnamed area carries no `id` attribute at all rather than an
 empty one. The trade-off, said out loud: a sheet of several cards renders the
 same design several times, so each id appears once per card. CSS is happy with
@@ -911,11 +914,11 @@ straightedge to cut against. `max(0mm, …)` on the length is what keeps a bleed
 thinner than the gap from drawing a negative mark.
 
 **A box's content lives in `.content`.** Handles and badges are absolutely
-positioned children of `.box` that hang past its edges, so measuring the box's
+positioned children of `.area` that hang past its edges, so measuring the box's
 own `scrollHeight` reports overflow on every selected box. The wrapper is what
 gets measured, and it is also the single flex item `justify-content` places.
 
-**Vertical alignment makes a box a flex column.** That is why `.box` is
+**Vertical alignment makes a box a flex column.** That is why `.area` is
 `display: flex`: `justify-content` is the only thing that places content
 vertically in a box whose height may be a `min-height`. The cost is that child
 margins no longer collapse out of the box, which the existing
@@ -933,8 +936,8 @@ the scaled card, so a 14px handle is nine pixels under the finger at 62%.
 multiplied by it, so a target is the size it was drawn at whatever the zoom.
 
 **A clipped box cuts its content, not its chrome.** The clip is CSS on
-`.box.clipped > .content`, never on `.box`: the handles, pivot and badges hang
-off `.box` as siblings of `.content`, so a clip on `.box` would eat its own
+`.area.clipped > .content`, never on `.area`: the handles, pivot and badges hang
+off `.area` as siblings of `.content`, so a clip on `.area` would eat its own
 selection chrome. The alternative was to suppress the clip in the
 editor the way `.card.editing` does, but a box is set to clip precisely so its
 content is cut at its edge: not cutting it in the editor would break WYSIWYG for
