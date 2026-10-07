@@ -581,7 +581,10 @@ resize boxes directly, or type exact millimetres.
   The button left of its × takes it **full screen** — no margins round it,
   and the editor as tall as the window — and back, as does a double-click on
   its title. It stays that way for the next time you open it until you
-  reload. On a phone it always opens full screen.
+  reload. On a phone it always opens full screen. **Text Wrap**, beside
+  Starter, folds long lines to the editor's width — on by default, the line
+  numbers standing as tall as the lines they count; off, a long line scrolls
+  sideways instead. On a phone both are a glyph in a square, without the word.
   The editor numbers its lines and colours them as you type. It indents with
   tabs: <kbd>Tab</kbd> and <kbd>Shift</kbd>+<kbd>Tab</kbd> move the line or the
   whole selection, <kbd>Enter</kbd> carries the indent of the line above and

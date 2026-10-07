@@ -67,7 +67,7 @@ src/lib/
     PrintSettingsPanel.svelte  Per Sheet, orientation, sheet background — shared with the print screen
     PrintSheet.svelte   one physical sheet — off-screen in PrintRoot, thumbnails in PrintPreview
     Lightbox / SheetLightbox  one card, or one sheet, full screen
-    CssEditor.svelte    the template's stylesheet: numbers, colour, tabs — over a real textarea
+    CssEditor.svelte    the template's stylesheet: numbers, colour, tabs, wrap — over a real textarea
     BitmapEditor.svelte the drawing surface, hosted in DataTable; saves a base64 PNG
     ImagesPanel.svelte  stored pictures, their weight, the folder; one large, to crop or turn
     Tooltip.svelte      every `title` as a tip: hover, or press and hold on touch

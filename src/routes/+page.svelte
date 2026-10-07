@@ -286,6 +286,8 @@
 	 * is all the margin gives back.
 	 */
 	let cssFull = $state(false);
+	/** Long lines in the CSS editor wrap to its width; off, they scroll sideways. For the session. */
+	let cssWrap = $state(true);
 	/**
 	 * The sheet being edited, and the sheet the card is drawn with.
 	 *
@@ -3410,6 +3412,7 @@
 			bind:value={cssDraft}
 			placeholder={cssPlaceholder}
 			readonly={!!template.locked}
+			wrap={cssWrap}
 			onapply={applyCss}
 		/>
 		<!-- Left to right: the one button that puts text in, then the three ways
@@ -3417,7 +3420,7 @@
 		     the door. A locked template can be read and not written, so the three
 		     that write are not here at all: disabled buttons on a row this short
 		     read as something broken rather than as something withheld. -->
-		<div class="modal-actions">
+		<div class="modal-actions css-actions">
 			{#if !template.locked}
 				<button
 					class="starter"
@@ -3428,6 +3431,17 @@
 					<Icon name="code-reference" size={15} /><span class="label">Starter</span>
 				</button>
 			{/if}
+			<!-- How the sheet is shown, not what is in it, so here for a locked
+			     template too: reading a long line needs it as much as writing one. -->
+			<button
+				class="wrap-toggle"
+				aria-pressed={cssWrap}
+				onclick={() => (cssWrap = !cssWrap)}
+				title={cssWrap ? 'Text wrap is on — long lines fold to the editor\'s width' : 'Text wrap is off — long lines scroll sideways'}
+				aria-label="Text wrap"
+			>
+				<Icon name="text-wrap" size={15} /><span class="label">Text Wrap</span>
+			</button>
 			<span class="spacer"></span>
 			<button onclick={cancelCss}>{template.locked ? 'Close' : 'Cancel'}</button>
 			{#if !template.locked}
@@ -4558,17 +4572,36 @@
 		}
 	}
 
-	/* The CSS dialog's starter sheet: Carbon's code-reference glyph, and the
-	   word only where there is room for it, as the bars' buttons do. */
-	.modal-actions .starter {
+	/* The CSS dialog's Starter and Text Wrap: a Carbon glyph each, and the
+	   word only where there is room for it, as the bars' buttons do. Without
+	   the word, square: as tall as the buttons on the right, and as wide.
+
+	   The row's line height is pinned so that height is a number rather than
+	   whatever `normal` comes to in this face — 0.75rem type at 1.25, its 6px
+	   of padding and its border — and the square is that number both ways.
+	   `aspect-ratio` would have been the shorter rule; a stretched flex item's
+	   height does not feed it, and the buttons came out 17px wide. */
+	.css-actions button {
+		line-height: 1.25;
+	}
+
+	.css-actions :is(.starter, .wrap-toggle) {
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
 	}
 
 	@media (max-width: 900px) {
-		.modal-actions .starter .label {
+		.css-actions :is(.starter, .wrap-toggle) .label {
 			display: none;
+		}
+
+		.css-actions :is(.starter, .wrap-toggle) {
+			--square: calc(0.75rem * 1.25 + 14px);
+			width: var(--square);
+			height: var(--square);
+			padding: 0;
+			justify-content: center;
 		}
 	}
 
