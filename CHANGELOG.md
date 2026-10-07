@@ -8,7 +8,7 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.27.11 — 2026-10-07
+## 0.27.12 — 2026-10-07
 
 - Recto / Verso: the fold drawn dot-dash, spreads and R or V in the print preview.
 - An area's words in 2 to 6 columns; a pinch zooms about the fingers.

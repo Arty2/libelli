@@ -73,7 +73,9 @@ function header(template: Template): string[] {
 		`/* Page ${round(page.w)} × ${round(page.h)} mm, margins ${round(m.top)} ${round(m.right)} ${round(m.bottom)} ${round(m.left)}, bleed ${round(bleedFor(template.bleed))}${template.facing ? ', facing pages' : ''}.`,
 		`   Text ${d.font} ${round(d.size)}pt/${round(d.lineHeight)} ${d.color}.`,
 		...wrap(`Fonts: ${fonts.join(', ')}.`, '   '),
-		...wrap(`Vars: ${cardVars(template).map(([name]) => name).join(' ')}.`, '   '),
+		// Read-only, and it says so: they are the page settings coming out to the
+		// sheet, and a sheet that sets one changes only what its own rules read.
+		...wrap(`Read-only vars: ${cardVars(template).map(([name]) => name).join(' ')}.`, '   '),
 		'   Scoped to the card; mm and pt; no @import or remote url().',
 		'   The bars win unless !important. */'
 	];
@@ -92,7 +94,8 @@ function selectors(template: Template): string[] {
 		'.box { }',
 		...areas,
 		'.page-number { }',
-		`${'.cover { }'.padEnd(18)} /* also .back-cover, #page-1, .recto, .verso */`,
+		`${'#page-1 { }'.padEnd(18)} /* one page by its number */`,
+		`${'.cover { }'.padEnd(18)} /* also .back-cover, .recto, .verso */`,
 		`${'.theme-dark { }'.padEnd(18)} /* screen only; also .theme-dark-page */`
 	];
 }

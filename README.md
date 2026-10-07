@@ -574,7 +574,10 @@ resize boxes directly, or type exact millimetres.
   the rules the card keeps — then an empty rule for each named area, with
   its mode, place and size beside it, and the page's hooks. The whole sheet
   can be pasted into a chat with an AI model and come back as CSS for this
-  page. Being a comment,
+  page. The variables are read-only: the card sets them from the page
+  settings, and a sheet that sets one (on `:root`, which here means the
+  card) changes only what its own rules read — never the page's size,
+  margins or bleed, which only the bars change. Being a comment,
   it sets nothing. The card also carries the page's numbers as variables a
   rule can read: `--page-w`, `--page-h`, `--margin-top` and the other three
   edges, `--bleed`, `--text-font`, `--text-size`, `--text-leading` and
