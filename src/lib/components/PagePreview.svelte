@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { flushSync, tick } from 'svelte';
 	import Card from './Card.svelte';
+	import type { Theme } from '$lib/theme';
 	import Icon from './Icon.svelte';
 	import { isDark } from '$lib/color';
 	import { SHORTCUTS, withKey } from '$lib/keys';
@@ -33,6 +34,8 @@
 		zoom: 'fit' | 'actual' | number;
 		/** 1-based position of the previewed row, for the page number */
 		pageNumber: number | null;
+		/** the theme on screen, glances included — the page's `theme-…` class */
+		theme: Theme;
 		/** the area being typed into on the card itself, if any */
 		editingId?: string | null;
 		/** areas hanging off the sheet, in part or entirely, and so cut or unreachable */
@@ -118,6 +121,7 @@
 		selectedIds,
 		zoom,
 		pageNumber,
+		theme,
 		editingId = null,
 		strayIds = [],
 		picking = false,
@@ -1456,6 +1460,7 @@
 				{smartGuides}
 				{scale}
 				{pageNumber}
+				{theme}
 				{background}
 				{images}
 				interactive={true}

@@ -14,7 +14,7 @@ file under **What's new** — press the version number in the status bar.
 - An area's words in 2 to 6 columns; a pinch zooms about the fingers.
 - `%%page:current%%`, `%%page:total%%`, `%%lookup:next:…%%` and `previous`.
 - Reindex beside the table's Lock; Reset in the menu for Getting Started.
-- CSS can style a page: `#page-3`, `.cover`, `.inside-cover`, `.back-cover`, `.recto`.
+- CSS can style a page: `#page-3`, `.cover`, `.inside-cover`, `.back-cover`, `.recto`, `.theme-dark`.
 - Drawings save at a third the size; in the table, a dot, Draw and their size.
 
 ## 0.26.3 — 2026-10-02

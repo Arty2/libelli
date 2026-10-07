@@ -764,6 +764,19 @@ covers need four pages, or a two-page run would call its back cover the inside
 of its front. The id repeats wherever the same page is drawn twice — the
 editor and a thumbnail — as an area's id already does.
 
+**The theme it is seen in is a class on the same wrapper.** `.theme-light`,
+`.theme-dark` or `.theme-dark-page`, because the interface's own
+`data-theme` is on `<html>`, and css.ts maps `html` to the card: a
+template had no way to say "in the dark". Three exclusive classes rather
+than one `.theme-dark` for both, because the two darks need opposite
+answers — in `dark` the page is turned back and shows colours as written;
+in `dark-page` its words and shadows are inverted but a fill is not, so the
+same rule that makes a word light in one makes it dark in the other. Only
+the editor's page takes the theme (+page.svelte's `shownTheme`, which
+follows a glance too); every other Card defaults to light, because print, an
+exported PNG and the lightbox all show the page the right way round, and a
+dark rule leaking into print would be printed.
+
 **A touch on the card drops the click that lands off it.** A touch's click
 is aimed at what is under the finger when it lifts. Pressing an area selects
 it on the way down, and on a phone that brings the area bar into the options

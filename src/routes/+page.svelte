@@ -185,10 +185,16 @@
 
 	/** Light or dark — see theme.ts. app.html has already applied it before the first paint. */
 	let theme = $state<Theme>('light');
+	/** What is on screen: the theme, or the other dark while a glance lasts — the page's `theme-…` class. */
+	let shownTheme = $state<Theme>('light');
+	function showTheme(shown: Theme) {
+		shownTheme = shown;
+		applyTheme(shown);
+	}
 	function setTheme(next: Theme) {
 		theme = next;
 		peeking = false;
-		applyTheme(next);
+		showTheme(next);
 		saveTheme(next);
 	}
 
@@ -206,7 +212,7 @@
 		peekTimer = setTimeout(() => {
 			peekTimer = null;
 			peeking = true;
-			applyTheme(peekTheme(theme) ?? theme);
+			showTheme(peekTheme(theme) ?? theme);
 		}, after);
 	}
 	function peekEnd() {
@@ -214,7 +220,7 @@
 		peekTimer = null;
 		if (!peeking) return;
 		peeking = false;
-		applyTheme(theme);
+		showTheme(theme);
 	}
 
 	/**
@@ -569,7 +575,10 @@
 			'#page-1 { }           /* a page by its number */',
 			'.cover { }            /* the first page; also .inside-cover, */',
 			'.back-cover { }       /* .inside-back-cover and the last page */',
-			'.recto { }            /* with Recto / Verso on: also .verso */'
+			'.recto { }            /* with Recto / Verso on: also .verso */',
+			'',
+			'.theme-dark { }       /* the editor seen in the dark theme; */',
+			'.theme-dark-page { }  /* the page inverted too; .theme-light */'
 		].join('\n');
 	});
 
@@ -906,7 +915,7 @@
 	// again here changes nothing on screen.
 	$effect(() => {
 		untrack(() => setTextSize(loadTextSize()));
-		untrack(() => (theme = loadTheme()));
+		untrack(() => (theme = shownTheme = loadTheme()));
 		return zoomAsText(() => untrack(() => textSize), setTextSize);
 	});
 
@@ -3113,6 +3122,7 @@
 			{selectedIds}
 			zoom={ui.zoom}
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
+			theme={shownTheme}
 			{activeRow}
 			rowCount={dataset.rows.length}
 			rows={lookupRows}

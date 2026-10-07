@@ -8,6 +8,7 @@
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
 	import { isParked } from '$lib/boxops';
+	import type { Theme } from '$lib/theme';
 	import { HOLD_SLOP } from '$lib/gestures';
 	import {
 		FREE_STEP,
@@ -75,6 +76,12 @@
 		pageNumber?: number | null;
 		/** how many cards there are, for the X/Y form of the page number */
 		pageCount?: number | null;
+		/**
+		 * The interface's theme, as this page is seen in it — `theme-light`,
+		 * `theme-dark` or `theme-dark-page` on the page, for a template's CSS.
+		 * Light unless said: only the editor's page is ever seen inverted.
+		 */
+		theme?: Theme;
 		/** the area whose words are being typed straight into the card, if any */
 		editingId?: string | null;
 		/**
@@ -152,6 +159,7 @@
 		background = null,
 		images = {},
 		pageCount = null,
+		theme = 'light',
 		editingId = null,
 		flashIds = [],
 		onselect,
@@ -506,7 +514,8 @@
 	 * is not a page of anything.
 	 */
 	const pageHooks = $derived.by(() => {
-		if (pageNumber == null) return { id: undefined, classes: '' };
+		const look = `theme-${theme}`;
+		if (pageNumber == null) return { id: undefined, classes: look };
 		const n = pageNumber;
 		const last = pageCount ?? 0;
 		const classes = [
@@ -514,7 +523,8 @@
 			last >= 4 && n === 2 && 'inside-cover',
 			last >= 4 && n === last - 1 && 'inside-back-cover',
 			last > 1 && n === last && 'back-cover',
-			template.facing === true && (verso ? 'verso' : 'recto')
+			template.facing === true && (verso ? 'verso' : 'recto'),
+			look
 		].filter(Boolean);
 		return { id: `page-${n}`, classes: classes.join(' ') };
 	});

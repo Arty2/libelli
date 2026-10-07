@@ -555,7 +555,15 @@ resize boxes directly, or type exact millimetres.
   `.back-cover` for the first and last pages, and, once there are four or
   more, `.inside-cover` and `.inside-back-cover` for the two just inside
   them; and with **Recto / Verso** on, `.recto` and `.verso`. Write them in
-  front of what they style — `.cover .box { … }`, `.verso #Title { … }`. The
+  front of what they style — `.cover .box { … }`, `.verso #Title { … }`.
+  The page in the editor also says which theme it is seen in —
+  `.theme-light`, `.theme-dark`, or `.theme-dark-page` when the page is
+  inverted too — so something that only the screen shows, like the starter's
+  post-it off the page's edge, can go dark with the rest:
+  `.theme-dark #notes { … }`. Remember that the inverted page turns words,
+  borders and shadows over but shows an area's fill as written. A printed
+  page, an exported picture and a page in the lightbox are always
+  `.theme-light`. The
   empty field's placeholder lists this template's own ids and these classes,
   and **Starter** — the code-reference glyph, its word on a desktop — puts
   that same sheet into the editor, to edit rather than read. The dialog can be dragged by its title, to see the card it is styling,
