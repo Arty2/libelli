@@ -2466,13 +2466,16 @@
 		padding: 0;
 	}
 
-	/* A locked table's words are faded a little, so the state is on the thing
-	   it applies to and not only on the button: read-only cells otherwise look
-	   exactly like cells that refuse your typing for no reason. It used to be
-	   ruled in the accent instead, which made a table you could not change the
-	   loudest thing on the screen. Faded, not greyed out: it is still there to
-	   be read. */
-	.locked td textarea {
+	/* A locked table's words — its cells and its column names — are faded a
+	   little, so the state is on the thing it applies to and not only on the
+	   button: read-only cells otherwise look exactly like cells that refuse
+	   your typing for no reason. It used to be ruled in the accent instead,
+	   which made a table you could not change the loudest thing on the
+	   screen. Faded, not greyed out: it is still there to be read. Before the
+	   keyword red below, which still wins: a column name that will never
+	   print is worth saying even on a locked table. */
+	.locked td textarea,
+	.locked .column-name {
 		color: #6b6b6b;
 	}
 
