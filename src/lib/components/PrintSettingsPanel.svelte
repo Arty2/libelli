@@ -33,7 +33,7 @@
 		/**
 		 * Recto / Verso, the page setting, repeated here. Only on the print screen:
 		 * it decides which edge is outer, and so the order a zine folds in, and
-		 * that is where it is found wanting — in page setup it is already beside
+		 * that is where it is found wanting — in the page bar it is already beside
 		 * the page size.
 		 */
 		showFacing?: boolean;
@@ -205,7 +205,7 @@
 	}
 </script>
 
-<!-- The card's own bleed, here as well as in Page Setup: it is a print
+<!-- The card's own bleed, here as well as in the page bar: it is a print
      decision, and the print screen is where you are when you notice the cards
      need one. -->
 <fieldset class="group">
@@ -300,7 +300,7 @@
 			<input
 				type="checkbox"
 				checked={!!template.facing}
-				title="Odd rows are right-hand pages and even rows their facing left-hand pages — the same setting as Recto / Verso in page setup"
+				title="Odd rows are right-hand pages and even rows their facing left-hand pages — the same setting as Recto / Verso in the page bar"
 				disabled={pageFrozen}
 				onchange={(e) => ontemplatechange({ ...template, facing: e.currentTarget.checked || undefined })}
 			/>

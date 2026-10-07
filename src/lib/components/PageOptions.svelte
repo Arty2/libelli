@@ -48,7 +48,12 @@
 		onmappingchange: (mapping: Mapping) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
-		onresettemplate: () => void;
+		/** absent where there is no starter to reset to — see `starterOfTemplate` */
+		onresettemplate?: () => void;
+		/** Lay the page out from the table's columns — see `openMagic` in the page. */
+		onmagiclayout?: () => void;
+		/** whether there is a table to lay a page out from */
+		hasColumns?: boolean;
 		/** every saved template, and which of them is loaded */
 		library: TemplateEntry[];
 		templateId: string;
@@ -80,6 +85,8 @@
 		editorFonts,
 		ontemplatechange,
 		onresettemplate,
+		onmagiclayout,
+		hasColumns = false,
 		library,
 		templateId,
 		onselecttemplate,
@@ -367,7 +374,7 @@
 	They share options-bar.css rather than a <style> block, because Svelte would
 	otherwise scope a copy of the same 240 lines to each.
 -->
-	<div class="options" aria-label="Page setup">
+	<div class="options" aria-label="Page settings">
 		<!-- The lock, then what this is called, with everything that acts on the
 		     template as a whole behind the caret — the lock outside the menu,
 		     because it is a state you need to see, not an errand. -->
@@ -385,10 +392,31 @@
 					<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
 					{pageFrozen ? 'Unlock' : 'Lock'}
 				</button>
+				<!-- Writing a page out of the columns. Pressed rarely — once, at the
+				     start, if at all — so it lives here with the other things done
+				     to the template as a whole, not in the column beside the page
+				     where it was always in reach and seldom wanted. Its own dialog
+				     says how many areas it would replace, with Cancel. -->
+				{#if onmagiclayout}
+					<button
+						class="css layout"
+						onclick={onmagiclayout}
+						disabled={pageFrozen}
+						title={pageFrozen
+							? 'Lay the page out from your columns — unlock the design first'
+							: hasColumns
+								? 'Lay the page out from your columns — a card worked out from your headings and your data'
+								: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
+					>
+						<Icon name="blog" size={16} /> <span class="label">Layout</span>
+					</button>
+				{/if}
+				<!-- No word before it: the name in it says what it is, and the bar
+				     needed the room more than the label. -->
 				<label class="field picker" bind:this={pickerEl}>
-					<span>Template</span>
 					<input
 						class="w-8"
+						aria-label="Template name"
 						value={template.name}
 						placeholder="Untitled card"
 						disabled={pageFrozen}
@@ -427,9 +455,11 @@
 							     things to do, not templates to open. -->
 							<li role="separator"><hr /></li>
 							<li role="none">
-								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onnewtemplate)}>
+								<!-- Not frozen by the lock: it starts another template and leaves
+								     this one exactly as it is, which is what the lock protects. -->
+								<button role="menuitem" onclick={fromMenu(onnewtemplate)}>
 									<span class="tick" aria-hidden="true"><Icon name="add" size={14} /></span>
-									New Template…
+									New Template
 								</button>
 							</li>
 							<!-- Never over the loaded design: it opens a copy of the starter that
@@ -445,6 +475,8 @@
 									A5 Starter Booklet
 								</button>
 							</li>
+							<!-- Files in and out, apart from the templates to start. -->
+							<li role="separator"><hr /></li>
 							<li role="none">
 								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onimporttemplate)}>
 									<span class="tick" aria-hidden="true"><Icon name="document-import" size={14} /></span>
@@ -459,19 +491,23 @@
 							</li>
 							<li role="separator"><hr /></li>
 							<!-- The two that lose something, together and in red: one puts the
-							     starter card back, the other takes this template away. -->
-							<li role="none">
-								<button
-									class="danger"
-									role="menuitem"
-									disabled={pageFrozen}
-									title="Put the A5 Starter Booklet over this design. Your rows are not touched."
-									onclick={fromMenu(onresettemplate)}
-								>
-									<span class="tick" aria-hidden="true"><Icon name="reset" size={14} /></span>
-									Reset…
-								</button>
-							</li>
+							     starter back, the other takes this template away. Reset only on
+							     a template that began as a starter: on any other there is
+							     nothing of its own to put back. -->
+							{#if onresettemplate}
+								<li role="none">
+									<button
+										class="danger"
+										role="menuitem"
+										disabled={pageFrozen}
+										title="Put the starter this template began as back over it. Your rows are not touched."
+										onclick={fromMenu(onresettemplate)}
+									>
+										<span class="tick" aria-hidden="true"><Icon name="reset" size={14} /></span>
+										Reset…
+									</button>
+								</li>
+							{/if}
 							<li role="none">
 								<button
 									class="danger"

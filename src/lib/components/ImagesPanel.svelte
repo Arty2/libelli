@@ -6,6 +6,7 @@
 	import {
 		chooseImageFolder,
 		deleteImage,
+		weigh,
 		folderAvailable,
 		forgetImageFolder,
 		imageFolder,
@@ -250,7 +251,6 @@
 			)
 	);
 
-	/** Kilobytes under a megabyte, one decimal above it; nobody wants 1483 KB. */
 	/**
 	 * What a drawing is saved as: where it is, and the type its data URL says —
 	 * `link-row-1.png`. The type is read off the URL, which has already been
@@ -264,9 +264,6 @@
 
 	/** A drawing's pixels, read off its thumbnail as it loads. */
 	let drawnSizes = $state<Record<string, { w: number; h: number }>>({});
-
-	const weigh = (bytes: number) =>
-		bytes >= 1024 * 1024 ? `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 	async function choose() {
 		const chosen = await chooseImageFolder();

@@ -33,6 +33,7 @@ src/lib/
   boxops.ts       box and selection transforms: duplicate, delete, group, lock, nudge
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
   gestures.ts     swipe; tooltip.ts where a tip goes; haptics.ts the buzz for a press
+  scrolledge.ts   which edges of a scroller have more, for the shadow that says so
   complete.ts     the column names `%%` offers; placeholders.ts what `%%name%%` resolves to
   modal.ts        the two-Enter rule every dialog with a default action shares
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
@@ -40,6 +41,7 @@ src/lib/
   qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
   hand.ts         a border drawn by hand: seeded wobble -> SVG paths, in mm
   bitmap.ts       the pixel budget a drawn area gets, and pointing at it
+  pngpack.ts      a drawing saved as a palette PNG, a bit or two a pixel
   tile.ts         a drawing cropped to its ink, for an area that repeats
   photo.ts        crop frames and write-back types, for editing a stored picture
   table.ts        column reorder, row sorting

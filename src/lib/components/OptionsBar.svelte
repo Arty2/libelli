@@ -9,6 +9,7 @@
 	 */
 	import BoxOptions from './BoxOptions.svelte';
 	import PageOptions from './PageOptions.svelte';
+	import { scrollEdges } from '$lib/scrolledge';
 	import type { TemplateEntry } from '$lib/storage';
 	import type { Box, Dataset, FontRef, Mapping, Row, Template } from '$lib/types';
 
@@ -26,7 +27,10 @@
 		onmappingchange: (mapping: Mapping) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
-		onresettemplate: () => void;
+		/** absent where there is no starter to reset to — see `starterOfTemplate` */
+		onresettemplate?: () => void;
+		onmagiclayout?: () => void;
+		hasColumns?: boolean;
 		library: TemplateEntry[];
 		/** fonts this browser knows that the template is not carrying */
 		editorFonts: FontRef[];
@@ -62,8 +66,12 @@
 	}
 </script>
 
-{#if section === 'page'}
-	<PageOptions {...rest} />
-{:else if rest.selected}
-	<BoxOptions bind:this={boxBar} {...rest} selected={rest.selected} />
-{/if}
+<!-- A frame for the shadow that says the bar scrolls on: drawn inside the bar,
+     it would scroll away with the settings it is pointing at. -->
+<div class="bar-frame" use:scrollEdges={(frame) => frame.querySelector<HTMLElement>(':scope > .options')}>
+	{#if section === 'page'}
+		<PageOptions {...rest} />
+	{:else if rest.selected}
+		<BoxOptions bind:this={boxBar} {...rest} selected={rest.selected} />
+	{/if}
+</div>

@@ -16,6 +16,7 @@
 		type Grid
 	} from '$lib/bitmap';
 	import { frameBetween, framePixels, isCrop, type Frame } from '$lib/photo';
+	import { packDrawing } from '$lib/pngpack';
 	import type { Box } from '$lib/types';
 
 	/**
@@ -93,13 +94,18 @@
 	 * in here: Save and Delete sit in the panel's own bar, where every picture's
 	 * do, so the board's rows are only what you draw with.
 	 */
-	export function save() {
-		const data = exported();
+	export async function save() {
+		// What is being saved is the board as it is now: a stroke made while it
+		// is being packed is not saved by this, and must not be marked as if it
+		// were.
+		const at = edits;
+		const board = { ...grid };
+		const data = await exported();
 		if (!data) return;
 		// The usual board is the absence of the field, the same rule the rest of
 		// the format follows.
-		onsave(data, isDefaultBoard(grid) ? undefined : { ...grid });
-		savedEdits = edits;
+		onsave(data, isDefaultBoard(board) ? undefined : board);
+		savedEdits = at;
 	}
 
 	// Read once: the box cannot change while this is up, and the board is the
@@ -509,12 +515,39 @@
 	 * drawn — see `Card.svelte` — so the cell keeps what was drawn and changing
 	 * an area to repeat and back changes nothing about the table.
 	 */
-	const exported = () => canvas?.toDataURL('image/png') ?? null;
+	/**
+	 * As a palette PNG — a few hundred bytes for a drawing, where the canvas's
+	 * own PNG is four bytes a pixel; see pngpack.ts. The canvas's own when the
+	 * board holds more colours than a palette does (a photograph pasted on),
+	 * or cannot be read at all.
+	 */
+	async function exported(): Promise<string | null> {
+		if (!canvas) return null;
+		try {
+			const ctx = context();
+			const packed = ctx && (await packDrawing(ctx.getImageData(0, 0, canvas.width, canvas.height)));
+			if (packed) return packed;
+		} catch {
+			// Fall through to the canvas's own encoding.
+		}
+		return canvas?.toDataURL('image/png') ?? null;
+	}
 
-	/** What this drawing will cost the cell it is going into, as it is drawn. */
+	/**
+	 * What this drawing will cost the cell it is going into, as it is drawn.
+	 * Packed a moment after the last stroke rather than after every pixel of
+	 * it, and only the latest answer kept: packing is asynchronous, and an
+	 * earlier stroke's could land after a later one's.
+	 */
+	let measuring: ReturnType<typeof setTimeout> | undefined;
+	let measured = 0;
 	function measure() {
-		const data = exported();
-		weight = data ? Math.round(data.length / 102.4) / 10 : null;
+		clearTimeout(measuring);
+		measuring = setTimeout(async () => {
+			const turn = ++measured;
+			const data = await exported();
+			if (turn === measured) weight = data ? Math.round(data.length / 102.4) / 10 : null;
+		}, 120);
 	}
 
 	function paint(at: { x: number; y: number }) {

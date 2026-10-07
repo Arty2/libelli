@@ -27,6 +27,8 @@ export const ICONS: Record<string, string> = {
 	'help': '<path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2Zm0,26A12,12,0,1,1,28,16,12,12,0,0,1,16,28Z"/><circle cx="16" cy="23.5" r="1.5"/><path d="M17,8H15.5A4.49,4.49,0,0,0,11,12.5V13h2v-.5A2.5,2.5,0,0,1,15.5,10H17a2.5,2.5,0,0,1,0,5H15v4.5h2V17a4.5,4.5,0,0,0,0-9Z"/>',
 	'grid': '<path d="M12,4H6A2,2,0,0,0,4,6v6a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V6A2,2,0,0,0,12,4Zm0,8H6V6h6Z"/><path d="M26,4H20a2,2,0,0,0-2,2v6a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V6A2,2,0,0,0,26,4Zm0,8H20V6h6Z"/><path d="M12,18H6a2,2,0,0,0-2,2v6a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V20A2,2,0,0,0,12,18Zm0,8H6V20h6Z"/><path d="M26,18H20a2,2,0,0,0-2,2v6a2,2,0,0,0,2,2h6a2,2,0,0,0,2-2V20A2,2,0,0,0,26,18Zm0,8H20V20h6Z"/>',
 	'settings': '<path d="M30,8h-4.1c-0.5-2.3-2.5-4-4.9-4s-4.4,1.7-4.9,4H2v2h14.1c0.5,2.3,2.5,4,4.9,4s4.4-1.7,4.9-4H30V8z M21,12c-1.7,0-3-1.3-3-3	s1.3-3,3-3s3,1.3,3,3S22.7,12,21,12z"/><path d="M2,24h4.1c0.5,2.3,2.5,4,4.9,4s4.4-1.7,4.9-4H30v-2H15.9c-0.5-2.3-2.5-4-4.9-4s-4.4,1.7-4.9,4H2V24z M11,20c1.7,0,3,1.3,3,3	s-1.3,3-3,3s-3-1.3-3-3S9.3,20,11,20z"/>',
+	'array-numbers': '<path d="M11,19v2h-6v-2h2v-5h-2v-2h2v-1h2v8h2ZM19,19h-4v-2h2c1.1025,0,2-.897,2-2v-2c0-1.103-.8975-2-2-2h-4v2h4v2h-2c-1.103,0-2,.897-2,2v4h6v-2ZM25,11h-4v2h4v2h-3v2h3v2h-4v2h4c1.1025,0,2-.8975,2-2v-6c0-1.103-.8975-2-2-2ZM2,4v4h2v-4h4v-2h-4c-1.1046,0-2,.8954-2,2ZM28,2h-4v2h4v4h2v-4c0-1.1046-.8954-2-2-2ZM4,28v-4h-2v4c0,1.1046.8954,2,2,2h4v-2h-4ZM28,24v4h-4v2h4c1.1046,0,2-.8954,2-2v-4h-2Z"/>',
+	'code-reference': '<path d="M4 20 4 22 8.586 22 2 28.586 3.414 30 10 23.414 10 28 12 28 12 20 4 20z"/><path d="M30 10 24 4 22.586 5.414 27.172 10 22.586 14.586 24 16 30 10z"/><path d="M8.944 9.001H24.974V11.001H8.944z" transform="rotate(-74.995 16.96 10)"/><path d="M4 10 10 4 11.414 5.414 6.828 10 11.414 14.586 10 16 4 10z"/>',
 	'locked': '<path d="M24,14H22V8A6,6,0,0,0,10,8v6H8a2,2,0,0,0-2,2V28a2,2,0,0,0,2,2H24a2,2,0,0,0,2-2V16A2,2,0,0,0,24,14ZM12,8a4,4,0,0,1,8,0v6H12ZM24,28H8V16H24Z"/>',
 	'unlocked': '<path d="M24,14H12V8a4,4,0,0,1,8,0h2A6,6,0,0,0,10,8v6H8a2,2,0,0,0-2,2V28a2,2,0,0,0,2,2H24a2,2,0,0,0,2-2V16A2,2,0,0,0,24,14Zm0,14H8V16H24Z"/>',
 	'print': '<path d="M28,9H25V3H7V9H4a2,2,0,0,0-2,2V21a2,2,0,0,0,2,2H7v6H25V23h3a2,2,0,0,0,2-2V11A2,2,0,0,0,28,9ZM9,5H23V9H9ZM23,27H9V17H23Zm5-6H25V15H7v6H4V11H28Z"/>',
@@ -97,11 +99,17 @@ export const ICONS: Record<string, string> = {
 	'layers': '<path d="M16,24a.9967.9967,0,0,1-.4741-.12l-13-7L3.4741,15.12,16,21.8643,28.5259,15.12l.9482,1.7607-13,7A.9967.9967,0,0,1,16,24Z"/><path d="M16,30a.9967.9967,0,0,1-.4741-.12l-13-7L3.4741,21.12,16,27.8643,28.5259,21.12l.9482,1.7607-13,7A.9967.9967,0,0,1,16,30Z"/><path d="M16,18a.9967.9967,0,0,1-.4741-.12l-13-7a1,1,0,0,1,0-1.7607l13-7a.9982.9982,0,0,1,.9482,0l13,7a1,1,0,0,1,0,1.7607l-13,7A.9967.9967,0,0,1,16,18ZM5.1094,10,16,15.8643,26.8906,10,16,4.1358Z"/>',
 	'activity': '<path d="M12,29a1,1,0,0,1-.92-.62L6.33,17H2V15H7a1,1,0,0,1,.92.62L12,25.28,20.06,3.65A1,1,0,0,1,21,3a1,1,0,0,1,.93.68L25.72,15H30v2H25a1,1,0,0,1-.95-.68L21,7,12.94,28.35A1,1,0,0,1,12,29Z"/>',
 	'arrows-horizontal': '<polygon points="11.41 26.59 7.83 23 28 23 28 21 7.83 21 11.41 17.41 10 16 4 22 10 28 11.41 26.59"/><polygon points="28 10 22 4 20.59 5.41 24.17 9 4 9 4 11 24.17 11 20.59 14.59 22 16 28 10"/>',
-	// Carbon has no closed pair of shears. This is its `cut` shut the whole way:
-	// the same rings (r 5 and 3) and 2-unit arms, but the rings brought together
-	// until they all but touch, as a closed pair's handles do, and the blades one
-	// narrow wedge on the axis. Drawn here, in Carbon's grid and weights.
-	'cut-closed': '<path fill-rule="evenodd" d="M19.5 10.5a5 5 0 1 0 10 0a5 5 0 1 0-10 0ZM21.5 10.5a3 3 0 1 1 6 0a3 3 0 1 1-6 0Z"/><path fill-rule="evenodd" d="M19.5 21.5a5 5 0 1 0 10 0a5 5 0 1 0-10 0ZM21.5 21.5a3 3 0 1 1 6 0a3 3 0 1 1-6 0Z"/><path d="M17.76 16.23 16.64 14.57 20.04 12.27 21.16 13.93Z"/><path d="M17.76 15.77 16.64 17.43 20.04 19.73 21.16 18.07Z"/><path d="M3 15.6 18 14.9 18 17.1 3 16.4Z"/>',
+	// Carbon has no closed pair of shears. This is its `cut` shut the whole way,
+	// as the real thing shuts: `cut` taken apart into its two rigid halves —
+	// each a blade running straight past the pivot (18.24, 16) to meet its ring
+	// on the ring's outer edge, and that ring — and each half turned 30° about
+	// the pivot onto the axis. So nothing is redrawn: the rings keep their size
+	// (r 5 and 3) and where the blade joins them, and swing in until they
+	// overlap; the blades lie on each other as one 2-unit bar. Moved left so
+	// the rings clear the right edge, and the bar then cut back at its tip to
+	// x 3 — where the open blades start — for the same margin on the left: the
+	// blades give up the room, not the rings, and the pivot stays put.
+	'cut-closed': '<path d="M3 14.98 26.49 15.01 22.52 17.01 3 16.99Z"/><path d="M3 17.02 26.49 16.99 22.52 14.99 3 15.01Z"/><path fill-rule="evenodd" d="M21.51 20.05a5 5 0 1 0 10 0a5 5 0 1 0-10 0ZM23.51 20.05a3 3 0 1 1 6 0a3 3 0 1 1-6 0Z"/><path fill-rule="evenodd" d="M21.51 11.95a5 5 0 1 0 10 0a5 5 0 1 0-10 0ZM23.51 11.95a3 3 0 1 1 6 0a3 3 0 1 1-6 0Z"/>',
 	'cut': '<path d="M26.5,19.63,20.24,16l6.26-3.63a5,5,0,0,0-1.21-9.2A5.19,5.19,0,0,0,24,3a5,5,0,0,0-4.33,7.53,5,5,0,0,0,2.39,2.1l-3.82,2.21L4,6.6,3,8.34,16.24,16,3,23.68l1,1.74,14.24-8.26,3.82,2.21a5,5,0,0,0-2.39,2.1A5,5,0,0,0,24,29a5.19,5.19,0,0,0,1.29-.17,5,5,0,0,0,1.21-9.2ZM21.4,9.53a3,3,0,0,1,1.1-4.12,3,3,0,0,1,4.1,1.11,3,3,0,0,1-1.1,4.11h0A3,3,0,0,1,21.4,9.53Zm5.2,16a3,3,0,0,1-4.1,1.11,3,3,0,0,1-1.1-4.12,3,3,0,0,1,4.1-1.1h0A3,3,0,0,1,26.6,25.48Z"/>',
 
 	'unlink': '<path d="M5 3.59H7V8.42H5z" transform="rotate(-45.01 5.996 6.005)"/><path d="M25 23.58H27V28.409999999999997H25z" transform="rotate(-44.99 25.995 25.999)"/><path d="M11 2H13V6H11z"/><path d="M2 11H6V13H2z"/><path d="M26 19H30V21H26z"/><path d="M19 26H21V30H19z"/><path d="M16.58,21.07l-3.71,3.72a4,4,0,1,1-5.66-5.66l3.72-3.72L9.51,14,5.8,17.72a6,6,0,0,0-.06,8.54A6,6,0,0,0,10,28a6.07,6.07,0,0,0,4.32-1.8L18,22.49Z"/><path d="M15.41,10.93l3.72-3.72a4,4,0,1,1,5.66,5.66l-3.72,3.72L22.49,18l3.71-3.72a6,6,0,0,0,.06-8.54A6,6,0,0,0,22,4a6.07,6.07,0,0,0-4.32,1.8L14,9.51Z"/>',

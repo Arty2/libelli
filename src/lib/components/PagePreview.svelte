@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { flushSync, tick } from 'svelte';
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
 	import { isDark } from '$lib/color';
@@ -71,10 +72,6 @@
 		onundo: () => void;
 		onredo: () => void;
 		onaddbox: () => void;
-		/** position every area from the columns — the button below Area, and its hold */
-		onmagiclayout: () => void;
-		/** whether there is any data to lay out; the button says so rather than hiding */
-		hasColumns: boolean;
 		onmenu: (id: string, x: number, y: number) => void;
 		/** the drag under an open menu has become a drag; see Card's own prop */
 		onmenuclose: () => void;
@@ -147,8 +144,6 @@
 		onundo,
 		onredo,
 		onaddbox,
-		onmagiclayout,
-		hasColumns,
 		onmenu,
 		onmenuclose,
 		modalOpen,
@@ -543,6 +538,99 @@
 	});
 
 	/**
+	 * The stage's edges moving under the page. Choosing an area opens its
+	 * options above the stage — on a phone a bar a third of the screen tall —
+	 * and the stage's top came down by that much, taking the page with it:
+	 * the area just tapped near the top slid away down the screen, which read
+	 * as the view jumping to the bar. So when an edge moves, the scroll moves
+	 * with it and the page stays where it was on screen, as far as there is
+	 * scroll to do it with; closing the bar puts it back the same way.
+	 *
+	 * And where that is not enough — a page with no room to scroll, or an area
+	 * already near the bottom — and the chosen area has ended up outside what
+	 * can be seen, it is scrolled to: the least distance that shows it, with a
+	 * margin, so a tall area shows its top. Only when the stage changes size,
+	 * not whenever the selection does: an area dragged off the edge on purpose
+	 * stays there.
+	 *
+	 * Both ways: the bar closing — the area deselected, or a second one
+	 * chosen — reveals what was chosen until a moment ago, as the bar opening
+	 * reveals what is chosen now.
+	 */
+	$effect(() => {
+		if (!host) return;
+		const node = host;
+		let last = node.getBoundingClientRect();
+		// From before the resize. A stage that grows shortens what can be
+		// scrolled, and the browser clamps the scroll back by itself before
+		// this hears of it — added to the edge's own move, a page near the
+		// bottom went twice as far as the bar it was making up for. Its scroll
+		// event even arrives first, in the same frame; so a scroll that
+		// landed in the frame of the resize is taken to be that clamp, and the
+		// one before it is used.
+		let scrolled = { x: node.scrollLeft, y: node.scrollTop };
+		let before = scrolled;
+		let scrolledAt = 0;
+		const onScroll = () => {
+			before = scrolled;
+			scrolled = { x: node.scrollLeft, y: node.scrollTop };
+			scrolledAt = performance.now();
+		};
+		const observer = new ResizeObserver(() => {
+			const now = node.getBoundingClientRect();
+			const moved = { x: now.left - last.left, y: now.top - last.top };
+			last = now;
+			if (moved.x || moved.y) {
+				const from = performance.now() - scrolledAt < 20 ? before : scrolled;
+				node.scrollLeft = from.x + moved.x;
+				node.scrollTop = from.y + moved.y;
+			}
+			revealSelection(now);
+			before = scrolled = { x: node.scrollLeft, y: node.scrollTop };
+			scrolledAt = 0;
+		});
+		node.addEventListener('scroll', onScroll, { passive: true });
+		observer.observe(node);
+		return () => {
+			observer.disconnect();
+			node.removeEventListener('scroll', onScroll);
+		};
+	});
+
+	/** What was chosen until a moment ago, and when it stopped being — see `revealSelection`. */
+	let lastChosen: { ids: string[]; until: number } = { ids: [], until: 0 };
+	$effect(() => {
+		if (selectedIds.length) lastChosen = { ids: [...selectedIds], until: Infinity };
+		else if (lastChosen.until === Infinity) lastChosen = { ...lastChosen, until: performance.now() };
+	});
+
+	const REVEAL_MARGIN = 16;
+
+	function revealSelection(view: DOMRect) {
+		if (!host || pinch.size) return;
+		const ids = selectedIds.length
+			? selectedIds
+			: performance.now() - lastChosen.until < 1000
+				? lastChosen.ids.filter((id) => template.boxes.some((b) => b.id === id))
+				: [];
+		if (!ids.length) return;
+		const r = selectionRect(ids);
+		if (!r || r.page) return;
+		const into = (start: number, size: number, from: number, to: number) => {
+			if (size > to - from - 2 * REVEAL_MARGIN || start < from + REVEAL_MARGIN) return start - (from + REVEAL_MARGIN);
+			if (start + size > to - REVEAL_MARGIN) return start + size - (to - REVEAL_MARGIN);
+			return 0;
+		};
+		// The visible part: short of the scroller's own bars.
+		const right = view.left + host.clientWidth;
+		const bottom = view.top + host.clientHeight;
+		const dx = r.left + r.w < view.left || r.left > right ? into(r.left, r.w, view.left, right) : 0;
+		const dy = r.top + r.h < view.top + REVEAL_MARGIN || r.top > bottom - REVEAL_MARGIN ? into(r.top, r.h, view.top, bottom) : 0;
+		if (dx) host.scrollLeft += dx;
+		if (dy) host.scrollTop += dy;
+	}
+
+	/**
 	 * Zooming starts from what is on screen, not from the last number typed: a
 	 * step out of `fit` picks up the fitted scale, so the page does not jump.
 	 */
@@ -559,7 +647,7 @@
 	 * being looked at, so it stays where it is on screen and the page grows or
 	 * shrinks around it — rather than about the top left, where the scroll
 	 * offsets happen to hold still, which sent a chosen area off the edge in
-	 * two steps of a pinch. With nothing chosen the page zooms as it always has.
+	 * two steps of a pinch. With nothing chosen, the paper itself is held.
 	 *
 	 * The point held still is where the zoom was asked for — the pointer under
 	 * a wheel, the middle of a pinch — brought inside the selection if it lies
@@ -579,9 +667,17 @@
 	type Hold = { x: number; y: number; fx: number; fy: number };
 	let held: Hold | null = null;
 
-	/** The chosen areas' union on screen. */
+	/**
+	 * The chosen areas' union on screen — or, with nothing chosen, the sheet
+	 * itself, so a pinch or a wheel over bare paper zooms about where it
+	 * happened rather than about the top left.
+	 */
 	function selectionRect(ids: string[] = pinchIds ?? selectedIds) {
-		if (!host || !ids.length) return null;
+		if (!host) return null;
+		if (!ids.length) {
+			const r = host.querySelector<HTMLElement>('.sheet')?.getBoundingClientRect();
+			return r ? { left: r.left, top: r.top, w: r.width, h: r.height, page: true } : null;
+		}
 		const rects = ids
 			.map((id) => host!.querySelector<HTMLElement>(`[data-box-id="${CSS.escape(id)}"]`)?.getBoundingClientRect())
 			.filter((r): r is DOMRect => !!r && (r.width > 0 || r.height > 0));
@@ -592,7 +688,8 @@
 			left,
 			top,
 			w: Math.max(...rects.map((r) => r.right)) - left,
-			h: Math.max(...rects.map((r) => r.bottom)) - top
+			h: Math.max(...rects.map((r) => r.bottom)) - top,
+			page: false
 		};
 	}
 
@@ -600,12 +697,21 @@
 	 * The point of the selection to hold still: `at`, clamped into it, kept as
 	 * a fraction of the selection so the same point can be found again at the
 	 * next scale. No `at`, its middle.
+	 *
+	 * The whole sheet is the one thing not clamped: what is under the fingers
+	 * stays under them, even out on the grey past the paper's edge. With no
+	 * position as well — the keys — there is nothing to hold, and the page
+	 * zooms as it always has.
 	 */
 	function holdAt(at?: { x: number; y: number }, ids?: string[]): Hold | null {
 		const r = selectionRect(ids);
-		if (!r) return null;
+		if (!r || (r.page && !at)) return null;
 		const fraction = (v: number | undefined, from: number, size: number) =>
-			v === undefined || size === 0 ? 0.5 : Math.min(1, Math.max(0, (v - from) / size));
+			v === undefined || size === 0
+				? 0.5
+				: r.page
+					? (v - from) / size
+					: Math.min(1, Math.max(0, (v - from) / size));
 		const fx = fraction(at?.x, r.left, r.w);
 		const fy = fraction(at?.y, r.top, r.h);
 		return { x: r.left + fx * r.w, y: r.top + fy * r.h, fx, fy };
@@ -615,12 +721,72 @@
 		held ??= holdAt(at);
 	}
 
+	/**
+	 * Room to scroll, for the length of a gesture. Below Fit, and for a while
+	 * past it, the page is no wider than the stage and centred in it: there is
+	 * nothing to scroll, so nothing to hold the point under the fingers still
+	 * with, and the page grew about its own middle — until it was wide enough
+	 * to scroll, when the hold took back everything it had lost at once. That
+	 * lurch was the jerk in a pinch from Fit. A transform to make up the
+	 * difference was tried, and fails where the scroll is at its end: moving
+	 * the page left takes its own width off what can be scrolled, and the
+	 * scroll gives back exactly what the transform took.
+	 *
+	 * So while a pinch or a zooming wheel is going on the page has a stage's
+	 * worth of empty margin on every side, and the scroll can always hold.
+	 * Taking it on moves nothing: the hold after the step puts the point back
+	 * where it was, margin and all. Taking it off at the end does move the
+	 * page — below Fit, back to the middle — so that move is played as a short
+	 * slide from where it was rather than a jump.
+	 */
+	let slack = $state(0);
+	let settle = $state<{ x: number; y: number; on: boolean } | null>(null);
+	let gestureEnd: ReturnType<typeof setTimeout> | undefined;
+
+	function beginGesture() {
+		clearTimeout(gestureEnd);
+		if (slack || !host || !pageEl) return;
+		// Drawn at once and scrolled by however far it moved the page, so that
+		// taking the room on is invisible whether or not a step follows.
+		const before = pageEl.getBoundingClientRect();
+		settle = null;
+		slack = Math.ceil(Math.max(host.clientWidth, host.clientHeight));
+		flushSync();
+		const after = pageEl.getBoundingClientRect();
+		host.scrollLeft += after.left - before.left;
+		host.scrollTop += after.top - before.top;
+	}
+
+	async function endGesture() {
+		clearTimeout(gestureEnd);
+		if (!slack || !host || !pageEl) return;
+		const before = pageEl.getBoundingClientRect();
+		const scrolled = { x: host.scrollLeft - slack, y: host.scrollTop - slack };
+		slack = 0;
+		await tick();
+		if (!host || !pageEl) return;
+		host.scrollLeft = scrolled.x;
+		host.scrollTop = scrolled.y;
+		const after = pageEl.getBoundingClientRect();
+		const from = { x: before.left - after.left, y: before.top - after.top };
+		if (Math.abs(from.x) < 1 && Math.abs(from.y) < 1) return;
+		// Drawn where it was, then let go to where it is.
+		settle = { ...from, on: false };
+		await tick();
+		requestAnimationFrame(() => {
+			if (settle) settle = { x: 0, y: 0, on: true };
+			setTimeout(() => (settle = null), 220);
+		});
+	}
+
+	let pageEl = $state<HTMLDivElement | null>(null);
+
 	$effect(() => {
 		void scale;
 		if (!held || !host) return;
 		// A pinch steers every step back to where the selection was when it
-		// began: early steps, near Fit, have almost no room to scroll and cannot
-		// hold it, and a target re-taken each step would keep what they lost.
+		// began, so a step that fell short is made up by the next rather than
+		// kept.
 		const was = pinchTarget ?? held;
 		held = null;
 		const r = selectionRect();
@@ -706,7 +872,12 @@
 			event.preventDefault();
 			lastWheel = performance.now();
 			if (event.shiftKey) resizeType(event);
-			else zoomBy(Math.exp(-event.deltaY / 220), { x: event.clientX, y: event.clientY });
+			else {
+				beginGesture();
+				zoomBy(Math.exp(-event.deltaY / 220), { x: event.clientX, y: event.clientY });
+				// A wheel has no end of its own: a pause is the end.
+				gestureEnd = setTimeout(() => void endGesture(), 250);
+			}
 		};
 		node.addEventListener('wheel', onWheel, { passive: false });
 		return () => node.removeEventListener('wheel', onWheel);
@@ -727,6 +898,7 @@
 		const onStart = (event: Event) => {
 			event.preventDefault();
 			from = scale;
+			beginGesture();
 		};
 		const onChange = (event: Event) => {
 			event.preventDefault();
@@ -735,17 +907,24 @@
 			const at = gesture.clientX === undefined || gesture.clientY === undefined ? undefined : { x: gesture.clientX, y: gesture.clientY };
 			if (gesture.scale) zoomTo(from * gesture.scale, at);
 		};
+		const onEnd = (event: Event) => {
+			event.preventDefault();
+			if (pinch.size === 0) void endGesture();
+		};
 		node.addEventListener('gesturestart', onStart);
 		node.addEventListener('gesturechange', onChange);
+		node.addEventListener('gestureend', onEnd);
 		return () => {
 			node.removeEventListener('gesturestart', onStart);
 			node.removeEventListener('gesturechange', onChange);
+			node.removeEventListener('gestureend', onEnd);
 		};
 	});
 
 	/** Two fingers on the page. Tracked by pointer id, so a stray third does nothing. */
 	let pinch = new Map<number, { x: number; y: number }>();
 	let pinchStart: { spread: number; scale: number } | null = null;
+	let pinchFrame = 0;
 
 	const spread = () => {
 		const [a, b] = [...pinch.values()];
@@ -772,7 +951,11 @@
 			pinchStart = { spread: spread(), scale };
 			pinchIds = beforeTouch;
 			const [a, b] = [...pinch.values()];
+			// Before the room is taken on: the scroll that makes up for it is
+			// whole pixels, and a target read after it would carry the half
+			// pixel it lost, grown by every step of the zoom.
 			pinchTarget = holdAt({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, beforeTouch);
+			beginGesture();
 			restoreSelection(beforeTouch);
 		}
 	}
@@ -789,11 +972,23 @@
 		pinch.set(event.pointerId, { x: event.clientX, y: event.clientY });
 		if (pinch.size !== 2 || !pinchStart || pinchStart.spread === 0) return;
 		event.preventDefault();
-		zoomTo(pinchStart.scale * (spread() / pinchStart.spread));
+		// One step a frame. A touchscreen reports its fingers faster than the
+		// screen draws — 120 times a second on many phones — and every step is
+		// a whole page redrawn at a new scale, so two to a frame was work thrown
+		// away and a frame missed. The last positions of the frame are the ones
+		// used.
+		if (pinchFrame) return;
+		pinchFrame = requestAnimationFrame(() => {
+			pinchFrame = 0;
+			if (pinch.size !== 2 || !pinchStart || pinchStart.spread === 0) return;
+			const [a, b] = [...pinch.values()];
+			zoomTo(pinchStart.scale * (spread() / pinchStart.spread), { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+		});
 	}
 
 	function onPinchUp(event: PointerEvent) {
 		pinch.delete(event.pointerId);
+		if (pinch.size < 2 && pinchStart) void endGesture();
 		if (pinch.size < 2) pinchStart = null;
 		if (pinch.size === 0) {
 			pinchIds = null;
@@ -815,6 +1010,8 @@
 		node.addEventListener('pointerup', onPinchUp, true);
 		node.addEventListener('pointercancel', onPinchUp, true);
 		return () => {
+			cancelAnimationFrame(pinchFrame);
+			pinchFrame = 0;
 			node.removeEventListener('pointerdown', onPinchDown, true);
 			node.removeEventListener('pointermove', onPinchMove, true);
 			node.removeEventListener('pointerup', onPinchUp, true);
@@ -1006,6 +1203,7 @@
 			padHeld = true;
 			padPress = null;
 			padHidden = true;
+			padThrown = false;
 			pushed = null;
 			vibrate(HOLD_MS);
 		}, PAD_HIDE_MS);
@@ -1039,9 +1237,45 @@
 		 */
 		const stash = (value: number, extent: number) =>
 			Math.max(-PAD_CELL, Math.min(extent - PAD_SIZE + PAD_CELL, value));
-		padAt = {
-			right: stash(padDrag.from.right - (event.clientX - padDrag.x), stage.width),
-			bottom: stash(padDrag.from.bottom - (event.clientY - padDrag.y), stage.height)
+		const wanted = {
+			right: padDrag.from.right - (event.clientX - padDrag.x),
+			bottom: padDrag.from.bottom - (event.clientY - padDrag.y)
+		};
+		padAt = { right: stash(wanted.right, stage.width), bottom: stash(wanted.bottom, stage.height) };
+		// How far the finger has gone on past where the pad stopped: pushed on
+		// far enough, letting go puts it away.
+		padPast = Math.max(Math.abs(wanted.right - padAt.right), Math.abs(wanted.bottom - padAt.bottom));
+	}
+
+	/** Past the edge by this much when let go, the pad is put away rather than parked. */
+	const PAD_THROW = 24;
+	let padPast = 0;
+	/** Put away by throwing it at the edge: it comes back home, not hanging off it. */
+	let padThrown = false;
+
+	/**
+	 * The pad shrinking into the button that brings it back, so it is plain
+	 * where it went — put away by a hold or thrown at the edge, it used to just
+	 * vanish. Worked out a moment after it starts, once the button it is going
+	 * to has been drawn in the same update; nothing to go to, or a reader who
+	 * asked for less motion, and it goes at once as before.
+	 */
+	function stowPad(node: HTMLElement) {
+		return () => {
+			const home = stage?.querySelector<HTMLElement>('[data-pad-home]')?.getBoundingClientRect();
+			if (!home || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return { duration: 0 };
+			const r = node.getBoundingClientRect();
+			const dx = home.left + home.width / 2 - (r.left + r.width / 2);
+			const dy = home.top + home.height / 2 - (r.top + r.height / 2);
+			const size = home.width / Math.max(1, r.width);
+			return {
+				duration: 280,
+				easing: (t: number) => t * t * (3 - 2 * t),
+				// `t` runs 1 to 0 on the way out: at 0 the pad is the button's
+				// size, on the button.
+				css: (t: number, u: number) =>
+					`transform:translate(${dx * u}px, ${dy * u}px) scale(${1 - (1 - size) * u});transform-origin:center;opacity:${Math.min(1, t * 2)}`
+			};
 		};
 	}
 
@@ -1075,6 +1309,13 @@
 
 	function padDrop() {
 		cancelPadHide();
+		if (padDrag && padPast > PAD_THROW) {
+			padHidden = true;
+			padThrown = true;
+			pushed = null;
+			vibrate(HOLD_MS);
+		}
+		padPast = 0;
 		padPress = null;
 		padDrag = null;
 		// Cleared on the next tick, so the click that follows the drag — which is
@@ -1175,9 +1416,11 @@
 >
 	<div
 		class="page"
-		style={zoomedIn
-			? `margin:${clearance.top}px ${clearance.right}px ${clearance.bottom}px ${clearance.left}px`
-			: undefined}
+		bind:this={pageEl}
+		class:settling={settle?.on}
+		style="{zoomedIn || slack
+			? `margin:${(zoomedIn ? clearance.top : 0) + slack}px ${(zoomedIn ? clearance.right : 0) + slack}px ${(zoomedIn ? clearance.bottom : 0) + slack}px ${(zoomedIn ? clearance.left : 0) + slack}px;`
+			: ''}{settle ? `transform:translate(${settle.x}px, ${settle.y}px)` : ''}"
 	>
 	<!-- A picture file dropped on the page itself, rather than on an area,
 	     becomes an area of its own there. An area's own drop stops the event
@@ -1363,14 +1606,11 @@
 	     three that come and go belong under it rather than pushing it sideways
 	     every time one of them appears.
 
-	     Area wears `shapes` and the automagic layout wears `blog`: one adds a
-	     shape to the page, the other writes a page out of the columns, and a
-	     glyph of stacked rules is what that second one looks like.
-
-	     16px, not 14: these are Carbon's 32-grid glyphs, and `blog` in
-	     particular carries a bar, two rules and a square — below 16 the three
-	     merge into a smudge. The column moves together, because one button
-	     drawn larger than the four beside it reads as a mistake. -->
+	     16px, not 14: these are Carbon's 32-grid glyphs, and the finer ones
+	     merge into a smudge below it. The column moves together, because one
+	     button drawn larger than the others beside it reads as a mistake. The
+	     automagic layout was here too, and moved to the page bar beside the
+	     lock: it is pressed once at the start, if at all. -->
 	<div class="corner top right stacked">
 		<!-- The page's lock, while it is locked: a padlock and no word, at the
 		     head of the column whose buttons it switches off, so the reason Area
@@ -1415,20 +1655,6 @@
 					<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
 				</button>
 			{/if}
-			<!-- Always there. It used to show only on an empty page, and be a press
-			     and hold on Area otherwise, so that a control replacing the design
-			     was not one mis-tap away — but it opens a dialog that says how many
-			     areas it would replace, with Cancel, which is the guard; and a hold
-			     is now how anything here explains itself. -->
-			<button
-				class="square"
-				onclick={onmagiclayout}
-				title={hasColumns
-					? 'Position areas automagically — a card worked out from your headings and your data'
-					: 'Nothing to lay out yet — import a CSV or paste a table under the page'}
-			>
-				<Icon name="blog" size={16} /><span class="sr-only">Position areas automagically</span>
-			</button>
 			<!-- Zoom and pan, on and off, under the two that make areas: those
 			     put things on the page, this is how you get about it. Always here
 			     on an unlocked page, so the way in is not a gesture to be found.
@@ -1450,8 +1676,11 @@
 				     under the mode it belongs to. -->
 				<button
 					class="square"
+					data-pad-home
 					onclick={() => {
 						padHidden = false;
+						if (padThrown) padAt = { ...PAD_HOME };
+						padThrown = false;
 						// The hold that hid it ended with the pad gone, so its release
 						// never arrived to clear this — and the first tap on the step
 						// would be swallowed.
@@ -1611,6 +1840,7 @@
 		     repeat while held, so a hold here is never a request for a tip. -->
 		<div
 			class="pad"
+			out:stowPad
 			data-no-hold-tip
 			class:moving={!!padDrag}
 			class:push-up={pushed === 'up'}
@@ -1702,7 +1932,7 @@
 		   how tall the sheet is, and the sheet's height decides whether a vertical
 		   scrollbar appears — which takes ~15px off the width the measurement
 		   started from. At a size where the scrollbar is marginal that is a loop,
-		   and closing Page Setup lands right in it. Reserving the gutter whether
+		   and closing the page bar lands right in it. Reserving the gutter whether
 		   or not it is used breaks the cycle at its one causal edge, rather than
 		   damping the oscillation afterwards. */
 		scrollbar-gutter: stable;
@@ -1728,6 +1958,11 @@
 		/* Kept in step with PAGE_GAP, which takes it out of the height the sheet
 		   is allowed to fill. */
 		gap: 10px;
+	}
+
+	/* The slide back after a gesture's room is taken away — see `slack`. */
+	.page.settling {
+		transition: transform 0.2s ease-out;
 	}
 
 	.sheet {

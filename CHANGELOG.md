@@ -8,6 +8,15 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
+## 0.27.1 — 2026-10-06
+
+- Recto / Verso: the fold drawn dot-dash, spreads and R or V in the print preview.
+- An area's words in 2 to 6 columns; a pinch zooms about the fingers.
+- `%%page:current%%`, `%%page:total%%`, `%%lookup:next:…%%` and `previous`.
+- Reindex beside the table's Lock; Reset in the menu for Getting Started.
+- CSS can style a page: `#page-3`, `.cover`, `.inside-cover`, `.back-cover`, `.recto`.
+- Drawings save at a third the size; in the table, a dot, Draw and their size.
+
 ## 0.26.3 — 2026-10-02
 
 - Dark theme: the button left of Help, or the logo, steps light, dark, and

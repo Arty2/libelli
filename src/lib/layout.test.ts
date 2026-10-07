@@ -334,4 +334,3 @@ describe('latchSpan', () => {
 		expect(latchSpan(30, 10, [0, 100], 1.5)).toBeNull();
 	});
 });
-

@@ -10,7 +10,7 @@
 	import { withKey } from '$lib/keys';
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
-	import { bleedFor, mmToPx } from '$lib/layout';
+	import { bleedFor, mmToPx, pageSide } from '$lib/layout';
 	import { planSheets, resolveImposition } from '$lib/imposition';
 	import type { Dataset, Mapping, Row, Template } from '$lib/types';
 
@@ -188,7 +188,13 @@
 	const NARROW = 520;
 	const STRIP_SHARE = 0.66;
 	const narrow = $derived(gridWidth > 0 && gridWidth < NARROW);
-	const thumbWidth = $derived(narrow ? Math.max(120, Math.floor(gridWidth * STRIP_SHARE)) : 210);
+	// In spreads on a phone, a whole spread to the screen — two pages and the
+	// fold — rather than two thirds of one page, which put every spread's fold
+	// off the edge of the strip.
+	const SPREAD_SHARE = 0.44;
+	const thumbWidth = $derived(
+		narrow ? Math.max(template.facing ? 90 : 120, Math.floor(gridWidth * (template.facing ? SPREAD_SHARE : STRIP_SHARE))) : 210
+	);
 	const thumbScale = $derived(thumbWidth / mmToPx(outerW));
 
 	// Included rows only, grouped into the same sheets Print and PNG-per-sheet
@@ -197,6 +203,41 @@
 	const includedPages = $derived(
 		dataset.rows.map((row, index) => ({ row, index })).filter(({ index }) => !excluded.has(index))
 	);
+
+	/**
+	 * A page's side of the fold is its number's, ticked or not: page 3 is a
+	 * right-hand page whether or not page 2 prints. Leaving a page out is not
+	 * a request to turn every page after it over — whoever wants that deletes
+	 * or moves the row, which renumbers the run.
+	 */
+	const sideAt = (i: number) => pageSide(i + 1);
+
+	/**
+	 * Where a page's fold line goes, if it gets one: the left of a going recto,
+	 * the right of a going verso — except a recto right after a going verso,
+	 * whose line is that verso's. Only with facing pages, and only for pages
+	 * that print.
+	 */
+	function foldLineAt(i: number): 'left' | 'right' | null {
+		if (!template.facing || excluded.has(i)) return null;
+		if (sideAt(i) === 'verso') return 'right';
+		return i > 0 && !excluded.has(i - 1) ? null : 'left';
+	}
+
+	/**
+	 * The pages in spreads, with facing pages on: each left-hand page and the
+	 * right-hand page after it, and the first page, a right-hand page, alone
+	 * with an empty place to its left (`lone`).
+	 */
+	const spreads = $derived.by(() => {
+		if (!template.facing) return null;
+		const out: { pages: number[]; lone: boolean }[] = [];
+		dataset.rows.forEach((_, i) => {
+			if (sideAt(i) === 'verso' || !out.length) out.push({ pages: [], lone: sideAt(i) === 'recto' });
+			out[out.length - 1].pages.push(i);
+		});
+		return out;
+	});
 	const sheetGroups = $derived(
 		imposed ? planSheets(includedPages, imposed.grid, template.print.order) : []
 	);
@@ -237,6 +278,64 @@
 </script>
 
 <svelte:window onkeydown={onKeydown} />
+
+{#snippet page(i: number)}
+	{@const row = dataset.rows[i]}
+	{@const included = !excluded.has(i)}
+	{@const fold = foldLineAt(i)}
+	<figure class:dropped={!included}>
+		{#if fold}
+			<!-- The fold, on the side of the page it is bound at, out in the gap.
+			     A going verso and the going recto after it are one sheet folded,
+			     so they share one line: the verso draws it. -->
+			<svg class="fold-line {fold}" style="height:{mmToPx(outerH) * thumbScale}px" aria-hidden="true"
+				><line x1="50%" y1="0" x2="50%" y2="100%" /></svg
+			>
+		{/if}
+		<button
+			class="thumb"
+			style="width:{mmToPx(outerW) * thumbScale}px;height:{mmToPx(outerH) * thumbScale}px"
+			class:current={i === activeRow}
+			onclick={() => open(i)}
+			aria-label="Open card {i + 1} full screen"
+		>
+			<span class="scaler" style="transform:scale({thumbScale})">
+				<Card
+					{template}
+					{row}
+					{mapping}
+					pageNumber={i + 1}
+					pageCount={dataset.rows.length}
+					rows={lookupRows}
+					{background}
+					{images}
+				/>
+			</span>
+		</button>
+		<!-- As wide as the page above it, and set like the count in the
+		     header: this row is the one control on this screen that gets
+		     pressed over and over, and it used to be a 15px tick with a
+		     number beside it floating in the middle of a 210px column. The
+		     width is the thumbnail's own, so the target and the thing it is
+		     about are the same shape. -->
+		<figcaption style="width:{mmToPx(outerW) * thumbScale}px">
+			<label>
+				<!-- Which side of the fold it is, with facing pages: its number's. -->
+				{#if template.facing}
+					<span class="side" title={sideAt(i) === 'recto' ? 'Recto — a right-hand page' : 'Verso — a left-hand page'}
+						>{sideAt(i) === 'recto' ? 'R' : 'V'}</span
+					>
+				{/if}
+				<input
+					type="checkbox"
+					checked={included}
+					onchange={(e) => toggle(i, e.currentTarget.checked)}
+				/>
+				{i + 1}
+			</label>
+		</figcaption>
+	</figure>
+{/snippet}
 
 <div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Export">
 	<!--
@@ -310,59 +409,47 @@
 	<div
 		class="grid"
 		class:narrow
+		class:spreads={!!spreads}
 		bind:this={grid}
 		bind:clientWidth={gridWidth}
 		style="--thumb:{thumbWidth}px"
 	>
-		{#each dataset.rows as row, i (i)}
-			{@const included = !excluded.has(i)}
-			<figure class:dropped={!included}>
-				<button
-					class="thumb"
-					style="width:{mmToPx(outerW) * thumbScale}px;height:{mmToPx(outerH) * thumbScale}px"
-					class:current={i === activeRow}
-					onclick={() => open(i)}
-					aria-label="Open card {i + 1} full screen"
-				>
-					<span class="scaler" style="transform:scale({thumbScale})">
-						<Card
-							{template}
-							{row}
-							{mapping}
-							pageNumber={i + 1}
-							pageCount={dataset.rows.length}
-							rows={lookupRows}
-							{background}
-							{images}
-						/>
-					</span>
-				</button>
-				<!-- As wide as the page above it, and set like the count in the
-				     header: this row is the one control on this screen that gets
-				     pressed over and over, and it used to be a 15px tick with a
-				     number beside it floating in the middle of a 210px column. The
-				     width is the thumbnail's own, so the target and the thing it is
-				     about are the same shape. -->
-				<figcaption style="width:{mmToPx(outerW) * thumbScale}px">
-					<label>
-						<input
-							type="checkbox"
-							checked={included}
-							onchange={(e) => toggle(i, e.currentTarget.checked)}
-						/>
-						{i + 1}
-					</label>
-				</figcaption>
-			</figure>
-		{/each}
+		{#if spreads}
+			<!-- Facing pages as the reader will hold them: a left-hand page beside
+			     its right-hand page, a spread never split across rows. The fold is
+			     the dot-dash line between them; the gaps are the grid's own. The
+			     first page is a right-hand page on its own, the place on its left
+			     kept empty. -->
+			{#each spreads as spread, s (s)}
+				<div class="spread">
+					{#if spread.lone}<span class="spread-blank" style="width:{mmToPx(outerW) * thumbScale}px" aria-hidden="true"></span>{/if}
+					{#each spread.pages as i (i)}{@render page(i)}{/each}
+				</div>
+			{/each}
+		{:else}
+			{#each dataset.rows as _, i (i)}{@render page(i)}{/each}
+		{/if}
 	</div>
 
-	<!-- The same Print Settings shared with Page Setup, so a sheet size or count
+	<!-- The same Print Settings shared with the page bar, so a sheet size or count
 	     picked wrong does not send you back to the editor to fix it — see
 	     PrintSettingsPanel.svelte and docs/decisions.md. Between the two grids:
 	     it is what turns the pages above into the sheets below, and standing
 	     there it separates them without a heading of its own. -->
 	<div class="options settings-strip">
+		<!-- The design's lock, here as in the page bar: these settings are the
+		     template's, so a locked one shows them greyed out, and this is the
+		     way to change that without leaving the preview. Never disabled by
+		     the lock it sets. -->
+		<button
+			class="lock-toggle"
+			aria-pressed={pageFrozen}
+			title={pageFrozen ? 'Unlock the design' : 'Lock the design — no dragging, no option changes'}
+			onclick={() => ontemplatechange({ ...template, locked: pageFrozen ? undefined : true })}
+		>
+			<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
+			{pageFrozen ? 'Unlock' : 'Lock'}
+		</button>
 		<PrintSettingsPanel {template} {pageFrozen} {ontemplatechange} onuploadbackground={onuploadprintbackground} {onnotice} showFacing />
 	</div>
 
@@ -636,6 +723,34 @@
 		flex-basis: 100%;
 	}
 
+	/* On a phone, one line that scrolls sideways rather than a stack of a
+	   dozen short rows between the pages and the sheets: the settings are a
+	   thing to reach for, and the two previews are what this screen is. Each
+	   group stays whole on the line, ruled off from the next at its side. */
+	@media (max-width: 900px) {
+		.options.settings-strip {
+			flex-wrap: nowrap;
+			overflow-x: auto;
+			overflow-y: hidden;
+			max-height: none;
+			overscroll-behavior-x: contain;
+		}
+
+		.settings-strip > :global(*) {
+			flex: none;
+		}
+
+		.settings-strip :global(.group),
+		.settings-strip :global(.sheet-group) {
+			flex: none;
+			flex-wrap: nowrap;
+			white-space: nowrap;
+			padding: 0 8px 0 0;
+			border-bottom: none;
+			border-right: 1px solid #e0e0e0;
+		}
+	}
+
 	.checklist {
 		padding: 12px 18px 24px;
 		font: 0.75rem/1.55 ui-sans-serif, system-ui, sans-serif;
@@ -725,7 +840,73 @@
 		scroll-snap-align: center;
 	}
 
+	/* Spreads wrap as a row of their own sizes: two pages to a grid cell, or
+	   three with one left out between them, is not a shape a column of fixed
+	   width holds. */
+	/* Spreads wrap as a row of their own sizes: two pages to a grid cell, or
+	   three with one left out between them, is not a shape a column of fixed
+	   width holds. The gaps are the grid's, inside a spread and between. */
+	.grid.spreads:not(.narrow) {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+	}
+
+	.grid {
+		--gap: 18px;
+	}
+
+	.grid.narrow {
+		--gap: 12px;
+	}
+
+	.spread {
+		display: flex;
+		gap: var(--gap);
+		align-items: flex-start;
+	}
+
+	.grid.narrow .spread {
+		flex: 0 0 auto;
+		scroll-snap-align: center;
+	}
+
+	.grid.narrow .spread figure {
+		scroll-snap-align: none;
+	}
+
+	/* Centred in the gap beside the page, so a verso's line and the recto
+	   after it would fall on the same place — which is why only one of them
+	   draws it. Dot and dash, the fold's mark everywhere else in the app. */
+	.fold-line {
+		position: absolute;
+		top: 0;
+		width: 2px;
+		overflow: visible;
+		pointer-events: none;
+	}
+
+	.fold-line.left {
+		left: calc(var(--gap) / -2 - 1px);
+	}
+
+	.fold-line.right {
+		right: calc(var(--gap) / -2 - 1px);
+	}
+
+	.fold-line line {
+		stroke: #8a8a8a;
+		stroke-width: 1.5px;
+		stroke-dasharray: 1.5px 4px 9px 4px;
+	}
+
+	.spread-blank {
+		flex: 0 0 auto;
+	}
+
+	/* Positioned, for the fold line hung off its side. */
 	figure {
+		position: relative;
 		margin: 0;
 		text-align: center;
 	}
@@ -797,6 +978,15 @@
 
 	.dropped figcaption {
 		color: #aaa;
+	}
+
+	/* A letter's width, whichever letter, so every caption's box and number
+	   line up whether it says R or V. */
+	.side {
+		display: inline-block;
+		width: 1ch;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
 	}
 
 	@media (prefers-reduced-motion: no-preference) {

@@ -5,7 +5,9 @@
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { armDefault } from '$lib/modal';
-	import { localImageName, safeMediaUrl } from '$lib/assets';
+	import { scrollEdges } from '$lib/scrolledge';
+	import { dataUrlBytes, localImageName, safeMediaUrl, weigh } from '$lib/assets';
+	import { parseColor } from '$lib/color';
 	import type { Grid } from '$lib/bitmap';
 	import BitmapEditor from './BitmapEditor.svelte';
 	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
@@ -129,11 +131,22 @@
 		/** open the Getting Started table, or start one */
 		ongettingstarted: () => void;
 		/**
+		 * Put the starter this table began as back over it, after asking.
+		 * Absent on a table that began any other way, which has no starter to
+		 * go back to — see `starterOfTable`.
+		 */
+		onresettable?: () => void;
+		/**
 		 * Say something. The table used to have a line of its own under the
 		 * buttons, which meant the app had two places a notice could appear and
 		 * neither of them was where you were looking.
 		 */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
+		/**
+		 * Say something worth reading in full: the status line's warning, and
+		 * its dialog open on it. A warning pressed for, not one that turned up.
+		 */
+		onwarn?: (message: string) => void;
 	}
 
 	let {
@@ -170,9 +183,11 @@
 		onchange,
 		onrenamecolumn,
 		ongettingstarted,
+		onresettable,
 		openRequest = null,
 		onleave,
-		onnotice
+		onnotice,
+		onwarn
 	}: Props = $props();
 
 	/**
@@ -327,7 +342,17 @@
 	 */
 	let editing = $state<{ row: number; column: string } | null>(null);
 
+	/** What a column a keyword has taken is told, here and in the status line. */
+	const keywordWarning = (column: string) =>
+		`“${column}” is a reserved keyword. Rename the column to enable the %%${column.trim().toLowerCase()}%% placeholder.`;
+
 	const countLabel = (value: string) => {
+		// A picture's words are base64 nobody counts; what it weighs is the
+		// number worth having — a drawing is what makes a table heavy.
+		const picture = cellPicture(value);
+		if (picture) return weigh(dataUrlBytes(picture));
+		const stored = localImageName(value);
+		if (stored) return stored;
 		const { characters, words } = countText(value);
 		return `${characters} character${characters === 1 ? '' : 's'} · ${words} word${words === 1 ? '' : 's'}`;
 	};
@@ -479,10 +504,15 @@
 		});
 	});
 
-	function saveArea(dataUrl: string, pixels: Grid | undefined) {
-		if (!drawingArea) return;
-		drawingArea = { ...drawingArea, value: dataUrl, pixels };
-		onsavearea(drawingArea.id, dataUrl, pixels);
+	/**
+	 * By the area it was drawn for, not whichever is open: saving packs the
+	 * board first, which takes a moment, and a Save pressed just before the
+	 * panel closed used to find no area open by the time it landed, and drop
+	 * the drawing.
+	 */
+	function saveArea(id: string, dataUrl: string, pixels: Grid | undefined) {
+		if (drawingArea?.id === id) drawingArea = { ...drawingArea, value: dataUrl, pixels };
+		onsavearea(id, dataUrl, pixels);
 	}
 
 	function deleteArea() {
@@ -515,8 +545,9 @@
 	 * and a prefix is not a shape.
 	 */
 	function cellPicture(value: string | undefined): string | null {
-		const text = value?.trim() ?? '';
-		return text.startsWith('data:image/') ? safeMediaUrl(text) : null;
+		// Asked of every cell on every render: tested in place first, so a
+		// cell of words is not copied whole by a trim just to be told no.
+		return value && /^\s*data:image\//.test(value) ? safeMediaUrl(value) : null;
 	}
 
 	/** Close the editor, back to where it was opened from — or, `toTable`, to the table regardless. */
@@ -702,6 +733,8 @@
 	} | null>(null);
 	let liftTimer: ReturnType<typeof setTimeout> | null = null;
 	let scrollEl = $state<HTMLElement | null>(null);
+	/** The sticky header's height, so the side shadows start below it. */
+	let headHeight = $state(0);
 	let headEls = $state<Array<HTMLElement | null>>([]);
 
 	function watchCarry(on: boolean) {
@@ -1020,6 +1053,22 @@
 		onchange(restored);
 		onactivate(previewed);
 		onnotice('Back to the order the rows came in.');
+	}
+
+	/**
+	 * The order the rows stand in, sorted or not, becomes their order: the
+	 * numbers are taken afresh from where each row is, so the pages print in
+	 * this order and the third-press unsort comes back here rather than to
+	 * how the table arrived. The numbers move, so every `%%lookup:N:…%%` is
+	 * carried along with its row, the way a move by hand carries it. One edit,
+	 * so one undo puts the old numbers and the lookups back together.
+	 */
+	function reindex() {
+		if (!orderOf(dataset) || locked) return;
+		const next = withoutOrder(dataset);
+		sortedBy = null;
+		const said = onchange(next, renumbering(dataset, next));
+		onnotice(said ? `Reindexed in this order. ${said.note}` : 'Reindexed in this order — undo puts the old numbers back.', said?.warning ? 'warning' : 'info');
 	}
 
 	/**
@@ -1373,6 +1422,8 @@
 	class:rows-full={rowHeight === 'full'}
 	class:locked
 	aria-label="Card data"
+	style="--head-h:{headHeight}px; --gutter-w:{gutterWidth}; --bar-h:{barHeight}px"
+	use:scrollEdges={(section) => section.querySelector<HTMLElement>(':scope > .scroll')}
 >
 	<div class="scroll" bind:this={scrollEl}>
 		<table style="min-width:{tableWidth}">
@@ -1391,6 +1442,7 @@
 			     control: on a phone the Data button opens the tray half way, and
 			     this is how it is pulled up to fill the screen. -->
 			<thead
+				bind:offsetHeight={headHeight}
 				class:draggable={trayDraggable}
 				onpointerdown={startTrayDrag}
 				onclickcapture={swallowClick}
@@ -1467,12 +1519,28 @@
 									onclick={() => onplacecolumn(column)}
 								><Icon name="unlink" size={12} /></button>
 							{/if}
+							<!-- A name a keyword has taken is red, and the red says nothing
+							     by itself — on a phone there is no hover to read the title
+							     by. The sign in front of it says there is something to read,
+							     and pressing it puts the sentence where sentences go. Not
+							     frozen by the lock: it changes nothing. -->
+							{#if isKeyword(column)}
+								<button
+									class="icon reserved"
+									title="Why this column is red"
+									aria-label="“{column}” is a reserved keyword — why"
+									onclick={(e) => {
+										e.stopPropagation();
+										const message = keywordWarning(column);
+										if (onwarn) onwarn(message);
+										else onnotice(message, 'warning');
+									}}
+								><Icon name="warning" size={12} /></button>
+							{/if}
 							<input
 								class="column-name"
 								class:keyword={isKeyword(column)}
-								title={isKeyword(column)
-									? `“${column}” is a reserved keyword. Rename the column to enable the %%${column.trim().toLowerCase()}%% placeholder.`
-									: undefined}
+								title={isKeyword(column) ? keywordWarning(column) : undefined}
 								value={column}
 								readonly={locked}
 								aria-label="Rename column {column}"
@@ -1539,11 +1607,21 @@
 						     column and naming it are two things, and the header is
 						     already editable in place. -->
 						<th class="ghost" scope="col">
-							{#if !locked}
-								<button class="icon add" title="Add a column" aria-label="Add a column" onclick={() => addColumn()}>
-									<Icon name="add" size={16} />
-								</button>
-							{/if}
+							<!-- Hidden on a locked table rather than taken away: it is the
+							     tallest thing in the header, and the row was 1.8px shorter
+							     without it, which moved every row under it. Locking should
+							     change the colour of the words and nothing else. -->
+							<button
+								class="icon add"
+								title="Add a column"
+								aria-label="Add a column"
+								disabled={locked}
+								tabindex={locked ? -1 : undefined}
+								style:visibility={locked ? 'hidden' : undefined}
+								onclick={() => addColumn()}
+							>
+								<Icon name="add" size={16} />
+							</button>
 						</th>
 				</tr>
 			</thead>
@@ -1606,7 +1684,10 @@
 							</span>
 						</td>
 						{#each dataset.columns as column, c (column)}
-							{@const picture = cellPicture(row[column]) ?? storedPicture(row[column])}
+							<!-- Read once: a drawing's cell is a long base64 string, and every
+							     check of it trims and tests the whole of it, on every render. -->
+							{@const drawing = cellPicture(row[column])}
+							{@const picture = drawing ?? storedPicture(row[column])}
 							<!-- The drop line runs down the whole column, not just its
 							     header, so it says which gap the column lands in however
 							     far down the table the eye is. -->
@@ -1630,18 +1711,47 @@
 									     stored one. A press picks the row, as anywhere else on
 									     it; a double-click opens it — a drawing on the
 									     drawing surface, a stored picture large in Images. -->
-									<img
-										class="cell-picture"
-										src={picture}
-										alt="{column}, row {rowLabel(i)}"
-										title={locked
-											? undefined
-											: localImageName(row[column])
-												? `${localImageName(row[column])} — double-click to open it in Images`
-												: 'A drawing — double-click to draw on it'}
-										draggable="false"
+									<!-- A button round it, so it can be chosen as a cell is:
+									     the bar then offers Draw and says what it weighs. -->
+									<button
+										class="cell-picture-pick"
+										aria-label="{column}, row {rowLabel(i)}: a picture"
+										onfocus={() => {
+											editing = { row: i, column };
+											onactivate(i);
+											oncellfocus(column);
+										}}
+										onblur={() => (editing = null)}
+										onkeydown={(e) => {
+											// Enter opens it, as a double-click does; a button's own
+											// Enter is a click, which here only chooses it.
+											if (e.key === 'Enter' && !locked) {
+												e.preventDefault();
+												openBigCell(i, column);
+											}
+											if (e.key === 'Escape') {
+												e.stopPropagation();
+												e.currentTarget.blur();
+											}
+										}}
+										onclick={(e) => e.stopPropagation()}
 										ondblclick={() => !locked && openBigCell(i, column)}
-									/>
+									>
+										<img
+											class="cell-picture"
+											src={picture}
+											alt=""
+											title={locked
+												? undefined
+												: localImageName(row[column])
+													? `${localImageName(row[column])} — double-click to open it in Images`
+													: 'A drawing — double-click to draw on it'}
+											draggable="false"
+										/>
+										{#if drawing}
+											<span class="ink-dot" style="background:{parseColor(drawingFor(column).ink) ?? '#000'}" aria-hidden="true"></span>
+										{/if}
+									</button>
 								{:else}
 								<!-- The whole cell, full size, is Edit in the bar while this is
 								     typed in, or the [...] when it holds more than it shows. It
@@ -1725,6 +1835,12 @@
 			</tbody>
 		</table>
 	</div>
+	<!-- The shadows that say there is more past an edge, outside the scroller
+	     because inside it they would scroll away with the rows. Bottom and
+	     left and right: see the note on `.edge`. -->
+	<span class="edge bottom" aria-hidden="true"></span>
+	<span class="edge left" aria-hidden="true"></span>
+	<span class="edge right" aria-hidden="true"></span>
 
 	<!-- One line, always: this bar wrapping was costing the table a row of its
 	     own height every time the tray narrowed. -->
@@ -1777,12 +1893,24 @@
 			<!-- First in the bar while a cell is typed in: the way into the
 			     whole of it. Mousedown is held off, or the field would lose its
 			     focus, and with it this button, before the click. -->
-			<button
-				title="Open this cell in the table's full room"
-				disabled={locked}
-				onmousedown={(e) => e.preventDefault()}
-				onclick={() => editing && openBigCell(editing.row, editing.column)}
-			><Icon name="task-edit" size={15} /> Edit</button>
+			{@const value = dataset.rows[editing.row]?.[editing.column] ?? ''}
+			{#if cellPicture(value) || localImageName(value)}
+				<!-- A picture is chosen rather than typed in, and the way into it is
+				     the drawing surface — or, for a stored one, the Images tray. -->
+				<button
+					title={localImageName(value) ? 'Open this picture in Images' : 'Draw on this picture'}
+					disabled={locked}
+					onmousedown={(e) => e.preventDefault()}
+					onclick={() => editing && openBigCell(editing.row, editing.column)}
+				><Icon name="edit" size={15} /> {localImageName(value) ? 'Open' : 'Draw'}</button>
+			{:else}
+				<button
+					title="Open this cell in the table's full room"
+					disabled={locked}
+					onmousedown={(e) => e.preventDefault()}
+					onclick={() => editing && openBigCell(editing.row, editing.column)}
+				><Icon name="task-edit" size={15} /> Edit</button>
+			{/if}
 		{/if}
 		<!-- Which table, and its lock, gone while rows are chosen or a cell is
 		     typed in: the row actions or the cell's Edit and count take the bar
@@ -1800,6 +1928,23 @@
 			>
 				<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
 				{locked ? 'Unlock' : 'Lock'}
+			</button>
+			<!-- Beside the lock, because like it this is about the table as a
+			     whole and how it prints, not an errand on some rows. Only does
+			     anything once a sort has moved rows off their numbers. -->
+			<button
+				class="reindex"
+				title={locked
+					? 'The table is locked — unlock it to reindex'
+					: orderOf(dataset)
+						? 'Reindex — make this order the rows\' own: the numbers follow it, and lookups with them'
+						: 'Reindex — the rows are already in the order of their numbers; sort the table first'}
+				aria-label="Reindex"
+				disabled={locked || !orderOf(dataset)}
+				onclick={reindex}
+			>
+				<Icon name="array-numbers" size={15} />
+				<span class="label">Reindex</span>
 			</button>
 			<!-- What table this is, beside its lock: the buttons act on it, and it
 			     is the one control here that is a name rather than an act. One
@@ -1860,7 +2005,7 @@
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="add" size={14} /></span>
-								New table…
+								New Table
 							</button>
 						</li>
 						<!-- Never over the open table's rows: it opens a table that already
@@ -1924,6 +2069,26 @@
 								Export
 							</button>
 						</li>
+						<!-- The two that lose something, together and in red, as under the
+						     template's name. Reset only on a table that began as a starter. -->
+						<li role="separator"><hr /></li>
+						{#if onresettable}
+							<li role="none">
+								<button
+									class="danger"
+									role="menuitem"
+									disabled={locked}
+									title="Put the starter this table began as back over it. Your design is not touched."
+									onclick={() => {
+										pickerOpen = false;
+										onresettable();
+									}}
+								>
+									<span class="mark" aria-hidden="true"><Icon name="reset" size={14} /></span>
+									Reset…
+								</button>
+							</li>
+						{/if}
 						<li role="none">
 							<button
 								class="danger"
@@ -2077,7 +2242,7 @@
 					box={{ pixels: area.pixels }}
 					value={area.value}
 					ink={area.ink}
-					onsave={saveArea}
+					onsave={(dataUrl, pixels) => saveArea(area.id, dataUrl, pixels)}
 					ondirty={(d) => (boardDirty = d)}
 					head={boardHead}
 					bar={boardBar}
@@ -2231,6 +2396,68 @@
 		background: #fff;
 	}
 
+	/* A shadow on the bottom, left and right edges of the scroller when there
+	   is more past them — the edges come from scrolledge.ts, which marks this
+	   section.
+
+	   None under the header. It is frozen, always there whatever has scrolled
+	   under it, and a shadow only made it look lifted — more important than
+	   the rows — without telling anybody anything; it gets a 2px rule instead,
+	   as furniture (see `thead th`). The row numbers are frozen too and have
+	   the same rule, but sideways the shadow beside them stays: a column
+	   scrolled out of sight on the left is otherwise invisible, where a row
+	   scrolled up past the header still shows in the row numbers' count.
+
+	   Short of the scroller's own bars, where a classic one takes room, of
+	   the action bar under it, of the header, and of the row numbers. Over
+	   the cells and their sticky parts (z-index 4 at most), under the cell
+	   editor. */
+	.edge {
+		position: absolute;
+		z-index: 5;
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 0.15s;
+	}
+
+	.edge.bottom {
+		left: 0;
+		right: var(--scrollbar-y, 0px);
+		bottom: calc(var(--bar-h, 0px) + var(--scrollbar-x, 0px));
+		height: 27px;
+		background: linear-gradient(to top, rgba(0, 0, 0, 0.18), transparent);
+	}
+
+	.edge.left,
+	.edge.right {
+		top: var(--head-h, 0px);
+		bottom: calc(var(--bar-h, 0px) + var(--scrollbar-x, 0px));
+		width: 27px;
+	}
+
+	.edge.left {
+		left: var(--gutter-w, 0px);
+		background: linear-gradient(to right, rgba(0, 0, 0, 0.18), transparent);
+	}
+
+	.edge.right {
+		right: var(--scrollbar-y, 0px);
+		background: linear-gradient(to left, rgba(0, 0, 0, 0.18), transparent);
+	}
+
+	/* `:global` only for the marks, which the action sets and the compiler
+	   cannot see. */
+	.data:global([data-more-bottom]) .edge.bottom,
+	.data:global([data-more-left]) .edge.left,
+	.data:global([data-more-right]) .edge.right {
+		opacity: 1;
+	}
+
+	/* Sideways on a phone too. There the table is a column or two wide and
+	   nearly always scrolls on, so the right-hand shadow is nearly always
+	   there — but it was asked for: without it nothing says the columns go
+	   on, and the left-hand one is the only sign of columns scrolled past. */
+
 	.scroll {
 		flex: 1;
 		overflow: auto;
@@ -2275,13 +2502,17 @@
 		padding: 0;
 	}
 
-	/* A locked table is ruled in the blue its Lock button wears when pressed,
-	   so the state is on the thing it applies to and not only on the button:
-	   read-only cells otherwise look exactly like cells that refuse your typing
-	   for no reason. */
-	.locked th,
-	.locked td {
-		border-color: var(--accent);
+	/* A locked table's words — its cells and its column names — are faded a
+	   little, so the state is on the thing it applies to and not only on the
+	   button: read-only cells otherwise look exactly like cells that refuse
+	   your typing for no reason. It used to be ruled in the accent instead,
+	   which made a table you could not change the loudest thing on the
+	   screen. Faded, not greyed out: it is still there to be read. Before the
+	   keyword red below, which still wins: a column name that will never
+	   print is worth saying even on a locked table. */
+	.locked td textarea,
+	.locked .column-name {
+		color: #6b6b6b;
 	}
 
 	/* The table's own outside, which no cell's right or bottom edge covers. */
@@ -2289,8 +2520,11 @@
 		border-left-width: 1px;
 	}
 
+	/* The line the rows slide under, twice the others, in place of a shadow —
+	   see `.edge`. */
 	thead th {
 		border-top-width: 1px;
+		border-bottom-width: 2px;
 	}
 
 	/* Where the tray is dragged taller from. `touch-action: none` because the
@@ -2361,6 +2595,14 @@
 	/* A name a keyword has taken: `%%today%%` will never print this column,
 	   and nothing else would say so — the template reads fine and prints the
 	   date. The warning red the status line and the card's marks use. */
+	/* The sign before a reserved name, in the name's own red. */
+	.column-head .icon.reserved {
+		width: 1.125rem;
+		height: 1.125rem;
+		color: #b42318;
+		flex: none;
+	}
+
 	.column-name.keyword {
 		color: #b42318;
 	}
@@ -2687,6 +2929,38 @@
 		cursor: default;
 	}
 
+	/* The picture's button: no chrome of its own, the cell's whole width, and
+	   the focus ring the text fields have. */
+	.cell-picture-pick {
+		display: block;
+		position: relative;
+		width: 100%;
+		padding: 0;
+		border: 0;
+		background: none;
+		text-align: left;
+		cursor: default;
+	}
+
+	.cell-picture-pick:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+	}
+
+	/* A drawing can be faint ink on white at the size a row allows, and read
+	   as an empty cell: a dot in its ink, where the first letter of a text
+	   cell would stand, says something is there. */
+	.ink-dot {
+		position: absolute;
+		top: 5px;
+		left: 6px;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		pointer-events: none;
+		box-shadow: 0 0 0 1px #fff;
+	}
+
 	.data.rows-short .cell-picture {
 		height: calc(var(--cell-line) + 7px);
 		padding: 2px 6px;
@@ -2719,6 +2993,9 @@
 		position: sticky;
 		left: 0;
 		z-index: 2;
+		/* Twice the other rules, like the header's: the line the columns slide
+		   under — see `.edge`. */
+		border-right-width: 2px;
 		white-space: nowrap;
 		padding: 5px 6px 3px;
 		color: #767676;
@@ -2986,6 +3263,8 @@
 		background: none;
 		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		color: #111;
+		/* As the template's: an ellipsis, not a cut letter, at the field's end. */
+		text-overflow: ellipsis;
 	}
 
 	.picker input:focus {
@@ -3000,7 +3279,10 @@
 		place-items: center;
 		border: none;
 		background: none;
-		padding: 0;
+		/* As the template's caret: a target, not just the glyph's 18px. */
+		min-width: 1.75rem;
+		min-height: 1.75rem;
+		padding: 0 3px;
 		margin-left: -2px;
 		color: #555;
 		border-radius: 3px;
@@ -3166,8 +3448,16 @@
 	   before it: the two are equally specific, so the later one wins, and
 	   written first this one never did — the word showed on every phone. */
 	@media (max-width: 900px) {
-		.row-height .label {
+		.row-height .label,
+		.reindex .label {
 			display: none;
+		}
+
+		.reindex {
+			box-sizing: border-box;
+			width: 1.8125rem;
+			padding-inline: 0;
+			justify-content: center;
 		}
 
 		/* An icon alone, so a square — as tall as it is wide, like every other

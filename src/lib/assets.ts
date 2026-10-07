@@ -92,6 +92,33 @@ export function safeMediaUrl(raw: unknown): string | null {
 	return safeImageUrl(value);
 }
 
+/** Kilobytes under a megabyte, one decimal above it; nobody wants 1483 KB. */
+export const weigh = (bytes: number) =>
+	bytes >= 1024 * 1024 ? `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+/**
+ * What a `data:` URL's picture weighs as a file: its base64 decoded, four
+ * characters to three bytes, less the padding. Not the length of the text —
+ * that is a third more than what a download of it would be.
+ */
+export function dataUrlBytes(url: string): number {
+	const comma = url.indexOf(',');
+	if (comma === -1) return 0;
+	const head = url.slice(0, comma);
+	const body = url.slice(comma + 1).replace(/\s/g, '');
+	if (!/;base64$/i.test(head)) {
+		// A stray `%` is enough to make this throw, and a weight is not worth
+		// an error: the text's own length is near enough.
+		try {
+			return decodeURIComponent(body).length;
+		} catch {
+			return body.length;
+		}
+	}
+	const padding = body.endsWith('==') ? 2 : body.endsWith('=') ? 1 : 0;
+	return Math.max(0, Math.floor((body.length * 3) / 4) - padding);
+}
+
 /** A URL as it can be written inside a `url("…")`, quotes and all. */
 export const cssUrl = (src: string) => `url("${src.replace(/["\\]/g, '\\$&')}")`;
 

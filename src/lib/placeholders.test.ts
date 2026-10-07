@@ -41,6 +41,23 @@ describe('applyPlaceholders', () => {
 		expect(applyPlaceholders('%%today:YYYY-MM-DD%%', { now: DAY })).toBe('2026-09-07');
 	});
 
+	it('fills the card\'s place in the run', () => {
+		const run = { page: 3, pageCount: 12 };
+		expect(applyPlaceholders('Page %%page:current%% of %%page:total%%', run)).toBe('Page 3 of 12');
+		expect(applyPlaceholders('%%PAGE: Current %%', run)).toBe('3');
+		// A column called page is the keyword's, like today's.
+		expect(applyPlaceholders('%%page:current%%', { ...run, row: { page: 'cover' } })).toBe('3');
+	});
+
+	it('leaves a page placeholder as written where there is nothing to count', () => {
+		expect(applyPlaceholders('%%page:current%%', {})).toBe('%%page:current%%');
+		expect(applyPlaceholders('%%page:total%%', { page: 1, pageCount: null })).toBe('%%page:total%%');
+		expect(applyPlaceholders('%%page%%', { page: 1, pageCount: 2 })).toBe('%%page%%');
+		expect(applyPlaceholders('%%page:next%%', { page: 1, pageCount: 2 })).toBe('%%page:next%%');
+		expect(applyPlaceholders('%%page:current%%', { markUnknown: true })).toBe(`${UNKNOWN_OPEN}page:current${UNKNOWN_CLOSE}`);
+		expect(referencedColumns('%%page:current%%', ['page'])).toEqual([]);
+	});
+
 	it('ignores case in the name but not in the format', () => {
 		expect(applyPlaceholders('%%TODAY%%', { now: DAY })).toBe('7 September 2026');
 		// `mm` is not a token, so it survives; `DD` is.
@@ -113,7 +130,7 @@ describe('applyPlaceholders', () => {
 	});
 
 	it('knows which column names a keyword takes', () => {
-		expect(['today', 'Today', 'LOOKUP', ' lookup '].every(isKeyword)).toBe(true);
+		expect(['today', 'Today', 'LOOKUP', ' lookup ', 'page', 'Page'].every(isKeyword)).toBe(true);
 		expect(['date', 'dates', 'look-up', 'title'].some(isKeyword)).toBe(false);
 	});
 });
@@ -170,10 +187,11 @@ describe('typing a placeholder', () => {
 	});
 
 	it('offers columns that start with it first, then ones that contain it, and today', () => {
-		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual(['title', 'today', 'subtitle']);
-		expect(placeholderChoices('', ['a', 'date'])).toEqual(['a', 'date', 'today']);
+		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual(['title', 'today', 'subtitle', 'page:current', 'page:total']);
+		expect(placeholderChoices('', ['a', 'date'])).toEqual(['a', 'date', 'today', 'page:current', 'page:total']);
+		expect(placeholderChoices('page:t', ['title'])).toEqual(['page:total']);
 		// A column a keyword has taken is not offered as itself…
-		expect(placeholderChoices('', ['Today', 'lookup', 'a'])).toEqual(['a', 'today']);
+		expect(placeholderChoices('', ['Today', 'lookup', 'Page', 'a'])).toEqual(['a', 'today', 'page:current', 'page:total']);
 		// …but is, after a lookup, which is the one way to reach it.
 		expect(placeholderChoices('lookup:2:', ['Today'])).toEqual(['lookup:2:Today']);
 	});
@@ -249,6 +267,25 @@ describe('a lookup into another row', () => {
 	it('is no way round for a cell to quote itself, but may quote its column in another row', () => {
 		expect(applyPlaceholders('%%lookup:1:note%%', { row: rows[0], rows, self: 'note' })).toBe('%%lookup:1:note%%');
 		expect(applyPlaceholders('%%lookup:1:note%%', { row: rows[1], rows, self: 'note' })).toBe('%%title%%');
+	});
+
+	it('reaches the next and the previous row from the card\'s own', () => {
+		expect(applyPlaceholders('Next: %%lookup:next:title%%', { row: rows[0], rows })).toBe('Next: Second');
+		expect(applyPlaceholders('%%lookup:previous:price%%', { row: rows[2], rows })).toBe('5');
+		expect(applyPlaceholders('%% lookup : Next : title %%', { row: rows[1], rows })).toBe('Third');
+		// Past either end, off the table, or with no row of its own: nothing to quote.
+		for (const [text, row] of [
+			['%%lookup:next:title%%', rows[2]],
+			['%%lookup:previous:title%%', rows[0]],
+			['%%lookup:next:title%%', { title: 'stray' }],
+			['%%lookup:next:title%%', null]
+		] as const) {
+			expect(applyPlaceholders(text, { row, rows })).toBe(text);
+		}
+		expect(referencedColumns('%%lookup:next:price%%', ['title', 'price'])).toEqual(['price']);
+		// No number in it, so a renumbering leaves it alone.
+		const moved = new Map<number, number | null>([[1, null]]);
+		expect(renumberLookups('%%lookup:next:title%%', moved)).toMatchObject({ text: '%%lookup:next:title%%', renumbered: 0, orphaned: 0 });
 	});
 
 	it('does not give way to a column somebody called lookup, but can reach it', () => {

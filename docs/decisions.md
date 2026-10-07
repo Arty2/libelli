@@ -184,6 +184,16 @@ out cannot quietly add a family the template then has to carry.
 
 ## `src/lib/storage.ts`
 
+**A starter is marked, not recognised.** A template or table that began as a
+bundled starter carries `starter: <id>` (`STARTER_TEMPLATES`, `STARTER_TABLES`
+in onboarding.ts), and that alone offers Reset and says what it resets to.
+Comparing against the starter, as `isStarterTemplate` does to avoid adding a
+second untouched copy, cannot answer this: the copy most worth resetting is
+the one somebody has changed. A copy stored before the mark existed is known by
+its name — the starter's, or that numbered by `freeName` — and only when it has
+no mark at all. The mark is kept through a table's import, as its name and
+lock are, so the Getting Started table stays that table.
+
 **`template:current` is still the working copy.** The library did not replace it:
 boot reads it first, every edit writes it, and a browser that has never opened
 the picker behaves exactly as it did before. The library is a *second* place the
@@ -487,6 +497,19 @@ where two strokes should join does not read as hand-drawn — it reads as broken
 
 ## `src/lib/bitmap.ts`, `src/lib/tile.ts` and `src/lib/components/BitmapEditor.svelte`
 
+**Smaller as a palette PNG, not gzipped.** Gzip was asked for and measured: the
+starter's drawing went from 856 bytes to 879, because a PNG's pixels are
+deflated already and a second pass only adds a header. The weight was the
+canvas writing four bytes a pixel for one ink on nothing. `pngpack.ts` writes
+colour type 3 at the fewest bits the palette needs (290 bytes for that
+drawing, 410 characters of base64 against 1,166), with the browser's own
+`CompressionStream` for the deflate and the CRC zip.ts already had. Still a
+PNG, so every reader of a cell is untouched and no stored drawing needs
+migrating; the starter's was re-encoded by hand, pixel for pixel the same.
+Over 256 colours, the canvas's own PNG. Saving and the live weight are
+asynchronous now: the weight is taken 120ms after the last stroke and only
+the latest kept, and Save marks as saved only the edits it actually packed.
+
 **The drawing goes in the cell, as base64.** Not into this browser's store like
 a dropped file: a drawing made here has no existence anywhere else, and a
 picture that lives beside the table would be lost the moment the CSV was handed
@@ -680,6 +703,15 @@ way, and a row that fits a phone is worth the two extra taps.
 
 ## `src/lib/history.ts`
 
+**Undo records first.** History is written on a 350ms debounce, so Undo pressed
+inside that third of a second used to find the latest change not yet recorded:
+it undid the change before, or on a fresh session nothing, and a drag just made
+stayed put. Undo, and the alternating chord, record what is on screen before
+stepping back. The debounced recorder cannot then record it again, since the
+state undo applies cancels its timer. Two actions inside the debounce are still
+one entry — an unlock and the drag straight after it go back together — which
+is the debounce's own bargain, kept.
+
 **A label rides alongside each state, never inside it.** States are compared by
 value to decide whether anything changed, and that comparison is what stops an
 applied undo recording itself straight back — so a label folded into the snapshot
@@ -711,6 +743,26 @@ undo or a redo, "the last change" is a different change and an alternating key
 would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
+
+**Columns are the browser's.** `Box.columns` (2–6, a gap in mm) is
+`column-count` and `column-gap` on the area's content, not on the box, so the
+padding, border and fill stay one frame round all the columns. Balanced rather
+than filled in turn: a fixed-height area cuts what runs past its height as it
+would one column, and a growing one grows to the longest. Words only — a
+picture or a QR code split into columns is a broken picture. Absent is one
+column; a count under two is read as absent.
+
+**A page's own id and classes sit on a box-less wrapper inside the trim.**
+`#page-N`, `.cover`, `.inside-cover`, `.inside-back-cover`, `.back-cover`,
+`.recto` and `.verso` let a template's CSS style a page as a whole. css.ts
+scopes every rule to `.trim …`, so `.cover .box` becomes `.trim .cover .box`,
+and the class has to be on something between the two: classes on the trim
+itself would never match, and moving the scope out to the card would have
+changed what `:root` means in every stylesheet already written. The wrapper is
+`display: contents`, so nothing is laid out or measured against it. Inside
+covers need four pages, or a two-page run would call its back cover the inside
+of its front. The id repeats wherever the same page is drawn twice — the
+editor and a thumbnail — as an area's id already does.
 
 **A touch on the card drops the click that lands off it.** A touch's click
 is aimed at what is under the finger when it lifts. Pressing an area selects
@@ -1248,7 +1300,62 @@ handle sit outside that, because mirroring places a box without flipping what is
 inside it. The latch guide carries a `flip` flag for the same reason: it is
 measured against stored edges and drawn where the eye sees them.
 
+**The fold is dot and dash.** With Recto / Verso on, the guides draw the fold
+as a dot-dash line just outside the inner trim edge — past any bleed, so it is
+never read as artwork — the convention for a fold on anything printed to be
+folded. An area that follows the fold draws its inner side in the same rhythm
+in place of a plain dash, and selected, with a longer dash, so the fold still
+reads against the solid selection. So the one side can be styled, the bound is
+four `<line>`s in percentages rather than a rect. A zigzag was tried first and
+read as a tear rather than a fold.
+
+**`#` is a swatch's placeholder.** An area with no words of its own that takes a
+color from a column shows `#` in the editor rather than "Area", and an area the
+row fills is never hidden as empty — it has something to draw.
+
 ## `src/lib/components/PagePreview.svelte`
+
+**With nothing chosen, a pinch holds the paper.** The zoom's hold — a point kept
+still on screen across a change of scale — falls back to the sheet when no area
+is chosen, unclamped, so what is under the fingers or the wheel stays under
+them even on the grey past the edge. The keys have no position and still zoom
+as they always did.
+
+**The page stays put when the stage's edge moves.** Choosing an area opens its
+options above the stage, on a phone a third of the screen, and the stage's top
+coming down carried the page with it: the area just tapped slid down the
+screen, which read as the view jumping to the bar. A resize of the scroller now
+scrolls by however far its top-left corner moved, so the page holds still where
+the scroll allows; and if the chosen area is still out of sight after that, it
+is scrolled into view by the least distance. Only on a resize, never on a
+change of selection alone, so an area dragged off the edge stays where it was
+put.
+
+Both ways. Closing the bar makes the stage taller, which shortens what can be
+scrolled, and the browser clamps the scroll before the resize is heard of — its
+scroll event even comes first, in the same frame. Made up for from that clamped
+value, a page near the bottom moved twice the bar's height on deselect; so a
+scroll in the frame of the resize is taken to be the clamp, and the value
+before it used. What was chosen until a moment ago (a second) is revealed as
+well, so the area deselected, or joined by a second, stays in sight.
+
+**The nudge pad goes somewhere.** Put away by a hold on its middle, or thrown
+24px on past the edge it stops at, it shrinks into the button that brings it
+back, worked out a tick after it starts so that button has been drawn. It used
+to vanish where it stood, and nothing said where it went. A thrown pad comes
+back to its home corner, not hanging off the edge it was thrown at.
+
+**A gesture brings its own room to scroll.** The hold keeps a point still by
+scrolling, and below Fit — and for a while past it — the page is centred and
+there is nothing to scroll: the page grew about its middle, then lurched back
+under the fingers the moment it could scroll (measured: 55px off, put right in
+two steps). For the length of a pinch or a zooming wheel the page has a stage's
+worth of margin on every side, taken on and off with the scroll moved to match,
+so the hold always has room; its removal at the end, which recentres a page
+below Fit, plays as a 0.2s slide. A transform for the shortfall was tried
+first and fails where the scroll is at its end: shifting the page left takes
+its own width off the scroll range and the scroll gives the shift back. Pinch
+steps are also held to one a frame, since phones report fingers at 120Hz.
 
 **Actual is measured, not assumed.** CSS's millimetre is a 96th of an inch per
 3.78 pixels, right for almost no screen sold this decade: a 13-inch MacBook at
@@ -1305,7 +1412,7 @@ letter.
 derive the scale, the scale sizes the sheet, the sheet's height decides whether a
 vertical scrollbar appears, and that scrollbar takes about fifteen pixels off the
 width the measurement started from. At a marginal size that oscillates until the
-browser's own resize-observer bail-out stops it, and closing Page Setup landed
+browser's own resize-observer bail-out stops it, and closing the page bar landed
 right in it. `scrollbar-gutter: stable` removes the causal edge rather than
 damping the swing; the observer is also coalesced to a frame and held to whole
 pixels so it cannot start again for some other reason. Reserving the *horizontal*
@@ -1574,6 +1681,27 @@ than plumbing the resolved layout up through two components. The cost is a
 rounding of a few hundredths of a millimetre, from going through pixels and back.
 
 ## `src/lib/components/DataTable.svelte`
+
+**A picture cell is a button.** A drawing has no field to focus, so it could
+not be chosen, and the bar under the table had nothing to say about it. Wrapped
+in a button it focuses like a text field, and the bar treats it as the cell
+being worked on: Draw where a text cell has Edit, and its weight (the base64
+decoded, `dataUrlBytes`) where a text cell has its count. A dot in the column's
+ink, through `parseColor` like every colour in a style, marks it, because a
+faint drawing at row height reads as an empty cell. The side shadows now show
+on a phone too: there the right-hand one is nearly always on, but it was the
+only sign the columns go on.
+
+**Reindex is `withoutOrder` with the lookups carried.** A sort reorders the
+rows but keeps their numbers, so that a lookup and the unsort both mean the
+order the table arrived in. Reindex is the way to say the sorted order is the
+real one now: it drops the saved order, which numbers the rows from where they
+stand, and goes through the same `renumbering` a move by hand does, so every
+`%%lookup:N:…%%` follows its row in the same undo step. It sits beside the
+Lock rather than among the row actions because it is about the whole table and
+how it prints; disabled with nothing sorted, since there would be nothing to
+change, and with the table locked, since a locked table's numbers are part of
+what it promised not to change. Icon only on a phone, like the row height.
 
 **The gutter is set in the cells' own line.** Each row's number and tick sit in a
 box exactly one line of cell text tall — 12px at 1.45, starting the same 5px
@@ -2219,7 +2347,7 @@ the orientation, so picking A4 under Auto keeps the sheet the way it is sitting.
 places — `PageOptions.svelte`, where every other page-level setting lives,
 and `PrintPreview.svelte`, so a sheet size or count picked wrong does not
 send you back to the editor before you can print. Both pass the same
-`template`/`ontemplatechange` shape the rest of the page-setup bar uses; the
+`template`/`ontemplatechange` shape the rest of the page bar uses; the
 panel itself does not know or care which screen it is in.
 
 **Its groups are fieldsets, with their names showing on both screens**, Bleed
@@ -2315,6 +2443,29 @@ takes the sheet with it. The sheet bleed adds to that padding, because it adds
 paper: the cards keep their places and the sheet grows around them.
 
 ## `src/lib/components/PrintPreview.svelte`
+
+**The settings strip carries the lock, and on a phone is one line.** The print
+settings are the template's, greyed out on a locked design, so the design's
+lock sits at the head of the strip, as in the page bar: unlocking no longer
+means leaving the preview. On a phone the shared bar styles stack every group
+on a line of its own, a dozen rows between the two previews; here they are one
+row that scrolls sideways, each group whole and ruled off at its side.
+
+**A page's side of the fold is its number's, ticked or not.** For a while a page
+left out turned every page after it over — page 3 printed after page 1 became a
+verso — so the run kept alternating. Taken back: leaving a page out of one
+print is not a request to re-impose the booklet, and whoever wants that
+deletes or moves the row, which renumbers the run. The caption's R or V is the
+number's side.
+
+**Spreads are the numbers' pairs.** With facing pages the thumbnails are
+grouped into spreads, page 1 alone with an empty page-width to its left, then
+2 and 3, 4 and 5, so a pair never wraps across two rows. The grid becomes a
+wrapping flex row there, since a pair is two pages wide. The fold is a
+dot-dash line out in the gap on each printing page's bound side, not a narrower
+gap: a narrower gap was tried, and pages that close read as cramped rather than
+bound. A verso and the recto after it, both printing, would draw their lines on
+the same spot, so the verso draws it for both.
 
 **One door to the printer.** Print opens the preview; the preview prints. The
 page selection lives there, keyed by row index and reset every time it opens —
@@ -2432,6 +2583,13 @@ never opened the list has news. Opening it, by hand or at start, marks this
 version read, so it does not open again.
 
 ## `src/lib/sw-policy.ts` and `src/service-worker.ts`
+
+**A tab come back to looks for an update.** The browser checks for a new worker
+only when the page loads, and an app left open in a tab can go days without
+one. Coming back to the tab after ten minutes or more (`dueForUpdateCheck`)
+calls `registration.update()`; what it finds is announced in the status bar
+like any update and waits for Reload. Ten minutes so that glancing away and
+back is not a request every time.
 
 **The worker only ever touches same-origin GETs.** `sw-policy.ts` decides, and it
 passes everything cross-origin straight through: the app promises to fetch
@@ -2764,7 +2922,7 @@ their filename instead, which says the same thing where it is looked for.
 **Images is a tray, not a bar.** It was a third bar in the options row, where a
 list of pictures had nine rows' height at most and the page bar had to give it
 the row. It takes the table's room now, one of the two at a time, at the same
-width or height, and the options row is page setup and the area bar only.
+width or height, and the options row is the page bar and the area bar only.
 
 **A cell's field is as tall as its words, and the cell is the target.** It
 filled the row by `height: 100%` against a cell of `height: 1px`, which
@@ -2852,12 +3010,12 @@ stays in view — a tabbed version was tried and read as messier, not calmer: a
 press to reach anything, and a bar whose height changed with the tab. The
 grouping and the order:
 
-- Page Setup: the template, then **Page** (size, margin, left & right),
+- The page bar: the template, then **Page** (size, margin, left & right),
   **Text**, **Paragraphs**, **Lists**, **Paper**, **Page Number**, and the
   print panel's **Bleed** and **Printing**.
 - An area: the name, then **Content**, **QR Code** when it is one, **Align**
   — ahead of the type, because it is what is reached for most — **Text** (font,
-  size, weight, color, letter spacing, case), **Position** (X, Y, W, H, anchor, recto / verso,
+  size, weight, color, letter spacing, case), **Position** (X, Y, W, H, anchor, fold follow,
   rotation), **Lines**, **Lists** for Markdown, **Box** (fill, border, padding,
   overflow), **Effects** (blend, opacity).
 
@@ -2867,10 +3025,13 @@ rule, because the bar wraps and a rule lands wherever the wrap does. A label tha
 only repeated its group's name is left to screen readers. A new control goes in
 the group it belongs to rather than on the end.
 
-**Recto / Verso, not Left & Right or Mirror.** The page's switch and the area's
-say the same thing in the same words, the book's own: a right-hand page and the
-left-hand page facing it. On an area it reads as "this area follows the
-spread"; off, it keeps its millimetres on both.
+**Recto / Verso on the page, Fold Follow on an area.** The page's switch is the
+book's own words: a right-hand page and the left-hand page facing it, with a
+plain slash — a ⧘ for the fold was tried and set too small to read in the bar's
+capitals. The area's switch once used the same words and meant something else — not "this is
+a spread" but "this area mirrors across it" — so it is named for what it does:
+it follows the fold, the dot-dash line the guides draw at the inner edge. Off, the area
+keeps its millimetres on both pages.
 
 **A color from a column is a link beside the swatch, not a mode.** Text color,
 fill and border color each get the same small link button; pressed, a column
@@ -2942,14 +3103,17 @@ a boat. No two badges answer with the same mark.
 Stacked, every selection and deselection would add or remove a whole toolbar
 from the top of the window: the stage would lose that much height, the fitted
 scale would change with it, and the page would jump under the pointer. Selecting
-an area gives it the row and Page Setup takes it back, letting go of the area to
-do it — pressing Page Setup means "show me the page", not "stack a second bar".
+an area gives it the row and Page takes it back, letting go of the area to
+do it — pressing Page means "show me the page", not "stack a second bar".
 That leaves the two bars being different heights, which is the same jump again
 and smaller, so the row is floored at the tallest bar it has held at this window
 size. The trade-off is a band of the bar's own colour under the shorter of the
 two; it buys a page that does not move when you pick something up. The floor is
 dropped on a resize, because both bars wrap and neither height survives a change
-of width.
+of width — and only a new measurement raises it again. The effect that raised
+it used to read the floor too, so the reset re-ran it at once with the height
+from the old width: a window widened from narrow kept the narrow bar's wrapped
+height, as a band of empty bar.
 
 **The page bar stands at the area bar's height before any area is picked.**
 The row was floored at the tallest bar it had held, so the page stopped jumping
@@ -2986,6 +3150,11 @@ what a modifier-click does; `selectBox` treats the mode and the modifier as the
 same thing, so there is one path and not two.
 
 ## `src/lib/boxops.ts` and `src/routes/+page.svelte`
+
+**A nudge is in screen directions.** On a left-hand page an area that follows
+the fold is drawn mirrored, so `nudgeBox` flips `dx` for it before writing the
+stored right-hand frame — the same undoing a mirrored drag goes through. Without
+it, the pad's right arrow moved the area left.
 
 **A new area is provisional until it is given something.** Arriving with the
 literal word "Text" would leave a box that says Text on the card whenever one is
@@ -3247,6 +3416,36 @@ not at all. The true inverse needs relative colour syntax, which is Baseline
 Newly, so it is behind `@supports`; without it the guides are `#da9c14`, the
 inverse of the fallback blue, worked out by hand.
 
+## `src/lib/scrolledge.ts` — the shadow at an edge with more
+
+**A scroller that stops on a row boundary looks finished.** The bars on a phone
+are capped and scroll, and the table scrolls both ways; nothing on screen said
+so. Each edge with more past it gets a soft shadow, gone at the end.
+
+**Script, not CSS.** The old `background-attachment: local` trick paints under
+the content, and every cell and every field here is opaque. Scroll-driven
+animations would do it in CSS alone but are not Baseline Widely available. So
+an action reads the four edges (`overflowEdges`, tested) and marks a frame
+round the scroller with `data-more-*`; the component draws the shadows. A frame
+because a shadow drawn inside a scroller scrolls away with it: the bars get a
+`.bar-frame` in `OptionsBar`, the table uses its own section, which holds only
+the scroller and the action bar.
+
+**The table has no shadow under its header.** It is frozen, always there
+whatever has scrolled under it; a shadow there only made it look lifted, more
+important than the rows, without saying anything. It gets a 2px rule instead —
+twice the others, as furniture rather than a signal — and so do the row
+numbers. Sideways the shadow beside the row numbers stays, though: a column
+scrolled off to the left is otherwise invisible, where a row scrolled up still
+shows in the numbering. So the table's shadows are the bottom and, on a desk,
+left and right, which start below the header. Not the sides on a phone: the
+table is a column or two wide there and nearly always scrolls sideways, so they
+would be a fixture, not a hint. The bars wrap and never scroll sideways, so they
+have top and bottom.
+
+**27px at 18% black.** Started at 10px and 12%, which read as a hairline; grown
+in two steps on asking.
+
 ## `src/lib/textsize.ts`, the viewport, and type in `rem`
 
 **The app is pinned to the window, not given a height.** `.app` is
@@ -3310,7 +3509,7 @@ while the buttons are small; with the text larger than default,
 `applyTextSize` (and the pre-paint script) set `data-text-larger` on the root,
 and the row is laid out as at 320px: the mark at the left, shrinking before
 anything wraps, and every button after the space — Install and Help in front of
-Page Setup. At 150% on a 412px phone a centred mark had sat over Page Setup;
+Page. At 150% on a 412px phone a centred mark had sat over Page;
 and with Help and Install left where they were, the logo split the controls in
 two.
 
@@ -3649,6 +3848,13 @@ Two things worth knowing before trusting a green run:
   `environment: 'node'` without that being a claim of coverage.
 
 ## `src/lib/theme.ts` — dark by inversion
+
+**With the page inverted, fills and pictures are turned back.** An area's fill
+layer and a photo in it keep their colours in `dark-page`; the words, the paper,
+drawings and QR codes stay inverted. Turning those back was tried: they are ink
+on transparent ground, and the right way round they were black on the inverted
+black paper — invisible. A drawing is told apart by the `drawn` class Card puts
+on a hand-drawn `<img>`.
 
 **One filter on the root, not a second palette.** The interface's colours are
 written where they are used, across every component; a dark palette would mean

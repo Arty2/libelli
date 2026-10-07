@@ -196,7 +196,7 @@
 	 * The same text as it is drawn, with `%%today%%` and any `%%column%%` of this
 	 * row filled in — in a cell and in an area's own words alike, once.
 	 */
-	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box) });
+	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box), page: pageNumber, pageCount });
 
 	/** The column a bound area's words come out of — the one they may not quote. */
 	const selfOf = (box: Box): string | undefined => (box.slot ? mapping[box.slot] : undefined);
@@ -210,7 +210,7 @@
 	 * measured for emptiness, or encoded into a QR.
 	 */
 	const shownTextOf = (box: Box): string =>
-		applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box), markUnknown: interactive && bounds });
+		applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds });
 
 	/** Text split around the marks, for plain text, which Svelte escapes itself. */
 	function segments(text: string): Array<{ text: string; unknown: boolean }> {
@@ -366,7 +366,11 @@
 	 */
 	const placeholderFor = (box: Box): string =>
 		interactive && bounds && isEmpty(box) && (!box.hideWhenEmpty || unsourced(box))
-			? // The column a bound area draws from, since that is what will be in
+			? // An area with no words of its own that takes a color from the row
+				// is a swatch: `#`, a color's own first character, says so — and
+				// keeps one that this row leaves unfilled from vanishing.
+				(!box.slot && linksColor(box) ? '#' : '') ||
+				// The column a bound area draws from, since that is what will be in
 				// it — the area's own name is often a generic word like "field".
 				// An unbound one says what it is waiting for.
 				(box.slot && mapping[box.slot]) ||
@@ -383,10 +387,16 @@
 	 * at all, in the editor — collapsed, it could not be clicked, selected or
 	 * moved, and it would be empty on every card there is. Bounds or no bounds.
 	 */
+	/** Any of an area's colors taken from a column; see `Box.colorFrom`. */
+	const linksColor = (box: Box) => !!(box.colorFrom?.text || box.colorFrom?.fill || box.colorFrom?.border);
+
+	/** The row fills this area: something drawn, even with no words in it. */
+	const filledByRow = (box: Box) => !!(row && box.colorFrom?.fill && parseColor(row[box.colorFrom.fill]));
+
 	const hidden = $derived(
 		new Set(
 			template.boxes
-				.filter((b) => b.hideWhenEmpty && isEmpty(b) && !(interactive && unsourced(b)))
+				.filter((b) => b.hideWhenEmpty && isEmpty(b) && !filledByRow(b) && !(interactive && unsourced(b)))
 				.map((b) => b.id)
 		)
 	);
@@ -481,6 +491,48 @@
 	 * anything back.
 	 */
 	const placed = (box: Box): Box => (verso && mirrors(box) ? mirrorBox(box, template.page.w) : box);
+
+	/**
+	 * The side of an area that faces the fold, for an area that follows it:
+	 * that edge is drawn as a fold line, dot and dash, so which areas mirror reads
+	 * off the page without opening the bar. Left on a right-hand page, right on
+	 * a left-hand one.
+	 */
+	/**
+	 * Where this page falls in the run, as an id and classes a template's CSS
+	 * can style: the covers by place — first, last, and the two inside them,
+	 * once there are enough pages for an inside — and, with facing pages, the
+	 * side of the fold. Nothing without a page number: the editor with no rows
+	 * is not a page of anything.
+	 */
+	const pageHooks = $derived.by(() => {
+		if (pageNumber == null) return { id: undefined, classes: '' };
+		const n = pageNumber;
+		const last = pageCount ?? 0;
+		const classes = [
+			n === 1 && 'cover',
+			last >= 4 && n === 2 && 'inside-cover',
+			last >= 4 && n === last - 1 && 'inside-back-cover',
+			last > 1 && n === last && 'back-cover',
+			template.facing === true && (verso ? 'verso' : 'recto')
+		].filter(Boolean);
+		return { id: `page-${n}`, classes: classes.join(' ') };
+	});
+
+	/**
+	 * Words in columns: the browser's own multi-column layout, on the content
+	 * rather than the box, so the box's padding, border and fill stay one
+	 * frame round all of them. Balanced: a fixed height cuts what overflows
+	 * as it cuts a single column, and a growing area grows to the longest.
+	 * Words only — a picture or a QR code in columns is a stretched picture.
+	 */
+	const columnsStyle = (box: Box): string | undefined =>
+		box.columns && (box.mode === 'plain' || box.mode === 'markdown')
+			? `column-count:${box.columns.count};column-gap:${box.columns.gap}mm`
+			: undefined;
+
+	const foldSide = (box: Box): 'left' | 'right' | null =>
+		template.facing === true && mirrors(box) ? (verso ? 'right' : 'left') : null;
 
 	/**
 	 * What an area paints under its content — the fill, a fill out of the data,
@@ -1813,6 +1865,25 @@
 <!-- Plain text with any unknown `%%name%%` in it marked — see `shownTextOf`.
      Written on one line: the text is `white-space: pre-wrap`, and a newline
      between these tags would be drawn. -->
+<!-- An area's outline. Following the fold, its inner edge is a fold line —
+     dot and dash, the way a fold is marked on anything meant to be folded —
+     so the rect gives way to four lines, in percentages like the rect, so
+     nothing is measured. -->
+{#snippet outline(kind: string, fold: 'left' | 'right' | null)}
+	{#if fold}
+		{@const inner = fold === 'left' ? '0' : '100%'}
+		{@const outer = fold === 'left' ? '100%' : '0'}
+		<svg class="chrome {kind}" aria-hidden="true">
+			<line x1="0" y1="0" x2="100%" y2="0" />
+			<line x1="0" y1="100%" x2="100%" y2="100%" />
+			<line x1={outer} y1="0" x2={outer} y2="100%" />
+			<line class="fold" x1={inner} y1="0" x2={inner} y2="100%" />
+		</svg>
+	{:else}
+		<svg class="chrome {kind}" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+	{/if}
+{/snippet}
+
 {#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.unknown}<span class="unknown-placeholder" title="No column called this in the table — or the cell naming its own column">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
 
 <!-- The shears, which are also the switch between cutting and growing. Red and
@@ -1867,6 +1938,15 @@
 			{@html styleTag(customCss)}
 		{/if}
 
+		<!-- The page itself, as a template's CSS can name it: `#page-3`, and
+		     `.cover`, `.inside-cover`, `.inside-back-cover`, `.back-cover`,
+		     `.recto`, `.verso` — see `pageHooks`. Inside the trim rather than on
+		     it, because css.ts scopes every rule to `.trim …`, so `.cover .box`
+		     is `.trim .cover .box` and needs the class between the two. No box
+		     of its own (`display: contents`): every area is still placed against
+		     the trim, and nothing measures differently. -->
+		<div class="page-hooks {pageHooks.classes}" id={pageHooks.id}>
+
 		{#if interactive && guides}
 			<!-- The page margins, as a guide, on a toggle of their own beside the
 			     grid's: lines to place against and to snap to, which a page may
@@ -1879,6 +1959,15 @@
 				aria-hidden="true"
 				style="top:{m.top}mm;right:{m.right}mm;bottom:{m.bottom}mm;left:{m.left}mm"
 			></div>
+			{#if template.facing}
+				<!-- The fold: just outside the inner trim edge, past any bleed, so
+				     it is never taken for something on the paper. -->
+				<svg
+					class="fold-guide {verso ? 'right' : 'left'}"
+					aria-hidden="true"
+					style="--fold-off:{bleed}mm"
+				><line x1="50%" y1="0" x2="50%" y2="100%" /></svg>
+			{/if}
 		{/if}
 
 		{#each template.boxes as box (box.id)}
@@ -1941,6 +2030,7 @@
 				{/if}
 				<div
 					class="content"
+					style={columnsStyle(box)}
 					class:being-edited={editingId === box.id}
 					class:shifted={!!baselineOf(box, template.defaults) && (box.mode === 'plain' || box.mode === 'markdown')}
 				>
@@ -1973,6 +2063,7 @@
 									<img
 									src={media.src}
 									alt=""
+									class:drawn={drawnByHand(media.src)}
 									style="object-fit:{box.fit ?? 'contain'}{drawnByHand(media.src)
 										? ';image-rendering:pixelated'
 										: ''}"
@@ -2027,14 +2118,14 @@
 				<!-- Not on a selected area: the selection is its outline, and a dashed
 				     bound drawn under a solid one doubled every edge. -->
 				{#if bounds && !empty && !(interactive && isSelected(box)) && !isParked(box, template.page, bleed)}
-					<svg class="chrome bounds" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+					{@render outline('bounds', foldSide(box))}
 				{/if}
 				{#if interactive && isSelected(box)}
 					{#if box.padding}
 						<!-- Where the words actually start. -->
 						<svg class="chrome pad" aria-hidden="true"><rect width="100%" height="100%" /></svg>
 					{/if}
-					<svg class="chrome selection" aria-hidden="true"><rect width="100%" height="100%" /></svg>
+					{@render outline('selection', foldSide(box))}
 				{/if}
 
 				{#if bounds && !empty && box.overflow === 'grow' && (layout.heights[box.id] ?? box.h) > box.h + 0.05}
@@ -2284,6 +2375,7 @@
 		{#if guide.y !== null}
 			<span class="guide horizontal" style="top:{guide.y}mm"></span>
 		{/if}
+		</div>
 	</div>
 
 	{#if bleed > 0 && template.bleed.cropMarks}
@@ -2336,6 +2428,11 @@
 	.trim {
 		position: relative;
 		box-sizing: border-box;
+	}
+
+	/* A wrapper for the page's own id and classes, and nothing else. */
+	.page-hooks {
+		display: contents;
 	}
 
 	.box {
@@ -2490,6 +2587,33 @@
 		/* Solid, and an inset shadow rather than an outline: an outline is
 		   rounded to whole pixels of the zoomed card, and doubled at 200%. */
 		box-shadow: inset 0 0 0 var(--line) color-mix(in srgb, var(--accent-inverse) 55%, transparent);
+	}
+
+	/* The page's fold: a dot-dash line just outside the trim and any bleed,
+	   the margin guide's color — it is a guide, and toggles with them. The
+	   SVG is a hair wide and centred on the line, with the stroke left to
+	   spill out of it. */
+	.fold-guide {
+		position: absolute;
+		top: 0;
+		width: 2px;
+		height: 100%;
+		overflow: visible;
+		pointer-events: none;
+	}
+
+	.fold-guide line {
+		stroke: color-mix(in srgb, var(--accent-inverse) 80%, transparent);
+		stroke-width: var(--line);
+		stroke-dasharray: var(--line) calc(var(--line) * 3) calc(var(--line) * 8) calc(var(--line) * 3);
+	}
+
+	.fold-guide.left {
+		left: calc(-1 * var(--fold-off, 0mm) - 4px * var(--ui-scale, 1) - 1px);
+	}
+
+	.fold-guide.right {
+		right: calc(-1 * var(--fold-off, 0mm) - 4px * var(--ui-scale, 1) - 1px);
 	}
 
 	/* The stage's grid, under the trim and everything in it. Positioned from
@@ -2865,15 +2989,18 @@
 			z-index: 2;
 		}
 
-		.chrome rect {
+		.chrome rect,
+		.chrome line {
 			fill: none;
 			stroke-width: var(--line);
 		}
 
-		.bounds rect {
+		.bounds rect,
+		.bounds line {
 			stroke: var(--bounds-color, color-mix(in srgb, var(--accent) 45%, transparent));
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
+
 
 		/* A locked *design* is not a box that happens to be locked: nothing on the
 		   card can be moved, so nothing on it is worth coloring for a reason. The
@@ -2894,12 +3021,14 @@
 			--bounds-color: rgba(180, 35, 24, 0.8);
 		}
 
-		.box.locked .bounds rect {
+		.box.locked .bounds rect,
+		.box.locked .bounds line {
 			stroke-width: var(--line-thick);
 			stroke-dasharray: calc(var(--line) * 5) calc(var(--line) * 3);
 		}
 
-		.selection rect {
+		.selection rect,
+		.selection line {
 			stroke: var(--accent);
 		}
 
@@ -2907,13 +3036,33 @@
 			--bounds-color: rgba(0, 0, 0, 0.32);
 		}
 
-		.card.frozen .box.locked .bounds rect {
+		.card.frozen .box.locked .bounds rect,
+		.card.frozen .box.locked .bounds line {
 			stroke-width: var(--line);
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
 		}
 
-		.card.frozen .selection rect {
+		.card.frozen .selection rect,
+		.card.frozen .selection line {
 			stroke: rgba(0, 0, 0, 0.5);
+		}
+
+		/* An area's edge on the fold: dot and dash, where its other sides are
+		   dashes; selected, the dash grows, so the fold still reads against the
+		   solid selection. After every dash it overrides, frozen card included. */
+		/* Its dash the same length as the dashes beside it, so the dot is the
+		   one difference: 3 on a bound, 5 on a locked one's coarser dash. */
+		.bounds line.fold,
+		.card.frozen .box.locked .bounds line.fold {
+			stroke-dasharray: var(--line) calc(var(--line) * 2) calc(var(--line) * 3) calc(var(--line) * 2);
+		}
+
+		.box.locked .bounds line.fold {
+			stroke-dasharray: var(--line) calc(var(--line) * 2) calc(var(--line) * 5) calc(var(--line) * 2);
+		}
+
+		.selection line.fold {
+			stroke-dasharray: var(--line) calc(var(--line) * 2) calc(var(--line) * 10) calc(var(--line) * 2);
 		}
 
 		/* Positioned by the padding the box was given, so the guide moves with it

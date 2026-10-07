@@ -21,6 +21,9 @@
 		LIST_MARKERS,
 		baselineOf,
 		normaliseBaseline,
+		normaliseColumns,
+		DEFAULT_COLUMN_GAP,
+		MAX_COLUMNS,
 		normaliseList,
 		MIN_BOX,
 		MIN_LEADING,
@@ -62,7 +65,8 @@
 		onmappingchange: (mapping: Mapping) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
-		onresettemplate: () => void;
+		/** absent where there is no starter to reset to — see `starterOfTemplate` */
+		onresettemplate?: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
@@ -768,12 +772,17 @@
 						<option value="plain">Plain Text</option>
 						<option value="markdown">Markdown</option>
 						<!-- A column can hold a picture — a drawing, an address, a
-						     stored name — or a color, so a field offers both. Words
-						     typed into the template cannot be either: that is what
-						     the Image content type is for. -->
+						     stored name — so a field offers it. Words typed into the
+						     template cannot be one: that is what the Image content
+						     type is for. A color from a column is not a mode: it is
+						     the link beside Fill. Color stays listed only for an
+						     area a template made with it, so the menu shows what
+						     the area is. -->
 						{#if source === 'field'}
 							<option value="image">Image</option>
-							<option value="color">Color</option>
+							{#if selected.mode === 'color'}
+								<option value="color">Color</option>
+							{/if}
 						{/if}
 						<option value="qr">QR Code</option>
 					</select>
@@ -1053,11 +1062,11 @@
 					<input
 						type="checkbox"
 						checked={selected.mirror !== false}
-						title="Mirror this area onto left-hand pages, so it keeps its distance from the outer edge. Off pins it to the same millimetres on every page"
+						title="Mirror this area across the fold onto left-hand pages, so it keeps its distance from the outer edge and its inner side stays on the fold. Off pins it to the same millimetres on every page"
 						disabled={boxFrozen}
 						onchange={(e) => patch({ mirror: e.currentTarget.checked ? undefined : false })}
 					/>
-					Recto / Verso
+					Fold Follow
 				</label>
 			{/if}
 			<label class="field">
@@ -1148,6 +1157,47 @@
 						<ResetButton to="the page's baseline" disabled={boxFrozen} onclick={() => patch({ baseline: undefined })} />
 					{/if}
 				</label>
+			{/if}
+			{#if selected.mode === 'plain' || selected.mode === 'markdown'}
+				<!-- Blank, or 1, is one column — the field gone, as every other
+				     "not set" is. The gap only while there are columns to have one. -->
+				<label class="field">
+					<span>Columns</span>
+					<input
+						class="n-2"
+						type="number"
+						step="1"
+						min="1"
+						max={MAX_COLUMNS}
+						placeholder="1"
+						title="Set the words in 2 to {MAX_COLUMNS} columns side by side; blank or 1 for one"
+						value={selected.columns?.count ?? ''}
+						disabled={boxFrozen}
+						onchange={(e) =>
+							patch({
+								columns: normaliseColumns({
+									count: e.currentTarget.value,
+									gap: selected.columns?.gap ?? DEFAULT_COLUMN_GAP
+								})
+							})}
+					/>
+				</label>
+				{#if selected.columns}
+					<label class="field">
+						<span>Gap</span>
+						<input
+							class="n-3"
+							type="number"
+							step="0.5"
+							min="0"
+							title="Between one column and the next"
+							value={selected.columns.gap}
+							disabled={boxFrozen}
+							onchange={(e) => patch({ columns: normaliseColumns({ count: selected.columns!.count, gap: numeric(e, selected.columns!.gap) }) })}
+						/>
+						<span class="unit">mm</span>
+					</label>
+				{/if}
 			{/if}
 			<!-- How one paragraph is told from the next: a space in lines of this
 			     leading, or an indent in em. -->

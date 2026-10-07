@@ -33,7 +33,7 @@
 		undo as undoStep,
 		undoLabel
 	} from '$lib/history';
-	import { alignBoxes, bleedFor, type AlignEdge } from '$lib/layout';
+	import { alignBoxes, bleedFor, mirrors, pageSide, type AlignEdge } from '$lib/layout';
 	import {
 		ALIGN_LABELS,
 		applyStyle,
@@ -52,7 +52,7 @@
 	} from '$lib/boxops';
 	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport, withKey } from '$lib/keys';
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
-	import { isStarterTemplate, sampleDataset, starterTemplate } from '$lib/onboarding';
+	import { isStarterTemplate, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { cssIdent } from '$lib/css';
@@ -137,8 +137,16 @@
 	// The library menu used to make the bar taller on a phone while it was up,
 	// and this had to refuse that height as a floor. The menu is `fixed` now —
 	// see PageOptions — so every height the bar reports is one it stands at.
+	//
+	// Only a new height raises the floor, never the floor changing: reading
+	// `barFloor` here made the resize's reset to 0 re-run this at once, with the
+	// height measured at the old width, so a window widened from a phone kept
+	// the narrow width's wrapped height as its floor — a band of empty bar.
 	$effect(() => {
-		if (barHeight > barFloor) barFloor = barHeight;
+		const height = barHeight;
+		untrack(() => {
+			if (height > barFloor) barFloor = height;
+		});
 	});
 
 	let ui = $state<UiState>({ showBounds: true, showTies: false, showGrid: false, showGuides: true, smartGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
@@ -278,7 +286,7 @@
 	/** The draft says something the card is not showing yet. */
 	const cssDirty = $derived((cssDraft.trim() || undefined) !== (template.css ?? undefined));
 	const cssCount = $derived(codeStats(cssDraft));
-	// Page setup is a panel, not a mode: it opens on wide screens and stays out of
+	// The page bar is a panel, not a mode: it opens on wide screens and stays out of
 	// the way on a phone, where it would eat the preview it is there to serve.
 	let pageSetupOpen = $state(true);
 	// Same bargain for the table: on a phone the preview and the spreadsheet
@@ -316,6 +324,12 @@
 	}
 	/** Reset replaces the design, so it asks first — as deleting the data does. */
 	let resetting = $state(false);
+	/** The table's Reset, asking first like the template's. */
+	let resettingTable = $state(false);
+
+	/** The starters this template and this table began as, if they did — what Reset puts back. */
+	const templateStarter = $derived(starterOfTemplate(template));
+	const tableStarter = $derived(starterOfTable(dataset));
 	/**
 	 * Deleting asks for the same reason and one more: undo reaches what is on
 	 * screen, but the stored copy is gone the moment this runs.
@@ -330,7 +344,7 @@
 	 * without waiting on the database.
 	 */
 	let templateId = $state('');
-	/** the template the swap in Page Setup goes back to, or '' while there is none */
+	/** the template the swap in the page bar goes back to, or '' while there is none */
 	let previousTemplate = $state('');
 	let library = $state<TemplateEntry[]>([]);
 
@@ -550,7 +564,12 @@
 			'em, strong, code { }',
 			'hr { }',
 			'.page-number { }      /* the number on the card */',
-			".page-number .of::before { content: ' of ' }"
+			".page-number .of::before { content: ' of ' }",
+			'',
+			'#page-1 { }           /* a page by its number */',
+			'.cover { }            /* the first page; also .inside-cover, */',
+			'.back-cover { }       /* .inside-back-cover and the last page */',
+			'.recto { }            /* with Recto / Verso on: also .verso */'
 		].join('\n');
 	});
 
@@ -673,7 +692,7 @@
 	const lookupRows = $derived(inArrivalOrder(dataset));
 
 	/**
-	 * Columns a keyword has taken — `today`, `lookup` — which `%%name%%` can
+	 * Columns a keyword has taken — `today`, `lookup`, `page` — which `%%name%%` can
 	 * never reach. The table colours them; the status line says why, once per
 	 * set of them, so it is said when one appears and not on every keystroke.
 	 */
@@ -1316,6 +1335,25 @@
 		return () => clearTimeout(timer);
 	});
 
+	/**
+	 * Record what is on screen now, without waiting out the debounce. Undo
+	 * (and redo) pressed within a third of a second of a change used to find that change
+	 * not yet in the history: it undid the one before it, or — on a fresh
+	 * session, where nothing had been recorded — nothing at all, and the drag
+	 * just made stayed where it was. The debounced recorder cannot record it a
+	 * second time: what undo applies changes the state, which cancels its
+	 * timer, and the state it then sees is the present.
+	 */
+	function flushHistory() {
+		if (!ready) return;
+		const before = history;
+		history = record(history, snapshot(), pending);
+		if (history !== before) {
+			toggledOff = false;
+			pending = '';
+		}
+	}
+
 	function applySnapshot(next: Snapshot) {
 		template = structuredClone(next.template);
 		dataset = structuredClone(next.dataset);
@@ -1340,7 +1378,8 @@
 	}
 
 	function undo() {
-		if (!undoable) return;
+		flushHistory();
+		if (!canUndo(history)) return;
 		toggledOff = false;
 		const what = undoLabel(history);
 		history = undoStep(history);
@@ -1352,7 +1391,11 @@
 	}
 
 	function redo() {
-		if (!redoable) return;
+		// Recorded first, as undo does: a change made since the undo, still
+		// inside the debounce, used to be thrown away by the redo that
+		// restored the future it should have cleared.
+		flushHistory();
+		if (!canRedo(history)) return;
 		toggledOff = false;
 		const what = redoLabel(history);
 		history = redoStep(history);
@@ -1382,7 +1425,8 @@
 			redo();
 			return;
 		}
-		if (!undoable) return;
+		flushHistory();
+		if (!canUndo(history)) return;
 		undo();
 		// After undo(), which clears it: the flag says "this chord took the last
 		// change off", and only this chord may put it back.
@@ -1695,11 +1739,31 @@
 	 */
 	function resetTemplate() {
 		resetting = false;
+		const starter = templateStarter;
+		if (!starter) return;
 		describe('Reset the template');
-		template = starterTemplate();
+		// Under its own name: it is still this entry in the library, and a
+		// second copy is called "… 2" for a reason.
+		template = { ...starter.make(), name: template.name };
 		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
-		notify('Template reset to the A5 Starter Booklet. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
+		notify(`Template reset to the ${starter.name}. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.`);
+	}
+
+	/**
+	 * The rows only, back to the starter the table began as. The design and
+	 * the name are left where they are; one snapshot is template and data
+	 * together, so one undo brings the rows back.
+	 */
+	function resetTable() {
+		resettingTable = false;
+		const starter = tableStarter;
+		if (!starter || dataset.locked) return;
+		describe('Reset the table');
+		dataset = { ...starter.make(), name: dataset.name };
+		activeRow = 0;
+		mapping = autoMap(usedSlots(template), dataset.columns);
+		notify(`Table reset to ${starter.name}. Your design is untouched, and Ctrl/Cmd+Z brings the old rows back.`);
 	}
 
 	// ---- the template library -----------------------------------------------
@@ -1755,7 +1819,7 @@
 	}
 
 	/**
-	 * The template being left behind is the one the swap in Page Setup comes
+	 * The template being left behind is the one the swap in the page bar comes
 	 * back to — the same pair the table keeps. '' says there is no pair any more.
 	 */
 	function rememberTemplate(id: string) {
@@ -2201,8 +2265,13 @@
 		// Millimetres: the editor has no pixels, and a status line that invented
 		// them would be describing a different app.
 		describe(`Move ${Math.max(Math.abs(dx), Math.abs(dy))}mm`);
+		// Right is right on screen. On a left-hand page an area that follows the
+		// fold is drawn mirrored, so a step right there is a step left in the
+		// right-hand page's millimetres the template stores — the same undoing a
+		// mirrored drag goes through before it is written.
+		const verso = template.facing === true && pageSide(dataset.rows.length ? activeRow + 1 : null) === 'verso';
 		for (const box of targets) {
-			const next = nudge(box, dx, dy);
+			const next = nudge(box, verso && mirrors(box) ? -dx : dx, dy);
 			if (next) updateBox(next);
 		}
 	}
@@ -2286,7 +2355,7 @@
 	 * where nobody can see what it did.
 	 */
 	const dialogOpen = $derived(
-		helpOpen || whatsNewOpen || statusOpen || cssOpen || resetting || deleting || deletingTable || magic !== null
+		helpOpen || whatsNewOpen || statusOpen || cssOpen || resetting || resettingTable || deleting || deletingTable || magic !== null
 	);
 	/** Something in front of the stage, which then leaves the keys alone. */
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
@@ -2319,6 +2388,7 @@
 			statusOpen = false;
 			if (cssOpen) cancelCss();
 			resetting = false;
+			resettingTable = false;
 			deleting = false;
 			deletingTable = false;
 			magic = null;
@@ -2777,10 +2847,10 @@
 			aria-pressed={pageSetupOpen && !barBox}
 			aria-expanded={pageSetupOpen && !barBox}
 			title={barBox && pageSetupOpen
-				? 'Page setup — the area bar has the row; this takes it back'
-				: 'Show or hide the page setup'}
+				? 'Page — the area bar has the row; this takes it back'
+				: 'Show or hide the page settings'}
 		>
-			<Icon name="document-blank" size={15} /> <span class="label">Page Setup</span>
+			<Icon name="document-blank" size={15} /> <span class="label">Page</span>
 		</button>
 		<!-- Every stored picture, in a tray of its own in the table's place: the
 		     pictures are the browser's, not the page's — a row's own photograph
@@ -2837,7 +2907,7 @@
 	     whole toolbar from the top of the window: the stage changed height, the
 	     fitted scale changed with it, and the page you were working on jumped and
 	     resized under the pointer. The area bar takes the row while an area is
-	     selected; Page Setup takes it back, and lets go of the area to do it.
+	     selected; Page takes it back, and lets go of the area to do it.
 
 	     That leaves the two bars being different heights, which is the same jump
 	     again, smaller. So the row never shrinks: it is floored at the tallest bar
@@ -2897,7 +2967,9 @@
 						onmappingchange={(m) => (mapping = m)}
 						onduplicate={duplicateBox}
 						ondelete={deleteBox}
-						onresettemplate={() => (resetting = true)}
+						onresettemplate={templateStarter ? () => (resetting = true) : undefined}
+						onmagiclayout={openMagic}
+						hasColumns={dataset.columns.length > 0}
 						{library}
 						{templateId}
 						{editorFonts}
@@ -2932,7 +3004,9 @@
 						onmappingchange={(m) => (mapping = m)}
 						onduplicate={duplicateBox}
 						ondelete={deleteBox}
-						onresettemplate={() => (resetting = true)}
+						onresettemplate={templateStarter ? () => (resetting = true) : undefined}
+						onmagiclayout={openMagic}
+						hasColumns={dataset.columns.length > 0}
 						{library}
 						{templateId}
 						{editorFonts}
@@ -3068,8 +3142,6 @@
 			onundo={undo}
 			onredo={redo}
 			onaddbox={addTextBox}
-			onmagiclayout={openMagic}
-			hasColumns={dataset.columns.length > 0}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
 			onmenuclose={() => (boxMenu = null)}
 			{editingId}
@@ -3179,7 +3251,12 @@
 				{selectedColumn}
 				onactivate={(i) => (activeRow = i)}
 				onnotice={notify}
+				onwarn={(message) => {
+					notify(message, 'warning');
+					statusOpen = true;
+				}}
 				ongettingstarted={() => void gettingStarted()}
+				onresettable={tableStarter ? () => (resettingTable = true) : undefined}
 				openRequest={cellRequest}
 				{images}
 				{drawingFor}
@@ -3221,6 +3298,10 @@
 					// tray means to change it — there is a button for that.
 					const named = next.name === undefined && dataset.name ? { ...next, name: dataset.name } : next;
 					let kept = dataset.locked ? { ...named, locked: true } : named;
+					// And which starter it began as: an import into the Getting
+					// Started table is still that table, and Reset still puts the
+					// tour back in it.
+					if (dataset.starter && kept.starter === undefined) kept = { ...kept, starter: dataset.starter };
 					// Rows deleted or moved by hand are renumbered, and every lookup
 					// that named one follows it — in the template and in the cells,
 					// in the same edit, so one undo puts both back.
@@ -3328,10 +3409,12 @@
 		<div class="modal-actions">
 			{#if !template.locked}
 				<button
+					class="starter"
 					onclick={() => cssEditor?.insert(cssPlaceholder)}
 					title="Put the starter sheet into the editor, to edit rather than read"
+					aria-label="Starter sheet"
 				>
-					Starter
+					<Icon name="code-reference" size={15} /><span class="label">Starter</span>
 				</button>
 			{/if}
 			<span class="spacer"></span>
@@ -3355,13 +3438,30 @@
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the template?" use:armDefault>
 		<h2>Reset the template?</h2>
 		<p>
-			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the A5 Starter Booklet. Your rows are
+			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the {templateStarter?.name}. Your rows are
 			not touched.
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button onclick={() => (resetting = false)}>Cancel</button>
 			<button class="danger-solid" data-default onclick={resetTemplate}>Reset Template</button>
+		</div>
+	</div>
+{/if}
+
+<!-- The table's Reset, the same shape: a count, and what is left alone. -->
+{#if resettingTable}
+	<div class="modal-backdrop" role="presentation" onclick={() => (resettingTable = false)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the table?" use:armDefault>
+		<h2>Reset the table?</h2>
+		<p>
+			{dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'} go back to {tableStarter?.name}. Your design is
+			not touched.
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (resettingTable = false)}>Cancel</button>
+			<button class="danger-solid" data-default onclick={resetTable}>Reset Table</button>
 		</div>
 	</div>
 {/if}
@@ -3418,7 +3518,7 @@
 		<!-- The CSS dialog's header: a rule under the title, a × that cancels,
 		     and dragged by it, so the card it would replace can be seen. -->
 		<header class="modal-header drag-title" data-drag-handle>
-			<h2 id="magic-title">Position Areas Automagically</h2>
+			<h2 id="magic-title">Automatic Layout</h2>
 			<button class="icon" onclick={() => (magic = null)} title="Close without laying anything out" aria-label="Close">
 				<Icon name="close" size={16} />
 			</button>
@@ -3474,7 +3574,7 @@
 			<p class="magic-warning" role="status">
 				<Icon name="warning" size={13} />
 				<span>
-					Replaces the {template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} already on this card.
+					Replaces the {template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} already on this template.
 					Ctrl/Cmd+Z puts {template.boxes.length === 1 ? 'it' : 'them'} back.
 				</span>
 			</p>
@@ -3964,18 +4064,19 @@
 		color: #555;
 	}
 
-	/* A finger's target without a taller bar: the padding grows, and the same
-	   margin taken back keeps the row the height it was. */
+	/* A finger's target with hardly a taller bar: the padding grows and most
+	   of it is taken back as margin — but not all, or the button ran past the
+	   bar's own padding to its very edge. 2px stays clear above and below. */
 	@media (pointer: coarse) {
 		.status-bar .version,
 		.status-bar .ui-size {
-			margin: -6px -4px -6px 0;
-			padding: 8px 8px;
+			margin: -3px -4px -3px 0;
+			padding: 7px 8px;
 		}
 
 		/* At the left end, it gives its spare width back on that side. */
 		.status-bar .ui-size {
-			margin: -6px 0 -6px -8px;
+			margin: -3px 0 -3px -8px;
 		}
 	}
 
@@ -4380,6 +4481,20 @@
 		}
 	}
 
+	/* The CSS dialog's starter sheet: Carbon's code-reference glyph, and the
+	   word only where there is room for it, as the bars' buttons do. */
+	.modal-actions .starter {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	@media (max-width: 900px) {
+		.modal-actions .starter .label {
+			display: none;
+		}
+	}
+
 	.modal-actions {
 		display: flex;
 		align-items: center;
@@ -4504,11 +4619,11 @@
 	   would be under one of them. Out of the centre, back into the row, at its
 	   left end as on a desk, with every button to the right of the space. The
 	   controls win the row, because they are the ones you press. */
-	/* Larger text makes larger buttons, and at 150% on a 412px phone Page Setup
+	/* Larger text makes larger buttons, and at 150% on a 412px phone Page
 	   ran under a mark centred over the row. For as long as the text is larger
 	   than default, the row is laid out as at 320px below: the mark at the left
 	   end, then the space, then every button — Install and Help in front of
-	   Page Setup, as the wide bar has them. Help and Install had stayed at the
+	   Page, as the wide bar has them. Help and Install had stayed at the
 	   left, either side of the mark, which split the controls into two groups
 	   with the logo between them. */
 	@media (max-width: 900px) {
@@ -4570,7 +4685,7 @@
 			transform: none;
 			/* First, where a mark on the left sits on a desk — and with it on the
 			   left, Install and Help go back to where the wide bar has them: after
-			   the space, in front of Page Setup, in that order. */
+			   the space, in front of Page, in that order. */
 			order: 0;
 		}
 

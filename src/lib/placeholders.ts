@@ -10,11 +10,17 @@
  *
  * And `%%lookup:3:title%%` reaches past the card's own row: the title of the
  * row numbered 3 in the table. A price list, a legend, a "next up" — one row
- * that every card quotes.
+ * that every card quotes. `%%lookup:next:title%%` and
+ * `%%lookup:previous:title%%` are the rows numbered one after and one before
+ * the card's own, for a "turn over for…" or a running "previously".
  *
- * `today` and `lookup` are keywords, and a keyword always wins: a column that
- * happens to be called either cannot be written as `%%today%%` or
- * `%%lookup%%`, only reached from another row by a lookup. The table marks
+ * `%%page:current%%` and `%%page:total%%` are the card's place in the run, the
+ * numbers the page number prints, for an area that wants them in words of its
+ * own — "page 3 of 12", a running head, a folio set in the body face.
+ *
+ * `today`, `lookup` and `page` are keywords, and a keyword always wins: a
+ * column that happens to be called one cannot be written as `%%today%%`,
+ * `%%lookup%%` or `%%page%%`, only reached from another row by a lookup. The table marks
  * such a column, because a template that meant it would otherwise print the
  * date instead, silently. The other way round — the column winning — made
  * what a placeholder means depend on the table under it.
@@ -66,6 +72,10 @@ export interface PlaceholderContext {
 	 * like a name nothing answers to, because it is the same mistake.
 	 */
 	self?: string;
+	/** this card's place in the run, from 1, for `%%page:current%%` */
+	page?: number | null;
+	/** how many cards the run has, for `%%page:total%%` */
+	pageCount?: number | null;
 }
 
 /**
@@ -170,17 +180,59 @@ const PLACEHOLDER = /%%[ \t]*([\p{L}\p{N}_-][\p{L}\p{N}_ \t-]*?)[ \t]*(?::((?:(?
  * number: a row is named by its number, never by what it holds, because a
  * value to search for could be in any column and in more than one row, and
  * a card that quietly picked the first would print the wrong one unmarked.
+ *
+ * Or `next` and `previous`, a `step` from the card's own row rather than a
+ * number: by the same numbers, so "next" is the row numbered one more — the
+ * next page in a table nobody has sorted, and still the same row in one
+ * somebody has, which is the bargain a lookup by number already makes. No
+ * number in it, so nothing for `renumberLookups` to move.
  */
-function lookupOf(spec: string): { index: number; name: string } | null {
+type LookupSpec = { index: number; step?: undefined; name: string } | { index?: undefined; step: 1 | -1; name: string };
+
+const STEPS: Record<string, 1 | -1> = { next: 1, previous: -1 };
+
+function lookupOf(spec: string): LookupSpec | null {
 	const colon = spec.indexOf(':');
 	if (colon === -1) return null;
-	const number = spec.slice(0, colon).trim();
-	if (!/^\d+$/.test(number)) return null;
-	return { index: Number(number) - 1, name: spec.slice(colon + 1).trim() };
+	const which = spec.slice(0, colon).trim();
+	const name = spec.slice(colon + 1).trim();
+	const step = STEPS[which.toLowerCase()];
+	if (step) return { step, name };
+	if (!/^\d+$/.test(which)) return null;
+	return { index: Number(which) - 1, name };
+}
+
+/**
+ * Each row's place in `rows`, built once per version of the table and shared
+ * by every card drawn from it. Searching the rows for the card's own on every
+ * `next` or `previous` made a run of N cards N² comparisons; the table is a
+ * new array whenever it changes, so the array itself is the key, and an old
+ * version's index goes when nothing holds the array any more.
+ */
+const placesOf = new WeakMap<readonly Row[], Map<Row, number>>();
+
+function placeOf(rows: readonly Row[], row: Row): number | undefined {
+	let places = placesOf.get(rows);
+	if (!places) {
+		places = new Map(rows.map((r, i) => [r, i]));
+		placesOf.set(rows, places);
+	}
+	return places.get(row);
+}
+
+/** The row a lookup lands on, from where the card is: undefined when there is none. */
+function lookupRow(lookup: LookupSpec, rows: readonly Row[] | undefined, row: Row | null): Row | undefined {
+	if (!rows) return undefined;
+	if (lookup.step === undefined) return rows[lookup.index];
+	const own = row ? placeOf(rows, row) : undefined;
+	return own === undefined ? undefined : rows[own + lookup.step];
 }
 
 /** The words `%%…%%` means before it means any column. */
-export const KEYWORDS = ['today', 'lookup'] as const;
+export const KEYWORDS = ['today', 'lookup', 'page'] as const;
+
+/** What `%%page:…%%` can ask for, as the completion offers them. */
+export const PAGE_PLACEHOLDERS = ['page:current', 'page:total'] as const;
 
 /**
  * A column whose name a keyword takes: `%%name%%` can never reach it,
@@ -246,7 +298,7 @@ export function renumberLookups(
 	let orphaned = 0;
 	if (!text || !text.includes('%%')) return { text, renumbered, orphaned };
 	const next = text.replace(PLACEHOLDER, (whole, name: string, format?: string) => {
-		if (!isLookup(name) || format === undefined || !lookupOf(format)) return whole;
+		if (!isLookup(name) || format === undefined || lookupOf(format)?.index === undefined) return whole;
 		const digits = /\d+/.exec(format)!;
 		const to = moved.get(Number(digits[0]));
 		if (to === undefined || to === Number(digits[0])) return whole;
@@ -333,12 +385,19 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 		// Keywords before columns — see the top of this file.
 		if (isLookup(name)) {
 			const lookup = format === undefined ? null : lookupOf(format);
-			const target = lookup ? context.rows?.[lookup.index] : undefined;
+			const target = lookup ? lookupRow(lookup, context.rows, row) : undefined;
 			const column = target && lookup ? findColumn(lookup.name, Object.keys(target)) : undefined;
 			// Its own cell, reached the long way round, is still a cell quoting
 			// itself — see `self`.
 			if (!target || !column || (target === row && column === context.self)) return unknown(whole);
 			return String(target[column] ?? '');
+		}
+		if (name.toLowerCase() === 'page') {
+			// Left as written, and marked, where there is no run to count — the
+			// editor with no rows — or the part is neither of the two.
+			const part = format?.trim().toLowerCase();
+			const value = part === 'current' ? context.page : part === 'total' ? context.pageCount : null;
+			return value == null ? unknown(whole) : String(value);
 		}
 		if (name.toLowerCase() === 'today') {
 			now ??= context.now ?? new Date();
@@ -378,7 +437,7 @@ export function openPlaceholder(text: string, caret: number): { start: number; q
 }
 
 /**
- * What to offer for a query: the columns, then `today`, those starting with
+ * What to offer for a query: the columns, then `today` and the page's two, those starting with
  * what was typed ahead of those merely containing it, ignoring case.
  */
 export function placeholderChoices(query: string, columns: readonly string[]): string[] {
@@ -387,7 +446,7 @@ export function placeholderChoices(query: string, columns: readonly string[]): s
 	const lookup = /^(\s*lookup\s*:[^:]*:)([^:]*)$/i.exec(query);
 	if (lookup) return ranked(lookup[2], columns).map((name) => lookup[1] + name);
 	// A column a keyword has taken is not offered: choosing it would print the keyword.
-	return ranked(query, [...columns.filter((c) => !isKeyword(c)), 'today']);
+	return ranked(query, [...columns.filter((c) => !isKeyword(c)), 'today', ...PAGE_PLACEHOLDERS]);
 }
 
 function ranked(query: string, names: readonly string[]): string[] {

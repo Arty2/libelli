@@ -14,10 +14,11 @@ export const SCHEMA_VERSION = 5;
  * `image` is a picture, whichever way it was made: a drawing made in the app
  * and kept as base64 in the cell or the template, an address, or a name this
  * browser is holding — what the value is says which, and the renderer reads
- * it. `color` is a fill. `image` also accepts a color, because it used to be
- * the only mode for both and templates written then rely on it; a column of
- * brand colors is better off saying `color`, which refuses anything that is
- * not one.
+ * it. `color` is a fill: templates written with it still draw, but the menu
+ * no longer offers it, because a fill linked to a column (`colorFrom`) does
+ * the same on any area and keeps its words. `image` also accepts a color,
+ * because it used to be the only mode for both and templates written then
+ * rely on it.
  *
  * There was a `bitmap` mode beside `image` for drawings. It was the same
  * picture with a different way in, and switching between the two dropped
@@ -263,6 +264,18 @@ export interface TextStyle {
 	 * correction for one face is wrong for any other.
 	 */
 	baseline?: number;
+	/**
+	 * The words set in columns, side by side within the area, the gap between
+	 * them in mm. Two to six; absent is one column, which is every area that
+	 * has not asked.
+	 */
+	columns?: TextColumns;
+}
+
+/** See `TextStyle.columns`. */
+export interface TextColumns {
+	count: number;
+	gap: number;
 }
 
 export type Defaults = Required<
@@ -426,6 +439,14 @@ export interface Template {
 	css?: string;
 	/** freezes the whole design: no dragging, no resizing, no option changes */
 	locked?: boolean;
+	/**
+	 * Which of the bundled starters this template began as, by id — see
+	 * `STARTER_TEMPLATES` in onboarding.ts. What offers Reset, and what it
+	 * resets to. Kept through every edit, since a starter somebody has worked
+	 * in is the one most worth being able to put back; absent on anything
+	 * started any other way.
+	 */
+	starter?: string;
 }
 
 /** Runtime state — never written into a template file. */
@@ -453,6 +474,8 @@ export interface Dataset {
 	 * reload, and undo, keep it. Absent means the rows stand where they arrived.
 	 */
 	order?: number[];
+	/** Which bundled starter table this began as; see `Template.starter`. */
+	starter?: string;
 }
 
 export type Row = Record<string, string>;

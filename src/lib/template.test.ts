@@ -16,6 +16,7 @@ import {
 	normaliseParagraph,
 	normaliseList,
 	normaliseBaseline,
+	normaliseColumns,
 	baselineOf,
 	listOf,
 	arrangeBoxes,
@@ -659,5 +660,29 @@ describe('colors from a column', () => {
 		const raw = JSON.parse(JSON.stringify(t));
 		raw.boxes[0].colorFrom = { fill: 'status', text: '' };
 		expect(normaliseTemplate(raw).boxes[0].colorFrom).toEqual({ fill: 'status' });
+	});
+});
+
+describe('normaliseColumns', () => {
+	it('keeps two to six whole columns and a gap of nothing or more', () => {
+		expect(normaliseColumns({ count: 3, gap: 4 })).toEqual({ count: 3, gap: 4 });
+		expect(normaliseColumns({ count: '2', gap: '0' })).toEqual({ count: 2, gap: 0 });
+		expect(normaliseColumns({ count: 9, gap: -2 })).toEqual({ count: 6, gap: 0 });
+		expect(normaliseColumns({ count: 2.6 })).toEqual({ count: 3, gap: 5 });
+	});
+
+	it('is one column — no field — for fewer than two, or nothing readable', () => {
+		expect(normaliseColumns({ count: 1, gap: 5 })).toBeUndefined();
+		expect(normaliseColumns({ count: '', gap: 5 })).toBeUndefined();
+		expect(normaliseColumns('three')).toBeUndefined();
+		expect(normaliseColumns(undefined)).toBeUndefined();
+	});
+
+	it('survives a template trip, and is dropped from one that does not say', () => {
+		const box = { id: 'a', slot: null, x: 0, y: 0, w: 50, h: 20, mode: 'plain', columns: { count: 4, gap: 3 } };
+		const t = normaliseTemplate({ ...builtinTemplate(), boxes: [box] });
+		expect(t.boxes[0].columns).toEqual({ count: 4, gap: 3 });
+		const plain = normaliseTemplate({ ...builtinTemplate(), boxes: [{ ...box, columns: undefined }] });
+		expect('columns' in plain.boxes[0]).toBe(false);
 	});
 });
