@@ -465,11 +465,14 @@
 	display: none;
 }
 
-/* Too narrow for the label and a name worth reading — a phone, or a large
-   text size — the picker is the glyph and the caret: one button that opens
-   the menu, rather than a sliver of name with the caret run over the swap
-   beside it. Renaming waits for a wider row. */
-@container (max-width: 10rem) {
+/* Too narrow for a name worth reading, the picker is the glyph and the
+   caret: one button that opens the menu, rather than a sliver of name with
+   the caret run over the swap beside it. Renaming waits for a wider row.
+   5rem, as the table's picker: it was 10rem when a long name was cut off
+   mid-letter, and once Layout joined the row that put an ordinary phone
+   under it — the name gone and the room it left standing empty — where an
+   ellipsis now reads fine at half that. */
+@container (max-width: 5rem) {
 	.options .field.picker > span:first-child,
 	.options .field.picker input {
 		display: none;
