@@ -853,6 +853,16 @@ export function missingLocalFonts(t: Template, available: Set<string>): FontRef[
 }
 
 /**
+ * A template read from a file somebody handed over. It arrives without a
+ * starter mark even when the file has one — one exported before files left it
+ * out — because Reset would put our starter over the design they sent.
+ */
+export function importedTemplate(raw: unknown): Template {
+	const { starter: _starter, ...template } = normaliseTemplate(raw);
+	return template;
+}
+
+/**
  * A template as a file. Without its starter mark: the mark says which bundled
  * starter this copy began as in this browser, and in somebody else's library
  * it would offer them a Reset that replaces the design they were sent with

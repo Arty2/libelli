@@ -28,6 +28,7 @@ import {
 	sidesOf,
 	builtinTemplate,
 	exportTemplate,
+	importedTemplate,
 	frameHeight,
 	newBox,
 	normaliseTemplate,
@@ -695,5 +696,10 @@ describe('exportTemplate', () => {
 		const file = JSON.parse(exportTemplate(t));
 		expect('starter' in file).toBe(false);
 		expect(file.name).toBe(t.name);
+	});
+
+	it('and an import leaves behind a mark an older file still carries', () => {
+		const old = { ...JSON.parse(JSON.stringify(builtinTemplate())), starter: 'a5-starter-booklet' };
+		expect('starter' in importedTemplate(old)).toBe(false);
 	});
 });

@@ -66,6 +66,14 @@ function wrap(text: string, prefix: string): string[] {
 	return lines;
 }
 
+/**
+ * Words from the template as they may go into the comment: a font name or a
+ * color is the template's to say, and the two characters that end a CSS
+ * comment, star then slash, in one would close it early and turn the rest of
+ * the facts into rules in the sheet.
+ */
+const inComment = (text: string) => text.replace(/\*\//g, '* /');
+
 /** The facts, as one comment: what a model needs and nothing it can guess. */
 function header(template: Template): string[] {
 	const { page, defaults: d } = template;
@@ -75,8 +83,8 @@ function header(template: Template): string[] {
 	);
 	return [
 		`/* Page ${round(page.w)} × ${round(page.h)} mm, margins ${round(m.top)} ${round(m.right)} ${round(m.bottom)} ${round(m.left)}, bleed ${round(bleedFor(template.bleed))}${template.facing ? ', facing pages' : ''}.`,
-		`   Text ${d.font} ${round(d.size)}pt/${round(d.lineHeight)} ${d.color}.`,
-		...wrap(`Fonts: ${fonts.join(', ')}.`, '   '),
+		`   Text ${inComment(d.font)} ${round(d.size)}pt/${round(d.lineHeight)} ${inComment(d.color)}.`,
+		...wrap(`Fonts: ${inComment(fonts.join(', '))}.`, '   '),
 		// Read-only, and it says so: they are the page settings coming out to the
 		// sheet, and a sheet that sets one changes only what its own rules read.
 		...wrap(`Read-only vars: ${cardVars(template).map(([name]) => name).join(' ')}.`, '   '),
@@ -103,7 +111,7 @@ function selectors(template: Template): string[] {
 		// what they style, which is the form the kit shows.
 		`${'#page-1 .box { }'.padEnd(18)} /* one page by its number */`,
 		`${'.cover .box { }'.padEnd(18)} /* also .back-cover, .recto, .verso */`,
-		`${'.theme-dark { }'.padEnd(18)} /* screen only; also .theme-dark-page */`
+		`${'.theme-dark .box { }'.padEnd(18)} /* screen only; also .theme-dark-page */`
 	];
 }
 

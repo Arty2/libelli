@@ -15,6 +15,16 @@ describe('cssKit', () => {
 		expect(header).toContain(template.defaults.font);
 	});
 
+	it('cannot be closed early by a name the template carries', () => {
+		const t = starterTemplate();
+		t.defaults = { ...t.defaults, font: 'Evil */ body { display: none } /*' };
+		const header = cssKit(t).slice(0, cssKit(t).indexOf('*/') + 2);
+		// The comment's first end is its own: everything after the font is
+		// still inside it, the name's star-slash defused.
+		expect(header).toContain('Read-only vars');
+		expect(header).toContain('Evil * / body');
+	});
+
 	it('names every named area once, by the id it wears', () => {
 		expect(kit).toContain('#notes ');
 		expect(kit).toContain('#sketch ');

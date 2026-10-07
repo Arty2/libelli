@@ -1374,7 +1374,7 @@
 		onunlock?.();
 	}
 
-	function padDrop() {
+	function padDrop(event?: PointerEvent) {
 		cancelPadHide();
 		if (padDrag && padPast > PAD_THROW) {
 			padHidden = true;
@@ -1385,7 +1385,11 @@
 			const first = padTrail[0];
 			const last = padTrail[padTrail.length - 1];
 			const dt = last.t - first.t;
-			if (dt > 0) {
+			// A finger held still before it lifts sends no moves, so the trail
+			// still holds the fast part of the drag: a pause before letting go
+			// is a placement, whatever the speed before it.
+			const paused = event ? event.timeStamp - last.t > 60 : false;
+			if (dt > 0 && !paused) {
 				const vx = (last.x - first.x) / dt;
 				const vy = (last.y - first.y) / dt;
 				if (Math.hypot(vx, vy) > PAD_FLICK) glidePad(vx, vy);

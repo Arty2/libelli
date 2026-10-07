@@ -80,7 +80,10 @@
 		/**
 		 * The interface's theme, as this page is seen in it — `theme-light`,
 		 * `theme-dark` or `theme-dark-page` on the page, for a template's CSS.
-		 * Light unless said: only the editor's page is ever seen inverted.
+		 * Light unless said, and only the editor's page says otherwise. The
+		 * print screen's thumbnails are inverted with dark-page too, but stay
+		 * light here on purpose: PNG export reads those same thumbnails, and a
+		 * dark-only rule must never be baked into a file.
 		 */
 		theme?: Theme;
 		/** the area whose words are being typed straight into the card, if any */

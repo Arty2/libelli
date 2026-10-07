@@ -70,6 +70,7 @@
 		autoMap,
 		blankTemplate,
 		exportTemplate,
+		importedTemplate,
 		newBox,
 		nextBoxId,
 		arrangeBoxes,
@@ -2623,7 +2624,7 @@
 		try {
 			const raw = JSON.parse(await file.text());
 			await flushTemplate();
-			template = normaliseTemplate(raw);
+			template = importedTemplate(raw);
 			selectedIds = [];
 			// An import joins the library rather than replacing what is loaded:
 			// a file someone handed you is a template you now have, not a
@@ -3263,12 +3264,12 @@
 					// And every color an area takes from it, which names the column
 					// itself rather than a slot. Only when one does, so a rename
 					// that touches no color leaves the template alone.
-					const renamed = (sources: ColorSources) =>
+					const remapSources = (sources: ColorSources) =>
 						Object.fromEntries(Object.entries(sources).map(([k, c]) => [k, c === from ? to : c]));
 					if (template.boxes.some((b) => Object.values(b.colorFrom ?? {}).includes(from))) {
 						template = {
 							...template,
-							boxes: template.boxes.map((b) => (b.colorFrom ? { ...b, colorFrom: renamed(b.colorFrom) } : b))
+							boxes: template.boxes.map((b) => (b.colorFrom ? { ...b, colorFrom: remapSources(b.colorFrom) } : b))
 						};
 					}
 				}}
