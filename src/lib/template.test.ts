@@ -27,6 +27,7 @@ import {
 	normaliseRotation,
 	sidesOf,
 	builtinTemplate,
+	exportTemplate,
 	frameHeight,
 	newBox,
 	normaliseTemplate,
@@ -684,5 +685,15 @@ describe('normaliseColumns', () => {
 		expect(t.boxes[0].columns).toEqual({ count: 4, gap: 3 });
 		const plain = normaliseTemplate({ ...builtinTemplate(), boxes: [{ ...box, columns: undefined }] });
 		expect('columns' in plain.boxes[0]).toBe(false);
+	});
+});
+
+describe('exportTemplate', () => {
+	it('leaves the starter mark behind: it is this browser\'s, not the design\'s', () => {
+		const t = normaliseTemplate({ ...JSON.parse(JSON.stringify(builtinTemplate())), starter: 'a5-starter-booklet' });
+		expect(t.starter).toBe('a5-starter-booklet');
+		const file = JSON.parse(exportTemplate(t));
+		expect('starter' in file).toBe(false);
+		expect(file.name).toBe(t.name);
 	});
 });

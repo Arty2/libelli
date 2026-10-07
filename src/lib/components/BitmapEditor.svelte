@@ -542,6 +542,9 @@
 	 */
 	let measuring: ReturnType<typeof setTimeout> | undefined;
 	let measured = 0;
+	// A stroke and a quick close would otherwise still pack the whole drawing
+	// for a board nobody can see.
+	$effect(() => () => clearTimeout(measuring));
 	function measure() {
 		clearTimeout(measuring);
 		measuring = setTimeout(async () => {

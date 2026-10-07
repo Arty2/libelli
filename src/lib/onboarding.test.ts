@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isStarterTemplate, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from './onboarding';
+import { isStarterTemplate, renamed, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from './onboarding';
 import { normaliseTemplate } from './template';
 
 describe('isStarterTemplate', () => {
@@ -46,5 +46,24 @@ describe('which starter something began as', () => {
 		expect(starterOfTemplate({ ...starterTemplate(), starter: 'gone' })).toBeNull();
 		expect(starterOfTable({ columns: [], rows: [], name: 'Getting Started list' })).toBeNull();
 		expect(starterOfTable({ columns: [], rows: [] })).toBeNull();
+	});
+});
+
+describe('renamed', () => {
+	it('drops the starter mark when the name changes, for a template and a table', () => {
+		const template = renamed(starterTemplate(), 'My zine');
+		expect(template.name).toBe('My zine');
+		expect('starter' in template).toBe(false);
+		expect(starterOfTemplate(template)).toBeNull();
+		const table = renamed(sampleDataset(), 'Guests');
+		expect('starter' in table).toBe(false);
+		expect(starterOfTable(table)).toBeNull();
+	});
+
+	it('keeps it when the name is the same, and removes the name when cleared', () => {
+		const same = starterTemplate();
+		expect(renamed(same, same.name)).toBe(same);
+		const cleared = renamed(sampleDataset(), undefined);
+		expect('name' in cleared || 'starter' in cleared).toBe(false);
 	});
 });

@@ -305,6 +305,19 @@ export function guessRoles(columns: string[], rows: Row[]): FieldGuess[] {
 		classifyColumn(column, rows.map((row) => row[column] ?? ''))
 	);
 
+	// A Notes column is notes beside a body. Where nothing else is prose and
+	// it is — paragraphs, not a line — it is the card's text, and laying it
+	// out as a grey footnote under an empty body was the wrong way round. The
+	// first such one, in column order; any others stay notes.
+	if (!guesses.some((g) => g.kind === 'body' && g.include !== false)) {
+		const prose = guesses.find((g) => {
+			if (g.kind !== 'notes' || g.include === false) return false;
+			const values = rows.map((row) => row[g.column] ?? '');
+			return columnStats(values).median > BODY_LENGTH || values.some((v) => MARKUP.test(v));
+		});
+		if (prose) prose.kind = 'body';
+	}
+
 	const only = (kind: FieldKind, keep: (g: FieldGuess) => boolean, demote: FieldKind = 'label') => {
 		let kept = false;
 		for (const guess of guesses) {

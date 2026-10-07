@@ -196,7 +196,9 @@ function lookupOf(spec: string): LookupSpec | null {
 	if (colon === -1) return null;
 	const which = spec.slice(0, colon).trim();
 	const name = spec.slice(colon + 1).trim();
-	const step = STEPS[which.toLowerCase()];
+	// Own keys only: a bare object would also answer to `constructor`.
+	const key = which.toLowerCase();
+	const step = Object.hasOwn(STEPS, key) ? STEPS[key] : undefined;
 	if (step) return { step, name };
 	if (!/^\d+$/.test(which)) return null;
 	return { index: Number(which) - 1, name };
@@ -226,6 +228,18 @@ function lookupRow(lookup: LookupSpec, rows: readonly Row[] | undefined, row: Ro
 	if (lookup.step === undefined) return rows[lookup.index];
 	const own = row ? placeOf(rows, row) : undefined;
 	return own === undefined ? undefined : rows[own + lookup.step];
+}
+
+/**
+ * A `next` on the last row, or a `previous` on the first: the card is in the
+ * run, and the run ends. That is not a mistake in the text — every booklet
+ * with a "turn over for…" footer has a last page — so it reads as nothing
+ * rather than as the placeholder printed on paper. Only at the ends: a row
+ * that is not in the table at all is still marked, and so is a column the
+ * table does not have.
+ */
+function pastTheEnd(lookup: LookupSpec, rows: readonly Row[] | undefined, row: Row | null): boolean {
+	return lookup.step !== undefined && !!rows && !!row && placeOf(rows, row) !== undefined && !!findColumn(lookup.name, Object.keys(row));
 }
 
 /** The words `%%…%%` means before it means any column. */
@@ -386,6 +400,7 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 		if (isLookup(name)) {
 			const lookup = format === undefined ? null : lookupOf(format);
 			const target = lookup ? lookupRow(lookup, context.rows, row) : undefined;
+			if (!target && lookup && pastTheEnd(lookup, context.rows, row)) return '';
 			const column = target && lookup ? findColumn(lookup.name, Object.keys(target)) : undefined;
 			// Its own cell, reached the long way round, is still a cell quoting
 			// itself — see `self`.

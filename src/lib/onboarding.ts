@@ -57,6 +57,20 @@ function starterOf<T extends { name?: string; starter?: string }>(item: T, start
 	return starters.find((s) => name === s.name || numbered(s)) ?? null;
 }
 
+/**
+ * A rename by hand, and with it the end of being a starter: the starter mark
+ * goes, so Reset is no longer offered and the menus stop calling it the
+ * starter. Renaming is the plainest way of saying "this one is mine now", and
+ * a renamed copy that still offered to put the starter back was offering to
+ * throw it away. Only a rename somebody makes: the numbered copies the app
+ * names itself (`freeName`) keep the mark. The same name is not a rename.
+ */
+export function renamed<T extends { name?: string; starter?: string }>(item: T, name: string | undefined): T {
+	if (name === item.name) return item;
+	const { starter: _starter, name: _name, ...rest } = item;
+	return (name === undefined ? rest : { ...rest, name }) as T;
+}
+
 export const starterOfTemplate = (template: Template) => starterOf(template, STARTER_TEMPLATES);
 export const starterOfTable = (dataset: Dataset) => starterOf(dataset, STARTER_TABLES);
 

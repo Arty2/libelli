@@ -115,6 +115,16 @@ describe('classifyColumn', () => {
 });
 
 describe('guessRoles', () => {
+	it('makes a prose Notes column the body when nothing else is one, and leaves it notes beside a body', () => {
+		const long = 'Paragraph after paragraph of the card’s own words, which run on well past any footnote. '.repeat(3);
+		const alone = guessRoles(['Title', 'Notes'], [{ Title: 'One', Notes: long }, { Title: 'Two', Notes: long }]);
+		expect(alone.find((g) => g.column === 'Notes')?.kind).toBe('body');
+		const beside = guessRoles(['Title', 'Body', 'Notes'], [{ Title: 'One', Body: long, Notes: long }]);
+		expect(beside.find((g) => g.column === 'Notes')?.kind).toBe('notes');
+		const short = guessRoles(['Title', 'Notes'], [{ Title: 'One', Notes: 'See p. 4' }]);
+		expect(short.find((g) => g.column === 'Notes')?.kind).toBe('notes');
+	});
+
 	const rows = (columns: Record<string, string[]>): Row[] => {
 		const names = Object.keys(columns);
 		const length = Math.max(...names.map((n) => columns[n].length));

@@ -852,6 +852,13 @@ export function missingLocalFonts(t: Template, available: Set<string>): FontRef[
 	return t.fonts.filter((f) => f.source === 'local' && !available.has(f.ref ?? f.family));
 }
 
+/**
+ * A template as a file. Without its starter mark: the mark says which bundled
+ * starter this copy began as in this browser, and in somebody else's library
+ * it would offer them a Reset that replaces the design they were sent with
+ * our starter.
+ */
 export function exportTemplate(t: Template): string {
-	return JSON.stringify(t, null, 2);
+	const { starter: _starter, ...shared } = t;
+	return JSON.stringify(shared, null, 2);
 }

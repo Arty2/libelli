@@ -620,8 +620,9 @@ without sharing anything else. **A5 Starter Booklet** opens the design a first r
 lands on, as it came: a copy nobody has changed if you have one, or a new one
 beside the rest — it never touches the template that is open. Reset puts the
 starter this template began as back over it, under the same name. A template
-remembers which starter it began as however it is renamed or changed; one made
-with New Template or imported from elsewhere has none, and no Reset; Delete removes the template and opens the next one, or a new empty
+remembers which starter it began as however it is changed, until you rename
+it — a renamed copy is yours, and Reset goes. One made with New Template or
+imported from elsewhere has none, and an exported file never carries it; Delete removes the template and opens the next one, or a new empty
 template when it was the last one, so the card a first run lands on can be
 deleted like any other. Both ask first, and both are one Ctrl/Cmd+Z away — an
 undone delete is written back out under the id it had. The menu opens over the
@@ -854,7 +855,7 @@ a notice can appear.
   ticked. Under a rule, **New Table** and **Getting Started**; under another,
   **Paste…**, **Import…** and **Export**; and under a third, in red, **Reset…**
   and **Delete Table…**. Reset is there only on a table that began as a
-  starter — Getting Started — and puts its rows back, asking first, with the
+  starter — Getting Started — and not renamed since, and puts its rows back, asking first, with the
   design and the table's name left alone and one Ctrl/Cmd+Z to undo it.
   Delete is the only way to delete one; there
   is no separate button to empty the table. A design and a table are kept apart on purpose — one design prints

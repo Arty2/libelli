@@ -54,7 +54,7 @@
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
 	import { cssKit } from '$lib/csskit';
 	import { loadTurn, saveTurn, type OutputTurn } from '$lib/turn';
-	import { isStarterTemplate, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from '$lib/onboarding';
+	import { renamed, isStarterTemplate, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { codeStats } from '$lib/csscode';
@@ -2071,9 +2071,9 @@
 	function renameDataset(name: string) {
 		const wanted = name.trim();
 		describe('Rename the table');
-		// Clearing the name removes it, and only it: the lock and the rows' order stay.
-		const { name: _name, ...unnamed } = dataset;
-		dataset = wanted ? { ...dataset, name: wanted } : unnamed;
+		// Clearing the name removes it, and the lock and the rows' order stay.
+		// A starter table renamed stops being the starter (`renamed`).
+		dataset = renamed(dataset, wanted || undefined);
 	}
 
 	/**
