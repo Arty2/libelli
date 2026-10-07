@@ -1214,10 +1214,23 @@
 	 */
 	let padTrail: { x: number; y: number; t: number }[] = [];
 	let padGlide: number | null = null;
-	/** Fraction of the speed kept per millisecond — about 0.32s to slow by two thirds. */
-	const PAD_FRICTION = 0.9965;
+	/**
+	 * Fraction of the speed kept per millisecond — about 0.16s to slow by two
+	 * thirds. Heavy on purpose: the pad is a thing to place, and a light one
+	 * that sailed across the stage felt like it had got away.
+	 */
+	const PAD_FRICTION = 0.993;
 	/** Below this, in px per ms, a release is a placement rather than a flick. */
-	const PAD_FLICK = 0.25;
+	const PAD_FLICK = 0.35;
+	/**
+	 * Whether the pad is against an edge of the stage, so meeting one buzzes
+	 * once — on a drag or a glide, by touch — and sliding along it does not.
+	 */
+	let padAtEdge = false;
+	function meetEdge(clamped: boolean, touch: boolean) {
+		if (clamped && !padAtEdge && touch) vibrate(HOLD_MS);
+		padAtEdge = clamped;
+	}
 
 	function stopGlide() {
 		if (padGlide !== null) cancelAnimationFrame(padGlide);
@@ -1227,7 +1240,7 @@
 	// A glide still running when the stage goes away has nothing left to move.
 	$effect(() => stopGlide);
 
-	function glidePad(vx: number, vy: number) {
+	function glidePad(vx: number, vy: number, touch: boolean) {
 		if (!host || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 		const stage = host.getBoundingClientRect();
 		let last = performance.now();
@@ -1239,10 +1252,15 @@
 			vy *= keep;
 			// `right` and `bottom` grow towards the top left, the other way to
 			// the pointer's x and y.
-			padAt = {
-				right: stashPad(padAt.right - vx * dt, stage.width),
-				bottom: stashPad(padAt.bottom - vy * dt, stage.height)
-			};
+			const wanted = { right: padAt.right - vx * dt, bottom: padAt.bottom - vy * dt };
+			padAt = { right: stashPad(wanted.right, stage.width), bottom: stashPad(wanted.bottom, stage.height) };
+			// Against an edge the pad stops on that axis, as a thing slid into a
+			// wall does, and the hand feels it arrive.
+			const hitX = padAt.right !== wanted.right;
+			const hitY = padAt.bottom !== wanted.bottom;
+			if (hitX) vx = 0;
+			if (hitY) vy = 0;
+			meetEdge(hitX || hitY, touch);
 			if (Math.hypot(vx, vy) < 0.02) {
 				padGlide = null;
 				return;
@@ -1255,6 +1273,14 @@
 	function padPickup(event: PointerEvent) {
 		if (event.button !== 0) return;
 		stopGlide();
+		// Picked up where it already rests against an edge, it has not just met it.
+		const stage = host?.getBoundingClientRect();
+		padAtEdge =
+			!!stage &&
+			(padAt.right !== stashPad(padAt.right + 1, stage.width) - 1 ||
+				padAt.bottom !== stashPad(padAt.bottom + 1, stage.height) - 1 ||
+				padAt.right !== stashPad(padAt.right - 1, stage.width) + 1 ||
+				padAt.bottom !== stashPad(padAt.bottom - 1, stage.height) + 1);
 		padTrail = [{ x: event.clientX, y: event.clientY, t: event.timeStamp }];
 		padPress = { x: event.clientX, y: event.clientY, from: { ...padAt } };
 		// Captured now, so a quick drag that leaves the button still brings the pad.
@@ -1307,6 +1333,7 @@
 			bottom: padDrag.from.bottom - (event.clientY - padDrag.y)
 		};
 		padAt = { right: stashPad(wanted.right, stage.width), bottom: stashPad(wanted.bottom, stage.height) };
+		meetEdge(padAt.right !== wanted.right || padAt.bottom !== wanted.bottom, event.pointerType === 'touch');
 		padTrail.push({ x: event.clientX, y: event.clientY, t: event.timeStamp });
 		while (padTrail.length > 2 && event.timeStamp - padTrail[0].t > 80) padTrail.shift();
 		// How far the finger has gone on past where the pad stopped: pushed on
@@ -1392,7 +1419,7 @@
 			if (dt > 0 && !paused) {
 				const vx = (last.x - first.x) / dt;
 				const vy = (last.y - first.y) / dt;
-				if (Math.hypot(vx, vy) > PAD_FLICK) glidePad(vx, vy);
+				if (Math.hypot(vx, vy) > PAD_FLICK) glidePad(vx, vy, event?.pointerType === 'touch');
 			}
 		}
 		padTrail = [];
