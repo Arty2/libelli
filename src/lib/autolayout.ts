@@ -42,7 +42,7 @@ import type { Box, Defaults, Mapping, PageSpec, Row } from './types';
  * the subtitle — the medium of a work, a film's duration, a size — because it
  * belongs to the heading it describes. A `credit` is the very last line of the
  * card, under the rest of the foot, where a credit line is printed. A
- * `footnote` is small type straight under the body — Markdown, like the body,
+ * `notes` is small type straight under the body — Markdown, like the body,
  * since a note is often a sentence with a link in it — and the body leaves it
  * room above the foot rather than running down to it.
  */
@@ -51,7 +51,7 @@ export type FieldKind =
 	| 'subtitle'
 	| 'detail'
 	| 'body'
-	| 'footnote'
+	| 'notes'
 	| 'label'
 	| 'credit'
 	| 'number'
@@ -87,7 +87,7 @@ export const FIELD_KINDS: FieldKind[] = [
 	'subtitle',
 	'detail',
 	'body',
-	'footnote',
+	'notes',
 	'label',
 	'number',
 	'date',
@@ -102,7 +102,7 @@ export const KIND_LABELS: Record<FieldKind, string> = {
 	subtitle: 'Subtitle',
 	detail: 'Detail',
 	body: 'Body',
-	footnote: 'Footnote',
+	notes: 'Notes',
 	label: 'Byline',
 	number: 'Number',
 	date: 'Date',
@@ -142,11 +142,13 @@ const NAME_HINTS: Array<[FieldKind, string[]]> = [
 	// `detail` and `credit` first: they are the most specific, and a heading
 	// that names one — Running time, Photo credit — is sure of it.
 	['detail', ['medium', 'media', 'material', 'materials', 'technique', 'dimensions', 'duration', 'runtime', 'runningtime', 'length', 'edition', 'format', 'instrumentation', 'ingredients']],
-	['footnote', ['footnote', 'footnotes', 'endnote', 'endnotes', 'annotation', 'annotations', 'sidenote', 'aside', 'fn']],
+	// Notes, under either name and in either number: a column called Note is
+	// as much a note as one called Footnotes, and it used to be read as body.
+	['notes', ['note', 'notes', 'footnote', 'footnotes', 'endnote', 'endnotes', 'annotation', 'annotations', 'sidenote', 'sidenotes', 'aside', 'fn']],
 	['credit', ['credit', 'credits', 'photocredit', 'copyright', 'courtesy', 'acknowledgement', 'acknowledgements', 'acknowledgment', 'rights', 'license', 'licence', 'collection', 'lender', 'provenance', 'source', 'sponsor', 'sponsors', 'funding']],
 	['title', ['title', 'name', 'heading', 'header', 'headline', 'card', 'product', 'item', 'term', 'word', 'question', ...PEOPLE]],
 	['subtitle', ['subtitle', 'sub', 'tagline', 'caption', 'role', 'byline', 'strapline', 'summary', 'artwork', 'work', 'piece', 'series', 'album', 'track', 'song', 'film', 'book', 'show', 'project', 'position', 'jobtitle', 'affiliation', 'organisation', 'organization', 'company']],
-	['body', ['body', 'content', 'text', 'description', 'desc', 'notes', 'note', 'detail', 'details', 'answer', 'markdown', 'definition', 'about', 'bio', 'biography', 'statement', 'abstract', 'synopsis', 'blurb', 'story', 'excerpt', 'quote', 'comment', 'comments', 'review', 'overview', 'info', 'information']],
+	['body', ['body', 'content', 'text', 'description', 'desc', 'detail', 'details', 'answer', 'markdown', 'definition', 'about', 'bio', 'biography', 'statement', 'abstract', 'synopsis', 'blurb', 'story', 'excerpt', 'quote', 'comment', 'comments', 'review', 'overview', 'info', 'information']],
 	['label', ['category', 'tag', 'tags', 'section', 'group', 'type', 'kind', 'class', 'status', 'level', 'set', 'genre', 'theme', 'topic', 'location', 'venue', 'place', 'room', 'city', 'country', 'origin', 'language', 'department']],
 	['number', ['price', 'cost', 'amount', 'qty', 'quantity', 'count', 'number', 'no', 'num', 'score', 'points', 'value', 'weight', 'size', 'rating', 'rank', 'total', 'pages', 'age', 'fee']],
 	['date', ['date', 'dates', 'day', 'when', 'year', 'created', 'updated', 'due', 'expires', 'published', 'released', 'born', 'died', 'time', 'period', 'era', 'season', 'deadline']],
@@ -264,8 +266,8 @@ export function classifyColumn(column: string, values: string[]): FieldGuess {
 
 	// A footnote is named, never measured: it is prose by nature, and the
 	// heading is the one thing that tells it from the body it sits under.
-	if (named === 'footnote' && shape !== 'image' && shape !== 'link') {
-		return { column, kind: 'footnote', sure: true, sample };
+	if (named === 'notes' && shape !== 'image' && shape !== 'link') {
+		return { column, kind: 'notes', sure: true, sample };
 	}
 	// Prose is the one thing that overrules a shape: a column of long text is a
 	// body even where every cell happens to parse as something else.
@@ -546,7 +548,7 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	const subtitleField = pick('subtitle');
 	const bodyField = pick('body');
 	const imageField = pick('image');
-	const footnotes = guesses.filter((g) => g.kind === 'footnote');
+	const footnotes = guesses.filter((g) => g.kind === 'notes');
 	/** A line each, and a gap above them — what the body leaves room for. */
 	const footnoteRoom = footnotes.length ? footnotes.length * smallH + gap : 0;
 

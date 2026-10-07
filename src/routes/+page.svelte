@@ -564,7 +564,12 @@
 			'em, strong, code { }',
 			'hr { }',
 			'.page-number { }      /* the number on the card */',
-			".page-number .of::before { content: ' of ' }"
+			".page-number .of::before { content: ' of ' }",
+			'',
+			'#page-1 { }           /* a page by its number */',
+			'.cover { }            /* the first page; also .inside-cover, */',
+			'.back-cover { }       /* .inside-back-cover and the last page */',
+			'.recto { }            /* with Recto / Verso on: also .verso */'
 		].join('\n');
 	});
 
@@ -3379,10 +3384,12 @@
 		<div class="modal-actions">
 			{#if !template.locked}
 				<button
+					class="starter"
 					onclick={() => cssEditor?.insert(cssPlaceholder)}
 					title="Put the starter sheet into the editor, to edit rather than read"
+					aria-label="Starter sheet"
 				>
-					Starter
+					<Icon name="code-reference" size={15} /><span class="label">Starter</span>
 				</button>
 			{/if}
 			<span class="spacer"></span>
@@ -3486,7 +3493,7 @@
 		<!-- The CSS dialog's header: a rule under the title, a × that cancels,
 		     and dragged by it, so the card it would replace can be seen. -->
 		<header class="modal-header drag-title" data-drag-handle>
-			<h2 id="magic-title">Position Areas Automagically</h2>
+			<h2 id="magic-title">Automatic Layout</h2>
 			<button class="icon" onclick={() => (magic = null)} title="Close without laying anything out" aria-label="Close">
 				<Icon name="close" size={16} />
 			</button>
@@ -3542,7 +3549,7 @@
 			<p class="magic-warning" role="status">
 				<Icon name="warning" size={13} />
 				<span>
-					Replaces the {template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} already on this card.
+					Replaces the {template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} already on this template.
 					Ctrl/Cmd+Z puts {template.boxes.length === 1 ? 'it' : 'them'} back.
 				</span>
 			</p>
@@ -4444,6 +4451,20 @@
 		}
 
 		.magic-sample {
+			display: none;
+		}
+	}
+
+	/* The CSS dialog's starter sheet: Carbon's code-reference glyph, and the
+	   word only where there is room for it, as the bars' buttons do. */
+	.modal-actions .starter {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	@media (max-width: 900px) {
+		.modal-actions .starter .label {
 			display: none;
 		}
 	}

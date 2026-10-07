@@ -29,10 +29,11 @@ describe('columnStats', () => {
 });
 
 describe('classifyColumn', () => {
-	it('reads a footnote by its heading, however long its cells', () => {
+	it('reads notes by their heading, singular or plural, however long the cells', () => {
 		const long = 'A note that runs on for long enough to be taken for a body anywhere else. '.repeat(3);
-		expect(kindOf('Footnote', [long, long])).toBe('footnote');
-		expect(kindOf('Notes', [long, long])).toBe('body');
+		expect(kindOf('Footnote', [long, long])).toBe('notes');
+		expect(kindOf('Note', [long, long])).toBe('notes');
+		expect(kindOf('notes', [long, long])).toBe('notes');
 	});
 
 	it('reads a column of links', () => {
@@ -91,7 +92,7 @@ describe('classifyColumn', () => {
 
 	it('matches a heading exactly before matching it loosely', () => {
 		// "no" is a number alias; "Notes" must not become one on a substring.
-		expect(kindOf('Notes', ['a note', 'another note'])).toBe('body');
+		expect(kindOf('Notes', ['a note', 'another note'])).toBe('notes');
 	});
 
 	it('lets prose overrule the heading', () => {

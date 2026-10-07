@@ -735,6 +735,18 @@ would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
 
+**A page's own id and classes sit on a box-less wrapper inside the trim.**
+`#page-N`, `.cover`, `.inside-cover`, `.inside-back-cover`, `.back-cover`,
+`.recto` and `.verso` let a template's CSS style a page as a whole. css.ts
+scopes every rule to `.trim …`, so `.cover .box` becomes `.trim .cover .box`,
+and the class has to be on something between the two: classes on the trim
+itself would never match, and moving the scope out to the card would have
+changed what `:root` means in every stylesheet already written. The wrapper is
+`display: contents`, so nothing is laid out or measured against it. Inside
+covers need four pages, or a two-page run would call its back cover the inside
+of its front. The id repeats wherever the same page is drawn twice — the
+editor and a thumbnail — as an area's id already does.
+
 **A touch on the card drops the click that lands off it.** A touch's click
 is aimed at what is under the finger when it lifts. Pressing an area selects
 it on the way down, and on a phone that brings the area bar into the options

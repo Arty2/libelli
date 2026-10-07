@@ -544,10 +544,15 @@ resize boxes directly, or type exact millimetres.
   one area and nothing else; `.box` reaches all of them. Every area also wears
   two classes: where its content comes from — `.content-field`,
   `.content-static` or `.content-image` — and its mode — `.mode-plain`,
-  `.mode-markdown`, `.mode-image`, `.mode-color` or `.mode-qr`. The empty
-  field's placeholder lists this template's own ids and these classes, and
-  **Starter** puts that same sheet into the editor, to edit rather than
-  read. The dialog can be dragged by its title, to see the card it is styling,
+  `.mode-markdown`, `.mode-image`, `.mode-color` or `.mode-qr`. A page can
+  be reached as a whole too: `#page-3` by its number; `.cover` and
+  `.back-cover` for the first and last pages, and, once there are four or
+  more, `.inside-cover` and `.inside-back-cover` for the two just inside
+  them; and with **Recto / Verso** on, `.recto` and `.verso`. Write them in
+  front of what they style — `.cover .box { … }`, `.verso #Title { … }`. The
+  empty field's placeholder lists this template's own ids and these classes,
+  and **Starter** — the code-reference glyph, its word on a desktop — puts
+  that same sheet into the editor, to edit rather than read. The dialog can be dragged by its title, to see the card it is styling,
   and says beside its name how many lines the sheet is and what it weighs.
   The editor numbers its lines and colours them as you type. It indents with
   tabs: <kbd>Tab</kbd> and <kbd>Shift</kbd>+<kbd>Tab</kbd> move the line or the
@@ -588,7 +593,7 @@ The library lives in this browser and travels nowhere. **Export** is still how a
 template leaves; an **Import** joins the library rather than replacing what is
 loaded.
 
-**Position areas automagically.** **Layout** in the page bar, right of
+**Automatic layout.** **Layout** in the page bar, right of
 **Lock** — a glyph alone on a phone — reads your columns and writes a first
 draft of a card:
 title, subtitle, detail lines under it, an image, a body, a footer of small
@@ -619,8 +624,9 @@ has areas, a line above the buttons says how many are about to be replaced.
   that a heading naming a detail or a credit beats a column of numbers.
 - **The kinds** — **Title**, **Subtitle**, **Detail** (a small line stacked
   under the subtitle: *Medium*, *Duration*, *Dimensions*, *Edition*),
-  **Body**, **Footnote** (small Markdown straight under the body — *Footnote*,
-  *Endnote*, *Annotation*, *Aside* — read by its heading however long it runs,
+  **Body**, **Notes** (small Markdown straight under the body — *Note* or
+  *Notes*, *Footnote*, *Endnote*, *Annotation*, *Aside*, singular or plural —
+  read by its heading however long it runs,
   with room left for it above the foot), **Byline**, **Number** and **Date**
   (the foot), **Image**, **QR code**, **Code**, and **Credit** (*Credits*,
   *Courtesy*, *Copyright*, *Collection*), which is always the foot's last line

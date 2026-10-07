@@ -498,6 +498,27 @@
 	 * off the page without opening the bar. Left on a right-hand page, right on
 	 * a left-hand one.
 	 */
+	/**
+	 * Where this page falls in the run, as an id and classes a template's CSS
+	 * can style: the covers by place — first, last, and the two inside them,
+	 * once there are enough pages for an inside — and, with facing pages, the
+	 * side of the fold. Nothing without a page number: the editor with no rows
+	 * is not a page of anything.
+	 */
+	const pageHooks = $derived.by(() => {
+		if (pageNumber == null) return { id: undefined, classes: '' };
+		const n = pageNumber;
+		const last = pageCount ?? 0;
+		const classes = [
+			n === 1 && 'cover',
+			last >= 4 && n === 2 && 'inside-cover',
+			last >= 4 && n === last - 1 && 'inside-back-cover',
+			last > 1 && n === last && 'back-cover',
+			template.facing === true && (verso ? 'verso' : 'recto')
+		].filter(Boolean);
+		return { id: `page-${n}`, classes: classes.join(' ') };
+	});
+
 	const foldSide = (box: Box): 'left' | 'right' | null =>
 		template.facing === true && mirrors(box) ? (verso ? 'right' : 'left') : null;
 
@@ -1905,6 +1926,15 @@
 			{@html styleTag(customCss)}
 		{/if}
 
+		<!-- The page itself, as a template's CSS can name it: `#page-3`, and
+		     `.cover`, `.inside-cover`, `.inside-back-cover`, `.back-cover`,
+		     `.recto`, `.verso` — see `pageHooks`. Inside the trim rather than on
+		     it, because css.ts scopes every rule to `.trim …`, so `.cover .box`
+		     is `.trim .cover .box` and needs the class between the two. No box
+		     of its own (`display: contents`): every area is still placed against
+		     the trim, and nothing measures differently. -->
+		<div class="page-hooks {pageHooks.classes}" id={pageHooks.id}>
+
 		{#if interactive && guides}
 			<!-- The page margins, as a guide, on a toggle of their own beside the
 			     grid's: lines to place against and to snap to, which a page may
@@ -2332,6 +2362,7 @@
 		{#if guide.y !== null}
 			<span class="guide horizontal" style="top:{guide.y}mm"></span>
 		{/if}
+		</div>
 	</div>
 
 	{#if bleed > 0 && template.bleed.cropMarks}
@@ -2384,6 +2415,11 @@
 	.trim {
 		position: relative;
 		box-sizing: border-box;
+	}
+
+	/* A wrapper for the page's own id and classes, and nothing else. */
+	.page-hooks {
+		display: contents;
 	}
 
 	.box {
