@@ -3,7 +3,7 @@
 	import ColorField from './ColorField.svelte';
 	import { withKey } from '$lib/keys';
 	import './options-bar.css';
-	import { cssIdent } from '$lib/css';
+	import { cssIdent, isPageId } from '$lib/css';
 	import { parseColor } from '$lib/color';
 	import { safeImageUrl } from '$lib/assets';
 	import { completePlaceholders } from '$lib/complete';
@@ -516,6 +516,11 @@
 				`Another area is already called “${clash.slot}”. A name is that area's CSS id, so no two can share one.`,
 				'warning'
 			);
+			return;
+		}
+		if (ident && isPageId(ident)) {
+			putBack();
+			onnotice(`“${value}” would be #${ident}, which is a page's CSS id — choose another name for the area.`, 'warning');
 			return;
 		}
 

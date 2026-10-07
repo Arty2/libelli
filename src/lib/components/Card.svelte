@@ -4,7 +4,7 @@
 	import { backgroundStyle, cssUrl, localImageName, safeMediaUrl } from '$lib/assets';
 	import { parseColor } from '$lib/color';
 	import { UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders } from '$lib/placeholders';
-	import { cssIdent, scopeCss, styleTag } from '$lib/css';
+	import { cssIdent, isPageId, scopeCss, styleTag } from '$lib/css';
 	import { cardVars } from '$lib/csskit';
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
@@ -532,7 +532,11 @@
 							? 'inside-back-cover'
 							: undefined;
 		const classes = [template.facing === true && (verso ? 'verso' : 'recto'), look].filter(Boolean);
-		return { id: `page-${n}`, place, classes: classes.join(' ') };
+		// An area that already wears one of these ids — named before the names
+		// were refused (`isPageId`) — keeps it, and the page goes without.
+		const taken = new Set(template.boxes.map((b) => cssIdent(b.slot ?? '')).filter(isPageId));
+		const free = (id: string | undefined) => (id && !taken.has(id) ? id : undefined);
+		return { id: free(`page-${n}`), place: free(place), classes: classes.join(' ') };
 	});
 
 	/**

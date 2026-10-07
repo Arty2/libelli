@@ -119,7 +119,13 @@
 	export function replaceAll(text: string) {
 		const el = field;
 		if (!el) return;
+		// `apply` has to focus the field — execCommand writes only into the
+		// focused one, and it is what keeps undo — so it is let go again when
+		// it was not where the focus was: Starter pressed on a phone is asking
+		// to read the kit, and a field left focused brought the keyboard up.
+		const wasFocused = document.activeElement === el;
 		apply({ start: 0, end: el.value.length, text, selStart: 0, selEnd: 0 });
+		if (!wasFocused) el.blur();
 		el.scrollTop = 0;
 		sync();
 	}

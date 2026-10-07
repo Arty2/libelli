@@ -27,9 +27,12 @@
 			moves when it lands.
 		-->
 		<style>
-			:root[data-theme='dark'],
-			:root[data-theme='dark-page'] {
-				background: #111;
+			/* Screen only, like app.css's dark: a printed page is never dark. */
+			@media screen {
+				:root[data-theme='dark'],
+				:root[data-theme='dark-page'] {
+					background: #111;
+				}
 			}
 		</style>
 		<!--
