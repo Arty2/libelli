@@ -4316,11 +4316,18 @@
 		background: #f3f3f3;
 	}
 
+	/* Edge to edge: out through the dialog's 22px of side padding to the
+	   window itself, which leaves its side borders and corners nothing to
+	   frame — the top and bottom rules still part it from the header and the
+	   buttons. The header and the buttons keep the padding. */
 	.modal.full :global(.editor) {
 		flex: 1;
 		min-height: 0;
 		height: auto;
 		resize: none;
+		margin-inline: -22px;
+		border-inline: none;
+		border-radius: 0;
 	}
 
 	/* Beside the title, in the header's own small print: what the sheet is, not
