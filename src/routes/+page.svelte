@@ -279,6 +279,12 @@
 	}
 	let cssOpen = $state(false);
 	/**
+	 * The CSS dialog over the whole window, for a long sheet. Kept for the
+	 * session rather than reset on each open: someone who wanted the room for
+	 * one sheet wants it for the next.
+	 */
+	let cssFull = $state(false);
+	/**
 	 * The sheet being edited, and the sheet the card is drawn with.
 	 *
 	 * The two are separate on purpose: the editor holds a draft, Apply puts it on
@@ -3347,7 +3353,7 @@
 
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
-	<div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
+	<div class="modal wide" class:full={cssFull} role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
 		<!-- The help dialog's header, and like it dragged by the title, so the
 		     card being styled can be seen beside it. The × is Cancel, as Esc
 		     and the backdrop are: only Apply and Save put anything on the card.
@@ -3363,6 +3369,17 @@
 					? `${cssCount.bytes} bytes`
 					: `${Math.round((cssCount.bytes / 1024) * 10) / 10} KB`}
 			</span>
+			<!-- Beside the ×, as a window's own controls sit: the room to work in,
+			     then the way out. -->
+			<button
+				class="icon"
+				onclick={() => (cssFull = !cssFull)}
+				aria-pressed={cssFull}
+				title={cssFull ? 'Back to a dialog' : 'Full screen — the whole window for the sheet'}
+				aria-label="Full screen"
+			>
+				<Icon name={cssFull ? 'minimize' : 'maximize'} size={16} />
+			</button>
 			<button class="icon" onclick={cancelCss} title="Close without keeping changes" aria-label="Close">
 				<Icon name="close" size={16} />
 			</button>
@@ -4236,6 +4253,35 @@
 	   a stylesheet wrapped at 560px is a stylesheet nobody can read. */
 	.modal.wide {
 		width: min(760px, calc(100vw - 32px));
+	}
+
+	/* Full screen: no gutter, no corners, no drag — the window edge to edge,
+	   and the editor takes every row the header and the buttons leave. A
+	   column, so the editor's height is the room left rather than its own
+	   17rem. `translate` is where a drag left the dialog (modal.ts); full
+	   screen is not somewhere it can be dragged from. */
+	.modal.full {
+		inset: 0;
+		transform: none;
+		translate: none !important;
+		width: 100vw;
+		max-height: none;
+		height: 100dvh;
+		border-radius: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.modal.full .drag-title {
+		cursor: default;
+	}
+
+	.modal.full :global(.editor) {
+		flex: 1;
+		min-height: 0;
+		height: auto;
+		resize: none;
 	}
 
 	/* Beside the title, in the header's own small print: what the sheet is, not

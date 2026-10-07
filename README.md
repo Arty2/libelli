@@ -578,6 +578,9 @@ resize boxes directly, or type exact millimetres.
   its size changes. What the bars set wins over the sheet unless a rule says
   `!important`. The dialog can be dragged by its title, to see the card it is styling,
   and says beside its name how many lines the sheet is and what it weighs.
+  The button left of its × takes it **full screen** — no margins round it,
+  and the editor as tall as the window — and back; it stays that way for the
+  next time you open it until you reload.
   The editor numbers its lines and colours them as you type. It indents with
   tabs: <kbd>Tab</kbd> and <kbd>Shift</kbd>+<kbd>Tab</kbd> move the line or the
   whole selection, <kbd>Enter</kbd> carries the indent of the line above and
