@@ -281,7 +281,9 @@
 	/**
 	 * The CSS dialog over the whole window, for a long sheet. Kept for the
 	 * session rather than reset on each open: someone who wanted the room for
-	 * one sheet wants it for the next.
+	 * one sheet wants it for the next. A phone opens it full screen every time
+	 * (`openCss`): there a dialog is the window less a gutter, and the gutter
+	 * is all the margin gives back.
 	 */
 	let cssFull = $state(false);
 	/**
@@ -559,6 +561,7 @@
 	function openCss() {
 		cssBefore = template.css;
 		cssDraft = template.css ?? '';
+		if (stacked) cssFull = true;
 		cssOpen = true;
 	}
 
@@ -3362,7 +3365,19 @@
 		     weighs. A template is meant to stay small enough to paste into a
 		     message, and its CSS is the part of it that grows without anybody
 		     noticing. -->
-		<header class="modal-header drag-title" data-drag-handle>
+		<!-- A double-click on the title is a window's own way to maximise, and
+		     does the same here; on the buttons it is two presses, not this. A
+		     shortcut for the pointer only: the full-screen button is the way
+		     there for a keyboard and a screen reader. -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<header
+			class="modal-header drag-title"
+			data-drag-handle
+			ondblclick={(e) => {
+				if ((e.target as HTMLElement).closest('button')) return;
+				cssFull = !cssFull;
+			}}
+		>
 			<h2 id="css-title">CSS</h2>
 			<span class="css-stats">
 				{cssCount.lines} line{cssCount.lines === 1 ? '' : 's'} · {cssCount.bytes < 1024
@@ -4275,6 +4290,30 @@
 
 	.modal.full .drag-title {
 		cursor: default;
+	}
+
+	/* The title is pressed and double-clicked, never read off: a double-click
+	   that also selected the word looked like the click had missed. On every
+	   child too, not just the header, so the stats beside it stay put. */
+	.drag-title,
+	.drag-title :global(*) {
+		user-select: none;
+		-webkit-user-select: none;
+	}
+
+	/* Drawn like the × beside it — a bare glyph — pressed or not: the glyph
+	   already says which way it goes, and the accent box a pressed button
+	   gets elsewhere made one of two window controls look like a tool.
+	   `.modal` in front for the weight: that global pressed rule counts an
+	   element and two `:not()`s, and this one has to outweigh it. */
+	.modal .modal-header .icon[aria-pressed='true'] {
+		border-color: transparent;
+		background: none;
+		color: #555;
+	}
+
+	.modal .modal-header .icon[aria-pressed='true']:hover {
+		background: #f3f3f3;
 	}
 
 	.modal.full :global(.editor) {
