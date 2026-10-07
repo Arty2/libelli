@@ -37,12 +37,10 @@
 	--accent-inverse: #da9c14;
 
 	/* The shadow on a scroller's edge that says there is more past it
-	   (scrolledge.ts). Dark is drawn by inverting, which turned this one into
-	   a glow — a light edge on a dark interface, the brightest thing near it
-	   and the last a hint should be. In the dark themes it is written white,
-	   so the filter makes it black: the rows fade into the edge rather than
-	   light up at it. Stronger there, because black over the black of the
-	   inverted rows only shows where it dims their words. */
+	   (scrolledge.ts). One value for every theme: in the dark ones the
+	   inversion turns it into a light edge, and that is kept on purpose. A
+	   black fade written for the darks was tried, and read as the rows dimming
+	   rather than as more to scroll to. */
 	--edge-shadow: rgba(0, 0, 0, 0.18);
 }
 
@@ -83,7 +81,10 @@
 	:root[data-theme='dark'],
 	:root[data-theme='dark-page'] {
 		filter: invert(1) hue-rotate(180deg);
-		--edge-shadow: rgba(255, 255, 255, 0.4);
+		/* The window's own ground, which the filter inverts too: #eee shows as
+		   the #111 app.html set before this sheet arrived, so the dark launch
+		   does not flash when it does. */
+		background: #eee;
 	}
 
 	:root[data-theme='dark']

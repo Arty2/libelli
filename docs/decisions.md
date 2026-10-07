@@ -3908,6 +3908,20 @@ Two things worth knowing before trusting a green run:
 
 ## `src/lib/theme.ts` — dark by inversion
 
+**The launch follows the theme, as far as anything can.** An installed app's
+splash is drawn by the system from the manifest, before a line of ours runs,
+so it cannot read the theme. What the page can do is name a different
+manifest: `manifest-dark.webmanifest` (same `id`, so the same installed app)
+with a `#111` background and the dark icons, swapped in by app.html before
+the first paint and by `applyTheme` after it (`THEME_ASSETS`, held to
+app.html's names by theme.test.ts). Chrome takes it up when it next refreshes
+the installed app, so a change lands a launch or a day late, and a changed
+icon may ask the user to confirm. iOS shows this app no splash at all. The
+blank moment before the bundle arrives is ours, and follows at once: app.html
+paints `#111`, and app.css sets `#eee` under its filter, which shows as the
+same `#111`, because the root's filter inverts the window's own background
+too.
+
 **With the page inverted, fills and pictures are turned back.** An area's fill
 layer and a photo in it keep their colours in `dark-page`; the words, the paper,
 drawings and QR codes stay inverted. Turning those back was tried: they are ink
@@ -3941,7 +3955,8 @@ see it. No `prefers-color-scheme`: the logo is the switch, and the app is
 light until it is pressed.
 
 **Two controls, one behaviour.** The theme button left of Help wears the
-theme it is on (Carbon's `light`, `asleep`, `contrast`); the logo, where the
+theme it is on (Carbon's `light`; `contrast` for dark, half and half because
+the page stays white; `asleep`, the moon, for the page inverted too); the logo, where the
 theme started, keeps working. Both spread one `themeControl` object, so they
 cannot drift apart.
 

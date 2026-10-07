@@ -168,9 +168,10 @@
 	 * Which paper the transparent pixels show. An area's ink is its own colour,
 	 * and a drawing in white or a pale yellow is invisible on light checks — the
 	 * checkerboard is there to say "nothing here", and it cannot do that by
-	 * hiding what is.
+	 * hiding what is. Dark to begin with, by choice: the light checks are a
+	 * press away for a dark drawing. Not remembered — each board opens dark.
 	 */
-	let checks = $state<'light' | 'dark'>('light');
+	let checks = $state<'light' | 'dark'>('dark');
 	/** brush width in pixels of the grid, not of the screen */
 	let nib = $state(1);
 	let weight = $state<number | null>(null);
@@ -701,7 +702,7 @@
 			aria-label="Dark checkerboard"
 			onclick={() => (checks = checks === 'dark' ? 'light' : 'dark')}
 		>
-			<Icon name="contrast" size={16} />
+			<Icon name="opacity" size={16} />
 		</button>
 		<input
 			type="number"

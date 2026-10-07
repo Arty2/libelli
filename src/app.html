@@ -20,6 +20,19 @@
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
 		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
 		<!--
+			The dark themes' ground while nothing has loaded: without it the first
+			moment of a dark launch was a white page. Written as the colour it shows,
+			since app.css has not arrived to invert anything; app.css then sets the
+			opposite under its filter, which shows as this same colour, so nothing
+			moves when it lands.
+		-->
+		<style>
+			:root[data-theme='dark'],
+			:root[data-theme='dark-page'] {
+				background: #111;
+			}
+		</style>
+		<!--
 			There is deliberately no `apple-mobile-web-app-capable` here. It is what
 			makes an iOS home-screen launch chromeless, and a chromeless iOS web app
 			has no Share → Print and no working window.print(). Printing is the whole
@@ -46,12 +59,19 @@
 				}
 			} catch (e) {}
 			// The theme the logo was last left on, for the same reason — and
-			// theme.test.ts for the same check. Anything else is light.
+			// theme.test.ts for the same check. Anything else is light. The dark
+			// manifest and touch icon too (theme.ts, `themeAssets`): an installed
+			// app's splash is drawn from the manifest this page names, and Chrome
+			// picks a change up the next time it refreshes the installed app.
 			try {
 				var t = JSON.parse(localStorage.getItem('libelli:ui:theme'));
 				if (t === 'dark' || t === 'dark-page') {
 					document.documentElement.setAttribute('data-theme', t);
 					document.querySelector('meta[name="theme-color"]').setAttribute('content', '#000000');
+					var m = document.querySelector('link[rel="manifest"]');
+					m.setAttribute('href', m.getAttribute('href').replace(/manifest\.webmanifest$/, 'manifest-dark.webmanifest'));
+					var a = document.querySelector('link[rel="apple-touch-icon"]');
+					a.setAttribute('href', a.getAttribute('href').replace(/apple-touch-icon\.png$/, 'apple-touch-icon-dark.png'));
 				}
 			} catch (e) {}
 		</script>

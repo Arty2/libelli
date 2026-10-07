@@ -19,9 +19,9 @@ export const ICONS: Record<string, string> = {
 	'checkbox-indeterminate': '<path d="M10 14H22V18H10z"/><path d="M26,4H6A2,2,0,0,0,4,6V26a2,2,0,0,0,2,2H26a2,2,0,0,0,2-2V6A2,2,0,0,0,26,4ZM6,26V6H26V26Z"/>',
 	'undo': '<path d="M20,10H7.8149l3.5874-3.5859L10,5,4,11,10,17l1.4023-1.4146L7.8179,12H20a6,6,0,0,1,0,12H12v2h8a8,8,0,0,0,0-16Z"/>',
 	'redo': '<path d="M12,10H24.1851L20.5977,6.4141,22,5,28,11,22,17l-1.4023-1.4146L24.1821,12H12a6,6,0,0,0,0,12h8v2H12a8,8,0,0,1,0-16Z"/>',
-	// The theme button wears the theme it is on: the sun for light, the moon
-	// for dark, and `contrast`, half dark and half light, for dark with the
-	// page inverted.
+	// The theme button wears the theme it is on: the sun for light,
+	// `contrast`, half dark and half light, for dark (the page stays white),
+	// and the moon for dark with the page inverted.
 	'light': '<path d="M15 2H17V7H15z"/><path d="M21.668 6.854H26.625999999999998V8.854H21.668z" transform="rotate(-45 24.147 7.853)"/><path d="M25 15H30V17H25z"/><path d="M23.147 21.668H25.147V26.625999999999998H23.147z" transform="rotate(-45 24.147 24.146)"/><path d="M15 25H17V30H15z"/><path d="M5.375 23.147H10.333V25.147H5.375z" transform="rotate(-45 7.853 24.146)"/><path d="M2 15H7V17H2z"/><path d="M6.854 5.375H8.854V10.333H6.854z" transform="rotate(-45 7.854 7.853)"/><path d="M16,12a4,4,0,1,1-4,4,4.0045,4.0045,0,0,1,4-4m0-2a6,6,0,1,0,6,6,6,6,0,0,0-6-6Z"/>',
 	'asleep': '<path d="M13.5025,5.4136A15.0755,15.0755,0,0,0,25.096,23.6082a11.1134,11.1134,0,0,1-7.9749,3.3893c-.1385,0-.2782.0051-.4178,0A11.0944,11.0944,0,0,1,13.5025,5.4136M14.98,3a1.0024,1.0024,0,0,0-.1746.0156A13.0959,13.0959,0,0,0,16.63,28.9973c.1641.006.3282,0,.4909,0a13.0724,13.0724,0,0,0,10.702-5.5556,1.0094,1.0094,0,0,0-.7833-1.5644A13.08,13.08,0,0,1,15.8892,4.38,1.0149,1.0149,0,0,0,14.98,3Z"/>',
 	'help': '<path d="M16,2A14,14,0,1,0,30,16,14,14,0,0,0,16,2Zm0,26A12,12,0,1,1,28,16,12,12,0,0,1,16,28Z"/><circle cx="16" cy="23.5" r="1.5"/><path d="M17,8H15.5A4.49,4.49,0,0,0,11,12.5V13h2v-.5A2.5,2.5,0,0,1,15.5,10H17a2.5,2.5,0,0,1,0,5H15v4.5h2V17a4.5,4.5,0,0,0,0-9Z"/>',
@@ -47,8 +47,10 @@ export const ICONS: Record<string, string> = {
 	'code': '<path d="M31 16 24 23 22.59 21.59 28.17 16 22.59 10.41 24 9 31 16z"/><path d="M1 16 8 9 9.41 10.41 3.83 16 9.41 21.59 8 23 1 16z"/><path d="M5.91 15H26.080000000000002V17H5.91z" transform="rotate(-75 15.996 16)"/>',
 	'caret-up': '<path d="M8 20 16 10 24 20z"/>',
 	'table': '<path d="M29,5a2,2,0,0,0-2-2H5A2,2,0,0,0,3,5V27a2,2,0,0,0,2,2H27a2,2,0,0,0,2-2ZM27,5V9H5V5Zm0,22H5V23H27Zm0-6H5V17H27Zm0-6H5V11H27Z"/>',
+	// The drawing board's paper: light checks or dark.
+	'opacity': '<path d="M6 6H10V10H6z"/><path d="M10 10H14V14H10z"/><path d="M14 6H18V10H14z"/><path d="M22 6H26V10H22z"/><path d="M6 14H10V18H6z"/><path d="M14 14H18V18H14z"/><path d="M22 14H26V18H22z"/><path d="M6 22H10V26H6z"/><path d="M14 22H18V26H14z"/><path d="M22 22H26V26H22z"/><path d="M18 10H22V14H18z"/><path d="M10 18H14V22H10z"/><path d="M18 18H22V22H18z"/>',
 	// The CSS editor's wrap toggle.
-	'text-wrap': '<path d="M4 23H12V25H4z"/><path d="M24.5232,14H4v2H24.5a3.5,3.5,0,0,1,0,7H18.8281l2.586-2.5859L20,19l-5,5,5,5,1.4141-1.4141L18.8281,25H24.5a5.5,5.5,0,0,0,.0232-11Z"/><path d="M4 5H28V7H4z"/>',
+	'text-wrap': '<path d="M4 23H12V25H4z"/><path d="M24.5232,14H4v2H24.5a3.5,3.5,0,0,1,0,7H18.8281l2.586-2.5859L20,19l-5,5,5,5,1.4141-1.4141L18.8281,25H24.533a5.5,5.5,0,0,0-.01-11Z"/><path d="M4 5H28V7H4z"/>',
 	// The CSS dialog's full screen, in and back out.
 	'maximize': '<path d="M20 2 20 4 26.586 4 18 12.582 19.414 14 28 5.414 28 12 30 12 30 2 20 2z"/><path d="M14 19.416 12.592 18 4 26.586 4 20 2 20 2 30 12 30 12 28 5.414 28 14 19.416z"/>',
 	'minimize': '<path d="M4 18 4 20 10.586 20 2 28.582 3.414 30 12 21.414 12 28 14 28 14 18 4 18z"/><path d="M30 3.416 28.592 2 20 10.586 20 4 18 4 18 14 28 14 28 12 21.414 12 30 3.416z"/>',

@@ -988,7 +988,8 @@ at its own size.
   in, which is the same rule the bar follows. Never in place: an area on a card
   is often a centimetre across, which is somewhere to show a drawing and nowhere
   to make one. The panel's title bar holds the board's own row, centred: the
-  **light or dark checkerboard** to see it on, the size in px, and what the
+  **dark or light checkerboard** to see it on (the Opacity glyph; dark to
+  begin with), the size in px, and what the
   drawing weighs. The board is always drawn as large as the panel has room for,
   so there is never a scrollbar round it. Pull the panel down to its least and
   the tool rows slide under the bottom bar, leaving the board. Under it the tools are two centred
@@ -1389,9 +1390,12 @@ There every zoom is the sheet's — a pinch, Ctrl/Cmd+scroll, <kbd>+</kbd> /
 <kbd>−</kbd> / <kbd>0</kbd> or a double-click — never the interface's text;
 drag to move about a zoomed sheet.
 
-**The theme button** left of Help — a sun, a moon, or half of each — steps the
-theme: light, dark, and dark with the page inverted too, for a white page in a
-dark room. With the page inverted, its pictures and its areas' fills keep their
+**The theme button** left of Help — a sun, half of each, or a moon — steps the
+theme: light, dark (half and half: the interface dark, the page still white),
+and dark with the page inverted too (the moon), for a white page in a dark
+room. The moment before the app loads follows it, and so does an installed
+app's launch screen — a dark background and a light mark — from the next time
+the browser refreshes the installed app. With the page inverted, its pictures and its areas' fills keep their
 own colours; the words, the paper, drawings and QR codes are inverted, since
 those are ink on transparent ground and would vanish into the dark paper
 otherwise. The logo does the same. In either dark, resting the mouse on either
