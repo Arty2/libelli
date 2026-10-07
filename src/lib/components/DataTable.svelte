@@ -2425,7 +2425,7 @@
 		right: var(--scrollbar-y, 0px);
 		bottom: calc(var(--bar-h, 0px) + var(--scrollbar-x, 0px));
 		height: 27px;
-		background: linear-gradient(to top, rgba(0, 0, 0, 0.18), transparent);
+		background: linear-gradient(to top, var(--edge-shadow), transparent);
 	}
 
 	.edge.left,
@@ -2437,12 +2437,12 @@
 
 	.edge.left {
 		left: var(--gutter-w, 0px);
-		background: linear-gradient(to right, rgba(0, 0, 0, 0.18), transparent);
+		background: linear-gradient(to right, var(--edge-shadow), transparent);
 	}
 
 	.edge.right {
 		right: var(--scrollbar-y, 0px);
-		background: linear-gradient(to left, rgba(0, 0, 0, 0.18), transparent);
+		background: linear-gradient(to left, var(--edge-shadow), transparent);
 	}
 
 	/* `:global` only for the marks, which the action sets and the compiler
@@ -3399,6 +3399,7 @@
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-button);
 		background: #fff;
+		color: #111;
 		cursor: pointer;
 	}
 
@@ -3406,8 +3407,12 @@
 		border-color: var(--border-control-hover);
 	}
 
+	/* As the bars' disabled buttons are (options-bar.css): the words kept
+	   dark and the whole faded. Left to the browser, a disabled button's words
+	   are its own faint grey, and faded again on top of that they were all but
+	   gone — invisible altogether once the dark themes turned them over. */
 	button:disabled {
-		opacity: 0.4;
+		opacity: 0.5;
 		cursor: default;
 	}
 
