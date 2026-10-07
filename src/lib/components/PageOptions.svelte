@@ -455,7 +455,9 @@
 							     things to do, not templates to open. -->
 							<li role="separator"><hr /></li>
 							<li role="none">
-								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onnewtemplate)}>
+								<!-- Not frozen by the lock: it starts another template and leaves
+								     this one exactly as it is, which is what the lock protects. -->
+								<button role="menuitem" onclick={fromMenu(onnewtemplate)}>
 									<span class="tick" aria-hidden="true"><Icon name="add" size={14} /></span>
 									New Template
 								</button>

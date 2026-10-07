@@ -2466,13 +2466,14 @@
 		padding: 0;
 	}
 
-	/* A locked table is ruled in the blue its Lock button wears when pressed,
-	   so the state is on the thing it applies to and not only on the button:
-	   read-only cells otherwise look exactly like cells that refuse your typing
-	   for no reason. */
-	.locked th,
-	.locked td {
-		border-color: var(--accent);
+	/* A locked table's words are faded a little, so the state is on the thing
+	   it applies to and not only on the button: read-only cells otherwise look
+	   exactly like cells that refuse your typing for no reason. It used to be
+	   ruled in the accent instead, which made a table you could not change the
+	   loudest thing on the screen. Faded, not greyed out: it is still there to
+	   be read. */
+	.locked td textarea {
+		color: #6b6b6b;
 	}
 
 	/* The table's own outside, which no cell's right or bottom edge covers. */

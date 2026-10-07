@@ -758,8 +758,8 @@ a notice can appear.
   picker, freezes it: no typing, no new, moved,
   renamed or deleted rows and columns, no paste or import — and nothing typed,
   dropped or drawn on the card reaches a cell either. Nor does sorting, since
-  row order is print order; choosing rows still works. The cells are ruled in
-  the blue of the pressed Lock while it is on. It is saved with the table and
+  row order is print order; choosing rows still works. The cells' words are
+  faded a little while it is on — still there to read, plainly not to type into. It is saved with the table and
   undoable.
 - **Column widths** — drag the right edge of a header, or double-click that edge
   for the default. The widths are a view preference of this browser's, not part
