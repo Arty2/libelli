@@ -10,6 +10,7 @@
 	import { withKey } from '$lib/keys';
 	import { downloadBlob, pageFilename, slugify } from '$lib/download';
 	import { elementToPng, ratioForDpi } from '$lib/png';
+	import { OUTPUT_TURNS, OUTPUT_TURN_NAMES, turnsOutput, type OutputTurn } from '$lib/turn';
 	import { bleedFor, mmToPx, pageSide } from '$lib/layout';
 	import { planSheets, resolveImposition } from '$lib/imposition';
 	import type { Dataset, Mapping, Row, Template } from '$lib/types';
@@ -34,6 +35,9 @@
 		onexcludedchange: (excluded: Set<number>) => void;
 		onexcludedsheetschange: (excluded: Set<number>) => void;
 		onprint: () => void;
+		/** which way round the files and the printed pages come out — turn.ts; never the template's */
+		turn: OutputTurn;
+		onturnchange: (turn: OutputTurn) => void;
 		ontemplatechange: (template: Template) => void;
 		onuploadprintbackground: (file: File) => void;
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
@@ -55,6 +59,8 @@
 		onexcludedchange,
 		onexcludedsheetschange,
 		onprint,
+		turn,
+		onturnchange,
 		ontemplatechange,
 		onuploadprintbackground,
 		onnotice,
@@ -83,6 +89,11 @@
 	);
 	const printSheetW = $derived((imposed?.sheetW ?? outerW) + sheetBleed * 2);
 	const printSheetH = $derived((imposed?.sheetH ?? outerH) + sheetBleed * 2);
+	// The paper the printer is asked for, after Output: the sheet, or the sheet
+	// the other way round when it is turned. The previews keep the sheet.
+	const turned = $derived(turnsOutput(turn, printSheetW, printSheetH));
+	const paperW = $derived(turned ? printSheetH : printSheetW);
+	const paperH = $derived(turned ? printSheetW : printSheetH);
 
 	/**
 	 * One file per selected page — or, with several cards to a sheet, one file
@@ -115,7 +126,12 @@
 			// One is still one PNG; more are one ZIP of them.
 			const files: ZipEntry[] = [];
 			for (const [i, element] of elements.entries()) {
-				const { blob, missingFonts } = await elementToPng(element, families, ratioForDpi(300));
+				const { blob, missingFonts } = await elementToPng(
+					element,
+					families,
+					ratioForDpi(300),
+					turnsOutput(turn, element.offsetWidth, element.offsetHeight)
+				);
 				for (const family of missingFonts) missing.add(family);
 				// Padded to the width of the run, so a directory listing comes back
 				// in print order rather than as 1, 10, 2 — see `pageFilename`.
@@ -437,6 +453,22 @@
 	     it is what turns the pages above into the sheets below, and standing
 	     there it separates them without a heading of its own. -->
 	<div class="options settings-strip">
+		<!-- Which way round the output comes out, first and outside the lock:
+		     it is this browser's, not the template's — never saved in it, never
+		     frozen by its lock — and it turns only the files and the printed
+		     pages, so the previews here stay the way the template is drawn. -->
+		<label class="field output-turn">
+			<span>Output</span>
+			<select
+				value={turn}
+				title="Which way round the PNGs and the printed pages come out: turned a quarter if they are not that way already. Kept in this browser, not in the template."
+				onchange={(e) => onturnchange(e.currentTarget.value as OutputTurn)}
+			>
+				{#each OUTPUT_TURNS as option (option)}
+					<option value={option}>{OUTPUT_TURN_NAMES[option]}</option>
+				{/each}
+			</select>
+		</label>
 		<!-- The design's lock, here as in the page bar: these settings are the
 		     template's, so a locked one shows them greyed out, and this is the
 		     way to change that without leaving the preview. Never disabled by
@@ -514,7 +546,7 @@
 		<h3>Before you print</h3>
 		<ol>
 			<li>
-				<strong>Paper size</strong> — the one matching <strong>{printSheetW} × {printSheetH} mm</strong>, or a larger sheet you trim.
+				<strong>Paper size</strong> — the one matching <strong>{paperW} × {paperH} mm</strong>, or a larger sheet you trim.
 				{#if imposed}{template.print.count} cards per sheet{imposed.scale < 0.999 ? `, scaled to ${Math.round(imposed.scale * 100)}%` : ''}.{/if}
 			</li>
 			<li><strong>Margins</strong> — <em>None</em>.</li>

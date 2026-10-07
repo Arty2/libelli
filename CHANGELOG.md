@@ -8,12 +8,12 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.27.3 — 2026-10-07
+## 0.27.4 — 2026-10-07
 
 - Recto / Verso: the fold drawn dot-dash, spreads and R or V in the print preview.
 - An area's words in 2 to 6 columns; a pinch zooms about the fingers.
 - `%%page:current%%`, `%%page:total%%`, `%%lookup:next:…%%` and `previous`.
-- Reindex beside the table's Lock; Reset in the menu for Getting Started.
+- Reindex beside the table's Lock; Reset for Getting Started; Export turns Portrait or Landscape.
 - CSS can style a page: `#page-3`, `.cover`, `.recto`, `.theme-dark`; Starter tells an AI the template.
 - Drawings save at a third the size; in the table, a dot, Draw and their size.
 

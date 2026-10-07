@@ -2482,6 +2482,23 @@ paper: the cards keep their places and the sheet grows around them.
 
 ## `src/lib/components/PrintPreview.svelte`
 
+**Output turns what goes out, not the template.** Portrait or Landscape is
+for the tray that takes paper one way round, or a PNG wanted sideways — a
+fact about this printer, so it is kept in this browser (`turn.ts`, beside the
+theme) and a template handed on does not arrive turned. It sits before the
+lock because the lock freezes the template's settings and this is not one.
+It turns a quarter only when the output is not that way already, so picking
+the way it is costs nothing. The PNG is drawn turned onto its canvas
+(`elementToPng`'s `turn`), one encode. Print lays each sheet, as PrintSheet
+draws it, on a paper the other way round and rotates it there — no second
+layout. The paper is `contain: strict` as well as clipped: clipping alone
+hid the turned sheet's overflow, but Chrome's print still counted it and
+shrank every page to 70%. The page break moved from the sheet to the paper
+for the same reason it had to: the sheet is now its paper's only child, and
+its last-child exception would have cancelled every break. The previews do
+not turn: they show the design, and a sideways thumbnail of every page is
+harder to check than a label saying what the files will be.
+
 **The settings strip carries the lock, and on a phone is one line.** The print
 settings are the template's, greyed out on a locked design, so the design's
 lock sits at the head of the strip, as in the page bar: unlocking no longer

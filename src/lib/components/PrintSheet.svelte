@@ -249,17 +249,11 @@
 	.sheet-marks .br::before { bottom: 0; left: 0; }
 	.sheet-marks .br::after { right: 0; top: 0; }
 
+	/* The page break is PrintRoot's, on the paper each sheet is laid on. */
 	@media print {
 		.print-sheet {
-			break-after: page;
-			page-break-after: always;
 			print-color-adjust: exact;
 			-webkit-print-color-adjust: exact;
-		}
-
-		.print-sheet:last-child {
-			break-after: auto;
-			page-break-after: auto;
 		}
 	}
 </style>

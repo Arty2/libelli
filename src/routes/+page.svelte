@@ -53,6 +53,7 @@
 	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport, withKey } from '$lib/keys';
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
 	import { cssKit } from '$lib/csskit';
+	import { loadTurn, saveTurn, type OutputTurn } from '$lib/turn';
 	import { isStarterTemplate, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault, dragByTitle } from '$lib/modal';
@@ -185,6 +186,8 @@
 
 	/** Light or dark — see theme.ts. app.html has already applied it before the first paint. */
 	let theme = $state<Theme>('light');
+	/** The export's own Portrait / Landscape — turn.ts. This browser's, never the template's. */
+	let outputTurn = $state<OutputTurn>('as-set');
 	/** What is on screen: the theme, or the other dark while a glance lasts — the page's `theme-…` class. */
 	let shownTheme = $state<Theme>('light');
 	function showTheme(shown: Theme) {
@@ -881,6 +884,7 @@
 	$effect(() => {
 		untrack(() => setTextSize(loadTextSize()));
 		untrack(() => (theme = shownTheme = loadTheme()));
+		untrack(() => (outputTurn = loadTurn()));
 		return zoomAsText(() => untrack(() => textSize), setTextSize);
 	});
 
@@ -3710,6 +3714,11 @@
 		}}
 		onexcludedsheetschange={(next) => (excludedSheets = next)}
 		onprint={printFromPreview}
+		turn={outputTurn}
+		onturnchange={(next) => {
+			outputTurn = next;
+			saveTurn(next);
+		}}
 		ontemplatechange={applyTemplate}
 		onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 		onnotice={notify}
@@ -3742,6 +3751,7 @@
 		{printBackground}
 		excluded={excludedRows}
 		{excludedSheets}
+		turn={outputTurn}
 	/>
 {/if}
 

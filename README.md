@@ -1278,6 +1278,14 @@ them and needs no heading of its own. The print checklist stays at the bottom
 happen. The title counts both units, *Export — 4 pages / 2 sheets*, so the
 number of sheets is known before scrolling to them.
 
+**Output** opens that strip, ahead of the lock: **As set**, **Portrait** or
+**Landscape**, for which way round the PNGs and the printed pages come out.
+Portrait or Landscape turns each file and each printed page a quarter
+clockwise when it is not that way round already — one card to a page, or a
+whole sheet of them — and leaves the previews as the template draws them. It
+belongs to this browser, not to the template: it is never saved in one, the
+lock does not touch it, and it is remembered here for the next export.
+
 On a phone each grid is a strip you swipe along rather than rows you scroll
 past. A hundred pages was a hundred rows between you and everything below
 them; sideways, the run costs one screen however long it is, and each
