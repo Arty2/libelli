@@ -3358,7 +3358,7 @@
 
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
-	<div class="modal wide" class:full={cssFull} role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
+	<div class="modal wide css-dialog" class:full={cssFull} role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
 		<!-- The help dialog's header, and like it dragged by the title, so the
 		     card being styled can be seen beside it. The × is Cancel, as Esc
 		     and the backdrop are: only Apply and Save put anything on the card.
@@ -4306,6 +4306,32 @@
 
 	.modal.full .drag-title {
 		cursor: default;
+	}
+
+	/* No rule under the CSS dialog's title: the editor's own top border is
+	   right below it, and two lines a few pixels apart read as one thick one. */
+	.css-dialog .modal-header {
+		border-bottom: none;
+	}
+
+	/* Full screen gives the rows to the sheet: the title bar and the buttons
+	   under the editor come in to a tighter fit, half their dialog padding.
+	   The sides keep their 22px, which is what the editor reaches out
+	   through to meet the window's edges. */
+	.css-dialog.full {
+		padding-block: 10px;
+	}
+
+	.css-dialog.full .modal-header {
+		margin-top: -10px;
+		padding-top: 8px;
+		padding-bottom: 6px;
+		margin-bottom: 4px;
+		top: -10px;
+	}
+
+	.css-dialog.full .modal-actions {
+		margin-top: 10px;
 	}
 
 	/* The title is pressed and double-clicked, never read off: a double-click
