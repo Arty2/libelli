@@ -568,11 +568,13 @@ resize boxes directly, or type exact millimetres.
   and **Starter** — the code-reference glyph, its word on a desktop — puts
   that same sheet in the editor **in place of** whatever CSS is there, to
   edit rather than read; <kbd>Ctrl/Cmd</kbd>+<kbd>Z</kbd> or **Cancel** brings
-  the old sheet back. It opens with a
-  comment that says what this template is — the page size and margins, the
-  text defaults, the fonts it loads, every area's id, mode, place and size —
-  and the few rules the card keeps, so the whole sheet can be pasted into a
-  chat with an AI model and come back as CSS for this page. Being a comment,
+  the old sheet back. It is barebones: a
+  few lines of comment saying what this template is — the page size and
+  margins, the text defaults, the fonts it loads, the variables below and
+  the rules the card keeps — then an empty rule for each named area, with
+  its mode, place and size beside it, and the page's hooks. The whole sheet
+  can be pasted into a chat with an AI model and come back as CSS for this
+  page. Being a comment,
   it sets nothing. The card also carries the page's numbers as variables a
   rule can read: `--page-w`, `--page-h`, `--margin-top` and the other three
   edges, `--bleed`, `--text-font`, `--text-size`, `--text-leading` and
@@ -591,12 +593,12 @@ resize boxes directly, or type exact millimetres.
   tabs: <kbd>Tab</kbd> and <kbd>Shift</kbd>+<kbd>Tab</kbd> move the line or the
   whole selection, <kbd>Enter</kbd> carries the indent of the line above and
   steps in after a `{`, and a `}` typed on a line of its own steps back out.
-  Nothing reaches the card until you press something: **Apply**
-  (<kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd>) puts the sheet on the card and leaves
-  the dialog open, **Save** does both, and **Cancel** puts back the CSS that was
-  there when it opened — <kbd>Esc</kbd> and a click on the ground behind do the
-  same. A **locked** template opens here to read: the sheet is there, and the
-  three buttons that would write to it are not.
+  Nothing reaches the card until you press **Save**
+  (<kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd>), which puts the sheet on the card and
+  closes the dialog; **Cancel** puts back the CSS that was there when it
+  opened — <kbd>Esc</kbd> and a click on the ground behind do the same. A
+  **locked** template opens here to read: the sheet is there, and the buttons
+  that would write to it are not.
 
 ## Templates, and laying one out
 

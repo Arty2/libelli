@@ -31,7 +31,7 @@
 		placeholder = '',
 		readonly = false,
 		wrap = true,
-		onapply
+		onsave
 	}: {
 		value: string;
 		placeholder?: string;
@@ -39,8 +39,8 @@
 		readonly?: boolean;
 		/** long lines wrap to the editor's width rather than scroll sideways */
 		wrap?: boolean;
-		/** Ctrl/Cmd + Enter, which the dialog answers by applying the sheet. */
-		onapply?: () => void;
+		/** Ctrl/Cmd + Enter, which the dialog answers by saving the sheet. */
+		onsave?: () => void;
 	} = $props();
 
 	let field = $state<HTMLTextAreaElement | null>(null);
@@ -156,7 +156,7 @@
 	function onKeydown(event: KeyboardEvent) {
 		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
 			event.preventDefault();
-			onapply?.();
+			onsave?.();
 			return;
 		}
 		// Tab moves the focus out of a field nobody can type in, which is what it

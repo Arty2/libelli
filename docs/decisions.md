@@ -353,20 +353,21 @@ taken with it: Tab no longer leaves the field. Escape is the way out of the
 dialog, and a code field where Tab moves the focus is one where indenting is
 impossible.
 
-**The dialog holds a draft, and three buttons decide what happens to it.**
-Nothing reaches the template until Apply or Save is pressed, which is what makes
+**The dialog holds a draft, and two buttons decide what happens to it.**
+Nothing reaches the template until Save is pressed, which is what makes
 Cancel — and the ×, the backdrop and Escape, which mean what it means — a matter
 of putting back one known value and closing. It replaced a field that committed
 on `change`, where Cancel had to blur the field first so the commit landed
-*before* the restore rather than after it. Apply exists because a stylesheet is
-written by looking at the card: it puts the draft on the card and stays open.
-The primary button says Save while the draft differs from what the card has and
-Done when it does not, so the one button answers "is there anything of mine not
-on the card yet".
+*before* the restore rather than after it. There was an Apply as well, to put
+the draft on the card and stay open; it went, because a third way out that
+was neither keeping nor leaving read as one too many, and Ctrl/Cmd+Enter,
+which had been Apply's, is Save's. The primary button says Save while the
+draft differs from what the card has and Done when it does not, so the one
+button answers "is there anything of mine not on the card yet".
 
 **A locked template opens here to read.** The lock is on writing, and a sheet
 somebody else wrote is the thing in a locked template most worth reading. The
-three buttons that write — Starter, Apply, Save — are not rendered rather
+buttons that write — Starter and Save — are not rendered rather
 than disabled: on a row this short a line of greyed buttons reads as something
 broken, and the field itself is `readonly`, which is the honest signal.
 

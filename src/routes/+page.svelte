@@ -291,9 +291,9 @@
 	/**
 	 * The sheet being edited, and the sheet the card is drawn with.
 	 *
-	 * The two are separate on purpose: the editor holds a draft, Apply puts it on
-	 * the card without closing the dialog, and Save does both and leaves. Nothing
-	 * reaches the template until one of those is pressed, so Cancel — and the ×,
+	 * The two are separate on purpose: the editor holds a draft, and Save puts it
+	 * on the card and leaves. Nothing reaches the template until Save is
+	 * pressed, so Cancel — and the ×,
 	 * the backdrop and Escape, which mean what it means — is a matter of closing
 	 * the dialog and putting back whatever was there when it opened.
 	 *
@@ -567,15 +567,9 @@
 		cssOpen = true;
 	}
 
-	/** Put the draft on the card, leaving the dialog where it is. */
-	function applyCss() {
-		if (template.locked) return;
-		writeCss(cssDraft.trim() || undefined);
-	}
-
-	/** Apply, and leave. */
+	/** Put the draft on the card, and leave. */
 	function saveCss() {
-		applyCss();
+		if (!template.locked) writeCss(cssDraft.trim() || undefined);
 		cssOpen = false;
 	}
 
@@ -3361,7 +3355,7 @@
 	<div class="modal wide css-dialog" class:full={cssFull} role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
 		<!-- The help dialog's header, and like it dragged by the title, so the
 		     card being styled can be seen beside it. The × is Cancel, as Esc
-		     and the backdrop are: only Apply and Save put anything on the card.
+		     and the backdrop are: only Save puts anything on the card.
 
 		     What the sheet is, beside its name: how many lines, and what it
 		     weighs. A template is meant to stay small enough to paste into a
@@ -3415,13 +3409,14 @@
 			placeholder={cssPlaceholder}
 			readonly={!!template.locked}
 			wrap={cssWrap}
-			onapply={applyCss}
+			onsave={saveCss}
 		/>
-		<!-- Left to right: the one button that puts text in, then the three ways
-		     out in the order of how much they do — nothing, the card, the card and
-		     the door. A locked template can be read and not written, so the three
-		     that write are not here at all: disabled buttons on a row this short
-		     read as something broken rather than as something withheld. -->
+		<!-- Left to right: the one button that puts text in and the one that
+		     changes how it is shown, then the two ways out — keeping nothing,
+		     and keeping the sheet. A locked template can be read and not
+		     written, so the buttons that write are not here at all: disabled
+		     buttons on a row this short read as something broken rather than as
+		     something withheld. -->
 		<div class="modal-actions css-actions">
 			{#if !template.locked}
 				<button
@@ -3447,10 +3442,7 @@
 			<span class="spacer"></span>
 			<button onclick={cancelCss}>{template.locked ? 'Close' : 'Cancel'}</button>
 			{#if !template.locked}
-				<button onclick={applyCss} disabled={!cssDirty} title="Put this on the card and stay here — Ctrl/Cmd + Enter">
-					Apply
-				</button>
-				<button class="primary" onclick={saveCss}>{cssDirty ? 'Save' : 'Done'}</button>
+				<button class="primary" onclick={saveCss} title="Put this on the card and close — Ctrl/Cmd + Enter">{cssDirty ? 'Save' : 'Done'}</button>
 			{/if}
 		</div>
 	</div>

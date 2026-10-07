@@ -5,10 +5,11 @@ import { marginsOf } from './template';
 import type { Template } from './types';
 
 /**
- * What the CSS dialog's Starter puts in the editor: the selectors a template
- * can reach, under a header that says what this template is — enough that the
- * sheet can be pasted into a chat with a language model and come back as
- * working CSS for this page.
+ * What the CSS dialog's Starter puts in the editor, in place of the sheet: a
+ * few lines saying what this template is, then an empty rule for each named
+ * area and the page's hooks — barebones on purpose, enough that the sheet can
+ * be pasted into a chat with a language model and come back as working CSS
+ * for this page, and short enough to start writing in.
  *
  * Everything in it is read from the template as the sheet is made, never
  * written out by hand, so there is nothing here to keep in step when the app
@@ -61,74 +62,38 @@ function wrap(text: string, prefix: string): string[] {
 	return lines;
 }
 
-/** The facts and the rules, as one comment. */
+/** The facts, as one comment: what a model needs and nothing it can guess. */
 function header(template: Template): string[] {
 	const { page, defaults: d } = template;
 	const m = marginsOf(page);
-	const bleed = bleedFor(template.bleed);
 	const fonts = [...new Set([d.font, ...template.fonts.map((f) => f.family), ...template.boxes.map((b) => b.font)])].filter(
 		(f): f is string => !!f
 	);
-	const areas = template.boxes.map((b) => {
-		const id = cssIdent(b.slot ?? '');
-		const name = id ? `#${id}` : '(unnamed)';
-		const type = [b.font, b.size && `${b.size}pt`].filter(Boolean).join(' ');
-		return `   ${name.padEnd(16)} ${b.mode.padEnd(9)} x ${round(b.x)}, y ${round(b.y)}, ${round(b.w)} × ${round(b.h)} mm${type ? ` — ${type}` : ''}`;
-	});
-	const vars = cardVars(template).map(([name]) => name);
 	return [
-		`/* ${template.name || 'Untitled'} — a libelli template's CSS.`,
-		'',
-		`   Page ${round(page.w)} × ${round(page.h)} mm` + (bleed ? `, bleed ${round(bleed)} mm` : ', no bleed') + '.',
-		`   Margins ${round(m.top)} ${round(m.right)} ${round(m.bottom)} ${round(m.left)} mm, top right bottom left.`,
-		...(template.facing ? ['   Facing pages: odd pages are right-hand; a left-hand page mirrors.'] : []),
-		`   Text ${d.font}, ${round(d.size)}pt, leading ${round(d.lineHeight)}, color ${d.color}.`,
-		`   Fonts loaded: ${fonts.join(', ') || 'none'}.`,
-		'   Name only these: any other family falls back.',
-		'   Areas, from the top-left of the trimmed page; reach an unnamed one',
-		'   only through .box and the classes below:',
-		...(areas.length ? areas : ['   none yet']),
-		'',
-		'   Rules:',
-		'   - Every selector is scoped to the card; :root and html mean the card.',
-		'   - Work in mm and pt. @import and any url() but data: are removed.',
-		'   - What the bars set — an area\'s place, size, font, color, fill — is',
-		'     an inline style and wins over this sheet. Leave it to the bars;',
-		'     use !important only to override one on purpose.',
-		'   - .theme-* classes are the editor\'s screen only; print is light.',
-		'   - The card sets these, for calc() — read them, never set them:',
-		...wrap(vars.join(', '), '     '),
-		'*/'
+		`/* Page ${round(page.w)} × ${round(page.h)} mm, margins ${round(m.top)} ${round(m.right)} ${round(m.bottom)} ${round(m.left)}, bleed ${round(bleedFor(template.bleed))}${template.facing ? ', facing pages' : ''}.`,
+		`   Text ${d.font} ${round(d.size)}pt/${round(d.lineHeight)} ${d.color}.`,
+		...wrap(`Fonts: ${fonts.join(', ')}.`, '   '),
+		...wrap(`Vars: ${cardVars(template).map(([name]) => name).join(' ')}.`, '   '),
+		'   Scoped to the card; mm and pt; no @import or remote url().',
+		'   The bars win unless !important. */'
 	];
 }
 
-/** The selectors a template can reach — every one of them real. */
+/** Every named area as an empty rule, with its frame, then the page's hooks. */
 function selectors(template: Template): string[] {
-	const ids = [...new Set(template.boxes.map((b) => cssIdent(b.slot ?? '')).filter(Boolean))];
+	const seen = new Set<string>();
+	const areas = template.boxes.flatMap((b) => {
+		const id = cssIdent(b.slot ?? '');
+		if (!id || seen.has(id)) return [];
+		seen.add(id);
+		return [`${`#${id} { }`.padEnd(18)} /* ${b.mode}, ${round(b.x)} ${round(b.y)}, ${round(b.w)} × ${round(b.h)} */`];
+	});
 	return [
-		'.box { }              /* every area */',
-		...ids.map((id) => `#${id} { }`),
-		'',
-		'.content-field { }    /* by what fills it: a column, */',
-		'.content-static { }   /* its own words, */',
-		'.content-image { }    /* or an image */',
-		'.mode-plain { }       /* by mode: also .mode-markdown, */',
-		'.mode-qr { }          /* .mode-image, .mode-color */',
-		'',
-		'h1, h2, h3 { }        /* Markdown headings */',
-		'p, ul, li { }         /* Markdown blocks */',
-		'em, strong, code { }',
-		'hr { }',
-		'.page-number { }      /* the number on the card */',
-		".page-number .of::before { content: ' of ' }",
-		'',
-		'#page-1 { }           /* a page by its number */',
-		'.cover { }            /* the first page; also .inside-cover, */',
-		'.back-cover { }       /* .inside-back-cover and the last page */',
-		'.recto { }            /* with Recto / Verso on: also .verso */',
-		'',
-		'.theme-dark { }       /* the editor seen in the dark theme; */',
-		'.theme-dark-page { }  /* the page inverted too; .theme-light */'
+		'.box { }',
+		...areas,
+		'.page-number { }',
+		`${'.cover { }'.padEnd(18)} /* also .back-cover, #page-1, .recto, .verso */`,
+		`${'.theme-dark { }'.padEnd(18)} /* screen only; also .theme-dark-page */`
 	];
 }
 
