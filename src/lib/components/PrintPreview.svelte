@@ -461,7 +461,7 @@
 			<span>Output</span>
 			<select
 				value={turn}
-				title="Which way round the PNGs and the printed pages come out: turned a quarter if they are not that way already. Kept in this browser, not in the template."
+				title="Which way round the PNGs and the printed pages come out. Auto follows the page settings; Portrait or Landscape turns them a quarter if they are not that way already. Kept in this browser, not in the template."
 				onchange={(e) => onturnchange(e.currentTarget.value as OutputTurn)}
 			>
 				{#each OUTPUT_TURNS as option (option)}

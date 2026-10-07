@@ -1278,13 +1278,19 @@ them and needs no heading of its own. The print checklist stays at the bottom
 happen. The title counts both units, *Export — 4 pages / 2 sheets*, so the
 number of sheets is known before scrolling to them.
 
-**Output** opens that strip, ahead of the lock: **As set**, **Portrait** or
+**Output** opens that strip, ahead of the lock: **Auto**, **Portrait** or
 **Landscape**, for which way round the PNGs and the printed pages come out.
+**Auto** takes its cue from the page settings: one card to a page comes out
+the shape of the page, and tiled cards the way **Orientation** in Print
+Settings laid the sheet.
 Portrait or Landscape turns each file and each printed page a quarter
 clockwise when it is not that way round already — one card to a page, or a
 whole sheet of them — and leaves the previews as the template draws them. It
 belongs to this browser, not to the template: it is never saved in one, the
-lock does not touch it, and it is remembered here for the next export.
+lock does not touch it, and it is remembered here for the next export. With
+cards tiled, **Orientation** re-tiles them for the paper and Output only
+turns the finished sheet — reach for Orientation to fit more to a sheet, and
+for Output when the tray or the screen wants it the other way round.
 
 On a phone each grid is a strip you swipe along rather than rows you scroll
 past. A hundred pages was a hundred rows between you and everything below

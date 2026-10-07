@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { readTurn, turnsOutput } from './turn';
 
 describe('turnsOutput', () => {
-	it('leaves everything as set by default', () => {
-		expect(turnsOutput('as-set', 148, 210)).toBe(false);
-		expect(turnsOutput('as-set', 210, 148)).toBe(false);
+	it('turns nothing on Auto, which follows the page settings', () => {
+		expect(turnsOutput('auto', 148, 210)).toBe(false);
+		expect(turnsOutput('auto', 210, 148)).toBe(false);
 	});
 
 	it('turns only what is not that way round already', () => {
@@ -21,9 +21,10 @@ describe('turnsOutput', () => {
 });
 
 describe('readTurn', () => {
-	it('reads what it wrote, and anything else as as-set', () => {
+	it('reads what it wrote, and anything else as auto — an old as-set included', () => {
 		expect(readTurn('landscape')).toBe('landscape');
-		expect(readTurn('sideways')).toBe('as-set');
-		expect(readTurn(undefined)).toBe('as-set');
+		expect(readTurn('sideways')).toBe('auto');
+		expect(readTurn(undefined)).toBe('auto');
+		expect(readTurn('as-set')).toBe('auto');
 	});
 });

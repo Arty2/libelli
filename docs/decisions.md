@@ -2487,8 +2487,11 @@ for the tray that takes paper one way round, or a PNG wanted sideways — a
 fact about this printer, so it is kept in this browser (`turn.ts`, beside the
 theme) and a template handed on does not arrive turned. It sits before the
 lock because the lock freezes the template's settings and this is not one.
-It turns a quarter only when the output is not that way already, so picking
-the way it is costs nothing. The PNG is drawn turned onto its canvas
+Auto, the default, turns nothing and so follows the page settings — the
+page's own shape, or the sheet as Print Settings' Orientation tiled it — and
+Portrait or Landscape turns a quarter only when the output is not that way
+already, so picking the way it is costs nothing. Not a second sheet
+orientation: that one re-tiles, this one only turns what was tiled. The PNG is drawn turned onto its canvas
 (`elementToPng`'s `turn`), one encode. Print lays each sheet, as PrintSheet
 draws it, on a paper the other way round and rotates it there — no second
 layout. The paper is `contain: strict` as well as clipped: clipping alone

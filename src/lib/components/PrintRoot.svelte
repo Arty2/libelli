@@ -34,7 +34,7 @@
 		printBackground,
 		excluded,
 		excludedSheets,
-		turn = 'as-set'
+		turn = 'auto'
 	}: Props = $props();
 
 	// Filtered into a list up front, carrying each row's original index: a page

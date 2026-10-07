@@ -187,7 +187,7 @@
 	/** Light or dark — see theme.ts. app.html has already applied it before the first paint. */
 	let theme = $state<Theme>('light');
 	/** The export's own Portrait / Landscape — turn.ts. This browser's, never the template's. */
-	let outputTurn = $state<OutputTurn>('as-set');
+	let outputTurn = $state<OutputTurn>('auto');
 	/** What is on screen: the theme, or the other dark while a glance lasts — the page's `theme-…` class. */
 	let shownTheme = $state<Theme>('light');
 	function showTheme(shown: Theme) {
