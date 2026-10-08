@@ -1147,8 +1147,10 @@ at its own size.
   encode — an accent in Code 128, a wrong check digit — prints nothing.
 
 The encoders are written here rather than pulled in, like the Markdown renderer
-and the CSV parser. Their tests decode what they produce with independent
-decoders, since a code that does not scan looks exactly like one that does.
+and the CSV parser. The QR tests decode what it produces with an independent
+decoder, since a code that does not scan looks exactly like one that does; the
+barcodes were decoded the same way once, and their tests hold them to the bars
+that scanned.
 
 ## Where the images live
 
