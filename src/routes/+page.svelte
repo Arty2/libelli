@@ -2582,8 +2582,12 @@
 		// table's lock is the one that guards it.
 		if (!box || !column || !row) return;
 		if (refuseLockedTable()) return;
+		// Where the editor's × goes back to, as for a drawing (`drawArea`): the
+		// table when it was already showing; otherwise it was opened only for
+		// this cell, and closing the cell closes it again.
+		const from = dataOpen ? undefined : 'card';
 		dataOpen = true;
-		cellRequest = { row: activeRow, column };
+		cellRequest = { row: activeRow, column, from };
 	}
 
 	/**
