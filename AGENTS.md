@@ -101,10 +101,10 @@ src/routes/app.css        the :root tokens and app-wide rules
   before it is written, not stored mirrored.
 - **No runtime dependencies.** The Markdown renderer, the CSV parser and the QR
   encoder are hand-written, so the app works offline and nothing can rot
-  underneath it. `jsqr` is a dev dependency only — the QR tests decode generated
-  codes with an independent decoder, because a code that does not scan looks
-  exactly like one that does. The barcodes were decoded once, and their tests
-  pin the bars that scanned.
+  underneath it. A code that does not scan looks exactly like one that does, so
+  every QR and barcode the tests hold was read back once with an independent
+  decoder and is pinned, module for module; change the encoder on purpose and
+  decode the new ones once more before pinning them.
 - **The app makes no request nobody asked for.** Three paths out: `png.ts`
   inlines faces and pictures for export, the worker caches, and `fonts.ts`
   appends a `<link>` for a Google family. A template reaches the last — it names

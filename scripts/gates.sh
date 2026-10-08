@@ -100,8 +100,8 @@ fi
 
 # ── 4. No runtime dependencies ───────────────────────────────────────────────
 # The Markdown renderer, the CSV parser and the QR encoder are hand-written so
-# the app works offline and nothing can rot underneath it. jsqr and the
-# toolchain are dev dependencies; a `dependencies` block means something now
+# the app works offline and nothing can rot underneath it. The toolchain is a
+# dev dependency; a `dependencies` block means something now
 # ships to the browser that nobody here maintains.
 runtime_deps=$(node -e 'const d=require("./package.json").dependencies||{};console.log(Object.keys(d).join(" "))' 2>/dev/null)
 
