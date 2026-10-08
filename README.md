@@ -378,12 +378,14 @@ resize boxes directly, or type exact millimetres.
   linked to a column fills only the cards whose cell says so. The link names the column, like `%%column%%`, follows it through a
   rename, and marks it as used in the table; press the link again to let go.
 - **A border drawn by hand** — **Draft**, beside the border color, draws it
-  wobbling, as a line rather than a rule. Width, style and radius all still
-  mean what they meant: a dashed 1mm hand border is dashed, 1mm and hand-drawn,
-  and a dotted one is dots. Each edge is drawn with its own width, so an area
-  with a bottom edge only comes out as an underline, and each corner is drawn
-  by the edge arriving at it — which is what a pen does when the sides are
-  drawn one after another. The wobble is worked out from the area's own name
+  rough, as a quick pen sketch rather than a rule: each edge wobbles and bows,
+  a solid line is gone over twice, and square corners are crossed rather than
+  met, each stroke running on a little past the corner. Width, style and radius
+  all still mean what they meant: a dashed 1mm hand border is dashed, 1mm and
+  hand-drawn, and a dotted one is dots. Each edge is drawn with its own width,
+  so an area with a bottom edge only comes out as an underline, and a rounded
+  corner is drawn by the edge arriving at it — which is what a pen does when
+  the sides are drawn one after another. The wobble is worked out from the area's own name
   rather than from chance, so it is the same line on every card of the run and
   it does not redraw itself while you type; two areas are never drawn alike.
   It is an SVG over the room the CSS border was already holding, so switching

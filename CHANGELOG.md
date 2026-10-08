@@ -12,6 +12,7 @@ file under **What's new** — press the version number in the status bar.
 
 - Phone: pull the table down past its lowest to close it; flick up from the status bar to open it.
 - The nudge pad stays as you left it when you switch between Move and zoom and pan.
+- Draft borders are much rougher: a wobble and a bow, two passes, corners crossed.
 
 ## 0.27.31 — 2026-10-08
 

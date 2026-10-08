@@ -493,6 +493,19 @@ one area is always drawn the same way and no two areas are drawn alike. It is
 also what makes the module testable at all: the same input gives the same path
 string, every time.
 
+**Rough enough to read as drawn.** The first hand strayed a third of a
+millimetre every 9mm and met every corner exactly, and printed it read as a
+ruled line printed badly — too subtle to be a choice. Now it strays 0.7mm
+every 6mm, bows the whole edge by up to 0.9mm, goes over a solid edge twice
+(the two passes never agree, which is most of a sketch), and crosses square
+corners rather than meeting them, each stroke running on by up to 1.4mm and
+never more than a sixth of its edge. A rounded corner still meets: it is one
+stroke turning, not two crossing. Dashed and dotted get one pass, or the
+dashes would fall out of step; a double is two lines already. A stamp keeps
+the old, smaller stray of its own — it is torn, not sketched. The overshoot
+reaches past the border box, which the SVG's `overflow: visible` already
+allowed for the wobble.
+
 **The wobble is in millimetres, not in percent.** A pen strays by a fixed
 physical amount whatever it is drawing around, so a small box is not drawn more
 neatly than a large one, and the same border drawn on an A7 zine page and an A3

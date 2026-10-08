@@ -15,9 +15,25 @@ import type { BorderStyle, Sides } from './types';
  * small box is not drawn more neatly than a large one.
  */
 
-/** How far a line strays from true, and how often it is allowed to. Both mm. */
-const WOBBLE = 0.32;
-const SEGMENT = 9;
+/**
+ * How far a line strays from true, and how often it is allowed to. Both mm.
+ *
+ * Rough on purpose: at a third of a millimetre every 9mm the line read as a
+ * ruled one that had been printed slightly badly, not as a draft. This is a
+ * quick pen, which a reader sees as drawn at arm's length.
+ */
+const WOBBLE = 0.7;
+const SEGMENT = 6;
+/** How far a whole edge may bow off its line, as a pen drifts across a long stroke. mm. */
+const BOW = 0.9;
+/**
+ * How far a square corner's strokes run on past it, at most. A pen drawing a
+ * box in four strokes does not stop on the corner, it crosses it: the
+ * overshoot is most of what makes a box look sketched rather than traced.
+ */
+const OVERSHOOT = 1.4;
+/** The perforated edge's own stray: a stamp is torn, not sketched, and keeps the old hand. */
+const STAMP_WOBBLE = 0.32;
 
 export interface HandStroke {
 	/** SVG path data, in millimetres from the border box's top left corner */
@@ -85,8 +101,9 @@ const pt = (p: Point) => `${round(p.x)} ${round(p.y)}`;
 /**
  * A straight run, walked in steps of about `SEGMENT` with every step but the
  * two ends pushed off the line, then smoothed through the midpoints between
- * them. The ends are left exactly where they were put: they are where the next
- * stroke starts, and a corner that does not meet is a gap, not a flourish.
+ * them; the whole run bowed one way or the other on top of that. The ends are
+ * left exactly where they were put — `handBorder` decides where those are, run
+ * on past a square corner or meeting a curved one.
  */
 function wobble(from: Point, to: Point, rng: () => number): Point[] {
 	const dx = to.x - from.x;
@@ -96,13 +113,35 @@ function wobble(from: Point, to: Point, rng: () => number): Point[] {
 	// The unit normal, so the stray is across the line rather than along it.
 	const nx = length ? -dy / length : 0;
 	const ny = length ? dx / length : 0;
+	// No more bow than a tenth of the run: a short edge bowed by a whole
+	// millimetre is a bracket, not a line.
+	const bow = (rng() - 0.5) * 2 * Math.min(BOW, length / 10);
 	const points: Point[] = [];
 	for (let i = 0; i <= steps; i++) {
 		const t = i / steps;
-		const stray = i === 0 || i === steps ? 0 : (rng() - 0.5) * 2 * WOBBLE;
+		const stray = i === 0 || i === steps ? 0 : (rng() - 0.5) * 2 * WOBBLE + bow * Math.sin(Math.PI * t);
 		points.push({ x: from.x + dx * t + nx * stray, y: from.y + dy * t + ny * stray });
 	}
 	return points;
+}
+
+/**
+ * A run carried on past both its ends, by up to `OVERSHOOT` each and never
+ * more than a sixth of its length, so a small box is not drawn as a hash sign.
+ * Each end by its own amount: a pen never crosses two corners alike.
+ */
+function overshoot(from: Point, to: Point, rng: () => number): [Point, Point] {
+	const dx = to.x - from.x;
+	const dy = to.y - from.y;
+	const length = Math.hypot(dx, dy);
+	if (!length) return [from, to];
+	const most = Math.min(OVERSHOOT, length / 6);
+	const back = most * (0.3 + 0.7 * rng());
+	const on = most * (0.3 + 0.7 * rng());
+	return [
+		{ x: from.x - (dx / length) * back, y: from.y - (dy / length) * back },
+		{ x: to.x + (dx / length) * on, y: to.y + (dy / length) * on }
+	];
 }
 
 /** Quadratics through the midpoints — the cheapest curve that reads as a pen. */
@@ -124,7 +163,7 @@ function smooth(points: Point[]): string {
  * edges of different widths is drawn at: the width of the edge that owns it.
  */
 function corner(from: Point, control: Point, to: Point, rng: () => number): string {
-	const stray = (rng() - 0.5) * WOBBLE;
+	const stray = (rng() - 0.5) * WOBBLE * 1.5;
 	return `Q${pt({ x: control.x + stray, y: control.y + stray })} ${pt(to)}`;
 }
 
@@ -204,9 +243,24 @@ export function handBorder({ w, h, widths, radius, style, seed, steady }: HandBo
 							? { x: run.control.x + cr, y: run.from.y }
 							: { x: run.from.x, y: run.control.y + cr };
 
-			let d = smooth(wobble(run.from, straightTo, rng));
-			if (cr > 0) d += corner(straightTo, run.control, run.to, rng);
-			strokes.push({ d, width: round(width), ...dashFor(style, width) });
+			// A rounded corner is one stroke that turns, so it has to meet the
+			// next edge's; a square one is two strokes crossing, and runs on.
+			// A solid line is gone over twice, each pass its own way, which is
+			// the other half of a sketch — the two never quite agree. A dashed
+			// or dotted line is not: two passes would put the dashes out of
+			// step, and a double is two lines already.
+			for (let again = 0; again < (style === 'solid' ? 2 : 1); again++) {
+				let d: string;
+				if (cr > 0) {
+					d = smooth(wobble(run.from, straightTo, rng)) + corner(straightTo, run.control, run.to, rng);
+				} else {
+					const [from, to] = overshoot(run.from, straightTo, rng);
+					d = smooth(wobble(from, to, rng));
+				}
+				// Round ends: a pen's line ends in the nib's shape, and an
+				// overshoot cut square reads as clipped.
+				strokes.push({ d, width: round(width), ...dashFor(style, width), ...(style === 'solid' ? { cap: 'round' as const } : {}) });
+			}
 		}
 	}
 	return strokes;
@@ -245,7 +299,7 @@ function stamp(w: number, h: number, widths: Sides, rng: (() => number) | null):
 		{ x: w - inset, y: inset },
 		{ x: w - inset, y: h - inset },
 		{ x: inset, y: h - inset }
-	].map((p) => ({ x: p.x + jitter(WOBBLE / 2), y: p.y + jitter(WOBBLE / 2) }));
+	].map((p) => ({ x: p.x + jitter(STAMP_WOBBLE / 2), y: p.y + jitter(STAMP_WOBBLE / 2) }));
 
 	let d = `M${pt(corners[0])}`;
 	for (let i = 0; i < 4; i++) {
