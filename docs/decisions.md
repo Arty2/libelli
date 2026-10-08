@@ -108,6 +108,29 @@ collapses to its own top, so what follows it does not move. A template whose
 unanchored, bottom- or middle-set growing area overflowed now overflows the
 other way — the feature, and the one visible change the new frame makes.
 
+## `src/lib/tablock.ts`
+
+**A locked-out tab never loads.** Every write in +page waits on `ready`, which
+only the tab holding the Web Lock ever sets — so a second tab cannot save what
+it never read, and no write path had to learn about tabs. Gating each save
+instead would have been a dozen guards, and the next save added would be the
+one without one.
+
+**Handed over, not stolen.** Use Here asks the holder over a
+BroadcastChannel; the holder writes everything at once, without the 300ms
+debounce, waits for it, stops, and only then lets go — so the new tab reads
+the latest of everything. A holder that does not answer in four seconds has the
+lock stolen; the browser tells it, and it stops all the same, but its last
+save can then land after the new tab has read: the one case that can still
+lose a few hundred milliseconds of typing, and only from a tab already frozen.
+A request left waiting when the steal happens is called off, or it would be
+granted later and take the lock back from the tab it went to. A tab that handed
+its work on reloads when it takes it back, since what it holds is older than
+what it gave.
+
+Web Locks and BroadcastChannel are both Baseline Widely available. Without
+them — no secure context — every tab edits, as before.
+
 ## `src/lib/template.ts`
 
 **Stacking is array order**, not a z-index: `arrangeBoxes` moves boxes within the

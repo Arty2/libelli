@@ -1720,6 +1720,17 @@ its millimetre is at any zoom — a repeating gradient rounds its tile to whole
 device pixels and drops whichever lines fall inside the rounding, which is why the
 grid used to be missing lines at some scales and not others.
 
+## One tab at a time
+
+Everything saves as you go, into this browser — so two tabs of libelli would
+each save their own copy over the other's. Only one tab edits. Open a second
+and it says libelli is open in another tab, and loads nothing, so it has
+nothing to save; **Use Here** moves the work to it. The tab that had it saves
+what it has first, then stops and says so, and the new one opens on exactly
+that. Its own Use Here moves it back. A tab that has frozen and does not answer
+has the work taken from it after a few seconds. Closing a tab frees the work
+for the next.
+
 ## Installing it, and working offline
 
 libelli keeps a copy of itself in the browser, so it opens with the network off

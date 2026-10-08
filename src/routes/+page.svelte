@@ -117,6 +117,7 @@
 		type TemplateEntry
 	} from '$lib/storage';
 	import { REFERENCE_FRAME } from '$lib/frame';
+	import { claimEditor, type EditorLock } from '$lib/tablock';
 	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
@@ -777,10 +778,71 @@
 		return { note: parts.filter(Boolean).join(' '), warning: orphaned > 0 };
 	}
 
-	// ---- boot ---------------------------------------------------------------
+	// ---- one tab edits -------------------------------------------------------
+
+	/**
+	 * Whether this tab is the one editing — tablock.ts. `checking` until the
+	 * lock answers; `here` holds it and boots; `elsewhere` found it held and
+	 * never loads anything, so it has nothing to save over the other tab's
+	 * work; `handed` gave it to another tab, having saved first, and has
+	 * stopped saving.
+	 */
+	let editor = $state<'checking' | 'here' | 'elsewhere' | 'handed'>('checking');
+	let editorLock: EditorLock | null = null;
+	let takingOver = $state(false);
+
+	/**
+	 * Everything the autosave would write, written now and waited for: the tab
+	 * taking over reads storage the moment this resolves, so nothing may be
+	 * left in a debounce. Then the saves stop — `ready` gates every one of
+	 * them — and the page says why.
+	 */
+	async function handOver() {
+		if (ready) {
+			const template$ = $state.snapshot(template);
+			const dataset$ = $state.snapshot(dataset);
+			saveMapping(templateId, $state.snapshot(mapping));
+			saveUi($state.snapshot(ui));
+			await Promise.all([
+				saveTemplate(template$),
+				templateId ? saveTemplateDoc(templateId, template$) : null,
+				saveDataset(dataset$),
+				datasetId ? saveDatasetDoc(datasetId, dataset$) : null
+			]);
+		}
+		ready = false;
+		editor = 'handed';
+	}
 
 	$effect(() => {
-		if (ready) return;
+		void claimEditor(handOver).then((lock) => {
+			editorLock = lock;
+			editor = lock.held ? 'here' : 'elsewhere';
+		});
+	});
+
+	/**
+	 * Bring the editing here. A tab that never loaded boots in place; one that
+	 * handed its work away is holding a copy older than what it handed on, so
+	 * it starts again from storage.
+	 */
+	async function useHere() {
+		if (!editorLock || takingOver) return;
+		takingOver = true;
+		await editorLock.takeOver();
+		if (editor === 'handed') location.reload();
+		else {
+			editor = 'here';
+			takingOver = false;
+		}
+	}
+
+	// ---- boot ---------------------------------------------------------------
+
+	// Only in the tab holding the lock, and only once: a tab that has handed
+	// its work on is not ready either, and must not start loading again.
+	$effect(() => {
+		if (ready || editor !== 'here') return;
 		void boot();
 	});
 
@@ -3434,6 +3496,31 @@
 		<button class="version as-typed" onclick={openWhatsNew} title="What's new">v{VERSION}</button>
 	</footer>
 </div>
+
+{#if editor === 'elsewhere' || editor === 'handed'}
+	<!-- Not dismissable: behind it is a tab that is not saving, and editing it
+	     would be work that goes nowhere. The one way on is to bring the editing
+	     here. -->
+	<div class="modal-backdrop" role="presentation"></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="elsewhere-title" aria-describedby="elsewhere-text">
+		<h2 id="elsewhere-title">Open in another tab</h2>
+		<p id="elsewhere-text">
+			{#if editor === 'handed'}
+				Your work moved to another tab, saved as you left it. This tab has stopped saving, so nothing here can
+				overwrite it.
+			{:else}
+				libelli is already open in another tab. One tab edits at a time, so that the two never save over each
+				other's work.
+			{/if}
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button class="primary" data-default disabled={takingOver} onclick={() => void useHere()}>
+				{takingOver ? 'Moving it here…' : 'Use Here'}
+			</button>
+		</div>
+	</div>
+{/if}
 
 {#if statusOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (statusOpen = false)}></div>

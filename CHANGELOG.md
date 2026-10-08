@@ -11,7 +11,7 @@ file under **What's new** — press the version number in the status bar.
 ## 0.28.0 — 2026-10-08
 
 - Phone: pull the table down past its lowest to close it; flick up from the status bar to open it.
-- The nudge pad stays as you left it when you switch between Move and zoom and pan.
+- The nudge pad stays as you left it between Move and zoom and pan. One tab edits at a time: Use Here.
 - Lists: ◯ Ring and □ Open Square, ➤ Arrow, circles and squares sized alike; numbers as letters or Roman.
 - Shrink: an area keeps its height and sets each card's words smaller to fit.
 - Tab leaders: `Espresso^t2.20`. Dragging shows the gaps in mm from the ringed corner, which X and Y now name.
