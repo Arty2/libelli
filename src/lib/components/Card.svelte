@@ -2406,7 +2406,6 @@
 						{#each HANDLES as handle (handle)}
 							<span
 								class="handle h-{handle}"
-								class:square={handle === corner}
 								onpointerdown={(e) => startDrag(e, box, handle)}
 								onpointermove={moveDrag}
 								onpointerup={endDrag}
@@ -2945,21 +2944,18 @@
 		}
 	}
 
-	/* The anchor corner's handle: square-cornered, the rest rounded, and a
-	   ring inside it — the corner the text is set from, which a resize from
-	   any other handle leaves where it is. Square alone was too quiet a
-	   difference at 14px to read as anything but a rendering quirk. A ring,
-	   not a cross: a cross is the pivot's mark, a point to turn about, and two
-	   crosshairs on one area said the same thing twice.
+	/* The anchor corner's handle: rounded like the rest, with a ring inside
+	   it — the corner the text is set from, which a resize from any other
+	   handle leaves where it is. It used to be told apart by square corners
+	   alone, which at 14px read as a rendering quirk; with the ring to say it,
+	   the corners went back to matching the other seven. A ring, not a cross:
+	   a cross is the pivot's mark, a point to turn about, and two crosshairs
+	   on one area said the same thing twice.
 
 	   An SVG for the same reason as the pivot's: a ring of gradients a
 	   fraction of a pixel wide comes out a different weight at every zoom. The
 	   viewBox is the fine-pointer handle's 14px, so a stroke of one unit is one
 	   screen pixel; the coarse handle is 10px and makes up the difference. */
-	.handle.square {
-		border-radius: 0;
-	}
-
 	.anchor-mark {
 		display: block;
 		width: 100%;

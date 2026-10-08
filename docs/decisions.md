@@ -1291,12 +1291,13 @@ buoy where an area has both. Not the bottom corner: on an area shorter than the
 badge, the tie would stack up over the top line. Consecutive shallow areas in a
 chain can still bring one area's buoy down to the next one's tie.
 
-**The corner the words hang from has a square handle with a ring in it.**
-Square alone was too quiet a difference at 14px to read as meaning anything. A
-ring rather than a cross, which is the pivot's mark; an SVG, like the pivot's,
-so its weight holds at every zoom. Left and top alignment
+**The corner the words hang from has a ring in its handle.** It was told
+apart by square corners alone, which at 14px read as a rendering quirk rather
+than a meaning; with the ring to say it, the handle is rounded like the other
+seven. A ring rather than a cross, which is the pivot's mark; an SVG, like the
+pivot's, so its weight holds at every zoom. Left and top alignment
 make it the top-left, right and bottom the bottom-right; a centred alignment
-on either axis has no such corner and every handle stays rounded. It is worked
+on either axis has no such corner and no handle has a ring. It is worked
 out as drawn, so on a mirrored left-hand page it is the mirrored corner.
 
 **Pointing at a tie draws its thread.** The link and the buoy are at two
