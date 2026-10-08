@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SWIPE_MIN, TRAY_SHUT_PX, swipeStep, swipeUpward, trayPull } from './gestures';
+import { SWIPE_MIN, swipeStep, swipeUpward, trayPull } from './gestures';
 
 describe('swipeStep', () => {
 	it('reads a flick left as forward and one right as back', () => {
@@ -33,16 +33,23 @@ describe('swipeUpward', () => {
 });
 
 describe('trayPull', () => {
-	it('follows the finger between its minimum and the whole area', () => {
+	it('follows the finger up to the whole area', () => {
 		expect(trayPull(0.5, 100, 1000, 0.2).share).toBeCloseTo(0.6);
-		expect(trayPull(0.5, 100, 1000, 0.2).shut).toBe(false);
 		expect(trayPull(0.5, 900, 1000, 0.2).share).toBe(1);
 	});
 
-	it('stops at the minimum, and shuts only when pulled well past it', () => {
-		// Down to 0.2 exactly: at the bottom, still open.
-		expect(trayPull(0.5, -300, 1000, 0.2)).toEqual({ share: 0.2, shut: false });
-		expect(trayPull(0.5, -300 - (TRAY_SHUT_PX - 1), 1000, 0.2).shut).toBe(false);
-		expect(trayPull(0.5, -300 - TRAY_SHUT_PX, 1000, 0.2)).toEqual({ share: 0.2, shut: true });
+	it('follows it down to nothing, rather than stopping at the minimum', () => {
+		expect(trayPull(0.5, -400, 1000, 0.2).share).toBeCloseTo(0.1);
+		expect(trayPull(0.5, -900, 1000, 0.2).share).toBe(0);
+	});
+
+	it('shuts when let go below the minimum, and only then', () => {
+		expect(trayPull(0.5, -300, 1000, 0.2).shut).toBe(false);
+		expect(trayPull(0.5, -301, 1000, 0.2).shut).toBe(true);
+	});
+
+	it('opens from nothing, pulled up from the status bar', () => {
+		expect(trayPull(0, 400, 1000, 0.2)).toEqual({ share: 0.4, shut: false });
+		expect(trayPull(0, 100, 1000, 0.2).shut).toBe(true);
 	});
 });

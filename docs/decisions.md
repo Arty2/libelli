@@ -3536,13 +3536,18 @@ under them is worse than doing nothing. Touch only: a mouse has a wheel and two
 arrows either side of the count, and treating a click-drag as a swipe would page
 the cards every time somebody tried to select the counter's text.
 
-**The status bar's flick up is the same reading turned on its side**, and the
-tray's pull down past its lowest is `trayPull`: the shut is counted in pixels
-past the minimum, not as a share, so a finger has to carry on the same distance
-on any screen, and merely reaching the bottom and lifting never closes it. The
-action sets `touch-action: none` on the bar itself, or the browser takes the
-vertical drag for a scroll and cancels the pointer before the flick is read;
-the text size's pinch reads touch events, which still arrive.
+**The tray follows the finger, and `trayPull` is the one reading for it**: up
+to the whole area and down to nothing, closing when let go below its
+minimum. It used to stop at the minimum and close only on a second pull past
+it, which read as stuck; and the status bar used to open it when a flick
+ended, which read as a lag. `pullUp` reports the pull as it moves, from the
+first few pixels upward, so the tray rises from nothing under the finger; a
+quick flick (`FLICK_MS`, the same slope as a swipe) that ends short opens it to
+its last height instead of closing. The action sets `touch-action: none` on the
+bar itself, or the browser takes the drag for a scroll and cancels the pointer;
+and it swallows the click a release may be owed anywhere on the page, because
+by then the tray has risen under the finger and the click would land on the
+table's header — a column's name went into editing that way.
 
 ## `src/routes/app.css` — the accent
 

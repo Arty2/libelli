@@ -90,69 +90,90 @@ export function swipeUpward(dx: number, dy: number): boolean {
 }
 
 /**
- * How far past its lowest the tray's edge has to be pulled before letting go
- * folds it away. A finger's width and a bit: the tray stops at its minimum
- * first, so reaching the minimum by accident and lifting does not close it —
- * only carrying on down does.
- */
-export const TRAY_SHUT_PX = 56;
-
-/**
  * The tray's share of the working area after its edge has been pulled `dy`
- * pixels up (negative is down), and whether the pull has gone far enough past
- * `min` that letting go now folds it away.
+ * pixels up (negative is down) from `from`, and whether letting go there folds
+ * it away.
+ *
+ * It follows the finger all the way: up to the whole area, and down to
+ * nothing — it used to stop at `min` and want a second pull past it, which
+ * read as stuck. Let go below `min` and it closes; above, it stays as tall as
+ * it was left. The same reading opens it from the status bar, pulled up from
+ * nothing.
  */
-export function trayPull(
-	from: number,
-	dy: number,
-	height: number,
-	min: number
-): { share: number; shut: boolean } {
-	// In pixels for the shut, so the distance a finger has to carry on is
-	// the same on any screen, and not lost to a fraction rounding down.
-	const wanted = from * height + dy;
-	return {
-		share: Math.min(1, Math.max(min, wanted / height)),
-		shut: min * height - wanted >= TRAY_SHUT_PX
-	};
+export function trayPull(from: number, dy: number, height: number, min: number): { share: number; shut: boolean } {
+	const share = Math.min(1, Math.max(0, from + dy / height));
+	return { share, shut: share < min };
 }
 
+/** A quick flick, rather than a pull: let go within this, and the pull's direction is what counts. */
+export const FLICK_MS = 300;
+
 /**
- * Turn an upward flick over a node into a call — the status bar's way to open
- * the tray above it. Touch only, as `swipe` is.
+ * The status bar pulled upwards, followed as it moves — the tray comes up
+ * under the finger, as a drawer does, rather than all at once when the finger
+ * lifts. Touch only, as `swipe` is.
  *
- * The bar is mostly buttons, so the flick may well start on one. A finger that
- * travelled this far was not tapping, and the browser does not make a click of
- * it; the click is swallowed all the same if one arrives, so the swipe is never
- * also a press on whatever it started on.
+ * `onpull('start')` is asked once the finger has moved far enough, and more
+ * upwards than sideways, to be pulling rather than tapping; it answers whether
+ * there is anything to pull (false: the tray is open already, say), and only
+ * then do `move` and `end` follow. `end` says whether it was a flick — quick
+ * and decidedly upwards — so a short flick can open the tray all the way.
+ *
+ * A pull is never also a press. The click it may be owed is swallowed
+ * wherever it lands — on a button of the bar it started on, or on whatever
+ * the tray has brought under the finger by the time it lifts, which was how
+ * letting go over the table's header put a column's name into editing.
  */
-export function swipeUp(node: HTMLElement, onswipe: () => void) {
-	let start: { x: number; y: number; id: number } | null = null;
-	// The flick is read from pointer events, so the browser must not take the
-	// finger for a scroll: it would cancel the pointer a few pixels in, and
-	// the flick would never arrive. Said here, by the gesture that needs it,
-	// rather than left to a stylesheet that might not say it. Nothing in the
+export function pullUp(
+	node: HTMLElement,
+	onpull: (phase: 'start' | 'move' | 'end', clientY: number, flick?: boolean) => boolean | void
+) {
+	let start: { x: number; y: number; id: number; at: number; pulling: boolean } | null = null;
+	// Read from pointer events, so the browser must not take the finger for a
+	// scroll: it would cancel the pointer a few pixels in. Said here, by the
+	// gesture that needs it, rather than left to a stylesheet. Nothing in the
 	// bar scrolls, and a pinch read from touch events still reaches them.
 	const touchAction = node.style.touchAction;
 	node.style.touchAction = 'none';
-	let handler = onswipe;
+	let handler = onpull;
 	let swallowUntil = 0;
 
 	const down = (event: PointerEvent) => {
 		if (event.pointerType !== 'touch') return;
-		start = { x: event.clientX, y: event.clientY, id: event.pointerId };
+		start = { x: event.clientX, y: event.clientY, id: event.pointerId, at: performance.now(), pulling: false };
+	};
+
+	// A touch pointer stays with the element it went down on, so these keep
+	// arriving here as the finger travels up over the page.
+	const move = (event: PointerEvent) => {
+		if (!start || event.pointerId !== start.id) return;
+		const dx = event.clientX - start.x;
+		const dy = event.clientY - start.y;
+		if (!start.pulling) {
+			if (-dy < HOLD_SLOP || Math.abs(dy) < Math.abs(dx)) return;
+			if (handler('start', event.clientY) === false) {
+				start = null;
+				return;
+			}
+			start.pulling = true;
+		}
+		handler('move', event.clientY);
 	};
 
 	const up = (event: PointerEvent) => {
 		if (!start || event.pointerId !== start.id) return;
-		const lifted = swipeUpward(event.clientX - start.x, event.clientY - start.y);
+		const { pulling, x, y, at } = start;
 		start = null;
-		if (!lifted) return;
+		if (!pulling) return;
 		swallowUntil = performance.now() + 400;
-		handler();
+		const flick = performance.now() - at < FLICK_MS && swipeUpward(event.clientX - x, event.clientY - y);
+		handler('end', event.clientY, flick);
 	};
 
-	const cancel = () => (start = null);
+	const cancel = (event: PointerEvent) => {
+		if (start?.pulling && event.pointerId === start.id) handler('end', start.y);
+		start = null;
+	};
 
 	const click = (event: MouseEvent) => {
 		if (performance.now() > swallowUntil) return;
@@ -162,16 +183,18 @@ export function swipeUp(node: HTMLElement, onswipe: () => void) {
 	};
 
 	node.addEventListener('pointerdown', down);
+	node.addEventListener('pointermove', move);
 	node.addEventListener('pointerup', up);
 	node.addEventListener('pointercancel', cancel);
-	node.addEventListener('click', click, true);
+	window.addEventListener('click', click, true);
 	return {
-		update: (next: () => void) => (handler = next),
+		update: (next: typeof onpull) => (handler = next),
 		destroy: () => {
 			node.removeEventListener('pointerdown', down);
+			node.removeEventListener('pointermove', move);
 			node.removeEventListener('pointerup', up);
 			node.removeEventListener('pointercancel', cancel);
-			node.removeEventListener('click', click, true);
+			window.removeEventListener('click', click, true);
 			node.style.touchAction = touchAction;
 		}
 	};

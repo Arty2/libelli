@@ -1670,11 +1670,14 @@ towards it and down is away. They repeat on a hold like the arrows do.
   drawing — is the same grip while it covers the table, and so is the head of
   the Images tray, list or large view. A press that goes nowhere is still the
   header button underneath being pressed.
-- **Pull the tray down past its lowest to fold it away.** It stops at its
-  smallest first, and fades if you carry on; let go then and it closes, as the
-  Data button would, keeping its height for next time. **Flick up from the
-  status bar** to bring the table back — a tap on the bar's buttons is still a
-  tap.
+- **The tray follows your finger, both ways.** Pull its header down and it
+  shrinks with you all the way, fading once it is smaller than it can stay;
+  let go there and it folds away, as the Data button would, keeping its height
+  for next time. **Pull up from the status bar** and the table comes up under
+  your finger, staying as tall as you leave it — or, for a quick flick, as tall
+  as it last was. Let go of a pull too short to use and it goes back down. A
+  tap on the bar's buttons is still a tap, and letting go of a pull never taps
+  what the tray has brought under your finger.
 - **Buttons answer.** A press on any control gives a few milliseconds of
   vibration where the device has it, and a tooltip arriving under a held finger
   gives a firmer one.

@@ -23,7 +23,7 @@
 	} from '$lib/assets';
 	import { download, slugify } from '$lib/download';
 	import { ensureGoogleFont, ensureTemplateFonts, mergeFonts, pruneFonts, uploadLocalFont } from '$lib/fonts';
-	import { swipeUp, trayPull } from '$lib/gestures';
+	import { pullUp, trayPull } from '$lib/gestures';
 	import {
 		canRedo,
 		canUndo,
@@ -511,30 +511,42 @@
 		return () => query.removeEventListener('change', sync);
 	});
 
-	function dragTray(phase: 'start' | 'move' | 'end', clientY: number) {
+	/**
+	 * The height the tray goes back to once a pull is over without leaving it
+	 * anywhere — folded away, or flicked open — so it comes back as tall as it
+	 * was. Null is the stylesheet's own.
+	 */
+	let trayRestore: number | null = null;
+
+	function dragTray(phase: 'start' | 'move' | 'end', clientY: number, flick = false) {
 		const height = mainEl?.getBoundingClientRect().height ?? 0;
 		if (!height || !asideEl) return;
 		if (phase === 'start') {
 			// Measured rather than read off `trayShare`, which is null until the
 			// first drag and stale after a resize.
 			trayFrom = { y: clientY, share: asideEl.getBoundingClientRect().height / height };
+			trayRestore = trayShare;
 			return;
 		}
 		if (!trayFrom) return;
 		// The finger is on the tray's top edge, so up is taller: the share it
-		// takes is what it had plus however far the edge has been pulled. Past
-		// the lowest it goes, it stays there and fades — let go then and it
-		// folds away, as the Data button would, keeping the height it had for
-		// when it comes back.
+		// takes is what it had plus however far the edge has been pulled — all
+		// the way down to nothing, fading below its smallest, which says that
+		// letting go there folds it away, as the Data button would.
 		const pull = trayPull(trayFrom.share, trayFrom.y - clientY, height, TRAY_MIN);
 		trayShare = pull.share;
 		trayShutting = pull.shut;
 		if (phase === 'end') {
-			const from = trayFrom.share;
 			trayFrom = null;
 			trayShutting = false;
+			if (pull.shut && flick) {
+				// Flicked open from the status bar: a short quick pull is asking
+				// for the tray, not for a sliver of it.
+				trayShare = trayRestore;
+				return;
+			}
 			if (pull.shut) {
-				trayShare = from;
+				trayShare = trayRestore;
 				if (imagesOpen) imagesOpen = false;
 				else dataOpen = false;
 				return;
@@ -543,10 +555,21 @@
 		}
 	}
 
-	/** The status bar flicked upwards, stacked: the table comes up, as the Data button brings it. */
-	function liftTray() {
-		if (!stacked || dataOpen || imagesOpen) return;
-		dataOpen = true;
+	/**
+	 * The status bar pulled upwards, stacked: the table comes up under the
+	 * finger from nothing, and is dragged from there as its header would be.
+	 * Nothing to pull when a tray is up already.
+	 */
+	function pullTray(phase: 'start' | 'move' | 'end', clientY: number, flick?: boolean): boolean | void {
+		if (phase === 'start') {
+			if (!stacked || dataOpen || imagesOpen) return false;
+			trayRestore = trayShare;
+			trayShare = 0;
+			dataOpen = true;
+			trayFrom = { y: clientY, share: 0 };
+			return true;
+		}
+		dragTray(phase, clientY, flick);
 	}
 
 	let printing = $state(false);
@@ -3490,10 +3513,10 @@
 		{/if}
 	</main>
 
-	<!-- On a phone a flick up off the bar brings the table up: the bar is the
-	     tray's lip when it is folded away, and a thumb at the bottom of the
-	     screen is nearer this than the Data button at the top. -->
-	<footer class="status-bar" use:swipeUp={liftTray}>
+	<!-- On a phone a pull up off the bar brings the table up under the finger:
+	     the bar is the tray's lip when it is folded away, and a thumb at the
+	     bottom of the screen is nearer this than the Data button at the top. -->
+	<footer class="status-bar" use:pullUp={pullTray}>
 		<!-- The interface's text size, when it is not the default: a pinch off the
 		     stage changes it without a word, and this is both where it says so and
 		     how it goes back. First in the bar, where the eye starts, so a size
