@@ -56,6 +56,16 @@ export function cssIdent(name: string): string {
 	return /^\d/.test(slug) ? `n-${slug}` : slug;
 }
 
+/**
+ * The ids a page wears for a template's CSS — its number and its place in the
+ * run (Card's `pageHooks`). An area named so that its id is one of these would
+ * share it with a page's wrapper, and a rule meant for the area would reach
+ * every area on that page by inheritance; so `BoxOptions` refuses the name,
+ * and on a template that already has one the area keeps the id and the page
+ * goes without.
+ */
+export const isPageId = (ident: string): boolean => /^(cover|back-cover|inside-cover|inside-back-cover|page-\d+)$/.test(ident);
+
 export function scopeCss(css: string, scope: string): string {
 	if (!css || !css.trim()) return '';
 	return scopeRules(sanitise(css), scope);

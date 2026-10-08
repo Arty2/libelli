@@ -273,15 +273,21 @@ describe('a lookup into another row', () => {
 		expect(applyPlaceholders('Next: %%lookup:next:title%%', { row: rows[0], rows })).toBe('Next: Second');
 		expect(applyPlaceholders('%%lookup:previous:price%%', { row: rows[2], rows })).toBe('5');
 		expect(applyPlaceholders('%% lookup : Next : title %%', { row: rows[1], rows })).toBe('Third');
-		// Past either end, off the table, or with no row of its own: nothing to quote.
+		// Past either end of the run: the run ends, so nothing — not the
+		// placeholder printed on the last page.
+		expect(applyPlaceholders('Next: %%lookup:next:title%%', { row: rows[2], rows })).toBe('Next: ');
+		expect(applyPlaceholders('%%lookup:previous:title%%', { row: rows[0], rows })).toBe('');
+		// Off the table, with no row of its own, or a column it does not have:
+		// nothing to quote, and left as written.
 		for (const [text, row] of [
-			['%%lookup:next:title%%', rows[2]],
-			['%%lookup:previous:title%%', rows[0]],
 			['%%lookup:next:title%%', { title: 'stray' }],
-			['%%lookup:next:title%%', null]
+			['%%lookup:next:title%%', null],
+			['%%lookup:next:nosuch%%', rows[2]]
 		] as const) {
 			expect(applyPlaceholders(text, { row, rows })).toBe(text);
 		}
+		// Not a step, however it is spelled: an own key of the step table only.
+		expect(applyPlaceholders('%%lookup:constructor:title%%', { row: rows[0], rows })).toBe('%%lookup:constructor:title%%');
 		expect(referencedColumns('%%lookup:next:price%%', ['title', 'price'])).toEqual(['price']);
 		// No number in it, so a renumbering leaves it alone.
 		const moved = new Map<number, number | null>([[1, null]]);

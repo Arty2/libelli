@@ -97,7 +97,9 @@ resize boxes directly, or type exact millimetres.
 - **Anchors** — a box can take its top edge from the *rendered* bottom of another
   box, plus a gap. The gap may be **negative**, tucking an area up under the one
   it follows so the two overlap. Drag an anchored box vertically and the gap
-  changes rather than the link breaking. Both ends of the tie are marked — on
+  changes rather than the link breaking — unless the area it follows is moving
+  with it, in a group or a selection, or one further up its chain is: then they
+  go together, by drag or nudge, and every gap stays as it was. Both ends of the tie are marked — on
   the area you have selected and on the areas tied to it, and not otherwise:
   badges on every area of a busy card were a field of marks competing with the
   design — and both marks are buttons: the **link** on the follower breaks its own tie, the **buoy** on the
@@ -178,7 +180,9 @@ resize boxes directly, or type exact millimetres.
   selected area whose words come out of a column wears a **pencil-and-page**
   badge at the top right, the same icon as **Edit** under the table: press it
   and that cell opens full size in the table, the table opening if it was
-  folded away. A locked area, or a locked table, refuses it. An empty image area reads *Image*,
+  folded away — and folding away again when the cell is closed with × or
+  Esc; the chevron goes on to the table. On a phone the options bar steps
+  aside while a cell is open full size, so the tray has the height. A locked area, or a locked table, refuses it. An empty image area reads *Image*,
   and an image area wears a mark at the corner the way static text does: a
   pencil when it holds a drawing — press it to draw on it — and an image
   otherwise.
@@ -193,9 +197,9 @@ resize boxes directly, or type exact millimetres.
 - **A selected area** draws only its selection, not its dashed bound as well
   under it, which doubled every edge.
 - **The anchor corner** — of a selected area's eight handles, the one at the
-  corner its words are set from is square: top-left for text aligned left and
+  corner its words are set from has a ring inside: top-left for text aligned left and
   to the top, bottom-right for right and bottom. Centred on either axis, no
-  corner is, and every handle is rounded.
+  corner is, and no handle has one.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with
   one selected, and a text box lies over the content inheriting the face, size,
   color and alignment it will print in. A bound area writes through to the cell;
@@ -270,7 +274,12 @@ resize boxes directly, or type exact millimetres.
   one column and the next. Blank or 1 is one column. The columns balance —
   a growing area grows to the longest of them, a fixed one cuts what runs
   past its height, as it would one column — and the area's padding, border
-  and fill stay one frame round all of them.
+  and fill stay one frame round all of them. **Orphans** and **Widows**, 2
+  and 3 to begin with, are the fewest lines of a paragraph a column break
+  leaves at the foot of one column and carries to the head of the next
+  (Firefox does not keep to them; the columns still flow). While the bounds
+  are shown, or the area is chosen, a dotted line marks each side of every
+  gap, and the area wears `.columns` for its CSS.
 - **Lists** — **Marker** picks a Markdown bullet list's marker, **• Bullet**,
   **● Disc**, **○ Circle**, **■ Square**, **– Dash**, **— Em Dash**, **→ Arrow**
   or **None**, each set in the area's own
@@ -508,6 +517,11 @@ resize boxes directly, or type exact millimetres.
   editor shows each page on the side it will be printed on — including while
   dragging, which follows the pointer on a left-hand page and writes the mirror
   of it back.
+- **The area bar's head** — Lock, the area's **Name**, Delete, and a bare
+  glyph at the end that puts the bar away until the next area is chosen, for
+  the room under it. On a phone the head is the bar's first row, the name
+  stretched to fill it and Delete a square glyph. A QR code's bar leaves out what does not apply to a
+  code: of Text, only Color, and no Lines.
 - **Lock** — **Lock** in either bar freezes what you have: no dragging, no
   resizing, no option changes. A locked area can still be *selected*, or the
   button that unlocks it could never be reached. A page lock covers every box
@@ -547,29 +561,63 @@ resize boxes directly, or type exact millimetres.
   `url()` pointing off this machine are stripped, so a template's CSS cannot
   reach the network at all.
   Each area wears its own **Name** as an id, so `#Job-Title { … }` reaches that
-  one area and nothing else; `.box` reaches all of them. Every area also wears
+  one area and nothing else; `.area` reaches all of them. Every area also wears
   two classes: where its content comes from — `.content-field`,
   `.content-static` or `.content-image` — and its mode — `.mode-plain`,
-  `.mode-markdown`, `.mode-image`, `.mode-color` or `.mode-qr`. A page can
-  be reached as a whole too: `#page-3` by its number; `.cover` and
-  `.back-cover` for the first and last pages, and, once there are four or
-  more, `.inside-cover` and `.inside-back-cover` for the two just inside
+  `.mode-markdown`, `.mode-image`, `.mode-color` or `.mode-qr` — and an area
+  set in columns wears `.columns` too. A page can
+  be reached as a whole too: `#page-3` by its number; `#cover` and
+  `#back-cover` for the first and last pages, and, once there are four or
+  more, `#inside-cover` and `#inside-back-cover` for the two just inside
   them; and with **Recto / Verso** on, `.recto` and `.verso`. Write them in
-  front of what they style — `.cover .box { … }`, `.verso #Title { … }`. The
+  front of what they style — `#cover .area { … }`, `.verso #Title { … }`.
+  The page in the editor also says which theme it is seen in —
+  `.theme-light`, `.theme-dark`, or `.theme-dark-page` when the page is
+  inverted too — so something that only the screen shows, like the starter's
+  post-it off the page's edge, can keep its daylight colours:
+  `.theme-dark-page #notes { … }`. Remember that the inverted page turns words,
+  borders and shadows over but shows an area's fill as written. A printed
+  page, an exported picture and a page in the lightbox are always
+  `.theme-light`. The
   empty field's placeholder lists this template's own ids and these classes,
   and **Starter** — the code-reference glyph, its word on a desktop — puts
-  that same sheet into the editor, to edit rather than read. The dialog can be dragged by its title, to see the card it is styling,
+  that same sheet in the editor **in place of** whatever CSS is there, to
+  edit rather than read; <kbd>Ctrl/Cmd</kbd>+<kbd>Z</kbd> or **Cancel** brings
+  the old sheet back. It is barebones: a
+  few lines of comment saying what this template is — the page size and
+  margins, the text defaults, the fonts it loads, the variables below and
+  the rules the card keeps — then an empty rule for each named area, with
+  its mode, place and size beside it, and the page's hooks. The whole sheet
+  can be pasted into a chat with an AI model and come back as CSS for this
+  page. The variables are read-only: the card sets them from the page
+  settings, and a sheet that sets one (on `:root`, which here means the
+  card) changes only what its own rules read — never the page's size,
+  margins or bleed, which only the bars change. Being a comment,
+  it sets nothing. The card also carries the page's numbers as variables a
+  rule can read: `--page-w`, `--page-h`, `--margin-top` and the other three
+  edges, `--bleed`, `--text-font`, `--text-size`, `--text-leading` and
+  `--text-color` — `width: calc(var(--page-w) - 20mm)` follows the page when
+  its size changes. What the bars set wins over the sheet unless a rule says
+  `!important`. The dialog can be dragged by its title, to see the card it is styling,
   and says beside its name how many lines the sheet is and what it weighs.
+  The button left of its × takes it **full screen** — no margins round it,
+  and the editor as tall as the window — and back, as does a double-click on
+  its title. Drag its title while it is full screen and it comes out of full
+  screen under your pointer, the way a window does. It stays that way for the next time you open it until you
+  reload. On a phone it always opens full screen. **Text Wrap**, beside
+  Starter, folds long lines to the editor's width — on by default, the line
+  numbers standing as tall as the lines they count; off, a long line scrolls
+  sideways instead. On a phone both are a glyph in a square, without the word.
   The editor numbers its lines and colours them as you type. It indents with
   tabs: <kbd>Tab</kbd> and <kbd>Shift</kbd>+<kbd>Tab</kbd> move the line or the
   whole selection, <kbd>Enter</kbd> carries the indent of the line above and
   steps in after a `{`, and a `}` typed on a line of its own steps back out.
-  Nothing reaches the card until you press something: **Apply**
-  (<kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd>) puts the sheet on the card and leaves
-  the dialog open, **Save** does both, and **Cancel** puts back the CSS that was
-  there when it opened — <kbd>Esc</kbd> and a click on the ground behind do the
-  same. A **locked** template opens here to read: the sheet is there, and the
-  three buttons that would write to it are not.
+  Nothing reaches the card until you press **Save**
+  (<kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd>), which puts the sheet on the card and
+  closes the dialog; **Cancel** puts back the CSS that was there when it
+  opened — <kbd>Esc</kbd> and a click on the ground behind do the same. A
+  **locked** template opens here to read: the sheet is there, and the buttons
+  that would write to it are not.
 
 ## Templates, and laying one out
 
@@ -588,8 +636,10 @@ without sharing anything else. **A5 Starter Booklet** opens the design a first r
 lands on, as it came: a copy nobody has changed if you have one, or a new one
 beside the rest — it never touches the template that is open. Reset puts the
 starter this template began as back over it, under the same name. A template
-remembers which starter it began as however it is renamed or changed; one made
-with New Template or imported from elsewhere has none, and no Reset; Delete removes the template and opens the next one, or a new empty
+remembers which starter it began as however it is changed, until you rename
+it — a renamed copy is yours, and Reset goes, even renamed back. One made
+with New Template or imported from a file has none, and an exported file
+never carries it; Delete removes the template and opens the next one, or a new empty
 template when it was the last one, so the card a first run lands on can be
 deleted like any other. Both ask first, and both are one Ctrl/Cmd+Z away — an
 undone delete is written back out under the id it had. The menu opens over the
@@ -822,7 +872,7 @@ a notice can appear.
   ticked. Under a rule, **New Table** and **Getting Started**; under another,
   **Paste…**, **Import…** and **Export**; and under a third, in red, **Reset…**
   and **Delete Table…**. Reset is there only on a table that began as a
-  starter — Getting Started — and puts its rows back, asking first, with the
+  starter — Getting Started — and not renamed since, and puts its rows back, asking first, with the
   design and the table's name left alone and one Ctrl/Cmd+Z to undo it.
   Delete is the only way to delete one; there
   is no separate button to empty the table. A design and a table are kept apart on purpose — one design prints
@@ -956,7 +1006,8 @@ at its own size.
   in, which is the same rule the bar follows. Never in place: an area on a card
   is often a centimetre across, which is somewhere to show a drawing and nowhere
   to make one. The panel's title bar holds the board's own row, centred: the
-  **light or dark checkerboard** to see it on, the size in px, and what the
+  **dark or light checkerboard** to see it on (the Opacity glyph; dark to
+  begin with), the size in px, and what the
   drawing weighs. The board is always drawn as large as the panel has room for,
   so there is never a scrollbar round it. Pull the panel down to its least and
   the tool rows slide under the bottom bar, leaving the board. Under it the tools are two centred
@@ -1260,6 +1311,20 @@ them and needs no heading of its own. The print checklist stays at the bottom
 happen. The title counts both units, *Export — 4 pages / 2 sheets*, so the
 number of sheets is known before scrolling to them.
 
+**Output** opens that strip, ahead of the lock: **Auto**, **Portrait** or
+**Landscape**, for which way round the PNGs and the printed pages come out.
+**Auto** takes its cue from the page settings: one card to a page comes out
+the shape of the page, and tiled cards the way **Orientation** in Print
+Settings laid the sheet.
+Portrait or Landscape turns each file and each printed page a quarter
+clockwise when it is not that way round already — one card to a page, or a
+whole sheet of them — and leaves the previews as the template draws them. It
+belongs to this browser, not to the template: it is never saved in one, the
+lock does not touch it, and it is remembered here for the next export. With
+cards tiled, **Orientation** re-tiles them for the paper and Output only
+turns the finished sheet — reach for Orientation to fit more to a sheet, and
+for Output when the tray or the screen wants it the other way round.
+
 On a phone each grid is a strip you swipe along rather than rows you scroll
 past. A hundred pages was a hundred rows between you and everything below
 them; sideways, the run costs one screen however long it is, and each
@@ -1343,9 +1408,12 @@ There every zoom is the sheet's — a pinch, Ctrl/Cmd+scroll, <kbd>+</kbd> /
 <kbd>−</kbd> / <kbd>0</kbd> or a double-click — never the interface's text;
 drag to move about a zoomed sheet.
 
-**The theme button** left of Help — a sun, a moon, or half of each — steps the
-theme: light, dark, and dark with the page inverted too, for a white page in a
-dark room. With the page inverted, its pictures and its areas' fills keep their
+**The theme button** left of Help — a sun, half of each, or a moon — steps the
+theme: light, dark (half and half: the interface dark, the page still white),
+and dark with the page inverted too (the moon), for a white page in a dark
+room. The moment before the app loads follows it, and so does an installed
+app's launch screen — a dark background and a light mark — from the next time
+the browser refreshes the installed app. With the page inverted, its pictures and its areas' fills keep their
 own colours; the words, the paper, drawings and QR codes are inverted, since
 those are ink on transparent ground and would vanish into the dark paper
 otherwise. The logo does the same. In either dark, resting the mouse on either
@@ -1477,19 +1545,25 @@ Otherwise the arrow keys move the selected box wherever you are on the page. On
 a touch screen the same job is done by the four-way pad that appears beside the
 card in **zoom and pan** (the button under *+ Area*) — one cross with one outline, not five tiles in the shape of a cross — with
 a chip in the middle cycling between 1mm, 5mm and 10mm; holding an arrow keeps
-it moving. The cross is drawn as a raised thing — lit from the top left, thicker
+it moving, with a short buzz for every step it takes — not the long-press
+buzz a held button would otherwise get. The cross is drawn as a raised thing — lit from the top left, thicker
 along the bottom and right, casting one shadow of its own, and it goes down
 under a press — because on a touch screen it is the one control with no cursor
 to tell you it is a control. The middle is round and set in a shallow well: it
 is not a direction, it is the step and the grip, and it should not read as a
 fifth arm. The pad parks over the bottom-right corner of the page, which is
 exactly the corner you may have reached for it to nudge — drag that middle chip
-and the pad comes with your finger; a tap still cycles the step. It can be pushed off the edge of
+and the pad comes with your finger; a tap still cycles the step. Flick it as you
+let go and it slides on — heavily — and slows to a stop; set it down slowly
+and it stays exactly where it was put. Meeting the edge of the stage, by a
+drag or a slide, it buzzes once. It can be pushed off the edge of
 the stage to get that corner back, as far as the middle chip: the arm you are
 not using goes out of sight, the chip you pick it up by never does. Throw it on
 past that, and let go, and it is put away — as holding the middle chip puts it
-away — shrinking into the button under zoom and pan that brings it back; thrown
-away, it comes back to its own corner. It is not drawn at all when nothing it
+away — shrinking into the button under zoom and pan that brings it back. A flick
+that slides it into the edge still moving does the same; one that has all but
+stopped by then only parks it there. Thrown away, it comes back to its own
+corner. It is not drawn at all when nothing it
 could move is selected. On an area whose top comes
 from an anchor, the two vertical keys change the **Gap** instead — the
 millimetres between it and the area it follows — and say so with a stop bar and
@@ -1519,8 +1593,11 @@ towards it and down is away. They repeat on a hold like the arrows do.
   do not. On, an area no longer moves under a finger or the
   mouse: one finger scrolls the page and two pinch it, a tap still chooses an
   area and a second opens it, and the **nudge pad** appears to move the chosen
-  one — it shows only in this mode, at any width; hold its middle to put it
-  away, and the cross that appears under zoom and pan brings it back. The resize handles and the
+  one — it shows by itself only in this mode, at any width; hold its middle to
+  put it away, and the cross that appears under zoom and pan brings it back. On
+  a touch screen the cross is there in **Move** too, with the pad put away to
+  begin with: press it for a nudge finer than a fingertip drags. Each mode
+  keeps the pad as you last left it. The resize handles and the
   lever still drag; they are small and grabbed on purpose. It starts **on**
   where the main pointer is a finger — a phone or a tablet — and off with a
   mouse; the button is the choice from then on.
@@ -1653,7 +1730,9 @@ than it has to.
   about where an area sits on the sheet, and because it wants to be pressed four
   times in a row rather than reopened from a menu between each press.
 - **Selection** — with more than one area chosen, another column appears under
-  that one — the six alignments, then group, lock, duplicate, delete.
+  that one — the six alignments, then group, lock, duplicate, delete. On a
+  phone that column is the alignments alone, and the count, group, lock and
+  delete go under the column at the top right; duplicate is in the menu.
 - **Right-click** — **Select Multiple** first, because it changes what every
   press after it means and a touchscreen has no shift key; then lock, then the
   style clipboard, then group, duplicate and delete. With several chosen it also

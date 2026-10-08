@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { flushSync, tick } from 'svelte';
 	import Card from './Card.svelte';
+	import type { Theme } from '$lib/theme';
 	import Icon from './Icon.svelte';
 	import { isDark } from '$lib/color';
 	import { SHORTCUTS, withKey } from '$lib/keys';
@@ -9,7 +10,7 @@
 	import type { AlignEdge } from '$lib/layout';
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { swipe } from '$lib/gestures';
-	import { HOLD_MS, vibrate } from '$lib/haptics';
+	import { HOLD_MS, TAP_MS, vibrate } from '$lib/haptics';
 	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
@@ -33,6 +34,8 @@
 		zoom: 'fit' | 'actual' | number;
 		/** 1-based position of the previewed row, for the page number */
 		pageNumber: number | null;
+		/** the theme on screen, glances included — the page's `theme-…` class */
+		theme: Theme;
 		/** the area being typed into on the card itself, if any */
 		editingId?: string | null;
 		/** areas hanging off the sheet, in part or entirely, and so cut or unreachable */
@@ -118,6 +121,7 @@
 		selectedIds,
 		zoom,
 		pageNumber,
+		theme,
 		editingId = null,
 		strayIds = [],
 		picking = false,
@@ -1037,7 +1041,7 @@
 		ArrowLeft: 'left',
 		ArrowRight: 'right'
 	};
-	const padShowing = () => padUsable && panning && !padHidden;
+	const padShowing = () => padUsable && padOpen;
 
 	function onKeyup(event: KeyboardEvent) {
 		if (ARROW_LEAN[event.key] && pushed === ARROW_LEAN[event.key]) pushed = null;
@@ -1107,6 +1111,11 @@
 	 * initial delay and then repeats, the same shape as a key repeat, because a
 	 * pad that only moves once per tap is unusable for anything but a final
 	 * millimetre.
+	 *
+	 * Each repeated step buzzes once, a tap's worth, so a hold counts out its
+	 * 1, 5 or 10mm under the thumb the way a ratchet clicks. Not the first
+	 * step: the press that started it already buzzed (haptics.ts), and two on
+	 * one step felt like a stutter.
 	 */
 	let repeat: ReturnType<typeof setTimeout> | null = null;
 
@@ -1118,11 +1127,17 @@
 	 */
 	let pushed = $state<'up' | 'down' | 'left' | 'right' | 'centre' | null>(null);
 
-	function startNudge(dx: number, dy: number) {
+	function startNudge(event: PointerEvent, dx: number, dy: number) {
 		pushed = dy < 0 ? 'up' : dy > 0 ? 'down' : dx < 0 ? 'left' : 'right';
 		onnudge(dx, dy);
+		// Touch only, as every buzz in the app is (haptics.ts): a mouse held on
+		// an arrow has the pad going down under a pointer it can see.
+		const buzz = event.pointerType === 'touch' ? TAP_MS : 0;
 		repeat = setTimeout(() => {
-			repeat = setInterval(() => onnudge(dx, dy), 90);
+			repeat = setInterval(() => {
+				onnudge(dx, dy);
+				vibrate(buzz);
+			}, 90);
 		}, 400);
 	}
 
@@ -1179,6 +1194,25 @@
 	 * the pad) are taken — a hold was the gesture it had left.
 	 */
 	let padHidden = $state(false);
+	/**
+	 * The pad out in Move mode, where dragging is the way to place an area and
+	 * the pad is put away to begin with. On a touch screen its button stays
+	 * under the toggle all the same, for a nudge finer than a fingertip drags:
+	 * pressed, the pad comes out until it is put away again. Its own flag, so
+	 * each mode keeps the pad as it was last left there.
+	 */
+	let padOut = $state(false);
+	/** Whether the pad is drawn, in whichever mode the stage is in. */
+	const padOpen = $derived(panning ? !padHidden : padOut);
+	/** A touch screen, where Move mode offers the pad's button too. */
+	let coarse = $state(false);
+	/** The pad put away, by a hold, a throw or a flick: `thrown` brings it home next time. */
+	function stowPadAway(thrown: boolean) {
+		if (panning) padHidden = true;
+		else padOut = false;
+		padThrown = thrown;
+		pushed = null;
+	}
 	const PAD_HIDE_MS = 500;
 	let padHideTimer: ReturnType<typeof setTimeout> | null = null;
 	function cancelPadHide() {
@@ -1187,11 +1221,105 @@
 	}
 
 	$effect(() => {
-		if (window.matchMedia('(pointer: coarse)').matches) panning = true;
+		coarse = window.matchMedia('(pointer: coarse)').matches;
+		if (coarse) panning = true;
 	});
+
+	/**
+	 * Momentum: a pad flicked as it is let go carries on and slows to a stop,
+	 * as a thing slid across a table does, rather than stopping dead under the
+	 * fingertip. The speed is the last ~80ms of the drag, so a slow, careful
+	 * placement has none and stays exactly where it was put. It runs through
+	 * the same clamp as the drag, so it can glide to the edge and not past it.
+	 */
+	let padTrail: { x: number; y: number; t: number }[] = [];
+	let padGlide: number | null = null;
+	/**
+	 * Fraction of the speed kept per millisecond — about 0.16s to slow by two
+	 * thirds. Heavy on purpose: the pad is a thing to place, and a light one
+	 * that sailed across the stage felt like it had got away.
+	 */
+	const PAD_FRICTION = 0.993;
+	/** Below this, in px per ms, a release is a placement rather than a flick. */
+	const PAD_FLICK = 0.35;
+	/**
+	 * At least this, in px per ms, when a glide meets the stage's edge, and the
+	 * pad is put away rather than stopped there. Well under `PAD_FLICK`: the
+	 * friction has taken half of a hard flick by the time it arrives — 0.17 off
+	 * a flick that started at twice the threshold — and a pad still crossing a
+	 * finger's width in a tenth of a second is plainly thrown, not drifting.
+	 */
+	const PAD_STOW_SPEED = 0.1;
+	/**
+	 * Whether the pad is against an edge of the stage, so meeting one buzzes
+	 * once — on a drag or a glide, by touch — and sliding along it does not.
+	 */
+	let padAtEdge = false;
+	function meetEdge(clamped: boolean, touch: boolean) {
+		if (clamped && !padAtEdge && touch) vibrate(HOLD_MS);
+		padAtEdge = clamped;
+	}
+
+	function stopGlide() {
+		if (padGlide !== null) cancelAnimationFrame(padGlide);
+		padGlide = null;
+	}
+
+	// A glide still running when the stage goes away has nothing left to move.
+	$effect(() => stopGlide);
+
+	function glidePad(vx: number, vy: number, touch: boolean) {
+		if (!host || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+		const stage = host.getBoundingClientRect();
+		let last = performance.now();
+		const frame = (now: number) => {
+			const dt = Math.min(32, now - last);
+			last = now;
+			const keep = Math.pow(PAD_FRICTION, dt);
+			vx *= keep;
+			vy *= keep;
+			// `right` and `bottom` grow towards the top left, the other way to
+			// the pointer's x and y.
+			const wanted = { right: padAt.right - vx * dt, bottom: padAt.bottom - vy * dt };
+			padAt = { right: stashPad(wanted.right, stage.width), bottom: stashPad(wanted.bottom, stage.height) };
+			// Against an edge the pad stops on that axis, as a thing slid into a
+			// wall does, and the hand feels it arrive.
+			const hitX = padAt.right !== wanted.right;
+			const hitY = padAt.bottom !== wanted.bottom;
+			// Still visibly moving when it gets there, it was thrown at the
+			// edge, not slid up to it: put away, as a drag pushed past the edge
+			// is, shrinking into the button that brings it back (`stowPad`).
+			// One buzz for the two, the put-away one.
+			if ((hitX && Math.abs(vx) > PAD_STOW_SPEED) || (hitY && Math.abs(vy) > PAD_STOW_SPEED)) {
+				padGlide = null;
+				stowPadAway(true);
+				if (touch) vibrate(HOLD_MS);
+				return;
+			}
+			if (hitX) vx = 0;
+			if (hitY) vy = 0;
+			meetEdge(hitX || hitY, touch);
+			if (Math.hypot(vx, vy) < 0.02) {
+				padGlide = null;
+				return;
+			}
+			padGlide = requestAnimationFrame(frame);
+		};
+		padGlide = requestAnimationFrame(frame);
+	}
 
 	function padPickup(event: PointerEvent) {
 		if (event.button !== 0) return;
+		stopGlide();
+		// Picked up where it already rests against an edge, it has not just met it.
+		const stage = host?.getBoundingClientRect();
+		padAtEdge =
+			!!stage &&
+			(padAt.right !== stashPad(padAt.right + 1, stage.width) - 1 ||
+				padAt.bottom !== stashPad(padAt.bottom + 1, stage.height) - 1 ||
+				padAt.right !== stashPad(padAt.right - 1, stage.width) + 1 ||
+				padAt.bottom !== stashPad(padAt.bottom - 1, stage.height) + 1);
+		padTrail = [{ x: event.clientX, y: event.clientY, t: event.timeStamp }];
 		padPress = { x: event.clientX, y: event.clientY, from: { ...padAt } };
 		// Captured now, so a quick drag that leaves the button still brings the pad.
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -1202,9 +1330,7 @@
 			// Held, so the click that ends the press does not also cycle the step.
 			padHeld = true;
 			padPress = null;
-			padHidden = true;
-			padThrown = false;
-			pushed = null;
+			stowPadAway(false);
 			vibrate(HOLD_MS);
 		}, PAD_HIDE_MS);
 	}
@@ -1217,6 +1343,17 @@
 	const PAD_CELL = 32;
 	const PAD_SIZE = PAD_CELL * 3;
 
+	/**
+	 * The pad may hang off the edge of the stage — a cross parked over the
+	 * corner of the page is still covering the corner, and tucking the far arm
+	 * of it out of sight is the cheapest way to get that corner back. What it
+	 * may not do is take the middle button with it: that button is how the pad
+	 * is picked up again, and a pad you cannot reach is a control you have
+	 * lost. So the far edge may reach the edge of the stage, and stop. The drag
+	 * and the glide after a flick both go through this.
+	 */
+	const stashPad = (value: number, extent: number) => Math.max(-PAD_CELL, Math.min(extent - PAD_SIZE + PAD_CELL, value));
+
 	function padMove(event: PointerEvent) {
 		if (!padDrag && padPress) {
 			if (Math.hypot(event.clientX - padPress.x, event.clientY - padPress.y) < PAD_SLOP) return;
@@ -1227,21 +1364,14 @@
 		if (!padDrag || !host) return;
 		event.preventDefault();
 		const stage = host.getBoundingClientRect();
-		/**
-		 * The pad may hang off the edge of the stage — a cross parked over the
-		 * corner of the page is still covering the corner, and tucking the far arm
-		 * of it out of sight is the cheapest way to get that corner back. What it
-		 * may not do is take the middle button with it: that button is how the pad
-		 * is picked up again, and a pad you cannot reach is a control you have
-		 * lost. So the far edge may reach the edge of the stage, and stop.
-		 */
-		const stash = (value: number, extent: number) =>
-			Math.max(-PAD_CELL, Math.min(extent - PAD_SIZE + PAD_CELL, value));
 		const wanted = {
 			right: padDrag.from.right - (event.clientX - padDrag.x),
 			bottom: padDrag.from.bottom - (event.clientY - padDrag.y)
 		};
-		padAt = { right: stash(wanted.right, stage.width), bottom: stash(wanted.bottom, stage.height) };
+		padAt = { right: stashPad(wanted.right, stage.width), bottom: stashPad(wanted.bottom, stage.height) };
+		meetEdge(padAt.right !== wanted.right || padAt.bottom !== wanted.bottom, event.pointerType === 'touch');
+		padTrail.push({ x: event.clientX, y: event.clientY, t: event.timeStamp });
+		while (padTrail.length > 2 && event.timeStamp - padTrail[0].t > 80) padTrail.shift();
 		// How far the finger has gone on past where the pad stopped: pushed on
 		// far enough, letting go puts it away.
 		padPast = Math.max(Math.abs(wanted.right - padAt.right), Math.abs(wanted.bottom - padAt.bottom));
@@ -1307,14 +1437,26 @@
 		onunlock?.();
 	}
 
-	function padDrop() {
+	function padDrop(event?: PointerEvent) {
 		cancelPadHide();
 		if (padDrag && padPast > PAD_THROW) {
-			padHidden = true;
-			padThrown = true;
-			pushed = null;
+			stowPadAway(true);
 			vibrate(HOLD_MS);
+		} else if (padDrag && padTrail.length > 1) {
+			const first = padTrail[0];
+			const last = padTrail[padTrail.length - 1];
+			const dt = last.t - first.t;
+			// A finger held still before it lifts sends no moves, so the trail
+			// still holds the fast part of the drag: a pause before letting go
+			// is a placement, whatever the speed before it.
+			const paused = event ? event.timeStamp - last.t > 60 : false;
+			if (dt > 0 && !paused) {
+				const vx = (last.x - first.x) / dt;
+				const vy = (last.y - first.y) / dt;
+				if (Math.hypot(vx, vy) > PAD_FLICK) glidePad(vx, vy, event?.pointerType === 'touch');
+			}
 		}
+		padTrail = [];
 		padPast = 0;
 		padPress = null;
 		padDrag = null;
@@ -1456,6 +1598,7 @@
 				{smartGuides}
 				{scale}
 				{pageNumber}
+				{theme}
 				{background}
 				{images}
 				interactive={true}
@@ -1611,6 +1754,9 @@
 	     button drawn larger than the others beside it reads as a mistake. The
 	     automagic layout was here too, and moved to the page bar beside the
 	     lock: it is pressed once at the start, if at all. -->
+	<!-- The right-hand column, and under it, on a phone, what acts on a set
+	     of areas (SelectionTools' `side`). -->
+	<div class="side-rail">
 	<div class="corner top right stacked">
 		<!-- The page's lock, while it is locked: a padlock and no word, at the
 		     head of the column whose buttons it switches off, so the reason Area
@@ -1671,14 +1817,16 @@
 			>
 				<Icon name={panning ? 'zoom-pan' : 'move'} size={16} /><span class="sr-only">Zoom and pan</span>
 			</button>
-			{#if panning && padHidden}
+			{#if !padOpen && (panning || coarse)}
 				<!-- The pad, put away by holding its middle: this is where it is,
-				     under the mode it belongs to. -->
+				     under the mode it belongs to. In Move mode, on a touch screen,
+				     where it starts put away. -->
 				<button
 					class="square"
 					data-pad-home
 					onclick={() => {
-						padHidden = false;
+						if (panning) padHidden = false;
+						else padOut = true;
 						if (padThrown) padAt = { ...PAD_HOME };
 						padThrown = false;
 						// The hold that hid it ended with the pad gone, so its release
@@ -1723,6 +1871,19 @@
 			>
 				<Icon name="data-collection" size={16} /><span class="sr-only">Bring stray areas back onto the page</span>
 			</button>
+		{/if}
+	</div>
+		{#if selectedBoxes.length > 1}
+			<SelectionTools
+				place="side"
+				boxes={selectedBoxes}
+				frozen={!!template.locked}
+				{onalign}
+				{ongroup}
+				onlock={onlockselection}
+				{onduplicate}
+				{ondelete}
+			/>
 		{/if}
 	</div>
 
@@ -1833,7 +1994,7 @@
 		/>
 	</div>
 
-	{#if padUsable && panning && !padHidden}
+	{#if padUsable && padOpen}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
 		     hopeless. Shown only where there is no keyboard to fall back on, and
 		     only while there is something it could actually move. Its arrows
@@ -1854,6 +2015,7 @@
 			onpointerup={stopNudge}
 			onpointercancel={stopNudge}
 			onpointerleave={stopNudge}
+			oncontextmenu={(e) => e.preventDefault()}
 		>
 			<!-- The tilt is its own element, under the pad that casts the shadow:
 			     a 3D transform and a filter on one element is a pairing Firefox
@@ -1866,11 +2028,11 @@
 					class="up"
 					class:tied={verticalTied}
 					title={verticalTied ? `Gap ${padStep}mm smaller — closer to the area this one follows` : `Up ${padStep}mm`}
-					onpointerdown={() => startNudge(0, -padStep)}
+					onpointerdown={(e) => startNudge(e, 0, -padStep)}
 				>
 					<Icon name={verticalTied ? 'skip-back-filled' : 'caret-up'} size={verticalTied ? 16 : 30} />
 				</button>
-				<button class="left" title="Left {padStep}mm" onpointerdown={() => startNudge(-padStep, 0)}><Icon name="caret-left" size={30} /></button>
+				<button class="left" title="Left {padStep}mm" onpointerdown={(e) => startNudge(e, -padStep, 0)}><Icon name="caret-left" size={30} /></button>
 				<!-- The middle button carries the second gesture: drag it and the pad
 				     comes with your finger. A tap still cycles the step. -->
 				<button
@@ -1888,12 +2050,12 @@
 						padStep = PAD_STEPS[(PAD_STEPS.indexOf(padStep) + 1) % PAD_STEPS.length];
 					}}>{padStep}</button
 				>
-				<button class="right" title="Right {padStep}mm" onpointerdown={() => startNudge(padStep, 0)}><Icon name="caret-right" size={30} /></button>
+				<button class="right" title="Right {padStep}mm" onpointerdown={(e) => startNudge(e, padStep, 0)}><Icon name="caret-right" size={30} /></button>
 				<button
 					class="down"
 					class:tied={verticalTied}
 					title={verticalTied ? `Gap ${padStep}mm larger — further from the area this one follows` : `Down ${padStep}mm`}
-					onpointerdown={() => startNudge(0, padStep)}
+					onpointerdown={(e) => startNudge(e, 0, padStep)}
 				>
 					<Icon name={verticalTied ? 'skip-back-filled' : 'caret-down'} size={verticalTied ? 16 : 30} />
 				</button>
@@ -2224,6 +2386,23 @@
 		padding: 4px;
 	}
 
+	/* Placed as the left rail is: the column at the top right holds its own
+	   place in the flow, so what goes under it on a phone sits below it
+	   whatever its height. */
+	.side-rail {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 8px;
+	}
+
+	.side-rail .corner {
+		position: static;
+	}
+
 	/* Area is always there; the rescue button and the Select Multiple chip come
 	   and go, so they go under it rather than shifting it sideways. */
 	.corner.stacked {
@@ -2299,6 +2478,13 @@
 		   its arms cast none. It is there all the time now — a thing that stands
 		   up off the page casts a shadow whether or not it is being moved. */
 		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.16));
+		/* A held arrow is a repeat, not a long press: no callout, no selection,
+		   and (with the context menu refused in the markup) none of the
+		   browser's own long-press answer — on Android a buzz and a highlight
+		   that came on top of the step's own. */
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
 	}
 
 	/* The cross itself, and what tilts: see the note in the markup. */

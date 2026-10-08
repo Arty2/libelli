@@ -177,6 +177,14 @@
 		/* The padding is the sheet's bleed plus the room the block is centred
 		   in; the sheet still has to measure exactly the paper it names. */
 		box-sizing: border-box;
+		/* Paper. Without it the room round the block was transparent and showed
+		   whatever was behind: in the dark theme the inverted ground, so a
+		   sheet turned the other way to its cards came out black round white
+		   pages. White here goes through the theme like the page does — white
+		   in dark, black in dark with the page inverted. Under any sheet
+		   background image; on paper it is no ink, and a sheet PNG's margins
+		   are white now rather than transparent, which is what paper is. */
+		background-color: #fff;
 	}
 
 	.print-grid {
@@ -249,17 +257,11 @@
 	.sheet-marks .br::before { bottom: 0; left: 0; }
 	.sheet-marks .br::after { right: 0; top: 0; }
 
+	/* The page break is PrintRoot's, on the paper each sheet is laid on. */
 	@media print {
 		.print-sheet {
-			break-after: page;
-			page-break-after: always;
 			print-color-adjust: exact;
 			-webkit-print-color-adjust: exact;
-		}
-
-		.print-sheet:last-child {
-			break-after: auto;
-			page-break-after: auto;
 		}
 	}
 </style>

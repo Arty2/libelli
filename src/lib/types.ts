@@ -276,6 +276,13 @@ export interface TextStyle {
 export interface TextColumns {
 	count: number;
 	gap: number;
+	/**
+	 * The fewest lines of a paragraph left at the foot of a column before it
+	 * breaks, and carried to the head of the next. Absent is the defaults,
+	 * `DEFAULT_ORPHANS` and `DEFAULT_WIDOWS`.
+	 */
+	orphans?: number;
+	widows?: number;
 }
 
 export type Defaults = Required<
@@ -443,8 +450,9 @@ export interface Template {
 	 * Which of the bundled starters this template began as, by id — see
 	 * `STARTER_TEMPLATES` in onboarding.ts. What offers Reset, and what it
 	 * resets to. Kept through every edit, since a starter somebody has worked
-	 * in is the one most worth being able to put back; absent on anything
-	 * started any other way.
+	 * in is the one most worth being able to put back — except a rename by
+	 * hand, which says the copy is somebody's own now (`renamed`). Never
+	 * exported (`exportTemplate`), and absent on anything started any other way.
 	 */
 	starter?: string;
 }
@@ -474,7 +482,7 @@ export interface Dataset {
 	 * reload, and undo, keep it. Absent means the rows stand where they arrived.
 	 */
 	order?: number[];
-	/** Which bundled starter table this began as; see `Template.starter`. */
+	/** Which bundled starter table this began as; see `Template.starter`. A rename by hand drops it. */
 	starter?: string;
 }
 

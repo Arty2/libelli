@@ -5,6 +5,7 @@ import {
 	copyStyle,
 	deleteBoxes,
 	duplicateBoxes,
+	followsInSet,
 	groupMembers,
 	nudgeBox,
 	stepAlignment,
@@ -288,5 +289,29 @@ describe('bringOnPage', () => {
 	it('leaves a locked box alone, and returns the array itself when nothing moved', () => {
 		const boxes = [box('a', { x: -60, y: 10, locked: true })];
 		expect(bringOnPage(boxes, ['a'], page)).toBe(boxes);
+	});
+});
+
+describe('followsInSet', () => {
+	const head = { id: 'a' } as Box;
+	const middle = { id: 'b', anchor: { to: 'a', gap: 3 } } as Box;
+	const tail = { id: 'c', anchor: { to: 'b', gap: 2 } } as Box;
+	const all = [head, middle, tail];
+	it('holds the gap of a box whose anchor moves with it', () => {
+		expect(followsInSet(middle, new Set(['a', 'b']), all)).toBe(true);
+	});
+	it('lets the gap change when the anchor stays put', () => {
+		expect(followsInSet(middle, new Set(['b']), all)).toBe(false);
+	});
+	it('holds it through a link that is not moving itself', () => {
+		expect(followsInSet(tail, new Set(['a', 'c']), all)).toBe(true);
+	});
+	it('has nothing to hold on an unanchored box', () => {
+		expect(followsInSet(head, new Set(['a', 'b']), all)).toBe(false);
+	});
+	it('ends on a loop', () => {
+		const x = { id: 'x', anchor: { to: 'y', gap: 0 } } as Box;
+		const y = { id: 'y', anchor: { to: 'x', gap: 0 } } as Box;
+		expect(followsInSet(x, new Set(['x']), [x, y])).toBe(false);
 	});
 });

@@ -35,6 +35,13 @@
 	   inverse, worked out by hand; the true inverse of whatever the accent is
 	   follows below where the browser can compute it. */
 	--accent-inverse: #da9c14;
+
+	/* The shadow on a scroller's edge that says there is more past it
+	   (scrolledge.ts). One value for every theme: in the dark ones the
+	   inversion turns it into a light edge, and that is kept on purpose. A
+	   black fade written for the darks was tried, and read as the rows dimming
+	   rather than as more to scroll to. */
+	--edge-shadow: rgba(0, 0, 0, 0.18);
 }
 
 /* `AccentColor` is not yet Baseline Widely, so it is behind a feature query:
@@ -74,6 +81,10 @@
 	:root[data-theme='dark'],
 	:root[data-theme='dark-page'] {
 		filter: invert(1) hue-rotate(180deg);
+		/* The window's own ground, which the filter inverts too: #eee shows as
+		   the #111 app.html set before this sheet arrived, so the dark launch
+		   does not flash when it does. */
+		background: #eee;
 	}
 
 	:root[data-theme='dark']
@@ -242,12 +253,15 @@ html, body {
    width of "Unlock": it said Lock at 68px and Unlock at 82, so pressing it
    shoved everything after it along the bar, and the three were three sizes.
    Its padlock and word start at the left, as every other button's do, so
-   the icon does not step sideways when the word changes. In `rem`, padlock
-   and all: the icon grows with the text as the word does (Icon.svelte), so
-   84px at the default size keeps room for "Unlock" at any other. */
+   the icon does not step sideways when the word changes. Two parts, because
+   a button is two kinds of length: its padding and border are px and stay
+   put, its padlock and word are rem and grow with the text (Icon.svelte).
+   The rem part is "UNLOCK" in capitals and tracking, with a little to
+   spare — the old 5.25rem was measured before buttons took capitals, and
+   the word ran into the right-hand padding. */
 .lock-toggle {
 	box-sizing: border-box;
-	width: 5.25rem;
+	width: calc(22px + 4.75rem);
 	justify-content: flex-start;
 }
 

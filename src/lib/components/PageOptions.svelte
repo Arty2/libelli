@@ -4,6 +4,7 @@
 	import PrintSettingsPanel from './PrintSettingsPanel.svelte';
 	import './options-bar.css';
 	import { safeImageUrl } from '$lib/assets';
+	import { renamed } from '$lib/onboarding';
 	import { fontChoices, previewFamilies } from '$lib/fonts';
 	import MenuSelect from './MenuSelect.svelte';
 	import { withKey } from '$lib/keys';
@@ -420,7 +421,7 @@
 						value={template.name}
 						placeholder="Untitled card"
 						disabled={pageFrozen}
-						onchange={(e) => patchTemplate({ name: e.currentTarget.value })}
+						onchange={(e) => ontemplatechange(renamed(template, e.currentTarget.value))}
 					/>
 					<button
 						class="caret"

@@ -47,7 +47,7 @@
 	}: Props = $props();
 
 	const many = $derived(selectedBoxes.length > 1);
-	const plural = $derived(many ? ` ${selectedBoxes.length} Boxes` : '');
+	const plural = $derived(many ? ` ${selectedBoxes.length} Areas` : '');
 	const grouped = $derived(
 		many && selectedBoxes.every((b) => b.group) && new Set(selectedBoxes.map((b) => b.group)).size === 1
 	);

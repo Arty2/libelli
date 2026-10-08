@@ -254,6 +254,20 @@
 	border-radius: var(--radius-input);
 }
 
+/* As tall as the buttons beside it, at every text size: the browser's own
+   color input is a fixed height (27px in Chrome, taller on a phone), so it
+   stood out of the row as soon as the text was sized up or down. A button is
+   one line of its type, its 5px of padding either side and its border; the
+   swatch is given that type and measured the same way, in `lh` — one line of
+   its own — because the line height of `normal` is the font's to round, and a
+   sum in rem came out a pixel short. `lh` is Baseline Widely (2026); without
+   it the declaration drops and the swatch keeps its own height. */
+.options .color-field .swatch {
+	box-sizing: border-box;
+	font: 0.75rem ui-sans-serif, system-ui, sans-serif;
+	height: calc(1lh + 12px);
+}
+
 /* Sized to the widest value each one actually holds, not to a grid: every rem
    saved here is a control that stays on the same row instead of wrapping to the
    next, and a field with room for characters that can never arrive reads as a
@@ -425,6 +439,24 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
+}
+
+/* The area bar's way to put itself away: a bare glyph like the CSS
+   dialog's window controls, square, filled only under the pointer. */
+.options .head-row button.bar-hide {
+	display: grid;
+	place-items: center;
+	width: 1.75rem;
+	height: 1.75rem;
+	padding: 0;
+	border-color: transparent;
+	background: none;
+	color: #555;
+}
+
+.options .head-row button.bar-hide:hover:not(:disabled) {
+	border-color: transparent;
+	background: #f3f3f3;
 }
 
 /* Its buttons hold their one line: squeezed, the row gave way at the space in
@@ -626,12 +658,12 @@
 
 .bar-frame::before {
 	top: 0;
-	background: linear-gradient(to bottom, rgba(0, 0, 0, 0.18), transparent);
+	background: linear-gradient(to bottom, var(--edge-shadow), transparent);
 }
 
 .bar-frame::after {
 	bottom: 0;
-	background: linear-gradient(to top, rgba(0, 0, 0, 0.18), transparent);
+	background: linear-gradient(to top, var(--edge-shadow), transparent);
 }
 
 .bar-frame[data-more-top]::before,
@@ -666,13 +698,15 @@
 	/* The CSS button keeps its glyph and loses the word, as the app's own
 	   toolbar buttons do at this width: the head has to hold a lock, a name,
 	   its menu and two buttons on one line. Square without it, like the swap
-	   button beside it, rather than a box drawn for a word that is not there. */
+	   button beside it, rather than a box drawn for a word that is not there.
+	   The area bar's Delete the same, so the name gets the room. */
 	.options .head-row .label {
 		display: none;
 	}
 
 	.options .head-row button.css,
-	.options .head-row button.layout {
+	.options .head-row button.layout,
+	.options .head-row button.delete {
 		--square: calc(0.875rem + 12px);
 		padding: 5px;
 		width: var(--square);
@@ -686,6 +720,34 @@
 	.options .head {
 		border-right: none;
 		padding-right: 0;
+	}
+
+	/* The area bar's head is its first row, edge to edge: Lock and Delete
+	   keep their size, and the name takes everything left between them,
+	   where it had a fixed 4.6rem and the row ended in empty space. */
+	.box-options .head {
+		flex: 1 0 100%;
+		align-items: stretch;
+	}
+
+	.box-options .head-row {
+		display: flex;
+	}
+
+	.box-options .head-row .area-name {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	/* The label on one line; the field beside it is what gives way. */
+	.box-options .head-row .context {
+		white-space: nowrap;
+	}
+
+	.box-options .head-row .area-name input {
+		flex: 1 1 auto;
+		width: auto;
+		min-width: 0;
 	}
 
 	/* One run to a line, ruled underneath rather than at the side, where a

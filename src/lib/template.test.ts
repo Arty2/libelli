@@ -27,6 +27,8 @@ import {
 	normaliseRotation,
 	sidesOf,
 	builtinTemplate,
+	exportTemplate,
+	importedTemplate,
 	frameHeight,
 	newBox,
 	normaliseTemplate,
@@ -678,11 +680,33 @@ describe('normaliseColumns', () => {
 		expect(normaliseColumns(undefined)).toBeUndefined();
 	});
 
+	it('keeps orphans and widows only where they differ from 2 and 3, as whole lines from 1 to 10', () => {
+		expect(normaliseColumns({ count: 2, gap: 5, orphans: 2, widows: 3 })).toEqual({ count: 2, gap: 5 });
+		expect(normaliseColumns({ count: 2, gap: 5, orphans: '4', widows: 1 })).toEqual({ count: 2, gap: 5, orphans: 4, widows: 1 });
+		expect(normaliseColumns({ count: 2, gap: 5, orphans: 0, widows: 99 })).toEqual({ count: 2, gap: 5, orphans: 1, widows: 10 });
+		expect(normaliseColumns({ count: 2, gap: 5, orphans: 'x', widows: '' })).toEqual({ count: 2, gap: 5 });
+	});
+
 	it('survives a template trip, and is dropped from one that does not say', () => {
 		const box = { id: 'a', slot: null, x: 0, y: 0, w: 50, h: 20, mode: 'plain', columns: { count: 4, gap: 3 } };
 		const t = normaliseTemplate({ ...builtinTemplate(), boxes: [box] });
 		expect(t.boxes[0].columns).toEqual({ count: 4, gap: 3 });
 		const plain = normaliseTemplate({ ...builtinTemplate(), boxes: [{ ...box, columns: undefined }] });
 		expect('columns' in plain.boxes[0]).toBe(false);
+	});
+});
+
+describe('exportTemplate', () => {
+	it('leaves the starter mark behind: it is this browser\'s, not the design\'s', () => {
+		const t = normaliseTemplate({ ...JSON.parse(JSON.stringify(builtinTemplate())), starter: 'a5-starter-booklet' });
+		expect(t.starter).toBe('a5-starter-booklet');
+		const file = JSON.parse(exportTemplate(t));
+		expect('starter' in file).toBe(false);
+		expect(file.name).toBe(t.name);
+	});
+
+	it('and an import leaves behind a mark an older file still carries', () => {
+		const old = { ...JSON.parse(JSON.stringify(builtinTemplate())), starter: 'a5-starter-booklet' };
+		expect('starter' in importedTemplate(old)).toBe(false);
 	});
 });

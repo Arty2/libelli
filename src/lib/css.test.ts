@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cssIdent, scopeCss, styleTag } from './css';
+import { cssIdent, isPageId, scopeCss, styleTag } from './css';
 
 const scoped = (css: string) => scopeCss(css, '.trim').replace(/\s+/g, ' ').trim();
 
@@ -87,5 +87,12 @@ describe('cssIdent', () => {
 	it('answers with nothing when there is nothing left to name', () => {
 		expect(cssIdent('  ')).toBe('');
 		expect(cssIdent('!!!')).toBe('');
+	});
+});
+
+describe('isPageId', () => {
+	it('knows the ids a page wears, and nothing an area would usually be called', () => {
+		for (const id of ['cover', 'back-cover', 'inside-cover', 'inside-back-cover', 'page-1', 'page-12']) expect(isPageId(id)).toBe(true);
+		for (const id of ['Cover', 'covers', 'page', 'page-one', 'title', 'Back-Cover']) expect(isPageId(id)).toBe(false);
 	});
 });

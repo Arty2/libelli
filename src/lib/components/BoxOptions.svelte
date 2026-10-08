@@ -3,7 +3,7 @@
 	import ColorField from './ColorField.svelte';
 	import { withKey } from '$lib/keys';
 	import './options-bar.css';
-	import { cssIdent } from '$lib/css';
+	import { cssIdent, isPageId } from '$lib/css';
 	import { parseColor } from '$lib/color';
 	import { safeImageUrl } from '$lib/assets';
 	import { completePlaceholders } from '$lib/complete';
@@ -23,6 +23,9 @@
 		normaliseBaseline,
 		normaliseColumns,
 		DEFAULT_COLUMN_GAP,
+		DEFAULT_ORPHANS,
+		DEFAULT_WIDOWS,
+		MAX_KEEP_LINES,
 		MAX_COLUMNS,
 		normaliseList,
 		MIN_BOX,
@@ -65,6 +68,8 @@
 		onmappingchange: (mapping: Mapping) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
+		/** put the bar away until the next area is chosen; absent where there is nowhere to put it */
+		onhide?: () => void;
 		/** absent where there is no starter to reset to — see `starterOfTemplate` */
 		onresettemplate?: () => void;
 		onuploadfont: (file: File) => void;
@@ -93,6 +98,7 @@
 		ontemplatechange,
 		onmappingchange,
 		ondelete,
+		onhide,
 		onuploadfont,
 		onnotice,
 		ondraw,
@@ -518,6 +524,11 @@
 			);
 			return;
 		}
+		if (ident && isPageId(ident)) {
+			putBack();
+			onnotice(`“${value}” would be #${ident}, which is a page's CSS id — choose another name for the area.`, 'warning');
+			return;
+		}
 
 		patch({ slot: value || null });
 		if (value && !template.slots.includes(value)) {
@@ -635,9 +646,9 @@
 					<Icon name={selected.locked ? 'unlocked' : 'locked'} size={14} />
 					{selected.locked ? 'Unlock' : 'Lock'}
 				</button>
-				<span class="context">Area</span>
+				<span class="context">Name</span>
 				{#if source === 'field'}
-					<label class="field">
+					<label class="field area-name">
 						<span class="sr-only">Name</span>
 						<input
 							class="w-5"
@@ -648,9 +659,23 @@
 						/>
 					</label>
 				{/if}
-				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen} title={withKey('Delete this area', 'delete')}>
-					<Icon name="trash" size={14} /> Delete
+				<button
+					class="danger-outline delete"
+					onclick={ondelete}
+					disabled={boxFrozen}
+					title={withKey('Delete this area', 'delete')}
+					aria-label="Delete this area"
+				>
+					<Icon name="trash" size={14} /> <span class="label">Delete</span>
 				</button>
+				<!-- The bar away, for the room under it; it comes back with the next
+				     area chosen. A bare glyph, as the CSS dialog's window controls
+				     are: it is about the bar, not an act on the area. -->
+				{#if onhide}
+					<button class="bar-hide" onclick={onhide} title="Hide these settings until the next area is chosen" aria-label="Hide the area settings">
+						<Icon name="row-collapse" size={16} />
+					</button>
+				{/if}
 			</span>
 		</span>
 		<!-- Most-used first, after what the area holds: its alignment and its
@@ -910,6 +935,8 @@
 		</fieldset>
 		<fieldset class="group">
 			<legend>Text</legend>
+			<!-- A QR code is drawn, not set: of the type it keeps only its color. -->
+			{#if selected.mode !== 'qr'}
 			<span class="field" class:inherits={!selected.font}>
 				<span>Font</span>
 				<MenuSelect
@@ -960,6 +987,7 @@
 					<ResetButton to="the page's {template.defaults.weight}" disabled={boxFrozen} onclick={() => patch({ weight: undefined })} />
 				{/if}
 			</label>
+			{/if}
 			<span class="field" class:inherits={!selected.color}>
 				<span>Color</span>
 				<ColorField
@@ -977,6 +1005,7 @@
 				{/if}
 				{@render fromColumn('text', 'text color')}
 			</span>
+			{#if selected.mode !== 'qr'}
 			<label class="field">
 				<span>Spacing</span>
 				<input
@@ -1002,6 +1031,7 @@
 					<option value="uppercase">Uppercase</option>
 				</select>
 			</label>
+			{/if}
 		</fieldset>
 		<fieldset class="group">
 			<legend>Position</legend>
@@ -1116,6 +1146,8 @@
 				<span class="unit">%</span>
 			{/if}
 		</fieldset>
+		<!-- Lines are the words' to have; a QR code has none. -->
+		{#if selected.mode !== 'qr'}
 		<fieldset class="group">
 			<legend>Lines</legend>
 			<label class="field">
@@ -1176,6 +1208,7 @@
 						onchange={(e) =>
 							patch({
 								columns: normaliseColumns({
+									...selected.columns,
 									count: e.currentTarget.value,
 									gap: selected.columns?.gap ?? DEFAULT_COLUMN_GAP
 								})
@@ -1193,9 +1226,40 @@
 							title="Between one column and the next"
 							value={selected.columns.gap}
 							disabled={boxFrozen}
-							onchange={(e) => patch({ columns: normaliseColumns({ count: selected.columns!.count, gap: numeric(e, selected.columns!.gap) }) })}
+							onchange={(e) => patch({ columns: normaliseColumns({ ...selected.columns, gap: numeric(e, selected.columns!.gap) }) })}
 						/>
 						<span class="unit">mm</span>
+					</label>
+					<!-- How many of a paragraph's lines stay together where a column
+					     breaks it: at the foot of the column, and at the head of the
+					     next. Shown at their value, 2 and 3 until changed. -->
+					<label class="field">
+						<span>Orphans</span>
+						<input
+							class="n-2"
+							type="number"
+							step="1"
+							min="1"
+							max={MAX_KEEP_LINES}
+							title="The fewest lines of a paragraph left at the foot of a column — fewer, and the paragraph starts in the next one"
+							value={selected.columns.orphans ?? DEFAULT_ORPHANS}
+							disabled={boxFrozen}
+							onchange={(e) => patch({ columns: normaliseColumns({ ...selected.columns, orphans: e.currentTarget.value }) })}
+						/>
+					</label>
+					<label class="field">
+						<span>Widows</span>
+						<input
+							class="n-2"
+							type="number"
+							step="1"
+							min="1"
+							max={MAX_KEEP_LINES}
+							title="The fewest lines of a paragraph carried to the head of the next column"
+							value={selected.columns.widows ?? DEFAULT_WIDOWS}
+							disabled={boxFrozen}
+							onchange={(e) => patch({ columns: normaliseColumns({ ...selected.columns, widows: e.currentTarget.value }) })}
+						/>
 					</label>
 				{/if}
 			{/if}
@@ -1234,6 +1298,7 @@
 				</label>
 			{/if}
 		</fieldset>
+		{/if}
 		{#if selected.mode === 'markdown'}
 			<fieldset class="group">
 				<legend>Lists</legend>

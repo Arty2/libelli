@@ -26,6 +26,7 @@ src/lib/
   color.ts       the only place a color string is allowed to become CSS
   css.ts          scopes the template's own CSS to the card; strips @import and remote url()
   csscode.ts      the CSS editor's colouring, and what Tab and Enter do to the text
+  csskit.ts       the Starter sheet: this template's facts for a model, and the card's vars
   parse.ts        CSV / TSV parsing (quoted fields, embedded newlines, delimiter sniffing)
   markdown.ts     hand-written Markdown subset -> HTML, escaping at the leaves
   layout.ts       mm geometry, anchors, snapping, and the left/right page mirror
@@ -56,6 +57,7 @@ src/lib/
   sw-policy.ts    the worker's answer to a request; pwa.ts registration, updates, install
   textsize.ts     no browser zoom: a pinch off the stage sizes the interface's text
   theme.ts        the logo steps light, dark, dark with the page inverted
+  turn.ts         Output's Portrait / Landscape: this browser's, never the template's
   version.ts      VERSION, and the bumping rule; changelog.ts reads CHANGELOG.md
   components/
     Card.svelte         the card itself: boxes, handles, drag, snap            (~3k)
@@ -65,7 +67,7 @@ src/lib/
     PrintSettingsPanel.svelte  Per Sheet, orientation, sheet background — shared with the print screen
     PrintSheet.svelte   one physical sheet — off-screen in PrintRoot, thumbnails in PrintPreview
     Lightbox / SheetLightbox  one card, or one sheet, full screen
-    CssEditor.svelte    the template's stylesheet: numbers, colour, tabs — over a real textarea
+    CssEditor.svelte    the template's stylesheet: numbers, colour, tabs, wrap — over a real textarea
     BitmapEditor.svelte the drawing surface, hosted in DataTable; saves a base64 PNG
     ImagesPanel.svelte  stored pictures, their weight, the folder; one large, to crop or turn
     Tooltip.svelte      every `title` as a tip: hover, or press and hold on touch
@@ -88,9 +90,10 @@ src/routes/app.css        the :root tokens and app-wide rules
   [Widely available](https://web.dev/baseline), not merely *Newly* — and weigh
   the failure mode, not just the support table: a feature that degrades costs
   little, one invalid at computed-value time takes the whole declaration with it
-  and can leave a page unreadable. One standing exception, taken knowingly:
+  and can leave a page unreadable. Two standing exceptions, taken knowingly:
   `field-sizing: content` in `DataTable.svelte`, which falls back to a fixed
-  scrollable field. Anything failing worse than that waits.
+  scrollable field, and `orphans`/`widows` on columns in `Card.svelte`, which
+  Firefox ignores while the columns still flow. Anything failing worse waits.
 - **A template stores the right-hand page.** With facing pages on, a left-hand
   page is `mirrorBox` applied as the card is drawn — never a second set of
   coordinates. Anything that writes geometry back (dragging, nudging, the

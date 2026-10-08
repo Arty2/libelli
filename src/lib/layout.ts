@@ -434,3 +434,20 @@ export function actualScale(screen: ScreenFacts): { scale: number; panel: string
 	const scale = Math.round((cssLong / panel.inches / 96) * 1000) / 1000;
 	return { scale, panel: panel.name, estimate: !!panel.estimate };
 }
+
+/**
+ * Where the gaps between an area's columns fall, as [left, right] fractions of
+ * the width its words have — the area less its borders and padding, which is
+ * what the browser's multi-column layout divides: `count` equal columns with
+ * `gap` between each pair. In the same unit as `width` and `gap`, mm. Nothing
+ * for one column, or for a width the gaps alone would fill.
+ */
+export function columnGaps(count: number, gap: number, width: number): Array<[number, number]> {
+	if (count < 2 || width <= 0) return [];
+	const column = (width - gap * (count - 1)) / count;
+	if (column <= 0) return [];
+	return Array.from({ length: count - 1 }, (_, i) => {
+		const left = (i + 1) * column + i * gap;
+		return [left / width, (left + gap) / width];
+	});
+}

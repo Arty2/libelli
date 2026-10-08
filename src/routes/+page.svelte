@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, untrack } from 'svelte';
+	import { flushSync, tick, untrack } from 'svelte';
 	import { base } from '$app/paths';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
 	import CssEditor from '$lib/components/CssEditor.svelte';
@@ -43,6 +43,7 @@
 		duplicateBoxes,
 		groupMembers,
 		nudgeBox as nudge,
+		followsInSet,
 		stepAlignment,
 		strayBoxes,
 		toggleGroup,
@@ -52,10 +53,11 @@
 	} from '$lib/boxops';
 	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport, withKey } from '$lib/keys';
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
-	import { isStarterTemplate, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from '$lib/onboarding';
+	import { cssKit } from '$lib/csskit';
+	import { loadTurn, saveTurn, type OutputTurn } from '$lib/turn';
+	import { renamed, isStarterTemplate, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
 	import { armDefault, dragByTitle } from '$lib/modal';
-	import { cssIdent } from '$lib/css';
 	import { codeStats } from '$lib/csscode';
 	import { watchPresses } from '$lib/haptics';
 	import { GONE_ROW, carryLookups, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
@@ -69,6 +71,7 @@
 		autoMap,
 		blankTemplate,
 		exportTemplate,
+		importedTemplate,
 		newBox,
 		nextBoxId,
 		arrangeBoxes,
@@ -185,10 +188,18 @@
 
 	/** Light or dark — see theme.ts. app.html has already applied it before the first paint. */
 	let theme = $state<Theme>('light');
+	/** The export's own Portrait / Landscape — turn.ts. This browser's, never the template's. */
+	let outputTurn = $state<OutputTurn>('auto');
+	/** What is on screen: the theme, or the other dark while a glance lasts — the page's `theme-…` class. */
+	let shownTheme = $state<Theme>('light');
+	function showTheme(shown: Theme) {
+		shownTheme = shown;
+		applyTheme(shown);
+	}
 	function setTheme(next: Theme) {
 		theme = next;
 		peeking = false;
-		applyTheme(next);
+		showTheme(next);
 		saveTheme(next);
 	}
 
@@ -206,7 +217,7 @@
 		peekTimer = setTimeout(() => {
 			peekTimer = null;
 			peeking = true;
-			applyTheme(peekTheme(theme) ?? theme);
+			showTheme(peekTheme(theme) ?? theme);
 		}, after);
 	}
 	function peekEnd() {
@@ -214,7 +225,7 @@
 		peekTimer = null;
 		if (!peeking) return;
 		peeking = false;
-		applyTheme(theme);
+		showTheme(theme);
 	}
 
 	/**
@@ -270,11 +281,31 @@
 	}
 	let cssOpen = $state(false);
 	/**
+	 * The CSS dialog over the whole window, for a long sheet. Kept for the
+	 * session rather than reset on each open: someone who wanted the room for
+	 * one sheet wants it for the next. A phone opens it full screen every time
+	 * (`openCss`): there a dialog is the window less a gutter, and the gutter
+	 * is all the margin gives back.
+	 */
+	let cssFull = $state(false);
+	/**
+	 * A drag on the title of the full-screen dialog takes it out of full
+	 * screen, as a window's does — see `dragByTitle`. Drawn at once, so the
+	 * drag can measure the dialog at its own size and carry on from there.
+	 */
+	function detachCss(): boolean {
+		if (!cssFull) return false;
+		flushSync(() => (cssFull = false));
+		return true;
+	}
+	/** Long lines in the CSS editor wrap to its width; off, they scroll sideways. For the session. */
+	let cssWrap = $state(true);
+	/**
 	 * The sheet being edited, and the sheet the card is drawn with.
 	 *
-	 * The two are separate on purpose: the editor holds a draft, Apply puts it on
-	 * the card without closing the dialog, and Save does both and leaves. Nothing
-	 * reaches the template until one of those is pressed, so Cancel — and the ×,
+	 * The two are separate on purpose: the editor holds a draft, and Save puts it
+	 * on the card and leaves. Nothing reaches the template until Save is
+	 * pressed, so Cancel — and the ×,
 	 * the backdrop and Escape, which mean what it means — is a matter of closing
 	 * the dialog and putting back whatever was there when it opened.
 	 *
@@ -282,7 +313,7 @@
 	 */
 	let cssDraft = $state('');
 	let cssBefore: string | undefined;
-	let cssEditor = $state<{ insert: (text: string) => void } | null>(null);
+	let cssEditor = $state<{ replaceAll: (text: string) => void } | null>(null);
 	/** The draft says something the card is not showing yet. */
 	const cssDirty = $derived((cssDraft.trim() || undefined) !== (template.css ?? undefined));
 	const cssCount = $derived(codeStats(cssDraft));
@@ -534,60 +565,23 @@
 	const focusOnOpen = (node: HTMLElement) => node.focus();
 
 	/**
-	 * What the CSS box says before anything is typed into it.
-	 *
-	 * The names an author can reach, as working declarations rather than as a
-	 * paragraph describing them. Every selector here is real: `.trim` is the
-	 * card, `.box` is an area, `.page-number .of` is the slash between the count
-	 * and the total. Scoping happens in css.ts, which anchors everything to the
-	 * card, strips `@import` and refuses any `url()` that is not a `data:` one.
+	 * What the CSS box says before anything is typed into it, and what Starter
+	 * puts in it: this template's facts and the selectors it can reach — see
+	 * csskit.ts. The placeholder is the documentation, so it names what this
+	 * template actually has.
 	 */
-	/**
-	 * The placeholder is the documentation — see the dialog below — so it names
-	 * what this template actually has: each area's id, as `cssIdent` writes it,
-	 * and the classes every area carries (see Card's `idFor`).
-	 */
-	const cssPlaceholder = $derived.by(() => {
-		const ids = [...new Set(template.boxes.map((b) => cssIdent(b.slot ?? '')).filter(Boolean))];
-		return [
-			'.box { }              /* every area */',
-			...ids.map((id) => `#${id} { }`),
-			'',
-			'.content-field { }    /* by what fills it: a column, */',
-			'.content-static { }   /* its own words, */',
-			'.content-image { }    /* or an image */',
-			'.mode-plain { }       /* by mode: also .mode-markdown, */',
-			'.mode-qr { }          /* .mode-image, .mode-color */',
-			'',
-			'h1, h2, h3 { }        /* Markdown headings */',
-			'p, ul, li { }         /* Markdown blocks */',
-			'em, strong, code { }',
-			'hr { }',
-			'.page-number { }      /* the number on the card */',
-			".page-number .of::before { content: ' of ' }",
-			'',
-			'#page-1 { }           /* a page by its number */',
-			'.cover { }            /* the first page; also .inside-cover, */',
-			'.back-cover { }       /* .inside-back-cover and the last page */',
-			'.recto { }            /* with Recto / Verso on: also .verso */'
-		].join('\n');
-	});
+	const cssPlaceholder = $derived(cssKit(template));
 
 	function openCss() {
 		cssBefore = template.css;
 		cssDraft = template.css ?? '';
+		if (stacked) cssFull = true;
 		cssOpen = true;
 	}
 
-	/** Put the draft on the card, leaving the dialog where it is. */
-	function applyCss() {
-		if (template.locked) return;
-		writeCss(cssDraft.trim() || undefined);
-	}
-
-	/** Apply, and leave. */
+	/** Put the draft on the card, and leave. */
 	function saveCss() {
-		applyCss();
+		if (!template.locked) writeCss(cssDraft.trim() || undefined);
 		cssOpen = false;
 	}
 
@@ -639,6 +633,18 @@
 	 * stays as it was.
 	 */
 	const barBox = $derived(template.locked ? null : selected);
+	/**
+	 * The area bar put away by its own button, for the room it takes — on a
+	 * phone, a third of the screen. Until the next area is chosen, which is
+	 * when the settings are wanted again. Held as the area it was put away on
+	 * rather than as a flag, so every way an area comes to be chosen brings it
+	 * back — a new area, a duplicate, a paste — not only a click through
+	 * `selectBox`, which also clears it for a click on the same area again.
+	 * The page bar is not hidden by it: that has its own button.
+	 */
+	let barHiddenFor = $state<string | null>(null);
+	const barHidden = $derived(!!barBox && barBox.id === barHiddenFor);
+	const hideBar = () => (barHiddenFor = barBox?.id ?? null);
 	const selectedBoxes = $derived(template.boxes.filter((b) => selectedIds.includes(b.id)));
 	/** The box the menu was opened on, whether or not it is the only one chosen. */
 	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
@@ -906,7 +912,8 @@
 	// again here changes nothing on screen.
 	$effect(() => {
 		untrack(() => setTextSize(loadTextSize()));
-		untrack(() => (theme = loadTheme()));
+		untrack(() => (theme = shownTheme = loadTheme()));
+		untrack(() => (outputTurn = loadTurn()));
 		return zoomAsText(() => untrack(() => textSize), setTextSize);
 	});
 
@@ -1296,7 +1303,15 @@
 	 * back when the picture is closed.
 	 */
 	let drawingInTable = $state(false);
-	const editingPicture = $derived((dataOpen && drawingInTable) || (imagesOpen && imageFocus !== null));
+	/**
+	 * Any cell open full size, words included. On a phone only: there the bar
+	 * and the tray share the height, and a cell being written in wants all of
+	 * it; on a desk the bar sits beside the table and costs it nothing.
+	 */
+	let fullCellInTable = $state(false);
+	const panelTakesRow = $derived(
+		(dataOpen && (drawingInTable || (stacked && fullCellInTable))) || (imagesOpen && imageFocus !== null)
+	);
 
 	function openImage(name: string) {
 		imageFocus = name;
@@ -2088,9 +2103,9 @@
 	function renameDataset(name: string) {
 		const wanted = name.trim();
 		describe('Rename the table');
-		// Clearing the name removes it, and only it: the lock and the rows' order stay.
-		const { name: _name, ...unnamed } = dataset;
-		dataset = wanted ? { ...dataset, name: wanted } : unnamed;
+		// Clearing the name removes it, and the lock and the rows' order stay.
+		// A starter table renamed stops being the starter (`renamed`).
+		dataset = renamed(dataset, wanted || undefined);
 	}
 
 	/**
@@ -2098,6 +2113,9 @@
 	 * group is for. A modifier-click adds or drops that whole set.
 	 */
 	function selectBox(id: string | null, additive = false) {
+		// Choosing an area — this one again, or another — brings back a bar
+		// that was put away (`barHidden`).
+		if (id) barHiddenFor = null;
 		if (provisional && id !== provisional) settleProvisional();
 		// Typing into one area and then picking another ends the typing; the
 		// change is already in, so there is nothing to confirm or discard.
@@ -2270,8 +2288,10 @@
 		// right-hand page's millimetres the template stores — the same undoing a
 		// mirrored drag goes through before it is written.
 		const verso = template.facing === true && pageSide(dataset.rows.length ? activeRow + 1 : null) === 'verso';
+		// An area following another that moves too goes down with it, gap kept.
+		const moving = new Set(targets.map((b) => b.id));
 		for (const box of targets) {
-			const next = nudge(box, verso && mirrors(box) ? -dx : dx, dy);
+			const next = nudge(box, verso && mirrors(box) ? -dx : dx, followsInSet(box, moving, template.boxes) ? 0 : dy);
 			if (next) updateBox(next);
 		}
 	}
@@ -2570,8 +2590,12 @@
 		// table's lock is the one that guards it.
 		if (!box || !column || !row) return;
 		if (refuseLockedTable()) return;
+		// Where the editor's × goes back to, as for a drawing (`drawArea`): the
+		// table when it was already showing; otherwise it was opened only for
+		// this cell, and closing the cell closes it again.
+		const from = dataOpen ? undefined : 'card';
 		dataOpen = true;
-		cellRequest = { row: activeRow, column };
+		cellRequest = { row: activeRow, column, from };
 	}
 
 	/**
@@ -2640,7 +2664,7 @@
 		try {
 			const raw = JSON.parse(await file.text());
 			await flushTemplate();
-			template = normaliseTemplate(raw);
+			template = importedTemplate(raw);
 			selectedIds = [];
 			// An import joins the library rather than replacing what is loaded:
 			// a file someone handed you is a template you now have, not a
@@ -2916,7 +2940,7 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if (barBox || pageSetupOpen) && !editingPicture}
+	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden}
 		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
@@ -2932,6 +2956,7 @@
 					onmappingchange={() => {}}
 					onduplicate={() => {}}
 					ondelete={() => {}}
+					onhide={() => {}}
 					onresettemplate={() => {}}
 					{library}
 					{templateId}
@@ -2967,6 +2992,7 @@
 						onmappingchange={(m) => (mapping = m)}
 						onduplicate={duplicateBox}
 						ondelete={deleteBox}
+						onhide={hideBar}
 						onresettemplate={templateStarter ? () => (resetting = true) : undefined}
 						onmagiclayout={openMagic}
 						hasColumns={dataset.columns.length > 0}
@@ -3113,6 +3139,7 @@
 			{selectedIds}
 			zoom={ui.zoom}
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
+			theme={shownTheme}
 			{activeRow}
 			rowCount={dataset.rows.length}
 			rows={lookupRows}
@@ -3265,6 +3292,7 @@
 				onsavearea={saveAreaDrawing}
 				ondeletearea={deleteAreaDrawing}
 				ondrawing={(on) => (drawingInTable = on)}
+				onfullcell={(on) => (fullCellInTable = on)}
 				onleave={(to) => {
 					dataOpen = false;
 					if (to === 'images') imagesOpen = true;
@@ -3279,12 +3307,12 @@
 					// And every color an area takes from it, which names the column
 					// itself rather than a slot. Only when one does, so a rename
 					// that touches no color leaves the template alone.
-					const renamed = (sources: ColorSources) =>
+					const remapSources = (sources: ColorSources) =>
 						Object.fromEntries(Object.entries(sources).map(([k, c]) => [k, c === from ? to : c]));
 					if (template.boxes.some((b) => Object.values(b.colorFrom ?? {}).includes(from))) {
 						template = {
 							...template,
-							boxes: template.boxes.map((b) => (b.colorFrom ? { ...b, colorFrom: renamed(b.colorFrom) } : b))
+							boxes: template.boxes.map((b) => (b.colorFrom ? { ...b, colorFrom: remapSources(b.colorFrom) } : b))
 						};
 					}
 				}}
@@ -3368,23 +3396,53 @@
 
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
-	<div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="css-title" use:dragByTitle>
+	<div
+		class="modal wide css-dialog"
+		class:full={cssFull}
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="css-title"
+		use:dragByTitle={{ detach: detachCss }}
+	>
 		<!-- The help dialog's header, and like it dragged by the title, so the
 		     card being styled can be seen beside it. The × is Cancel, as Esc
-		     and the backdrop are: only Apply and Save put anything on the card.
+		     and the backdrop are: only Save puts anything on the card.
 
 		     What the sheet is, beside its name: how many lines, and what it
 		     weighs. A template is meant to stay small enough to paste into a
 		     message, and its CSS is the part of it that grows without anybody
 		     noticing. -->
-		<header class="modal-header drag-title" data-drag-handle>
+		<!-- A double-click on the title is a window's own way to maximise, and
+		     does the same here; on the buttons it is two presses, not this. A
+		     shortcut for the pointer only: the full-screen button is the way
+		     there for a keyboard and a screen reader. -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<header
+			class="modal-header drag-title"
+			data-drag-handle
+			ondblclick={(e) => {
+				if ((e.target as HTMLElement).closest('button')) return;
+				cssFull = !cssFull;
+			}}
+		>
 			<h2 id="css-title">CSS</h2>
 			<span class="css-stats">
 				{cssCount.lines} line{cssCount.lines === 1 ? '' : 's'} · {cssCount.bytes < 1024
 					? `${cssCount.bytes} bytes`
 					: `${Math.round((cssCount.bytes / 1024) * 10) / 10} KB`}
 			</span>
-			<button class="icon" onclick={cancelCss} title="Close without keeping changes" aria-label="Close">
+			<!-- Beside the ×, as a window's own controls sit: the room to work in,
+			     then the way out. -->
+			<button
+				class="icon"
+				onclick={() => (cssFull = !cssFull)}
+				aria-pressed={cssFull}
+				title={cssFull ? 'Back to a dialog' : 'Full screen — the whole window for the sheet'}
+				aria-label="Full screen"
+			>
+				<Icon name={cssFull ? 'minimize' : 'maximize'} size={16} />
+			</button>
+			<button class="icon" use:focusOnOpen onclick={cancelCss} title="Close without keeping changes" aria-label="Close">
 				<Icon name="close" size={16} />
 			</button>
 		</header>
@@ -3393,37 +3451,49 @@
 		     actually needs is the names of the things they can reach, and a
 		     placeholder is where they will look for them. The prose that was here
 		     is in the README, where prose belongs. Starter puts that same text
-		     into the editor, where it can be edited rather than read. -->
+		     in the editor in place of what is there, so the kit is the whole
+		     sheet rather than spliced into the middle of a template's own rules
+		     — undo or Cancel brings them back. -->
 		<CssEditor
 			bind:this={cssEditor}
 			bind:value={cssDraft}
 			placeholder={cssPlaceholder}
 			readonly={!!template.locked}
-			onapply={applyCss}
+			wrap={cssWrap}
+			onsave={saveCss}
 		/>
-		<!-- Left to right: the one button that puts text in, then the three ways
-		     out in the order of how much they do — nothing, the card, the card and
-		     the door. A locked template can be read and not written, so the three
-		     that write are not here at all: disabled buttons on a row this short
-		     read as something broken rather than as something withheld. -->
-		<div class="modal-actions">
+		<!-- Left to right: the one button that puts text in and the one that
+		     changes how it is shown, then the two ways out — keeping nothing,
+		     and keeping the sheet. A locked template can be read and not
+		     written, so the buttons that write are not here at all: disabled
+		     buttons on a row this short read as something broken rather than as
+		     something withheld. -->
+		<div class="modal-actions css-actions">
 			{#if !template.locked}
 				<button
 					class="starter"
-					onclick={() => cssEditor?.insert(cssPlaceholder)}
-					title="Put the starter sheet into the editor, to edit rather than read"
+					onclick={() => cssEditor?.replaceAll(cssPlaceholder)}
+					title="Replace the sheet with the starter kit: this template's facts and the selectors it can reach. Ctrl/Cmd + Z or Cancel brings the old sheet back."
 					aria-label="Starter sheet"
 				>
 					<Icon name="code-reference" size={15} /><span class="label">Starter</span>
 				</button>
 			{/if}
+			<!-- How the sheet is shown, not what is in it, so here for a locked
+			     template too: reading a long line needs it as much as writing one. -->
+			<button
+				class="wrap-toggle"
+				aria-pressed={cssWrap}
+				onclick={() => (cssWrap = !cssWrap)}
+				title={cssWrap ? 'Text wrap is on — long lines fold to the editor\'s width' : 'Text wrap is off — long lines scroll sideways'}
+				aria-label="Text wrap"
+			>
+				<Icon name="text-wrap" size={15} /><span class="label">Text Wrap</span>
+			</button>
 			<span class="spacer"></span>
 			<button onclick={cancelCss}>{template.locked ? 'Close' : 'Cancel'}</button>
 			{#if !template.locked}
-				<button onclick={applyCss} disabled={!cssDirty} title="Put this on the card and stay here — Ctrl/Cmd + Enter">
-					Apply
-				</button>
-				<button class="primary" onclick={saveCss}>{cssDirty ? 'Save' : 'Done'}</button>
+				<button class="primary" onclick={saveCss} title="Put this on the card and close — Ctrl/Cmd + Enter">{cssDirty ? 'Save' : 'Done'}</button>
 			{/if}
 		</div>
 	</div>
@@ -3735,6 +3805,11 @@
 		}}
 		onexcludedsheetschange={(next) => (excludedSheets = next)}
 		onprint={printFromPreview}
+		turn={outputTurn}
+		onturnchange={(next) => {
+			outputTurn = next;
+			saveTurn(next);
+		}}
 		ontemplatechange={applyTemplate}
 		onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 		onnotice={notify}
@@ -3767,6 +3842,7 @@
 		{printBackground}
 		excluded={excludedRows}
 		{excludedSheets}
+		turn={outputTurn}
 	/>
 {/if}
 
@@ -4253,6 +4329,92 @@
 		width: min(760px, calc(100vw - 32px));
 	}
 
+	/* Full screen: no gutter, no corners, no drag — the window edge to edge,
+	   and the editor takes every row the header and the buttons leave. A
+	   column, so the editor's height is the room left rather than its own
+	   17rem. `translate` is where a drag left the dialog (modal.ts); full
+	   screen is not somewhere it can be dragged from. */
+	.modal.full {
+		inset: 0;
+		transform: none;
+		translate: none !important;
+		width: 100vw;
+		max-height: none;
+		height: 100dvh;
+		border-radius: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.modal.full .drag-title {
+		cursor: default;
+	}
+
+	/* No rule under the CSS dialog's title: the editor's own top border is
+	   right below it, and two lines a few pixels apart read as one thick one. */
+	.css-dialog .modal-header {
+		border-bottom: none;
+	}
+
+	/* Full screen gives the rows to the sheet: the title bar and the buttons
+	   under the editor come in to a tighter fit, half their dialog padding.
+	   The sides keep their 22px, which is what the editor reaches out
+	   through to meet the window's edges. */
+	.css-dialog.full {
+		padding-block: 10px;
+	}
+
+	.css-dialog.full .modal-header {
+		margin-top: -10px;
+		padding-top: 8px;
+		padding-bottom: 6px;
+		margin-bottom: 4px;
+		top: -10px;
+	}
+
+	.css-dialog.full .modal-actions {
+		margin-top: 10px;
+	}
+
+	/* The title is pressed and double-clicked, never read off: a double-click
+	   that also selected the word looked like the click had missed. On every
+	   child too, not just the header, so the stats beside it stay put. */
+	.drag-title,
+	.drag-title :global(*) {
+		user-select: none;
+		-webkit-user-select: none;
+	}
+
+	/* Drawn like the × beside it — a bare glyph — pressed or not: the glyph
+	   already says which way it goes, and the accent box a pressed button
+	   gets elsewhere made one of two window controls look like a tool.
+	   `.modal` in front for the weight: that global pressed rule counts an
+	   element and two `:not()`s, and this one has to outweigh it. */
+	.modal .modal-header .icon[aria-pressed='true'] {
+		border-color: transparent;
+		background: none;
+		color: #555;
+	}
+
+	.modal .modal-header .icon[aria-pressed='true']:hover {
+		background: #f3f3f3;
+	}
+
+	/* Edge to edge: out through the dialog's 22px of side padding to the
+	   window itself, which leaves its side borders and corners nothing to
+	   frame — the top and bottom rules still part it from the header and the
+	   buttons. The header and the buttons keep the padding. */
+	.modal.full :global(.editor) {
+		flex: 1;
+		min-height: 0;
+		height: auto;
+		resize: none;
+		margin-inline: -22px;
+		border-inline: none;
+		border-radius: 0;
+	}
+
 	/* Beside the title, in the header's own small print: what the sheet is, not
 	   something to press. */
 	.css-stats {
@@ -4481,17 +4643,36 @@
 		}
 	}
 
-	/* The CSS dialog's starter sheet: Carbon's code-reference glyph, and the
-	   word only where there is room for it, as the bars' buttons do. */
-	.modal-actions .starter {
+	/* The CSS dialog's Starter and Text Wrap: a Carbon glyph each, and the
+	   word only where there is room for it, as the bars' buttons do. Without
+	   the word, square: as tall as the buttons on the right, and as wide.
+
+	   The row's line height is pinned so that height is a number rather than
+	   whatever `normal` comes to in this face — 0.75rem type at 1.25, its 6px
+	   of padding and its border — and the square is that number both ways.
+	   `aspect-ratio` would have been the shorter rule; a stretched flex item's
+	   height does not feed it, and the buttons came out 17px wide. */
+	.css-actions button {
+		line-height: 1.25;
+	}
+
+	.css-actions :is(.starter, .wrap-toggle) {
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
 	}
 
 	@media (max-width: 900px) {
-		.modal-actions .starter .label {
+		.css-actions :is(.starter, .wrap-toggle) .label {
 			display: none;
+		}
+
+		.css-actions :is(.starter, .wrap-toggle) {
+			--square: calc(0.75rem * 1.25 + 14px);
+			width: var(--square);
+			height: var(--square);
+			padding: 0;
+			justify-content: center;
 		}
 	}
 

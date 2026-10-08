@@ -224,7 +224,9 @@ async function inlineImages(clone: HTMLElement): Promise<void> {
 export async function elementToPng(
 	node: HTMLElement,
 	families: string[],
-	pixelRatio = 4
+	pixelRatio = 4,
+	/** a quarter turn clockwise — the export's Portrait / Landscape, see turn.ts */
+	turn = false
 ): Promise<PngResult> {
 	const width = node.offsetWidth;
 	const height = node.offsetHeight;
@@ -251,10 +253,17 @@ export async function elementToPng(
 
 	const image = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
 	const canvas = document.createElement('canvas');
-	canvas.width = Math.round(width * pixelRatio);
-	canvas.height = Math.round(height * pixelRatio);
+	canvas.width = Math.round((turn ? height : width) * pixelRatio);
+	canvas.height = Math.round((turn ? width : height) * pixelRatio);
 	const context = canvas.getContext('2d');
 	if (!context) throw new Error('This browser will not give a canvas to draw on.');
+	// Turned as it is drawn rather than drawn and then turned: one canvas, one
+	// encode. A quarter turn clockwise about the top left corner puts the
+	// picture to the left of the canvas, so it is slid back across first.
+	if (turn) {
+		context.translate(canvas.width, 0);
+		context.rotate(Math.PI / 2);
+	}
 	context.scale(pixelRatio, pixelRatio);
 	context.drawImage(image, 0, 0);
 

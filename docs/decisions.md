@@ -272,7 +272,7 @@ already existed, rather than a third state to keep in step.
 
 **An area's name is its CSS id, and `cssIdent` is the one place a name becomes
 one.** A template's own CSS is the escape hatch for everything the bar does not
-offer, and it was reaching areas by nothing but `.box` — all of them at once.
+offer, and it was reaching areas by nothing but `.box` (now `.area`) — all of them at once.
 Naming one needs a selector, and the area already has a name the author typed;
 `cssIdent` is what turns that name into something a selector can carry. Case is
 kept, because the name as typed is what the author is looking at while writing
@@ -287,6 +287,27 @@ not an id. Duplicating an area deliberately still produces two boxes with one
 name, because a copy that kept its name kept its binding with it, and a rule
 written for `#Job-Title` means both of them — CSS matches every element wearing
 an id, which is exactly the behaviour that case wants.
+
+## `src/lib/csskit.ts`
+
+**The Starter sheet is generated, never written.** It is what someone pastes
+into a chat with a language model, so it carries the template's facts — page,
+margins, text defaults, fonts, every area's id, mode and frame — under a
+comment, and the selectors under that. All of it is read from the template as
+the sheet is made: a fact written out by hand is one more thing to update
+when the app changes, and the first to be wrong.
+
+**A comment, so pasting it back sets nothing.** The facts are context, not
+rules; a rule restating the page size would fight the bar that sets it. The
+bars' settings are inline styles and win anyway, which is what the sheet's
+rules tell the model: leave them to the bars, `!important` only on purpose.
+
+**The variables are one list, `cardVars`.** Card writes them on the card and
+the header names them from the same function, so the comment cannot promise
+a variable the card does not set. On the card rather than the trim, so a
+template's `:root` (which css.ts maps to `.trim`) can still redefine one for
+its own rules without the card's value overwriting it. Margins are the stored
+right-hand page's: a mirrored left-hand page does not swap them.
 
 ## `src/lib/csscode.ts` and `src/lib/components/CssEditor.svelte`
 
@@ -332,20 +353,21 @@ taken with it: Tab no longer leaves the field. Escape is the way out of the
 dialog, and a code field where Tab moves the focus is one where indenting is
 impossible.
 
-**The dialog holds a draft, and three buttons decide what happens to it.**
-Nothing reaches the template until Apply or Save is pressed, which is what makes
+**The dialog holds a draft, and two buttons decide what happens to it.**
+Nothing reaches the template until Save is pressed, which is what makes
 Cancel — and the ×, the backdrop and Escape, which mean what it means — a matter
 of putting back one known value and closing. It replaced a field that committed
 on `change`, where Cancel had to blur the field first so the commit landed
-*before* the restore rather than after it. Apply exists because a stylesheet is
-written by looking at the card: it puts the draft on the card and stays open.
-The primary button says Save while the draft differs from what the card has and
-Done when it does not, so the one button answers "is there anything of mine not
-on the card yet".
+*before* the restore rather than after it. There was an Apply as well, to put
+the draft on the card and stay open; it went, because a third way out that
+was neither keeping nor leaving read as one too many, and Ctrl/Cmd+Enter,
+which had been Apply's, is Save's. The primary button says Save while the
+draft differs from what the card has and Done when it does not, so the one
+button answers "is there anything of mine not on the card yet".
 
 **A locked template opens here to read.** The lock is on writing, and a sheet
 somebody else wrote is the thing in a locked template most worth reading. The
-three buttons that write — Starter, Apply, Save — are not rendered rather
+buttons that write — Starter and Save — are not rendered rather
 than disabled: on a row this short a line of greyed buttons reads as something
 broken, and the field itself is `readonly`, which is the honest signal.
 
@@ -752,17 +774,33 @@ would one column, and a growing one grows to the longest. Words only — a
 picture or a QR code split into columns is a broken picture. Absent is one
 column; a count under two is read as absent.
 
-**A page's own id and classes sit on a box-less wrapper inside the trim.**
-`#page-N`, `.cover`, `.inside-cover`, `.inside-back-cover`, `.back-cover`,
-`.recto` and `.verso` let a template's CSS style a page as a whole. css.ts
-scopes every rule to `.trim …`, so `.cover .box` becomes `.trim .cover .box`,
-and the class has to be on something between the two: classes on the trim
+**A page's own ids and classes sit on box-less wrappers inside the trim.**
+`#page-N`, `#cover`, `#inside-cover`, `#inside-back-cover`, `#back-cover`,
+`.recto` and `.verso` let a template's CSS style a page as a whole. The places
+are ids, not classes, because there is one of each and at most one a page; an
+element has one id and `#page-N` holds the outer wrapper's, so the place is on
+a second wrapper inside it. css.ts scopes every rule to `.trim …`, so
+`#cover .area` becomes `.trim #cover .area`, and the hook has to be on
+something between the two: classes on the trim
 itself would never match, and moving the scope out to the card would have
 changed what `:root` means in every stylesheet already written. The wrapper is
 `display: contents`, so nothing is laid out or measured against it. Inside
 covers need four pages, or a two-page run would call its back cover the inside
 of its front. The id repeats wherever the same page is drawn twice — the
 editor and a thumbnail — as an area's id already does.
+
+**The theme it is seen in is a class on the same wrapper.** `.theme-light`,
+`.theme-dark` or `.theme-dark-page`, because the interface's own
+`data-theme` is on `<html>`, and css.ts maps `html` to the card: a
+template had no way to say "in the dark". Three exclusive classes rather
+than one `.theme-dark` for both, because the two darks need opposite
+answers — in `dark` the page is turned back and shows colours as written;
+in `dark-page` its words and shadows are inverted but a fill is not, so the
+same rule that makes a word light in one makes it dark in the other. Only
+the editor's page takes the theme (+page.svelte's `shownTheme`, which
+follows a glance too); every other Card defaults to light, because print, an
+exported PNG and the lightbox all show the page the right way round, and a
+dark rule leaking into print would be printed.
 
 **A touch on the card drops the click that lands off it.** A touch's click
 is aimed at what is under the finger when it lifts. Pressing an area selects
@@ -847,7 +885,7 @@ its old behaviour there.
 
 **The area's name is the element's `id`.** That is the whole point of a name you
 can type: `#Job-Title { … }` in the template's own CSS reaches one area, where
-`.box` reaches all of them. It is spread as an object rather than written as
+`.area` reaches all of them. It is spread as an object rather than written as
 `id={…}` so an unnamed area carries no `id` attribute at all rather than an
 empty one. The trade-off, said out loud: a sheet of several cards renders the
 same design several times, so each id appears once per card. CSS is happy with
@@ -876,11 +914,11 @@ straightedge to cut against. `max(0mm, …)` on the length is what keeps a bleed
 thinner than the gap from drawing a negative mark.
 
 **A box's content lives in `.content`.** Handles and badges are absolutely
-positioned children of `.box` that hang past its edges, so measuring the box's
+positioned children of `.area` that hang past its edges, so measuring the box's
 own `scrollHeight` reports overflow on every selected box. The wrapper is what
 gets measured, and it is also the single flex item `justify-content` places.
 
-**Vertical alignment makes a box a flex column.** That is why `.box` is
+**Vertical alignment makes a box a flex column.** That is why `.area` is
 `display: flex`: `justify-content` is the only thing that places content
 vertically in a box whose height may be a `min-height`. The cost is that child
 margins no longer collapse out of the box, which the existing
@@ -898,8 +936,8 @@ the scaled card, so a 14px handle is nine pixels under the finger at 62%.
 multiplied by it, so a target is the size it was drawn at whatever the zoom.
 
 **A clipped box cuts its content, not its chrome.** The clip is CSS on
-`.box.clipped > .content`, never on `.box`: the handles, pivot and badges hang
-off `.box` as siblings of `.content`, so a clip on `.box` would eat its own
+`.area.clipped > .content`, never on `.area`: the handles, pivot and badges hang
+off `.area` as siblings of `.content`, so a clip on `.area` would eat its own
 selection chrome. The alternative was to suppress the clip in the
 editor the way `.card.editing` does, but a box is set to clip precisely so its
 content is cut at its edge: not cutting it in the editor would break WYSIWYG for
@@ -1062,6 +1100,16 @@ beat the grid, the grid beats sibling edges, sibling edges beat plain
 movement, because a box must never latch
 onto a guide that is not being drawn — a snap to an invisible edge reads as a
 bug. An anchored box always snaps its `gap`, never its `y`.
+
+**A box moving with the box it follows keeps its gap** (`followsInSet`). It
+already comes down behind that box, so adding the move to its gap as well
+moved it twice: a grouped heading and the line anchored under it drifted
+apart by the whole of every drag and nudge. When the box under the pointer is
+the follower, its move is read and handed to the rest of the set — the head of
+the chain takes it — and its own gap is put back. Up the whole chain, not one
+link: grouping a heading with the line two below it, the line between left
+out, the lower line hung from a box that was not moving yet came down all the
+same, and it too moved twice.
 
 **The editor does not clip, the output does.** `.card` is `overflow: hidden` so a
 print or a PNG never spills onto its neighbour; `.card.editing` — the interactive
@@ -1243,9 +1291,13 @@ buoy where an area has both. Not the bottom corner: on an area shorter than the
 badge, the tie would stack up over the top line. Consecutive shallow areas in a
 chain can still bring one area's buoy down to the next one's tie.
 
-**The corner the words hang from has a square handle.** Left and top alignment
+**The corner the words hang from has a ring in its handle.** It was told
+apart by square corners alone, which at 14px read as a rendering quirk rather
+than a meaning; with the ring to say it, the handle is rounded like the other
+seven. A ring rather than a cross, which is the pivot's mark; an SVG, like the
+pivot's, so its weight holds at every zoom. Left and top alignment
 make it the top-left, right and bottom the bottom-right; a centred alignment
-on either axis has no such corner and every handle stays rounded. It is worked
+on either axis has no such corner and no handle has a ring. It is worked
 out as drawn, so on a mirrored left-hand page it is the mirrored corner.
 
 **Pointing at a tie draws its thread.** The link and the buoy are at two
@@ -1503,7 +1555,10 @@ control dragged off the edge of a phone is a control you do not get back.
 
 **Controls sit next to what they act on.** Undo and redo are a column at the
 page's top-left corner, with stacking order under them whenever anything is
-selected and the multi-selection tools under that; *+ Area* is at the top-right,
+selected and the multi-selection tools under that (on a phone only the six
+alignments; the count, group, lock and delete go under the top-right column,
+since ten buttons down the left were as tall as the page they sat over, and
+Duplicate stays in the area's menu); *+ Area* is at the top-right,
 the view toggles are along the bottom edge and the card pager sits under the
 sheet. The window toolbar holds only what is about the whole app. Tools that come
 and go with a selection belong on that rail rather than in the options bar, where
@@ -1973,7 +2028,11 @@ Off the page's outer edge sits a post-it, bound to a `notes` column: an area
 on the pasteboard never prints, so it is the place for a note to yourself. Set
 in Patrick Hand — the one hand face left, on the one thing written by hand —
 with a `box-shadow` curl and a glue strip from `::after` in the CSS, locked so
-the rescue button leaves it where it is (see `boxops.ts`).
+the rescue button leaves it where it is (see `boxops.ts`). In both darks it
+keeps its daylight colours rather than going dark: dark turns the page back
+by itself, and under `.theme-dark-page` the note is turned back as a whole,
+with `filter: none !important` on its `.surface`, which app.css had already
+turned back and a second turn would invert again.
 
 It prints as card 4 says to: two to an A4 sheet, in a zine's order, so
 Export opens on the booklet rather than on four loose pages — hence the name.
@@ -2443,6 +2502,26 @@ takes the sheet with it. The sheet bleed adds to that padding, because it adds
 paper: the cards keep their places and the sheet grows around them.
 
 ## `src/lib/components/PrintPreview.svelte`
+
+**Output turns what goes out, not the template.** Portrait or Landscape is
+for the tray that takes paper one way round, or a PNG wanted sideways — a
+fact about this printer, so it is kept in this browser (`turn.ts`, beside the
+theme) and a template handed on does not arrive turned. It sits before the
+lock because the lock freezes the template's settings and this is not one.
+Auto, the default, turns nothing and so follows the page settings — the
+page's own shape, or the sheet as Print Settings' Orientation tiled it — and
+Portrait or Landscape turns a quarter only when the output is not that way
+already, so picking the way it is costs nothing. Not a second sheet
+orientation: that one re-tiles, this one only turns what was tiled. The PNG is drawn turned onto its canvas
+(`elementToPng`'s `turn`), one encode. Print lays each sheet, as PrintSheet
+draws it, on a paper the other way round and rotates it there — no second
+layout. The paper is `contain: strict` as well as clipped: clipping alone
+hid the turned sheet's overflow, but Chrome's print still counted it and
+shrank every page to 70%. The page break moved from the sheet to the paper
+for the same reason it had to: the sheet is now its paper's only child, and
+its last-child exception would have cancelled every break. The previews do
+not turn: they show the design, and a sideways thumbnail of every page is
+harder to check than a label saying what the files will be.
 
 **The settings strip carries the lock, and on a phone is one line.** The print
 settings are the template's, greyed out on a locked design, so the design's
@@ -3849,6 +3928,20 @@ Two things worth knowing before trusting a green run:
 
 ## `src/lib/theme.ts` — dark by inversion
 
+**The launch follows the theme, as far as anything can.** An installed app's
+splash is drawn by the system from the manifest, before a line of ours runs,
+so it cannot read the theme. What the page can do is name a different
+manifest: `manifest-dark.webmanifest` (same `id`, so the same installed app)
+with a `#111` background and the dark icons, swapped in by app.html before
+the first paint and by `applyTheme` after it (`THEME_ASSETS`, held to
+app.html's names by theme.test.ts). Chrome takes it up when it next refreshes
+the installed app, so a change lands a launch or a day late, and a changed
+icon may ask the user to confirm. iOS shows this app no splash at all. The
+blank moment before the bundle arrives is ours, and follows at once: app.html
+paints `#111`, and app.css sets `#eee` under its filter, which shows as the
+same `#111`, because the root's filter inverts the window's own background
+too.
+
 **With the page inverted, fills and pictures are turned back.** An area's fill
 layer and a photo in it keep their colours in `dark-page`; the words, the paper,
 drawings and QR codes stay inverted. Turning those back was tried: they are ink
@@ -3882,7 +3975,8 @@ see it. No `prefers-color-scheme`: the logo is the switch, and the app is
 light until it is pressed.
 
 **Two controls, one behaviour.** The theme button left of Help wears the
-theme it is on (Carbon's `light`, `asleep`, `contrast`); the logo, where the
+theme it is on (Carbon's `light`; `contrast` for dark, half and half because
+the page stays white; `asleep`, the moon, for the page inverted too); the logo, where the
 theme started, keeps working. Both spread one `themeControl` object, so they
 cannot drift apart.
 
