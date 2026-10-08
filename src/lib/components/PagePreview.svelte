@@ -28,6 +28,8 @@
 		guides: boolean;
 		/** the temporary guides a drag shows as it lines up — see Card's `smartGuides` */
 		smartGuides: boolean;
+		/** the distances a drag shows to its neighbours — see Card's `spacing` */
+		spacingGuides: boolean;
 		/** ruled lines, or a dot at every intersection */
 		gridStyle: GridStyle;
 		selectedIds: string[];
@@ -65,7 +67,7 @@
 		onbounds: (show: boolean, ties: boolean) => void;
 		ongrid: (show: boolean) => void;
 		/** the margins and the temporary guides, together — the Guides box's three states */
-		onguides: (margins: boolean, smart: boolean) => void;
+		onguides: (margins: boolean, smart: boolean, spacing: boolean) => void;
 		/** press and hold the Grid toggle: the same grid, drawn the other way */
 		ongridstyle: (style: GridStyle) => void;
 		onzoom: (zoom: 'fit' | 'actual' | number) => void;
@@ -117,6 +119,7 @@
 		grid,
 		guides,
 		smartGuides,
+		spacingGuides,
 		gridStyle,
 		selectedIds,
 		zoom,
@@ -1472,16 +1475,21 @@
 	 * back whatever the grid is then.
 	 */
 	/**
-	 * The Guides box's three states, one press apart: ticked draws the page
-	 * margins and shows the temporary guides a drag lines up on; the dash keeps
-	 * the temporary guides with no margins drawn; off is neither. Temporary
-	 * guides are what most people mean by guides, so they are what the middle
-	 * state keeps. The keys go round the same way.
+	 * The Guides box's three states, one press apart: ticked is everything —
+	 * the page margins, the temporary guides a drag lines up on, and the
+	 * millimetres a drag shows to its neighbours; the dash keeps the margins
+	 * and the temporary guides and drops the millimetres, for when the numbers
+	 * are in the way; off is none of it. The keys go round the same way.
+	 *
+	 * The dash was the temporary guides alone, with no margins. A setting saved
+	 * that way still reads as the dash, and the next press goes on to off.
 	 */
+	const guidesFull = $derived(guides && smartGuides && spacingGuides);
+	const guidesOff = $derived(!guides && !smartGuides);
 	function cycleGuides() {
-		if (guides) onguides(false, true);
-		else if (smartGuides) onguides(false, false);
-		else onguides(true, true);
+		if (guidesFull) onguides(true, true, false);
+		else if (!guidesOff) onguides(false, false, false);
+		else onguides(true, true, true);
 	}
 
 	/**
@@ -1595,6 +1603,7 @@
 				{grid}
 				{guides}
 				{smartGuides}
+				spacing={spacingGuides && guides && smartGuides}
 				{scale}
 				{pageNumber}
 				{theme}
@@ -1931,23 +1940,23 @@
 		</label>
 		<label
 			title={withKey(
-				guides
-					? 'Page margins and alignment guides — press for alignment guides only'
-					: smartGuides
-						? 'Alignment guides only: a drag lines up on other areas\' edges and middles, and the page\'s centre — press to turn guides off'
-						: 'No guides — press for the page margins and alignment guides',
+				guidesFull
+					? 'Page margins, alignment guides and spacing: a drag shows its millimetres to its neighbours — press to hide the spacing'
+					: !guidesOff
+						? 'Page margins and alignment guides, without the spacing — press to turn guides off'
+						: 'No guides — press for the page margins, alignment guides and spacing',
 				'guides'
 			)}
 		>
 			<input
 				type="checkbox"
 				aria-label="Guides"
-				checked={guides || smartGuides}
-				use:mixed={!guides && smartGuides}
+				checked={!guidesOff}
+				use:mixed={!guidesFull && !guidesOff}
 				onchange={(e) => {
 					// The box's own toggle is overruled by the three states: what it
 					// shows is set from them on the next update.
-					e.currentTarget.checked = !(guides === false && smartGuides);
+					e.currentTarget.checked = !guidesOff;
 					cycleGuides();
 				}}
 			/>

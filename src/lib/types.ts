@@ -552,6 +552,13 @@ export interface UiState {
 	 * its dash.
 	 */
 	smartGuides: boolean;
+	/**
+	 * The millimetres a dragged area has to its neighbours and the page edge,
+	 * drawn as it moves. Only with the Guides box ticked; its dash keeps the
+	 * margins and the temporary guides without these. Absent, from an older
+	 * build, is on.
+	 */
+	spacingGuides?: boolean;
 	/** how the grid draws itself: ruled lines, or a dot at every intersection */
 	gridStyle: GridStyle;
 	/**

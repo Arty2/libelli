@@ -3157,6 +3157,7 @@
 			grid={ui.showGrid}
 			guides={ui.showGuides}
 			smartGuides={ui.smartGuides}
+			spacingGuides={ui.spacingGuides ?? true}
 			gridStyle={ui.gridStyle}
 			{selectedIds}
 			zoom={ui.zoom}
@@ -3176,7 +3177,7 @@
 			onaction={describe}
 			onbounds={(show, ties) => (ui = { ...ui, showBounds: show, showTies: ties })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
-			onguides={(margins, smart) => (ui = { ...ui, showGuides: margins, smartGuides: smart })}
+			onguides={(margins, smart, spacing) => (ui = { ...ui, showGuides: margins, smartGuides: smart, spacingGuides: spacing })}
 			ongridstyle={(gridStyle) => {
 				// A hold on a checkbox is a gesture nobody was taught, so it says what
 				// it did — and it turns the grid on if it was off, because changing

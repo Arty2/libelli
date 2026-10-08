@@ -4,6 +4,7 @@ import {
 	SHRINK_FLOOR,
 	boxHeight,
 	shrinkScale,
+	spacingReadouts,
 	actualScale,
 	columnGaps,
 	GRID_MAJOR,
@@ -383,5 +384,51 @@ describe('shrinkScale', () => {
 	it('keeps its height, as a clip does', () => {
 		const box = newBox({ h: 20, overflow: 'shrink' });
 		expect(boxHeight(box, 50, false)).toBe(20);
+	});
+});
+
+describe('spacingReadouts', () => {
+	const page = { w: 100, h: 100 };
+
+	it('measures to the page edge where nothing is beside the box', () => {
+		const r = spacingReadouts({ x: 10, y: 20, w: 30, h: 10 }, [], page);
+		expect(r.map((s) => [s.axis, s.from, s.to, s.gap])).toEqual([
+			['x', 0, 10, 10],
+			['x', 40, 100, 60],
+			['y', 0, 20, 20],
+			['y', 30, 100, 70]
+		]);
+	});
+
+	it('measures to the nearest box beside it, at the middle of what they share', () => {
+		const left = { x: 0, y: 0, w: 20, h: 40 };
+		const fartherLeft = { x: 0, y: 10, w: 5, h: 10 };
+		const r = spacingReadouts({ x: 25, y: 10, w: 20, h: 20 }, [fartherLeft, left], page);
+		const toLeft = r.find((s) => s.axis === 'x' && s.to === 25)!;
+		expect(toLeft.from).toBe(20);
+		expect(toLeft.gap).toBe(5);
+		// They share 10 to 30 down the page.
+		expect(toLeft.at).toBe(20);
+	});
+
+	it('ignores a box that overlaps, or one only diagonally off a corner', () => {
+		const overlapping = { x: 15, y: 15, w: 20, h: 20 };
+		const diagonal = { x: 0, y: 0, w: 5, h: 5 };
+		const r = spacingReadouts({ x: 10, y: 10, w: 20, h: 20 }, [overlapping, diagonal], page);
+		expect(r.find((s) => s.axis === 'x' && s.to === 10)!.from).toBe(0);
+		expect(r.find((s) => s.axis === 'y' && s.to === 10)!.from).toBe(0);
+	});
+
+	it('flags equal gaps either side, and leaves out a side with none', () => {
+		const a = { x: 0, y: 0, w: 20, h: 10 };
+		const b = { x: 60, y: 0, w: 20, h: 10 };
+		const r = spacingReadouts({ x: 30, y: 0, w: 20, h: 10 }, [a, b], page);
+		const across = r.filter((s) => s.axis === 'x');
+		expect(across.map((s) => [s.gap, s.equal])).toEqual([
+			[10, true],
+			[10, true]
+		]);
+		// Against the top edge: no gap there, so no readout.
+		expect(r.some((s) => s.axis === 'y' && s.to === 0)).toBe(false);
 	});
 });

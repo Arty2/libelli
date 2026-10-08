@@ -1672,9 +1672,13 @@ lone one.
 
 The **Guides** box has three states. **Ticked**: the page **margins** show as a
 solid guide in the inverse of the accent (amber against the default blue
-outlines), over the grid and under every area, and the temporary guides below
-are on too. **The dash**: the temporary guides only, with no margins drawn.
-**Off**: neither.
+outlines), over the grid and under every area, the temporary guides below are
+on too, and so is the **spacing**: while an area is dragged or sized, a line to
+the nearest area beside it on each side — or to the page's edge where there is
+none — carries its millimetres, and when the gaps either side match, both say
+**=** and draw solid, which is how an area is centred between two others by
+eye. **The dash**: the margins and the temporary guides, without the spacing,
+for when the numbers are in the way. **Off**: none of it.
 
 Dragging snaps in this order. With the margins drawn, an edge that comes within
 reach of one lands on it — the left and top edges, and the right and bottom

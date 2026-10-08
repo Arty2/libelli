@@ -29,7 +29,8 @@
 		snapTo,
 		snapToEdges,
 		columnGaps,
-		shrinkScale
+		shrinkScale,
+		spacingReadouts
 	} from '$lib/layout';
 	import { flagUnknown, leaderStyle, renderMarkdown, tabSplit } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
@@ -72,6 +73,11 @@
 		 * so they can be had without the margins drawn.
 		 */
 		smartGuides?: boolean;
+		/**
+		 * The millimetres a dragged area has to its neighbours and to the page
+		 * edge, drawn as it moves — `spacingReadouts`.
+		 */
+		spacing?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
 		scale?: number;
 		interactive?: boolean;
@@ -158,6 +164,7 @@
 		grid = false,
 		guides = false,
 		smartGuides = false,
+		spacing = false,
 		scale = 1,
 		interactive = false,
 		panning = false,
@@ -198,6 +205,29 @@
 	 * stores it.
 	 */
 	let guide = $state<{ x: number | null; y: number | null; flip?: boolean }>({ x: null, y: null });
+	/**
+	 * The area being dragged, once it has moved, with the ones moving with it:
+	 * what the spacing is measured from, and what it is not measured to. State,
+	 * where `drag` is not, so the readouts follow the layout as it changes.
+	 */
+	let spaced = $state<{ id: string; with: string[] } | null>(null);
+	/**
+	 * The spacing readouts, in the frame the card is drawn in: on a left-hand
+	 * page a mirrored area is measured where it is seen, not where it is stored.
+	 * Hidden areas take no room, so nothing is measured to one.
+	 */
+	const readouts = $derived.by(() => {
+		if (!spacing || !spaced) return [];
+		const rectOf = (b: Box) => {
+			const drawn = placed(b);
+			return { x: drawn.x, y: layout.tops[b.id] ?? b.y, w: b.w, h: layout.heights[b.id] ?? b.h };
+		};
+		const box = template.boxes.find((b) => b.id === spaced!.id);
+		if (!box) return [];
+		const skip = new Set([spaced.id, ...spaced.with]);
+		const others = template.boxes.filter((b) => !skip.has(b.id) && !hidden.has(b.id)).map(rectOf);
+		return spacingReadouts(rectOf(box), others, template.page);
+	});
 
 	/**
 	 * What the area actually holds — a cell of the row, or its own words. This is
@@ -1109,6 +1139,7 @@
 		}
 		drag = null;
 		guide = { x: null, y: null };
+		spaced = null;
 	}
 
 	function startDrag(event: PointerEvent, box: Box, mode: DragMode) {
@@ -1291,6 +1322,10 @@
 		if (!drag.named) {
 			drag.named = true;
 			onaction?.(DRAG_LABELS[drag.mode]);
+			// Moving or sizing; a turn is about its angle, not its gaps.
+			if (drag.mode !== 'rotate' && drag.mode !== 'centre') {
+				spaced = { id: drag.id, with: [...drag.others, ...drag.held].map((b) => b.id) };
+			}
 		}
 		// Past the slop, this is a drag rather than a hand that will not keep
 		// still, so a menu the same press opened gets out of the way. The same
@@ -1574,6 +1609,7 @@
 		}
 		drag = null;
 		guide = { x: null, y: null };
+		spaced = null;
 	}
 
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -2576,6 +2612,18 @@
 		{#if guide.y !== null}
 			<span class="guide horizontal" style="top:{guide.y}mm"></span>
 		{/if}
+		<!-- The gaps: a line from edge to edge with its millimetres, the pair
+		     either side marked = when they match. -->
+		{#each readouts as r, i (i)}
+			<span
+				class="spacing {r.axis === 'x' ? 'across' : 'down'}"
+				class:equal={r.equal}
+				style={r.axis === 'x'
+					? `left:${r.from}mm;width:${r.gap}mm;top:${r.at}mm`
+					: `top:${r.from}mm;height:${r.gap}mm;left:${r.at}mm`}
+				><span class="spacing-label">{r.equal ? '= ' : ''}{Math.round(r.gap * 10) / 10}</span></span
+			>
+		{/each}
 		</div>
 		</div>
 	</div>
@@ -3618,6 +3666,32 @@
 
 		.guide.vertical { top: 0; bottom: 0; width: calc(3 * var(--line)); margin-left: calc(-1 * var(--line)); background-size: var(--line) 100%; }
 		.guide.horizontal { left: 0; right: 0; height: calc(3 * var(--line)); margin-top: calc(-1 * var(--line)); background-size: 100% var(--line); }
+
+		/* A gap: a thin line in the guides' colour, its number in a chip at the
+		   middle, sized against the zoom like every other mark on the card. */
+		.spacing {
+			position: absolute;
+			pointer-events: none;
+			z-index: 4;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: var(--accent-inverse);
+		}
+
+		.spacing.across { height: 0; border-top: var(--line) dashed currentColor; }
+		.spacing.down { width: 0; border-left: var(--line) dashed currentColor; }
+		.spacing.equal { border-style: solid; }
+
+		.spacing-label {
+			font: 600 calc(0.625rem * var(--ui-scale)) / 1 system-ui, sans-serif;
+			font-variant-numeric: tabular-nums;
+			padding: calc(2px * var(--ui-scale)) calc(4px * var(--ui-scale));
+			border-radius: calc(3px * var(--ui-scale));
+			background: var(--accent-inverse);
+			color: #fff;
+			white-space: nowrap;
+		}
 	}
 
 	/* The overlays are conditional on `bounds` and on being interactive, neither

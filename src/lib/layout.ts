@@ -477,3 +477,95 @@ export function shrinkScale(fits: (scale: number) => boolean, floor = SHRINK_FLO
 	}
 	return Math.floor(lo * 100) / 100;
 }
+
+// ---- spacing readouts ------------------------------------------------------
+
+export interface Rect {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+}
+
+/** One distance shown while a box is dragged: a line from `from` to `to` along `axis`, at `at` across it. */
+export interface SpacingReadout {
+	axis: 'x' | 'y';
+	from: number;
+	to: number;
+	at: number;
+	/** mm, `to - from` */
+	gap: number;
+	/** the gap on the other side is the same: the box is centred between them */
+	equal: boolean;
+}
+
+/** Within this many mm two gaps read as the same — a twentieth, under any rounding the fields show. */
+const EQUAL_GAP = 0.05;
+
+/**
+ * The distances a dragged box has on each side, InDesign's smart spacing kept
+ * to its useful half: to the nearest box that lies beside it (overlapping it
+ * across), or to the page's trim edge where nothing does. Each is drawn as a
+ * line with its millimetres, at the middle of what the two have in common;
+ * where a side's gap matches the opposite side's, both are flagged, which is
+ * how a box is centred between two others by eye.
+ *
+ * A box overlapping the dragged one is beside nothing, so it is never the
+ * nearest; nor is one touching it the long way round a corner, which is a
+ * diagonal and not a gap.
+ */
+export function spacingReadouts(box: Rect, others: Rect[], page: { w: number; h: number }): SpacingReadout[] {
+	const across = (a: Rect, axis: 'x' | 'y') =>
+		axis === 'x' ? [Math.max(a.y, box.y), Math.min(a.y + a.h, box.y + box.h)] : [Math.max(a.x, box.x), Math.min(a.x + a.w, box.x + box.w)];
+	const middleOf = (a: Rect | null, axis: 'x' | 'y') => {
+		if (!a) return axis === 'x' ? box.y + box.h / 2 : box.x + box.w / 2;
+		const [lo, hi] = across(a, axis);
+		return (lo + hi) / 2;
+	};
+	const beside = (a: Rect, axis: 'x' | 'y') => {
+		const [lo, hi] = across(a, axis);
+		return hi - lo > 0.01;
+	};
+	const round = (n: number) => Math.round(n * 100) / 100;
+
+	const sides: Array<{ axis: 'x' | 'y'; near: Rect | null; from: number; to: number }> = [];
+	for (const axis of ['x', 'y'] as const) {
+		const start = axis === 'x' ? box.x : box.y;
+		const end = axis === 'x' ? box.x + box.w : box.y + box.h;
+		let before: Rect | null = null;
+		let beforeEdge = 0;
+		let after: Rect | null = null;
+		let afterEdge = axis === 'x' ? page.w : page.h;
+		for (const other of others) {
+			if (!beside(other, axis)) continue;
+			const oStart = axis === 'x' ? other.x : other.y;
+			const oEnd = oStart + (axis === 'x' ? other.w : other.h);
+			if (oEnd <= start + 0.01 && oEnd > beforeEdge) {
+				before = other;
+				beforeEdge = oEnd;
+			}
+			if (oStart >= end - 0.01 && oStart < afterEdge) {
+				after = other;
+				afterEdge = oStart;
+			}
+		}
+		sides.push({ axis, near: before, from: beforeEdge, to: start }, { axis, near: after, from: end, to: afterEdge });
+	}
+
+	const readouts = sides.map(({ axis, near, from, to }) => ({
+		axis,
+		from: round(from),
+		to: round(to),
+		at: round(middleOf(near, axis)),
+		gap: round(to - from),
+		equal: false
+	}));
+	for (const [a, b] of [
+		[0, 1],
+		[2, 3]
+	]) {
+		if (readouts[a].gap > 0 && Math.abs(readouts[a].gap - readouts[b].gap) < EQUAL_GAP) readouts[a].equal = readouts[b].equal = true;
+	}
+	// A box against something has no gap there to show.
+	return readouts.filter((r) => r.gap > 0);
+}
