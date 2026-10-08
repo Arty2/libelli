@@ -181,7 +181,8 @@ resize boxes directly, or type exact millimetres.
   badge at the top right, the same icon as **Edit** under the table: press it
   and that cell opens full size in the table, the table opening if it was
   folded away — and folding away again when the cell is closed with × or
-  Esc; the chevron goes on to the table. A locked area, or a locked table, refuses it. An empty image area reads *Image*,
+  Esc; the chevron goes on to the table. On a phone the options bar steps
+  aside while a cell is open full size, so the tray has the height. A locked area, or a locked table, refuses it. An empty image area reads *Image*,
   and an image area wears a mark at the corner the way static text does: a
   pencil when it holds a drawing — press it to draw on it — and an image
   otherwise.

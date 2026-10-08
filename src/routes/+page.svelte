@@ -1303,7 +1303,15 @@
 	 * back when the picture is closed.
 	 */
 	let drawingInTable = $state(false);
-	const editingPicture = $derived((dataOpen && drawingInTable) || (imagesOpen && imageFocus !== null));
+	/**
+	 * Any cell open full size, words included. On a phone only: there the bar
+	 * and the tray share the height, and a cell being written in wants all of
+	 * it; on a desk the bar sits beside the table and costs it nothing.
+	 */
+	let fullCellInTable = $state(false);
+	const panelTakesRow = $derived(
+		(dataOpen && (drawingInTable || (stacked && fullCellInTable))) || (imagesOpen && imageFocus !== null)
+	);
 
 	function openImage(name: string) {
 		imageFocus = name;
@@ -2932,7 +2940,7 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if (barBox || pageSetupOpen) && !editingPicture && !barHidden}
+	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden}
 		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
@@ -3284,6 +3292,7 @@
 				onsavearea={saveAreaDrawing}
 				ondeletearea={deleteAreaDrawing}
 				ondrawing={(on) => (drawingInTable = on)}
+				onfullcell={(on) => (fullCellInTable = on)}
 				onleave={(to) => {
 					dataOpen = false;
 					if (to === 'images') imagesOpen = true;
