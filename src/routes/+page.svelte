@@ -634,11 +634,16 @@
 	const barBox = $derived(template.locked ? null : selected);
 	/**
 	 * The area bar put away by its own button, for the room it takes — on a
-	 * phone, a third of the screen. Until the next area is chosen (`selectBox`),
-	 * which is when the settings are wanted again. The page bar is not hidden
-	 * by it: that has its own button.
+	 * phone, a third of the screen. Until the next area is chosen, which is
+	 * when the settings are wanted again. Held as the area it was put away on
+	 * rather than as a flag, so every way an area comes to be chosen brings it
+	 * back — a new area, a duplicate, a paste — not only a click through
+	 * `selectBox`, which also clears it for a click on the same area again.
+	 * The page bar is not hidden by it: that has its own button.
 	 */
-	let barHidden = $state(false);
+	let barHiddenFor = $state<string | null>(null);
+	const barHidden = $derived(!!barBox && barBox.id === barHiddenFor);
+	const hideBar = () => (barHiddenFor = barBox?.id ?? null);
 	const selectedBoxes = $derived(template.boxes.filter((b) => selectedIds.includes(b.id)));
 	/** The box the menu was opened on, whether or not it is the only one chosen. */
 	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
@@ -2101,7 +2106,7 @@
 	function selectBox(id: string | null, additive = false) {
 		// Choosing an area — this one again, or another — brings back a bar
 		// that was put away (`barHidden`).
-		if (id) barHidden = false;
+		if (id) barHiddenFor = null;
 		if (provisional && id !== provisional) settleProvisional();
 		// Typing into one area and then picking another ends the typing; the
 		// change is already in, so there is nothing to confirm or discard.
@@ -2920,7 +2925,7 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if (barBox || pageSetupOpen) && !editingPicture && !(barBox && barHidden)}
+	{#if (barBox || pageSetupOpen) && !editingPicture && !barHidden}
 		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
@@ -2936,6 +2941,7 @@
 					onmappingchange={() => {}}
 					onduplicate={() => {}}
 					ondelete={() => {}}
+					onhide={() => {}}
 					onresettemplate={() => {}}
 					{library}
 					{templateId}
@@ -2971,7 +2977,7 @@
 						onmappingchange={(m) => (mapping = m)}
 						onduplicate={duplicateBox}
 						ondelete={deleteBox}
-						onhide={() => (barHidden = true)}
+						onhide={hideBar}
 						onresettemplate={templateStarter ? () => (resetting = true) : undefined}
 						onmagiclayout={openMagic}
 						hasColumns={dataset.columns.length > 0}
@@ -3009,7 +3015,6 @@
 						onmappingchange={(m) => (mapping = m)}
 						onduplicate={duplicateBox}
 						ondelete={deleteBox}
-						onhide={() => (barHidden = true)}
 						onresettemplate={templateStarter ? () => (resetting = true) : undefined}
 						onmagiclayout={openMagic}
 						hasColumns={dataset.columns.length > 0}
