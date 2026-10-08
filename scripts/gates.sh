@@ -311,6 +311,33 @@ else
 	pass "CHANGELOG.md entries are plain text and code spans" "changelog-plain-text"
 fi
 
+# ── 13. The top-left bridge is dropped on time ──────────────────────────────
+# A template file gives each area at its reference point (src/lib/frame.ts);
+# files written before that gave top-left corners, and are read that way only
+# until LEGACY_TOP_LEFT_UNTIL — by then every browser that has opened the app
+# has rewritten its own. A promise to delete code later is the kind that is
+# never kept, so this fails the version it falls due: delete the top-left
+# reading (`fromFile`'s unmarked path, `rewriteStoredTemplates` in +page) and
+# this check with it. One format, one way to read it.
+legacy_until=$(sed -n "s/^export const LEGACY_TOP_LEFT_UNTIL = '\(.*\)';$/\1/p" src/lib/frame.ts 2>/dev/null)
+if [ -n "$legacy_until" ] && [ -n "$src_version" ]; then
+	due=$(node -e '
+		const [a, b] = process.argv.slice(1).map((v) => v.split(".").map(Number));
+		const cmp = a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+		console.log(cmp >= 0 ? "due" : "");
+	' "$src_version" "$legacy_until")
+	if [ -n "$due" ]; then
+		fail "the top-left template reading is past its date" \
+			"VERSION $src_version has reached LEGACY_TOP_LEFT_UNTIL $legacy_until
+delete the unmarked path in src/lib/frame.ts, rewriteStoredTemplates in +page.svelte, and this check" \
+			"legacy-top-left-dropped"
+	else
+		pass "the top-left template reading is due in $legacy_until" "legacy-top-left-dropped"
+	fi
+else
+	pass "no top-left template reading left to drop" "legacy-top-left-dropped"
+fi
+
 # ── local, gitignored log — see the header comment ───────────────────────────
 mkdir -p .claude/logs
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)

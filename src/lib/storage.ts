@@ -1,4 +1,5 @@
 import type { Dataset, FontRef, Mapping, Template, UiState } from './types';
+import { toFile } from './frame';
 
 /**
  * Client-side persistence. Nothing here ever leaves the browser.
@@ -188,7 +189,11 @@ export const idbKeys = (store: string) => tx<IDBValidKey[]>(store, 'readonly', (
  */
 export const storageAvailable = () => openDb().then((db) => db !== null);
 
-export const saveTemplate = (t: Template) => idbSet(STORE_KV, KEY_TEMPLATE, t);
+/**
+ * Both template writes go through `toFile`: what is stored is a file, with
+ * each area at its reference point and the marker that says so — frame.ts.
+ */
+export const saveTemplate = (t: Template) => idbSet(STORE_KV, KEY_TEMPLATE, toFile(t));
 export const loadTemplate = () => idbGet<Template>(STORE_KV, KEY_TEMPLATE);
 export const saveDataset = (d: Dataset) => idbSet(STORE_KV, KEY_DATASET, d);
 export const loadDataset = () => idbGet<Dataset>(STORE_KV, KEY_DATASET);
@@ -228,7 +233,7 @@ const mintId = (prefix: string): string =>
 
 const templateDocKey = (id: string) => `${KEY_TEMPLATE_PREFIX}${id}`;
 
-export const saveTemplateDoc = (id: string, t: Template) => idbSet(STORE_KV, templateDocKey(id), t);
+export const saveTemplateDoc = (id: string, t: Template) => idbSet(STORE_KV, templateDocKey(id), toFile(t));
 export const loadTemplateDoc = (id: string) => idbGet<Template>(STORE_KV, templateDocKey(id));
 export const deleteTemplateDoc = (id: string) => idbDelete(STORE_KV, templateDocKey(id));
 

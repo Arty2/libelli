@@ -85,6 +85,7 @@ export function resolveLayout({ boxes, measured, hidden }: LayoutInput): LayoutR
 		resolving.add(box.id);
 
 		let value = box.y;
+		let anchored = false;
 		if (box.anchor) {
 			let target = byId.get(box.anchor.to);
 			// Walk past hidden boxes so they cost nothing, not even their gap.
@@ -97,7 +98,20 @@ export function resolveLayout({ boxes, measured, hidden }: LayoutInput): LayoutR
 				seen.add(target.id);
 				target = target.anchor ? byId.get(target.anchor.to) : undefined;
 			}
-			if (target && target.id !== box.id) value = top(target) + height(target) + box.anchor.gap;
+			if (target && target.id !== box.id) {
+				value = top(target) + height(target) + box.anchor.gap;
+				anchored = true;
+			}
+		}
+		// A growing area grows away from its reference point: down from a top,
+		// up from a bottom, both ways from a middle — so the point the bar
+		// names stays where it says on every card, however long the words.
+		// Not an anchored area, whose top is its anchor's to decide and which
+		// grows down as it always has; not a hidden one, which collapses to
+		// its own top as it always has, so what follows it does not move.
+		if (!anchored && box.overflow === 'grow' && !hidden.has(box.id)) {
+			const { fy } = referenceOf('left', box.valign);
+			if (fy) value = box.y - (height(box) - box.h) * fy;
 		}
 
 		resolving.delete(box.id);

@@ -85,8 +85,10 @@ resize boxes directly, or type exact millimetres.
   anything if one area answers to it, two areas may not share a name: a rename
   onto a name already in use is refused, the field goes back to what it said, and
   the status bar names the area that already has it.
-- **`grow` / `clip` / `shrink`** — a grow box keeps its top edge and lengthens
-  downward; a clip box keeps its height and hard-cuts what does not fit; a
+- **`grow` / `clip` / `shrink`** — a grow box keeps its reference point and
+  lengthens away from it: down from the top, up from the bottom of an area set
+  to the bottom, both ways from the middle of one set to the middle (an anchored
+  area always grows down, its top being its anchor's); a clip box keeps its height and hard-cuts what does not fit; a
   shrink box keeps its height and sets its words smaller, card by card, until
   they fit both ways — a word too long for the width counts too — down to half
   their size, past which it cuts as a clip does. The long name is set small and
@@ -210,8 +212,11 @@ resize boxes directly, or type exact millimetres.
   the one point everything that places the area speaks of: **X** and **Y** in
   the bar are where it is (a right-aligned area's X is its right edge), a typed
   W or H keeps it where it is, and the spacing a drag shows is measured out
-  from it. The file still stores the top-left corner, so older templates read
-  the same.
+  from it. The file stores it too, so the number in the file is the number in
+  the bar, and changing an alignment moves nothing — the area stays, and its
+  numbers follow. A template saved before this read its areas by their top-left
+  corners; it is read that way and rewritten once, the first time the app opens
+  with it, and an exported file from before is read the old way until 0.30.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with
   one selected, and a text box lies over the content inheriting the face, size,
   color and alignment it will print in. A bound area writes through to the cell;

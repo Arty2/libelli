@@ -1619,6 +1619,23 @@
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
 	/**
+	 * Where a grown area's given height lies inside it, in mm from its drawn
+	 * top: the edges of the frame it was given that its words have grown past.
+	 * Grown down, that is the given bottom; grown up from a bottom, the given
+	 * top; grown both ways from a middle, both — see `resolveLayout`. Anchored
+	 * areas always grow down.
+	 */
+	function trimEdges(box: Box): number[] {
+		const grownBy = (layout.heights[box.id] ?? box.h) - box.h;
+		const fy = box.anchor ? 0 : referenceOf('left', box.valign).fy;
+		const top = Math.round(grownBy * fy * 100) / 100;
+		const edges = [];
+		if (fy > 0) edges.push(top);
+		if (fy < 1) edges.push(Math.round((top + box.h) * 100) / 100);
+		return edges;
+	}
+
+	/**
 	 * The area's reference point as drawn — `referenceOf`, the point its words
 	 * are set from, which the X and Y in the bar measure and the spacing is
 	 * read from. On a mirrored left-hand page it is the mirrored point.
@@ -2112,7 +2129,7 @@
 	<button
 		class="overflow-mark"
 		class:offered={!cutting}
-		style="--edge:{cutting ? '100%' : `${box.h}mm`};--stack:{badgeCount(box)}"
+		style="--edge:{cutting ? '100%' : `${trimEdges(box)[0]}mm`};--stack:{badgeCount(box)}"
 		disabled={!editable(box)}
 		title={cutting
 			? 'The content does not fit — this area is cutting off what will print. Press to let it grow instead.'
@@ -2376,9 +2393,11 @@
 					     has grown it past that. Sparser than the bound, so it is not
 					     taken for one, and with the shears beside it in blue — the cut
 					     this area *could* make, offered rather than made. -->
-					<svg class="chrome original-edge" aria-hidden="true" style="top:{box.h}mm">
-						<line x1="0" y1="0" x2="100%" y2="0" />
-					</svg>
+					{#each trimEdges(box) as edge (edge)}
+						<svg class="chrome original-edge" aria-hidden="true" style="top:{edge}mm">
+							<line x1="0" y1="0" x2="100%" y2="0" />
+						</svg>
+					{/each}
 					{@render shears(box, false)}
 				{/if}
 

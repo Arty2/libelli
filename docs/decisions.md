@@ -70,6 +70,44 @@ the page default: that is body text, and body text reads the same way on both
 sides of a spread. The rule is one sentence and it is the difference between a
 mirrored margin and a mirrored paragraph.
 
+## `src/lib/frame.ts`
+
+**A file gives each area at its reference point; memory keeps the top-left
+corner.** The reference point (`referenceOf`) is where an area's words are set
+from, and the bar's X and Y, the ring and the spacing all name it — so the file
+says it too, and a growing area grows away from it. But the drag, the snapping,
+the layout and the mirror are hundreds of lines written in top-left corners,
+and none of them was rewritten: `toFile` and `fromFile` are the only place the
+two meet, at the two writes in storage.ts, at export, and inside
+`normaliseTemplate`, which every read goes through. Changing an alignment keeps
+the corner in memory, so nothing moves; the file's numbers follow it the next
+time it is written. Both directions use the declared width and height, and
+round to a ten-thousandth of a millimetre, so a round trip is exact.
+
+**The marker, not the schema, says which.** A file in the new frame carries
+`frame: 'reference'`. Anything without it is read top-left — an old file, and
+equally a template in memory — so a save path that somehow missed `toFile`
+writes a file that still reads true rather than one off by an area's width. The
+schema went to 6 as well, but only so that an older build, a cached install on
+another device, refuses a new file instead of reading it top-left.
+
+**Changed once, then the bridge goes.** Boot rewrites every stored template
+without the marker (`rewriteStoredTemplates`), awaited before anything is read
+for the screen, so it cannot race the autosave. The top-left reading stays
+until `LEGACY_TOP_LEFT_UNTIL` (0.30.0) for files people exported; at that
+version `npm run gates` fails until the unmarked path, the boot rewrite and the
+gate itself are deleted, leaving one format read one way. A file exported before
+0.28.0 and opened after that is read as reference points, and an area aligned
+right or bottom lands off by its width or height — the accepted cost of not
+carrying two formats forever.
+
+**Growing away from the reference point** is `resolveLayout`'s: an unanchored
+growing area set to the bottom grows up, one set to the middle grows both ways.
+An anchored one grows down as ever, its top being its anchor's, and a hidden one
+collapses to its own top, so what follows it does not move. A template whose
+unanchored, bottom- or middle-set growing area overflowed now overflows the
+other way — the feature, and the one visible change the new frame makes.
+
 ## `src/lib/template.ts`
 
 **Stacking is array order**, not a z-index: `arrangeBoxes` moves boxes within the

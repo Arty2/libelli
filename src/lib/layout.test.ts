@@ -473,3 +473,33 @@ describe('spacingReadouts from a reference point', () => {
 		expect(r.find((s) => s.axis === 'x' && s.to === 40)!.from).toBe(0);
 	});
 });
+
+describe('a growing area grows away from its reference point', () => {
+	const grown = (valign: 'top' | 'middle' | 'bottom', extra: Partial<Box> = {}) => {
+		const box = newBox({ id: 'g', x: 10, y: 50, w: 40, h: 10, overflow: 'grow', valign, ...extra });
+		return resolveLayout({ boxes: [box], measured: { g: 30 }, hidden: new Set() });
+	};
+
+	it('down from a top, up from a bottom, both ways from a middle', () => {
+		expect(grown('top').tops.g).toBe(50);
+		expect(grown('bottom').tops.g).toBe(30);
+		expect(grown('middle').tops.g).toBe(40);
+		// The reference point stays where it was declared: the bottom at 60.
+		const r = grown('bottom');
+		expect(r.tops.g + r.heights.g).toBe(60);
+	});
+
+	it('not when it fits, nor when it clips', () => {
+		const box = newBox({ id: 'g', y: 50, h: 10, overflow: 'grow', valign: 'bottom' });
+		expect(resolveLayout({ boxes: [box], measured: { g: 8 }, hidden: new Set() }).tops.g).toBe(50);
+		expect(grown('bottom', { overflow: 'clip' }).tops.g).toBe(50);
+	});
+
+	it('down, as always, when anchored or hidden', () => {
+		const head = newBox({ id: 'h', y: 10, h: 10, overflow: 'clip' });
+		const box = newBox({ id: 'g', y: 50, h: 10, overflow: 'grow', valign: 'bottom', anchor: { to: 'h', gap: 2 } });
+		expect(resolveLayout({ boxes: [head, box], measured: { g: 30 }, hidden: new Set() }).tops.g).toBe(22);
+		const lone = newBox({ id: 'g', y: 50, h: 10, overflow: 'grow', valign: 'bottom', hideWhenEmpty: true });
+		expect(resolveLayout({ boxes: [lone], measured: { g: 30 }, hidden: new Set(['g']) }).tops.g).toBe(50);
+	});
+});

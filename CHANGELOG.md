@@ -15,7 +15,7 @@ file under **What's new** — press the version number in the status bar.
 - Lists: ◯ Ring and □ Open Square, ➤ Arrow, circles and squares sized alike; numbers as letters or Roman.
 - Shrink: an area keeps its height and sets each card's words smaller to fit.
 - Tab leaders: `Espresso^t2.20`. Dragging shows the gaps in mm from the ringed corner, which X and Y now name.
-- Barcode: Code 128 and EAN-13 beside QR. Draft borders rougher on short edges.
+- Barcode: Code 128 and EAN-13 beside QR. A bottom-set Grow area grows upwards. Draft borders rougher on short edges.
 
 ## 0.27.31 — 2026-10-08
 

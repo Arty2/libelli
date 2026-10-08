@@ -3,6 +3,7 @@ import { clampSide, fitBoard } from './bitmap';
 import { fromRgba, parseColor, toRgba } from './color';
 import defaultCard from './templates/default-card.json';
 import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
+import { fromFile, toFile } from './frame';
 import type {
 	Anchor,
 	ColorSources,
@@ -515,7 +516,28 @@ export function normaliseTemplate(raw: unknown): Template {
 	}
 	if (!Array.isArray(t.boxes)) throw new Error('Template has no boxes.');
 
-	const boxes: Box[] = t.boxes.map((b: any) => newBox(b));
+	// The defaults first: an area inheriting the page's alignment is placed
+	// by it, so its corner cannot be found from the file until they are read.
+	const defaults = stripUndefined({
+		...DEFAULT_DEFAULTS,
+		...stripUndefined(t.defaults ?? {}),
+		color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color,
+		size: atLeast(t.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
+		lineHeight: atLeast(t.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
+		paragraph: normaliseParagraph(t.defaults?.paragraph),
+		// The page's `none` is the same as none at all, so it is not kept.
+		leader: normaliseLeader(t.defaults?.leader) === 'none' ? undefined : normaliseLeader(t.defaults?.leader),
+		list: normaliseList(t.defaults?.list),
+		baseline: normaliseBaseline(t.defaults?.baseline)
+	}) as Defaults;
+	// Top-left corners in memory, whichever way the file gave them — frame.ts.
+	// A file without the marker was written with top-left corners, and is read
+	// that way until LEGACY_TOP_LEFT_UNTIL.
+	const boxes: Box[] = fromFile(
+		t.boxes.map((b: any) => newBox(b)),
+		defaults,
+		t.frame
+	);
 	const ids = new Set(boxes.map((b) => b.id));
 	// Drop anchors that point nowhere rather than letting layout guess.
 	for (const box of boxes) {
@@ -540,18 +562,7 @@ export function normaliseTemplate(raw: unknown): Template {
 		print: normalisePrintSettings(t.print),
 		pageNumber: normalisePageNumber(t.pageNumber),
 		fonts: normaliseFonts(t.fonts),
-		defaults: stripUndefined({
-			...DEFAULT_DEFAULTS,
-			...stripUndefined(t.defaults ?? {}),
-			color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color,
-			size: atLeast(t.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
-			lineHeight: atLeast(t.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
-			paragraph: normaliseParagraph(t.defaults?.paragraph),
-			// The page's `none` is the same as none at all, so it is not kept.
-			leader: normaliseLeader(t.defaults?.leader) === 'none' ? undefined : normaliseLeader(t.defaults?.leader),
-			list: normaliseList(t.defaults?.list),
-			baseline: normaliseBaseline(t.defaults?.baseline)
-		}) as Defaults,
+		defaults,
 		slots,
 		boxes,
 		...stripUndefined({
@@ -943,6 +954,6 @@ export function importedTemplate(raw: unknown): Template {
  * our starter.
  */
 export function exportTemplate(t: Template): string {
-	const { starter: _starter, ...shared } = t;
+	const { starter: _starter, ...shared } = toFile(t);
 	return JSON.stringify(shared, null, 2);
 }

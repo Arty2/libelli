@@ -6,7 +6,12 @@
  * print convention beats consistency.
  */
 
-export const SCHEMA_VERSION = 5;
+/**
+ * 6: a file gives each area's x and y at its reference point, and says so
+ * with `frame` — see frame.ts. Raised so a build from before refuses such a
+ * file rather than placing every right- or bottom-aligned area wrong.
+ */
+export const SCHEMA_VERSION = 6;
 
 /**
  * What an area draws, given what its cell or its template says.
@@ -471,6 +476,12 @@ export interface Template {
 	defaults: Defaults;
 	slots: string[];
 	boxes: Box[];
+	/**
+	 * In a file only: `reference` says each area's x and y are at its
+	 * reference point rather than its top-left corner — frame.ts. Never on a
+	 * template in memory, whose areas are always top-left.
+	 */
+	frame?: 'reference';
 	/**
 	 * Left and right pages. Off is a run of identical pages — the card case,
 	 * and what every template without this field is. On, an odd page is a
