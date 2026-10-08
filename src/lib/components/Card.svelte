@@ -2390,16 +2390,19 @@
 							onpointercancel={endDrag}
 							role="presentation"
 						></span>
+						{@const corner = anchorCorner(box)}
 						{#each HANDLES as handle (handle)}
 							<span
 								class="handle h-{handle}"
-								class:square={handle === anchorCorner(box)}
+								class:square={handle === corner}
 								onpointerdown={(e) => startDrag(e, box, handle)}
 								onpointermove={moveDrag}
 								onpointerup={endDrag}
 								onpointercancel={endDrag}
 								role="presentation"
-							></span>
+							>{#if handle === corner}<svg class="anchor-mark" viewBox="0 0 14 14" aria-hidden="true"
+										><path d="M0 0L14 14M14 0L0 14" /></svg
+									>{/if}</span>
 						{/each}
 					{/if}
 				{/if}
@@ -2930,9 +2933,33 @@
 		}
 	}
 
-	/* The anchor corner's handle: square-cornered, the rest rounded. */
+	/* The anchor corner's handle: square-cornered, the rest rounded, and
+	   crossed — the corner the text is set from, which a resize from any other
+	   handle leaves where it is. Square alone was too quiet a difference at
+	   14px to read as anything but a rendering quirk.
+
+	   An SVG for the same reason as the pivot's: diagonal gradient stops a
+	   fraction of a pixel apart come out a different weight at every zoom. The
+	   viewBox is the fine-pointer handle's 14px, so a stroke of one unit is one
+	   screen pixel; the coarse handle is 10px and makes up the difference. */
 	.handle.square {
 		border-radius: 0;
+	}
+
+	.anchor-mark {
+		display: block;
+		width: 100%;
+		height: 100%;
+		pointer-events: none;
+		fill: none;
+		stroke: var(--accent);
+		stroke-width: 1;
+	}
+
+	@media (pointer: coarse) {
+		.anchor-mark {
+			stroke-width: 1.4;
+		}
 	}
 
 	.h-nw { top: calc(var(--mark) / -2); left: calc(var(--mark) / -2); cursor: nwse-resize; }

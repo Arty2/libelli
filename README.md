@@ -193,7 +193,7 @@ resize boxes directly, or type exact millimetres.
 - **A selected area** draws only its selection, not its dashed bound as well
   under it, which doubled every edge.
 - **The anchor corner** — of a selected area's eight handles, the one at the
-  corner its words are set from is square: top-left for text aligned left and
+  corner its words are set from is square and crossed: top-left for text aligned left and
   to the top, bottom-right for right and bottom. Centred on either axis, no
   corner is, and every handle is rounded.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with

@@ -1281,7 +1281,9 @@ buoy where an area has both. Not the bottom corner: on an area shorter than the
 badge, the tie would stack up over the top line. Consecutive shallow areas in a
 chain can still bring one area's buoy down to the next one's tie.
 
-**The corner the words hang from has a square handle.** Left and top alignment
+**The corner the words hang from has a square, crossed handle.** Square alone
+was too quiet a difference at 14px to read as meaning anything; the cross is
+an SVG, like the pivot's, so its weight holds at every zoom. Left and top alignment
 make it the top-left, right and bottom the bottom-right; a centred alignment
 on either axis has no such corner and every handle stays rounded. It is worked
 out as drawn, so on a mirrored left-hand page it is the mirrored corner.
