@@ -30,7 +30,8 @@
 		snapToEdges,
 		columnGaps,
 		shrinkScale,
-		spacingReadouts
+		spacingReadouts,
+		referenceOf
 	} from '$lib/layout';
 	import { flagUnknown, leaderStyle, renderMarkdown, tabSplit } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
@@ -226,7 +227,10 @@
 		if (!box) return [];
 		const skip = new Set([spaced.id, ...spaced.with]);
 		const others = template.boxes.filter((b) => !skip.has(b.id) && !hidden.has(b.id)).map(rectOf);
-		return spacingReadouts(rectOf(box), others, template.page);
+		// Read out from the reference point, the one the bar's X and Y name.
+		const rect = rectOf(box);
+		const { fx, fy } = referenceFor(box);
+		return spacingReadouts(rect, others, template.page, { x: rect.x + rect.w * fx, y: rect.y + rect.h * fy });
 	});
 
 	/**
@@ -1615,18 +1619,22 @@
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
 	/**
-	 * The corner the area's words are set from — top-left for text aligned left
-	 * and to the top, bottom-right for right and bottom — whose handle is drawn
-	 * square: the point the content hangs from, told apart from the others.
-	 * None where either alignment is centred: then no corner is the anchor.
-	 * As drawn, so on a mirrored left-hand page it is the mirrored corner.
+	 * The area's reference point as drawn — `referenceOf`, the point its words
+	 * are set from, which the X and Y in the bar measure and the spacing is
+	 * read from. On a mirrored left-hand page it is the mirrored point.
+	 */
+	const referenceFor = (box: Box) => referenceOf(placed(box).align ?? template.defaults.align, box.valign);
+
+	/**
+	 * The handle at the reference point, which wears the ring: a corner, or
+	 * the middle of an edge where one alignment is centred. None where both
+	 * are, since that point is the middle of the area and has no handle.
 	 */
 	function anchorCorner(box: Box): DragMode | null {
-		const align = placed(box).align ?? template.defaults.align;
-		const valign = box.valign ?? 'top';
-		const x = align === 'right' ? 'e' : align === 'left' || align === 'justify' ? 'w' : null;
-		const y = valign === 'bottom' ? 's' : valign === 'top' ? 'n' : null;
-		return x && y ? ((y + x) as DragMode) : null;
+		const { fx, fy } = referenceFor(box);
+		const x = fx === 1 ? 'e' : fx === 0 ? 'w' : '';
+		const y = fy === 1 ? 's' : fy === 0 ? 'n' : '';
+		return (y + x || null) as DragMode | null;
 	}
 
 	const DRAG_LABELS: Record<DragMode, string> = {

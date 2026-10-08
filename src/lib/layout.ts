@@ -1,4 +1,4 @@
-import type { Align, Box, PageNumberPosition, PageSide } from './types';
+import type { Align, Box, PageNumberPosition, PageSide, VAlign } from './types';
 
 /**
  * Millimetre geometry: unit conversion and anchor resolution.
@@ -478,6 +478,25 @@ export function shrinkScale(fits: (scale: number) => boolean, floor = SHRINK_FLO
 	return Math.floor(lo * 100) / 100;
 }
 
+// ---- the reference point ---------------------------------------------------
+
+/**
+ * Where on an area its position is said from, as fractions of its width and
+ * height: the point its words are set from. Left (or justified) and top is
+ * the top-left corner, right and bottom the bottom-right; centred on an axis,
+ * the middle of that axis. One point for everything that names a place on
+ * the area — the ring on its handle, the X and Y in the bar, the spacing a
+ * drag shows, and the edge a typed W or H keeps — so they never disagree
+ * about which corner is meant. The file still stores the top-left corner;
+ * this is how it is shown and typed.
+ */
+export function referenceOf(align: Align, valign: VAlign = 'top'): { fx: 0 | 0.5 | 1; fy: 0 | 0.5 | 1 } {
+	return {
+		fx: align === 'right' ? 1 : align === 'center' ? 0.5 : 0,
+		fy: valign === 'bottom' ? 1 : valign === 'middle' ? 0.5 : 0
+	};
+}
+
 // ---- spacing readouts ------------------------------------------------------
 
 export interface Rect {
@@ -504,59 +523,51 @@ const EQUAL_GAP = 0.05;
 
 /**
  * The distances a dragged box has on each side, InDesign's smart spacing kept
- * to its useful half: to the nearest box that lies beside it (overlapping it
- * across), or to the page's trim edge where nothing does. Each is drawn as a
- * line with its millimetres, at the middle of what the two have in common;
- * where a side's gap matches the opposite side's, both are flagged, which is
- * how a box is centred between two others by eye.
+ * to its useful half, measured out from `focus` — the box's reference point
+ * (`referenceOf`), its middle when none is given. Across, a line runs level
+ * with the focus to the nearest box it meets, or to the page's trim edge
+ * where it meets none; down, a line runs plumb with it. Each is drawn with its
+ * millimetres; where a side's gap matches the opposite side's, both are
+ * flagged, which is how a box is centred between two others by eye.
  *
- * A box overlapping the dragged one is beside nothing, so it is never the
- * nearest; nor is one touching it the long way round a corner, which is a
- * diagonal and not a gap.
+ * A focus on the box's own edge is looked along from just inside it, so a box
+ * sitting on that edge's line — above a top-left focus, say — is a diagonal
+ * neighbour and not one beside it; nor is a box overlapping the dragged one,
+ * which is beside nothing.
  */
-export function spacingReadouts(box: Rect, others: Rect[], page: { w: number; h: number }): SpacingReadout[] {
-	const across = (a: Rect, axis: 'x' | 'y') =>
-		axis === 'x' ? [Math.max(a.y, box.y), Math.min(a.y + a.h, box.y + box.h)] : [Math.max(a.x, box.x), Math.min(a.x + a.w, box.x + box.w)];
-	const middleOf = (a: Rect | null, axis: 'x' | 'y') => {
-		if (!a) return axis === 'x' ? box.y + box.h / 2 : box.x + box.w / 2;
-		const [lo, hi] = across(a, axis);
-		return (lo + hi) / 2;
-	};
-	const beside = (a: Rect, axis: 'x' | 'y') => {
-		const [lo, hi] = across(a, axis);
-		return hi - lo > 0.01;
-	};
+export function spacingReadouts(
+	box: Rect,
+	others: Rect[],
+	page: { w: number; h: number },
+	focus: { x: number; y: number } = { x: box.x + box.w / 2, y: box.y + box.h / 2 }
+): SpacingReadout[] {
+	const inside = (at: number, lo: number, hi: number) => (at <= lo + 0.001 ? at + 0.01 : at >= hi - 0.001 ? at - 0.01 : at);
+	const probe = { x: inside(focus.x, box.x, box.x + box.w), y: inside(focus.y, box.y, box.y + box.h) };
+	const beside = (a: Rect, axis: 'x' | 'y') =>
+		axis === 'x' ? a.y < probe.y && probe.y < a.y + a.h : a.x < probe.x && probe.x < a.x + a.w;
 	const round = (n: number) => Math.round(n * 100) / 100;
 
-	const sides: Array<{ axis: 'x' | 'y'; near: Rect | null; from: number; to: number }> = [];
+	const sides: Array<{ axis: 'x' | 'y'; from: number; to: number }> = [];
 	for (const axis of ['x', 'y'] as const) {
 		const start = axis === 'x' ? box.x : box.y;
 		const end = axis === 'x' ? box.x + box.w : box.y + box.h;
-		let before: Rect | null = null;
 		let beforeEdge = 0;
-		let after: Rect | null = null;
 		let afterEdge = axis === 'x' ? page.w : page.h;
 		for (const other of others) {
 			if (!beside(other, axis)) continue;
 			const oStart = axis === 'x' ? other.x : other.y;
 			const oEnd = oStart + (axis === 'x' ? other.w : other.h);
-			if (oEnd <= start + 0.01 && oEnd > beforeEdge) {
-				before = other;
-				beforeEdge = oEnd;
-			}
-			if (oStart >= end - 0.01 && oStart < afterEdge) {
-				after = other;
-				afterEdge = oStart;
-			}
+			if (oEnd <= start + 0.01 && oEnd > beforeEdge) beforeEdge = oEnd;
+			if (oStart >= end - 0.01 && oStart < afterEdge) afterEdge = oStart;
 		}
-		sides.push({ axis, near: before, from: beforeEdge, to: start }, { axis, near: after, from: end, to: afterEdge });
+		sides.push({ axis, from: beforeEdge, to: start }, { axis, from: end, to: afterEdge });
 	}
 
-	const readouts = sides.map(({ axis, near, from, to }) => ({
+	const readouts = sides.map(({ axis, from, to }) => ({
 		axis,
 		from: round(from),
 		to: round(to),
-		at: round(middleOf(near, axis)),
+		at: round(axis === 'x' ? focus.y : focus.x),
 		gap: round(to - from),
 		equal: false
 	}));

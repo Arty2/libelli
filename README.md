@@ -202,10 +202,16 @@ resize boxes directly, or type exact millimetres.
   area are the same switch the other way — press them and it grows to fit.
 - **A selected area** draws only its selection, not its dashed bound as well
   under it, which doubled every edge.
-- **The anchor corner** — of a selected area's eight handles, the one at the
-  corner its words are set from has a ring inside: top-left for text aligned left and
-  to the top, bottom-right for right and bottom. Centred on either axis, no
-  corner is, and no handle has one.
+- **The reference point** — of a selected area's eight handles, the one at the
+  point its words are set from has a ring inside: top-left for text aligned left
+  and to the top, bottom-right for right and bottom, and the middle of an edge
+  where one alignment is centred — left and middle is the left edge's handle.
+  Centred both ways it is the area's middle, which has no handle to ring. It is
+  the one point everything that places the area speaks of: **X** and **Y** in
+  the bar are where it is (a right-aligned area's X is its right edge), a typed
+  W or H keeps it where it is, and the spacing a drag shows is measured out
+  from it. The file still stores the top-left corner, so older templates read
+  the same.
 - **Typing on the card** — double-click an area, or press <kbd>Enter</kbd> with
   one selected, and a text box lies over the content inheriting the face, size,
   color and alignment it will print in. A bound area writes through to the cell;
@@ -1674,9 +1680,10 @@ lone one.
 The **Guides** box has three states. **Ticked**: the page **margins** show as a
 solid guide in the inverse of the accent (amber against the default blue
 outlines), over the grid and under every area, the temporary guides below are
-on too, and so is the **spacing**: while an area is dragged or sized, a line to
-the nearest area beside it on each side — or to the page's edge where there is
-none — carries its millimetres, and when the gaps either side match, both say
+on too, and so is the **spacing**: while an area is dragged or sized, a line
+from its reference point (the ringed handle) to the nearest area it meets on
+each side — level with that point across, plumb with it down, or to the page's
+edge where it meets none — carries its millimetres, and when the gaps either side match, both say
 **=** and draw solid, which is how an area is centred between two others by
 eye. **The dash**: the margins and the temporary guides, without the spacing,
 for when the numbers are in the way. **Off**: none of it.

@@ -5,6 +5,7 @@ import {
 	boxHeight,
 	shrinkScale,
 	spacingReadouts,
+	referenceOf,
 	actualScale,
 	columnGaps,
 	GRID_MAJOR,
@@ -400,7 +401,7 @@ describe('spacingReadouts', () => {
 		]);
 	});
 
-	it('measures to the nearest box beside it, at the middle of what they share', () => {
+	it('measures to the nearest box beside it, level with the middle by default', () => {
 		const left = { x: 0, y: 0, w: 20, h: 40 };
 		const fartherLeft = { x: 0, y: 10, w: 5, h: 10 };
 		const r = spacingReadouts({ x: 25, y: 10, w: 20, h: 20 }, [fartherLeft, left], page);
@@ -430,5 +431,45 @@ describe('spacingReadouts', () => {
 		]);
 		// Against the top edge: no gap there, so no readout.
 		expect(r.some((s) => s.axis === 'y' && s.to === 0)).toBe(false);
+	});
+});
+
+describe('referenceOf', () => {
+	it('is the corner the words are set from, or the middle where they are centred', () => {
+		expect(referenceOf('left', 'top')).toEqual({ fx: 0, fy: 0 });
+		expect(referenceOf('justify')).toEqual({ fx: 0, fy: 0 });
+		expect(referenceOf('right', 'bottom')).toEqual({ fx: 1, fy: 1 });
+		expect(referenceOf('center', 'middle')).toEqual({ fx: 0.5, fy: 0.5 });
+		expect(referenceOf('right', 'middle')).toEqual({ fx: 1, fy: 0.5 });
+	});
+});
+
+describe('spacingReadouts from a reference point', () => {
+	const page = { w: 100, h: 100 };
+	const box = { x: 40, y: 40, w: 20, h: 20 };
+
+	it('runs its lines level and plumb with the point, not the middle', () => {
+		const r = spacingReadouts(box, [], page, { x: 40, y: 40 });
+		expect(r.filter((s) => s.axis === 'x').every((s) => s.at === 40)).toBe(true);
+		expect(r.filter((s) => s.axis === 'y').every((s) => s.at === 40)).toBe(true);
+	});
+
+	it('measures to what that line meets, and nothing it misses', () => {
+		// Beside the box but only lower down: a line along the top misses it.
+		const low = { x: 10, y: 45, w: 10, h: 20 };
+		// Level with the top: it meets this one.
+		const level = { x: 0, y: 35, w: 5, h: 10 };
+		const r = spacingReadouts(box, [low, level], page, { x: 40, y: 40 });
+		expect(r.find((s) => s.axis === 'x' && s.to === 40)!.from).toBe(5);
+		// From the middle, the lower one is the nearer.
+		const m = spacingReadouts(box, [low, level], page);
+		expect(m.find((s) => s.axis === 'x' && s.to === 40)!.from).toBe(20);
+	});
+
+	it('takes a box ending on its edge line as a diagonal, not a neighbour', () => {
+		// Above and to the left, its bottom on the box's top line.
+		const corner = { x: 10, y: 20, w: 10, h: 20 };
+		const r = spacingReadouts(box, [corner], page, { x: 40, y: 40 });
+		expect(r.find((s) => s.axis === 'x' && s.to === 40)!.from).toBe(0);
 	});
 });

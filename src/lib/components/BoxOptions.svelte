@@ -10,6 +10,7 @@
 	import { availableWeights, fontChoices, previewFamilies } from '$lib/fonts';
 	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
 	import ResetButton from './ResetButton.svelte';
+	import { referenceOf } from '$lib/layout';
 	import {
 		BLEND_MODES,
 		BORDER_STYLES,
@@ -377,6 +378,14 @@
 	);
 
 	/** The area's own list style, field by field; a blank field takes the page's. */
+	/** The reference point, in the stored frame the fields write — see `referenceOf`. */
+	const reference = $derived(referenceOf(selected?.align ?? template.defaults.align, selected?.valign));
+	const round2 = (n: number) => Math.round(n * 100) / 100;
+	const refX = $derived(selected ? round2(selected.x + selected.w * reference.fx) : 0);
+	const refY = $derived(selected ? round2(selected.y + selected.h * reference.fy) : 0);
+	const REF_X = { 0: 'left edge', 0.5: 'middle, across', 1: 'right edge' } as const;
+	const REF_Y = { 0: 'top edge', 0.5: 'middle, down', 1: 'bottom edge' } as const;
+
 	function setList(change: Record<string, unknown>) {
 		patch({ list: normaliseList({ ...selected?.list, ...change }) });
 	}
@@ -1064,8 +1073,22 @@
 		</fieldset>
 		<fieldset class="group">
 			<legend>Position</legend>
+			<!-- X and Y name the reference point, the one the ring is on: the
+			     corner the words are set from, or the middle of an edge where
+			     they are centred. Shown and typed there, stored as the top-left
+			     corner as ever, so the file and every older template read the
+			     same. Measured against the declared height, which is the one
+			     the field beside it says. -->
 			<label class="field"><span>X</span>
-				<input class="n-4" type="number" step="0.5" value={selected.x} disabled={boxFrozen} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
+				<input
+					class="n-4"
+					type="number"
+					step="0.5"
+					value={refX}
+					title="The {REF_X[reference.fx]} — where the words are set from, and the handle with the ring"
+					disabled={boxFrozen}
+					onchange={(e) => patch({ x: round2(numeric(e, refX) - selected.w * reference.fx) })}
+				/>
 				<span class="unit">mm</span>
 			</label>
 			<label class="field"><span>Y</span>
@@ -1073,10 +1096,12 @@
 					class="n-4"
 					type="number"
 					step="0.5"
-					value={selected.y}
+					value={refY}
 					disabled={boxFrozen || !!selected.anchor}
-					title={selected.anchor ? 'Anchored: the gap sets the top edge' : ''}
-					onchange={(e) => patch({ y: numeric(e, selected.y) })}
+					title={selected.anchor
+						? 'Anchored: the gap sets the top edge'
+						: `The ${REF_Y[reference.fy]} — where the words are set from, and the handle with the ring`}
+					onchange={(e) => patch({ y: round2(numeric(e, refY) - selected.h * reference.fy) })}
 				/>
 				<span class="unit">mm</span>
 			</label>
