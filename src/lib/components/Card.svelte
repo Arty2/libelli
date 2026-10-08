@@ -2413,7 +2413,7 @@
 								onpointercancel={endDrag}
 								role="presentation"
 							>{#if handle === corner}<svg class="anchor-mark" viewBox="0 0 14 14" aria-hidden="true"
-										><path d="M0 0L14 14M14 0L0 14" /></svg
+										><circle cx="7" cy="7" r="3.5" /></svg
 									>{/if}</span>
 						{/each}
 					{/if}
@@ -2945,13 +2945,15 @@
 		}
 	}
 
-	/* The anchor corner's handle: square-cornered, the rest rounded, and
-	   crossed — the corner the text is set from, which a resize from any other
-	   handle leaves where it is. Square alone was too quiet a difference at
-	   14px to read as anything but a rendering quirk.
+	/* The anchor corner's handle: square-cornered, the rest rounded, and a
+	   ring inside it — the corner the text is set from, which a resize from
+	   any other handle leaves where it is. Square alone was too quiet a
+	   difference at 14px to read as anything but a rendering quirk. A ring,
+	   not a cross: a cross is the pivot's mark, a point to turn about, and two
+	   crosshairs on one area said the same thing twice.
 
-	   An SVG for the same reason as the pivot's: diagonal gradient stops a
-	   fraction of a pixel apart come out a different weight at every zoom. The
+	   An SVG for the same reason as the pivot's: a ring of gradients a
+	   fraction of a pixel wide comes out a different weight at every zoom. The
 	   viewBox is the fine-pointer handle's 14px, so a stroke of one unit is one
 	   screen pixel; the coarse handle is 10px and makes up the difference. */
 	.handle.square {
