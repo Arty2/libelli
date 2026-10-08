@@ -790,6 +790,8 @@
 	 */
 	let editor = $state<'checking' | 'here' | 'elsewhere' | 'handed'>('checking');
 	let editorLock: EditorLock | null = null;
+	/** The boot under way, for a handover to wait out — see `handOver`. */
+	let booting: Promise<void> | null = null;
 	let takingOver = $state(false);
 
 	/**
@@ -800,6 +802,11 @@
 	 * asked for: the other tab is already editing, so this tab writes nothing.
 	 */
 	async function handOver(save: boolean) {
+		// Asked in the middle of boot: let it finish, so there is something to
+		// save and nothing left running to turn the autosave on afterwards —
+		// a boot still awaiting storage would set `ready` after this had
+		// handed over, and write this tab's copy over the other tab's work.
+		await booting?.catch(() => {});
 		if (ready && save) {
 			const template$ = $state.snapshot(template);
 			const dataset$ = $state.snapshot(dataset);
@@ -832,6 +839,12 @@
 		if (!editorLock || takingOver) return;
 		takingOver = true;
 		await editorLock.takeOver();
+		// Only with the lock in hand: a request that came back empty leaves the
+		// other tab editing, and two tabs saving is what the lock is there for.
+		if (!editorLock.held) {
+			takingOver = false;
+			return;
+		}
 		if (editor === 'handed') location.reload();
 		else {
 			editor = 'here';
@@ -845,7 +858,7 @@
 	// its work on is not ready either, and must not start loading again.
 	$effect(() => {
 		if (ready || editor !== 'here') return;
-		void boot();
+		booting = boot();
 	});
 
 	async function boot() {
@@ -4879,13 +4892,6 @@
 
 		aside.shutting {
 			opacity: 0.45;
-		}
-
-		/* The flick up is read off pointer events, so the browser must not take
-		   the finger for a scroll and cancel them: nothing in the bar scrolls,
-		   and the text size's pinch reads touch events, which still arrive. */
-		.status-bar {
-			touch-action: none;
 		}
 
 		.toolbar {

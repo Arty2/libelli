@@ -128,6 +128,13 @@ export function trayPull(
  */
 export function swipeUp(node: HTMLElement, onswipe: () => void) {
 	let start: { x: number; y: number; id: number } | null = null;
+	// The flick is read from pointer events, so the browser must not take the
+	// finger for a scroll: it would cancel the pointer a few pixels in, and
+	// the flick would never arrive. Said here, by the gesture that needs it,
+	// rather than left to a stylesheet that might not say it. Nothing in the
+	// bar scrolls, and a pinch read from touch events still reaches them.
+	const touchAction = node.style.touchAction;
+	node.style.touchAction = 'none';
 	let handler = onswipe;
 	let swallowUntil = 0;
 
@@ -165,6 +172,7 @@ export function swipeUp(node: HTMLElement, onswipe: () => void) {
 			node.removeEventListener('pointerup', up);
 			node.removeEventListener('pointercancel', cancel);
 			node.removeEventListener('click', click, true);
+			node.style.touchAction = touchAction;
 		}
 	};
 }

@@ -560,7 +560,12 @@
 	}
 
 	/** Close the editor, back to where it was opened from — or, `toTable`, to the table regardless. */
-	function closeBigCell(toTable = false) {
+	/**
+	 * A save that was pressed lands first: closing in the middle of one would
+	 * have said the drawing was dropped and then written it anyway.
+	 */
+	async function closeBigCell(toTable = false) {
+		await board?.settled();
 		const to = leaveTo;
 		bigCell = null;
 		drawingArea = null;
@@ -2251,7 +2256,7 @@
 					box={{ pixels: area.pixels }}
 					value={area.value}
 					ink={area.ink}
-					onsave={(dataUrl, pixels) => saveArea(area.id, dataUrl, pixels)}
+					onsave={((id) => (dataUrl: string, pixels: Grid | undefined) => saveArea(id, dataUrl, pixels))(area.id)}
 					ondirty={(d) => (boardDirty = d)}
 					head={boardHead}
 					bar={boardBar}
@@ -2300,7 +2305,10 @@
 						box={{ pixels: look.pixels }}
 						value={drawingSource(text)}
 						ink={look.ink}
-						onsave={(dataUrl, pixels) => drew(open.row, open.column, dataUrl, pixels)}
+						onsave={((row, column) => (dataUrl: string, pixels: Grid | undefined) => drew(row, column, dataUrl, pixels))(
+							open.row,
+							open.column
+						)}
 						ondirty={(d) => (boardDirty = d)}
 						head={boardHead}
 						bar={boardBar}

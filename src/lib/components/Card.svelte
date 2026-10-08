@@ -522,9 +522,13 @@
 			// hangs its last line's inline box a few pixels past them, and
 			// scrollHeight counts that, which flagged every two-line title as cut.
 			const content = node.querySelector<HTMLElement>('.content');
-			// Shrink cuts too, once its words are as small as it will set them.
-			const overflow = template.boxes.find((b) => b.id === id)?.overflow;
-			const clipped = overflow === 'clip' || overflow === 'shrink';
+			// Shrink cuts too, once its words are as small as it will set them —
+			// but whether words of a Shrink area are cut is `fitWords`'s to say:
+			// it measures the room inside the padding and the width as well,
+			// and two judges writing one flag in turn made the warning flicker.
+			const box = template.boxes.find((b) => b.id === id);
+			if (box?.overflow === 'shrink' && (box.mode === 'plain' || box.mode === 'markdown')) return;
+			const clipped = box?.overflow === 'clip' || box?.overflow === 'shrink';
 			const spills = clipped && !!content && content.scrollHeight > node.clientHeight + 1;
 			if ((overflowing[id] ?? false) !== spills) overflowing = { ...overflowing, [id]: spills };
 		};
@@ -634,9 +638,25 @@
 		if (typeof document !== 'undefined' && document.fonts) document.fonts.ready.then(read).catch(() => {});
 		return {
 			update: (next: string | null) => {
-				if (current && !next && shrunk[current] !== undefined) {
-					const { [current]: _was, ...rest } = shrunk;
-					shrunk = rest;
+				// Switched off and on again, nothing in the key has changed, but
+				// the scale was dropped: search afresh rather than skip.
+				searched = '';
+				if (current && !next) {
+					const was = current;
+					if (shrunk[was] !== undefined) {
+						const { [was]: _gone, ...rest } = shrunk;
+						shrunk = rest;
+					}
+					// Switched to Clip or Grow: the words are full size again, and
+					// whether they are now cut is `measure`'s to say — but nothing it
+					// watches has changed, so it would not say it until the next
+					// edit. Asked here once the full size has been drawn.
+					requestAnimationFrame(() => {
+						const content = node.querySelector<HTMLElement>(':scope > .content');
+						const clipped = template.boxes.find((b) => b.id === was)?.overflow === 'clip';
+						const spills = clipped && !!content && content.scrollHeight > node.clientHeight + 1;
+						if ((overflowing[was] ?? false) !== spills) overflowing = { ...overflowing, [was]: spills };
+					});
 				}
 				current = next;
 				watch();

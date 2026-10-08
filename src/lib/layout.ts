@@ -500,9 +500,9 @@ export function shrinkScale(fits: (scale: number) => boolean, floor = SHRINK_FLO
  * the top-left corner, right and bottom the bottom-right; centred on an axis,
  * the middle of that axis. One point for everything that names a place on
  * the area — the ring on its handle, the X and Y in the bar, the spacing a
- * drag shows, and the edge a typed W or H keeps — so they never disagree
- * about which corner is meant. The file still stores the top-left corner;
- * this is how it is shown and typed.
+ * drag shows, the edge a typed W or H keeps, and the point a file gives an
+ * area at (frame.ts) — so they never disagree about which corner is meant.
+ * In memory an area is still its top-left corner; frame.ts converts.
  */
 export function referenceOf(align: Align, valign: VAlign = 'top'): { fx: 0 | 0.5 | 1; fy: 0 | 0.5 | 1 } {
 	return {

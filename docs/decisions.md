@@ -3540,9 +3540,9 @@ the cards every time somebody tried to select the counter's text.
 tray's pull down past its lowest is `trayPull`: the shut is counted in pixels
 past the minimum, not as a share, so a finger has to carry on the same distance
 on any screen, and merely reaching the bottom and lifting never closes it. The
-bar is `touch-action: none` when stacked, or the browser takes the vertical
-drag for a scroll and cancels the pointer before the flick is read; the text
-size's pinch reads touch events, which still arrive.
+action sets `touch-action: none` on the bar itself, or the browser takes the
+vertical drag for a scroll and cancels the pointer before the flick is read;
+the text size's pinch reads touch events, which still arrive.
 
 ## `src/routes/app.css` — the accent
 
