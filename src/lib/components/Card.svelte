@@ -568,6 +568,8 @@
 	 */
 	function fitWords(node: HTMLElement, id: string | null) {
 		let current = id;
+		/** What the last search was for: the same words in the same room in the same type fit the same. */
+		let searched = '';
 		const read = () => {
 			if (!current) return;
 			const content = node.querySelector<HTMLElement>(':scope > .content');
@@ -578,6 +580,19 @@
 			// would never fit in it at any size.
 			const pad = getComputedStyle(node);
 			const room = node.clientHeight - parseFloat(pad.paddingTop) - parseFloat(pad.paddingBottom);
+			// The area's style holds its position too, so a drag or a nudge
+			// changes it every frame without changing what fits; selecting it
+			// changes its class. Only a change to the words, the room or the
+			// type is worth a search's dozen forced layouts.
+			// The words as text and the count of what they are set in: a change to
+			// either is a change to the words. Not the markup itself — reading it
+			// is a sink the gates refuse, and its text says the same.
+			const key = [current, room, node.clientWidth, pad.font, pad.letterSpacing, content.textContent, content.getElementsByTagName('*').length].join('|');
+			if (key === searched) {
+				words.takeRecords();
+				return;
+			}
+			searched = key;
 			const fits = (scale: number) => {
 				content.style.fontSize = `${scale}em`;
 				return content.scrollHeight <= room + 1 && content.scrollWidth <= content.clientWidth + 1;
@@ -2794,6 +2809,9 @@
 	.tabbed {
 		display: flex;
 		align-items: baseline;
+		/* A paragraph's indent is inherited by every flex item, and would push
+		   the words at the right edge in from it. */
+		text-indent: 0;
 	}
 
 	.tab-right {

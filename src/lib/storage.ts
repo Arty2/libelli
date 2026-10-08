@@ -235,6 +235,12 @@ const templateDocKey = (id: string) => `${KEY_TEMPLATE_PREFIX}${id}`;
 
 export const saveTemplateDoc = (id: string, t: Template) => idbSet(STORE_KV, templateDocKey(id), toFile(t));
 export const loadTemplateDoc = (id: string) => idbGet<Template>(STORE_KV, templateDocKey(id));
+/**
+ * A template kept exactly as it was read, not passed through `toFile`: one
+ * this build cannot read — a newer schema, say — must not be converted by a
+ * build that does not understand it, only kept until one that does.
+ */
+export const keepTemplateDocAsIs = (id: string, raw: unknown) => idbSet(STORE_KV, templateDocKey(id), raw);
 export const deleteTemplateDoc = (id: string) => idbDelete(STORE_KV, templateDocKey(id));
 
 /**

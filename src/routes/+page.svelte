@@ -95,6 +95,7 @@
 		loadMapping,
 		loadTemplate,
 		loadTemplateDoc,
+		keepTemplateDocAsIs,
 		loadTemplateId,
 		loadUi,
 		loadEditorFonts,
@@ -795,10 +796,11 @@
 	 * Everything the autosave would write, written now and waited for: the tab
 	 * taking over reads storage the moment this resolves, so nothing may be
 	 * left in a debounce. Then the saves stop — `ready` gates every one of
-	 * them — and the page says why.
+	 * them — and the page says why. With `save` false the lock was taken, not
+	 * asked for: the other tab is already editing, so this tab writes nothing.
 	 */
-	async function handOver() {
-		if (ready) {
+	async function handOver(save: boolean) {
+		if (ready && save) {
 			const template$ = $state.snapshot(template);
 			const dataset$ = $state.snapshot(dataset);
 			saveMapping(templateId, $state.snapshot(mapping));
@@ -915,6 +917,16 @@
 		// id nobody has yet is minted here, which is how a browser that has only
 		// ever had one template acquires a library containing exactly that one.
 		templateId = loadTemplateId() || nextTemplateId();
+		// A saved template this build could not read is never saved over: the
+		// starter shown in its place goes into the library under a new id, and
+		// the one that could not be read stays where it was — kept as it was,
+		// in the library, if it was only ever the working copy — for a build
+		// that can read it. The autosave would otherwise have written the
+		// starter over it within a third of a second.
+		if (unreadable) {
+			if (!(await loadTemplateDoc(templateId))) await keepTemplateDocAsIs(templateId, storedTemplate);
+			templateId = nextTemplateId();
+		}
 		saveTemplateId(templateId);
 		previousTemplate = loadPreviousTemplateId();
 		void refreshLibrary();
@@ -944,7 +956,10 @@
 				'warning'
 			);
 		} else if (unreadable)
-			notify('The saved template could not be read, so this is the starter card. Your data is untouched.', 'warning');
+			notify(
+				'The saved template could not be read — perhaps a newer version of libelli wrote it — so this is the starter card. The saved one is kept in your templates, untouched, and your data too.',
+				'warning'
+			);
 		else if (firstRun)
 			notify('Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.');
 		missingFonts = await ensureTemplateFonts(template);

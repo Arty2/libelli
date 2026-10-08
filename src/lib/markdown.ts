@@ -105,10 +105,14 @@ export function listCount(n: number, numbering: ListNumbering = 'decimal'): stri
  * where there is none.
  */
 export function tabSplit(line: string): [string, string] | null {
-	const at = Math.max(line.lastIndexOf('\t'), line.lastIndexOf('^t'));
-	if (at < 0) return null;
-	const width = line[at] === '\t' ? 1 : 2;
-	return [line.slice(0, at), line.slice(at + width)];
+	// Never inside a code span: `a^tb` is code somebody typed, and cutting it
+	// leaves two halves with one backtick each, printed as typed.
+	const inCode = (at: number) => (line.slice(0, at).match(/`/g)?.length ?? 0) % 2 === 1;
+	for (let at = line.length - 1; at >= 0; at--) {
+		const width = line[at] === '\t' ? 1 : line.startsWith('^t', at) ? 2 : 0;
+		if (width && !inCode(at)) return [line.slice(0, at), line.slice(at + width)];
+	}
+	return null;
 }
 
 /**
@@ -136,7 +140,9 @@ export function leaderStyle(leader: Exclude<Leader, 'none'>): string {
 /** A tabbed line as a row: the words, the leader, the words at the right edge. */
 function leaderLine(parts: [string, string], leader: Exclude<Leader, 'none'>): string {
 	return (
-		`<span style="display:flex;align-items:baseline">` +
+		// No indent of its own: a paragraph's text-indent is inherited by every
+		// flex item, and would push the price in from the edge it is set to.
+		`<span style="display:flex;align-items:baseline;text-indent:0">` +
 		`<span>${renderInline(parts[0])}</span>` +
 		`<span style="${leaderStyle(leader)}"></span>` +
 		`<span style="text-align:right">${renderInline(parts[1])}</span></span>`

@@ -267,7 +267,6 @@ export function colorsFromRow(box: Box, row: Row | null | undefined): Box {
 	};
 }
 
-/** A baseline shift in em, negative allowed; zero is no shift and is dropped. */
 /** Columns an area's words may be set in: two at least, or it is not columns. */
 export const MIN_COLUMNS = 2;
 export const MAX_COLUMNS = 6;
@@ -314,6 +313,7 @@ export function normaliseColumns(raw: unknown): TextColumns | undefined {
 	return columns;
 }
 
+/** A baseline shift in em, negative allowed; zero is no shift and is dropped. */
 export function normaliseBaseline(raw: unknown): number | undefined {
 	if (raw === undefined || raw === null || raw === '') return undefined;
 	const n = Number(raw);

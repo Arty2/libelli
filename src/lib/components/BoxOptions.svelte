@@ -377,7 +377,6 @@
 			!(selected.static?.text?.trim() || selected.static?.dataUrl || selected.static?.url || selected.static?.svg)
 	);
 
-	/** The area's own list style, field by field; a blank field takes the page's. */
 	/** The reference point, in the stored frame the fields write — see `referenceOf`. */
 	const reference = $derived(referenceOf(selected?.align ?? template.defaults.align, selected?.valign));
 	const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -386,6 +385,7 @@
 	const REF_X = { 0: 'left edge', 0.5: 'middle, across', 1: 'right edge' } as const;
 	const REF_Y = { 0: 'top edge', 0.5: 'middle, down', 1: 'bottom edge' } as const;
 
+	/** The area's own list style, field by field; a blank field takes the page's. */
 	function setList(change: Record<string, unknown>) {
 		patch({ list: normaliseList({ ...selected?.list, ...change }) });
 	}

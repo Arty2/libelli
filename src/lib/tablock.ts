@@ -32,14 +32,17 @@ export interface EditorLock {
 }
 
 /**
- * Try for the lock. `onHandOver` runs in the tab giving it up, when another
- * tab asks for it or takes it: save, stop, and say so — the lock is let go
- * only once it resolves.
+ * Try for the lock. `onHandOver` runs in the tab giving it up: asked for it,
+ * it is called with `save` true — save, stop, and say so; the lock is let go
+ * only once it resolves. Had it taken by a tab that stopped waiting, it is
+ * called with `save` false — stop and say so, and write nothing: the tab that
+ * took the lock has already read storage and may be editing, so anything
+ * written now would land on top of its work.
  *
  * Where Web Locks are missing — no secure context — every tab edits, as all of
  * them did before this.
  */
-export async function claimEditor(onHandOver: () => Promise<void>): Promise<EditorLock> {
+export async function claimEditor(onHandOver: (save: boolean) => Promise<void>): Promise<EditorLock> {
 	const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
 	if (!locks) return { held: true, takeOver: async () => {} };
 
@@ -65,16 +68,16 @@ export async function claimEditor(onHandOver: () => Promise<void>): Promise<Edit
 				.catch(() => {
 					// Taken from this tab by a tab that would not wait: it is no
 					// longer the editor, whatever it was in the middle of.
-					if (lock.held) void giveUp();
+					if (lock.held) void giveUp(false);
 					granted(false);
 				});
 		});
 
-	const giveUp = async () => {
+	const giveUp = async (save: boolean) => {
 		if (handingOver) return;
 		handingOver = true;
 		try {
-			await onHandOver();
+			await onHandOver(save);
 		} finally {
 			lock.held = false;
 			release?.();
@@ -83,8 +86,18 @@ export async function claimEditor(onHandOver: () => Promise<void>): Promise<Edit
 		}
 	};
 
+	/** Set when the holder says it heard: then it is saving, not frozen, and is waited for. */
+	let heard: (() => void) | null = null;
+
 	channel?.addEventListener('message', (event) => {
-		if (event.data === 'handover' && lock.held) void giveUp();
+		if (event.data === 'handover' && lock.held) {
+			// Said before the save starts: a big table with drawings can take
+			// longer to write than a frozen tab is given, and a tab that is
+			// saving must never have the lock taken from under it.
+			channel.postMessage('heard');
+			void giveUp(true);
+		}
+		if (event.data === 'heard') heard?.();
 	});
 
 	lock.takeOver = async () => {
@@ -94,11 +107,16 @@ export async function claimEditor(onHandOver: () => Promise<void>): Promise<Edit
 		// itself — and take it back from the tab it went to.
 		const waiting = new AbortController();
 		const waited = hold({ signal: waiting.signal });
+		const answered = new Promise<'heard'>((yes) => (heard = () => yes('heard')));
 		const timeout = new Promise<'late'>((late) => setTimeout(() => late('late'), HANDOVER_WAIT_MS));
-		if ((await Promise.race([waited, timeout])) === 'late' && !lock.held) {
+		const first = await Promise.race([waited, answered, timeout]);
+		// Heard: the holder is saving, and lets go when it is done — however long.
+		if (first === 'heard') await waited;
+		else if (first === 'late' && !lock.held) {
 			waiting.abort();
 			await hold({ steal: true });
 		}
+		heard = null;
 	};
 
 	await hold({ ifAvailable: true });

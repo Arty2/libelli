@@ -224,12 +224,15 @@ describe('tab leaders', () => {
 		expect(tabSplit('Coffee^t3.50')).toEqual(['Coffee', '3.50']);
 		expect(tabSplit('A\tB\tC')).toEqual(['A\tB', 'C']);
 		expect(tabSplit('No tab here')).toBeNull();
+		// Never inside a code span.
+		expect(tabSplit('Use `a^tb` here')).toBeNull();
+		expect(tabSplit('Use `a^tb`^t3.50')).toEqual(['Use `a^tb`', '3.50']);
 	});
 
 	it('sets a tabbed line as words, a leader and words at the right', () => {
 		const html = renderMarkdown('Coffee^t3.50\nTea^t2.80', { size: 10, leader: 'dotted' });
 		expect(html).toContain('radial-gradient(circle,currentColor');
-		expect(html.match(/display:flex;align-items:baseline/g)).toHaveLength(2);
+		expect(html.match(/display:flex;align-items:baseline;text-indent:0/g)).toHaveLength(2);
 		expect(html).toContain('<span>Coffee</span>');
 		expect(html).toContain('<span style="text-align:right">3.50</span>');
 		// Rows are blocks already: no break between them.
