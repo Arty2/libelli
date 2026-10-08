@@ -138,14 +138,27 @@ export function normaliseParagraph(raw: unknown): ParagraphStyle | undefined {
 	return { mode, amount: Math.round(Math.max(0, Math.min(MAX_PARAGRAPH, n)) * 100) / 100 };
 }
 
-export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'circle', 'square', 'dash', 'emdash', 'arrow', 'none'];
+export const LIST_MARKERS: ListMarker[] = [
+	'bullet',
+	'disc',
+	'circle',
+	'ring',
+	'square',
+	'openSquare',
+	'dash',
+	'emdash',
+	'arrow',
+	'none'
+];
 
 /** Said with the glyph, since the glyph is the choice. */
 export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
 	bullet: '• Bullet',
 	disc: '● Disc',
 	circle: '○ Circle',
+	ring: '◯ Ring',
 	square: '■ Square',
+	openSquare: '□ Open Square',
 	dash: '– Dash',
 	emdash: '— Em Dash',
 	arrow: '➤ Arrow',

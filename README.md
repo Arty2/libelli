@@ -281,12 +281,15 @@ resize boxes directly, or type exact millimetres.
   are shown, or the area is chosen, a dotted line marks each side of every
   gap, and the area wears `.columns` for its CSS.
 - **Lists** — **Marker** picks a Markdown bullet list's marker, **• Bullet**,
-  **● Disc**, **○ Circle**, **■ Square**, **– Dash**, **— Em Dash**, **➤ Arrow**
+  **● Disc**, **○ Circle**, **◯ Ring**, **■ Square**, **□ Open Square**,
+  **– Dash**, **— Em Dash**, **➤ Arrow**
   or **None**, each set in the area's own
   font like the words beside it (a font without the glyph falls back as for any
-  missing character) — except the disc, drawn as a dot the bullet's size in the
-  text's color, since the faces that have `●` draw it at any size from half a
-  capital to a whole one; **Indent** is the space from the area's edge to
+  missing character) — except the circles and squares, drawn in the text's
+  color at sizes of their own, since the faces that have `●` or `■` draw them
+  at any size from half a capital to a whole one: the circle the bullet's size,
+  the disc and the ring a size up, the squares near the disc's, all with their
+  middles where the bullet's is; **Indent** is the space from the area's edge to
   the markers, in em, and **Leading** the list's own line height, a multiple of
   the size like the text's; left blank, a list takes the text's leading. All
   three are a group of their own in the page bar and, for a Markdown area, in the

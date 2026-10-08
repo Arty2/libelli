@@ -30,14 +30,16 @@ export interface MarkdownOptions {
  * The glyph each bullet marker names. Set in the area's own face like the
  * words beside it — the marker is text in the item, not a list-style image —
  * so a dash is that font's dash; a face without the glyph falls back through
- * the area's stack as any missing character does. The disc is the exception,
- * drawn rather than typed — see `DISC`.
+ * the area's stack as any missing character does. The circles and squares are
+ * the exception, drawn rather than typed — see `DRAWN`.
  */
 export const LIST_GLYPHS: Record<ListMarker, string | null> = {
 	bullet: '•',
 	disc: '●',
 	circle: '○',
+	ring: '◯',
 	square: '■',
+	openSquare: '□',
 	dash: '–',
 	emdash: '—',
 	arrow: '➤',
@@ -45,20 +47,48 @@ export const LIST_GLYPHS: Record<ListMarker, string | null> = {
 };
 
 /**
- * The disc, drawn rather than typed. `●` is a geometric shape, near the size of
- * a capital, where `•` is a typographer's dot sized for lowercase — and few
- * text faces carry `●`, so it falls back to whichever symbol face the system
- * has, at whatever size that face draws it: two-thirds of an em in one, under
- * half in another. No one scale brings that to the bullet's size, so the disc
- * is a dot of the bullet's measure instead — a third of an em, its middle a
- * third of an em up, where `•` sits in the common faces — in the text's
- * color. Empty, so its baseline is its bottom edge, and lifted from there by
- * an offset — a flex item's margin is not counted in its baseline. The side
- * margins stand in for the glyph's side bearings, so the words sit where they
+ * The circles and squares, drawn rather than typed. `●`, `○`, `■` and `□` are
+ * geometric shapes, and few text faces carry them, so they fall back to
+ * whichever symbol face the system has, at whatever size that face draws them
+ * — two-thirds of an em in one, under half in another — and no one scale puts
+ * them where they belong beside `•`. So each is a box of a fixed measure in
+ * the text's color, filled or outlined: the circle at the bullet's own size,
+ * the disc and the ring a size up, the squares a shade smaller than the disc
+ * because a square of the same measure looks the larger. Every one has its
+ * middle a third of an em up, where `•` sits in the common faces.
+ */
+const DRAWN: Partial<Record<ListMarker, { size: number; round: boolean; open: boolean }>> = {
+	circle: { size: 0.3, round: true, open: true },
+	disc: { size: 0.44, round: true, open: false },
+	ring: { size: 0.44, round: true, open: true },
+	square: { size: 0.38, round: false, open: false },
+	openSquare: { size: 0.38, round: false, open: true }
+};
+
+/** Where `•` has its middle, in em above the baseline. */
+const BULLET_MIDDLE = 0.335;
+
+/**
+ * Empty, so its baseline is its bottom edge, and lifted from there by an
+ * offset — a flex item's margin is not counted in its baseline. The side
+ * margins stand in for a glyph's side bearings, so the words sit where they
  * would beside a bullet.
  */
-const DISC =
-	'<span style="flex:none;display:inline-block;width:0.3em;height:0.3em;margin:0 0.14em 0 0.08em;position:relative;top:-0.19em;border-radius:50%;background:currentColor" aria-hidden="true"></span>';
+function drawnMarker({ size, round, open }: { size: number; round: boolean; open: boolean }): string {
+	const style = [
+		'flex:none',
+		'display:inline-block',
+		'box-sizing:border-box',
+		`width:${size}em`,
+		`height:${size}em`,
+		'margin:0 0.14em 0 0.08em',
+		'position:relative',
+		`top:-${Math.round((BULLET_MIDDLE - size / 2) * 1000) / 1000}em`,
+		...(round ? ['border-radius:50%'] : []),
+		open ? 'border:0.07em solid currentColor' : 'background:currentColor'
+	].join(';');
+	return `<span style="${style}" aria-hidden="true"></span>`;
+}
 
 interface ListItem {
 	text: string;
@@ -257,7 +287,7 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 		item: mm(md.list.itemSpacing ?? 0),
 		gap: mm(md.list.markerGap ?? 0),
 		bullet: LIST_GLYPHS[list?.marker ?? 'bullet'],
-		disc: (list?.marker ?? 'bullet') === 'disc'
+		drawn: DRAWN[list?.marker ?? 'bullet']
 	};
 	const para = options.paragraph;
 	// Space after is in lines of the leading — a line is `lineHeight` em — and
@@ -325,8 +355,8 @@ interface ListLook {
 	item: string;
 	gap: string;
 	bullet: string | null;
-	/** the bullet is the drawn disc rather than its glyph — see `DISC` */
-	disc?: boolean;
+	/** the bullet is drawn rather than typed — see `DRAWN` */
+	drawn?: { size: number; round: boolean; open: boolean };
 }
 
 function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, look: ListLook): string {
@@ -358,8 +388,8 @@ function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, 
 			const mark =
 				marker === null
 					? ''
-					: !list.ordered && look.disc
-						? DISC
+					: !list.ordered && look.drawn
+						? drawnMarker(look.drawn)
 						: `<span style="flex:none;white-space:nowrap">${escapeHtml(marker)}</span>`;
 			return `<li style="${itemStyle}">${mark}${inner.join('')}</li>`;
 		})

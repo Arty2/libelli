@@ -220,8 +220,18 @@ export interface ParagraphStyle {
 	amount: number;
 }
 
-/** What a Markdown bullet list is marked with: `•`, `●`, `○`, `■`, `–`, `—`, `➤`, or nothing. */
-export type ListMarker = 'bullet' | 'disc' | 'circle' | 'square' | 'dash' | 'emdash' | 'arrow' | 'none';
+/** What a Markdown bullet list is marked with: `•`, `●`, `○`, `◯`, `■`, `□`, `–`, `—`, `➤`, or nothing. */
+export type ListMarker =
+	| 'bullet'
+	| 'disc'
+	| 'circle'
+	| 'ring'
+	| 'square'
+	| 'openSquare'
+	| 'dash'
+	| 'emdash'
+	| 'arrow'
+	| 'none';
 
 /**
  * How a Markdown list is set. Each field on its own: an area can take the

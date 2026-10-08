@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { escapeHtml, flagUnknown, renderInline, renderMarkdown } from './markdown';
 import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
-
+import type { ListMarker } from './types';
 const render = (src: string) => renderMarkdown(src, { size: 12.5 });
 
 describe('escaping', () => {
@@ -152,17 +152,29 @@ describe('list style', () => {
 		expect(html).toContain('padding:0 0 0 3em;line-height:1.2');
 		// No leading of its own, and the list says nothing: it takes the area's.
 		expect(renderMarkdown('- a', { size: 10, lineHeight: 1.5 })).not.toContain('line-height:');
-		expect(renderMarkdown('- a', { size: 10, list: { marker: 'circle' } })).toContain('>○</span>');
-		expect(renderMarkdown('- a', { size: 10, list: { marker: 'square' } })).toContain('>■</span>');
 		expect(renderMarkdown('- a', { size: 10, list: { marker: 'arrow' } })).toContain('>➤</span>');
 		expect(renderMarkdown('- a', { size: 10 })).toContain('>•</span>');
 	});
 
-	it('draws a disc at the size of a bullet, and types the rest', () => {
-		const disc = renderMarkdown('- a', { size: 10, list: { marker: 'disc' } });
-		expect(disc).toContain('width:0.3em;height:0.3em');
-		expect(disc).toContain('background:currentColor');
-		expect(disc).not.toContain('●');
+	it('draws the circles and squares, at sizes of their own, and types the rest', () => {
+		const look = (marker: ListMarker) => renderMarkdown('- a', { size: 10, list: { marker } });
+		// The circle at the bullet's size, outlined; the disc and the ring a size up.
+		expect(look('circle')).toContain('width:0.3em;height:0.3em');
+		expect(look('circle')).toContain('border-radius:50%;border:0.07em solid currentColor');
+		expect(look('disc')).toContain('width:0.44em;height:0.44em');
+		expect(look('disc')).toContain('border-radius:50%;background:currentColor');
+		expect(look('ring')).toContain('width:0.44em;height:0.44em');
+		expect(look('ring')).toContain('border:0.07em solid currentColor');
+		// Squares a shade smaller than the disc, and square.
+		expect(look('square')).toContain('width:0.38em;height:0.38em');
+		expect(look('square')).not.toContain('border-radius');
+		expect(look('openSquare')).toContain('border:0.07em solid currentColor');
+		// Every one has its middle where the bullet's is.
+		expect(look('circle')).toContain('top:-0.185em');
+		expect(look('disc')).toContain('top:-0.115em');
+		for (const m of ['circle', 'disc', 'ring', 'square', 'openSquare'] as const) {
+			expect(look(m)).not.toMatch(/[●○◯■□]/);
+		}
 		expect(renderMarkdown('- a', { size: 10 })).toContain('<span style="flex:none;white-space:nowrap">•</span>');
 		// A number is not a disc, whatever marker the bullets are given.
 		expect(renderMarkdown('1. a', { size: 10, list: { marker: 'disc' } })).toContain(
