@@ -1223,6 +1223,14 @@
 	/** Below this, in px per ms, a release is a placement rather than a flick. */
 	const PAD_FLICK = 0.35;
 	/**
+	 * At least this, in px per ms, when a glide meets the stage's edge, and the
+	 * pad is put away rather than stopped there. Well under `PAD_FLICK`: the
+	 * friction has taken half of a hard flick by the time it arrives — 0.17 off
+	 * a flick that started at twice the threshold — and a pad still crossing a
+	 * finger's width in a tenth of a second is plainly thrown, not drifting.
+	 */
+	const PAD_STOW_SPEED = 0.1;
+	/**
 	 * Whether the pad is against an edge of the stage, so meeting one buzzes
 	 * once — on a drag or a glide, by touch — and sliding along it does not.
 	 */
@@ -1258,6 +1266,18 @@
 			// wall does, and the hand feels it arrive.
 			const hitX = padAt.right !== wanted.right;
 			const hitY = padAt.bottom !== wanted.bottom;
+			// Still visibly moving when it gets there, it was thrown at the
+			// edge, not slid up to it: put away, as a drag pushed past the edge
+			// is, shrinking into the button that brings it back (`stowPad`).
+			// One buzz for the two, the put-away one.
+			if ((hitX && Math.abs(vx) > PAD_STOW_SPEED) || (hitY && Math.abs(vy) > PAD_STOW_SPEED)) {
+				padGlide = null;
+				padHidden = true;
+				padThrown = true;
+				pushed = null;
+				if (touch) vibrate(HOLD_MS);
+				return;
+			}
 			if (hitX) vx = 0;
 			if (hitY) vy = 0;
 			meetEdge(hitX || hitY, touch);
@@ -1720,6 +1740,9 @@
 	     button drawn larger than the others beside it reads as a mistake. The
 	     automagic layout was here too, and moved to the page bar beside the
 	     lock: it is pressed once at the start, if at all. -->
+	<!-- The right-hand column, and under it, on a phone, what acts on a set
+	     of areas (SelectionTools' `side`). -->
+	<div class="side-rail">
 	<div class="corner top right stacked">
 		<!-- The page's lock, while it is locked: a padlock and no word, at the
 		     head of the column whose buttons it switches off, so the reason Area
@@ -1832,6 +1855,19 @@
 			>
 				<Icon name="data-collection" size={16} /><span class="sr-only">Bring stray areas back onto the page</span>
 			</button>
+		{/if}
+	</div>
+		{#if selectedBoxes.length > 1}
+			<SelectionTools
+				place="side"
+				boxes={selectedBoxes}
+				frozen={!!template.locked}
+				{onalign}
+				{ongroup}
+				onlock={onlockselection}
+				{onduplicate}
+				{ondelete}
+			/>
 		{/if}
 	</div>
 
@@ -2332,6 +2368,23 @@
 
 	.corner.top.right {
 		padding: 4px;
+	}
+
+	/* Placed as the left rail is: the column at the top right holds its own
+	   place in the flow, so what goes under it on a phone sits below it
+	   whatever its height. */
+	.side-rail {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 8px;
+	}
+
+	.side-rail .corner {
+		position: static;
 	}
 
 	/* Area is always there; the rescue button and the Select Multiple chip come

@@ -513,10 +513,10 @@ resize boxes directly, or type exact millimetres.
   editor shows each page on the side it will be printed on — including while
   dragging, which follows the pointer on a left-hand page and writes the mirror
   of it back.
-- **The area bar's head** — Lock, the **Area Name**, Delete, and a bare
+- **The area bar's head** — Lock, the area's **Name**, Delete, and a bare
   glyph at the end that puts the bar away until the next area is chosen, for
   the room under it. On a phone the head is the bar's first row, the name
-  stretched to fill it. A QR code's bar leaves out what does not apply to a
+  stretched to fill it and Delete a square glyph. A QR code's bar leaves out what does not apply to a
   code: of Text, only Color, and no Lines.
 - **Lock** — **Lock** in either bar freezes what you have: no dragging, no
   resizing, no option changes. A locked area can still be *selected*, or the
@@ -1556,8 +1556,10 @@ drag or a slide, it buzzes once. It can be pushed off the edge of
 the stage to get that corner back, as far as the middle chip: the arm you are
 not using goes out of sight, the chip you pick it up by never does. Throw it on
 past that, and let go, and it is put away — as holding the middle chip puts it
-away — shrinking into the button under zoom and pan that brings it back; thrown
-away, it comes back to its own corner. It is not drawn at all when nothing it
+away — shrinking into the button under zoom and pan that brings it back. A flick
+that slides it into the edge still moving does the same; one that has all but
+stopped by then only parks it there. Thrown away, it comes back to its own
+corner. It is not drawn at all when nothing it
 could move is selected. On an area whose top comes
 from an anchor, the two vertical keys change the **Gap** instead — the
 millimetres between it and the area it follows — and say so with a stop bar and
@@ -1721,7 +1723,9 @@ than it has to.
   about where an area sits on the sheet, and because it wants to be pressed four
   times in a row rather than reopened from a menu between each press.
 - **Selection** — with more than one area chosen, another column appears under
-  that one — the six alignments, then group, lock, duplicate, delete.
+  that one — the six alignments, then group, lock, duplicate, delete. On a
+  phone that column is the alignments alone, and the count, group, lock and
+  delete go under the column at the top right; duplicate is in the menu.
 - **Right-click** — **Select Multiple** first, because it changes what every
   press after it means and a touchscreen has no shift key; then lock, then the
   style clipboard, then group, duplicate and delete. With several chosen it also
