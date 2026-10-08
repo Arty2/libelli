@@ -646,7 +646,7 @@
 					<Icon name={selected.locked ? 'unlocked' : 'locked'} size={14} />
 					{selected.locked ? 'Unlock' : 'Lock'}
 				</button>
-				<span class="context">Area Name</span>
+				<span class="context">Name</span>
 				{#if source === 'field'}
 					<label class="field area-name">
 						<span class="sr-only">Name</span>
@@ -659,8 +659,14 @@
 						/>
 					</label>
 				{/if}
-				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen} title={withKey('Delete this area', 'delete')}>
-					<Icon name="trash" size={14} /> Delete
+				<button
+					class="danger-outline delete"
+					onclick={ondelete}
+					disabled={boxFrozen}
+					title={withKey('Delete this area', 'delete')}
+					aria-label="Delete this area"
+				>
+					<Icon name="trash" size={14} /> <span class="label">Delete</span>
 				</button>
 				<!-- The bar away, for the room under it; it comes back with the next
 				     area chosen. A bare glyph, as the CSS dialog's window controls

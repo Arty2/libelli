@@ -698,13 +698,15 @@
 	/* The CSS button keeps its glyph and loses the word, as the app's own
 	   toolbar buttons do at this width: the head has to hold a lock, a name,
 	   its menu and two buttons on one line. Square without it, like the swap
-	   button beside it, rather than a box drawn for a word that is not there. */
+	   button beside it, rather than a box drawn for a word that is not there.
+	   The area bar's Delete the same, so the name gets the room. */
 	.options .head-row .label {
 		display: none;
 	}
 
 	.options .head-row button.css,
-	.options .head-row button.layout {
+	.options .head-row button.layout,
+	.options .head-row button.delete {
 		--square: calc(0.875rem + 12px);
 		padding: 5px;
 		width: var(--square);

@@ -1543,7 +1543,10 @@ control dragged off the edge of a phone is a control you do not get back.
 
 **Controls sit next to what they act on.** Undo and redo are a column at the
 page's top-left corner, with stacking order under them whenever anything is
-selected and the multi-selection tools under that; *+ Area* is at the top-right,
+selected and the multi-selection tools under that (on a phone only the six
+alignments; the count, group, lock and delete go under the top-right column,
+since ten buttons down the left were as tall as the page they sat over, and
+Duplicate stays in the area's menu); *+ Area* is at the top-right,
 the view toggles are along the bottom edge and the card pager sits under the
 sheet. The window toolbar holds only what is about the whole app. Tools that come
 and go with a selection belong on that rail rather than in the options bar, where

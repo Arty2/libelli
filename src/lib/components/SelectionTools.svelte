@@ -12,9 +12,16 @@
 		onlock: () => void;
 		onduplicate: () => void;
 		ondelete: () => void;
+		/**
+		 * Which copy this is. On a desk one column holds everything, beside undo.
+		 * On a phone that column is the align buttons alone, and the count and
+		 * what acts on the set go under the right-hand column (`side`) — the
+		 * left edge was a column of ten, as tall as the page it sat over.
+		 */
+		place?: 'rail' | 'side';
 	}
 
-	let { boxes, frozen, onalign, ongroup, onlock, onduplicate, ondelete }: Props = $props();
+	let { boxes, frozen, onalign, ongroup, onlock, onduplicate, ondelete, place = 'rail' }: Props = $props();
 
 	const allLocked = $derived(boxes.length > 0 && boxes.every((b) => b.locked));
 	const grouped = $derived(
@@ -35,18 +42,21 @@
      more than one box chosen, so they belong beside the page rather than
      pushing the options bar around every time a second box is picked up. Icons
      only — the count and the wording live in the right-click menu. -->
-<div class="tools" role="toolbar" aria-label="Selection" aria-orientation="vertical">
-	<span class="count" aria-hidden="true">{boxes.length}</span>
+<div class="tools {place}" role="toolbar" aria-label="Selection" aria-orientation="vertical">
+	<span class="count act" aria-hidden="true">{boxes.length}</span>
 
-	{#each ALIGN_EDGES as option (option.value)}
-		<button title={option.label} aria-label={option.label} disabled={frozen} onclick={() => onalign(option.value)}>
-			<Icon name={option.icon} size={16} />
-		</button>
-	{/each}
+	{#if place === 'rail'}
+		{#each ALIGN_EDGES as option (option.value)}
+			<button title={option.label} aria-label={option.label} disabled={frozen} onclick={() => onalign(option.value)}>
+				<Icon name={option.icon} size={16} />
+			</button>
+		{/each}
 
-	<hr />
+		<hr class="act" />
+	{/if}
 
 	<button
+		class="act"
 		aria-pressed={grouped}
 		title={grouped ? 'Ungroup' : 'Group — move, lock and delete these as one'}
 		aria-label={grouped ? 'Ungroup' : 'Group'}
@@ -56,6 +66,7 @@
 		<Icon name={grouped ? 'ungroup-objects' : 'group-objects'} size={16} />
 	</button>
 	<button
+		class="act"
 		aria-pressed={allLocked}
 		title={allLocked ? 'Unlock all of them' : 'Lock all of them'}
 		aria-label={allLocked ? 'Unlock' : 'Lock'}
@@ -64,10 +75,14 @@
 	>
 		<Icon name="locked" size={16} />
 	</button>
-	<button title={withKey('Duplicate', 'duplicate')} aria-label="Duplicate" disabled={frozen} onclick={onduplicate}>
-		<Icon name="replicate" size={16} />
-	</button>
-	<button class="danger" title={withKey('Delete', 'delete')} aria-label="Delete" disabled={frozen || allLocked} onclick={ondelete}>
+	<!-- Not on a phone: there it is in the area's menu, a long press away, and
+	     the side column has room for the few a set is most often used for. -->
+	{#if place === 'rail'}
+		<button class="act" title={withKey('Duplicate', 'duplicate')} aria-label="Duplicate" disabled={frozen} onclick={onduplicate}>
+			<Icon name="replicate" size={16} />
+		</button>
+	{/if}
+	<button class="act danger" title={withKey('Delete', 'delete')} aria-label="Delete" disabled={frozen || allLocked} onclick={ondelete}>
 		<Icon name="trash" size={16} />
 	</button>
 </div>
@@ -87,6 +102,24 @@
 		max-height: calc(100dvh - 220px);
 		overflow-y: auto;
 		overscroll-behavior: contain;
+	}
+
+	/* The desk's one column, or the phone's two: the same breakpoint the app
+	   stacks at (`stacked` in +page.svelte). Both copies are in the DOM at
+	   every width, as the corners' short and long labels are, so crossing it
+	   costs nothing. */
+	.side {
+		display: none;
+	}
+
+	@media (max-width: 900px) {
+		.rail .act {
+			display: none;
+		}
+
+		.side {
+			display: flex;
+		}
 	}
 
 	.count {
