@@ -56,7 +56,8 @@ export interface LayoutResult {
 
 export function boxHeight(box: Box, measured: number | undefined, hidden: boolean): number {
 	if (hidden) return 0;
-	if (box.overflow === 'clip') return box.h;
+	// Shrink keeps its height, as a clip does: it is the words that change size.
+	if (box.overflow === 'clip' || box.overflow === 'shrink') return box.h;
 	return Math.max(box.h, measured ?? 0);
 }
 
@@ -450,4 +451,29 @@ export function columnGaps(count: number, gap: number, width: number): Array<[nu
 		const left = (i + 1) * column + i * gap;
 		return [left / width, (left + gap) / width];
 	});
+}
+
+/** How small Shrink may set an area's words: half the size, and no further. */
+export const SHRINK_FLOOR = 0.5;
+
+/**
+ * The largest scale of an area's words at which `fits` says they fit, to the
+ * nearest hundredth: 1 if they fit as set, `SHRINK_FLOOR` if nothing does.
+ *
+ * A bisection, because a fit is monotonic in the size — smaller words never
+ * take more room — and each try is a layout the browser has to do. Seven
+ * halvings of the half between the floor and full size land within a
+ * hundredth, which is a quarter of a point on 24pt type.
+ */
+export function shrinkScale(fits: (scale: number) => boolean, floor = SHRINK_FLOOR): number {
+	if (fits(1)) return 1;
+	let lo = floor;
+	let hi = 1;
+	if (!fits(lo)) return floor;
+	while (hi - lo > 0.005) {
+		const mid = (lo + hi) / 2;
+		if (fits(mid)) lo = mid;
+		else hi = mid;
+	}
+	return Math.floor(lo * 100) / 100;
 }

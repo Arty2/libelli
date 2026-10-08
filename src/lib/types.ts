@@ -25,7 +25,12 @@ export const SCHEMA_VERSION = 5;
  * whichever the area held; a template that says `bitmap` is read as `image`.
  */
 export type BoxMode = 'plain' | 'markdown' | 'image' | 'color' | 'qr';
-export type Overflow = 'clip' | 'grow';
+/**
+ * What an area does with words that do not fit: cut them off, get taller, or
+ * keep its height and set them smaller until they fit — down to `SHRINK_FLOOR`
+ * of the size, past which it cuts as a clip does.
+ */
+export type Overflow = 'clip' | 'grow' | 'shrink';
 export type Align = 'left' | 'center' | 'right' | 'justify';
 /** vertical placement of a box's content within its own frame */
 export type VAlign = 'top' | 'middle' | 'bottom';

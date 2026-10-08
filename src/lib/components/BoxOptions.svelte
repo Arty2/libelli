@@ -1598,9 +1598,10 @@
 				<span>Overflow</span>
 				<select
 					value={selected.overflow}
-					title="Clip cuts off what does not fit in the box's millimetres; Grow lets the box get taller to hold it" disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
+					title="Clip cuts off what does not fit in the box's millimetres; Grow lets the box get taller to hold it; Shrink keeps the height and sets the words smaller until they fit, down to half their size" disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
 					<option value="clip">Clip</option>
 					<option value="grow">Grow</option>
+					<option value="shrink">Shrink</option>
 				</select>
 			</label>
 		</fieldset>

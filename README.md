@@ -85,8 +85,14 @@ resize boxes directly, or type exact millimetres.
   anything if one area answers to it, two areas may not share a name: a rename
   onto a name already in use is refused, the field goes back to what it said, and
   the status bar names the area that already has it.
-- **`grow` / `clip`** — a grow box keeps its top edge and lengthens downward; a
-  clip box keeps its height and hard-cuts what does not fit.
+- **`grow` / `clip` / `shrink`** — a grow box keeps its top edge and lengthens
+  downward; a clip box keeps its height and hard-cuts what does not fit; a
+  shrink box keeps its height and sets its words smaller, card by card, until
+  they fit both ways — a word too long for the width counts too — down to half
+  their size, past which it cuts as a clip does. The long name is set small and
+  the short one on the next card is not, in the editor and in print alike.
+  Everything in the words scales together, headings included; padding,
+  borders and letter-spacing, which are millimetres, stay as set.
 - **Sizes grow from the aligned edge** — typing a new **W** into the bar keeps a
   right-aligned area's right edge where it was, and a centred one's middle; a
   new **H** does the same for a bottom- or middle-aligned area, unless it is

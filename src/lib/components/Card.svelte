@@ -28,7 +28,8 @@
 		latchSpan,
 		snapTo,
 		snapToEdges,
-		columnGaps
+		columnGaps,
+		shrinkScale
 	} from '$lib/layout';
 	import { flagUnknown, renderMarkdown } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
@@ -184,6 +185,12 @@
 	let measured = $state<Record<string, number>>({});
 	/** boxes whose content is taller than the box will let it be */
 	let overflowing = $state<Record<string, boolean>>({});
+	/**
+	 * The scale a Shrink area's words are set at on this card, by box id; absent
+	 * is full size. Per card, because each row has its own words: the long name
+	 * is set small and the short one beside it is not.
+	 */
+	let shrunk = $state<Record<string, number>>({});
 	/**
 	 * The edge a live drag has latched onto, drawn as a guide until it lets go.
 	 * `flip` records that the latch was measured against a mirrored box, so the
@@ -476,7 +483,9 @@
 			// hangs its last line's inline box a few pixels past them, and
 			// scrollHeight counts that, which flagged every two-line title as cut.
 			const content = node.querySelector<HTMLElement>('.content');
-			const clipped = template.boxes.find((b) => b.id === id)?.overflow === 'clip';
+			// Shrink cuts too, once its words are as small as it will set them.
+			const overflow = template.boxes.find((b) => b.id === id)?.overflow;
+			const clipped = overflow === 'clip' || overflow === 'shrink';
 			const spills = clipped && !!content && content.scrollHeight > node.clientHeight + 1;
 			if ((overflowing[id] ?? false) !== spills) overflowing = { ...overflowing, [id]: spills };
 		};
@@ -499,6 +508,88 @@
 			destroy: () => {
 				observer.disconnect();
 				mutations.disconnect();
+			}
+		};
+	}
+
+	/**
+	 * Shrink: the words set as large as they can be and still fit the area, both
+	 * ways — a word too long for the width counts as much as a line too many.
+	 * Tried on the element itself, a bisection of layouts (`shrinkScale`), and
+	 * then kept in `shrunk`, so the style the card renders says the same thing
+	 * the search left behind and the next render does not undo it. Every size in
+	 * the area is in em of it — Markdown's headings included — so one font size
+	 * on `.content` scales the lot; padding, borders and the letter-spacing,
+	 * which are millimetres, stay as set.
+	 *
+	 * Run again whenever what the area holds or how it is set changes: its
+	 * text (a mutation), its width (a resize), its style (font, size — an
+	 * attribute change), and a web font landing. The search's own writes are
+	 * attribute changes as well, and are thrown away when it finishes.
+	 */
+	function fitWords(node: HTMLElement, id: string | null) {
+		let current = id;
+		const read = () => {
+			if (!current) return;
+			const content = node.querySelector<HTMLElement>(':scope > .content');
+			if (!content) return;
+			// Against the room the area has inside its padding, not `.content`'s
+			// own height: that is only as tall as the words when they are short,
+			// and a face whose last line hangs a few pixels past its line box
+			// would never fit in it at any size.
+			const pad = getComputedStyle(node);
+			const room = node.clientHeight - parseFloat(pad.paddingTop) - parseFloat(pad.paddingBottom);
+			const fits = (scale: number) => {
+				content.style.fontSize = `${scale}em`;
+				return content.scrollHeight <= room + 1 && content.scrollWidth <= content.clientWidth + 1;
+			};
+			const scale = shrinkScale(fits);
+			content.style.fontSize = scale === 1 ? '' : `${scale}em`;
+			// Said again here, as `measure` says it: that one read the words before
+			// they were set smaller, and setting them smaller is no change it
+			// watches for. Only at the floor can they still be cut.
+			const spills = content.scrollHeight > room + 1 || content.scrollWidth > content.clientWidth + 1;
+			if ((overflowing[current] ?? false) !== spills) overflowing = { ...overflowing, [current]: spills };
+			if ((shrunk[current] ?? 1) !== scale) {
+				const { [current]: _was, ...rest } = shrunk;
+				shrunk = scale === 1 ? rest : { ...rest, [current]: scale };
+			}
+			// The search's own writes to `.content` are mutations too; read
+			// again for them and it would never stop.
+			words.takeRecords();
+		};
+		const resize = new ResizeObserver(read);
+		const words = new MutationObserver(read);
+		const watch = () => {
+			resize.disconnect();
+			words.disconnect();
+			if (!current) return;
+			resize.observe(node);
+			// One call: a second `observe` on the same node replaces the first's
+			// options rather than adding to them.
+			words.observe(node, {
+				subtree: true,
+				childList: true,
+				characterData: true,
+				attributes: true,
+				attributeFilter: ['style', 'class']
+			});
+			read();
+		};
+		watch();
+		if (typeof document !== 'undefined' && document.fonts) document.fonts.ready.then(read).catch(() => {});
+		return {
+			update: (next: string | null) => {
+				if (current && !next && shrunk[current] !== undefined) {
+					const { [current]: _was, ...rest } = shrunk;
+					shrunk = rest;
+				}
+				current = next;
+				watch();
+			},
+			destroy: () => {
+				resize.disconnect();
+				words.disconnect();
 			}
 		};
 	}
@@ -731,7 +822,7 @@
 		}
 		if (hidden.has(box.id)) {
 			parts.push('height:0', 'overflow:hidden', 'visibility:hidden');
-		} else if (box.overflow === 'clip') {
+		} else if (box.overflow === 'clip' || box.overflow === 'shrink') {
 			// The height only. The clip itself is CSS, on .content — put here, on
 			// the box, it also ate the handles and badges that hang off its edges.
 			parts.push(`height:${box.h}mm`);
@@ -2055,7 +2146,7 @@
 				class:outlined={bounds && !empty}
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
-				class:clipped={box.overflow === 'clip' && !empty}
+				class:clipped={(box.overflow === 'clip' || box.overflow === 'shrink') && !empty}
 				class:locked={!!box.locked}
 				class:no-padding={!box.padding}
 				class:grouped={!!box.group}
@@ -2067,6 +2158,7 @@
 				{...idFor(box)}
 				data-box-id={box.id}
 				use:measure={box.id}
+				use:fitWords={box.overflow === 'shrink' && (box.mode === 'plain' || box.mode === 'markdown') ? box.id : null}
 				onpointerdown={(e) => startDrag(e, box, 'move')}
 				ondblclick={(e) => {
 					if (!interactive) return;
@@ -2102,7 +2194,9 @@
 				{/if}
 				<div
 					class="content"
-					style={columnsStyle(box)}
+					style={[columnsStyle(box), shrunk[box.id] && box.overflow === 'shrink' ? `font-size:${shrunk[box.id]}em` : '']
+						.filter(Boolean)
+						.join(';') || undefined}
 					class:being-edited={editingId === box.id}
 					class:shifted={!!baselineOf(box, template.defaults) && (box.mode === 'plain' || box.mode === 'markdown')}
 				>
@@ -2223,7 +2317,7 @@
 
 				<!-- The cut is a clipped area's alone: a growing one is never cut —
 				     it has the trim line above instead. -->
-				{#if bounds && !empty && box.overflow === 'clip' && overflowing[box.id]}
+				{#if bounds && !empty && (box.overflow === 'clip' || box.overflow === 'shrink') && overflowing[box.id]}
 					<!-- Where the words are actually severed, drawn as the cut it is: a
 					     dashed red line along the bottom edge, with the shears straddling
 					     it at the end of the stroke. The other three edges keep the plain

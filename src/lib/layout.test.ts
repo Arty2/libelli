@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
 	FREE_STEP,
+	SHRINK_FLOOR,
+	boxHeight,
+	shrinkScale,
 	actualScale,
 	columnGaps,
 	GRID_MAJOR,
@@ -350,5 +353,35 @@ describe('columnGaps', () => {
 		expect(columnGaps(1, 5, 100)).toEqual([]);
 		expect(columnGaps(3, 5, 0)).toEqual([]);
 		expect(columnGaps(3, 60, 100)).toEqual([]);
+	});
+});
+
+describe('shrinkScale', () => {
+	it('leaves words that fit at their size, and tries nothing smaller', () => {
+		const tried: number[] = [];
+		expect(
+			shrinkScale((s) => {
+				tried.push(s);
+				return true;
+			})
+		).toBe(1);
+		expect(tried).toEqual([1]);
+	});
+
+	it('finds the largest size that fits, never over it', () => {
+		// Words that fit at 0.734 of the size and not above.
+		const scale = shrinkScale((s) => s <= 0.734);
+		expect(scale).toBeLessThanOrEqual(0.734);
+		expect(scale).toBeGreaterThanOrEqual(0.72);
+	});
+
+	it('stops at the floor when nothing fits', () => {
+		expect(shrinkScale(() => false)).toBe(SHRINK_FLOOR);
+		expect(shrinkScale((s) => s <= 0.3, 0.4)).toBe(0.4);
+	});
+
+	it('keeps its height, as a clip does', () => {
+		const box = newBox({ h: 20, overflow: 'shrink' });
+		expect(boxHeight(box, 50, false)).toBe(20);
 	});
 });

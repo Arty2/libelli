@@ -16,7 +16,7 @@ import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
  */
 
 export interface MarkdownOptions {
-	/** base font size in points; heading sizes are multipliers of it */
+	/** the area's font size in points; headings are set as multiples of it, in em */
 	size: number;
 	md?: MarkdownStyle;
 	/** the area's paragraph style, with the leading its amount is counted in */
@@ -334,7 +334,10 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 				const key = `h${block.level}` as 'h1' | 'h2' | 'h3';
 				const s = md[key];
 				const style = [
-					`font-size:${round(options.size * (s.size ?? 1))}pt`,
+					// In em of the area, not points worked out from its size: the
+					// same thing at the size the area is set in, and it follows the
+					// area down when Shrink sets the words smaller to fit.
+					`font-size:${round(s.size ?? 1)}em`,
 					`font-weight:${s.weight ?? 700}`,
 					'line-height:1.2',
 					`margin:${mm(first ? 0 : (s.spaceBefore ?? 0))} 0 ${mm(s.spaceAfter ?? 0)}`

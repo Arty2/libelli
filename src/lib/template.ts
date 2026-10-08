@@ -431,7 +431,8 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		// A mode decides which renderer a cell reaches, so a word this format does
 		// not name is read as words rather than trusted.
 		mode: readMode(partial.mode),
-		overflow: partial.overflow ?? 'clip',
+		// Read, not trusted: a word this format does not name is the default.
+		overflow: partial.overflow === 'grow' || partial.overflow === 'shrink' ? partial.overflow : 'clip',
 		// Anything optional that is not named here is dropped on load: this list
 		// is the box format, so a new field has to be added in both places.
 		...stripUndefined({

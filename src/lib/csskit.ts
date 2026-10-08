@@ -114,6 +114,7 @@ function selectors(template: Template): string[] {
 		const notes = [
 			b.columns && (b.mode === 'plain' || b.mode === 'markdown') && `${b.columns.count} columns`,
 			b.overflow === 'grow' && 'grows',
+			b.overflow === 'shrink' && 'shrinks to fit',
 			b.anchor && `below ${idOf(b.anchor.to)}`
 		].filter(Boolean);
 		const frame = `${b.mode}, ${round(b.x)} ${round(b.y)}, ${round(b.w)} × ${round(b.h)}${notes.length ? `; ${notes.join(', ')}` : ''}`;

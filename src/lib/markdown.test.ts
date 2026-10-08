@@ -25,7 +25,7 @@ describe('blocks', () => {
 	it('renders headings at multiples of the box size', () => {
 		const html = renderMarkdown('## Too dry', { size: 10, md: { h2: { size: 1.5 } } });
 		expect(html).toContain('<h2');
-		expect(html).toContain('font-size:15pt');
+		expect(html).toContain('font-size:1.5em');
 	});
 
 	it('drops the leading space before a first-block heading', () => {
