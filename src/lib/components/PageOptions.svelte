@@ -21,6 +21,9 @@
 		LIST_MARKERS,
 		LIST_NUMBERING_LABELS,
 		LIST_NUMBERINGS,
+		LEADER_LABELS,
+		LEADERS,
+		normaliseLeader,
 		MAX_BASELINE,
 		MAX_LIST,
 		FACING_PAGE_NUMBER_POSITIONS,
@@ -282,6 +285,13 @@
 		const { list: _was, ...rest } = template.defaults;
 		const list = normaliseList({ ...template.defaults.list, ...change });
 		patchTemplate({ defaults: list ? { ...rest, list } : rest });
+	}
+
+	/** None is no leader at all, so it is not kept: an absent key, as Clearing a field means removing it. */
+	function setDefaultLeader(raw: string) {
+		const { leader: _was, ...rest } = template.defaults;
+		const leader = normaliseLeader(raw);
+		patchTemplate({ defaults: leader && leader !== 'none' ? { ...rest, leader } : rest });
 	}
 
 	function setDefaultBaseline(raw: string) {
@@ -807,6 +817,19 @@
 					<span class="unit">{template.defaults.paragraph.mode === 'space' ? 'lines' : 'em'}</span>
 				</label>
 			{/if}
+			<label class="field">
+				<span>Leader</span>
+				<select
+					value={template.defaults.leader ?? 'none'}
+					title="A line with a tab in it, or ^t, sets what follows against the right edge, joined by this line — Coffee^t3.50 for a price list. For every area that sets none of its own"
+					disabled={pageFrozen}
+					onchange={(e) => setDefaultLeader(e.currentTarget.value)}
+				>
+					{#each LEADERS as leader (leader)}
+						<option value={leader}>{LEADER_LABELS[leader]}</option>
+					{/each}
+				</select>
+			</label>
 		</fieldset>
 		<fieldset class="group">
 			<legend>Lists</legend>

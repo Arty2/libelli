@@ -21,6 +21,8 @@
 		LIST_MARKERS,
 		LIST_NUMBERING_LABELS,
 		LIST_NUMBERINGS,
+		LEADER_LABELS,
+		LEADERS,
 		baselineOf,
 		normaliseBaseline,
 		normaliseColumns,
@@ -1324,6 +1326,25 @@
 					<ResetButton to="the page's paragraphs" disabled={boxFrozen} onclick={() => patch({ paragraph: undefined })} />
 				</label>
 			{/if}
+			<!-- With the paragraphs, since it is how a line of one is set. -->
+			<label class="field">
+				<span>Leader</span>
+				<select
+					class:inherits={!selected.leader}
+					value={selected.leader ?? ''}
+					title="A line with a tab in it, or ^t, sets what follows against the right edge, joined by this line — Coffee^t3.50 for a price list"
+					disabled={boxFrozen}
+					onchange={(e) => patch({ leader: (e.currentTarget.value || undefined) as Box['leader'] })}
+				>
+					<option value="">Default: {LEADER_LABELS[template.defaults.leader ?? 'none']}</option>
+					{#each LEADERS as leader (leader)}
+						<option value={leader}>{LEADER_LABELS[leader]}</option>
+					{/each}
+				</select>
+				{#if selected.leader}
+					<ResetButton to="the page's leader" disabled={boxFrozen} onclick={() => patch({ leader: undefined })} />
+				{/if}
+			</label>
 		</fieldset>
 		{/if}
 		{#if selected.mode === 'markdown'}

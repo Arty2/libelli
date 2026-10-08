@@ -17,6 +17,7 @@ import type {
 	FontRef,
 	ListMarker,
 	ListNumbering,
+	Leader,
 	ListStyle,
 	Mapping,
 	PageBackgroundImage,
@@ -180,6 +181,21 @@ export const LIST_NUMBERING_LABELS: Record<ListNumbering, string> = {
 	lowerRoman: 'i, ii, iii Roman',
 	upperRoman: 'I, II, III Roman Capitals'
 };
+
+/** The tab leaders, in the order the menu offers them. */
+export const LEADERS: Leader[] = ['none', 'dotted', 'dashed', 'solid'];
+
+export const LEADER_LABELS: Record<Leader, string> = {
+	none: 'None',
+	dotted: 'Dotted',
+	dashed: 'Dashed',
+	solid: 'Solid'
+};
+
+/** A leader the format names, or nothing. */
+export function normaliseLeader(raw: unknown): Leader | undefined {
+	return LEADERS.includes(raw as Leader) ? (raw as Leader) : undefined;
+}
 
 /** How far a list may be indented, in em. */
 export const MAX_LIST = 10;
@@ -441,6 +457,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			weight: partial.weight === undefined ? undefined : Math.max(100, Math.min(900, num(partial.weight, 400))),
 			lineHeight: optionalAtLeast(partial.lineHeight, MIN_LEADING),
 			paragraph: normaliseParagraph(partial.paragraph),
+			leader: normaliseLeader(partial.leader),
 			list: normaliseList(partial.list),
 			baseline: normaliseBaseline(partial.baseline),
 			columns: normaliseColumns(partial.columns),
@@ -530,6 +547,8 @@ export function normaliseTemplate(raw: unknown): Template {
 			size: atLeast(t.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
 			lineHeight: atLeast(t.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
 			paragraph: normaliseParagraph(t.defaults?.paragraph),
+			// The page's `none` is the same as none at all, so it is not kept.
+			leader: normaliseLeader(t.defaults?.leader) === 'none' ? undefined : normaliseLeader(t.defaults?.leader),
 			list: normaliseList(t.defaults?.list),
 			baseline: normaliseBaseline(t.defaults?.baseline)
 		}) as Defaults,

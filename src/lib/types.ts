@@ -219,6 +219,9 @@ export interface FontRef {
  * lines of the area's own leading, an indent in em of its size, so either
  * keeps its proportion when the type size or the leading changes.
  */
+/** How a tab leader is drawn — see `TextStyle.leader`. */
+export type Leader = 'none' | 'dotted' | 'dashed' | 'solid';
+
 export interface ParagraphStyle {
 	mode: 'space' | 'indent';
 	/** lines of the leading for a space; em of the type size for an indent */
@@ -275,6 +278,14 @@ export interface TextStyle {
 	letterSpacing?: number;
 	/** absent inherits the page's; absent there too is each renderer's own */
 	paragraph?: ParagraphStyle;
+	/**
+	 * A line with a tab in it — or `^t`, which can be typed where a tab cannot
+	 * — sets what follows the last one against the right edge, joined to what
+	 * comes before by this line: a price list's dots. Absent inherits the
+	 * page's, absent there too is none, and with none a tab is only a space.
+	 * `none` is an area saying so over a page that has one.
+	 */
+	leader?: Leader;
 	/** absent inherits the page's, field by field; Markdown areas only */
 	list?: ListStyle;
 	/**
@@ -308,7 +319,7 @@ export interface TextColumns {
 export type Defaults = Required<
 	Pick<TextStyle, 'font' | 'size' | 'lineHeight' | 'weight' | 'color' | 'align' | 'letterSpacing'>
 > &
-	Pick<TextStyle, 'paragraph' | 'list' | 'baseline'>;
+	Pick<TextStyle, 'paragraph' | 'list' | 'baseline' | 'leader'>;
 
 /** Markdown block metrics. `size` values are multipliers of the box size; every spacing is mm. */
 export interface MarkdownStyle {

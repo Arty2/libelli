@@ -275,6 +275,14 @@ resize boxes directly, or type exact millimetres.
   first — a heading or a list before it included, since on a card most
   paragraphs follow one, and the book rule of indenting only a paragraph after
   another meant it hardly ever showed.
+- **Tab leaders** — **Leader**, beside Paragraph in both bars: **Dotted**,
+  **Dashed**, **Solid** or **None**. With one set, a line with a tab in it puts
+  what follows the last tab against the area's right edge and fills the room
+  between with the leader, on the baseline — `Espresso^t2.20` is a price list's
+  line. `^t` is InDesign's code for a tab, and the way to write one here: a Tab
+  key moves to the next field, and a tab pasted from a spreadsheet starts a new
+  column. Plain text and Markdown, paragraphs and list items alike; with no
+  leader a line is set as it always was.
 - **Columns** — in the area bar's Lines, for an area of words: 2 to 6 sets
   them side by side within the area, with **Gap** the millimetres between
   one column and the next. Blank or 1 is one column. The columns balance —

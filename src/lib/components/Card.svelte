@@ -31,13 +31,13 @@
 		columnGaps,
 		shrinkScale
 	} from '$lib/layout';
-	import { flagUnknown, renderMarkdown } from '$lib/markdown';
+	import { flagUnknown, leaderStyle, renderMarkdown, tabSplit } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
 	import { DEFAULT_ORPHANS, DEFAULT_WIDOWS, baselineOf, colorsFromRow, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import { barcodeSvg } from '$lib/barcode';
-	import type { Box, Mapping, Row, Template } from '$lib/types';
+	import type { Box, Leader, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
@@ -251,6 +251,11 @@
 
 	/** The area's paragraph style, or the page's when it names none of its own. */
 	const paragraphOf = (box: Box) => box.paragraph ?? template.defaults.paragraph;
+	/** The tab leader an area draws, over the page's; undefined where it draws none. */
+	const leaderOf = (box: Box): Exclude<Leader, 'none'> | undefined => {
+		const leader = box.leader ?? template.defaults.leader;
+		return leader && leader !== 'none' ? leader : undefined;
+	};
 
 	/**
 	 * What an image area resolves to: a picture, a fill, or nothing at all.
@@ -2050,6 +2055,15 @@
      astride the cut on an area that is cutting its words off, where pressing
      lets it grow; blue and faint beside the trim line on one that has grown,
      where pressing cuts it back to the height it was given. -->
+<!-- A line of plain text, as a row of words, leader and words at the right
+     edge when it has a tab and the area a leader — `tabSplit`, `leaderStyle`,
+     the same as Markdown's. -->
+{#snippet leadered(line: string, leader: Exclude<Leader, 'none'> | undefined)}{@const parts = leader ? tabSplit(line) : null}{#if parts && leader}<span class="tabbed"
+		><span>{@render marked(parts[0])}</span><span style={leaderStyle(leader)}></span><span class="tab-right"
+			>{@render marked(parts[1])}</span
+		></span
+	>{:else}{@render marked(line)}{/if}{/snippet}
+
 {#snippet shears(box: Box, cutting: boolean)}
 	<button
 		class="overflow-mark"
@@ -2209,7 +2223,8 @@
 							md: box.md,
 							paragraph: paragraphOf(box),
 							lineHeight: box.lineHeight ?? template.defaults.lineHeight,
-							list: listOf(box, template.defaults)
+							list: listOf(box, template.defaults),
+							leader: leaderOf(box)
 						}))}
 					{:else if box.mode === 'qr'}
 						<span class="media" style="height:{mediaHeight(box)}">
@@ -2250,7 +2265,15 @@
 								<span
 									class="para"
 									style={para.mode === 'space' ? `margin-bottom:${step}` : i > 0 ? `text-indent:${step}` : ''}
-								>{#if line}{@render marked(line)}{:else}&nbsp;{/if}</span>
+								>{#if line}{@render leadered(line, leaderOf(box))}{:else}&nbsp;{/if}</span>
+							{/each}
+						</span>
+					{:else if leaderOf(box) && shownTextOf(box).split('\n').some((line) => tabSplit(line))}
+						<!-- Line by line only when a line needs its leader: one run of
+						     text otherwise, as plain text always was. -->
+						<span class="paras">
+							{#each shownTextOf(box).split('\n') as line, i (i)}
+								<span class="para">{#if line}{@render leadered(line, leaderOf(box))}{:else}&nbsp;{/if}</span>
 							{/each}
 						</span>
 					{:else}
@@ -2689,6 +2712,17 @@
 	.plain {
 		display: block;
 		white-space: pre-wrap;
+	}
+
+	/* A tabbed line: the words, the leader filling what is left, the words at
+	   the right edge — all on the baseline, where the leader's rule sits. */
+	.tabbed {
+		display: flex;
+		align-items: baseline;
+	}
+
+	.tab-right {
+		text-align: right;
 	}
 
 	/* The last paragraph's space would only push the area's own bottom down. */

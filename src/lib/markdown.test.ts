@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, flagUnknown, listCount, renderInline, renderMarkdown } from './markdown';
+import { escapeHtml, flagUnknown, listCount, renderInline, renderMarkdown, tabSplit } from './markdown';
 import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
 import type { ListMarker } from './types';
 const render = (src: string) => renderMarkdown(src, { size: 12.5 });
@@ -215,5 +215,42 @@ describe('listCount', () => {
 		expect(html).toContain('>i.</span>');
 		expect(html).toContain('>iv.</span>');
 		expect(renderMarkdown('- a', { size: 10, list: { numbering: 'upperAlpha' } })).toContain('>•</span>');
+	});
+});
+
+describe('tab leaders', () => {
+	it('splits a line at its last tab, or at ^t', () => {
+		expect(tabSplit('Coffee\t3.50')).toEqual(['Coffee', '3.50']);
+		expect(tabSplit('Coffee^t3.50')).toEqual(['Coffee', '3.50']);
+		expect(tabSplit('A\tB\tC')).toEqual(['A\tB', 'C']);
+		expect(tabSplit('No tab here')).toBeNull();
+	});
+
+	it('sets a tabbed line as words, a leader and words at the right', () => {
+		const html = renderMarkdown('Coffee^t3.50\nTea^t2.80', { size: 10, leader: 'dotted' });
+		expect(html).toContain('radial-gradient(circle,currentColor');
+		expect(html.match(/display:flex;align-items:baseline/g)).toHaveLength(2);
+		expect(html).toContain('<span>Coffee</span>');
+		expect(html).toContain('<span style="text-align:right">3.50</span>');
+		// Rows are blocks already: no break between them.
+		expect(html).not.toContain('<br />');
+	});
+
+	it('keeps the other lines of the paragraph as they were', () => {
+		const html = renderMarkdown('Menu\nCoffee^t3.50\nServed all day\nlate', { size: 10, leader: 'solid' });
+		expect(html).toContain('Menu<span style="display:flex');
+		expect(html).toContain('</span></span>Served all day<br />late');
+	});
+
+	it('leaves tabs alone with no leader, or with none', () => {
+		expect(renderMarkdown('Coffee^t3.50', { size: 10 })).toContain('Coffee^t3.50');
+		expect(renderMarkdown('Coffee^t3.50', { size: 10, leader: 'none' })).not.toContain('display:flex');
+	});
+
+	it('sets a list item the same way, and escapes both halves', () => {
+		const html = renderMarkdown('- Tea <b>^t2.80 & up', { size: 10, leader: 'dashed' });
+		expect(html).toContain('linear-gradient(90deg,currentColor 55%');
+		expect(html).toContain('<span>Tea &lt;b&gt;</span>');
+		expect(html).toContain('2.80 &amp; up');
 	});
 });
