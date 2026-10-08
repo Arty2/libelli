@@ -253,12 +253,15 @@ html, body {
    width of "Unlock": it said Lock at 68px and Unlock at 82, so pressing it
    shoved everything after it along the bar, and the three were three sizes.
    Its padlock and word start at the left, as every other button's do, so
-   the icon does not step sideways when the word changes. In `rem`, padlock
-   and all: the icon grows with the text as the word does (Icon.svelte), so
-   84px at the default size keeps room for "Unlock" at any other. */
+   the icon does not step sideways when the word changes. Two parts, because
+   a button is two kinds of length: its padding and border are px and stay
+   put, its padlock and word are rem and grow with the text (Icon.svelte).
+   The rem part is "UNLOCK" in capitals and tracking, with a little to
+   spare — the old 5.25rem was measured before buttons took capitals, and
+   the word ran into the right-hand padding. */
 .lock-toggle {
 	box-sizing: border-box;
-	width: 5.25rem;
+	width: calc(22px + 4.75rem);
 	justify-content: flex-start;
 }
 
