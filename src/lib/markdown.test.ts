@@ -154,9 +154,20 @@ describe('list style', () => {
 		expect(renderMarkdown('- a', { size: 10, lineHeight: 1.5 })).not.toContain('line-height:');
 		expect(renderMarkdown('- a', { size: 10, list: { marker: 'circle' } })).toContain('>○</span>');
 		expect(renderMarkdown('- a', { size: 10, list: { marker: 'square' } })).toContain('>■</span>');
-		expect(renderMarkdown('- a', { size: 10, list: { marker: 'arrow' } })).toContain('>→</span>');
+		expect(renderMarkdown('- a', { size: 10, list: { marker: 'arrow' } })).toContain('>➤</span>');
 		expect(renderMarkdown('- a', { size: 10 })).toContain('>•</span>');
-		expect(renderMarkdown('- a', { size: 10, list: { marker: 'disc' } })).toContain('>●</span>');
+	});
+
+	it('draws a disc at the size of a bullet, and types the rest', () => {
+		const disc = renderMarkdown('- a', { size: 10, list: { marker: 'disc' } });
+		expect(disc).toContain('width:0.3em;height:0.3em');
+		expect(disc).toContain('background:currentColor');
+		expect(disc).not.toContain('●');
+		expect(renderMarkdown('- a', { size: 10 })).toContain('<span style="flex:none;white-space:nowrap">•</span>');
+		// A number is not a disc, whatever marker the bullets are given.
+		expect(renderMarkdown('1. a', { size: 10, list: { marker: 'disc' } })).toContain(
+			'<span style="flex:none;white-space:nowrap">1.</span>'
+		);
 	});
 
 	it('draws no marker, and no gap for one, when the marker is none', () => {

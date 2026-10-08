@@ -148,7 +148,7 @@ export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
 	square: '■ Square',
 	dash: '– Dash',
 	emdash: '— Em Dash',
-	arrow: '→ Arrow',
+	arrow: '➤ Arrow',
 	none: 'None'
 };
 

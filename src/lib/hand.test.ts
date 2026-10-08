@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { handBorder } from './hand';
+import { handBorder, shortness } from './hand';
 import type { Sides } from './types';
 
 const even = (width: number): Sides => ({ top: width, right: width, bottom: width, left: width });
@@ -17,26 +17,10 @@ const border = (over: Partial<Parameters<typeof handBorder>[0]> = {}) =>
 
 /** The first coordinate pair of a path — where the pen was put down. */
 const start = (d: string) => d.replace(/^M/, '').split(/[A-Z]/)[0].trim();
-/** The last coordinate pair of a path — where the pen was lifted. */
-const end = (d: string) => {
-	const pairs = [...d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)];
-	const last = pairs[pairs.length - 1];
-	return { x: Number(last[1]), y: Number(last[2]) };
-};
-const at = (pair: string) => {
-	const [x, y] = pair.split(' ').map(Number);
-	return { x, y };
-};
 
 describe('handBorder', () => {
-	it('goes over a solid edge twice, and a dashed one once', () => {
-		expect(border()).toHaveLength(8);
-		expect(border({ style: 'dashed' })).toHaveLength(4);
-	});
-
-	it('draws the two passes over an edge differently', () => {
-		const [first, second] = border();
-		expect(first.d).not.toBe(second.d);
+	it('draws one stroke per edge', () => {
+		expect(border()).toHaveLength(4);
 	});
 
 	it('draws the same border every time, for the same box', () => {
@@ -47,55 +31,39 @@ describe('handBorder', () => {
 		expect(border({ seed: 'b_one' })[0].d).not.toBe(border({ seed: 'b_two' })[0].d);
 	});
 
-	it('runs the strokes round the border box, a half width in, crossing at the corners', () => {
-		// Half of 0.5mm, so the stroke covers what the CSS border would. Each
-		// square corner is crossed rather than met: the pen is put down a
-		// little before it and lifted a little after, along the edge's line.
-		const [top, , right, , bottom, , left] = border();
-		const runsOn = (p: { x: number; y: number }, along: 'x' | 'y', from: number, line: number, past: 1 | -1) => {
-			expect(p[along === 'x' ? 'y' : 'x']).toBe(line);
-			const by = (p[along] - from) * past;
-			expect(by).toBeGreaterThan(0);
-			expect(by).toBeLessThanOrEqual(1.4);
-		};
-		runsOn(at(start(top.d)), 'x', 0.25, 0.25, -1);
-		runsOn(end(top.d), 'x', 59.75, 0.25, 1);
-		runsOn(at(start(right.d)), 'y', 0.25, 59.75, -1);
-		runsOn(at(start(bottom.d)), 'x', 59.75, 39.75, 1);
-		runsOn(at(start(left.d)), 'y', 39.75, 0.25, 1);
+	it('runs the strokes round the border box, a half width in', () => {
+		// Half of 0.5mm, so the stroke covers exactly what the CSS border would.
+		const [top, right, bottom, left] = border();
+		expect(start(top.d)).toBe('0.25 0.25');
+		expect(start(right.d)).toBe('59.75 0.25');
+		expect(start(bottom.d)).toBe('59.75 39.75');
+		expect(start(left.d)).toBe('0.25 39.75');
 	});
 
-	it('strays well off true along the way, and not wildly', () => {
-		// Rough enough to read as drawn, not as a ruled line printed badly:
-		// somewhere along a 60mm edge it is half a millimetre out.
+	it('strays from true, but never at the corners', () => {
+		// Every stroke ends exactly where the next one starts, or the corners
+		// would not meet. In between, no stroke is a straight line.
 		const [top] = border();
+		expect(top.d.endsWith('L59.75 0.25')).toBe(true);
 		const ys = [...top.d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[2]));
-		const most = Math.max(...ys.map((y) => Math.abs(y - 0.25)));
-		expect(most).toBeGreaterThan(0.5);
-		expect(most).toBeLessThan(1.7);
-	});
-
-	it('runs a small box on past its corners by no more than a sixth of an edge', () => {
-		const [top] = border({ w: 6, h: 6 });
-		expect(at(start(top.d)).x).toBeGreaterThanOrEqual(0.25 - 5.5 / 6);
+		expect(ys.some((y) => y !== 0.25)).toBe(true);
+		expect(Math.max(...ys.map((y) => Math.abs(y - 0.25)))).toBeLessThan(0.4);
 	});
 
 	it('leaves out an edge with no width, and the corner it would have turned', () => {
-		const strokes = border({ widths: { top: 0, right: 0, bottom: 0.5, left: 0 }, radius: 4, style: 'dashed' });
+		const strokes = border({ widths: { top: 0, right: 0, bottom: 0.5, left: 0 }, radius: 4 });
 		expect(strokes).toHaveLength(1);
 		expect(strokes[0].width).toBe(0.5);
 	});
 
 	it('gives each edge its own width', () => {
-		const strokes = border({ widths: { top: 2, right: 0.5, bottom: 1, left: 0.25 }, style: 'dashed' });
+		const strokes = border({ widths: { top: 2, right: 0.5, bottom: 1, left: 0.25 } });
 		expect(strokes.map((s) => s.width)).toEqual([2, 0.5, 1, 0.25]);
 	});
 
 	it('turns a corner where there is a radius, and not where there is none', () => {
-		// Square: the top edge runs on past the corner, along its own line.
-		const square = end(border({ radius: 0 })[0].d);
-		expect(square.y).toBe(0.25);
-		expect(square.x).toBeGreaterThan(59.75);
+		// Square: the top edge runs corner to corner and simply stops there.
+		expect(border({ radius: 0 })[0].d.endsWith('L59.75 0.25')).toBe(true);
 
 		// Rounded: it starts a radius in — less the quarter millimetre the
 		// stroke itself sits inside the border box — and a curve carries it
@@ -126,12 +94,26 @@ describe('handBorder', () => {
 		const strokes = border({ style: 'double', widths: even(3) });
 		expect(strokes).toHaveLength(8);
 		expect(strokes.every((s) => s.width === 1)).toBe(true);
-		// The outer line a sixth of the way in, the inner one five sixths —
-		// each put down a little before the corner it crosses.
-		expect(at(start(strokes[0].d)).y).toBe(0.5);
-		expect(at(start(strokes[0].d)).x).toBeLessThan(0.5);
-		expect(at(start(strokes[4].d)).y).toBe(2.5);
-		expect(at(start(strokes[4].d)).x).toBeLessThan(2.5);
+		// The outer line a sixth of the way in, the inner one five sixths.
+		expect(start(strokes[0].d)).toBe('0.5 0.5');
+		expect(start(strokes[4].d)).toBe('2.5 2.5');
+	});
+
+	it('draws a short edge with a heavier hand, and a long one as before', () => {
+		expect(shortness(60)).toBe(0);
+		expect(shortness(40)).toBe(0);
+		expect(shortness(25)).toBe(0.5);
+		expect(shortness(10)).toBe(1);
+		expect(shortness(3)).toBe(1);
+		// A 15mm edge bends more than once, and further than a long one may.
+		const [top] = border({ w: 15, h: 15 });
+		expect(top.d.match(/Q/g)?.length ?? 0).toBeGreaterThan(1);
+		const strays = (d: string) =>
+			Math.max(...[...d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => Math.abs(Number(m[2]) - 0.25)));
+		const seeds = ['a', 'b', 'c', 'd', 'e', 'f'];
+		const shortMost = Math.max(...seeds.map((seed) => strays(border({ w: 15, h: 15, seed })[0].d)));
+		expect(shortMost).toBeGreaterThan(0.32);
+		expect(shortMost).toBeLessThanOrEqual(0.56);
 	});
 
 	it('wobbles a long edge more often than a short one', () => {

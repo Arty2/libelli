@@ -2541,9 +2541,9 @@
 		top: calc(-1 * var(--bw-t, 0mm));
 		left: calc(-1 * var(--bw-l, 0mm));
 		pointer-events: none;
-		/* A wobble strays past the line it follows, and a draft's square corners
-		   run on past them by a millimetre or so, which at the trim edge of the
-		   card is the difference between a drawn border and a clipped one. */
+		/* A wobble strays a fraction of a millimetre past the line it follows,
+		   which at the trim edge of the card is the difference between a drawn
+		   border and a clipped one. */
 		overflow: visible;
 	}
 
