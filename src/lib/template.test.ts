@@ -580,6 +580,8 @@ describe('list style and baseline', () => {
 	it('keeps only the list fields that make sense', () => {
 		expect(normaliseList({ marker: 'dash', indent: '4', leading: 0.1 })).toEqual({ marker: 'dash', indent: 4, leading: MIN_LEADING });
 		expect(normaliseList({ marker: 'arrow', leading: '1.25' })).toEqual({ marker: 'arrow', leading: 1.25 });
+		expect(normaliseList({ numbering: 'upperRoman' })).toEqual({ numbering: 'upperRoman' });
+		expect(normaliseList({ numbering: 'hebrew' })).toBeUndefined();
 		// The spacing a list briefly had is not carried: it does not convert.
 		expect(normaliseList({ spacing: 2 })).toBeUndefined();
 		expect(normaliseList({ marker: 'star', indent: 'x' })).toBeUndefined();

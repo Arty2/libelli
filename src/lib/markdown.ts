@@ -1,5 +1,5 @@
 import { parseColor } from './color';
-import type { ListMarker, ListStyle, MarkdownStyle, ParagraphStyle } from './types';
+import type { ListMarker, ListNumbering, ListStyle, MarkdownStyle, ParagraphStyle } from './types';
 import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
 
 /**
@@ -64,6 +64,36 @@ const DRAWN: Partial<Record<ListMarker, { size: number; round: boolean; open: bo
 	square: { size: 0.38, round: false, open: false },
 	openSquare: { size: 0.38, round: false, open: true }
 };
+
+/**
+ * The count of a numbered list's `n`th item, from 1, as `numbering` writes it.
+ *
+ * Letters go on past z as a spreadsheet's columns do — y, z, aa, ab — which is
+ * what CSS's own `lower-alpha` does. Roman numerals are the subtractive kind
+ * (iv, ix, xl) and stop at 3999, the last one written without a bar over it;
+ * past that, and at 0, the number is given as a number rather than invented.
+ */
+export function listCount(n: number, numbering: ListNumbering = 'decimal'): string {
+	if (numbering === 'lowerAlpha' || numbering === 'upperAlpha') {
+		let out = '';
+		for (let k = n; k > 0; k = Math.floor((k - 1) / 26)) out = String.fromCharCode(97 + ((k - 1) % 26)) + out;
+		const letters = out || String(n);
+		return numbering === 'upperAlpha' ? letters.toUpperCase() : letters;
+	}
+	if ((numbering === 'lowerRoman' || numbering === 'upperRoman') && n > 0 && n < 4000) {
+		const steps: Array<[number, string]> = [
+			[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
+			[50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
+		];
+		let out = '';
+		let left = n;
+		for (const [value, numeral] of steps) {
+			for (; left >= value; left -= value) out += numeral;
+		}
+		return numbering === 'upperRoman' ? out : out.toLowerCase();
+	}
+	return String(n);
+}
 
 /** Where `•` has its middle, in em above the baseline. */
 const BULLET_MIDDLE = 0.335;
@@ -287,7 +317,8 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 		item: mm(md.list.itemSpacing ?? 0),
 		gap: mm(md.list.markerGap ?? 0),
 		bullet: LIST_GLYPHS[list?.marker ?? 'bullet'],
-		drawn: DRAWN[list?.marker ?? 'bullet']
+		drawn: DRAWN[list?.marker ?? 'bullet'],
+		numbering: list?.numbering
 	};
 	const para = options.paragraph;
 	// Space after is in lines of the leading — a line is `lineHeight` em — and
@@ -355,6 +386,8 @@ interface ListLook {
 	item: string;
 	gap: string;
 	bullet: string | null;
+	/** how a numbered list counts — see `listCount` */
+	numbering?: ListNumbering;
 	/** the bullet is drawn rather than typed — see `DRAWN` */
 	drawn?: { size: number; round: boolean; open: boolean };
 }
@@ -372,7 +405,7 @@ function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, 
 		.map((item, i) => {
 			// Ordered lists are renumbered from source order; a source that restarts
 			// its numbering part-way through is a bug, not intent.
-			const marker = list.ordered ? `${i + 1}.` : look.bullet;
+			const marker = list.ordered ? `${listCount(i + 1, look.numbering)}.` : look.bullet;
 			const itemStyle = [
 				'display:flex',
 				'align-items:baseline',

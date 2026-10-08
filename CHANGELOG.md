@@ -12,7 +12,8 @@ file under **What's new** — press the version number in the status bar.
 
 - Phone: pull the table down past its lowest to close it; flick up from the status bar to open it.
 - The nudge pad stays as you left it when you switch between Move and zoom and pan.
-- Lists: ◯ Ring and □ Open Square, ➤ Arrow; circles and squares sized to match. Draft borders rougher on short edges.
+- Lists: ◯ Ring and □ Open Square, ➤ Arrow, circles and squares sized alike; numbers as letters or Roman.
+- Draft borders rougher on short edges.
 
 ## 0.27.31 — 2026-10-08
 

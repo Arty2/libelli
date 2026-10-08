@@ -289,7 +289,10 @@ resize boxes directly, or type exact millimetres.
   color at sizes of their own, since the faces that have `●` or `■` draw them
   at any size from half a capital to a whole one: the circle the bullet's size,
   the disc and the ring a size up, the squares near the disc's, all with their
-  middles where the bullet's is; **Indent** is the space from the area's edge to
+  middles where the bullet's is; **Numbers** is how a numbered list counts —
+  **1, 2, 3**, **a, b, c**, **A, B, C**, **i, ii, iii** or **I, II, III** —
+  letters going on past z as a spreadsheet's columns do (y, z, aa), Roman
+  numerals up to 3999 and plain numbers past that; **Indent** is the space from the area's edge to
   the markers, in em, and **Leading** the list's own line height, a multiple of
   the size like the text's; left blank, a list takes the text's leading. All
   three are a group of their own in the page bar and, for a Markdown area, in the

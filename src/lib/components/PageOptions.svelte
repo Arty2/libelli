@@ -19,6 +19,8 @@
 		normaliseList,
 		LIST_MARKER_LABELS,
 		LIST_MARKERS,
+		LIST_NUMBERING_LABELS,
+		LIST_NUMBERINGS,
 		MAX_BASELINE,
 		MAX_LIST,
 		FACING_PAGE_NUMBER_POSITIONS,
@@ -818,6 +820,19 @@
 				>
 					{#each LIST_MARKERS as marker (marker)}
 						<option value={marker}>{LIST_MARKER_LABELS[marker]}</option>
+					{/each}
+				</select>
+			</label>
+			<label class="field">
+				<span>Numbers</span>
+				<select
+					value={template.defaults.list?.numbering ?? 'decimal'}
+					title="How a numbered Markdown list counts: numbers, letters or Roman numerals"
+					disabled={pageFrozen}
+					onchange={(e) => setDefaultList({ numbering: e.currentTarget.value })}
+				>
+					{#each LIST_NUMBERINGS as numbering (numbering)}
+						<option value={numbering}>{LIST_NUMBERING_LABELS[numbering]}</option>
 					{/each}
 				</select>
 			</label>

@@ -233,6 +233,9 @@ export type ListMarker =
 	| 'arrow'
 	| 'none';
 
+/** How a numbered list counts: 1, a, A, i, I — each followed by a full stop. */
+export type ListNumbering = 'decimal' | 'lowerAlpha' | 'upperAlpha' | 'lowerRoman' | 'upperRoman';
+
 /**
  * How a Markdown list is set. Each field on its own: an area can take the
  * page's marker and change only its indent. In type units, like a paragraph
@@ -240,6 +243,8 @@ export type ListMarker =
  */
 export interface ListStyle {
 	marker?: ListMarker;
+	/** how a numbered list counts; absent, 1, 2, 3 */
+	numbering?: ListNumbering;
 	/** em of the area's size, from its edge to the marker */
 	indent?: number;
 	/**

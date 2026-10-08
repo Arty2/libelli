@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, flagUnknown, renderInline, renderMarkdown } from './markdown';
+import { escapeHtml, flagUnknown, listCount, renderInline, renderMarkdown } from './markdown';
 import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
 import type { ListMarker } from './types';
 const render = (src: string) => renderMarkdown(src, { size: 12.5 });
@@ -185,5 +185,35 @@ describe('list style', () => {
 	it('draws no marker, and no gap for one, when the marker is none', () => {
 		const html = renderMarkdown('- a', { size: 10, list: { marker: 'none' } });
 		expect(html).toContain('<li style="display:flex;align-items:baseline;gap:0;margin:0 0 0"><span style="flex:1;min-width:0">a</span></li>');
+	});
+});
+
+describe('listCount', () => {
+	it('counts in numbers by default', () => {
+		expect(listCount(1)).toBe('1');
+		expect(listCount(12, 'decimal')).toBe('12');
+	});
+
+	it('counts in letters, on past z as spreadsheet columns do', () => {
+		expect([1, 2, 26, 27, 28, 52, 53, 702, 703].map((n) => listCount(n, 'lowerAlpha'))).toEqual([
+			'a', 'b', 'z', 'aa', 'ab', 'az', 'ba', 'zz', 'aaa'
+		]);
+		expect(listCount(3, 'upperAlpha')).toBe('C');
+	});
+
+	it('counts in Roman numerals, the subtractive kind', () => {
+		expect([1, 4, 9, 14, 40, 90, 400, 1994, 3999].map((n) => listCount(n, 'upperRoman'))).toEqual([
+			'I', 'IV', 'IX', 'XIV', 'XL', 'XC', 'CD', 'MCMXCIV', 'MMMCMXCIX'
+		]);
+		expect(listCount(4, 'lowerRoman')).toBe('iv');
+		// Past what Roman numerals write without a bar, a number stays a number.
+		expect(listCount(4000, 'lowerRoman')).toBe('4000');
+	});
+
+	it('numbers a list the way it is asked to, and leaves bullets alone', () => {
+		const html = renderMarkdown('1. a\n2. b\n3. c\n4. d', { size: 10, list: { numbering: 'lowerRoman' } });
+		expect(html).toContain('>i.</span>');
+		expect(html).toContain('>iv.</span>');
+		expect(renderMarkdown('- a', { size: 10, list: { numbering: 'upperAlpha' } })).toContain('>•</span>');
 	});
 });

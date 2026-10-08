@@ -19,6 +19,8 @@
 		MAX_LIST,
 		LIST_MARKER_LABELS,
 		LIST_MARKERS,
+		LIST_NUMBERING_LABELS,
+		LIST_NUMBERINGS,
 		baselineOf,
 		normaliseBaseline,
 		normaliseColumns,
@@ -1318,6 +1320,28 @@
 					</select>
 					{#if selected.list?.marker}
 						<ResetButton to="the page's list marker" disabled={boxFrozen} onclick={() => setList({ marker: undefined })} />
+					{/if}
+				</label>
+				<label class="field">
+					<span>Numbers</span>
+					<select
+						class:inherits={!selected.list?.numbering}
+						value={selected.list?.numbering ?? ''}
+						title="How a numbered list counts: numbers, letters or Roman numerals"
+						disabled={boxFrozen}
+						onchange={(e) => setList({ numbering: e.currentTarget.value || undefined })}
+					>
+						<option value="">Default: {LIST_NUMBERING_LABELS[template.defaults.list?.numbering ?? 'decimal']}</option>
+						{#each LIST_NUMBERINGS as numbering (numbering)}
+							<option value={numbering}>{LIST_NUMBERING_LABELS[numbering]}</option>
+						{/each}
+					</select>
+					{#if selected.list?.numbering}
+						<ResetButton
+							to="the page's list numbering"
+							disabled={boxFrozen}
+							onclick={() => setList({ numbering: undefined })}
+						/>
 					{/if}
 				</label>
 				<label class="field">

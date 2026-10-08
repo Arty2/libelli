@@ -16,6 +16,7 @@ import type {
 	Defaults,
 	FontRef,
 	ListMarker,
+	ListNumbering,
 	ListStyle,
 	Mapping,
 	PageBackgroundImage,
@@ -165,6 +166,21 @@ export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
 	none: 'None'
 };
 
+/**
+ * How a numbered list may count, in the order the menu offers them: numbers,
+ * then letters, then Roman numerals, small before capital.
+ */
+export const LIST_NUMBERINGS: ListNumbering[] = ['decimal', 'lowerAlpha', 'upperAlpha', 'lowerRoman', 'upperRoman'];
+
+/** Said with the first three, since the count is the choice. */
+export const LIST_NUMBERING_LABELS: Record<ListNumbering, string> = {
+	decimal: '1, 2, 3 Numbers',
+	lowerAlpha: 'a, b, c Letters',
+	upperAlpha: 'A, B, C Capitals',
+	lowerRoman: 'i, ii, iii Roman',
+	upperRoman: 'I, II, III Roman Capitals'
+};
+
 /** How far a list may be indented, in em. */
 export const MAX_LIST = 10;
 
@@ -174,7 +190,7 @@ export const MAX_BASELINE = 1;
 /** A list style with only the fields that make sense; none of them, nothing. */
 export function normaliseList(raw: unknown): ListStyle | undefined {
 	if (!raw || typeof raw !== 'object') return undefined;
-	const { marker, indent, leading } = raw as Record<string, unknown>;
+	const { marker, numbering, indent, leading } = raw as Record<string, unknown>;
 	const number = (v: unknown, floor: number, ceiling: number) => {
 		if (v === undefined || v === null || v === '') return undefined;
 		const n = Number(v);
@@ -182,6 +198,7 @@ export function normaliseList(raw: unknown): ListStyle | undefined {
 	};
 	const list = stripUndefined({
 		marker: LIST_MARKERS.includes(marker as ListMarker) ? (marker as ListMarker) : undefined,
+		numbering: LIST_NUMBERINGS.includes(numbering as ListNumbering) ? (numbering as ListNumbering) : undefined,
 		indent: number(indent, 0, MAX_LIST),
 		// The same floor an area's own leading has; past 3 lines is not leading.
 		leading: number(leading, MIN_LEADING, 3)
