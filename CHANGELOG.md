@@ -8,6 +8,11 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
+## 0.28.0 — 2026-10-08
+
+- Phone: pull the table down past its lowest to close it; flick up from the status bar to open it.
+- The nudge pad stays as you left it when you switch between Move and zoom and pan.
+
 ## 0.27.31 — 2026-10-08
 
 - Recto / Verso: the fold drawn dot-dash, spreads and R or V in the print preview.

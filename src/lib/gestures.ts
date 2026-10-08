@@ -79,3 +79,92 @@ export function swipe(node: HTMLElement, onswipe: (by: -1 | 1) => void) {
 		}
 	};
 }
+
+/**
+ * Whether a drag reads as a swipe up: the same distance and slope as a
+ * sideways one, turned on its side. Down is not a swipe here — the only thing
+ * that answers one is the status bar, which has nowhere further down to go.
+ */
+export function swipeUpward(dx: number, dy: number): boolean {
+	return -dy >= SWIPE_MIN && Math.abs(dy) >= Math.abs(dx) * SWIPE_SLOPE;
+}
+
+/**
+ * How far past its lowest the tray's edge has to be pulled before letting go
+ * folds it away. A finger's width and a bit: the tray stops at its minimum
+ * first, so reaching the minimum by accident and lifting does not close it —
+ * only carrying on down does.
+ */
+export const TRAY_SHUT_PX = 56;
+
+/**
+ * The tray's share of the working area after its edge has been pulled `dy`
+ * pixels up (negative is down), and whether the pull has gone far enough past
+ * `min` that letting go now folds it away.
+ */
+export function trayPull(
+	from: number,
+	dy: number,
+	height: number,
+	min: number
+): { share: number; shut: boolean } {
+	// In pixels for the shut, so the distance a finger has to carry on is
+	// the same on any screen, and not lost to a fraction rounding down.
+	const wanted = from * height + dy;
+	return {
+		share: Math.min(1, Math.max(min, wanted / height)),
+		shut: min * height - wanted >= TRAY_SHUT_PX
+	};
+}
+
+/**
+ * Turn an upward flick over a node into a call — the status bar's way to open
+ * the tray above it. Touch only, as `swipe` is.
+ *
+ * The bar is mostly buttons, so the flick may well start on one. A finger that
+ * travelled this far was not tapping, and the browser does not make a click of
+ * it; the click is swallowed all the same if one arrives, so the swipe is never
+ * also a press on whatever it started on.
+ */
+export function swipeUp(node: HTMLElement, onswipe: () => void) {
+	let start: { x: number; y: number; id: number } | null = null;
+	let handler = onswipe;
+	let swallowUntil = 0;
+
+	const down = (event: PointerEvent) => {
+		if (event.pointerType !== 'touch') return;
+		start = { x: event.clientX, y: event.clientY, id: event.pointerId };
+	};
+
+	const up = (event: PointerEvent) => {
+		if (!start || event.pointerId !== start.id) return;
+		const lifted = swipeUpward(event.clientX - start.x, event.clientY - start.y);
+		start = null;
+		if (!lifted) return;
+		swallowUntil = performance.now() + 400;
+		handler();
+	};
+
+	const cancel = () => (start = null);
+
+	const click = (event: MouseEvent) => {
+		if (performance.now() > swallowUntil) return;
+		swallowUntil = 0;
+		event.preventDefault();
+		event.stopPropagation();
+	};
+
+	node.addEventListener('pointerdown', down);
+	node.addEventListener('pointerup', up);
+	node.addEventListener('pointercancel', cancel);
+	node.addEventListener('click', click, true);
+	return {
+		update: (next: () => void) => (handler = next),
+		destroy: () => {
+			node.removeEventListener('pointerdown', down);
+			node.removeEventListener('pointerup', up);
+			node.removeEventListener('pointercancel', cancel);
+			node.removeEventListener('click', click, true);
+		}
+	};
+}

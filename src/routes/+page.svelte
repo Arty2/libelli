@@ -23,6 +23,7 @@
 	} from '$lib/assets';
 	import { download, slugify } from '$lib/download';
 	import { ensureGoogleFont, ensureTemplateFonts, mergeFonts, pruneFonts, uploadLocalFont } from '$lib/fonts';
+	import { swipeUp, trayPull } from '$lib/gestures';
 	import {
 		canRedo,
 		canUndo,
@@ -425,6 +426,8 @@
 	let asideEl = $state<HTMLElement | null>(null);
 	let trayShare = $state<number | null>(null);
 	let trayFrom: { y: number; share: number } | null = null;
+	/** Pulled down past its lowest: let go now, and the tray folds away. */
+	let trayShutting = $state(false);
 
 	/** Below this the tray is a row of buttons and no table, which is not a tray. */
 	const TRAY_MIN = 0.2;
@@ -489,12 +492,31 @@
 		}
 		if (!trayFrom) return;
 		// The finger is on the tray's top edge, so up is taller: the share it
-		// takes is what it had plus however far the edge has been pulled.
-		trayShare = Math.min(1, Math.max(TRAY_MIN, trayFrom.share + (trayFrom.y - clientY) / height));
+		// takes is what it had plus however far the edge has been pulled. Past
+		// the lowest it goes, it stays there and fades — let go then and it
+		// folds away, as the Data button would, keeping the height it had for
+		// when it comes back.
+		const pull = trayPull(trayFrom.share, trayFrom.y - clientY, height, TRAY_MIN);
+		trayShare = pull.share;
+		trayShutting = pull.shut;
 		if (phase === 'end') {
+			const from = trayFrom.share;
 			trayFrom = null;
+			trayShutting = false;
+			if (pull.shut) {
+				trayShare = from;
+				if (imagesOpen) imagesOpen = false;
+				else dataOpen = false;
+				return;
+			}
 			ui = { ...ui, trayHeightShare: Math.round(trayShare * 10000) / 10000 };
 		}
+	}
+
+	/** The status bar flicked upwards, stacked: the table comes up, as the Data button brings it. */
+	function liftTray() {
+		if (!stacked || dataOpen || imagesOpen) return;
+		dataOpen = true;
 	}
 
 	let printing = $state(false);
@@ -3194,7 +3216,7 @@
 		/>
 
 		{#if dataOpen || imagesOpen}
-		<aside bind:this={asideEl}>
+		<aside bind:this={asideEl} class:shutting={trayShutting}>
 			{#if !stacked}
 				<!-- The edge between the page and the table, dragged to share the
 				     width between them. A separator in the ARIA sense, so the arrow
@@ -3348,7 +3370,10 @@
 		{/if}
 	</main>
 
-	<footer class="status-bar">
+	<!-- On a phone a flick up off the bar brings the table up: the bar is the
+	     tray's lip when it is folded away, and a thumb at the bottom of the
+	     screen is nearer this than the Data button at the top. -->
+	<footer class="status-bar" use:swipeUp={liftTray}>
 		<!-- The interface's text size, when it is not the default: a pinch off the
 		     stage changes it without a word, and this is both where it says so and
 		     how it goes back. First in the bar, where the eye starts, so a size
@@ -4713,6 +4738,22 @@
 		/* Stacked, not side by side: the shadow falls upwards onto the preview. */
 		aside {
 			box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+		}
+
+		/* Pulled past its lowest, the tray says it is about to go. */
+		aside {
+			transition: opacity 0.15s;
+		}
+
+		aside.shutting {
+			opacity: 0.45;
+		}
+
+		/* The flick up is read off pointer events, so the browser must not take
+		   the finger for a scroll and cancel them: nothing in the bar scrolls,
+		   and the text size's pinch reads touch events, which still arrive. */
+		.status-bar {
+			touch-action: none;
 		}
 
 		.toolbar {

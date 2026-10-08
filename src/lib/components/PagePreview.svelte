@@ -1187,29 +1187,28 @@
 	let panning = $state(false);
 
 	/**
-	 * The pad put away. It covers a corner of the page, and zoomed in that can
-	 * be the corner you are working on; held on its middle it goes, and a
-	 * button under zoom and pan brings it back. The middle, because the arrows
-	 * already repeat while held, and the middle's tap (the step) and drag (move
-	 * the pad) are taken — a hold was the gesture it had left.
+	 * The pad shown or put away, by hand. It covers a corner of the page, and
+	 * zoomed in that can be the corner you are working on; held on its middle
+	 * it goes, and a button under zoom and pan brings it back. The middle,
+	 * because the arrows already repeat while held, and the middle's tap (the
+	 * step) and drag (move the pad) are taken — a hold was the gesture it had
+	 * left.
+	 *
+	 * One choice for both modes, not one each: switching between Move and zoom
+	 * and pan is about what a finger on an area does, and a pad that came and
+	 * went with it was a second thing changing that nobody had asked to change.
+	 * Null until there is a choice, so the pad starts as the mode the stage
+	 * opens in has it — out under zoom and pan, which a touch screen opens in,
+	 * put away in Move — and the first switch keeps it as it was.
 	 */
-	let padHidden = $state(false);
-	/**
-	 * The pad out in Move mode, where dragging is the way to place an area and
-	 * the pad is put away to begin with. On a touch screen its button stays
-	 * under the toggle all the same, for a nudge finer than a fingertip drags:
-	 * pressed, the pad comes out until it is put away again. Its own flag, so
-	 * each mode keeps the pad as it was last left there.
-	 */
-	let padOut = $state(false);
+	let padChoice = $state<boolean | null>(null);
 	/** Whether the pad is drawn, in whichever mode the stage is in. */
-	const padOpen = $derived(panning ? !padHidden : padOut);
+	const padOpen = $derived(padChoice ?? panning);
 	/** A touch screen, where Move mode offers the pad's button too. */
 	let coarse = $state(false);
 	/** The pad put away, by a hold, a throw or a flick: `thrown` brings it home next time. */
 	function stowPadAway(thrown: boolean) {
-		if (panning) padHidden = true;
-		else padOut = false;
+		padChoice = false;
 		padThrown = thrown;
 		pushed = null;
 	}
@@ -1810,7 +1809,11 @@
 			<button
 				class="square"
 				aria-pressed={panning}
-				onclick={() => (panning = !panning)}
+				onclick={() => {
+					// Settled as it is seen, so the switch leaves the pad alone.
+					padChoice ??= padOpen;
+					panning = !panning;
+				}}
 				title={panning
 					? 'Zoom and pan — a finger scrolls, areas stay put; tap one and nudge it with the pad. Press to drag areas again.'
 					: 'Move — areas drag where you press them. Press for zoom and pan: scroll and pinch without dragging, and nudge with a pad.'}
@@ -1819,14 +1822,13 @@
 			</button>
 			{#if !padOpen && (panning || coarse)}
 				<!-- The pad, put away by holding its middle: this is where it is,
-				     under the mode it belongs to. In Move mode, on a touch screen,
-				     where it starts put away. -->
+				     under the mode switch, which leaves it as it was. In Move mode
+				     only on a touch screen, where a mouse has the arrow keys. -->
 				<button
 					class="square"
 					data-pad-home
 					onclick={() => {
-						if (panning) padHidden = false;
-						else padOut = true;
+						padChoice = true;
 						if (padThrown) padAt = { ...PAD_HOME };
 						padThrown = false;
 						// The hold that hid it ended with the pad gone, so its release

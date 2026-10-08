@@ -1397,6 +1397,12 @@ back, worked out a tick after it starts so that button has been drawn. It used
 to vanish where it stood, and nothing said where it went. A thrown pad comes
 back to its home corner, not hanging off the edge it was thrown at.
 
+**The pad is one choice across both modes.** It used to be two flags, out by
+default under zoom and pan and put away in Move, so every switch of mode
+brought it or took it — a second thing changing that the switch was not about.
+Now the switch settles it as it is seen and leaves it there; until the first
+choice, the mode the stage opens in decides.
+
 **A gesture brings its own room to scroll.** The hold keeps a point still by
 scrolling, and below Fit — and for a while past it — the page is centred and
 there is nothing to scroll: the page grew about its middle, then lurched back
@@ -3460,6 +3466,14 @@ somebody scrolling and catching this on the way past — paging the cards out fr
 under them is worse than doing nothing. Touch only: a mouse has a wheel and two
 arrows either side of the count, and treating a click-drag as a swipe would page
 the cards every time somebody tried to select the counter's text.
+
+**The status bar's flick up is the same reading turned on its side**, and the
+tray's pull down past its lowest is `trayPull`: the shut is counted in pixels
+past the minimum, not as a share, so a finger has to carry on the same distance
+on any screen, and merely reaching the bottom and lifting never closes it. The
+bar is `touch-action: none` when stacked, or the browser takes the vertical
+drag for a scroll and cancels the pointer before the flick is read; the text
+size's pinch reads touch events, which still arrive.
 
 ## `src/routes/app.css` — the accent
 

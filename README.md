@@ -1596,8 +1596,9 @@ towards it and down is away. They repeat on a hold like the arrows do.
   one — it shows by itself only in this mode, at any width; hold its middle to
   put it away, and the cross that appears under zoom and pan brings it back. On
   a touch screen the cross is there in **Move** too, with the pad put away to
-  begin with: press it for a nudge finer than a fingertip drags. Each mode
-  keeps the pad as you last left it. The resize handles and the
+  begin with: press it for a nudge finer than a fingertip drags. Switching
+  between the two modes leaves the pad as you last left it, out or put away.
+  The resize handles and the
   lever still drag; they are small and grabbed on purpose. It starts **on**
   where the main pointer is a finger — a phone or a tablet — and off with a
   mouse; the button is the choice from then on.
@@ -1625,6 +1626,11 @@ towards it and down is away. They repeat on a hold like the arrows do.
   drawing — is the same grip while it covers the table, and so is the head of
   the Images tray, list or large view. A press that goes nowhere is still the
   header button underneath being pressed.
+- **Pull the tray down past its lowest to fold it away.** It stops at its
+  smallest first, and fades if you carry on; let go then and it closes, as the
+  Data button would, keeping its height for next time. **Flick up from the
+  status bar** to bring the table back — a tap on the bar's buttons is still a
+  tap.
 - **Buttons answer.** A press on any control gives a few milliseconds of
   vibration where the device has it, and a tooltip arriving under a held finger
   gives a firmer one.
