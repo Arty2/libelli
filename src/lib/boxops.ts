@@ -118,13 +118,27 @@ export function toggleGroup(boxes: Box[], ids: string[]): { boxes: Box[]; groupe
 }
 
 /**
- * Whether a box moved as one of `moving` keeps its gap: it is anchored to
- * another box that is moving with it, so it already follows that box down
- * the page — resolveLayout takes its top from that box's bottom. Changing its
- * gap as well would move it twice and pull a group apart; this is what holds
- * an anchored group together under a drag or a nudge.
+ * Whether a box moved as one of `moving` keeps its gap: the box it hangs from
+ * comes down the page with the move, so it already follows — resolveLayout
+ * takes its top from that box's bottom. Changing its gap as well would move it
+ * twice and pull a group apart; this is what holds an anchored group together
+ * under a drag or a nudge.
+ *
+ * Up the whole chain, not one link: a box can hang from one that is not
+ * moving itself but hangs from one that is — a group of a heading and the
+ * line two below it, with the line between left out — and that box comes down
+ * just the same. `boxes` is where the chain is read; a loop ends the walk.
  */
-export const followsInSet = (box: Box, moving: ReadonlySet<string>) => !!box.anchor && moving.has(box.anchor.to);
+export function followsInSet(box: Box, moving: ReadonlySet<string>, boxes: readonly Box[]): boolean {
+	const seen = new Set([box.id]);
+	let to = box.anchor?.to;
+	while (to && !seen.has(to)) {
+		if (moving.has(to)) return true;
+		seen.add(to);
+		to = boxes.find((b) => b.id === to)?.anchor?.to;
+	}
+	return false;
+}
 
 /**
  * Move a box by whole millimetres. An anchored box moves its gap rather than

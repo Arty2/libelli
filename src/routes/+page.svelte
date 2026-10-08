@@ -2283,7 +2283,7 @@
 		// An area following another that moves too goes down with it, gap kept.
 		const moving = new Set(targets.map((b) => b.id));
 		for (const box of targets) {
-			const next = nudge(box, verso && mirrors(box) ? -dx : dx, followsInSet(box, moving) ? 0 : dy);
+			const next = nudge(box, verso && mirrors(box) ? -dx : dx, followsInSet(box, moving, template.boxes) ? 0 : dy);
 			if (next) updateBox(next);
 		}
 	}

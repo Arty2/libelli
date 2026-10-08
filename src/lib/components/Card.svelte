@@ -1384,7 +1384,7 @@
 		// gap: that area takes the vertical move (or the one at the head of the
 		// chain does), and it comes down behind it.
 		const moving = drag.mode === 'move' && drag.others.length ? new Set([origin.id, ...drag.others.map((b) => b.id)]) : null;
-		if (moving && followsInSet(origin, moving)) next.anchor = origin.anchor;
+		if (moving && followsInSet(origin, moving, template.boxes)) next.anchor = origin.anchor;
 		onchange?.(next);
 
 		// Whatever snapping did to the box under the pointer is what the others
@@ -1394,7 +1394,7 @@
 			const movedX = next.x - origin.x;
 			for (const other of drag.others) {
 				const moved: Box = { ...other, x: round2(other.x + alongX(other, origin, movedX)) };
-				if (movedY && !followsInSet(other, moving)) {
+				if (movedY && !followsInSet(other, moving, template.boxes)) {
 					if (other.anchor) moved.anchor = { ...other.anchor, gap: round2(other.anchor.gap + movedY) };
 					else moved.y = round2(other.y + movedY);
 				}

@@ -1106,7 +1106,10 @@ already comes down behind that box, so adding the move to its gap as well
 moved it twice: a grouped heading and the line anchored under it drifted
 apart by the whole of every drag and nudge. When the box under the pointer is
 the follower, its move is read and handed to the rest of the set — the head of
-the chain takes it — and its own gap is put back.
+the chain takes it — and its own gap is put back. Up the whole chain, not one
+link: grouping a heading with the line two below it, the line between left
+out, the lower line hung from a box that was not moving yet came down all the
+same, and it too moved twice.
 
 **The editor does not clip, the output does.** `.card` is `overflow: hidden` so a
 print or a PNG never spills onto its neighbour; `.card.editing` — the interactive

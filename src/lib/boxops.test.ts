@@ -293,14 +293,25 @@ describe('bringOnPage', () => {
 });
 
 describe('followsInSet', () => {
-	const anchored = { id: 'b', anchor: { to: 'a', gap: 3 } } as Box;
+	const head = { id: 'a' } as Box;
+	const middle = { id: 'b', anchor: { to: 'a', gap: 3 } } as Box;
+	const tail = { id: 'c', anchor: { to: 'b', gap: 2 } } as Box;
+	const all = [head, middle, tail];
 	it('holds the gap of a box whose anchor moves with it', () => {
-		expect(followsInSet(anchored, new Set(['a', 'b']))).toBe(true);
+		expect(followsInSet(middle, new Set(['a', 'b']), all)).toBe(true);
 	});
 	it('lets the gap change when the anchor stays put', () => {
-		expect(followsInSet(anchored, new Set(['b']))).toBe(false);
+		expect(followsInSet(middle, new Set(['b']), all)).toBe(false);
+	});
+	it('holds it through a link that is not moving itself', () => {
+		expect(followsInSet(tail, new Set(['a', 'c']), all)).toBe(true);
 	});
 	it('has nothing to hold on an unanchored box', () => {
-		expect(followsInSet({ id: 'a' } as Box, new Set(['a', 'b']))).toBe(false);
+		expect(followsInSet(head, new Set(['a', 'b']), all)).toBe(false);
+	});
+	it('ends on a loop', () => {
+		const x = { id: 'x', anchor: { to: 'y', gap: 0 } } as Box;
+		const y = { id: 'y', anchor: { to: 'x', gap: 0 } } as Box;
+		expect(followsInSet(x, new Set(['x']), [x, y])).toBe(false);
 	});
 });
