@@ -33,7 +33,7 @@
 	import { flagUnknown, renderMarkdown } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
-	import { baselineOf, colorsFromRow, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
+	import { DEFAULT_ORPHANS, DEFAULT_WIDOWS, baselineOf, colorsFromRow, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
@@ -547,9 +547,14 @@
 	 * as it cuts a single column, and a growing area grows to the longest.
 	 * Words only — a picture or a QR code in columns is a stretched picture.
 	 */
+	const inColumns = (box: Box) => !!box.columns && (box.mode === 'plain' || box.mode === 'markdown');
+	// Orphans and widows: how many of a paragraph's lines are kept together
+	// where a column breaks it. Not Baseline — Firefox has never had them —
+	// and taken knowingly (AGENTS.md): where they are not read the columns
+	// still flow, only without the rule.
 	const columnsStyle = (box: Box): string | undefined =>
-		box.columns && (box.mode === 'plain' || box.mode === 'markdown')
-			? `column-count:${box.columns.count};column-gap:${box.columns.gap}mm`
+		inColumns(box)
+			? `column-count:${box.columns!.count};column-gap:${box.columns!.gap}mm;orphans:${box.columns!.orphans ?? DEFAULT_ORPHANS};widows:${box.columns!.widows ?? DEFAULT_WIDOWS}`
 			: undefined;
 
 	/**
@@ -566,10 +571,10 @@
 	 * read off the page while the bounds are shown or the area is chosen.
 	 */
 	const gapsOf = (box: Box): Array<[number, number]> => {
-		if (!box.columns || (box.mode !== 'plain' && box.mode !== 'markdown')) return [];
+		if (!inColumns(box)) return [];
 		const pad = sidesOf(box.padding ?? 0);
 		const border = sidesOf(box.borderWidth ?? 0);
-		return columnGaps(box.columns.count, box.columns.gap, box.w - pad.left - pad.right - border.left - border.right);
+		return columnGaps(box.columns!.count, box.columns!.gap, box.w - pad.left - pad.right - border.left - border.right);
 	};
 
 	const foldSide = (box: Box): 'left' | 'right' | null =>
@@ -2023,6 +2028,7 @@
 			{@const strokes = handStrokes(look)}
 			<div
 				class="area content-{box.slot ? 'field' : shownAsMedia(box.mode) ? 'image' : 'static'} mode-{box.mode}"
+				class:columns={inColumns(box)}
 				class:outlined={bounds && !empty}
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}

@@ -276,6 +276,13 @@ export interface TextStyle {
 export interface TextColumns {
 	count: number;
 	gap: number;
+	/**
+	 * The fewest lines of a paragraph left at the foot of a column before it
+	 * breaks, and carried to the head of the next. Absent is the defaults,
+	 * `DEFAULT_ORPHANS` and `DEFAULT_WIDOWS`.
+	 */
+	orphans?: number;
+	widows?: number;
 }
 
 export type Defaults = Required<

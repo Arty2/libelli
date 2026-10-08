@@ -226,6 +226,15 @@ export const MIN_COLUMNS = 2;
 export const MAX_COLUMNS = 6;
 /** The gap a fresh pair of columns gets, in mm. */
 export const DEFAULT_COLUMN_GAP = 5;
+/**
+ * Lines a paragraph keeps together at a column's foot and head. Above the
+ * browser's own 2 for widows: a paragraph's last line alone at the top of a
+ * column reads as a stray more than a lone first line does at the bottom.
+ */
+export const DEFAULT_ORPHANS = 2;
+export const DEFAULT_WIDOWS = 3;
+/** More than this many lines held together stops being a column break and starts being a hole. */
+export const MAX_KEEP_LINES = 10;
 
 /**
  * Columns as a file may write them: a whole count from two to six and a gap of
@@ -234,14 +243,28 @@ export const DEFAULT_COLUMN_GAP = 5;
  */
 export function normaliseColumns(raw: unknown): TextColumns | undefined {
 	if (!raw || typeof raw !== 'object') return undefined;
-	const { count, gap } = raw as { count?: unknown; gap?: unknown };
+	const { count, gap, orphans, widows } = raw as { count?: unknown; gap?: unknown; orphans?: unknown; widows?: unknown };
 	const n = Math.round(Number(count));
 	if (!Number.isFinite(n) || n < MIN_COLUMNS) return undefined;
 	const g = Number(gap);
-	return {
+	const columns: TextColumns = {
 		count: Math.min(MAX_COLUMNS, n),
 		gap: Number.isFinite(g) ? Math.max(0, Math.round(g * 100) / 100) : DEFAULT_COLUMN_GAP
 	};
+	// Kept only where they differ from the defaults: the default is the
+	// absent key, as every other "not set" is.
+	const lines = (value: unknown, fallback: number) => {
+		if (value === undefined || value === null || value === '') return undefined;
+		const v = Math.round(Number(value));
+		if (!Number.isFinite(v)) return undefined;
+		const kept = Math.min(MAX_KEEP_LINES, Math.max(1, v));
+		return kept === fallback ? undefined : kept;
+	};
+	const o = lines(orphans, DEFAULT_ORPHANS);
+	const w = lines(widows, DEFAULT_WIDOWS);
+	if (o !== undefined) columns.orphans = o;
+	if (w !== undefined) columns.widows = w;
+	return columns;
 }
 
 export function normaliseBaseline(raw: unknown): number | undefined {

@@ -270,8 +270,12 @@ resize boxes directly, or type exact millimetres.
   one column and the next. Blank or 1 is one column. The columns balance —
   a growing area grows to the longest of them, a fixed one cuts what runs
   past its height, as it would one column — and the area's padding, border
-  and fill stay one frame round all of them. While the bounds are shown, or
-  the area is chosen, a dotted line marks each side of every gap.
+  and fill stay one frame round all of them. **Orphans** and **Widows**, 2
+  and 3 to begin with, are the fewest lines of a paragraph a column break
+  leaves at the foot of one column and carries to the head of the next
+  (Firefox does not keep to them; the columns still flow). While the bounds
+  are shown, or the area is chosen, a dotted line marks each side of every
+  gap, and the area wears `.columns` for its CSS.
 - **Lists** — **Marker** picks a Markdown bullet list's marker, **• Bullet**,
   **● Disc**, **○ Circle**, **■ Square**, **– Dash**, **— Em Dash**, **→ Arrow**
   or **None**, each set in the area's own
@@ -551,7 +555,8 @@ resize boxes directly, or type exact millimetres.
   one area and nothing else; `.area` reaches all of them. Every area also wears
   two classes: where its content comes from — `.content-field`,
   `.content-static` or `.content-image` — and its mode — `.mode-plain`,
-  `.mode-markdown`, `.mode-image`, `.mode-color` or `.mode-qr`. A page can
+  `.mode-markdown`, `.mode-image`, `.mode-color` or `.mode-qr` — and an area
+  set in columns wears `.columns` too. A page can
   be reached as a whole too: `#page-3` by its number; `#cover` and
   `#back-cover` for the first and last pages, and, once there are four or
   more, `#inside-cover` and `#inside-back-cover` for the two just inside

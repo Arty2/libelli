@@ -112,6 +112,7 @@ function selectors(template: Template): string[] {
 		if (!id || seen.has(id)) return [];
 		seen.add(id);
 		const notes = [
+			b.columns && (b.mode === 'plain' || b.mode === 'markdown') && `${b.columns.count} columns`,
 			b.overflow === 'grow' && 'grows',
 			b.anchor && `below ${idOf(b.anchor.to)}`
 		].filter(Boolean);

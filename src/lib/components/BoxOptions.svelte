@@ -23,6 +23,9 @@
 		normaliseBaseline,
 		normaliseColumns,
 		DEFAULT_COLUMN_GAP,
+		DEFAULT_ORPHANS,
+		DEFAULT_WIDOWS,
+		MAX_KEEP_LINES,
 		MAX_COLUMNS,
 		normaliseList,
 		MIN_BOX,
@@ -1181,6 +1184,7 @@
 						onchange={(e) =>
 							patch({
 								columns: normaliseColumns({
+									...selected.columns,
 									count: e.currentTarget.value,
 									gap: selected.columns?.gap ?? DEFAULT_COLUMN_GAP
 								})
@@ -1198,9 +1202,40 @@
 							title="Between one column and the next"
 							value={selected.columns.gap}
 							disabled={boxFrozen}
-							onchange={(e) => patch({ columns: normaliseColumns({ count: selected.columns!.count, gap: numeric(e, selected.columns!.gap) }) })}
+							onchange={(e) => patch({ columns: normaliseColumns({ ...selected.columns, gap: numeric(e, selected.columns!.gap) }) })}
 						/>
 						<span class="unit">mm</span>
+					</label>
+					<!-- How many of a paragraph's lines stay together where a column
+					     breaks it: at the foot of the column, and at the head of the
+					     next. Shown at their value, 2 and 3 until changed. -->
+					<label class="field">
+						<span>Orphans</span>
+						<input
+							class="n-2"
+							type="number"
+							step="1"
+							min="1"
+							max={MAX_KEEP_LINES}
+							title="The fewest lines of a paragraph left at the foot of a column — fewer, and the paragraph starts in the next one"
+							value={selected.columns.orphans ?? DEFAULT_ORPHANS}
+							disabled={boxFrozen}
+							onchange={(e) => patch({ columns: normaliseColumns({ ...selected.columns, orphans: e.currentTarget.value }) })}
+						/>
+					</label>
+					<label class="field">
+						<span>Widows</span>
+						<input
+							class="n-2"
+							type="number"
+							step="1"
+							min="1"
+							max={MAX_KEEP_LINES}
+							title="The fewest lines of a paragraph carried to the head of the next column"
+							value={selected.columns.widows ?? DEFAULT_WIDOWS}
+							disabled={boxFrozen}
+							onchange={(e) => patch({ columns: normaliseColumns({ ...selected.columns, widows: e.currentTarget.value }) })}
+						/>
 					</label>
 				{/if}
 			{/if}
