@@ -35,6 +35,7 @@
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
 	import { DEFAULT_ORPHANS, DEFAULT_WIDOWS, baselineOf, colorsFromRow, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
+	import { barcodeSvg } from '$lib/barcode';
 	import type { Box, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
@@ -289,14 +290,24 @@
 	};
 
 	/**
-	 * A QR is only worth printing if it scans, so anything the encoder refuses —
-	 * empty text, or more than a version-10 code can hold — renders as nothing
-	 * rather than as a square that no phone will read.
+	 * A code is only worth printing if it scans, so anything the encoder refuses
+	 * — empty text, more than a version-10 QR can hold, a character Code 128 has
+	 * not got, an EAN with the wrong check digit — renders as nothing rather
+	 * than as bars no scanner will read.
+	 *
+	 * A barcode ignores Fit: it is read across, so it fills the area both ways,
+	 * every bar widened alike.
 	 */
 	function qrFor(box: Box): string {
 		const value = contentOf(box).trim() || box.static?.text?.trim() || '';
 		if (!value) return '';
 		try {
+			if (box.qr?.kind) {
+				return barcodeSvg(value, box.qr.kind, {
+					color: box.color ?? template.defaults.color,
+					background: box.qr.background
+				});
+			}
 			return fitSvg(
 				qrSvg(value, {
 					level: box.qr?.level ?? 'M',

@@ -39,7 +39,7 @@ src/lib/
   modal.ts        the two-Enter rule every dialog with a default action shares
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
-  qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
+  qr.ts           QR encoding (byte mode, versions 1-10) -> SVG; barcode.ts Code 128, EAN-13
   hand.ts         a border drawn by hand: seeded wobble -> SVG paths, in mm
   bitmap.ts       the pixel budget a drawn area gets, and pointing at it
   pngpack.ts      a drawing saved as a palette PNG, a bit or two a pixel
@@ -101,9 +101,9 @@ src/routes/app.css        the :root tokens and app-wide rules
   before it is written, not stored mirrored.
 - **No runtime dependencies.** The Markdown renderer, the CSV parser and the QR
   encoder are hand-written, so the app works offline and nothing can rot
-  underneath it. `jsqr` is a dev dependency only — the tests decode generated
-  codes with an independent decoder, because a QR that does not scan looks
-  exactly like one that does.
+  underneath it. `jsqr` and `@zxing/library` are dev dependencies only — the
+  tests decode generated codes with an independent decoder, because a code that
+  does not scan looks exactly like one that does.
 - **The app makes no request nobody asked for.** Three paths out: `png.ts`
   inlines faces and pictures for export, the worker caches, and `fonts.ts`
   appends a `<link>` for a Google family. A template reaches the last — it names

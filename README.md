@@ -944,7 +944,7 @@ refuses everything else, so nothing can ride into a style attribute behind a
 color. Nothing that comes back out of it is the string that went in: a
 functional notation is rebuilt from the numbers it parsed to.
 
-## Images, colors and QR codes
+## Images, colors and codes
 
 Two box modes carry something other than text: **Image** is a Content type of
 its own where the template holds the image, and Image or QR is a **Mode**
@@ -1121,10 +1121,20 @@ at its own size.
   plenty at card sizes; a padding older templates set in modules is not carried
   over. Text the encoder cannot hold renders as nothing rather than
   as a square that will not scan.
+- **Barcodes** — the mode is called **Barcode**, and its **Type** is **QR
+  Code** (the default, and what every template made before it still is),
+  **Code 128** — bars for any plain text: letters, digits, punctuation, and
+  long runs of digits packed two to a bar — or **EAN-13**, the retail number
+  and the ISBN: twelve digits get their check digit worked out, thirteen must
+  already end in the right one, and spaces and hyphens are let through as an
+  ISBN is written. A barcode fills the area both ways, every bar widened alike,
+  so it has no Fit; make the area wide and short. Leave it ten bars' width of
+  **Padding** either side — the scanner's quiet zone. Anything a type cannot
+  encode — an accent in Code 128, a wrong check digit — prints nothing.
 
-The encoder is written here rather than pulled in, like the Markdown renderer
-and the CSV parser. Its tests decode what it produces with an independent
-decoder, since a QR that does not scan looks exactly like one that does.
+The encoders are written here rather than pulled in, like the Markdown renderer
+and the CSV parser. Their tests decode what they produce with independent
+decoders, since a code that does not scan looks exactly like one that does.
 
 ## Where the images live
 

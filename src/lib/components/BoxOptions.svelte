@@ -553,6 +553,12 @@
 	}
 
 	/** Transparent is the absence of a background, not a white one. */
+	/** QR is the absence of a kind, as it always was, so a QR template stays as it was written. */
+	function setQrKind(value: string) {
+		const { kind: _was, ...rest } = { ...DEFAULT_QR, ...selected?.qr };
+		patch({ qr: value === 'code128' || value === 'ean13' ? { ...rest, kind: value } : rest });
+	}
+
 	function setQrBackground(opaque: boolean) {
 		if (!selected) return;
 		const qr = { ...DEFAULT_QR, ...selected.qr };
@@ -811,11 +817,15 @@
 								<option value="color">Color</option>
 							{/if}
 						{/if}
-						<option value="qr">QR Code</option>
+						<!-- Every code the area can draw, QR and the barcodes; the type
+						     is chosen in its own group. Still `qr` in the file. -->
+						<option value="qr">Barcode</option>
 					</select>
 				</label>
 			{/if}
-			{#if takesADrawing(selected.mode) || selected.mode === 'qr'}
+			<!-- A barcode is read across and fills the area both ways: Fit has
+			     nothing to choose for it. -->
+			{#if takesADrawing(selected.mode) || (selected.mode === 'qr' && !selected.qr?.kind)}
 				<label class="field">
 					<span>Fit</span>
 					<select value={selected.fit ?? 'contain'} disabled={boxFrozen} onchange={(e) => patch({ fit: e.currentTarget.value as Box['fit'] })}>
@@ -862,21 +872,36 @@
 		</fieldset>
 		{#if selected.mode === 'qr'}
 			<fieldset class="group">
-				<legend>QR Code</legend>
+				<legend>Barcode</legend>
 				<label class="field">
-					<span>Correction</span>
+					<span>Type</span>
 					<select
-						value={selected.qr?.level ?? DEFAULT_QR.level}
-						title="How much of the code can be damaged and still scan"
+						value={selected.qr?.kind ?? 'qr'}
+						title="QR holds anything and reads from any angle; Code 128 is a line of bars for any plain text; EAN-13 is a 13-digit retail number or ISBN"
 						disabled={boxFrozen}
-						onchange={(e) => setQr({ level: e.currentTarget.value as QrSettings['level'] })}
+						onchange={(e) => setQrKind(e.currentTarget.value)}
 					>
-						<option value="L">L — 7%</option>
-						<option value="M">M — 15%</option>
-						<option value="Q">Q — 25%</option>
-						<option value="H">H — 30%</option>
+						<option value="qr">QR Code</option>
+						<option value="code128">Code 128</option>
+						<option value="ean13">EAN-13</option>
 					</select>
 				</label>
+				{#if !selected.qr?.kind}
+					<label class="field">
+						<span>Correction</span>
+						<select
+							value={selected.qr?.level ?? DEFAULT_QR.level}
+							title="How much of the code can be damaged and still scan"
+							disabled={boxFrozen}
+							onchange={(e) => setQr({ level: e.currentTarget.value as QrSettings['level'] })}
+						>
+							<option value="L">L — 7%</option>
+							<option value="M">M — 15%</option>
+							<option value="Q">Q — 25%</option>
+							<option value="H">H — 30%</option>
+						</select>
+					</label>
+				{/if}
 				<label class="field">
 					<span>Background</span>
 					<select
@@ -891,11 +916,11 @@
 				</label>
 				{#if selected.qr?.background}
 					<span class="field">
-						<span class="sr-only">QR Background Color</span>
+						<span class="sr-only">Barcode Background Color</span>
 						<ColorField
 							value={selected.qr.background}
 							fallback="#ffffff"
-							label="QR background color"
+							label="Barcode background color"
 							disabled={boxFrozen}
 							onchange={(v) => setQr({ background: v })}
 						/>

@@ -548,7 +548,8 @@ export const DEFAULT_QR: QrSettings = { level: 'M' };
 function normaliseQr(raw: any): QrSettings {
 	const level = ['L', 'M', 'Q', 'H'].includes(raw?.level) ? raw.level : DEFAULT_QR.level;
 	const background = parseColor(raw?.background);
-	return { level, ...(background ? { background } : {}) };
+	const kind = raw?.kind === 'code128' || raw?.kind === 'ean13' ? raw.kind : undefined;
+	return { ...(kind ? { kind } : {}), level, ...(background ? { background } : {}) };
 }
 
 function normaliseBleed(raw: any): Template['bleed'] {

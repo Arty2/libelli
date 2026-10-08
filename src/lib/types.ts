@@ -315,9 +315,15 @@ export interface MarkdownStyle {
 	rule?: { spaceBefore?: number; spaceAfter?: number; color?: string };
 }
 
-/** QR rendering options for a `qr` box; the value encoded is the bound cell. */
+/**
+ * Code options for a `qr` box; the value encoded is the bound cell. The mode
+ * kept its name when it learned barcodes — every template already made says
+ * `qr` — so a code with no `kind` is a QR code, and nothing needed migrating.
+ */
 export interface QrSettings {
-	/** error correction: L 7%, M 15%, Q 25%, H 30% of the code recoverable */
+	/** absent is a QR code; Code 128 takes any printable ASCII, EAN-13 a retail number */
+	kind?: 'code128' | 'ean13';
+	/** error correction: L 7%, M 15%, Q 25%, H 30% of the code recoverable; a QR's only */
 	level: 'L' | 'M' | 'Q' | 'H';
 	// No quiet zone of its own: the white border a scanner needs is the area's
 	// padding, like the space round anything else. A `margin` in an older
