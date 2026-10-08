@@ -1041,7 +1041,7 @@
 		ArrowLeft: 'left',
 		ArrowRight: 'right'
 	};
-	const padShowing = () => padUsable && panning && !padHidden;
+	const padShowing = () => padUsable && padOpen;
 
 	function onKeyup(event: KeyboardEvent) {
 		if (ARROW_LEAN[event.key] && pushed === ARROW_LEAN[event.key]) pushed = null;
@@ -1194,6 +1194,25 @@
 	 * the pad) are taken — a hold was the gesture it had left.
 	 */
 	let padHidden = $state(false);
+	/**
+	 * The pad out in Move mode, where dragging is the way to place an area and
+	 * the pad is put away to begin with. On a touch screen its button stays
+	 * under the toggle all the same, for a nudge finer than a fingertip drags:
+	 * pressed, the pad comes out until it is put away again. Its own flag, so
+	 * each mode keeps the pad as it was last left there.
+	 */
+	let padOut = $state(false);
+	/** Whether the pad is drawn, in whichever mode the stage is in. */
+	const padOpen = $derived(panning ? !padHidden : padOut);
+	/** A touch screen, where Move mode offers the pad's button too. */
+	let coarse = $state(false);
+	/** The pad put away, by a hold, a throw or a flick: `thrown` brings it home next time. */
+	function stowPadAway(thrown: boolean) {
+		if (panning) padHidden = true;
+		else padOut = false;
+		padThrown = thrown;
+		pushed = null;
+	}
 	const PAD_HIDE_MS = 500;
 	let padHideTimer: ReturnType<typeof setTimeout> | null = null;
 	function cancelPadHide() {
@@ -1202,7 +1221,8 @@
 	}
 
 	$effect(() => {
-		if (window.matchMedia('(pointer: coarse)').matches) panning = true;
+		coarse = window.matchMedia('(pointer: coarse)').matches;
+		if (coarse) panning = true;
 	});
 
 	/**
@@ -1272,9 +1292,7 @@
 			// One buzz for the two, the put-away one.
 			if ((hitX && Math.abs(vx) > PAD_STOW_SPEED) || (hitY && Math.abs(vy) > PAD_STOW_SPEED)) {
 				padGlide = null;
-				padHidden = true;
-				padThrown = true;
-				pushed = null;
+				stowPadAway(true);
 				if (touch) vibrate(HOLD_MS);
 				return;
 			}
@@ -1312,9 +1330,7 @@
 			// Held, so the click that ends the press does not also cycle the step.
 			padHeld = true;
 			padPress = null;
-			padHidden = true;
-			padThrown = false;
-			pushed = null;
+			stowPadAway(false);
 			vibrate(HOLD_MS);
 		}, PAD_HIDE_MS);
 	}
@@ -1424,9 +1440,7 @@
 	function padDrop(event?: PointerEvent) {
 		cancelPadHide();
 		if (padDrag && padPast > PAD_THROW) {
-			padHidden = true;
-			padThrown = true;
-			pushed = null;
+			stowPadAway(true);
 			vibrate(HOLD_MS);
 		} else if (padDrag && padTrail.length > 1) {
 			const first = padTrail[0];
@@ -1803,14 +1817,16 @@
 			>
 				<Icon name={panning ? 'zoom-pan' : 'move'} size={16} /><span class="sr-only">Zoom and pan</span>
 			</button>
-			{#if panning && padHidden}
+			{#if !padOpen && (panning || coarse)}
 				<!-- The pad, put away by holding its middle: this is where it is,
-				     under the mode it belongs to. -->
+				     under the mode it belongs to. In Move mode, on a touch screen,
+				     where it starts put away. -->
 				<button
 					class="square"
 					data-pad-home
 					onclick={() => {
-						padHidden = false;
+						if (panning) padHidden = false;
+						else padOut = true;
 						if (padThrown) padAt = { ...PAD_HOME };
 						padThrown = false;
 						// The hold that hid it ended with the pad gone, so its release
@@ -1978,7 +1994,7 @@
 		/>
 	</div>
 
-	{#if padUsable && panning && !padHidden}
+	{#if padUsable && padOpen}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
 		     hopeless. Shown only where there is no keyboard to fall back on, and
 		     only while there is something it could actually move. Its arrows

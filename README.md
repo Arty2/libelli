@@ -98,8 +98,8 @@ resize boxes directly, or type exact millimetres.
   box, plus a gap. The gap may be **negative**, tucking an area up under the one
   it follows so the two overlap. Drag an anchored box vertically and the gap
   changes rather than the link breaking — unless the area it follows is moving
-  with it, in a group or a selection: then the two go together, by drag or
-  nudge, and the gap stays as it was. Both ends of the tie are marked — on
+  with it, in a group or a selection, or one further up its chain is: then they
+  go together, by drag or nudge, and every gap stays as it was. Both ends of the tie are marked — on
   the area you have selected and on the areas tied to it, and not otherwise:
   badges on every area of a busy card were a field of marks competing with the
   design — and both marks are buttons: the **link** on the follower breaks its own tie, the **buoy** on the
@@ -1591,8 +1591,11 @@ towards it and down is away. They repeat on a hold like the arrows do.
   do not. On, an area no longer moves under a finger or the
   mouse: one finger scrolls the page and two pinch it, a tap still chooses an
   area and a second opens it, and the **nudge pad** appears to move the chosen
-  one — it shows only in this mode, at any width; hold its middle to put it
-  away, and the cross that appears under zoom and pan brings it back. The resize handles and the
+  one — it shows by itself only in this mode, at any width; hold its middle to
+  put it away, and the cross that appears under zoom and pan brings it back. On
+  a touch screen the cross is there in **Move** too, with the pad put away to
+  begin with: press it for a nudge finer than a fingertip drags. Each mode
+  keeps the pad as you last left it. The resize handles and the
   lever still drag; they are small and grabbed on purpose. It starts **on**
   where the main pointer is a finger — a phone or a tablet — and off with a
   mouse; the button is the choice from then on.
