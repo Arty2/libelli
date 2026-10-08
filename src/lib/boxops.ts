@@ -118,6 +118,15 @@ export function toggleGroup(boxes: Box[], ids: string[]): { boxes: Box[]; groupe
 }
 
 /**
+ * Whether a box moved as one of `moving` keeps its gap: it is anchored to
+ * another box that is moving with it, so it already follows that box down
+ * the page — resolveLayout takes its top from that box's bottom. Changing its
+ * gap as well would move it twice and pull a group apart; this is what holds
+ * an anchored group together under a drag or a nudge.
+ */
+export const followsInSet = (box: Box, moving: ReadonlySet<string>) => !!box.anchor && moving.has(box.anchor.to);
+
+/**
  * Move a box by whole millimetres. An anchored box moves its gap rather than
  * its y — the same rule dragging follows — so a nudge cannot quietly break an
  * anchor chain. The gap may go below zero, overlapping the area it follows,

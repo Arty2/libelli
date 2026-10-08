@@ -43,6 +43,7 @@
 		duplicateBoxes,
 		groupMembers,
 		nudgeBox as nudge,
+		followsInSet,
 		stepAlignment,
 		strayBoxes,
 		toggleGroup,
@@ -2279,8 +2280,10 @@
 		// right-hand page's millimetres the template stores — the same undoing a
 		// mirrored drag goes through before it is written.
 		const verso = template.facing === true && pageSide(dataset.rows.length ? activeRow + 1 : null) === 'verso';
+		// An area following another that moves too goes down with it, gap kept.
+		const moving = new Set(targets.map((b) => b.id));
 		for (const box of targets) {
-			const next = nudge(box, verso && mirrors(box) ? -dx : dx, dy);
+			const next = nudge(box, verso && mirrors(box) ? -dx : dx, followsInSet(box, moving) ? 0 : dy);
 			if (next) updateBox(next);
 		}
 	}

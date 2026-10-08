@@ -1101,6 +1101,13 @@ movement, because a box must never latch
 onto a guide that is not being drawn — a snap to an invisible edge reads as a
 bug. An anchored box always snaps its `gap`, never its `y`.
 
+**A box moving with the box it follows keeps its gap** (`followsInSet`). It
+already comes down behind that box, so adding the move to its gap as well
+moved it twice: a grouped heading and the line anchored under it drifted
+apart by the whole of every drag and nudge. When the box under the pointer is
+the follower, its move is read and handed to the rest of the set — the head of
+the chain takes it — and its own gap is put back.
+
 **The editor does not clip, the output does.** `.card` is `overflow: hidden` so a
 print or a PNG never spills onto its neighbour; `.card.editing` — the interactive
 preview only — turns that off, so a box dragged past the edge stays visible and

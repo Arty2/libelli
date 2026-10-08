@@ -5,6 +5,7 @@ import {
 	copyStyle,
 	deleteBoxes,
 	duplicateBoxes,
+	followsInSet,
 	groupMembers,
 	nudgeBox,
 	stepAlignment,
@@ -288,5 +289,18 @@ describe('bringOnPage', () => {
 	it('leaves a locked box alone, and returns the array itself when nothing moved', () => {
 		const boxes = [box('a', { x: -60, y: 10, locked: true })];
 		expect(bringOnPage(boxes, ['a'], page)).toBe(boxes);
+	});
+});
+
+describe('followsInSet', () => {
+	const anchored = { id: 'b', anchor: { to: 'a', gap: 3 } } as Box;
+	it('holds the gap of a box whose anchor moves with it', () => {
+		expect(followsInSet(anchored, new Set(['a', 'b']))).toBe(true);
+	});
+	it('lets the gap change when the anchor stays put', () => {
+		expect(followsInSet(anchored, new Set(['b']))).toBe(false);
+	});
+	it('has nothing to hold on an unanchored box', () => {
+		expect(followsInSet({ id: 'a' } as Box, new Set(['a', 'b']))).toBe(false);
 	});
 });

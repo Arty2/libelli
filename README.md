@@ -97,7 +97,9 @@ resize boxes directly, or type exact millimetres.
 - **Anchors** — a box can take its top edge from the *rendered* bottom of another
   box, plus a gap. The gap may be **negative**, tucking an area up under the one
   it follows so the two overlap. Drag an anchored box vertically and the gap
-  changes rather than the link breaking. Both ends of the tie are marked — on
+  changes rather than the link breaking — unless the area it follows is moving
+  with it, in a group or a selection: then the two go together, by drag or
+  nudge, and the gap stays as it was. Both ends of the tie are marked — on
   the area you have selected and on the areas tied to it, and not otherwise:
   badges on every area of a busy card were a field of marks competing with the
   design — and both marks are buttons: the **link** on the follower breaks its own tie, the **buoy** on the

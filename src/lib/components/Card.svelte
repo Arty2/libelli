@@ -8,7 +8,7 @@
 	import { cardVars } from '$lib/csskit';
 	import { fontStack } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
-	import { isParked } from '$lib/boxops';
+	import { followsInSet, isParked } from '$lib/boxops';
 	import type { Theme } from '$lib/theme';
 	import { HOLD_SLOP } from '$lib/gestures';
 	import {
@@ -1055,27 +1055,33 @@
 		if (additive && event.shiftKey && isSelected(box) && editable(box)) pendingToggle = box.id;
 		else onselect?.(box.id, additive);
 		if (!editable(box)) return;
+		// Snapshotted at the start: moving several boxes applies one delta to
+		// each of these, so a box cannot drift by accumulating rounding.
+		const others =
+			mode === 'move' && selectedIds.length > 1
+				? template.boxes.filter((b) => b.id !== box.id && selectedIds.includes(b.id) && !b.locked).map((b) => ({ ...b }))
+				: [];
+		// Anchored boxes already follow the moving ones downwards — resolveLayout
+		// takes their top from its bottom — so they only need the sideways half
+		// of the move. Applying the vertical delta as well would move them twice.
+		// Those of every box moving, not only the one under the pointer, or a
+		// chain hanging off another chosen area was left behind sideways.
+		const held = new Map<string, Box>();
+		if (mode === 'move') {
+			for (const mover of [box, ...others]) {
+				for (const b of dependentsOf(mover.id)) {
+					if (!b.locked && !selectedIds.includes(b.id) && b.id !== box.id) held.set(b.id, { ...b });
+				}
+			}
+		}
 		drag = {
 			id: box.id,
 			mode,
 			startX: event.clientX,
 			startY: event.clientY,
 			origin: { ...box },
-			// Snapshotted at the start: moving several boxes applies one delta to
-			// each of these, so a box cannot drift by accumulating rounding.
-			others:
-				mode === 'move' && selectedIds.length > 1
-					? template.boxes.filter((b) => b.id !== box.id && selectedIds.includes(b.id) && !b.locked).map((b) => ({ ...b }))
-					: [],
-			// Anchored boxes already follow this one downwards — resolveLayout takes
-			// their top from its bottom — so they only need the sideways half of the
-			// move. Applying the vertical delta as well would move them twice.
-			held:
-				mode === 'move'
-					? dependentsOf(box.id)
-							.filter((b) => !b.locked && !selectedIds.includes(b.id))
-							.map((b) => ({ ...b }))
-					: []
+			others,
+			held: [...held.values()]
 		};
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 	}
@@ -1371,18 +1377,24 @@
 			}
 		}
 		guide = { ...latched, flip };
+		// What the box under the pointer moved down by, read before it is
+		// perhaps put back below: the others move by it too.
+		const movedY = origin.anchor ? (next.anchor?.gap ?? 0) - origin.anchor.gap : next.y - origin.y;
+		// Carried with the area it follows, the box under the pointer keeps its
+		// gap: that area takes the vertical move (or the one at the head of the
+		// chain does), and it comes down behind it.
+		const moving = drag.mode === 'move' && drag.others.length ? new Set([origin.id, ...drag.others.map((b) => b.id)]) : null;
+		if (moving && followsInSet(origin, moving)) next.anchor = origin.anchor;
 		onchange?.(next);
 
 		// Whatever snapping did to the box under the pointer is what the others
-		// move by, so the selection keeps its shape.
-		if (drag.mode === 'move' && drag.others.length) {
+		// move by, so the selection keeps its shape — every one but those that
+		// follow another moving with them, which keep their gap and come along.
+		if (moving) {
 			const movedX = next.x - origin.x;
-			const movedY = origin.anchor
-				? (next.anchor?.gap ?? 0) - origin.anchor.gap
-				: next.y - origin.y;
 			for (const other of drag.others) {
 				const moved: Box = { ...other, x: round2(other.x + alongX(other, origin, movedX)) };
-				if (movedY) {
+				if (movedY && !followsInSet(other, moving)) {
 					if (other.anchor) moved.anchor = { ...other.anchor, gap: round2(other.anchor.gap + movedY) };
 					else moved.y = round2(other.y + movedY);
 				}
