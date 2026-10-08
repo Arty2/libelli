@@ -441,6 +441,24 @@
 	gap: 8px;
 }
 
+/* The area bar's way to put itself away: a bare glyph like the CSS
+   dialog's window controls, square, filled only under the pointer. */
+.options .head-row button.bar-hide {
+	display: grid;
+	place-items: center;
+	width: 1.75rem;
+	height: 1.75rem;
+	padding: 0;
+	border-color: transparent;
+	background: none;
+	color: #555;
+}
+
+.options .head-row button.bar-hide:hover:not(:disabled) {
+	border-color: transparent;
+	background: #f3f3f3;
+}
+
 /* Its buttons hold their one line: squeezed, the row gave way at the space in
    "</> CSS •" and stacked the icon over the word, when it is the name field
    beside them that has room to give. */
@@ -700,6 +718,34 @@
 	.options .head {
 		border-right: none;
 		padding-right: 0;
+	}
+
+	/* The area bar's head is its first row, edge to edge: Lock and Delete
+	   keep their size, and the name takes everything left between them,
+	   where it had a fixed 4.6rem and the row ended in empty space. */
+	.box-options .head {
+		flex: 1 0 100%;
+		align-items: stretch;
+	}
+
+	.box-options .head-row {
+		display: flex;
+	}
+
+	.box-options .head-row .area-name {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	/* The label on one line; the field beside it is what gives way. */
+	.box-options .head-row .context {
+		white-space: nowrap;
+	}
+
+	.box-options .head-row .area-name input {
+		flex: 1 1 auto;
+		width: auto;
+		min-width: 0;
 	}
 
 	/* One run to a line, ruled underneath rather than at the side, where a

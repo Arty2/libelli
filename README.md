@@ -513,6 +513,11 @@ resize boxes directly, or type exact millimetres.
   editor shows each page on the side it will be printed on — including while
   dragging, which follows the pointer on a left-hand page and writes the mirror
   of it back.
+- **The area bar's head** — Lock, the **Area Name**, Delete, and a bare
+  glyph at the end that puts the bar away until the next area is chosen, for
+  the room under it. On a phone the head is the bar's first row, the name
+  stretched to fill it. A QR code's bar leaves out what does not apply to a
+  code: of Text, only Color, and no Lines.
 - **Lock** — **Lock** in either bar freezes what you have: no dragging, no
   resizing, no option changes. A locked area can still be *selected*, or the
   button that unlocks it could never be reached. A page lock covers every box

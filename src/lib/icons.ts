@@ -47,6 +47,8 @@ export const ICONS: Record<string, string> = {
 	'code': '<path d="M31 16 24 23 22.59 21.59 28.17 16 22.59 10.41 24 9 31 16z"/><path d="M1 16 8 9 9.41 10.41 3.83 16 9.41 21.59 8 23 1 16z"/><path d="M5.91 15H26.080000000000002V17H5.91z" transform="rotate(-75 15.996 16)"/>',
 	'caret-up': '<path d="M8 20 16 10 24 20z"/>',
 	'table': '<path d="M29,5a2,2,0,0,0-2-2H5A2,2,0,0,0,3,5V27a2,2,0,0,0,2,2H27a2,2,0,0,0,2-2ZM27,5V9H5V5Zm0,22H5V23H27Zm0-6H5V17H27Zm0-6H5V11H27Z"/>',
+	// The area bar put away until the next area is chosen.
+	'row-collapse': '<path d="M26,20H6a2,2,0,0,0-2,2v4a2,2,0,0,0,2,2H26a2,2,0,0,0,2-2V22A2,2,0,0,0,26,20Zm0,6H6V22H26Z"/><path d="M17 7.828 19.586 10.414 21 9 16 4 11 9 12.414 10.414 15 7.828 15 14 4 14 4 16 28 16 28 14 17 14 17 7.828z"/>',
 	// The drawing board's paper: light checks or dark.
 	'opacity': '<path d="M6 6H10V10H6z"/><path d="M10 10H14V14H10z"/><path d="M14 6H18V10H14z"/><path d="M22 6H26V10H22z"/><path d="M6 14H10V18H6z"/><path d="M14 14H18V18H14z"/><path d="M22 14H26V18H22z"/><path d="M6 22H10V26H6z"/><path d="M14 22H18V26H14z"/><path d="M22 22H26V26H22z"/><path d="M18 10H22V14H18z"/><path d="M10 18H14V22H10z"/><path d="M18 18H22V22H18z"/>',
 	// The CSS editor's wrap toggle.

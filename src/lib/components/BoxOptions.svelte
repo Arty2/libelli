@@ -68,6 +68,8 @@
 		onmappingchange: (mapping: Mapping) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
+		/** put the bar away until the next area is chosen; absent where there is nowhere to put it */
+		onhide?: () => void;
 		/** absent where there is no starter to reset to — see `starterOfTemplate` */
 		onresettemplate?: () => void;
 		onuploadfont: (file: File) => void;
@@ -96,6 +98,7 @@
 		ontemplatechange,
 		onmappingchange,
 		ondelete,
+		onhide,
 		onuploadfont,
 		onnotice,
 		ondraw,
@@ -643,9 +646,9 @@
 					<Icon name={selected.locked ? 'unlocked' : 'locked'} size={14} />
 					{selected.locked ? 'Unlock' : 'Lock'}
 				</button>
-				<span class="context">Area</span>
+				<span class="context">Area Name</span>
 				{#if source === 'field'}
-					<label class="field">
+					<label class="field area-name">
 						<span class="sr-only">Name</span>
 						<input
 							class="w-5"
@@ -659,6 +662,14 @@
 				<button class="danger-outline" onclick={ondelete} disabled={boxFrozen} title={withKey('Delete this area', 'delete')}>
 					<Icon name="trash" size={14} /> Delete
 				</button>
+				<!-- The bar away, for the room under it; it comes back with the next
+				     area chosen. A bare glyph, as the CSS dialog's window controls
+				     are: it is about the bar, not an act on the area. -->
+				{#if onhide}
+					<button class="bar-hide" onclick={onhide} title="Hide these settings until the next area is chosen" aria-label="Hide the area settings">
+						<Icon name="row-collapse" size={16} />
+					</button>
+				{/if}
 			</span>
 		</span>
 		<!-- Most-used first, after what the area holds: its alignment and its
@@ -918,6 +929,8 @@
 		</fieldset>
 		<fieldset class="group">
 			<legend>Text</legend>
+			<!-- A QR code is drawn, not set: of the type it keeps only its color. -->
+			{#if selected.mode !== 'qr'}
 			<span class="field" class:inherits={!selected.font}>
 				<span>Font</span>
 				<MenuSelect
@@ -968,6 +981,7 @@
 					<ResetButton to="the page's {template.defaults.weight}" disabled={boxFrozen} onclick={() => patch({ weight: undefined })} />
 				{/if}
 			</label>
+			{/if}
 			<span class="field" class:inherits={!selected.color}>
 				<span>Color</span>
 				<ColorField
@@ -985,6 +999,7 @@
 				{/if}
 				{@render fromColumn('text', 'text color')}
 			</span>
+			{#if selected.mode !== 'qr'}
 			<label class="field">
 				<span>Spacing</span>
 				<input
@@ -1010,6 +1025,7 @@
 					<option value="uppercase">Uppercase</option>
 				</select>
 			</label>
+			{/if}
 		</fieldset>
 		<fieldset class="group">
 			<legend>Position</legend>
@@ -1124,6 +1140,8 @@
 				<span class="unit">%</span>
 			{/if}
 		</fieldset>
+		<!-- Lines are the words' to have; a QR code has none. -->
+		{#if selected.mode !== 'qr'}
 		<fieldset class="group">
 			<legend>Lines</legend>
 			<label class="field">
@@ -1274,6 +1292,7 @@
 				</label>
 			{/if}
 		</fieldset>
+		{/if}
 		{#if selected.mode === 'markdown'}
 			<fieldset class="group">
 				<legend>Lists</legend>
