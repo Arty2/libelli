@@ -44,12 +44,20 @@ describe('the built-in template', () => {
 	it('loads with its boxes, anchors and bleed intact', () => {
 		expect(template.name).toBe('A5 Starter Booklet');
 		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff', margin: { top: 11, right: 14, bottom: 8, left: 14 } });
-		expect(template.boxes.map((b) => b.id)).toEqual(['b_accent', 'b_category', 'b_title', 'b_subtitle', 'b_body', 'b_sketch', 'b_link', 'b_date', 'b_qr', 'b_notes']);
+		expect(template.boxes.map((b) => b.id)).toEqual(['b_accent', 'b_category', 'b_title', 'b_subtitle', 'b_body', 'b_sketch', 'b_link', 'b_date', 'b_qr', 'b_isbn', 'b_notes']);
 		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 6 });
 		expect(template.boxes.find((b) => b.id === 'b_title')?.anchor).toEqual({ to: 'b_category', gap: 5 });
 		expect(template.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });
 		// Printed as it says on card 4: two to an A4 sheet, in a zine's order.
 		expect(template.print).toMatchObject({ enabled: true, count: 2, order: 'zine', sheet: { w: 210, h: 297 } });
+	});
+
+	it('shows a barcode and a contents list, as card 4 says', () => {
+		// The ISBN row is drawn as the EAN-13 every book carries, with its digits.
+		expect(template.boxes.find((b) => b.id === 'b_isbn')).toMatchObject({ slot: 'isbn', mode: 'qr', qr: { kind: 'ean13' } });
+		expect(template.boxes.find((b) => b.id === 'b_isbn')?.qr?.hideDigits).toBeUndefined();
+		// The contents' page numbers are joined to the titles by dots.
+		expect(template.boxes.find((b) => b.id === 'b_body')?.leader).toBe('dotted');
 	});
 
 	it('keeps the markdown metrics on the body box', () => {

@@ -733,7 +733,8 @@ has areas, a line above the buttons says how many are about to be replaced.
   pass their check digit, not by the heading: a column called *ISBN* holding
   typos stays text, since a barcode would print nothing. An old ten-digit
   ISBN is printed as the 978 barcode a book carries. One barcode to a card;
-  another column of them is a line of text.
+  another column of them is a line of text, and so is the one barcode on a
+  card too narrow to keep a line of words beside it at the foot.
 - **The dialog** — dragged by its title, closed by its ×; a row left out stays
   listed at half strength, its menu still yours to set, and **Guess** before a
   menu marks a kind worked out from nothing but the length of the cells.
@@ -1983,6 +1984,9 @@ npm run build    # static output in ./build, deployable anywhere
   because a request failed. It is a plain CSV precisely so the walkthrough can be
   edited in a spreadsheet rather than in a string literal. The four rows are a walkthrough of the app rather
   than filler; **Getting Started** in the Table menu brings them back at any time.
+  The last ends on what a booklet's back page carries: its contents, from
+  `%%toc:title%%` with a dotted leader, and its ISBN as an EAN-13 barcode,
+  which only that row fills, so the other cards leave the corner empty.
   A first visit opens the starter card **locked**, so a stray drag cannot
   rearrange the tour before it has been read; the padlock above *+ Area* unlocks
   it, and it stays unlocked from then on. A new template starts unlocked — it

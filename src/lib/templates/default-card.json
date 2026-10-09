@@ -81,6 +81,7 @@
     "body",
     "category",
     "link",
+    "isbn",
     "sketch",
     "notes"
   ],
@@ -227,7 +228,8 @@
       "anchor": {
         "to": "b_subtitle",
         "gap": 6
-      }
+      },
+      "leader": "dotted"
     },
     {
       "id": "b_sketch",
@@ -305,6 +307,26 @@
       },
       "hideWhenEmpty": true,
       "fit": "contain"
+    },
+    {
+      "id": "b_isbn",
+      "slot": "isbn",
+      "x": 14,
+      "y": 197,
+      "w": 34,
+      "h": 15,
+      "mode": "qr",
+      "overflow": "clip",
+      "font": "IBM Plex Mono",
+      "size": 6.5,
+      "lineHeight": 1.2,
+      "color": "#1c1b19",
+      "valign": "bottom",
+      "qr": {
+        "kind": "ean13",
+        "level": "M"
+      },
+      "hideWhenEmpty": true
     },
     {
       "id": "b_notes",
