@@ -8,7 +8,7 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.28.11 — 2026-10-09
+## 0.28.12 — 2026-10-09
 
 - Phone: the table follows your finger — pull up from the status bar to open it, down to close it.
 - The nudge pad stays as you left it between Move and zoom and pan. One tab edits at a time: Use Here.

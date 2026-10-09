@@ -592,8 +592,16 @@
 			// type is worth a search's dozen forced layouts.
 			// The words as text and the count of what they are set in: a change to
 			// either is a change to the words. Not the markup itself — reading it
-			// is a sink the gates refuse, and its text says the same.
-			const key = [current, room, node.clientWidth, pad.font, pad.letterSpacing, content.textContent, content.getElementsByTagName('*').length].join('|');
+			// is a sink the gates refuse, and its text says the same. And the
+			// styles inside: columns, a paragraph's space or indent, a heading's
+			// size live there, change what fits, and leave the text as it was.
+			// Less the font size the search itself writes, or it would search for
+			// ever.
+			const styles = [
+				(content.getAttribute('style') ?? '').replace(/(^|;)\s*font-size:[^;]*/, ''),
+				...[...content.querySelectorAll('[style]')].map((el) => el.getAttribute('style'))
+			].join('|');
+			const key = [current, room, node.clientWidth, pad.font, pad.letterSpacing, content.textContent, content.getElementsByTagName('*').length, styles].join('|');
 			if (key === searched) {
 				words.takeRecords();
 				return;
@@ -1480,7 +1488,16 @@
 				// snaps, and a snap on the axis that is meant to stand still is a
 				// line that is not straight.
 				if (along !== 'y') next.x = place(origin.x + dx, 'x', origin.w);
-				if (along !== 'x') setTop(dy, layout.heights[origin.id] ?? origin.h);
+				if (along !== 'x') {
+					const height = layout.heights[origin.id] ?? origin.h;
+					// A Grow area set bottom or middle is drawn above its stored top,
+					// by however far its words grew it (`freedTop`). Snapped as drawn —
+					// the edges and the margins it latches to are the drawn ones —
+					// and stored back below by the same lift.
+					const lift = origin.anchor ? 0 : freedTop(origin, 0, height);
+					if (lift) next.y = round2(place(origin.y - lift + dy, 'y', height) + lift);
+					else setTop(dy, height);
+				}
 				break;
 			}
 			case 'e':

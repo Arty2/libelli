@@ -566,13 +566,13 @@
 		patch({ qr: { ...DEFAULT_QR, ...selected?.qr, ...change } });
 	}
 
-	/** Transparent is the absence of a background, not a white one. */
 	/** QR is the absence of a kind, as it always was, so a QR template stays as it was written. */
 	function setQrKind(value: string) {
 		const { kind: _was, ...rest } = { ...DEFAULT_QR, ...selected?.qr };
 		patch({ qr: value === 'code128' || value === 'ean13' ? { ...rest, kind: value } : rest });
 	}
 
+	/** Transparent is the absence of a background, not a white one. */
 	function setQrBackground(opaque: boolean) {
 		if (!selected) return;
 		const qr = { ...DEFAULT_QR, ...selected.qr };

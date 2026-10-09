@@ -559,10 +559,11 @@
 		return value && /^\s*data:image\//.test(value) ? safeMediaUrl(value) : null;
 	}
 
-	/** Close the editor, back to where it was opened from — or, `toTable`, to the table regardless. */
 	/**
-	 * A save that was pressed lands first: closing in the middle of one would
-	 * have said the drawing was dropped and then written it anyway.
+	 * Close the editor, back to where it was opened from — or, `toTable`, to
+	 * the table regardless. A save that was pressed lands first: closing in the
+	 * middle of one would have said the drawing was dropped and then written it
+	 * anyway.
 	 */
 	async function closeBigCell(toTable = false) {
 		// What was open when Close was pressed: another cell opened while the

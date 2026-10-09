@@ -1557,16 +1557,18 @@
 		mapping = structuredClone(next.mapping);
 		if (next.templateId && next.templateId !== templateId) {
 			templateId = next.templateId;
-			saveTemplateId(templateId);
+			// Only the editor writes: every other path into storage waits on
+			// `ready`, and so does this one.
+			if (ready) saveTemplateId(templateId);
 			// A template undone back into existence is written out again by the
 			// autosave, under the id it had — which is what makes deleting one
 			// recoverable rather than merely reversible on screen.
 			void refreshLibrary();
 		}
 		if (next.datasetId && next.datasetId !== datasetId) {
-			rememberTable(datasetId);
+			if (ready) rememberTable(datasetId);
 			datasetId = next.datasetId;
-			saveDatasetId(datasetId);
+			if (ready) saveDatasetId(datasetId);
 			void refreshTables();
 		}
 		if (activeRow >= dataset.rows.length) activeRow = Math.max(0, dataset.rows.length - 1);
@@ -2563,6 +2565,10 @@
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
 
 	function onWindowKeydown(event: KeyboardEvent) {
+		// A tab that is not the editor holds a stale copy behind its dialog:
+		// a delete or an undo there edits what nobody will see saved, and an
+		// undo across a template switch would write its id over the editor's.
+		if (editor !== 'here') return;
 		const target = event.target as HTMLElement | null;
 		const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
 		if (wantsExport(event)) {
