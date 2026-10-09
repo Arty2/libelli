@@ -292,6 +292,11 @@
 	/** The interface's text size, as a multiple of the browser's default — see textsize.ts. */
 	let textSize = $state(1);
 	function setTextSize(scale: number) {
+		// The bars wrap round their text as they do round the window, so a new
+		// size is a new width as far as the row's floor goes — and no resize
+		// fires to drop it. Kept, the floor learnt at a larger size held the row
+		// at that height after the text came back down.
+		if (scale !== textSize) barFloor = 0;
 		textSize = scale;
 		applyTextSize(scale);
 		saveTextSize(scale);

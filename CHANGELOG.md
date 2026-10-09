@@ -8,7 +8,7 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.28.12 — 2026-10-09
+## 0.28.13 — 2026-10-09
 
 - Phone: the table follows your finger — pull up from the status bar to open it, down to close it.
 - The nudge pad stays as you left it between Move and zoom and pan. One tab edits at a time: Use Here.
@@ -17,7 +17,7 @@ file under **What's new** — press the version number in the status bar.
 - Tab leaders: `Espresso %%% 2.20`; `%%toc:title%%` for a table of contents, as the starter's last card shows with an ISBN. Dragging shows the gaps in mm from the ringed handle, which X and Y now name.
 - Barcode: Code 128 and EAN-13 beside QR, with the digits; a layout from columns makes ISBNs barcodes. A bottom-set Grow area grows upwards. Draft borders rougher on short edges.
 
-## 0.27.31 — 2026-10-08
+## 0.27.32 — 2026-10-08
 
 - Recto / Verso: the fold drawn dot-dash, spreads and R or V in the print preview.
 - An area's words in 2 to 6 columns; a pinch zooms about the fingers.
