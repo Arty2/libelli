@@ -846,9 +846,14 @@ a notice can appear.
   what was chosen stays chosen.
 - **Which area it feeds** — entering a cell flashes the areas on the card that
   print it, in the bounds' blue, for a moment.
+- **A cell with a finger** — a tap chooses a cell without typing in it, so the
+  keyboard does not come up over half the screen each time a finger lands in
+  the table; **double-tap** it, or **press and hold**, to open it full size and
+  type there. **Edit** in the bar does the same. A mouse or a pen types in the
+  cell where it is clicked, as before.
 - **A cell full size** — press **Edit** in the bar while typing in a cell, press the
-  **[...]** on a cell that holds more than it shows, or press the edit badge on
-  a Data Field area, and the whole of it opens in the table's own space — over
+  **[...]** on a cell that holds more than it shows, double-tap or hold a cell
+  with a finger, or press the edit badge on a Data Field area, and the whole of it opens in the table's own space — over
   the rows, with the card still in view beside or above it. Its column's name
   and the **×** are at the top; the bar under it stays, with a pager at the
   left — **‹ 2 / 4 ›**, the same as the card's — that steps to the same column

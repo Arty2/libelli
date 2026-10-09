@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SWIPE_MIN, swipeStep, swipeUpward, trayPull } from './gestures';
+import { DOUBLE_TAP_MS, HOLD_SLOP, SWIPE_MIN, isDoubleTap, swipeStep, swipeUpward, trayPull } from './gestures';
 
 describe('swipeStep', () => {
 	it('reads a flick left as forward and one right as back', () => {
@@ -51,5 +51,19 @@ describe('trayPull', () => {
 	it('opens from nothing, pulled up from the status bar', () => {
 		expect(trayPull(0, 400, 1000, 0.2)).toEqual({ share: 0.4, shut: false });
 		expect(trayPull(0, 100, 1000, 0.2).shut).toBe(true);
+	});
+});
+
+describe('isDoubleTap', () => {
+	const first = { x: 100, y: 100, at: 1000 };
+
+	it('takes a second tap soon after and close by', () => {
+		expect(isDoubleTap(first, { x: 104, y: 98, at: 1000 + DOUBLE_TAP_MS - 1 })).toBe(true);
+	});
+
+	it('refuses one too late, too far, or with no first', () => {
+		expect(isDoubleTap(first, { x: 100, y: 100, at: 1000 + DOUBLE_TAP_MS })).toBe(false);
+		expect(isDoubleTap(first, { x: 100 + HOLD_SLOP * 3 + 1, y: 100, at: 1100 })).toBe(false);
+		expect(isDoubleTap(null, first)).toBe(false);
 	});
 });

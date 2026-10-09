@@ -199,3 +199,117 @@ export function pullUp(
 		}
 	};
 }
+
+/** How soon a second tap has to follow the first to make a double tap — Card's figure. */
+export const DOUBLE_TAP_MS = 350;
+/** How long a finger rests before it is a long press — a tooltip's hold. */
+export const LONG_PRESS_MS = 450;
+
+export interface Tap {
+	x: number;
+	y: number;
+	at: number;
+}
+
+/**
+ * Whether `now` is the second tap of a double tap begun by `last`: soon
+ * enough, and near enough — three times a press's slop, since the second tap
+ * of two lands a little apart from the first on a phone held in one hand.
+ */
+export function isDoubleTap(last: Tap | null, now: Tap): boolean {
+	if (!last) return false;
+	return now.at - last.at < DOUBLE_TAP_MS && Math.hypot(now.x - last.x, now.y - last.y) <= HOLD_SLOP * 3;
+}
+
+/**
+ * A double tap or a long press with a finger, as one "open this". Touch only:
+ * a mouse has its double-click, and a held mouse button is a selection.
+ *
+ * For a table cell on a phone, where a single tap must not bring the
+ * keyboard up — the cell is read-only to a finger, and this is the way in.
+ * A long press that fires swallows the context menu Android follows it with,
+ * and a finger that wanders is scrolling, not pressing. The lift that ends
+ * either is cancelled (`touchend`, which stops the browser's own mouse events
+ * and click): what was under the finger is the editor just opened, and the
+ * second tap of a double tap landing there selected a word in it.
+ */
+export function touchOpen(node: HTMLElement, onopen: () => void) {
+	let handler = onopen;
+	let press: { id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
+	let last: Tap | null = null;
+	let held = false;
+	/** The lift that ends an open: its click would land on what it opened. */
+	let swallow = false;
+
+	const clear = () => {
+		if (press) clearTimeout(press.timer);
+		press = null;
+	};
+	const down = (event: PointerEvent) => {
+		if (event.pointerType !== 'touch') return;
+		clear();
+		held = false;
+		swallow = false;
+		press = {
+			id: event.pointerId,
+			x: event.clientX,
+			y: event.clientY,
+			timer: setTimeout(() => {
+				press = null;
+				held = true;
+				swallow = true;
+				last = null;
+				handler();
+			}, LONG_PRESS_MS)
+		};
+	};
+	const move = (event: PointerEvent) => {
+		if (press && event.pointerId === press.id && Math.hypot(event.clientX - press.x, event.clientY - press.y) > HOLD_SLOP) {
+			clear();
+			last = null;
+		}
+	};
+	const up = (event: PointerEvent) => {
+		if (!press || event.pointerId !== press.id) return;
+		clear();
+		const tap = { x: event.clientX, y: event.clientY, at: event.timeStamp || performance.now() };
+		if (isDoubleTap(last, tap)) {
+			last = null;
+			swallow = true;
+			handler();
+		} else last = tap;
+	};
+	const cancel = () => {
+		clear();
+		last = null;
+	};
+	const lift = (event: TouchEvent) => {
+		if (!swallow) return;
+		swallow = false;
+		if (event.cancelable) event.preventDefault();
+	};
+	const menu = (event: Event) => {
+		if (!held) return;
+		held = false;
+		event.preventDefault();
+	};
+
+	node.addEventListener('pointerdown', down);
+	node.addEventListener('pointermove', move);
+	node.addEventListener('pointerup', up);
+	node.addEventListener('pointercancel', cancel);
+	node.addEventListener('contextmenu', menu);
+	node.addEventListener('touchend', lift);
+	return {
+		update: (next: () => void) => (handler = next),
+		destroy: () => {
+			clear();
+			node.removeEventListener('pointerdown', down);
+			node.removeEventListener('pointermove', move);
+			node.removeEventListener('pointerup', up);
+			node.removeEventListener('pointercancel', cancel);
+			node.removeEventListener('contextmenu', menu);
+			node.removeEventListener('touchend', lift);
+		}
+	};
+}

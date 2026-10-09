@@ -4,6 +4,7 @@
 	import { download } from '$lib/download';
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
+	import { touchOpen } from '$lib/gestures';
 	import { armDefault } from '$lib/modal';
 	import { scrollEdges } from '$lib/scrolledge';
 	import { dataUrlBytes, localImageName, safeMediaUrl, weigh } from '$lib/assets';
@@ -347,6 +348,15 @@
 	 * render and follows the value as it is typed.
 	 */
 	let editing = $state<{ row: number; column: string } | null>(null);
+	/**
+	 * Whether the press that is choosing a cell is a finger's. A cell a finger
+	 * taps is read-only, so the tap chooses it without the keyboard coming up
+	 * over half the screen; a double tap or a long press (`touchOpen`) opens it
+	 * full size to type in, as Edit does. A mouse or a pen types in place. Set
+	 * on the way down, captured on the table, which is before the cell takes
+	 * focus — and focus is what brings a keyboard.
+	 */
+	let byFinger = $state(false);
 
 	/** What a column a keyword has taken is told, here and in the status line. */
 	const keywordWarning = (column: string) =>
@@ -1445,7 +1455,7 @@
 	use:scrollEdges={(section) => section.querySelector<HTMLElement>(':scope > .scroll')}
 >
 	<div class="scroll" bind:this={scrollEl}>
-		<table style="min-width:{tableWidth}">
+		<table style="min-width:{tableWidth}" onpointerdowncapture={(e) => (byFinger = e.pointerType === 'touch')}>
 			<!-- Widths belong to the columns, not to the cells: one place to set
 			     them, and `table-layout: fixed` above means they are obeyed rather
 			     than treated as a suggestion the widest cell can overrule. -->
@@ -1755,6 +1765,7 @@
 										}}
 										onclick={(e) => e.stopPropagation()}
 										ondblclick={() => !locked && openBigCell(i, column)}
+										use:touchOpen={() => !locked && openBigCell(i, column)}
 									>
 										<img
 											class="cell-picture"
@@ -1780,7 +1791,9 @@
 									rows="1"
 									aria-label="{column}, row {rowLabel(i)}"
 									value={row[column] ?? ''}
-									readonly={locked}
+									readonly={locked || byFinger}
+									class:by-finger={byFinger && !locked}
+									use:touchOpen={() => !locked && openBigCell(i, column)}
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
 									use:completePlaceholders={dataset.columns}
@@ -2889,6 +2902,13 @@
 
 	td textarea:read-only {
 		cursor: default;
+	}
+
+	/* A finger's cell: a long press opens it, so it must not also start a
+	   text selection with its handles and its menu. */
+	td textarea.by-finger {
+		-webkit-user-select: none;
+		user-select: none;
 	}
 
 

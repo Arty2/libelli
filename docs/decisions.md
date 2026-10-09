@@ -2308,6 +2308,20 @@ anchored to. It stays a child of the field in the DOM — that is what lets the
 dismissal be a containment check rather than a full-screen backdrop — and opens
 upwards, because the row is at the bottom of the tray.
 
+**A finger does not type in a cell; it chooses it.** Every cell is a
+textarea, so a tap focused one and the keyboard came up over half a phone's
+screen — for a tap that was usually choosing a row, or a scroll that
+started on a cell. A cell a finger presses is read-only (`byFinger`, read on
+the table's capturing pointerdown, which comes before focus), so a tap
+chooses it, Edit appears, and nothing else moves; a double tap or a long
+press (`touchOpen` in gestures.ts) opens the cell full size, where typing is
+what was asked for. The tap that opens it is cancelled at `touchend`, or its
+click lands on the editor just opened and selects a word. Per press, not per
+device: a laptop with a touch screen still types in place under its mouse.
+The cost: a quick fix to one cell on a phone is two taps and a close, where
+it was one tap; and the long press that opens a cell is the one that would
+otherwise show a tip, which a cell has none of.
+
 ## Pull-to-refresh
 
 **A reload is the one accident this app cannot absorb, so the browser is not
