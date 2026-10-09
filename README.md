@@ -267,12 +267,11 @@ resize boxes directly, or type exact millimetres.
   how many there are — the same numbers as **Page Number**, for words of
   your own around them: `Page %%page:current%% of %%page:total%%`. With no
   rows loaded there is nothing to count, and they are underlined.
-  `%%toc:title%%` is a **table of contents**: a line for every page whose
+  `%%toc:title%%` is a **table of contents**: a line for every other page whose
   `title` is not blank, in the order they print, each the title, a tab leader
-  and its page number — as InDesign builds one from its styles and Word from
-  its headings, built here from a column, since a page is a row. Set a
-  **Leader** on the area to draw the dots; the contents page lists itself too,
-  unless its own cell is the one holding the placeholder.
+  and its page number — only those lines, with no heading of its own, and never
+  the page it is printed on. A contents built from a column, since a page is a
+  row. Set a **Leader** on the area to draw the dots.
   `today`, `lookup`, `page` and `toc` are reserved keywords and always mean
   themselves: a column called one is **titled in red** in the table, behind a warning sign that, pressed, opens the reason in full, with a note in the
   status line — rename it to quote it by name, or reach it from another row

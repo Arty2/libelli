@@ -18,7 +18,7 @@
  * numbers the page number prints, for an area that wants them in words of its
  * own — "page 3 of 12", a running head, a folio set in the body face.
  *
- * `%%toc:title%%` is a table of contents: one line for every page whose
+ * `%%toc:title%%` is a table of contents: one line for every other page whose
  * `title` is not blank, in the order they print, each the title, a tab leader
  * (`%%%`, see markdown.ts) and its page number — what InDesign builds from its
  * paragraph styles and Word from its headings, built here from a column,
@@ -273,17 +273,20 @@ const isToc = (name: string) => name.trim().toLowerCase() === 'toc';
 
 /**
  * The contents of a run: a line per page whose `column` holds anything, as
- * that and its page number either side of a tab leader. A value that is
- * itself a contents — the contents page's own cell — is left out rather than
- * printed as its raw placeholder, since substitution never runs twice.
- * Undefined when there is no run, or no such column.
+ * that and its page number either side of a tab leader — nothing else, no
+ * heading of its own; a contents page says "Contents" in its own words if it
+ * wants to. Never the page it is printed on (`own`), which listing itself
+ * would only be its own title and number; nor a value that is itself a
+ * contents, printed as its raw placeholder since substitution never runs
+ * twice. Undefined when there is no run, or no such column.
  */
-function contents(name: string, run: readonly Row[] | undefined): string | undefined {
+function contents(name: string, run: readonly Row[] | undefined, own: Row | null): string | undefined {
 	if (!run?.length) return undefined;
 	const column = findColumn(name.trim(), Object.keys(run[0]));
 	if (!column) return undefined;
 	const lines: string[] = [];
 	run.forEach((row, i) => {
+		if (row === own) return;
 		const value = String(row[column] ?? '').replace(/\s*\n\s*/g, ' ').trim();
 		if (!value || /%%\s*toc\s*:/i.test(value)) return;
 		lines.push(`${value} ${TAB_MARK} ${i + 1}`);
@@ -449,7 +452,7 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 			return String(target[column] ?? '');
 		}
 		if (isToc(name)) {
-			const listed = format === undefined ? undefined : contents(format, context.run);
+			const listed = format === undefined ? undefined : contents(format, context.run, row);
 			return listed === undefined ? unknown(whole) : listed;
 		}
 		if (name.toLowerCase() === 'page') {

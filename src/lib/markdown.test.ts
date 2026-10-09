@@ -303,10 +303,10 @@ describe('a table of contents', () => {
 
 	it('with %%toc:column%%, every titled page and its number', () => {
 		const filled = applyPlaceholders('%%toc:title%%', { row: rows[0], rows, run: rows });
-		// The blank title is left out, and the contents page lists itself.
-		expect(filled).toBe('Contents %%% 1\nFerns %%% 2\nMosses & lichens %%% 4');
+		// Only the lines: no heading of its own, the blank title left out, and
+		// the page the contents is printed on not listing itself.
+		expect(filled).toBe('Ferns %%% 2\nMosses & lichens %%% 4');
 		expect(lines(renderMarkdown(filled, { size: 10, leader: 'dotted' }))).toEqual([
-			['Contents', '1'],
 			['Ferns', '2'],
 			['Mosses &amp; lichens', '4']
 		]);
@@ -315,14 +315,13 @@ describe('a table of contents', () => {
 	it('numbers pages in the order they print, not the order the rows arrived', () => {
 		// Sorted, the run is the other way round; lookups would still use arrival numbers.
 		const run = [rows[3], rows[1], rows[0]];
-		expect(applyPlaceholders('%%toc:title%%', { row: rows[0], rows, run })).toBe(
-			'Mosses & lichens %%% 1\nFerns %%% 2\nContents %%% 3'
-		);
+		expect(applyPlaceholders('%%toc:title%%', { row: rows[0], rows, run })).toBe('Mosses & lichens %%% 1\nFerns %%% 2');
 	});
 
-	it('leaves out the contents page cell itself, and is left as written with no run', () => {
+	it('leaves out a contents cell, and is left as written with no run', () => {
 		const withToc = [{ title: '%%toc:title%%' }, { title: 'Ferns' }];
-		expect(applyPlaceholders('%%toc:title%%', { row: withToc[0], rows: withToc, run: withToc })).toBe('Ferns %%% 2');
+		// Quoted from another page, the contents cell is still not listed raw.
+		expect(applyPlaceholders('%%toc:title%%', { row: withToc[1], rows: withToc, run: withToc })).toBe('');
 		expect(applyPlaceholders('%%toc:title%%', { row: rows[0], rows })).toBe('%%toc:title%%');
 		expect(applyPlaceholders('%%toc:nothing%%', { row: rows[0], rows, run: rows })).toBe('%%toc:nothing%%');
 	});

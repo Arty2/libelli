@@ -3397,9 +3397,10 @@ family the rest of the placeholders belong to. Page numbers are a row's place
 in the run (`dataset.rows`), not its arrival number, which is what lookups
 use; the cards are handed the arrival list, so `inArrivalOrder` remembers the
 run it was made from (`runOf`) rather than a second list being threaded
-through every component that draws a card. Substitution still runs once, so a
-contents page whose own cell holds the placeholder leaves itself out rather
-than listing the raw text.
+through every component that draws a card. It writes only the lines — a
+heading is the page's own words — and never lists the page it is printed on;
+a cell holding the placeholder is left out wherever it is quoted, since
+substitution runs once and would print it raw.
 
 **Find and replace is two parts after a column, never a pattern.**
 `%%column:find:replace%%` is a literal, case-sensitive swap of every
