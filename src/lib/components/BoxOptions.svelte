@@ -384,6 +384,9 @@
 	const refY = $derived(selected ? round2(selected.y + selected.h * reference.fy) : 0);
 	const REF_X = { 0: 'left edge', 0.5: 'middle, across', 1: 'right edge' } as const;
 	const REF_Y = { 0: 'top edge', 0.5: 'middle, down', 1: 'bottom edge' } as const;
+	// Centred both ways the reference point is the area's middle, which has no
+	// handle to ring.
+	const ringNote = $derived(reference.fx === 0.5 && reference.fy === 0.5 ? '' : ', and the handle with the ring');
 
 	/** The area's own list style, field by field; a blank field takes the page's. */
 	function setList(change: Record<string, unknown>) {
@@ -1093,9 +1096,9 @@
 			<legend>Position</legend>
 			<!-- X and Y name the reference point, the one the ring is on: the
 			     corner the words are set from, or the middle of an edge where
-			     they are centred. Shown and typed there, stored as the top-left
-			     corner as ever, so the file and every older template read the
-			     same. Measured against the declared height, which is the one
+			     they are centred. Shown and typed there, kept in memory as the
+			     top-left corner as ever; frame.ts turns it into the reference
+			     point the file stores. Measured against the declared height, which is the one
 			     the field beside it says. -->
 			<label class="field"><span>X</span>
 				<input
@@ -1103,7 +1106,7 @@
 					type="number"
 					step="0.5"
 					value={refX}
-					title="The {REF_X[reference.fx]} — where the words are set from, and the handle with the ring"
+					title="The {REF_X[reference.fx]} — where the words are set from{ringNote}"
 					disabled={boxFrozen}
 					onchange={(e) => patch({ x: round2(numeric(e, refX) - selected.w * reference.fx) })}
 				/>
@@ -1117,8 +1120,8 @@
 					value={refY}
 					disabled={boxFrozen || !!selected.anchor}
 					title={selected.anchor
-						? 'Anchored: the gap sets the top edge'
-						: `The ${REF_Y[reference.fy]} — where the words are set from, and the handle with the ring`}
+						? `Anchored: the gap sets the top edge — this is the ${REF_Y[reference.fy]}`
+						: `The ${REF_Y[reference.fy]} — where the words are set from${ringNote}`}
 					onchange={(e) => patch({ y: round2(numeric(e, refY) - selected.h * reference.fy) })}
 				/>
 				<span class="unit">mm</span>
@@ -1398,7 +1401,7 @@
 					<select
 						class:inherits={!selected.list?.marker}
 						value={selected.list?.marker ?? ''}
-						title="What each item of a list is marked with"
+						title="What each item of a bullet list is marked with — a numbered list counts by Numbers"
 						disabled={boxFrozen}
 						onchange={(e) => setList({ marker: e.currentTarget.value || undefined })}
 					>

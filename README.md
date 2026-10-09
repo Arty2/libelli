@@ -70,7 +70,7 @@ resize boxes directly, or type exact millimetres.
   last is what it shows. Switching the Content keeps only what the new choice
   shows — static words do not ride along into an image or a data field — and
   undo brings back what a switch dropped. The first two then take a **Mode** — plain text, Markdown,
-  or a QR code, and a data field can also be **Image**, since a column can
+  or **Barcode** (a QR code, Code 128 or EAN-13), and a data field can also be **Image**, since a column can
   hold a picture. A column of colors is not a mode: link the area's **Fill**
   to it (the link beside the swatch), and an area with no words of its own
   shows `#` in the editor so it stays findable. Nothing about the file format changes — the three are
@@ -326,7 +326,7 @@ resize boxes directly, or type exact millimetres.
   numerals up to 3999 and plain numbers past that; **Indent** is the space from the area's edge to
   the markers, in em, and **Leading** the list's own line height, a multiple of
   the size like the text's; left blank, a list takes the text's leading. All
-  three are a group of their own in the page bar and, for a Markdown area, in the
+  four are a group of their own in the page bar and, for a Markdown area, in the
   area bar, where each on its own overrides the page's; left blank, a list is
   set as it always was.
 - **Baseline** — just after Leading: raises an area's text by a share of its size, in em, or lowers
@@ -559,8 +559,9 @@ resize boxes directly, or type exact millimetres.
 - **The area bar's head** — Lock, the area's **Name**, Delete, and a bare
   glyph at the end that puts the bar away until the next area is chosen, for
   the room under it. On a phone the head is the bar's first row, the name
-  stretched to fill it and Delete a square glyph. A QR code's bar leaves out what does not apply to a
-  code: of Text, only Color, and no Lines.
+  stretched to fill it and Delete a square glyph. A code's bar leaves out what does not apply to it:
+  of Text, only Color — and Font, Size and Weight for a barcode showing its
+  digits — no Lines, and no Fit for a barcode other than a QR code.
 - **Lock** — **Lock** in either bar freezes what you have: no dragging, no
   resizing, no option changes. A locked area can still be *selected*, or the
   button that unlocks it could never be reached. A page lock covers every box
@@ -987,12 +988,12 @@ functional notation is rebuilt from the numbers it parsed to.
 ## Images, colors and codes
 
 Two box modes carry something other than text: **Image** is a Content type of
-its own where the template holds the image, and Image or QR is a **Mode**
+its own where the template holds the image, and Image or Barcode is a **Mode**
 where a column supplies the value. Both are framed by the box's
 declared height, and both take a **Fit**: *fit* puts the whole thing inside the
 box, *cover* fills the box and crops the overflow, *stretch* distorts it to the
 box exactly, and *tile* — images only, since a tiled QR is not a QR — repeats it
-at its own size.
+at its own size. Code 128 and EAN-13 have no Fit: a barcode fills the area.
 
 - **Image, and a fill from a column.** A column of colors fills an area
   through the link beside its **Fill** swatch, which refuses anything that is
@@ -1261,7 +1262,7 @@ Pick a curated Google family, type any other family name, or upload a file.
   this list. Every font, missing or not, has **Upload…** — a file installed
   under that font's own name, so everything set in it takes the file: a missing
   face supplied, a Google family made local, an upload swapped for a newer cut
-  — and **Replace…**, which sets everything in that font in another instead,
+  — and every font the design uses has **Replace…**, which sets everything in that font in another instead,
   from the local files or Google's families, one undo to take back. A local
   file nothing in the design uses is *local · unused*, to be deleted — after
   asking, since another design in the library may still be set in it, and a
@@ -1603,7 +1604,7 @@ name a key the app does not listen for.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>v</kbd> | Paste that style onto the selection |
 | <kbd>?</kbd> or <kbd>/</kbd> | The help panel — a few lines, and these keys |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>h</kbd> | Boxes on or off — bounds, badges and the page's padlock |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>;</kbd> or <kbd>\|</kbd> | Guides on or off — Photoshop's key and Inkscape's |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>;</kbd> or <kbd>\|</kbd> | Guides: all, then without the spacing, then off — Photoshop's key and Inkscape's |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> or <kbd>#</kbd> | Grid on or off |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>s</kbd> | Save the drawing, while drawing |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>p</kbd> | Export — again from that screen to print |
@@ -1670,8 +1671,8 @@ towards it and down is away. They repeat on a hold like the arrows do.
   off; it wears **Move** while areas drag and the zoom-and-pan glyph while they
   do not. On, an area no longer moves under a finger or the
   mouse: one finger scrolls the page and two pinch it, a tap still chooses an
-  area and a second opens it, and the **nudge pad** appears to move the chosen
-  one — it shows by itself only in this mode, at any width; hold its middle to
+  area and a second opens it, and the **nudge pad** moves the chosen one — out
+  to begin with in this mode, at any width; hold its middle to
   put it away, and the cross that appears under zoom and pan brings it back. On
   a touch screen the cross is there in **Move** too, with the pad put away to
   begin with: press it for a nudge finer than a fingertip drags. Switching
@@ -1817,12 +1818,12 @@ than it has to.
   sheet size (a preset or your own, a button to turn it over, and left and
   right pages), margin (one number all round, or one per edge — top, bottom and
   left and right, or inner and outer with left and right pages), bleed, crop marks · type defaults (font, size, leading,
-  spacing, paragraph, baseline, list marker, indent and spacing) · surface (paper color, background image and fit) · page
+  spacing, paragraph, leader, baseline, list marker, numbers, indent and leading) · surface (paper color, background image and fit) · page
   number, whether to print the total, and its margin · CSS
 - **Area** — head, on one line: lock, the field's name, duplicate, delete · content
-  (data field or static text, column, mode, fit, QR settings) · type (font,
-  size, weight, color) · setting (leading, spacing, paragraph, baseline, and
-  for Markdown the list marker, indent and spacing, case) · alignment,
+  (data field or static text, column, mode, fit, barcode type, digits and correction) · type (font,
+  size, weight, color) · setting (leading, spacing, paragraph, leader, baseline,
+  and for Markdown the list marker, numbers, indent and leading, case) · alignment,
   horizontal and vertical · surface (fill, padding, border width, style, hand and
   color, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
   when empty, and mirror where the template has left and right pages) ·

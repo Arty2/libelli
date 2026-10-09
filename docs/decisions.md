@@ -70,6 +70,25 @@ the page default: that is body text, and body text reads the same way on both
 sides of a spread. The rule is one sentence and it is the difference between a
 mirrored margin and a mirrored paragraph.
 
+**Shrink keeps the height and scales the words, never below half.** Grow and
+Clip were the only answers to a long cell, and a card set in a fixed grid
+wants neither: Shrink sets one card's words smaller until they fit the area as
+drawn. The scale is a bisection (`shrinkScale`) because a fit only gets easier
+as the words get smaller, and each try is a layout the browser does; it stops
+at `SHRINK_FLOOR`, half the size, because words below that are not read, and
+an area that still does not fit shows its red corner as a clipped one does.
+A shrinking area is measured as Clip is, at its declared height, so nothing
+anchored to it moves when its words do.
+
+**The spacing a drag shows is measured from the reference point.** InDesign's
+smart spacing, kept to the useful half: from the point X and Y name
+(`spacingReadouts`), level and plumb to the nearest area or the trim edge,
+each gap in millimetres, and a pair of equal gaps marked, which is how an area
+is centred between two by eye. From the reference point rather than the
+middle, so the number a drag shows and the number the bar shows are measured
+from the same place. It is the full Guides state only: the dash keeps the
+margins and alignment guides for a person who finds the numbers noisy.
+
 ## `src/lib/frame.ts`
 
 **A file gives each area at its reference point; memory keeps the top-left
@@ -884,8 +903,8 @@ lifts, so a drag (which makes no click) cannot leave it to eat a later tap.
 its middle too.** They were tied to Boxes being on and the grid being off, so
 turning the grid on — or the margins off — took them away without a word, and a
 moving box only ever tried its left and top edges, so nothing lined up by its
-middle. Now Guides goes round three states (margins and temporary guides, the
-temporary guides alone as the dash, neither), the temporary guides include the
+middle. Now Guides goes round three states (margins, temporary guides and the
+spacing; the same without the spacing as the dash; neither), the temporary guides include the
 page's centre lines, a moving box tries start, middle and end (`latchSpan`),
 and an alignment in reach beats the grid. The margins still win over both,
 because a margin that is not a whole number of grid steps would otherwise have
@@ -1360,13 +1379,14 @@ buoy where an area has both. Not the bottom corner: on an area shorter than the
 badge, the tie would stack up over the top line. Consecutive shallow areas in a
 chain can still bring one area's buoy down to the next one's tie.
 
-**The corner the words hang from has a ring in its handle.** It was told
+**The point the words are set from has a ring in its handle.** It was told
 apart by square corners alone, which at 14px read as a rendering quirk rather
 than a meaning; with the ring to say it, the handle is rounded like the other
 seven. A ring rather than a cross, which is the pivot's mark; an SVG, like the
 pivot's, so its weight holds at every zoom. Left and top alignment
-make it the top-left, right and bottom the bottom-right; a centred alignment
-on either axis has no such corner and no handle has a ring. It is worked
+make it the top-left, right and bottom the bottom-right; centred on one axis
+it is the middle of an edge, and centred both ways it is the area's middle,
+where no handle is, so none has a ring. It is worked
 out as drawn, so on a mirrored left-hand page it is the mirrored corner.
 
 **Pointing at a tie draws its thread.** The link and the buoy are at two
@@ -2824,6 +2844,18 @@ attribute without passing a chokepoint. A name that does not look like one is
 refused outright rather than cleaned, because a half-cleaned name is a family
 nobody asked for.
 
+**The Fonts list in the Images tray is for a design that changed computers.**
+A template names its fonts and the bytes stay behind, so a design opened
+elsewhere is set in a fallback without saying which face it wanted. The list
+says which fonts are **local** — a file in this browser — and which are
+**missing**; a Google family is neither, since it arrives by itself, and
+tagging every one would bury the two that need a person. Every font gets
+Upload…, because a file installed under a family's name replaces whatever
+supplied it (a Google link, an older upload), so it is also how a Google family
+is made local. Replace… is only on fonts the design uses — renaming an unused
+one changes nothing — and an unused local file gets Delete instead, asking
+first, because another template in the library may still be set in it.
+
 ## `src/lib/assets.ts` and `src/lib/fonts.ts`
 
 **The Images bar uploads, and carries by pointer.** Without the folder —
@@ -2956,6 +2988,34 @@ starter card's QR carries 1mm, and Position Automagically gives one 2mm. The
 padding guide is an SVG sized from the insets, never `auto`, which for an SVG is
 300 × 150px.
 
+## `src/lib/barcode.ts`
+
+**The QR mode learned barcodes rather than a new mode joining it.** A code is
+a code to the person choosing it, and every template already says `qr`, so
+`QrSettings.kind` is absent for a QR and nothing migrates. Code 128 takes any
+printable ASCII, packing runs of digits two to a symbol; EAN-13 takes twelve
+digits (the check is worked out), thirteen (the check must be right) or an
+ISBN-10, which becomes the 978 code every book since 2007 carries.
+
+**A barcode fills its area, so it has no Fit.** A scanner reads the ratio of
+bars, not their width, so stretching every bar alike costs nothing, and an
+area drawn wide and short is the shape the code wants. Contain or cover would
+only leave white the person then has to size away by hand.
+
+**The digits are type, in the area's own face and size.** Show Digits is on
+by default because every packet prints them and a code nobody can read back by
+eye cannot be checked. Set in HTML beside an SVG of the bars rather than as SVG
+text, so they take the area's font, size, weight and color like any other
+words, and the bar shows those controls for a barcode with digits. EAN-13 is
+laid out as retail does — the first digit in the left quiet zone, six under
+each half, the guard bars running down between — which needs the bars'
+viewBox seven modules wider on the left.
+
+**Encoders are pinned, not decoded on every run.** Each was read back once
+with an independent decoder and its modules are pinned in the tests; the
+decoders left the dev dependencies, so changing an encoder means decoding its
+output once more by hand before pinning it again.
+
 ## Screen lines are drawn so the zoom cannot round them
 
 Everything on the card is inside one `transform: scale()`, and a box's edges
@@ -2971,8 +3031,9 @@ line left as a border; it has no SVG cousin yet.
 
 ## Lists and the baseline
 
-`TextStyle.list` is a marker (`bullet`, `disc`, `circle`, `square`, `dash`,
-`emdash`, `arrow`, `none`), an indent and a leading, each optional and each
+`TextStyle.list` is a marker (`bullet`, `disc`, `circle`, `square`,
+`openSquare`, `dash`, `emdash`, `arrow`, `none`), a numbering for ordered lists
+(`1`, `a`, `A`, `i`, `I`), an indent and a leading, each optional and each
 merged over the page's on its own, so an area can change its indent and keep the
 page's marker. They are type units — the indent in em, the leading a bare
 multiple of the size — as a paragraph's are. They were mm for a round, which was
@@ -2988,9 +3049,12 @@ not a line height. So `normaliseList` drops a stored `spacing` rather than
 carrying a field nothing on screen can edit or clear. The leading goes on the
 top `<ul>` as `line-height`, which the items and any nested list inherit.
 
-The marker is a text node in the item, so it is set in the area's face; a
-face without the glyph falls back through the area's stack like any missing
-character — which in practice is `●` in a handwriting face.
+The text markers are a text node in the item, so they are set in the area's
+face; a face without the glyph falls back through the area's stack like any
+missing character. The four round and square ones (`drawnMarker`) are drawn
+instead, in the text's color at sizes of their own: faces that have `●` or `■`
+draw them anywhere from half a capital to a whole one, and in a handwriting
+face the fallback was a different size again.
 
 A cell that quotes its own column (`self` in `applyPlaceholders`) is not
 filled in: filling it once only prints the placeholder back.
@@ -3167,7 +3231,7 @@ grouping and the order:
 - The page bar: the template, then **Page** (size, margin, left & right),
   **Text**, **Paragraphs**, **Lists**, **Paper**, **Page Number**, and the
   print panel's **Bleed** and **Printing**.
-- An area: the name, then **Content**, **QR Code** when it is one, **Align**
+- An area: the name, then **Content**, **Barcode** when it is one, **Align**
   — ahead of the type, because it is what is reached for most — **Text** (font,
   size, weight, color, letter spacing, case), **Position** (X, Y, W, H, anchor, fold follow,
   rotation), **Lines**, **Lists** for Markdown, **Box** (fill, border, padding,

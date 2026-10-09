@@ -110,7 +110,16 @@ export const loadUi = (): UiState => {
 	// `trayWidth` was px, in 0.16.0; the width is a share now, and a stale
 	// number carried along in every save would only be something to misread.
 	const { showOutlines, trayWidth: _px, ...rest } = stored;
-	return { ...UI_DEFAULTS, ...(showOutlines === undefined ? {} : { showBounds: showOutlines }), ...rest };
+	// Before the spacing, the Guides box's dash was the temporary guides
+	// without the margins; now it is both without the spacing. Read as the
+	// dash it was, so the box's tip, which names the margins, is true of it.
+	const oldDash = rest.spacingGuides === undefined && rest.showGuides === false && rest.smartGuides === true;
+	return {
+		...UI_DEFAULTS,
+		...(showOutlines === undefined ? {} : { showBounds: showOutlines }),
+		...rest,
+		...(oldDash ? { showGuides: true, spacingGuides: false } : {})
+	};
 };
 export const saveUi = (ui: UiState) => local.set('ui', ui);
 

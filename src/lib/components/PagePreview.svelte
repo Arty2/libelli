@@ -1825,7 +1825,7 @@
 				}}
 				title={panning
 					? 'Zoom and pan — a finger scrolls, areas stay put; tap one and nudge it with the pad. Press to drag areas again.'
-					: 'Move — areas drag where you press them. Press for zoom and pan: scroll and pinch without dragging, and nudge with a pad.'}
+					: 'Move — areas drag where you press them. Press for zoom and pan: scroll and pinch without dragging; the cross brings out a nudge pad.'}
 			>
 				<Icon name={panning ? 'zoom-pan' : 'move'} size={16} /><span class="sr-only">Zoom and pan</span>
 			</button>

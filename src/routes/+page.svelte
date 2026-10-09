@@ -4000,7 +4000,7 @@
 			<dt>Pinch, Ctrl/Cmd + scroll<span>off the page</span></dt><dd>Text size — the interface itself never zooms</dd>
 			<dt>Ctrl/Cmd + +<span>in a field or here</span></dt><dd>Text size, in steps; Ctrl/Cmd + 0, or the percentage beside the version, puts it back</dd>
 			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + ;<span>|</span></dt><dd>Guides on or off</dd>
+			<dt>Ctrl/Cmd + ;<span>|</span></dt><dd>Guides: all, without the spacing, off</dd>
 			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off</dd>
 			<dt>Ctrl/Cmd + S</dt><dd>Save the drawing, while drawing</dd>
 			<dt>Ctrl/Cmd + P</dt><dd>Export — press again from that screen to print</dd>

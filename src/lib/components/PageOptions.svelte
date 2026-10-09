@@ -837,7 +837,7 @@
 				<span>Marker</span>
 				<select
 					value={template.defaults.list?.marker ?? 'bullet'}
-					title="What each item of a Markdown list is marked with"
+					title="What each item of a Markdown bullet list is marked with — a numbered list counts by Numbers"
 					disabled={pageFrozen}
 					onchange={(e) => setDefaultList({ marker: e.currentTarget.value })}
 				>

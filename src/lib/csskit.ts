@@ -123,7 +123,10 @@ function selectors(template: Template): string[] {
 		const { fx, fy } = referenceOf(b.align ?? template.defaults.align, b.valign);
 		const point = fx || fy ? ` (${['top', 'middle', 'bottom'][fy * 2]} ${['left', 'centre', 'right'][fx * 2]})` : '';
 		const at = `${round(b.x + b.w * fx)} ${round(b.y + b.h * fy)}${point}`;
-		const frame = `${b.mode}, ${at}, ${round(b.w)} × ${round(b.h)}${notes.length ? `; ${notes.join(', ')}` : ''}`;
+		// `qr` is the mode's stored name for every code; a model told a Code
+		// 128 is a QR would style it as a square.
+		const mode = b.mode === 'qr' ? (b.qr?.kind ?? 'qr') : b.mode;
+		const frame = `${mode}, ${at}, ${round(b.w)} × ${round(b.h)}${notes.length ? `; ${notes.join(', ')}` : ''}`;
 		return [`${`#${id} { }`.padEnd(21)} /* ${inComment(frame)} */`];
 	});
 	return [
