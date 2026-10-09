@@ -39,7 +39,6 @@ export const LIST_GLYPHS: Record<ListMarker, string | null> = {
 	bullet: '•',
 	disc: '●',
 	circle: '○',
-	ring: '◯',
 	square: '■',
 	openSquare: '□',
 	dash: '–',
@@ -55,14 +54,13 @@ export const LIST_GLYPHS: Record<ListMarker, string | null> = {
  * — two-thirds of an em in one, under half in another — and no one scale puts
  * them where they belong beside `•`. So each is a box of a fixed measure in
  * the text's color, filled or outlined: the circle at the bullet's own size,
- * the disc and the ring a size up, the squares a shade smaller than the disc
+ * the disc a size up, the squares a shade smaller than the disc
  * because a square of the same measure looks the larger. Every one has its
  * middle a third of an em up, where `•` sits in the common faces.
  */
 const DRAWN: Partial<Record<ListMarker, { size: number; round: boolean; open: boolean }>> = {
 	circle: { size: 0.3, round: true, open: true },
 	disc: { size: 0.44, round: true, open: false },
-	ring: { size: 0.44, round: true, open: true },
 	square: { size: 0.38, round: false, open: false },
 	openSquare: { size: 0.38, round: false, open: true }
 };
@@ -98,47 +96,64 @@ export function listCount(n: number, numbering: ListNumbering = 'decimal'): stri
 }
 
 /**
- * A line split at its last tab, or at `^t` — InDesign's own code for a tab,
- * and the way to write one where a Tab key moves to the next field and a
- * pasted tab starts a new column. The last, because a price list's entry may
- * hold a tab of its own and the price is always the end of the line. Null
- * where there is none.
+ * A line split at its last tab mark, or null where it has none.
+ *
+ * The mark is `%%%`: three percent signs, exactly — a run of two is the edge of
+ * a placeholder, and placeholders are filled in before this ever sees the
+ * line, so `Coffee %%% %%price%%` arrives as `Coffee %%% 2.20`. One left
+ * unfilled stays two percent signs either side of its name and is never read
+ * as a mark; nor is a run of four or more. It is what a person can type where
+ * a Tab key moves to the next field and a tab pasted from a spreadsheet
+ * starts a new column. A real tab counts too, but only where the area asks
+ * for a leader (`tabs`): one already sitting in somebody's table was a space
+ * before there were leaders, and stays one.
+ *
+ * The last mark, because a contents line's words may hold one of their own
+ * and the page number is always the end of the line; never one inside a code
+ * span, which cutting would leave as two halves with a backtick each. The
+ * spaces either side of a mark are the mark's.
  */
-export function tabSplit(line: string): [string, string] | null {
-	// Never inside a code span: `a^tb` is code somebody typed, and cutting it
-	// leaves two halves with one backtick each, printed as typed.
+export function tabSplit(line: string, tabs = false): [string, string] | null {
 	const inCode = (at: number) => (line.slice(0, at).match(/`/g)?.length ?? 0) % 2 === 1;
 	for (let at = line.length - 1; at >= 0; at--) {
-		const width = line[at] === '\t' ? 1 : line.startsWith('^t', at) ? 2 : 0;
-		if (width && !inCode(at)) return [line.slice(0, at), line.slice(at + width)];
+		const mark =
+			line[at] === '\t' && tabs
+				? 1
+				: line.startsWith('%%%', at) && line[at - 1] !== '%' && line[at + 3] !== '%'
+					? 3
+					: 0;
+		if (mark && !inCode(at)) return [line.slice(0, at).trimEnd(), line.slice(at + mark).trimStart()];
 	}
 	return null;
 }
 
 /**
  * The leader between the two halves of a tabbed line: the room left over,
- * drawn along the baseline in the text's color. Empty, so a flex row aligned
- * on the baseline puts its bottom edge on the line's baseline, where a row of
- * full stops would sit; a little space either side, so it does not touch the
- * words.
+ * drawn along the baseline in the text's color — or nothing drawn at all, for
+ * `none`, which is still the right edge for what follows the mark. Empty, so a
+ * flex row aligned on the baseline puts its bottom edge on the line's
+ * baseline, where a row of full stops would sit; a little space either side,
+ * so it does not touch the words.
  *
  * Dots and dashes are painted, not a dotted border: a border that thin draws
  * specks a pixel wide with no room between them, where a leader is full
  * stops — round, a period's size, a third of an em apart. Every length is in
  * em, so they keep their proportions at any size and shrink with Shrink.
  */
-export function leaderStyle(leader: Exclude<Leader, 'none'>): string {
+export function leaderStyle(leader: Leader): string {
 	const paint =
 		leader === 'dotted'
-			? 'height:0.16em;background:radial-gradient(circle,currentColor 0.065em,transparent 0.075em) left bottom/0.33em 0.16em repeat-x'
+			? ';height:0.16em;background:radial-gradient(circle,currentColor 0.065em,transparent 0.075em) left bottom/0.33em 0.16em repeat-x'
 			: leader === 'dashed'
-				? 'height:0.07em;background:linear-gradient(90deg,currentColor 55%,transparent 55%) left bottom/0.5em 0.07em repeat-x'
-				: 'height:0.07em;background:currentColor';
-	return `flex:1 1 0;min-width:1em;margin:0 0.3em;${paint}`;
+				? ';height:0.07em;background:linear-gradient(90deg,currentColor 55%,transparent 55%) left bottom/0.5em 0.07em repeat-x'
+				: leader === 'solid'
+					? ';height:0.07em;background:currentColor'
+					: '';
+	return `flex:1 1 0;min-width:1em;margin:0 0.3em${paint}`;
 }
 
 /** A tabbed line as a row: the words, the leader, the words at the right edge. */
-function leaderLine(parts: [string, string], leader: Exclude<Leader, 'none'>): string {
+function leaderLine(parts: [string, string], leader: Leader): string {
 	return (
 		// No indent of its own: a paragraph's text-indent is inherited by every
 		// flex item, and would push the price in from the edge it is set to.
@@ -150,16 +165,15 @@ function leaderLine(parts: [string, string], leader: Exclude<Leader, 'none'>): s
 }
 
 /**
- * A paragraph's lines, with a tabbed one set as a row of its own when there is
- * a leader. The others are joined as they always were, with a break, so an
- * indent still lands on the paragraph's first line only.
+ * A paragraph's lines, a tabbed one set as a row of its own. The others are
+ * joined as they always were, with a break, so an indent still lands on the
+ * paragraph's first line only.
  */
-function paragraphLines(lines: string[], leader: Leader | undefined): string {
-	if (!leader || leader === 'none') return lines.map(renderInline).join('<br />');
+function paragraphLines(lines: string[], leader: Leader = 'none'): string {
 	let out = '';
 	let previousRow = true;
 	for (const line of lines) {
-		const parts = tabSplit(line);
+		const parts = tabSplit(line, leader !== 'none');
 		if (parts) {
 			out += leaderLine(parts, leader);
 			previousRow = true;
@@ -496,8 +510,8 @@ function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, 
 				`gap:${marker === null ? '0' : look.gap}`,
 				`margin:0 0 ${i === list.items.length - 1 ? '0' : look.item}`
 			].join(';');
-			const tabbed = look.leader && look.leader !== 'none' ? tabSplit(item.text) : null;
-			const words = tabbed ? leaderLine(tabbed, look.leader as Exclude<Leader, 'none'>) : renderInline(item.text);
+			const tabbed = tabSplit(item.text, !!look.leader && look.leader !== 'none');
+			const words = tabbed ? leaderLine(tabbed, look.leader ?? 'none') : renderInline(item.text);
 			const inner = [`<span style="flex:1;min-width:0">${words}`];
 			if (item.children) {
 				inner.push(`<div style="margin-top:${look.item}">${renderList(item.children, md, false, look)}</div>`);

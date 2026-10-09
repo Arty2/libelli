@@ -145,7 +145,6 @@ export const LIST_MARKERS: ListMarker[] = [
 	'bullet',
 	'disc',
 	'circle',
-	'ring',
 	'square',
 	'openSquare',
 	'dash',
@@ -159,7 +158,6 @@ export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
 	bullet: '• Bullet',
 	disc: '● Disc',
 	circle: '○ Circle',
-	ring: '◯ Ring',
 	square: '■ Square',
 	openSquare: '□ Open Square',
 	dash: '– Dash',
@@ -214,7 +212,9 @@ export function normaliseList(raw: unknown): ListStyle | undefined {
 		return Number.isFinite(n) ? Math.round(Math.max(floor, Math.min(ceiling, n)) * 100) / 100 : undefined;
 	};
 	const list = stripUndefined({
-		marker: LIST_MARKERS.includes(marker as ListMarker) ? (marker as ListMarker) : undefined,
+		// `ring` was a circle the disc's size, for a few days in 0.28, and read
+		// as the circle twice over; a template that chose it gets the circle.
+		marker: marker === 'ring' ? 'circle' : LIST_MARKERS.includes(marker as ListMarker) ? (marker as ListMarker) : undefined,
 		numbering: LIST_NUMBERINGS.includes(numbering as ListNumbering) ? (numbering as ListNumbering) : undefined,
 		indent: number(indent, 0, MAX_LIST),
 		// The same floor an area's own leading has; past 3 lines is not leading.

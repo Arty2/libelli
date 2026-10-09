@@ -267,7 +267,13 @@ resize boxes directly, or type exact millimetres.
   how many there are — the same numbers as **Page Number**, for words of
   your own around them: `Page %%page:current%% of %%page:total%%`. With no
   rows loaded there is nothing to count, and they are underlined.
-  `today`, `lookup` and `page` are reserved keywords and always mean
+  `%%toc:title%%` is a **table of contents**: a line for every page whose
+  `title` is not blank, in the order they print, each the title, a tab leader
+  and its page number — as InDesign builds one from its styles and Word from
+  its headings, built here from a column, since a page is a row. Set a
+  **Leader** on the area to draw the dots; the contents page lists itself too,
+  unless its own cell is the one holding the placeholder.
+  `today`, `lookup`, `page` and `toc` are reserved keywords and always mean
   themselves: a column called one is **titled in red** in the table, behind a warning sign that, pressed, opens the reason in full, with a note in the
   status line — rename it to quote it by name, or reach it from another row
   with `%%lookup:3:today%%`. A single percent sign is ordinary text —
@@ -286,14 +292,15 @@ resize boxes directly, or type exact millimetres.
   first — a heading or a list before it included, since on a card most
   paragraphs follow one, and the book rule of indenting only a paragraph after
   another meant it hardly ever showed.
-- **Tab leaders** — **Leader**, beside Paragraph in both bars: **Dotted**,
-  **Dashed**, **Solid** or **None**. With one set, a line with a tab in it puts
-  what follows the last tab against the area's right edge and fills the room
-  between with the leader, on the baseline — `Espresso^t2.20` is a price list's
-  line. `^t` is InDesign's code for a tab, and the way to write one here: a Tab
-  key moves to the next field, and a tab pasted from a spreadsheet starts a new
-  column. Plain text and Markdown, paragraphs and list items alike; with no
-  leader a line is set as it always was.
+- **Tab leaders** — write `%%%` in a line and what follows the last one is set
+  against the area's right edge: `Espresso %%% 2.20` is a price list's line,
+  `%%item%% %%% %%price%%` the same from two columns. **Leader**, beside
+  Paragraph in both bars, fills the room between: **Dotted**, **Dashed**,
+  **Solid**, or **None** for blank space. Exactly three percent signs, so it is
+  never a placeholder's edge — `%%item%%%%%%%price%%` is a name, a leader and a
+  name — while `%%%item%%`, three and two, is a stray sign and a placeholder.
+  A real tab counts too, once a leader is set; one already in a table without
+  one stays a space. Plain text and Markdown, paragraphs and list items alike.
 - **Columns** — in the area bar's Lines, for an area of words: 2 to 6 sets
   them side by side within the area, with **Gap** the millimetres between
   one column and the next. Blank or 1 is one column. The columns balance —
@@ -306,14 +313,14 @@ resize boxes directly, or type exact millimetres.
   are shown, or the area is chosen, a dotted line marks each side of every
   gap, and the area wears `.columns` for its CSS.
 - **Lists** — **Marker** picks a Markdown bullet list's marker, **• Bullet**,
-  **● Disc**, **○ Circle**, **◯ Ring**, **■ Square**, **□ Open Square**,
+  **● Disc**, **○ Circle**, **■ Square**, **□ Open Square**,
   **– Dash**, **— Em Dash**, **➤ Arrow**
   or **None**, each set in the area's own
   font like the words beside it (a font without the glyph falls back as for any
   missing character) — except the circles and squares, drawn in the text's
   color at sizes of their own, since the faces that have `●` or `■` draw them
   at any size from half a capital to a whole one: the circle the bullet's size,
-  the disc and the ring a size up, the squares near the disc's, all with their
+  the disc a size up, the squares near the disc's, all with their
   middles where the bullet's is; **Numbers** is how a numbered list counts —
   **1, 2, 3**, **a, b, c**, **A, B, C**, **i, ii, iii** or **I, II, III** —
   letters going on past z as a spreadsheet's columns do (y, z, aa), Roman

@@ -6,6 +6,7 @@ import {
 	deleteRows,
 	dropTarget,
 	inArrivalOrder,
+	runOf,
 	indexAfterSort,
 	moveColumn,
 	moveRows,
@@ -215,5 +216,15 @@ describe('row numbers and the arrival order', () => {
 				[2, 3]
 			])
 		);
+	});
+});
+
+describe('runOf', () => {
+	it('finds the order the rows print in from the arrival-ordered list made of them', () => {
+		const dataset = { columns: ['n'], rows: [{ n: 'b' }, { n: 'a' }] };
+		const arrival = inArrivalOrder(dataset);
+		expect(runOf(arrival)).toBe(dataset.rows);
+		expect(runOf([...arrival])).toBeUndefined();
+		expect(runOf(undefined)).toBeUndefined();
 	});
 });

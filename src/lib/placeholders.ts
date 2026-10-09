@@ -18,7 +18,13 @@
  * numbers the page number prints, for an area that wants them in words of its
  * own — "page 3 of 12", a running head, a folio set in the body face.
  *
- * `today`, `lookup` and `page` are keywords, and a keyword always wins: a
+ * `%%toc:title%%` is a table of contents: one line for every page whose
+ * `title` is not blank, in the order they print, each the title, a tab leader
+ * (`%%%`, see markdown.ts) and its page number — what InDesign builds from its
+ * paragraph styles and Word from its headings, built here from a column,
+ * since a page here is a row.
+ *
+ * `today`, `lookup`, `page` and `toc` are keywords, and a keyword always wins: a
  * column that happens to be called one cannot be written as `%%today%%`,
  * `%%lookup%%` or `%%page%%`, only reached from another row by a lookup. The table marks
  * such a column, because a template that meant it would otherwise print the
@@ -76,7 +82,15 @@ export interface PlaceholderContext {
 	page?: number | null;
 	/** how many cards the run has, for `%%page:total%%` */
 	pageCount?: number | null;
+	/**
+	 * The rows in the order they print, a page number being a row's place in
+	 * it from 1 — for `%%toc:…%%`. See `runOf` in table.ts.
+	 */
+	run?: readonly Row[];
 }
+
+/** The tab leader's mark, between a contents line's words and its page: markdown.ts. */
+export const TAB_MARK = '%%%';
 
 /**
  * Private-use characters around a placeholder nothing answers to. Chosen from
@@ -243,7 +257,7 @@ function pastTheEnd(lookup: LookupSpec, rows: readonly Row[] | undefined, row: R
 }
 
 /** The words `%%…%%` means before it means any column. */
-export const KEYWORDS = ['today', 'lookup', 'page'] as const;
+export const KEYWORDS = ['today', 'lookup', 'page', 'toc'] as const;
 
 /** What `%%page:…%%` can ask for, as the completion offers them. */
 export const PAGE_PLACEHOLDERS = ['page:current', 'page:total'] as const;
@@ -255,6 +269,27 @@ export const PAGE_PLACEHOLDERS = ['page:current', 'page:total'] as const;
 export const isKeyword = (name: string) => (KEYWORDS as readonly string[]).includes(name.trim().toLowerCase());
 
 const isLookup = (name: string) => name.trim().toLowerCase() === 'lookup';
+const isToc = (name: string) => name.trim().toLowerCase() === 'toc';
+
+/**
+ * The contents of a run: a line per page whose `column` holds anything, as
+ * that and its page number either side of a tab leader. A value that is
+ * itself a contents — the contents page's own cell — is left out rather than
+ * printed as its raw placeholder, since substitution never runs twice.
+ * Undefined when there is no run, or no such column.
+ */
+function contents(name: string, run: readonly Row[] | undefined): string | undefined {
+	if (!run?.length) return undefined;
+	const column = findColumn(name.trim(), Object.keys(run[0]));
+	if (!column) return undefined;
+	const lines: string[] = [];
+	run.forEach((row, i) => {
+		const value = String(row[column] ?? '').replace(/\s*\n\s*/g, ' ').trim();
+		if (!value || /%%\s*toc\s*:/i.test(value)) return;
+		lines.push(`${value} ${TAB_MARK} ${i + 1}`);
+	});
+	return lines.join('\n');
+}
 
 /** The column a written name refers to, or undefined when there is none. */
 export function findColumn(name: string, columns: readonly string[]): string | undefined {
@@ -277,6 +312,12 @@ export function referencedColumns(text: string, columns: readonly string[]): str
 		const swap = match[2] === undefined ? null : findReplace(match[2]);
 		if (column && (match[2] === undefined || swap)) {
 			found.add(column);
+			continue;
+		}
+		// A contents uses its column on every page.
+		const listed = isToc(match[1]) && match[2] !== undefined ? findColumn(match[2].trim(), columns) : undefined;
+		if (listed) {
+			found.add(listed);
 			continue;
 		}
 		// A lookup uses its column in some other row — still a use of it.
@@ -407,6 +448,10 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 			if (!target || !column || (target === row && column === context.self)) return unknown(whole);
 			return String(target[column] ?? '');
 		}
+		if (isToc(name)) {
+			const listed = format === undefined ? undefined : contents(format, context.run);
+			return listed === undefined ? unknown(whole) : listed;
+		}
 		if (name.toLowerCase() === 'page') {
 			// Left as written, and marked, where there is no run to count — the
 			// editor with no rows — or the part is neither of the two.
@@ -460,6 +505,9 @@ export function placeholderChoices(query: string, columns: readonly string[]): s
 	// has to keep the row it was typed with.
 	const lookup = /^(\s*lookup\s*:[^:]*:)([^:]*)$/i.exec(query);
 	if (lookup) return ranked(lookup[2], columns).map((name) => lookup[1] + name);
+	// Past `toc:`, the same: a column, as the contents will list.
+	const toc = /^(\s*toc\s*:)([^:]*)$/i.exec(query);
+	if (toc) return ranked(toc[2], columns).map((name) => toc[1] + name);
 	// A column a keyword has taken is not offered: choosing it would print the keyword.
 	return ranked(query, [...columns.filter((c) => !isKeyword(c)), 'today', ...PAGE_PLACEHOLDERS]);
 }

@@ -233,12 +233,11 @@ export interface ParagraphStyle {
 	amount: number;
 }
 
-/** What a Markdown bullet list is marked with: `•`, `●`, `○`, `◯`, `■`, `□`, `–`, `—`, `➤`, or nothing. */
+/** What a Markdown bullet list is marked with: `•`, `●`, `○`, `■`, `□`, `–`, `—`, `➤`, or nothing. */
 export type ListMarker =
 	| 'bullet'
 	| 'disc'
 	| 'circle'
-	| 'ring'
 	| 'square'
 	| 'openSquare'
 	| 'dash'

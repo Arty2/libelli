@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { escapeHtml, flagUnknown, listCount, renderInline, renderMarkdown, tabSplit } from './markdown';
-import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
+import { UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders } from './placeholders';
 import type { ListMarker } from './types';
 const render = (src: string) => renderMarkdown(src, { size: 12.5 });
 
@@ -158,13 +158,11 @@ describe('list style', () => {
 
 	it('draws the circles and squares, at sizes of their own, and types the rest', () => {
 		const look = (marker: ListMarker) => renderMarkdown('- a', { size: 10, list: { marker } });
-		// The circle at the bullet's size, outlined; the disc and the ring a size up.
+		// The circle at the bullet's size, outlined; the disc a size up.
 		expect(look('circle')).toContain('width:0.3em;height:0.3em');
 		expect(look('circle')).toContain('border-radius:50%;border:0.07em solid currentColor');
 		expect(look('disc')).toContain('width:0.44em;height:0.44em');
 		expect(look('disc')).toContain('border-radius:50%;background:currentColor');
-		expect(look('ring')).toContain('width:0.44em;height:0.44em');
-		expect(look('ring')).toContain('border:0.07em solid currentColor');
 		// Squares a shade smaller than the disc, and square.
 		expect(look('square')).toContain('width:0.38em;height:0.38em');
 		expect(look('square')).not.toContain('border-radius');
@@ -172,8 +170,8 @@ describe('list style', () => {
 		// Every one has its middle where the bullet's is.
 		expect(look('circle')).toContain('top:-0.185em');
 		expect(look('disc')).toContain('top:-0.115em');
-		for (const m of ['circle', 'disc', 'ring', 'square', 'openSquare'] as const) {
-			expect(look(m)).not.toMatch(/[●○◯■□]/);
+		for (const m of ['circle', 'disc', 'square', 'openSquare'] as const) {
+			expect(look(m)).not.toMatch(/[●○■□]/);
 		}
 		expect(renderMarkdown('- a', { size: 10 })).toContain('<span style="flex:none;white-space:nowrap">•</span>');
 		// A number is not a disc, whatever marker the bullets are given.
@@ -219,18 +217,36 @@ describe('listCount', () => {
 });
 
 describe('tab leaders', () => {
-	it('splits a line at its last tab, or at ^t', () => {
-		expect(tabSplit('Coffee\t3.50')).toEqual(['Coffee', '3.50']);
-		expect(tabSplit('Coffee^t3.50')).toEqual(['Coffee', '3.50']);
-		expect(tabSplit('A\tB\tC')).toEqual(['A\tB', 'C']);
-		expect(tabSplit('No tab here')).toBeNull();
+	it('splits a line at its last %%%, and at a tab only when asked', () => {
+		expect(tabSplit('Coffee %%% 3.50')).toEqual(['Coffee', '3.50']);
+		expect(tabSplit('Coffee%%%3.50')).toEqual(['Coffee', '3.50']);
+		expect(tabSplit('A %%% B %%% C')).toEqual(['A %%% B', 'C']);
+		expect(tabSplit('Coffee\t3.50')).toBeNull();
+		expect(tabSplit('Coffee\t3.50', true)).toEqual(['Coffee', '3.50']);
+		expect(tabSplit('No mark here')).toBeNull();
 		// Never inside a code span.
-		expect(tabSplit('Use `a^tb` here')).toBeNull();
-		expect(tabSplit('Use `a^tb`^t3.50')).toEqual(['Use `a^tb`', '3.50']);
+		expect(tabSplit('Use `a%%%b` here')).toBeNull();
+		expect(tabSplit('Use `a%%%b` %%% 3.50')).toEqual(['Use `a%%%b`', '3.50']);
 	});
 
-	it('sets a tabbed line as words, a leader and words at the right', () => {
-		const html = renderMarkdown('Coffee^t3.50\nTea^t2.80', { size: 10, leader: 'dotted' });
+	it('takes three percent signs exactly, never a placeholder edge', () => {
+		// A placeholder left unfilled is two signs either side of its name.
+		expect(tabSplit('Coffee %%price%%')).toBeNull();
+		expect(tabSplit('Coffee %%%%%price%%')).toBeNull();
+		expect(tabSplit('50%% off')).toBeNull();
+		expect(tabSplit('Mark %%%% here')).toBeNull();
+		expect(tabSplit('Total %%% 100%')).toEqual(['Total', '100%']);
+	});
+
+	it('reads a leader beside a placeholder as both, once the placeholder is filled', () => {
+		const row = { item: 'Espresso', price: '2.20' };
+		expect(applyPlaceholders('%%item%% %%% %%price%%', { row })).toBe('Espresso %%% 2.20');
+		expect(applyPlaceholders('%%item%%%%%%%price%%', { row })).toBe('Espresso%%%2.20');
+		expect(tabSplit(applyPlaceholders('%%item%%%%%%%price%%', { row }))).toEqual(['Espresso', '2.20']);
+	});
+
+	it('sets a marked line as words, a leader and words at the right', () => {
+		const html = renderMarkdown('Coffee %%% 3.50\nTea %%% 2.80', { size: 10, leader: 'dotted' });
 		expect(html).toContain('radial-gradient(circle,currentColor');
 		expect(html.match(/display:flex;align-items:baseline;text-indent:0/g)).toHaveLength(2);
 		expect(html).toContain('<span>Coffee</span>');
@@ -240,20 +256,74 @@ describe('tab leaders', () => {
 	});
 
 	it('keeps the other lines of the paragraph as they were', () => {
-		const html = renderMarkdown('Menu\nCoffee^t3.50\nServed all day\nlate', { size: 10, leader: 'solid' });
+		const html = renderMarkdown('Menu\nCoffee %%% 3.50\nServed all day\nlate', { size: 10, leader: 'solid' });
 		expect(html).toContain('Menu<span style="display:flex');
 		expect(html).toContain('</span></span>Served all day<br />late');
 	});
 
-	it('leaves tabs alone with no leader, or with none', () => {
-		expect(renderMarkdown('Coffee^t3.50', { size: 10 })).toContain('Coffee^t3.50');
-		expect(renderMarkdown('Coffee^t3.50', { size: 10, leader: 'none' })).not.toContain('display:flex');
+	it('sets %%% at the right edge with no leader drawn, and a tab as before', () => {
+		const plain = renderMarkdown('Coffee %%% 3.50', { size: 10 });
+		expect(plain).toContain('display:flex');
+		expect(plain).not.toMatch(/gradient|background/);
+		expect(renderMarkdown('Coffee\t3.50', { size: 10 })).not.toContain('display:flex');
 	});
 
 	it('sets a list item the same way, and escapes both halves', () => {
-		const html = renderMarkdown('- Tea <b>^t2.80 & up', { size: 10, leader: 'dashed' });
+		const html = renderMarkdown('- Tea <b> %%% 2.80 & up', { size: 10, leader: 'dashed' });
 		expect(html).toContain('linear-gradient(90deg,currentColor 55%');
 		expect(html).toContain('<span>Tea &lt;b&gt;</span>');
 		expect(html).toContain('2.80 &amp; up');
+	});
+});
+
+describe('a table of contents', () => {
+	// A booklet: a contents page, then three chapters, in the order they print.
+	const rows = [
+		{ title: 'Contents', body: '' },
+		{ title: 'Ferns', body: 'Green.' },
+		{ title: '', body: 'An untitled spread.' },
+		{ title: 'Mosses & lichens', body: 'Small.' }
+	];
+	const lines = (html: string) =>
+		[...html.matchAll(/<span>([^<]*)<\/span><span style="[^"]*"><\/span><span style="text-align:right">([^<]*)<\/span>/g)].map(
+			(m) => [m[1], m[2]]
+		);
+
+	it('by hand, with lookups and leaders', () => {
+		// Each line looks a row up by its number and puts the number after a leader.
+		const text = ['%%lookup:2:title%% %%% 2', '%%lookup:4:title%% %%% 4'].join('\n');
+		const filled = applyPlaceholders(text, { row: rows[0], rows });
+		const html = renderMarkdown(filled, { size: 10, leader: 'dotted' });
+		expect(lines(html)).toEqual([
+			['Ferns', '2'],
+			['Mosses &amp; lichens', '4']
+		]);
+		expect(html.match(/radial-gradient/g)).toHaveLength(2);
+	});
+
+	it('with %%toc:column%%, every titled page and its number', () => {
+		const filled = applyPlaceholders('%%toc:title%%', { row: rows[0], rows, run: rows });
+		// The blank title is left out, and the contents page lists itself.
+		expect(filled).toBe('Contents %%% 1\nFerns %%% 2\nMosses & lichens %%% 4');
+		expect(lines(renderMarkdown(filled, { size: 10, leader: 'dotted' }))).toEqual([
+			['Contents', '1'],
+			['Ferns', '2'],
+			['Mosses &amp; lichens', '4']
+		]);
+	});
+
+	it('numbers pages in the order they print, not the order the rows arrived', () => {
+		// Sorted, the run is the other way round; lookups would still use arrival numbers.
+		const run = [rows[3], rows[1], rows[0]];
+		expect(applyPlaceholders('%%toc:title%%', { row: rows[0], rows, run })).toBe(
+			'Mosses & lichens %%% 1\nFerns %%% 2\nContents %%% 3'
+		);
+	});
+
+	it('leaves out the contents page cell itself, and is left as written with no run', () => {
+		const withToc = [{ title: '%%toc:title%%' }, { title: 'Ferns' }];
+		expect(applyPlaceholders('%%toc:title%%', { row: withToc[0], rows: withToc, run: withToc })).toBe('Ferns %%% 2');
+		expect(applyPlaceholders('%%toc:title%%', { row: rows[0], rows })).toBe('%%toc:title%%');
+		expect(applyPlaceholders('%%toc:nothing%%', { row: rows[0], rows, run: rows })).toBe('%%toc:nothing%%');
 	});
 });

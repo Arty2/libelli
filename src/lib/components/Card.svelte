@@ -39,6 +39,7 @@
 	import { DEFAULT_ORPHANS, DEFAULT_WIDOWS, baselineOf, colorsFromRow, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
 	import { barcodeSvg } from '$lib/barcode';
+	import { runOf } from '$lib/table';
 	import type { Box, Leader, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
@@ -251,7 +252,9 @@
 	 * The same text as it is drawn, with `%%today%%` and any `%%column%%` of this
 	 * row filled in — in a cell and in an area's own words alike, once.
 	 */
-	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box), page: pageNumber, pageCount });
+	/** The rows in the order they print, for a contents — `runOf`. */
+	const run = $derived(runOf(rows));
+	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount });
 
 	/** The column a bound area's words come out of — the one they may not quote. */
 	const selfOf = (box: Box): string | undefined => (box.slot ? mapping[box.slot] : undefined);
@@ -265,7 +268,7 @@
 	 * measured for emptiness, or encoded into a QR.
 	 */
 	const shownTextOf = (box: Box): string =>
-		applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds });
+		applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds });
 
 	/** Text split around the marks, for plain text, which Svelte escapes itself. */
 	function segments(text: string): Array<{ text: string; unknown: boolean }> {
@@ -286,10 +289,7 @@
 	/** The area's paragraph style, or the page's when it names none of its own. */
 	const paragraphOf = (box: Box) => box.paragraph ?? template.defaults.paragraph;
 	/** The tab leader an area draws, over the page's; undefined where it draws none. */
-	const leaderOf = (box: Box): Exclude<Leader, 'none'> | undefined => {
-		const leader = box.leader ?? template.defaults.leader;
-		return leader && leader !== 'none' ? leader : undefined;
-	};
+	const leaderOf = (box: Box): Leader => box.leader ?? template.defaults.leader ?? 'none';
 
 	/**
 	 * What an image area resolves to: a picture, a fill, or nothing at all.
@@ -2152,9 +2152,9 @@
      lets it grow; blue and faint beside the trim line on one that has grown,
      where pressing cuts it back to the height it was given. -->
 <!-- A line of plain text, as a row of words, leader and words at the right
-     edge when it has a tab and the area a leader — `tabSplit`, `leaderStyle`,
-     the same as Markdown's. -->
-{#snippet leadered(line: string, leader: Exclude<Leader, 'none'> | undefined)}{@const parts = leader ? tabSplit(line) : null}{#if parts && leader}<span class="tabbed"
+     edge when it has a `%%%` (or a tab, with a leader set) — `tabSplit`,
+     `leaderStyle`, the same as Markdown's. -->
+{#snippet leadered(line: string, leader: Leader)}{@const parts = tabSplit(line, leader !== 'none')}{#if parts}<span class="tabbed"
 		><span>{@render marked(parts[0])}</span><span style={leaderStyle(leader)}></span><span class="tab-right"
 			>{@render marked(parts[1])}</span
 		></span
@@ -2364,7 +2364,7 @@
 								>{#if line}{@render leadered(line, leaderOf(box))}{:else}&nbsp;{/if}</span>
 							{/each}
 						</span>
-					{:else if leaderOf(box) && shownTextOf(box).split('\n').some((line) => tabSplit(line))}
+					{:else if shownTextOf(box).split('\n').some((line) => tabSplit(line, leaderOf(box) !== 'none'))}
 						<!-- Line by line only when a line needs its leader: one run of
 						     text otherwise, as plain text always was. -->
 						<span class="paras">
