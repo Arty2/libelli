@@ -232,8 +232,12 @@ export function isDoubleTap(last: Tap | null, now: Tap): boolean {
  * either is cancelled (`touchend`, which stops the browser's own mouse events
  * and click): what was under the finger is the editor just opened, and the
  * second tap of a double tap landing there selected a word in it.
+ *
+ * `onopen` is told where the press was meant: the first tap of a double tap,
+ * which is where the eye was when the finger went down, or where a long
+ * press rested — so a cell can open with its caret there.
  */
-export function touchOpen(node: HTMLElement, onopen: () => void) {
+export function touchOpen(node: HTMLElement, onopen: (at: { x: number; y: number }, node: HTMLElement) => void) {
 	let handler = onopen;
 	let press: { id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
 	let last: Tap | null = null;
@@ -255,11 +259,12 @@ export function touchOpen(node: HTMLElement, onopen: () => void) {
 			x: event.clientX,
 			y: event.clientY,
 			timer: setTimeout(() => {
+				const at = press ? { x: press.x, y: press.y } : { x: event.clientX, y: event.clientY };
 				press = null;
 				held = true;
 				swallow = true;
 				last = null;
-				handler();
+				handler(at, node);
 			}, LONG_PRESS_MS)
 		};
 	};
@@ -273,10 +278,12 @@ export function touchOpen(node: HTMLElement, onopen: () => void) {
 		if (!press || event.pointerId !== press.id) return;
 		clear();
 		const tap = { x: event.clientX, y: event.clientY, at: event.timeStamp || performance.now() };
-		if (isDoubleTap(last, tap)) {
+		const first = last;
+		if (first && isDoubleTap(first, tap)) {
+			const at = { x: first.x, y: first.y };
 			last = null;
 			swallow = true;
-			handler();
+			handler(at, node);
 		} else last = tap;
 	};
 	const cancel = () => {
@@ -301,7 +308,7 @@ export function touchOpen(node: HTMLElement, onopen: () => void) {
 	node.addEventListener('contextmenu', menu);
 	node.addEventListener('touchend', lift);
 	return {
-		update: (next: () => void) => (handler = next),
+		update: (next: typeof onopen) => (handler = next),
 		destroy: () => {
 			clear();
 			node.removeEventListener('pointerdown', down);

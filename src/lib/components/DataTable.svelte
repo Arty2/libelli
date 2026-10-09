@@ -5,6 +5,7 @@
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { touchOpen } from '$lib/gestures';
+	import { caretAt } from '$lib/caret';
 	import { armDefault } from '$lib/modal';
 	import { scrollEdges } from '$lib/scrolledge';
 	import { dataUrlBytes, localImageName, safeMediaUrl, weigh } from '$lib/assets';
@@ -392,7 +393,7 @@
 	 * editor's to open at all — it goes to the Images tray, where it can be
 	 * seen large and cropped or turned.
 	 */
-	function openBigCell(rowIndex: number, column: string, draw = false, from: 'table' | Origin = 'table') {
+	function openBigCell(rowIndex: number, column: string, draw = false, from: 'table' | Origin = 'table', caret?: number) {
 		const value = dataset.rows[rowIndex]?.[column];
 		if (value === undefined) return false;
 		const stored = localImageName(value);
@@ -405,6 +406,7 @@
 		(document.activeElement as HTMLElement | null)?.blur();
 		drawingArea = null;
 		leaveTo = from;
+		openCaret = caret ?? null;
 		bigCell = { row: rowIndex, column, draw: draw || undefined };
 		drawnValue = value;
 		onactivate(rowIndex);
@@ -594,7 +596,18 @@
 	const leaveTitle = (dirty: boolean) =>
 		(dirty ? 'Close — the drawing not saved is dropped' : leaveTo === 'images' ? 'Back to Images' : leaveTo === 'card' ? 'Close' : 'Back to the table') + ' (Esc)';
 
-	const focusOnOpen = (node: HTMLElement) => node.focus();
+	/**
+	 * Where the caret goes as the cell opens full size: where a finger
+	 * double-tapped or held the small one (`caretAt`), which the eye was on.
+	 * Used once — stepping to the next row with the pager opens a new field
+	 * at the end, as it always did.
+	 */
+	let openCaret: number | null = null;
+	const focusOnOpen = (node: HTMLElement) => {
+		node.focus();
+		if (openCaret !== null && node instanceof HTMLTextAreaElement) node.setSelectionRange(openCaret, openCaret);
+		openCaret = null;
+	};
 
 	/** The open table at the top of its menu, the rest in the library's order. */
 	const tablesActiveFirst = $derived([
@@ -1793,7 +1806,7 @@
 									value={row[column] ?? ''}
 									readonly={locked || byFinger}
 									class:by-finger={byFinger && !locked}
-									use:touchOpen={() => !locked && openBigCell(i, column)}
+									use:touchOpen={(at, field) => !locked && openBigCell(i, column, false, 'table', caretAt(field as HTMLTextAreaElement, at.x, at.y))}
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
 									use:completePlaceholders={dataset.columns}

@@ -2315,8 +2315,13 @@ started on a cell. A cell a finger presses is read-only (`byFinger`, read on
 the table's capturing pointerdown, which comes before focus), so a tap
 chooses it, Edit appears, and nothing else moves; a double tap or a long
 press (`touchOpen` in gestures.ts) opens the cell full size, where typing is
-what was asked for. The tap that opens it is cancelled at `touchend`, or its
-click lands on the editor just opened and selects a word. Per press, not per
+what was asked for, with the caret where the first tap was (or the hold
+rested): `caretAt` copies the cell's box, type and wrapping into a hidden
+block over it and measures its characters, since no browser says where a
+point falls inside a form control's text, and a read-only field tapped by a
+finger has no caret of its own to read. The tap that opens it is cancelled
+at `touchend`, or its click lands on the editor just opened and selects a
+word. Per press, not per
 device: a laptop with a touch screen still types in place under its mouse.
 The cost: a quick fix to one cell on a phone is two taps and a close, where
 it was one tap; and the long press that opens a cell is the one that would
