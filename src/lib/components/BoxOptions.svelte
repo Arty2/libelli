@@ -897,6 +897,23 @@
 						<option value="ean13">EAN-13</option>
 					</select>
 				</label>
+				{#if selected.qr?.kind}
+					<!-- The line a person reads, as every packet prints it; in the
+					     area's own type, so its size is the area's Size. -->
+					<label class="check">
+						<input
+							type="checkbox"
+							checked={!selected.qr.hideDigits}
+							title="The digits under the bars, in this area's type — EAN-13 in its three groups, Code 128 centred"
+							disabled={boxFrozen}
+							onchange={(e) => {
+								const { hideDigits: _was, ...rest } = { ...DEFAULT_QR, ...selected.qr };
+								patch({ qr: e.currentTarget.checked ? rest : { ...rest, hideDigits: true } });
+							}}
+						/>
+						Show Digits
+					</label>
+				{/if}
 				{#if !selected.qr?.kind}
 					<label class="field">
 						<span>Correction</span>
@@ -973,8 +990,9 @@
 		</fieldset>
 		<fieldset class="group">
 			<legend>Text</legend>
-			<!-- A QR code is drawn, not set: of the type it keeps only its color. -->
-			{#if selected.mode !== 'qr'}
+			<!-- A QR code is drawn, not set: of the type it keeps only its color —
+			     but a barcode's digits are set, in this face, size and weight. -->
+			{#if selected.mode !== 'qr' || (selected.qr?.kind && !selected.qr.hideDigits)}
 			<span class="field" class:inherits={!selected.font}>
 				<span>Font</span>
 				<MenuSelect

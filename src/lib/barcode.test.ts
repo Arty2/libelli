@@ -89,3 +89,33 @@ describe('barcodeSvg', () => {
 		expect(barcodeSvg('400638133393', 'ean13').match(/M/g)).toHaveLength(runs);
 	});
 });
+
+describe('the digits under the bars', () => {
+	it('sets EAN-13 in its three groups, the first outside the bars', () => {
+		const html = barcodeSvg('400638133393', 'ean13', { digits: true });
+		expect(html).toContain('aria-label="EAN-13 barcode: 4006381333931"');
+		// Room for the first digit: seven modules more on the left.
+		expect(html).toContain('viewBox="0 0 102 1"');
+		const groups = [...html.matchAll(/<span style="flex:1;text-align:center">(\d)<\/span>/g)].map((m) => m[1]).join('');
+		expect(groups).toBe('006381333931');
+		expect(html).toMatch(/text-align:center">4<\/span>/);
+	});
+
+	it('runs the guard bars on down into the digits row, and only them', () => {
+		const html = barcodeSvg('400638133393', 'ean13', { digits: true });
+		const paths = [...html.matchAll(/<path d="([^"]*)"/g)].map((m) => m[1]);
+		expect(paths).toHaveLength(2);
+		// Three guards: two bars each at the ends, two in the middle.
+		expect(paths[1].match(/M/g)).toHaveLength(6);
+	});
+
+	it('centres Code 128 text, escaped', () => {
+		const html = barcodeSvg('A<b>&', 'code128', { digits: true });
+		expect(html).toContain('A&lt;b&gt;&amp;</span>');
+		expect(html).not.toContain('<b>');
+	});
+
+	it('draws the bars alone without them', () => {
+		expect(barcodeSvg('400638133393', 'ean13')).not.toContain('<span');
+	});
+});

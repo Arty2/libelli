@@ -351,7 +351,8 @@
 			if (box.qr?.kind) {
 				return barcodeSvg(value, box.qr.kind, {
 					color: box.color ?? template.defaults.color,
-					background: box.qr.background
+					background: box.qr.background,
+					digits: !box.qr.hideDigits
 				});
 			}
 			return fitSvg(

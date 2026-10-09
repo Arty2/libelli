@@ -1,4 +1,5 @@
 import { parseColor } from './color';
+import { escapeHtml } from './markdown';
 
 /**
  * One-dimensional barcodes: Code 128 for any printable ASCII, EAN-13 for a
@@ -157,33 +158,103 @@ export function ean13(text: string): boolean[] {
 export interface BarcodeSvgOptions {
 	color?: string;
 	background?: string;
+	/**
+	 * The human-readable line under the bars, as every retail code is printed:
+	 * EAN-13's thirteen digits in their three groups, Code 128's text centred.
+	 */
+	digits?: boolean;
+}
+
+/** One path of bars, x offset by `shift` modules, for those modules `keep` lets through. */
+function barsPath(modules: boolean[], shift = 0, keep: (x: number) => boolean = () => true): string {
+	let path = '';
+	for (let x = 0; x < modules.length; ) {
+		if (!modules[x] || !keep(x)) {
+			x++;
+			continue;
+		}
+		let w = 1;
+		while (modules[x + w] && keep(x + w)) w++;
+		path += `M${x + shift} 0h${w}v1h-${w}z`;
+		x += w;
+	}
+	return path;
+}
+
+/** Bars stretched to their box, one unit per module and one unit tall. */
+function barsSvg(path: string, width: number, color: string, label: string, style = ''): string {
+	return (
+		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} 1" width="100%" height="100%"` +
+		` preserveAspectRatio="none" shape-rendering="crispEdges"${label ? ` role="img" aria-label="${label}"` : ' aria-hidden="true"'}` +
+		`${style ? ` style="${style}"` : ''}><path d="${path}" fill="${color}"/></svg>`
+	);
 }
 
 /**
- * The modules as one path of bars, one unit per module and one unit tall,
- * stretched to whatever box it is put in.
+ * The code as markup for the card: the bars alone, stretched to the area, or
+ * — with `digits` — the bars over the line a person reads, in the area's own
+ * face and size (it inherits both), so the digits are as large as the area's
+ * type says.
+ *
+ * EAN-13 is laid out as every packet prints it: the first digit outside the
+ * bars on the left, in the quiet zone that is otherwise blank, six digits under
+ * each half, and the three guard patterns running on down between the groups.
+ * The bars' viewBox grows by seven modules on the left to make that room. Code
+ * 128's text is simply centred under the bars.
+ *
+ * Every color goes through color.ts, and the text through escapeHtml: a Code
+ * 128 value is whatever the cell holds.
  */
 export function barcodeSvg(text: string, kind: BarcodeKind, options: BarcodeSvgOptions = {}): string {
 	const modules = kind === 'ean13' ? ean13(text) : code128(text);
 	const color = parseColor(options.color ?? null) ?? '#000000';
 	const background = parseColor(options.background ?? null);
-	let path = '';
-	for (let x = 0; x < modules.length; ) {
-		if (!modules[x]) {
-			x++;
-			continue;
-		}
-		let w = 1;
-		while (modules[x + w]) w++;
-		path += `M${x} 0h${w}v1h-${w}z`;
-		x += w;
-	}
 	const label = kind === 'ean13' ? 'EAN-13 barcode' : 'Code 128 barcode';
-	return [
-		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${modules.length} 1" width="100%" height="100%"`,
-		` preserveAspectRatio="none" shape-rendering="crispEdges" role="img" aria-label="${label}">`,
-		background ? `<rect width="${modules.length}" height="1" fill="${background}"/>` : '',
-		`<path d="${path}" fill="${color}"/>`,
-		`</svg>`
-	].join('');
+	if (!options.digits) {
+		return barsSvg(barsPath(modules), modules.length, color, label).replace(
+			'><path',
+			`>${background ? `<rect width="${modules.length}" height="1" fill="${background}"/>` : ''}<path`
+		);
+	}
+	const box = [
+		'display:flex',
+		'flex-direction:column',
+		'width:100%',
+		'height:100%',
+		'line-height:1',
+		'font-variant-numeric:tabular-nums',
+		`color:${color}`,
+		...(background ? [`background:${background}`] : [])
+	].join(';');
+	// Height is the bars' own, past the stylesheet that sizes every picture
+	// in an area to the whole of it: the digits' row needs its room.
+	const stretch = 'flex:1 1 0;min-height:0;height:auto';
+	const row = 'position:relative;flex:none;height:1.15em';
+	const at = (from: number, width: number, total: number) =>
+		`position:absolute;top:0.1em;left:${((from / total) * 100).toFixed(3)}%;width:${((width / total) * 100).toFixed(3)}%`;
+	if (kind === 'code128') {
+		return (
+			`<span style="${box}" role="img" aria-label="${label}: ${escapeHtml(text)}">` +
+			barsSvg(barsPath(modules), modules.length, color, '', stretch) +
+			`<span style="position:relative;flex:none;height:1.3em;padding-top:0.15em;box-sizing:border-box;text-align:center;white-space:nowrap;overflow:hidden" aria-hidden="true">${escapeHtml(text)}</span></span>`
+		);
+	}
+	const all = text.replace(/[\s-]/g, '').slice(0, 12);
+	const digits = all + eanCheck(all);
+	const LEFT = 7;
+	const total = LEFT + modules.length;
+	// The guards: 101 at either end, 01010 in the middle.
+	const guard = (x: number) => x < 3 || (x >= 45 && x < 50) || x >= 92;
+	const group = (chars: string) =>
+		[...chars].map((d) => `<span style="flex:1;text-align:center">${d}</span>`).join('');
+	return (
+		`<span style="${box}" role="img" aria-label="${label}: ${digits}">` +
+		barsSvg(barsPath(modules, LEFT), total, color, '', stretch) +
+		`<span style="${row}" aria-hidden="true">` +
+		barsSvg(barsPath(modules, LEFT, guard), total, color, '', 'position:absolute;inset:0;height:100%') +
+		`<span style="${at(0, LEFT - 1, total)};text-align:center">${digits[0]}</span>` +
+		`<span style="${at(LEFT + 3, 42, total)};display:flex">${group(digits.slice(1, 7))}</span>` +
+		`<span style="${at(LEFT + 50, 42, total)};display:flex">${group(digits.slice(7))}</span>` +
+		`</span></span>`
+	);
 }

@@ -343,6 +343,8 @@ export interface MarkdownStyle {
 export interface QrSettings {
 	/** absent is a QR code; Code 128 takes any printable ASCII, EAN-13 a retail number */
 	kind?: 'code128' | 'ean13';
+	/** a barcode's bars without the digits a person reads under them; absent, the digits show */
+	hideDigits?: true;
 	/** error correction: L 7%, M 15%, Q 25%, H 30% of the code recoverable; a QR's only */
 	level: 'L' | 'M' | 'Q' | 'H';
 	// No quiet zone of its own: the white border a scanner needs is the area's

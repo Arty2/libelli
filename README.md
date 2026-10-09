@@ -1158,8 +1158,13 @@ at its own size.
   long runs of digits packed two to a bar — or **EAN-13**, the retail number
   and the ISBN: twelve digits get their check digit worked out, thirteen must
   already end in the right one, and spaces and hyphens are let through as an
-  ISBN is written. A barcode fills the area both ways, every bar widened alike,
-  so it has no Fit; make the area wide and short. Leave it ten bars' width of
+  ISBN is written. **Show Digits**, on unless you turn it off, prints the line a
+  person reads under the bars, as every packet does: EAN-13's first digit
+  outside the bars on the left and six under each half, with the guard bars
+  running on down between the groups; Code 128's text centred. The digits are
+  set in the area's own font, size, weight and color, so the bar shows those
+  controls for a barcode with digits. A barcode fills the area both ways, every
+  bar widened alike, so it has no Fit; make the area wide and short. Leave it ten bars' width of
   **Padding** either side — the scanner's quiet zone. Anything a type cannot
   encode — an accent in Code 128, a wrong check digit — prints nothing.
 
