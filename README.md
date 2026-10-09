@@ -723,9 +723,17 @@ has areas, a line above the buttons says how many are about to be replaced.
   *Notes*, *Footnote*, *Endnote*, *Annotation*, *Aside*, singular or plural —
   read by its heading however long it runs,
   with room left for it above the foot), **Byline**, **Number** and **Date**
-  (the foot), **Image**, **QR code**, **Code**, and **Credit** (*Credits*,
-  *Courtesy*, *Copyright*, *Collection*), which is always the foot's last line
-  and is the one kept when the foot runs out of room.
+  (the foot), **Image**, **QR code**, **Barcode**, **Code**, and **Credit**
+  (*Credits*, *Courtesy*, *Copyright*, *Collection*), which is always the
+  foot's last line and is the one kept when the foot runs out of room.
+- **Codes from the cells** — a column of addresses a phone opens becomes a
+  **QR code**: `https://…`, `www.…`, `mailto:` or `tel:` in every cell. A
+  column of ISBNs or retail numbers becomes an EAN-13 **Barcode**, with its
+  digits, at the foot beside the QR — decided by the numbers, which must all
+  pass their check digit, not by the heading: a column called *ISBN* holding
+  typos stays text, since a barcode would print nothing. An old ten-digit
+  ISBN is printed as the 978 barcode a book carries. One barcode to a card;
+  another column of them is a line of text.
 - **The dialog** — dragged by its title, closed by its ×; a row left out stays
   listed at half strength, its menu still yours to set, and **Guess** before a
   menu marks a kind worked out from nothing but the length of the cells.

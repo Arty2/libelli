@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barcodeSvg, code128, code128Values, ean13, eanCheck } from './barcode';
+import { barcodeSvg, code128, code128Values, ean13, eanCheck, eanDigits } from './barcode';
 
 /** Modules as a string of 1s and 0s, bar first. */
 const bits = (modules: boolean[]) => modules.map((bar) => (bar ? '1' : '0')).join('');
@@ -117,5 +117,20 @@ describe('the digits under the bars', () => {
 
 	it('draws the bars alone without them', () => {
 		expect(barcodeSvg('400638133393', 'ean13')).not.toContain('<span');
+	});
+});
+
+describe('eanDigits', () => {
+	it('reads an ISBN-10 as the 978 EAN a book carries, and refuses a bad one', () => {
+		expect(eanDigits('0-306-40615-2')).toBe('9780306406157');
+		expect(eanDigits('080442957X')).toBe('9780804429573');
+		expect(eanDigits('0-306-40615-3')).toBeNull();
+		expect(bits(ean13('0-306-40615-2'))).toBe(bits(ean13('978-0-306-40615-7')));
+	});
+
+	it('takes twelve or thirteen digits as before', () => {
+		expect(eanDigits('400638133393')).toBe('4006381333931');
+		expect(eanDigits('4006381333932')).toBeNull();
+		expect(eanDigits('hello')).toBeNull();
 	});
 });

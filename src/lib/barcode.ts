@@ -130,16 +130,31 @@ export function eanCheck(twelve: string): number {
 }
 
 /**
- * EAN-13 as modules. Twelve digits get their check digit; thirteen must
- * already end in the right one. Spaces and hyphens, as an ISBN is written,
- * are let through.
+ * The thirteen digits an EAN-13 of `text` would print, or null where it cannot
+ * be one. Twelve digits get their check digit; thirteen must already end in
+ * the right one. An ISBN-10 — nine digits and a check that may be X, valid —
+ * becomes the 978 EAN every book since 2007 carries. Spaces and hyphens, as an
+ * ISBN is written, are let through.
  */
-export function ean13(text: string): boolean[] {
-	const digits = text.replace(/[\s-]/g, '');
-	if (!/^\d{12,13}$/.test(digits)) throw new Error('EAN-13 takes 12 or 13 digits.');
+export function eanDigits(text: string): string | null {
+	const digits = text.replace(/[\s-]/g, '').toUpperCase();
+	if (/^\d{9}[\dX]$/.test(digits)) {
+		let sum = 0;
+		for (let i = 0; i < 10; i++) sum += (digits[i] === 'X' ? 10 : Number(digits[i])) * (10 - i);
+		if (sum % 11 !== 0) return null;
+		const twelve = `978${digits.slice(0, 9)}`;
+		return twelve + eanCheck(twelve);
+	}
+	if (!/^\d{12,13}$/.test(digits)) return null;
 	const check = eanCheck(digits);
-	if (digits.length === 13 && Number(digits[12]) !== check) throw new Error('The check digit is wrong.');
-	const all = digits.slice(0, 12) + check;
+	if (digits.length === 13 && Number(digits[12]) !== check) return null;
+	return digits.slice(0, 12) + check;
+}
+
+/** EAN-13 as modules, for whatever `eanDigits` accepts. */
+export function ean13(text: string): boolean[] {
+	const all = eanDigits(text);
+	if (!all) throw new Error('EAN-13 takes 12 or 13 digits, with a right check digit, or an ISBN-10.');
 	const out: boolean[] = [];
 	widths('111', out);
 	const parity = EAN_PARITY[Number(all[0])];
@@ -239,8 +254,7 @@ export function barcodeSvg(text: string, kind: BarcodeKind, options: BarcodeSvgO
 			`<span style="position:relative;flex:none;height:1.3em;padding-top:0.15em;box-sizing:border-box;text-align:center;white-space:nowrap;overflow:hidden" aria-hidden="true">${escapeHtml(text)}</span></span>`
 		);
 	}
-	const all = text.replace(/[\s-]/g, '').slice(0, 12);
-	const digits = all + eanCheck(all);
+	const digits = eanDigits(text)!;
 	const LEFT = 7;
 	const total = LEFT + modules.length;
 	// The guards: 101 at either end, 01010 in the middle.

@@ -416,3 +416,52 @@ describe('an exhibition label', () => {
 	});
 });
 
+
+describe('codes from the cells', () => {
+	it('reads a column of addresses a phone opens as links — www., mailto:, tel: as well', () => {
+		const kind = (values: string[]) => classifyColumn('Where', values).kind;
+		expect(kind(['https://a.example/1', 'http://b.example'])).toBe('link');
+		expect(kind(['www.a.example', 'www.b.example/page'])).toBe('link');
+		expect(kind(['mailto:hi@a.example', 'tel:+301234567'])).toBe('link');
+		// A file name is as often a file as a site.
+		expect(kind(['notes.txt', 'plan.pdf'])).not.toBe('link');
+	});
+
+	it('reads a column of ISBNs or retail numbers as a barcode, by their check digits', () => {
+		expect(classifyColumn('Book', ['978-0-306-40615-7', '0-8044-2957-X']).kind).toBe('barcode');
+		expect(classifyColumn('Product', ['4006381333931', '5901234123457']).kind).toBe('barcode');
+		// Called ISBN, but not one: text, since a barcode would print nothing.
+		expect(classifyColumn('ISBN', ['978-0-306-40615-8', 'tbc']).kind).toBe('code');
+		// Thirteen digits that happen to pass once are not a column of them.
+		expect(classifyColumn('Phone', ['4006381333931', '2101234567891']).kind).not.toBe('barcode');
+	});
+
+	it('keeps one barcode, and prints another column of them as text', () => {
+		const rows = [
+			{ title: 'One', isbn: '9780306406157', ean: '4006381333931' },
+			{ title: 'Two', isbn: '0-8044-2957-X', ean: '5901234123457' }
+		];
+		const kinds = guessRoles(['title', 'isbn', 'ean'], rows).map((g) => g.kind);
+		expect(kinds.filter((k) => k === 'barcode')).toHaveLength(1);
+		expect(kinds).toContain('code');
+	});
+
+	it('puts the barcode in the foot, left of the QR, the lines short of both', () => {
+		const rows = [
+			{ title: 'Ferns of the north', isbn: '9780306406157', link: 'https://a.example/1', shelf: 'B2' },
+			{ title: 'Mosses', isbn: '9780804429573', link: 'https://a.example/2', shelf: 'C4' }
+		];
+		const { boxes } = autoLayout({ page, defaults: DEFAULT_DEFAULTS, columns: ['title', 'isbn', 'link', 'shelf'], rows });
+		const code = boxes.find((b) => b.slot === 'isbn')!;
+		const qr = boxes.find((b) => b.slot === 'link')!;
+		const shelf = boxes.find((b) => b.slot === 'shelf')!;
+		expect(code.mode).toBe('qr');
+		expect(code.qr?.kind).toBe('ean13');
+		expect(qr.qr?.kind).toBeUndefined();
+		// Side by side, the barcode first, neither over the other.
+		expect(code.x + code.w).toBeLessThanOrEqual(qr.x);
+		expect(code.y + code.h).toBeCloseTo(qr.y + qr.h);
+		// The foot's lines stop short of the barcode.
+		expect(shelf.x + shelf.w).toBeLessThanOrEqual(code.x);
+	});
+});

@@ -1,4 +1,5 @@
 import { localImageName } from './assets';
+import { eanDigits } from './barcode';
 import { parseColor } from './color';
 import { GRID_MINOR } from './layout';
 import { marginsOf, newBox } from './template';
@@ -33,8 +34,11 @@ import type { Box, Defaults, Mapping, PageSpec, Row } from './types';
  * What a column is *for*. Two sorts of thing, and the difference matters when
  * the signals disagree:
  *
- * `image`, `link`, `number` and `date` are shapes — checkable facts about the
- * cells, so the data wins over the heading. `title`, `subtitle`, `body`,
+ * `image`, `link`, `barcode`, `number` and `date` are shapes — checkable facts
+ * about the cells, so the data wins over the heading. A `barcode` is a column
+ * of retail numbers or ISBNs that pass their check digits, drawn as EAN-13; a
+ * column only called ISBN, holding anything else, is a `code` printed as text,
+ * since a barcode refuses what it cannot encode and would print nothing. `title`, `subtitle`, `body`,
  * `label` and `code` are roles — nothing in a string of forty characters says
  * whether it is a heading or a caption, so the heading wins over the data.
  *
@@ -58,6 +62,7 @@ export type FieldKind =
 	| 'date'
 	| 'image'
 	| 'link'
+	| 'barcode'
 	| 'code';
 
 /** A column, what it was taken for, and how much of that was a guess. */
@@ -93,6 +98,7 @@ export const FIELD_KINDS: FieldKind[] = [
 	'date',
 	'image',
 	'link',
+	'barcode',
 	'code',
 	'credit'
 ];
@@ -108,6 +114,7 @@ export const KIND_LABELS: Record<FieldKind, string> = {
 	date: 'Date',
 	image: 'Image',
 	link: 'QR code',
+	barcode: 'Barcode',
 	code: 'Code',
 	credit: 'Credit'
 };
@@ -182,6 +189,12 @@ const nameKind = (column: string): FieldKind | undefined => {
 
 const IMAGE_FILE = /\.(png|jpe?g|gif|webp|avif|svg|bmp)(\?|#|$)/i;
 const HTTP_URL = /^https?:\/\/\S+$/i;
+/**
+ * Something a phone opens when it scans it: a web address, with its scheme or
+ * starting `www.`, or a `mailto:` or `tel:`. Not a bare `name.ext`, which is as
+ * often a file as a site.
+ */
+const SCANNABLE = /^(?:https?:\/\/|www\.[^\s.]+\.|mailto:|tel:)\S+$/i;
 // A number, with the punctuation people actually type: currency, thousands
 // separators, a trailing percent, a leading minus.
 const NUMERIC = /^[-+]?[£$€¥]?\s?\d{1,3}(?:[ ,]\d{3})*(?:[.,]\d+)?\s?%?$/;
@@ -235,7 +248,12 @@ function shapeKind(values: string[]): FieldKind | undefined {
 	const isImage = (v: string) =>
 		/^data:image\//i.test(v) || localImageName(v) !== null || (HTTP_URL.test(v) && IMAGE_FILE.test(v));
 	if (every(isImage)) return 'image';
-	if (every((v) => HTTP_URL.test(v))) return 'link';
+	if (every((v) => SCANNABLE.test(v))) return 'link';
+	// Every cell a retail number or an ISBN with a right check digit. Before
+	// numbers, which a run of thirteen digits never matches anyway, and more
+	// than one cell, since one number in ten passes a check digit by chance.
+	if (filled.length > 1 && every((v) => /\d/.test(v) && eanDigits(v) !== null)) return 'barcode';
+	if (filled.length === 1 && eanDigits(filled[0]) !== null && /^97[89]/.test(eanDigits(filled[0])!)) return 'barcode';
 	// A column of colors is an image as far as a box is concerned: an `image`
 	// box shows whatever its source resolves to, and a color resolves to a fill.
 	if (every((v) => parseColor(v) !== null)) return 'image';
@@ -266,7 +284,7 @@ export function classifyColumn(column: string, values: string[]): FieldGuess {
 
 	// A footnote is named, never measured: it is prose by nature, and the
 	// heading is the one thing that tells it from the body it sits under.
-	if (named === 'notes' && shape !== 'image' && shape !== 'link') {
+	if (named === 'notes' && shape !== 'image' && shape !== 'link' && shape !== 'barcode') {
 		return { column, kind: 'notes', sure: true, sample };
 	}
 	// Prose is the one thing that overrules a shape: a column of long text is a
@@ -363,6 +381,8 @@ export function guessRoles(columns: string[], rows: Row[]): FieldGuess[] {
 			null
 		);
 	only('body', (g) => g === widest);
+	// One barcode to a card's foot; another column of them is printed as text.
+	only('barcode', () => true, 'code');
 
 	const hasTitle = only('title', (g) => !person || g === person);
 	// A second subtitle is a line under the first rather than one in the foot.
@@ -495,6 +515,11 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 
 	const linkField = pick('link');
 	const qrSide = linkField ? up(clamp(contentW * 0.16, 14, 26)) : 0;
+	// An EAN-13 is 37mm wide at its nominal size and prints well down to about
+	// 80%; wide and short, with the digits under it.
+	const barcodeField = pick('barcode');
+	const barcodeW = barcodeField ? up(clamp(contentW * 0.42, 30, 45)) : 0;
+	const barcodeH = barcodeField ? up(clamp(barcodeW * 0.5, 14, 22)) : 0;
 
 	// Whatever is short and not already spoken for, in column order. Capped by
 	// the room a foot may take rather than by a count: a quarter of the card is
@@ -513,10 +538,11 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 		...footFields.filter((g) => g.kind !== 'credit').slice(0, footCapacity - keptCredits.length),
 		...keptCredits
 	];
-	const footH = Math.max(footLines.length * smallH, qrSide);
+	const footH = Math.max(footLines.length * smallH, qrSide, barcodeH);
 	const footTop = bottomEdge - footH;
-	// The foot's left column stops short of the QR rather than running under it.
-	const footW = qrSide ? contentW - qrSide - gap : contentW;
+	// The foot's left column stops short of the QR and the barcode rather than
+	// running under them.
+	const footW = contentW - (qrSide ? qrSide + gap : 0) - (barcodeW ? barcodeW + gap : 0);
 
 	footLines.forEach((field, index) => {
 		place({
@@ -548,6 +574,25 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 			qr: { level: 'M' },
 			// The quiet zone a scanner needs, as the area's own padding.
 			padding: 2
+		});
+	}
+
+	if (barcodeField) {
+		place({
+			slot: barcodeField.column,
+			// Left of the QR where there is one, its foot on the same line.
+			x: rightEdge - (qrSide ? qrSide + gap : 0) - barcodeW,
+			y: bottomEdge - barcodeH,
+			w: barcodeW,
+			h: barcodeH,
+			mode: 'qr',
+			overflow: 'clip',
+			anchor: null,
+			qr: { level: 'M', kind: 'ean13' },
+			// The digits are set in the area's type: small, like the rest of the foot.
+			size: round(clamp(smallSize, 6, 8.5), 1),
+			// Room either side for the quiet zone, the first digit sitting in the left one.
+			padding: 1
 		});
 	}
 
