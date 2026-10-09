@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fontChoices, fontStack, mergeFonts, pruneFonts, weightsOf } from './fonts';
+import { fontChoices, fontInventory, fontStack, mergeFonts, pruneFonts, replaceFamily, weightsOf } from './fonts';
+import type { Template } from './types';
 
 describe('fontStack', () => {
 	it('quotes the family and keeps the system stack behind it', () => {
@@ -82,5 +83,55 @@ describe('weightsOf', () => {
 		expect(weightsOf('bold')).toEqual([700]);
 		expect(weightsOf('300 600')).toEqual([300, 400, 500, 600]);
 		expect(weightsOf('nonsense')).toEqual([]);
+	});
+});
+
+type Design = Pick<Template, 'defaults' | 'boxes' | 'fonts'>;
+
+describe('fontInventory', () => {
+	const design = {
+		defaults: { font: 'Inter' },
+		boxes: [{ font: 'Studio Sans' }, { font: 'Lora' }, {}],
+		fonts: [
+			{ family: 'Studio Sans', source: 'local', ref: 'font:studio-sans' },
+			{ family: 'Inter', source: 'google' }
+		]
+	} as unknown as Design;
+
+	it('says which fonts the design needs and this browser has not got', () => {
+		const list = fontInventory(design, []);
+		expect(list.map((f) => [f.family, f.status, f.used])).toEqual([
+			['Inter', 'google', true],
+			['Lora', 'google', true],
+			['Studio Sans', 'missing', true]
+		]);
+	});
+
+	it('lists uploads with their weight, and the ones nothing uses last', () => {
+		const list = fontInventory(design, [
+			{ ref: 'font:studio-sans', family: 'Studio Sans', bytes: 40000 },
+			{ ref: 'font:old-face', family: 'Old Face', bytes: 9000 }
+		]);
+		expect(list.find((f) => f.family === 'Studio Sans')).toMatchObject({ status: 'uploaded', used: true, bytes: 40000 });
+		expect(list[list.length - 1]).toMatchObject({ family: 'Old Face', status: 'unused', used: false });
+	});
+});
+
+describe('replaceFamily', () => {
+	const design = {
+		defaults: { font: 'Studio Sans' },
+		boxes: [{ id: 'a', font: 'studio sans' }, { id: 'b', font: 'Lora' }],
+		fonts: [{ family: 'Studio Sans', source: 'local', ref: 'font:studio-sans' }]
+	} as unknown as Design;
+
+	it('swaps every use, ignoring case, and the font list with it', () => {
+		const next = replaceFamily(design, 'Studio Sans', { family: 'Inter', source: 'google' });
+		expect(next.defaults.font).toBe('Inter');
+		expect(next.boxes.map((b) => b.font)).toEqual(['Inter', 'Lora']);
+		expect(next.fonts).toEqual([{ family: 'Inter', source: 'google' }]);
+	});
+
+	it('leaves a design that never names it alone', () => {
+		expect(replaceFamily(design, 'Nothing', { family: 'Inter', source: 'google' })).toBe(design);
 	});
 });

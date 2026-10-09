@@ -22,7 +22,20 @@
 		uploadBackgroundImage
 	} from '$lib/assets';
 	import { download, slugify } from '$lib/download';
-	import { ensureGoogleFont, ensureTemplateFonts, mergeFonts, pruneFonts, uploadLocalFont } from '$lib/fonts';
+	import {
+		CURATED_GOOGLE_FONTS,
+		deleteStoredFont,
+		ensureGoogleFont,
+		ensureTemplateFonts,
+		fontInventory,
+		listStoredFonts,
+		mergeFonts,
+		pruneFonts,
+		replaceFamily,
+		uploadLocalFont,
+		type FontEntry,
+		type StoredFontEntry
+	} from '$lib/fonts';
 	import { pullUp, trayPull } from '$lib/gestures';
 	import {
 		canRedo,
@@ -999,6 +1012,7 @@
 		else if (firstRun)
 			notify('Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.');
 		missingFonts = await ensureTemplateFonts(template);
+		void refreshStoredFonts();
 
 		// Last, so the precache download is not competing with the first paint.
 		registerServiceWorker(() => {
@@ -2859,6 +2873,7 @@
 			const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== ref.family.toLowerCase());
 			template = { ...template, fonts: [...fonts, ref] };
 			missingFonts = missingFonts.filter((f) => (f.ref ?? f.family) !== (ref.ref ?? ref.family));
+			await refreshStoredFonts();
 			// Uploading from a box's Font dropdown is a way of choosing a font, not
 			// just of installing one: it used to leave the box on its old family,
 			// so the file landed and nothing on the card changed. Only when the
@@ -2905,6 +2920,42 @@
 		const file = input.files?.[0];
 		input.value = '';
 		if (file && missingPrintImage) await handlePrintBackgroundUpload(file, missingPrintImage);
+	}
+
+	/** Every font uploaded to this browser — the Images tray's Fonts, beside the design's own. */
+	let storedFonts = $state<StoredFontEntry[]>([]);
+	const refreshStoredFonts = async () => (storedFonts = await listStoredFonts());
+	const fontEntries = $derived(fontInventory(template, storedFonts));
+	/** What a font can be swapped for: whatever this browser has, and Google's curated list. */
+	const fontOptions = $derived(
+		[...new Set([...storedFonts.map((f) => f.family), ...editorFonts.map((f) => f.family), ...CURATED_GOOGLE_FONTS])].sort((a, b) =>
+			a.localeCompare(b)
+		)
+	);
+
+	/**
+	 * A font the design is set in swapped for another, everywhere — how a design
+	 * moved to a computer without its uploaded face is made to print, when the
+	 * file is not to hand. One undo puts it back.
+	 */
+	async function replaceFont(from: string, to: string) {
+		if (template.locked) return notify('The design is locked — unlock it to change its fonts.', 'warning');
+		const held = storedFonts.find((f) => f.family.toLowerCase() === to.toLowerCase());
+		const ref: FontRef = held ? { family: held.family, source: 'local', ref: held.ref } : { family: to, source: 'google' };
+		describe(`Replace ${from} with ${to}`);
+		template = replaceFamily($state.snapshot(template) as Template, from, ref);
+		missingFonts = await ensureTemplateFonts(template);
+		notify(`Everything set in ${from} is now in ${to}. Ctrl/Cmd+Z puts it back.`);
+	}
+
+	/** An upload nothing in the design uses, deleted from this browser — not from undo's reach, so it says so. */
+	async function forgetFont(font: FontEntry) {
+		if (!font.ref || font.used) return;
+		await deleteStoredFont(font.ref, font.family);
+		editorFonts = editorFonts.filter((f) => f.family.toLowerCase() !== font.family.toLowerCase());
+		saveEditorFonts($state.snapshot(editorFonts));
+		await refreshStoredFonts();
+		notify(`${font.family} deleted from this browser.`);
 	}
 
 	function pickMissingFont(font: FontRef) {
@@ -3232,6 +3283,14 @@
 			{#each missingFonts as font (font.ref ?? font.family)}
 				<button onclick={() => pickMissingFont(font)}>Choose {font.family} File…</button>
 			{/each}
+			<!-- No file to hand: the Images tray's Fonts swaps the face for another. -->
+			<button
+				onclick={() => {
+					imagesOpen = true;
+					dataOpen = false;
+					imageFocus = null;
+				}}
+			>Replace…</button>
 		</div>
 	{/if}
 
@@ -3407,6 +3466,11 @@
 					{drawings}
 					onopendrawing={openDrawing}
 					ontraydrag={stacked ? dragTray : undefined}
+					fonts={fontEntries}
+					{fontOptions}
+					onfontfile={(family, file) => void handleFontUpload(file, family)}
+					onreplacefont={replaceFont}
+					ondeletefont={(font) => void forgetFont(font)}
 				/>
 			{:else}
 			<DataTable

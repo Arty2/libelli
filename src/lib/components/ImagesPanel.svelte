@@ -17,6 +17,7 @@
 		type FolderState,
 		type ImageRecord
 	} from '$lib/assets';
+	import { fontStack, type FontEntry } from '$lib/fonts';
 
 	/**
 	 * Where the pictures are, what they weigh, and how to get rid of them.
@@ -56,6 +57,20 @@
 		 */
 		drawings?: Array<{ key: string; label: string; where: string; src: string }>;
 		onopendrawing?: (key: string) => void;
+		/**
+		 * The fonts the design names and this browser holds — `fontInventory` —
+		 * listed after the pictures for the same reason they are: the one place
+		 * to see what a design needs that a file cannot carry, and to supply or
+		 * swap it.
+		 */
+		fonts?: FontEntry[];
+		/** families a font can be replaced with, everything this browser can draw */
+		fontOptions?: string[];
+		/** a file chosen for a font, to be installed under that font's own name */
+		onfontfile?: (family: string, file: File) => void;
+		/** every use of one family swapped for another */
+		onreplacefont?: (from: string, to: string) => void;
+		ondeletefont?: (font: FontEntry) => void;
 	}
 
 	let {
@@ -69,8 +84,45 @@
 		focus = null,
 		drawings = [],
 		onopendrawing,
-		onfocus
+		onfocus,
+		fonts = [],
+		fontOptions = [],
+		onfontfile,
+		onreplacefont,
+		ondeletefont
 	}: Props = $props();
+
+	/** The font a file is being chosen for: supplied under its own name, so the design finds it. */
+	let fontInput = $state<HTMLInputElement | null>(null);
+	let fontFor = $state<string | null>(null);
+
+	function chooseFontFile(family: string) {
+		fontFor = family;
+		fontInput?.click();
+	}
+
+	function fontChosen(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		const family = fontFor;
+		fontFor = null;
+		if (file && family) onfontfile?.(family, file);
+	}
+
+	/**
+	 * Deleting a font asks, as deleting a picture does: the file is in no undo,
+	 * and "unused" is this design's word — another design in the library may
+	 * be set in it, and would find it missing.
+	 */
+	let confirmingFont = $state<FontEntry | null>(null);
+
+	const FONT_STATUS: Record<FontEntry['status'], string> = {
+		uploaded: 'uploaded',
+		google: 'Google Fonts',
+		missing: 'missing',
+		unused: 'unused'
+	};
 
 	/**
 	 * A picture the design points at and this browser does not hold — a table
@@ -564,7 +616,7 @@
 	<div class="list">
 		{#if busy}
 			<p class="empty">…</p>
-		{:else if !images.length && !missing.length && !drawings.length}
+		{:else if !images.length && !missing.length && !drawings.length && !fonts.length}
 			<p class="empty">Nothing here yet.</p>
 		{:else}
 			<!-- One picture a line: what it looks like, what it is called, how big
@@ -676,6 +728,65 @@
 					</li>
 				{/each}
 			</ul>
+		{/if}
+		{#if !busy && fonts.length}
+			<!-- The faces the design is set in, and the files this browser holds.
+			     A design carries a font's name, never its file, so a design moved
+			     to another computer finds an uploaded face missing: here it says
+			     so, takes the file under the name the design uses, or swaps the
+			     face for another everywhere it is used. -->
+			<h3 class="section">Fonts <span class="total">{fonts.length}{fonts.some((f) => f.bytes) ? ` · ${weigh(fonts.reduce((sum, f) => sum + (f.bytes ?? 0), 0))}` : ''}</span></h3>
+			<ul class="images fonts">
+				{#each fonts as font (font.family)}
+					<li class:missing={font.status === 'missing'} class:unused={font.status === 'unused'}>
+						<!-- A sample in the face itself: the quickest way to tell one font
+						     from another, and to see that a missing one is falling back. -->
+						<span class="thumb font-sample" style="font-family:{fontStack(font.family, 'serif')}" aria-hidden="true">Ag</span>
+						<span class="name">{font.family}</span>
+						<span class="size">{font.bytes ? weigh(font.bytes) : ''}</span>
+						<span class="tag" class:missing-tag={font.status === 'missing'}>{FONT_STATUS[font.status]}</span>
+						{#if font.status === 'missing'}
+							<button class="find" title="Choose the font file for {font.family} — it is installed under this name, so the design finds it" onclick={() => chooseFontFile(font.family)}>
+								<Icon name="font" size={13} /> Find…
+							</button>
+						{/if}
+						{#if font.used}
+							<select
+								class="replace"
+								value=""
+								title="Set everything in {font.family} in another font instead"
+								aria-label="Replace {font.family} with"
+								onchange={(e) => {
+									const to = e.currentTarget.value;
+									e.currentTarget.value = '';
+									if (to) onreplacefont?.(font.family, to);
+								}}
+							>
+								<option value="">Replace…</option>
+								{#each fontOptions.filter((f) => f.toLowerCase() !== font.family.toLowerCase()) as option (option)}
+									<option value={option}>{option}</option>
+								{/each}
+							</select>
+						{:else if font.status === 'unused'}
+							<button
+								class="square"
+								title="Delete {font.family} from this browser — nothing in this design is set in it"
+								aria-label="Delete {font.family}"
+								onclick={() => (confirmingFont = font)}
+							>
+								<Icon name="trash" size={12} />
+							</button>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+			<input
+				bind:this={fontInput}
+				type="file"
+				accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2"
+				hidden
+				onchange={fontChosen}
+			/>
 		{/if}
 	</div>
 	{/if}
@@ -795,6 +906,41 @@
 					confirming = null;
 					void remove(doomed);
 				}}>Delete Image</button
+			>
+		</div>
+	</div>
+{/if}
+
+{#if confirmingFont}
+	{@const font = confirmingFont}
+	<div class="confirm-backdrop" role="presentation" onclick={() => (confirmingFont = null)}></div>
+	<div
+		class="confirm"
+		role="alertdialog"
+		aria-modal="true"
+		aria-labelledby="delete-font-title"
+		tabindex="-1"
+		use:armDefault
+		onkeydown={(e) => {
+			e.stopPropagation();
+			if (e.key === 'Escape') confirmingFont = null;
+		}}
+	>
+		<h2 id="delete-font-title">Delete “{font.family}”?</h2>
+		<p>
+			It is removed from this browser, and this cannot be undone. Nothing in this design is set in it, but
+			another design in your library may be, and would find it missing until the file is chosen again.
+		</p>
+		<div class="confirm-actions">
+			<button onclick={() => (confirmingFont = null)}>Cancel</button>
+			<button
+				class="danger-solid"
+				data-default
+				onclick={() => {
+					const doomed = font;
+					confirmingFont = null;
+					ondeletefont?.(doomed);
+				}}>Delete Font</button
 			>
 		</div>
 	</div>
@@ -1181,6 +1327,20 @@
 	}
 
 	/* The drawings' heading, under the stored pictures. */
+	/* The sample in a font's own face, where a picture has its thumbnail. */
+	.font-sample {
+		display: grid;
+		place-items: center;
+		font-size: 1rem;
+		line-height: 1;
+		color: var(--text, #222);
+	}
+
+	.fonts .replace {
+		font-size: 0.75rem;
+		max-width: 9rem;
+	}
+
 	.section {
 		display: flex;
 		align-items: baseline;

@@ -1,4 +1,4 @@
-import { STORE_FONTS, idbGet, idbKeys, idbSet, local } from './storage';
+import { STORE_FONTS, idbDelete, idbGet, idbKeys, idbSet, local } from './storage';
 import type { FontRef, Template } from './types';
 
 /**
@@ -344,4 +344,119 @@ export function previewFamilies(families: string[], editorFonts: FontRef[], decl
 		[...editorFonts, ...declared].filter((f) => f.source !== 'google').map((f) => f.family.toLowerCase())
 	);
 	for (const family of families) if (!local.has(family.toLowerCase())) ensureGoogleFont(family);
+}
+
+// ---- the fonts a design carries, and repairing one -------------------------
+
+/** A font uploaded to this browser, as the Images tray lists it. */
+export interface StoredFontEntry {
+	ref: string;
+	family: string;
+	/** bytes the file takes in this browser */
+	bytes: number;
+}
+
+/** Every font uploaded to this browser, by family. */
+export async function listStoredFonts(): Promise<StoredFontEntry[]> {
+	const out: StoredFontEntry[] = [];
+	for (const ref of await idbKeys(STORE_FONTS)) {
+		const stored = await idbGet<StoredFont>(STORE_FONTS, ref);
+		if (stored?.family) out.push({ ref, family: stored.family, bytes: stored.bytes?.byteLength ?? 0 });
+	}
+	return out.sort((a, b) => a.family.localeCompare(b.family));
+}
+
+/**
+ * Forget an uploaded font: its bytes, and the face this page registered. Only
+ * offered for a font nothing on this design is set in — a font in use would
+ * turn missing under the person deleting it.
+ */
+export async function deleteStoredFont(ref: string, family: string): Promise<void> {
+	await idbDelete(STORE_FONTS, ref);
+	loadedLocal.delete(ref);
+	if (typeof document === 'undefined' || !document.fonts) return;
+	document.fonts.forEach((face) => {
+		if (face.family.replace(/^["']|["']$/g, '') === family) document.fonts.delete(face);
+	});
+}
+
+/** Where a font a design names comes from, as far as this browser can tell. */
+export type FontStatus = 'uploaded' | 'google' | 'missing' | 'unused';
+
+export interface FontEntry {
+	family: string;
+	status: FontStatus;
+	/** set in by the page or an area of this design */
+	used: boolean;
+	/** for an uploaded one: its key, and what it weighs */
+	ref?: string;
+	bytes?: number;
+}
+
+/**
+ * Every font this design names, and every font this browser holds, as one
+ * list: what each is, whether the design is set in it, and — the reason the
+ * list exists — which the design needs and this browser has not got. A design
+ * carries font names, never files; moved to another computer, an uploaded
+ * face is the one thing it cannot bring, and nothing is substituted for it.
+ *
+ * A declared upload this browser does not hold is `missing`; a family the
+ * design uses without declaring it, and not uploaded, is asked of Google as
+ * the editor does (`ensureTemplateFonts`), so `google`. Uploads nothing here
+ * uses are listed last, as `unused`, to be deleted. Used ones first, then by
+ * name.
+ */
+export function fontInventory(
+	template: Pick<Template, 'defaults' | 'boxes' | 'fonts'>,
+	stored: StoredFontEntry[]
+): FontEntry[] {
+	const used = familiesUsed(template);
+	const storedBy = new Map(stored.map((f) => [f.family.toLowerCase(), f]));
+	const entries = new Map<string, FontEntry>();
+	const add = (entry: FontEntry) => {
+		const key = entry.family.toLowerCase();
+		if (!entries.has(key)) entries.set(key, entry);
+	};
+	for (const font of template.fonts) {
+		const key = font.family.toLowerCase();
+		const held = storedBy.get(key);
+		if (font.source === 'local') {
+			add(
+				held
+					? { family: font.family, status: 'uploaded', used: used.has(key), ref: held.ref, bytes: held.bytes }
+					: { family: font.family, status: 'missing', used: used.has(key), ref: font.ref }
+			);
+		} else if (font.source === 'google') add({ family: font.family, status: 'google', used: used.has(key) });
+	}
+	for (const family of [template.defaults.font, ...template.boxes.map((b) => b.font)]) {
+		if (!family) continue;
+		const held = storedBy.get(family.toLowerCase());
+		add(held ? { family, status: 'uploaded', used: true, ref: held.ref, bytes: held.bytes } : { family, status: 'google', used: true });
+	}
+	for (const held of stored) add({ family: held.family, status: 'unused', used: false, ref: held.ref, bytes: held.bytes });
+	return [...entries.values()].sort((a, b) => Number(b.used) - Number(a.used) || a.family.localeCompare(b.family));
+}
+
+/**
+ * Every use of one family swapped for another — the page's face, each area's
+ * own, and the template's list of fonts — for a design that names a face this
+ * browser cannot have. `to` says where the new one comes from: uploaded here,
+ * or Google's. Matched ignoring case, as every font lookup here is. Returns the
+ * same template when nothing names `from`.
+ */
+export function replaceFamily<T extends Pick<Template, 'defaults' | 'boxes' | 'fonts'>>(template: T, from: string, to: FontRef): T {
+	const key = from.toLowerCase();
+	const swap = (family: string | undefined) => (family && family.toLowerCase() === key ? to.family : family);
+	const touched =
+		template.defaults.font?.toLowerCase() === key ||
+		template.boxes.some((b) => b.font?.toLowerCase() === key) ||
+		template.fonts.some((f) => f.family.toLowerCase() === key);
+	if (!touched) return template;
+	const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== key && f.family.toLowerCase() !== to.family.toLowerCase());
+	return {
+		...template,
+		defaults: { ...template.defaults, font: swap(template.defaults.font) },
+		boxes: template.boxes.map((b) => (b.font?.toLowerCase() === key ? { ...b, font: to.family } : b)),
+		fonts: to.source === 'system' ? fonts : [...fonts, to]
+	};
 }
