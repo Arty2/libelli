@@ -1252,16 +1252,19 @@ they travel with the table. See **Drawing one**, above.
 Pick a curated Google family, type any other family name, or upload a file.
 
 - **Fonts, in the Images tray** — every font the design is set in and every
-  font file this browser holds, in one list under the pictures: a sample in
-  the face itself, where it comes from (*uploaded*, *Google Fonts*), and what it
-  weighs. A design carries a font's name, never its file, so one moved to
-  another computer finds an uploaded face **missing** — said here and in a
-  banner, which has a **Replace…** that opens this list. **Find…** takes the
-  file and installs it under the name the design uses, so nothing else has to
-  change; **Replace…** sets everything that was in that font in another one
-  instead, one undo to take back. An uploaded file nothing in the design uses
-  is listed as *unused*, to be deleted — after asking, since another design in
-  the library may still be set in it, and a file is in no undo.
+  font file this browser holds, in one list under the pictures, each with a
+  sample in its own face. A design carries a font's name, never its file, so
+  what is marked is what does not travel: **local** for a file kept in this
+  browser, and **missing** for one a design moved from another computer needs
+  and this browser has not got — said in a banner too, whose **Replace…** opens
+  this list. Every font, missing or not, has **Upload…** — a file installed
+  under that font's own name, so everything set in it takes the file: a missing
+  face supplied, a Google family made local, an upload swapped for a newer cut
+  — and **Replace…**, which sets everything in that font in another instead,
+  from the local files or Google's families, one undo to take back. A local
+  file nothing in the design uses is *local · unused*, to be deleted — after
+  asking, since another design in the library may still be set in it, and a
+  file is in no undo.
 - **A template carries only what it uses** — the families its page default and
   its areas are set in, and no others. A family you stop using is not
   forgotten: it moves to this browser's own list, and every font menu shows the

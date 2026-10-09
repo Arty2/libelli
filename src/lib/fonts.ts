@@ -253,6 +253,21 @@ export async function installFontBytes(ref: string, family: string, bytes: Array
 	if (typeof document === 'undefined') return;
 	const face = new FontFace(family, bytes.slice(0));
 	await face.load();
+	// A file chosen for a family already drawn — a Google one, or an earlier
+	// upload — replaces it: the faces the page had for that name go, or the
+	// browser would go on matching whichever it found first. A Google family's
+	// faces belong to its stylesheet and cannot be deleted one by one, so the
+	// stylesheet goes, and the family is no longer counted as fetched.
+	const name = family.toLowerCase();
+	document.querySelectorAll<HTMLLinkElement>('link[data-font-family]').forEach((link) => {
+		if (link.dataset.fontFamily?.toLowerCase() === name) link.remove();
+	});
+	loadedGoogle.delete(name);
+	const stale: FontFace[] = [];
+	document.fonts.forEach((old) => {
+		if (old.family.replace(/^["']|["']$/g, '').toLowerCase() === name) stale.push(old);
+	});
+	for (const old of stale) document.fonts.delete(old);
 	document.fonts.add(face);
 	loadedLocal.add(ref);
 	await idbSet(STORE_FONTS, ref, { family, format, bytes } satisfies StoredFont);

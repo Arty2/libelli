@@ -1041,8 +1041,12 @@
 		)
 	);
 
+	// Not a family the design takes from a file in this browser: asking Google
+	// for it too would bring back the faces an upload replaced, and they would
+	// be matched in its place.
 	$effect(() => {
-		for (const family of familiesInUse) ensureGoogleFont(family);
+		const local = new Set(template.fonts.filter((f) => f.source === 'local').map((f) => f.family.toLowerCase()));
+		for (const family of familiesInUse) if (!local.has(family.toLowerCase())) ensureGoogleFont(family);
 	});
 
 	/**
@@ -2926,12 +2930,13 @@
 	let storedFonts = $state<StoredFontEntry[]>([]);
 	const refreshStoredFonts = async () => (storedFonts = await listStoredFonts());
 	const fontEntries = $derived(fontInventory(template, storedFonts));
-	/** What a font can be swapped for: whatever this browser has, and Google's curated list. */
-	const fontOptions = $derived(
-		[...new Set([...storedFonts.map((f) => f.family), ...editorFonts.map((f) => f.family), ...CURATED_GOOGLE_FONTS])].sort((a, b) =>
-			a.localeCompare(b)
-		)
-	);
+	/** What a font can be swapped for: the files this browser holds, then Google's curated families. */
+	const fontOptions = $derived.by(() => {
+		const local = [...new Set(storedFonts.map((f) => f.family))].sort((a, b) => a.localeCompare(b));
+		const taken = new Set(local.map((f) => f.toLowerCase()));
+		const google = CURATED_GOOGLE_FONTS.filter((f) => !taken.has(f.toLowerCase())).sort((a, b) => a.localeCompare(b));
+		return { local, google };
+	});
 
 	/**
 	 * A font the design is set in swapped for another, everywhere — how a design

@@ -64,8 +64,8 @@
 		 * swap it.
 		 */
 		fonts?: FontEntry[];
-		/** families a font can be replaced with, everything this browser can draw */
-		fontOptions?: string[];
+		/** families a font can be replaced with: the files this browser holds, and Google's */
+		fontOptions?: { local: string[]; google: string[] };
 		/** a file chosen for a font, to be installed under that font's own name */
 		onfontfile?: (family: string, file: File) => void;
 		/** every use of one family swapped for another */
@@ -86,7 +86,7 @@
 		onopendrawing,
 		onfocus,
 		fonts = [],
-		fontOptions = [],
+		fontOptions = { local: [], google: [] },
 		onfontfile,
 		onreplacefont,
 		ondeletefont
@@ -117,11 +117,17 @@
 	 */
 	let confirmingFont = $state<FontEntry | null>(null);
 
+	/**
+	 * Said only where it matters: a file kept in this browser — the thing a
+	 * design cannot carry to another computer — or one it needs and has not got.
+	 * A family fetched from Google by name travels with the design, and says
+	 * nothing.
+	 */
 	const FONT_STATUS: Record<FontEntry['status'], string> = {
-		uploaded: 'uploaded',
-		google: 'Google Fonts',
+		uploaded: 'local',
+		google: '',
 		missing: 'missing',
-		unused: 'unused'
+		unused: 'local · unused'
 	};
 
 	/**
@@ -732,9 +738,9 @@
 		{#if !busy && fonts.length}
 			<!-- The faces the design is set in, and the files this browser holds.
 			     A design carries a font's name, never its file, so a design moved
-			     to another computer finds an uploaded face missing: here it says
-			     so, takes the file under the name the design uses, or swaps the
-			     face for another everywhere it is used. -->
+			     to another computer finds a local face missing: here it says so.
+			     Any font can be given a file under its own name, or swapped for
+			     another everywhere it is used. -->
 			<h3 class="section">Fonts <span class="total">{fonts.length}{fonts.some((f) => f.bytes) ? ` · ${weigh(fonts.reduce((sum, f) => sum + (f.bytes ?? 0), 0))}` : ''}</span></h3>
 			<ul class="images fonts">
 				{#each fonts as font (font.family)}
@@ -744,12 +750,20 @@
 						<span class="thumb font-sample" style="font-family:{fontStack(font.family, 'serif')}" aria-hidden="true">Ag</span>
 						<span class="name">{font.family}</span>
 						<span class="size">{font.bytes ? weigh(font.bytes) : ''}</span>
-						<span class="tag" class:missing-tag={font.status === 'missing'}>{FONT_STATUS[font.status]}</span>
-						{#if font.status === 'missing'}
-							<button class="find" title="Choose the font file for {font.family} — it is installed under this name, so the design finds it" onclick={() => chooseFontFile(font.family)}>
-								<Icon name="font" size={13} /> Find…
-							</button>
+						{#if FONT_STATUS[font.status]}
+							<span class="tag" class:missing-tag={font.status === 'missing'}>{FONT_STATUS[font.status]}</span>
 						{/if}
+						<!-- Every font, missing or not: a file chosen here is installed
+						     under this font's own name, so the design takes it up without
+						     another change — a missing face supplied, a Google one made
+						     local, an upload swapped for a newer cut. -->
+						<button
+							class="find"
+							title="Choose a font file to use as {font.family} — installed in this browser under this name, so everything set in it takes the file"
+							onclick={() => chooseFontFile(font.family)}
+						>
+							<Icon name="font" size={13} /> Upload…
+						</button>
 						{#if font.used}
 							<select
 								class="replace"
@@ -763,9 +777,18 @@
 								}}
 							>
 								<option value="">Replace…</option>
-								{#each fontOptions.filter((f) => f.toLowerCase() !== font.family.toLowerCase()) as option (option)}
-									<option value={option}>{option}</option>
-								{/each}
+								{#if fontOptions.local.some((f) => f.toLowerCase() !== font.family.toLowerCase())}
+									<optgroup label="Local">
+										{#each fontOptions.local.filter((f) => f.toLowerCase() !== font.family.toLowerCase()) as option (option)}
+											<option value={option}>{option}</option>
+										{/each}
+									</optgroup>
+								{/if}
+								<optgroup label="Google Fonts">
+									{#each fontOptions.google.filter((f) => f.toLowerCase() !== font.family.toLowerCase()) as option (option)}
+										<option value={option}>{option}</option>
+									{/each}
+								</optgroup>
 							</select>
 						{:else if font.status === 'unused'}
 							<button
