@@ -565,7 +565,11 @@
 	 * have said the drawing was dropped and then written it anyway.
 	 */
 	async function closeBigCell(toTable = false) {
+		// What was open when Close was pressed: another cell opened while the
+		// save was still packing is not the one being closed.
+		const closing = { cell: bigCell, area: drawingArea };
 		await board?.settled();
+		if (bigCell !== closing.cell || drawingArea !== closing.area) return;
 		const to = leaveTo;
 		bigCell = null;
 		drawingArea = null;

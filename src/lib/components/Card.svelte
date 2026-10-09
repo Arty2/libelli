@@ -31,7 +31,8 @@
 		columnGaps,
 		shrinkScale,
 		spacingReadouts,
-		referenceOf
+		referenceOf,
+		freedTop
 	} from '$lib/layout';
 	import { flagUnknown, leaderStyle, renderMarkdown, tabSplit } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
@@ -1984,7 +1985,10 @@
 		// The resolved top is where the box is actually sitting, so writing it back
 		// as its own y is what "keeps its place" means — an anchor released to the
 		// box's stale y would jump it up the card.
-		for (const held of moored) onchange?.({ ...held, anchor: null, y: round2(layout.tops[held.id] ?? held.y) });
+		for (const held of moored) {
+			const y = freedTop(held, layout.tops[held.id] ?? held.y, layout.heights[held.id] ?? held.h);
+			onchange?.({ ...held, anchor: null, y });
+		}
 	}
 
 	/**
@@ -2034,7 +2038,7 @@
 	function breakAnchor(box: Box) {
 		if (!box.anchor || box.locked) return;
 		onaction?.('Break the anchor');
-		onchange?.({ ...box, anchor: null, y: round2(layout.tops[box.id] ?? box.y) });
+		onchange?.({ ...box, anchor: null, y: freedTop(box, layout.tops[box.id] ?? box.y, layout.heights[box.id] ?? box.h) });
 	}
 
 	// ---- typing into the card ------------------------------------------------
@@ -2155,7 +2159,7 @@
 <!-- A line of plain text, as a row of words, leader and words at the right
      edge when it has a `%%%` (or a tab, with a leader set) — `tabSplit`,
      `leaderStyle`, the same as Markdown's. -->
-{#snippet leadered(line: string, leader: Leader)}{@const parts = tabSplit(line, leader !== 'none')}{#if parts}<span class="tabbed"
+{#snippet leadered(line: string, leader: Leader)}{@const parts = tabSplit(line, leader !== 'none', false)}{#if parts}<span class="tabbed"
 		><span>{@render marked(parts[0])}</span><span style={leaderStyle(leader)}></span><span class="tab-right"
 			>{@render marked(parts[1])}</span
 		></span
@@ -2365,16 +2369,23 @@
 								>{#if line}{@render leadered(line, leaderOf(box))}{:else}&nbsp;{/if}</span>
 							{/each}
 						</span>
-					{:else if shownTextOf(box).split('\n').some((line) => tabSplit(line, leaderOf(box) !== 'none'))}
-						<!-- Line by line only when a line needs its leader: one run of
-						     text otherwise, as plain text always was. -->
-						<span class="paras">
-							{#each shownTextOf(box).split('\n') as line, i (i)}
-								<span class="para">{#if line}{@render leadered(line, leaderOf(box))}{:else}&nbsp;{/if}</span>
-							{/each}
-						</span>
 					{:else}
-						<span class="plain">{@render marked(shownTextOf(box))}</span>
+						<!-- The words worked out once: filling the placeholders in is the
+						     costly part — a contents builds itself from every row — and
+						     the test, the lines and the plain run all want the same text. -->
+						{@const text = shownTextOf(box)}
+						{@const lines = text.split('\n')}
+						{#if lines.some((line) => tabSplit(line, leaderOf(box) !== 'none', false))}
+							<!-- Line by line only when a line needs its leader: one run of
+							     text otherwise, as plain text always was. -->
+							<span class="paras">
+								{#each lines as line, i (i)}
+									<span class="para">{#if line}{@render leadered(line, leaderOf(box))}{:else}&nbsp;{/if}</span>
+								{/each}
+							</span>
+						{:else}
+							<span class="plain">{@render marked(text)}</span>
+						{/if}
 					{/if}
 				</div>
 

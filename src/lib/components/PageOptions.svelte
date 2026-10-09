@@ -821,7 +821,7 @@
 				<span>Leader</span>
 				<select
 					value={template.defaults.leader ?? 'none'}
-					title="A line with a tab in it, or ^t, sets what follows against the right edge, joined by this line — Coffee^t3.50 for a price list. For every area that sets none of its own"
+					title="A line with %%% in it sets what follows against the right edge, joined by this line — Coffee %%% 3.50 for a price list; with a leader set, a tab does too. For every area that sets none of its own"
 					disabled={pageFrozen}
 					onchange={(e) => setDefaultLeader(e.currentTarget.value)}
 				>

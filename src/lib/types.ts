@@ -283,11 +283,12 @@ export interface TextStyle {
 	/** absent inherits the page's; absent there too is each renderer's own */
 	paragraph?: ParagraphStyle;
 	/**
-	 * A line with a tab in it — or `^t`, which can be typed where a tab cannot
+	 * A line with `%%%` in it — or a real tab, once a leader is set
 	 * — sets what follows the last one against the right edge, joined to what
 	 * comes before by this line: a price list's dots. Absent inherits the
-	 * page's, absent there too is none, and with none a tab is only a space.
-	 * `none` is an area saying so over a page that has one.
+	 * page's, absent there too is none: `%%%` still sets the words at the right
+	 * edge, with nothing drawn between, and a tab is only a space. `none` is an
+	 * area saying so over a page that has one.
 	 */
 	leader?: Leader;
 	/** absent inherits the page's, field by field; Markdown areas only */

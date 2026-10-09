@@ -252,8 +252,15 @@ function shapeKind(values: string[]): FieldKind | undefined {
 	// Every cell a retail number or an ISBN with a right check digit. Before
 	// numbers, which a run of thirteen digits never matches anyway, and more
 	// than one cell, since one number in ten passes a check digit by chance.
-	if (filled.length > 1 && every((v) => /\d/.test(v) && eanDigits(v) !== null)) return 'barcode';
-	if (filled.length === 1 && eanDigits(filled[0]) !== null && /^97[89]/.test(eanDigits(filled[0])!)) return 'barcode';
+	// Whole codes only: thirteen digits that carry their own check, or an
+	// ISBN-10 with its own. Twelve would be given a check digit by the encoder,
+	// and any twelve-digit phone number or order id would pass.
+	const whole = (v: string) => {
+		const digits = v.replace(/[\s-]/g, '');
+		return (digits.length === 13 || digits.length === 10) && eanDigits(v) !== null;
+	};
+	if (filled.length > 1 && every(whole)) return 'barcode';
+	if (filled.length === 1 && whole(filled[0]) && /^97[89]/.test(eanDigits(filled[0])!)) return 'barcode';
 	// A column of colors is an image as far as a box is concerned: an `image`
 	// box shows whatever its source resolves to, and a color resolves to a fill.
 	if (every((v) => parseColor(v) !== null)) return 'image';
@@ -517,7 +524,12 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	const qrSide = linkField ? up(clamp(contentW * 0.16, 14, 26)) : 0;
 	// An EAN-13 is 37mm wide at its nominal size and prints well down to about
 	// 80%; wide and short, with the digits under it.
-	const barcodeField = pick('barcode');
+	// Only where the foot keeps room for a line of words beside it: on a card
+	// too narrow for both, the code is printed as text, as a second one is.
+	const FOOT_TEXT_MIN = 24;
+	const fits = contentW - (qrSide ? qrSide + gap : 0) - (up(clamp(contentW * 0.42, 30, 45)) + gap) >= FOOT_TEXT_MIN;
+	const wantedBarcode = pick('barcode');
+	const barcodeField = fits ? wantedBarcode : undefined;
 	const barcodeW = barcodeField ? up(clamp(contentW * 0.42, 30, 45)) : 0;
 	const barcodeH = barcodeField ? up(clamp(barcodeW * 0.5, 14, 22)) : 0;
 
@@ -529,7 +541,9 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	// a credit line is the one line of a foot that is owed rather than chosen.
 	const credits = guesses.filter((g) => g.kind === 'credit');
 	const footFields = [
-		...guesses.filter((g) => ['label', 'number', 'date', 'code'].includes(g.kind)),
+		...guesses.filter(
+			(g) => ['label', 'number', 'date', 'code'].includes(g.kind) || (g === wantedBarcode && !barcodeField)
+		),
 		...credits
 	];
 	const footCapacity = Math.max(1, Math.floor((contentH * 0.25) / smallH));

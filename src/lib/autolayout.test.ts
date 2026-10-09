@@ -465,3 +465,22 @@ describe('codes from the cells', () => {
 		expect(shelf.x + shelf.w).toBeLessThanOrEqual(code.x);
 	});
 });
+
+describe('codes from the cells, at the edges', () => {
+	it('does not take twelve-digit numbers for barcodes', () => {
+		expect(classifyColumn('Phone', ['447700900123', '447700900456']).kind).not.toBe('barcode');
+	});
+
+	it('prints the code as a line on a card too narrow for a barcode beside the words', () => {
+		const narrow: PageSpec = { w: 54, h: 86, unit: 'mm', background: '#ffffff' };
+		const rows = [
+			{ title: 'Ferns', isbn: '9780306406157', link: 'https://a.example/1' },
+			{ title: 'Mosses', isbn: '9780804429573', link: 'https://a.example/2' }
+		];
+		const { boxes } = autoLayout({ page: narrow, defaults, columns: ['title', 'isbn', 'link'], rows });
+		const code = boxes.find((b) => b.slot === 'isbn')!;
+		expect(code.mode).toBe('plain');
+		for (const box of boxes) expect(box.w).toBeGreaterThan(0);
+		for (const box of boxes) expect(box.x).toBeGreaterThanOrEqual(0);
+	});
+});

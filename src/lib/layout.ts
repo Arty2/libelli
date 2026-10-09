@@ -511,6 +511,20 @@ export function referenceOf(align: Align, valign: VAlign = 'top'): { fx: 0 | 0.5
 	};
 }
 
+/**
+ * The `y` an area must store to stay where it is drawn once nothing anchors
+ * it: drawn with its top at `top` and `height` tall. Its own top as a rule —
+ * but a growing area set to the bottom or the middle grows away from that
+ * point once it is free (`resolveLayout`), so its stored top is where its
+ * declared frame sits, its growth reckoned back out; written as the drawn top,
+ * it would jump up by however far its words had grown it.
+ */
+export function freedTop(box: Box, top: number, height: number): number {
+	const { fy } = referenceOf('left', box.valign);
+	const y = box.overflow === 'grow' && fy ? top + (height - box.h) * fy : top;
+	return Math.round(y * 100) / 100;
+}
+
 // ---- spacing readouts ------------------------------------------------------
 
 export interface Rect {

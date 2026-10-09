@@ -113,8 +113,10 @@ export function listCount(n: number, numbering: ListNumbering = 'decimal'): stri
  * span, which cutting would leave as two halves with a backtick each. The
  * spaces either side of a mark are the mark's.
  */
-export function tabSplit(line: string, tabs = false): [string, string] | null {
-	const inCode = (at: number) => (line.slice(0, at).match(/`/g)?.length ?? 0) % 2 === 1;
+export function tabSplit(line: string, tabs = false, markdown = true): [string, string] | null {
+	// Code spans are Markdown's: in plain text a backtick is a character, and
+	// one typed for an apostrophe must not hide the mark after it.
+	const inCode = (at: number) => markdown && (line.slice(0, at).match(/`/g)?.length ?? 0) % 2 === 1;
 	for (let at = line.length - 1; at >= 0; at--) {
 		const mark =
 			line[at] === '\t' && tabs

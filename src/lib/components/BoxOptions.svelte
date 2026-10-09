@@ -1375,7 +1375,7 @@
 				<select
 					class:inherits={!selected.leader}
 					value={selected.leader ?? ''}
-					title="A line with a tab in it, or ^t, sets what follows against the right edge, joined by this line — Coffee^t3.50 for a price list"
+					title="A line with %%% in it sets what follows against the right edge, joined by this line — Coffee %%% 3.50 for a price list; with a leader set, a tab does too"
 					disabled={boxFrozen}
 					onchange={(e) => patch({ leader: (e.currentTarget.value || undefined) as Box['leader'] })}
 				>

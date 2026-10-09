@@ -6,6 +6,7 @@ import {
 	shrinkScale,
 	spacingReadouts,
 	referenceOf,
+	freedTop,
 	actualScale,
 	columnGaps,
 	GRID_MAJOR,
@@ -501,5 +502,18 @@ describe('a growing area grows away from its reference point', () => {
 		expect(resolveLayout({ boxes: [head, box], measured: { g: 30 }, hidden: new Set() }).tops.g).toBe(22);
 		const lone = newBox({ id: 'g', y: 50, h: 10, overflow: 'grow', valign: 'bottom', hideWhenEmpty: true });
 		expect(resolveLayout({ boxes: [lone], measured: { g: 30 }, hidden: new Set(['g']) }).tops.g).toBe(50);
+	});
+});
+
+describe('freedTop', () => {
+	it('keeps a freed area where it is drawn, its growth reckoned out for one that grows up', () => {
+		const head = newBox({ id: 'h', y: 10, h: 10, overflow: 'clip' });
+		for (const valign of ['top', 'middle', 'bottom'] as const) {
+			const box = newBox({ id: 'g', y: 0, h: 10, overflow: 'grow', valign, anchor: { to: 'h', gap: 2 } });
+			const before = resolveLayout({ boxes: [head, box], measured: { g: 30 }, hidden: new Set() });
+			const freed = { ...box, anchor: null, y: freedTop(box, before.tops.g, before.heights.g) };
+			const after = resolveLayout({ boxes: [head, freed], measured: { g: 30 }, hidden: new Set() });
+			expect(after.tops.g).toBe(before.tops.g);
+		}
 	});
 });

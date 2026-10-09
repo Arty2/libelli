@@ -1,7 +1,7 @@
 import { parseColor } from './color';
 import { cssIdent } from './css';
 import { fontStack } from './fonts';
-import { bleedFor } from './layout';
+import { bleedFor, referenceOf } from './layout';
 import { marginsOf } from './template';
 import type { Template } from './types';
 
@@ -117,7 +117,13 @@ function selectors(template: Template): string[] {
 			b.overflow === 'shrink' && 'shrinks to fit',
 			b.anchor && `below ${idOf(b.anchor.to)}`
 		].filter(Boolean);
-		const frame = `${b.mode}, ${round(b.x)} ${round(b.y)}, ${round(b.w)} × ${round(b.h)}${notes.length ? `; ${notes.join(', ')}` : ''}`;
+		// At the point the bar's X and Y and the file give — `referenceOf` —
+		// named where it is not the top-left corner, so a sheet written from
+		// these numbers does not take a right edge for a left one.
+		const { fx, fy } = referenceOf(b.align ?? template.defaults.align, b.valign);
+		const point = fx || fy ? ` (${['top', 'middle', 'bottom'][fy * 2]} ${['left', 'centre', 'right'][fx * 2]})` : '';
+		const at = `${round(b.x + b.w * fx)} ${round(b.y + b.h * fy)}${point}`;
+		const frame = `${b.mode}, ${at}, ${round(b.w)} × ${round(b.h)}${notes.length ? `; ${notes.join(', ')}` : ''}`;
 		return [`${`#${id} { }`.padEnd(21)} /* ${inComment(frame)} */`];
 	});
 	return [

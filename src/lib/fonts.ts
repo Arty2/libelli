@@ -390,9 +390,12 @@ export async function deleteStoredFont(ref: string, family: string): Promise<voi
 	await idbDelete(STORE_FONTS, ref);
 	loadedLocal.delete(ref);
 	if (typeof document === 'undefined' || !document.fonts) return;
+	const name = family.toLowerCase();
+	const doomed: FontFace[] = [];
 	document.fonts.forEach((face) => {
-		if (face.family.replace(/^["']|["']$/g, '') === family) document.fonts.delete(face);
+		if (face.family.replace(/^["']|["']$/g, '').toLowerCase() === name) doomed.push(face);
 	});
+	for (const face of doomed) document.fonts.delete(face);
 }
 
 /** Where a font a design names comes from, as far as this browser can tell. */

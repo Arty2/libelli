@@ -326,3 +326,10 @@ describe('a table of contents', () => {
 		expect(applyPlaceholders('%%toc:nothing%%', { row: rows[0], rows, run: rows })).toBe('%%toc:nothing%%');
 	});
 });
+
+describe('tab marks in plain text', () => {
+	it('reads a backtick as a character, not the edge of a code span', () => {
+		expect(tabSplit('Chef`s special %%% 4.50', false, false)).toEqual(['Chef`s special', '4.50']);
+		expect(tabSplit('Chef`s special %%% 4.50')).toBeNull();
+	});
+});
