@@ -2892,15 +2892,21 @@ so it, and a file that says nothing, stays sans-serif. Measuring the face on
 a canvas could tell a monospace but not a serif from a sans; the tables say
 both, for the files that have them.
 
-**X-height is a scale on the face, with the leading kept.** `font-size-adjust`
-is the property for it, and it is *Newly* available (2024), not *Widely*.
-So a face's entry carries `xHeight`, a factor on its size wherever it is used,
-and the card divides the leading by the same factor, so lines keep their
-distance and nothing below moves. One value per face, not per area: the
-point is to bring one face to another's x-height, which is a fact about the
-face; the page bar, the area bar and the tray's steps all set that one value.
-A list or a heading with a leading of its own opens up a little with the
-scaled size — the trade for not threading the factor through every renderer.
+**X-height is `font-size-adjust`, taken knowingly.** It is *Newly*
+available (2024), not *Widely*; asked for, and its failure is the right one:
+a browser without it ignores the declaration and draws the face at its own
+x-height, as before there was a setting. It was a scale on the face's size
+for a release (0.28.27), the leading divided back, but that is an imitation:
+the size and every em in the area moved, and a list or heading with its own
+leading opened up. `font-size-adjust` leaves the size alone, so the leading
+and everything measured in em stay as set — and it brings a fallback standing
+in for a missing face to the same x-height, which no scale could. The value is
+the x-height as a fraction of the size (`FontRef.xHeight`, 0.2 to 1), one per
+face, not per area: give two faces the same number and their lowercase
+matches, which is the point. A scale from 0.28.27 (around 1) is out of range
+and dropped. While none is set, the field and the tray show the face's own,
+measured on a canvas once the face has loaded (`naturalXHeight`), and the
+tray's steps start from it.
 
 **Font menus are grouped by source, local first.** Local files, then Google
 Fonts, then System (`fontChoices`, drawn by `familyItems`): the faces

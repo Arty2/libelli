@@ -1274,13 +1274,17 @@ the upload button off: there is no file to give a face the computer has.
   WOFF2 falls back to sans-serif), and the design keeps that with the font.
 - **X-Height** — faces of one size can differ by a fifth in how big their
   lowercase looks. **X-Height**, beside Font in the page bar and the area bar,
-  sets every use of a face at a percentage of its size — one value per font,
-  shared by both bars — and keeps the leading, so nothing below moves. The
-  Images tray has the same value on each font as **−** and **+**, two percent a
-  press, beside **Replace**: replace a face, bring the new one to the old one's
-  x-height there and then, and **undo** takes back the replace and the steps
-  together while **redo** (Ctrl/Cmd+Y) brings both back — flip between the two
-  faces to compare them.
+  is the height of a face's lowercase as a percentage of its size: blank is the
+  face's own, shown greyed as the field's placeholder; give two faces the same
+  number and their lowercase matches. One value per font, shared by both bars,
+  every use of the face; the size and the leading stay as set, so nothing
+  below moves, and a fallback standing in for a missing face is brought to the
+  same x-height. The Images tray has the same value on each font as **−** and
+  **+**, a point a press, beside **Replace**: replace a face, bring the new one
+  to the old one's x-height there and then, and **undo** takes back the
+  replace and the steps together while **redo** (Ctrl/Cmd+Y) brings both back
+  — flip between the two faces to compare them. Drawn with CSS
+  `font-size-adjust`; a browser without it draws each face at its own.
 
 - **Fonts, in the Images tray** — every font the design is set in and every
   font file this browser holds, in one list under the pictures, each name set

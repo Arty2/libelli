@@ -93,10 +93,12 @@ src/routes/app.css        the :root tokens and app-wide rules
   [Widely available](https://web.dev/baseline), not merely *Newly* — and weigh
   the failure mode, not just the support table: a feature that degrades costs
   little, one invalid at computed-value time takes the whole declaration with it
-  and can leave a page unreadable. Two standing exceptions, taken knowingly:
+  and can leave a page unreadable. Three standing exceptions, taken knowingly:
   `field-sizing: content` in `DataTable.svelte`, which falls back to a fixed
-  scrollable field, and `orphans`/`widows` on columns in `Card.svelte`, which
-  Firefox ignores while the columns still flow. Anything failing worse waits.
+  scrollable field; `orphans`/`widows` on columns in `Card.svelte`, which
+  Firefox ignores while the columns still flow; and `font-size-adjust` for a
+  face's X-Height in `Card.svelte`, which a browser without it ignores,
+  drawing the face at its own. Anything failing worse waits.
 - **A template stores the right-hand page.** With facing pages on, a left-hand
   page is `mirrorBox` applied as the card is drawn — never a second set of
   coordinates. Anything that writes geometry back (dragging, nudging, the

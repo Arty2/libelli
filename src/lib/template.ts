@@ -663,13 +663,13 @@ function normaliseFonts(raw: any): FontRef[] {
 		if (!family) continue;
 		const source: FontRef['source'] = f?.source === 'local' ? 'local' : f?.source === 'system' ? 'system' : 'google';
 		const kind = FONT_KINDS.includes(f?.kind) ? (f.kind as FontKind) : undefined;
-		const xHeight = clampXHeight(Number(f?.xHeight));
+		const xHeight = clampXHeight(f?.xHeight === undefined ? undefined : Number(f.xHeight));
 		out.push({
 			family,
 			source,
 			...(f?.ref ? { ref: String(f.ref) } : {}),
 			...(kind ? { kind } : {}),
-			...(xHeight !== 1 ? { xHeight } : {})
+			...(xHeight !== undefined ? { xHeight } : {})
 		});
 	}
 	return out;

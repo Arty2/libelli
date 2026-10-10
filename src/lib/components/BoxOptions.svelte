@@ -7,7 +7,7 @@
 	import { parseColor } from '$lib/color';
 	import { safeImageUrl } from '$lib/assets';
 	import { completePlaceholders } from '$lib/complete';
-	import { availableWeights, fontChoices, fontRef, previewFamilies, setXHeight, xHeightOf } from '$lib/fonts';
+	import { availableWeights, fontChoices, fontRef, naturalXHeight, previewFamilies, setXHeight, watchFaces, xHeightOf } from '$lib/fonts';
 	import MenuSelect, { familyItems, type MenuItem } from './MenuSelect.svelte';
 	import ResetButton from './ResetButton.svelte';
 	import { referenceOf } from '$lib/layout';
@@ -469,20 +469,14 @@
 	 */
 	let facesVersion = $state(0);
 
-	$effect(() => {
-		if (typeof document === 'undefined' || !document.fonts) return;
-		const bump = () => (facesVersion += 1);
-		document.fonts.addEventListener('loadingdone', bump);
-		// A stylesheet adds its faces without loading any of them, so a
-		// finished request is watched for too.
-		const observer = new MutationObserver(bump);
-		observer.observe(document.head, { childList: true });
-		const late = setTimeout(bump, 1500);
-		return () => {
-			document.fonts.removeEventListener('loadingdone', bump);
-			observer.disconnect();
-			clearTimeout(late);
-		};
+	$effect(() => watchFaces(() => (facesVersion += 1)));
+
+	/** This area's face's own x-height, for X-Height's placeholder and its start. */
+	const areaNatural = $derived.by(() => {
+		// Read, so this is worked out again as faces arrive.
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		facesVersion;
+		return naturalXHeight(areaFamily);
 	});
 
 	/**
@@ -1010,21 +1004,26 @@
 					<ResetButton to="the page's {template.defaults.font}" disabled={boxFrozen} onclick={() => patch({ font: undefined })} />
 				{/if}
 			</span>
-			<!-- The face's x-height scale: one value per font, shared by every use
-			     of it — this field, the other bar's and the Images tray's steps all
-			     set the same one. The leading is kept, so nothing moves down. -->
+			<!-- The face's x-height, as a share of its size: one value per font,
+			     shared by every use of it — this field, the other bar's and the
+			     Images tray's steps all set the same one. Blank, the face's own,
+			     measured, shows as the placeholder. -->
 			<label class="field">
 				<span>X-Height</span>
 				<input
 					class="n-3"
 					type="number"
 					step="1"
-					min="50"
-					max="200"
-					title="Set everything in {areaFamily} at this percentage of its size, to match its x-height to another face's — every use of the font, keeping its leading"
-					value={Math.round(xHeightOf(template.fonts, areaFamily) * 100)}
+					min="20"
+					max="100"
+					title="The height of {areaFamily}'s lowercase, as a percentage of its size — give two faces the same and their x-heights match. Every use of the font; the leading is kept. Blank is the face's own{areaNatural ? ` (${Math.round(areaNatural * 100)})` : ''}"
+					placeholder={areaNatural ? String(Math.round(areaNatural * 100)) : ''}
+					value={xHeightOf(template.fonts, areaFamily) === undefined ? '' : Math.round((xHeightOf(template.fonts, areaFamily) ?? 0) * 100)}
 					disabled={pageFrozen}
-					onchange={(e) => ontemplatechange(setXHeight(template, areaFamily, numeric(e, 100) / 100, fontRef(areaFamily, editorFonts)))}
+					onchange={(e) => {
+						const typed = e.currentTarget.value.trim();
+						ontemplatechange(setXHeight(template, areaFamily, typed === '' ? undefined : Number(typed) / 100, fontRef(areaFamily, editorFonts)));
+					}}
 				/>
 				<span class="unit">%</span>
 			</label>

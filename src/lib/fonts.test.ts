@@ -67,21 +67,22 @@ describe('a face on a card', () => {
 		expect(kindOf([{ family: 'Studio', source: 'local', kind: 'serif' }], 'studio')).toBe('serif');
 	});
 
-	it('scales by its x-height, 1 when the template says nothing', () => {
-		const fonts: FontRef[] = [{ family: 'Lora', source: 'google', xHeight: 1.08 }];
-		expect(faceOf(fonts, 'lora')).toEqual({ stack: fontStack('lora', 'serif'), scale: 1.08 });
-		expect(faceOf(fonts, 'Inter').scale).toBe(1);
+	it('carries the x-height it is set to, for font-size-adjust; nothing when it is its own', () => {
+		const fonts: FontRef[] = [{ family: 'Lora', source: 'google', xHeight: 0.52 }];
+		expect(faceOf(fonts, 'lora')).toEqual({ stack: fontStack('lora', 'serif'), adjust: 0.52 });
+		expect(faceOf(fonts, 'Inter')).toEqual({ stack: fontStack('Inter', 'sans-serif') });
 	});
 
-	it('sets an x-height on the entry, makes one where there is none, and removes it at 1', () => {
+	it('sets an x-height on the entry, makes one where there is none, and clears it', () => {
 		const t = { fonts: [{ family: 'Lora', source: 'google' }] as FontRef[] };
-		const up = setXHeight(t, 'lora', 1.064, { family: 'lora', source: 'google' });
-		expect(up.fonts).toEqual([{ family: 'Lora', source: 'google', xHeight: 1.06 }]);
-		expect(setXHeight(up, 'Lora', 1, { family: 'Lora', source: 'google' }).fonts).toEqual([{ family: 'Lora', source: 'google' }]);
-		const system = setXHeight(t, 'Georgia', 0.9, { family: 'Georgia', source: 'system' });
-		expect(system.fonts[1]).toEqual({ family: 'Georgia', source: 'system', xHeight: 0.9 });
-		expect(setXHeight(t, 'Georgia', 1, { family: 'Georgia', source: 'system' })).toBe(t);
-		expect(setXHeight(t, 'Lora', 9, { family: 'Lora', source: 'google' }).fonts[0].xHeight).toBe(2);
+		const up = setXHeight(t, 'lora', 0.524, { family: 'lora', source: 'google' });
+		expect(up.fonts).toEqual([{ family: 'Lora', source: 'google', xHeight: 0.52 }]);
+		expect(setXHeight(up, 'Lora', undefined, { family: 'Lora', source: 'google' }).fonts).toEqual([{ family: 'Lora', source: 'google' }]);
+		const system = setXHeight(t, 'Georgia', 0.48, { family: 'Georgia', source: 'system' });
+		expect(system.fonts[1]).toEqual({ family: 'Georgia', source: 'system', xHeight: 0.48 });
+		expect(setXHeight(t, 'Georgia', undefined, { family: 'Georgia', source: 'system' })).toBe(t);
+		// Out of range is no value: a scale from 0.28.27 is not an x-height.
+		expect(setXHeight(up, 'Lora', 1.06, { family: 'Lora', source: 'google' }).fonts[0].xHeight).toBeUndefined();
 	});
 
 	it('keeps the replacement\'s own x-height when a font is replaced with it', () => {
@@ -90,11 +91,11 @@ describe('a face on a card', () => {
 			boxes: [],
 			fonts: [
 				{ family: 'Alpha', source: 'google' },
-				{ family: 'Beta', source: 'google', xHeight: 1.1 }
+				{ family: 'Beta', source: 'google', xHeight: 0.5 }
 			]
 		} as unknown as Design;
 		const out = replaceFamily(design, 'Alpha', { family: 'Beta', source: 'google' });
-		expect(out.fonts).toEqual([{ family: 'Beta', source: 'google', xHeight: 1.1 }]);
+		expect(out.fonts).toEqual([{ family: 'Beta', source: 'google', xHeight: 0.5 }]);
 	});
 });
 
@@ -235,8 +236,8 @@ describe('fontInventory', () => {
 			fonts: [...design.fonts, { family: 'Plain Office', source: 'system' }]
 		} as unknown as Design;
 		const list = fontInventory(withSystem, []);
-		expect(list.find((f) => f.family === 'Georgia')).toEqual({ family: 'Georgia', status: 'system', used: true, kind: 'serif', xHeight: 1 });
-		expect(list.find((f) => f.family === 'Plain Office')).toEqual({ family: 'Plain Office', status: 'system', used: true, xHeight: 1 });
+		expect(list.find((f) => f.family === 'Georgia')).toEqual({ family: 'Georgia', status: 'system', used: true, kind: 'serif' });
+		expect(list.find((f) => f.family === 'Plain Office')).toEqual({ family: 'Plain Office', status: 'system', used: true });
 		// An upload under a system face's name is the upload.
 		expect(fontInventory(withSystem, [{ ref: 'font:georgia', family: 'Georgia', bytes: 100 }]).find((f) => f.family === 'Georgia')?.status).toBe('uploaded');
 	});

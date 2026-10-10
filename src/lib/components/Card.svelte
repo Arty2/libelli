@@ -819,30 +819,32 @@
 	}
 
 	/**
-	 * A face's size and leading on the card: the size times the face's
-	 * x-height scale, and the leading divided by it, so a face set larger to
-	 * match another's x-height keeps the same distance between lines and
-	 * nothing below it moves. A list or a heading that sets a leading of its
-	 * own does so against the scaled size, and opens up a little with it.
+	 * A face's stack, and its x-height as `font-size-adjust` where the
+	 * template sets one: the browser draws the face so its lowercase is that
+	 * fraction of the size, and the size — so the leading, and everything
+	 * measured in em — stays as set, nothing below moving. A fallback standing
+	 * in for a missing face is brought to the same x-height too.
+	 *
+	 * Newly available rather than Widely (2024), taken knowingly: a browser
+	 * without it ignores the declaration and draws the face at its own
+	 * x-height, which is what it did before there was a setting.
 	 */
-	function typeOf(family: string | undefined, size: number, lineHeight: number) {
+	function faceStyle(family: string | undefined): string[] {
 		const face = faceOf(template.fonts, family);
-		const round3 = (v: number) => Math.round(v * 1000) / 1000;
-		return { stack: face.stack, size: round3(size * face.scale), lineHeight: round3(lineHeight / face.scale) };
+		return [`font-family:${face.stack}`, ...(face.adjust !== undefined ? [`font-size-adjust:${face.adjust}`] : [])];
 	}
 
 	function boxStyle(box: Box): string {
 		const drawn = placed(box);
 		const align = drawn.align ?? template.defaults.align;
-		const type = typeOf(box.font ?? template.defaults.font, box.size ?? template.defaults.size, box.lineHeight ?? template.defaults.lineHeight);
 		const parts = [
 			`left:${drawn.x}mm`,
 			`top:${layout.tops[box.id] ?? box.y}mm`,
 			`width:${box.w}mm`,
-			`font-family:${type.stack}`,
-			`font-size:${type.size}pt`,
+			...faceStyle(box.font ?? template.defaults.font),
+			`font-size:${box.size ?? template.defaults.size}pt`,
 			`font-weight:${box.weight ?? template.defaults.weight}`,
-			`line-height:${type.lineHeight}`,
+			`line-height:${box.lineHeight ?? template.defaults.lineHeight}`,
 			`color:${box.color ?? template.defaults.color}`,
 			`text-align:${align}`,
 			// Vertical placement needs the box to be a flex column. That stops the
@@ -863,7 +865,7 @@
 		// each element that uses it, so a heading twice the size would have
 		// moved twice as far as the paragraph under it.
 		const baseline = baselineOf(box, template.defaults);
-		if (baseline) parts.push(`--baseline:${Math.round(-baseline * type.size * 1000) / 1000}pt`);
+		if (baseline) parts.push(`--baseline:${Math.round(-baseline * (box.size ?? template.defaults.size) * 1000) / 1000}pt`);
 		// Emitted whether or not there is any, because the selected-box padding
 		// guide reads these back and a missing custom property would fall to 0 and
 		// draw the guide exactly on top of the bounds.
@@ -1039,11 +1041,10 @@
 		// pages there are only right-hand pages, so outer is the right edge.
 		const position = facingPosition(template.pageNumber.position, verso ? 'verso' : 'recto');
 		const [vertical, horizontal] = position.split('-');
-		const pageType = typeOf(template.defaults.font, template.defaults.size, 1);
 		const parts = [
 			vertical === 'top' ? `top:${margin}mm` : `bottom:${margin}mm`,
-			`font-family:${pageType.stack}`,
-			`font-size:${pageType.size}pt`,
+			...faceStyle(template.defaults.font),
+			`font-size:${template.defaults.size}pt`,
 			`font-weight:${template.defaults.weight}`,
 			`color:${template.defaults.color}`,
 			`line-height:1`

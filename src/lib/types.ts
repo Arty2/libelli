@@ -215,10 +215,14 @@ export interface PageNumberSpec {
 export type FontKind = 'serif' | 'sans-serif' | 'monospace' | 'handwriting';
 export const FONT_KINDS: readonly FontKind[] = ['serif', 'sans-serif', 'monospace', 'handwriting'];
 
-/** The x-height scale a face may be given: half to double, to the hundredth; anything else is 1. */
-export function clampXHeight(value: number): number {
-	if (!Number.isFinite(value) || value <= 0) return 1;
-	return Math.round(Math.min(2, Math.max(0.5, value)) * 100) / 100;
+/**
+ * An x-height a face may be given, as a fraction of its size: 0.2 to 1, to the
+ * hundredth. Anything else is none — the face's own. A value from 0.28.27,
+ * when this was a scale around 1, is above the range and dropped.
+ */
+export function clampXHeight(value: number | undefined): number | undefined {
+	if (value === undefined || !Number.isFinite(value) || value < 0.2 || value > 1) return undefined;
+	return Math.round(value * 100) / 100;
 }
 
 export interface FontRef {
@@ -233,10 +237,12 @@ export interface FontRef {
 	 */
 	kind?: FontKind;
 	/**
-	 * Every use of this face set this many times its size, so its x-height can
-	 * be matched to another's: faces of one size can differ by a fifth in how
-	 * big their lowercase looks. The leading is kept, so nothing moves down
-	 * the page. Absent is 1.
+	 * Every use of this face drawn with its x-height at this fraction of its
+	 * size (`font-size-adjust`), so it can be matched to another face's: faces
+	 * of one size can differ by a fifth in how big their lowercase looks. Two
+	 * faces given the same value have lowercase of the same height. The
+	 * leading is the size's, so nothing moves down the page. Absent, the
+	 * face's own.
 	 */
 	xHeight?: number;
 }

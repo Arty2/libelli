@@ -100,35 +100,86 @@ export function kindOf(fonts: readonly FontRef[], family: string | undefined): F
 	return fonts.find((f) => f.family.toLowerCase() === key)?.kind ?? KNOWN_KINDS[key];
 }
 
-/** A family's x-height scale in this template: 1 unless its entry says otherwise. */
-export function xHeightOf(fonts: readonly FontRef[], family: string | undefined): number {
-	if (!family) return 1;
+/** A family's x-height in this template, as a fraction of its size; undefined for the face's own. */
+export function xHeightOf(fonts: readonly FontRef[], family: string | undefined): number | undefined {
+	if (!family) return undefined;
 	const key = family.trim().toLowerCase();
-	return clampXHeight(fonts.find((f) => f.family.toLowerCase() === key)?.xHeight ?? 1);
-}
-
-/** How a face is drawn on a card: its stack, fallback by kind, and its x-height scale. */
-export function faceOf(fonts: readonly FontRef[], family: string | undefined): { stack: string; scale: number } {
-	return { stack: fontStack(family, kindOf(fonts, family)), scale: xHeightOf(fonts, family) };
+	return clampXHeight(fonts.find((f) => f.family.toLowerCase() === key)?.xHeight);
 }
 
 /**
- * The template with `family` set at `scale` times its size everywhere it is
- * used. Kept on the family's entry in the template's fonts; a family with no
- * entry yet (a system face, an undeclared name) gets one from `base`, as a
- * menu would have made it. 1 removes the key, as clearing a field does.
+ * How a face is drawn on a card: its stack, fallback by kind, and the
+ * x-height it is set to, if any — for `font-size-adjust`, which also brings a
+ * fallback face to the same x-height when the face itself is missing.
  */
-export function setXHeight<T extends Pick<Template, 'fonts'>>(template: T, family: string, scale: number, base: FontRef): T {
+export function faceOf(fonts: readonly FontRef[], family: string | undefined): { stack: string; adjust?: number } {
+	const adjust = xHeightOf(fonts, family);
+	return { stack: fontStack(family, kindOf(fonts, family)), ...(adjust !== undefined ? { adjust } : {}) };
+}
+
+/**
+ * The template with `family` drawn at an x-height of `value` times its size
+ * everywhere it is used. Kept on the family's entry in the template's fonts;
+ * a family with no entry yet (a system face, an undeclared name) gets one
+ * from `base`, as a menu would have made it. Undefined — or out of range —
+ * removes the key, back to the face's own, as clearing a field does.
+ */
+export function setXHeight<T extends Pick<Template, 'fonts'>>(template: T, family: string, value: number | undefined, base: FontRef): T {
 	const key = family.toLowerCase();
-	const value = clampXHeight(scale);
+	const xHeight = clampXHeight(value);
 	const at = template.fonts.findIndex((f) => f.family.toLowerCase() === key);
 	const fit = (ref: FontRef): FontRef => {
 		const { xHeight: _was, ...rest } = ref;
-		return value === 1 ? rest : { ...rest, xHeight: value };
+		return xHeight === undefined ? rest : { ...rest, xHeight };
 	};
 	if (at >= 0) return { ...template, fonts: template.fonts.map((f, i) => (i === at ? fit(f) : f)) };
-	if (value === 1) return template;
+	if (xHeight === undefined) return template;
 	return { ...template, fonts: [...template.fonts, fit({ ...base, family })] };
+}
+
+/**
+ * Call `onchange` whenever the document's faces may have changed — a face
+ * finished loading, or a Google stylesheet arrived (which adds its faces
+ * without loading any) — and once more a moment after start, for what was
+ * already on its way. For what is read off the faces: the weights a family
+ * has, a face's own x-height. Returns the way to stop.
+ */
+export function watchFaces(onchange: () => void): () => void {
+	if (typeof document === 'undefined' || !document.fonts) return () => {};
+	document.fonts.addEventListener('loadingdone', onchange);
+	const observer = new MutationObserver(onchange);
+	observer.observe(document.head, { childList: true });
+	const late = setTimeout(onchange, 1500);
+	return () => {
+		document.fonts.removeEventListener('loadingdone', onchange);
+		observer.disconnect();
+		clearTimeout(late);
+	};
+}
+
+const measured = new Map<string, number>();
+/**
+ * A face's own x-height, as a fraction of its size: the top of a lowercase x
+ * above the baseline, measured on a canvas in the face as this document has
+ * it. What X-Height shows while it is not set, and where its steps start.
+ * Remembered once the face itself is loaded; until then — the fallback
+ * standing in — it is measured each time and not kept. Undefined outside a
+ * browser, or where nothing can be measured.
+ */
+export function naturalXHeight(family: string | undefined): number | undefined {
+	const name = safeFamily(family);
+	if (!name || typeof document === 'undefined') return undefined;
+	const key = name.toLowerCase();
+	const known = measured.get(key);
+	if (known !== undefined) return known;
+	const context = document.createElement('canvas').getContext('2d');
+	if (!context) return undefined;
+	context.font = `100px "${name}", ${FALLBACKS['sans-serif']}`;
+	const ascent = context.measureText('x').actualBoundingBoxAscent;
+	if (!(ascent > 0)) return undefined;
+	const value = Math.round(ascent) / 100;
+	if (document.fonts.check(`100px "${name}"`)) measured.set(key, value);
+	return value;
 }
 
 /**
@@ -596,8 +647,8 @@ export interface FontEntry {
 	bytes?: number;
 	/** its kind, for the fallback its name is drawn with; undefined when nobody knows */
 	kind?: FontKind;
-	/** its x-height scale in this design, 1 when untouched */
-	xHeight: number;
+	/** the x-height it is set to in this design, as a fraction of its size; absent, its own */
+	xHeight?: number;
 }
 
 /**
@@ -625,7 +676,8 @@ export function fontInventory(
 	const add = (entry: Omit<FontEntry, 'kind' | 'xHeight'>) => {
 		const key = entry.family.toLowerCase();
 		const kind = kindOf(template.fonts, entry.family);
-		if (!entries.has(key)) entries.set(key, { ...entry, ...(kind ? { kind } : {}), xHeight: xHeightOf(template.fonts, entry.family) });
+		const xHeight = xHeightOf(template.fonts, entry.family);
+		if (!entries.has(key)) entries.set(key, { ...entry, ...(kind ? { kind } : {}), ...(xHeight !== undefined ? { xHeight } : {}) });
 	};
 	for (const font of template.fonts) {
 		const key = font.family.toLowerCase();

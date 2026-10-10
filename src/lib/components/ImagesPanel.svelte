@@ -18,7 +18,7 @@
 		type FolderState,
 		type ImageRecord
 	} from '$lib/assets';
-	import { fontStack, type FontEntry } from '$lib/fonts';
+	import { fontStack, naturalXHeight, watchFaces, type FontEntry } from '$lib/fonts';
 
 	/**
 	 * Where the pictures are, what they weigh, and how to get rid of them.
@@ -69,8 +69,8 @@
 		fontFamilies?: { local: string[]; google: string[]; system: string[] };
 		/** a Replace menu opening: fetch the faces its names are set in, as the font menus do */
 		onfontsopen?: () => void;
-		/** a face set at this many times its size everywhere, to match its x-height to another's */
-		onxheight?: (family: string, scale: number) => void;
+		/** a face drawn with its x-height at this fraction of its size everywhere, to match another's */
+		onxheight?: (family: string, xHeight: number) => void;
 		/** a file chosen for a font, to be installed under that font's own name */
 		onfontfile?: (family: string, file: File) => void;
 		/** every use of one family swapped for another; false, or a promise of it, when it was refused */
@@ -109,6 +109,17 @@
 	 * nothing is outlined. Lower case, as fonts.ts matches families.
 	 */
 	let fontOrder = $state<string[]>([]);
+
+	/** Bumped as faces load, so a face's own x-height is measured again once the face is here. */
+	let facesVersion = $state(0);
+	$effect(() => watchFaces(() => (facesVersion += 1)));
+	/** A face's own x-height — where its steps start while it has none set. */
+	const natural = (family: string) => {
+		// Read, so this is worked out again as faces arrive.
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		facesVersion;
+		return naturalXHeight(family);
+	};
 	let replacedFont = $state<string | null>(null);
 	$effect(() => {
 		if (!fontOrder.length && fonts.length) fontOrder = fonts.map((f) => f.family.toLowerCase());
@@ -812,21 +823,29 @@
 							<!-- Beside Replace, so a face just swapped in can be brought to the
 							     old one's x-height there and then; from here, the nudges join
 							     the replace's undo, so undo and redo flip between the two. -->
+							{@const own = font.xHeight === undefined}
+							{@const at = font.xHeight ?? natural(font.family)}
 							<span class="x-height" role="group" aria-label="X-height of {font.family}">
 								<button
 									class="square save"
-									title="Smaller: set everything in {font.family} 2% smaller, keeping its leading"
+									title="Smaller x-height: {font.family}'s lowercase a point of its size lower"
 									aria-label="Smaller x-height for {font.family}"
-									disabled={font.xHeight <= 0.5}
-									onclick={() => onxheight?.(font.family, font.xHeight - 0.02)}
+									disabled={at === undefined || at <= 0.2}
+									onclick={() => at !== undefined && onxheight?.(font.family, at - 0.01)}
 								><Icon name="subtract" size={12} /></button>
-								<span class="x-value" title="{font.family} at {Math.round(font.xHeight * 100)}% of its size, to match another face's x-height">{Math.round(font.xHeight * 100)}%</span>
+								<span
+									class="x-value"
+									class:own
+									title={at === undefined
+										? `${font.family}'s x-height cannot be measured until the face has loaded`
+										: `${font.family}'s lowercase is ${Math.round(at * 100)}% of its size${own ? ' — its own' : ''}`}
+								>{at === undefined ? '—' : `${Math.round(at * 100)}%`}</span>
 								<button
 									class="square save"
-									title="Larger: set everything in {font.family} 2% larger, keeping its leading"
+									title="Larger x-height: {font.family}'s lowercase a point of its size higher"
 									aria-label="Larger x-height for {font.family}"
-									disabled={font.xHeight >= 2}
-									onclick={() => onxheight?.(font.family, font.xHeight + 0.02)}
+									disabled={at === undefined || at >= 1}
+									onclick={() => at !== undefined && onxheight?.(font.family, at + 0.01)}
 								><Icon name="add" size={12} /></button>
 							</span>
 						{/if}
@@ -1433,6 +1452,12 @@
 		flex: none;
 		display: inline-flex;
 		align-items: center;
+	}
+
+	/* Its own, not set: quieter, as a placeholder is. */
+	.fonts .x-value.own {
+		color: #999;
+		font-style: italic;
 	}
 
 	.fonts .x-value {

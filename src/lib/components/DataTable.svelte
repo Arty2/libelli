@@ -2979,13 +2979,14 @@
 	}
 
 	/* The caret a finger's tap drew, where the browser draws none: a line the
-	   width and blink of a caret, in the accent, as the selection is. */
+	   width and blink of the system's caret — one pixel — in the accent, as
+	   the selection is. */
 	.finger-caret {
 		position: absolute;
 		/* Over the field, which lifts itself while it has the focus. */
 		z-index: 3;
-		width: 0.125rem;
-		margin-left: -0.0625rem;
+		width: 1px;
+		margin-left: -0.5px;
 		background: var(--accent-strong);
 		pointer-events: none;
 		animation: finger-caret 1.1s steps(1) infinite;
