@@ -1,7 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
 	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
-	import { parseColor } from '$lib/color';
 	import { armDefault } from '$lib/modal';
 	import { downloadUrl, slugify } from '$lib/download';
 	import { editableType, frameBetween, framePixels, isCrop, type Frame } from '$lib/photo';
@@ -72,9 +71,7 @@
 		onfontfile?: (family: string, file: File) => void;
 		/** every use of one family swapped for another */
 		onreplacefont?: (from: string, to: string) => void;
-		/** the page's paper and its type's color, for a font's sample: the face as the card shows it */
-		paper?: string;
-		ink?: string;
+
 		ondeletefont?: (font: FontEntry) => void;
 	}
 
@@ -94,13 +91,8 @@
 		fontOptions = { local: [], google: [] },
 		onfontfile,
 		onreplacefont,
-		ondeletefont,
-		paper,
-		ink
+		ondeletefont
 	}: Props = $props();
-
-	/** Through color.ts like every color bound for a style; the paper a page has when it names none. */
-	const sampleStyle = $derived(`background:${parseColor(paper ?? null) ?? '#ffffff'};color:${parseColor(ink ?? null) ?? '#222222'}`);
 
 	/**
 	 * What a font can be replaced with, as the app's own menu: the local files
@@ -769,13 +761,25 @@
 			<ul class="images fonts">
 				{#each fonts as font (font.family)}
 					<li class:missing={font.status === 'missing'} class:unused={font.status === 'unused'}>
-						<!-- A sample in the face itself: the quickest way to tell one font
-						     from another, and to see that a missing one is falling back. -->
-						<span class="thumb font-sample" style="font-family:{fontStack(font.family, 'serif')};{sampleStyle}" aria-hidden="true">Ag</span>
-						<span class="name">{font.family}</span>
+						<!-- The name set in the face it names: the quickest way to tell one
+						     font from another, and to see that a missing one is falling
+						     back — and no sample beside it to take the name's room. -->
+						<span class="name font-name" style="font-family:{fontStack(font.family, 'serif')}">{font.family}</span>
 						<span class="size">{font.bytes ? weigh(font.bytes) : ''}</span>
 						{#if FONT_STATUS[font.status]}
 							<span class="tag" class:missing-tag={font.status === 'missing'}>{FONT_STATUS[font.status]}</span>
+						{/if}
+						{#if font.used}
+							<span class="replace">
+								<MenuSelect
+									label="Replace {font.family} with"
+									title="Set everything in {font.family} in another font instead"
+									placeholder="Replace…"
+									value=""
+									items={replaceItems(font.family)}
+									onselect={(to) => to && onreplacefont?.(font.family, to)}
+								/>
+							</span>
 						{/if}
 						<!-- Every font, missing or not: a file chosen here is installed
 						     under this font's own name, so the design takes it up without
@@ -789,18 +793,7 @@
 						>
 							<Icon name="upload" size={12} />
 						</button>
-						{#if font.used}
-							<span class="replace">
-								<MenuSelect
-									label="Replace {font.family} with"
-									title="Set everything in {font.family} in another font instead"
-									placeholder="Replace…"
-									value=""
-									items={replaceItems(font.family)}
-									onselect={(to) => to && onreplacefont?.(font.family, to)}
-								/>
-							</span>
-						{:else if font.status === 'unused'}
+						{#if !font.used && font.status === 'unused'}
 							<button
 								class="square"
 								title="Delete {font.family} from this browser — nothing in this design is set in it"
@@ -1360,19 +1353,24 @@
 	}
 
 	/* The drawings' heading, under the stored pictures. */
-	/* The sample in a font's own face, where a picture has its thumbnail. */
-	.font-sample {
-		display: grid;
-		place-items: center;
-		font-size: 1rem;
-		line-height: 1;
-		color: var(--text, #222);
+	/* A font's name in its own face, a size up so the face can be read. */
+	.font-name {
+		font-size: 0.9375rem;
+		line-height: 1.6;
 	}
 
-	/* Wide enough for its word; the name before it gets the rest. */
+	/* Wide enough for its word; the name before it gets the rest. In capitals,
+	   as the panel's other actions are. */
 	.fonts .replace {
 		flex: none;
 		display: inline-flex;
+	}
+
+	/* On the trigger itself: a button does not inherit a text-transform. The
+	   menu it opens keeps the names' own case. */
+	.fonts .replace :global(.trigger) {
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
 	}
 
 	.section {

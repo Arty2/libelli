@@ -3487,8 +3487,6 @@
 					onfontfile={(family, file) => void handleFontUpload(file, family)}
 					onreplacefont={replaceFont}
 					ondeletefont={(font) => void forgetFont(font)}
-					paper={template.page.background}
-					ink={template.defaults.color}
 				/>
 			{:else}
 			<DataTable

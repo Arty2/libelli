@@ -89,8 +89,14 @@
 	function place() {
 		const box = trigger?.getBoundingClientRect();
 		if (!box) return;
-		const below = window.innerHeight - box.bottom - 8;
-		const above = box.top - 8;
+		// The screen a person can see, not the layout's: on a phone the
+		// browser's own bars and a pinch can leave less of the window showing,
+		// and a menu measured to the window ran under them.
+		const view = window.visualViewport;
+		const height = view ? view.offsetTop + view.height : window.innerHeight;
+		const width = view ? view.offsetLeft + view.width : window.innerWidth;
+		const below = height - box.bottom - 8;
+		const above = box.top - (view?.offsetTop ?? 0) - 8;
 		// Down where there is room, up where there is more of it — the zoom sits
 		// in the bottom corner of the stage, and a menu hung below it is off the
 		// screen.
@@ -98,13 +104,15 @@
 		// the zoom's trigger is at the right of the stage, and a menu reaching
 		// rightwards from it ran under the table beside the page.
 		const side =
-			box.left + box.width / 2 > window.innerWidth / 2
-				? { right: Math.max(8, window.innerWidth - box.right) }
-				: { left: Math.max(8, Math.min(box.left, window.innerWidth - 216)) };
+			box.left + box.width / 2 > width / 2
+				? { right: Math.max(8, window.innerWidth - Math.min(box.right, width - 8)) }
+				: { left: Math.max(8, Math.min(box.left, width - 216)) };
+		// Never more than the room on its side: a floor taller than the room
+		// pushed the menu's end off the screen.
 		at =
 			below >= 240 || below >= above
-				? { ...side, top: box.bottom + 4, maxHeight: Math.max(120, below) }
-				: { ...side, bottom: window.innerHeight - box.top + 4, maxHeight: Math.max(120, above) };
+				? { ...side, top: box.bottom + 4, maxHeight: below - 4 }
+				: { ...side, bottom: window.innerHeight - box.top + 4, maxHeight: above - 4 };
 	}
 
 	/**
@@ -304,6 +312,8 @@
 	.menu {
 		position: fixed;
 		z-index: 60;
+		/* Its padding and border inside the height `place` measured for it. */
+		box-sizing: border-box;
 		min-width: 12rem;
 		max-width: min(20rem, calc(100vw - 16px));
 		overflow-y: auto;
