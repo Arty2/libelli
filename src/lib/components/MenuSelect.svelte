@@ -43,7 +43,7 @@
 
 <script lang="ts">
 	import Icon from './Icon.svelte';
-	import { fontStack } from '$lib/fonts';
+	import { fontStack, kindOf } from '$lib/fonts';
 
 	/**
 	 * A select, drawn the way the template picker is drawn: the value on a
@@ -113,6 +113,13 @@
 
 	const choices = $derived(items.filter((item): item is Extract<MenuItem, { value: string }> => 'value' in item));
 	const current = $derived(choices.find((item) => item.value === value));
+
+	/**
+	 * A family's name in its own face, falling back to a face of its kind
+	 * (`kindOf`): a phone without Georgia shows it in a serif, without
+	 * Consolas in a monospace, so the list still says what each one is like.
+	 */
+	const faceStack = (family: string) => fontStack(family, kindOf([], family));
 
 	function place() {
 		const box = trigger?.getBoundingClientRect();
@@ -235,7 +242,7 @@
 		onclick={press}
 		onkeydown={onTriggerKey}
 	>
-		<span class="value" style={showFamily && current?.family ? `font-family:${fontStack(current.family, '')}` : ''}
+		<span class="value" style={showFamily && current?.family ? `font-family:${faceStack(current.family)}` : ''}
 			>{current?.label ?? placeholder ?? value}</span
 		>
 		<Icon name="caret-down" size={18} />
@@ -269,7 +276,7 @@
 							<span class="tick" aria-hidden="true">
 								{#if item.value === value}<Icon name="checkmark" size={16} />{/if}
 							</span>
-							<span style={item.family ? `font-family:${fontStack(item.family, '')}` : ''}>{item.label}</span>
+							<span style={item.family ? `font-family:${faceStack(item.family)}` : ''}>{item.label}</span>
 						</button>
 					</li>
 				{/if}
