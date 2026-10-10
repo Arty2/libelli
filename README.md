@@ -1287,6 +1287,11 @@ the upload button off: there is no file to give a face the computer has.
   flip between the two faces to compare them. Tuning any other time is a step
   of its own.
 
+- **Replacing a picture** — each stored picture in the Images tray has an
+  upload button (the arrow out of a tray) beside its download: a new file under
+  the same name, so every card and page showing it shows the new one with
+  nothing to re-point. Not in undo, as no picture's bytes are. A drawing has a
+  pencil there instead, which opens it to draw on, as pressing its line does.
 - **Sections that fold** — the Images tray lists **Images**, **Drawings** and
   **Fonts** under heads that say how many each holds and what they weigh; a
   press on a head folds its list shut or open, and this browser remembers

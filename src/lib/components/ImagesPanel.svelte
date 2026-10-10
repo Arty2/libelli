@@ -214,8 +214,12 @@
 	let replaceInput = $state<HTMLInputElement | null>(null);
 	let replacing = $state<string | null>(null);
 
-	function findFor(name: string) {
+	/** Whether the file being chosen supplies a missing picture or replaces one that is here. */
+	let replacingPresent = false;
+
+	function findFor(name: string, present = false) {
 		replacing = name;
+		replacingPresent = present;
 		replaceInput?.click();
 	}
 
@@ -229,7 +233,7 @@
 		await storeLocalImage(file, name);
 		await refresh();
 		onchanged();
-		onnotice(`${name} is back, from ${file.name}.`);
+		onnotice(replacingPresent ? `${name} is now ${file.name} — everything showing it shows the new one.` : `${name} is back, from ${file.name}.`);
 	}
 
 	/**
@@ -751,6 +755,17 @@
 							.filter(Boolean)
 							.join(' · ')}</span>
 						{#if !used.has(image.name)}<span class="tag">unused</span>{/if}
+						<!-- A new file under the same name: every card and page that shows
+						     this picture shows the new one, with nothing to re-point. The
+						     arrow out of a tray, as a font's upload is. -->
+						<button
+							class="square save"
+							title="Replace {image.name} with another file, under the same name — everything showing it shows the new one"
+							aria-label="Replace {image.name}"
+							onclick={() => findFor(image.name, true)}
+						>
+							<Icon name="upload" size={12} />
+						</button>
 						{#if urls[image.name]}
 							<button
 								class="square save"
@@ -813,6 +828,16 @@
 							]
 								.filter(Boolean)
 								.join(' · ')}</span>
+						</button>
+						<!-- The line opens it too; the pencil says so, where the pictures
+						     above have their upload. -->
+						<button
+							class="square save"
+							title="Draw on {drawing.label}, {drawing.where}"
+							aria-label="Draw on {drawing.label}, {drawing.where}"
+							onclick={() => onopendrawing?.(drawing.key)}
+						>
+							<Icon name="edit" size={12} />
 						</button>
 						<button
 							class="square save"
