@@ -1297,13 +1297,14 @@ the upload button off: there is no file to give a face the computer has.
   what is marked is what does not travel: **local** for a file kept in this
   browser, and **missing** for one a design moved from another computer needs
   and this browser has not got — said in a banner too, whose **Replace…** opens
-  this list. Every font, missing or not, has an **upload** button (the arrow
-  out of a tray, after **Replace**) — a file installed
-  under that font's own name, so everything set in it takes the file: a missing
-  face supplied, a Google family made local, an upload swapped for a newer cut
-  — and every font the design uses has **Replace**, which sets everything in that font in another instead,
-  from the same list as the **Font** menus — the design's other fonts, then
-  the rest, each in its own face — one undo to take back; the new
+  this list. Every font the design uses has **Replace**: first **Upload…**, a
+  file installed under that font's own name, so everything set in it takes the
+  file — a missing face supplied, a Google family made local, an upload
+  swapped for a newer cut (off for a system font, which has no file); then the
+  faces to set everything in it in instead, each in its own face, **Local**
+  first, then **System**, then **Google Fonts** — what this computer has before
+  what must be fetched — one undo to take back. An uploaded font nothing uses
+  keeps an upload button of its own (the arrow out of a tray). The new
   font takes the old one's row, outlined, so the list keeps its order until
   the tray is opened again. A local
   file nothing in the design uses is *local · unused*, to be deleted — after

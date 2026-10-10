@@ -111,6 +111,9 @@
 	 */
 	let fontOrder = $state<string[]>([]);
 
+	/** Replace's first item: not a family — a name no family can have. */
+	const UPLOAD = '\u0000upload';
+
 	/**
 	 * The sections folded shut — `images`, `drawings`, `fonts` — kept in this
 	 * browser, so the tray opens as it was left: a person who never draws
@@ -885,34 +888,38 @@
 						{/if}
 						{#if font.used}
 							<span class="replace">
+								<!-- Upload first: a file under this font's own name is the
+								     replacement nearest to hand — a missing face supplied, a
+								     Google one made local — then every other face to swap it
+								     for, what this computer has before what must be fetched. -->
 								<MenuSelect
 									label="Replace {font.family} with"
-									title="Set everything in {font.family} in another font instead"
+									title="Upload a file for {font.family}, or set everything in it in another font instead"
 									placeholder="Replace"
 									value=""
-									items={familyItems(fontFamilies, font.family)}
+									items={[
+										font.status === 'system'
+											? { value: UPLOAD, label: 'Upload…', disabled: true, title: `${font.family} is a system font — it is on the computer already, so there is no file to upload` }
+											: { value: UPLOAD, label: 'Upload…', title: `A font file to use as ${font.family}, installed in this browser under this name` },
+										...familyItems(fontFamilies, font.family, ['local', 'system', 'google'])
+									]}
 									onopen={onfontsopen}
-									onselect={(to) => to && void replaceFontKeepingPlace(font.family, to)}
+									onselect={(to) => (to === UPLOAD ? chooseFontFile(font.family) : to && void replaceFontKeepingPlace(font.family, to))}
 								/>
 							</span>
 						{/if}
-						<!-- Every font, missing or not: a file chosen here is installed
-						     under this font's own name, so the design takes it up without
-						     another change — a missing face supplied, a Google one made
-						     local, an upload swapped for a newer cut. -->
-						<!-- Not for a system face: it is on the computer already, and a file
-						     under its name would only shadow it in this one browser. -->
-						<button
-							class="square save"
-							disabled={font.status === 'system'}
-							title={font.status === 'system'
-								? `${font.family} is a system font — it is on the computer already, so there is no file to upload`
-								: `Upload a font file to use as ${font.family} — installed in this browser under this name, so everything set in it takes the file`}
-							aria-label="Upload a file for {font.family}"
-							onclick={() => chooseFontFile(font.family)}
-						>
-							<Icon name="upload" size={12} />
-						</button>
+						<!-- A font nothing uses has no Replace, so its upload — a newer
+						     cut under the same name — is a button of its own. -->
+						{#if !font.used}
+							<button
+								class="square save"
+								title="Upload a font file to use as {font.family} — installed in this browser under this name"
+								aria-label="Upload a file for {font.family}"
+								onclick={() => chooseFontFile(font.family)}
+							>
+								<Icon name="upload" size={12} />
+							</button>
+						{/if}
 						{#if !font.used && font.status === 'unused'}
 							<button
 								class="square"

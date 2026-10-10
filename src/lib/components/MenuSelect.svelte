@@ -16,16 +16,23 @@
 	 * Every font menu's families, each name set in its own face, under a
 	 * heading for where it comes from: Local, then Google Fonts, then System
 	 * (`fontChoices`). One list for the page's Font, an area's, and a font's
-	 * Replace, which leaves out the font being replaced (`except`). A run
-	 * with nothing in it has no heading either.
+	 * Replace, which leaves out the font being replaced (`except`) and puts
+	 * the system faces before Google's (`order`): there it is a choice of what
+	 * this computer already has before what must be fetched. A run with
+	 * nothing in it has no heading either.
 	 */
-	export function familyItems(choices: { local: string[]; google: string[]; system: string[] }, except?: string): MenuItem[] {
+	export type FamilySource = 'local' | 'google' | 'system';
+	const SOURCE_HEADINGS: Record<FamilySource, string> = { local: 'Local', google: 'Google Fonts', system: 'System' };
+	export function familyItems(
+		choices: Record<FamilySource, string[]>,
+		except?: string,
+		order: FamilySource[] = ['local', 'google', 'system']
+	): MenuItem[] {
 		const keep = (family: string) => family.toLowerCase() !== except?.toLowerCase();
-		const run = (heading: string, families: string[]): MenuItem[] => {
-			const kept = families.filter(keep);
-			return kept.length ? [{ heading }, ...kept.map((family) => ({ value: family, label: family, family }))] : [];
-		};
-		return [...run('Local', choices.local), ...run('Google Fonts', choices.google), ...run('System', choices.system)];
+		return order.flatMap((source): MenuItem[] => {
+			const kept = choices[source].filter(keep);
+			return kept.length ? [{ heading: SOURCE_HEADINGS[source] }, ...kept.map((family) => ({ value: family, label: family, family }))] : [];
+		});
 	}
 </script>
 
