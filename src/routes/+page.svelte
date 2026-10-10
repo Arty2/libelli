@@ -2910,8 +2910,12 @@
 			const ref = await uploadLocalFont(file, family);
 			editorFonts = mergeFonts(editorFonts, [ref]);
 			saveEditorFonts($state.snapshot(editorFonts));
+			// The design's own entry keeps its tuning: a file supplied for a face
+			// that was missing, or a Google face made local, is the same face,
+			// and the design set it as it wanted.
+			const old = template.fonts.find((f) => f.family.toLowerCase() === ref.family.toLowerCase());
 			const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== ref.family.toLowerCase());
-			template = { ...template, fonts: [...fonts, ref] };
+			template = { ...template, fonts: [...fonts, { ...old, ...ref }] };
 			missingFonts = missingFonts.filter((f) => (f.ref ?? f.family) !== (ref.ref ?? ref.family));
 			await refreshStoredFonts();
 			// Uploading from a box's Font dropdown is a way of choosing a font, not
@@ -2974,10 +2978,11 @@
 			return;
 		}
 		const tunes = fromTray && fontSession?.family === family.toLowerCase();
-		// Recorded already: fold into it. Still waiting on the debounce: the
-		// replace's own label is pending, and this lands in the same entry.
+		// Recorded already, and still the last step: fold into it. Otherwise a
+		// step of its own, named — `describe` keeps a label already waiting,
+		// so a tune inside the replace's own debounce lands under its name.
 		if (tunes && history.present.label === fontSession?.label) amendNext = true;
-		else if (!tunes) describe(`Tune ${family}`);
+		else describe(`Tune ${family}`);
 		template = tuneFont($state.snapshot(template) as Template, family, change, fontRef(family, editorFonts));
 	}
 
@@ -3000,7 +3005,10 @@
 			return false;
 		}
 		const held = storedFonts.find((f) => f.family.toLowerCase() === to.toLowerCase());
-		const ref: FontRef = held ? { family: held.family, source: 'local', ref: held.ref } : fontRef(to, editorFonts);
+		// What the editor knows of it — its kind, read when it was uploaded —
+		// with the file this browser holds.
+		const known = fontRef(to, editorFonts);
+		const ref: FontRef = held ? { ...known, family: held.family, source: 'local', ref: held.ref } : known;
 		const label = `Replace ${from} with ${to}`;
 		describe(label);
 		fontSession = { label, family: to.toLowerCase() };

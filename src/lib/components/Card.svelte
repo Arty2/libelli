@@ -601,7 +601,9 @@
 				(content.getAttribute('style') ?? '').replace(/(^|;)\s*font-size:[^;]*/, ''),
 				...[...content.querySelectorAll('[style]')].map((el) => el.getAttribute('style'))
 			].join('|');
-			const key = [current, room, node.clientWidth, pad.font, pad.letterSpacing, content.textContent, content.getElementsByTagName('*').length, styles].join('|');
+			// The face's x-height too: font-size-adjust changes what fits and is
+			// in neither the font shorthand nor the content's styles.
+			const key = [current, room, node.clientWidth, pad.font, pad.fontFamily, pad.fontSize, pad.fontSizeAdjust, pad.letterSpacing, content.textContent, content.getElementsByTagName('*').length, styles].join('|');
 			if (key === searched) {
 				words.takeRecords();
 				return;
@@ -852,6 +854,15 @@
 		else if (em) parts.push(`letter-spacing:${em}em`);
 		return { parts, size: pt };
 	}
+
+	/**
+	 * The leading a box's words are actually set at: its own or the page's,
+	 * times its face's leading from the Images tray — what `typeParts` writes
+	 * as the line height, so a paragraph's "space of one line" is one line of
+	 * that, not of the untuned leading.
+	 */
+	const leadingOf = (box: Box) =>
+		(box.lineHeight ?? template.defaults.lineHeight) * faceOf(template.fonts, box.font ?? template.defaults.font).leading;
 
 	function boxStyle(box: Box): string {
 		const drawn = placed(box);
@@ -2376,7 +2387,7 @@
 							size: box.size ?? template.defaults.size,
 							md: box.md,
 							paragraph: paragraphOf(box),
-							lineHeight: box.lineHeight ?? template.defaults.lineHeight,
+							lineHeight: leadingOf(box),
 							list: listOf(box, template.defaults),
 							leader: leaderOf(box)
 						}))}
@@ -2413,7 +2424,7 @@
 						     indent. An empty line keeps its height. -->
 						{@const para = paragraphOf(box)!}
 						<!-- A space in lines of the leading, an indent in em. -->
-						{@const step = `${Math.round(para.amount * (para.mode === 'space' ? (box.lineHeight ?? template.defaults.lineHeight) : 1) * 1000) / 1000}em`}
+						{@const step = `${Math.round(para.amount * (para.mode === 'space' ? leadingOf(box) : 1) * 1000) / 1000}em`}
 						<span class="paras">
 							{#each shownTextOf(box).split('\n') as line, i (i)}
 								<span

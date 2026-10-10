@@ -107,8 +107,11 @@ export function caretPlace(field: HTMLTextAreaElement | HTMLInputElement, x: num
 			range.setEnd(node, i + 1);
 			const r = range.getBoundingClientRect();
 			if (!r.height) continue;
-			// A line below the point: every character from here on is further.
-			if (r.top > y && score < Infinity) break;
+			// A line further below the point than the best so far is off by:
+			// every character after it is further still. Not merely below —
+			// a glyph is shorter than its line, and a tap in the top of line
+			// two's leading is above every glyph on it, yet still on line two.
+			if (r.top > y && (r.top - y) * 1e4 > score) break;
 			// Off its line by any amount counts for more than any distance along it.
 			const off = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
 			const near = (at: number, edge: number) => {

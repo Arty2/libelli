@@ -184,7 +184,11 @@ describe('the fonts a template carries', () => {
 
 	it('gives a chosen family its source: an upload, a system face, else Google', () => {
 		const held: FontRef = { family: 'Studio', source: 'local', ref: 'font:studio' };
-		expect(fontRef('studio', [held])).toBe(held);
+		expect(fontRef('studio', [held])).toEqual(held);
+		// What one design did with a face stays in that design.
+		const tuned: FontRef = { ...held, kind: 'serif', size: 1.2, xHeight: 0.5, tracking: 20, leading: 0.9 };
+		expect(fontRef('Studio', [tuned])).toEqual({ ...held, kind: 'serif' });
+		expect(mergeFonts([], [tuned])).toEqual([{ ...held, kind: 'serif' }]);
 		expect(fontRef('georgia', [])).toEqual({ family: 'georgia', source: 'system' });
 		expect(isSystemFamily(' Times New Roman ')).toBe(true);
 		expect(fontRef('Lora', [])).toEqual({ family: 'Lora', source: 'google' });

@@ -51,7 +51,7 @@ export const isSystemFamily = (family: string) => systemKeys.has(family.trim().t
  */
 export function fontRef(family: string, editorFonts: FontRef[]): FontRef {
 	const known = editorFonts.find((f) => f.family.toLowerCase() === family.toLowerCase());
-	if (known) return known;
+	if (known) return untuned(known);
 	return isSystemFamily(family) ? { family, source: 'system' } : { family, source: 'google' };
 }
 
@@ -478,9 +478,21 @@ export function fontChoices(
  * wins, so a family uploaded as a file replaces the Google name it shadowed.
  */
 export function mergeFonts(list: FontRef[], added: FontRef[]): FontRef[] {
-	const out = new Map(list.map((f) => [f.family.toLowerCase(), f]));
-	for (const font of added) out.set(font.family.toLowerCase(), font);
+	const out = new Map(list.map((f) => [f.family.toLowerCase(), untuned(f)]));
+	for (const font of added) out.set(font.family.toLowerCase(), untuned(font));
 	return [...out.values()];
+}
+
+/**
+ * A reference without one design's tuning of it. The editor's own list of
+ * fonts is this browser's, shared by every design in it: a face tuned 20%
+ * larger in one design and then dropped from it must not come back 20%
+ * larger when another design chooses it. What the face is — its source, its
+ * file, its kind — travels; what one design did with it does not.
+ */
+export function untuned(ref: FontRef): FontRef {
+	const { xHeight: _x, size: _s, tracking: _t, leading: _l, ...rest } = ref;
+	return rest;
 }
 
 /**
