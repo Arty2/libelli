@@ -833,7 +833,6 @@
 			{#snippet stepper(
 				family: string,
 				label: string,
-				short: string,
 				value: string,
 				own: boolean,
 				atMin: boolean,
@@ -843,7 +842,7 @@
 				what: string
 			)}
 				<span class="tune-group">
-					<span class="tune-label" title={label}><span class="label-long">{label}</span><span class="label-short" aria-hidden="true">{short}</span></span>
+					<span class="tune-label">{label}</span>
 					<span class="x-height" role="group" aria-label="{label} of {family}">
 						<button class="square save" title="Less: {what}" aria-label="Less {label.toLowerCase()} for {family}" disabled={atMin} onclick={less}
 							><Icon name="subtract" size={12} /></button
@@ -934,18 +933,18 @@
 							     replace's undo, so undo and redo flip between the two. Only on
 							     the outlined row: one font tuned at a time. -->
 							<div class="tune">
-								{@render stepper(font.family, 'Size', 'Size', `${Math.round(size * 100)}%`, font.size === undefined, size <= 0.5, size >= 2,
+								{@render stepper(font.family, 'Size', `${Math.round(size * 100)}%`, font.size === undefined, size <= 0.5, size >= 2,
 									() => ontune?.(font.family, { size: size - 0.02 }), () => ontune?.(font.family, { size: size + 0.02 }),
 									`every size ${font.family} is set at, as a percentage`)}
-								{@render stepper(font.family, 'X-Height', 'X-Ht', xHeight === undefined ? '—' : `${Math.round(xHeight * 100)}%`, font.xHeight === undefined,
+								{@render stepper(font.family, 'X-Height', xHeight === undefined ? '—' : `${Math.round(xHeight * 100)}%`, font.xHeight === undefined,
 									xHeight === undefined || xHeight <= 0.2, xHeight === undefined || xHeight >= 1,
 									() => xHeight !== undefined && ontune?.(font.family, { xHeight: xHeight - 0.01 }),
 									() => xHeight !== undefined && ontune?.(font.family, { xHeight: xHeight + 0.01 }),
 									`the height of ${font.family}'s lowercase, as a percentage of its size — give two faces the same and their x-heights match`)}
-								{@render stepper(font.family, 'Spacing', 'Track', `${tracking > 0 ? '+' : ''}${tracking}`, font.tracking === undefined, tracking <= -200, tracking >= 1000,
+								{@render stepper(font.family, 'Spacing', `${tracking > 0 ? '+' : ''}${tracking}`, font.tracking === undefined, tracking <= -200, tracking >= 1000,
 									() => ontune?.(font.family, { tracking: tracking - 10 }), () => ontune?.(font.family, { tracking: tracking + 10 }),
 									`letter spacing added to ${font.family}, in thousandths of its size`)}
-								{@render stepper(font.family, 'Leading', 'Lead', `${Math.round(leading * 100)}%`, font.leading === undefined, leading <= 0.5, leading >= 2,
+								{@render stepper(font.family, 'Leading', `${Math.round(leading * 100)}%`, font.leading === undefined, leading <= 0.5, leading >= 2,
 									() => ontune?.(font.family, { leading: leading - 0.02 }), () => ontune?.(font.family, { leading: leading + 0.02 }),
 									`every leading ${font.family} is set at, as a percentage`)}
 							</div>
@@ -1529,8 +1528,8 @@
 
 	/* One line, always: four columns sharing the row's width, each its name
 	   over its stepper, and everything in them free to shrink — the steps'
-	   buttons, the value, the label, which shortens where the row is tight
-	   (measured on the row, in rem, so it follows the text size). */
+	   buttons, the value, the label's size, never its words (measured on the
+	   row, in rem, so it follows the text size). */
 	.fonts .tune {
 		flex-basis: 100%;
 		min-width: 0;
@@ -1551,31 +1550,17 @@
 		min-width: 0;
 	}
 
+	/* Whole, in capitals like the bar's labels, without their extra
+	   tracking: the room is the columns'. */
 	.fonts .tune .tune-label {
-		max-width: 100%;
-		overflow: hidden;
-		text-overflow: ellipsis;
 		white-space: nowrap;
 		font-size: 0.5625rem;
+		letter-spacing: 0;
 		line-height: 1.3;
 	}
 
-	.fonts .tune .label-short {
-		display: none;
-	}
-
-	@container (width < 20.5rem) {
-		.fonts .tune .label-long {
-			display: none;
-		}
-
-		.fonts .tune .label-short {
-			display: inline;
-		}
-	}
-
-	/* Tighter still: the per cent sign goes — the label says what the number
-	   is — and the steps' buttons narrow. */
+	/* Tight: the per cent sign goes — the label says what the number is —
+	   the steps' buttons narrow, and the labels set a size smaller. */
 	@container (width < 17.5rem) {
 		.fonts .tune .pct {
 			display: none;
@@ -1583,6 +1568,10 @@
 
 		.fonts .tune :global(button.square) {
 			width: 0.875rem;
+		}
+
+		.fonts .tune .tune-label {
+			font-size: 0.5rem;
 		}
 	}
 
