@@ -18,7 +18,7 @@
 		type FolderState,
 		type ImageRecord
 	} from '$lib/assets';
-	import { fontStack, naturalXHeight, watchFaces, type FontEntry } from '$lib/fonts';
+	import { fontStack, naturalXHeight, watchFaces, type FontEntry, type FontTune } from '$lib/fonts';
 
 	/**
 	 * Where the pictures are, what they weigh, and how to get rid of them.
@@ -69,8 +69,8 @@
 		fontFamilies?: { local: string[]; google: string[]; system: string[] };
 		/** a Replace menu opening: fetch the faces its names are set in, as the font menus do */
 		onfontsopen?: () => void;
-		/** a face drawn with its x-height at this fraction of its size everywhere, to match another's */
-		onxheight?: (family: string, xHeight: number) => void;
+		/** a face's own tuning changed — size, x-height, spacing, leading — everywhere it is used */
+		ontune?: (family: string, change: FontTune) => void;
 		/** a file chosen for a font, to be installed under that font's own name */
 		onfontfile?: (family: string, file: File) => void;
 		/** every use of one family swapped for another; false, or a promise of it, when it was refused */
@@ -94,7 +94,7 @@
 		fonts = [],
 		fontFamilies = { local: [], google: [], system: [] },
 		onfontsopen,
-		onxheight,
+		ontune,
 		onfontfile,
 		onreplacefont,
 		ondeletefont
@@ -120,7 +120,12 @@
 		facesVersion;
 		return naturalXHeight(family);
 	};
-	let replacedFont = $state<string | null>(null);
+	/**
+	 * The font whose row is outlined, and so shows its tuning: the one a
+	 * replace just put in, or the one last tapped. One at a time, so the list
+	 * stays a list of names; gone, like the order, when the panel closes.
+	 */
+	let outlinedFont = $state<string | null>(null);
 	$effect(() => {
 		if (!fontOrder.length && fonts.length) fontOrder = fonts.map((f) => f.family.toLowerCase());
 	});
@@ -138,7 +143,7 @@
 		// Into the old font's row; or, when the replacement was already in
 		// the list, the old row simply goes and the replacement keeps its own.
 		fontOrder = fontOrder.includes(now) ? fontOrder.filter((f) => f !== was) : fontOrder.map((f) => (f === was ? now : f));
-		replacedFont = now;
+		outlinedFont = now;
 	}
 
 
@@ -792,18 +797,54 @@
 			     to another computer finds a local face missing: here it says so.
 			     Any font can be given a file under its own name, or swapped for
 			     another everywhere it is used. -->
+			<!-- One tuning: its name over − value +, the value greyed while it is the
+			     face's own. -->
+			{#snippet stepper(
+				family: string,
+				label: string,
+				value: string,
+				own: boolean,
+				atMin: boolean,
+				atMax: boolean,
+				less: () => void,
+				more: () => void,
+				what: string
+			)}
+				<span class="tune-group">
+					<span class="tune-label">{label}</span>
+					<span class="x-height" role="group" aria-label="{label} of {family}">
+						<button class="square save" title="Less: {what}" aria-label="Less {label.toLowerCase()} for {family}" disabled={atMin} onclick={less}
+							><Icon name="subtract" size={12} /></button
+						>
+						<span class="x-value" class:own title="{label}: {what}{own ? ' — its own' : ''}">{value}</span>
+						<button class="square save" title="More: {what}" aria-label="More {label.toLowerCase()} for {family}" disabled={atMax} onclick={more}
+							><Icon name="add" size={12} /></button
+						>
+					</span>
+				</span>
+			{/snippet}
 			<h3 class="section">Fonts <span class="total">{fonts.length}{fonts.some((f) => f.bytes) ? ` · ${weigh(fonts.reduce((sum, f) => sum + (f.bytes ?? 0), 0))}` : ''}</span></h3>
 			<ul class="images fonts">
 				{#each shownFonts as font (font.family)}
 					<li
 						class:missing={font.status === 'missing'}
 						class:unused={font.status === 'unused'}
-						class:replaced={font.family.toLowerCase() === replacedFont}
+						class:replaced={font.family.toLowerCase() === outlinedFont}
 					>
 						<!-- The name set in the face it names: the quickest way to tell one
 						     font from another, and to see that a missing one is falling
 						     back — and no sample beside it to take the name's room. -->
-						<span class="name font-name" style="font-family:{fontStack(font.family, font.kind)}">{font.family}</span>
+						{#if font.used}
+							<button
+								class="name font-name"
+								style="font-family:{fontStack(font.family, font.kind)}"
+								aria-expanded={font.family.toLowerCase() === outlinedFont}
+								title="Tune {font.family}: its size, x-height, spacing and leading, everywhere it is used"
+								onclick={() => (outlinedFont = font.family.toLowerCase() === outlinedFont ? null : font.family.toLowerCase())}
+							>{font.family}</button>
+						{:else}
+							<span class="name font-name" style="font-family:{fontStack(font.family, font.kind)}">{font.family}</span>
+						{/if}
 						<span class="size">{font.bytes ? weigh(font.bytes) : ''}</span>
 						{#if FONT_STATUS[font.status]}
 							<span class="tag" class:missing-tag={font.status === 'missing'}>{FONT_STATUS[font.status]}</span>
@@ -819,34 +860,6 @@
 									onopen={onfontsopen}
 									onselect={(to) => to && void replaceFontKeepingPlace(font.family, to)}
 								/>
-							</span>
-							<!-- Beside Replace, so a face just swapped in can be brought to the
-							     old one's x-height there and then; from here, the nudges join
-							     the replace's undo, so undo and redo flip between the two. -->
-							{@const own = font.xHeight === undefined}
-							{@const at = font.xHeight ?? natural(font.family)}
-							<span class="x-height" role="group" aria-label="X-height of {font.family}">
-								<button
-									class="square save"
-									title="Smaller x-height: {font.family}'s lowercase a point of its size lower"
-									aria-label="Smaller x-height for {font.family}"
-									disabled={at === undefined || at <= 0.2}
-									onclick={() => at !== undefined && onxheight?.(font.family, at - 0.01)}
-								><Icon name="subtract" size={12} /></button>
-								<span
-									class="x-value"
-									class:own
-									title={at === undefined
-										? `${font.family}'s x-height cannot be measured until the face has loaded`
-										: `${font.family}'s lowercase is ${Math.round(at * 100)}% of its size${own ? ' — its own' : ''}`}
-								>{at === undefined ? '—' : `${Math.round(at * 100)}%`}</span>
-								<button
-									class="square save"
-									title="Larger x-height: {font.family}'s lowercase a point of its size higher"
-									aria-label="Larger x-height for {font.family}"
-									disabled={at === undefined || at >= 1}
-									onclick={() => at !== undefined && onxheight?.(font.family, at + 0.01)}
-								><Icon name="add" size={12} /></button>
 							</span>
 						{/if}
 						<!-- Every font, missing or not: a file chosen here is installed
@@ -875,6 +888,32 @@
 							>
 								<Icon name="trash" size={12} />
 							</button>
+						{/if}
+						{#if font.used && font.family.toLowerCase() === outlinedFont}
+							{@const size = font.size ?? 1}
+							{@const xHeight = font.xHeight ?? natural(font.family)}
+							{@const tracking = font.tracking ?? 0}
+							{@const leading = font.leading ?? 1}
+							<!-- Under Replace, so a face just swapped in can be brought to sit
+							     like the old one there and then; from here, the steps join the
+							     replace's undo, so undo and redo flip between the two. Only on
+							     the outlined row: one font tuned at a time. -->
+							<div class="tune">
+								{@render stepper(font.family, 'Size', `${Math.round(size * 100)}%`, font.size === undefined, size <= 0.5, size >= 2,
+									() => ontune?.(font.family, { size: size - 0.02 }), () => ontune?.(font.family, { size: size + 0.02 }),
+									`every size ${font.family} is set at, as a percentage`)}
+								{@render stepper(font.family, 'X-Height', xHeight === undefined ? '—' : `${Math.round(xHeight * 100)}%`, font.xHeight === undefined,
+									xHeight === undefined || xHeight <= 0.2, xHeight === undefined || xHeight >= 1,
+									() => xHeight !== undefined && ontune?.(font.family, { xHeight: xHeight - 0.01 }),
+									() => xHeight !== undefined && ontune?.(font.family, { xHeight: xHeight + 0.01 }),
+									`the height of ${font.family}'s lowercase, as a percentage of its size — give two faces the same and their x-heights match`)}
+								{@render stepper(font.family, 'Spacing', `${tracking > 0 ? '+' : ''}${tracking}`, font.tracking === undefined, tracking <= -200, tracking >= 1000,
+									() => ontune?.(font.family, { tracking: tracking - 10 }), () => ontune?.(font.family, { tracking: tracking + 10 }),
+									`letter spacing added to ${font.family}, in thousandths of its size`)}
+								{@render stepper(font.family, 'Leading', `${Math.round(leading * 100)}%`, font.leading === undefined, leading <= 0.5, leading >= 2,
+									() => ontune?.(font.family, { leading: leading - 0.02 }), () => ontune?.(font.family, { leading: leading + 0.02 }),
+									`every leading ${font.family} is set at, as a percentage`)}
+							</div>
 						{/if}
 					</li>
 				{/each}
@@ -1447,6 +1486,33 @@
 		border-radius: 3px;
 	}
 
+	/* A used font's second line: its type tuning, under its name. */
+	.fonts li:has(.tune) {
+		flex-wrap: wrap;
+	}
+
+	/* Four columns, each its name over its stepper: one line at a phone's width. */
+	.fonts .tune {
+		flex-basis: 100%;
+		display: grid;
+		grid-template-columns: repeat(4, max-content);
+		column-gap: 0.75rem;
+		padding: 0 0 4px;
+	}
+
+	.fonts .tune-group {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.fonts .tune-label {
+		font: 600 0.625rem ui-sans-serif, system-ui, sans-serif;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: #777;
+	}
+
 	/* The x-height stepper: two quiet squares and the scale between them. */
 	.fonts .x-height {
 		flex: none;
@@ -1466,6 +1532,21 @@
 		font: 0.6875rem ui-sans-serif, system-ui, sans-serif;
 		font-variant-numeric: tabular-nums;
 		color: #555;
+	}
+
+	/* A used font's name is the way to its tuning: a button that looks like the name. */
+	.images li button.font-name {
+		border: none;
+		background: none;
+		padding: 0;
+		height: auto;
+		text-align: left;
+		/* Not the panel's button type: the name, in its face, as it was. */
+		text-transform: none;
+		letter-spacing: normal;
+		font-weight: 400;
+		color: inherit;
+		cursor: pointer;
 	}
 
 	/* A font's name in its own face, a size up so the face can be read. */

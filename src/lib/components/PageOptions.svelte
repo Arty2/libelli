@@ -5,7 +5,7 @@
 	import './options-bar.css';
 	import { safeImageUrl } from '$lib/assets';
 	import { renamed } from '$lib/onboarding';
-	import { fontChoices, fontRef, naturalXHeight, previewFamilies, setXHeight, watchFaces, xHeightOf } from '$lib/fonts';
+	import { fontChoices, fontRef, previewFamilies } from '$lib/fonts';
 	import MenuSelect, { familyItems } from './MenuSelect.svelte';
 	import { withKey } from '$lib/keys';
 	import {
@@ -174,16 +174,6 @@
 	/** Every family a font menu offers, by where it comes from — see `fontChoices`. */
 	const families = $derived(fontChoices(template, editorFonts));
 
-	/** Bumped as faces load, so the page face's own x-height is read again once it has arrived. */
-	let facesVersion = $state(0);
-	$effect(() => watchFaces(() => (facesVersion += 1)));
-	/** The page face's own x-height, for X-Height's placeholder. */
-	const pageNatural = $derived.by(() => {
-		// Read, so this is worked out again as faces arrive.
-		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
-		facesVersion;
-		return naturalXHeight(template.defaults.font);
-	});
 
 	/** The other end of the swap, while it is still in the library. */
 	const previousEntry = $derived(
@@ -716,29 +706,6 @@
 					onselect={setDefaultFont}
 				/>
 			</span>
-			<!-- The face's x-height, as a share of its size: one value per font,
-			     shared by every use of it — this field, the other bar's and the
-			     Images tray's steps all set the same one. Blank, the face's own,
-			     measured, shows as the placeholder. -->
-			<label class="field">
-				<span>X-Height</span>
-				<input
-					class="n-3"
-					type="number"
-					step="1"
-					min="20"
-					max="100"
-					title="The height of {template.defaults.font}'s lowercase, as a percentage of its size — give two faces the same and their x-heights match. Every use of the font; the leading is kept. Blank is the face's own{pageNatural ? ` (${Math.round(pageNatural * 100)})` : ''}"
-					placeholder={pageNatural ? String(Math.round(pageNatural * 100)) : ''}
-					value={xHeightOf(template.fonts, template.defaults.font) === undefined ? '' : Math.round((xHeightOf(template.fonts, template.defaults.font) ?? 0) * 100)}
-					disabled={pageFrozen}
-					onchange={(e) => {
-						const typed = e.currentTarget.value.trim();
-						ontemplatechange(setXHeight(template, template.defaults.font, typed === '' ? undefined : Number(typed) / 100, fontRef(template.defaults.font, editorFonts)));
-					}}
-				/>
-				<span class="unit">%</span>
-			</label>
 			<label class="field">
 				<span>Size</span>
 				<input

@@ -2904,9 +2904,21 @@ in for a missing face to the same x-height, which no scale could. The value is
 the x-height as a fraction of the size (`FontRef.xHeight`, 0.2 to 1), one per
 face, not per area: give two faces the same number and their lowercase
 matches, which is the point. A scale from 0.28.27 (around 1) is out of range
-and dropped. While none is set, the field and the tray show the face's own,
-measured on a canvas once the face has loaded (`naturalXHeight`), and the
-tray's steps start from it.
+and dropped. While none is set, the tray shows the face's own, measured on a
+canvas once the face has loaded (`naturalXHeight`), and its steps start from
+it.
+
+**A face's tuning lives on the face, and only in the Images tray.** Size,
+x-height, spacing and leading (`FontTune`, on the template's font entry) are
+facts about a face — what it takes to make one face sit like another — so
+they apply wherever it is used, on top of what the page and each area set:
+size and leading as factors, spacing as tracking in thousandths of the size
+(em, added to the text's own spacing in mm with `calc`). They were briefly an
+X-Height field in the page and area bars too; but those bars set what an area
+is, whatever its face, and a per-face value there read as per-area. So they
+are in the tray, under the font's name, shown only on the outlined row — the
+one tapped, or the one a replace just put in — so the list stays a list of
+names.
 
 **Font menus are grouped by source, local first.** Local files, then Google
 Fonts, then System (`fontChoices`, drawn by `familyItems`): the faces

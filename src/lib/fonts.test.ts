@@ -11,7 +11,7 @@ import {
 	mergeFonts,
 	pruneFonts,
 	replaceFamily,
-	setXHeight,
+	tuneFont,
 	weightsOf
 } from './fonts';
 import type { FontRef, Template } from './types';
@@ -69,20 +69,26 @@ describe('a face on a card', () => {
 
 	it('carries the x-height it is set to, for font-size-adjust; nothing when it is its own', () => {
 		const fonts: FontRef[] = [{ family: 'Lora', source: 'google', xHeight: 0.52 }];
-		expect(faceOf(fonts, 'lora')).toEqual({ stack: fontStack('lora', 'serif'), adjust: 0.52 });
-		expect(faceOf(fonts, 'Inter')).toEqual({ stack: fontStack('Inter', 'sans-serif') });
+		expect(faceOf(fonts, 'lora')).toEqual({ stack: fontStack('lora', 'serif'), adjust: 0.52, size: 1, tracking: 0, leading: 1 });
+		expect(faceOf(fonts, 'Inter')).toEqual({ stack: fontStack('Inter', 'sans-serif'), size: 1, tracking: 0, leading: 1 });
+		const tuned: FontRef[] = [{ family: 'Lora', source: 'google', size: 1.1, tracking: 20, leading: 0.9 }];
+		expect(faceOf(tuned, 'Lora')).toMatchObject({ size: 1.1, tracking: 20, leading: 0.9 });
 	});
 
-	it('sets an x-height on the entry, makes one where there is none, and clears it', () => {
+	it('tunes a face on its entry, makes one where there is none, and clears what goes back to none', () => {
 		const t = { fonts: [{ family: 'Lora', source: 'google' }] as FontRef[] };
-		const up = setXHeight(t, 'lora', 0.524, { family: 'lora', source: 'google' });
-		expect(up.fonts).toEqual([{ family: 'Lora', source: 'google', xHeight: 0.52 }]);
-		expect(setXHeight(up, 'Lora', undefined, { family: 'Lora', source: 'google' }).fonts).toEqual([{ family: 'Lora', source: 'google' }]);
-		const system = setXHeight(t, 'Georgia', 0.48, { family: 'Georgia', source: 'system' });
+		const up = tuneFont(t, 'lora', { xHeight: 0.524, size: 1.1, tracking: 20, leading: 0.9 }, { family: 'lora', source: 'google' });
+		expect(up.fonts).toEqual([{ family: 'Lora', source: 'google', xHeight: 0.52, size: 1.1, tracking: 20, leading: 0.9 }]);
+		// Each key on its own; one left out of the change is left alone.
+		const back = tuneFont(up, 'Lora', { size: 1, tracking: 0 }, { family: 'Lora', source: 'google' });
+		expect(back.fonts).toEqual([{ family: 'Lora', source: 'google', xHeight: 0.52, leading: 0.9 }]);
+		expect(tuneFont(back, 'Lora', { xHeight: undefined, leading: 1 }, { family: 'Lora', source: 'google' }).fonts).toEqual([{ family: 'Lora', source: 'google' }]);
+		const system = tuneFont(t, 'Georgia', { xHeight: 0.48 }, { family: 'Georgia', source: 'system' });
 		expect(system.fonts[1]).toEqual({ family: 'Georgia', source: 'system', xHeight: 0.48 });
-		expect(setXHeight(t, 'Georgia', undefined, { family: 'Georgia', source: 'system' })).toBe(t);
-		// Out of range is no value: a scale from 0.28.27 is not an x-height.
-		expect(setXHeight(up, 'Lora', 1.06, { family: 'Lora', source: 'google' }).fonts[0].xHeight).toBeUndefined();
+		expect(tuneFont(t, 'Georgia', { size: 1 }, { family: 'Georgia', source: 'system' })).toBe(t);
+		// Out of range: an x-height of 1.06 is none, a size of 9 is the most there is.
+		expect(tuneFont(up, 'Lora', { xHeight: 1.06 }, { family: 'Lora', source: 'google' }).fonts[0].xHeight).toBeUndefined();
+		expect(tuneFont(up, 'Lora', { size: 9, tracking: -999 }, { family: 'Lora', source: 'google' }).fonts[0]).toMatchObject({ size: 2, tracking: -200 });
 	});
 
 	it('keeps the replacement\'s own x-height when a font is replaced with it', () => {

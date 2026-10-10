@@ -1,5 +1,5 @@
 import { STORE_FONTS, idbDelete, idbGet, idbKeys, idbSet, local } from './storage';
-import { clampXHeight, type FontKind, type FontRef, type Template } from './types';
+import { clampFactor, clampTracking, clampXHeight, type FontKind, type FontRef, type Template } from './types';
 
 /**
  * Font loading. Google families come in as a stylesheet `<link>`; local files
@@ -107,34 +107,66 @@ export function xHeightOf(fonts: readonly FontRef[], family: string | undefined)
 	return clampXHeight(fonts.find((f) => f.family.toLowerCase() === key)?.xHeight);
 }
 
+/** A face's own tuning in a template, each absent when it is none — see `FontRef`. */
+export interface FontTune {
+	size?: number;
+	xHeight?: number;
+	tracking?: number;
+	leading?: number;
+}
+
+const entryOf = (fonts: readonly FontRef[], family: string | undefined) => {
+	const key = family?.trim().toLowerCase();
+	return key ? fonts.find((f) => f.family.toLowerCase() === key) : undefined;
+};
+
 /**
- * How a face is drawn on a card: its stack, fallback by kind, and the
- * x-height it is set to, if any — for `font-size-adjust`, which also brings a
- * fallback face to the same x-height when the face itself is missing.
+ * How a face is drawn on a card: its stack, fallback by kind; the x-height it
+ * is set to, if any — for `font-size-adjust`, which also brings a fallback
+ * face to the same x-height when the face itself is missing; and its own
+ * size and leading factors and tracking, 1, 0 and 1 when untuned.
  */
-export function faceOf(fonts: readonly FontRef[], family: string | undefined): { stack: string; adjust?: number } {
-	const adjust = xHeightOf(fonts, family);
-	return { stack: fontStack(family, kindOf(fonts, family)), ...(adjust !== undefined ? { adjust } : {}) };
+export function faceOf(
+	fonts: readonly FontRef[],
+	family: string | undefined
+): { stack: string; adjust?: number; size: number; tracking: number; leading: number } {
+	const entry = entryOf(fonts, family);
+	const adjust = clampXHeight(entry?.xHeight);
+	return {
+		stack: fontStack(family, kindOf(fonts, family)),
+		...(adjust !== undefined ? { adjust } : {}),
+		size: clampFactor(entry?.size) ?? 1,
+		tracking: clampTracking(entry?.tracking) ?? 0,
+		leading: clampFactor(entry?.leading) ?? 1
+	};
 }
 
 /**
- * The template with `family` drawn at an x-height of `value` times its size
- * everywhere it is used. Kept on the family's entry in the template's fonts;
- * a family with no entry yet (a system face, an undeclared name) gets one
- * from `base`, as a menu would have made it. Undefined — or out of range —
- * removes the key, back to the face's own, as clearing a field does.
+ * The template with `family`'s tuning changed: each key of `change` set, or
+ * — undefined, or back at none (size 1, tracking 0, leading 1, x-height out
+ * of range) — removed, as clearing a field does. Kept on the family's entry
+ * in the template's fonts; a family with no entry yet (a system face, an
+ * undeclared name) gets one from `base`, as a menu would have made it.
  */
-export function setXHeight<T extends Pick<Template, 'fonts'>>(template: T, family: string, value: number | undefined, base: FontRef): T {
+export function tuneFont<T extends Pick<Template, 'fonts'>>(template: T, family: string, change: FontTune, base: FontRef): T {
 	const key = family.toLowerCase();
-	const xHeight = clampXHeight(value);
 	const at = template.fonts.findIndex((f) => f.family.toLowerCase() === key);
 	const fit = (ref: FontRef): FontRef => {
-		const { xHeight: _was, ...rest } = ref;
-		return xHeight === undefined ? rest : { ...rest, xHeight };
+		const next: FontRef = { ...ref };
+		const set = <K extends keyof FontTune>(name: K, value: number | undefined) => {
+			if (value === undefined) delete next[name];
+			else next[name] = value;
+		};
+		if ('size' in change) set('size', clampFactor(change.size));
+		if ('xHeight' in change) set('xHeight', clampXHeight(change.xHeight));
+		if ('tracking' in change) set('tracking', clampTracking(change.tracking));
+		if ('leading' in change) set('leading', clampFactor(change.leading));
+		return next;
 	};
 	if (at >= 0) return { ...template, fonts: template.fonts.map((f, i) => (i === at ? fit(f) : f)) };
-	if (xHeight === undefined) return template;
-	return { ...template, fonts: [...template.fonts, fit({ ...base, family })] };
+	const made = fit({ ...base, family });
+	const tuned = ['size', 'xHeight', 'tracking', 'leading'].some((k) => k in made);
+	return tuned ? { ...template, fonts: [...template.fonts, made] } : template;
 }
 
 /**
@@ -647,8 +679,11 @@ export interface FontEntry {
 	bytes?: number;
 	/** its kind, for the fallback its name is drawn with; undefined when nobody knows */
 	kind?: FontKind;
-	/** the x-height it is set to in this design, as a fraction of its size; absent, its own */
+	/** its tuning in this design (`FontTune`): each absent when it is none */
 	xHeight?: number;
+	size?: number;
+	tracking?: number;
+	leading?: number;
 }
 
 /**
@@ -673,11 +708,19 @@ export function fontInventory(
 	const used = familiesUsed(template);
 	const storedBy = new Map(stored.map((f) => [f.family.toLowerCase(), f]));
 	const entries = new Map<string, FontEntry>();
-	const add = (entry: Omit<FontEntry, 'kind' | 'xHeight'>) => {
+	const add = (entry: Omit<FontEntry, 'kind' | keyof FontTune>) => {
 		const key = entry.family.toLowerCase();
+		if (entries.has(key)) return;
 		const kind = kindOf(template.fonts, entry.family);
-		const xHeight = xHeightOf(template.fonts, entry.family);
-		if (!entries.has(key)) entries.set(key, { ...entry, ...(kind ? { kind } : {}), ...(xHeight !== undefined ? { xHeight } : {}) });
+		const own = entryOf(template.fonts, entry.family);
+		const tune: FontTune = {
+			xHeight: clampXHeight(own?.xHeight),
+			size: clampFactor(own?.size),
+			tracking: clampTracking(own?.tracking),
+			leading: clampFactor(own?.leading)
+		};
+		const set = Object.fromEntries(Object.entries(tune).filter(([, v]) => v !== undefined));
+		entries.set(key, { ...entry, ...(kind ? { kind } : {}), ...set });
 	};
 	for (const font of template.fonts) {
 		const key = font.family.toLowerCase();

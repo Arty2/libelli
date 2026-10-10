@@ -34,7 +34,8 @@
 		previewFamilies,
 		pruneFonts,
 		replaceFamily,
-		setXHeight,
+		tuneFont,
+		type FontTune,
 		uploadLocalFont,
 		type FontEntry,
 		type StoredFontEntry
@@ -2962,12 +2963,12 @@
 	}
 
 	/**
-	 * A face set at `scale` times its size everywhere it is used, to match
-	 * its x-height to another's. From the Images tray (`fromTray`), just after
+	 * A face's own tuning changed — size, x-height, tracking, leading —
+	 * everywhere it is used. From the Images tray (`fromTray`), just after
 	 * that face was replaced in, it joins the replace's undo entry — see
-	 * `fontSession`; anywhere else it is a step of its own.
+	 * `fontSession`; otherwise it is a step of its own.
 	 */
-	function setFontXHeight(family: string, scale: number, fromTray = false) {
+	function setFontTune(family: string, change: FontTune, fromTray = false) {
 		if (template.locked) {
 			notify('The design is locked — unlock it to change its fonts.', 'warning');
 			return;
@@ -2976,8 +2977,8 @@
 		// Recorded already: fold into it. Still waiting on the debounce: the
 		// replace's own label is pending, and this lands in the same entry.
 		if (tunes && history.present.label === fontSession?.label) amendNext = true;
-		else if (!tunes) describe(`X-height of ${family}`);
-		template = setXHeight($state.snapshot(template) as Template, family, scale, fontRef(family, editorFonts));
+		else if (!tunes) describe(`Tune ${family}`);
+		template = tuneFont($state.snapshot(template) as Template, family, change, fontRef(family, editorFonts));
 	}
 
 	/** Every font uploaded to this browser — the Images tray's Fonts, beside the design's own. */
@@ -3533,7 +3534,7 @@
 					onfontfile={(family, file) => void handleFontUpload(file, family)}
 					onreplacefont={replaceFont}
 					ondeletefont={(font) => void forgetFont(font)}
-					onxheight={(family, scale) => setFontXHeight(family, scale, true)}
+					ontune={(family, change) => setFontTune(family, change, true)}
 				/>
 			{:else}
 			<DataTable

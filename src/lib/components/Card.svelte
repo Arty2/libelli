@@ -834,17 +834,40 @@
 		return [`font-family:${face.stack}`, ...(face.adjust !== undefined ? [`font-size-adjust:${face.adjust}`] : [])];
 	}
 
+	/**
+	 * The type of a run set in `family`, with the face's own tuning from the
+	 * Images tray on top of what the text sets: its size times the face's
+	 * size factor, its leading times the face's leading factor, and the
+	 * face's tracking — thousandths of the size, so em — added to the text's
+	 * letter spacing in mm. Untuned, exactly what the text sets.
+	 */
+	function typeParts(family: string | undefined, size: number, lineHeight: number, letterSpacing: number): { parts: string[]; size: number } {
+		const face = faceOf(template.fonts, family);
+		const round3 = (v: number) => Math.round(v * 1000) / 1000;
+		const pt = round3(size * face.size);
+		const parts = [...faceStyle(family), `font-size:${pt}pt`, `line-height:${round3(lineHeight * face.leading)}`];
+		const em = face.tracking / 1000;
+		if (letterSpacing && em) parts.push(`letter-spacing:calc(${letterSpacing}mm + ${em}em)`);
+		else if (letterSpacing) parts.push(`letter-spacing:${letterSpacing}mm`);
+		else if (em) parts.push(`letter-spacing:${em}em`);
+		return { parts, size: pt };
+	}
+
 	function boxStyle(box: Box): string {
 		const drawn = placed(box);
 		const align = drawn.align ?? template.defaults.align;
+		const type = typeParts(
+			box.font ?? template.defaults.font,
+			box.size ?? template.defaults.size,
+			box.lineHeight ?? template.defaults.lineHeight,
+			box.letterSpacing ?? template.defaults.letterSpacing
+		);
 		const parts = [
 			`left:${drawn.x}mm`,
 			`top:${layout.tops[box.id] ?? box.y}mm`,
 			`width:${box.w}mm`,
-			...faceStyle(box.font ?? template.defaults.font),
-			`font-size:${box.size ?? template.defaults.size}pt`,
+			...type.parts,
 			`font-weight:${box.weight ?? template.defaults.weight}`,
-			`line-height:${box.lineHeight ?? template.defaults.lineHeight}`,
 			`color:${box.color ?? template.defaults.color}`,
 			`text-align:${align}`,
 			// Vertical placement needs the box to be a flex column. That stops the
@@ -856,8 +879,6 @@
 		// Justified text without hyphenation opens rivers; the card is `lang="en"`
 		// so the browser has a dictionary to break with.
 		if (align === 'justify') parts.push('hyphens:auto');
-		const letterSpacing = box.letterSpacing ?? template.defaults.letterSpacing;
-		if (letterSpacing) parts.push(`letter-spacing:${letterSpacing}mm`);
 		if (box.italic) parts.push('font-style:italic');
 		if (box.textCase === 'uppercase') parts.push('text-transform:uppercase');
 		if (box.textCase === 'smallcaps') parts.push('font-variant-caps:small-caps');
@@ -865,7 +886,7 @@
 		// each element that uses it, so a heading twice the size would have
 		// moved twice as far as the paragraph under it.
 		const baseline = baselineOf(box, template.defaults);
-		if (baseline) parts.push(`--baseline:${Math.round(-baseline * (box.size ?? template.defaults.size) * 1000) / 1000}pt`);
+		if (baseline) parts.push(`--baseline:${Math.round(-baseline * type.size * 1000) / 1000}pt`);
 		// Emitted whether or not there is any, because the selected-box padding
 		// guide reads these back and a missing custom property would fall to 0 and
 		// draw the guide exactly on top of the bounds.
@@ -1043,8 +1064,7 @@
 		const [vertical, horizontal] = position.split('-');
 		const parts = [
 			vertical === 'top' ? `top:${margin}mm` : `bottom:${margin}mm`,
-			...faceStyle(template.defaults.font),
-			`font-size:${template.defaults.size}pt`,
+			...typeParts(template.defaults.font, template.defaults.size, 1, 0).parts.filter((p) => !p.startsWith('line-height')),
 			`font-weight:${template.defaults.weight}`,
 			`color:${template.defaults.color}`,
 			`line-height:1`

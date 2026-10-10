@@ -7,7 +7,7 @@
 	import { parseColor } from '$lib/color';
 	import { safeImageUrl } from '$lib/assets';
 	import { completePlaceholders } from '$lib/complete';
-	import { availableWeights, fontChoices, fontRef, naturalXHeight, previewFamilies, setXHeight, watchFaces, xHeightOf } from '$lib/fonts';
+	import { availableWeights, fontChoices, fontRef, previewFamilies, watchFaces } from '$lib/fonts';
 	import MenuSelect, { familyItems, type MenuItem } from './MenuSelect.svelte';
 	import ResetButton from './ResetButton.svelte';
 	import { referenceOf } from '$lib/layout';
@@ -130,8 +130,6 @@
 
 	/** Every family a font menu offers, by where it comes from — see `fontChoices`. */
 	const families = $derived(fontChoices(template, editorFonts));
-	/** The face this area is set in: its own, or the page's. */
-	const areaFamily = $derived(selected?.font ?? template.defaults.font);
 
 	/**
 	 * The font menu: the page default, the families under their sources'
@@ -471,13 +469,6 @@
 
 	$effect(() => watchFaces(() => (facesVersion += 1)));
 
-	/** This area's face's own x-height, for X-Height's placeholder and its start. */
-	const areaNatural = $derived.by(() => {
-		// Read, so this is worked out again as faces arrive.
-		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
-		facesVersion;
-		return naturalXHeight(areaFamily);
-	});
 
 	/**
 	 * The weights this area's family actually has — see `availableWeights`.
@@ -1004,29 +995,6 @@
 					<ResetButton to="the page's {template.defaults.font}" disabled={boxFrozen} onclick={() => patch({ font: undefined })} />
 				{/if}
 			</span>
-			<!-- The face's x-height, as a share of its size: one value per font,
-			     shared by every use of it — this field, the other bar's and the
-			     Images tray's steps all set the same one. Blank, the face's own,
-			     measured, shows as the placeholder. -->
-			<label class="field">
-				<span>X-Height</span>
-				<input
-					class="n-3"
-					type="number"
-					step="1"
-					min="20"
-					max="100"
-					title="The height of {areaFamily}'s lowercase, as a percentage of its size — give two faces the same and their x-heights match. Every use of the font; the leading is kept. Blank is the face's own{areaNatural ? ` (${Math.round(areaNatural * 100)})` : ''}"
-					placeholder={areaNatural ? String(Math.round(areaNatural * 100)) : ''}
-					value={xHeightOf(template.fonts, areaFamily) === undefined ? '' : Math.round((xHeightOf(template.fonts, areaFamily) ?? 0) * 100)}
-					disabled={pageFrozen}
-					onchange={(e) => {
-						const typed = e.currentTarget.value.trim();
-						ontemplatechange(setXHeight(template, areaFamily, typed === '' ? undefined : Number(typed) / 100, fontRef(areaFamily, editorFonts)));
-					}}
-				/>
-				<span class="unit">%</span>
-			</label>
 			<label class="field">
 				<span>Size</span>
 				<input

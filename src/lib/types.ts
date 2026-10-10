@@ -225,6 +225,20 @@ export function clampXHeight(value: number | undefined): number | undefined {
 	return Math.round(value * 100) / 100;
 }
 
+/** A face's size or leading factor: half to double, to the hundredth; 1, or anything else, is none. */
+export function clampFactor(value: number | undefined): number | undefined {
+	if (value === undefined || !Number.isFinite(value)) return undefined;
+	const v = Math.round(Math.min(2, Math.max(0.5, value)) * 100) / 100;
+	return v === 1 ? undefined : v;
+}
+
+/** A face's tracking, in thousandths of its size: -200 to 1000, whole; 0, or anything else, is none. */
+export function clampTracking(value: number | undefined): number | undefined {
+	if (value === undefined || !Number.isFinite(value)) return undefined;
+	const v = Math.round(Math.min(1000, Math.max(-200, value)));
+	return v === 0 ? undefined : v;
+}
+
 export interface FontRef {
 	family: string;
 	source: 'google' | 'local' | 'system';
@@ -245,6 +259,17 @@ export interface FontRef {
 	 * face's own.
 	 */
 	xHeight?: number;
+	/**
+	 * The face's own tuning, set from the Images tray and applied wherever it
+	 * is used — what makes one face sit like another when it replaces it.
+	 * `size`: every size it is set at, times this. `tracking`: letter spacing
+	 * added to whatever the text sets, in thousandths of the size, as type is
+	 * tracked. `leading`: every leading it is set at, times this. Absent is
+	 * none: 1, 0, 1.
+	 */
+	size?: number;
+	tracking?: number;
+	leading?: number;
 }
 
 /**
