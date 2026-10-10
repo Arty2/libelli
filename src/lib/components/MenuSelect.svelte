@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	/** One choice in the menu, a rule between runs of them, or a run's heading. */
+	/** One choice in the menu, or a rule between runs of them. */
 	export type MenuItem =
 		| {
 				value: string;
@@ -9,8 +9,21 @@
 				title?: string;
 				disabled?: boolean;
 		  }
-		| { rule: true }
-		| { heading: string };
+		| { rule: true };
+
+	/**
+	 * Every font menu's families, each name set in its own face: the ones
+	 * this design is set in, then under a rule everything else this browser
+	 * knows (`fontChoices`). One list for the page's Font, an area's, and a
+	 * font's Replace, which leaves out the font being replaced (`except`).
+	 */
+	export function familyItems(choices: { used: string[]; others: string[] }, except?: string): MenuItem[] {
+		const keep = (family: string) => family.toLowerCase() !== except?.toLowerCase();
+		const item = (family: string) => ({ value: family, label: family, family });
+		const used = choices.used.filter(keep).map(item);
+		const others = choices.others.filter(keep).map(item);
+		return [...used, ...(used.length && others.length ? [{ rule: true as const }] : []), ...others];
+	}
 </script>
 
 <script lang="ts">
@@ -226,8 +239,6 @@
 			{#each items as item, i (i)}
 				{#if 'rule' in item}
 					<li role="separator"><hr /></li>
-				{:else if 'heading' in item}
-					<li role="presentation" class="heading">{item.heading}</li>
 				{:else}
 					<li role="none">
 						<button
@@ -325,15 +336,6 @@
 		border: 1px solid #d5d5d5;
 		border-radius: 6px;
 		box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
-	}
-
-	/* A run's name, quieter than its choices, as the bar's legends are. */
-	.menu .heading {
-		padding: 6px 8px 2px 30px;
-		font: 600 0.6875rem ui-sans-serif, system-ui, sans-serif;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: #666;
 	}
 
 	.menu button {

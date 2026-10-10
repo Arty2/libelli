@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
-	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
+	import MenuSelect, { familyItems } from './MenuSelect.svelte';
 	import { armDefault } from '$lib/modal';
 	import { downloadUrl, slugify } from '$lib/download';
 	import { editableType, frameBetween, framePixels, isCrop, type Frame } from '$lib/photo';
@@ -65,8 +65,10 @@
 		 * swap it.
 		 */
 		fonts?: FontEntry[];
-		/** families a font can be replaced with: the files this browser holds, and Google's */
-		fontOptions?: { local: string[]; google: string[] };
+		/** what a font can be replaced with: the font menus' own families (`fontChoices`) */
+		fontFamilies?: { used: string[]; others: string[] };
+		/** a Replace menu opening: fetch the faces its names are set in, as the font menus do */
+		onfontsopen?: () => void;
 		/** a file chosen for a font, to be installed under that font's own name */
 		onfontfile?: (family: string, file: File) => void;
 		/** every use of one family swapped for another; false, or a promise of it, when it was refused */
@@ -88,7 +90,8 @@
 		onopendrawing,
 		onfocus,
 		fonts = [],
-		fontOptions = { local: [], google: [] },
+		fontFamilies = { used: [], others: [] },
+		onfontsopen,
 		onfontfile,
 		onreplacefont,
 		ondeletefont
@@ -124,19 +127,6 @@
 		replacedFont = now;
 	}
 
-	/**
-	 * What a font can be replaced with, as the app's own menu: the local files
-	 * (each in its own face, which this browser holds), then Google's families.
-	 */
-	const replaceItems = (family: string): MenuItem[] => {
-		const other = (f: string) => f.toLowerCase() !== family.toLowerCase();
-		const local = fontOptions.local.filter(other);
-		return [
-			...(local.length ? [{ heading: 'Local' }, ...local.map((f) => ({ value: f, label: f, family: f }))] : []),
-			{ heading: 'Google Fonts' },
-			...fontOptions.google.filter(other).map((f) => ({ value: f, label: f }))
-		];
-	};
 
 	/** The font a file is being chosen for: supplied under its own name, so the design finds it. */
 	let fontInput = $state<HTMLInputElement | null>(null);
@@ -810,7 +800,8 @@
 									title="Set everything in {font.family} in another font instead"
 									placeholder="Replace"
 									value=""
-									items={replaceItems(font.family)}
+									items={familyItems(fontFamilies, font.family)}
+									onopen={onfontsopen}
 									onselect={(to) => to && void replaceFontKeepingPlace(font.family, to)}
 								/>
 							</span>

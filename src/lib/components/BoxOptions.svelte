@@ -8,7 +8,7 @@
 	import { safeImageUrl } from '$lib/assets';
 	import { completePlaceholders } from '$lib/complete';
 	import { availableWeights, fontChoices, previewFamilies } from '$lib/fonts';
-	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
+	import MenuSelect, { familyItems, type MenuItem } from './MenuSelect.svelte';
 	import ResetButton from './ResetButton.svelte';
 	import { referenceOf } from '$lib/layout';
 	import {
@@ -141,9 +141,7 @@
 	 */
 	const fontItems = $derived.by((): MenuItem[] => [
 		{ value: '', label: `Default: ${template.defaults.font}` },
-		...families.used.map((family) => ({ value: family, label: family, family })),
-		{ rule: true },
-		...families.others.map((family) => ({ value: family, label: family, family })),
+		...familyItems(families),
 		{ rule: true },
 		{ value: '__custom', label: 'Other Family…' },
 		{ value: '__upload', label: 'Upload a Font File…' }

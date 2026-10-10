@@ -6,7 +6,7 @@
 	import { safeImageUrl } from '$lib/assets';
 	import { renamed } from '$lib/onboarding';
 	import { fontChoices, previewFamilies } from '$lib/fonts';
-	import MenuSelect from './MenuSelect.svelte';
+	import MenuSelect, { familyItems } from './MenuSelect.svelte';
 	import { withKey } from '$lib/keys';
 	import {
 		MAX_PARAGRAPH,
@@ -700,11 +700,7 @@
 				<MenuSelect
 					label="Font"
 					value={template.defaults.font}
-					items={[
-						...families.used.map((family) => ({ value: family, label: family, family })),
-						{ rule: true as const },
-						...families.others.map((family) => ({ value: family, label: family, family }))
-					]}
+					items={familyItems(families)}
 					disabled={pageFrozen}
 					showFamily
 					onopen={() => previewFamilies([...families.used, ...families.others], editorFonts, template.fonts)}

@@ -23,13 +23,14 @@
 	} from '$lib/assets';
 	import { download, slugify } from '$lib/download';
 	import {
-		CURATED_GOOGLE_FONTS,
 		deleteStoredFont,
 		ensureGoogleFont,
 		ensureTemplateFonts,
+		fontChoices,
 		fontInventory,
 		listStoredFonts,
 		mergeFonts,
+		previewFamilies,
 		pruneFonts,
 		replaceFamily,
 		uploadLocalFont,
@@ -2941,20 +2942,15 @@
 	let storedFonts = $state<StoredFontEntry[]>([]);
 	const refreshStoredFonts = async () => (storedFonts = await listStoredFonts());
 	const fontEntries = $derived(fontInventory(template, storedFonts));
-	/** What a font can be swapped for: the files this browser holds, then Google's curated families. */
-	const fontOptions = $derived.by(() => {
-		const local = [...new Set(storedFonts.map((f) => f.family))].sort((a, b) => a.localeCompare(b));
-		const taken = new Set(local.map((f) => f.toLowerCase()));
-		const google = CURATED_GOOGLE_FONTS.filter((f) => !taken.has(f.toLowerCase())).sort((a, b) => a.localeCompare(b));
-		return { local, google };
-	});
+	/** What a font can be swapped for: what the font menus offer (`fontChoices`). */
+	const fontFamilies = $derived(fontChoices(template, editorFonts));
 
 	/**
 	 * A font the design is set in swapped for another, everywhere — how a design
 	 * moved to a computer without its uploaded face is made to print, when the
-	 * file is not to hand. One undo puts it back.
+	 * file is not to hand. One undo puts it back. Says whether it happened: the
+	 * Images tray keeps the replacement where the font was, and only then.
 	 */
-	/** Whether it happened: the Images tray keeps the replacement where the font was, and only then. */
 	async function replaceFont(from: string, to: string): Promise<boolean> {
 		if (template.locked) {
 			notify('The design is locked — unlock it to change its fonts.', 'warning');
@@ -3488,7 +3484,8 @@
 					onopendrawing={openDrawing}
 					ontraydrag={stacked ? dragTray : undefined}
 					fonts={fontEntries}
-					{fontOptions}
+					{fontFamilies}
+					onfontsopen={() => previewFamilies([...fontFamilies.used, ...fontFamilies.others], editorFonts, template.fonts)}
 					onfontfile={(family, file) => void handleFontUpload(file, family)}
 					onreplacefont={replaceFont}
 					ondeletefont={(font) => void forgetFont(font)}
