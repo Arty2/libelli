@@ -782,7 +782,12 @@
 	 * substitution goes — see placeholders.ts — so a column named only from a
 	 * column nobody prints is still a column nobody prints.
 	 */
-	const usedColumns = $derived.by(() => {
+	//
+	// In two halves, so a drag — the template replaced every frame — does not
+	// read the whole table again: what the template prints, as a string that
+	// comes out the same while nothing printed changes; and, from the table
+	// alone, what each column's cells name.
+	const printedByTemplate = $derived.by(() => {
 		const columns = dataset.columns;
 		const used = new Set<string>();
 		for (const box of template.boxes) {
@@ -792,11 +797,21 @@
 			// A column an area takes a color from is printed too, as a color.
 			for (const column of Object.values(box.colorFrom ?? {})) if (columns.includes(column)) used.add(column);
 		}
-		for (const column of [...used]) {
-			for (const r of dataset.rows) {
-				for (const named of referencedColumns(r[column] ?? '', columns)) used.add(named);
-			}
+		return [...used].sort().join('\u0000');
+	});
+	const namedByCells = $derived.by(() => {
+		const columns = dataset.columns;
+		const named = new Map<string, Set<string>>();
+		for (const column of columns) {
+			const found = new Set<string>();
+			for (const row of dataset.rows) for (const name of referencedColumns(row[column] ?? '', columns)) found.add(name);
+			if (found.size) named.set(column, found);
 		}
+		return named;
+	});
+	const usedColumns = $derived.by(() => {
+		const used = new Set(printedByTemplate ? printedByTemplate.split('\u0000') : []);
+		for (const column of [...used]) for (const name of namedByCells.get(column) ?? []) used.add(name);
 		return used;
 	});
 
@@ -1135,8 +1150,15 @@
 	 * `local` image the browser has never been given resolves to null and is
 	 * asked for by name — the same bargain as a missing font.
 	 */
+	// Keyed on the reference as a string, which a drag does not change, and on
+	// `imagesVersion`, which a replaced file does: on the template itself, it
+	// read the picture back from storage on every frame of every drag.
+	const pageImageKey = $derived(JSON.stringify(template.page.image ?? null));
+	const printImageKey = $derived(JSON.stringify(template.print.background ?? null));
 	$effect(() => {
-		const image = template.page.image ? $state.snapshot(template.page.image) : undefined;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		imagesVersion;
+		const image = (JSON.parse(pageImageKey) ?? undefined) as Template['page']['image'];
 		let stale = false;
 		void (async () => {
 			const resolved = await resolveBackground(image);
@@ -1151,7 +1173,9 @@
 
 	/** Same bargain as the page background, kept as a separate reference so the two never collide. */
 	$effect(() => {
-		const image = template.print.background ? $state.snapshot(template.print.background) : undefined;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		imagesVersion;
+		const image = (JSON.parse(printImageKey) ?? undefined) as Template['print']['background'];
 		let stale = false;
 		void (async () => {
 			const resolved = await resolveBackground(image);
@@ -1174,7 +1198,10 @@
 	 * as a notice — the areas simply draw nothing, and a card that is blank for
 	 * a reason should say so.
 	 */
-	const imageNames = $derived.by(() => {
+	// The table's names and the template's, each on its own, so a drag does
+	// not read every cell again — the template's half, a string, comes out
+	// the same.
+	const cellImages = $derived.by(() => {
 		const names = new Set<string>();
 		for (const row of dataset.rows) {
 			for (const value of Object.values(row)) {
@@ -1182,10 +1209,18 @@
 				if (name) names.add(name);
 			}
 		}
-		for (const box of template.boxes) {
-			const name = localImageName(box.static?.url);
-			if (name) names.add(name);
-		}
+		return names;
+	});
+	const areaImages = $derived(
+		template.boxes
+			.map((box) => localImageName(box.static?.url))
+			.filter((name): name is string => !!name)
+			.sort()
+			.join('\u0000')
+	);
+	const imageNames = $derived.by(() => {
+		const names = new Set(cellImages);
+		for (const name of areaImages ? areaImages.split('\u0000') : []) names.add(name);
 		return [...names].sort();
 	});
 	/**

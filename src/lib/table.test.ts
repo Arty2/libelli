@@ -13,6 +13,7 @@ import {
 	moveRowsTo,
 	orderOf,
 	renumbering,
+	numberIn,
 	rowNumber,
 	sortRows,
 	unsortRows,
@@ -164,6 +165,9 @@ describe('row numbers and the arrival order', () => {
 		expect(twice.rows).toEqual([c, b, a]);
 		expect(twice.order).toEqual([1, 0, 2]);
 		expect([0, 1, 2].map((i) => rowNumber(twice, i))).toEqual([2, 1, 3]);
+		// The table's labels, from the order checked once, say the same.
+		expect([0, 1, 2].map((i) => numberIn(orderOf(twice), i))).toEqual([2, 1, 3]);
+		expect(numberIn(null, 4)).toBe(5);
 	});
 
 	it('leaves no order on a table that stands where it arrived', () => {

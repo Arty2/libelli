@@ -1060,6 +1060,14 @@ boxes that did not need it. A `MutationObserver` on the box's subtree catches
 the content change itself. It settles rather than looping, because `read()`
 writes state only when a number actually moved.
 
+**Measured on the observer's first report, not at mount.** A read as the box
+mounts is an `offsetHeight` in the middle of mounting everything else: a forced
+layout per area per card, which opening Export with a thousand cards turned
+into half a minute. A `ResizeObserver` reports every box it is given once,
+after the layout the browser does anyway and before that frame is painted, so
+nothing is drawn unmeasured. The codes a card draws are cached for every card
+at once, in the module, for the same thousand: each drew the same picture.
+
 **Only a clipped box can be cut.** A growing box is a `min-height`, so it is
 always as tall as its lines, and `scrollHeight` beating its height does not make
 it cut: a face whose ascent and descent outrun a tight line height — Patrick
@@ -1932,7 +1940,10 @@ flip through to find what suits the table, so three presses on one control
 rather than a menu, kept in the UI state beside the column widths. Short does
 not grow on focus, because a row that did would shove every row under it; full
 lifts the cap, and where there is no `field-sizing` an `autosize` action sets
-each field to its scroll height instead.
+each field to its scroll height instead. That action, and the mark for a field cut
+short, measure through one queue: every field reads first and then every one
+writes, once a frame. A field measuring itself read and wrote in turn, and each
+write made the next field's read lay the table out again — once per cell.
 
 **The bar under the table is the picker and the lock.** Paste, Import and
 Export are errands done with a table, so they sit in its menu with New and
@@ -2667,6 +2678,16 @@ takes the sheet with it. The sheet bleed adds to that padding, because it adds
 paper: the cards keep their places and the sheet grows around them.
 
 ## `src/lib/components/PrintPreview.svelte`
+
+**A thumbnail is filled in as it comes near.** Each one is a whole card behind a
+transform, and five hundred rows made a thousand of them, pages and sheets, all
+laid out before the screen could open. The buttons are sized from the template
+and not from what is inside them, so a card arriving later moves nothing. An
+`IntersectionObserver` fills in the ones within a screen of view and a few on
+either side of each, the count being for a phone's sideways strip, which clips
+at its own edge where a margin on the viewport does not reach. A card once in
+stays. Export to PNG reads these cards, so it fills in the rest first and waits
+two frames for their words to be measured.
 
 **Output turns what goes out, not the template.** Portrait or Landscape is
 for the tray that takes paper one way round, or a PNG wanted sideways — a
@@ -3670,7 +3691,9 @@ their order. Being part of the dataset, the order is saved, reloaded and undone
 with it. `orderOf` checks it fits before anything believes it, and an order
 that says nothing the positions do not is left off. `rowNumber` is the one rule
 the row labels and `inArrivalOrder`, which the lookups read, both use, so the
-two cannot drift apart. It is still one pass, so what a lookup finds is never
+two cannot drift apart; the table holds the checked order once and labels
+through `numberIn`, the same rule, since checking it per label was a pass over
+the table for every row. It is still one pass, so what a lookup finds is never
 read for placeholders, and reaching a cell's own column in its own row is
 marked the way `%%self%%` is. `Card` takes `rows` as a required prop rather
 than a defaulted one: a renderer that forgot it would print the placeholder on

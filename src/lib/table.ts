@@ -100,7 +100,16 @@ function compact(order: number[]): number[] {
  * has put it, so sorting carries every number along with its row.
  */
 export function rowNumber(dataset: Dataset, index: number): number {
-	return (orderOf(dataset)?.[index] ?? index) + 1;
+	return numberIn(orderOf(dataset), index);
+}
+
+/**
+ * `rowNumber` from an order already checked by `orderOf`. The table labels
+ * every row, and checking the order once per label was a pass over all of it
+ * for each — on a sorted table of five hundred rows, seconds a keystroke.
+ */
+export function numberIn(order: readonly number[] | null, index: number): number {
+	return (order?.[index] ?? index) + 1;
 }
 
 /**

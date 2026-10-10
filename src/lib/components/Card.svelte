@@ -1,3 +1,16 @@
+<script lang="ts" module>
+	/**
+	 * Codes already drawn, by everything that shapes one. `qrFor` runs again
+	 * whenever the template is replaced — every frame of dragging any area —
+	 * and encoding a QR of a hundred characters is several milliseconds, for
+	 * the same picture. Shared by every card, not one map each: the editor,
+	 * the print root and each thumbnail of Export draw the same codes, and a
+	 * map per card filled the same entries a thousand times over. Kept small:
+	 * cleared whole past a few hundred.
+	 */
+	const drawnCodes = new Map<string, string>();
+</script>
+
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
@@ -345,14 +358,6 @@
 	 * A barcode ignores Fit: it is read across, so it fills the area both ways,
 	 * every bar widened alike.
 	 */
-	/**
-	 * Codes already drawn, by everything that shapes one. `qrFor` runs again
-	 * whenever the template is replaced — every frame of dragging any area —
-	 * and encoding a QR of a hundred characters is several milliseconds, for
-	 * the same picture. Kept small: cleared whole past a few hundred.
-	 */
-	const drawnCodes = new Map<string, string>();
-
 	function qrFor(box: Box): string {
 		const value = contentOf(box).trim() || box.static?.text?.trim() || '';
 		if (!value) return '';
@@ -552,7 +557,10 @@
 			const spills = clipped && !!content && content.scrollHeight > node.clientHeight + 1;
 			if ((overflowing[id] ?? false) !== spills) overflowing = { ...overflowing, [id]: spills };
 		};
-		read();
+		// No read here at mount: an offsetHeight now forces a layout per area per
+		// card, in the middle of mounting the rest — a thousand of them opening
+		// Export — while the observer's first report lands after the one layout
+		// the browser does anyway, still before that frame is painted.
 		const observer = new ResizeObserver(read);
 		observer.observe(node);
 		// A clipped box is a fixed height, so nothing it contains can ever change

@@ -23,9 +23,9 @@
 		moveColumn,
 		moveRows,
 		moveRowsTo,
+		numberIn,
 		orderOf,
 		renumbering,
-		rowNumber,
 		sortRows,
 		unsortRows,
 		withoutOrder,
@@ -264,29 +264,81 @@
 	 */
 	const sizesItself = typeof CSS !== 'undefined' && CSS.supports('field-sizing', 'content');
 
+	/**
+	 * The fields waiting to be measured — to be sized (`autosize`) or marked
+	 * as holding more than they show (`overflowMark`) — done together once a
+	 * frame: every write that resets a height, then every read, then every
+	 * write of what was read. Done one field at a time, each read came after
+	 * the last field's write and forced the whole table to lay out again: a
+	 * table of five hundred rows took seconds to open, sort or import.
+	 */
+	const toFit = new Set<HTMLTextAreaElement>();
+	const toMark = new Set<HTMLTextAreaElement>();
+	let measureFrame = 0;
+	const measureSoon = () => {
+		if (!measureFrame) measureFrame = requestAnimationFrame(measureAll);
+	};
+	function measureAll() {
+		measureFrame = 0;
+		const fits = [...toFit].filter((n) => n.isConnected);
+		toFit.clear();
+		for (const node of fits) node.style.height = 'auto';
+		const heights = fits.map((node) => node.scrollHeight);
+		fits.forEach((node, i) => (node.style.height = `${heights[i]}px`));
+		const marks = [...toMark].filter((n) => n.isConnected);
+		toMark.clear();
+		const more = marks.map((node) => node.scrollHeight > node.clientHeight + 1);
+		marks.forEach((node, i) => node.parentElement?.toggleAttribute('data-more', more[i]));
+	}
+	/** One observer for every field, each told apart by what it watches. */
+	let fieldObserver: ResizeObserver | null = null;
+	const fitting = new WeakMap<Element, HTMLTextAreaElement>();
+	const observeField = (target: Element) => {
+		fieldObserver ??= new ResizeObserver((entries) => {
+			for (const { target: seen } of entries) {
+				const field = fitting.get(seen);
+				if (field) toFit.add(field);
+				if (seen instanceof HTMLTextAreaElement) toMark.add(seen);
+			}
+			measureSoon();
+		});
+		fieldObserver.observe(target);
+	};
+
 	function autosize(node: HTMLTextAreaElement, on: boolean) {
 		let active = on && !sizesItself;
+		// Typing: at once, the one field — the words must not wait a frame.
 		const fit = () => {
 			if (!active) return;
 			node.style.height = 'auto';
 			node.style.height = `${node.scrollHeight}px`;
 		};
-		const observer = new ResizeObserver(() => requestAnimationFrame(fit));
+		const cell = node.closest('td') ?? node;
 		const start = () => {
 			node.addEventListener('input', fit);
-			observer.observe(node.closest('td') ?? node);
-			fit();
+			fitting.set(cell, node);
+			observeField(cell);
+			toFit.add(node);
+			measureSoon();
 		};
 		const stop = () => {
 			node.removeEventListener('input', fit);
-			observer.disconnect();
+			fitting.delete(cell);
+			if (cell !== node) fieldObserver?.unobserve(cell);
+			toFit.delete(node);
 			node.style.height = '';
 		};
 		if (active) start();
 		return {
 			update(next: boolean) {
 				const wanted = next && !sizesItself;
-				if (wanted === active) return fit();
+				if (wanted === active) {
+					if (active) {
+						toFit.add(node);
+						measureSoon();
+					}
+					return;
+				}
 				active = wanted;
 				if (active) start();
 				else stop();
@@ -309,17 +361,17 @@
 	 */
 	function overflowMark(node: HTMLTextAreaElement, _value: string) {
 		const check = () => {
-			const cell = node.parentElement;
-			if (cell) cell.toggleAttribute('data-more', node.scrollHeight > node.clientHeight + 1);
+			toMark.add(node);
+			measureSoon();
 		};
-		const observer = new ResizeObserver(check);
-		observer.observe(node);
+		observeField(node);
 		node.addEventListener('input', check);
 		check();
 		return {
-			update: () => requestAnimationFrame(check),
+			update: check,
 			destroy: () => {
-				observer.disconnect();
+				fieldObserver?.unobserve(node);
+				toMark.delete(node);
 				node.removeEventListener('input', check);
 			}
 		};
@@ -1076,8 +1128,24 @@
 		onchange({ ...dataset, rows: dataset.rows.map((r, i) => (i === rowIndex ? after : r)) });
 	}
 
-	/** The number a row wears — see `rowNumber`. */
-	const rowLabel = (index: number): number => rowNumber(dataset, index);
+	/**
+	 * The table's sort, worked out once per change of the table rather than
+	 * once per label: every row asks for its number a dozen times — its tick,
+	 * its number, each cell's name — and finding the order checks the whole of
+	 * it, so a sorted table of five hundred rows did that six thousand times a
+	 * keystroke. The order is the same array across a cell's edit, so the rows
+	 * reading it are not run again either.
+	 */
+	const order = $derived(orderOf(dataset));
+	/**
+	 * The columns, for what every row and cell draws. A cell's edit gives a
+	 * new table with the same columns array, so this stays the same object
+	 * and the rows reading it are left alone; read off `dataset` instead,
+	 * every row's loop and every field's placeholder action ran again on each
+	 * keystroke.
+	 */
+	const columns = $derived(dataset.columns);
+	const rowLabel = (index: number): number => numberIn(order, index);
 
 
 	function renameColumn(index: number, name: string, field?: HTMLInputElement) {
@@ -1575,7 +1643,7 @@
 								onclick={toggleAll}
 							><Icon name={allChosen ? 'checkbox-checked' : someChosen ? 'checkbox-indeterminate' : 'checkbox'} size={14} /></button>
 						{/if}
-						{#if sortedBy || orderOf(dataset)}
+						{#if sortedBy || order}
 							<!-- A sort survives a reload, as the numbers it left on the rows;
 							     which column did it is only remembered for the session. -->
 							<button
@@ -1785,7 +1853,7 @@
 							>{rowLabel(i)}</span>
 							</span>
 						</td>
-						{#each dataset.columns as column, c (column)}
+						{#each columns as column, c (column)}
 							<!-- Read once: a drawing's cell is a long base64 string, and every
 							     check of it trims and tests the whole of it, on every render. -->
 							{@const drawing = cellPicture(row[column])}
@@ -1806,7 +1874,7 @@
 								}}
 								class:bound={!!selectedColumn && column === selectedColumn}
 								class:drop-before={carrying?.on && carrying.before === c}
-								class:drop-after={carrying?.on && c === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
+								class:drop-after={carrying?.on && c === columns.length - 1 && carrying.before === columns.length}
 							>
 								{#if picture}
 									<!-- The picture in place of its base64, or of the name of a
@@ -1873,7 +1941,7 @@
 									data-column={column}
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
-									use:completePlaceholders={dataset.columns}
+									use:completePlaceholders={columns}
 									onfocus={() => {
 										editing = { row: i, column };
 										onactivate(i);
@@ -2056,11 +2124,11 @@
 				class="reindex"
 				title={locked
 					? 'The table is locked — unlock it to reindex'
-					: orderOf(dataset)
+					: order
 						? 'Reindex — make this order the rows\' own: the numbers follow it, and lookups with them'
 						: 'Reindex — the rows are already in the order of their numbers; sort the table first'}
 				aria-label="Reindex"
-				disabled={locked || !orderOf(dataset)}
+				disabled={locked || !order}
 				onclick={reindex}
 			>
 				<Icon name="array-numbers" size={15} />

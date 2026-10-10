@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tick } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
 	import Lightbox from './Lightbox.svelte';
@@ -96,10 +98,59 @@
 	const paperH = $derived(turned ? printSheetW : printSheetH);
 
 	/**
+	 * Which thumbnails have a card in them yet. Every page here is a whole Card
+	 * behind a transform, and a run of five hundred rows mounted a thousand of
+	 * them — pages and sheets — before the screen could open: half a minute of
+	 * layout for thumbnails nobody had scrolled to. The buttons are sized from
+	 * the template, not from what is inside them, so filling one in later moves
+	 * nothing. Once in, a card stays: scrolling back is not paid for twice.
+	 */
+	const inView = new SvelteSet<string>();
+	/** How far ahead of the one that came into view to fill in — a sideways
+	 * run on a phone clips at the grid, where a margin on the viewport does not
+	 * reach, so the look-ahead is counted in thumbnails instead. */
+	const AHEAD = 6;
+	let viewObserver: IntersectionObserver | undefined;
+
+	function nearView(node: HTMLElement, key: string) {
+		viewObserver ??= new IntersectionObserver(
+			(entries) => {
+				for (const entry of entries) {
+					if (!entry.isIntersecting) continue;
+					const [kind, at] = (entry.target as HTMLElement).dataset.view!.split(':');
+					for (let i = Math.max(0, +at - AHEAD); i <= +at + AHEAD; i++) inView.add(`${kind}:${i}`);
+					viewObserver!.unobserve(entry.target);
+				}
+			},
+			{ rootMargin: '600px' }
+		);
+		node.dataset.view = key;
+		viewObserver.observe(node);
+		return {
+			update(next: string) {
+				node.dataset.view = next;
+			},
+			destroy() {
+				viewObserver?.unobserve(node);
+			}
+		};
+	}
+
+	/** Every thumbnail of a kind filled in and laid out, for an export that reads them. */
+	async function mountAll(kind: 'page' | 'sheet', count: number) {
+		for (let i = 0; i < count; i++) inView.add(`${kind}:${i}`);
+		await tick();
+		// Two frames: a card sizes its words from a ResizeObserver, whose first
+		// report lands before the next paint, and what it writes needs one more.
+		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+	}
+
+	/**
 	 * One file per selected page — or, with several cards to a sheet, one file
-	 * per sheet — at 300 dpi; more than one of them comes as a single ZIP. Everything is already rendered here at full size
-	 * behind a thumbnail's transform, so the export reads the same DOM the
-	 * preview is showing rather than building a second one.
+	 * per sheet — at 300 dpi; more than one of them comes as a single ZIP. Every
+	 * card is rendered here at full size behind a thumbnail's transform — the
+	 * ones not yet scrolled to are filled in first — so the export reads the
+	 * same DOM the preview is showing rather than building a second one.
 	 */
 	async function exportPng() {
 		const container = imposed ? sheetGrid : grid;
@@ -113,6 +164,7 @@
 		const missing = new Set<string>();
 		let written = 0;
 		try {
+			await mountAll(imposed ? 'sheet' : 'page', imposed ? sheetGroups.length : dataset.rows.length);
 			// `:not(.dropped)` either way: unticked pages and unticked sheets are
 			// both marked that way, so what is exported is what the grid shows as
 			// going.
@@ -314,8 +366,10 @@
 			class:current={i === activeRow}
 			onclick={() => open(i)}
 			aria-label="Open card {i + 1} full screen"
+			use:nearView={`page:${i}`}
 		>
 			<span class="scaler" style="transform:scale({thumbScale})">
+				{#if inView.has(`page:${i}`)}
 				<Card
 					{template}
 					{row}
@@ -326,6 +380,7 @@
 					{background}
 					{images}
 				/>
+				{/if}
 			</span>
 		</button>
 		<!-- As wide as the page above it, and set like the count in the
@@ -505,8 +560,10 @@
 							style="width:{mmToPx(printSheetW) * sheetThumbScale}px;height:{mmToPx(printSheetH) * sheetThumbScale}px"
 							onclick={() => (sheetFullscreen = i)}
 							aria-label="Open sheet {i + 1} full screen"
+							use:nearView={`sheet:${i}`}
 						>
 							<span class="scaler" style="transform:scale({sheetThumbScale})">
+								{#if inView.has(`sheet:${i}`)}
 								<PrintSheet
 									{template}
 									{mapping}
@@ -518,6 +575,7 @@
 									rows={lookupRows}
 									previewScale={sheetThumbScale}
 								/>
+								{/if}
 							</span>
 						</button>
 						<!-- A sheet is its own thing to tick: the pages on it stay ticked
