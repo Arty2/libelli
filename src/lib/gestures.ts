@@ -222,56 +222,67 @@ export function isDoubleTap(last: Tap | null, now: Tap): boolean {
 }
 
 /**
- * A second tap or a long press with a finger, as one "open this". Touch only:
- * a mouse has its double-click, and a held mouse button is a selection.
+ * A second tap or a long press with a finger on one of the cells inside
+ * `node`, as one "open this". Touch only: a mouse has its double-click, and a
+ * held mouse button is a selection.
+ *
+ * Listened for once, on the table, not on every cell: `find` says which cell
+ * a press landed in, or none, and every press that lands nowhere — or comes
+ * from a mouse — stops there. A table of a few hundred rows had six
+ * listeners on each of its thousands of cells for this.
  *
  * For a table cell on a phone, where a single tap must not bring the
- * keyboard up — the first tap chooses the cell (and places its caret), and
- * this is the way in. A second tap is a tap on the node while it already has
- * the focus, however long after the first: a person reads what they chose
- * before deciding to type, and a double tap's few hundred milliseconds asked
- * them to decide before they had looked. It opens on the tap's click, once
- * the browser has moved the caret to where the second tap landed. A node a
- * tap does not focus (a button, on iOS) still opens on a quick double tap.
+ * keyboard up — the first tap chooses the cell, and this is the way in. A
+ * second tap is a tap on the cell while it already has the focus, however
+ * long after the first: a person reads what they chose before deciding to
+ * type, and a double tap's few hundred milliseconds asked them to decide
+ * before they had looked. A cell a tap does not focus (a button, on iOS)
+ * still opens on a quick double tap.
  *
- * A long press that fires swallows the context menu Android follows it with,
- * and its lift is cancelled (`touchend`, which stops the browser's own mouse
- * events and click): what is under the finger is the editor just opened, and
- * a click landing there would select a word in it. A finger that wanders is
- * scrolling, not pressing.
+ * `onopen` is told where the opening press was, for the caret. A long press
+ * swallows the context menu Android follows it with; the lift that ends
+ * either is cancelled (`touchend`, which stops the browser's own mouse events
+ * and click), or what is under the finger — the editor just opened — takes a
+ * click and selects a word. A finger that wanders is scrolling, not pressing.
  */
-export function touchOpen(node: HTMLElement, onopen: (node: HTMLElement) => void) {
-	let handler = onopen;
-	let press: { id: number; x: number; y: number; focused: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
-	let last: Tap | null = null;
+export function touchOpen(
+	node: HTMLElement,
+	options: { find: (target: EventTarget | null) => HTMLElement | null; onopen: (cell: HTMLElement, at: { x: number; y: number }) => void }
+) {
+	let { find, onopen } = options;
+	let press: { id: number; x: number; y: number; cell: HTMLElement; focused: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
+	let last: (Tap & { cell: HTMLElement }) | null = null;
 	let held = false;
-	/** The lift that ends a long press: its click would land on what it opened. */
+	/** The lift that ends an open: its click would land on what it opened. */
 	let swallow = false;
-	/** A second tap has lifted: open on its click, after the caret has moved. */
-	let second = false;
 
 	const clear = () => {
 		if (press) clearTimeout(press.timer);
 		press = null;
 	};
+	const open = (cell: HTMLElement, at: { x: number; y: number }) => {
+		last = null;
+		swallow = true;
+		onopen(cell, at);
+	};
 	const down = (event: PointerEvent) => {
-		if (event.pointerType !== 'touch') return;
 		clear();
 		held = false;
 		swallow = false;
-		second = false;
+		if (event.pointerType !== 'touch') return;
+		const cell = find(event.target);
+		if (!cell) return;
+		const at = { x: event.clientX, y: event.clientY };
 		press = {
 			id: event.pointerId,
-			x: event.clientX,
-			y: event.clientY,
+			...at,
+			cell,
 			// Read on the way down: the first tap's focus lands after its lift.
-			focused: document.activeElement === node,
+			focused: document.activeElement === cell,
 			timer: setTimeout(() => {
 				press = null;
 				held = true;
-				swallow = true;
-				last = null;
-				handler(node);
+				open(cell, at);
 			}, LONG_PRESS_MS)
 		};
 	};
@@ -283,23 +294,15 @@ export function touchOpen(node: HTMLElement, onopen: (node: HTMLElement) => void
 	};
 	const up = (event: PointerEvent) => {
 		if (!press || event.pointerId !== press.id) return;
-		const { focused } = press;
+		const { cell, focused } = press;
 		clear();
-		const tap = { x: event.clientX, y: event.clientY, at: event.timeStamp || performance.now() };
-		if (focused || isDoubleTap(last, tap)) {
-			last = null;
-			second = true;
-		} else last = tap;
-	};
-	const click = () => {
-		if (!second) return;
-		second = false;
-		handler(node);
+		const tap = { x: event.clientX, y: event.clientY, at: event.timeStamp || performance.now(), cell };
+		if (focused || (last?.cell === cell && isDoubleTap(last, tap))) open(cell, tap);
+		else last = tap;
 	};
 	const cancel = () => {
 		clear();
 		last = null;
-		second = false;
 	};
 	const lift = (event: TouchEvent) => {
 		if (!swallow) return;
@@ -316,18 +319,16 @@ export function touchOpen(node: HTMLElement, onopen: (node: HTMLElement) => void
 	node.addEventListener('pointermove', move);
 	node.addEventListener('pointerup', up);
 	node.addEventListener('pointercancel', cancel);
-	node.addEventListener('click', click);
 	node.addEventListener('contextmenu', menu);
 	node.addEventListener('touchend', lift);
 	return {
-		update: (next: typeof onopen) => (handler = next),
+		update: (next: typeof options) => ({ find, onopen } = next),
 		destroy: () => {
 			clear();
 			node.removeEventListener('pointerdown', down);
 			node.removeEventListener('pointermove', move);
 			node.removeEventListener('pointerup', up);
 			node.removeEventListener('pointercancel', cancel);
-			node.removeEventListener('click', click);
 			node.removeEventListener('contextmenu', menu);
 			node.removeEventListener('touchend', lift);
 		}

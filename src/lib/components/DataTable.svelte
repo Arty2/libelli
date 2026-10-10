@@ -5,6 +5,7 @@
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { touchOpen } from '$lib/gestures';
+	import { caretAt } from '$lib/caret';
 	import { armDefault } from '$lib/modal';
 	import { scrollEdges } from '$lib/scrolledge';
 	import { dataUrlBytes, localImageName, safeMediaUrl, weigh } from '$lib/assets';
@@ -350,18 +351,17 @@
 	let editing = $state<{ row: number; column: string } | null>(null);
 	/**
 	 * Whether the press that is choosing a cell is a finger's. A cell a finger
-	 * taps asks for no keyboard (`inputmode="none"`), so the tap chooses it —
-	 * and puts the browser's own caret where it landed — without the keyboard
-	 * coming up over half the screen; a second tap on it, however much later,
-	 * or a long press (`touchOpen`) opens it full size to type in, at the
-	 * caret the last tap left. A mouse or a
-	 * pen types in place. Set on the way down, captured on the table, which is
+	 * taps is read-only, so the tap chooses it without the keyboard coming up
+	 * over half the screen; a second tap on it, however much later, or a long
+	 * press (`touchOpen`) opens it full size to type in. A mouse or a pen
+	 * types in place. Set on the way down, captured on the table, which is
 	 * before the cell takes focus — and focus is what brings a keyboard.
 	 *
-	 * Not `readonly`, which also kept the keyboard down but left no caret, so
-	 * where the finger was had to be measured off a hidden copy of the cell.
-	 * The cost of the browser doing it: a hardware keyboard can type straight
-	 * into a cell chosen by a finger, as it could into one chosen by a mouse.
+	 * Read-only rather than `inputmode="none"`, which kept the keyboard down
+	 * too and let the browser place a caret — and with the caret, Android's
+	 * own Paste bubble on the first tap, which nothing on a page can turn off.
+	 * A read-only cell has no caret, so where the finger was is measured
+	 * (`caretAt`) on the press that opens it.
 	 */
 	let byFinger = $state(false);
 
@@ -603,19 +603,23 @@
 		(dirty ? 'Close — the drawing not saved is dropped' : leaveTo === 'images' ? 'Back to Images' : leaveTo === 'card' ? 'Close' : 'Back to the table') + ' (Esc)';
 
 	/**
-	 * Where the caret goes as the cell opens full size: where a finger's tap
-	 * left it in the small one (`fingerCaret`), which the eye was on. Used once — stepping to the next row with the pager opens a new field
+	 * Where the caret goes as the cell opens full size: where the finger
+	 * that opened it pressed the small one (`caretAt`), which the eye was on.
+	 * Used once — stepping to the next row with the pager opens a new field
 	 * at the end, as it always did.
 	 */
 	let openCaret: number | null = null;
-	/**
-	 * The caret a finger left in a cell, if it left one. A second tap opens
-	 * once it has moved the caret to where it landed; a long press on a cell nobody tapped
-	 * yet has none — the browser places a caret on a tap, after the finger
-	 * lifts — so that opens at the end, as Edit does.
-	 */
-	const fingerCaret = (field: HTMLElement) =>
-		document.activeElement === field && field instanceof HTMLTextAreaElement ? field.selectionStart : undefined;
+
+	/** The cell a press landed in, for `touchOpen`: a field or a picture, marked `data-opens`. */
+	const cellFrom = (target: EventTarget | null) =>
+		target instanceof Element ? target.closest<HTMLElement>('tbody [data-opens]') : null;
+	/** A finger's second tap or long press on a cell: open it full size, the caret where it pressed. */
+	function openFromFinger(cell: HTMLElement, at: { x: number; y: number }) {
+		const row = Number(cell.dataset.row);
+		const column = cell.dataset.column;
+		if (locked || column === undefined || !Number.isInteger(row)) return;
+		openBigCell(row, column, false, 'table', cell instanceof HTMLTextAreaElement ? caretAt(cell, at.x, at.y) : undefined);
+	}
 	const focusOnOpen = (node: HTMLElement) => {
 		node.focus();
 		if (openCaret !== null && node instanceof HTMLTextAreaElement) node.setSelectionRange(openCaret, openCaret);
@@ -1481,7 +1485,9 @@
 	use:scrollEdges={(section) => section.querySelector<HTMLElement>(':scope > .scroll')}
 >
 	<div class="scroll" bind:this={scrollEl}>
-		<table style="min-width:{tableWidth}" onpointerdowncapture={(e) => (byFinger = e.pointerType === 'touch')}>
+		<table style="min-width:{tableWidth}" onpointerdowncapture={(e) => (byFinger = e.pointerType === 'touch')}
+			use:touchOpen={{ find: cellFrom, onopen: openFromFinger }}
+		>
 			<!-- Widths belong to the columns, not to the cells: one place to set
 			     them, and `table-layout: fixed` above means they are obeyed rather
 			     than treated as a suggestion the widest cell can overrule. -->
@@ -1791,7 +1797,9 @@
 										}}
 										onclick={(e) => e.stopPropagation()}
 										ondblclick={() => !locked && openBigCell(i, column)}
-										use:touchOpen={() => !locked && openBigCell(i, column)}
+										data-opens
+										data-row={i}
+										data-column={column}
 									>
 										<img
 											class="cell-picture"
@@ -1810,16 +1818,18 @@
 									</button>
 								{:else}
 								<!-- The whole cell, full size, is Edit in the bar while this is
-								     typed in, or the [...] when it holds more than it shows. It
-								     was a press and hold too, until a hold came to mean "what is
-								     this?" everywhere. -->
+								     typed in, or the [...] when it holds more than it shows — and,
+								     for a finger, a second tap or a hold (`touchOpen` on the
+								     table, which finds the cell by `data-opens`). -->
 								<textarea
 									rows="1"
 									aria-label="{column}, row {rowLabel(i)}"
 									value={row[column] ?? ''}
-									readonly={locked}
-									inputmode={byFinger && !locked ? 'none' : undefined}
-									use:touchOpen={(field) => !locked && openBigCell(i, column, false, 'table', fingerCaret(field))}
+									readonly={locked || byFinger}
+									class:by-finger={byFinger && !locked}
+									data-opens
+									data-row={i}
+									data-column={column}
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
 									use:completePlaceholders={dataset.columns}
@@ -2928,6 +2938,13 @@
 
 	td textarea:read-only {
 		cursor: default;
+	}
+
+	/* A finger's cell: a long press opens it, so it must not also start a
+	   text selection with its handles and its menu. */
+	td textarea.by-finger {
+		-webkit-user-select: none;
+		user-select: none;
 	}
 
 

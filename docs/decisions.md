@@ -2311,35 +2311,42 @@ upwards, because the row is at the bottom of the tray.
 **A finger does not type in a cell; it chooses it.** Every cell is a
 textarea, so a tap focused one and the keyboard came up over half a phone's
 screen — for a tap that was usually choosing a row, or a scroll that
-started on a cell. A cell a finger presses asks for no keyboard
-(`inputmode="none"`, set by `byFinger`, read on the table's capturing
-pointerdown, which comes before focus), so a tap chooses it, Edit appears,
-and the browser puts its own caret where the finger landed; a second tap on
-the chosen cell or a long press (`touchOpen` in gestures.ts) opens the cell
-full size, where typing is what was asked for, at that caret. A second tap,
-not a double tap: it counts however long after the first it comes, since a
-person reads the cell they chose before deciding to type, and the 350ms of a
-double tap asked them to decide first. It opens on that tap's click, once
-the browser has moved the caret to where it landed, so the caret is the
-last tap's. A long press's lift is cancelled at `touchend`, or its click
-lands on the editor just opened and selects a word. The cost: a chosen cell
-can no longer have its caret moved by a tap without opening — but it has no
-keyboard to type at that caret with, so there is nothing to move it for. Per press, not per device: a laptop with a touch screen
-still types in place under its mouse.
+started on a cell. A cell a finger presses is read-only (`byFinger`, read on
+the table's capturing pointerdown, which comes before focus), so a tap
+chooses it, Edit appears, and nothing else moves; a second tap on the chosen
+cell or a long press (`touchOpen` in gestures.ts) opens the cell full size,
+where typing is what was asked for. Per press, not per device: a laptop with
+a touch screen still types in place under its mouse.
 
-It was `readonly` first, which kept the keyboard down too but left no caret,
-so where the finger had been was worked out by laying a hidden copy of the
-cell over it and measuring its characters one by one. The browser placing
-the caret is exact where that was an imitation — right-to-left text, emoji,
-ligatures — and costs nothing. What it costs instead: a hardware keyboard
-types straight into a cell a finger chose, the browser's caret handles can
-show on the tapped cell, and an on-screen keyboard that ignores
-`inputmode="none"` would come up as before. A long press on a cell nobody has
-tapped yet opens at the end: a browser places a caret on a tap, after the
-finger lifts, and a hold has not lifted. And a quick fix to one cell on a
-phone is two taps and a close, where it was one tap; the long press that
-opens a cell is the one that would otherwise show a tip, which a cell has
-none of.
+A second tap, not a double tap: it counts however long after the first it
+comes, since a person reads the cell they chose before deciding to type, and
+the 350ms of a double tap asked them to decide first. A quick double tap is
+the same thing faster, and still how a picture cell's button opens on iOS,
+where a tap does not focus a button.
+
+**The caret goes where the opening press was, measured.** A read-only cell
+has no caret to read, and no browser says where a point falls inside a form
+control's text, so `caretAt` lays a hidden copy of the cell over it — same
+box, type and wrapping — and measures its characters, stopping at the first
+line below the point: a small cell shows a few lines, so that is a few
+hundred characters at most. It was `inputmode="none"` for a while instead,
+which kept the keyboard down and let the browser place the caret exactly —
+but a caret a person places is one Android puts its own Paste bubble on, on
+the first tap, and nothing on a page can turn that off. The measuring is an
+imitation of the browser's layout, so right-to-left text may land a
+character off.
+
+**The gesture is listened for on the table, not on each cell.** `touchOpen`
+takes a `find` that names the cell a press landed in (`data-opens`, with the
+row and column beside it), so a table of a few hundred rows has six
+listeners for it, not six on each of its thousands of cells, and a mouse
+press stops at the first check. The lift that opens a cell is cancelled at
+`touchend`, or its click lands on the editor just opened and selects a word;
+a long press also swallows Android's context menu, and the finger's cell
+turns off text selection so a hold raises no handles. The cost: a quick fix
+to one cell on a phone is two taps and a close, where it was one tap; and the
+long press that opens a cell is the one that would otherwise show a tip,
+which a cell has none of.
 
 ## Pull-to-refresh
 
