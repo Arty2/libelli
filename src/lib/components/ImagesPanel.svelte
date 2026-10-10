@@ -69,8 +69,8 @@
 		fontOptions?: { local: string[]; google: string[] };
 		/** a file chosen for a font, to be installed under that font's own name */
 		onfontfile?: (family: string, file: File) => void;
-		/** every use of one family swapped for another */
-		onreplacefont?: (from: string, to: string) => void;
+		/** every use of one family swapped for another; false, or a promise of it, when it was refused */
+		onreplacefont?: (from: string, to: string) => boolean | void | Promise<boolean | void>;
 
 		ondeletefont?: (font: FontEntry) => void;
 	}
@@ -93,6 +93,36 @@
 		onreplacefont,
 		ondeletefont
 	}: Props = $props();
+
+	/**
+	 * The fonts in the order they were first shown, and the one a replace
+	 * just put in: the inventory sorts by name, so a replacement jumped to
+	 * wherever its name fell and the person lost their place in the list.
+	 * Here it takes the replaced font's row, outlined to say so. Both live as
+	 * long as the panel — opened again, the list is in its own order and
+	 * nothing is outlined. Lower case, as fonts.ts matches families.
+	 */
+	let fontOrder = $state<string[]>([]);
+	let replacedFont = $state<string | null>(null);
+	$effect(() => {
+		if (!fontOrder.length && fonts.length) fontOrder = fonts.map((f) => f.family.toLowerCase());
+	});
+	/** As first shown; a font that arrived since (an upload) after them, in the inventory's order. */
+	const shownFonts = $derived.by(() => {
+		const rank = new Map(fontOrder.map((family, i) => [family, i]));
+		const at = (f: FontEntry) => rank.get(f.family.toLowerCase()) ?? Infinity;
+		return [...fonts].sort((a, b) => at(a) - at(b));
+	});
+
+	async function replaceFontKeepingPlace(from: string, to: string) {
+		if ((await onreplacefont?.(from, to)) === false) return;
+		const was = from.toLowerCase();
+		const now = to.toLowerCase();
+		// Into the old font's row; or, when the replacement was already in
+		// the list, the old row simply goes and the replacement keeps its own.
+		fontOrder = fontOrder.includes(now) ? fontOrder.filter((f) => f !== was) : fontOrder.map((f) => (f === was ? now : f));
+		replacedFont = now;
+	}
 
 	/**
 	 * What a font can be replaced with, as the app's own menu: the local files
@@ -759,8 +789,12 @@
 			     another everywhere it is used. -->
 			<h3 class="section">Fonts <span class="total">{fonts.length}{fonts.some((f) => f.bytes) ? ` · ${weigh(fonts.reduce((sum, f) => sum + (f.bytes ?? 0), 0))}` : ''}</span></h3>
 			<ul class="images fonts">
-				{#each fonts as font (font.family)}
-					<li class:missing={font.status === 'missing'} class:unused={font.status === 'unused'}>
+				{#each shownFonts as font (font.family)}
+					<li
+						class:missing={font.status === 'missing'}
+						class:unused={font.status === 'unused'}
+						class:replaced={font.family.toLowerCase() === replacedFont}
+					>
 						<!-- The name set in the face it names: the quickest way to tell one
 						     font from another, and to see that a missing one is falling
 						     back — and no sample beside it to take the name's room. -->
@@ -777,7 +811,7 @@
 									placeholder="Replace"
 									value=""
 									items={replaceItems(font.family)}
-									onselect={(to) => to && onreplacefont?.(font.family, to)}
+									onselect={(to) => to && void replaceFontKeepingPlace(font.family, to)}
 								/>
 							</span>
 						{/if}
@@ -1358,6 +1392,14 @@
 	}
 
 	/* The drawings' heading, under the stored pictures. */
+	/* The font a replace just put in, where the replaced one was: outlined
+	   until the panel is opened again, as a reminder of what changed. */
+	.fonts li.replaced {
+		outline: 1px solid var(--accent);
+		outline-offset: -1px;
+		border-radius: 3px;
+	}
+
 	/* A font's name in its own face, a size up so the face can be read. */
 	.font-name {
 		font-size: 0.9375rem;

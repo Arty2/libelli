@@ -2954,14 +2954,19 @@
 	 * moved to a computer without its uploaded face is made to print, when the
 	 * file is not to hand. One undo puts it back.
 	 */
-	async function replaceFont(from: string, to: string) {
-		if (template.locked) return notify('The design is locked — unlock it to change its fonts.', 'warning');
+	/** Whether it happened: the Images tray keeps the replacement where the font was, and only then. */
+	async function replaceFont(from: string, to: string): Promise<boolean> {
+		if (template.locked) {
+			notify('The design is locked — unlock it to change its fonts.', 'warning');
+			return false;
+		}
 		const held = storedFonts.find((f) => f.family.toLowerCase() === to.toLowerCase());
 		const ref: FontRef = held ? { family: held.family, source: 'local', ref: held.ref } : { family: to, source: 'google' };
 		describe(`Replace ${from} with ${to}`);
 		template = replaceFamily($state.snapshot(template) as Template, from, ref);
 		missingFonts = await ensureTemplateFonts(template);
 		notify(`Everything set in ${from} is now in ${to}. Ctrl/Cmd+Z puts it back.`);
+		return true;
 	}
 
 	/** An upload nothing in the design uses, deleted from this browser — not from undo's reach, so it says so. */

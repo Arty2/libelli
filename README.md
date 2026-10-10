@@ -1270,7 +1270,9 @@ Pick a curated Google family, type any other family name, or upload a file.
   under that font's own name, so everything set in it takes the file: a missing
   face supplied, a Google family made local, an upload swapped for a newer cut
   — and every font the design uses has **Replace**, which sets everything in that font in another instead,
-  from the local files or Google's families, one undo to take back. A local
+  from the local files or Google's families, one undo to take back; the new
+  font takes the old one's row, outlined, so the list keeps its order until
+  the tray is opened again. A local
   file nothing in the design uses is *local · unused*, to be deleted — after
   asking, since another design in the library may still be set in it, and a
   file is in no undo.
