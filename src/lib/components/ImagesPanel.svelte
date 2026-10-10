@@ -1524,19 +1524,50 @@
 		flex-wrap: wrap;
 	}
 
-	/* Four columns, each its name over its stepper: one line at a phone's width. */
+	/* Four columns that share the row's width, each its name over its
+	   stepper; where four will not fit — a narrow phone, the interface's text
+	   made larger — they go two and two, never past the row's edge. The break
+	   is in rem, so it moves with the text size. */
 	.fonts .tune {
 		flex-basis: 100%;
+		min-width: 0;
 		display: grid;
-		grid-template-columns: repeat(4, max-content);
-		column-gap: 0.75rem;
-		padding: 0 0 4px;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 2px 4px;
+		padding: 0 0 2px;
+	}
+
+	/* Measured on the row, not the window: the tray is a column of its own. */
+	.fonts li:has(.tune) {
+		container-type: inline-size;
+	}
+
+	/* Two and two, never three and one: a stepper is about 4.75rem. */
+	@container (width < 20.5rem) {
+		.fonts .tune {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
 	}
 
 	.fonts .tune-group {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		min-width: 0;
+	}
+
+	.fonts .tune .tune-label {
+		line-height: 1.2;
+	}
+
+	/* The tuning's steps a little smaller than the row's own squares. */
+	.fonts .tune :global(button.square) {
+		width: 1.125rem;
+		height: 1.125rem;
+	}
+
+	.fonts .tune .x-value {
+		min-width: 2.25rem;
 	}
 
 	.fonts .tune-label {
