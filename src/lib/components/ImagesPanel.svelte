@@ -833,6 +833,7 @@
 			{#snippet stepper(
 				family: string,
 				label: string,
+				short: string,
 				value: string,
 				own: boolean,
 				atMin: boolean,
@@ -842,12 +843,14 @@
 				what: string
 			)}
 				<span class="tune-group">
-					<span class="tune-label">{label}</span>
+					<span class="tune-label" title={label}><span class="label-long">{label}</span><span class="label-short" aria-hidden="true">{short}</span></span>
 					<span class="x-height" role="group" aria-label="{label} of {family}">
 						<button class="square save" title="Less: {what}" aria-label="Less {label.toLowerCase()} for {family}" disabled={atMin} onclick={less}
 							><Icon name="subtract" size={12} /></button
 						>
-						<span class="x-value" class:own title="{label}: {what}{own ? ' — its own' : ''}">{value}</span>
+						<span class="x-value" class:own title="{label}: {what}{own ? ' — its own' : ''}"
+							>{value.replace(/%$/, '')}{#if value.endsWith('%')}<span class="pct">%</span>{/if}</span
+						>
 						<button class="square save" title="More: {what}" aria-label="More {label.toLowerCase()} for {family}" disabled={atMax} onclick={more}
 							><Icon name="add" size={12} /></button
 						>
@@ -931,18 +934,18 @@
 							     replace's undo, so undo and redo flip between the two. Only on
 							     the outlined row: one font tuned at a time. -->
 							<div class="tune">
-								{@render stepper(font.family, 'Size', `${Math.round(size * 100)}%`, font.size === undefined, size <= 0.5, size >= 2,
+								{@render stepper(font.family, 'Size', 'Size', `${Math.round(size * 100)}%`, font.size === undefined, size <= 0.5, size >= 2,
 									() => ontune?.(font.family, { size: size - 0.02 }), () => ontune?.(font.family, { size: size + 0.02 }),
 									`every size ${font.family} is set at, as a percentage`)}
-								{@render stepper(font.family, 'X-Height', xHeight === undefined ? '—' : `${Math.round(xHeight * 100)}%`, font.xHeight === undefined,
+								{@render stepper(font.family, 'X-Height', 'X-Ht', xHeight === undefined ? '—' : `${Math.round(xHeight * 100)}%`, font.xHeight === undefined,
 									xHeight === undefined || xHeight <= 0.2, xHeight === undefined || xHeight >= 1,
 									() => xHeight !== undefined && ontune?.(font.family, { xHeight: xHeight - 0.01 }),
 									() => xHeight !== undefined && ontune?.(font.family, { xHeight: xHeight + 0.01 }),
 									`the height of ${font.family}'s lowercase, as a percentage of its size — give two faces the same and their x-heights match`)}
-								{@render stepper(font.family, 'Spacing', `${tracking > 0 ? '+' : ''}${tracking}`, font.tracking === undefined, tracking <= -200, tracking >= 1000,
+								{@render stepper(font.family, 'Spacing', 'Track', `${tracking > 0 ? '+' : ''}${tracking}`, font.tracking === undefined, tracking <= -200, tracking >= 1000,
 									() => ontune?.(font.family, { tracking: tracking - 10 }), () => ontune?.(font.family, { tracking: tracking + 10 }),
 									`letter spacing added to ${font.family}, in thousandths of its size`)}
-								{@render stepper(font.family, 'Leading', `${Math.round(leading * 100)}%`, font.leading === undefined, leading <= 0.5, leading >= 2,
+								{@render stepper(font.family, 'Leading', 'Lead', `${Math.round(leading * 100)}%`, font.leading === undefined, leading <= 0.5, leading >= 2,
 									() => ontune?.(font.family, { leading: leading - 0.02 }), () => ontune?.(font.family, { leading: leading + 0.02 }),
 									`every leading ${font.family} is set at, as a percentage`)}
 							</div>
@@ -1524,29 +1527,21 @@
 		flex-wrap: wrap;
 	}
 
-	/* Four columns that share the row's width, each its name over its
-	   stepper; where four will not fit — a narrow phone, the interface's text
-	   made larger — they go two and two, never past the row's edge. The break
-	   is in rem, so it moves with the text size. */
+	/* One line, always: four columns sharing the row's width, each its name
+	   over its stepper, and everything in them free to shrink — the steps'
+	   buttons, the value, the label, which shortens where the row is tight
+	   (measured on the row, in rem, so it follows the text size). */
 	.fonts .tune {
 		flex-basis: 100%;
 		min-width: 0;
 		display: grid;
 		grid-template-columns: repeat(4, minmax(0, 1fr));
-		gap: 2px 4px;
+		gap: 2px;
 		padding: 0 0 2px;
 	}
 
-	/* Measured on the row, not the window: the tray is a column of its own. */
 	.fonts li:has(.tune) {
 		container-type: inline-size;
-	}
-
-	/* Two and two, never three and one: a stepper is about 4.75rem. */
-	@container (width < 20.5rem) {
-		.fonts .tune {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-		}
 	}
 
 	.fonts .tune-group {
@@ -1557,17 +1552,54 @@
 	}
 
 	.fonts .tune .tune-label {
-		line-height: 1.2;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: 0.5625rem;
+		line-height: 1.3;
 	}
 
-	/* The tuning's steps a little smaller than the row's own squares. */
+	.fonts .tune .label-short {
+		display: none;
+	}
+
+	@container (width < 20.5rem) {
+		.fonts .tune .label-long {
+			display: none;
+		}
+
+		.fonts .tune .label-short {
+			display: inline;
+		}
+	}
+
+	/* Tighter still: the per cent sign goes — the label says what the number
+	   is — and the steps' buttons narrow. */
+	@container (width < 17.5rem) {
+		.fonts .tune .pct {
+			display: none;
+		}
+
+		.fonts .tune :global(button.square) {
+			width: 0.875rem;
+		}
+	}
+
+	.fonts .tune .x-height {
+		max-width: 100%;
+	}
+
+	/* The tuning's steps smaller than the row's own squares. */
 	.fonts .tune :global(button.square) {
-		width: 1.125rem;
+		width: 1rem;
 		height: 1.125rem;
 	}
 
 	.fonts .tune .x-value {
-		min-width: 2.25rem;
+		min-width: 0;
+		padding: 0 1px;
+		white-space: nowrap;
 	}
 
 	.fonts .tune-label {
