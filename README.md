@@ -1287,6 +1287,10 @@ the upload button off: there is no file to give a face the computer has.
   flip between the two faces to compare them. Tuning any other time is a step
   of its own.
 
+- **Sections that fold** — the Images tray lists **Images**, **Drawings** and
+  **Fonts** under heads that say how many each holds and what they weigh; a
+  press on a head folds its list shut or open, and this browser remembers
+  which are shut, so the tray opens as it was left.
 - **Fonts, in the Images tray** — every font the design is set in and every
   font file this browser holds, in one list under the pictures, each name set
   in the face it names. A design carries a font's name, never its file, so

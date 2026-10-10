@@ -2,6 +2,7 @@
 	import Icon from './Icon.svelte';
 	import MenuSelect, { familyItems } from './MenuSelect.svelte';
 	import { armDefault } from '$lib/modal';
+	import { local } from '$lib/storage';
 	import { downloadUrl, slugify } from '$lib/download';
 	import { editableType, frameBetween, framePixels, isCrop, type Frame } from '$lib/photo';
 	import {
@@ -109,6 +110,19 @@
 	 * nothing is outlined. Lower case, as fonts.ts matches families.
 	 */
 	let fontOrder = $state<string[]>([]);
+
+	/**
+	 * The sections folded shut — `images`, `drawings`, `fonts` — kept in this
+	 * browser, so the tray opens as it was left: a person who never draws
+	 * need not scroll past the drawings to reach the fonts every time.
+	 */
+	const COLLAPSED_KEY = 'images-collapsed';
+	const stored = local.get<unknown>(COLLAPSED_KEY, []);
+	let collapsed = $state<string[]>(Array.isArray(stored) ? stored.filter((k): k is string => typeof k === 'string') : []);
+	function toggleSection(key: string) {
+		collapsed = collapsed.includes(key) ? collapsed.filter((k) => k !== key) : [...collapsed, key];
+		local.set(COLLAPSED_KEY, collapsed);
+	}
 
 	/** Bumped as faces load, so a face's own x-height is measured again once the face is here. */
 	let facesVersion = $state(0);
@@ -619,9 +633,6 @@
 		{:else}
 		<span class="context">Images</span>
 		{/if}
-		{#if !focus && images.length}
-			<span class="total">{images.length} · {weigh(total)}</span>
-		{/if}
 		{#if folder && !focus}
 			<span class="where">
 				{#if folder.ready}
@@ -676,6 +687,17 @@
 		</div>
 	{:else}
 	<div class="list">
+		<!-- A section's head is its fold: its name, how many and how much, and a
+		     caret that says which way it is. -->
+		{#snippet sectionHead(key: string, label: string, total: string)}
+			<h3 class="section">
+				<button class="section-toggle" aria-expanded={!collapsed.includes(key)} onclick={() => toggleSection(key)}>
+					<Icon name={collapsed.includes(key) ? 'caret-right' : 'caret-down'} size={14} />
+					{label}
+					<span class="total">{total}</span>
+				</button>
+			</h3>
+		{/snippet}
 		{#if busy}
 			<p class="empty">…</p>
 		{:else if !images.length && !missing.length && !drawings.length && !fonts.length}
@@ -684,6 +706,9 @@
 			<!-- One picture a line: what it looks like, what it is called, how big
 			     it is in pixels and in bytes, and whether anything uses it. The
 			     thumbnail is also the handle it is carried onto an area by. -->
+			{#if images.length || missing.length}
+			{@render sectionHead('images', 'Images', `${images.length + missing.length}${images.length ? ` · ${weigh(total)}` : ''}`)}
+			{#if !collapsed.includes('images')}
 			<ul class="images">
 				{#each shown as image (image.where + image.name)}
 					<li class:unused={!used.has(image.name)} title="{image.name} — {image.where === 'folder' ? 'in the folder' : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}">
@@ -750,12 +775,15 @@
 					</li>
 				{/each}
 			</ul>
+			{/if}
+			{/if}
 		{/if}
 		{#if !busy && drawings.length}
 			<!-- The pictures kept in the table itself, and on areas with no
 			     column: not files, so nothing to delete or carry here — a press
 			     opens one to draw on, in the side panel. -->
-			<h3 class="section">Drawings <span class="total">{drawings.length} · {weigh(drawings.reduce((sum, d) => sum + d.src.length * 0.75, 0))}</span></h3>
+			{@render sectionHead('drawings', 'Drawings', `${drawings.length} · ${weigh(drawings.reduce((sum, d) => sum + d.src.length * 0.75, 0))}`)}
+			{#if !collapsed.includes('drawings')}
 			<ul class="images">
 				{#each drawings as drawing (drawing.key)}
 					<li>
@@ -790,6 +818,7 @@
 					</li>
 				{/each}
 			</ul>
+			{/if}
 		{/if}
 		{#if !busy && fonts.length}
 			<!-- The faces the design is set in, and the files this browser holds.
@@ -823,7 +852,8 @@
 					</span>
 				</span>
 			{/snippet}
-			<h3 class="section">Fonts <span class="total">{fonts.length}{fonts.some((f) => f.bytes) ? ` · ${weigh(fonts.reduce((sum, f) => sum + (f.bytes ?? 0), 0))}` : ''}</span></h3>
+			{@render sectionHead('fonts', 'Fonts', `${fonts.length}${fonts.some((f) => f.bytes) ? ` · ${weigh(fonts.reduce((sum, f) => sum + (f.bytes ?? 0), 0))}` : ''}`)}
+			{#if !collapsed.includes('fonts')}
 			<ul class="images fonts">
 				{#each shownFonts as font (font.family)}
 					<li
@@ -918,6 +948,7 @@
 					</li>
 				{/each}
 			</ul>
+			{/if}
 			<input
 				bind:this={fontInput}
 				type="file"
@@ -1578,6 +1609,31 @@
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		color: #555;
+	}
+
+	/* The whole head is the fold, a quiet button in the heading's own type. */
+	.section-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		margin-left: -4px;
+		padding: 2px 4px;
+		border: none;
+		border-radius: var(--radius-button);
+		background: none;
+		font: inherit;
+		letter-spacing: inherit;
+		text-transform: inherit;
+		color: inherit;
+		cursor: pointer;
+	}
+
+	.section-toggle:hover {
+		background: #f0f0f0;
+	}
+
+	.section-toggle .total {
+		margin-left: 4px;
 	}
 
 	.section .total {
