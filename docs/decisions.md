@@ -2945,8 +2945,13 @@ it.
 x-height, spacing and leading (`FontTune`, on the template's font entry) are
 facts about a face — what it takes to make one face sit like another — so
 they apply wherever it is used, on top of what the page and each area set:
-size and leading as factors, spacing as tracking in thousandths of the size
-(em, added to the text's own spacing in mm with `calc`). They were briefly an
+size and leading as factors, spacing in mm, added to the text's own. Spacing
+was tracking in thousandths of the size first, as type is tracked, but it sat
+beside an area's Spacing in mm and the two did not read as one sum; renamed
+`letterSpacing` with the change, so a value saved in the old unit is dropped
+rather than read as millimetres. A changed value is a button back to the
+face's own: one tuning put back among several, without an undo through the
+others. They were briefly an
 X-Height field in the page and area bars too; but those bars set what an area
 is, whatever its face, and a per-face value there read as per-area. So they
 are in the tray, under the font's name, shown only on the outlined row — the

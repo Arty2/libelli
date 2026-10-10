@@ -3072,7 +3072,7 @@
 	}
 
 	/**
-	 * A face's own tuning changed — size, x-height, tracking, leading —
+	 * A face's own tuning changed — size, x-height, spacing, leading —
 	 * everywhere it is used. From the Images tray (`fromTray`), just after
 	 * that face was replaced in, it joins the replace's undo entry — see
 	 * `fontSession`; otherwise it is a step of its own.

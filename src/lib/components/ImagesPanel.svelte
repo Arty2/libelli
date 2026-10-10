@@ -868,7 +868,8 @@
 			     Any font can be given a file under its own name, or swapped for
 			     another everywhere it is used. -->
 			<!-- One tuning: its name over − value +, the value greyed while it is the
-			     face's own. -->
+			     face's own. A changed value is a button back to it: the quickest
+			     undo of one tuning among several, and where the eye already is. -->
 			{#snippet stepper(
 				family: string,
 				label: string,
@@ -878,6 +879,7 @@
 				atMax: boolean,
 				less: () => void,
 				more: () => void,
+				reset: () => void,
 				what: string
 			)}
 				<span class="tune-group">
@@ -886,9 +888,15 @@
 						<button class="square save" title="Less: {what}" aria-label="Less {label.toLowerCase()} for {family}" disabled={atMin} onclick={less}
 							><Icon name="subtract" size={12} /></button
 						>
-						<span class="x-value" class:own title="{label}: {what}{own ? ' — its own' : ''}"
-							>{value.replace(/%$/, '')}{#if value.endsWith('%')}<span class="pct">%</span>{/if}</span
-						>
+						{#if own}
+							<span class="x-value own" title="{label}: {what} — its own"
+								>{value.replace(/(%|mm)$/, '')}{#if /(%|mm)$/.test(value)}<span class="pct">{value.match(/(%|mm)$/)?.[0]}</span>{/if}</span
+							>
+						{:else}
+							<button class="x-value" title="{label}: {what}. Tap to set it back to its own" aria-label="Set the {label.toLowerCase()} of {family} back to its own" onclick={reset}
+								>{value.replace(/(%|mm)$/, '')}{#if /(%|mm)$/.test(value)}<span class="pct">{value.match(/(%|mm)$/)?.[0]}</span>{/if}</button
+							>
+						{/if}
 						<button class="square save" title="More: {what}" aria-label="More {label.toLowerCase()} for {family}" disabled={atMax} onclick={more}
 							><Icon name="add" size={12} /></button
 						>
@@ -921,6 +929,28 @@
 						<span class="size">{font.bytes ? weigh(font.bytes) : ''}</span>
 						{#if FONT_STATUS[font.status]}
 							<span class="tag" class:missing-tag={font.status === 'missing'}>{FONT_STATUS[font.status]}</span>
+						{/if}
+						<!-- What kind of face it is, for the fallback a card names after it
+						     where the face is missing — on the outlined row, between the
+						     name and Replace, as one more thing said about the face. Auto is
+						     what its file says, or what the app knows of it; a file can say
+						     nothing, or say it wrongly. -->
+						{#if font.used && font.family.toLowerCase() === outlinedFont}
+							<span class="kind">
+								<MenuSelect
+									label="Type of {font.family}, for its fallback"
+									title="What kind of face {font.family} is: where it is missing, a face of this kind stands in"
+									value={font.fallback ?? ''}
+									items={[
+										{ value: '', label: `Auto (${KIND_NAMES[font.detected ?? 'sans-serif']})` },
+										{ value: 'serif', label: KIND_NAMES.serif },
+										{ value: 'sans-serif', label: KIND_NAMES['sans-serif'] },
+										{ value: 'monospace', label: KIND_NAMES.monospace },
+										{ value: 'handwriting', label: KIND_NAMES.handwriting }
+									]}
+									onselect={(kind) => ontune?.(font.family, { fallback: (kind || undefined) as FontKind | undefined })}
+								/>
+							</span>
 						{/if}
 						{#if font.used}
 							<span class="replace">
@@ -970,7 +1000,7 @@
 						{#if font.used && font.family.toLowerCase() === outlinedFont}
 							{@const size = font.size ?? 1}
 							{@const xHeight = font.xHeight ?? natural(font.family)}
-							{@const tracking = font.tracking ?? 0}
+							{@const spacing = font.letterSpacing ?? 0}
 							{@const leading = font.leading ?? 1}
 							<!-- Under Replace, so a face just swapped in can be brought to sit
 							     like the old one there and then; from here, the steps join the
@@ -979,37 +1009,24 @@
 							<div class="tune">
 								{@render stepper(font.family, 'Size', `${Math.round(size * 100)}%`, font.size === undefined, size <= 0.5, size >= 2,
 									() => ontune?.(font.family, { size: size - 0.02 }), () => ontune?.(font.family, { size: size + 0.02 }),
+									() => ontune?.(font.family, { size: 1 }),
 									`every size ${font.family} is set at, as a percentage`)}
 								{@render stepper(font.family, 'X-Height', xHeight === undefined ? '—' : `${Math.round(xHeight * 100)}%`, font.xHeight === undefined,
 									xHeight === undefined || xHeight <= 0.2, xHeight === undefined || xHeight >= 1,
 									() => xHeight !== undefined && ontune?.(font.family, { xHeight: xHeight - 0.01 }),
 									() => xHeight !== undefined && ontune?.(font.family, { xHeight: xHeight + 0.01 }),
+									() => ontune?.(font.family, { xHeight: undefined }),
 									`the height of ${font.family}'s lowercase, as a percentage of its size — give two faces the same and their x-heights match`)}
-								{@render stepper(font.family, 'Spacing', `${tracking > 0 ? '+' : ''}${tracking}`, font.tracking === undefined, tracking <= -200, tracking >= 1000,
-									() => ontune?.(font.family, { tracking: tracking - 10 }), () => ontune?.(font.family, { tracking: tracking + 10 }),
-									`letter spacing added to ${font.family}, in thousandths of its size`)}
+								<!-- In mm and in the steps of an area's Spacing, so the two add
+								     up as they read: this is added to whatever the area sets. -->
+								{@render stepper(font.family, 'Spacing', `${spacing > 0 ? '+' : ''}${spacing.toFixed(2)}mm`, font.letterSpacing === undefined, spacing <= -2, spacing >= 5,
+									() => ontune?.(font.family, { letterSpacing: spacing - 0.05 }), () => ontune?.(font.family, { letterSpacing: spacing + 0.05 }),
+									() => ontune?.(font.family, { letterSpacing: 0 }),
+									`letter spacing in mm, added to whatever ${font.family} is set with`)}
 								{@render stepper(font.family, 'Leading', `${Math.round(leading * 100)}%`, font.leading === undefined, leading <= 0.5, leading >= 2,
 									() => ontune?.(font.family, { leading: leading - 0.02 }), () => ontune?.(font.family, { leading: leading + 0.02 }),
+									() => ontune?.(font.family, { leading: 1 }),
 									`every leading ${font.family} is set at, as a percentage`)}
-							</div>
-							<!-- What kind of face it is, for the fallback a card names after it
-							     where the face is missing. Auto is what its file says, or what
-							     the app knows of it; a file can say nothing, or say it wrongly. -->
-							<div class="tune-kind">
-								<span class="tune-label">Type</span>
-								<MenuSelect
-									label="Type of {font.family}, for its fallback"
-									title="What kind of face {font.family} is: where it is missing, a face of this kind stands in"
-									value={font.fallback ?? ''}
-									items={[
-										{ value: '', label: `Auto (${KIND_NAMES[font.detected ?? 'sans-serif']})` },
-										{ value: 'serif', label: KIND_NAMES.serif },
-										{ value: 'sans-serif', label: KIND_NAMES['sans-serif'] },
-										{ value: 'monospace', label: KIND_NAMES.monospace },
-										{ value: 'handwriting', label: KIND_NAMES.handwriting }
-									]}
-									onselect={(kind) => ontune?.(font.family, { fallback: (kind || undefined) as FontKind | undefined })}
-								/>
 							</div>
 						{/if}
 					</li>
@@ -1622,7 +1639,7 @@
 		line-height: 1.3;
 	}
 
-	/* Tight: the per cent sign goes — the label says what the number is —
+	/* Tight: the unit, % or mm, goes — the label says what the number is —
 	   the steps' buttons narrow, and the labels set a size smaller. */
 	@container (width < 17.5rem) {
 		.fonts .tune .pct {
@@ -1682,18 +1699,26 @@
 		color: #555;
 	}
 
-	/* Its kind, under the steps: the label and the menu on one short line. */
-	.fonts .tune-kind {
-		flex-basis: 100%;
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 0 0 4px;
+	/* Its kind, between the name and Replace: as wide as its word. */
+	.fonts .kind {
+		flex: none;
+		display: inline-flex;
 	}
 
-	.fonts .tune-kind .tune-label {
-		font-size: 0.5625rem;
-		letter-spacing: 0;
+	/* A changed value, a button back to the face's own: the value as it
+	   reads, with no button's frame or type. */
+	.fonts button.x-value {
+		border: none;
+		background: none;
+		height: auto;
+		cursor: pointer;
+		text-transform: none;
+		letter-spacing: normal;
+	}
+
+	.fonts button.x-value:hover {
+		color: var(--accent-strong);
+		text-decoration: underline;
 	}
 
 	/* A used font's name is the way to its tuning: a button that looks like the name. */

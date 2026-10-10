@@ -35,7 +35,7 @@ import type {
 	Template,
 	TextColumns
 } from './types';
-import { FONT_KINDS, SCHEMA_VERSION, clampFactor, clampTracking, clampXHeight } from './types';
+import { FONT_KINDS, SCHEMA_VERSION, clampFactor, clampLetterSpacing, clampXHeight } from './types';
 
 /**
  * Template defaults, validation and import/export.
@@ -666,7 +666,7 @@ function normaliseFonts(raw: any): FontRef[] {
 		const fallback = FONT_KINDS.includes(f?.fallback) ? (f.fallback as FontKind) : undefined;
 		const xHeight = clampXHeight(f?.xHeight === undefined ? undefined : Number(f.xHeight));
 		const size = clampFactor(f?.size === undefined ? undefined : Number(f.size));
-		const tracking = clampTracking(f?.tracking === undefined ? undefined : Number(f.tracking));
+		const letterSpacing = clampLetterSpacing(f?.letterSpacing === undefined ? undefined : Number(f.letterSpacing));
 		const leading = clampFactor(f?.leading === undefined ? undefined : Number(f.leading));
 		out.push({
 			family,
@@ -676,7 +676,7 @@ function normaliseFonts(raw: any): FontRef[] {
 			...(fallback ? { fallback } : {}),
 			...(xHeight !== undefined ? { xHeight } : {}),
 			...(size !== undefined ? { size } : {}),
-			...(tracking !== undefined ? { tracking } : {}),
+			...(letterSpacing !== undefined ? { letterSpacing } : {}),
 			...(leading !== undefined ? { leading } : {})
 		});
 	}

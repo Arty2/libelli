@@ -71,18 +71,18 @@ describe('a face on a card', () => {
 
 	it('carries the x-height it is set to, for font-size-adjust; nothing when it is its own', () => {
 		const fonts: FontRef[] = [{ family: 'Lora', source: 'google', xHeight: 0.52 }];
-		expect(faceOf(fonts, 'lora')).toEqual({ stack: fontStack('lora', 'serif'), adjust: 0.52, size: 1, tracking: 0, leading: 1 });
-		expect(faceOf(fonts, 'Inter')).toEqual({ stack: fontStack('Inter', 'sans-serif'), size: 1, tracking: 0, leading: 1 });
-		const tuned: FontRef[] = [{ family: 'Lora', source: 'google', size: 1.1, tracking: 20, leading: 0.9 }];
-		expect(faceOf(tuned, 'Lora')).toMatchObject({ size: 1.1, tracking: 20, leading: 0.9 });
+		expect(faceOf(fonts, 'lora')).toEqual({ stack: fontStack('lora', 'serif'), adjust: 0.52, size: 1, letterSpacing: 0, leading: 1 });
+		expect(faceOf(fonts, 'Inter')).toEqual({ stack: fontStack('Inter', 'sans-serif'), size: 1, letterSpacing: 0, leading: 1 });
+		const tuned: FontRef[] = [{ family: 'Lora', source: 'google', size: 1.1, letterSpacing: 0.2, leading: 0.9 }];
+		expect(faceOf(tuned, 'Lora')).toMatchObject({ size: 1.1, letterSpacing: 0.2, leading: 0.9 });
 	});
 
 	it('tunes a face on its entry, makes one where there is none, and clears what goes back to none', () => {
 		const t = { fonts: [{ family: 'Lora', source: 'google' }] as FontRef[] };
-		const up = tuneFont(t, 'lora', { xHeight: 0.524, size: 1.1, tracking: 20, leading: 0.9 }, { family: 'lora', source: 'google' });
-		expect(up.fonts).toEqual([{ family: 'Lora', source: 'google', xHeight: 0.52, size: 1.1, tracking: 20, leading: 0.9 }]);
+		const up = tuneFont(t, 'lora', { xHeight: 0.524, size: 1.1, letterSpacing: 0.2, leading: 0.9 }, { family: 'lora', source: 'google' });
+		expect(up.fonts).toEqual([{ family: 'Lora', source: 'google', xHeight: 0.52, size: 1.1, letterSpacing: 0.2, leading: 0.9 }]);
 		// Each key on its own; one left out of the change is left alone.
-		const back = tuneFont(up, 'Lora', { size: 1, tracking: 0 }, { family: 'Lora', source: 'google' });
+		const back = tuneFont(up, 'Lora', { size: 1, letterSpacing: 0 }, { family: 'Lora', source: 'google' });
 		expect(back.fonts).toEqual([{ family: 'Lora', source: 'google', xHeight: 0.52, leading: 0.9 }]);
 		expect(tuneFont(back, 'Lora', { xHeight: undefined, leading: 1 }, { family: 'Lora', source: 'google' }).fonts).toEqual([{ family: 'Lora', source: 'google' }]);
 		const system = tuneFont(t, 'Georgia', { xHeight: 0.48 }, { family: 'Georgia', source: 'system' });
@@ -90,7 +90,7 @@ describe('a face on a card', () => {
 		expect(tuneFont(t, 'Georgia', { size: 1 }, { family: 'Georgia', source: 'system' })).toBe(t);
 		// Out of range: an x-height of 1.06 is none, a size of 9 is the most there is.
 		expect(tuneFont(up, 'Lora', { xHeight: 1.06 }, { family: 'Lora', source: 'google' }).fonts[0].xHeight).toBeUndefined();
-		expect(tuneFont(up, 'Lora', { size: 9, tracking: -999 }, { family: 'Lora', source: 'google' }).fonts[0]).toMatchObject({ size: 2, tracking: -200 });
+		expect(tuneFont(up, 'Lora', { size: 9, letterSpacing: -9 }, { family: 'Lora', source: 'google' }).fonts[0]).toMatchObject({ size: 2, letterSpacing: -2 });
 	});
 
 	it('falls back by the kind chosen for it, over the one detected; Auto is the detected', () => {
@@ -212,7 +212,7 @@ describe('the fonts a template carries', () => {
 		const held: FontRef = { family: 'Studio', source: 'local', ref: 'font:studio' };
 		expect(fontRef('studio', [held])).toEqual(held);
 		// What one design did with a face stays in that design.
-		const tuned: FontRef = { ...held, kind: 'serif', size: 1.2, xHeight: 0.5, tracking: 20, leading: 0.9 };
+		const tuned: FontRef = { ...held, kind: 'serif', size: 1.2, xHeight: 0.5, letterSpacing: 0.2, leading: 0.9 };
 		expect(fontRef('Studio', [tuned])).toEqual({ ...held, kind: 'serif' });
 		expect(mergeFonts([], [tuned])).toEqual([{ ...held, kind: 'serif' }]);
 		expect(fontRef('georgia', [])).toEqual({ family: 'georgia', source: 'system' });

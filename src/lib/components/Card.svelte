@@ -866,18 +866,15 @@
 	 * The type of a run set in `family`, with the face's own tuning from the
 	 * Images tray on top of what the text sets: its size times the face's
 	 * size factor, its leading times the face's leading factor, and the
-	 * face's tracking — thousandths of the size, so em — added to the text's
-	 * letter spacing in mm. Untuned, exactly what the text sets.
+	 * face's letter spacing added to the text's, both in mm. Untuned, exactly what the text sets.
 	 */
 	function typeParts(family: string | undefined, size: number, lineHeight: number, letterSpacing: number): { parts: string[]; size: number } {
 		const face = faceOf(template.fonts, family);
 		const round3 = (v: number) => Math.round(v * 1000) / 1000;
 		const pt = round3(size * face.size);
 		const parts = [...faceStyle(family), `font-size:${pt}pt`, `line-height:${round3(lineHeight * face.leading)}`];
-		const em = face.tracking / 1000;
-		if (letterSpacing && em) parts.push(`letter-spacing:calc(${letterSpacing}mm + ${em}em)`);
-		else if (letterSpacing) parts.push(`letter-spacing:${letterSpacing}mm`);
-		else if (em) parts.push(`letter-spacing:${em}em`);
+		const spacing = round3(letterSpacing + face.letterSpacing);
+		if (spacing) parts.push(`letter-spacing:${spacing}mm`);
 		return { parts, size: pt };
 	}
 

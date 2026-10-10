@@ -1,5 +1,5 @@
 import { STORE_FONTS, idbDelete, idbGet, idbKeys, idbSet, local } from './storage';
-import { FONT_KINDS, clampFactor, clampTracking, clampXHeight, type FontKind, type FontRef, type Template } from './types';
+import { FONT_KINDS, clampFactor, clampLetterSpacing, clampXHeight, type FontKind, type FontRef, type Template } from './types';
 
 /**
  * Font loading. Google families come in as a stylesheet `<link>`; local files
@@ -122,7 +122,7 @@ export function xHeightOf(fonts: readonly FontRef[], family: string | undefined)
 export interface FontTune {
 	size?: number;
 	xHeight?: number;
-	tracking?: number;
+	letterSpacing?: number;
 	leading?: number;
 	/** the kind chosen for its fallback; undefined is Auto */
 	fallback?: FontKind;
@@ -137,26 +137,26 @@ const entryOf = (fonts: readonly FontRef[], family: string | undefined) => {
  * How a face is drawn on a card: its stack, fallback by kind; the x-height it
  * is set to, if any — for `font-size-adjust`, which also brings a fallback
  * face to the same x-height when the face itself is missing; and its own
- * size and leading factors and tracking, 1, 0 and 1 when untuned.
+ * size and leading factors and letter spacing in mm, 1, 0 and 1 when untuned.
  */
 export function faceOf(
 	fonts: readonly FontRef[],
 	family: string | undefined
-): { stack: string; adjust?: number; size: number; tracking: number; leading: number } {
+): { stack: string; adjust?: number; size: number; letterSpacing: number; leading: number } {
 	const entry = entryOf(fonts, family);
 	const adjust = clampXHeight(entry?.xHeight);
 	return {
 		stack: fontStack(family, kindOf(fonts, family)),
 		...(adjust !== undefined ? { adjust } : {}),
 		size: clampFactor(entry?.size) ?? 1,
-		tracking: clampTracking(entry?.tracking) ?? 0,
+		letterSpacing: clampLetterSpacing(entry?.letterSpacing) ?? 0,
 		leading: clampFactor(entry?.leading) ?? 1
 	};
 }
 
 /**
  * The template with `family`'s tuning changed: each key of `change` set, or
- * — undefined, or back at none (size 1, tracking 0, leading 1, x-height out
+ * — undefined, or back at none (size 1, letter spacing 0, leading 1, x-height out
  * of range) — removed, as clearing a field does. Kept on the family's entry
  * in the template's fonts; a family with no entry yet (a system face, an
  * undeclared name) gets one from `base`, as a menu would have made it.
@@ -166,13 +166,13 @@ export function tuneFont<T extends Pick<Template, 'fonts'>>(template: T, family:
 	const at = template.fonts.findIndex((f) => f.family.toLowerCase() === key);
 	const fit = (ref: FontRef): FontRef => {
 		const next: FontRef = { ...ref };
-		const set = (name: 'size' | 'xHeight' | 'tracking' | 'leading', value: number | undefined) => {
+		const set = (name: 'size' | 'xHeight' | 'letterSpacing' | 'leading', value: number | undefined) => {
 			if (value === undefined) delete next[name];
 			else next[name] = value;
 		};
 		if ('size' in change) set('size', clampFactor(change.size));
 		if ('xHeight' in change) set('xHeight', clampXHeight(change.xHeight));
-		if ('tracking' in change) set('tracking', clampTracking(change.tracking));
+		if ('letterSpacing' in change) set('letterSpacing', clampLetterSpacing(change.letterSpacing));
 		if ('leading' in change) set('leading', clampFactor(change.leading));
 		if ('fallback' in change) {
 			if (change.fallback && FONT_KINDS.includes(change.fallback)) next.fallback = change.fallback;
@@ -182,7 +182,7 @@ export function tuneFont<T extends Pick<Template, 'fonts'>>(template: T, family:
 	};
 	if (at >= 0) return { ...template, fonts: template.fonts.map((f, i) => (i === at ? fit(f) : f)) };
 	const made = fit({ ...base, family });
-	const tuned = ['size', 'xHeight', 'tracking', 'leading', 'fallback'].some((k) => k in made);
+	const tuned = ['size', 'xHeight', 'letterSpacing', 'leading', 'fallback'].some((k) => k in made);
 	return tuned ? { ...template, fonts: [...template.fonts, made] } : template;
 }
 
@@ -510,12 +510,12 @@ export function mergeFonts(list: FontRef[], added: FontRef[]): FontRef[] {
 /** A design's tuning of a face, and nothing else: what `untuned` takes away. */
 export function tuningOf(ref: FontRef | undefined): Partial<FontRef> {
 	if (!ref) return {};
-	const { xHeight, size, tracking, leading, fallback } = ref;
-	return Object.fromEntries(Object.entries({ xHeight, size, tracking, leading, fallback }).filter(([, v]) => v !== undefined));
+	const { xHeight, size, letterSpacing, leading, fallback } = ref;
+	return Object.fromEntries(Object.entries({ xHeight, size, letterSpacing, leading, fallback }).filter(([, v]) => v !== undefined));
 }
 
 export function untuned(ref: FontRef): FontRef {
-	const { xHeight: _x, size: _s, tracking: _t, leading: _l, fallback: _f, ...rest } = ref;
+	const { xHeight: _x, size: _s, letterSpacing: _t, leading: _l, fallback: _f, ...rest } = ref;
 	return rest;
 }
 
@@ -722,7 +722,7 @@ export interface FontEntry {
 	/** its tuning in this design (`FontTune`): each absent when it is none */
 	xHeight?: number;
 	size?: number;
-	tracking?: number;
+	letterSpacing?: number;
 	leading?: number;
 }
 
@@ -758,7 +758,7 @@ export function fontInventory(
 			fallback: own?.fallback,
 			xHeight: clampXHeight(own?.xHeight),
 			size: clampFactor(own?.size),
-			tracking: clampTracking(own?.tracking),
+			letterSpacing: clampLetterSpacing(own?.letterSpacing),
 			leading: clampFactor(own?.leading)
 		};
 		const set = Object.fromEntries(Object.entries(tune).filter(([, v]) => v !== undefined));

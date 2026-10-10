@@ -232,10 +232,13 @@ export function clampFactor(value: number | undefined): number | undefined {
 	return v === 1 ? undefined : v;
 }
 
-/** A face's tracking, in thousandths of its size: -200 to 1000, whole; 0, or anything else, is none. */
-export function clampTracking(value: number | undefined): number | undefined {
+/**
+ * A face's letter spacing, in mm like an area's: -2 to 5, to the hundredth; 0,
+ * or anything else, is none.
+ */
+export function clampLetterSpacing(value: number | undefined): number | undefined {
 	if (value === undefined || !Number.isFinite(value)) return undefined;
-	const v = Math.round(Math.min(1000, Math.max(-200, value)));
+	const v = Math.round(Math.min(5, Math.max(-2, value)) * 100) / 100;
 	return v === 0 ? undefined : v;
 }
 
@@ -268,13 +271,12 @@ export interface FontRef {
 	/**
 	 * The face's own tuning, set from the Images tray and applied wherever it
 	 * is used — what makes one face sit like another when it replaces it.
-	 * `size`: every size it is set at, times this. `tracking`: letter spacing
-	 * added to whatever the text sets, in thousandths of the size, as type is
-	 * tracked. `leading`: every leading it is set at, times this. Absent is
-	 * none: 1, 0, 1.
+	 * `size`: every size it is set at, times this. `letterSpacing`: mm added
+	 * to whatever the text sets, the unit of an area's Spacing. `leading`:
+	 * every leading it is set at, times this. Absent is none: 1, 0, 1.
 	 */
 	size?: number;
-	tracking?: number;
+	letterSpacing?: number;
 	leading?: number;
 }
 
