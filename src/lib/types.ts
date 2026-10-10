@@ -211,11 +211,34 @@ export interface PageNumberSpec {
 	showTotal?: boolean;
 }
 
+/** What kind of face a font is, for the fallback a card names after it. */
+export type FontKind = 'serif' | 'sans-serif' | 'monospace' | 'handwriting';
+export const FONT_KINDS: readonly FontKind[] = ['serif', 'sans-serif', 'monospace', 'handwriting'];
+
+/** The x-height scale a face may be given: half to double, to the hundredth; anything else is 1. */
+export function clampXHeight(value: number): number {
+	if (!Number.isFinite(value) || value <= 0) return 1;
+	return Math.round(Math.min(2, Math.max(0.5, value)) * 100) / 100;
+}
+
 export interface FontRef {
 	family: string;
 	source: 'google' | 'local' | 'system';
 	/** IndexedDB key for `source: 'local'` fonts, e.g. `font:studio-sans` */
 	ref?: string;
+	/**
+	 * What kind of face it is, read off an uploaded file when it arrived: the
+	 * fallback the card names after it, for a computer that has not got the
+	 * file. Absent, a family the app knows (`kindOf`) — or sans-serif.
+	 */
+	kind?: FontKind;
+	/**
+	 * Every use of this face set this many times its size, so its x-height can
+	 * be matched to another's: faces of one size can differ by a fifth in how
+	 * big their lowercase looks. The leading is kept, so nothing moves down
+	 * the page. Absent is 1.
+	 */
+	xHeight?: number;
 }
 
 /**

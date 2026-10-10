@@ -55,6 +55,19 @@ export function record<T>(history: History<T>, next: T, label = ''): History<T> 
 	return { ...history, past, present: { state: next, label }, future: [] };
 }
 
+/**
+ * Fold a new state into the present entry instead of recording one after it:
+ * the present keeps its label, and its state becomes `next`. For a change
+ * that refines the last step rather than being one of its own — x-height
+ * set on a font just replaced in, so one undo takes back the swap and the
+ * tuning together, and one redo brings both back. What was ahead of the
+ * present is dropped, as any edit drops it.
+ */
+export function amend<T>(history: History<T>, next: T): History<T> {
+	if (same(history.present.state, next)) return history;
+	return { ...history, present: { state: next, label: history.present.label }, future: [] };
+}
+
 export function undo<T>(history: History<T>): History<T> {
 	if (!canUndo(history)) return history;
 	const past = [...history.past];

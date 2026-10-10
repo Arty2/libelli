@@ -813,6 +813,14 @@ way, and a row that fits a phone is worth the two extra taps.
 
 ## `src/lib/history.ts`
 
+**A refinement can be folded into the last step (`amend`).** The page uses
+it for one thing: x-height set from the Images tray on a face just replaced
+in from there joins the replace's entry (`fontSession`, `commit` in +page),
+so one undo goes back to the old face and one redo brings the new one back as
+tuned — two faces compared by flipping, not by stepping back through every
+nudge. Anything recorded in between makes the replace no longer the present
+entry, and the next nudge is a step of its own.
+
 **Undo records first.** History is written on a 350ms debounce, so Undo pressed
 inside that third of a second used to find the latest change not yet recorded:
 it undid the change before, or on a fresh session nothing, and a drag just made
@@ -2870,6 +2878,29 @@ is set in, each replaceable — with Upload off: a file under a system face's
 name would only shadow it in one browser. The
 cost: a design moved to a computer without the face falls back silently,
 the way any web page does, where an upload would be marked missing.
+
+**A face falls back to its own kind.** A card's `font-family` is the face,
+then a stack of its kind (`FALLBACKS` by `kindOf`): a serif after a serif, a
+monospace after a monospace, so a design opened without its upload or its
+system face keeps its texture and a price list its columns. The app knows the
+kinds of the faces it offers (`KNOWN_KINDS`); an upload is read once, as it
+arrives (`fontKindOf`), from what its own tables say — `post.isFixedPitch`,
+PANOSE, the OS/2 IBM family class — and the kind is kept on the template's
+font entry so it travels with the design. WOFF is zlib, which
+`DecompressionStream` reads; WOFF2 is Brotli, which a page cannot decompress,
+so it, and a file that says nothing, stays sans-serif. Measuring the face on
+a canvas could tell a monospace but not a serif from a sans; the tables say
+both, for the files that have them.
+
+**X-height is a scale on the face, with the leading kept.** `font-size-adjust`
+is the property for it, and it is *Newly* available (2024), not *Widely*.
+So a face's entry carries `xHeight`, a factor on its size wherever it is used,
+and the card divides the leading by the same factor, so lines keep their
+distance and nothing below moves. One value per face, not per area: the
+point is to bring one face to another's x-height, which is a fact about the
+face; the page bar, the area bar and the tray's steps all set that one value.
+A list or a heading with a leading of its own opens up a little with the
+scaled size — the trade for not threading the factor through every renderer.
 
 **Font menus are grouped by source, local first.** Local files, then Google
 Fonts, then System (`fontChoices`, drawn by `familyItems`): the faces

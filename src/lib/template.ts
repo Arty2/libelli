@@ -15,6 +15,7 @@ import type {
 	BoxMode,
 	Centre,
 	Defaults,
+	FontKind,
 	FontRef,
 	ListMarker,
 	ListNumbering,
@@ -34,7 +35,7 @@ import type {
 	Template,
 	TextColumns
 } from './types';
-import { SCHEMA_VERSION } from './types';
+import { FONT_KINDS, SCHEMA_VERSION, clampXHeight } from './types';
 
 /**
  * Template defaults, validation and import/export.
@@ -661,7 +662,15 @@ function normaliseFonts(raw: any): FontRef[] {
 		const family = typeof f === 'string' ? f : String(f.family ?? '').trim();
 		if (!family) continue;
 		const source: FontRef['source'] = f?.source === 'local' ? 'local' : f?.source === 'system' ? 'system' : 'google';
-		out.push({ family, source, ...(f?.ref ? { ref: String(f.ref) } : {}) });
+		const kind = FONT_KINDS.includes(f?.kind) ? (f.kind as FontKind) : undefined;
+		const xHeight = clampXHeight(Number(f?.xHeight));
+		out.push({
+			family,
+			source,
+			...(f?.ref ? { ref: String(f.ref) } : {}),
+			...(kind ? { kind } : {}),
+			...(xHeight !== 1 ? { xHeight } : {})
+		});
 	}
 	return out;
 }

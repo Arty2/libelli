@@ -1,6 +1,6 @@
 import { parseColor } from './color';
 import { cssIdent } from './css';
-import { fontStack } from './fonts';
+import { fontStack, kindOf } from './fonts';
 import { bleedFor, referenceOf } from './layout';
 import { marginsOf } from './template';
 import type { Template } from './types';
@@ -42,7 +42,7 @@ export function cardVars(template: Template): [string, string][] {
 		['--margin-bottom', `${round(m.bottom)}mm`],
 		['--margin-left', `${round(m.left)}mm`],
 		['--bleed', `${round(bleedFor(template.bleed))}mm`],
-		['--text-font', fontStack(d.font, d.font)],
+		['--text-font', fontStack(d.font, kindOf(template.fonts, d.font))],
 		['--text-size', `${round(d.size)}pt`],
 		['--text-leading', `${round(d.lineHeight)}`],
 		// Through color.ts like every color that reaches a style attribute; the

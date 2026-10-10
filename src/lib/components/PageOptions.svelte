@@ -5,7 +5,7 @@
 	import './options-bar.css';
 	import { safeImageUrl } from '$lib/assets';
 	import { renamed } from '$lib/onboarding';
-	import { fontChoices, fontRef, previewFamilies } from '$lib/fonts';
+	import { fontChoices, fontRef, previewFamilies, setXHeight, xHeightOf } from '$lib/fonts';
 	import MenuSelect, { familyItems } from './MenuSelect.svelte';
 	import { withKey } from '$lib/keys';
 	import {
@@ -705,6 +705,24 @@
 					onselect={setDefaultFont}
 				/>
 			</span>
+			<!-- The face's x-height scale: one value per font, shared by every use
+			     of it — this field, the other bar's and the Images tray's steps all
+			     set the same one. The leading is kept, so nothing moves down. -->
+			<label class="field">
+				<span>X-Height</span>
+				<input
+					class="n-3"
+					type="number"
+					step="1"
+					min="50"
+					max="200"
+					title="Set everything in {template.defaults.font} at this percentage of its size, to match its x-height to another face's — every use of the font, keeping its leading"
+					value={Math.round(xHeightOf(template.fonts, template.defaults.font) * 100)}
+					disabled={pageFrozen}
+					onchange={(e) => ontemplatechange(setXHeight(template, template.defaults.font, numeric(e, 100) / 100, fontRef(template.defaults.font, editorFonts)))}
+				/>
+				<span class="unit">%</span>
+			</label>
 			<label class="field">
 				<span>Size</span>
 				<input

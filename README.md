@@ -1265,6 +1265,23 @@ Verdana, which nearly every computer has, so nothing is fetched for them. The
 Images tray lists the ones a design uses, to be replaced like any other, with
 the upload button off: there is no file to give a face the computer has.
 
+- **A fallback of the same kind** — every face is known as serif, sans-serif,
+  monospace or handwriting, and the card names a fallback of that kind after
+  it: a design opened where an uploaded file or a system face is missing
+  falls back to a serif for a serif and a monospace for a monospace, so a
+  price list still lines up. The app knows the faces it offers; an uploaded
+  file says what it is in its own tables (TrueType, OpenType and WOFF — a
+  WOFF2 falls back to sans-serif), and the design keeps that with the font.
+- **X-Height** — faces of one size can differ by a fifth in how big their
+  lowercase looks. **X-Height**, beside Font in the page bar and the area bar,
+  sets every use of a face at a percentage of its size — one value per font,
+  shared by both bars — and keeps the leading, so nothing below moves. The
+  Images tray has the same value on each font as **−** and **+**, two percent a
+  press, beside **Replace**: replace a face, bring the new one to the old one's
+  x-height there and then, and **undo** takes back the replace and the steps
+  together while **redo** (Ctrl/Cmd+Y) brings both back — flip between the two
+  faces to compare them.
+
 - **Fonts, in the Images tray** — every font the design is set in and every
   font file this browser holds, in one list under the pictures, each name set
   in the face it names. A design carries a font's name, never its file, so

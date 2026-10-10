@@ -34,6 +34,7 @@
 		previewFamilies,
 		pruneFonts,
 		replaceFamily,
+		setXHeight,
 		uploadLocalFont,
 		type FontEntry,
 		type StoredFontEntry
@@ -42,6 +43,7 @@
 	import {
 		canRedo,
 		canUndo,
+		amend,
 		createHistory,
 		record,
 		redo as redoStep,
@@ -1530,7 +1532,7 @@
 		const snap = snapshot();
 		const timer = setTimeout(() => {
 			const before = history;
-			history = record(history, snap, pending);
+			history = commit(snap);
 			// A fresh edit makes "the last change" a different change, so the
 			// alternating chord starts over rather than flipping the wrong one.
 			if (history !== before) toggledOff = false;
@@ -1538,6 +1540,26 @@
 		}, 350);
 		return () => clearTimeout(timer);
 	});
+
+	/**
+	 * A font replaced from the Images tray, while it is still the last step:
+	 * its entry's label, and the face it put in. X-height set on that face
+	 * from the tray joins the replace's entry (`amend`) rather than following
+	 * it, so one undo goes back to the old face and one redo brings the new
+	 * one back as tuned — the way to compare two faces, flipping between
+	 * them, without stepping back through every nudge. Anything else recorded
+	 * in between makes the replace no longer the last step, and ends it.
+	 */
+	let fontSession: { label: string; family: string } | null = null;
+	/** The next recording is such a nudge: amend, if the replace is still the present entry. */
+	let amendNext = false;
+
+	/** Record `snap` — or fold it into the replace it tunes, per `fontSession`. */
+	function commit(snap: Snapshot): typeof history {
+		const joins = amendNext && fontSession !== null && history.present.label === fontSession.label && canUndo(history);
+		amendNext = false;
+		return joins ? amend(history, snap) : record(history, snap, pending);
+	}
 
 	/**
 	 * Record what is on screen now, without waiting out the debounce. Undo
@@ -1551,7 +1573,7 @@
 	function flushHistory() {
 		if (!ready) return;
 		const before = history;
-		history = record(history, snapshot(), pending);
+		history = commit(snapshot());
 		if (history !== before) {
 			toggledOff = false;
 			pending = '';
@@ -2939,6 +2961,25 @@
 		if (file && missingPrintImage) await handlePrintBackgroundUpload(file, missingPrintImage);
 	}
 
+	/**
+	 * A face set at `scale` times its size everywhere it is used, to match
+	 * its x-height to another's. From the Images tray (`fromTray`), just after
+	 * that face was replaced in, it joins the replace's undo entry — see
+	 * `fontSession`; anywhere else it is a step of its own.
+	 */
+	function setFontXHeight(family: string, scale: number, fromTray = false) {
+		if (template.locked) {
+			notify('The design is locked — unlock it to change its fonts.', 'warning');
+			return;
+		}
+		const tunes = fromTray && fontSession?.family === family.toLowerCase();
+		// Recorded already: fold into it. Still waiting on the debounce: the
+		// replace's own label is pending, and this lands in the same entry.
+		if (tunes && history.present.label === fontSession?.label) amendNext = true;
+		else if (!tunes) describe(`X-height of ${family}`);
+		template = setXHeight($state.snapshot(template) as Template, family, scale, fontRef(family, editorFonts));
+	}
+
 	/** Every font uploaded to this browser — the Images tray's Fonts, beside the design's own. */
 	let storedFonts = $state<StoredFontEntry[]>([]);
 	const refreshStoredFonts = async () => (storedFonts = await listStoredFonts());
@@ -2959,7 +3000,9 @@
 		}
 		const held = storedFonts.find((f) => f.family.toLowerCase() === to.toLowerCase());
 		const ref: FontRef = held ? { family: held.family, source: 'local', ref: held.ref } : fontRef(to, editorFonts);
-		describe(`Replace ${from} with ${to}`);
+		const label = `Replace ${from} with ${to}`;
+		describe(label);
+		fontSession = { label, family: to.toLowerCase() };
 		template = replaceFamily($state.snapshot(template) as Template, from, ref);
 		missingFonts = await ensureTemplateFonts(template);
 		notify(`Everything set in ${from} is now in ${to}. Ctrl/Cmd+Z puts it back.`);
@@ -3490,6 +3533,7 @@
 					onfontfile={(family, file) => void handleFontUpload(file, family)}
 					onreplacefont={replaceFont}
 					ondeletefont={(font) => void forgetFont(font)}
+					onxheight={(family, scale) => setFontXHeight(family, scale, true)}
 				/>
 			{:else}
 			<DataTable

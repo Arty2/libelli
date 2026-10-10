@@ -7,7 +7,7 @@
 	import { parseColor } from '$lib/color';
 	import { safeImageUrl } from '$lib/assets';
 	import { completePlaceholders } from '$lib/complete';
-	import { availableWeights, fontChoices, fontRef, previewFamilies } from '$lib/fonts';
+	import { availableWeights, fontChoices, fontRef, previewFamilies, setXHeight, xHeightOf } from '$lib/fonts';
 	import MenuSelect, { familyItems, type MenuItem } from './MenuSelect.svelte';
 	import ResetButton from './ResetButton.svelte';
 	import { referenceOf } from '$lib/layout';
@@ -130,6 +130,8 @@
 
 	/** Every family a font menu offers, by where it comes from — see `fontChoices`. */
 	const families = $derived(fontChoices(template, editorFonts));
+	/** The face this area is set in: its own, or the page's. */
+	const areaFamily = $derived(selected?.font ?? template.defaults.font);
 
 	/**
 	 * The font menu: the page default, the families under their sources'
@@ -1008,6 +1010,24 @@
 					<ResetButton to="the page's {template.defaults.font}" disabled={boxFrozen} onclick={() => patch({ font: undefined })} />
 				{/if}
 			</span>
+			<!-- The face's x-height scale: one value per font, shared by every use
+			     of it — this field, the other bar's and the Images tray's steps all
+			     set the same one. The leading is kept, so nothing moves down. -->
+			<label class="field">
+				<span>X-Height</span>
+				<input
+					class="n-3"
+					type="number"
+					step="1"
+					min="50"
+					max="200"
+					title="Set everything in {areaFamily} at this percentage of its size, to match its x-height to another face's — every use of the font, keeping its leading"
+					value={Math.round(xHeightOf(template.fonts, areaFamily) * 100)}
+					disabled={pageFrozen}
+					onchange={(e) => ontemplatechange(setXHeight(template, areaFamily, numeric(e, 100) / 100, fontRef(areaFamily, editorFonts)))}
+				/>
+				<span class="unit">%</span>
+			</label>
 			<label class="field">
 				<span>Size</span>
 				<input

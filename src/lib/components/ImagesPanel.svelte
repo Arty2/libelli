@@ -69,6 +69,8 @@
 		fontFamilies?: { local: string[]; google: string[]; system: string[] };
 		/** a Replace menu opening: fetch the faces its names are set in, as the font menus do */
 		onfontsopen?: () => void;
+		/** a face set at this many times its size everywhere, to match its x-height to another's */
+		onxheight?: (family: string, scale: number) => void;
 		/** a file chosen for a font, to be installed under that font's own name */
 		onfontfile?: (family: string, file: File) => void;
 		/** every use of one family swapped for another; false, or a promise of it, when it was refused */
@@ -92,6 +94,7 @@
 		fonts = [],
 		fontFamilies = { local: [], google: [], system: [] },
 		onfontsopen,
+		onxheight,
 		onfontfile,
 		onreplacefont,
 		ondeletefont
@@ -789,7 +792,7 @@
 						<!-- The name set in the face it names: the quickest way to tell one
 						     font from another, and to see that a missing one is falling
 						     back — and no sample beside it to take the name's room. -->
-						<span class="name font-name" style="font-family:{fontStack(font.family, 'serif')}">{font.family}</span>
+						<span class="name font-name" style="font-family:{fontStack(font.family, font.kind)}">{font.family}</span>
 						<span class="size">{font.bytes ? weigh(font.bytes) : ''}</span>
 						{#if FONT_STATUS[font.status]}
 							<span class="tag" class:missing-tag={font.status === 'missing'}>{FONT_STATUS[font.status]}</span>
@@ -805,6 +808,26 @@
 									onopen={onfontsopen}
 									onselect={(to) => to && void replaceFontKeepingPlace(font.family, to)}
 								/>
+							</span>
+							<!-- Beside Replace, so a face just swapped in can be brought to the
+							     old one's x-height there and then; from here, the nudges join
+							     the replace's undo, so undo and redo flip between the two. -->
+							<span class="x-height" role="group" aria-label="X-height of {font.family}">
+								<button
+									class="square save"
+									title="Smaller: set everything in {font.family} 2% smaller, keeping its leading"
+									aria-label="Smaller x-height for {font.family}"
+									disabled={font.xHeight <= 0.5}
+									onclick={() => onxheight?.(font.family, font.xHeight - 0.02)}
+								><Icon name="subtract" size={12} /></button>
+								<span class="x-value" title="{font.family} at {Math.round(font.xHeight * 100)}% of its size, to match another face's x-height">{Math.round(font.xHeight * 100)}%</span>
+								<button
+									class="square save"
+									title="Larger: set everything in {font.family} 2% larger, keeping its leading"
+									aria-label="Larger x-height for {font.family}"
+									disabled={font.xHeight >= 2}
+									onclick={() => onxheight?.(font.family, font.xHeight + 0.02)}
+								><Icon name="add" size={12} /></button>
 							</span>
 						{/if}
 						<!-- Every font, missing or not: a file chosen here is installed
@@ -1403,6 +1426,21 @@
 		outline: 1px solid var(--accent);
 		outline-offset: -1px;
 		border-radius: 3px;
+	}
+
+	/* The x-height stepper: two quiet squares and the scale between them. */
+	.fonts .x-height {
+		flex: none;
+		display: inline-flex;
+		align-items: center;
+	}
+
+	.fonts .x-value {
+		min-width: 2.25rem;
+		text-align: center;
+		font: 0.6875rem ui-sans-serif, system-ui, sans-serif;
+		font-variant-numeric: tabular-nums;
+		color: #555;
 	}
 
 	/* A font's name in its own face, a size up so the face can be read. */
