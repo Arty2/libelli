@@ -1176,12 +1176,21 @@
 		}
 		return [...names].sort();
 	});
+	/**
+	 * The same names as one string, which `$derived` compares by value: the
+	 * list above is a new array on every edit — a drag frame, a keystroke —
+	 * and the effect below, keyed on it, read every stored picture's bytes
+	 * back from IndexedDB or the folder each time. Keyed on this, it reads
+	 * them when the set of names changes, or `imagesVersion` says the bytes
+	 * did.
+	 */
+	const imageKey = $derived(imageNames.join('\u0000'));
 
 	/** Names the template or the table point at that this browser does not hold. */
 	let missingImages = $state<string[]>([]);
 
 	$effect(() => {
-		const wanted = imageNames;
+		const wanted = imageKey ? imageKey.split('\u0000') : [];
 		// A bare read, so $effect tracks it and a bump re-runs this.
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		imagesVersion;
@@ -1528,18 +1537,38 @@
 	// Debounced, so a drag or a burst of typing becomes one entry. `record`
 	// ignores a state equal to the present, which is what stops an applied undo
 	// from recording itself straight back.
-	$effect(() => {
-		if (!ready) return;
-		const snap = snapshot();
-		const timer = setTimeout(() => {
+	//
+	// Two watchers, one timer: the template and the table are snapshotted by
+	// separate effects, each keeping its latest, so a drag — which changes the
+	// template on every frame — never clones the table, and a keystroke in a
+	// cell never clones the template. One snapshot of the whole state was
+	// taken on every change, before the debounce, and on a table of drawings
+	// that was most of a frame. An unchanged half is the same object as last
+	// time, which the history compares by reference before anything else.
+	let shotTemplate: { template: Template; templateId: string } | null = null;
+	let shotData: { dataset: Dataset; mapping: Mapping; datasetId: string } | null = null;
+	let recordTimer: ReturnType<typeof setTimeout> | undefined;
+	function recordSoon() {
+		clearTimeout(recordTimer);
+		recordTimer = setTimeout(() => {
+			if (!shotTemplate || !shotData) return;
 			const before = history;
-			history = commit(snap);
+			history = commit({ ...shotTemplate, ...shotData });
 			// A fresh edit makes "the last change" a different change, so the
 			// alternating chord starts over rather than flipping the wrong one.
 			if (history !== before) toggledOff = false;
 			pending = '';
 		}, 350);
-		return () => clearTimeout(timer);
+	}
+	$effect(() => {
+		if (!ready) return;
+		shotTemplate = { template: $state.snapshot(template), templateId };
+		recordSoon();
+	});
+	$effect(() => {
+		if (!ready) return;
+		shotData = { dataset: $state.snapshot(dataset), mapping: $state.snapshot(mapping), datasetId };
+		recordSoon();
 	});
 
 	/**

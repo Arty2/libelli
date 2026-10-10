@@ -813,6 +813,16 @@ way, and a row that fits a phone is worth the two extra taps.
 
 ## `src/lib/history.ts`
 
+**Two snapshots, one debounce; equal by reference first.** The recorder in
++page snapshots the template and the table in separate effects, each keeping
+its latest, and one timer records them together: a drag changes the
+template on every frame and never clones the table, a keystroke in a cell
+never clones the template. The half nobody touched is the very object the
+present holds, so `same` compares a state field by field and takes a shared
+reference as equal without serialising it; a state's serialisation is kept
+beside it (a WeakMap — states are never changed once recorded) so the
+present is not serialised again at every commit.
+
 **A refinement can be folded into the last step (`amend`).** The page uses
 it for one thing: x-height set from the Images tray on a face just replaced
 in from there joins the replace's entry (`fontSession`, `commit` in +page),

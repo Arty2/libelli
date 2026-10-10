@@ -209,8 +209,10 @@ export const LOCAL_IMAGE = 'local:';
 /** The name in a `local:` reference, or null for anything else. */
 export function localImageName(raw: unknown): string | null {
 	if (typeof raw !== 'string') return null;
+	// Asked of every cell on every change: the prefix is lower-cased, not the
+	// cell, which can be a drawing's thirty kilobytes of base64.
 	const value = raw.trim();
-	if (!value.toLowerCase().startsWith(LOCAL_IMAGE)) return null;
+	if (value.slice(0, LOCAL_IMAGE.length).toLowerCase() !== LOCAL_IMAGE) return null;
 	const name = value.slice(LOCAL_IMAGE.length).trim();
 	return name || null;
 }

@@ -39,7 +39,40 @@ export function createHistory<T>(present: T, limit = DEFAULT_LIMIT): History<T> 
 export const canUndo = <T>(history: History<T>) => history.past.length > 0;
 export const canRedo = <T>(history: History<T>) => history.future.length > 0;
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * Each state's serialisation, once: comparing is how a no-op is told from a
+ * change, and a state holding a table of drawings is tens of kilobytes of
+ * JSON — serialised twice per commit, the present again every time. A state
+ * is never changed once recorded (the page records snapshots), so its text
+ * is kept beside it until the state itself is let go.
+ */
+const serialised = new WeakMap<object, string>();
+function serialise(state: unknown): string {
+	if (typeof state !== 'object' || state === null) return JSON.stringify(state);
+	let text = serialised.get(state);
+	if (text === undefined) {
+		text = JSON.stringify(state);
+		serialised.set(state, text);
+	}
+	return text;
+}
+
+/**
+ * Field by field where a state is an object: a part left alone is the same
+ * object as before — the page keeps the half it did not snapshot again — and
+ * is known equal by reference, without serialising it at all.
+ */
+function same(a: unknown, b: unknown): boolean {
+	if (a === b) return true;
+	if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null || Array.isArray(a) || Array.isArray(b)) {
+		return serialise(a) === serialise(b);
+	}
+	const keys = Object.keys(a);
+	if (keys.length !== Object.keys(b).length) return false;
+	const x = a as Record<string, unknown>;
+	const y = b as Record<string, unknown>;
+	return keys.every((k) => k in y && (x[k] === y[k] || serialise(x[k]) === serialise(y[k])));
+}
 
 /**
  * Record a new present. A state identical to the current one is ignored, which

@@ -345,9 +345,27 @@
 	 * A barcode ignores Fit: it is read across, so it fills the area both ways,
 	 * every bar widened alike.
 	 */
+	/**
+	 * Codes already drawn, by everything that shapes one. `qrFor` runs again
+	 * whenever the template is replaced — every frame of dragging any area —
+	 * and encoding a QR of a hundred characters is several milliseconds, for
+	 * the same picture. Kept small: cleared whole past a few hundred.
+	 */
+	const drawnCodes = new Map<string, string>();
+
 	function qrFor(box: Box): string {
 		const value = contentOf(box).trim() || box.static?.text?.trim() || '';
 		if (!value) return '';
+		const key = JSON.stringify([value, box.qr?.kind, box.qr?.level, box.qr?.background, box.qr?.hideDigits, box.color ?? template.defaults.color, box.fit]);
+		const known = drawnCodes.get(key);
+		if (known !== undefined) return known;
+		if (drawnCodes.size > 300) drawnCodes.clear();
+		const svg = drawCode(box, value);
+		drawnCodes.set(key, svg);
+		return svg;
+	}
+
+	function drawCode(box: Box, value: string): string {
 		try {
 			if (box.qr?.kind) {
 				return barcodeSvg(value, box.qr.kind, {
