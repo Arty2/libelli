@@ -132,15 +132,17 @@ describe('fontInventory', () => {
 		expect(list[list.length - 1]).toMatchObject({ family: 'Old Face', status: 'unused', used: false });
 	});
 
-	it('leaves the system faces out: there is nothing to supply or swap for one', () => {
+	it('lists the system faces the design uses, as system: replaceable, nothing to upload', () => {
 		const withSystem = {
 			...design,
 			boxes: [...design.boxes, { font: 'Georgia' }, { font: 'Plain Office' }],
 			fonts: [...design.fonts, { family: 'Plain Office', source: 'system' }]
 		} as unknown as Design;
-		const families = fontInventory(withSystem, []).map((f) => f.family);
-		expect(families).not.toContain('Georgia');
-		expect(families).not.toContain('Plain Office');
+		const list = fontInventory(withSystem, []);
+		expect(list.find((f) => f.family === 'Georgia')).toEqual({ family: 'Georgia', status: 'system', used: true });
+		expect(list.find((f) => f.family === 'Plain Office')).toEqual({ family: 'Plain Office', status: 'system', used: true });
+		// An upload under a system face's name is the upload.
+		expect(fontInventory(withSystem, [{ ref: 'font:georgia', family: 'Georgia', bytes: 100 }]).find((f) => f.family === 'Georgia')?.status).toBe('uploaded');
 	});
 });
 

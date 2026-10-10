@@ -162,6 +162,7 @@
 	const FONT_STATUS: Record<FontEntry['status'], string> = {
 		uploaded: 'local',
 		google: '',
+		system: '',
 		missing: 'missing',
 		unused: 'local · unused'
 	};
@@ -810,9 +811,14 @@
 						     under this font's own name, so the design takes it up without
 						     another change — a missing face supplied, a Google one made
 						     local, an upload swapped for a newer cut. -->
+						<!-- Not for a system face: it is on the computer already, and a file
+						     under its name would only shadow it in this one browser. -->
 						<button
 							class="square save"
-							title="Upload a font file to use as {font.family} — installed in this browser under this name, so everything set in it takes the file"
+							disabled={font.status === 'system'}
+							title={font.status === 'system'
+								? `${font.family} is a system font — it is on the computer already, so there is no file to upload`
+								: `Upload a font file to use as ${font.family} — installed in this browser under this name, so everything set in it takes the file`}
 							aria-label="Upload a file for {font.family}"
 							onclick={() => chooseFontFile(font.family)}
 						>
@@ -1380,6 +1386,14 @@
 	.images li :global(button.square.save:hover) {
 		color: var(--accent-strong);
 		background: var(--accent-tint);
+	}
+
+	/* Off — a system font has no file to upload: faint, and no hover. */
+	.images li :global(button.square:disabled),
+	.images li :global(button.square:disabled:hover) {
+		color: #c4c4c4;
+		background: none;
+		cursor: default;
 	}
 
 	/* The drawings' heading, under the stored pictures. */

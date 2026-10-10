@@ -1261,8 +1261,9 @@ Pick a curated Google family, a system face, type any other family name, or
 upload a file. Every font menu lists them by where they come from: **Local**
 (files uploaded to this browser) first, then **Google Fonts**, then
 **System** — Arial, Georgia, Times New Roman, Courier New, Consolas and
-Verdana, which nearly every computer has, so nothing is fetched for them and
-the Images tray does not list them: there is nothing to supply or replace.
+Verdana, which nearly every computer has, so nothing is fetched for them. The
+Images tray lists the ones a design uses, to be replaced like any other, with
+the upload button off: there is no file to give a face the computer has.
 
 - **Fonts, in the Images tray** — every font the design is set in and every
   font file this browser holds, in one list under the pictures, each name set

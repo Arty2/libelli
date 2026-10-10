@@ -2864,8 +2864,10 @@ computer, so a menu offers them beside Google's, under their own heading.
 through, so no caller can forget — since Google would answer for a different
 face of the same name, or not at all, and the app makes no request nobody
 needed. `fontRef` gives a chosen family its source, and a system one is not
-declared in the template's fonts, as `replaceFamily` already left it out;
-the Images tray does not list them, having nothing to supply or swap. The
+declared in the template's fonts, as `replaceFamily` already left it out.
+The Images tray lists the ones in use — the list is every face the design
+is set in, each replaceable — with Upload off: a file under a system face's
+name would only shadow it in one browser. The
 cost: a design moved to a computer without the face falls back silently,
 the way any web page does, where an upload would be marked missing.
 

@@ -34,8 +34,9 @@ export const CURATED_GOOGLE_FONTS = [
  * Faces nearly every computer already has, offered beside the Google ones:
  * nothing to fetch and nothing to upload. Never asked of Google
  * (`ensureGoogleFont` refuses them), never declared in a template's fonts
- * (`fontRef`), and not in the Images tray's list — a design moved elsewhere
- * finds them there, or falls back as any page does without a face.
+ * (`fontRef`). The Images tray lists them, to be replaced like any other, but
+ * offers no upload: a design moved elsewhere finds them there, or falls back
+ * as any page does without a face.
  */
 export const SYSTEM_FONTS = ['Arial', 'Courier New', 'Consolas', 'Georgia', 'Times New Roman', 'Verdana'];
 
@@ -438,7 +439,7 @@ export async function deleteStoredFont(ref: string, family: string): Promise<voi
 }
 
 /** Where a font a design names comes from, as far as this browser can tell. */
-export type FontStatus = 'uploaded' | 'google' | 'missing' | 'unused';
+export type FontStatus = 'uploaded' | 'google' | 'system' | 'missing' | 'unused';
 
 export interface FontEntry {
 	family: string;
@@ -459,9 +460,11 @@ export interface FontEntry {
  *
  * A declared upload this browser does not hold is `missing`; a family the
  * design uses without declaring it, and not uploaded, is asked of Google as
- * the editor does (`ensureTemplateFonts`), so `google`. Uploads nothing here
- * uses are listed last, as `unused`, to be deleted. Used ones first, then by
- * name.
+ * the editor does (`ensureTemplateFonts`), so `google`; one of the system
+ * faces is `system` — listed so the list is every face the design is set in,
+ * each one replaceable, though there is no file to give it. Uploads nothing
+ * here uses are listed last, as `unused`, to be deleted. Used ones first,
+ * then by name.
  */
 export function fontInventory(
 	template: Pick<Template, 'defaults' | 'boxes' | 'fonts'>,
@@ -484,12 +487,18 @@ export function fontInventory(
 					: { family: font.family, status: 'missing', used: used.has(key), ref: font.ref }
 			);
 		} else if (font.source === 'google') add({ family: font.family, status: 'google', used: used.has(key) });
+		else add({ family: font.family, status: 'system', used: used.has(key) });
 	}
 	const declaredSystem = new Set(template.fonts.filter((f) => f.source === 'system').map((f) => f.family.toLowerCase()));
 	for (const family of [template.defaults.font, ...template.boxes.map((b) => b.font)]) {
-		// A system face needs nothing from anyone: not a thing to supply or swap.
-		if (!family || isSystemFamily(family) || declaredSystem.has(family.toLowerCase())) continue;
+		if (!family) continue;
 		const held = storedBy.get(family.toLowerCase());
+		// Listed, so the list is every face the design is set in and any can
+		// be replaced; but there is no file to give one, and nothing to fetch.
+		if (!held && (isSystemFamily(family) || declaredSystem.has(family.toLowerCase()))) {
+			add({ family, status: 'system', used: true });
+			continue;
+		}
 		add(held ? { family, status: 'uploaded', used: true, ref: held.ref, bytes: held.bytes } : { family, status: 'google', used: true });
 	}
 	for (const held of stored) add({ family: held.family, status: 'unused', used: false, ref: held.ref, bytes: held.bytes });
