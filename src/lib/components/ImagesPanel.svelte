@@ -113,8 +113,8 @@
 
 	/** Replace's first item: not a family — a name no family can have. */
 	const UPLOAD = '\u0000upload';
-	/** What the file picker below accepts, said where the choice is made. */
-	const UPLOAD_LABEL = 'Upload TTF/OTF/WOFF/WOFF2…';
+	/** Plain: the picker takes every common font format, so naming them adds nothing. */
+	const UPLOAD_LABEL = 'Upload…';
 
 	/**
 	 * The sections folded shut — `images`, `drawings`, `fonts` — kept in this
@@ -902,7 +902,7 @@
 									items={[
 										font.status === 'system'
 											? { value: UPLOAD, label: UPLOAD_LABEL, disabled: true, title: `${font.family} is a system font — it is on the computer already, so there is no file to upload` }
-											: { value: UPLOAD, label: UPLOAD_LABEL, title: `A font file to use as ${font.family}, installed in this browser under this name` },
+											: { value: UPLOAD, label: UPLOAD_LABEL, title: `A font file (TTF, OTF, WOFF or WOFF2) to use as ${font.family}, installed in this browser under this name` },
 										{ rule: true },
 										...familyItems(fontFamilies, font.family, ['local', 'system', 'google'], true)
 									]}

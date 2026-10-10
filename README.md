@@ -1297,8 +1297,8 @@ the upload button off: there is no file to give a face the computer has.
   what is marked is what does not travel: **local** for a file kept in this
   browser, and **missing** for one a design moved from another computer needs
   and this browser has not got — said in a banner too, whose **Replace…** opens
-  this list. Every font the design uses has **Replace**: first **Upload
-  TTF/OTF/WOFF/WOFF2…**, a file installed under that font's own name, so everything set in it takes the
+  this list. Every font the design uses has **Replace**: first **Upload…**, a
+  file installed under that font's own name, so everything set in it takes the
   file — a missing face supplied, a Google family made local, an upload
   swapped for a newer cut (off for a system font, which has no file); then the
   faces to set everything in it in instead, each in its own face, **Local**
