@@ -1,6 +1,9 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
+	import MenuSelect, { familyItems } from './MenuSelect.svelte';
 	import { armDefault } from '$lib/modal';
+	import { local } from '$lib/storage';
 	import { downloadUrl, slugify } from '$lib/download';
 	import { editableType, frameBetween, framePixels, isCrop, type Frame } from '$lib/photo';
 	import {
@@ -17,6 +20,8 @@
 		type FolderState,
 		type ImageRecord
 	} from '$lib/assets';
+	import { fontStack, type FontEntry, type FontTune } from '$lib/fonts';
+	import { FONT_KINDS, type FontKind } from '$lib/types';
 
 	/**
 	 * Where the pictures are, what they weigh, and how to get rid of them.
@@ -56,6 +61,25 @@
 		 */
 		drawings?: Array<{ key: string; label: string; where: string; src: string }>;
 		onopendrawing?: (key: string) => void;
+		/**
+		 * The fonts the design names and this browser holds — `fontInventory` —
+		 * listed after the pictures for the same reason they are: the one place
+		 * to see what a design needs that a file cannot carry, and to supply or
+		 * swap it.
+		 */
+		fonts?: FontEntry[];
+		/** what a font can be replaced with: the font menus' own families (`fontChoices`) */
+		fontFamilies?: { local: string[]; google: string[]; system: string[] };
+		/** a Replace menu opening: fetch the faces its names are set in, as the font menus do */
+		onfontsopen?: () => void;
+		/** the kind a face's fallback is chosen by, changed — everywhere it is used */
+		ontune?: (family: string, change: FontTune) => void;
+		/** a file chosen for a font, to be installed under that font's own name */
+		onfontfile?: (family: string, file: File) => void;
+		/** every use of one family swapped for another; false, or a promise of it, when it was refused */
+		onreplacefont?: (from: string, to: string) => boolean | void | Promise<boolean | void>;
+
+		ondeletefont?: (font: FontEntry) => void;
 	}
 
 	let {
@@ -69,8 +93,117 @@
 		focus = null,
 		drawings = [],
 		onopendrawing,
-		onfocus
+		onfocus,
+		fonts = [],
+		fontFamilies = { local: [], google: [], system: [] },
+		onfontsopen,
+		ontune,
+		onfontfile,
+		onreplacefont,
+		ondeletefont
 	}: Props = $props();
+
+	/**
+	 * The fonts in the order they were first shown, and the one a replace
+	 * just put in: the inventory sorts by name, so a replacement jumped to
+	 * wherever its name fell and the person lost their place in the list.
+	 * Here it takes the replaced font's row, outlined to say so. Both live as
+	 * long as the panel — opened again, the list is in its own order and
+	 * nothing is outlined. Lower case, as fonts.ts matches families.
+	 */
+	let fontOrder = $state<string[]>([]);
+
+	/** A kind of face, as the Type menu names it. */
+	const KIND_NAMES: Record<FontKind, string> = {
+		serif: 'Serif',
+		'sans-serif': 'Sans Serif',
+		monospace: 'Monospaced',
+		handwriting: 'Cursive'
+	};
+
+	/** Replace's first item: not a family — a name no family can have. */
+	const UPLOAD = '\u0000upload';
+	/** Plain: the picker takes every common font format, so naming them adds nothing. */
+	const UPLOAD_LABEL = 'Upload…';
+
+	/**
+	 * The sections folded shut — `images`, `drawings`, `fonts` — kept in this
+	 * browser, so the tray opens as it was left: a person who never draws
+	 * need not scroll past the drawings to reach the fonts every time.
+	 */
+	const COLLAPSED_KEY = 'images-collapsed';
+	const stored = local.get<unknown>(COLLAPSED_KEY, []);
+	let collapsed = $state<string[]>(Array.isArray(stored) ? stored.filter((k): k is string => typeof k === 'string') : []);
+	function toggleSection(key: string) {
+		collapsed = collapsed.includes(key) ? collapsed.filter((k) => k !== key) : [...collapsed, key];
+		local.set(COLLAPSED_KEY, collapsed);
+	}
+
+	/**
+	 * The font whose row is outlined, and so shows its Type: the one a
+	 * replace just put in, or the one last tapped. One at a time, so the list
+	 * stays a list of names; gone, like the order, when the panel closes.
+	 */
+	let outlinedFont = $state<string | null>(null);
+	$effect(() => {
+		if (!fontOrder.length && fonts.length) fontOrder = fonts.map((f) => f.family.toLowerCase());
+	});
+	/** As first shown; a font that arrived since (an upload) after them, in the inventory's order. */
+	const shownFonts = $derived.by(() => {
+		const rank = new Map(fontOrder.map((family, i) => [family, i]));
+		const at = (f: FontEntry) => rank.get(f.family.toLowerCase()) ?? Infinity;
+		return [...fonts].sort((a, b) => at(a) - at(b));
+	});
+
+	async function replaceFontKeepingPlace(from: string, to: string) {
+		if ((await onreplacefont?.(from, to)) === false) return;
+		const was = from.toLowerCase();
+		const now = to.toLowerCase();
+		// Into the old font's row; or, when the replacement was already in
+		// the list, the old row simply goes and the replacement keeps its own.
+		fontOrder = fontOrder.includes(now) ? fontOrder.filter((f) => f !== was) : fontOrder.map((f) => (f === was ? now : f));
+		outlinedFont = now;
+	}
+
+
+	/** The font a file is being chosen for: supplied under its own name, so the design finds it. */
+	let fontInput = $state<HTMLInputElement | null>(null);
+	let fontFor = $state<string | null>(null);
+
+	function chooseFontFile(family: string) {
+		fontFor = family;
+		fontInput?.click();
+	}
+
+	function fontChosen(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		const family = fontFor;
+		fontFor = null;
+		if (file && family) onfontfile?.(family, file);
+	}
+
+	/**
+	 * Deleting a font asks, as deleting a picture does: the file is in no undo,
+	 * and "unused" is this design's word — another design in the library may
+	 * be set in it, and would find it missing.
+	 */
+	let confirmingFont = $state<FontEntry | null>(null);
+
+	/**
+	 * Said only where it matters: a file kept in this browser — the thing a
+	 * design cannot carry to another computer — or one it needs and has not got.
+	 * A family fetched from Google by name travels with the design, and says
+	 * nothing.
+	 */
+	const FONT_STATUS: Record<FontEntry['status'], string> = {
+		uploaded: 'local',
+		google: '',
+		system: '',
+		missing: 'missing',
+		unused: 'local · unused'
+	};
 
 	/**
 	 * A picture the design points at and this browser does not hold — a table
@@ -81,8 +214,12 @@
 	let replaceInput = $state<HTMLInputElement | null>(null);
 	let replacing = $state<string | null>(null);
 
-	function findFor(name: string) {
+	/** Whether the file being chosen supplies a missing picture or replaces one that is here. */
+	let replacingPresent = false;
+
+	function findFor(name: string, present = false) {
 		replacing = name;
+		replacingPresent = present;
 		replaceInput?.click();
 	}
 
@@ -96,7 +233,7 @@
 		await storeLocalImage(file, name);
 		await refresh();
 		onchanged();
-		onnotice(`${name} is back, from ${file.name}.`);
+		onnotice(replacingPresent ? `${name} is now ${file.name} — everything showing it shows the new one.` : `${name} is back, from ${file.name}.`);
 	}
 
 	/**
@@ -471,10 +608,10 @@
 	looked at beside the card that uses them, and a list of them wants the
 	height a bar in the options row could never give it. One tray at a time —
 	this or the table — in the same room, at the same width or height. What
-	is stored and what it weighs at the top, the ways in at the foot, where
-	the table keeps its own.
+	is stored and what it weighs at the top; the ways in on the Images head,
+	since they are the images' alone.
 -->
-<section class="images-tray" aria-label="Images">
+<section class="images-tray" aria-label="Pictures">
 	<!-- The head is also the tray's grip on a phone, as the table's header
 	     row is: pulled up or down, it shares the height with the page. -->
 	<div
@@ -503,10 +640,7 @@
 			{/if}
 			{#if dirty}<span class="tag">edited</span>{/if}
 		{:else}
-		<span class="context">Images</span>
-		{/if}
-		{#if !focus && images.length}
-			<span class="total">{images.length} · {weigh(total)}</span>
+		<span class="context">Pictures</span>
 		{/if}
 		{#if folder && !focus}
 			<span class="where">
@@ -562,14 +696,62 @@
 		</div>
 	{:else}
 	<div class="list">
+		<!-- A section's head is its fold: its name, how many and how much, and a
+		     caret that says which way it is. -->
+		{#snippet sectionHead(key: string, label: string, total: string, actions?: Snippet)}
+			<h3 class="section">
+				<!-- After the name, as an accordion's: down to open what is folded,
+				     up to fold what is open. -->
+				<button class="section-toggle" aria-expanded={!collapsed.includes(key)} onclick={() => toggleSection(key)}>
+					{label}
+					<span class="total">{total}</span>
+					<Icon name={collapsed.includes(key) ? 'chevron-down' : 'chevron-up'} size={18} />
+				</button>
+				{#if actions}<span class="section-actions">{@render actions()}</span>{/if}
+			</h3>
+		{/snippet}
+		<!-- The ways in are the images' alone — a drawing is made in the table,
+		     a font comes in on its own row — so they are on the images' head, at
+		     its far end, rather than in a bar under every section. Upload is
+		     every browser's, a phone included; the folder is Chromium's. -->
+		{#snippet imageWays()}
+			{#if available && folder && !folder.ready}
+				<button class="open-folder" title="Open {folder.name} again, to read the images in it" onclick={reopen}>Open {folder.name}</button>
+			{/if}
+			<button class="square save" title="Upload images from this device" aria-label="Upload images" onclick={() => fileInput?.click()}>
+				<Icon name="upload" size={12} />
+			</button>
+			<!-- Shown where it cannot work too, off, so a phone or Firefox says
+			     why there is no folder rather than leaving it to be wondered at. -->
+			<button
+				class="square save"
+				disabled={!available}
+				title={!available
+					? 'A folder of your own needs Chrome or Edge on a computer — this browser cannot keep images in one, so they stay in its own storage'
+					: folder
+						? `Another folder — images are kept in ${folder.name} now`
+						: "Keep images as ordinary files in a folder of your own, rather than in this browser's storage"}
+				aria-label={folder ? 'Choose another folder' : 'Choose a folder'}
+				onclick={choose}><Icon name="folder" size={12} /></button
+			>
+			{#if available && folder}
+				<button class="square" title="Stop reading {folder.name}. Nothing in it is deleted" aria-label="Forget {folder.name}" onclick={forget}>
+					<Icon name="close" size={12} />
+				</button>
+			{/if}
+		{/snippet}
 		{#if busy}
 			<p class="empty">…</p>
-		{:else if !images.length && !missing.length && !drawings.length}
-			<p class="empty">Nothing here yet.</p>
 		{:else}
 			<!-- One picture a line: what it looks like, what it is called, how big
 			     it is in pixels and in bytes, and whether anything uses it. The
-			     thumbnail is also the handle it is carried onto an area by. -->
+			     thumbnail is also the handle it is carried onto an area by. The
+			     head is there with none, for its ways in. -->
+			{@render sectionHead('images', 'Images', `${images.length + missing.length}${images.length ? ` · ${weigh(total)}` : ''}`, imageWays)}
+			{#if !collapsed.includes('images')}
+			{#if !images.length && !missing.length}
+				<p class="empty">No images yet — upload one, or drop it on an area.</p>
+			{/if}
 			<ul class="images">
 				{#each shown as image (image.where + image.name)}
 					<li class:unused={!used.has(image.name)} title="{image.name} — {image.where === 'folder' ? 'in the folder' : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}">
@@ -605,6 +787,17 @@
 							.filter(Boolean)
 							.join(' · ')}</span>
 						{#if !used.has(image.name)}<span class="tag">unused</span>{/if}
+						<!-- A new file under the same name: every card and page that shows
+						     this picture shows the new one, with nothing to re-point. The
+						     arrow out of a tray, as a font's upload is. -->
+						<button
+							class="square save"
+							title="Replace {image.name} with another file, under the same name — everything showing it shows the new one"
+							aria-label="Replace {image.name}"
+							onclick={() => findFor(image.name, true)}
+						>
+							<Icon name="upload" size={12} />
+						</button>
 						{#if urls[image.name]}
 							<button
 								class="square save"
@@ -636,12 +829,14 @@
 					</li>
 				{/each}
 			</ul>
+			{/if}
 		{/if}
 		{#if !busy && drawings.length}
 			<!-- The pictures kept in the table itself, and on areas with no
 			     column: not files, so nothing to delete or carry here — a press
 			     opens one to draw on, in the side panel. -->
-			<h3 class="section">Drawings <span class="total">{drawings.length} · {weigh(drawings.reduce((sum, d) => sum + d.src.length * 0.75, 0))}</span></h3>
+			{@render sectionHead('drawings', 'Drawings', `${drawings.length} · ${weigh(drawings.reduce((sum, d) => sum + d.src.length * 0.75, 0))}`)}
+			{#if !collapsed.includes('drawings')}
 			<ul class="images">
 				{#each drawings as drawing (drawing.key)}
 					<li>
@@ -676,6 +871,119 @@
 					</li>
 				{/each}
 			</ul>
+			{/if}
+		{/if}
+		{#if !busy && fonts.length}
+			<!-- The faces the design is set in, and the files this browser holds.
+			     A design carries a font's name, never its file, so a design moved
+			     to another computer finds a local face missing: here it says so.
+			     Any font can be given a file under its own name, or swapped for
+			     another everywhere it is used. -->
+			{@render sectionHead('fonts', 'Fonts', `${fonts.length}${fonts.some((f) => f.bytes) ? ` · ${weigh(fonts.reduce((sum, f) => sum + (f.bytes ?? 0), 0))}` : ''}`)}
+			{#if !collapsed.includes('fonts')}
+			<ul class="images fonts">
+				{#each shownFonts as font (font.family)}
+					<li
+						class:missing={font.status === 'missing'}
+						class:unused={font.status === 'unused'}
+						class:replaced={font.family.toLowerCase() === outlinedFont}
+					>
+						<!-- The name set in the face it names: the quickest way to tell one
+						     font from another, and to see that a missing one is falling
+						     back — and no sample beside it to take the name's room. -->
+						{#if font.used}
+							<button
+								class="name font-name"
+								style="font-family:{fontStack(font.family, font.kind)}"
+								aria-expanded={font.family.toLowerCase() === outlinedFont}
+								title="{font.family}: what kind of face it is, for the one that stands in where it is missing"
+								onclick={() => (outlinedFont = font.family.toLowerCase() === outlinedFont ? null : font.family.toLowerCase())}
+							>{font.family}</button>
+						{:else}
+							<span class="name font-name" style="font-family:{fontStack(font.family, font.kind)}">{font.family}</span>
+						{/if}
+						<span class="size">{font.bytes ? weigh(font.bytes) : ''}</span>
+						{#if FONT_STATUS[font.status]}
+							<span class="tag" class:missing-tag={font.status === 'missing'}>{FONT_STATUS[font.status]}</span>
+						{/if}
+						<!-- What kind of face it is, for the fallback a card names after it
+						     where the face is missing — on the outlined row, between the
+						     name and Replace, as one more thing said about the face. Auto is
+						     what its file says, or what the app knows of it; a file can say
+						     nothing, or say it wrongly. -->
+						{#if font.used && font.family.toLowerCase() === outlinedFont}
+							<!-- A plain select, as the bars' are; Auto, which is no choice,
+							     ruled off from the kinds. -->
+							<select
+								class="kind"
+								aria-label="Type of {font.family}, for its fallback"
+								title="What kind of face {font.family} is: where it is missing, a face of this kind stands in"
+								value={font.fallback ?? ''}
+								onchange={(e) => ontune?.(font.family, { fallback: (e.currentTarget.value || undefined) as FontKind | undefined })}
+							>
+								<option value="">Auto ({KIND_NAMES[font.detected ?? 'sans-serif']})</option>
+								<hr />
+								{#each FONT_KINDS as kind (kind)}
+									<option value={kind}>{KIND_NAMES[kind]}</option>
+								{/each}
+							</select>
+						{/if}
+						{#if font.used}
+							<span class="replace">
+								<!-- Upload first: a file under this font's own name is the
+								     replacement nearest to hand — a missing face supplied, a
+								     Google one made local — then every other face to swap it
+								     for, what this computer has before what must be fetched. -->
+								<MenuSelect
+									label="Replace {font.family} with"
+									title="Upload a file for {font.family}, or set everything in it in another font instead"
+									placeholder="Replace"
+									value=""
+									items={[
+										font.status === 'system'
+											? { value: UPLOAD, label: UPLOAD_LABEL, disabled: true, title: `${font.family} is a system font — it is on the computer already, so there is no file to upload` }
+											: { value: UPLOAD, label: UPLOAD_LABEL, title: `A font file (TTF, OTF, WOFF or WOFF2) to use as ${font.family}, installed in this browser under this name` },
+										{ rule: true },
+										...familyItems(fontFamilies, font.family, ['local', 'system', 'google'], true)
+									]}
+									onopen={onfontsopen}
+									onselect={(to) => (to === UPLOAD ? chooseFontFile(font.family) : to && void replaceFontKeepingPlace(font.family, to))}
+								/>
+							</span>
+						{/if}
+						<!-- A font nothing uses has no Replace, so its upload — a newer
+						     cut under the same name — is a button of its own. -->
+						{#if !font.used}
+							<button
+								class="square save"
+								title="Upload a font file to use as {font.family} — installed in this browser under this name"
+								aria-label="Upload a file for {font.family}"
+								onclick={() => chooseFontFile(font.family)}
+							>
+								<Icon name="upload" size={12} />
+							</button>
+						{/if}
+						{#if !font.used && font.status === 'unused'}
+							<button
+								class="square"
+								title="Delete {font.family} from this browser — nothing in this design is set in it"
+								aria-label="Delete {font.family}"
+								onclick={() => (confirmingFont = font)}
+							>
+								<Icon name="trash" size={12} />
+							</button>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+			{/if}
+			<input
+				bind:this={fontInput}
+				type="file"
+				accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2"
+				hidden
+				onchange={fontChosen}
+			/>
 		{/if}
 	</div>
 	{/if}
@@ -733,26 +1041,6 @@
 				<button class="primary" disabled={!dirty || saving} title="Write the edit over {focus}" onclick={save}>Save</button>
 			{/if}
 		</div>
-	{:else}
-	<!-- The ways in, where the table keeps its toolbar. Upload is every
-	     browser's, a phone included; the folder is Chromium's. -->
-	<div class="actions">
-		<button title="Add images from this device" onclick={() => fileInput?.click()}>
-			<Icon name="image-reference" size={15} /> Upload…
-		</button>
-		{#if available}
-			{#if folder && !folder.ready}
-				<button class="primary" onclick={reopen}>Open {folder.name}</button>
-			{/if}
-			<button
-				title="Keep images as ordinary files in a folder of your own, rather than in this browser's storage"
-				onclick={choose}><Icon name="folder" size={15} /> {folder ? 'Another Folder…' : 'Folder…'}</button
-			>
-			{#if folder}
-				<button title="Stop reading the folder. Nothing in it is deleted" onclick={forget}>Forget</button>
-			{/if}
-		{/if}
-	</div>
 	{/if}
 </section>
 
@@ -795,6 +1083,41 @@
 					confirming = null;
 					void remove(doomed);
 				}}>Delete Image</button
+			>
+		</div>
+	</div>
+{/if}
+
+{#if confirmingFont}
+	{@const font = confirmingFont}
+	<div class="confirm-backdrop" role="presentation" onclick={() => (confirmingFont = null)}></div>
+	<div
+		class="confirm"
+		role="alertdialog"
+		aria-modal="true"
+		aria-labelledby="delete-font-title"
+		tabindex="-1"
+		use:armDefault
+		onkeydown={(e) => {
+			e.stopPropagation();
+			if (e.key === 'Escape') confirmingFont = null;
+		}}
+	>
+		<h2 id="delete-font-title">Delete “{font.family}”?</h2>
+		<p>
+			It is removed from this browser, and this cannot be undone. Nothing in this design is set in it, but
+			another design in your library may be, and would find it missing until the file is chosen again.
+		</p>
+		<div class="confirm-actions">
+			<button onclick={() => (confirmingFont = null)}>Cancel</button>
+			<button
+				class="danger-solid"
+				data-default
+				onclick={() => {
+					const doomed = font;
+					confirmingFont = null;
+					ondeletefont?.(doomed);
+				}}>Delete Font</button
 			>
 		</div>
 	</div>
@@ -1159,28 +1482,113 @@
 		color: #b26a00;
 	}
 
-	.images li :global(button.square) {
+	/* A grid, so the icon is in the middle of what a finger presses: as a
+	   block, the `justify-content` it had did nothing and the glyph sat at
+	   the left of its square. */
+	.images li :global(button.square),
+	.section-actions :global(button.square) {
+		flex: none;
+		display: inline-grid;
+		place-items: center;
 		border: none;
 		width: 1.375rem;
 		height: 1.375rem;
 		padding: 0;
-		justify-content: center;
 		color: #767676;
 		background: none;
 	}
 
-	.images li :global(button.square:hover) {
+	.images li :global(button.square:hover),
+	.section-actions :global(button.square:hover) {
 		color: #b42318;
 		background: #fdf3f2;
 	}
 
 	/* The download, beside Delete: as quiet, and not red on hover. */
-	.images li :global(button.square.save:hover) {
+	.images li :global(button.square.save:hover),
+	.section-actions :global(button.square.save:hover) {
 		color: var(--accent-strong);
 		background: var(--accent-tint);
 	}
 
+	/* Off — a system font has no file to upload: faint, and no hover. */
+	.images li :global(button.square:disabled),
+	.section-actions :global(button.square:disabled),
+	.images li :global(button.square:disabled:hover),
+	.section-actions :global(button.square:disabled:hover) {
+		color: #c4c4c4;
+		background: none;
+		cursor: default;
+	}
+
 	/* The drawings' heading, under the stored pictures. */
+	/* The font a replace just put in, where the replaced one was: outlined
+	   until the panel is opened again, as a reminder of what changed. */
+	.fonts li.replaced {
+		outline: 1px solid var(--accent);
+		outline-offset: -1px;
+		border-radius: 3px;
+	}
+
+	/* Its kind, between the name and Replace: the bars' own select — a line
+	   under the value, the accent's when focused — as wide as its word. */
+	.fonts select.kind {
+		flex: none;
+		max-width: 9.5rem;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
+		padding: 3px 2px;
+		border: none;
+		border-bottom: 1px solid var(--border-control);
+		border-radius: 0;
+		background: transparent;
+		color: #111;
+	}
+
+	.fonts select.kind:hover {
+		border-bottom-color: var(--border-control-hover);
+	}
+
+	.fonts select.kind:focus {
+		outline: none;
+		border-bottom-color: var(--accent);
+		box-shadow: 0 1px 0 var(--accent);
+	}
+
+	/* A used font's name is the way to its Type: a button that looks like the name. */
+	.images li button.font-name {
+		border: none;
+		background: none;
+		padding: 0;
+		height: auto;
+		text-align: left;
+		/* Not the panel's button type: the name, in its face, as it was. */
+		text-transform: none;
+		letter-spacing: normal;
+		font-weight: 400;
+		color: inherit;
+		cursor: pointer;
+	}
+
+	/* A font's name in its own face, a size up so the face can be read. */
+	.font-name {
+		font-size: 0.9375rem;
+		line-height: 1.6;
+	}
+
+	/* Wide enough for its word; the name before it gets the rest. */
+	.fonts .replace {
+		flex: none;
+		display: inline-flex;
+	}
+
+	/* "Replace" as written, beside the Type select's "Auto (Serif)": two
+	   menus on one line, set alike. On the trigger itself, since the
+	   panel's buttons are set in capitals and a button inherits none. */
+	.fonts .replace :global(.trigger) {
+		text-transform: none;
+		letter-spacing: normal;
+	}
+
 	.section {
 		display: flex;
 		align-items: baseline;
@@ -1189,6 +1597,60 @@
 		font: 600 0.6875rem ui-sans-serif, system-ui, sans-serif;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
+		color: #555;
+	}
+
+	/* The whole head is the fold, a quiet button in the heading's own type. */
+	.section-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		margin-left: -4px;
+		padding: 2px 4px;
+		border: none;
+		border-radius: var(--radius-button);
+		background: none;
+		font: inherit;
+		letter-spacing: inherit;
+		text-transform: inherit;
+		color: inherit;
+		cursor: pointer;
+	}
+
+	/* The images' ways in, at the far end of their head, as quiet as the
+	   buttons on each line under it. */
+	.section-actions {
+		margin-left: auto;
+		align-self: center;
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 400;
+	}
+
+	.section-actions .open-folder {
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
+		padding: 2px 8px;
+		margin-right: 4px;
+		border: 1px solid var(--border-control);
+		border-radius: var(--radius-button);
+		background: #fff;
+		color: #111;
+		cursor: pointer;
+	}
+
+	.section-toggle:hover {
+		background: #f0f0f0;
+	}
+
+	.section-toggle .total {
+		margin-left: 4px;
+	}
+
+	.section-toggle :global(svg) {
+		margin-left: 2px;
 		color: #555;
 	}
 

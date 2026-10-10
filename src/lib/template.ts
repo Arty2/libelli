@@ -3,6 +3,7 @@ import { clampSide, fitBoard } from './bitmap';
 import { fromRgba, parseColor, toRgba } from './color';
 import defaultCard from './templates/default-card.json';
 import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
+import { fromFile, toFile } from './frame';
 import type {
 	Anchor,
 	ColorSources,
@@ -14,8 +15,11 @@ import type {
 	BoxMode,
 	Centre,
 	Defaults,
+	FontKind,
 	FontRef,
 	ListMarker,
+	ListNumbering,
+	Leader,
 	ListStyle,
 	Mapping,
 	PageBackgroundImage,
@@ -31,7 +35,7 @@ import type {
 	Template,
 	TextColumns
 } from './types';
-import { SCHEMA_VERSION } from './types';
+import { FONT_KINDS, SCHEMA_VERSION, clampXHeight } from './types';
 
 /**
  * Template defaults, validation and import/export.
@@ -138,7 +142,17 @@ export function normaliseParagraph(raw: unknown): ParagraphStyle | undefined {
 	return { mode, amount: Math.round(Math.max(0, Math.min(MAX_PARAGRAPH, n)) * 100) / 100 };
 }
 
-export const LIST_MARKERS: ListMarker[] = ['bullet', 'disc', 'circle', 'square', 'dash', 'emdash', 'arrow', 'none'];
+export const LIST_MARKERS: ListMarker[] = [
+	'bullet',
+	'disc',
+	'circle',
+	'square',
+	'openSquare',
+	'dash',
+	'emdash',
+	'arrow',
+	'none'
+];
 
 /** Said with the glyph, since the glyph is the choice. */
 export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
@@ -146,11 +160,42 @@ export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
 	disc: '● Disc',
 	circle: '○ Circle',
 	square: '■ Square',
+	openSquare: '□ Open Square',
 	dash: '– Dash',
 	emdash: '— Em Dash',
-	arrow: '→ Arrow',
+	arrow: '➤ Arrow',
 	none: 'None'
 };
+
+/**
+ * How a numbered list may count, in the order the menu offers them: numbers,
+ * then letters, then Roman numerals, small before capital.
+ */
+export const LIST_NUMBERINGS: ListNumbering[] = ['decimal', 'lowerAlpha', 'upperAlpha', 'lowerRoman', 'upperRoman'];
+
+/** Said with the first three, since the count is the choice. */
+export const LIST_NUMBERING_LABELS: Record<ListNumbering, string> = {
+	decimal: '1, 2, 3 Numbers',
+	lowerAlpha: 'a, b, c Letters',
+	upperAlpha: 'A, B, C Capitals',
+	lowerRoman: 'i, ii, iii Roman',
+	upperRoman: 'I, II, III Roman Capitals'
+};
+
+/** The tab leaders, in the order the menu offers them. */
+export const LEADERS: Leader[] = ['none', 'dotted', 'dashed', 'solid'];
+
+export const LEADER_LABELS: Record<Leader, string> = {
+	none: 'None',
+	dotted: 'Dotted',
+	dashed: 'Dashed',
+	solid: 'Solid'
+};
+
+/** A leader the format names, or nothing. */
+export function normaliseLeader(raw: unknown): Leader | undefined {
+	return LEADERS.includes(raw as Leader) ? (raw as Leader) : undefined;
+}
 
 /** How far a list may be indented, in em. */
 export const MAX_LIST = 10;
@@ -161,14 +206,17 @@ export const MAX_BASELINE = 1;
 /** A list style with only the fields that make sense; none of them, nothing. */
 export function normaliseList(raw: unknown): ListStyle | undefined {
 	if (!raw || typeof raw !== 'object') return undefined;
-	const { marker, indent, leading } = raw as Record<string, unknown>;
+	const { marker, numbering, indent, leading } = raw as Record<string, unknown>;
 	const number = (v: unknown, floor: number, ceiling: number) => {
 		if (v === undefined || v === null || v === '') return undefined;
 		const n = Number(v);
 		return Number.isFinite(n) ? Math.round(Math.max(floor, Math.min(ceiling, n)) * 100) / 100 : undefined;
 	};
 	const list = stripUndefined({
-		marker: LIST_MARKERS.includes(marker as ListMarker) ? (marker as ListMarker) : undefined,
+		// `ring` was a circle the disc's size, for a few days in 0.28, and read
+		// as the circle twice over; a template that chose it gets the circle.
+		marker: marker === 'ring' ? 'circle' : LIST_MARKERS.includes(marker as ListMarker) ? (marker as ListMarker) : undefined,
+		numbering: LIST_NUMBERINGS.includes(numbering as ListNumbering) ? (numbering as ListNumbering) : undefined,
 		indent: number(indent, 0, MAX_LIST),
 		// The same floor an area's own leading has; past 3 lines is not leading.
 		leading: number(leading, MIN_LEADING, 3)
@@ -220,7 +268,6 @@ export function colorsFromRow(box: Box, row: Row | null | undefined): Box {
 	};
 }
 
-/** A baseline shift in em, negative allowed; zero is no shift and is dropped. */
 /** Columns an area's words may be set in: two at least, or it is not columns. */
 export const MIN_COLUMNS = 2;
 export const MAX_COLUMNS = 6;
@@ -267,6 +314,7 @@ export function normaliseColumns(raw: unknown): TextColumns | undefined {
 	return columns;
 }
 
+/** A baseline shift in em, negative allowed; zero is no shift and is dropped. */
 export function normaliseBaseline(raw: unknown): number | undefined {
 	if (raw === undefined || raw === null || raw === '') return undefined;
 	const n = Number(raw);
@@ -401,7 +449,8 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		// A mode decides which renderer a cell reaches, so a word this format does
 		// not name is read as words rather than trusted.
 		mode: readMode(partial.mode),
-		overflow: partial.overflow ?? 'clip',
+		// Read, not trusted: a word this format does not name is the default.
+		overflow: partial.overflow === 'grow' || partial.overflow === 'shrink' ? partial.overflow : 'clip',
 		// Anything optional that is not named here is dropped on load: this list
 		// is the box format, so a new field has to be added in both places.
 		...stripUndefined({
@@ -410,6 +459,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			weight: partial.weight === undefined ? undefined : Math.max(100, Math.min(900, num(partial.weight, 400))),
 			lineHeight: optionalAtLeast(partial.lineHeight, MIN_LEADING),
 			paragraph: normaliseParagraph(partial.paragraph),
+			leader: normaliseLeader(partial.leader),
 			list: normaliseList(partial.list),
 			baseline: normaliseBaseline(partial.baseline),
 			columns: normaliseColumns(partial.columns),
@@ -422,6 +472,9 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			italic: partial.italic,
 			letterSpacing: partial.letterSpacing,
 			textCase: partial.textCase,
+			// Only beside the page's size, as the bar offers it: a box with a
+			// size of its own keeps that and drops this.
+			xHeight: partial.size === undefined ? clampXHeight(partial.xHeight === undefined ? undefined : Number(partial.xHeight)) : undefined,
 			md: partial.md,
 			qr: partial.mode === 'qr' ? normaliseQr(partial.qr) : partial.qr,
 			anchor: normaliseAnchor(partial.anchor),
@@ -467,7 +520,28 @@ export function normaliseTemplate(raw: unknown): Template {
 	}
 	if (!Array.isArray(t.boxes)) throw new Error('Template has no boxes.');
 
-	const boxes: Box[] = t.boxes.map((b: any) => newBox(b));
+	// The defaults first: an area inheriting the page's alignment is placed
+	// by it, so its corner cannot be found from the file until they are read.
+	const defaults = stripUndefined({
+		...DEFAULT_DEFAULTS,
+		...stripUndefined(t.defaults ?? {}),
+		color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color,
+		size: atLeast(t.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
+		lineHeight: atLeast(t.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
+		paragraph: normaliseParagraph(t.defaults?.paragraph),
+		// The page's `none` is the same as none at all, so it is not kept.
+		leader: normaliseLeader(t.defaults?.leader) === 'none' ? undefined : normaliseLeader(t.defaults?.leader),
+		list: normaliseList(t.defaults?.list),
+		baseline: normaliseBaseline(t.defaults?.baseline)
+	}) as Defaults;
+	// Top-left corners in memory, whichever way the file gave them — frame.ts.
+	// A file without the marker was written with top-left corners, and is read
+	// that way until LEGACY_TOP_LEFT_UNTIL.
+	const boxes: Box[] = fromFile(
+		t.boxes.map((b: any) => newBox(b)),
+		defaults,
+		t.frame
+	);
 	const ids = new Set(boxes.map((b) => b.id));
 	// Drop anchors that point nowhere rather than letting layout guess.
 	for (const box of boxes) {
@@ -492,16 +566,7 @@ export function normaliseTemplate(raw: unknown): Template {
 		print: normalisePrintSettings(t.print),
 		pageNumber: normalisePageNumber(t.pageNumber),
 		fonts: normaliseFonts(t.fonts),
-		defaults: stripUndefined({
-			...DEFAULT_DEFAULTS,
-			...stripUndefined(t.defaults ?? {}),
-			color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color,
-			size: atLeast(t.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
-			lineHeight: atLeast(t.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
-			paragraph: normaliseParagraph(t.defaults?.paragraph),
-			list: normaliseList(t.defaults?.list),
-			baseline: normaliseBaseline(t.defaults?.baseline)
-		}) as Defaults,
+		defaults,
 		slots,
 		boxes,
 		...stripUndefined({
@@ -518,7 +583,13 @@ export const DEFAULT_QR: QrSettings = { level: 'M' };
 function normaliseQr(raw: any): QrSettings {
 	const level = ['L', 'M', 'Q', 'H'].includes(raw?.level) ? raw.level : DEFAULT_QR.level;
 	const background = parseColor(raw?.background);
-	return { level, ...(background ? { background } : {}) };
+	const kind = raw?.kind === 'code128' || raw?.kind === 'ean13' ? raw.kind : undefined;
+	return {
+		...(kind ? { kind } : {}),
+		...(kind && raw?.hideDigits === true ? { hideDigits: true as const } : {}),
+		level,
+		...(background ? { background } : {})
+	};
 }
 
 function normaliseBleed(raw: any): Template['bleed'] {
@@ -594,7 +665,15 @@ function normaliseFonts(raw: any): FontRef[] {
 		const family = typeof f === 'string' ? f : String(f.family ?? '').trim();
 		if (!family) continue;
 		const source: FontRef['source'] = f?.source === 'local' ? 'local' : f?.source === 'system' ? 'system' : 'google';
-		out.push({ family, source, ...(f?.ref ? { ref: String(f.ref) } : {}) });
+		const kind = FONT_KINDS.includes(f?.kind) ? (f.kind as FontKind) : undefined;
+		const fallback = FONT_KINDS.includes(f?.fallback) ? (f.fallback as FontKind) : undefined;
+		out.push({
+			family,
+			source,
+			...(f?.ref ? { ref: String(f.ref) } : {}),
+			...(kind ? { kind } : {}),
+			...(fallback ? { fallback } : {})
+		});
 	}
 	return out;
 }
@@ -892,6 +971,6 @@ export function importedTemplate(raw: unknown): Template {
  * our starter.
  */
 export function exportTemplate(t: Template): string {
-	const { starter: _starter, ...shared } = t;
+	const { starter: _starter, ...shared } = toFile(t);
 	return JSON.stringify(shared, null, 2);
 }

@@ -34,12 +34,13 @@ src/lib/
   boxops.ts       box and selection transforms: duplicate, delete, group, lock, nudge
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
   gestures.ts     swipe; tooltip.ts where a tip goes; haptics.ts the buzz for a press
+  caret.ts        the character of a text field a point lands on
   scrolledge.ts   which edges of a scroller have more, for the shadow that says so
   complete.ts     the column names `%%` offers; placeholders.ts what `%%name%%` resolves to
   modal.ts        the two-Enter rule every dialog with a default action shares
   icons.ts        IBM Carbon icon paths (Apache-2.0), inlined rather than depended on
   png.ts          card -> PNG via SVG foreignObject; inlines stylesheets and stored fonts
-  qr.ts           QR encoding (byte mode, versions 1-10) -> SVG
+  qr.ts           QR encoding (byte mode, versions 1-10) -> SVG; barcode.ts Code 128, EAN-13
   hand.ts         a border drawn by hand: seeded wobble -> SVG paths, in mm
   bitmap.ts       the pixel budget a drawn area gets, and pointing at it
   pngpack.ts      a drawing saved as a palette PNG, a bit or two a pixel
@@ -49,6 +50,8 @@ src/lib/
   imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
   download.ts     hand the browser a file; zip.ts packs several into one
   template.ts     defaults (templates/default-card.json), validation, migration, import/export
+  frame.ts        a file's x, y at the reference point; memory's top-left; the bridge to 0.30
+  tablock.ts      one tab edits: a Web Lock, handed over on request after a save
   fonts.ts        Google families + local files via FontFace/IndexedDB
   assets.ts       images — page backgrounds and a row's own; bytes in a folder or IndexedDB
   history.ts      undo/redo snapshots
@@ -69,7 +72,7 @@ src/lib/
     Lightbox / SheetLightbox  one card, or one sheet, full screen
     CssEditor.svelte    the template's stylesheet: numbers, colour, tabs, wrap — over a real textarea
     BitmapEditor.svelte the drawing surface, hosted in DataTable; saves a base64 PNG
-    ImagesPanel.svelte  stored pictures, their weight, the folder; one large, to crop or turn
+    ImagesPanel.svelte  the Pictures tray: images, drawings, fonts; one large, to crop or turn
     Tooltip.svelte      every `title` as a tip: hover, or press and hold on touch
     PrintRoot, BoxMenu, SelectionTools, MenuSelect, ColorField, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
@@ -90,10 +93,12 @@ src/routes/app.css        the :root tokens and app-wide rules
   [Widely available](https://web.dev/baseline), not merely *Newly* — and weigh
   the failure mode, not just the support table: a feature that degrades costs
   little, one invalid at computed-value time takes the whole declaration with it
-  and can leave a page unreadable. Two standing exceptions, taken knowingly:
+  and can leave a page unreadable. Three standing exceptions, taken knowingly:
   `field-sizing: content` in `DataTable.svelte`, which falls back to a fixed
-  scrollable field, and `orphans`/`widows` on columns in `Card.svelte`, which
-  Firefox ignores while the columns still flow. Anything failing worse waits.
+  scrollable field; `orphans`/`widows` on columns in `Card.svelte`, which
+  Firefox ignores while the columns still flow; and `font-size-adjust` for an
+  area's X-Height in `Card.svelte`, which a browser without it ignores,
+  drawing the face at its own. Anything failing worse waits.
 - **A template stores the right-hand page.** With facing pages on, a left-hand
   page is `mirrorBox` applied as the card is drawn — never a second set of
   coordinates. Anything that writes geometry back (dragging, nudging, the
@@ -101,9 +106,10 @@ src/routes/app.css        the :root tokens and app-wide rules
   before it is written, not stored mirrored.
 - **No runtime dependencies.** The Markdown renderer, the CSV parser and the QR
   encoder are hand-written, so the app works offline and nothing can rot
-  underneath it. `jsqr` is a dev dependency only — the tests decode generated
-  codes with an independent decoder, because a QR that does not scan looks
-  exactly like one that does.
+  underneath it. A code that does not scan looks exactly like one that does, so
+  every QR and barcode the tests hold was read back once with an independent
+  decoder and is pinned, module for module; change the encoder on purpose and
+  decode the new ones once more before pinning them.
 - **The app makes no request nobody asked for.** Three paths out: `png.ts`
   inlines faces and pictures for export, the worker caches, and `fonts.ts`
   appends a `<link>` for a Google family. A template reaches the last — it names

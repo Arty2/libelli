@@ -25,7 +25,7 @@ const assetKey = (name: string) => `image:${name.trim().toLowerCase()}`;
  * Without this, re-picking an image a few times leaks a copy each time.
  *
  * Replaced only when the picture has changed, not on every resolve. The card
- * and the Images bar each hold the URLs they were given, and a resolve by one
+ * and the Pictures tray each hold the URLs they were given, and a resolve by one
  * used to revoke what the other was still showing — a picture carried out of
  * the bar a second time dragged a broken-image icon, its URL revoked by the
  * card's resolve after the first drop. `version` says whether it is the same
@@ -209,8 +209,10 @@ export const LOCAL_IMAGE = 'local:';
 /** The name in a `local:` reference, or null for anything else. */
 export function localImageName(raw: unknown): string | null {
 	if (typeof raw !== 'string') return null;
+	// Asked of every cell on every change: the prefix is lower-cased, not the
+	// cell, which can be a drawing's thirty kilobytes of base64.
 	const value = raw.trim();
-	if (!value.toLowerCase().startsWith(LOCAL_IMAGE)) return null;
+	if (value.slice(0, LOCAL_IMAGE.length).toLowerCase() !== LOCAL_IMAGE) return null;
 	const name = value.slice(LOCAL_IMAGE.length).trim();
 	return name || null;
 }

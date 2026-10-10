@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	/** One choice in the menu, or a rule between runs of them. */
+	/** One choice in the menu, a rule between runs of them, or a run's heading. */
 	export type MenuItem =
 		| {
 				value: string;
@@ -9,12 +9,41 @@
 				title?: string;
 				disabled?: boolean;
 		  }
-		| { rule: true };
+		| { rule: true }
+		| { heading: string };
+
+	/**
+	 * Every font menu's families, each name set in its own face, under a
+	 * heading for where it comes from: Local, then Google Fonts, then System
+	 * (`fontChoices`). One list for the page's Font, an area's, and a font's
+	 * Replace, which leaves out the font being replaced (`except`) and puts
+	 * the system faces before Google's (`order`): there it is a choice of what
+	 * this computer already has before what must be fetched, a rule between
+	 * the runs (`ruled`). A run with nothing in it has no heading either.
+	 */
+	export type FamilySource = 'local' | 'google' | 'system';
+	const SOURCE_HEADINGS: Record<FamilySource, string> = { local: 'Local', google: 'Google Fonts', system: 'System' };
+	export function familyItems(
+		choices: Record<FamilySource, string[]>,
+		except?: string,
+		order: FamilySource[] = ['local', 'google', 'system'],
+		ruled = false
+	): MenuItem[] {
+		const keep = (family: string) => family.toLowerCase() !== except?.toLowerCase();
+		const runs = order
+			.map((source) => ({ source, kept: choices[source].filter(keep) }))
+			.filter((run) => run.kept.length);
+		return runs.flatMap(({ source, kept }, i): MenuItem[] => [
+			...(ruled && i > 0 ? [{ rule: true as const }] : []),
+			{ heading: SOURCE_HEADINGS[source] },
+			...kept.map((family) => ({ value: family, label: family, family }))
+		]);
+	}
 </script>
 
 <script lang="ts">
 	import Icon from './Icon.svelte';
-	import { fontStack } from '$lib/fonts';
+	import { fontStack, kindOf } from '$lib/fonts';
 
 	/**
 	 * A select, drawn the way the template picker is drawn: the value on a
@@ -52,6 +81,11 @@
 		 * Fit and the zoom before it.
 		 */
 		ondouble?: () => void;
+		/**
+		 * What the trigger says while the value is none of the choices: an
+		 * action rather than a setting — *Replace…* — whose value is never kept.
+		 */
+		placeholder?: string;
 	}
 
 	let {
@@ -64,7 +98,8 @@
 		onopen,
 		showFamily = false,
 		bare = false,
-		ondouble
+		ondouble,
+		placeholder
 	}: Props = $props();
 
 	let open = $state(false);
@@ -76,14 +111,27 @@
 		maxHeight: 320
 	});
 
-	const choices = $derived(items.filter((item): item is Extract<MenuItem, { value: string }> => !('rule' in item)));
+	const choices = $derived(items.filter((item): item is Extract<MenuItem, { value: string }> => 'value' in item));
 	const current = $derived(choices.find((item) => item.value === value));
+
+	/**
+	 * A family's name in its own face, falling back to a face of its kind
+	 * (`kindOf`): a phone without Georgia shows it in a serif, without
+	 * Consolas in a monospace, so the list still says what each one is like.
+	 */
+	const faceStack = (family: string) => fontStack(family, kindOf([], family));
 
 	function place() {
 		const box = trigger?.getBoundingClientRect();
 		if (!box) return;
-		const below = window.innerHeight - box.bottom - 8;
-		const above = box.top - 8;
+		// The screen a person can see, not the layout's: on a phone the
+		// browser's own bars and a pinch can leave less of the window showing,
+		// and a menu measured to the window ran under them.
+		const view = window.visualViewport;
+		const height = view ? view.offsetTop + view.height : window.innerHeight;
+		const width = view ? view.offsetLeft + view.width : window.innerWidth;
+		const below = height - box.bottom - 8;
+		const above = box.top - (view?.offsetTop ?? 0) - 8;
 		// Down where there is room, up where there is more of it — the zoom sits
 		// in the bottom corner of the stage, and a menu hung below it is off the
 		// screen.
@@ -91,13 +139,15 @@
 		// the zoom's trigger is at the right of the stage, and a menu reaching
 		// rightwards from it ran under the table beside the page.
 		const side =
-			box.left + box.width / 2 > window.innerWidth / 2
-				? { right: Math.max(8, window.innerWidth - box.right) }
-				: { left: Math.max(8, Math.min(box.left, window.innerWidth - 216)) };
+			box.left + box.width / 2 > width / 2
+				? { right: Math.max(8, window.innerWidth - Math.min(box.right, width - 8)) }
+				: { left: Math.max(8, Math.min(box.left, width - 216)) };
+		// Never more than the room on its side: a floor taller than the room
+		// pushed the menu's end off the screen.
 		at =
 			below >= 240 || below >= above
-				? { ...side, top: box.bottom + 4, maxHeight: Math.max(120, below) }
-				: { ...side, bottom: window.innerHeight - box.top + 4, maxHeight: Math.max(120, above) };
+				? { ...side, top: box.bottom + 4, maxHeight: below - 4 }
+				: { ...side, bottom: window.innerHeight - box.top + 4, maxHeight: above - 4 };
 	}
 
 	/**
@@ -186,14 +236,14 @@
 		type="button"
 		aria-haspopup="menu"
 		aria-expanded={open}
-		aria-label="{label}: {current?.label ?? value}"
+		aria-label="{label}: {current?.label ?? placeholder ?? value}"
 		title={title ?? current?.title}
 		{disabled}
 		onclick={press}
 		onkeydown={onTriggerKey}
 	>
-		<span class="value" style={showFamily && current?.family ? `font-family:${fontStack(current.family, '')}` : ''}
-			>{current?.label ?? value}</span
+		<span class="value" style={showFamily && current?.family ? `font-family:${faceStack(current.family)}` : ''}
+			>{current?.label ?? placeholder ?? value}</span
 		>
 		<Icon name="caret-down" size={18} />
 	</button>
@@ -211,6 +261,8 @@
 			{#each items as item, i (i)}
 				{#if 'rule' in item}
 					<li role="separator"><hr /></li>
+				{:else if 'heading' in item}
+					<li role="presentation" class="heading">{item.heading}</li>
 				{:else}
 					<li role="none">
 						<button
@@ -224,7 +276,7 @@
 							<span class="tick" aria-hidden="true">
 								{#if item.value === value}<Icon name="checkmark" size={16} />{/if}
 							</span>
-							<span style={item.family ? `font-family:${fontStack(item.family, '')}` : ''}>{item.label}</span>
+							<span style={item.family ? `font-family:${faceStack(item.family)}` : ''}>{item.label}</span>
 						</button>
 					</li>
 				{/if}
@@ -295,6 +347,8 @@
 	.menu {
 		position: fixed;
 		z-index: 60;
+		/* Its padding and border inside the height `place` measured for it. */
+		box-sizing: border-box;
 		min-width: 12rem;
 		max-width: min(20rem, calc(100vw - 16px));
 		overflow-y: auto;
@@ -306,6 +360,16 @@
 		border: 1px solid #d5d5d5;
 		border-radius: 6px;
 		box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+	}
+
+	/* A run's name, quieter than its choices, as the bar's legends are; in
+	   line with the choices' names, past the tick column. */
+	.menu .heading {
+		padding: 8px 8px 2px 30px;
+		font: 600 0.6875rem ui-sans-serif, system-ui, sans-serif;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: #666;
 	}
 
 	.menu button {

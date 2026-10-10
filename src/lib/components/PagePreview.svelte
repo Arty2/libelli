@@ -28,6 +28,8 @@
 		guides: boolean;
 		/** the temporary guides a drag shows as it lines up — see Card's `smartGuides` */
 		smartGuides: boolean;
+		/** the distances a drag shows to its neighbours — see Card's `spacing` */
+		spacingGuides: boolean;
 		/** ruled lines, or a dot at every intersection */
 		gridStyle: GridStyle;
 		selectedIds: string[];
@@ -65,7 +67,7 @@
 		onbounds: (show: boolean, ties: boolean) => void;
 		ongrid: (show: boolean) => void;
 		/** the margins and the temporary guides, together — the Guides box's three states */
-		onguides: (margins: boolean, smart: boolean) => void;
+		onguides: (margins: boolean, smart: boolean, spacing: boolean) => void;
 		/** press and hold the Grid toggle: the same grid, drawn the other way */
 		ongridstyle: (style: GridStyle) => void;
 		onzoom: (zoom: 'fit' | 'actual' | number) => void;
@@ -117,6 +119,7 @@
 		grid,
 		guides,
 		smartGuides,
+		spacingGuides,
 		gridStyle,
 		selectedIds,
 		zoom,
@@ -1187,29 +1190,28 @@
 	let panning = $state(false);
 
 	/**
-	 * The pad put away. It covers a corner of the page, and zoomed in that can
-	 * be the corner you are working on; held on its middle it goes, and a
-	 * button under zoom and pan brings it back. The middle, because the arrows
-	 * already repeat while held, and the middle's tap (the step) and drag (move
-	 * the pad) are taken — a hold was the gesture it had left.
+	 * The pad shown or put away, by hand. It covers a corner of the page, and
+	 * zoomed in that can be the corner you are working on; held on its middle
+	 * it goes, and a button under zoom and pan brings it back. The middle,
+	 * because the arrows already repeat while held, and the middle's tap (the
+	 * step) and drag (move the pad) are taken — a hold was the gesture it had
+	 * left.
+	 *
+	 * One choice for both modes, not one each: switching between Move and zoom
+	 * and pan is about what a finger on an area does, and a pad that came and
+	 * went with it was a second thing changing that nobody had asked to change.
+	 * Null until there is a choice, so the pad starts as the mode the stage
+	 * opens in has it — out under zoom and pan, which a touch screen opens in,
+	 * put away in Move — and the first switch keeps it as it was.
 	 */
-	let padHidden = $state(false);
-	/**
-	 * The pad out in Move mode, where dragging is the way to place an area and
-	 * the pad is put away to begin with. On a touch screen its button stays
-	 * under the toggle all the same, for a nudge finer than a fingertip drags:
-	 * pressed, the pad comes out until it is put away again. Its own flag, so
-	 * each mode keeps the pad as it was last left there.
-	 */
-	let padOut = $state(false);
+	let padChoice = $state<boolean | null>(null);
 	/** Whether the pad is drawn, in whichever mode the stage is in. */
-	const padOpen = $derived(panning ? !padHidden : padOut);
+	const padOpen = $derived(padChoice ?? panning);
 	/** A touch screen, where Move mode offers the pad's button too. */
 	let coarse = $state(false);
 	/** The pad put away, by a hold, a throw or a flick: `thrown` brings it home next time. */
 	function stowPadAway(thrown: boolean) {
-		if (panning) padHidden = true;
-		else padOut = false;
+		padChoice = false;
 		padThrown = thrown;
 		pushed = null;
 	}
@@ -1473,16 +1475,21 @@
 	 * back whatever the grid is then.
 	 */
 	/**
-	 * The Guides box's three states, one press apart: ticked draws the page
-	 * margins and shows the temporary guides a drag lines up on; the dash keeps
-	 * the temporary guides with no margins drawn; off is neither. Temporary
-	 * guides are what most people mean by guides, so they are what the middle
-	 * state keeps. The keys go round the same way.
+	 * The Guides box's three states, one press apart: ticked is everything —
+	 * the page margins, the temporary guides a drag lines up on, and the
+	 * millimetres a drag shows to its neighbours; the dash keeps the margins
+	 * and the temporary guides and drops the millimetres, for when the numbers
+	 * are in the way; off is none of it. The keys go round the same way.
+	 *
+	 * The dash was the temporary guides alone, with no margins. A setting saved
+	 * that way still reads as the dash, and the next press goes on to off.
 	 */
+	const guidesFull = $derived(guides && smartGuides && spacingGuides);
+	const guidesOff = $derived(!guides && !smartGuides);
 	function cycleGuides() {
-		if (guides) onguides(false, true);
-		else if (smartGuides) onguides(false, false);
-		else onguides(true, true);
+		if (guidesFull) onguides(true, true, false);
+		else if (!guidesOff) onguides(false, false, false);
+		else onguides(true, true, true);
 	}
 
 	/**
@@ -1596,6 +1603,7 @@
 				{grid}
 				{guides}
 				{smartGuides}
+				spacing={spacingGuides && guides && smartGuides}
 				{scale}
 				{pageNumber}
 				{theme}
@@ -1810,23 +1818,26 @@
 			<button
 				class="square"
 				aria-pressed={panning}
-				onclick={() => (panning = !panning)}
+				onclick={() => {
+					// Settled as it is seen, so the switch leaves the pad alone.
+					padChoice ??= padOpen;
+					panning = !panning;
+				}}
 				title={panning
 					? 'Zoom and pan — a finger scrolls, areas stay put; tap one and nudge it with the pad. Press to drag areas again.'
-					: 'Move — areas drag where you press them. Press for zoom and pan: scroll and pinch without dragging, and nudge with a pad.'}
+					: 'Move — areas drag where you press them. Press for zoom and pan: scroll and pinch without dragging; the cross brings out a nudge pad.'}
 			>
 				<Icon name={panning ? 'zoom-pan' : 'move'} size={16} /><span class="sr-only">Zoom and pan</span>
 			</button>
 			{#if !padOpen && (panning || coarse)}
 				<!-- The pad, put away by holding its middle: this is where it is,
-				     under the mode it belongs to. In Move mode, on a touch screen,
-				     where it starts put away. -->
+				     under the mode switch, which leaves it as it was. In Move mode
+				     only on a touch screen, where a mouse has the arrow keys. -->
 				<button
 					class="square"
 					data-pad-home
 					onclick={() => {
-						if (panning) padHidden = false;
-						else padOut = true;
+						padChoice = true;
 						if (padThrown) padAt = { ...PAD_HOME };
 						padThrown = false;
 						// The hold that hid it ended with the pad gone, so its release
@@ -1929,23 +1940,23 @@
 		</label>
 		<label
 			title={withKey(
-				guides
-					? 'Page margins and alignment guides — press for alignment guides only'
-					: smartGuides
-						? 'Alignment guides only: a drag lines up on other areas\' edges and middles, and the page\'s centre — press to turn guides off'
-						: 'No guides — press for the page margins and alignment guides',
+				guidesFull
+					? 'Page margins, alignment guides and spacing: a drag shows its millimetres to its neighbours — press to hide the spacing'
+					: !guidesOff
+						? 'Page margins and alignment guides, without the spacing — press to turn guides off'
+						: 'No guides — press for the page margins, alignment guides and spacing',
 				'guides'
 			)}
 		>
 			<input
 				type="checkbox"
 				aria-label="Guides"
-				checked={guides || smartGuides}
-				use:mixed={!guides && smartGuides}
+				checked={!guidesOff}
+				use:mixed={!guidesFull && !guidesOff}
 				onchange={(e) => {
 					// The box's own toggle is overruled by the three states: what it
 					// shows is set from them on the next update.
-					e.currentTarget.checked = !(guides === false && smartGuides);
+					e.currentTarget.checked = !guidesOff;
 					cycleGuides();
 				}}
 			/>
@@ -1974,7 +1985,7 @@
 				}}
 			/>
 			<span class="wide">Boxes</span>
-			<span class="narrow" aria-hidden="true">B</span>
+			<span class="narrow" aria-hidden="true">□</span>
 		</label>
 	</div>
 
@@ -2719,7 +2730,7 @@
 			/* inline-block, because a width means nothing on an inline box: the
 			   two marks are different widths and the ticks would not line up. */
 			display: inline-block;
-			/* A lone # or B is a mark, not a word: it needs the weight to read as
+			/* A lone #, | or □ is a mark, not a word: it needs the weight to read as
 			   a label rather than as a stray glyph beside a tick. */
 			font-weight: 700;
 			width: 0.75em;

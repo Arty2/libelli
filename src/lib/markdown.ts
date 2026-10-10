@@ -1,5 +1,5 @@
 import { parseColor } from './color';
-import type { ListMarker, ListStyle, MarkdownStyle, ParagraphStyle } from './types';
+import type { Leader, ListMarker, ListNumbering, ListStyle, MarkdownStyle, ParagraphStyle } from './types';
 import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
 
 /**
@@ -16,12 +16,14 @@ import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
  */
 
 export interface MarkdownOptions {
-	/** base font size in points; heading sizes are multipliers of it */
+	/** the area's font size in points; headings are set as multiples of it, in em */
 	size: number;
 	md?: MarkdownStyle;
 	/** the area's paragraph style, with the leading its amount is counted in */
 	paragraph?: ParagraphStyle;
 	lineHeight?: number;
+	/** the area's tab leader, over the page's — see `TextStyle.leader` */
+	leader?: Leader;
 	/** the area's list style, over the page's; each field over `md.list` */
 	list?: ListStyle;
 }
@@ -30,18 +32,186 @@ export interface MarkdownOptions {
  * The glyph each bullet marker names. Set in the area's own face like the
  * words beside it — the marker is text in the item, not a list-style image —
  * so a dash is that font's dash; a face without the glyph falls back through
- * the area's stack as any missing character does.
+ * the area's stack as any missing character does. The circles and squares are
+ * the exception, drawn rather than typed — see `DRAWN`.
  */
 export const LIST_GLYPHS: Record<ListMarker, string | null> = {
 	bullet: '•',
 	disc: '●',
 	circle: '○',
 	square: '■',
+	openSquare: '□',
 	dash: '–',
 	emdash: '—',
-	arrow: '→',
+	arrow: '➤',
 	none: null
 };
+
+/**
+ * The circles and squares, drawn rather than typed. `●`, `○`, `■` and `□` are
+ * geometric shapes, and few text faces carry them, so they fall back to
+ * whichever symbol face the system has, at whatever size that face draws them
+ * — two-thirds of an em in one, under half in another — and no one scale puts
+ * them where they belong beside `•`. So each is a box of a fixed measure in
+ * the text's color, filled or outlined: the circle at the bullet's own size,
+ * the disc a size up, the squares a shade smaller than the disc
+ * because a square of the same measure looks the larger. Every one has its
+ * middle a third of an em up, where `•` sits in the common faces.
+ */
+const DRAWN: Partial<Record<ListMarker, { size: number; round: boolean; open: boolean }>> = {
+	circle: { size: 0.3, round: true, open: true },
+	disc: { size: 0.44, round: true, open: false },
+	square: { size: 0.38, round: false, open: false },
+	openSquare: { size: 0.38, round: false, open: true }
+};
+
+/**
+ * The count of a numbered list's `n`th item, from 1, as `numbering` writes it.
+ *
+ * Letters go on past z as a spreadsheet's columns do — y, z, aa, ab — which is
+ * what CSS's own `lower-alpha` does. Roman numerals are the subtractive kind
+ * (iv, ix, xl) and stop at 3999, the last one written without a bar over it;
+ * past that, and at 0, the number is given as a number rather than invented.
+ */
+export function listCount(n: number, numbering: ListNumbering = 'decimal'): string {
+	if (numbering === 'lowerAlpha' || numbering === 'upperAlpha') {
+		let out = '';
+		for (let k = n; k > 0; k = Math.floor((k - 1) / 26)) out = String.fromCharCode(97 + ((k - 1) % 26)) + out;
+		const letters = out || String(n);
+		return numbering === 'upperAlpha' ? letters.toUpperCase() : letters;
+	}
+	if ((numbering === 'lowerRoman' || numbering === 'upperRoman') && n > 0 && n < 4000) {
+		const steps: Array<[number, string]> = [
+			[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
+			[50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
+		];
+		let out = '';
+		let left = n;
+		for (const [value, numeral] of steps) {
+			for (; left >= value; left -= value) out += numeral;
+		}
+		return numbering === 'upperRoman' ? out : out.toLowerCase();
+	}
+	return String(n);
+}
+
+/**
+ * A line split at its last tab mark, or null where it has none.
+ *
+ * The mark is `%%%`: three percent signs, exactly — a run of two is the edge of
+ * a placeholder, and placeholders are filled in before this ever sees the
+ * line, so `Coffee %%% %%price%%` arrives as `Coffee %%% 2.20`. One left
+ * unfilled stays two percent signs either side of its name and is never read
+ * as a mark; nor is a run of four or more. It is what a person can type where
+ * a Tab key moves to the next field and a tab pasted from a spreadsheet
+ * starts a new column. A real tab counts too, but only where the area asks
+ * for a leader (`tabs`): one already sitting in somebody's table was a space
+ * before there were leaders, and stays one.
+ *
+ * The last mark, because a contents line's words may hold one of their own
+ * and the page number is always the end of the line; never one inside a code
+ * span, which cutting would leave as two halves with a backtick each. The
+ * spaces either side of a mark are the mark's.
+ */
+export function tabSplit(line: string, tabs = false, markdown = true): [string, string] | null {
+	// Code spans are Markdown's: in plain text a backtick is a character, and
+	// one typed for an apostrophe must not hide the mark after it.
+	const inCode = (at: number) => markdown && (line.slice(0, at).match(/`/g)?.length ?? 0) % 2 === 1;
+	for (let at = line.length - 1; at >= 0; at--) {
+		const mark =
+			line[at] === '\t' && tabs
+				? 1
+				: line.startsWith('%%%', at) && line[at - 1] !== '%' && line[at + 3] !== '%'
+					? 3
+					: 0;
+		if (mark && !inCode(at)) return [line.slice(0, at).trimEnd(), line.slice(at + mark).trimStart()];
+	}
+	return null;
+}
+
+/**
+ * The leader between the two halves of a tabbed line: the room left over,
+ * drawn along the baseline in the text's color — or nothing drawn at all, for
+ * `none`, which is still the right edge for what follows the mark. Empty, so a
+ * flex row aligned on the baseline puts its bottom edge on the line's
+ * baseline, where a row of full stops would sit; a little space either side,
+ * so it does not touch the words.
+ *
+ * Dots and dashes are painted, not a dotted border: a border that thin draws
+ * specks a pixel wide with no room between them, where a leader is full
+ * stops — round, a period's size, a third of an em apart. Every length is in
+ * em, so they keep their proportions at any size and shrink with Shrink.
+ */
+export function leaderStyle(leader: Leader): string {
+	const paint =
+		leader === 'dotted'
+			? ';height:0.16em;background:radial-gradient(circle,currentColor 0.065em,transparent 0.075em) left bottom/0.33em 0.16em repeat-x'
+			: leader === 'dashed'
+				? ';height:0.07em;background:linear-gradient(90deg,currentColor 55%,transparent 55%) left bottom/0.5em 0.07em repeat-x'
+				: leader === 'solid'
+					? ';height:0.07em;background:currentColor'
+					: '';
+	return `flex:1 1 0;min-width:1em;margin:0 0.3em${paint}`;
+}
+
+/** A tabbed line as a row: the words, the leader, the words at the right edge. */
+function leaderLine(parts: [string, string], leader: Leader): string {
+	return (
+		// No indent of its own: a paragraph's text-indent is inherited by every
+		// flex item, and would push the price in from the edge it is set to.
+		`<span style="display:flex;align-items:baseline;text-indent:0">` +
+		`<span>${renderInline(parts[0])}</span>` +
+		`<span style="${leaderStyle(leader)}"></span>` +
+		`<span style="text-align:right">${renderInline(parts[1])}</span></span>`
+	);
+}
+
+/**
+ * A paragraph's lines, a tabbed one set as a row of its own. The others are
+ * joined as they always were, with a break, so an indent still lands on the
+ * paragraph's first line only.
+ */
+function paragraphLines(lines: string[], leader: Leader = 'none'): string {
+	let out = '';
+	let previousRow = true;
+	for (const line of lines) {
+		const parts = tabSplit(line, leader !== 'none');
+		if (parts) {
+			out += leaderLine(parts, leader);
+			previousRow = true;
+			continue;
+		}
+		if (!previousRow) out += '<br />';
+		out += renderInline(line);
+		previousRow = false;
+	}
+	return out;
+}
+
+/** Where `•` has its middle, in em above the baseline. */
+const BULLET_MIDDLE = 0.335;
+
+/**
+ * Empty, so its baseline is its bottom edge, and lifted from there by an
+ * offset — a flex item's margin is not counted in its baseline. The side
+ * margins stand in for a glyph's side bearings, so the words sit where they
+ * would beside a bullet.
+ */
+function drawnMarker({ size, round, open }: { size: number; round: boolean; open: boolean }): string {
+	const style = [
+		'flex:none',
+		'display:inline-block',
+		'box-sizing:border-box',
+		`width:${size}em`,
+		`height:${size}em`,
+		'margin:0 0.14em 0 0.08em',
+		'position:relative',
+		`top:-${Math.round((BULLET_MIDDLE - size / 2) * 1000) / 1000}em`,
+		...(round ? ['border-radius:50%'] : []),
+		open ? 'border:0.07em solid currentColor' : 'background:currentColor'
+	].join(';');
+	return `<span style="${style}" aria-hidden="true"></span>`;
+}
 
 interface ListItem {
 	text: string;
@@ -239,7 +409,10 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 		leading: list?.leading,
 		item: mm(md.list.itemSpacing ?? 0),
 		gap: mm(md.list.markerGap ?? 0),
-		bullet: LIST_GLYPHS[list?.marker ?? 'bullet']
+		bullet: LIST_GLYPHS[list?.marker ?? 'bullet'],
+		drawn: DRAWN[list?.marker ?? 'bullet'],
+		numbering: list?.numbering,
+		leader: options.leader
 	};
 	const para = options.paragraph;
 	// Space after is in lines of the leading — a line is `lineHeight` em — and
@@ -255,7 +428,10 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 				const key = `h${block.level}` as 'h1' | 'h2' | 'h3';
 				const s = md[key];
 				const style = [
-					`font-size:${round(options.size * (s.size ?? 1))}pt`,
+					// In em of the area, not points worked out from its size: the
+					// same thing at the size the area is set in, and it follows the
+					// area down when Shrink sets the words smaller to fit.
+					`font-size:${round(s.size ?? 1)}em`,
 					`font-weight:${s.weight ?? 700}`,
 					'line-height:1.2',
 					`margin:${mm(first ? 0 : (s.spaceBefore ?? 0))} 0 ${mm(s.spaceAfter ?? 0)}`
@@ -277,7 +453,7 @@ export function renderMarkdown(src: string, options: MarkdownOptions): string {
 						: para?.mode === 'indent'
 							? `margin:0${follows ? `;text-indent:${amount}` : ''}`
 							: `margin:0 0 ${mm(md.paragraph.spaceAfter ?? 0)}`;
-				html.push(`<p style="${style}">${block.lines.map(renderInline).join('<br />')}</p>`);
+				html.push(`<p style="${style}">${paragraphLines(block.lines, options.leader)}</p>`);
 				break;
 			}
 			case 'rule': {
@@ -307,6 +483,12 @@ interface ListLook {
 	item: string;
 	gap: string;
 	bullet: string | null;
+	/** the tab leader, for an item that is a price-list line */
+	leader?: Leader;
+	/** how a numbered list counts — see `listCount` */
+	numbering?: ListNumbering;
+	/** the bullet is drawn rather than typed — see `DRAWN` */
+	drawn?: { size: number; round: boolean; open: boolean };
 }
 
 function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, look: ListLook): string {
@@ -322,7 +504,7 @@ function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, 
 		.map((item, i) => {
 			// Ordered lists are renumbered from source order; a source that restarts
 			// its numbering part-way through is a bug, not intent.
-			const marker = list.ordered ? `${i + 1}.` : look.bullet;
+			const marker = list.ordered ? `${listCount(i + 1, look.numbering)}.` : look.bullet;
 			const itemStyle = [
 				'display:flex',
 				'align-items:baseline',
@@ -330,12 +512,19 @@ function renderList(list: ListBlock, md: Required<MarkdownStyle>, top: boolean, 
 				`gap:${marker === null ? '0' : look.gap}`,
 				`margin:0 0 ${i === list.items.length - 1 ? '0' : look.item}`
 			].join(';');
-			const inner = [`<span style="flex:1;min-width:0">${renderInline(item.text)}`];
+			const tabbed = tabSplit(item.text, !!look.leader && look.leader !== 'none');
+			const words = tabbed ? leaderLine(tabbed, look.leader ?? 'none') : renderInline(item.text);
+			const inner = [`<span style="flex:1;min-width:0">${words}`];
 			if (item.children) {
 				inner.push(`<div style="margin-top:${look.item}">${renderList(item.children, md, false, look)}</div>`);
 			}
 			inner.push('</span>');
-			const mark = marker === null ? '' : `<span style="flex:none;white-space:nowrap">${escapeHtml(marker)}</span>`;
+			const mark =
+				marker === null
+					? ''
+					: !list.ordered && look.drawn
+						? drawnMarker(look.drawn)
+						: `<span style="flex:none;white-space:nowrap">${escapeHtml(marker)}</span>`;
 			return `<li style="${itemStyle}">${mark}${inner.join('')}</li>`;
 		})
 		.join('');

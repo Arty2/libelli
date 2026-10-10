@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { isStarterTemplate, renamed, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from './onboarding';
+import { eanDigits } from './barcode';
+import { renderMarkdown } from './markdown';
+import { applyPlaceholders } from './placeholders';
 import { normaliseTemplate } from './template';
 
 describe('isStarterTemplate', () => {
@@ -67,5 +70,23 @@ describe('renamed', () => {
 		expect(renamed(same, same.name)).toBe(same);
 		const cleared = renamed(sampleDataset(), undefined);
 		expect('name' in cleared || 'starter' in cleared).toBe(false);
+	});
+});
+
+describe('the sample rows', () => {
+	const { rows } = sampleDataset();
+
+	it('give the last card an ISBN that scans, and no other card one', () => {
+		expect(rows.map((row) => Boolean(row.isbn))).toEqual([false, false, false, true]);
+		expect(eanDigits(String(rows[3].isbn))).toBe('9781234567897');
+	});
+
+	it('list the other three cards in the last one’s contents, by page', () => {
+		const body = applyPlaceholders(String(rows[3].body), { row: rows[3], rows, run: rows, self: 'body' });
+		expect(body).toContain(`${rows[0].title} %%% 1\n${rows[1].title} %%% 2\n${rows[2].title} %%% 3`);
+		// Set as leader rows, and the `%%%` explained in a code span stays text.
+		const html = renderMarkdown(body, { size: 10, leader: 'dotted' });
+		expect(html.match(/align-items:baseline;text-indent:0/g)).toHaveLength(3);
+		expect(html).toMatch(/<code[^>]*>%%%<\/code>/);
 	});
 });

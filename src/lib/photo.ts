@@ -1,5 +1,5 @@
 /**
- * The arithmetic behind editing a stored picture in the Images tray — the
+ * The arithmetic behind editing a stored picture in the Pictures tray — the
  * crop rectangle and the file type an edit is written back as. The canvas
  * work is the component's; what can be got wrong without a browser is here.
  */

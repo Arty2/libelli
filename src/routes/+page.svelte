@@ -21,11 +21,31 @@
 		storeLocalImage,
 		uploadBackgroundImage
 	} from '$lib/assets';
-	import { download, slugify } from '$lib/download';
-	import { ensureGoogleFont, ensureTemplateFonts, mergeFonts, pruneFonts, uploadLocalFont } from '$lib/fonts';
+	import { download, fileStem } from '$lib/download';
+	import {
+		deleteStoredFont,
+		ensureGoogleFont,
+		ensureTemplateFonts,
+		fontChoices,
+		fontInventory,
+		fontRef,
+		listStoredFonts,
+		mergeFonts,
+		previewFamilies,
+		pruneFonts,
+		replaceFamily,
+		tuneFont,
+		type FontTune,
+		tuningOf,
+		uploadLocalFont,
+		type FontEntry,
+		type StoredFontEntry
+	} from '$lib/fonts';
+	import { pullUp, trayPull } from '$lib/gestures';
 	import {
 		canRedo,
 		canUndo,
+		amend,
 		createHistory,
 		record,
 		redo as redoStep,
@@ -60,7 +80,7 @@
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { codeStats } from '$lib/csscode';
 	import { watchPresses } from '$lib/haptics';
-	import { GONE_ROW, carryLookups, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
+	import { GONE_ROW, carryLookups, isKeyword, referencedColumns } from '$lib/placeholders';
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
 	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
@@ -94,6 +114,7 @@
 		loadMapping,
 		loadTemplate,
 		loadTemplateDoc,
+		keepTemplateDocAsIs,
 		loadTemplateId,
 		loadUi,
 		loadEditorFonts,
@@ -115,6 +136,8 @@
 		type DatasetEntry,
 		type TemplateEntry
 	} from '$lib/storage';
+	import { REFERENCE_FRAME } from '$lib/frame';
+	import { claimEditor, type EditorLock } from '$lib/tablock';
 	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
@@ -408,6 +431,33 @@
 	let deletingTable = $state(false);
 	const tableName = $derived(dataset.name?.trim() || UNTITLED_TABLE);
 
+	/**
+	 * Every template this browser holds, written once in the file's new frame —
+	 * each area at its reference point, with the marker that says so (frame.ts).
+	 * A template written before is read as it was written, top-left, and saved
+	 * back; one already marked is left alone, so this costs a read per template
+	 * and nothing more once it has run. Awaited at boot, before anything is
+	 * read for the screen or could be saved over it, so it never races the
+	 * autosave. One that will not read is left as it is, for boot to say so.
+	 *
+	 * The bridge is meant to be short — see LEGACY_TOP_LEFT_UNTIL: by then every
+	 * browser that has opened the app has been through this, and this goes too.
+	 */
+	async function rewriteStoredTemplates() {
+		const rewrite = async (raw: unknown, save: (t: Template) => Promise<unknown>) => {
+			if (!raw || (raw as Template).frame === REFERENCE_FRAME) return;
+			try {
+				await save(normaliseTemplate(raw));
+			} catch {
+				/* unreadable: left for boot to report */
+			}
+		};
+		await rewrite(await loadTemplate(), saveTemplate);
+		for (const { id } of await listTemplates()) {
+			await rewrite(await loadTemplateDoc(id), (t) => saveTemplateDoc(id, t));
+		}
+	}
+
 	async function refreshTables() {
 		tables = await listDatasets();
 	}
@@ -430,6 +480,8 @@
 	let asideEl = $state<HTMLElement | null>(null);
 	let trayShare = $state<number | null>(null);
 	let trayFrom: { y: number; share: number } | null = null;
+	/** Pulled down past its lowest: let go now, and the tray folds away. */
+	let trayShutting = $state(false);
 
 	/** Below this the tray is a row of buttons and no table, which is not a tray. */
 	const TRAY_MIN = 0.2;
@@ -483,23 +535,65 @@
 		return () => query.removeEventListener('change', sync);
 	});
 
-	function dragTray(phase: 'start' | 'move' | 'end', clientY: number) {
+	/**
+	 * The height the tray goes back to once a pull is over without leaving it
+	 * anywhere — folded away, or flicked open — so it comes back as tall as it
+	 * was. Null is the stylesheet's own.
+	 */
+	let trayRestore: number | null = null;
+
+	function dragTray(phase: 'start' | 'move' | 'end', clientY: number, flick = false) {
 		const height = mainEl?.getBoundingClientRect().height ?? 0;
 		if (!height || !asideEl) return;
 		if (phase === 'start') {
 			// Measured rather than read off `trayShare`, which is null until the
 			// first drag and stale after a resize.
 			trayFrom = { y: clientY, share: asideEl.getBoundingClientRect().height / height };
+			trayRestore = trayShare;
 			return;
 		}
 		if (!trayFrom) return;
 		// The finger is on the tray's top edge, so up is taller: the share it
-		// takes is what it had plus however far the edge has been pulled.
-		trayShare = Math.min(1, Math.max(TRAY_MIN, trayFrom.share + (trayFrom.y - clientY) / height));
+		// takes is what it had plus however far the edge has been pulled — all
+		// the way down to nothing, fading below its smallest, which says that
+		// letting go there folds it away, as the Data button would.
+		const pull = trayPull(trayFrom.share, trayFrom.y - clientY, height, TRAY_MIN);
+		trayShare = pull.share;
+		trayShutting = pull.shut;
 		if (phase === 'end') {
 			trayFrom = null;
+			trayShutting = false;
+			if (pull.shut && flick) {
+				// Flicked open from the status bar: a short quick pull is asking
+				// for the tray, not for a sliver of it.
+				trayShare = trayRestore;
+				return;
+			}
+			if (pull.shut) {
+				trayShare = trayRestore;
+				if (imagesOpen) imagesOpen = false;
+				else dataOpen = false;
+				return;
+			}
 			ui = { ...ui, trayHeightShare: Math.round(trayShare * 10000) / 10000 };
 		}
+	}
+
+	/**
+	 * The status bar pulled upwards, stacked: the table comes up under the
+	 * finger from nothing, and is dragged from there as its header would be.
+	 * Nothing to pull when a tray is up already.
+	 */
+	function pullTray(phase: 'start' | 'move' | 'end', clientY: number, flick?: boolean): boolean | void {
+		if (phase === 'start') {
+			if (!stacked || dataOpen || imagesOpen) return false;
+			trayRestore = trayShare;
+			trayShare = 0;
+			dataOpen = true;
+			trayFrom = { y: clientY, share: 0 };
+			return true;
+		}
+		dragTray(phase, clientY, flick);
 	}
 
 	let printing = $state(false);
@@ -518,7 +612,7 @@
 	let images = $state<Record<string, string>>({});
 	let imagesOpen = $state(false);
 	/**
-	 * Bumped when the Images panel changes what is stored. The resolver below is
+	 * Bumped when the Pictures panel changes what is stored. The resolver below is
 	 * keyed on the *names* a template and table use, and deleting a picture or
 	 * choosing a folder changes neither — so there has to be something else for
 	 * it to watch.
@@ -603,6 +697,17 @@
 		template = stripUndefined({ ...$state.snapshot(template), css }) as Template;
 	}
 
+	/**
+	 * Read every value under `value`, so the effect doing it runs again when
+	 * any of them changes — what `$state.snapshot` did as a side effect of
+	 * copying, without the copy. Walking a table is reading its cells; copying
+	 * it was allocating every row again, on every keystroke.
+	 */
+	function watchDeep(value: unknown): void {
+		if (typeof value !== 'object' || value === null) return;
+		for (const key in value) watchDeep((value as Record<string, unknown>)[key]);
+	}
+
 	const snapshot = (): Snapshot => ({
 		template: $state.snapshot(template),
 		dataset: $state.snapshot(dataset),
@@ -677,7 +782,12 @@
 	 * substitution goes — see placeholders.ts — so a column named only from a
 	 * column nobody prints is still a column nobody prints.
 	 */
-	const usedColumns = $derived.by(() => {
+	//
+	// In two halves, so a drag — the template replaced every frame — does not
+	// read the whole table again: what the template prints, as a string that
+	// comes out the same while nothing printed changes; and, from the table
+	// alone, what each column's cells name.
+	const printedByTemplate = $derived.by(() => {
 		const columns = dataset.columns;
 		const used = new Set<string>();
 		for (const box of template.boxes) {
@@ -687,11 +797,21 @@
 			// A column an area takes a color from is printed too, as a color.
 			for (const column of Object.values(box.colorFrom ?? {})) if (columns.includes(column)) used.add(column);
 		}
-		for (const column of [...used]) {
-			for (const r of dataset.rows) {
-				for (const named of referencedColumns(r[column] ?? '', columns)) used.add(named);
-			}
+		return [...used].sort().join('\u0000');
+	});
+	const namedByCells = $derived.by(() => {
+		const columns = dataset.columns;
+		const named = new Map<string, Set<string>>();
+		for (const column of columns) {
+			const found = new Set<string>();
+			for (const row of dataset.rows) for (const name of referencedColumns(row[column] ?? '', columns)) found.add(name);
+			if (found.size) named.set(column, found);
 		}
+		return named;
+	});
+	const usedColumns = $derived.by(() => {
+		const used = new Set(printedByTemplate ? printedByTemplate.split('\u0000') : []);
+		for (const column of [...used]) for (const name of namedByCells.get(column) ?? []) used.add(name);
 		return used;
 	});
 
@@ -732,11 +852,86 @@
 		return { note: parts.filter(Boolean).join(' '), warning: orphaned > 0 };
 	}
 
-	// ---- boot ---------------------------------------------------------------
+	// ---- one tab edits -------------------------------------------------------
+
+	/**
+	 * Whether this tab is the one editing — tablock.ts. `checking` until the
+	 * lock answers; `here` holds it and boots; `elsewhere` found it held and
+	 * never loads anything, so it has nothing to save over the other tab's
+	 * work; `handed` gave it to another tab, having saved first, and has
+	 * stopped saving.
+	 */
+	let editor = $state<'checking' | 'here' | 'elsewhere' | 'handed'>('checking');
+	let editorLock: EditorLock | null = null;
+	/** The boot under way, for a handover to wait out — see `handOver`. */
+	let booting: Promise<void> | null = null;
+	let takingOver = $state(false);
+
+	/**
+	 * Everything the autosave would write, written now and waited for: the tab
+	 * taking over reads storage the moment this resolves, so nothing may be
+	 * left in a debounce. Then the saves stop — `ready` gates every one of
+	 * them — and the page says why. With `save` false the lock was taken, not
+	 * asked for: the other tab is already editing, so this tab writes nothing.
+	 */
+	async function handOver(save: boolean) {
+		// Asked in the middle of boot: let it finish, so there is something to
+		// save and nothing left running to turn the autosave on afterwards —
+		// a boot still awaiting storage would set `ready` after this had
+		// handed over, and write this tab's copy over the other tab's work.
+		await booting?.catch(() => {});
+		if (ready && save) {
+			const template$ = $state.snapshot(template);
+			const dataset$ = $state.snapshot(dataset);
+			saveMapping(templateId, $state.snapshot(mapping));
+			saveUi($state.snapshot(ui));
+			await Promise.all([
+				saveTemplate(template$),
+				templateId ? saveTemplateDoc(templateId, template$) : null,
+				saveDataset(dataset$),
+				datasetId ? saveDatasetDoc(datasetId, dataset$) : null
+			]);
+		}
+		ready = false;
+		editor = 'handed';
+	}
 
 	$effect(() => {
-		if (ready) return;
-		void boot();
+		void claimEditor(handOver).then((lock) => {
+			editorLock = lock;
+			editor = lock.held ? 'here' : 'elsewhere';
+		});
+	});
+
+	/**
+	 * Bring the editing here. A tab that never loaded boots in place; one that
+	 * handed its work away is holding a copy older than what it handed on, so
+	 * it starts again from storage.
+	 */
+	async function useHere() {
+		if (!editorLock || takingOver) return;
+		takingOver = true;
+		await editorLock.takeOver();
+		// Only with the lock in hand: a request that came back empty leaves the
+		// other tab editing, and two tabs saving is what the lock is there for.
+		if (!editorLock.held) {
+			takingOver = false;
+			return;
+		}
+		if (editor === 'handed') location.reload();
+		else {
+			editor = 'here';
+			takingOver = false;
+		}
+	}
+
+	// ---- boot ---------------------------------------------------------------
+
+	// Only in the tab holding the lock, and only once: a tab that has handed
+	// its work on is not ready either, and must not start loading again.
+	$effect(() => {
+		if (ready || editor !== 'here') return;
+		booting = boot();
 	});
 
 	async function boot() {
@@ -747,6 +942,7 @@
 		// a returning user would be told their month of work was sample data.
 		const storable = await storageAvailable();
 		let unreadable = false;
+		if (storable) await rewriteStoredTemplates();
 
 		const storedTemplate = await loadTemplate();
 		// A first visit lands on the starter card locked: it is the tour, read
@@ -807,6 +1003,16 @@
 		// id nobody has yet is minted here, which is how a browser that has only
 		// ever had one template acquires a library containing exactly that one.
 		templateId = loadTemplateId() || nextTemplateId();
+		// A saved template this build could not read is never saved over: the
+		// starter shown in its place goes into the library under a new id, and
+		// the one that could not be read stays where it was — kept as it was,
+		// in the library, if it was only ever the working copy — for a build
+		// that can read it. The autosave would otherwise have written the
+		// starter over it within a third of a second.
+		if (unreadable) {
+			if (!(await loadTemplateDoc(templateId))) await keepTemplateDocAsIs(templateId, storedTemplate);
+			templateId = nextTemplateId();
+		}
 		saveTemplateId(templateId);
 		previousTemplate = loadPreviousTemplateId();
 		void refreshLibrary();
@@ -836,10 +1042,14 @@
 				'warning'
 			);
 		} else if (unreadable)
-			notify('The saved template could not be read, so this is the starter card. Your data is untouched.', 'warning');
+			notify(
+				'The saved template could not be read — perhaps a newer version of libelli wrote it — so this is the starter card. The saved one is kept in your templates, untouched, and your data too.',
+				'warning'
+			);
 		else if (firstRun)
 			notify('Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.');
 		missingFonts = await ensureTemplateFonts(template);
+		void refreshStoredFonts();
 
 		// Last, so the precache download is not competing with the first paint.
 		registerServiceWorker(() => {
@@ -868,8 +1078,12 @@
 		)
 	);
 
+	// Not a family the design takes from a file in this browser: asking Google
+	// for it too would bring back the faces an upload replaced, and they would
+	// be matched in its place.
 	$effect(() => {
-		for (const family of familiesInUse) ensureGoogleFont(family);
+		const local = new Set(template.fonts.filter((f) => f.source === 'local').map((f) => f.family.toLowerCase()));
+		for (const family of familiesInUse) if (!local.has(family.toLowerCase())) ensureGoogleFont(family);
 	});
 
 	/**
@@ -936,8 +1150,15 @@
 	 * `local` image the browser has never been given resolves to null and is
 	 * asked for by name — the same bargain as a missing font.
 	 */
+	// Keyed on the reference as a string, which a drag does not change, and on
+	// `imagesVersion`, which a replaced file does: on the template itself, it
+	// read the picture back from storage on every frame of every drag.
+	const pageImageKey = $derived(JSON.stringify(template.page.image ?? null));
+	const printImageKey = $derived(JSON.stringify(template.print.background ?? null));
 	$effect(() => {
-		const image = template.page.image ? $state.snapshot(template.page.image) : undefined;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		imagesVersion;
+		const image = (JSON.parse(pageImageKey) ?? undefined) as Template['page']['image'];
 		let stale = false;
 		void (async () => {
 			const resolved = await resolveBackground(image);
@@ -952,7 +1173,9 @@
 
 	/** Same bargain as the page background, kept as a separate reference so the two never collide. */
 	$effect(() => {
-		const image = template.print.background ? $state.snapshot(template.print.background) : undefined;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		imagesVersion;
+		const image = (JSON.parse(printImageKey) ?? undefined) as Template['print']['background'];
 		let stale = false;
 		void (async () => {
 			const resolved = await resolveBackground(image);
@@ -975,7 +1198,10 @@
 	 * as a notice — the areas simply draw nothing, and a card that is blank for
 	 * a reason should say so.
 	 */
-	const imageNames = $derived.by(() => {
+	// The table's names and the template's, each on its own, so a drag does
+	// not read every cell again — the template's half, a string, comes out
+	// the same.
+	const cellImages = $derived.by(() => {
 		const names = new Set<string>();
 		for (const row of dataset.rows) {
 			for (const value of Object.values(row)) {
@@ -983,18 +1209,35 @@
 				if (name) names.add(name);
 			}
 		}
-		for (const box of template.boxes) {
-			const name = localImageName(box.static?.url);
-			if (name) names.add(name);
-		}
+		return names;
+	});
+	const areaImages = $derived(
+		template.boxes
+			.map((box) => localImageName(box.static?.url))
+			.filter((name): name is string => !!name)
+			.sort()
+			.join('\u0000')
+	);
+	const imageNames = $derived.by(() => {
+		const names = new Set(cellImages);
+		for (const name of areaImages ? areaImages.split('\u0000') : []) names.add(name);
 		return [...names].sort();
 	});
+	/**
+	 * The same names as one string, which `$derived` compares by value: the
+	 * list above is a new array on every edit — a drag frame, a keystroke —
+	 * and the effect below, keyed on it, read every stored picture's bytes
+	 * back from IndexedDB or the folder each time. Keyed on this, it reads
+	 * them when the set of names changes, or `imagesVersion` says the bytes
+	 * did.
+	 */
+	const imageKey = $derived(imageNames.join('\u0000'));
 
 	/** Names the template or the table point at that this browser does not hold. */
 	let missingImages = $state<string[]>([]);
 
 	$effect(() => {
-		const wanted = imageNames;
+		const wanted = imageKey ? imageKey.split('\u0000') : [];
 		// A bare read, so $effect tracks it and a bump re-runs this.
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		imagesVersion;
@@ -1003,7 +1246,7 @@
 			const { urls, missing } = await resolveLocalImages(wanted);
 			if (stale) return;
 			images = urls;
-			// Listed in the Images tray as placeholders, each with a way to put
+			// Listed in the Pictures tray as placeholders, each with a way to put
 			// the file back — rather than said once in the status line and lost.
 			missingImages = missing;
 		})();
@@ -1021,13 +1264,26 @@
 	 * message. An area bound to no column has nowhere in the table to put it, so
 	 * it keeps the reference itself and the picture is the same on every card.
 	 */
+	/**
+	 * A picture stored from outside the Pictures tray — dropped on an area or on
+	 * the page. Under the file's own name, which may be one the page already
+	 * points at (a missing picture supplied, a second "image.png" pasted over
+	 * the first): the set of names is then unchanged, so `imagesVersion` says
+	 * the bytes are new, or the cards keep the old picture, or none.
+	 */
+	async function storeImage(file: File): Promise<string> {
+		const name = await storeLocalImage(file);
+		imagesVersion += 1;
+		return name;
+	}
+
 	async function handleImageDrop(box: Box, file: File) {
 		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
-		placeImage(box, await storeLocalImage(file));
+		placeImage(box, await storeImage(file));
 	}
 
 	/**
-	 * A picture this browser already holds, carried from the Images bar onto
+	 * A picture this browser already holds, carried from the Pictures tray onto
 	 * an area. The same placing as a file dropped from outside — into the row's
 	 * cell when the area is bound, onto the area otherwise — minus the storing,
 	 * which already happened when it was uploaded.
@@ -1239,7 +1495,7 @@
 		if (column && row && refuseLockedTable()) return;
 		// Where the editor's × goes back to. With the table already showing,
 		// that is the table; otherwise the panel was opened only to draw in,
-		// and closing the drawing closes it (or goes back to Images).
+		// and closing the drawing closes it (or goes back to Pictures).
 		const from = via === 'images' ? via : dataOpen ? undefined : 'card';
 		dataOpen = true;
 		imagesOpen = false;
@@ -1259,7 +1515,7 @@
 
 	/**
 	 * Every picture held in the table or on an area rather than in storage,
-	 * for the Images tray: a cell's drawing, by column and row, and a drawing
+	 * for the Pictures tray: a cell's drawing, by column and row, and a drawing
 	 * on an area with no column. Only `data:` pictures that pass the same
 	 * check a cell's thumbnail does — the cell is untrusted.
 	 */
@@ -1281,7 +1537,7 @@
 		return out;
 	});
 
-	/** A drawing pressed in the Images tray, opened in the drawing editor it belongs to. */
+	/** A drawing pressed in the Pictures tray, opened in the drawing editor it belongs to. */
 	function openDrawing(key: string) {
 		if (key.startsWith('area:')) {
 			drawArea(key.slice('area:'.length), 'images');
@@ -1298,7 +1554,7 @@
 		cellRequest = { row: rowIndex, column, draw: true, from: 'images' };
 	}
 
-	/** A stored picture, opened large in the Images tray. */
+	/** A stored picture, opened large in the Pictures tray. */
 	let imageFocus = $state<string | null>(null);
 	/**
 	 * A picture being worked on in the side panel — the drawing board, or one
@@ -1341,19 +1597,70 @@
 	// Debounced, so a drag or a burst of typing becomes one entry. `record`
 	// ignores a state equal to the present, which is what stops an applied undo
 	// from recording itself straight back.
-	$effect(() => {
-		if (!ready) return;
-		const snap = snapshot();
-		const timer = setTimeout(() => {
+	//
+	// Two watchers, one timer: the template and the table are snapshotted by
+	// separate effects, each keeping its latest, so a drag — which changes the
+	// template on every frame — never clones the table, and a keystroke in a
+	// cell never clones the template. One snapshot of the whole state was
+	// taken on every change, before the debounce, and on a table of drawings
+	// that was most of a frame. An unchanged half is the same object as last
+	// time, which the history compares by reference before anything else.
+	let shotTemplate: { template: Template; templateId: string } | null = null;
+	let shotData: { dataset: Dataset; mapping: Mapping; datasetId: string } | null = null;
+	/** The table changed since `shotData` was taken: snapshot it when the debounce lands, once. */
+	let dataChanged = true;
+	let recordTimer: ReturnType<typeof setTimeout> | undefined;
+	function recordSoon() {
+		clearTimeout(recordTimer);
+		recordTimer = setTimeout(() => {
+			if (dataChanged) {
+				shotData = { dataset: $state.snapshot(dataset), mapping: $state.snapshot(mapping), datasetId };
+				dataChanged = false;
+			}
+			if (!shotTemplate || !shotData) return;
 			const before = history;
-			history = record(history, snap, pending);
+			history = commit({ ...shotTemplate, ...shotData });
 			// A fresh edit makes "the last change" a different change, so the
 			// alternating chord starts over rather than flipping the wrong one.
 			if (history !== before) toggledOff = false;
 			pending = '';
 		}, 350);
-		return () => clearTimeout(timer);
+	}
+	$effect(() => {
+		if (!ready) return;
+		shotTemplate = { template: $state.snapshot(template), templateId };
+		recordSoon();
 	});
+	$effect(() => {
+		if (!ready) return;
+		// Read, not copied: a keystroke in a cell is a change to watch for,
+		// and the copy waits for the debounce — one per burst of typing.
+		watchDeep(dataset);
+		watchDeep(mapping);
+		void datasetId;
+		dataChanged = true;
+		recordSoon();
+	});
+
+	/**
+	 * A font replaced from the Pictures tray, while it is still the last step:
+	 * its entry's label, and the face it put in. X-height set on that face
+	 * from the tray joins the replace's entry (`amend`) rather than following
+	 * it, so one undo goes back to the old face and one redo brings the new
+	 * one back as tuned — the way to compare two faces, flipping between
+	 * them, without stepping back through every nudge. Anything else recorded
+	 * in between makes the replace no longer the last step, and ends it.
+	 */
+	let fontSession: { label: string; family: string } | null = null;
+	/** The next recording is such a nudge: amend, if the replace is still the present entry. */
+	let amendNext = false;
+
+	/** Record `snap` — or fold it into the replace it tunes, per `fontSession`. */
+	function commit(snap: Snapshot): typeof history {
+		const joins = amendNext && fontSession !== null && history.present.label === fontSession.label && canUndo(history);
+		amendNext = false;
+		return joins ? amend(history, snap) : record(history, snap, pending);
+	}
 
 	/**
 	 * Record what is on screen now, without waiting out the debounce. Undo
@@ -1367,7 +1674,7 @@
 	function flushHistory() {
 		if (!ready) return;
 		const before = history;
-		history = record(history, snapshot(), pending);
+		history = commit(snapshot());
 		if (history !== before) {
 			toggledOff = false;
 			pending = '';
@@ -1380,16 +1687,18 @@
 		mapping = structuredClone(next.mapping);
 		if (next.templateId && next.templateId !== templateId) {
 			templateId = next.templateId;
-			saveTemplateId(templateId);
+			// Only the editor writes: every other path into storage waits on
+			// `ready`, and so does this one.
+			if (ready) saveTemplateId(templateId);
 			// A template undone back into existence is written out again by the
 			// autosave, under the id it had — which is what makes deleting one
 			// recoverable rather than merely reversible on screen.
 			void refreshLibrary();
 		}
 		if (next.datasetId && next.datasetId !== datasetId) {
-			rememberTable(datasetId);
+			if (ready) rememberTable(datasetId);
 			datasetId = next.datasetId;
-			saveDatasetId(datasetId);
+			if (ready) saveDatasetId(datasetId);
 			void refreshTables();
 		}
 		if (activeRow >= dataset.rows.length) activeRow = Math.max(0, dataset.rows.length - 1);
@@ -1499,11 +1808,14 @@
 
 	// The working copy and the library entry, on one debounce — the same
 	// arrangement the template above is saved under, and for the same reason.
+	// Read every cell to watch it, and copy the table once the typing pauses:
+	// a copy per keystroke was a whole table's clone each time.
 	$effect(() => {
 		if (!ready) return;
-		const saved = $state.snapshot(dataset);
+		watchDeep(dataset);
 		const id = datasetId;
 		const timer = setTimeout(() => {
+			const saved = $state.snapshot(dataset);
 			void saveDataset(saved).then(reportSave);
 			if (id) void saveDatasetDoc(id, saved);
 		}, 300);
@@ -2386,6 +2698,10 @@
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
 
 	function onWindowKeydown(event: KeyboardEvent) {
+		// A tab that is not the editor holds a stale copy behind its dialog:
+		// a delete or an undo there edits what nobody will see saved, and an
+		// undo across a template switch would write its id over the editor's.
+		if (editor !== 'here') return;
 		const target = event.target as HTMLElement | null;
 		const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
 		if (wantsExport(event)) {
@@ -2655,9 +2971,10 @@
 	}
 
 	function doExportTemplate() {
-		// Dated, so a folder of exports says which is which and the newest sorts
-		// last: `name_2026-09-25.json`, in the underscore `pageFilename` uses.
-		download(`${slugify(template.name)}_${formatDate(new Date(), 'YYYY-MM-DD')}.json`, exportTemplate($state.snapshot(template)));
+		// The template's name, as written, spaces as dashes: the file is found
+		// under the name it was given, and imported back as that name. The
+		// browser numbers a second export of the same name itself.
+		download(`${fileStem(template.name)}.json`, exportTemplate($state.snapshot(template)));
 		notify('Template exported — fonts referenced by name.');
 	}
 
@@ -2697,9 +3014,16 @@
 			const ref = await uploadLocalFont(file, family);
 			editorFonts = mergeFonts(editorFonts, [ref]);
 			saveEditorFonts($state.snapshot(editorFonts));
+			// The design's own entry keeps its tuning: a file supplied for a face
+			// that was missing, or a Google face made local, is the same face,
+			// and the design set it as it wanted.
+			// Its tuning only: what the old file said it was (`kind`) is the old
+			// file's, and the new one says for itself, or says nothing.
+			const old = template.fonts.find((f) => f.family.toLowerCase() === ref.family.toLowerCase());
 			const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== ref.family.toLowerCase());
-			template = { ...template, fonts: [...fonts, ref] };
+			template = { ...template, fonts: [...fonts, { ...ref, ...tuningOf(old) }] };
 			missingFonts = missingFonts.filter((f) => (f.ref ?? f.family) !== (ref.ref ?? ref.family));
+			await refreshStoredFonts();
 			// Uploading from a box's Font dropdown is a way of choosing a font, not
 			// just of installing one: it used to leave the box on its old family,
 			// so the file landed and nothing on the card changed. Only when the
@@ -2746,6 +3070,68 @@
 		const file = input.files?.[0];
 		input.value = '';
 		if (file && missingPrintImage) await handlePrintBackgroundUpload(file, missingPrintImage);
+	}
+
+	/**
+	 * The kind a face's fallback is chosen by, changed —
+	 * everywhere it is used. From the Pictures tray (`fromTray`), just after
+	 * that face was replaced in, it joins the replace's undo entry — see
+	 * `fontSession`; otherwise it is a step of its own.
+	 */
+	function setFontTune(family: string, change: FontTune, fromTray = false) {
+		if (template.locked) {
+			notify('The design is locked — unlock it to change its fonts.', 'warning');
+			return;
+		}
+		const tunes = fromTray && fontSession?.family === family.toLowerCase();
+		// Recorded already, and still the last step: fold into it. Otherwise a
+		// step of its own, named — `describe` keeps a label already waiting,
+		// so a tune inside the replace's own debounce lands under its name.
+		if (tunes && history.present.label === fontSession?.label) amendNext = true;
+		else describe(`Type of ${family}`);
+		template = tuneFont($state.snapshot(template) as Template, family, change, fontRef(family, editorFonts));
+	}
+
+	/** Every font uploaded to this browser — the Pictures tray's Fonts, beside the design's own. */
+	let storedFonts = $state<StoredFontEntry[]>([]);
+	const refreshStoredFonts = async () => (storedFonts = await listStoredFonts());
+	const fontEntries = $derived(fontInventory(template, storedFonts));
+	/** What a font can be swapped for: what the font menus offer (`fontChoices`). */
+	const fontFamilies = $derived(fontChoices(template, editorFonts));
+
+	/**
+	 * A font the design is set in swapped for another, everywhere — how a design
+	 * moved to a computer without its uploaded face is made to print, when the
+	 * file is not to hand. One undo puts it back. Says whether it happened: the
+	 * Pictures tray keeps the replacement where the font was, and only then.
+	 */
+	async function replaceFont(from: string, to: string): Promise<boolean> {
+		if (template.locked) {
+			notify('The design is locked — unlock it to change its fonts.', 'warning');
+			return false;
+		}
+		const held = storedFonts.find((f) => f.family.toLowerCase() === to.toLowerCase());
+		// What the editor knows of it — its kind, read when it was uploaded —
+		// with the file this browser holds.
+		const known = fontRef(to, editorFonts);
+		const ref: FontRef = held ? { ...known, family: held.family, source: 'local', ref: held.ref } : known;
+		const label = `Replace ${from} with ${to}`;
+		describe(label);
+		fontSession = { label, family: to.toLowerCase() };
+		template = replaceFamily($state.snapshot(template) as Template, from, ref);
+		missingFonts = await ensureTemplateFonts(template);
+		notify(`Everything set in ${from} is now in ${to}. Ctrl/Cmd+Z puts it back.`);
+		return true;
+	}
+
+	/** An upload nothing in the design uses, deleted from this browser — not from undo's reach, so it says so. */
+	async function forgetFont(font: FontEntry) {
+		if (!font.ref || font.used) return;
+		await deleteStoredFont(font.ref, font.family);
+		editorFonts = editorFonts.filter((f) => f.family.toLowerCase() !== font.family.toLowerCase());
+		saveEditorFonts($state.snapshot(editorFonts));
+		await refreshStoredFonts();
+		notify(`${font.family} deleted from this browser.`);
 	}
 
 	function pickMissingFont(font: FontRef) {
@@ -2883,7 +3269,7 @@
 		</button>
 		<!-- Every stored picture, in a tray of its own in the table's place: the
 		     pictures are the browser's, not the page's — a row's own photograph
-		     is in there too. Images and Data share that room, one at a time, so
+		     is in there too. Pictures and Data share that room, one at a time, so
 		     opening either closes the other. -->
 		<button
 			class="images"
@@ -2894,9 +3280,9 @@
 				imageFocus = null;
 				if (imagesOpen) dataOpen = false;
 			}}
-			title="Every image this browser is holding — what each weighs, whether anything uses it, and where they are kept"
+			title="Pictures: the images, drawings and fonts of this design and this browser — what each weighs, whether anything uses it, and a way to replace it"
 		>
-			<Icon name="image" size={15} /> <span class="label">Images</span>
+			<Icon name="image" size={15} /> <span class="label">Pictures</span>
 		</button>
 		<button
 			class="data"
@@ -3073,6 +3459,14 @@
 			{#each missingFonts as font (font.ref ?? font.family)}
 				<button onclick={() => pickMissingFont(font)}>Choose {font.family} File…</button>
 			{/each}
+			<!-- No file to hand: the Pictures tray's Fonts swaps the face for another. -->
+			<button
+				onclick={() => {
+					imagesOpen = true;
+					dataOpen = false;
+					imageFocus = null;
+				}}
+			>Replace…</button>
 		</div>
 	{/if}
 
@@ -3140,6 +3534,7 @@
 			grid={ui.showGrid}
 			guides={ui.showGuides}
 			smartGuides={ui.smartGuides}
+			spacingGuides={ui.spacingGuides ?? true}
 			gridStyle={ui.gridStyle}
 			{selectedIds}
 			zoom={ui.zoom}
@@ -3155,11 +3550,11 @@
 			onselect={selectBox}
 			onchange={updateBox}
 			onimagedrop={(box, file) => void handleImageDrop(box, file)}
-			onimagepagedrop={(file, x, y) => void (async () => placeImageOnPage(await storeLocalImage(file), x, y, file))()}
+			onimagepagedrop={(file, x, y) => void (async () => placeImageOnPage(await storeImage(file), x, y, file))()}
 			onaction={describe}
 			onbounds={(show, ties) => (ui = { ...ui, showBounds: show, showTies: ties })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
-			onguides={(margins, smart) => (ui = { ...ui, showGuides: margins, smartGuides: smart })}
+			onguides={(margins, smart, spacing) => (ui = { ...ui, showGuides: margins, smartGuides: smart, spacingGuides: spacing })}
 			ongridstyle={(gridStyle) => {
 				// A hold on a checkbox is a gesture nobody was taught, so it says what
 				// it did — and it turns the grid on if it was off, because changing
@@ -3199,7 +3594,7 @@
 		/>
 
 		{#if dataOpen || imagesOpen}
-		<aside bind:this={asideEl}>
+		<aside bind:this={asideEl} class:shutting={trayShutting}>
 			{#if !stacked}
 				<!-- The edge between the page and the table, dragged to share the
 				     width between them. A separator in the ARIA sense, so the arrow
@@ -3247,6 +3642,13 @@
 					{drawings}
 					onopendrawing={openDrawing}
 					ontraydrag={stacked ? dragTray : undefined}
+					fonts={fontEntries}
+					{fontFamilies}
+					onfontsopen={() => previewFamilies(fontFamilies.google, editorFonts, template.fonts)}
+					onfontfile={(family, file) => void handleFontUpload(file, family)}
+					onreplacefont={replaceFont}
+					ondeletefont={(font) => void forgetFont(font)}
+					ontune={(family, change) => setFontTune(family, change, true)}
 				/>
 			{:else}
 			<DataTable
@@ -3353,7 +3755,10 @@
 		{/if}
 	</main>
 
-	<footer class="status-bar">
+	<!-- On a phone a pull up off the bar brings the table up under the finger:
+	     the bar is the tray's lip when it is folded away, and a thumb at the
+	     bottom of the screen is nearer this than the Data button at the top. -->
+	<footer class="status-bar" use:pullUp={pullTray}>
 		<!-- The interface's text size, when it is not the default: a pinch off the
 		     stage changes it without a word, and this is both where it says so and
 		     how it goes back. First in the bar, where the eye starts, so a size
@@ -3384,6 +3789,31 @@
 		<button class="version as-typed" onclick={openWhatsNew} title="What's new">v{VERSION}</button>
 	</footer>
 </div>
+
+{#if editor === 'elsewhere' || editor === 'handed'}
+	<!-- Not dismissable: behind it is a tab that is not saving, and editing it
+	     would be work that goes nowhere. The one way on is to bring the editing
+	     here. -->
+	<div class="modal-backdrop" role="presentation"></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="elsewhere-title" aria-describedby="elsewhere-text">
+		<h2 id="elsewhere-title">Open in another tab</h2>
+		<p id="elsewhere-text">
+			{#if editor === 'handed'}
+				Your work moved to another tab, saved as you left it. This tab has stopped saving, so nothing here can
+				overwrite it.
+			{:else}
+				libelli is already open in another tab. One tab edits at a time, so that the two never save over each
+				other's work.
+			{/if}
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button class="primary" data-default disabled={takingOver} onclick={() => void useHere()}>
+				{takingOver ? 'Moving it here…' : 'Use Here'}
+			</button>
+		</div>
+	</div>
+{/if}
 
 {#if statusOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (statusOpen = false)}></div>
@@ -3743,7 +4173,7 @@
 			<dt>Pinch, Ctrl/Cmd + scroll<span>off the page</span></dt><dd>Text size — the interface itself never zooms</dd>
 			<dt>Ctrl/Cmd + +<span>in a field or here</span></dt><dd>Text size, in steps; Ctrl/Cmd + 0, or the percentage beside the version, puts it back</dd>
 			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + ;<span>|</span></dt><dd>Guides on or off</dd>
+			<dt>Ctrl/Cmd + ;<span>|</span></dt><dd>Guides: all, without the spacing, off</dd>
 			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off</dd>
 			<dt>Ctrl/Cmd + S</dt><dd>Save the drawing, while drawing</dd>
 			<dt>Ctrl/Cmd + P</dt><dd>Export — press again from that screen to print</dd>
@@ -4720,6 +5150,15 @@
 			box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
 		}
 
+		/* Pulled past its lowest, the tray says it is about to go. */
+		aside {
+			transition: opacity 0.15s;
+		}
+
+		aside.shutting {
+			opacity: 0.45;
+		}
+
 		.toolbar {
 			gap: 6px;
 			/* Tighter top and bottom on a phone; the sides hold their 16, because
@@ -4778,7 +5217,7 @@
 		}
 
 		/* Named and ordered like the rest: a button left out of this list keeps
-		   the initial `order: 0` and lands in front of Help, which is how Images
+		   the initial `order: 0` and lands in front of Help, which is how Pictures
 		   came to open the phone row. */
 		.toolbar .images {
 			order: 5;

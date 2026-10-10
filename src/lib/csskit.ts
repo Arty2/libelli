@@ -1,7 +1,7 @@
 import { parseColor } from './color';
 import { cssIdent } from './css';
-import { fontStack } from './fonts';
-import { bleedFor } from './layout';
+import { fontStack, kindOf } from './fonts';
+import { bleedFor, referenceOf } from './layout';
 import { marginsOf } from './template';
 import type { Template } from './types';
 
@@ -42,7 +42,7 @@ export function cardVars(template: Template): [string, string][] {
 		['--margin-bottom', `${round(m.bottom)}mm`],
 		['--margin-left', `${round(m.left)}mm`],
 		['--bleed', `${round(bleedFor(template.bleed))}mm`],
-		['--text-font', fontStack(d.font, d.font)],
+		['--text-font', fontStack(d.font, kindOf(template.fonts, d.font))],
 		['--text-size', `${round(d.size)}pt`],
 		['--text-leading', `${round(d.lineHeight)}`],
 		// Through color.ts like every color that reaches a style attribute; the
@@ -114,9 +114,19 @@ function selectors(template: Template): string[] {
 		const notes = [
 			b.columns && (b.mode === 'plain' || b.mode === 'markdown') && `${b.columns.count} columns`,
 			b.overflow === 'grow' && 'grows',
+			b.overflow === 'shrink' && 'shrinks to fit',
 			b.anchor && `below ${idOf(b.anchor.to)}`
 		].filter(Boolean);
-		const frame = `${b.mode}, ${round(b.x)} ${round(b.y)}, ${round(b.w)} × ${round(b.h)}${notes.length ? `; ${notes.join(', ')}` : ''}`;
+		// At the point the bar's X and Y and the file give — `referenceOf` —
+		// named where it is not the top-left corner, so a sheet written from
+		// these numbers does not take a right edge for a left one.
+		const { fx, fy } = referenceOf(b.align ?? template.defaults.align, b.valign);
+		const point = fx || fy ? ` (${['top', 'middle', 'bottom'][fy * 2]} ${['left', 'centre', 'right'][fx * 2]})` : '';
+		const at = `${round(b.x + b.w * fx)} ${round(b.y + b.h * fy)}${point}`;
+		// `qr` is the mode's stored name for every code; a model told a Code
+		// 128 is a QR would style it as a square.
+		const mode = b.mode === 'qr' ? (b.qr?.kind ?? 'qr') : b.mode;
+		const frame = `${mode}, ${at}, ${round(b.w)} × ${round(b.h)}${notes.length ? `; ${notes.join(', ')}` : ''}`;
 		return [`${`#${id} { }`.padEnd(21)} /* ${inComment(frame)} */`];
 	});
 	return [

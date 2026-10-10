@@ -94,18 +94,34 @@
 	 * in here: Save and Delete sit in the panel's own bar, where every picture's
 	 * do, so the board's rows are only what you draw with.
 	 */
-	export async function save() {
-		// What is being saved is the board as it is now: a stroke made while it
-		// is being packed is not saved by this, and must not be marked as if it
-		// were.
-		const at = edits;
-		const board = { ...grid };
-		const data = await exported();
-		if (!data) return;
-		// The usual board is the absence of the field, the same rule the rest of
-		// the format follows.
-		onsave(data, isDefaultBoard(board) ? undefined : board);
-		savedEdits = at;
+	export function save(): Promise<void> {
+		// One at a time: packing a large board takes a moment, and a second
+		// press in it would write the cell twice — two undo entries for one
+		// save. The second press waits for the first.
+		if (pending) return pending;
+		pending = (async () => {
+			// What is being saved is the board as it is now: a stroke made while
+			// it is being packed is not saved by this, and must not be marked as
+			// if it were. And where it goes is fixed now, too: the panel may
+			// have closed by the time the packing is done.
+			const at = edits;
+			const board = { ...grid };
+			const write = onsave;
+			const data = await exported();
+			if (!data) return;
+			// The usual board is the absence of the field, the same rule the rest
+			// of the format follows.
+			write(data, isDefaultBoard(board) ? undefined : board);
+			savedEdits = at;
+		})().finally(() => (pending = null));
+		return pending;
+	}
+
+	let pending: Promise<void> | null = null;
+
+	/** Resolves once no save is under way — what closing the panel waits for. */
+	export function settled(): Promise<void> {
+		return pending ?? Promise.resolve();
 	}
 
 	// Read once: the box cannot change while this is up, and the board is the
@@ -389,7 +405,7 @@
 	}
 
 	/**
-	 * A crop, as the Images tray does one: press Crop, drag a frame over the
+	 * A crop, as the Pictures tray does one: press Crop, drag a frame over the
 	 * board, Apply. It used to trim the board to what was drawn on it, which
 	 * is what a repeating area already does as it is drawn (see `tile.ts`) and
 	 * left no way to keep a margin or cut into the drawing. The frame snaps to
@@ -1130,7 +1146,7 @@
 	}
 
 	/* What stays, lit; what goes, dimmed by the frame's own shadow — as the
-	   Images tray draws its crop. Clipped to the board by the stage. */
+	   Pictures tray draws its crop. Clipped to the board by the stage. */
 	.crop-frame {
 		position: absolute;
 		border: 1px dashed #fff;

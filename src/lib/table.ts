@@ -100,7 +100,16 @@ function compact(order: number[]): number[] {
  * has put it, so sorting carries every number along with its row.
  */
 export function rowNumber(dataset: Dataset, index: number): number {
-	return (orderOf(dataset)?.[index] ?? index) + 1;
+	return numberIn(orderOf(dataset), index);
+}
+
+/**
+ * `rowNumber` from an order already checked by `orderOf`. The table labels
+ * every row, and checking the order once per label was a pass over all of it
+ * for each — on a sorted table of five hundred rows, seconds a keystroke.
+ */
+export function numberIn(order: readonly number[] | null, index: number): number {
+	return (order?.[index] ?? index) + 1;
 }
 
 /**
@@ -111,11 +120,24 @@ export function rowNumber(dataset: Dataset, index: number): number {
  */
 export function inArrivalOrder(dataset: Dataset): Row[] {
 	const order = orderOf(dataset);
-	if (!order) return [...dataset.rows];
-	const rows: Row[] = new Array(order.length);
-	order.forEach((n, i) => (rows[n] = dataset.rows[i]));
+	const rows: Row[] = order ? new Array(order.length) : [...dataset.rows];
+	if (order) order.forEach((n, i) => (rows[n] = dataset.rows[i]));
+	runs.set(rows, dataset.rows);
 	return rows;
 }
+
+/**
+ * The run each arrival-ordered list was made from — the table's rows in the
+ * order they print, a card's page number being its place in it. Every card is
+ * handed the arrival-ordered list for its lookups; this lets the one thing
+ * that needs pages as well, `%%toc:…%%`, find them from it, without a second
+ * list threaded through every component that draws a card.
+ */
+const runs = new WeakMap<readonly Row[], readonly Row[]>();
+
+/** The rows in the order they print, for a list `inArrivalOrder` made; undefined for any other. */
+export const runOf = (arrival: readonly Row[] | undefined): readonly Row[] | undefined =>
+	arrival ? runs.get(arrival) : undefined;
 
 /** The table back in the order it arrived in: what "unsort" does. */
 export function unsortRows(dataset: Dataset): Dataset {

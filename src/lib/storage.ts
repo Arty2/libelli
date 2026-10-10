@@ -1,4 +1,5 @@
 import type { Dataset, FontRef, Mapping, Template, UiState } from './types';
+import { toFile } from './frame';
 
 /**
  * Client-side persistence. Nothing here ever leaves the browser.
@@ -109,7 +110,16 @@ export const loadUi = (): UiState => {
 	// `trayWidth` was px, in 0.16.0; the width is a share now, and a stale
 	// number carried along in every save would only be something to misread.
 	const { showOutlines, trayWidth: _px, ...rest } = stored;
-	return { ...UI_DEFAULTS, ...(showOutlines === undefined ? {} : { showBounds: showOutlines }), ...rest };
+	// Before the spacing, the Guides box's dash was the temporary guides
+	// without the margins; now it is both without the spacing. Read as the
+	// dash it was, so the box's tip, which names the margins, is true of it.
+	const oldDash = rest.spacingGuides === undefined && rest.showGuides === false && rest.smartGuides === true;
+	return {
+		...UI_DEFAULTS,
+		...(showOutlines === undefined ? {} : { showBounds: showOutlines }),
+		...rest,
+		...(oldDash ? { showGuides: true, spacingGuides: false } : {})
+	};
 };
 export const saveUi = (ui: UiState) => local.set('ui', ui);
 
@@ -188,7 +198,11 @@ export const idbKeys = (store: string) => tx<IDBValidKey[]>(store, 'readonly', (
  */
 export const storageAvailable = () => openDb().then((db) => db !== null);
 
-export const saveTemplate = (t: Template) => idbSet(STORE_KV, KEY_TEMPLATE, t);
+/**
+ * Both template writes go through `toFile`: what is stored is a file, with
+ * each area at its reference point and the marker that says so — frame.ts.
+ */
+export const saveTemplate = (t: Template) => idbSet(STORE_KV, KEY_TEMPLATE, toFile(t));
 export const loadTemplate = () => idbGet<Template>(STORE_KV, KEY_TEMPLATE);
 export const saveDataset = (d: Dataset) => idbSet(STORE_KV, KEY_DATASET, d);
 export const loadDataset = () => idbGet<Dataset>(STORE_KV, KEY_DATASET);
@@ -228,8 +242,14 @@ const mintId = (prefix: string): string =>
 
 const templateDocKey = (id: string) => `${KEY_TEMPLATE_PREFIX}${id}`;
 
-export const saveTemplateDoc = (id: string, t: Template) => idbSet(STORE_KV, templateDocKey(id), t);
+export const saveTemplateDoc = (id: string, t: Template) => idbSet(STORE_KV, templateDocKey(id), toFile(t));
 export const loadTemplateDoc = (id: string) => idbGet<Template>(STORE_KV, templateDocKey(id));
+/**
+ * A template kept exactly as it was read, not passed through `toFile`: one
+ * this build cannot read — a newer schema, say — must not be converted by a
+ * build that does not understand it, only kept until one that does.
+ */
+export const keepTemplateDocAsIs = (id: string, raw: unknown) => idbSet(STORE_KV, templateDocKey(id), raw);
 export const deleteTemplateDoc = (id: string) => idbDelete(STORE_KV, templateDocKey(id));
 
 /**

@@ -7,9 +7,10 @@
 	import { parseColor } from '$lib/color';
 	import { safeImageUrl } from '$lib/assets';
 	import { completePlaceholders } from '$lib/complete';
-	import { availableWeights, fontChoices, previewFamilies } from '$lib/fonts';
-	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
+	import { availableWeights, fontChoices, fontRef, naturalXHeight, previewFamilies, watchFaces } from '$lib/fonts';
+	import MenuSelect, { familyItems, type MenuItem } from './MenuSelect.svelte';
 	import ResetButton from './ResetButton.svelte';
+	import { referenceOf } from '$lib/layout';
 	import {
 		BLEND_MODES,
 		BORDER_STYLES,
@@ -19,6 +20,10 @@
 		MAX_LIST,
 		LIST_MARKER_LABELS,
 		LIST_MARKERS,
+		LIST_NUMBERING_LABELS,
+		LIST_NUMBERINGS,
+		LEADER_LABELS,
+		LEADERS,
 		baselineOf,
 		normaliseBaseline,
 		normaliseColumns,
@@ -39,6 +44,7 @@
 		sidesOf,
 		takesADrawing
 	} from '$lib/template';
+	import { clampXHeight } from '$lib/types';
 	import type {
 		Align,
 		BlendMode,
@@ -123,22 +129,17 @@
 	/** the same question for padding; the two expand independently */
 	let perSidePadding = $state(false);
 
-	/**
-	 * The families this template is set in, then under a rule everything else
-	 * this browser knows — see `fontChoices`.
-	 */
+	/** Every family a font menu offers, by where it comes from — see `fontChoices`. */
 	const families = $derived(fontChoices(template, editorFonts));
 
 	/**
-	 * The font menu: the page default, the template's families, under a rule
-	 * this browser's others, and under another the two ways to name a family
-	 * that is in neither list. Each name in its own face.
+	 * The font menu: the page default, the families under their sources'
+	 * headings, and under a rule the two ways to name a family that is in no
+	 * list. Each name in its own face.
 	 */
 	const fontItems = $derived.by((): MenuItem[] => [
 		{ value: '', label: `Default: ${template.defaults.font}` },
-		...families.used.map((family) => ({ value: family, label: family, family })),
-		{ rule: true },
-		...families.others.map((family) => ({ value: family, label: family, family })),
+		...familyItems(families),
 		{ rule: true },
 		{ value: '__custom', label: 'Other Family…' },
 		{ value: '__upload', label: 'Upload a Font File…' }
@@ -372,6 +373,17 @@
 			!(selected.static?.text?.trim() || selected.static?.dataUrl || selected.static?.url || selected.static?.svg)
 	);
 
+	/** The reference point, in the stored frame the fields write — see `referenceOf`. */
+	const reference = $derived(referenceOf(selected?.align ?? template.defaults.align, selected?.valign));
+	const round2 = (n: number) => Math.round(n * 100) / 100;
+	const refX = $derived(selected ? round2(selected.x + selected.w * reference.fx) : 0);
+	const refY = $derived(selected ? round2(selected.y + selected.h * reference.fy) : 0);
+	const REF_X = { 0: 'left edge', 0.5: 'middle, across', 1: 'right edge' } as const;
+	const REF_Y = { 0: 'top edge', 0.5: 'middle, down', 1: 'bottom edge' } as const;
+	// Centred both ways the reference point is the area's middle, which has no
+	// handle to ring.
+	const ringNote = $derived(reference.fx === 0.5 && reference.fy === 0.5 ? '' : ', and the handle with the ring');
+
 	/** The area's own list style, field by field; a blank field takes the page's. */
 	function setList(change: Record<string, unknown>) {
 		patch({ list: normaliseList({ ...selected?.list, ...change }) });
@@ -442,9 +454,11 @@
 
 	function registerFamily(family: string) {
 		if (template.fonts.some((f) => f.family.toLowerCase() === family.toLowerCase())) return;
-		// An uploaded face the editor is holding keeps its file reference.
-		const known = editorFonts.find((f) => f.family.toLowerCase() === family.toLowerCase());
-		patchTemplate({ fonts: [...template.fonts, known ?? { family, source: 'google' }] });
+		// An uploaded face keeps its file reference; a system face is not
+		// declared at all, as `replaceFamily` leaves it out — there is
+		// nothing to fetch or supply for it.
+		const ref = fontRef(family, editorFonts);
+		if (ref.source !== 'system') patchTemplate({ fonts: [...template.fonts, ref] });
 	}
 
 	/**
@@ -454,20 +468,14 @@
 	 */
 	let facesVersion = $state(0);
 
-	$effect(() => {
-		if (typeof document === 'undefined' || !document.fonts) return;
-		const bump = () => (facesVersion += 1);
-		document.fonts.addEventListener('loadingdone', bump);
-		// A stylesheet adds its faces without loading any of them, so a
-		// finished request is watched for too.
-		const observer = new MutationObserver(bump);
-		observer.observe(document.head, { childList: true });
-		const late = setTimeout(bump, 1500);
-		return () => {
-			document.fonts.removeEventListener('loadingdone', bump);
-			observer.disconnect();
-			clearTimeout(late);
-		};
+	$effect(() => watchFaces(() => (facesVersion += 1)));
+
+	/** This area's face's own x-height, as X-Height's placeholder: blank is this. */
+	const ownXHeight = $derived.by(() => {
+		// Read, so this is measured again once the face has arrived.
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		facesVersion;
+		return naturalXHeight(selected?.font ?? template.defaults.font);
 	});
 
 	/**
@@ -548,6 +556,12 @@
 
 	function setQr(change: Partial<QrSettings>) {
 		patch({ qr: { ...DEFAULT_QR, ...selected?.qr, ...change } });
+	}
+
+	/** QR is the absence of a kind, as it always was, so a QR template stays as it was written. */
+	function setQrKind(value: string) {
+		const { kind: _was, ...rest } = { ...DEFAULT_QR, ...selected?.qr };
+		patch({ qr: value === 'code128' || value === 'ean13' ? { ...rest, kind: value } : rest });
 	}
 
 	/** Transparent is the absence of a background, not a white one. */
@@ -809,11 +823,15 @@
 								<option value="color">Color</option>
 							{/if}
 						{/if}
-						<option value="qr">QR Code</option>
+						<!-- Every code the area can draw, QR and the barcodes; the type
+						     is chosen in its own group. Still `qr` in the file. -->
+						<option value="qr">Barcode</option>
 					</select>
 				</label>
 			{/if}
-			{#if takesADrawing(selected.mode) || selected.mode === 'qr'}
+			<!-- A barcode is read across and fills the area both ways: Fit has
+			     nothing to choose for it. -->
+			{#if takesADrawing(selected.mode) || (selected.mode === 'qr' && !selected.qr?.kind)}
 				<label class="field">
 					<span>Fit</span>
 					<select value={selected.fit ?? 'contain'} disabled={boxFrozen} onchange={(e) => patch({ fit: e.currentTarget.value as Box['fit'] })}>
@@ -860,21 +878,53 @@
 		</fieldset>
 		{#if selected.mode === 'qr'}
 			<fieldset class="group">
-				<legend>QR Code</legend>
+				<legend>Barcode</legend>
 				<label class="field">
-					<span>Correction</span>
+					<span>Type</span>
 					<select
-						value={selected.qr?.level ?? DEFAULT_QR.level}
-						title="How much of the code can be damaged and still scan"
+						value={selected.qr?.kind ?? 'qr'}
+						title="QR holds anything and reads from any angle; Code 128 is a line of bars for any plain text; EAN-13 is a 13-digit retail number or ISBN"
 						disabled={boxFrozen}
-						onchange={(e) => setQr({ level: e.currentTarget.value as QrSettings['level'] })}
+						onchange={(e) => setQrKind(e.currentTarget.value)}
 					>
-						<option value="L">L — 7%</option>
-						<option value="M">M — 15%</option>
-						<option value="Q">Q — 25%</option>
-						<option value="H">H — 30%</option>
+						<option value="qr">QR Code</option>
+						<option value="code128">Code 128</option>
+						<option value="ean13">EAN-13</option>
 					</select>
 				</label>
+				{#if selected.qr?.kind}
+					<!-- The line a person reads, as every packet prints it; in the
+					     area's own type, so its size is the area's Size. -->
+					<label class="check">
+						<input
+							type="checkbox"
+							checked={!selected.qr.hideDigits}
+							title="The digits under the bars, in this area's type — EAN-13 in its three groups, Code 128 centred"
+							disabled={boxFrozen}
+							onchange={(e) => {
+								const { hideDigits: _was, ...rest } = { ...DEFAULT_QR, ...selected.qr };
+								patch({ qr: e.currentTarget.checked ? rest : { ...rest, hideDigits: true } });
+							}}
+						/>
+						Show Digits
+					</label>
+				{/if}
+				{#if !selected.qr?.kind}
+					<label class="field">
+						<span>Correction</span>
+						<select
+							value={selected.qr?.level ?? DEFAULT_QR.level}
+							title="How much of the code can be damaged and still scan"
+							disabled={boxFrozen}
+							onchange={(e) => setQr({ level: e.currentTarget.value as QrSettings['level'] })}
+						>
+							<option value="L">L — 7%</option>
+							<option value="M">M — 15%</option>
+							<option value="Q">Q — 25%</option>
+							<option value="H">H — 30%</option>
+						</select>
+					</label>
+				{/if}
 				<label class="field">
 					<span>Background</span>
 					<select
@@ -889,11 +939,11 @@
 				</label>
 				{#if selected.qr?.background}
 					<span class="field">
-						<span class="sr-only">QR Background Color</span>
+						<span class="sr-only">Barcode Background Color</span>
 						<ColorField
 							value={selected.qr.background}
 							fallback="#ffffff"
-							label="QR background color"
+							label="Barcode background color"
 							disabled={boxFrozen}
 							onchange={(v) => setQr({ background: v })}
 						/>
@@ -935,8 +985,9 @@
 		</fieldset>
 		<fieldset class="group">
 			<legend>Text</legend>
-			<!-- A QR code is drawn, not set: of the type it keeps only its color. -->
-			{#if selected.mode !== 'qr'}
+			<!-- A QR code is drawn, not set: of the type it keeps only its color —
+			     but a barcode's digits are set, in this face, size and weight. -->
+			{#if selected.mode !== 'qr' || (selected.qr?.kind && !selected.qr.hideDigits)}
 			<span class="field" class:inherits={!selected.font}>
 				<span>Font</span>
 				<MenuSelect
@@ -945,7 +996,7 @@
 					items={fontItems}
 					disabled={boxFrozen}
 					showFamily
-					onopen={() => previewFamilies([...families.used, ...families.others], editorFonts, template.fonts)}
+					onopen={() => previewFamilies(families.google, editorFonts, template.fonts)}
 					onselect={setFont}
 				/>
 				{#if selected.font}
@@ -963,11 +1014,44 @@
 					title="Blank inherits the page's {template.defaults.size}pt"
 					value={selected.size ?? ''}
 					disabled={boxFrozen}
-					onchange={(e) => patch({ size: inherited(e, MIN_SIZE) })}
+					onchange={(e) => {
+						const size = inherited(e, MIN_SIZE);
+						// A size of its own is the area's answer to how big its words
+						// are, so the X-Height that only goes with the page's goes.
+						patch(size === undefined ? { size } : { size, xHeight: undefined });
+					}}
 				/>
 				<span class="unit">pt</span>
 				{#if selected.size !== undefined}
 					<ResetButton to="the page's {template.defaults.size}pt" disabled={boxFrozen} onclick={() => patch({ size: undefined })} />
+				{/if}
+			</label>
+			<!-- The face's lowercase as a percentage of the size, to make one
+			     face sit like another at the page's size: only while the area
+			     takes that size, since a size of its own already says how big
+			     its words are. Blank is the face's own, shown greyed. -->
+			<label class="field" class:inherits={selected.xHeight === undefined}>
+				<span>X-Height</span>
+				<input
+					class="n-3"
+					type="number"
+					step="1"
+					min="20"
+					max="100"
+					placeholder={ownXHeight === undefined ? '' : String(Math.round(ownXHeight * 100))}
+					title={selected.size === undefined
+						? "The lowercase's height as a percentage of the size; blank is the face's own"
+						: 'Only with the page\'s size — clear Size to set it'}
+					value={selected.xHeight === undefined ? '' : Math.round(selected.xHeight * 100)}
+					disabled={boxFrozen || selected.size !== undefined}
+					onchange={(e) => {
+						const typed = e.currentTarget.value.trim();
+						patch({ xHeight: typed === '' ? undefined : clampXHeight(Number(typed) / 100) });
+					}}
+				/>
+				<span class="unit">%</span>
+				{#if selected.xHeight !== undefined}
+					<ResetButton to="the face's own" disabled={boxFrozen} onclick={() => patch({ xHeight: undefined })} />
 				{/if}
 			</label>
 			<label class="field">
@@ -1007,13 +1091,13 @@
 			</span>
 			{#if selected.mode !== 'qr'}
 			<label class="field">
-				<span>Spacing</span>
+				<span>Tracking</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.05"
 					placeholder={String(template.defaults.letterSpacing)}
-					title="Letter spacing; blank inherits the page's"
+					title="Tracking: space added between letters, in mm; blank inherits the page's"
 					value={selected.letterSpacing ?? ''}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ letterSpacing: inherited(e) })}
@@ -1035,8 +1119,22 @@
 		</fieldset>
 		<fieldset class="group">
 			<legend>Position</legend>
+			<!-- X and Y name the reference point, the one the ring is on: the
+			     corner the words are set from, or the middle of an edge where
+			     they are centred. Shown and typed there, kept in memory as the
+			     top-left corner as ever; frame.ts turns it into the reference
+			     point the file stores. Measured against the declared height, which is the one
+			     the field beside it says. -->
 			<label class="field"><span>X</span>
-				<input class="n-4" type="number" step="0.5" value={selected.x} disabled={boxFrozen} onchange={(e) => patch({ x: numeric(e, selected.x) })} />
+				<input
+					class="n-4"
+					type="number"
+					step="0.5"
+					value={refX}
+					title="The {REF_X[reference.fx]} — where the words are set from{ringNote}"
+					disabled={boxFrozen}
+					onchange={(e) => patch({ x: round2(numeric(e, refX) - selected.w * reference.fx) })}
+				/>
 				<span class="unit">mm</span>
 			</label>
 			<label class="field"><span>Y</span>
@@ -1044,10 +1142,12 @@
 					class="n-4"
 					type="number"
 					step="0.5"
-					value={selected.y}
+					value={refY}
 					disabled={boxFrozen || !!selected.anchor}
-					title={selected.anchor ? 'Anchored: the gap sets the top edge' : ''}
-					onchange={(e) => patch({ y: numeric(e, selected.y) })}
+					title={selected.anchor
+						? `Anchored: the gap sets the top edge — this is the ${REF_Y[reference.fy]}`
+						: `The ${REF_Y[reference.fy]} — where the words are set from${ringNote}`}
+					onchange={(e) => patch({ y: round2(numeric(e, refY) - selected.h * reference.fy) })}
 				/>
 				<span class="unit">mm</span>
 			</label>
@@ -1297,6 +1397,25 @@
 					<ResetButton to="the page's paragraphs" disabled={boxFrozen} onclick={() => patch({ paragraph: undefined })} />
 				</label>
 			{/if}
+			<!-- With the paragraphs, since it is how a line of one is set. -->
+			<label class="field">
+				<span>Leader</span>
+				<select
+					class:inherits={!selected.leader}
+					value={selected.leader ?? ''}
+					title="A line with %%% in it sets what follows against the right edge, joined by this line — Coffee %%% 3.50 for a price list; with a leader set, a tab does too"
+					disabled={boxFrozen}
+					onchange={(e) => patch({ leader: (e.currentTarget.value || undefined) as Box['leader'] })}
+				>
+					<option value="">Default: {LEADER_LABELS[template.defaults.leader ?? 'none']}</option>
+					{#each LEADERS as leader (leader)}
+						<option value={leader}>{LEADER_LABELS[leader]}</option>
+					{/each}
+				</select>
+				{#if selected.leader}
+					<ResetButton to="the page's leader" disabled={boxFrozen} onclick={() => patch({ leader: undefined })} />
+				{/if}
+			</label>
 		</fieldset>
 		{/if}
 		{#if selected.mode === 'markdown'}
@@ -1307,7 +1426,7 @@
 					<select
 						class:inherits={!selected.list?.marker}
 						value={selected.list?.marker ?? ''}
-						title="What each item of a list is marked with"
+						title="What each item of a bullet list is marked with — a numbered list counts by Numbers"
 						disabled={boxFrozen}
 						onchange={(e) => setList({ marker: e.currentTarget.value || undefined })}
 					>
@@ -1318,6 +1437,28 @@
 					</select>
 					{#if selected.list?.marker}
 						<ResetButton to="the page's list marker" disabled={boxFrozen} onclick={() => setList({ marker: undefined })} />
+					{/if}
+				</label>
+				<label class="field">
+					<span>Numbers</span>
+					<select
+						class:inherits={!selected.list?.numbering}
+						value={selected.list?.numbering ?? ''}
+						title="How a numbered list counts: numbers, letters or Roman numerals"
+						disabled={boxFrozen}
+						onchange={(e) => setList({ numbering: e.currentTarget.value || undefined })}
+					>
+						<option value="">Default: {LIST_NUMBERING_LABELS[template.defaults.list?.numbering ?? 'decimal']}</option>
+						{#each LIST_NUMBERINGS as numbering (numbering)}
+							<option value={numbering}>{LIST_NUMBERING_LABELS[numbering]}</option>
+						{/each}
+					</select>
+					{#if selected.list?.numbering}
+						<ResetButton
+							to="the page's list numbering"
+							disabled={boxFrozen}
+							onclick={() => setList({ numbering: undefined })}
+						/>
 					{/if}
 				</label>
 				<label class="field">
@@ -1549,9 +1690,10 @@
 				<span>Overflow</span>
 				<select
 					value={selected.overflow}
-					title="Clip cuts off what does not fit in the box's millimetres; Grow lets the box get taller to hold it" disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
+					title="Clip cuts off what does not fit in the box's millimetres; Grow lets the box get taller to hold it; Shrink keeps the height and sets the words smaller until they fit, down to half their size" disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
 					<option value="clip">Clip</option>
 					<option value="grow">Grow</option>
+					<option value="shrink">Shrink</option>
 				</select>
 			</label>
 		</fieldset>

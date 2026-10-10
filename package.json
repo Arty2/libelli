@@ -1,7 +1,7 @@
 {
 	"name": "libelli",
 	"private": true,
-	"version": "0.27.32",
+	"version": "0.28.51",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -21,7 +21,6 @@
 		"eslint": "^10.11.0",
 		"eslint-plugin-svelte": "^3.23.0",
 		"globals": "^17.12.0",
-		"jsqr": "^1.4.0",
 		"svelte": "^5.57.0",
 		"svelte-check": "^4.7.6",
 		"typescript": "~5.9.3",

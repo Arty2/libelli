@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import Icon from './Icon.svelte';
-	import { download } from '$lib/download';
+	import { download, fileStem } from '$lib/download';
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
+	import { touchOpen } from '$lib/gestures';
+	import { caretAt, caretPlace } from '$lib/caret';
 	import { armDefault } from '$lib/modal';
 	import { scrollEdges } from '$lib/scrolledge';
 	import { dataUrlBytes, localImageName, safeMediaUrl, weigh } from '$lib/assets';
@@ -21,9 +23,9 @@
 		moveColumn,
 		moveRows,
 		moveRowsTo,
+		numberIn,
 		orderOf,
 		renumbering,
-		rowNumber,
 		sortRows,
 		unsortRows,
 		withoutOrder,
@@ -84,7 +86,7 @@
 		 * puts its options row away for it too, so the tray has the height.
 		 */
 		onfullcell?: (open: boolean) => void;
-		/** A stored picture, opened large in the Images tray to be looked at and edited. */
+		/** A stored picture, opened large in the Pictures tray to be looked at and edited. */
 		onopenimage: (name: string) => void;
 		/** lock or unlock the whole table; the page owns the dataset */
 		onlock: (locked: boolean) => void;
@@ -129,7 +131,7 @@
 		openRequest?: { row: number; column: string; draw?: boolean; from?: Origin } | null;
 		/**
 		 * The editor closed on something that was not opened from the table: the
-		 * page puts back what was there before — the Images tray, or no panel at
+		 * page puts back what was there before — the Pictures tray, or no panel at
 		 * all — rather than leaving the table showing, which nobody asked for.
 		 */
 		onleave?: (to: Origin) => void;
@@ -199,7 +201,7 @@
 	/**
 	 * Where the open editor was asked for from, and so where its × goes back
 	 * to. From the table itself, the table; from an area on the card, the
-	 * panel closes, since it was only opened to draw in; from the Images
+	 * panel closes, since it was only opened to draw in; from the Pictures
 	 * tray, back to that.
 	 */
 	let leaveTo = $state<'table' | Origin>('table');
@@ -262,29 +264,81 @@
 	 */
 	const sizesItself = typeof CSS !== 'undefined' && CSS.supports('field-sizing', 'content');
 
+	/**
+	 * The fields waiting to be measured — to be sized (`autosize`) or marked
+	 * as holding more than they show (`overflowMark`) — done together once a
+	 * frame: every write that resets a height, then every read, then every
+	 * write of what was read. Done one field at a time, each read came after
+	 * the last field's write and forced the whole table to lay out again: a
+	 * table of five hundred rows took seconds to open, sort or import.
+	 */
+	const toFit = new Set<HTMLTextAreaElement>();
+	const toMark = new Set<HTMLTextAreaElement>();
+	let measureFrame = 0;
+	const measureSoon = () => {
+		if (!measureFrame) measureFrame = requestAnimationFrame(measureAll);
+	};
+	function measureAll() {
+		measureFrame = 0;
+		const fits = [...toFit].filter((n) => n.isConnected);
+		toFit.clear();
+		for (const node of fits) node.style.height = 'auto';
+		const heights = fits.map((node) => node.scrollHeight);
+		fits.forEach((node, i) => (node.style.height = `${heights[i]}px`));
+		const marks = [...toMark].filter((n) => n.isConnected);
+		toMark.clear();
+		const more = marks.map((node) => node.scrollHeight > node.clientHeight + 1);
+		marks.forEach((node, i) => node.parentElement?.toggleAttribute('data-more', more[i]));
+	}
+	/** One observer for every field, each told apart by what it watches. */
+	let fieldObserver: ResizeObserver | null = null;
+	const fitting = new WeakMap<Element, HTMLTextAreaElement>();
+	const observeField = (target: Element) => {
+		fieldObserver ??= new ResizeObserver((entries) => {
+			for (const { target: seen } of entries) {
+				const field = fitting.get(seen);
+				if (field) toFit.add(field);
+				if (seen instanceof HTMLTextAreaElement) toMark.add(seen);
+			}
+			measureSoon();
+		});
+		fieldObserver.observe(target);
+	};
+
 	function autosize(node: HTMLTextAreaElement, on: boolean) {
 		let active = on && !sizesItself;
+		// Typing: at once, the one field — the words must not wait a frame.
 		const fit = () => {
 			if (!active) return;
 			node.style.height = 'auto';
 			node.style.height = `${node.scrollHeight}px`;
 		};
-		const observer = new ResizeObserver(() => requestAnimationFrame(fit));
+		const cell = node.closest('td') ?? node;
 		const start = () => {
 			node.addEventListener('input', fit);
-			observer.observe(node.closest('td') ?? node);
-			fit();
+			fitting.set(cell, node);
+			observeField(cell);
+			toFit.add(node);
+			measureSoon();
 		};
 		const stop = () => {
 			node.removeEventListener('input', fit);
-			observer.disconnect();
+			fitting.delete(cell);
+			if (cell !== node) fieldObserver?.unobserve(cell);
+			toFit.delete(node);
 			node.style.height = '';
 		};
 		if (active) start();
 		return {
 			update(next: boolean) {
 				const wanted = next && !sizesItself;
-				if (wanted === active) return fit();
+				if (wanted === active) {
+					if (active) {
+						toFit.add(node);
+						measureSoon();
+					}
+					return;
+				}
 				active = wanted;
 				if (active) start();
 				else stop();
@@ -307,17 +361,17 @@
 	 */
 	function overflowMark(node: HTMLTextAreaElement, _value: string) {
 		const check = () => {
-			const cell = node.parentElement;
-			if (cell) cell.toggleAttribute('data-more', node.scrollHeight > node.clientHeight + 1);
+			toMark.add(node);
+			measureSoon();
 		};
-		const observer = new ResizeObserver(check);
-		observer.observe(node);
+		observeField(node);
 		node.addEventListener('input', check);
 		check();
 		return {
-			update: () => requestAnimationFrame(check),
+			update: check,
 			destroy: () => {
-				observer.disconnect();
+				fieldObserver?.unobserve(node);
+				toMark.delete(node);
 				node.removeEventListener('input', check);
 			}
 		};
@@ -347,6 +401,21 @@
 	 * render and follows the value as it is typed.
 	 */
 	let editing = $state<{ row: number; column: string } | null>(null);
+	/**
+	 * Whether the press that is choosing a cell is a finger's. A cell a finger
+	 * taps is read-only, so the tap chooses it without the keyboard coming up
+	 * over half the screen; a second tap on it, however much later, or a long
+	 * press (`touchOpen`) opens it full size to type in. A mouse or a pen
+	 * types in place. Set on the way down, captured on the table, which is
+	 * before the cell takes focus — and focus is what brings a keyboard.
+	 *
+	 * Read-only rather than `inputmode="none"`, which kept the keyboard down
+	 * too and let the browser place a caret — and with the caret, Android's
+	 * own Paste bubble on the first tap, which nothing on a page can turn off.
+	 * A read-only cell has no caret, so where the finger was is measured
+	 * (`caretAt`) on the press that opens it.
+	 */
+	let byFinger = $state(false);
 
 	/** What a column a keyword has taken is told, here and in the status line. */
 	const keywordWarning = (column: string) =>
@@ -379,10 +448,10 @@
 	 * `draw` is the card asking for the drawing surface on an area bound to
 	 * this column: then an empty cell, or one pointing at a stored picture, is
 	 * drawn on rather than typed in. Without it, a stored picture is not this
-	 * editor's to open at all — it goes to the Images tray, where it can be
+	 * editor's to open at all — it goes to the Pictures tray, where it can be
 	 * seen large and cropped or turned.
 	 */
-	function openBigCell(rowIndex: number, column: string, draw = false, from: 'table' | Origin = 'table') {
+	function openBigCell(rowIndex: number, column: string, draw = false, from: 'table' | Origin = 'table', caret?: number) {
 		const value = dataset.rows[rowIndex]?.[column];
 		if (value === undefined) return false;
 		const stored = localImageName(value);
@@ -395,6 +464,8 @@
 		(document.activeElement as HTMLElement | null)?.blur();
 		drawingArea = null;
 		leaveTo = from;
+		openCaret = caret ?? null;
+		fingerMark = null;
 		bigCell = { row: rowIndex, column, draw: draw || undefined };
 		drawnValue = value;
 		onactivate(rowIndex);
@@ -426,7 +497,7 @@
 	 * showing pictures asked for it, so the column is a column of pictures,
 	 * and whatever a cell holds that cannot be drawn over (an address from
 	 * elsewhere) opens as a blank board, as it always has. Otherwise a stored
-	 * picture's own look with the way to the Images tray, or the words.
+	 * picture's own look with the way to the Pictures tray, or the words.
 	 */
 	/** Whether the panel shows the drawing board for this open cell. */
 	$effect(() => {
@@ -475,7 +546,7 @@
 	/**
 	 * The board in the panel, and whether it holds drawing not yet saved. Its
 	 * Save and Delete are in the panel's bar, beside the pager — where every
-	 * picture's are, the Images tray's included — so the bar asks the board.
+	 * picture's are, the Pictures tray's included — so the bar asks the board.
 	 * Closing with drawing unsaved drops it, as Cancel did; the pager waits
 	 * instead, because stepping away is not a way of saying "never mind".
 	 */
@@ -559,8 +630,18 @@
 		return value && /^\s*data:image\//.test(value) ? safeMediaUrl(value) : null;
 	}
 
-	/** Close the editor, back to where it was opened from — or, `toTable`, to the table regardless. */
-	function closeBigCell(toTable = false) {
+	/**
+	 * Close the editor, back to where it was opened from — or, `toTable`, to
+	 * the table regardless. A save that was pressed lands first: closing in the
+	 * middle of one would have said the drawing was dropped and then written it
+	 * anyway.
+	 */
+	async function closeBigCell(toTable = false) {
+		// What was open when Close was pressed: another cell opened while the
+		// save was still packing is not the one being closed.
+		const closing = { cell: bigCell, area: drawingArea };
+		await board?.settled();
+		if (bigCell !== closing.cell || drawingArea !== closing.area) return;
 		const to = leaveTo;
 		bigCell = null;
 		drawingArea = null;
@@ -568,13 +649,75 @@
 		if (!toTable && to !== 'table') onleave?.(to);
 	}
 
-	/** The chevron: one step back — to the Images tray it came from, or else to the table. */
+	/** The chevron: one step back — to the Pictures tray it came from, or else to the table. */
 	const stepBack = () => closeBigCell(leaveTo !== 'images');
 
 	const leaveTitle = (dirty: boolean) =>
-		(dirty ? 'Close — the drawing not saved is dropped' : leaveTo === 'images' ? 'Back to Images' : leaveTo === 'card' ? 'Close' : 'Back to the table') + ' (Esc)';
+		(dirty ? 'Close — the drawing not saved is dropped' : leaveTo === 'images' ? 'Back to Pictures' : leaveTo === 'card' ? 'Close' : 'Back to the table') + ' (Esc)';
 
-	const focusOnOpen = (node: HTMLElement) => node.focus();
+	/**
+	 * Where the caret goes as the cell opens full size: where the finger
+	 * that opened it pressed the small one (`caretAt`), which the eye was on.
+	 * Used once — stepping to the next row with the pager opens a new field
+	 * at the end, as it always did.
+	 */
+	let openCaret: number | null = null;
+
+	/** The cell a press landed in, for `touchOpen`: a field or a picture, marked `data-opens`. */
+	const cellFrom = (target: EventTarget | null) =>
+		target instanceof Element ? target.closest<HTMLElement>('tbody [data-opens]') : null;
+	/**
+	 * The caret a finger's first tap put in a cell, drawn by the page: the
+	 * cell is read-only to a finger and its own caret hidden, so the browser
+	 * shows none, and a tap that left no mark looked like a tap that missed.
+	 * In px from the cell's top-left, where it is drawn; and its offset,
+	 * which Edit opens at.
+	 */
+	let fingerMark = $state<{ row: number; column: string; offset: number; left: number; top: number; height: number } | null>(null);
+
+	/** A finger's first tap on a cell: the cell is chosen, and the caret drawn where it landed. */
+	function chooseByFinger(cell: HTMLElement, at: { x: number; y: number }) {
+		const row = Number(cell.dataset.row);
+		const column = cell.dataset.column;
+		const td = cell.closest('td');
+		if (!(cell instanceof HTMLTextAreaElement) || !td || column === undefined || !Number.isInteger(row)) {
+			fingerMark = null;
+			return;
+		}
+		const place = caretPlace(cell, at.x, at.y);
+		// In the scroller's content, which it is drawn in: where it is on
+		// screen, plus how far the table is scrolled.
+		const box = scrollEl?.getBoundingClientRect();
+		if (!scrollEl || !box) return;
+		fingerMark = {
+			row,
+			column,
+			offset: place.offset,
+			left: place.x - box.left + scrollEl.scrollLeft,
+			top: place.top - box.top + scrollEl.scrollTop,
+			height: place.bottom - place.top
+		};
+	}
+
+	/** Edit in the bar: the cell full size, at the caret a finger's tap drew, if it drew one. */
+	function editChosen() {
+		if (!editing) return;
+		const mark = fingerMark && fingerMark.row === editing.row && fingerMark.column === editing.column ? fingerMark.offset : undefined;
+		openBigCell(editing.row, editing.column, false, 'table', mark);
+	}
+
+	/** A finger's second tap or long press on a cell: open it full size, the caret where it pressed. */
+	function openFromFinger(cell: HTMLElement, at: { x: number; y: number }) {
+		const row = Number(cell.dataset.row);
+		const column = cell.dataset.column;
+		if (locked || column === undefined || !Number.isInteger(row)) return;
+		openBigCell(row, column, false, 'table', cell instanceof HTMLTextAreaElement ? caretAt(cell, at.x, at.y) : undefined);
+	}
+	const focusOnOpen = (node: HTMLElement) => {
+		node.focus();
+		if (openCaret !== null && node instanceof HTMLTextAreaElement) node.setSelectionRange(openCaret, openCaret);
+		openCaret = null;
+	};
 
 	/** The open table at the top of its menu, the rest in the library's order. */
 	const tablesActiveFirst = $derived([
@@ -985,8 +1128,24 @@
 		onchange({ ...dataset, rows: dataset.rows.map((r, i) => (i === rowIndex ? after : r)) });
 	}
 
-	/** The number a row wears — see `rowNumber`. */
-	const rowLabel = (index: number): number => rowNumber(dataset, index);
+	/**
+	 * The table's sort, worked out once per change of the table rather than
+	 * once per label: every row asks for its number a dozen times — its tick,
+	 * its number, each cell's name — and finding the order checks the whole of
+	 * it, so a sorted table of five hundred rows did that six thousand times a
+	 * keystroke. The order is the same array across a cell's edit, so the rows
+	 * reading it are not run again either.
+	 */
+	const order = $derived(orderOf(dataset));
+	/**
+	 * The columns, for what every row and cell draws. A cell's edit gives a
+	 * new table with the same columns array, so this stays the same object
+	 * and the rows reading it are left alone; read off `dataset` instead,
+	 * every row's loop and every field's placeholder action ran again on each
+	 * keystroke.
+	 */
+	const columns = $derived(dataset.columns);
+	const rowLabel = (index: number): number => numberIn(order, index);
 
 
 	function renameColumn(index: number, name: string, field?: HTMLInputElement) {
@@ -1418,7 +1577,8 @@
 
 	/** The table as it stands, back out as a file. Nothing leaves the browser. */
 	function exportCsv() {
-		download('card-data.csv', toCsv(dataset), 'text/csv');
+		// Named as the picker names it, so the file is found under the table's name.
+		download(`${fileStem(tableName, UNTITLED_TABLE)}.csv`, toCsv(dataset), 'text/csv');
 		onnotice(`${dataset.rows.length} row${dataset.rows.length === 1 ? '' : 's'} exported as CSV.`);
 	}
 </script>
@@ -1435,7 +1595,9 @@
 	use:scrollEdges={(section) => section.querySelector<HTMLElement>(':scope > .scroll')}
 >
 	<div class="scroll" bind:this={scrollEl}>
-		<table style="min-width:{tableWidth}">
+		<table style="min-width:{tableWidth}" onpointerdowncapture={(e) => (byFinger = e.pointerType === 'touch')}
+			use:touchOpen={{ find: cellFrom, onopen: openFromFinger, onchoose: chooseByFinger }}
+		>
 			<!-- Widths belong to the columns, not to the cells: one place to set
 			     them, and `table-layout: fixed` above means they are obeyed rather
 			     than treated as a suggestion the widest cell can overrule. -->
@@ -1482,7 +1644,7 @@
 								onclick={toggleAll}
 							><Icon name={allChosen ? 'checkbox-checked' : someChosen ? 'checkbox-indeterminate' : 'checkbox'} size={14} /></button>
 						{/if}
-						{#if sortedBy || orderOf(dataset)}
+						{#if sortedBy || order}
 							<!-- A sort survives a reload, as the numbers it left on the rows;
 							     which column did it is only remembered for the session. -->
 							<button
@@ -1692,7 +1854,7 @@
 							>{rowLabel(i)}</span>
 							</span>
 						</td>
-						{#each dataset.columns as column, c (column)}
+						{#each columns as column, c (column)}
 							<!-- Read once: a drawing's cell is a long base64 string, and every
 							     check of it trims and tests the whole of it, on every render. -->
 							{@const drawing = cellPicture(row[column])}
@@ -1713,13 +1875,13 @@
 								}}
 								class:bound={!!selectedColumn && column === selectedColumn}
 								class:drop-before={carrying?.on && carrying.before === c}
-								class:drop-after={carrying?.on && c === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
+								class:drop-after={carrying?.on && c === columns.length - 1 && carrying.before === columns.length}
 							>
 								{#if picture}
 									<!-- The picture in place of its base64, or of the name of a
 									     stored one. A press picks the row, as anywhere else on
 									     it; a double-click opens it — a drawing on the
-									     drawing surface, a stored picture large in Images. -->
+									     drawing surface, a stored picture large in Pictures. -->
 									<!-- A button round it, so it can be chosen as a cell is:
 									     the bar then offers Draw and says what it weighs. -->
 									<button
@@ -1745,6 +1907,9 @@
 										}}
 										onclick={(e) => e.stopPropagation()}
 										ondblclick={() => !locked && openBigCell(i, column)}
+										data-opens
+										data-row={i}
+										data-column={column}
 									>
 										<img
 											class="cell-picture"
@@ -1753,7 +1918,7 @@
 											title={locked
 												? undefined
 												: localImageName(row[column])
-													? `${localImageName(row[column])} — double-click to open it in Images`
+													? `${localImageName(row[column])} — double-click to open it in Pictures`
 													: 'A drawing — double-click to draw on it'}
 											draggable="false"
 										/>
@@ -1763,17 +1928,21 @@
 									</button>
 								{:else}
 								<!-- The whole cell, full size, is Edit in the bar while this is
-								     typed in, or the [...] when it holds more than it shows. It
-								     was a press and hold too, until a hold came to mean "what is
-								     this?" everywhere. -->
+								     typed in, or the [...] when it holds more than it shows — and,
+								     for a finger, a second tap or a hold (`touchOpen` on the
+								     table, which finds the cell by `data-opens`). -->
 								<textarea
 									rows="1"
 									aria-label="{column}, row {rowLabel(i)}"
 									value={row[column] ?? ''}
-									readonly={locked}
+									readonly={locked || byFinger}
+									class:by-finger={byFinger && !locked}
+									data-opens
+									data-row={i}
+									data-column={column}
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
-									use:completePlaceholders={dataset.columns}
+									use:completePlaceholders={columns}
 									onfocus={() => {
 										editing = { row: i, column };
 										onactivate(i);
@@ -1843,6 +2012,17 @@
 				{/if}
 			</tbody>
 		</table>
+		<!-- One caret for the whole table, where a finger's first tap chose a
+		     cell: drawn here, in the scroller's own coordinates, so it scrolls
+		     with the rows — not as a maybe in every cell, which a tap made
+		     every cell of a large table check again. -->
+		{#if fingerMark && editing?.row === fingerMark.row && editing.column === fingerMark.column}
+			<span
+				class="finger-caret"
+				style="left:{fingerMark.left}px;top:{fingerMark.top}px;height:{fingerMark.height}px"
+				aria-hidden="true"
+			></span>
+		{/if}
 	</div>
 	<!-- The shadows that say there is more past an edge, outside the scroller
 	     because inside it they would scroll away with the rows. Bottom and
@@ -1905,9 +2085,9 @@
 			{@const value = dataset.rows[editing.row]?.[editing.column] ?? ''}
 			{#if cellPicture(value) || localImageName(value)}
 				<!-- A picture is chosen rather than typed in, and the way into it is
-				     the drawing surface — or, for a stored one, the Images tray. -->
+				     the drawing surface — or, for a stored one, the Pictures tray. -->
 				<button
-					title={localImageName(value) ? 'Open this picture in Images' : 'Draw on this picture'}
+					title={localImageName(value) ? 'Open this picture in Pictures' : 'Draw on this picture'}
 					disabled={locked}
 					onmousedown={(e) => e.preventDefault()}
 					onclick={() => editing && openBigCell(editing.row, editing.column)}
@@ -1917,7 +2097,7 @@
 					title="Open this cell in the table's full room"
 					disabled={locked}
 					onmousedown={(e) => e.preventDefault()}
-					onclick={() => editing && openBigCell(editing.row, editing.column)}
+					onclick={editChosen}
 				><Icon name="task-edit" size={15} /> Edit</button>
 			{/if}
 		{/if}
@@ -1945,11 +2125,11 @@
 				class="reindex"
 				title={locked
 					? 'The table is locked — unlock it to reindex'
-					: orderOf(dataset)
+					: order
 						? 'Reindex — make this order the rows\' own: the numbers follow it, and lookups with them'
 						: 'Reindex — the rows are already in the order of their numbers; sort the table first'}
 				aria-label="Reindex"
-				disabled={locked || !orderOf(dataset)}
+				disabled={locked || !order}
 				onclick={reindex}
 			>
 				<Icon name="array-numbers" size={15} />
@@ -2209,14 +2389,14 @@
 	     table hid the card the words are for. It takes exactly the table's
 	     room — the rows and the bar under them — and gives it back on Done or
 	     Cancel. -->
-	<!-- The drawing editor's way back, as the Images tray's large view has it:
-	     one step — to Images if that is where it came from, else to the table
+	<!-- The drawing editor's way back, as the Pictures tray's large view has it:
+	     one step — to Pictures if that is where it came from, else to the table
 	     the drawing lives in. The × beside it closes to wherever it came from. -->
 	{#snippet back()}
 		<button
 			class="icon back"
-			title={leaveTo === 'images' ? 'Back to Images' : 'Back to the table'}
-			aria-label={leaveTo === 'images' ? 'Back to Images' : 'Back to the table'}
+			title={leaveTo === 'images' ? 'Back to Pictures' : 'Back to the table'}
+			aria-label={leaveTo === 'images' ? 'Back to Pictures' : 'Back to the table'}
 			onclick={stepBack}
 		>
 			<Icon name="chevron-left" size={16} />
@@ -2251,7 +2431,7 @@
 					box={{ pixels: area.pixels }}
 					value={area.value}
 					ink={area.ink}
-					onsave={(dataUrl, pixels) => saveArea(area.id, dataUrl, pixels)}
+					onsave={((id) => (dataUrl: string, pixels: Grid | undefined) => saveArea(id, dataUrl, pixels))(area.id)}
 					ondirty={(d) => (boardDirty = d)}
 					head={boardHead}
 					bar={boardBar}
@@ -2300,7 +2480,10 @@
 						box={{ pixels: look.pixels }}
 						value={drawingSource(text)}
 						ink={look.ink}
-						onsave={(dataUrl, pixels) => drew(open.row, open.column, dataUrl, pixels)}
+						onsave={((row, column) => (dataUrl: string, pixels: Grid | undefined) => drew(row, column, dataUrl, pixels))(
+							open.row,
+							open.column
+						)}
 						ondirty={(d) => (boardDirty = d)}
 						head={boardHead}
 						bar={boardBar}
@@ -2309,13 +2492,13 @@
 				{/key}
 			{:else if kind !== 'text'}
 				<!-- A stored picture landed on by the pager, or any picture in a
-				     locked table: itself, large. A stored one is the Images tray's
+				     locked table: itself, large. A stored one is the Pictures tray's
 				     to edit, and a press takes it there. -->
 				{@const stored = localImageName(text)}
 				<button
 					class="big-picture"
 					disabled={!stored}
-					title={stored ? `Open ${stored} in Images` : undefined}
+					title={stored ? `Open ${stored} in Pictures` : undefined}
 					onclick={() => stored && onopenimage(stored)}
 				><img src={drawingSource(text)} alt={open.column} /></button>
 			{:else}
@@ -2377,7 +2560,7 @@
 {/if}
 
 <!-- A picture's two acts, at the far end of the panel's bar as they are in
-     the Images tray: Delete in red, then Save, lit while there is drawing to
+     the Pictures tray: Delete in red, then Save, lit while there is drawing to
      keep. -->
 {#snippet drawingButtons(present: boolean, remove: () => void)}
 	<button class="danger" disabled={!present && !boardDirty} title="Delete this drawing" onclick={remove}>
@@ -2469,6 +2652,8 @@
 
 	.scroll {
 		flex: 1;
+		/* Holds the finger's caret, placed in its scrolled content. */
+		position: relative;
 		overflow: auto;
 		min-height: 0;
 		/* Scrolled to the top and flicked down, this would otherwise reload. */
@@ -2876,6 +3061,35 @@
 
 	td textarea:read-only {
 		cursor: default;
+	}
+
+	/* The caret a finger's tap drew, where the browser draws none: a line the
+	   width and blink of the system's caret — one pixel — in the accent, as
+	   the selection is. */
+	.finger-caret {
+		position: absolute;
+		/* Over the field, which lifts itself while it has the focus. */
+		z-index: 3;
+		width: 1px;
+		margin-left: -0.5px;
+		background: var(--accent-strong);
+		pointer-events: none;
+		animation: finger-caret 1.1s steps(1) infinite;
+	}
+
+	@keyframes finger-caret {
+		50% {
+			opacity: 0;
+		}
+	}
+
+	/* A finger's cell: a long press opens it, so it must not also start a
+	   text selection with its handles and its menu; and it is chosen, not
+	   typed in, so no caret blinks in it to say otherwise. */
+	td textarea.by-finger {
+		-webkit-user-select: none;
+		user-select: none;
+		caret-color: transparent;
 	}
 
 

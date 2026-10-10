@@ -18,6 +18,23 @@ import type { BorderStyle, Sides } from './types';
 /** How far a line strays from true, and how often it is allowed to. Both mm. */
 const WOBBLE = 0.32;
 const SEGMENT = 9;
+/**
+ * Below this an edge is short, and is drawn with a heavier hand, by its full
+ * measure at `SHORTEST` and under. A 9mm step leaves a 15mm edge one bend in
+ * the middle, which reads as a ruled line that came out slightly wrong rather
+ * than as one drawn: so a short edge bends more often, and further — up to
+ * `SHORT_WOBBLE` times as far, at steps down to `SHORT_SEGMENT`. A long edge
+ * is drawn exactly as it was. All mm.
+ */
+const SHORT = 40;
+const SHORTEST = 10;
+const SHORT_WOBBLE = 1.75;
+const SHORT_SEGMENT = 4;
+
+/** How much of the short-edge hand a run of this length gets: 0 long, 1 at `SHORTEST` and under. */
+export function shortness(length: number): number {
+	return Math.min(1, Math.max(0, (SHORT - length) / (SHORT - SHORTEST)));
+}
 
 export interface HandStroke {
 	/** SVG path data, in millimetres from the border box's top left corner */
@@ -83,7 +100,8 @@ const round = (n: number) => Math.round(n * 100) / 100;
 const pt = (p: Point) => `${round(p.x)} ${round(p.y)}`;
 
 /**
- * A straight run, walked in steps of about `SEGMENT` with every step but the
+ * A straight run, walked in steps of about `SEGMENT` — fewer millimetres and
+ * further off true on a short one, see `SHORT` — with every step but the
  * two ends pushed off the line, then smoothed through the midpoints between
  * them. The ends are left exactly where they were put: they are where the next
  * stroke starts, and a corner that does not meet is a gap, not a flourish.
@@ -92,14 +110,17 @@ function wobble(from: Point, to: Point, rng: () => number): Point[] {
 	const dx = to.x - from.x;
 	const dy = to.y - from.y;
 	const length = Math.hypot(dx, dy);
-	const steps = Math.max(2, Math.round(length / SEGMENT));
+	const k = shortness(length);
+	const segment = SEGMENT - (SEGMENT - SHORT_SEGMENT) * k;
+	const reach = WOBBLE * (1 + (SHORT_WOBBLE - 1) * k);
+	const steps = Math.max(2, Math.round(length / segment));
 	// The unit normal, so the stray is across the line rather than along it.
 	const nx = length ? -dy / length : 0;
 	const ny = length ? dx / length : 0;
 	const points: Point[] = [];
 	for (let i = 0; i <= steps; i++) {
 		const t = i / steps;
-		const stray = i === 0 || i === steps ? 0 : (rng() - 0.5) * 2 * WOBBLE;
+		const stray = i === 0 || i === steps ? 0 : (rng() - 0.5) * 2 * reach;
 		points.push({ x: from.x + dx * t + nx * stray, y: from.y + dy * t + ny * stray });
 	}
 	return points;

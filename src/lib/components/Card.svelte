@@ -1,3 +1,16 @@
+<script lang="ts" module>
+	/**
+	 * Codes already drawn, by everything that shapes one. `qrFor` runs again
+	 * whenever the template is replaced — every frame of dragging any area —
+	 * and encoding a QR of a hundred characters is several milliseconds, for
+	 * the same picture. Shared by every card, not one map each: the editor,
+	 * the print root and each thumbnail of Export draw the same codes, and a
+	 * map per card filled the same entries a thousand times over. Kept small:
+	 * cleared whole past a few hundred.
+	 */
+	const drawnCodes = new Map<string, string>();
+</script>
+
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
@@ -6,7 +19,7 @@
 	import { UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders } from '$lib/placeholders';
 	import { cssIdent, isPageId, scopeCss, styleTag } from '$lib/css';
 	import { cardVars } from '$lib/csskit';
-	import { fontStack } from '$lib/fonts';
+	import { fontStack, kindOf } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
 	import { followsInSet, isParked } from '$lib/boxops';
 	import type { Theme } from '$lib/theme';
@@ -28,14 +41,20 @@
 		latchSpan,
 		snapTo,
 		snapToEdges,
-		columnGaps
+		columnGaps,
+		shrinkScale,
+		spacingReadouts,
+		referenceOf,
+		freedTop
 	} from '$lib/layout';
-	import { flagUnknown, renderMarkdown } from '$lib/markdown';
+	import { flagUnknown, leaderStyle, renderMarkdown, tabSplit } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
 	import { DEFAULT_ORPHANS, DEFAULT_WIDOWS, baselineOf, colorsFromRow, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
 	import { qrSvg } from '$lib/qr';
-	import type { Box, Mapping, Row, Template } from '$lib/types';
+	import { barcodeSvg } from '$lib/barcode';
+	import { runOf } from '$lib/table';
+	import { clampXHeight, type Box, type Leader, type Mapping, type Row, type Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
@@ -70,6 +89,11 @@
 		 * so they can be had without the margins drawn.
 		 */
 		smartGuides?: boolean;
+		/**
+		 * The millimetres a dragged area has to its neighbours and to the page
+		 * edge, drawn as it moves — `spacingReadouts`.
+		 */
+		spacing?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
 		scale?: number;
 		interactive?: boolean;
@@ -156,6 +180,7 @@
 		grid = false,
 		guides = false,
 		smartGuides = false,
+		spacing = false,
 		scale = 1,
 		interactive = false,
 		panning = false,
@@ -184,12 +209,44 @@
 	/** boxes whose content is taller than the box will let it be */
 	let overflowing = $state<Record<string, boolean>>({});
 	/**
+	 * The scale a Shrink area's words are set at on this card, by box id; absent
+	 * is full size. Per card, because each row has its own words: the long name
+	 * is set small and the short one beside it is not.
+	 */
+	let shrunk = $state<Record<string, number>>({});
+	/**
 	 * The edge a live drag has latched onto, drawn as a guide until it lets go.
 	 * `flip` records that the latch was measured against a mirrored box, so the
 	 * line is drawn where the eye sees the edge rather than where the template
 	 * stores it.
 	 */
 	let guide = $state<{ x: number | null; y: number | null; flip?: boolean }>({ x: null, y: null });
+	/**
+	 * The area being dragged, once it has moved, with the ones moving with it:
+	 * what the spacing is measured from, and what it is not measured to. State,
+	 * where `drag` is not, so the readouts follow the layout as it changes.
+	 */
+	let spaced = $state<{ id: string; with: string[] } | null>(null);
+	/**
+	 * The spacing readouts, in the frame the card is drawn in: on a left-hand
+	 * page a mirrored area is measured where it is seen, not where it is stored.
+	 * Hidden areas take no room, so nothing is measured to one.
+	 */
+	const readouts = $derived.by(() => {
+		if (!spacing || !spaced) return [];
+		const rectOf = (b: Box) => {
+			const drawn = placed(b);
+			return { x: drawn.x, y: layout.tops[b.id] ?? b.y, w: b.w, h: layout.heights[b.id] ?? b.h };
+		};
+		const box = template.boxes.find((b) => b.id === spaced!.id);
+		if (!box) return [];
+		const skip = new Set([spaced.id, ...spaced.with]);
+		const others = template.boxes.filter((b) => !skip.has(b.id) && !hidden.has(b.id)).map(rectOf);
+		// Read out from the reference point, the one the bar's X and Y name.
+		const rect = rectOf(box);
+		const { fx, fy } = referenceFor(box);
+		return spacingReadouts(rect, others, template.page, { x: rect.x + rect.w * fx, y: rect.y + rect.h * fy });
+	});
 
 	/**
 	 * What the area actually holds — a cell of the row, or its own words. This is
@@ -209,7 +266,9 @@
 	 * The same text as it is drawn, with `%%today%%` and any `%%column%%` of this
 	 * row filled in — in a cell and in an area's own words alike, once.
 	 */
-	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box), page: pageNumber, pageCount });
+	/** The rows in the order they print, for a contents — `runOf`. */
+	const run = $derived(runOf(rows));
+	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount });
 
 	/** The column a bound area's words come out of — the one they may not quote. */
 	const selfOf = (box: Box): string | undefined => (box.slot ? mapping[box.slot] : undefined);
@@ -223,7 +282,7 @@
 	 * measured for emptiness, or encoded into a QR.
 	 */
 	const shownTextOf = (box: Box): string =>
-		applyPlaceholders(rawContentOf(box), { row, rows, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds });
+		applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds });
 
 	/** Text split around the marks, for plain text, which Svelte escapes itself. */
 	function segments(text: string): Array<{ text: string; unknown: boolean }> {
@@ -243,6 +302,8 @@
 
 	/** The area's paragraph style, or the page's when it names none of its own. */
 	const paragraphOf = (box: Box) => box.paragraph ?? template.defaults.paragraph;
+	/** The tab leader an area draws, over the page's; undefined where it draws none. */
+	const leaderOf = (box: Box): Leader => box.leader ?? template.defaults.leader ?? 'none';
 
 	/**
 	 * What an image area resolves to: a picture, a fill, or nothing at all.
@@ -289,14 +350,35 @@
 	};
 
 	/**
-	 * A QR is only worth printing if it scans, so anything the encoder refuses —
-	 * empty text, or more than a version-10 code can hold — renders as nothing
-	 * rather than as a square that no phone will read.
+	 * A code is only worth printing if it scans, so anything the encoder refuses
+	 * — empty text, more than a version-10 QR can hold, a character Code 128 has
+	 * not got, an EAN with the wrong check digit — renders as nothing rather
+	 * than as bars no scanner will read.
+	 *
+	 * A barcode ignores Fit: it is read across, so it fills the area both ways,
+	 * every bar widened alike.
 	 */
 	function qrFor(box: Box): string {
 		const value = contentOf(box).trim() || box.static?.text?.trim() || '';
 		if (!value) return '';
+		const key = JSON.stringify([value, box.qr?.kind, box.qr?.level, box.qr?.background, box.qr?.hideDigits, box.color ?? template.defaults.color, box.fit]);
+		const known = drawnCodes.get(key);
+		if (known !== undefined) return known;
+		if (drawnCodes.size > 300) drawnCodes.clear();
+		const svg = drawCode(box, value);
+		drawnCodes.set(key, svg);
+		return svg;
+	}
+
+	function drawCode(box: Box, value: string): string {
 		try {
+			if (box.qr?.kind) {
+				return barcodeSvg(value, box.qr.kind, {
+					color: box.color ?? template.defaults.color,
+					background: box.qr.background,
+					digits: !box.qr.hideDigits
+				});
+			}
 			return fitSvg(
 				qrSvg(value, {
 					level: box.qr?.level ?? 'M',
@@ -465,11 +547,20 @@
 			// hangs its last line's inline box a few pixels past them, and
 			// scrollHeight counts that, which flagged every two-line title as cut.
 			const content = node.querySelector<HTMLElement>('.content');
-			const clipped = template.boxes.find((b) => b.id === id)?.overflow === 'clip';
+			// Shrink cuts too, once its words are as small as it will set them —
+			// but whether words of a Shrink area are cut is `fitWords`'s to say:
+			// it measures the room inside the padding and the width as well,
+			// and two judges writing one flag in turn made the warning flicker.
+			const box = template.boxes.find((b) => b.id === id);
+			if (box?.overflow === 'shrink' && (box.mode === 'plain' || box.mode === 'markdown')) return;
+			const clipped = box?.overflow === 'clip' || box?.overflow === 'shrink';
 			const spills = clipped && !!content && content.scrollHeight > node.clientHeight + 1;
 			if ((overflowing[id] ?? false) !== spills) overflowing = { ...overflowing, [id]: spills };
 		};
-		read();
+		// No read here at mount: an offsetHeight now forces a layout per area per
+		// card, in the middle of mounting the rest — a thousand of them opening
+		// Export — while the observer's first report lands after the one layout
+		// the browser does anyway, still before that frame is painted.
 		const observer = new ResizeObserver(read);
 		observer.observe(node);
 		// A clipped box is a fixed height, so nothing it contains can ever change
@@ -488,6 +579,129 @@
 			destroy: () => {
 				observer.disconnect();
 				mutations.disconnect();
+			}
+		};
+	}
+
+	/**
+	 * Shrink: the words set as large as they can be and still fit the area, both
+	 * ways — a word too long for the width counts as much as a line too many.
+	 * Tried on the element itself, a bisection of layouts (`shrinkScale`), and
+	 * then kept in `shrunk`, so the style the card renders says the same thing
+	 * the search left behind and the next render does not undo it. Every size in
+	 * the area is in em of it — Markdown's headings included — so one font size
+	 * on `.content` scales the lot; padding, borders and the letter-spacing,
+	 * which are millimetres, stay as set.
+	 *
+	 * Run again whenever what the area holds or how it is set changes: its
+	 * text (a mutation), its width (a resize), its style (font, size — an
+	 * attribute change), and a web font landing. The search's own writes are
+	 * attribute changes as well, and are thrown away when it finishes.
+	 */
+	function fitWords(node: HTMLElement, id: string | null) {
+		let current = id;
+		/** What the last search was for: the same words in the same room in the same type fit the same. */
+		let searched = '';
+		const read = () => {
+			if (!current) return;
+			const content = node.querySelector<HTMLElement>(':scope > .content');
+			if (!content) return;
+			// Against the room the area has inside its padding, not `.content`'s
+			// own height: that is only as tall as the words when they are short,
+			// and a face whose last line hangs a few pixels past its line box
+			// would never fit in it at any size.
+			const pad = getComputedStyle(node);
+			const room = node.clientHeight - parseFloat(pad.paddingTop) - parseFloat(pad.paddingBottom);
+			// The area's style holds its position too, so a drag or a nudge
+			// changes it every frame without changing what fits; selecting it
+			// changes its class. Only a change to the words, the room or the
+			// type is worth a search's dozen forced layouts.
+			// The words as text and the count of what they are set in: a change to
+			// either is a change to the words. Not the markup itself — reading it
+			// is a sink the gates refuse, and its text says the same. And the
+			// styles inside: columns, a paragraph's space or indent, a heading's
+			// size live there, change what fits, and leave the text as it was.
+			// Less the font size the search itself writes, or it would search for
+			// ever.
+			const styles = [
+				(content.getAttribute('style') ?? '').replace(/(^|;)\s*font-size:[^;]*/, ''),
+				...[...content.querySelectorAll('[style]')].map((el) => el.getAttribute('style'))
+			].join('|');
+			// The face's x-height too: font-size-adjust changes what fits and is
+			// in neither the font shorthand nor the content's styles.
+			const key = [current, room, node.clientWidth, pad.font, pad.fontFamily, pad.fontSize, pad.fontSizeAdjust, pad.letterSpacing, content.textContent, content.getElementsByTagName('*').length, styles].join('|');
+			if (key === searched) {
+				words.takeRecords();
+				return;
+			}
+			searched = key;
+			const fits = (scale: number) => {
+				content.style.fontSize = `${scale}em`;
+				return content.scrollHeight <= room + 1 && content.scrollWidth <= content.clientWidth + 1;
+			};
+			const scale = shrinkScale(fits);
+			content.style.fontSize = scale === 1 ? '' : `${scale}em`;
+			// Said again here, as `measure` says it: that one read the words before
+			// they were set smaller, and setting them smaller is no change it
+			// watches for. Only at the floor can they still be cut.
+			const spills = content.scrollHeight > room + 1 || content.scrollWidth > content.clientWidth + 1;
+			if ((overflowing[current] ?? false) !== spills) overflowing = { ...overflowing, [current]: spills };
+			if ((shrunk[current] ?? 1) !== scale) {
+				const { [current]: _was, ...rest } = shrunk;
+				shrunk = scale === 1 ? rest : { ...rest, [current]: scale };
+			}
+			// The search's own writes to `.content` are mutations too; read
+			// again for them and it would never stop.
+			words.takeRecords();
+		};
+		const resize = new ResizeObserver(read);
+		const words = new MutationObserver(read);
+		const watch = () => {
+			resize.disconnect();
+			words.disconnect();
+			if (!current) return;
+			resize.observe(node);
+			// One call: a second `observe` on the same node replaces the first's
+			// options rather than adding to them.
+			words.observe(node, {
+				subtree: true,
+				childList: true,
+				characterData: true,
+				attributes: true,
+				attributeFilter: ['style', 'class']
+			});
+			read();
+		};
+		watch();
+		if (typeof document !== 'undefined' && document.fonts) document.fonts.ready.then(read).catch(() => {});
+		return {
+			update: (next: string | null) => {
+				// Switched off and on again, nothing in the key has changed, but
+				// the scale was dropped: search afresh rather than skip.
+				searched = '';
+				if (current && !next) {
+					const was = current;
+					if (shrunk[was] !== undefined) {
+						const { [was]: _gone, ...rest } = shrunk;
+						shrunk = rest;
+					}
+					// Switched to Clip or Grow: the words are full size again, and
+					// whether they are now cut is `measure`'s to say — but nothing it
+					// watches has changed, so it would not say it until the next
+					// edit. Asked here once the full size has been drawn.
+					requestAnimationFrame(() => {
+						const content = node.querySelector<HTMLElement>(':scope > .content');
+						const clipped = template.boxes.find((b) => b.id === was)?.overflow === 'clip';
+						const spills = clipped && !!content && content.scrollHeight > node.clientHeight + 1;
+						if ((overflowing[was] ?? false) !== spills) overflowing = { ...overflowing, [was]: spills };
+					});
+				}
+				current = next;
+				watch();
+			},
+			destroy: () => {
+				resize.disconnect();
+				words.disconnect();
 			}
 		};
 	}
@@ -632,17 +846,44 @@
 		return parts.join(';');
 	}
 
+	/**
+	 * A run's type: its face's stack, fallback by kind, then its size, leading
+	 * and letter spacing — and an area's X-Height as `font-size-adjust`: the
+	 * browser draws the face so its lowercase is that fraction of the size,
+	 * and the size — so the leading, and everything measured in em — stays as
+	 * set, nothing below moving. A fallback standing in for a missing face is
+	 * brought to the same x-height too.
+	 *
+	 * Newly available rather than Widely (2024), taken knowingly: a browser
+	 * without it ignores the declaration and draws the face at its own
+	 * x-height, which is what it did before there was a setting.
+	 */
+	function typeParts(family: string | undefined, size: number, lineHeight: number, letterSpacing: number, xHeight?: number): string[] {
+		const parts = [`font-family:${fontStack(family, kindOf(template.fonts, family))}`, `font-size:${size}pt`, `line-height:${lineHeight}`];
+		if (xHeight !== undefined) parts.push(`font-size-adjust:${xHeight}`);
+		if (letterSpacing) parts.push(`letter-spacing:${letterSpacing}mm`);
+		return parts;
+	}
+
+	const leadingOf = (box: Box) => box.lineHeight ?? template.defaults.lineHeight;
+
 	function boxStyle(box: Box): string {
 		const drawn = placed(box);
 		const align = drawn.align ?? template.defaults.align;
+		const type = typeParts(
+			box.font ?? template.defaults.font,
+			box.size ?? template.defaults.size,
+			box.lineHeight ?? template.defaults.lineHeight,
+			box.letterSpacing ?? template.defaults.letterSpacing,
+			// The page's size or none: a size of the area's own is its answer.
+			box.size === undefined ? clampXHeight(box.xHeight) : undefined
+		);
 		const parts = [
 			`left:${drawn.x}mm`,
 			`top:${layout.tops[box.id] ?? box.y}mm`,
 			`width:${box.w}mm`,
-			`font-family:${fontStack(box.font ?? template.defaults.font, template.defaults.font)}`,
-			`font-size:${box.size ?? template.defaults.size}pt`,
+			...type,
 			`font-weight:${box.weight ?? template.defaults.weight}`,
-			`line-height:${box.lineHeight ?? template.defaults.lineHeight}`,
 			`color:${box.color ?? template.defaults.color}`,
 			`text-align:${align}`,
 			// Vertical placement needs the box to be a flex column. That stops the
@@ -654,8 +895,6 @@
 		// Justified text without hyphenation opens rivers; the card is `lang="en"`
 		// so the browser has a dictionary to break with.
 		if (align === 'justify') parts.push('hyphens:auto');
-		const letterSpacing = box.letterSpacing ?? template.defaults.letterSpacing;
-		if (letterSpacing) parts.push(`letter-spacing:${letterSpacing}mm`);
 		if (box.italic) parts.push('font-style:italic');
 		if (box.textCase === 'uppercase') parts.push('text-transform:uppercase');
 		if (box.textCase === 'smallcaps') parts.push('font-variant-caps:small-caps');
@@ -720,7 +959,7 @@
 		}
 		if (hidden.has(box.id)) {
 			parts.push('height:0', 'overflow:hidden', 'visibility:hidden');
-		} else if (box.overflow === 'clip') {
+		} else if (box.overflow === 'clip' || box.overflow === 'shrink') {
 			// The height only. The clip itself is CSS, on .content — put here, on
 			// the box, it also ate the handles and badges that hang off its edges.
 			parts.push(`height:${box.h}mm`);
@@ -841,8 +1080,7 @@
 		const [vertical, horizontal] = position.split('-');
 		const parts = [
 			vertical === 'top' ? `top:${margin}mm` : `bottom:${margin}mm`,
-			`font-family:${fontStack(template.defaults.font, template.defaults.font)}`,
-			`font-size:${template.defaults.size}pt`,
+			...typeParts(template.defaults.font, template.defaults.size, 1, 0).filter((p) => !p.startsWith('line-height')),
 			`font-weight:${template.defaults.weight}`,
 			`color:${template.defaults.color}`,
 			`line-height:1`
@@ -1002,6 +1240,7 @@
 		}
 		drag = null;
 		guide = { x: null, y: null };
+		spaced = null;
 	}
 
 	function startDrag(event: PointerEvent, box: Box, mode: DragMode) {
@@ -1184,6 +1423,10 @@
 		if (!drag.named) {
 			drag.named = true;
 			onaction?.(DRAG_LABELS[drag.mode]);
+			// Moving or sizing; a turn is about its angle, not its gaps.
+			if (drag.mode !== 'rotate' && drag.mode !== 'centre') {
+				spaced = { id: drag.id, with: [...drag.others, ...drag.held].map((b) => b.id) };
+			}
 		}
 		// Past the slop, this is a drag rather than a hand that will not keep
 		// still, so a menu the same press opened gets out of the way. The same
@@ -1297,7 +1540,16 @@
 				// snaps, and a snap on the axis that is meant to stand still is a
 				// line that is not straight.
 				if (along !== 'y') next.x = place(origin.x + dx, 'x', origin.w);
-				if (along !== 'x') setTop(dy, layout.heights[origin.id] ?? origin.h);
+				if (along !== 'x') {
+					const height = layout.heights[origin.id] ?? origin.h;
+					// A Grow area set bottom or middle is drawn above its stored top,
+					// by however far its words grew it (`freedTop`). Snapped as drawn —
+					// the edges and the margins it latches to are the drawn ones —
+					// and stored back below by the same lift.
+					const lift = origin.anchor ? 0 : freedTop(origin, 0, height);
+					if (lift) next.y = round2(place(origin.y - lift + dy, 'y', height) + lift);
+					else setTop(dy, height);
+				}
 				break;
 			}
 			case 'e':
@@ -1467,23 +1719,45 @@
 		}
 		drag = null;
 		guide = { x: null, y: null };
+		spaced = null;
 	}
 
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
 	/**
-	 * The corner the area's words are set from — top-left for text aligned left
-	 * and to the top, bottom-right for right and bottom — whose handle is drawn
-	 * square: the point the content hangs from, told apart from the others.
-	 * None where either alignment is centred: then no corner is the anchor.
-	 * As drawn, so on a mirrored left-hand page it is the mirrored corner.
+	 * Where a grown area's given height lies inside it, in mm from its drawn
+	 * top: the edges of the frame it was given that its words have grown past.
+	 * Grown down, that is the given bottom; grown up from a bottom, the given
+	 * top; grown both ways from a middle, both — see `resolveLayout`. Anchored
+	 * areas always grow down.
+	 */
+	function trimEdges(box: Box): number[] {
+		const grownBy = (layout.heights[box.id] ?? box.h) - box.h;
+		const fy = box.anchor ? 0 : referenceOf('left', box.valign).fy;
+		const top = Math.round(grownBy * fy * 100) / 100;
+		const edges = [];
+		if (fy > 0) edges.push(top);
+		if (fy < 1) edges.push(Math.round((top + box.h) * 100) / 100);
+		return edges;
+	}
+
+	/**
+	 * The area's reference point as drawn — `referenceOf`, the point its words
+	 * are set from, which the X and Y in the bar measure and the spacing is
+	 * read from. On a mirrored left-hand page it is the mirrored point.
+	 */
+	const referenceFor = (box: Box) => referenceOf(placed(box).align ?? template.defaults.align, box.valign);
+
+	/**
+	 * The handle at the reference point, which wears the ring: a corner, or
+	 * the middle of an edge where one alignment is centred. None where both
+	 * are, since that point is the middle of the area and has no handle.
 	 */
 	function anchorCorner(box: Box): DragMode | null {
-		const align = placed(box).align ?? template.defaults.align;
-		const valign = box.valign ?? 'top';
-		const x = align === 'right' ? 'e' : align === 'left' || align === 'justify' ? 'w' : null;
-		const y = valign === 'bottom' ? 's' : valign === 'top' ? 'n' : null;
-		return x && y ? ((y + x) as DragMode) : null;
+		const { fx, fy } = referenceFor(box);
+		const x = fx === 1 ? 'e' : fx === 0 ? 'w' : '';
+		const y = fy === 1 ? 's' : fy === 0 ? 'n' : '';
+		return (y + x || null) as DragMode | null;
 	}
 
 	const DRAG_LABELS: Record<DragMode, string> = {
@@ -1780,7 +2054,10 @@
 		// The resolved top is where the box is actually sitting, so writing it back
 		// as its own y is what "keeps its place" means — an anchor released to the
 		// box's stale y would jump it up the card.
-		for (const held of moored) onchange?.({ ...held, anchor: null, y: round2(layout.tops[held.id] ?? held.y) });
+		for (const held of moored) {
+			const y = freedTop(held, layout.tops[held.id] ?? held.y, layout.heights[held.id] ?? held.h);
+			onchange?.({ ...held, anchor: null, y });
+		}
 	}
 
 	/**
@@ -1830,7 +2107,7 @@
 	function breakAnchor(box: Box) {
 		if (!box.anchor || box.locked) return;
 		onaction?.('Break the anchor');
-		onchange?.({ ...box, anchor: null, y: round2(layout.tops[box.id] ?? box.y) });
+		onchange?.({ ...box, anchor: null, y: freedTop(box, layout.tops[box.id] ?? box.y, layout.heights[box.id] ?? box.h) });
 	}
 
 	// ---- typing into the card ------------------------------------------------
@@ -1948,11 +2225,20 @@
      astride the cut on an area that is cutting its words off, where pressing
      lets it grow; blue and faint beside the trim line on one that has grown,
      where pressing cuts it back to the height it was given. -->
+<!-- A line of plain text, as a row of words, leader and words at the right
+     edge when it has a `%%%` (or a tab, with a leader set) — `tabSplit`,
+     `leaderStyle`, the same as Markdown's. -->
+{#snippet leadered(line: string, leader: Leader)}{@const parts = tabSplit(line, leader !== 'none', false)}{#if parts}<span class="tabbed"
+		><span>{@render marked(parts[0])}</span><span style={leaderStyle(leader)}></span><span class="tab-right"
+			>{@render marked(parts[1])}</span
+		></span
+	>{:else}{@render marked(line)}{/if}{/snippet}
+
 {#snippet shears(box: Box, cutting: boolean)}
 	<button
 		class="overflow-mark"
 		class:offered={!cutting}
-		style="--edge:{cutting ? '100%' : `${box.h}mm`};--stack:{badgeCount(box)}"
+		style="--edge:{cutting ? '100%' : `${trimEdges(box)[0]}mm`};--stack:{badgeCount(box)}"
 		disabled={!editable(box)}
 		title={cutting
 			? 'The content does not fit — this area is cutting off what will print. Press to let it grow instead.'
@@ -2044,7 +2330,7 @@
 				class:outlined={bounds && !empty}
 				class:selected={interactive && isSelected(box)}
 				class:interactive={editable(box)}
-				class:clipped={box.overflow === 'clip' && !empty}
+				class:clipped={(box.overflow === 'clip' || box.overflow === 'shrink') && !empty}
 				class:locked={!!box.locked}
 				class:no-padding={!box.padding}
 				class:grouped={!!box.group}
@@ -2056,6 +2342,7 @@
 				{...idFor(box)}
 				data-box-id={box.id}
 				use:measure={box.id}
+				use:fitWords={box.overflow === 'shrink' && (box.mode === 'plain' || box.mode === 'markdown') ? box.id : null}
 				onpointerdown={(e) => startDrag(e, box, 'move')}
 				ondblclick={(e) => {
 					if (!interactive) return;
@@ -2091,7 +2378,9 @@
 				{/if}
 				<div
 					class="content"
-					style={columnsStyle(box)}
+					style={[columnsStyle(box), shrunk[box.id] && box.overflow === 'shrink' ? `font-size:${shrunk[box.id]}em` : '']
+						.filter(Boolean)
+						.join(';') || undefined}
 					class:being-edited={editingId === box.id}
 					class:shifted={!!baselineOf(box, template.defaults) && (box.mode === 'plain' || box.mode === 'markdown')}
 				>
@@ -2103,8 +2392,9 @@
 							size: box.size ?? template.defaults.size,
 							md: box.md,
 							paragraph: paragraphOf(box),
-							lineHeight: box.lineHeight ?? template.defaults.lineHeight,
-							list: listOf(box, template.defaults)
+							lineHeight: leadingOf(box),
+							list: listOf(box, template.defaults),
+							leader: leaderOf(box)
 						}))}
 					{:else if box.mode === 'qr'}
 						<span class="media" style="height:{mediaHeight(box)}">
@@ -2139,17 +2429,32 @@
 						     indent. An empty line keeps its height. -->
 						{@const para = paragraphOf(box)!}
 						<!-- A space in lines of the leading, an indent in em. -->
-						{@const step = `${Math.round(para.amount * (para.mode === 'space' ? (box.lineHeight ?? template.defaults.lineHeight) : 1) * 1000) / 1000}em`}
+						{@const step = `${Math.round(para.amount * (para.mode === 'space' ? leadingOf(box) : 1) * 1000) / 1000}em`}
 						<span class="paras">
 							{#each shownTextOf(box).split('\n') as line, i (i)}
 								<span
 									class="para"
 									style={para.mode === 'space' ? `margin-bottom:${step}` : i > 0 ? `text-indent:${step}` : ''}
-								>{#if line}{@render marked(line)}{:else}&nbsp;{/if}</span>
+								>{#if line}{@render leadered(line, leaderOf(box))}{:else}&nbsp;{/if}</span>
 							{/each}
 						</span>
 					{:else}
-						<span class="plain">{@render marked(shownTextOf(box))}</span>
+						<!-- The words worked out once: filling the placeholders in is the
+						     costly part — a contents builds itself from every row — and
+						     the test, the lines and the plain run all want the same text. -->
+						{@const text = shownTextOf(box)}
+						{@const lines = text.split('\n')}
+						{#if lines.some((line) => tabSplit(line, leaderOf(box) !== 'none', false))}
+							<!-- Line by line only when a line needs its leader: one run of
+							     text otherwise, as plain text always was. -->
+							<span class="paras">
+								{#each lines as line, i (i)}
+									<span class="para">{#if line}{@render leadered(line, leaderOf(box))}{:else}&nbsp;{/if}</span>
+								{/each}
+							</span>
+						{:else}
+							<span class="plain">{@render marked(text)}</span>
+						{/if}
 					{/if}
 				</div>
 
@@ -2204,15 +2509,17 @@
 					     has grown it past that. Sparser than the bound, so it is not
 					     taken for one, and with the shears beside it in blue — the cut
 					     this area *could* make, offered rather than made. -->
-					<svg class="chrome original-edge" aria-hidden="true" style="top:{box.h}mm">
-						<line x1="0" y1="0" x2="100%" y2="0" />
-					</svg>
+					{#each trimEdges(box) as edge (edge)}
+						<svg class="chrome original-edge" aria-hidden="true" style="top:{edge}mm">
+							<line x1="0" y1="0" x2="100%" y2="0" />
+						</svg>
+					{/each}
 					{@render shears(box, false)}
 				{/if}
 
 				<!-- The cut is a clipped area's alone: a growing one is never cut —
 				     it has the trim line above instead. -->
-				{#if bounds && !empty && box.overflow === 'clip' && overflowing[box.id]}
+				{#if bounds && !empty && (box.overflow === 'clip' || box.overflow === 'shrink') && overflowing[box.id]}
 					<!-- Where the words are actually severed, drawn as the cut it is: a
 					     dashed red line along the bottom edge, with the shears straddling
 					     it at the end of the stroke. The other three edges keep the plain
@@ -2448,6 +2755,18 @@
 		{#if guide.y !== null}
 			<span class="guide horizontal" style="top:{guide.y}mm"></span>
 		{/if}
+		<!-- The gaps: a line from edge to edge with its millimetres, the pair
+		     either side marked = when they match. -->
+		{#each readouts as r, i (i)}
+			<span
+				class="spacing {r.axis === 'x' ? 'across' : 'down'}"
+				class:equal={r.equal}
+				style={r.axis === 'x'
+					? `left:${r.from}mm;width:${r.gap}mm;top:${r.at}mm`
+					: `top:${r.from}mm;height:${r.gap}mm;left:${r.at}mm`}
+				><span class="spacing-label">{r.equal ? '= ' : ''}{Math.round(r.gap * 10) / 10}</span></span
+			>
+		{/each}
 		</div>
 		</div>
 	</div>
@@ -2586,6 +2905,20 @@
 		white-space: pre-wrap;
 	}
 
+	/* A tabbed line: the words, the leader filling what is left, the words at
+	   the right edge — all on the baseline, where the leader's rule sits. */
+	.tabbed {
+		display: flex;
+		align-items: baseline;
+		/* A paragraph's indent is inherited by every flex item, and would push
+		   the words at the right edge in from it. */
+		text-indent: 0;
+	}
+
+	.tab-right {
+		text-align: right;
+	}
+
 	/* The last paragraph's space would only push the area's own bottom down. */
 	.paras {
 		display: block;
@@ -2701,7 +3034,7 @@
 		line-height: 0;
 	}
 
-	/* The area a picture carried out of the Images bar would land in. Set by
+	/* The area a picture carried out of the Pictures tray would land in. Set by
 	   ImagesPanel as an attribute, so the card's own class handling cannot
 	   take it off mid-drag. */
 	.area:global([data-image-target]) {
@@ -3479,6 +3812,32 @@
 
 		.guide.vertical { top: 0; bottom: 0; width: calc(3 * var(--line)); margin-left: calc(-1 * var(--line)); background-size: var(--line) 100%; }
 		.guide.horizontal { left: 0; right: 0; height: calc(3 * var(--line)); margin-top: calc(-1 * var(--line)); background-size: 100% var(--line); }
+
+		/* A gap: a thin line in the guides' colour, its number in a chip at the
+		   middle, sized against the zoom like every other mark on the card. */
+		.spacing {
+			position: absolute;
+			pointer-events: none;
+			z-index: 4;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: var(--accent-inverse);
+		}
+
+		.spacing.across { height: 0; border-top: var(--line) dashed currentColor; }
+		.spacing.down { width: 0; border-left: var(--line) dashed currentColor; }
+		.spacing.equal { border-style: solid; }
+
+		.spacing-label {
+			font: 600 calc(0.625rem * var(--ui-scale)) / 1 system-ui, sans-serif;
+			font-variant-numeric: tabular-nums;
+			padding: calc(2px * var(--ui-scale)) calc(4px * var(--ui-scale));
+			border-radius: calc(3px * var(--ui-scale));
+			background: var(--accent-inverse);
+			color: #fff;
+			white-space: nowrap;
+		}
 	}
 
 	/* The overlays are conditional on `bounds` and on being interactive, neither

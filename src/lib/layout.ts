@@ -1,4 +1,4 @@
-import type { Align, Box, PageNumberPosition, PageSide } from './types';
+import type { Align, Box, PageNumberPosition, PageSide, VAlign } from './types';
 
 /**
  * Millimetre geometry: unit conversion and anchor resolution.
@@ -56,7 +56,8 @@ export interface LayoutResult {
 
 export function boxHeight(box: Box, measured: number | undefined, hidden: boolean): number {
 	if (hidden) return 0;
-	if (box.overflow === 'clip') return box.h;
+	// Shrink keeps its height, as a clip does: it is the words that change size.
+	if (box.overflow === 'clip' || box.overflow === 'shrink') return box.h;
 	return Math.max(box.h, measured ?? 0);
 }
 
@@ -84,6 +85,7 @@ export function resolveLayout({ boxes, measured, hidden }: LayoutInput): LayoutR
 		resolving.add(box.id);
 
 		let value = box.y;
+		let anchored = false;
 		if (box.anchor) {
 			let target = byId.get(box.anchor.to);
 			// Walk past hidden boxes so they cost nothing, not even their gap.
@@ -96,7 +98,20 @@ export function resolveLayout({ boxes, measured, hidden }: LayoutInput): LayoutR
 				seen.add(target.id);
 				target = target.anchor ? byId.get(target.anchor.to) : undefined;
 			}
-			if (target && target.id !== box.id) value = top(target) + height(target) + box.anchor.gap;
+			if (target && target.id !== box.id) {
+				value = top(target) + height(target) + box.anchor.gap;
+				anchored = true;
+			}
+		}
+		// A growing area grows away from its reference point: down from a top,
+		// up from a bottom, both ways from a middle — so the point the bar
+		// names stays where it says on every card, however long the words.
+		// Not an anchored area, whose top is its anchor's to decide and which
+		// grows down as it always has; not a hidden one, which collapses to
+		// its own top as it always has, so what follows it does not move.
+		if (!anchored && box.overflow === 'grow' && !hidden.has(box.id)) {
+			const { fy } = referenceOf('left', box.valign);
+			if (fy) value = box.y - (height(box) - box.h) * fy;
 		}
 
 		resolving.delete(box.id);
@@ -450,4 +465,146 @@ export function columnGaps(count: number, gap: number, width: number): Array<[nu
 		const left = (i + 1) * column + i * gap;
 		return [left / width, (left + gap) / width];
 	});
+}
+
+/** How small Shrink may set an area's words: half the size, and no further. */
+export const SHRINK_FLOOR = 0.5;
+
+/**
+ * The largest scale of an area's words at which `fits` says they fit, to the
+ * nearest hundredth: 1 if they fit as set, `SHRINK_FLOOR` if nothing does.
+ *
+ * A bisection, because a fit is monotonic in the size — smaller words never
+ * take more room — and each try is a layout the browser has to do. Seven
+ * halvings of the half between the floor and full size land within a
+ * hundredth, which is a quarter of a point on 24pt type.
+ */
+export function shrinkScale(fits: (scale: number) => boolean, floor = SHRINK_FLOOR): number {
+	if (fits(1)) return 1;
+	let lo = floor;
+	let hi = 1;
+	if (!fits(lo)) return floor;
+	while (hi - lo > 0.005) {
+		const mid = (lo + hi) / 2;
+		if (fits(mid)) lo = mid;
+		else hi = mid;
+	}
+	return Math.floor(lo * 100) / 100;
+}
+
+// ---- the reference point ---------------------------------------------------
+
+/**
+ * Where on an area its position is said from, as fractions of its width and
+ * height: the point its words are set from. Left (or justified) and top is
+ * the top-left corner, right and bottom the bottom-right; centred on an axis,
+ * the middle of that axis. One point for everything that names a place on
+ * the area — the ring on its handle, the X and Y in the bar, the spacing a
+ * drag shows, the edge a typed W or H keeps, and the point a file gives an
+ * area at (frame.ts) — so they never disagree about which corner is meant.
+ * In memory an area is still its top-left corner; frame.ts converts.
+ */
+export function referenceOf(align: Align, valign: VAlign = 'top'): { fx: 0 | 0.5 | 1; fy: 0 | 0.5 | 1 } {
+	return {
+		fx: align === 'right' ? 1 : align === 'center' ? 0.5 : 0,
+		fy: valign === 'bottom' ? 1 : valign === 'middle' ? 0.5 : 0
+	};
+}
+
+/**
+ * The `y` an area must store to stay where it is drawn once nothing anchors
+ * it: drawn with its top at `top` and `height` tall. Its own top as a rule —
+ * but a growing area set to the bottom or the middle grows away from that
+ * point once it is free (`resolveLayout`), so its stored top is where its
+ * declared frame sits, its growth reckoned back out; written as the drawn top,
+ * it would jump up by however far its words had grown it.
+ */
+export function freedTop(box: Box, top: number, height: number): number {
+	const { fy } = referenceOf('left', box.valign);
+	const y = box.overflow === 'grow' && fy ? top + (height - box.h) * fy : top;
+	return Math.round(y * 100) / 100;
+}
+
+// ---- spacing readouts ------------------------------------------------------
+
+export interface Rect {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+}
+
+/** One distance shown while a box is dragged: a line from `from` to `to` along `axis`, at `at` across it. */
+export interface SpacingReadout {
+	axis: 'x' | 'y';
+	from: number;
+	to: number;
+	at: number;
+	/** mm, `to - from` */
+	gap: number;
+	/** the gap on the other side is the same: the box is centred between them */
+	equal: boolean;
+}
+
+/** Within this many mm two gaps read as the same — a twentieth, under any rounding the fields show. */
+const EQUAL_GAP = 0.05;
+
+/**
+ * The distances a dragged box has on each side, InDesign's smart spacing kept
+ * to its useful half, measured out from `focus` — the box's reference point
+ * (`referenceOf`), its middle when none is given. Across, a line runs level
+ * with the focus to the nearest box it meets, or to the page's trim edge
+ * where it meets none; down, a line runs plumb with it. Each is drawn with its
+ * millimetres; where a side's gap matches the opposite side's, both are
+ * flagged, which is how a box is centred between two others by eye.
+ *
+ * A focus on the box's own edge is looked along from just inside it, so a box
+ * sitting on that edge's line — above a top-left focus, say — is a diagonal
+ * neighbour and not one beside it; nor is a box overlapping the dragged one,
+ * which is beside nothing.
+ */
+export function spacingReadouts(
+	box: Rect,
+	others: Rect[],
+	page: { w: number; h: number },
+	focus: { x: number; y: number } = { x: box.x + box.w / 2, y: box.y + box.h / 2 }
+): SpacingReadout[] {
+	const inside = (at: number, lo: number, hi: number) => (at <= lo + 0.001 ? at + 0.01 : at >= hi - 0.001 ? at - 0.01 : at);
+	const probe = { x: inside(focus.x, box.x, box.x + box.w), y: inside(focus.y, box.y, box.y + box.h) };
+	const beside = (a: Rect, axis: 'x' | 'y') =>
+		axis === 'x' ? a.y < probe.y && probe.y < a.y + a.h : a.x < probe.x && probe.x < a.x + a.w;
+	const round = (n: number) => Math.round(n * 100) / 100;
+
+	const sides: Array<{ axis: 'x' | 'y'; from: number; to: number }> = [];
+	for (const axis of ['x', 'y'] as const) {
+		const start = axis === 'x' ? box.x : box.y;
+		const end = axis === 'x' ? box.x + box.w : box.y + box.h;
+		let beforeEdge = 0;
+		let afterEdge = axis === 'x' ? page.w : page.h;
+		for (const other of others) {
+			if (!beside(other, axis)) continue;
+			const oStart = axis === 'x' ? other.x : other.y;
+			const oEnd = oStart + (axis === 'x' ? other.w : other.h);
+			if (oEnd <= start + 0.01 && oEnd > beforeEdge) beforeEdge = oEnd;
+			if (oStart >= end - 0.01 && oStart < afterEdge) afterEdge = oStart;
+		}
+		sides.push({ axis, from: beforeEdge, to: start }, { axis, from: end, to: afterEdge });
+	}
+
+	const readouts = sides.map(({ axis, from, to }) => ({
+		axis,
+		from: round(from),
+		to: round(to),
+		at: round(axis === 'x' ? focus.y : focus.x),
+		gap: round(to - from),
+		equal: false
+	}));
+	for (const [a, b] of [
+		[0, 1],
+		[2, 3]
+	]) {
+		if (readouts[a].gap > 0 && Math.abs(readouts[a].gap - readouts[b].gap) < EQUAL_GAP) readouts[a].equal = readouts[b].equal = true;
+	}
+	// A box against something has no gap there to show.
+	return readouts.filter((r) => r.gap > 0);
 }

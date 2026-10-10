@@ -5,8 +5,8 @@
 	import './options-bar.css';
 	import { safeImageUrl } from '$lib/assets';
 	import { renamed } from '$lib/onboarding';
-	import { fontChoices, previewFamilies } from '$lib/fonts';
-	import MenuSelect from './MenuSelect.svelte';
+	import { fontChoices, fontRef, previewFamilies } from '$lib/fonts';
+	import MenuSelect, { familyItems } from './MenuSelect.svelte';
 	import { withKey } from '$lib/keys';
 	import {
 		MAX_PARAGRAPH,
@@ -19,6 +19,11 @@
 		normaliseList,
 		LIST_MARKER_LABELS,
 		LIST_MARKERS,
+		LIST_NUMBERING_LABELS,
+		LIST_NUMBERINGS,
+		LEADER_LABELS,
+		LEADERS,
+		normaliseLeader,
 		MAX_BASELINE,
 		MAX_LIST,
 		FACING_PAGE_NUMBER_POSITIONS,
@@ -166,11 +171,9 @@
 		pickerOpen = false;
 	}
 
-	/**
-	 * The families this template is set in, then under a rule everything else
-	 * this browser knows — see `fontChoices`.
-	 */
+	/** Every family a font menu offers, by where it comes from — see `fontChoices`. */
 	const families = $derived(fontChoices(template, editorFonts));
+
 
 	/** The other end of the swap, while it is still in the library. */
 	const previousEntry = $derived(
@@ -216,12 +219,13 @@
 	function setDefaultFont(family: string) {
 		const declared = template.fonts.some((f) => f.family.toLowerCase() === family.toLowerCase());
 		// An uploaded face the editor is holding comes back with its file
-		// reference, not as a Google name that would be asked for and missed.
-		const known = editorFonts.find((f) => f.family.toLowerCase() === family.toLowerCase());
+		// reference, not as a Google name that would be asked for and missed;
+		// a system face is not declared, having nothing to fetch.
+		const ref = fontRef(family, editorFonts);
 		ontemplatechange({
 			...template,
 			defaults: { ...template.defaults, font: family },
-			fonts: declared ? template.fonts : [...template.fonts, known ?? { family, source: 'google' }]
+			fonts: declared || ref.source === 'system' ? template.fonts : [...template.fonts, ref]
 		});
 	}
 
@@ -280,6 +284,13 @@
 		const { list: _was, ...rest } = template.defaults;
 		const list = normaliseList({ ...template.defaults.list, ...change });
 		patchTemplate({ defaults: list ? { ...rest, list } : rest });
+	}
+
+	/** None is no leader at all, so it is not kept: an absent key, as Clearing a field means removing it. */
+	function setDefaultLeader(raw: string) {
+		const { leader: _was, ...rest } = template.defaults;
+		const leader = normaliseLeader(raw);
+		patchTemplate({ defaults: leader && leader !== 'none' ? { ...rest, leader } : rest });
 	}
 
 	function setDefaultBaseline(raw: string) {
@@ -688,14 +699,10 @@
 				<MenuSelect
 					label="Font"
 					value={template.defaults.font}
-					items={[
-						...families.used.map((family) => ({ value: family, label: family, family })),
-						{ rule: true as const },
-						...families.others.map((family) => ({ value: family, label: family, family }))
-					]}
+					items={familyItems(families)}
 					disabled={pageFrozen}
 					showFamily
-					onopen={() => previewFamilies([...families.used, ...families.others], editorFonts, template.fonts)}
+					onopen={() => previewFamilies(families.google, editorFonts, template.fonts)}
 					onselect={setDefaultFont}
 				/>
 			</span>
@@ -757,12 +764,13 @@
 				<span class="unit">em</span>
 			</label>
 			<label class="field">
-				<span>Spacing</span>
+				<span>Tracking</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.05"
 					placeholder="0"
+					title="Tracking: space added between letters, in mm, for every area that does not set its own"
 					value={template.defaults.letterSpacing}
 					disabled={pageFrozen}
 					onchange={(e) =>
@@ -805,6 +813,19 @@
 					<span class="unit">{template.defaults.paragraph.mode === 'space' ? 'lines' : 'em'}</span>
 				</label>
 			{/if}
+			<label class="field">
+				<span>Leader</span>
+				<select
+					value={template.defaults.leader ?? 'none'}
+					title="A line with %%% in it sets what follows against the right edge, joined by this line — Coffee %%% 3.50 for a price list; with a leader set, a tab does too. For every area that sets none of its own"
+					disabled={pageFrozen}
+					onchange={(e) => setDefaultLeader(e.currentTarget.value)}
+				>
+					{#each LEADERS as leader (leader)}
+						<option value={leader}>{LEADER_LABELS[leader]}</option>
+					{/each}
+				</select>
+			</label>
 		</fieldset>
 		<fieldset class="group">
 			<legend>Lists</legend>
@@ -812,12 +833,25 @@
 				<span>Marker</span>
 				<select
 					value={template.defaults.list?.marker ?? 'bullet'}
-					title="What each item of a Markdown list is marked with"
+					title="What each item of a Markdown bullet list is marked with — a numbered list counts by Numbers"
 					disabled={pageFrozen}
 					onchange={(e) => setDefaultList({ marker: e.currentTarget.value })}
 				>
 					{#each LIST_MARKERS as marker (marker)}
 						<option value={marker}>{LIST_MARKER_LABELS[marker]}</option>
+					{/each}
+				</select>
+			</label>
+			<label class="field">
+				<span>Numbers</span>
+				<select
+					value={template.defaults.list?.numbering ?? 'decimal'}
+					title="How a numbered Markdown list counts: numbers, letters or Roman numerals"
+					disabled={pageFrozen}
+					onchange={(e) => setDefaultList({ numbering: e.currentTarget.value })}
+				>
+					{#each LIST_NUMBERINGS as numbering (numbering)}
+						<option value={numbering}>{LIST_NUMBERING_LABELS[numbering]}</option>
 					{/each}
 				</select>
 			</label>

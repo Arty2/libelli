@@ -1,46 +1,149 @@
 import { describe, expect, it } from 'vitest';
-import { fontChoices, fontStack, mergeFonts, pruneFonts, weightsOf } from './fonts';
+import {
+	detectedKindOf,
+	fontChoices,
+	fontInventory,
+	fontKindOf,
+	fontRef,
+	fontStack,
+	isSystemFamily,
+	kindOf,
+	mergeFonts,
+	pruneFonts,
+	replaceFamily,
+	tuneFont,
+	tuningOf,
+	weightsOf
+} from './fonts';
+import type { FontRef, Template } from './types';
 
 describe('fontStack', () => {
-	it('quotes the family and keeps the system stack behind it', () => {
-		const stack = fontStack('Bitter', 'Inter');
+	it('quotes the family and keeps a fallback behind it', () => {
+		const stack = fontStack('Bitter');
 		expect(stack.startsWith('"Bitter", ')).toBe(true);
 		expect(stack.length).toBeGreaterThan('"Bitter", '.length);
 	});
 
-	it('falls back to the given family when the box names none', () => {
-		expect(fontStack(undefined, 'Inter').startsWith('"Inter", ')).toBe(true);
+	it('falls back by kind: a serif to serifs, a monospace to monospaces', () => {
+		expect(fontStack('Bitter', 'serif')).toMatch(/^"Bitter", .*Georgia.*serif$/);
+		expect(fontStack('Plex', 'monospace')).toMatch(/^"Plex", .*Consolas.*monospace$/);
+		expect(fontStack('Hand', 'handwriting')).toBe('"Hand", cursive');
+		expect(fontStack('Plain', 'sans-serif')).toBe(fontStack('Plain'));
 	});
 
-	it('is the bare system stack when there is nothing to name', () => {
-		// The system stack quotes families of its own, so the tell is that
-		// nothing was prepended, not that there are no quotes in it.
-		const bare = fontStack(undefined, '');
-		expect(fontStack('   ', '')).toBe(bare);
-		expect(fontStack('', '')).toBe(bare);
-		expect(fontStack('Bitter', '')).toBe(`"Bitter", ${bare}`);
+	it('is the bare fallback when there is nothing to name', () => {
+		const bare = fontStack(undefined);
+		expect(fontStack('   ')).toBe(bare);
+		expect(fontStack('')).toBe(bare);
+		expect(fontStack(undefined, 'serif')).toMatch(/^ui-serif/);
 	});
 
 	it('refuses a name that is not one, rather than cleaning it up', () => {
 		// Cleaning gives back a family nobody asked for; refusing falls to the
 		// fallback, which is a face that exists.
-		const bare = fontStack(undefined, '');
-		expect(fontStack('Bit"ter', 'Inter').startsWith('"Inter", ')).toBe(true);
-		expect(fontStack('Bit"ter', '')).toBe(bare);
+		expect(fontStack('Bit"ter')).toBe(fontStack(undefined));
 	});
 
 	it('will not let a family smuggle a declaration into the style attribute', () => {
 		// boxStyle joins its parts with `;` into an inline style, so a family
 		// carrying one used to write extra CSS into every box on the card.
 		for (const nasty of ['X; color: red', 'X}.card{display:none', 'X\\3b color:red', 'a'.repeat(65)]) {
-			expect(fontStack(nasty, 'Inter').startsWith('"Inter", ')).toBe(true);
+			expect(fontStack(nasty, 'serif')).toBe(fontStack(undefined, 'serif'));
 		}
 	});
 
 	it('keeps the punctuation real family names use', () => {
 		for (const real of ['Patrick Hand', 'Space Mono', 'PT Sans', "Amatic SC", 'Source Sans 3', 'Libre Baskerville']) {
-			expect(fontStack(real, 'Inter')).toBe(`"${real}", ${fontStack(undefined, '')}`);
+			expect(fontStack(real)).toBe(`"${real}", ${fontStack(undefined)}`);
 		}
+	});
+});
+
+describe('a face on a card', () => {
+	it('knows the kinds of the families it offers, and prefers what the template says', () => {
+		expect(kindOf([], 'georgia')).toBe('serif');
+		expect(kindOf([], 'Consolas')).toBe('monospace');
+		expect(kindOf([], 'Caveat')).toBe('handwriting');
+		expect(kindOf([], 'Nobody Knows')).toBeUndefined();
+		expect(kindOf([{ family: 'Studio', source: 'local', kind: 'serif' }], 'studio')).toBe('serif');
+	});
+
+	it('chooses a face\'s fallback kind on its entry, makes one where there is none, and clears Auto', () => {
+		const t = { fonts: [{ family: 'Lora', source: 'google' }] as FontRef[] };
+		const up = tuneFont(t, 'lora', { fallback: 'monospace' }, { family: 'lora', source: 'google' });
+		expect(up.fonts).toEqual([{ family: 'Lora', source: 'google', fallback: 'monospace' }]);
+		expect(tuneFont(up, 'Lora', { fallback: undefined }, { family: 'Lora', source: 'google' }).fonts).toEqual([{ family: 'Lora', source: 'google' }]);
+		const system = tuneFont(t, 'Georgia', { fallback: 'sans-serif' }, { family: 'Georgia', source: 'system' });
+		expect(system.fonts[1]).toEqual({ family: 'Georgia', source: 'system', fallback: 'sans-serif' });
+		// Auto on a face with no entry makes none.
+		expect(tuneFont(t, 'Georgia', { fallback: undefined }, { family: 'Georgia', source: 'system' })).toBe(t);
+	});
+
+	it('falls back by the kind chosen for it, over the one detected; Auto is the detected', () => {
+		const fonts: FontRef[] = [{ family: 'Studio', source: 'local', kind: 'sans-serif', fallback: 'monospace' }];
+		expect(kindOf(fonts, 'Studio')).toBe('monospace');
+		expect(detectedKindOf(fonts, 'Studio')).toBe('sans-serif');
+		const t = { fonts };
+		const auto = tuneFont(t, 'Studio', { fallback: undefined }, { family: 'Studio', source: 'local' });
+		expect(auto.fonts[0]).toEqual({ family: 'Studio', source: 'local', kind: 'sans-serif' });
+		expect(kindOf(auto.fonts, 'Studio')).toBe('sans-serif');
+		// Chosen for a system face, which has no entry until then.
+		const georgia = tuneFont({ fonts: [] as FontRef[] }, 'Georgia', { fallback: 'sans-serif' }, { family: 'Georgia', source: 'system' });
+		expect(georgia.fonts).toEqual([{ family: 'Georgia', source: 'system', fallback: 'sans-serif' }]);
+		// A design's choice does not travel into the editor's list.
+		expect(mergeFonts([], fonts)).toEqual([{ family: 'Studio', source: 'local', kind: 'sans-serif' }]);
+	});
+
+	it('carries a design\'s chosen kind across a new file, and nothing the old file said', () => {
+		const old: FontRef = { family: 'Brand', source: 'local', ref: 'font:brand', kind: 'serif', fallback: 'monospace' };
+		expect(tuningOf(old)).toEqual({ fallback: 'monospace' });
+		expect(tuningOf(undefined)).toEqual({});
+		// A new upload that names no kind does not inherit the old file's.
+		const next = { ...{ family: 'Brand', source: 'local' as const, ref: 'font:brand' }, ...tuningOf(old) };
+		expect(next).not.toHaveProperty('kind');
+	});
+});
+
+/** A font file of the tables `fontKindOf` reads: an OS/2 with a family class and PANOSE, and a post. */
+function sfnt({ familyClass = 0, panose = [0, 0, 0, 0], fixed = 0 }: { familyClass?: number; panose?: number[]; fixed?: number }) {
+	const os2 = new Uint8Array(96);
+	os2[30] = familyClass;
+	panose.forEach((b, i) => (os2[32 + i] = b));
+	const post = new Uint8Array(32);
+	new DataView(post.buffer).setUint32(12, fixed);
+	const tables: [string, Uint8Array][] = [['OS/2', os2], ['post', post]];
+	const head = 12 + tables.length * 16;
+	const out = new Uint8Array(head + os2.length + post.length);
+	const view = new DataView(out.buffer);
+	view.setUint32(0, 0x00010000);
+	view.setUint16(4, tables.length);
+	let offset = head;
+	tables.forEach(([tag, bytes], i) => {
+		const at = 12 + i * 16;
+		[...tag].forEach((c, k) => view.setUint8(at + k, c.charCodeAt(0)));
+		view.setUint32(at + 8, offset);
+		view.setUint32(at + 12, bytes.length);
+		out.set(bytes, offset);
+		offset += bytes.length;
+	});
+	return out.buffer;
+}
+
+describe('fontKindOf', () => {
+	it('reads the kind a font file files itself under', async () => {
+		expect(await fontKindOf(sfnt({ familyClass: 8 }))).toBe('sans-serif');
+		expect(await fontKindOf(sfnt({ familyClass: 1 }))).toBe('serif');
+		expect(await fontKindOf(sfnt({ familyClass: 10 }))).toBe('handwriting');
+		expect(await fontKindOf(sfnt({ fixed: 1 }))).toBe('monospace');
+		expect(await fontKindOf(sfnt({ panose: [2, 2, 6, 9] }))).toBe('monospace');
+		expect(await fontKindOf(sfnt({ panose: [2, 11, 5, 3] }))).toBe('sans-serif');
+		expect(await fontKindOf(sfnt({ panose: [2, 4, 5, 3] }))).toBe('serif');
+	});
+
+	it('says nothing for a file that says nothing, or is no font it can read', async () => {
+		expect(await fontKindOf(sfnt({}))).toBeNull();
+		expect(await fontKindOf(new TextEncoder().encode('wOF2 not read here').buffer)).toBeNull();
+		expect(await fontKindOf(new ArrayBuffer(4))).toBeNull();
 	});
 });
 
@@ -62,12 +165,32 @@ describe('the fonts a template carries', () => {
 		expect(pruneFonts(pruned).template).toBe(pruned);
 	});
 
-	it('offers the used families first and everything else after', () => {
-		const { used, others } = fontChoices(template, [{ family: 'Old Face', source: 'local' }]);
-		expect(used).toEqual(['Inter', 'Lora']);
-		expect(others).toContain('Old Face');
-		expect(others).toContain('Karla');
-		expect(others).not.toContain('Inter');
+	it('offers the local files, then Google, then the system faces, once each', () => {
+		const { local, google, system } = fontChoices(template, [{ family: 'Old Face', source: 'local' }]);
+		expect(local).toEqual(['Old Face']);
+		expect(google).toContain('Inter');
+		expect(google).toContain('Lora');
+		expect(google).toContain('Karla');
+		expect(google).not.toContain('Old Face');
+		expect(system).toEqual(['Arial', 'Consolas', 'Courier New', 'Georgia', 'Times New Roman', 'Verdana']);
+	});
+
+	it('keeps an upload under Local even when it shares a system face\'s name', () => {
+		const { local, system } = fontChoices(template, [{ family: 'Arial', source: 'local', ref: 'font:arial' }]);
+		expect(local).toContain('Arial');
+		expect(system).not.toContain('Arial');
+	});
+
+	it('gives a chosen family its source: an upload, a system face, else Google', () => {
+		const held: FontRef = { family: 'Studio', source: 'local', ref: 'font:studio' };
+		expect(fontRef('studio', [held])).toEqual(held);
+		// What one design did with a face stays in that design.
+		const tuned: FontRef = { ...held, kind: 'serif', fallback: 'monospace' };
+		expect(fontRef('Studio', [tuned])).toEqual({ ...held, kind: 'serif' });
+		expect(mergeFonts([], [tuned])).toEqual([{ ...held, kind: 'serif' }]);
+		expect(fontRef('georgia', [])).toEqual({ family: 'georgia', source: 'system' });
+		expect(isSystemFamily(' Times New Roman ')).toBe(true);
+		expect(fontRef('Lora', [])).toEqual({ family: 'Lora', source: 'google' });
 	});
 
 	it('keeps one entry per family in the editor list, the later winning', () => {
@@ -82,5 +205,68 @@ describe('weightsOf', () => {
 		expect(weightsOf('bold')).toEqual([700]);
 		expect(weightsOf('300 600')).toEqual([300, 400, 500, 600]);
 		expect(weightsOf('nonsense')).toEqual([]);
+	});
+});
+
+type Design = Pick<Template, 'defaults' | 'boxes' | 'fonts'>;
+
+describe('fontInventory', () => {
+	const design = {
+		defaults: { font: 'Inter' },
+		boxes: [{ font: 'Studio Sans' }, { font: 'Lora' }, {}],
+		fonts: [
+			{ family: 'Studio Sans', source: 'local', ref: 'font:studio-sans' },
+			{ family: 'Inter', source: 'google' }
+		]
+	} as unknown as Design;
+
+	it('says which fonts the design needs and this browser has not got', () => {
+		const list = fontInventory(design, []);
+		expect(list.map((f) => [f.family, f.status, f.used])).toEqual([
+			['Inter', 'google', true],
+			['Lora', 'google', true],
+			['Studio Sans', 'missing', true]
+		]);
+	});
+
+	it('lists uploads with their weight, and the ones nothing uses last', () => {
+		const list = fontInventory(design, [
+			{ ref: 'font:studio-sans', family: 'Studio Sans', bytes: 40000 },
+			{ ref: 'font:old-face', family: 'Old Face', bytes: 9000 }
+		]);
+		expect(list.find((f) => f.family === 'Studio Sans')).toMatchObject({ status: 'uploaded', used: true, bytes: 40000 });
+		expect(list[list.length - 1]).toMatchObject({ family: 'Old Face', status: 'unused', used: false });
+	});
+
+	it('lists the system faces the design uses, as system: replaceable, nothing to upload', () => {
+		const withSystem = {
+			...design,
+			boxes: [...design.boxes, { font: 'Georgia' }, { font: 'Plain Office' }],
+			fonts: [...design.fonts, { family: 'Plain Office', source: 'system' }]
+		} as unknown as Design;
+		const list = fontInventory(withSystem, []);
+		expect(list.find((f) => f.family === 'Georgia')).toEqual({ family: 'Georgia', status: 'system', used: true, kind: 'serif', detected: 'serif' });
+		expect(list.find((f) => f.family === 'Plain Office')).toEqual({ family: 'Plain Office', status: 'system', used: true });
+		// An upload under a system face's name is the upload.
+		expect(fontInventory(withSystem, [{ ref: 'font:georgia', family: 'Georgia', bytes: 100 }]).find((f) => f.family === 'Georgia')?.status).toBe('uploaded');
+	});
+});
+
+describe('replaceFamily', () => {
+	const design = {
+		defaults: { font: 'Studio Sans' },
+		boxes: [{ id: 'a', font: 'studio sans' }, { id: 'b', font: 'Lora' }],
+		fonts: [{ family: 'Studio Sans', source: 'local', ref: 'font:studio-sans' }]
+	} as unknown as Design;
+
+	it('swaps every use, ignoring case, and the font list with it', () => {
+		const next = replaceFamily(design, 'Studio Sans', { family: 'Inter', source: 'google' });
+		expect(next.defaults.font).toBe('Inter');
+		expect(next.boxes.map((b) => b.font)).toEqual(['Inter', 'Lora']);
+		expect(next.fonts).toEqual([{ family: 'Inter', source: 'google' }]);
+	});
+
+	it('leaves a design that never names it alone', () => {
+		expect(replaceFamily(design, 'Nothing', { family: 'Inter', source: 'google' })).toBe(design);
 	});
 });

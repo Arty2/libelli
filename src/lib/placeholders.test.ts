@@ -344,3 +344,11 @@ describe('a lookup into another row', () => {
 		expect(placeholderChoices('lookup:3:', ['title'])).toEqual(['lookup:3:title']);
 	});
 });
+
+describe('%%toc:…%%', () => {
+	it('counts its column as used, and is offered as toc: and a column', () => {
+		expect(referencedColumns('%%toc:title%%', ['title', 'body'])).toEqual(['title']);
+		expect(placeholderChoices('toc:ti', ['title', 'body'])).toEqual(['toc:title']);
+		expect(isKeyword('toc')).toBe(true);
+	});
+});

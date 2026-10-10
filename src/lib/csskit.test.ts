@@ -67,3 +67,14 @@ describe('cardVars', () => {
 		expect(Object.fromEntries(cardVars(t))['--text-color']).toBe('#1c1b19');
 	});
 });
+
+describe('the areas in the Starter sheet', () => {
+	it('gives each at the point the bar and the file give, and names it when it is not the top-left', () => {
+		const t = starterTemplate();
+		const right = { ...t.boxes[0], slot: 'price', align: 'right' as const, valign: 'bottom' as const, x: 10, y: 20, w: 40, h: 10 };
+		const left = { ...t.boxes[0], id: 'b_other', slot: 'name', align: 'left' as const, valign: 'top' as const, x: 10, y: 20, w: 40, h: 10 };
+		const kit = cssKit({ ...t, boxes: [right, left] });
+		expect(kit).toMatch(/#price \{ \}.*50 30 \(bottom right\), 40 × 10/);
+		expect(kit).toMatch(/#name \{ \}.*10 20, 40 × 10/);
+	});
+});

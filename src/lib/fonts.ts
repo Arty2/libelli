@@ -1,5 +1,5 @@
-import { STORE_FONTS, idbGet, idbKeys, idbSet, local } from './storage';
-import type { FontRef, Template } from './types';
+import { STORE_FONTS, idbDelete, idbGet, idbKeys, idbSet, local } from './storage';
+import { FONT_KINDS, type FontKind, type FontRef, type Template } from './types';
 
 /**
  * Font loading. Google families come in as a stylesheet `<link>`; local files
@@ -30,8 +30,223 @@ export const CURATED_GOOGLE_FONTS = [
 	'JetBrains Mono'
 ];
 
+/**
+ * Faces nearly every computer already has, offered beside the Google ones:
+ * nothing to fetch and nothing to upload. Never asked of Google
+ * (`ensureGoogleFont` refuses them), never declared in a template's fonts
+ * (`fontRef`). The Pictures tray lists them, to be replaced like any other, but
+ * offers no upload: a design moved elsewhere finds them there, or falls back
+ * as any page does without a face.
+ */
+export const SYSTEM_FONTS = ['Arial', 'Courier New', 'Consolas', 'Georgia', 'Times New Roman', 'Verdana'];
+
+const systemKeys = new Set(SYSTEM_FONTS.map((f) => f.toLowerCase()));
+/** Whether a family is one of `SYSTEM_FONTS`, ignoring case as every font lookup here does. */
+export const isSystemFamily = (family: string) => systemKeys.has(family.trim().toLowerCase());
+
+/**
+ * What a family chosen in a menu is, for the template's list of fonts: an
+ * upload this browser holds keeps its file reference, a system face is a
+ * system face, and any other name is asked of Google.
+ */
+export function fontRef(family: string, editorFonts: FontRef[]): FontRef {
+	const known = editorFonts.find((f) => f.family.toLowerCase() === family.toLowerCase());
+	if (known) return untuned(known);
+	return isSystemFamily(family) ? { family, source: 'system' } : { family, source: 'google' };
+}
+
 export const SYSTEM_FONT_STACK =
 	'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+/**
+ * What kind of face each family the app offers is, for the fallback after
+ * it: the curated Google families, the system faces, and the starter's own.
+ * An upload says what it is itself (`fontKindOf`), and the template keeps
+ * that; a family named here is never asked about. Anything else is
+ * sans-serif, as a page's fallback always was.
+ */
+const KNOWN_KINDS: Record<string, FontKind> = Object.fromEntries(
+	(
+		[
+			['serif', ['Lora', 'Playfair Display', 'EB Garamond', 'Spectral', 'Fraunces', 'Georgia', 'Times New Roman']],
+			['monospace', ['Space Mono', 'IBM Plex Mono', 'Courier Prime', 'JetBrains Mono', 'Courier New', 'Consolas']],
+			['handwriting', ['Patrick Hand', 'Caveat', 'Kalam']],
+			[
+				'sans-serif',
+				['Inter', 'Work Sans', 'Source Sans 3', 'IBM Plex Sans', 'Libre Franklin', 'Karla', 'Archivo', 'Bebas Neue',
+					'Instrument Sans', 'Ysabeau Office', 'Arial', 'Verdana']
+			]
+		] as [FontKind, string[]][]
+	).flatMap(([kind, families]) => families.map((family) => [family.toLowerCase(), kind]))
+);
+
+/**
+ * The stack after a face, by its kind: what the browser reaches for when the
+ * face is not there — a design opened where an upload was not brought, or a
+ * system face this computer has not got. A serif falls back to a serif, a
+ * monospace to a monospace, so a price list still lines up.
+ */
+const FALLBACKS: Record<FontKind, string> = {
+	serif: 'ui-serif, Georgia, "Times New Roman", serif',
+	'sans-serif': SYSTEM_FONT_STACK,
+	monospace: 'ui-monospace, Consolas, "Courier New", monospace',
+	handwriting: 'cursive'
+};
+
+/**
+ * A family's kind, for its fallback: the one chosen for it in the Pictures tray
+ * (`fallback`), else the one read off its file (`kind`), else what the app
+ * knows; undefined when none says.
+ */
+export function kindOf(fonts: readonly FontRef[], family: string | undefined): FontKind | undefined {
+	if (!family) return undefined;
+	const key = family.trim().toLowerCase();
+	const entry = fonts.find((f) => f.family.toLowerCase() === key);
+	return entry?.fallback ?? entry?.kind ?? KNOWN_KINDS[key];
+}
+
+/** What Auto means for a family: its file's kind, else the app's — never the chosen one. */
+export function detectedKindOf(fonts: readonly FontRef[], family: string): FontKind | undefined {
+	const key = family.trim().toLowerCase();
+	return fonts.find((f) => f.family.toLowerCase() === key)?.kind ?? KNOWN_KINDS[key];
+}
+
+/** What the Pictures tray changes about a face: the kind its fallback is chosen by. */
+export interface FontTune {
+	/** the kind chosen for its fallback; undefined is Auto */
+	fallback?: FontKind;
+}
+
+/**
+ * The template with `family`'s fallback kind chosen, or put back to Auto.
+ * Kept on the family's entry in the template's fonts; a family with no entry
+ * yet (a system face, an undeclared name) gets one from `base`, as a menu
+ * would have made it.
+ */
+export function tuneFont<T extends Pick<Template, 'fonts'>>(template: T, family: string, change: FontTune, base: FontRef): T {
+	const key = family.toLowerCase();
+	const at = template.fonts.findIndex((f) => f.family.toLowerCase() === key);
+	const fit = (ref: FontRef): FontRef => {
+		const next: FontRef = { ...ref };
+		if ('fallback' in change) {
+			if (change.fallback && FONT_KINDS.includes(change.fallback)) next.fallback = change.fallback;
+			else delete next.fallback;
+		}
+		return next;
+	};
+	if (at >= 0) return { ...template, fonts: template.fonts.map((f, i) => (i === at ? fit(f) : f)) };
+	const made = fit({ ...base, family });
+	return made.fallback ? { ...template, fonts: [...template.fonts, made] } : template;
+}
+
+/**
+ * Call `onchange` whenever the document's faces may have changed — a face
+ * finished loading, or a Google stylesheet arrived (which adds its faces
+ * without loading any) — and once more a moment after start, for what was
+ * already on its way. For what is read off the faces: the weights a family
+ * has, a face's own x-height. Returns the way to stop.
+ */
+export function watchFaces(onchange: () => void): () => void {
+	if (typeof document === 'undefined' || !document.fonts) return () => {};
+	document.fonts.addEventListener('loadingdone', onchange);
+	const observer = new MutationObserver(onchange);
+	observer.observe(document.head, { childList: true });
+	const late = setTimeout(onchange, 1500);
+	return () => {
+		document.fonts.removeEventListener('loadingdone', onchange);
+		observer.disconnect();
+		clearTimeout(late);
+	};
+}
+
+const measured = new Map<string, number>();
+/**
+ * A face's own x-height, as a fraction of its size: the top of a lowercase x
+ * above the baseline, measured on a canvas in the face as this document has
+ * it. What X-Height shows while it is not set, and where its steps start.
+ * Remembered once the face itself is loaded; until then — the fallback
+ * standing in — it is measured each time and not kept. Undefined outside a
+ * browser, or where nothing can be measured.
+ */
+export function naturalXHeight(family: string | undefined): number | undefined {
+	const name = safeFamily(family);
+	if (!name || typeof document === 'undefined') return undefined;
+	const key = name.toLowerCase();
+	const known = measured.get(key);
+	if (known !== undefined) return known;
+	const context = document.createElement('canvas').getContext('2d');
+	if (!context) return undefined;
+	context.font = `100px "${name}", ${FALLBACKS['sans-serif']}`;
+	const ascent = context.measureText('x').actualBoundingBoxAscent;
+	if (!(ascent > 0)) return undefined;
+	const value = Math.round(ascent) / 100;
+	if (document.fonts.check(`100px "${name}"`)) measured.set(key, value);
+	return value;
+}
+
+/**
+ * Which kind of face a font file holds, read from its own tables — the way a
+ * type foundry files it, so no guess from how it looks. `post.isFixedPitch`
+ * or a monospaced PANOSE says monospace; the OS/2 IBM family class says
+ * serif, sans-serif or script; failing that, PANOSE's serif style. Plain
+ * TrueType and OpenType (`sfnt`) and WOFF (zlib, `DecompressionStream`); a
+ * WOFF2 is Brotli, which browsers will not decompress for a page, so it — and
+ * a file that says nothing — gives null, and the fallback stays sans-serif.
+ */
+export async function fontKindOf(bytes: ArrayBuffer): Promise<FontKind | null> {
+	const view = new DataView(bytes);
+	if (view.byteLength < 12) return null;
+	const tag = (at: number) => String.fromCharCode(view.getUint8(at), view.getUint8(at + 1), view.getUint8(at + 2), view.getUint8(at + 3));
+	const tables = new Map<string, DataView>();
+	if (tag(0) === 'wOFF') {
+		const count = view.getUint16(12);
+		for (let i = 0; i < count; i++) {
+			const at = 44 + i * 20;
+			const name = tag(at);
+			if (name !== 'OS/2' && name !== 'post') continue;
+			const offset = view.getUint32(at + 4);
+			const length = view.getUint32(at + 8);
+			const original = view.getUint32(at + 12);
+			const raw = bytes.slice(offset, offset + length);
+			tables.set(name, new DataView(length < original ? await inflate(raw) : raw));
+		}
+	} else {
+		const version = view.getUint32(0);
+		if (version !== 0x00010000 && tag(0) !== 'OTTO' && tag(0) !== 'true') return null;
+		const count = view.getUint16(4);
+		for (let i = 0; i < count; i++) {
+			const at = 12 + i * 16;
+			const name = tag(at);
+			if (name !== 'OS/2' && name !== 'post') continue;
+			tables.set(name, new DataView(bytes, view.getUint32(at + 8), view.getUint32(at + 12)));
+		}
+	}
+	return kindFromTables(tables.get('OS/2'), tables.get('post'));
+}
+
+async function inflate(raw: ArrayBuffer): Promise<ArrayBuffer> {
+	const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate'));
+	return new Response(stream).arrayBuffer();
+}
+
+/** The kind from a font's OS/2 and post tables — see `fontKindOf`. */
+export function kindFromTables(os2: DataView | undefined, post: DataView | undefined): FontKind | null {
+	if (post && post.byteLength >= 16 && post.getUint32(12) !== 0) return 'monospace';
+	if (!os2 || os2.byteLength < 42) return null;
+	const familyClass = os2.getUint8(30);
+	const panose = (i: number) => os2.getUint8(32 + i);
+	// PANOSE, Latin text: proportion 9 is monospaced.
+	if (panose(0) === 2 && panose(3) === 9) return 'monospace';
+	if (familyClass === 10 || panose(0) === 3) return 'handwriting';
+	if (familyClass === 8) return 'sans-serif';
+	if ([1, 2, 3, 4, 5, 7].includes(familyClass)) return 'serif';
+	if (panose(0) === 2) {
+		const serifStyle = panose(1);
+		if (serifStyle >= 11 && serifStyle <= 13) return 'sans-serif';
+		if (serifStyle >= 2 && serifStyle <= 10) return 'serif';
+	}
+	return null;
+}
 
 export interface StoredFont {
 	family: string;
@@ -72,7 +287,9 @@ export function ensureGoogleFont(family: string): void {
 	// Only a name that is safe to put in a stylesheet is safe to put in a URL.
 	const name = safeFamily(family);
 	const key = name.toLowerCase();
-	if (!key || loadedGoogle.has(key)) return;
+	// A system face is already here, and Google would only answer with a
+	// stylesheet for a different face of the same name, or none.
+	if (!key || loadedGoogle.has(key) || isSystemFamily(name)) return;
 	loadedGoogle.add(key);
 
 	// Start from the request that worked for this family last time, so a
@@ -191,26 +408,39 @@ export function pruneFonts<T extends Pick<Template, 'defaults' | 'boxes' | 'font
 }
 
 /**
- * What a font menu offers, in two runs: the families this template uses, then
- * under a rule everything else this browser knows — fonts uploaded or named
- * here before, and the curated list.
+ * What a font menu offers, by where a face comes from: the files uploaded to
+ * this browser first — the faces somebody went to the trouble of bringing —
+ * then Google's families (the curated list, and any other name this browser
+ * or this design has asked for), then the system faces. Each run by name,
+ * one entry per family, matched ignoring case. A local file named in the
+ * design but missing here is still listed as local: that is what it is.
  */
 export function fontChoices(
 	template: Pick<Template, 'defaults' | 'boxes' | 'fonts'>,
 	editorFonts: FontRef[]
-): { used: string[]; others: string[] } {
+): { local: string[]; google: string[]; system: string[] } {
 	const byName = (a: string, b: string) => a.localeCompare(b);
-	const used = familiesUsed(template);
-	const spelled = new Map<string, string>();
-	for (const family of [...template.fonts.map((f) => f.family), template.defaults.font, ...template.boxes.map((b) => b.font)]) {
-		if (family && used.has(family.toLowerCase()) && !spelled.has(family.toLowerCase())) spelled.set(family.toLowerCase(), family);
-	}
-	const others = new Map<string, string>();
-	for (const family of [...editorFonts.map((f) => f.family), ...CURATED_GOOGLE_FONTS]) {
-		const key = family.toLowerCase();
-		if (!used.has(key) && !others.has(key)) others.set(key, family);
-	}
-	return { used: [...spelled.values()].sort(byName), others: [...others.values()].sort(byName) };
+	const seen = new Set<string>();
+	const run = (families: (string | undefined)[]) => {
+		const out: string[] = [];
+		for (const family of families) {
+			const key = family?.trim().toLowerCase();
+			if (!family || !key || seen.has(key)) continue;
+			seen.add(key);
+			out.push(family);
+		}
+		return out.sort(byName);
+	};
+	const declared = [...editorFonts, ...template.fonts];
+	const local = run(declared.filter((f) => f.source === 'local').map((f) => f.family));
+	const system = run([...SYSTEM_FONTS, ...declared.filter((f) => f.source === 'system').map((f) => f.family)]);
+	const google = run([
+		...CURATED_GOOGLE_FONTS,
+		...declared.filter((f) => f.source === 'google').map((f) => f.family),
+		template.defaults.font,
+		...template.boxes.map((b) => b.font)
+	]);
+	return { local, google, system };
 }
 
 /**
@@ -218,9 +448,26 @@ export function fontChoices(
  * wins, so a family uploaded as a file replaces the Google name it shadowed.
  */
 export function mergeFonts(list: FontRef[], added: FontRef[]): FontRef[] {
-	const out = new Map(list.map((f) => [f.family.toLowerCase(), f]));
-	for (const font of added) out.set(font.family.toLowerCase(), font);
+	const out = new Map(list.map((f) => [f.family.toLowerCase(), untuned(f)]));
+	for (const font of added) out.set(font.family.toLowerCase(), untuned(font));
 	return [...out.values()];
+}
+
+/** A design's choice about a face, and nothing else: what `untuned` takes away. */
+export function tuningOf(ref: FontRef | undefined): Partial<FontRef> {
+	return ref?.fallback ? { fallback: ref.fallback } : {};
+}
+
+/**
+ * A reference without one design's choice about it. The editor's own list of
+ * fonts is this browser's, shared by every design in it: a face called a
+ * serif in one design and then dropped from it must not come back so in
+ * another. What the face is — its source, its file, its kind — travels; what
+ * one design said of it does not.
+ */
+export function untuned(ref: FontRef): FontRef {
+	const { fallback: _f, ...rest } = ref;
+	return rest;
 }
 
 /**
@@ -253,6 +500,21 @@ export async function installFontBytes(ref: string, family: string, bytes: Array
 	if (typeof document === 'undefined') return;
 	const face = new FontFace(family, bytes.slice(0));
 	await face.load();
+	// A file chosen for a family already drawn — a Google one, or an earlier
+	// upload — replaces it: the faces the page had for that name go, or the
+	// browser would go on matching whichever it found first. A Google family's
+	// faces belong to its stylesheet and cannot be deleted one by one, so the
+	// stylesheet goes, and the family is no longer counted as fetched.
+	const name = family.toLowerCase();
+	document.querySelectorAll<HTMLLinkElement>('link[data-font-family]').forEach((link) => {
+		if (link.dataset.fontFamily?.toLowerCase() === name) link.remove();
+	});
+	loadedGoogle.delete(name);
+	const stale: FontFace[] = [];
+	document.fonts.forEach((old) => {
+		if (old.family.replace(/^["']|["']$/g, '').toLowerCase() === name) stale.push(old);
+	});
+	for (const old of stale) document.fonts.delete(old);
 	document.fonts.add(face);
 	loadedLocal.add(ref);
 	await idbSet(STORE_FONTS, ref, { family, format, bytes } satisfies StoredFont);
@@ -263,7 +525,10 @@ export async function uploadLocalFont(file: File, familyOverride?: string): Prom
 	const ref = `font:${family.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 	const bytes = await file.arrayBuffer();
 	await installFontBytes(ref, family, bytes, formatFor(file.name));
-	return { family, source: 'local', ref };
+	// Read once, as it arrives, and kept with the font in the template: on a
+	// computer without the file, the fallback is of the same kind.
+	const kind = await fontKindOf(bytes).catch(() => null);
+	return { family, source: 'local', ref, ...(kind ? { kind } : {}) };
 }
 
 export async function storedFontRefs(): Promise<Set<string>> {
@@ -324,10 +589,15 @@ export function safeFamily(family: string | undefined): string {
 	return /^[A-Za-z0-9 ._'-]+$/.test(name) ? name : '';
 }
 
-export function fontStack(family: string | undefined, fallback: string): string {
-	const name = safeFamily(family) || safeFamily(fallback);
-	if (!name) return SYSTEM_FONT_STACK;
-	return `"${name}", ${SYSTEM_FONT_STACK}`;
+/**
+ * A face's CSS stack: its name, then the fallback for its kind (`FALLBACKS`;
+ * sans-serif when the kind is not known). A name that is not safe to write
+ * into a style is left out, and the fallback stands alone.
+ */
+export function fontStack(family: string | undefined, kind?: FontKind | ''): string {
+	const fallback = FALLBACKS[kind || 'sans-serif'];
+	const name = safeFamily(family);
+	return name ? `"${name}", ${fallback}` : fallback;
 }
 
 /**
@@ -344,4 +614,147 @@ export function previewFamilies(families: string[], editorFonts: FontRef[], decl
 		[...editorFonts, ...declared].filter((f) => f.source !== 'google').map((f) => f.family.toLowerCase())
 	);
 	for (const family of families) if (!local.has(family.toLowerCase())) ensureGoogleFont(family);
+}
+
+// ---- the fonts a design carries, and repairing one -------------------------
+
+/** A font uploaded to this browser, as the Pictures tray lists it. */
+export interface StoredFontEntry {
+	ref: string;
+	family: string;
+	/** bytes the file takes in this browser */
+	bytes: number;
+}
+
+/** Every font uploaded to this browser, by family. */
+export async function listStoredFonts(): Promise<StoredFontEntry[]> {
+	const out: StoredFontEntry[] = [];
+	for (const ref of await idbKeys(STORE_FONTS)) {
+		const stored = await idbGet<StoredFont>(STORE_FONTS, ref);
+		if (stored?.family) out.push({ ref, family: stored.family, bytes: stored.bytes?.byteLength ?? 0 });
+	}
+	return out.sort((a, b) => a.family.localeCompare(b.family));
+}
+
+/**
+ * Forget an uploaded font: its bytes, and the face this page registered. Only
+ * offered for a font nothing on this design is set in — a font in use would
+ * turn missing under the person deleting it.
+ */
+export async function deleteStoredFont(ref: string, family: string): Promise<void> {
+	await idbDelete(STORE_FONTS, ref);
+	loadedLocal.delete(ref);
+	if (typeof document === 'undefined' || !document.fonts) return;
+	const name = family.toLowerCase();
+	const doomed: FontFace[] = [];
+	document.fonts.forEach((face) => {
+		if (face.family.replace(/^["']|["']$/g, '').toLowerCase() === name) doomed.push(face);
+	});
+	for (const face of doomed) document.fonts.delete(face);
+}
+
+/** Where a font a design names comes from, as far as this browser can tell. */
+export type FontStatus = 'uploaded' | 'google' | 'system' | 'missing' | 'unused';
+
+export interface FontEntry {
+	family: string;
+	status: FontStatus;
+	/** set in by the page or an area of this design */
+	used: boolean;
+	/** for an uploaded one: its key, and what it weighs */
+	ref?: string;
+	bytes?: number;
+	/** its kind, for the fallback its name is drawn with — chosen, else detected; undefined when nobody knows */
+	kind?: FontKind;
+	/** what Auto is for it: its file's kind, else the app's */
+	detected?: FontKind;
+	/** the kind chosen for it in this design; absent is Auto */
+	fallback?: FontKind;
+}
+
+/**
+ * Every font this design names, and every font this browser holds, as one
+ * list: what each is, whether the design is set in it, and — the reason the
+ * list exists — which the design needs and this browser has not got. A design
+ * carries font names, never files; moved to another computer, an uploaded
+ * face is the one thing it cannot bring, and nothing is substituted for it.
+ *
+ * A declared upload this browser does not hold is `missing`; a family the
+ * design uses without declaring it, and not uploaded, is asked of Google as
+ * the editor does (`ensureTemplateFonts`), so `google`; one of the system
+ * faces is `system` — listed so the list is every face the design is set in,
+ * each one replaceable, though there is no file to give it. Uploads nothing
+ * here uses are listed last, as `unused`, to be deleted. Used ones first,
+ * then by name.
+ */
+export function fontInventory(
+	template: Pick<Template, 'defaults' | 'boxes' | 'fonts'>,
+	stored: StoredFontEntry[]
+): FontEntry[] {
+	const used = familiesUsed(template);
+	const storedBy = new Map(stored.map((f) => [f.family.toLowerCase(), f]));
+	const entries = new Map<string, FontEntry>();
+	const add = (entry: Omit<FontEntry, 'kind' | 'detected' | 'fallback'>) => {
+		const key = entry.family.toLowerCase();
+		if (entries.has(key)) return;
+		const kind = kindOf(template.fonts, entry.family);
+		const detected = detectedKindOf(template.fonts, entry.family);
+		const fallback = template.fonts.find((f) => f.family.toLowerCase() === key)?.fallback;
+		entries.set(key, { ...entry, ...(kind ? { kind } : {}), ...(detected ? { detected } : {}), ...(fallback ? { fallback } : {}) });
+	};
+	for (const font of template.fonts) {
+		const key = font.family.toLowerCase();
+		const held = storedBy.get(key);
+		if (font.source === 'local') {
+			add(
+				held
+					? { family: font.family, status: 'uploaded', used: used.has(key), ref: held.ref, bytes: held.bytes }
+					: { family: font.family, status: 'missing', used: used.has(key), ref: font.ref }
+			);
+		} else if (font.source === 'google') add({ family: font.family, status: 'google', used: used.has(key) });
+		else add({ family: font.family, status: 'system', used: used.has(key) });
+	}
+	const declaredSystem = new Set(template.fonts.filter((f) => f.source === 'system').map((f) => f.family.toLowerCase()));
+	for (const family of [template.defaults.font, ...template.boxes.map((b) => b.font)]) {
+		if (!family) continue;
+		const held = storedBy.get(family.toLowerCase());
+		// Listed, so the list is every face the design is set in and any can
+		// be replaced; but there is no file to give one, and nothing to fetch.
+		if (!held && (isSystemFamily(family) || declaredSystem.has(family.toLowerCase()))) {
+			add({ family, status: 'system', used: true });
+			continue;
+		}
+		add(held ? { family, status: 'uploaded', used: true, ref: held.ref, bytes: held.bytes } : { family, status: 'google', used: true });
+	}
+	for (const held of stored) add({ family: held.family, status: 'unused', used: false, ref: held.ref, bytes: held.bytes });
+	return [...entries.values()].sort((a, b) => Number(b.used) - Number(a.used) || a.family.localeCompare(b.family));
+}
+
+/**
+ * Every use of one family swapped for another — the page's face, each area's
+ * own, and the template's list of fonts — for a design that names a face this
+ * browser cannot have. `to` says where the new one comes from: uploaded here,
+ * or Google's. Matched ignoring case, as every font lookup here is. Returns the
+ * same template when nothing names `from`.
+ */
+export function replaceFamily<T extends Pick<Template, 'defaults' | 'boxes' | 'fonts'>>(template: T, from: string, to: FontRef): T {
+	const key = from.toLowerCase();
+	const swap = (family: string | undefined) => (family && family.toLowerCase() === key ? to.family : family);
+	const touched =
+		template.defaults.font?.toLowerCase() === key ||
+		template.boxes.some((b) => b.font?.toLowerCase() === key) ||
+		template.fonts.some((f) => f.family.toLowerCase() === key);
+	if (!touched) return template;
+	// The new face's own entry, where it has one, keeps what it carries — its
+	// x-height, its kind — over the bare reference a menu made.
+	const toKey = to.family.toLowerCase();
+	const existing = template.fonts.find((f) => f.family.toLowerCase() === toKey);
+	const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== key && f.family.toLowerCase() !== toKey);
+	const entry = existing ?? (to.source === 'system' ? null : to);
+	return {
+		...template,
+		defaults: { ...template.defaults, font: swap(template.defaults.font) },
+		boxes: template.boxes.map((b) => (b.font?.toLowerCase() === key ? { ...b, font: to.family } : b)),
+		fonts: entry ? [...fonts, entry] : fonts
+	};
 }

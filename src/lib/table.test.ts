@@ -6,12 +6,14 @@ import {
 	deleteRows,
 	dropTarget,
 	inArrivalOrder,
+	runOf,
 	indexAfterSort,
 	moveColumn,
 	moveRows,
 	moveRowsTo,
 	orderOf,
 	renumbering,
+	numberIn,
 	rowNumber,
 	sortRows,
 	unsortRows,
@@ -163,6 +165,9 @@ describe('row numbers and the arrival order', () => {
 		expect(twice.rows).toEqual([c, b, a]);
 		expect(twice.order).toEqual([1, 0, 2]);
 		expect([0, 1, 2].map((i) => rowNumber(twice, i))).toEqual([2, 1, 3]);
+		// The table's labels, from the order checked once, say the same.
+		expect([0, 1, 2].map((i) => numberIn(orderOf(twice), i))).toEqual([2, 1, 3]);
+		expect(numberIn(null, 4)).toBe(5);
 	});
 
 	it('leaves no order on a table that stands where it arrived', () => {
@@ -215,5 +220,15 @@ describe('row numbers and the arrival order', () => {
 				[2, 3]
 			])
 		);
+	});
+});
+
+describe('runOf', () => {
+	it('finds the order the rows print in from the arrival-ordered list made of them', () => {
+		const dataset = { columns: ['n'], rows: [{ n: 'b' }, { n: 'a' }] };
+		const arrival = inArrivalOrder(dataset);
+		expect(runOf(arrival)).toBe(dataset.rows);
+		expect(runOf([...arrival])).toBeUndefined();
+		expect(runOf(undefined)).toBeUndefined();
 	});
 });

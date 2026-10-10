@@ -44,12 +44,20 @@ describe('the built-in template', () => {
 	it('loads with its boxes, anchors and bleed intact', () => {
 		expect(template.name).toBe('A5 Starter Booklet');
 		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff', margin: { top: 11, right: 14, bottom: 8, left: 14 } });
-		expect(template.boxes.map((b) => b.id)).toEqual(['b_accent', 'b_category', 'b_title', 'b_subtitle', 'b_body', 'b_sketch', 'b_link', 'b_date', 'b_qr', 'b_notes']);
+		expect(template.boxes.map((b) => b.id)).toEqual(['b_accent', 'b_category', 'b_title', 'b_subtitle', 'b_body', 'b_sketch', 'b_link', 'b_date', 'b_qr', 'b_isbn', 'b_notes']);
 		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 6 });
 		expect(template.boxes.find((b) => b.id === 'b_title')?.anchor).toEqual({ to: 'b_category', gap: 5 });
 		expect(template.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });
 		// Printed as it says on card 4: two to an A4 sheet, in a zine's order.
 		expect(template.print).toMatchObject({ enabled: true, count: 2, order: 'zine', sheet: { w: 210, h: 297 } });
+	});
+
+	it('shows a barcode and a contents list, as card 4 says', () => {
+		// The ISBN row is drawn as the EAN-13 every book carries, with its digits.
+		expect(template.boxes.find((b) => b.id === 'b_isbn')).toMatchObject({ slot: 'isbn', mode: 'qr', qr: { kind: 'ean13' } });
+		expect(template.boxes.find((b) => b.id === 'b_isbn')?.qr?.hideDigits).toBeUndefined();
+		// The contents' page numbers are joined to the titles by dots.
+		expect(template.boxes.find((b) => b.id === 'b_body')?.leader).toBe('dotted');
 	});
 
 	it('keeps the markdown metrics on the body box', () => {
@@ -463,6 +471,16 @@ describe('newBox blending', () => {
 	});
 });
 
+describe('newBox x-height', () => {
+	it('keeps an x-height in range, to the hundredth, beside the page\'s size only', () => {
+		expect(newBox({ xHeight: 0.524 }).xHeight).toBe(0.52);
+		expect(newBox({ xHeight: 1.06 }).xHeight).toBeUndefined();
+		expect(newBox({ xHeight: 'big' as never }).xHeight).toBeUndefined();
+		// A size of its own is the area's answer; the x-height goes.
+		expect(newBox({ xHeight: 0.5, size: 12 }).xHeight).toBeUndefined();
+	});
+});
+
 describe('newBox opacity', () => {
 	it('keeps a value between 0 and 1, to the nearest hundredth', () => {
 		expect(newBox({ opacity: 0.5 }).opacity).toBe(0.5);
@@ -580,6 +598,8 @@ describe('list style and baseline', () => {
 	it('keeps only the list fields that make sense', () => {
 		expect(normaliseList({ marker: 'dash', indent: '4', leading: 0.1 })).toEqual({ marker: 'dash', indent: 4, leading: MIN_LEADING });
 		expect(normaliseList({ marker: 'arrow', leading: '1.25' })).toEqual({ marker: 'arrow', leading: 1.25 });
+		expect(normaliseList({ numbering: 'upperRoman' })).toEqual({ numbering: 'upperRoman' });
+		expect(normaliseList({ numbering: 'hebrew' })).toBeUndefined();
 		// The spacing a list briefly had is not carried: it does not convert.
 		expect(normaliseList({ spacing: 2 })).toBeUndefined();
 		expect(normaliseList({ marker: 'star', indent: 'x' })).toBeUndefined();

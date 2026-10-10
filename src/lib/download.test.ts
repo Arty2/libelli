@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pageFilename, slugify } from './download';
+import { fileStem, pageFilename, slugify } from './download';
 
 describe('slugify', () => {
 	it('makes a filename stem out of a human name', () => {
@@ -34,5 +34,20 @@ describe('pageFilename', () => {
 
 	it('separates with an underscore, because a slug may carry hyphens', () => {
 		expect(pageFilename('a5-instruction-card', 2, 4, 'png')).toBe('a5-instruction-card_2.png');
+	});
+});
+
+describe('fileStem', () => {
+	it('keeps the name as written, spaces as dashes', () => {
+		expect(fileStem('A5 Starter Template')).toBe('A5-Starter-Template');
+		expect(fileStem('  Κάρτες   μαθήματος ')).toBe('Κάρτες-μαθήματος');
+		expect(fileStem('Herbs & Ferns')).toBe('Herbs-&-Ferns');
+	});
+
+	it('takes out only what a file system refuses, and never leaves nothing', () => {
+		expect(fileStem('a/b: c?')).toBe('a-b-c');
+		expect(fileStem('.hidden')).toBe('hidden');
+		expect(fileStem('  ')).toBe('untitled');
+		expect(fileStem('', 'Untitled table')).toBe('Untitled-table');
 	});
 });

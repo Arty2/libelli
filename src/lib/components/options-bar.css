@@ -642,14 +642,16 @@
    hint — the edges come from scrolledge.ts. Vertical only: the bars wrap, so
    they never scroll sideways. Over the fields, because a shadow drawn under
    them is covered by every opaque one; under the pickers' menus, which are
-   fixed at 30, and never in the way of a press. */
+   fixed at 30, and never in the way of a press. At 1, no higher: the tray is
+   at 1 too and comes later, so a menu opened from the tray — fixed, but
+   inside the tray's layer — is drawn over this shadow, not under it. */
 .bar-frame::before,
 .bar-frame::after {
 	content: '';
 	position: absolute;
 	left: 0;
 	right: 0;
-	z-index: 5;
+	z-index: 1;
 	height: 27px;
 	pointer-events: none;
 	opacity: 0;
