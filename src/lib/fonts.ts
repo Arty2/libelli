@@ -507,6 +507,13 @@ export function mergeFonts(list: FontRef[], added: FontRef[]): FontRef[] {
  * larger when another design chooses it. What the face is — its source, its
  * file, its kind — travels; what one design did with it does not.
  */
+/** A design's tuning of a face, and nothing else: what `untuned` takes away. */
+export function tuningOf(ref: FontRef | undefined): Partial<FontRef> {
+	if (!ref) return {};
+	const { xHeight, size, tracking, leading, fallback } = ref;
+	return Object.fromEntries(Object.entries({ xHeight, size, tracking, leading, fallback }).filter(([, v]) => v !== undefined));
+}
+
 export function untuned(ref: FontRef): FontRef {
 	const { xHeight: _x, size: _s, tracking: _t, leading: _l, fallback: _f, ...rest } = ref;
 	return rest;

@@ -36,6 +36,7 @@
 		replaceFamily,
 		tuneFont,
 		type FontTune,
+		tuningOf,
 		uploadLocalFont,
 		type FontEntry,
 		type StoredFontEntry
@@ -1228,9 +1229,22 @@
 	 * message. An area bound to no column has nowhere in the table to put it, so
 	 * it keeps the reference itself and the picture is the same on every card.
 	 */
+	/**
+	 * A picture stored from outside the Images tray — dropped on an area or on
+	 * the page. Under the file's own name, which may be one the page already
+	 * points at (a missing picture supplied, a second "image.png" pasted over
+	 * the first): the set of names is then unchanged, so `imagesVersion` says
+	 * the bytes are new, or the cards keep the old picture, or none.
+	 */
+	async function storeImage(file: File): Promise<string> {
+		const name = await storeLocalImage(file);
+		imagesVersion += 1;
+		return name;
+	}
+
 	async function handleImageDrop(box: Box, file: File) {
 		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
-		placeImage(box, await storeLocalImage(file));
+		placeImage(box, await storeImage(file));
 	}
 
 	/**
@@ -2967,9 +2981,11 @@
 			// The design's own entry keeps its tuning: a file supplied for a face
 			// that was missing, or a Google face made local, is the same face,
 			// and the design set it as it wanted.
+			// Its tuning only: what the old file said it was (`kind`) is the old
+			// file's, and the new one says for itself, or says nothing.
 			const old = template.fonts.find((f) => f.family.toLowerCase() === ref.family.toLowerCase());
 			const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== ref.family.toLowerCase());
-			template = { ...template, fonts: [...fonts, { ...old, ...ref }] };
+			template = { ...template, fonts: [...fonts, { ...ref, ...tuningOf(old) }] };
 			missingFonts = missingFonts.filter((f) => (f.ref ?? f.family) !== (ref.ref ?? ref.family));
 			await refreshStoredFonts();
 			// Uploading from a box's Font dropdown is a way of choosing a font, not
@@ -3498,7 +3514,7 @@
 			onselect={selectBox}
 			onchange={updateBox}
 			onimagedrop={(box, file) => void handleImageDrop(box, file)}
-			onimagepagedrop={(file, x, y) => void (async () => placeImageOnPage(await storeLocalImage(file), x, y, file))()}
+			onimagepagedrop={(file, x, y) => void (async () => placeImageOnPage(await storeImage(file), x, y, file))()}
 			onaction={describe}
 			onbounds={(show, ties) => (ui = { ...ui, showBounds: show, showTies: ties })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}

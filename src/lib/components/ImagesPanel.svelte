@@ -1005,7 +1005,8 @@
 										{ value: '', label: `Auto (${KIND_NAMES[font.detected ?? 'sans-serif']})` },
 										{ value: 'serif', label: KIND_NAMES.serif },
 										{ value: 'sans-serif', label: KIND_NAMES['sans-serif'] },
-										{ value: 'monospace', label: KIND_NAMES.monospace }
+										{ value: 'monospace', label: KIND_NAMES.monospace },
+										{ value: 'handwriting', label: KIND_NAMES.handwriting }
 									]}
 									onselect={(kind) => ontune?.(font.family, { fallback: (kind || undefined) as FontKind | undefined })}
 								/>

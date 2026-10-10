@@ -13,6 +13,7 @@ import {
 	pruneFonts,
 	replaceFamily,
 	tuneFont,
+	tuningOf,
 	weightsOf
 } from './fonts';
 import type { FontRef, Template } from './types';
@@ -105,6 +106,15 @@ describe('a face on a card', () => {
 		expect(georgia.fonts).toEqual([{ family: 'Georgia', source: 'system', fallback: 'sans-serif' }]);
 		// A design's choice does not travel into the editor's list.
 		expect(mergeFonts([], fonts)).toEqual([{ family: 'Studio', source: 'local', kind: 'sans-serif' }]);
+	});
+
+	it('carries a design\'s tuning across a new file, and nothing the old file said', () => {
+		const old: FontRef = { family: 'Brand', source: 'local', ref: 'font:brand', kind: 'serif', size: 1.1, fallback: 'monospace' };
+		expect(tuningOf(old)).toEqual({ size: 1.1, fallback: 'monospace' });
+		expect(tuningOf(undefined)).toEqual({});
+		// A new upload that names no kind does not inherit the old file's.
+		const next = { ...{ family: 'Brand', source: 'local' as const, ref: 'font:brand' }, ...tuningOf(old) };
+		expect(next).not.toHaveProperty('kind');
 	});
 
 	it('keeps the replacement\'s own x-height when a font is replaced with it', () => {
