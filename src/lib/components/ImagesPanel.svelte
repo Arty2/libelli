@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
+	import { parseColor } from '$lib/color';
 	import { armDefault } from '$lib/modal';
 	import { downloadUrl, slugify } from '$lib/download';
 	import { editableType, frameBetween, framePixels, isCrop, type Frame } from '$lib/photo';
@@ -70,6 +72,9 @@
 		onfontfile?: (family: string, file: File) => void;
 		/** every use of one family swapped for another */
 		onreplacefont?: (from: string, to: string) => void;
+		/** the page's paper and its type's color, for a font's sample: the face as the card shows it */
+		paper?: string;
+		ink?: string;
 		ondeletefont?: (font: FontEntry) => void;
 	}
 
@@ -89,8 +94,27 @@
 		fontOptions = { local: [], google: [] },
 		onfontfile,
 		onreplacefont,
-		ondeletefont
+		ondeletefont,
+		paper,
+		ink
 	}: Props = $props();
+
+	/** Through color.ts like every color bound for a style; the paper a page has when it names none. */
+	const sampleStyle = $derived(`background:${parseColor(paper ?? null) ?? '#ffffff'};color:${parseColor(ink ?? null) ?? '#222222'}`);
+
+	/**
+	 * What a font can be replaced with, as the app's own menu: the local files
+	 * (each in its own face, which this browser holds), then Google's families.
+	 */
+	const replaceItems = (family: string): MenuItem[] => {
+		const other = (f: string) => f.toLowerCase() !== family.toLowerCase();
+		const local = fontOptions.local.filter(other);
+		return [
+			...(local.length ? [{ heading: 'Local' }, ...local.map((f) => ({ value: f, label: f, family: f }))] : []),
+			{ heading: 'Google Fonts' },
+			...fontOptions.google.filter(other).map((f) => ({ value: f, label: f }))
+		];
+	};
 
 	/** The font a file is being chosen for: supplied under its own name, so the design finds it. */
 	let fontInput = $state<HTMLInputElement | null>(null);
@@ -747,7 +771,7 @@
 					<li class:missing={font.status === 'missing'} class:unused={font.status === 'unused'}>
 						<!-- A sample in the face itself: the quickest way to tell one font
 						     from another, and to see that a missing one is falling back. -->
-						<span class="thumb font-sample" style="font-family:{fontStack(font.family, 'serif')}" aria-hidden="true">Ag</span>
+						<span class="thumb font-sample" style="font-family:{fontStack(font.family, 'serif')};{sampleStyle}" aria-hidden="true">Ag</span>
 						<span class="name">{font.family}</span>
 						<span class="size">{font.bytes ? weigh(font.bytes) : ''}</span>
 						{#if FONT_STATUS[font.status]}
@@ -758,38 +782,24 @@
 						     another change — a missing face supplied, a Google one made
 						     local, an upload swapped for a newer cut. -->
 						<button
-							class="find"
-							title="Choose a font file to use as {font.family} — installed in this browser under this name, so everything set in it takes the file"
+							class="square save"
+							title="Upload a font file to use as {font.family} — installed in this browser under this name, so everything set in it takes the file"
+							aria-label="Upload a file for {font.family}"
 							onclick={() => chooseFontFile(font.family)}
 						>
-							<Icon name="font" size={13} /> Upload…
+							<Icon name="upload" size={12} />
 						</button>
 						{#if font.used}
-							<select
-								class="replace"
-								value=""
-								title="Set everything in {font.family} in another font instead"
-								aria-label="Replace {font.family} with"
-								onchange={(e) => {
-									const to = e.currentTarget.value;
-									e.currentTarget.value = '';
-									if (to) onreplacefont?.(font.family, to);
-								}}
-							>
-								<option value="">Replace…</option>
-								{#if fontOptions.local.some((f) => f.toLowerCase() !== font.family.toLowerCase())}
-									<optgroup label="Local">
-										{#each fontOptions.local.filter((f) => f.toLowerCase() !== font.family.toLowerCase()) as option (option)}
-											<option value={option}>{option}</option>
-										{/each}
-									</optgroup>
-								{/if}
-								<optgroup label="Google Fonts">
-									{#each fontOptions.google.filter((f) => f.toLowerCase() !== font.family.toLowerCase()) as option (option)}
-										<option value={option}>{option}</option>
-									{/each}
-								</optgroup>
-							</select>
+							<span class="replace">
+								<MenuSelect
+									label="Replace {font.family} with"
+									title="Set everything in {font.family} in another font instead"
+									placeholder="Replace…"
+									value=""
+									items={replaceItems(font.family)}
+									onselect={(to) => to && onreplacefont?.(font.family, to)}
+								/>
+							</span>
 						{:else if font.status === 'unused'}
 							<button
 								class="square"
@@ -1359,9 +1369,10 @@
 		color: var(--text, #222);
 	}
 
+	/* Wide enough for its word; the name before it gets the rest. */
 	.fonts .replace {
-		font-size: 0.75rem;
-		max-width: 9rem;
+		flex: none;
+		display: inline-flex;
 	}
 
 	.section {

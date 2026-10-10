@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	/** One choice in the menu, or a rule between runs of them. */
+	/** One choice in the menu, a rule between runs of them, or a run's heading. */
 	export type MenuItem =
 		| {
 				value: string;
@@ -9,7 +9,8 @@
 				title?: string;
 				disabled?: boolean;
 		  }
-		| { rule: true };
+		| { rule: true }
+		| { heading: string };
 </script>
 
 <script lang="ts">
@@ -52,6 +53,11 @@
 		 * Fit and the zoom before it.
 		 */
 		ondouble?: () => void;
+		/**
+		 * What the trigger says while the value is none of the choices: an
+		 * action rather than a setting — *Replace…* — whose value is never kept.
+		 */
+		placeholder?: string;
 	}
 
 	let {
@@ -64,7 +70,8 @@
 		onopen,
 		showFamily = false,
 		bare = false,
-		ondouble
+		ondouble,
+		placeholder
 	}: Props = $props();
 
 	let open = $state(false);
@@ -76,7 +83,7 @@
 		maxHeight: 320
 	});
 
-	const choices = $derived(items.filter((item): item is Extract<MenuItem, { value: string }> => !('rule' in item)));
+	const choices = $derived(items.filter((item): item is Extract<MenuItem, { value: string }> => 'value' in item));
 	const current = $derived(choices.find((item) => item.value === value));
 
 	function place() {
@@ -186,14 +193,14 @@
 		type="button"
 		aria-haspopup="menu"
 		aria-expanded={open}
-		aria-label="{label}: {current?.label ?? value}"
+		aria-label="{label}: {current?.label ?? placeholder ?? value}"
 		title={title ?? current?.title}
 		{disabled}
 		onclick={press}
 		onkeydown={onTriggerKey}
 	>
 		<span class="value" style={showFamily && current?.family ? `font-family:${fontStack(current.family, '')}` : ''}
-			>{current?.label ?? value}</span
+			>{current?.label ?? placeholder ?? value}</span
 		>
 		<Icon name="caret-down" size={18} />
 	</button>
@@ -211,6 +218,8 @@
 			{#each items as item, i (i)}
 				{#if 'rule' in item}
 					<li role="separator"><hr /></li>
+				{:else if 'heading' in item}
+					<li role="presentation" class="heading">{item.heading}</li>
 				{:else}
 					<li role="none">
 						<button
@@ -306,6 +315,15 @@
 		border: 1px solid #d5d5d5;
 		border-radius: 6px;
 		box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+	}
+
+	/* A run's name, quieter than its choices, as the bar's legends are. */
+	.menu .heading {
+		padding: 6px 8px 2px 30px;
+		font: 600 0.6875rem ui-sans-serif, system-ui, sans-serif;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: #666;
 	}
 
 	.menu button {

@@ -1261,11 +1261,12 @@ Pick a curated Google family, type any other family name, or upload a file.
 
 - **Fonts, in the Images tray** — every font the design is set in and every
   font file this browser holds, in one list under the pictures, each with a
-  sample in its own face. A design carries a font's name, never its file, so
+  sample in its own face, on the page's paper in the page's ink color. A design carries a font's name, never its file, so
   what is marked is what does not travel: **local** for a file kept in this
   browser, and **missing** for one a design moved from another computer needs
   and this browser has not got — said in a banner too, whose **Replace…** opens
-  this list. Every font, missing or not, has **Upload…** — a file installed
+  this list. Every font, missing or not, has an **upload** button (the arrow
+  out of a tray) — a file installed
   under that font's own name, so everything set in it takes the file: a missing
   face supplied, a Google family made local, an upload swapped for a newer cut
   — and every font the design uses has **Replace…**, which sets everything in that font in another instead,
