@@ -222,27 +222,33 @@ export function isDoubleTap(last: Tap | null, now: Tap): boolean {
 }
 
 /**
- * A double tap or a long press with a finger, as one "open this". Touch only:
+ * A second tap or a long press with a finger, as one "open this". Touch only:
  * a mouse has its double-click, and a held mouse button is a selection.
  *
  * For a table cell on a phone, where a single tap must not bring the
- * keyboard up — the cell is read-only to a finger, and this is the way in.
- * A long press that fires swallows the context menu Android follows it with,
- * and a finger that wanders is scrolling, not pressing. The lift that ends
- * either is cancelled (`touchend`, which stops the browser's own mouse events
- * and click): what was under the finger is the editor just opened, and the
- * second tap of a double tap landing there selected a word in it.
+ * keyboard up — the first tap chooses the cell (and places its caret), and
+ * this is the way in. A second tap is a tap on the node while it already has
+ * the focus, however long after the first: a person reads what they chose
+ * before deciding to type, and a double tap's few hundred milliseconds asked
+ * them to decide before they had looked. It opens on the tap's click, once
+ * the browser has moved the caret to where the second tap landed. A node a
+ * tap does not focus (a button, on iOS) still opens on a quick double tap.
  *
- * `onopen` is handed the node, so a cell can read the caret its first tap
- * left there.
+ * A long press that fires swallows the context menu Android follows it with,
+ * and its lift is cancelled (`touchend`, which stops the browser's own mouse
+ * events and click): what is under the finger is the editor just opened, and
+ * a click landing there would select a word in it. A finger that wanders is
+ * scrolling, not pressing.
  */
 export function touchOpen(node: HTMLElement, onopen: (node: HTMLElement) => void) {
 	let handler = onopen;
-	let press: { id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
+	let press: { id: number; x: number; y: number; focused: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
 	let last: Tap | null = null;
 	let held = false;
-	/** The lift that ends an open: its click would land on what it opened. */
+	/** The lift that ends a long press: its click would land on what it opened. */
 	let swallow = false;
+	/** A second tap has lifted: open on its click, after the caret has moved. */
+	let second = false;
 
 	const clear = () => {
 		if (press) clearTimeout(press.timer);
@@ -253,10 +259,13 @@ export function touchOpen(node: HTMLElement, onopen: (node: HTMLElement) => void
 		clear();
 		held = false;
 		swallow = false;
+		second = false;
 		press = {
 			id: event.pointerId,
 			x: event.clientX,
 			y: event.clientY,
+			// Read on the way down: the first tap's focus lands after its lift.
+			focused: document.activeElement === node,
 			timer: setTimeout(() => {
 				press = null;
 				held = true;
@@ -274,17 +283,23 @@ export function touchOpen(node: HTMLElement, onopen: (node: HTMLElement) => void
 	};
 	const up = (event: PointerEvent) => {
 		if (!press || event.pointerId !== press.id) return;
+		const { focused } = press;
 		clear();
 		const tap = { x: event.clientX, y: event.clientY, at: event.timeStamp || performance.now() };
-		if (isDoubleTap(last, tap)) {
+		if (focused || isDoubleTap(last, tap)) {
 			last = null;
-			swallow = true;
-			handler(node);
+			second = true;
 		} else last = tap;
+	};
+	const click = () => {
+		if (!second) return;
+		second = false;
+		handler(node);
 	};
 	const cancel = () => {
 		clear();
 		last = null;
+		second = false;
 	};
 	const lift = (event: TouchEvent) => {
 		if (!swallow) return;
@@ -301,6 +316,7 @@ export function touchOpen(node: HTMLElement, onopen: (node: HTMLElement) => void
 	node.addEventListener('pointermove', move);
 	node.addEventListener('pointerup', up);
 	node.addEventListener('pointercancel', cancel);
+	node.addEventListener('click', click);
 	node.addEventListener('contextmenu', menu);
 	node.addEventListener('touchend', lift);
 	return {
@@ -311,6 +327,7 @@ export function touchOpen(node: HTMLElement, onopen: (node: HTMLElement) => void
 			node.removeEventListener('pointermove', move);
 			node.removeEventListener('pointerup', up);
 			node.removeEventListener('pointercancel', cancel);
+			node.removeEventListener('click', click);
 			node.removeEventListener('contextmenu', menu);
 			node.removeEventListener('touchend', lift);
 		}

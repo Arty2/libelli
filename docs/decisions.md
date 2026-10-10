@@ -2314,11 +2314,17 @@ screen — for a tap that was usually choosing a row, or a scroll that
 started on a cell. A cell a finger presses asks for no keyboard
 (`inputmode="none"`, set by `byFinger`, read on the table's capturing
 pointerdown, which comes before focus), so a tap chooses it, Edit appears,
-and the browser puts its own caret where the finger landed; a double tap or
-a long press (`touchOpen` in gestures.ts) opens the cell full size, where
-typing is what was asked for, at that caret. The tap that opens it is
-cancelled at `touchend`, or its click lands on the editor just opened and
-selects a word. Per press, not per device: a laptop with a touch screen
+and the browser puts its own caret where the finger landed; a second tap on
+the chosen cell or a long press (`touchOpen` in gestures.ts) opens the cell
+full size, where typing is what was asked for, at that caret. A second tap,
+not a double tap: it counts however long after the first it comes, since a
+person reads the cell they chose before deciding to type, and the 350ms of a
+double tap asked them to decide first. It opens on that tap's click, once
+the browser has moved the caret to where it landed, so the caret is the
+last tap's. A long press's lift is cancelled at `touchend`, or its click
+lands on the editor just opened and selects a word. The cost: a chosen cell
+can no longer have its caret moved by a tap without opening — but it has no
+keyboard to type at that caret with, so there is nothing to move it for. Per press, not per device: a laptop with a touch screen
 still types in place under its mouse.
 
 It was `readonly` first, which kept the keyboard down too but left no caret,

@@ -352,8 +352,9 @@
 	 * Whether the press that is choosing a cell is a finger's. A cell a finger
 	 * taps asks for no keyboard (`inputmode="none"`), so the tap chooses it —
 	 * and puts the browser's own caret where it landed — without the keyboard
-	 * coming up over half the screen; a double tap or a long press
-	 * (`touchOpen`) opens it full size to type in, at that caret. A mouse or a
+	 * coming up over half the screen; a second tap on it, however much later,
+	 * or a long press (`touchOpen`) opens it full size to type in, at the
+	 * caret the last tap left. A mouse or a
 	 * pen types in place. Set on the way down, captured on the table, which is
 	 * before the cell takes focus — and focus is what brings a keyboard.
 	 *
@@ -608,8 +609,8 @@
 	 */
 	let openCaret: number | null = null;
 	/**
-	 * The caret a finger left in a cell, if it left one. A double tap's first
-	 * tap focused the cell and placed it; a long press on a cell nobody tapped
+	 * The caret a finger left in a cell, if it left one. A second tap opens
+	 * once it has moved the caret to where it landed; a long press on a cell nobody tapped
 	 * yet has none — the browser places a caret on a tap, after the finger
 	 * lifts — so that opens at the end, as Edit does.
 	 */
