@@ -18,21 +18,26 @@
 	 * (`fontChoices`). One list for the page's Font, an area's, and a font's
 	 * Replace, which leaves out the font being replaced (`except`) and puts
 	 * the system faces before Google's (`order`): there it is a choice of what
-	 * this computer already has before what must be fetched. A run with
-	 * nothing in it has no heading either.
+	 * this computer already has before what must be fetched, a rule between
+	 * the runs (`ruled`). A run with nothing in it has no heading either.
 	 */
 	export type FamilySource = 'local' | 'google' | 'system';
 	const SOURCE_HEADINGS: Record<FamilySource, string> = { local: 'Local', google: 'Google Fonts', system: 'System' };
 	export function familyItems(
 		choices: Record<FamilySource, string[]>,
 		except?: string,
-		order: FamilySource[] = ['local', 'google', 'system']
+		order: FamilySource[] = ['local', 'google', 'system'],
+		ruled = false
 	): MenuItem[] {
 		const keep = (family: string) => family.toLowerCase() !== except?.toLowerCase();
-		return order.flatMap((source): MenuItem[] => {
-			const kept = choices[source].filter(keep);
-			return kept.length ? [{ heading: SOURCE_HEADINGS[source] }, ...kept.map((family) => ({ value: family, label: family, family }))] : [];
-		});
+		const runs = order
+			.map((source) => ({ source, kept: choices[source].filter(keep) }))
+			.filter((run) => run.kept.length);
+		return runs.flatMap(({ source, kept }, i): MenuItem[] => [
+			...(ruled && i > 0 ? [{ rule: true as const }] : []),
+			{ heading: SOURCE_HEADINGS[source] },
+			...kept.map((family) => ({ value: family, label: family, family }))
+		]);
 	}
 </script>
 

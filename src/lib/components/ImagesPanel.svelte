@@ -901,7 +901,8 @@
 										font.status === 'system'
 											? { value: UPLOAD, label: 'Upload…', disabled: true, title: `${font.family} is a system font — it is on the computer already, so there is no file to upload` }
 											: { value: UPLOAD, label: 'Upload…', title: `A font file to use as ${font.family}, installed in this browser under this name` },
-										...familyItems(fontFamilies, font.family, ['local', 'system', 'google'])
+										{ rule: true },
+										...familyItems(fontFamilies, font.family, ['local', 'system', 'google'], true)
 									]}
 									onopen={onfontsopen}
 									onselect={(to) => (to === UPLOAD ? chooseFontFile(font.family) : to && void replaceFontKeepingPlace(font.family, to))}
