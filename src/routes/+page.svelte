@@ -28,6 +28,7 @@
 		ensureTemplateFonts,
 		fontChoices,
 		fontInventory,
+		fontRef,
 		listStoredFonts,
 		mergeFonts,
 		previewFamilies,
@@ -2957,7 +2958,7 @@
 			return false;
 		}
 		const held = storedFonts.find((f) => f.family.toLowerCase() === to.toLowerCase());
-		const ref: FontRef = held ? { family: held.family, source: 'local', ref: held.ref } : { family: to, source: 'google' };
+		const ref: FontRef = held ? { family: held.family, source: 'local', ref: held.ref } : fontRef(to, editorFonts);
 		describe(`Replace ${from} with ${to}`);
 		template = replaceFamily($state.snapshot(template) as Template, from, ref);
 		missingFonts = await ensureTemplateFonts(template);
@@ -3485,7 +3486,7 @@
 					ontraydrag={stacked ? dragTray : undefined}
 					fonts={fontEntries}
 					{fontFamilies}
-					onfontsopen={() => previewFamilies([...fontFamilies.used, ...fontFamilies.others], editorFonts, template.fonts)}
+					onfontsopen={() => previewFamilies(fontFamilies.google, editorFonts, template.fonts)}
 					onfontfile={(family, file) => void handleFontUpload(file, family)}
 					onreplacefont={replaceFont}
 					ondeletefont={(font) => void forgetFont(font)}

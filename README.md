@@ -1257,7 +1257,12 @@ they travel with the table. See **Drawing one**, above.
 
 ## Fonts
 
-Pick a curated Google family, type any other family name, or upload a file.
+Pick a curated Google family, a system face, type any other family name, or
+upload a file. Every font menu lists them by where they come from: **Local**
+(files uploaded to this browser) first, then **Google Fonts**, then
+**System** — Arial, Georgia, Times New Roman, Courier New, Consolas and
+Verdana, which nearly every computer has, so nothing is fetched for them and
+the Images tray does not list them: there is nothing to supply or replace.
 
 - **Fonts, in the Images tray** — every font the design is set in and every
   font file this browser holds, in one list under the pictures, each name set

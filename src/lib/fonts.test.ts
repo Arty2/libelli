@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fontChoices, fontInventory, fontStack, mergeFonts, pruneFonts, replaceFamily, weightsOf } from './fonts';
-import type { Template } from './types';
+import { fontChoices, fontInventory, fontRef, fontStack, isSystemFamily, mergeFonts, pruneFonts, replaceFamily, weightsOf } from './fonts';
+import type { FontRef, Template } from './types';
 
 describe('fontStack', () => {
 	it('quotes the family and keeps the system stack behind it', () => {
@@ -63,12 +63,28 @@ describe('the fonts a template carries', () => {
 		expect(pruneFonts(pruned).template).toBe(pruned);
 	});
 
-	it('offers the used families first and everything else after', () => {
-		const { used, others } = fontChoices(template, [{ family: 'Old Face', source: 'local' }]);
-		expect(used).toEqual(['Inter', 'Lora']);
-		expect(others).toContain('Old Face');
-		expect(others).toContain('Karla');
-		expect(others).not.toContain('Inter');
+	it('offers the local files, then Google, then the system faces, once each', () => {
+		const { local, google, system } = fontChoices(template, [{ family: 'Old Face', source: 'local' }]);
+		expect(local).toEqual(['Old Face']);
+		expect(google).toContain('Inter');
+		expect(google).toContain('Lora');
+		expect(google).toContain('Karla');
+		expect(google).not.toContain('Old Face');
+		expect(system).toEqual(['Arial', 'Consolas', 'Courier New', 'Georgia', 'Times New Roman', 'Verdana']);
+	});
+
+	it('keeps an upload under Local even when it shares a system face\'s name', () => {
+		const { local, system } = fontChoices(template, [{ family: 'Arial', source: 'local', ref: 'font:arial' }]);
+		expect(local).toContain('Arial');
+		expect(system).not.toContain('Arial');
+	});
+
+	it('gives a chosen family its source: an upload, a system face, else Google', () => {
+		const held: FontRef = { family: 'Studio', source: 'local', ref: 'font:studio' };
+		expect(fontRef('studio', [held])).toBe(held);
+		expect(fontRef('georgia', [])).toEqual({ family: 'georgia', source: 'system' });
+		expect(isSystemFamily(' Times New Roman ')).toBe(true);
+		expect(fontRef('Lora', [])).toEqual({ family: 'Lora', source: 'google' });
 	});
 
 	it('keeps one entry per family in the editor list, the later winning', () => {
@@ -114,6 +130,17 @@ describe('fontInventory', () => {
 		]);
 		expect(list.find((f) => f.family === 'Studio Sans')).toMatchObject({ status: 'uploaded', used: true, bytes: 40000 });
 		expect(list[list.length - 1]).toMatchObject({ family: 'Old Face', status: 'unused', used: false });
+	});
+
+	it('leaves the system faces out: there is nothing to supply or swap for one', () => {
+		const withSystem = {
+			...design,
+			boxes: [...design.boxes, { font: 'Georgia' }, { font: 'Plain Office' }],
+			fonts: [...design.fonts, { family: 'Plain Office', source: 'system' }]
+		} as unknown as Design;
+		const families = fontInventory(withSystem, []).map((f) => f.family);
+		expect(families).not.toContain('Georgia');
+		expect(families).not.toContain('Plain Office');
 	});
 });
 

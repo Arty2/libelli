@@ -5,7 +5,7 @@
 	import './options-bar.css';
 	import { safeImageUrl } from '$lib/assets';
 	import { renamed } from '$lib/onboarding';
-	import { fontChoices, previewFamilies } from '$lib/fonts';
+	import { fontChoices, fontRef, previewFamilies } from '$lib/fonts';
 	import MenuSelect, { familyItems } from './MenuSelect.svelte';
 	import { withKey } from '$lib/keys';
 	import {
@@ -171,10 +171,7 @@
 		pickerOpen = false;
 	}
 
-	/**
-	 * The families this template is set in, then under a rule everything else
-	 * this browser knows — see `fontChoices`.
-	 */
+	/** Every family a font menu offers, by where it comes from — see `fontChoices`. */
 	const families = $derived(fontChoices(template, editorFonts));
 
 	/** The other end of the swap, while it is still in the library. */
@@ -221,12 +218,13 @@
 	function setDefaultFont(family: string) {
 		const declared = template.fonts.some((f) => f.family.toLowerCase() === family.toLowerCase());
 		// An uploaded face the editor is holding comes back with its file
-		// reference, not as a Google name that would be asked for and missed.
-		const known = editorFonts.find((f) => f.family.toLowerCase() === family.toLowerCase());
+		// reference, not as a Google name that would be asked for and missed;
+		// a system face is not declared, having nothing to fetch.
+		const ref = fontRef(family, editorFonts);
 		ontemplatechange({
 			...template,
 			defaults: { ...template.defaults, font: family },
-			fonts: declared ? template.fonts : [...template.fonts, known ?? { family, source: 'google' }]
+			fonts: declared || ref.source === 'system' ? template.fonts : [...template.fonts, ref]
 		});
 	}
 
@@ -703,7 +701,7 @@
 					items={familyItems(families)}
 					disabled={pageFrozen}
 					showFamily
-					onopen={() => previewFamilies([...families.used, ...families.others], editorFonts, template.fonts)}
+					onopen={() => previewFamilies(families.google, editorFonts, template.fonts)}
 					onselect={setDefaultFont}
 				/>
 			</span>

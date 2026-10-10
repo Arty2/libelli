@@ -30,6 +30,30 @@ export const CURATED_GOOGLE_FONTS = [
 	'JetBrains Mono'
 ];
 
+/**
+ * Faces nearly every computer already has, offered beside the Google ones:
+ * nothing to fetch and nothing to upload. Never asked of Google
+ * (`ensureGoogleFont` refuses them), never declared in a template's fonts
+ * (`fontRef`), and not in the Images tray's list — a design moved elsewhere
+ * finds them there, or falls back as any page does without a face.
+ */
+export const SYSTEM_FONTS = ['Arial', 'Courier New', 'Consolas', 'Georgia', 'Times New Roman', 'Verdana'];
+
+const systemKeys = new Set(SYSTEM_FONTS.map((f) => f.toLowerCase()));
+/** Whether a family is one of `SYSTEM_FONTS`, ignoring case as every font lookup here does. */
+export const isSystemFamily = (family: string) => systemKeys.has(family.trim().toLowerCase());
+
+/**
+ * What a family chosen in a menu is, for the template's list of fonts: an
+ * upload this browser holds keeps its file reference, a system face is a
+ * system face, and any other name is asked of Google.
+ */
+export function fontRef(family: string, editorFonts: FontRef[]): FontRef {
+	const known = editorFonts.find((f) => f.family.toLowerCase() === family.toLowerCase());
+	if (known) return known;
+	return isSystemFamily(family) ? { family, source: 'system' } : { family, source: 'google' };
+}
+
 export const SYSTEM_FONT_STACK =
 	'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
@@ -72,7 +96,9 @@ export function ensureGoogleFont(family: string): void {
 	// Only a name that is safe to put in a stylesheet is safe to put in a URL.
 	const name = safeFamily(family);
 	const key = name.toLowerCase();
-	if (!key || loadedGoogle.has(key)) return;
+	// A system face is already here, and Google would only answer with a
+	// stylesheet for a different face of the same name, or none.
+	if (!key || loadedGoogle.has(key) || isSystemFamily(name)) return;
 	loadedGoogle.add(key);
 
 	// Start from the request that worked for this family last time, so a
@@ -191,26 +217,39 @@ export function pruneFonts<T extends Pick<Template, 'defaults' | 'boxes' | 'font
 }
 
 /**
- * What a font menu offers, in two runs: the families this template uses, then
- * under a rule everything else this browser knows — fonts uploaded or named
- * here before, and the curated list.
+ * What a font menu offers, by where a face comes from: the files uploaded to
+ * this browser first — the faces somebody went to the trouble of bringing —
+ * then Google's families (the curated list, and any other name this browser
+ * or this design has asked for), then the system faces. Each run by name,
+ * one entry per family, matched ignoring case. A local file named in the
+ * design but missing here is still listed as local: that is what it is.
  */
 export function fontChoices(
 	template: Pick<Template, 'defaults' | 'boxes' | 'fonts'>,
 	editorFonts: FontRef[]
-): { used: string[]; others: string[] } {
+): { local: string[]; google: string[]; system: string[] } {
 	const byName = (a: string, b: string) => a.localeCompare(b);
-	const used = familiesUsed(template);
-	const spelled = new Map<string, string>();
-	for (const family of [...template.fonts.map((f) => f.family), template.defaults.font, ...template.boxes.map((b) => b.font)]) {
-		if (family && used.has(family.toLowerCase()) && !spelled.has(family.toLowerCase())) spelled.set(family.toLowerCase(), family);
-	}
-	const others = new Map<string, string>();
-	for (const family of [...editorFonts.map((f) => f.family), ...CURATED_GOOGLE_FONTS]) {
-		const key = family.toLowerCase();
-		if (!used.has(key) && !others.has(key)) others.set(key, family);
-	}
-	return { used: [...spelled.values()].sort(byName), others: [...others.values()].sort(byName) };
+	const seen = new Set<string>();
+	const run = (families: (string | undefined)[]) => {
+		const out: string[] = [];
+		for (const family of families) {
+			const key = family?.trim().toLowerCase();
+			if (!family || !key || seen.has(key)) continue;
+			seen.add(key);
+			out.push(family);
+		}
+		return out.sort(byName);
+	};
+	const declared = [...editorFonts, ...template.fonts];
+	const local = run(declared.filter((f) => f.source === 'local').map((f) => f.family));
+	const system = run([...SYSTEM_FONTS, ...declared.filter((f) => f.source === 'system').map((f) => f.family)]);
+	const google = run([
+		...CURATED_GOOGLE_FONTS,
+		...declared.filter((f) => f.source === 'google').map((f) => f.family),
+		template.defaults.font,
+		...template.boxes.map((b) => b.font)
+	]);
+	return { local, google, system };
 }
 
 /**
@@ -446,8 +485,10 @@ export function fontInventory(
 			);
 		} else if (font.source === 'google') add({ family: font.family, status: 'google', used: used.has(key) });
 	}
+	const declaredSystem = new Set(template.fonts.filter((f) => f.source === 'system').map((f) => f.family.toLowerCase()));
 	for (const family of [template.defaults.font, ...template.boxes.map((b) => b.font)]) {
-		if (!family) continue;
+		// A system face needs nothing from anyone: not a thing to supply or swap.
+		if (!family || isSystemFamily(family) || declaredSystem.has(family.toLowerCase())) continue;
 		const held = storedBy.get(family.toLowerCase());
 		add(held ? { family, status: 'uploaded', used: true, ref: held.ref, bytes: held.bytes } : { family, status: 'google', used: true });
 	}

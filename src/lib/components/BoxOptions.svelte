@@ -7,7 +7,7 @@
 	import { parseColor } from '$lib/color';
 	import { safeImageUrl } from '$lib/assets';
 	import { completePlaceholders } from '$lib/complete';
-	import { availableWeights, fontChoices, previewFamilies } from '$lib/fonts';
+	import { availableWeights, fontChoices, fontRef, previewFamilies } from '$lib/fonts';
 	import MenuSelect, { familyItems, type MenuItem } from './MenuSelect.svelte';
 	import ResetButton from './ResetButton.svelte';
 	import { referenceOf } from '$lib/layout';
@@ -128,16 +128,13 @@
 	/** the same question for padding; the two expand independently */
 	let perSidePadding = $state(false);
 
-	/**
-	 * The families this template is set in, then under a rule everything else
-	 * this browser knows — see `fontChoices`.
-	 */
+	/** Every family a font menu offers, by where it comes from — see `fontChoices`. */
 	const families = $derived(fontChoices(template, editorFonts));
 
 	/**
-	 * The font menu: the page default, the template's families, under a rule
-	 * this browser's others, and under another the two ways to name a family
-	 * that is in neither list. Each name in its own face.
+	 * The font menu: the page default, the families under their sources'
+	 * headings, and under a rule the two ways to name a family that is in no
+	 * list. Each name in its own face.
 	 */
 	const fontItems = $derived.by((): MenuItem[] => [
 		{ value: '', label: `Default: ${template.defaults.font}` },
@@ -456,9 +453,11 @@
 
 	function registerFamily(family: string) {
 		if (template.fonts.some((f) => f.family.toLowerCase() === family.toLowerCase())) return;
-		// An uploaded face the editor is holding keeps its file reference.
-		const known = editorFonts.find((f) => f.family.toLowerCase() === family.toLowerCase());
-		patchTemplate({ fonts: [...template.fonts, known ?? { family, source: 'google' }] });
+		// An uploaded face keeps its file reference; a system face is not
+		// declared at all, as `replaceFamily` leaves it out — there is
+		// nothing to fetch or supply for it.
+		const ref = fontRef(family, editorFonts);
+		if (ref.source !== 'system') patchTemplate({ fonts: [...template.fonts, ref] });
 	}
 
 	/**
@@ -1002,7 +1001,7 @@
 					items={fontItems}
 					disabled={boxFrozen}
 					showFamily
-					onopen={() => previewFamilies([...families.used, ...families.others], editorFonts, template.fonts)}
+					onopen={() => previewFamilies(families.google, editorFonts, template.fonts)}
 					onselect={setFont}
 				/>
 				{#if selected.font}

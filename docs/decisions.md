@@ -2857,6 +2857,24 @@ address is fetched once per card however many areas share it.
 
 ## `src/lib/fonts.ts`
 
+**System faces are offered, and never fetched.** Arial, Georgia, Times New
+Roman, Courier New, Consolas and Verdana (`SYSTEM_FONTS`) are on nearly every
+computer, so a menu offers them beside Google's, under their own heading.
+`ensureGoogleFont` refuses them — the one door every Google request goes
+through, so no caller can forget — since Google would answer for a different
+face of the same name, or not at all, and the app makes no request nobody
+needed. `fontRef` gives a chosen family its source, and a system one is not
+declared in the template's fonts, as `replaceFamily` already left it out;
+the Images tray does not list them, having nothing to supply or swap. The
+cost: a design moved to a computer without the face falls back silently,
+the way any web page does, where an upload would be marked missing.
+
+**Font menus are grouped by source, local first.** Local files, then Google
+Fonts, then System (`fontChoices`, drawn by `familyItems`): the faces
+somebody went to the trouble of bringing come first. The design's own
+families were the first run before; now they are found in their source's
+run, each name in its own face.
+
 **A template names only the families it is set in.** Every family in a template
 is a request the next browser makes, and for an uploaded face a banner asking
 for a file nobody on the card uses. `pruneFonts` runs on every template change

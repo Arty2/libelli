@@ -66,7 +66,7 @@
 		 */
 		fonts?: FontEntry[];
 		/** what a font can be replaced with: the font menus' own families (`fontChoices`) */
-		fontFamilies?: { used: string[]; others: string[] };
+		fontFamilies?: { local: string[]; google: string[]; system: string[] };
 		/** a Replace menu opening: fetch the faces its names are set in, as the font menus do */
 		onfontsopen?: () => void;
 		/** a file chosen for a font, to be installed under that font's own name */
@@ -90,7 +90,7 @@
 		onopendrawing,
 		onfocus,
 		fonts = [],
-		fontFamilies = { used: [], others: [] },
+		fontFamilies = { local: [], google: [], system: [] },
 		onfontsopen,
 		onfontfile,
 		onreplacefont,
