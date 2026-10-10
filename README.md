@@ -1250,12 +1250,17 @@ sections, **Images**, **Drawings** and **Fonts**.
   **Images** head, beside Upload, and images are written
   there as ordinary files from then on: replace one from a photo editor and the
   card follows, back them up with the rest of your work, and clear them out with
-  your file manager rather than through this app. The folder is remembered
+  your file manager rather than through this app. Once connected, the folder
+  is one line at the top of **Images** — its name, how many pictures and what
+  they weigh — folded until you press it, so a folder of hundreds of
+  photographs does not crowd out the rest; a search shows its matches either
+  way. It is read in the background, filling in as it goes, and its
+  thumbnails are drawn only as you scroll to them. The folder is remembered
   between visits, but a browser asks to be let into it once per visit — the
-  tray's head says it is not opened, and **Open** on the Images head opens
-  it — and until then images come
-  from browser storage as before. The **×** beside the folder lets go of it;
-  nothing in it is deleted.
+  folder's line says it is not opened, and its **Open** opens it — and until
+  then images come from browser storage as before. On the same line, the
+  **folder** button picks another and **Disconnect** lets go of it; nothing in
+  it is deleted.
 - **Where that works** — the File System Access API is Chromium's: Chrome, Edge,
   Opera and Arc have it; Firefox and Safari do not. Everywhere else the app keeps
   images in IndexedDB exactly as it always did. The folder button is there
@@ -1947,7 +1952,8 @@ than it has to.
   **Pictures** and **Data** in the window toolbar each close the other. Its
   sections — **Images**, **Drawings**, **Fonts** — fill the height, each head
   saying how many and how much they weigh; the ways in are the images' alone,
-  so **Upload** and the **folder** are on the Images head, at its far end,
+  so **Upload** and the **folder** are on the Images head, at its far end —
+  the folder on its own line under it once one is connected —
   and the tray has no bar at its foot. On a phone its head is the grip that
   shares the height with the page, as the table's header row is. Carry one onto an area to put it there, or onto the **page** between
   areas for a new image area of its own, centred where it was let go, 40mm

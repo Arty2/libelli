@@ -3089,6 +3089,21 @@ list is what is stored, what it weighs, where it is, and whether anything
 currently points at it. That last one is the question — *which of these can I
 delete* — and nothing else in the app could answer it.
 
+**The folder is read in the background, and is one line.** A folder can be
+hundreds of full-size photographs. Read in one pass, the tray sat on "…"
+until the last file had been asked for, one after another; listed in full,
+it pushed this browser's own pictures, the drawings and the fonts out of
+sight. So this browser's own are listed at once and the folder's arrive in
+batches behind them (`folderImages`, an async generator: each batch's files
+asked for together, handed over before the next is begun), a newer refresh
+taking over from an older one still reading. The folder is a single line —
+name, count, weight, Open, another folder, Disconnect — folded until pressed,
+and opened by a search, since its contents may be what is being looked for.
+Thumbnails are `loading="lazy"` and `decoding="async"`, so only the ones
+scrolled to are decoded, and a size read off one is written into the map
+rather than spreading it, which was a copy of the map per picture.
+`resolveLocalImages` asks for every name at once for the same reason.
+
 **The folder is listed by extension.** It is an ordinary folder that may hold
 anything, and a panel offering to delete a file this app never wrote would be a
 trap.
