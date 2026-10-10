@@ -849,7 +849,7 @@ a notice can appear.
 - **A cell with a finger** — a tap chooses a cell without typing in it, so the
   keyboard does not come up over half the screen each time a finger lands in
   the table; **double-tap** it, or **press and hold**, to open it full size and
-  type there, the caret already where your finger was. **Edit** in the bar does the same. A mouse or a pen types in the
+  type there, the caret already where the tap put it. **Edit** in the bar does the same. A mouse or a pen types in the
   cell where it is clicked, as before.
 - **A cell full size** — press **Edit** in the bar while typing in a cell, press the
   **[...]** on a cell that holds more than it shows, double-tap or hold a cell

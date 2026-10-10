@@ -34,7 +34,6 @@ src/lib/
   boxops.ts       box and selection transforms: duplicate, delete, group, lock, nudge
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
   gestures.ts     swipe; tooltip.ts where a tip goes; haptics.ts the buzz for a press
-  caret.ts        the character of a text field a point lands on
   scrolledge.ts   which edges of a scroller have more, for the shadow that says so
   complete.ts     the column names `%%` offers; placeholders.ts what `%%name%%` resolves to
   modal.ts        the two-Enter rule every dialog with a default action shares

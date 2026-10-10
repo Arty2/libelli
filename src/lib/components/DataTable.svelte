@@ -5,7 +5,6 @@
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { touchOpen } from '$lib/gestures';
-	import { caretAt } from '$lib/caret';
 	import { armDefault } from '$lib/modal';
 	import { scrollEdges } from '$lib/scrolledge';
 	import { dataUrlBytes, localImageName, safeMediaUrl, weigh } from '$lib/assets';
@@ -351,11 +350,17 @@
 	let editing = $state<{ row: number; column: string } | null>(null);
 	/**
 	 * Whether the press that is choosing a cell is a finger's. A cell a finger
-	 * taps is read-only, so the tap chooses it without the keyboard coming up
-	 * over half the screen; a double tap or a long press (`touchOpen`) opens it
-	 * full size to type in, as Edit does. A mouse or a pen types in place. Set
-	 * on the way down, captured on the table, which is before the cell takes
-	 * focus — and focus is what brings a keyboard.
+	 * taps asks for no keyboard (`inputmode="none"`), so the tap chooses it —
+	 * and puts the browser's own caret where it landed — without the keyboard
+	 * coming up over half the screen; a double tap or a long press
+	 * (`touchOpen`) opens it full size to type in, at that caret. A mouse or a
+	 * pen types in place. Set on the way down, captured on the table, which is
+	 * before the cell takes focus — and focus is what brings a keyboard.
+	 *
+	 * Not `readonly`, which also kept the keyboard down but left no caret, so
+	 * where the finger was had to be measured off a hidden copy of the cell.
+	 * The cost of the browser doing it: a hardware keyboard can type straight
+	 * into a cell chosen by a finger, as it could into one chosen by a mouse.
 	 */
 	let byFinger = $state(false);
 
@@ -597,12 +602,19 @@
 		(dirty ? 'Close — the drawing not saved is dropped' : leaveTo === 'images' ? 'Back to Images' : leaveTo === 'card' ? 'Close' : 'Back to the table') + ' (Esc)';
 
 	/**
-	 * Where the caret goes as the cell opens full size: where a finger
-	 * double-tapped or held the small one (`caretAt`), which the eye was on.
-	 * Used once — stepping to the next row with the pager opens a new field
+	 * Where the caret goes as the cell opens full size: where a finger's tap
+	 * left it in the small one (`fingerCaret`), which the eye was on. Used once — stepping to the next row with the pager opens a new field
 	 * at the end, as it always did.
 	 */
 	let openCaret: number | null = null;
+	/**
+	 * The caret a finger left in a cell, if it left one. A double tap's first
+	 * tap focused the cell and placed it; a long press on a cell nobody tapped
+	 * yet has none — the browser places a caret on a tap, after the finger
+	 * lifts — so that opens at the end, as Edit does.
+	 */
+	const fingerCaret = (field: HTMLElement) =>
+		document.activeElement === field && field instanceof HTMLTextAreaElement ? field.selectionStart : undefined;
 	const focusOnOpen = (node: HTMLElement) => {
 		node.focus();
 		if (openCaret !== null && node instanceof HTMLTextAreaElement) node.setSelectionRange(openCaret, openCaret);
@@ -1804,9 +1816,9 @@
 									rows="1"
 									aria-label="{column}, row {rowLabel(i)}"
 									value={row[column] ?? ''}
-									readonly={locked || byFinger}
-									class:by-finger={byFinger && !locked}
-									use:touchOpen={(at, field) => !locked && openBigCell(i, column, false, 'table', caretAt(field as HTMLTextAreaElement, at.x, at.y))}
+									readonly={locked}
+									inputmode={byFinger && !locked ? 'none' : undefined}
+									use:touchOpen={(field) => !locked && openBigCell(i, column, false, 'table', fingerCaret(field))}
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
 									use:completePlaceholders={dataset.columns}
@@ -2915,13 +2927,6 @@
 
 	td textarea:read-only {
 		cursor: default;
-	}
-
-	/* A finger's cell: a long press opens it, so it must not also start a
-	   text selection with its handles and its menu. */
-	td textarea.by-finger {
-		-webkit-user-select: none;
-		user-select: none;
 	}
 
 

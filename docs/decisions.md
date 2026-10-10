@@ -2311,21 +2311,29 @@ upwards, because the row is at the bottom of the tray.
 **A finger does not type in a cell; it chooses it.** Every cell is a
 textarea, so a tap focused one and the keyboard came up over half a phone's
 screen — for a tap that was usually choosing a row, or a scroll that
-started on a cell. A cell a finger presses is read-only (`byFinger`, read on
-the table's capturing pointerdown, which comes before focus), so a tap
-chooses it, Edit appears, and nothing else moves; a double tap or a long
-press (`touchOpen` in gestures.ts) opens the cell full size, where typing is
-what was asked for, with the caret where the first tap was (or the hold
-rested): `caretAt` copies the cell's box, type and wrapping into a hidden
-block over it and measures its characters, since no browser says where a
-point falls inside a form control's text, and a read-only field tapped by a
-finger has no caret of its own to read. The tap that opens it is cancelled
-at `touchend`, or its click lands on the editor just opened and selects a
-word. Per press, not per
-device: a laptop with a touch screen still types in place under its mouse.
-The cost: a quick fix to one cell on a phone is two taps and a close, where
-it was one tap; and the long press that opens a cell is the one that would
-otherwise show a tip, which a cell has none of.
+started on a cell. A cell a finger presses asks for no keyboard
+(`inputmode="none"`, set by `byFinger`, read on the table's capturing
+pointerdown, which comes before focus), so a tap chooses it, Edit appears,
+and the browser puts its own caret where the finger landed; a double tap or
+a long press (`touchOpen` in gestures.ts) opens the cell full size, where
+typing is what was asked for, at that caret. The tap that opens it is
+cancelled at `touchend`, or its click lands on the editor just opened and
+selects a word. Per press, not per device: a laptop with a touch screen
+still types in place under its mouse.
+
+It was `readonly` first, which kept the keyboard down too but left no caret,
+so where the finger had been was worked out by laying a hidden copy of the
+cell over it and measuring its characters one by one. The browser placing
+the caret is exact where that was an imitation — right-to-left text, emoji,
+ligatures — and costs nothing. What it costs instead: a hardware keyboard
+types straight into a cell a finger chose, the browser's caret handles can
+show on the tapped cell, and an on-screen keyboard that ignores
+`inputmode="none"` would come up as before. A long press on a cell nobody has
+tapped yet opens at the end: a browser places a caret on a tap, after the
+finger lifts, and a hold has not lifted. And a quick fix to one cell on a
+phone is two taps and a close, where it was one tap; the long press that
+opens a cell is the one that would otherwise show a tip, which a cell has
+none of.
 
 ## Pull-to-refresh
 

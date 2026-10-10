@@ -233,11 +233,10 @@ export function isDoubleTap(last: Tap | null, now: Tap): boolean {
  * and click): what was under the finger is the editor just opened, and the
  * second tap of a double tap landing there selected a word in it.
  *
- * `onopen` is told where the press was meant: the first tap of a double tap,
- * which is where the eye was when the finger went down, or where a long
- * press rested — so a cell can open with its caret there.
+ * `onopen` is handed the node, so a cell can read the caret its first tap
+ * left there.
  */
-export function touchOpen(node: HTMLElement, onopen: (at: { x: number; y: number }, node: HTMLElement) => void) {
+export function touchOpen(node: HTMLElement, onopen: (node: HTMLElement) => void) {
 	let handler = onopen;
 	let press: { id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
 	let last: Tap | null = null;
@@ -259,12 +258,11 @@ export function touchOpen(node: HTMLElement, onopen: (at: { x: number; y: number
 			x: event.clientX,
 			y: event.clientY,
 			timer: setTimeout(() => {
-				const at = press ? { x: press.x, y: press.y } : { x: event.clientX, y: event.clientY };
 				press = null;
 				held = true;
 				swallow = true;
 				last = null;
-				handler(at, node);
+				handler(node);
 			}, LONG_PRESS_MS)
 		};
 	};
@@ -278,12 +276,10 @@ export function touchOpen(node: HTMLElement, onopen: (at: { x: number; y: number
 		if (!press || event.pointerId !== press.id) return;
 		clear();
 		const tap = { x: event.clientX, y: event.clientY, at: event.timeStamp || performance.now() };
-		const first = last;
-		if (first && isDoubleTap(first, tap)) {
-			const at = { x: first.x, y: first.y };
+		if (isDoubleTap(last, tap)) {
 			last = null;
 			swallow = true;
-			handler(at, node);
+			handler(node);
 		} else last = tap;
 	};
 	const cancel = () => {
