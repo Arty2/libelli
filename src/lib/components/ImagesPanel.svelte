@@ -20,6 +20,7 @@
 		type ImageRecord
 	} from '$lib/assets';
 	import { fontStack, naturalXHeight, watchFaces, type FontEntry, type FontTune } from '$lib/fonts';
+	import type { FontKind } from '$lib/types';
 
 	/**
 	 * Where the pictures are, what they weigh, and how to get rid of them.
@@ -110,6 +111,14 @@
 	 * nothing is outlined. Lower case, as fonts.ts matches families.
 	 */
 	let fontOrder = $state<string[]>([]);
+
+	/** A kind of face, as the Type menu names it. */
+	const KIND_NAMES: Record<FontKind, string> = {
+		serif: 'Serif',
+		'sans-serif': 'Sans Serif',
+		monospace: 'Monospaced',
+		handwriting: 'Handwriting'
+	};
 
 	/** Replace's first item: not a family — a name no family can have. */
 	const UPLOAD = '\u0000upload';
@@ -983,6 +992,24 @@
 									() => ontune?.(font.family, { leading: leading - 0.02 }), () => ontune?.(font.family, { leading: leading + 0.02 }),
 									`every leading ${font.family} is set at, as a percentage`)}
 							</div>
+							<!-- What kind of face it is, for the fallback a card names after it
+							     where the face is missing. Auto is what its file says, or what
+							     the app knows of it; a file can say nothing, or say it wrongly. -->
+							<div class="tune-kind">
+								<span class="tune-label">Type</span>
+								<MenuSelect
+									label="Type of {font.family}, for its fallback"
+									title="What kind of face {font.family} is: where it is missing, a face of this kind stands in"
+									value={font.fallback ?? ''}
+									items={[
+										{ value: '', label: `Auto (${KIND_NAMES[font.detected ?? 'sans-serif']})` },
+										{ value: 'serif', label: KIND_NAMES.serif },
+										{ value: 'sans-serif', label: KIND_NAMES['sans-serif'] },
+										{ value: 'monospace', label: KIND_NAMES.monospace }
+									]}
+									onselect={(kind) => ontune?.(font.family, { fallback: (kind || undefined) as FontKind | undefined })}
+								/>
+							</div>
 						{/if}
 					</li>
 				{/each}
@@ -1652,6 +1679,20 @@
 		font: 0.6875rem ui-sans-serif, system-ui, sans-serif;
 		font-variant-numeric: tabular-nums;
 		color: #555;
+	}
+
+	/* Its kind, under the steps: the label and the menu on one short line. */
+	.fonts .tune-kind {
+		flex-basis: 100%;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 0 0 4px;
+	}
+
+	.fonts .tune-kind .tune-label {
+		font-size: 0.5625rem;
+		letter-spacing: 0;
 	}
 
 	/* A used font's name is the way to its tuning: a button that looks like the name. */

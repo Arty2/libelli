@@ -2898,7 +2898,9 @@ arrives (`fontKindOf`), from what its own tables say — `post.isFixedPitch`,
 PANOSE, the OS/2 IBM family class — and the kind is kept on the template's
 font entry so it travels with the design. WOFF is zlib, which
 `DecompressionStream` reads; WOFF2 is Brotli, which a page cannot decompress,
-so it, and a file that says nothing, stays sans-serif. Measuring the face on
+so it, and a file that says nothing, stays sans-serif. A file can say nothing,
+or say it wrongly, so the tray's **Type** can choose one (`fallback`, over
+`kind`); Auto is the detected kind, shown in brackets beside the word. Measuring the face on
 a canvas could tell a monospace but not a serif from a sans; the tables say
 both, for the files that have them.
 

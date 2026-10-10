@@ -696,6 +696,17 @@
 		template = stripUndefined({ ...$state.snapshot(template), css }) as Template;
 	}
 
+	/**
+	 * Read every value under `value`, so the effect doing it runs again when
+	 * any of them changes — what `$state.snapshot` did as a side effect of
+	 * copying, without the copy. Walking a table is reading its cells; copying
+	 * it was allocating every row again, on every keystroke.
+	 */
+	function watchDeep(value: unknown): void {
+		if (typeof value !== 'object' || value === null) return;
+		for (const key in value) watchDeep((value as Record<string, unknown>)[key]);
+	}
+
 	const snapshot = (): Snapshot => ({
 		template: $state.snapshot(template),
 		dataset: $state.snapshot(dataset),
@@ -1547,10 +1558,16 @@
 	// time, which the history compares by reference before anything else.
 	let shotTemplate: { template: Template; templateId: string } | null = null;
 	let shotData: { dataset: Dataset; mapping: Mapping; datasetId: string } | null = null;
+	/** The table changed since `shotData` was taken: snapshot it when the debounce lands, once. */
+	let dataChanged = true;
 	let recordTimer: ReturnType<typeof setTimeout> | undefined;
 	function recordSoon() {
 		clearTimeout(recordTimer);
 		recordTimer = setTimeout(() => {
+			if (dataChanged) {
+				shotData = { dataset: $state.snapshot(dataset), mapping: $state.snapshot(mapping), datasetId };
+				dataChanged = false;
+			}
 			if (!shotTemplate || !shotData) return;
 			const before = history;
 			history = commit({ ...shotTemplate, ...shotData });
@@ -1567,7 +1584,12 @@
 	});
 	$effect(() => {
 		if (!ready) return;
-		shotData = { dataset: $state.snapshot(dataset), mapping: $state.snapshot(mapping), datasetId };
+		// Read, not copied: a keystroke in a cell is a change to watch for,
+		// and the copy waits for the debounce — one per burst of typing.
+		watchDeep(dataset);
+		watchDeep(mapping);
+		void datasetId;
+		dataChanged = true;
 		recordSoon();
 	});
 
@@ -1737,11 +1759,14 @@
 
 	// The working copy and the library entry, on one debounce — the same
 	// arrangement the template above is saved under, and for the same reason.
+	// Read every cell to watch it, and copy the table once the typing pauses:
+	// a copy per keystroke was a whole table's clone each time.
 	$effect(() => {
 		if (!ready) return;
-		const saved = $state.snapshot(dataset);
+		watchDeep(dataset);
 		const id = datasetId;
 		const timer = setTimeout(() => {
+			const saved = $state.snapshot(dataset);
 			void saveDataset(saved).then(reportSave);
 			if (id) void saveDatasetDoc(id, saved);
 		}, 300);

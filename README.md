@@ -1279,7 +1279,10 @@ the upload button off: there is no file to give a face the computer has.
   same and their lowercase matches; drawn with CSS `font-size-adjust`, which a
   browser without it ignores), **Spacing** (letter spacing added, in
   thousandths of its size, as type is tracked) and **Leading** (every leading
-  it is set at, as a percentage). Each is the face's, not an area's: it
+  it is set at, as a percentage), and under them **Type** — **Auto** (the
+  kind its file says, or the app knows, shown in brackets), **Serif**, **Sans
+  Serif** or **Monospaced** — which picks the fallback a card names after the
+  face where it is missing. Each is the face's, not an area's: it
   applies wherever the face is used, on top of what the page and the areas
   set. Replace a face and the new one is outlined, ready to be brought to sit
   like the old one; those steps join the replace, so **undo** takes back the

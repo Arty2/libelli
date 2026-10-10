@@ -633,8 +633,18 @@
 			return;
 		}
 		const place = caretPlace(cell, at.x, at.y);
-		const box = td.getBoundingClientRect();
-		fingerMark = { row, column, offset: place.offset, left: place.x - box.left, top: place.top - box.top, height: place.bottom - place.top };
+		// In the scroller's content, which it is drawn in: where it is on
+		// screen, plus how far the table is scrolled.
+		const box = scrollEl?.getBoundingClientRect();
+		if (!scrollEl || !box) return;
+		fingerMark = {
+			row,
+			column,
+			offset: place.offset,
+			left: place.x - box.left + scrollEl.scrollLeft,
+			top: place.top - box.top + scrollEl.scrollTop,
+			height: place.bottom - place.top
+		};
 	}
 
 	/** Edit in the bar: the cell full size, at the caret a finger's tap drew, if it drew one. */
@@ -1882,13 +1892,6 @@
 										}
 									}}
 								></textarea>
-								{#if fingerMark && fingerMark.row === i && fingerMark.column === column && editing?.row === i && editing.column === column}
-									<span
-										class="finger-caret"
-										style="left:{fingerMark.left}px;top:{fingerMark.top}px;height:{fingerMark.height}px"
-										aria-hidden="true"
-									></span>
-								{/if}
 								<!-- Drawn only when the cell holds more than it shows (see
 								     `overflowMark`), and a way into the rest: the same full-size
 								     editor Edit opens. Out of the tab order — the field before it is where
@@ -1940,6 +1943,17 @@
 				{/if}
 			</tbody>
 		</table>
+		<!-- One caret for the whole table, where a finger's first tap chose a
+		     cell: drawn here, in the scroller's own coordinates, so it scrolls
+		     with the rows — not as a maybe in every cell, which a tap made
+		     every cell of a large table check again. -->
+		{#if fingerMark && editing?.row === fingerMark.row && editing.column === fingerMark.column}
+			<span
+				class="finger-caret"
+				style="left:{fingerMark.left}px;top:{fingerMark.top}px;height:{fingerMark.height}px"
+				aria-hidden="true"
+			></span>
+		{/if}
 	</div>
 	<!-- The shadows that say there is more past an edge, outside the scroller
 	     because inside it they would scroll away with the rows. Bottom and
@@ -2569,6 +2583,8 @@
 
 	.scroll {
 		flex: 1;
+		/* Holds the finger's caret, placed in its scrolled content. */
+		position: relative;
 		overflow: auto;
 		min-height: 0;
 		/* Scrolled to the top and flicked down, this would otherwise reload. */

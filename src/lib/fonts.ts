@@ -1,5 +1,5 @@
 import { STORE_FONTS, idbDelete, idbGet, idbKeys, idbSet, local } from './storage';
-import { clampFactor, clampTracking, clampXHeight, type FontKind, type FontRef, type Template } from './types';
+import { FONT_KINDS, clampFactor, clampTracking, clampXHeight, type FontKind, type FontRef, type Template } from './types';
 
 /**
  * Font loading. Google families come in as a stylesheet `<link>`; local files
@@ -93,9 +93,20 @@ const FALLBACKS: Record<FontKind, string> = {
 	handwriting: 'cursive'
 };
 
-/** A family's kind: what the template says of it, else what the app knows; undefined when neither. */
+/**
+ * A family's kind, for its fallback: the one chosen for it in the Images tray
+ * (`fallback`), else the one read off its file (`kind`), else what the app
+ * knows; undefined when none says.
+ */
 export function kindOf(fonts: readonly FontRef[], family: string | undefined): FontKind | undefined {
 	if (!family) return undefined;
+	const key = family.trim().toLowerCase();
+	const entry = fonts.find((f) => f.family.toLowerCase() === key);
+	return entry?.fallback ?? entry?.kind ?? KNOWN_KINDS[key];
+}
+
+/** What Auto means for a family: its file's kind, else the app's — never the chosen one. */
+export function detectedKindOf(fonts: readonly FontRef[], family: string): FontKind | undefined {
 	const key = family.trim().toLowerCase();
 	return fonts.find((f) => f.family.toLowerCase() === key)?.kind ?? KNOWN_KINDS[key];
 }
@@ -113,6 +124,8 @@ export interface FontTune {
 	xHeight?: number;
 	tracking?: number;
 	leading?: number;
+	/** the kind chosen for its fallback; undefined is Auto */
+	fallback?: FontKind;
 }
 
 const entryOf = (fonts: readonly FontRef[], family: string | undefined) => {
@@ -153,7 +166,7 @@ export function tuneFont<T extends Pick<Template, 'fonts'>>(template: T, family:
 	const at = template.fonts.findIndex((f) => f.family.toLowerCase() === key);
 	const fit = (ref: FontRef): FontRef => {
 		const next: FontRef = { ...ref };
-		const set = <K extends keyof FontTune>(name: K, value: number | undefined) => {
+		const set = (name: 'size' | 'xHeight' | 'tracking' | 'leading', value: number | undefined) => {
 			if (value === undefined) delete next[name];
 			else next[name] = value;
 		};
@@ -161,11 +174,15 @@ export function tuneFont<T extends Pick<Template, 'fonts'>>(template: T, family:
 		if ('xHeight' in change) set('xHeight', clampXHeight(change.xHeight));
 		if ('tracking' in change) set('tracking', clampTracking(change.tracking));
 		if ('leading' in change) set('leading', clampFactor(change.leading));
+		if ('fallback' in change) {
+			if (change.fallback && FONT_KINDS.includes(change.fallback)) next.fallback = change.fallback;
+			else delete next.fallback;
+		}
 		return next;
 	};
 	if (at >= 0) return { ...template, fonts: template.fonts.map((f, i) => (i === at ? fit(f) : f)) };
 	const made = fit({ ...base, family });
-	const tuned = ['size', 'xHeight', 'tracking', 'leading'].some((k) => k in made);
+	const tuned = ['size', 'xHeight', 'tracking', 'leading', 'fallback'].some((k) => k in made);
 	return tuned ? { ...template, fonts: [...template.fonts, made] } : template;
 }
 
@@ -491,7 +508,7 @@ export function mergeFonts(list: FontRef[], added: FontRef[]): FontRef[] {
  * file, its kind — travels; what one design did with it does not.
  */
 export function untuned(ref: FontRef): FontRef {
-	const { xHeight: _x, size: _s, tracking: _t, leading: _l, ...rest } = ref;
+	const { xHeight: _x, size: _s, tracking: _t, leading: _l, fallback: _f, ...rest } = ref;
 	return rest;
 }
 
@@ -689,8 +706,12 @@ export interface FontEntry {
 	/** for an uploaded one: its key, and what it weighs */
 	ref?: string;
 	bytes?: number;
-	/** its kind, for the fallback its name is drawn with; undefined when nobody knows */
+	/** its kind, for the fallback its name is drawn with — chosen, else detected; undefined when nobody knows */
 	kind?: FontKind;
+	/** what Auto is for it: its file's kind, else the app's */
+	detected?: FontKind;
+	/** the kind chosen for it in this design; absent is Auto */
+	fallback?: FontKind;
 	/** its tuning in this design (`FontTune`): each absent when it is none */
 	xHeight?: number;
 	size?: number;
@@ -720,19 +741,21 @@ export function fontInventory(
 	const used = familiesUsed(template);
 	const storedBy = new Map(stored.map((f) => [f.family.toLowerCase(), f]));
 	const entries = new Map<string, FontEntry>();
-	const add = (entry: Omit<FontEntry, 'kind' | keyof FontTune>) => {
+	const add = (entry: Omit<FontEntry, 'kind' | 'detected' | keyof FontTune>) => {
 		const key = entry.family.toLowerCase();
 		if (entries.has(key)) return;
 		const kind = kindOf(template.fonts, entry.family);
+		const detected = detectedKindOf(template.fonts, entry.family);
 		const own = entryOf(template.fonts, entry.family);
 		const tune: FontTune = {
+			fallback: own?.fallback,
 			xHeight: clampXHeight(own?.xHeight),
 			size: clampFactor(own?.size),
 			tracking: clampTracking(own?.tracking),
 			leading: clampFactor(own?.leading)
 		};
 		const set = Object.fromEntries(Object.entries(tune).filter(([, v]) => v !== undefined));
-		entries.set(key, { ...entry, ...(kind ? { kind } : {}), ...set });
+		entries.set(key, { ...entry, ...(kind ? { kind } : {}), ...(detected ? { detected } : {}), ...set });
 	};
 	for (const font of template.fonts) {
 		const key = font.family.toLowerCase();

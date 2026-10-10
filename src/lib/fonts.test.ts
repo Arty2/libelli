@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	detectedKindOf,
 	faceOf,
 	fontChoices,
 	fontInventory,
@@ -89,6 +90,21 @@ describe('a face on a card', () => {
 		// Out of range: an x-height of 1.06 is none, a size of 9 is the most there is.
 		expect(tuneFont(up, 'Lora', { xHeight: 1.06 }, { family: 'Lora', source: 'google' }).fonts[0].xHeight).toBeUndefined();
 		expect(tuneFont(up, 'Lora', { size: 9, tracking: -999 }, { family: 'Lora', source: 'google' }).fonts[0]).toMatchObject({ size: 2, tracking: -200 });
+	});
+
+	it('falls back by the kind chosen for it, over the one detected; Auto is the detected', () => {
+		const fonts: FontRef[] = [{ family: 'Studio', source: 'local', kind: 'sans-serif', fallback: 'monospace' }];
+		expect(kindOf(fonts, 'Studio')).toBe('monospace');
+		expect(detectedKindOf(fonts, 'Studio')).toBe('sans-serif');
+		const t = { fonts };
+		const auto = tuneFont(t, 'Studio', { fallback: undefined }, { family: 'Studio', source: 'local' });
+		expect(auto.fonts[0]).toEqual({ family: 'Studio', source: 'local', kind: 'sans-serif' });
+		expect(kindOf(auto.fonts, 'Studio')).toBe('sans-serif');
+		// Chosen for a system face, which has no entry until then.
+		const georgia = tuneFont({ fonts: [] as FontRef[] }, 'Georgia', { fallback: 'sans-serif' }, { family: 'Georgia', source: 'system' });
+		expect(georgia.fonts).toEqual([{ family: 'Georgia', source: 'system', fallback: 'sans-serif' }]);
+		// A design's choice does not travel into the editor's list.
+		expect(mergeFonts([], fonts)).toEqual([{ family: 'Studio', source: 'local', kind: 'sans-serif' }]);
 	});
 
 	it('keeps the replacement\'s own x-height when a font is replaced with it', () => {
@@ -246,7 +262,7 @@ describe('fontInventory', () => {
 			fonts: [...design.fonts, { family: 'Plain Office', source: 'system' }]
 		} as unknown as Design;
 		const list = fontInventory(withSystem, []);
-		expect(list.find((f) => f.family === 'Georgia')).toEqual({ family: 'Georgia', status: 'system', used: true, kind: 'serif' });
+		expect(list.find((f) => f.family === 'Georgia')).toEqual({ family: 'Georgia', status: 'system', used: true, kind: 'serif', detected: 'serif' });
 		expect(list.find((f) => f.family === 'Plain Office')).toEqual({ family: 'Plain Office', status: 'system', used: true });
 		// An upload under a system face's name is the upload.
 		expect(fontInventory(withSystem, [{ ref: 'font:georgia', family: 'Georgia', bytes: 100 }]).find((f) => f.family === 'Georgia')?.status).toBe('uploaded');

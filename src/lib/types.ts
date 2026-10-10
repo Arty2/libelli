@@ -251,6 +251,12 @@ export interface FontRef {
 	 */
 	kind?: FontKind;
 	/**
+	 * The kind chosen for it in the Images tray, over the one read off its
+	 * file or known to the app: for a file that says nothing, or says it
+	 * wrongly. Absent is Auto — `kind`, else what the app knows.
+	 */
+	fallback?: FontKind;
+	/**
 	 * Every use of this face drawn with its x-height at this fraction of its
 	 * size (`font-size-adjust`), so it can be matched to another face's: faces
 	 * of one size can differ by a fifth in how big their lowercase looks. Two
