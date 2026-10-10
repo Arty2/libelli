@@ -2336,6 +2336,15 @@ the first tap, and nothing on a page can turn that off. The measuring is an
 imitation of the browser's layout, so right-to-left text may land a
 character off.
 
+**The browser never handles a finger's tap on a cell.** Read-only was not
+enough: a tap the browser handles on a text field still puts its caret
+there, and Android reads a second tap near that caret as a tap on it and
+offers Paste. So `touchOpen` cancels every tap's `touchend` on a cell —
+which stops the browser's focus, mouse events and click for that tap — and
+focuses the cell itself; a focus from a script draws no handles, and the
+finger's cell hides its caret (`caret-color: transparent`). A scroll that
+started on a cell is not a tap, is never cancelled, and scrolls as before.
+
 **The gesture is listened for on the table, not on each cell.** `touchOpen`
 takes a `find` that names the cell a press landed in (`data-opens`, with the
 row and column beside it), so a table of a few hundred rows has six

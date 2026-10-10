@@ -236,14 +236,22 @@ export function isDoubleTap(last: Tap | null, now: Tap): boolean {
  * second tap is a tap on the cell while it already has the focus, however
  * long after the first: a person reads what they chose before deciding to
  * type, and a double tap's few hundred milliseconds asked them to decide
- * before they had looked. A cell a tap does not focus (a button, on iOS)
- * still opens on a quick double tap.
+ * before they had looked. A quick double tap is the same thing faster.
+ *
+ * Every tap on a cell is the page's, not the browser's: its lift is
+ * cancelled (`touchend`, which stops the browser's own handling of the tap —
+ * its focus, its mouse events, its click) and the first tap focuses the cell
+ * from here. A tap the browser handles on a text field puts its own caret
+ * there, read-only or not, and Android reads the next tap near that caret as
+ * a tap on it and offers Paste; nothing on a page turns that bubble off, so
+ * the browser is never given the tap. Focus from a script draws no handles.
+ * After an open, the cancelled lift also keeps its click off the editor just
+ * opened, where it would select a word.
  *
  * `onopen` is told where the opening press was, for the caret. A long press
- * swallows the context menu Android follows it with; the lift that ends
- * either is cancelled (`touchend`, which stops the browser's own mouse events
- * and click), or what is under the finger — the editor just opened — takes a
- * click and selects a word. A finger that wanders is scrolling, not pressing.
+ * swallows the context menu Android follows it with. A finger that wanders
+ * is scrolling, not pressing — and a scroll was never a tap, so it is never
+ * cancelled.
  */
 export function touchOpen(
 	node: HTMLElement,
@@ -253,7 +261,7 @@ export function touchOpen(
 	let press: { id: number; x: number; y: number; cell: HTMLElement; focused: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
 	let last: (Tap & { cell: HTMLElement }) | null = null;
 	let held = false;
-	/** The lift that ends an open: its click would land on what it opened. */
+	/** The lift that ends a tap on a cell: the browser's handling of it is the page's. */
 	let swallow = false;
 
 	const clear = () => {
@@ -298,7 +306,11 @@ export function touchOpen(
 		clear();
 		const tap = { x: event.clientX, y: event.clientY, at: event.timeStamp || performance.now(), cell };
 		if (focused || (last?.cell === cell && isDoubleTap(last, tap))) open(cell, tap);
-		else last = tap;
+		else {
+			last = tap;
+			swallow = true;
+			cell.focus({ preventScroll: true });
+		}
 	};
 	const cancel = () => {
 		clear();

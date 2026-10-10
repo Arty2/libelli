@@ -2941,10 +2941,12 @@
 	}
 
 	/* A finger's cell: a long press opens it, so it must not also start a
-	   text selection with its handles and its menu. */
+	   text selection with its handles and its menu; and it is chosen, not
+	   typed in, so no caret blinks in it to say otherwise. */
 	td textarea.by-finger {
 		-webkit-user-select: none;
 		user-select: none;
+		caret-color: transparent;
 	}
 
 
