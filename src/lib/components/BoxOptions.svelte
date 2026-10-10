@@ -1091,13 +1091,13 @@
 			</span>
 			{#if selected.mode !== 'qr'}
 			<label class="field">
-				<span>Kerning</span>
+				<span>Tracking</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.05"
 					placeholder={String(template.defaults.letterSpacing)}
-					title="Kerning: space added between letters, in mm; blank inherits the page's"
+					title="Tracking: space added between letters, in mm; blank inherits the page's"
 					value={selected.letterSpacing ?? ''}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ letterSpacing: inherited(e) })}

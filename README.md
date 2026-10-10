@@ -448,7 +448,7 @@ resize boxes directly, or type exact millimetres.
   modifiers with the arrows step the alignment of the selection in the direction
   pressed. Both give an area a value of its own on the first go, so an area that
   was inheriting stops.
-- **Type defaults** — the page bar holds the family, size, leading, kerning and
+- **Type defaults** — the page bar holds the family, size, leading, tracking and
   color. A box that leaves those fields blank inherits them, so changing the
   page moves every box that never overrode it; a new box starts out inheriting
   everything.
@@ -1867,11 +1867,11 @@ than it has to.
   sheet size (a preset or your own, a button to turn it over, and left and
   right pages), margin (one number all round, or one per edge — top, bottom and
   left and right, or inner and outer with left and right pages), bleed, crop marks · type defaults (font, size, leading,
-  kerning, paragraph, leader, baseline, list marker, numbers, indent and leading) · surface (paper color, background image and fit) · page
+  tracking, paragraph, leader, baseline, list marker, numbers, indent and leading) · surface (paper color, background image and fit) · page
   number, whether to print the total, and its margin · CSS
 - **Area** — head, on one line: lock, the field's name, duplicate, delete · content
   (data field or static text, column, mode, fit, barcode type, digits and correction) · type (font,
-  size, x-height, weight, color) · setting (leading, kerning, paragraph, leader, baseline,
+  size, x-height, weight, color) · setting (leading, tracking, paragraph, leader, baseline,
   and for Markdown the list marker, numbers, indent and leading, case) · alignment,
   horizontal and vertical · surface (fill, padding, border width, style, hand and
   color, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide

@@ -3429,14 +3429,14 @@ surface, a hand-drawn edge, a QR — and nowhere else. Everything that measures,
 drags or writes the area back holds the stored one, so one card's color can
 never be saved as the template's.
 
-**Labels stay one word where one word was there.** Leading, Kerning, Draft,
+**Labels stay one word where one word was there.** Leading, Tracking, Draft,
 Width and Height were tried as longer, plainer phrases and put back: in a bar
 this dense a second word costs more than it explains, and the tip on each field
 says the rest. The group names are set in capitals like the labels, bold, which
-is what tells a group's name from a field's. Spacing became Kerning, as asked:
-strictly, space added evenly between every letter is tracking and kerning is
-pairwise, but Kerning is the word the people setting these cards reach for,
-and Spacing read as space between lines or paragraphs.
+is what tells a group's name from a field's. Spacing became Tracking: space
+added evenly between every letter is what Photoshop, Illustrator and
+InDesign call it (kerning is pairwise, which this is not), and Spacing read
+as space between lines or paragraphs.
 
 **A value taken from the page looks taken; one set here has an ×.** Blank was
 always how an area's field inherited, and nothing on screen said which ones
