@@ -608,8 +608,8 @@
 	looked at beside the card that uses them, and a list of them wants the
 	height a bar in the options row could never give it. One tray at a time —
 	this or the table — in the same room, at the same width or height. What
-	is stored and what it weighs at the top, the ways in at the foot, where
-	the table keeps its own.
+	is stored and what it weighs at the top; the ways in on the Images head,
+	since they are the images' alone.
 -->
 <section class="images-tray" aria-label="Pictures">
 	<!-- The head is also the tray's grip on a phone, as the table's header

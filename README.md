@@ -1196,7 +1196,7 @@ Everything else this app keeps is small — a template is a page of JSON, a
 dataset is text. Images are not, and browser storage is a poor place for them:
 it is a bucket you cannot look into, shared with everything else the app saves,
 and the browser may empty it. **Pictures**, in the toolbar between Page
-Setup and Data, opens a tray in the table's place — a tray rather than a
+and Data, opens a tray in the table's place — a tray rather than a
 dialog, so the card that uses the pictures stays in view. It holds three
 sections, **Images**, **Drawings** and **Fonts**.
 
@@ -1252,7 +1252,8 @@ sections, **Images**, **Drawings** and **Fonts**.
   card follows, back them up with the rest of your work, and clear them out with
   your file manager rather than through this app. The folder is remembered
   between visits, but a browser asks to be let into it once per visit — the
-  Images head says so, with **Open** to do it — and until then images come
+  tray's head says it is not opened, and **Open** on the Images head opens
+  it — and until then images come
   from browser storage as before. The **×** beside the folder lets go of it;
   nothing in it is deleted.
 - **Where that works** — the File System Access API is Chromium's: Chrome, Edge,
@@ -1348,7 +1349,7 @@ order, or the order a fold needs. See **Zines** below.
 
 ## Zines
 
-**Order**, beside **Print Per Sheet**, decides which page lands in which cell of
+**Order**, beside **Pages per Sheet**, decides which page lands in which cell of
 the sheet.
 
 - **Sequential** is the card case and the default: the run is poured into the
@@ -1394,6 +1395,10 @@ checklist are the same act, so they are the same screen — and **Print
 Settings** itself sits right there too: the same panel the page bar shows, so a
 sheet size or count picked wrong does not send you back to the editor to fix
 it before you print.
+
+A thumbnail is filled in as it scrolls near, so a run of hundreds opens at
+once; each frame is sized from the template, so nothing moves as they fill,
+and **PNG** fills in the rest before it starts.
 
 With **Pages per Sheet** on, a second grid appears under the cards: **Sheets —
 what will print**, one thumbnail per physical sheet, each showing exactly the
@@ -1866,17 +1871,19 @@ than it has to.
   its caret, which also holds new, import, export, reset and delete ·
   sheet size (a preset or your own, a button to turn it over, and left and
   right pages), margin (one number all round, or one per edge — top, bottom and
-  left and right, or inner and outer with left and right pages), bleed, crop marks · type defaults (font, size, leading,
-  tracking, paragraph, leader, baseline, list marker, numbers, indent and leading) · surface (paper color, background image and fit) · page
+  left and right, or inner and outer with left and right pages), bleed, crop marks · type defaults (font, size, color,
+  leading, baseline, tracking; paragraph and leader; list marker, numbers, indent and leading) · surface (paper color, background image and fit) · page
   number, whether to print the total, and its margin · CSS
-- **Area** — head, on one line: lock, the field's name, duplicate, delete · content
-  (data field or static text, column, mode, fit, barcode type, digits and correction) · type (font,
-  size, x-height, weight, color) · setting (leading, tracking, paragraph, leader, baseline,
-  and for Markdown the list marker, numbers, indent and leading, case) · alignment,
-  horizontal and vertical · surface (fill, padding, border width, style, hand and
-  color, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
-  when empty, and mirror where the template has left and right pages) ·
-  rotation and its pivot
+- **Area** — head, on one line: lock, the area's name, delete, and the glyph
+  that puts the bar away · content (data field or static text, column, mode,
+  fit, hide when empty; barcode type, digits and correction) · alignment,
+  horizontal and vertical · text (font, size, x-height, weight, color,
+  tracking, case) · position (x, y, w, h, anchor and gap, fold follow where
+  the template has left and right pages, rotation and its pivot) · lines
+  (leading, baseline, columns with their gap, orphans and widows, paragraph,
+  leader) and for Markdown lists (marker, numbers, indent, leading) · box
+  (fill, border width, style, hand and color, radius, padding, overflow) ·
+  effects (blend, opacity)
 - **Stacking order** — not in either bar and not in the right-click menu: a
   column beside the page, under undo and redo, whenever anything is selected.
   Bring to front, forward, backward, send to back. It lives there because it is
@@ -1945,8 +1952,9 @@ than it has to.
   shares the height with the page, as the table's header row is. Carry one onto an area to put it there, or onto the **page** between
   areas for a new image area of its own, centred where it was let go, 40mm
   across and in the image's proportions; an image file dragged in from
-  outside does the same. Every **Upload…** that takes an image wears Carbon's
-  *image reference*, and every **URL…** its *copy link*. Deleting an image
+  outside does the same. Every **Upload…** in a bar that takes an image wears
+  Carbon's *image reference* — the tray's own upload buttons are the arrow out
+  of a tray — and every **URL…** its *copy link*. Deleting an image
   asks first — **Delete Image**, Escape to keep it — because undo keeps the
   template and the table, not the bytes. A name something points at that this
   browser has no image for stays in the list as a dashed, red *missing* line,
