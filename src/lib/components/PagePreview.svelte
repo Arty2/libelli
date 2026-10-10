@@ -1985,7 +1985,7 @@
 				}}
 			/>
 			<span class="wide">Boxes</span>
-			<span class="narrow" aria-hidden="true">B</span>
+			<span class="narrow" aria-hidden="true">□</span>
 		</label>
 	</div>
 
@@ -2730,7 +2730,7 @@
 			/* inline-block, because a width means nothing on an inline box: the
 			   two marks are different widths and the ticks would not line up. */
 			display: inline-block;
-			/* A lone # or B is a mark, not a word: it needs the weight to read as
+			/* A lone #, | or □ is a mark, not a word: it needs the weight to read as
 			   a label rather than as a stray glyph beside a tick. */
 			font-weight: 700;
 			width: 0.75em;

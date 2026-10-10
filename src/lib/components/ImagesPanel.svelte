@@ -118,7 +118,7 @@
 		serif: 'Serif',
 		'sans-serif': 'Sans Serif',
 		monospace: 'Monospaced',
-		handwriting: 'Handwriting'
+		handwriting: 'Cursive'
 	};
 
 	/** Replace's first item: not a family — a name no family can have. */
@@ -721,20 +721,23 @@
 			<button class="square save" title="Upload images from this device" aria-label="Upload images" onclick={() => fileInput?.click()}>
 				<Icon name="upload" size={12} />
 			</button>
-			{#if available}
-				<button
-					class="square save"
-					title={folder
+			<!-- Shown where it cannot work too, off, so a phone or Firefox says
+			     why there is no folder rather than leaving it to be wondered at. -->
+			<button
+				class="square save"
+				disabled={!available}
+				title={!available
+					? 'A folder of your own needs Chrome or Edge on a computer — this browser cannot keep images in one, so they stay in its own storage'
+					: folder
 						? `Another folder — images are kept in ${folder.name} now`
 						: "Keep images as ordinary files in a folder of your own, rather than in this browser's storage"}
-					aria-label={folder ? 'Choose another folder' : 'Choose a folder'}
-					onclick={choose}><Icon name="folder" size={12} /></button
-				>
-				{#if folder}
-					<button class="square" title="Stop reading {folder.name}. Nothing in it is deleted" aria-label="Forget {folder.name}" onclick={forget}>
-						<Icon name="close" size={12} />
-					</button>
-				{/if}
+				aria-label={folder ? 'Choose another folder' : 'Choose a folder'}
+				onclick={choose}><Icon name="folder" size={12} /></button
+			>
+			{#if available && folder}
+				<button class="square" title="Stop reading {folder.name}. Nothing in it is deleted" aria-label="Forget {folder.name}" onclick={forget}>
+					<Icon name="close" size={12} />
+				</button>
 			{/if}
 		{/snippet}
 		{#if busy}

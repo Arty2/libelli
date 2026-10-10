@@ -667,9 +667,10 @@ the open one ticked, with everything that acts on the template as a whole under 
 rule: **New Template** and **A5 Starter Booklet**; under another, **Import…** and
 **Export**; and under a third, in red, **Reset…** — only on a template that began
 as a starter — and **Delete…** (whose dialog still says **Delete Template**, so the button you
-confirm with names what goes). An export is named for the template and the
-day — `a5-starter-booklet_2026-09-25.json` — so a folder of them sorts by
-date. **Lock** stays outside the menu, beside the field,
+confirm with names what goes). An export is named for the template as you wrote
+it, spaces as dashes — `A5-Starter-Booklet.json` — so it is found under the
+name it has here; a second export of the same name is numbered by the
+browser. **Lock** stays outside the menu, beside the field,
 because it is a state you need to see rather than an errand. Renaming is typing
 in the field — the template keeps its identity, so two of them may share a name
 without sharing anything else. **A5 Starter Booklet** opens the design a first run
@@ -1231,7 +1232,16 @@ sections, **Images**, **Drawings** and **Fonts**.
   WebP can be edited; a GIF, an SVG or an AVIF is shown large and left alone,
   because a canvas cannot write one back, and a browser that cannot write the
   type a file's name promises refuses rather than saving a PNG under it.
-- **Onto the card** — drag a thumbnail out of the bar and let go over an area:
+- **Replacing a picture** — each stored picture in the Pictures tray has an
+  upload button (the arrow out of a tray) beside its download: a new file under
+  the same name, so every card and page showing it shows the new one with
+  nothing to re-point. Not in undo, as no picture's bytes are. A drawing's
+  whole line opens it to draw on.
+- **Sections that fold** — the Pictures tray lists **Images**, **Drawings** and
+  **Fonts** under heads that say how many each holds and what they weigh; a
+  press on a head folds its list shut or open, and this browser remembers
+  which are shut, so the tray opens as it was left.
+- **Onto the card** — drag a thumbnail out of the tray and let go over an area:
   the image goes where a dropped file would, into this row's cell when the
   area is bound to a column and onto the area otherwise. The area under the
   pointer is outlined while you carry it. It works with a finger as well as a
@@ -1247,8 +1257,8 @@ sections, **Images**, **Drawings** and **Fonts**.
   nothing in it is deleted.
 - **Where that works** — the File System Access API is Chromium's: Chrome, Edge,
   Opera and Arc have it; Firefox and Safari do not. Everywhere else the app keeps
-  images in IndexedDB exactly as it always did, and the bar says which of the
-  two is in force.
+  images in IndexedDB exactly as it always did. The folder button is there
+  anyway, greyed, and its tip says why.
 - **Both at once** — an image is looked for in the folder first and in this
   browser second, so a run made before you chose a folder keeps rendering, and
   a name put in the folder afterwards is what that name means from then on. New
@@ -1269,7 +1279,7 @@ Pictures tray lists the ones a design uses, to be replaced like any other, with
 the upload button off: there is no file to give a face the computer has.
 
 - **A fallback of the same kind** — every face is known as serif, sans-serif,
-  monospace or handwriting, and the card names a fallback of that kind after
+  monospace or cursive, and the card names a fallback of that kind after
   it: a design opened where an uploaded file or a system face is missing
   falls back to a serif for a serif and a monospace for a monospace, so a
   price list still lines up. The app knows the faces it offers; an uploaded
@@ -1278,7 +1288,7 @@ the upload button off: there is no file to give a face the computer has.
 - **A face's Type** — tap a used font's name in the Pictures tray and its row is
   outlined, with **Type** between the name and Replace — **Auto** (the kind
   its file says, or the app knows, shown in brackets), then **Serif**, **Sans
-  Serif**, **Monospaced** or **Handwriting** — which picks the fallback a card
+  Serif**, **Monospaced** or **Cursive** — which picks the fallback a card
   names after the face where it is missing. Replace a face and the new one is
   outlined; a Type chosen then joins the replace, so **undo** takes back both
   and **redo** (Ctrl/Cmd+Y) brings both back.
@@ -1287,16 +1297,6 @@ the upload button off: there is no file to give a face the computer has.
   `font-size-adjust`, which a browser without it ignores). Blank, greyed, is
   the face's own. Only while the area takes the page's size: give it a Size
   of its own and X-Height is cleared and off.
-
-- **Replacing a picture** — each stored picture in the Pictures tray has an
-  upload button (the arrow out of a tray) beside its download: a new file under
-  the same name, so every card and page showing it shows the new one with
-  nothing to re-point. Not in undo, as no picture's bytes are. A drawing's
-  whole line opens it to draw on.
-- **Sections that fold** — the Pictures tray lists **Images**, **Drawings** and
-  **Fonts** under heads that say how many each holds and what they weigh; a
-  press on a head folds its list shut or open, and this browser remembers
-  which are shut, so the tray opens as it was left.
 - **Fonts, in the Pictures tray** — every font the design is set in and every
   font file this browser holds, in one list under the pictures, each name set
   in the face it names. A design carries a font's name, never its file, so
@@ -1318,9 +1318,9 @@ the upload button off: there is no file to give a face the computer has.
   file is in no undo.
 - **A template carries only what it uses** — the families its page default and
   its areas are set in, and no others. A family you stop using is not
-  forgotten: it moves to this browser's own list, and every font menu shows the
-  template's families first and, under a rule, everything else this browser
-  knows — fonts you have named or uploaded before, and the curated list.
+  forgotten: it moves to this browser's own list, and every font menu still
+  offers it, in its source's group — with the fonts you have named or uploaded
+  before, and the curated list.
 - **Google families** — injected as a stylesheet link. Every weight is asked for
   first, for a variable family; then regular and bold with their italics; then
   the family as it comes — Google refuses a request for a weight a family has
@@ -1923,7 +1923,7 @@ than it has to.
   double-tap** the zoom to go to **Fit** and a second time to come back to the
   zoom you were at — or, from Fit with nothing to come back to, to Actual. The
   menu is drawn like the template picker's, as are the font menus. On a phone the two left-hand toggles keep their row and lose
-  their words — a **#** for the grid, a **|** for the guides and a **B** for
+  their words — a **#** for the grid, a **|** for the guides and a **□** for
   the boxes, beside ticks
   that already say whether they are on — rather than stacking into a two-line
   panel that grew up over the sheet. What a screen reader is told does not
@@ -1988,7 +1988,8 @@ A template claiming a schema newer than the app understands is refused outright
 rather than half-read.
 
 Data comes in as CSV or pasted TSV and goes out as printed pages; the dataset
-itself stays in the browser. **Export CSV** takes the table you are in, not the
+itself stays in the browser. **Export** in the table's menu takes the table
+you are in, named as the table is, spaces as dashes — `Plant-cards.csv` — not the
 library — a table is a file's worth of rows, and there is nothing a bundle of
 all of them would open in.
 

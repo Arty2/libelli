@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import Icon from './Icon.svelte';
-	import { download } from '$lib/download';
+	import { download, fileStem } from '$lib/download';
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { touchOpen } from '$lib/gestures';
@@ -1577,7 +1577,8 @@
 
 	/** The table as it stands, back out as a file. Nothing leaves the browser. */
 	function exportCsv() {
-		download('card-data.csv', toCsv(dataset), 'text/csv');
+		// Named as the picker names it, so the file is found under the table's name.
+		download(`${fileStem(tableName, UNTITLED_TABLE)}.csv`, toCsv(dataset), 'text/csv');
 		onnotice(`${dataset.rows.length} row${dataset.rows.length === 1 ? '' : 's'} exported as CSV.`);
 	}
 </script>

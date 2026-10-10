@@ -3288,10 +3288,18 @@ are where a tooltip gets a key from, and the right-click menu prints them too.
 **No unsaved dot.** There was one for a release — a mark beside the template's
 name while the design differed from its last export — and it was taken out
 again: templates autosave in this browser, so it was a mark about a file most
-people never write, on a field they look at all the time. Exports are dated in
-their filename instead, which says the same thing where it is looked for.
+people never write, on a field they look at all the time.
 
-**Images is a tray, not a bar.** It was a third bar in the options row, where a
+**An export is named as its thing is named.** The template's file is its
+name and the table's CSV the table's name, as written — case, accents, a
+Greek name whole — with spaces as dashes and only what a file system refuses
+taken out (`fileStem`). They were `slugify`d and dated, then, and the CSV was
+always `card-data.csv`: a file is looked for by the name somebody gave it,
+`slugify` turned any name outside ASCII into `untitled`, and a browser
+numbers a second download of one name itself. The PNGs keep `slugify`, since
+they run in numbered series where the stem is only a prefix.
+
+**Pictures is a tray, not a bar.** It was a third bar in the options row, where a
 list of pictures had nine rows' height at most and the page bar had to give it
 the row. It takes the table's room now, one of the two at a time, at the same
 width or height, and the options row is the page bar and the area bar only.

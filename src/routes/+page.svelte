@@ -21,7 +21,7 @@
 		storeLocalImage,
 		uploadBackgroundImage
 	} from '$lib/assets';
-	import { download, slugify } from '$lib/download';
+	import { download, fileStem } from '$lib/download';
 	import {
 		deleteStoredFont,
 		ensureGoogleFont,
@@ -80,7 +80,7 @@
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { codeStats } from '$lib/csscode';
 	import { watchPresses } from '$lib/haptics';
-	import { GONE_ROW, carryLookups, formatDate, isKeyword, referencedColumns } from '$lib/placeholders';
+	import { GONE_ROW, carryLookups, isKeyword, referencedColumns } from '$lib/placeholders';
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
 	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
@@ -2971,9 +2971,10 @@
 	}
 
 	function doExportTemplate() {
-		// Dated, so a folder of exports says which is which and the newest sorts
-		// last: `name_2026-09-25.json`, in the underscore `pageFilename` uses.
-		download(`${slugify(template.name)}_${formatDate(new Date(), 'YYYY-MM-DD')}.json`, exportTemplate($state.snapshot(template)));
+		// The template's name, as written, spaces as dashes: the file is found
+		// under the name it was given, and imported back as that name. The
+		// browser numbers a second export of the same name itself.
+		download(`${fileStem(template.name)}.json`, exportTemplate($state.snapshot(template)));
 		notify('Template exported — fonts referenced by name.');
 	}
 
