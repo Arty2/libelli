@@ -1272,24 +1272,18 @@ the upload button off: there is no file to give a face the computer has.
   price list still lines up. The app knows the faces it offers; an uploaded
   file says what it is in its own tables (TrueType, OpenType and WOFF — a
   WOFF2 falls back to sans-serif), and the design keeps that with the font.
-- **Tuning a face** — tap a font's name in the Images tray and its row is
-  outlined, with **Type** beside the name — **Auto** (the kind its file says,
-  or the app knows, shown in brackets), **Serif**, **Sans Serif**,
-  **Monospaced** or **Handwriting**, which picks the fallback a card names
-  after the face where it is missing — and four steps under it, each **−**
-  value **+**, greyed while it is the face's own: **Size** (every size it is
-  set at, as a percentage), **X-Height** (its lowercase as a percentage of its
-  size — give two faces the same and their lowercase matches; drawn with CSS
-  `font-size-adjust`, which a browser without it ignores), **Spacing** (letter
-  spacing added, in mm like an area's) and **Leading** (every leading it is
-  set at, as a percentage). A changed value is a button: tap it to put that
-  one back to the face's own. Each is the face's, not an area's: it
-  applies wherever the face is used, on top of what the page and the areas
-  set. Replace a face and the new one is outlined, ready to be brought to sit
-  like the old one; those steps join the replace, so **undo** takes back the
-  replace and the tuning together and **redo** (Ctrl/Cmd+Y) brings both back —
-  flip between the two faces to compare them. Tuning any other time is a step
-  of its own.
+- **A face's Type** — tap a used font's name in the Images tray and its row is
+  outlined, with **Type** between the name and Replace — **Auto** (the kind
+  its file says, or the app knows, shown in brackets), then **Serif**, **Sans
+  Serif**, **Monospaced** or **Handwriting** — which picks the fallback a card
+  names after the face where it is missing. Replace a face and the new one is
+  outlined; a Type chosen then joins the replace, so **undo** takes back both
+  and **redo** (Ctrl/Cmd+Y) brings both back.
+- **X-Height** — in the area bar, beside Size: the area's lowercase as a
+  percentage of its size, to make one face sit like another (drawn with CSS
+  `font-size-adjust`, which a browser without it ignores). Blank, greyed, is
+  the face's own. Only while the area takes the page's size: give it a Size
+  of its own and X-Height is cleared and off.
 
 - **Replacing a picture** — each stored picture in the Images tray has an
   upload button (the arrow out of a tray) beside its download: a new file under
@@ -1874,7 +1868,7 @@ than it has to.
   number, whether to print the total, and its margin · CSS
 - **Area** — head, on one line: lock, the field's name, duplicate, delete · content
   (data field or static text, column, mode, fit, barcode type, digits and correction) · type (font,
-  size, weight, color) · setting (leading, spacing, paragraph, leader, baseline,
+  size, x-height, weight, color) · setting (leading, spacing, paragraph, leader, baseline,
   and for Markdown the list marker, numbers, indent and leading, case) · alignment,
   horizontal and vertical · surface (fill, padding, border width, style, hand and
   color, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide

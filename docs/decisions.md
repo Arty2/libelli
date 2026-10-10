@@ -824,12 +824,12 @@ beside it (a WeakMap — states are never changed once recorded) so the
 present is not serialised again at every commit.
 
 **A refinement can be folded into the last step (`amend`).** The page uses
-it for one thing: x-height set from the Images tray on a face just replaced
+it for one thing: a Type chosen in the Images tray for a face just replaced
 in from there joins the replace's entry (`fontSession`, `commit` in +page),
 so one undo goes back to the old face and one redo brings the new one back as
-tuned — two faces compared by flipping, not by stepping back through every
-nudge. Anything recorded in between makes the replace no longer the present
-entry, and the next nudge is a step of its own.
+chosen — two faces compared by flipping, not by stepping back through each
+choice. Anything recorded in between makes the replace no longer the present
+entry, and the next choice is a step of its own.
 
 **Undo records first.** History is written on a 350ms debounce, so Undo pressed
 inside that third of a second used to find the latest change not yet recorded:
@@ -2928,35 +2928,27 @@ both, for the files that have them.
 **X-height is `font-size-adjust`, taken knowingly.** It is *Newly*
 available (2024), not *Widely*; asked for, and its failure is the right one:
 a browser without it ignores the declaration and draws the face at its own
-x-height, as before there was a setting. It was a scale on the face's size
-for a release (0.28.27), the leading divided back, but that is an imitation:
-the size and every em in the area moved, and a list or heading with its own
-leading opened up. `font-size-adjust` leaves the size alone, so the leading
-and everything measured in em stay as set — and it brings a fallback standing
-in for a missing face to the same x-height, which no scale could. The value is
-the x-height as a fraction of the size (`FontRef.xHeight`, 0.2 to 1), one per
-face, not per area: give two faces the same number and their lowercase
-matches, which is the point. A scale from 0.28.27 (around 1) is out of range
-and dropped. While none is set, the tray shows the face's own, measured on a
-canvas once the face has loaded (`naturalXHeight`), and its steps start from
-it.
+x-height, as before there was a setting. A scale on the size would be an
+imitation: the size and every em in the area would move, and a list or heading
+with its own leading would open up. `font-size-adjust` leaves the size alone,
+so the leading and everything measured in em stay as set — and it brings a
+fallback standing in for a missing face to the same x-height, which no scale
+could. The value is the lowercase as a fraction of the size (`Box.xHeight`,
+0.2 to 1); blank is the face's own, measured on a canvas once the face has
+loaded (`naturalXHeight`) and shown as the field's placeholder.
 
-**A face's tuning lives on the face, and only in the Images tray.** Size,
-x-height, spacing and leading (`FontTune`, on the template's font entry) are
-facts about a face — what it takes to make one face sit like another — so
-they apply wherever it is used, on top of what the page and each area set:
-size and leading as factors, spacing in mm, added to the text's own. Spacing
-was tracking in thousandths of the size first, as type is tracked, but it sat
-beside an area's Spacing in mm and the two did not read as one sum; renamed
-`letterSpacing` with the change, so a value saved in the old unit is dropped
-rather than read as millimetres. A changed value is a button back to the
-face's own: one tuning put back among several, without an undo through the
-others. They were briefly an
-X-Height field in the page and area bars too; but those bars set what an area
-is, whatever its face, and a per-face value there read as per-area. So they
-are in the tray, under the font's name, shown only on the outlined row — the
-one tapped, or the one a replace just put in — so the list stays a list of
-names.
+**X-Height is an area's, and only beside the page's size.** It went round:
+per face in the page and area bars, then per face in the Images tray with
+size, spacing and leading beside it, applied on top of whatever the page and
+the areas set. Settings that change type from somewhere other than the bar
+the type is set in did not make sense to use, so the tray kept only Type, and
+X-Height came back to the area bar as the area's. It is enabled only while the
+area takes the page's size: a size of its own is already the area's answer
+to how big its words are, and two answers to one question is how a card ends
+up looking wrong with neither field showing why. Typing a Size clears it, and
+`newBox` drops one beside a size, so the rule holds for a pasted style or a
+template from elsewhere too. The tray's per-face tuning was never on main;
+its keys on a font entry are dropped on load.
 
 **Font menus are grouped by source, local first.** Local files, then Google
 Fonts, then System (`fontChoices`, drawn by `familyItems`): the faces
@@ -3392,7 +3384,7 @@ grouping and the order:
   print panel's **Bleed** and **Printing**.
 - An area: the name, then **Content**, **Barcode** when it is one, **Align**
   — ahead of the type, because it is what is reached for most — **Text** (font,
-  size, weight, color, letter spacing, case), **Position** (X, Y, W, H, anchor, fold follow,
+  size, x-height, weight, color, letter spacing, case), **Position** (X, Y, W, H, anchor, fold follow,
   rotation), **Lines**, **Lists** for Markdown, **Box** (fill, border, padding,
   overflow), **Effects** (blend, opacity).
 

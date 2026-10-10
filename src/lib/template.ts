@@ -35,7 +35,7 @@ import type {
 	Template,
 	TextColumns
 } from './types';
-import { FONT_KINDS, SCHEMA_VERSION, clampFactor, clampLetterSpacing, clampXHeight } from './types';
+import { FONT_KINDS, SCHEMA_VERSION, clampXHeight } from './types';
 
 /**
  * Template defaults, validation and import/export.
@@ -472,6 +472,9 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			italic: partial.italic,
 			letterSpacing: partial.letterSpacing,
 			textCase: partial.textCase,
+			// Only beside the page's size, as the bar offers it: a box with a
+			// size of its own keeps that and drops this.
+			xHeight: partial.size === undefined ? clampXHeight(partial.xHeight === undefined ? undefined : Number(partial.xHeight)) : undefined,
 			md: partial.md,
 			qr: partial.mode === 'qr' ? normaliseQr(partial.qr) : partial.qr,
 			anchor: normaliseAnchor(partial.anchor),
@@ -664,20 +667,12 @@ function normaliseFonts(raw: any): FontRef[] {
 		const source: FontRef['source'] = f?.source === 'local' ? 'local' : f?.source === 'system' ? 'system' : 'google';
 		const kind = FONT_KINDS.includes(f?.kind) ? (f.kind as FontKind) : undefined;
 		const fallback = FONT_KINDS.includes(f?.fallback) ? (f.fallback as FontKind) : undefined;
-		const xHeight = clampXHeight(f?.xHeight === undefined ? undefined : Number(f.xHeight));
-		const size = clampFactor(f?.size === undefined ? undefined : Number(f.size));
-		const letterSpacing = clampLetterSpacing(f?.letterSpacing === undefined ? undefined : Number(f.letterSpacing));
-		const leading = clampFactor(f?.leading === undefined ? undefined : Number(f.leading));
 		out.push({
 			family,
 			source,
 			...(f?.ref ? { ref: String(f.ref) } : {}),
 			...(kind ? { kind } : {}),
-			...(fallback ? { fallback } : {}),
-			...(xHeight !== undefined ? { xHeight } : {}),
-			...(size !== undefined ? { size } : {}),
-			...(letterSpacing !== undefined ? { letterSpacing } : {}),
-			...(leading !== undefined ? { leading } : {})
+			...(fallback ? { fallback } : {})
 		});
 	}
 	return out;

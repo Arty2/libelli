@@ -471,6 +471,16 @@ describe('newBox blending', () => {
 	});
 });
 
+describe('newBox x-height', () => {
+	it('keeps an x-height in range, to the hundredth, beside the page\'s size only', () => {
+		expect(newBox({ xHeight: 0.524 }).xHeight).toBe(0.52);
+		expect(newBox({ xHeight: 1.06 }).xHeight).toBeUndefined();
+		expect(newBox({ xHeight: 'big' as never }).xHeight).toBeUndefined();
+		// A size of its own is the area's answer; the x-height goes.
+		expect(newBox({ xHeight: 0.5, size: 12 }).xHeight).toBeUndefined();
+	});
+});
+
 describe('newBox opacity', () => {
 	it('keeps a value between 0 and 1, to the nearest hundredth', () => {
 		expect(newBox({ opacity: 0.5 }).opacity).toBe(0.5);

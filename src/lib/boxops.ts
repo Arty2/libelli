@@ -218,6 +218,7 @@ export const STYLE_KEYS = [
 	'valign',
 	'italic',
 	'letterSpacing',
+	'xHeight',
 	'textCase',
 	'md',
 	'columns',

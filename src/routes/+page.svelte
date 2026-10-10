@@ -3072,7 +3072,7 @@
 	}
 
 	/**
-	 * A face's own tuning changed — size, x-height, spacing, leading —
+	 * The kind a face's fallback is chosen by, changed —
 	 * everywhere it is used. From the Images tray (`fromTray`), just after
 	 * that face was replaced in, it joins the replace's undo entry — see
 	 * `fontSession`; otherwise it is a step of its own.
@@ -3087,7 +3087,7 @@
 		// step of its own, named — `describe` keeps a label already waiting,
 		// so a tune inside the replace's own debounce lands under its name.
 		if (tunes && history.present.label === fontSession?.label) amendNext = true;
-		else describe(`Tune ${family}`);
+		else describe(`Type of ${family}`);
 		template = tuneFont($state.snapshot(template) as Template, family, change, fontRef(family, editorFonts));
 	}
 

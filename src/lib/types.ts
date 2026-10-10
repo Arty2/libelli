@@ -216,30 +216,12 @@ export type FontKind = 'serif' | 'sans-serif' | 'monospace' | 'handwriting';
 export const FONT_KINDS: readonly FontKind[] = ['serif', 'sans-serif', 'monospace', 'handwriting'];
 
 /**
- * An x-height a face may be given, as a fraction of its size: 0.2 to 1, to the
- * hundredth. Anything else is none — the face's own. A value from 0.28.27,
- * when this was a scale around 1, is above the range and dropped.
+ * An x-height an area may be set to, as a fraction of its size: 0.2 to 1, to
+ * the hundredth. Anything else is none — the face's own.
  */
 export function clampXHeight(value: number | undefined): number | undefined {
 	if (value === undefined || !Number.isFinite(value) || value < 0.2 || value > 1) return undefined;
 	return Math.round(value * 100) / 100;
-}
-
-/** A face's size or leading factor: half to double, to the hundredth; 1, or anything else, is none. */
-export function clampFactor(value: number | undefined): number | undefined {
-	if (value === undefined || !Number.isFinite(value)) return undefined;
-	const v = Math.round(Math.min(2, Math.max(0.5, value)) * 100) / 100;
-	return v === 1 ? undefined : v;
-}
-
-/**
- * A face's letter spacing, in mm like an area's: -2 to 5, to the hundredth; 0,
- * or anything else, is none.
- */
-export function clampLetterSpacing(value: number | undefined): number | undefined {
-	if (value === undefined || !Number.isFinite(value)) return undefined;
-	const v = Math.round(Math.min(5, Math.max(-2, value)) * 100) / 100;
-	return v === 0 ? undefined : v;
 }
 
 export interface FontRef {
@@ -259,25 +241,6 @@ export interface FontRef {
 	 * wrongly. Absent is Auto — `kind`, else what the app knows.
 	 */
 	fallback?: FontKind;
-	/**
-	 * Every use of this face drawn with its x-height at this fraction of its
-	 * size (`font-size-adjust`), so it can be matched to another face's: faces
-	 * of one size can differ by a fifth in how big their lowercase looks. Two
-	 * faces given the same value have lowercase of the same height. The
-	 * leading is the size's, so nothing moves down the page. Absent, the
-	 * face's own.
-	 */
-	xHeight?: number;
-	/**
-	 * The face's own tuning, set from the Images tray and applied wherever it
-	 * is used — what makes one face sit like another when it replaces it.
-	 * `size`: every size it is set at, times this. `letterSpacing`: mm added
-	 * to whatever the text sets, the unit of an area's Spacing. `leading`:
-	 * every leading it is set at, times this. Absent is none: 1, 0, 1.
-	 */
-	size?: number;
-	letterSpacing?: number;
-	leading?: number;
 }
 
 /**
@@ -454,6 +417,14 @@ export interface Box extends TextStyle {
 	mode: BoxMode;
 	overflow: Overflow;
 	textCase?: TextCase;
+	/**
+	 * The area's words drawn with their lowercase this fraction of the size
+	 * (`font-size-adjust`, 0.2 to 1): faces of one size differ by a fifth in
+	 * how big their lowercase looks, and this makes one sit like another. Only
+	 * while the area takes the page's size — a size of its own is already the
+	 * area's own answer to how big its words are. Absent, the face's own.
+	 */
+	xHeight?: number;
 	md?: MarkdownStyle;
 	qr?: QrSettings;
 	anchor?: Anchor | null;

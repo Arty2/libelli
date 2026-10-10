@@ -7,7 +7,7 @@
 	import { parseColor } from '$lib/color';
 	import { safeImageUrl } from '$lib/assets';
 	import { completePlaceholders } from '$lib/complete';
-	import { availableWeights, fontChoices, fontRef, previewFamilies, watchFaces } from '$lib/fonts';
+	import { availableWeights, fontChoices, fontRef, naturalXHeight, previewFamilies, watchFaces } from '$lib/fonts';
 	import MenuSelect, { familyItems, type MenuItem } from './MenuSelect.svelte';
 	import ResetButton from './ResetButton.svelte';
 	import { referenceOf } from '$lib/layout';
@@ -44,6 +44,7 @@
 		sidesOf,
 		takesADrawing
 	} from '$lib/template';
+	import { clampXHeight } from '$lib/types';
 	import type {
 		Align,
 		BlendMode,
@@ -469,6 +470,13 @@
 
 	$effect(() => watchFaces(() => (facesVersion += 1)));
 
+	/** This area's face's own x-height, as X-Height's placeholder: blank is this. */
+	const ownXHeight = $derived.by(() => {
+		// Read, so this is measured again once the face has arrived.
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		facesVersion;
+		return naturalXHeight(selected?.font ?? template.defaults.font);
+	});
 
 	/**
 	 * The weights this area's family actually has — see `availableWeights`.
@@ -1006,11 +1014,44 @@
 					title="Blank inherits the page's {template.defaults.size}pt"
 					value={selected.size ?? ''}
 					disabled={boxFrozen}
-					onchange={(e) => patch({ size: inherited(e, MIN_SIZE) })}
+					onchange={(e) => {
+						const size = inherited(e, MIN_SIZE);
+						// A size of its own is the area's answer to how big its words
+						// are, so the X-Height that only goes with the page's goes.
+						patch(size === undefined ? { size } : { size, xHeight: undefined });
+					}}
 				/>
 				<span class="unit">pt</span>
 				{#if selected.size !== undefined}
 					<ResetButton to="the page's {template.defaults.size}pt" disabled={boxFrozen} onclick={() => patch({ size: undefined })} />
+				{/if}
+			</label>
+			<!-- The face's lowercase as a percentage of the size, to make one
+			     face sit like another at the page's size: only while the area
+			     takes that size, since a size of its own already says how big
+			     its words are. Blank is the face's own, shown greyed. -->
+			<label class="field" class:inherits={selected.xHeight === undefined}>
+				<span>X-Height</span>
+				<input
+					class="n-3"
+					type="number"
+					step="1"
+					min="20"
+					max="100"
+					placeholder={ownXHeight === undefined ? '' : String(Math.round(ownXHeight * 100))}
+					title={selected.size === undefined
+						? "The lowercase's height as a percentage of the size; blank is the face's own"
+						: 'Only with the page\'s size — clear Size to set it'}
+					value={selected.xHeight === undefined ? '' : Math.round(selected.xHeight * 100)}
+					disabled={boxFrozen || selected.size !== undefined}
+					onchange={(e) => {
+						const typed = e.currentTarget.value.trim();
+						patch({ xHeight: typed === '' ? undefined : clampXHeight(Number(typed) / 100) });
+					}}
+				/>
+				<span class="unit">%</span>
+				{#if selected.xHeight !== undefined}
+					<ResetButton to="the face's own" disabled={boxFrozen} onclick={() => patch({ xHeight: undefined })} />
 				{/if}
 			</label>
 			<label class="field">

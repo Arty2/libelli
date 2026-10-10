@@ -19,7 +19,7 @@
 	import { UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders } from '$lib/placeholders';
 	import { cssIdent, isPageId, scopeCss, styleTag } from '$lib/css';
 	import { cardVars } from '$lib/csskit';
-	import { faceOf } from '$lib/fonts';
+	import { fontStack, kindOf } from '$lib/fonts';
 	import { handBorder, type HandStroke } from '$lib/hand';
 	import { followsInSet, isParked } from '$lib/boxops';
 	import type { Theme } from '$lib/theme';
@@ -54,7 +54,7 @@
 	import { qrSvg } from '$lib/qr';
 	import { barcodeSvg } from '$lib/barcode';
 	import { runOf } from '$lib/table';
-	import type { Box, Leader, Mapping, Row, Template } from '$lib/types';
+	import { clampXHeight, type Box, type Leader, type Mapping, type Row, type Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
@@ -847,45 +847,25 @@
 	}
 
 	/**
-	 * A face's stack, and its x-height as `font-size-adjust` where the
-	 * template sets one: the browser draws the face so its lowercase is that
-	 * fraction of the size, and the size — so the leading, and everything
-	 * measured in em — stays as set, nothing below moving. A fallback standing
-	 * in for a missing face is brought to the same x-height too.
+	 * A run's type: its face's stack, fallback by kind, then its size, leading
+	 * and letter spacing — and an area's X-Height as `font-size-adjust`: the
+	 * browser draws the face so its lowercase is that fraction of the size,
+	 * and the size — so the leading, and everything measured in em — stays as
+	 * set, nothing below moving. A fallback standing in for a missing face is
+	 * brought to the same x-height too.
 	 *
 	 * Newly available rather than Widely (2024), taken knowingly: a browser
 	 * without it ignores the declaration and draws the face at its own
 	 * x-height, which is what it did before there was a setting.
 	 */
-	function faceStyle(family: string | undefined): string[] {
-		const face = faceOf(template.fonts, family);
-		return [`font-family:${face.stack}`, ...(face.adjust !== undefined ? [`font-size-adjust:${face.adjust}`] : [])];
+	function typeParts(family: string | undefined, size: number, lineHeight: number, letterSpacing: number, xHeight?: number): string[] {
+		const parts = [`font-family:${fontStack(family, kindOf(template.fonts, family))}`, `font-size:${size}pt`, `line-height:${lineHeight}`];
+		if (xHeight !== undefined) parts.push(`font-size-adjust:${xHeight}`);
+		if (letterSpacing) parts.push(`letter-spacing:${letterSpacing}mm`);
+		return parts;
 	}
 
-	/**
-	 * The type of a run set in `family`, with the face's own tuning from the
-	 * Images tray on top of what the text sets: its size times the face's
-	 * size factor, its leading times the face's leading factor, and the
-	 * face's letter spacing added to the text's, both in mm. Untuned, exactly what the text sets.
-	 */
-	function typeParts(family: string | undefined, size: number, lineHeight: number, letterSpacing: number): { parts: string[]; size: number } {
-		const face = faceOf(template.fonts, family);
-		const round3 = (v: number) => Math.round(v * 1000) / 1000;
-		const pt = round3(size * face.size);
-		const parts = [...faceStyle(family), `font-size:${pt}pt`, `line-height:${round3(lineHeight * face.leading)}`];
-		const spacing = round3(letterSpacing + face.letterSpacing);
-		if (spacing) parts.push(`letter-spacing:${spacing}mm`);
-		return { parts, size: pt };
-	}
-
-	/**
-	 * The leading a box's words are actually set at: its own or the page's,
-	 * times its face's leading from the Images tray — what `typeParts` writes
-	 * as the line height, so a paragraph's "space of one line" is one line of
-	 * that, not of the untuned leading.
-	 */
-	const leadingOf = (box: Box) =>
-		(box.lineHeight ?? template.defaults.lineHeight) * faceOf(template.fonts, box.font ?? template.defaults.font).leading;
+	const leadingOf = (box: Box) => box.lineHeight ?? template.defaults.lineHeight;
 
 	function boxStyle(box: Box): string {
 		const drawn = placed(box);
@@ -894,13 +874,15 @@
 			box.font ?? template.defaults.font,
 			box.size ?? template.defaults.size,
 			box.lineHeight ?? template.defaults.lineHeight,
-			box.letterSpacing ?? template.defaults.letterSpacing
+			box.letterSpacing ?? template.defaults.letterSpacing,
+			// The page's size or none: a size of the area's own is its answer.
+			box.size === undefined ? clampXHeight(box.xHeight) : undefined
 		);
 		const parts = [
 			`left:${drawn.x}mm`,
 			`top:${layout.tops[box.id] ?? box.y}mm`,
 			`width:${box.w}mm`,
-			...type.parts,
+			...type,
 			`font-weight:${box.weight ?? template.defaults.weight}`,
 			`color:${box.color ?? template.defaults.color}`,
 			`text-align:${align}`,
@@ -920,7 +902,7 @@
 		// each element that uses it, so a heading twice the size would have
 		// moved twice as far as the paragraph under it.
 		const baseline = baselineOf(box, template.defaults);
-		if (baseline) parts.push(`--baseline:${Math.round(-baseline * type.size * 1000) / 1000}pt`);
+		if (baseline) parts.push(`--baseline:${Math.round(-baseline * (box.size ?? template.defaults.size) * 1000) / 1000}pt`);
 		// Emitted whether or not there is any, because the selected-box padding
 		// guide reads these back and a missing custom property would fall to 0 and
 		// draw the guide exactly on top of the bounds.
@@ -1098,7 +1080,7 @@
 		const [vertical, horizontal] = position.split('-');
 		const parts = [
 			vertical === 'top' ? `top:${margin}mm` : `bottom:${margin}mm`,
-			...typeParts(template.defaults.font, template.defaults.size, 1, 0).parts.filter((p) => !p.startsWith('line-height')),
+			...typeParts(template.defaults.font, template.defaults.size, 1, 0).filter((p) => !p.startsWith('line-height')),
 			`font-weight:${template.defaults.weight}`,
 			`color:${template.defaults.color}`,
 			`line-height:1`
