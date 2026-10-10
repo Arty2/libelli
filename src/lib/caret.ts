@@ -46,6 +46,14 @@ const COPIED = [
 	'direction'
 ] as const;
 
+/** A caret: its offset in the text, and where it is drawn, in client pixels. */
+export interface CaretPlace {
+	offset: number;
+	x: number;
+	top: number;
+	bottom: number;
+}
+
 /**
  * The caret offset in `field` nearest the point (`x`, `y`, in client
  * pixels): before the character the point is on, or after it when the point
@@ -53,10 +61,25 @@ const COPIED = [
  * text, the end of it.
  */
 export function caretAt(field: HTMLTextAreaElement | HTMLInputElement, x: number, y: number): number {
+	return caretPlace(field, x, y).offset;
+}
+
+/**
+ * `caretAt`, and where that caret is drawn — the edge of the character it
+ * sits against, as tall as that character's line — for a caret the page
+ * draws itself in a field that shows none.
+ */
+export function caretPlace(field: HTMLTextAreaElement | HTMLInputElement, x: number, y: number): CaretPlace {
 	const text = field.value;
-	if (!text) return 0;
 	const box = field.getBoundingClientRect();
 	const style = getComputedStyle(field);
+	if (!text) {
+		// Where the first character would start: inside the border and padding.
+		const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
+		const top = box.top + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop);
+		const line = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+		return { offset: 0, x: left, top, bottom: top + line };
+	}
 	const copy = document.createElement('div');
 	for (const name of COPIED) copy.style[name] = style[name];
 	Object.assign(copy.style, {
@@ -77,7 +100,7 @@ export function caretAt(field: HTMLTextAreaElement | HTMLInputElement, x: number
 	document.body.append(copy);
 	try {
 		const range = document.createRange();
-		let best = text.length;
+		let best: CaretPlace | null = null;
 		let score = Infinity;
 		for (let i = 0; i < text.length; i++) {
 			range.setStart(node, i);
@@ -92,14 +115,14 @@ export function caretAt(field: HTMLTextAreaElement | HTMLInputElement, x: number
 				const s = off * 1e4 + Math.abs(x - edge);
 				if (s < score) {
 					score = s;
-					best = at;
+					best = { offset: at, x: edge, top: r.top, bottom: r.bottom };
 				}
 			};
 			near(i, r.left);
 			// A line break's right edge is the next line's start, drawn on this one.
 			if (text[i] !== '\n') near(i + 1, r.right);
 		}
-		return best;
+		return best ?? { offset: text.length, x: box.left, top: box.top, bottom: box.top };
 	} finally {
 		copy.remove();
 	}

@@ -848,7 +848,7 @@ a notice can appear.
   print it, in the bounds' blue, for a moment.
 - **A cell with a finger** — a tap chooses a cell without typing in it, so the
   keyboard does not come up over half the screen each time a finger lands in
-  the table; **tap it again** — take your time — or **press and hold**, to
+  the table, and marks where it landed with a blinking caret of its own; **tap it again** — take your time — or **press and hold**, to
   open it full size and type there, the caret already where that tap or hold
   pressed. **Edit** in the bar does the same. A mouse or a pen types in the
   cell where it is clicked, as before.
@@ -1266,10 +1266,10 @@ Pick a curated Google family, type any other family name, or upload a file.
   browser, and **missing** for one a design moved from another computer needs
   and this browser has not got — said in a banner too, whose **Replace…** opens
   this list. Every font, missing or not, has an **upload** button (the arrow
-  out of a tray, after **Replace…**) — a file installed
+  out of a tray, after **Replace**) — a file installed
   under that font's own name, so everything set in it takes the file: a missing
   face supplied, a Google family made local, an upload swapped for a newer cut
-  — and every font the design uses has **Replace…**, which sets everything in that font in another instead,
+  — and every font the design uses has **Replace**, which sets everything in that font in another instead,
   from the local files or Google's families, one undo to take back. A local
   file nothing in the design uses is *local · unused*, to be deleted — after
   asking, since another design in the library may still be set in it, and a

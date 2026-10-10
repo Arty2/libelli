@@ -774,7 +774,7 @@
 								<MenuSelect
 									label="Replace {font.family} with"
 									title="Set everything in {font.family} in another font instead"
-									placeholder="Replace…"
+									placeholder="Replace"
 									value=""
 									items={replaceItems(font.family)}
 									onselect={(to) => to && onreplacefont?.(font.family, to)}
@@ -1331,12 +1331,17 @@
 		color: #b26a00;
 	}
 
+	/* A grid, so the icon is in the middle of what a finger presses: as a
+	   block, the `justify-content` it had did nothing and the glyph sat at
+	   the left of its square. */
 	.images li :global(button.square) {
+		flex: none;
+		display: inline-grid;
+		place-items: center;
 		border: none;
 		width: 1.375rem;
 		height: 1.375rem;
 		padding: 0;
-		justify-content: center;
 		color: #767676;
 		background: none;
 	}

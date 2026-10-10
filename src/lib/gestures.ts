@@ -255,9 +255,14 @@ export function isDoubleTap(last: Tap | null, now: Tap): boolean {
  */
 export function touchOpen(
 	node: HTMLElement,
-	options: { find: (target: EventTarget | null) => HTMLElement | null; onopen: (cell: HTMLElement, at: { x: number; y: number }) => void }
+	options: {
+		find: (target: EventTarget | null) => HTMLElement | null;
+		onopen: (cell: HTMLElement, at: { x: number; y: number }) => void;
+		/** the first tap, which chose the cell: where it was, so a caret can be drawn there */
+		onchoose?: (cell: HTMLElement, at: { x: number; y: number }) => void;
+	}
 ) {
-	let { find, onopen } = options;
+	let { find, onopen, onchoose } = options;
 	let press: { id: number; x: number; y: number; cell: HTMLElement; focused: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
 	let last: (Tap & { cell: HTMLElement }) | null = null;
 	let held = false;
@@ -310,6 +315,7 @@ export function touchOpen(
 			last = tap;
 			swallow = true;
 			cell.focus({ preventScroll: true });
+			onchoose?.(cell, tap);
 		}
 	};
 	const cancel = () => {
@@ -334,7 +340,7 @@ export function touchOpen(
 	node.addEventListener('contextmenu', menu);
 	node.addEventListener('touchend', lift);
 	return {
-		update: (next: typeof options) => ({ find, onopen } = next),
+		update: (next: typeof options) => ({ find, onopen, onchoose } = next),
 		destroy: () => {
 			clear();
 			node.removeEventListener('pointerdown', down);

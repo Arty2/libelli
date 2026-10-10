@@ -2342,7 +2342,10 @@ there, and Android reads a second tap near that caret as a tap on it and
 offers Paste. So `touchOpen` cancels every tap's `touchend` on a cell —
 which stops the browser's focus, mouse events and click for that tap — and
 focuses the cell itself; a focus from a script draws no handles, and the
-finger's cell hides its caret (`caret-color: transparent`). A scroll that
+finger's cell hides its caret (`caret-color: transparent`). So that a tap
+still shows where it landed, the page draws a caret of its own there
+(`caretPlace`, the same measuring the opening press uses, which also gives
+the edge it sits against), and Edit opens at it. A scroll that
 started on a cell is not a tap, is never cancelled, and scrolls as before.
 
 **The gesture is listened for on the table, not on each cell.** `touchOpen`

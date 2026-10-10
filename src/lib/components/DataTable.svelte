@@ -5,7 +5,7 @@
 	import { completePlaceholders } from '$lib/complete';
 	import { HOLD_MS, vibrate } from '$lib/haptics';
 	import { touchOpen } from '$lib/gestures';
-	import { caretAt } from '$lib/caret';
+	import { caretAt, caretPlace } from '$lib/caret';
 	import { armDefault } from '$lib/modal';
 	import { scrollEdges } from '$lib/scrolledge';
 	import { dataUrlBytes, localImageName, safeMediaUrl, weigh } from '$lib/assets';
@@ -413,6 +413,7 @@
 		drawingArea = null;
 		leaveTo = from;
 		openCaret = caret ?? null;
+		fingerMark = null;
 		bigCell = { row: rowIndex, column, draw: draw || undefined };
 		drawnValue = value;
 		onactivate(rowIndex);
@@ -613,6 +614,36 @@
 	/** The cell a press landed in, for `touchOpen`: a field or a picture, marked `data-opens`. */
 	const cellFrom = (target: EventTarget | null) =>
 		target instanceof Element ? target.closest<HTMLElement>('tbody [data-opens]') : null;
+	/**
+	 * The caret a finger's first tap put in a cell, drawn by the page: the
+	 * cell is read-only to a finger and its own caret hidden, so the browser
+	 * shows none, and a tap that left no mark looked like a tap that missed.
+	 * In px from the cell's top-left, where it is drawn; and its offset,
+	 * which Edit opens at.
+	 */
+	let fingerMark = $state<{ row: number; column: string; offset: number; left: number; top: number; height: number } | null>(null);
+
+	/** A finger's first tap on a cell: the cell is chosen, and the caret drawn where it landed. */
+	function chooseByFinger(cell: HTMLElement, at: { x: number; y: number }) {
+		const row = Number(cell.dataset.row);
+		const column = cell.dataset.column;
+		const td = cell.closest('td');
+		if (!(cell instanceof HTMLTextAreaElement) || !td || column === undefined || !Number.isInteger(row)) {
+			fingerMark = null;
+			return;
+		}
+		const place = caretPlace(cell, at.x, at.y);
+		const box = td.getBoundingClientRect();
+		fingerMark = { row, column, offset: place.offset, left: place.x - box.left, top: place.top - box.top, height: place.bottom - place.top };
+	}
+
+	/** Edit in the bar: the cell full size, at the caret a finger's tap drew, if it drew one. */
+	function editChosen() {
+		if (!editing) return;
+		const mark = fingerMark && fingerMark.row === editing.row && fingerMark.column === editing.column ? fingerMark.offset : undefined;
+		openBigCell(editing.row, editing.column, false, 'table', mark);
+	}
+
 	/** A finger's second tap or long press on a cell: open it full size, the caret where it pressed. */
 	function openFromFinger(cell: HTMLElement, at: { x: number; y: number }) {
 		const row = Number(cell.dataset.row);
@@ -1486,7 +1517,7 @@
 >
 	<div class="scroll" bind:this={scrollEl}>
 		<table style="min-width:{tableWidth}" onpointerdowncapture={(e) => (byFinger = e.pointerType === 'touch')}
-			use:touchOpen={{ find: cellFrom, onopen: openFromFinger }}
+			use:touchOpen={{ find: cellFrom, onopen: openFromFinger, onchoose: chooseByFinger }}
 		>
 			<!-- Widths belong to the columns, not to the cells: one place to set
 			     them, and `table-layout: fixed` above means they are obeyed rather
@@ -1851,6 +1882,13 @@
 										}
 									}}
 								></textarea>
+								{#if fingerMark && fingerMark.row === i && fingerMark.column === column && editing?.row === i && editing.column === column}
+									<span
+										class="finger-caret"
+										style="left:{fingerMark.left}px;top:{fingerMark.top}px;height:{fingerMark.height}px"
+										aria-hidden="true"
+									></span>
+								{/if}
 								<!-- Drawn only when the cell holds more than it shows (see
 								     `overflowMark`), and a way into the rest: the same full-size
 								     editor Edit opens. Out of the tab order — the field before it is where
@@ -1976,7 +2014,7 @@
 					title="Open this cell in the table's full room"
 					disabled={locked}
 					onmousedown={(e) => e.preventDefault()}
-					onclick={() => editing && openBigCell(editing.row, editing.column)}
+					onclick={editChosen}
 				><Icon name="task-edit" size={15} /> Edit</button>
 			{/if}
 		{/if}
@@ -2938,6 +2976,25 @@
 
 	td textarea:read-only {
 		cursor: default;
+	}
+
+	/* The caret a finger's tap drew, where the browser draws none: a line the
+	   width and blink of a caret, in the accent, as the selection is. */
+	.finger-caret {
+		position: absolute;
+		/* Over the field, which lifts itself while it has the focus. */
+		z-index: 3;
+		width: 0.125rem;
+		margin-left: -0.0625rem;
+		background: var(--accent-strong);
+		pointer-events: none;
+		animation: finger-caret 1.1s steps(1) infinite;
+	}
+
+	@keyframes finger-caret {
+		50% {
+			opacity: 0;
+		}
 	}
 
 	/* A finger's cell: a long press opens it, so it must not also start a
