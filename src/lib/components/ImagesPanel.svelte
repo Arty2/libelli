@@ -691,10 +691,12 @@
 		     caret that says which way it is. -->
 		{#snippet sectionHead(key: string, label: string, total: string)}
 			<h3 class="section">
+				<!-- After the name, as an accordion's: down to open what is folded,
+				     up to fold what is open. -->
 				<button class="section-toggle" aria-expanded={!collapsed.includes(key)} onclick={() => toggleSection(key)}>
-					<Icon name={collapsed.includes(key) ? 'caret-right' : 'caret-down'} size={14} />
 					{label}
 					<span class="total">{total}</span>
+					<Icon name={collapsed.includes(key) ? 'chevron-down' : 'chevron-up'} size={18} />
 				</button>
 			</h3>
 		{/snippet}
@@ -1634,6 +1636,11 @@
 
 	.section-toggle .total {
 		margin-left: 4px;
+	}
+
+	.section-toggle :global(svg) {
+		margin-left: 2px;
+		color: #555;
 	}
 
 	.section .total {

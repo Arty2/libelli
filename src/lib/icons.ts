@@ -75,6 +75,8 @@ export const ICONS: Record<string, string> = {
 	'checkmark': '<path d="M13 24 4 15 5.414 13.586 13 21.171 26.586 7.586 28 9 13 24z"/>',
 	'caret-left': '<path d="M20 24 10 16 20 8z"/>',
 	'caret-right': '<path d="M12 8 22 16 12 24z"/>',
+	'chevron-up': '<path d="M16 10 26 20 24.6 21.4 16 12.8 7.4 21.4 6 20z"/>',
+	'chevron-down': '<path d="M16 22 6 12 7.4 10.6 16 19.2 24.6 10.6 26 12z"/>',
 	'chevron-left': '<path d="M10 16 20 6 21.4 7.4 12.8 16 21.4 24.6 20 26z"/>',
 	'chevron-right': '<path d="M22 16 12 26 10.6 24.6 19.2 16 10.6 7.4 12 6z"/>',
 	'sort': '<path d="M24 24 16 32 8 24z"/><path d="M8 8 16 0 24 8z"/>',
