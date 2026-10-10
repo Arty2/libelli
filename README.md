@@ -448,7 +448,7 @@ resize boxes directly, or type exact millimetres.
   modifiers with the arrows step the alignment of the selection in the direction
   pressed. Both give an area a value of its own on the first go, so an area that
   was inheriting stops.
-- **Type defaults** — the page bar holds the family, size, leading, spacing and
+- **Type defaults** — the page bar holds the family, size, leading, kerning and
   color. A box that leaves those fields blank inherits them, so changing the
   page moves every box that never overrode it; a new box starts out inheriting
   everything.
@@ -761,7 +761,7 @@ library is loaded to do it.
 
 The dataset is one row per card, one column per field. It sits beside the page
 on a wide screen and under it on a phone, and **Data** in the toolbar folds it
-away when the page needs the room. Whether it, Page and Images were open
+away when the page needs the room. Whether it, Page and Pictures were open
 is remembered, so a reload comes back to the screen it left; a first visit on a
 phone starts with all of them folded away. Stacked under the page it opens at a little
 under half the screen and is **dragged taller by its own header** — pull the
@@ -864,7 +864,7 @@ a notice can appear.
   **drawing surface** rather than as text: the same board and tools the card
   opens, in this same room, and the pager steps down the column through words
   and drawings alike. A cell pointing at a stored image (`local:name`) shows
-  that image too, and opens it large in **Images** instead — see below. A
+  that image too, and opens it large in **Pictures** instead — see below. A
   drawing is kept with **Save** in the bar, beside **Delete** — see *Drawing
   one* below. Words are edited live, so the
   card follows as you type and undo reaches every change; the **×** at the top
@@ -1040,18 +1040,18 @@ at its own size. Code 128 and EAN-13 have no Fit: a barcode fills the area.
   images it is missing, and dropping the files on again puts them back. An
   image uploaded as a page background can be used in a row without uploading it
   twice — they share one store, because an image is an image. Which store that is, and how to
-  empty it, is **Images** in the toolbar — see below.
+  empty it, is **Pictures** in the toolbar — see below.
 - **Drawing one** — double-click an image area, press the **pen** beside the
   page, or press **Draw…** in the area bar, and the drawing surface opens in the
   **side panel**, in the table's room, with the card in view beside it. While a
-  drawing is open — or an image is open large in **Images** — the options row
+  drawing is open — or an image is open large in **Pictures** — the options row
   at the top is put away, so on a phone the tray has the height to reach the
   board; it comes back when the picture is closed. An area
   bound to a column draws into this row's cell, and the pager under it steps to
   the same cell in the next row; an area with no column draws onto the area
   itself, in the same place — a locked table does not stop that, since nothing
   in the table changes. **Save** and **Delete** are at the far end of the
-  panel's bar, where the Images tray has them: Save (or
+  panel's bar, where the Pictures tray has them: Save (or
   <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>S</kbd>) writes the drawing, and each save
   is one entry in the app's undo however many strokes it took; Delete takes the
   drawing out of the cell or off the area, and undo brings it back. While there
@@ -1078,10 +1078,10 @@ at its own size. Code 128 and EAN-13 have no Fit: a barcode fills the area.
   is how the board is emptied.
 
   The **×** goes back to where the drawing was opened from: the table if you
-  opened it there (or the table was already showing), the Images tray if it
+  opened it there (or the table was already showing), the Pictures tray if it
   came from there, and otherwise it simply closes the panel — drawing on an
   area never leaves the table open behind it. The **‹** at the other end of the
-  title bar steps back to the table (or to Images), to see the drawing's row.
+  title bar steps back to the table (or to Pictures), to see the drawing's row.
 
   **Rotate** turns the drawing a quarter turn clockwise, board and all.
   **Flip** mirrors it on the same board, pixel for pixel. **Crop** works as it
@@ -1194,12 +1194,14 @@ and the tests pin it, module for module, as it scanned.
 Everything else this app keeps is small — a template is a page of JSON, a
 dataset is text. Images are not, and browser storage is a poor place for them:
 it is a bucket you cannot look into, shared with everything else the app saves,
-and the browser may empty it. **Images**, in the toolbar between Page
-Setup and Data, opens a bar of its own in the same row as the other two — a bar
-rather than a dialog, so the card that uses the images stays in view.
+and the browser may empty it. **Pictures**, in the toolbar between Page
+Setup and Data, opens a tray in the table's place — a tray rather than a
+dialog, so the card that uses the pictures stays in view. It holds three
+sections, **Images**, **Drawings** and **Fonts**.
 
-- **Upload…** — images from this device, in every browser and on a phone:
-  the folder below is Chromium's, and dropping a file onto an area is not
+- **Upload** — the arrow out of a tray at the far end of the **Images** head:
+  images from this device, in every browser and on a phone: the folder below
+  is Chromium's, and dropping a file onto an area is not
   something a phone can do. They go wherever images go — the folder when
   there is one, this browser otherwise.
 - **What is stored** — one line per image, unused ones first: a thumbnail,
@@ -1234,14 +1236,15 @@ rather than a dialog, so the card that uses the images stays in view.
   area is bound to a column and onto the area otherwise. The area under the
   pointer is outlined while you carry it. It works with a finger as well as a
   mouse.
-- **A folder of your own** — press **Folder…** and images are written
+- **A folder of your own** — press the **folder** at the far end of the
+  **Images** head, beside Upload, and images are written
   there as ordinary files from then on: replace one from a photo editor and the
   card follows, back them up with the rest of your work, and clear them out with
   your file manager rather than through this app. The folder is remembered
   between visits, but a browser asks to be let into it once per visit — the
-  bar says so, with the button to do it — and until then images come from
-  browser storage as before. **Forget** lets go of the folder; nothing in it
-  is deleted.
+  Images head says so, with **Open** to do it — and until then images come
+  from browser storage as before. The **×** beside the folder lets go of it;
+  nothing in it is deleted.
 - **Where that works** — the File System Access API is Chromium's: Chrome, Edge,
   Opera and Arc have it; Firefox and Safari do not. Everywhere else the app keeps
   images in IndexedDB exactly as it always did, and the bar says which of the
@@ -1262,7 +1265,7 @@ upload a file. Every font menu lists them by where they come from: **Local**
 (files uploaded to this browser) first, then **Google Fonts**, then
 **System** — Arial, Georgia, Times New Roman, Courier New, Consolas and
 Verdana, which nearly every computer has, so nothing is fetched for them. The
-Images tray lists the ones a design uses, to be replaced like any other, with
+Pictures tray lists the ones a design uses, to be replaced like any other, with
 the upload button off: there is no file to give a face the computer has.
 
 - **A fallback of the same kind** — every face is known as serif, sans-serif,
@@ -1272,7 +1275,7 @@ the upload button off: there is no file to give a face the computer has.
   price list still lines up. The app knows the faces it offers; an uploaded
   file says what it is in its own tables (TrueType, OpenType and WOFF — a
   WOFF2 falls back to sans-serif), and the design keeps that with the font.
-- **A face's Type** — tap a used font's name in the Images tray and its row is
+- **A face's Type** — tap a used font's name in the Pictures tray and its row is
   outlined, with **Type** between the name and Replace — **Auto** (the kind
   its file says, or the app knows, shown in brackets), then **Serif**, **Sans
   Serif**, **Monospaced** or **Handwriting** — which picks the fallback a card
@@ -1285,16 +1288,16 @@ the upload button off: there is no file to give a face the computer has.
   the face's own. Only while the area takes the page's size: give it a Size
   of its own and X-Height is cleared and off.
 
-- **Replacing a picture** — each stored picture in the Images tray has an
+- **Replacing a picture** — each stored picture in the Pictures tray has an
   upload button (the arrow out of a tray) beside its download: a new file under
   the same name, so every card and page showing it shows the new one with
-  nothing to re-point. Not in undo, as no picture's bytes are. A drawing has a
-  pencil there instead, which opens it to draw on, as pressing its line does.
-- **Sections that fold** — the Images tray lists **Images**, **Drawings** and
+  nothing to re-point. Not in undo, as no picture's bytes are. A drawing's
+  whole line opens it to draw on.
+- **Sections that fold** — the Pictures tray lists **Images**, **Drawings** and
   **Fonts** under heads that say how many each holds and what they weigh; a
   press on a head folds its list shut or open, and this browser remembers
   which are shut, so the tray opens as it was left.
-- **Fonts, in the Images tray** — every font the design is set in and every
+- **Fonts, in the Pictures tray** — every font the design is set in and every
   font file this browser holds, in one list under the pictures, each name set
   in the face it names. A design carries a font's name, never its file, so
   what is marked is what does not travel: **local** for a file kept in this
@@ -1749,7 +1752,7 @@ towards it and down is away. They repeat on a hold like the arrows do.
   at a little under half the screen; pull the header up to fill the screen with
   it, pull it back down to see the card. The full-size editor's head — a cell, or a
   drawing — is the same grip while it covers the table, and so is the head of
-  the Images tray, list or large view. A press that goes nowhere is still the
+  the Pictures tray, list or large view. A press that goes nowhere is still the
   header button underneath being pressed.
 - **The tray follows your finger, both ways.** Pull its header down and it
   shrinks with you all the way, fading once it is smaller than it can stay;
@@ -1864,11 +1867,11 @@ than it has to.
   sheet size (a preset or your own, a button to turn it over, and left and
   right pages), margin (one number all round, or one per edge — top, bottom and
   left and right, or inner and outer with left and right pages), bleed, crop marks · type defaults (font, size, leading,
-  spacing, paragraph, leader, baseline, list marker, numbers, indent and leading) · surface (paper color, background image and fit) · page
+  kerning, paragraph, leader, baseline, list marker, numbers, indent and leading) · surface (paper color, background image and fit) · page
   number, whether to print the total, and its margin · CSS
 - **Area** — head, on one line: lock, the field's name, duplicate, delete · content
   (data field or static text, column, mode, fit, barcode type, digits and correction) · type (font,
-  size, x-height, weight, color) · setting (leading, spacing, paragraph, leader, baseline,
+  size, x-height, weight, color) · setting (leading, kerning, paragraph, leader, baseline,
   and for Markdown the list marker, numbers, indent and leading, case) · alignment,
   horizontal and vertical · surface (fill, padding, border width, style, hand and
   color, radius) · position (x, y, anchor, gap) · size (w, h, overflow, hide
@@ -1932,12 +1935,13 @@ than it has to.
 - **The table's own row** — under the table: the lock, the **Table** picker —
   whose menu holds paste, import, export, new and delete — and the swap beside
   it; what acts on the rows you have chosen; and at the far end the row height.
-- **Images** — a tray in the table's place, at the table's width on a wide
+- **Pictures** — a tray in the table's place, at the table's width on a wide
   screen and its height on a phone, and only one of the two open at a time:
-  **Images** and **Data** in the window toolbar each close the other. At its
-  head *Images*, how many and how much they weigh; a line for every image,
-  filling the height; and at its foot, where the table keeps its toolbar,
-  **Upload…** and **Folder…**. On a phone its head is the grip that
+  **Pictures** and **Data** in the window toolbar each close the other. Its
+  sections — **Images**, **Drawings**, **Fonts** — fill the height, each head
+  saying how many and how much they weigh; the ways in are the images' alone,
+  so **Upload** and the **folder** are on the Images head, at its far end,
+  and the tray has no bar at its foot. On a phone its head is the grip that
   shares the height with the page, as the table's header row is. Carry one onto an area to put it there, or onto the **page** between
   areas for a new image area of its own, centred where it was let go, 40mm
   across and in the image's proportions; an image file dragged in from
@@ -1948,7 +1952,7 @@ than it has to.
   browser has no image for stays in the list as a dashed, red *missing* line,
   with **Find…** to put a file back under that very name.
 - **The window toolbar** holds only what is about the whole app: the mark, then
-  Help, Page, Images, Data and Export — the two panels in the order they
+  Help, Page, Pictures, Data and Export — the two panels in the order they
   sit on screen, settings above the page and the table beside it. On a phone the
   buttons drop their words and keep their icons, and the row is read from the
   outside in: Help and, where the browser offers it, Install on the left, the

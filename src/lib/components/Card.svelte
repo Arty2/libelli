@@ -3034,7 +3034,7 @@
 		line-height: 0;
 	}
 
-	/* The area a picture carried out of the Images bar would land in. Set by
+	/* The area a picture carried out of the Pictures tray would land in. Set by
 	   ImagesPanel as an attribute, so the card's own class handling cannot
 	   take it off mid-drag. */
 	.area:global([data-image-target]) {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
 	import MenuSelect, { familyItems } from './MenuSelect.svelte';
 	import { armDefault } from '$lib/modal';
@@ -610,7 +611,7 @@
 	is stored and what it weighs at the top, the ways in at the foot, where
 	the table keeps its own.
 -->
-<section class="images-tray" aria-label="Images">
+<section class="images-tray" aria-label="Pictures">
 	<!-- The head is also the tray's grip on a phone, as the table's header
 	     row is: pulled up or down, it shares the height with the page. -->
 	<div
@@ -639,7 +640,7 @@
 			{/if}
 			{#if dirty}<span class="tag">edited</span>{/if}
 		{:else}
-		<span class="context">Images</span>
+		<span class="context">Pictures</span>
 		{/if}
 		{#if folder && !focus}
 			<span class="where">
@@ -697,7 +698,7 @@
 	<div class="list">
 		<!-- A section's head is its fold: its name, how many and how much, and a
 		     caret that says which way it is. -->
-		{#snippet sectionHead(key: string, label: string, total: string)}
+		{#snippet sectionHead(key: string, label: string, total: string, actions?: Snippet)}
 			<h3 class="section">
 				<!-- After the name, as an accordion's: down to open what is folded,
 				     up to fold what is open. -->
@@ -706,19 +707,48 @@
 					<span class="total">{total}</span>
 					<Icon name={collapsed.includes(key) ? 'chevron-down' : 'chevron-up'} size={18} />
 				</button>
+				{#if actions}<span class="section-actions">{@render actions()}</span>{/if}
 			</h3>
+		{/snippet}
+		<!-- The ways in are the images' alone — a drawing is made in the table,
+		     a font comes in on its own row — so they are on the images' head, at
+		     its far end, rather than in a bar under every section. Upload is
+		     every browser's, a phone included; the folder is Chromium's. -->
+		{#snippet imageWays()}
+			{#if available && folder && !folder.ready}
+				<button class="open-folder" title="Open {folder.name} again, to read the images in it" onclick={reopen}>Open {folder.name}</button>
+			{/if}
+			<button class="square save" title="Upload images from this device" aria-label="Upload images" onclick={() => fileInput?.click()}>
+				<Icon name="upload" size={12} />
+			</button>
+			{#if available}
+				<button
+					class="square save"
+					title={folder
+						? `Another folder — images are kept in ${folder.name} now`
+						: "Keep images as ordinary files in a folder of your own, rather than in this browser's storage"}
+					aria-label={folder ? 'Choose another folder' : 'Choose a folder'}
+					onclick={choose}><Icon name="folder" size={12} /></button
+				>
+				{#if folder}
+					<button class="square" title="Stop reading {folder.name}. Nothing in it is deleted" aria-label="Forget {folder.name}" onclick={forget}>
+						<Icon name="close" size={12} />
+					</button>
+				{/if}
+			{/if}
 		{/snippet}
 		{#if busy}
 			<p class="empty">…</p>
-		{:else if !images.length && !missing.length && !drawings.length && !fonts.length}
-			<p class="empty">Nothing here yet.</p>
 		{:else}
 			<!-- One picture a line: what it looks like, what it is called, how big
 			     it is in pixels and in bytes, and whether anything uses it. The
-			     thumbnail is also the handle it is carried onto an area by. -->
-			{#if images.length || missing.length}
-			{@render sectionHead('images', 'Images', `${images.length + missing.length}${images.length ? ` · ${weigh(total)}` : ''}`)}
+			     thumbnail is also the handle it is carried onto an area by. The
+			     head is there with none, for its ways in. -->
+			{@render sectionHead('images', 'Images', `${images.length + missing.length}${images.length ? ` · ${weigh(total)}` : ''}`, imageWays)}
 			{#if !collapsed.includes('images')}
+			{#if !images.length && !missing.length}
+				<p class="empty">No images yet — upload one, or drop it on an area.</p>
+			{/if}
 			<ul class="images">
 				{#each shown as image (image.where + image.name)}
 					<li class:unused={!used.has(image.name)} title="{image.name} — {image.where === 'folder' ? 'in the folder' : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}">
@@ -797,7 +827,6 @@
 				{/each}
 			</ul>
 			{/if}
-			{/if}
 		{/if}
 		{#if !busy && drawings.length}
 			<!-- The pictures kept in the table itself, and on areas with no
@@ -827,16 +856,6 @@
 							]
 								.filter(Boolean)
 								.join(' · ')}</span>
-						</button>
-						<!-- The line opens it too; the pencil says so, where the pictures
-						     above have their upload. -->
-						<button
-							class="square save"
-							title="Draw on {drawing.label}, {drawing.where}"
-							aria-label="Draw on {drawing.label}, {drawing.where}"
-							onclick={() => onopendrawing?.(drawing.key)}
-						>
-							<Icon name="edit" size={12} />
 						</button>
 						<button
 							class="square save"
@@ -1019,26 +1038,6 @@
 				<button class="primary" disabled={!dirty || saving} title="Write the edit over {focus}" onclick={save}>Save</button>
 			{/if}
 		</div>
-	{:else}
-	<!-- The ways in, where the table keeps its toolbar. Upload is every
-	     browser's, a phone included; the folder is Chromium's. -->
-	<div class="actions">
-		<button title="Add images from this device" onclick={() => fileInput?.click()}>
-			<Icon name="image-reference" size={15} /> Upload…
-		</button>
-		{#if available}
-			{#if folder && !folder.ready}
-				<button class="primary" onclick={reopen}>Open {folder.name}</button>
-			{/if}
-			<button
-				title="Keep images as ordinary files in a folder of your own, rather than in this browser's storage"
-				onclick={choose}><Icon name="folder" size={15} /> {folder ? 'Another Folder…' : 'Folder…'}</button
-			>
-			{#if folder}
-				<button title="Stop reading the folder. Nothing in it is deleted" onclick={forget}>Forget</button>
-			{/if}
-		{/if}
-	</div>
 	{/if}
 </section>
 
@@ -1483,7 +1482,8 @@
 	/* A grid, so the icon is in the middle of what a finger presses: as a
 	   block, the `justify-content` it had did nothing and the glyph sat at
 	   the left of its square. */
-	.images li :global(button.square) {
+	.images li :global(button.square),
+	.section-actions :global(button.square) {
 		flex: none;
 		display: inline-grid;
 		place-items: center;
@@ -1495,20 +1495,24 @@
 		background: none;
 	}
 
-	.images li :global(button.square:hover) {
+	.images li :global(button.square:hover),
+	.section-actions :global(button.square:hover) {
 		color: #b42318;
 		background: #fdf3f2;
 	}
 
 	/* The download, beside Delete: as quiet, and not red on hover. */
-	.images li :global(button.square.save:hover) {
+	.images li :global(button.square.save:hover),
+	.section-actions :global(button.square.save:hover) {
 		color: var(--accent-strong);
 		background: var(--accent-tint);
 	}
 
 	/* Off — a system font has no file to upload: faint, and no hover. */
 	.images li :global(button.square:disabled),
-	.images li :global(button.square:disabled:hover) {
+	.section-actions :global(button.square:disabled),
+	.images li :global(button.square:disabled:hover),
+	.section-actions :global(button.square:disabled:hover) {
 		color: #c4c4c4;
 		background: none;
 		cursor: default;
@@ -1568,18 +1572,18 @@
 		line-height: 1.6;
 	}
 
-	/* Wide enough for its word; the name before it gets the rest. In capitals,
-	   as the panel's other actions are. */
+	/* Wide enough for its word; the name before it gets the rest. */
 	.fonts .replace {
 		flex: none;
 		display: inline-flex;
 	}
 
-	/* On the trigger itself: a button does not inherit a text-transform. The
-	   menu it opens keeps the names' own case. */
+	/* "Replace" as written, beside the Type select's "Auto (Serif)": two
+	   menus on one line, set alike. On the trigger itself, since the
+	   panel's buttons are set in capitals and a button inherits none. */
 	.fonts .replace :global(.trigger) {
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
+		text-transform: none;
+		letter-spacing: normal;
 	}
 
 	.section {
@@ -1607,6 +1611,30 @@
 		letter-spacing: inherit;
 		text-transform: inherit;
 		color: inherit;
+		cursor: pointer;
+	}
+
+	/* The images' ways in, at the far end of their head, as quiet as the
+	   buttons on each line under it. */
+	.section-actions {
+		margin-left: auto;
+		align-self: center;
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 400;
+	}
+
+	.section-actions .open-folder {
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
+		padding: 2px 8px;
+		margin-right: 4px;
+		border: 1px solid var(--border-control);
+		border-radius: var(--radius-button);
+		background: #fff;
+		color: #111;
 		cursor: pointer;
 	}
 

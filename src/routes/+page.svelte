@@ -612,7 +612,7 @@
 	let images = $state<Record<string, string>>({});
 	let imagesOpen = $state(false);
 	/**
-	 * Bumped when the Images panel changes what is stored. The resolver below is
+	 * Bumped when the Pictures panel changes what is stored. The resolver below is
 	 * keyed on the *names* a template and table use, and deleting a picture or
 	 * choosing a folder changes neither — so there has to be something else for
 	 * it to watch.
@@ -1246,7 +1246,7 @@
 			const { urls, missing } = await resolveLocalImages(wanted);
 			if (stale) return;
 			images = urls;
-			// Listed in the Images tray as placeholders, each with a way to put
+			// Listed in the Pictures tray as placeholders, each with a way to put
 			// the file back — rather than said once in the status line and lost.
 			missingImages = missing;
 		})();
@@ -1265,7 +1265,7 @@
 	 * it keeps the reference itself and the picture is the same on every card.
 	 */
 	/**
-	 * A picture stored from outside the Images tray — dropped on an area or on
+	 * A picture stored from outside the Pictures tray — dropped on an area or on
 	 * the page. Under the file's own name, which may be one the page already
 	 * points at (a missing picture supplied, a second "image.png" pasted over
 	 * the first): the set of names is then unchanged, so `imagesVersion` says
@@ -1283,7 +1283,7 @@
 	}
 
 	/**
-	 * A picture this browser already holds, carried from the Images bar onto
+	 * A picture this browser already holds, carried from the Pictures tray onto
 	 * an area. The same placing as a file dropped from outside — into the row's
 	 * cell when the area is bound, onto the area otherwise — minus the storing,
 	 * which already happened when it was uploaded.
@@ -1495,7 +1495,7 @@
 		if (column && row && refuseLockedTable()) return;
 		// Where the editor's × goes back to. With the table already showing,
 		// that is the table; otherwise the panel was opened only to draw in,
-		// and closing the drawing closes it (or goes back to Images).
+		// and closing the drawing closes it (or goes back to Pictures).
 		const from = via === 'images' ? via : dataOpen ? undefined : 'card';
 		dataOpen = true;
 		imagesOpen = false;
@@ -1515,7 +1515,7 @@
 
 	/**
 	 * Every picture held in the table or on an area rather than in storage,
-	 * for the Images tray: a cell's drawing, by column and row, and a drawing
+	 * for the Pictures tray: a cell's drawing, by column and row, and a drawing
 	 * on an area with no column. Only `data:` pictures that pass the same
 	 * check a cell's thumbnail does — the cell is untrusted.
 	 */
@@ -1537,7 +1537,7 @@
 		return out;
 	});
 
-	/** A drawing pressed in the Images tray, opened in the drawing editor it belongs to. */
+	/** A drawing pressed in the Pictures tray, opened in the drawing editor it belongs to. */
 	function openDrawing(key: string) {
 		if (key.startsWith('area:')) {
 			drawArea(key.slice('area:'.length), 'images');
@@ -1554,7 +1554,7 @@
 		cellRequest = { row: rowIndex, column, draw: true, from: 'images' };
 	}
 
-	/** A stored picture, opened large in the Images tray. */
+	/** A stored picture, opened large in the Pictures tray. */
 	let imageFocus = $state<string | null>(null);
 	/**
 	 * A picture being worked on in the side panel — the drawing board, or one
@@ -1643,7 +1643,7 @@
 	});
 
 	/**
-	 * A font replaced from the Images tray, while it is still the last step:
+	 * A font replaced from the Pictures tray, while it is still the last step:
 	 * its entry's label, and the face it put in. X-height set on that face
 	 * from the tray joins the replace's entry (`amend`) rather than following
 	 * it, so one undo goes back to the old face and one redo brings the new
@@ -3073,7 +3073,7 @@
 
 	/**
 	 * The kind a face's fallback is chosen by, changed —
-	 * everywhere it is used. From the Images tray (`fromTray`), just after
+	 * everywhere it is used. From the Pictures tray (`fromTray`), just after
 	 * that face was replaced in, it joins the replace's undo entry — see
 	 * `fontSession`; otherwise it is a step of its own.
 	 */
@@ -3091,7 +3091,7 @@
 		template = tuneFont($state.snapshot(template) as Template, family, change, fontRef(family, editorFonts));
 	}
 
-	/** Every font uploaded to this browser — the Images tray's Fonts, beside the design's own. */
+	/** Every font uploaded to this browser — the Pictures tray's Fonts, beside the design's own. */
 	let storedFonts = $state<StoredFontEntry[]>([]);
 	const refreshStoredFonts = async () => (storedFonts = await listStoredFonts());
 	const fontEntries = $derived(fontInventory(template, storedFonts));
@@ -3102,7 +3102,7 @@
 	 * A font the design is set in swapped for another, everywhere — how a design
 	 * moved to a computer without its uploaded face is made to print, when the
 	 * file is not to hand. One undo puts it back. Says whether it happened: the
-	 * Images tray keeps the replacement where the font was, and only then.
+	 * Pictures tray keeps the replacement where the font was, and only then.
 	 */
 	async function replaceFont(from: string, to: string): Promise<boolean> {
 		if (template.locked) {
@@ -3268,7 +3268,7 @@
 		</button>
 		<!-- Every stored picture, in a tray of its own in the table's place: the
 		     pictures are the browser's, not the page's — a row's own photograph
-		     is in there too. Images and Data share that room, one at a time, so
+		     is in there too. Pictures and Data share that room, one at a time, so
 		     opening either closes the other. -->
 		<button
 			class="images"
@@ -3279,9 +3279,9 @@
 				imageFocus = null;
 				if (imagesOpen) dataOpen = false;
 			}}
-			title="Every image this browser is holding — what each weighs, whether anything uses it, and where they are kept"
+			title="Pictures: the images, drawings and fonts of this design and this browser — what each weighs, whether anything uses it, and a way to replace it"
 		>
-			<Icon name="image" size={15} /> <span class="label">Images</span>
+			<Icon name="image" size={15} /> <span class="label">Pictures</span>
 		</button>
 		<button
 			class="data"
@@ -3458,7 +3458,7 @@
 			{#each missingFonts as font (font.ref ?? font.family)}
 				<button onclick={() => pickMissingFont(font)}>Choose {font.family} File…</button>
 			{/each}
-			<!-- No file to hand: the Images tray's Fonts swaps the face for another. -->
+			<!-- No file to hand: the Pictures tray's Fonts swaps the face for another. -->
 			<button
 				onclick={() => {
 					imagesOpen = true;
@@ -5216,7 +5216,7 @@
 		}
 
 		/* Named and ordered like the rest: a button left out of this list keeps
-		   the initial `order: 0` and lands in front of Help, which is how Images
+		   the initial `order: 0` and lands in front of Help, which is how Pictures
 		   came to open the phone row. */
 		.toolbar .images {
 			order: 5;

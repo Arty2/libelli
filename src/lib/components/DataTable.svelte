@@ -86,7 +86,7 @@
 		 * puts its options row away for it too, so the tray has the height.
 		 */
 		onfullcell?: (open: boolean) => void;
-		/** A stored picture, opened large in the Images tray to be looked at and edited. */
+		/** A stored picture, opened large in the Pictures tray to be looked at and edited. */
 		onopenimage: (name: string) => void;
 		/** lock or unlock the whole table; the page owns the dataset */
 		onlock: (locked: boolean) => void;
@@ -131,7 +131,7 @@
 		openRequest?: { row: number; column: string; draw?: boolean; from?: Origin } | null;
 		/**
 		 * The editor closed on something that was not opened from the table: the
-		 * page puts back what was there before — the Images tray, or no panel at
+		 * page puts back what was there before — the Pictures tray, or no panel at
 		 * all — rather than leaving the table showing, which nobody asked for.
 		 */
 		onleave?: (to: Origin) => void;
@@ -201,7 +201,7 @@
 	/**
 	 * Where the open editor was asked for from, and so where its × goes back
 	 * to. From the table itself, the table; from an area on the card, the
-	 * panel closes, since it was only opened to draw in; from the Images
+	 * panel closes, since it was only opened to draw in; from the Pictures
 	 * tray, back to that.
 	 */
 	let leaveTo = $state<'table' | Origin>('table');
@@ -448,7 +448,7 @@
 	 * `draw` is the card asking for the drawing surface on an area bound to
 	 * this column: then an empty cell, or one pointing at a stored picture, is
 	 * drawn on rather than typed in. Without it, a stored picture is not this
-	 * editor's to open at all — it goes to the Images tray, where it can be
+	 * editor's to open at all — it goes to the Pictures tray, where it can be
 	 * seen large and cropped or turned.
 	 */
 	function openBigCell(rowIndex: number, column: string, draw = false, from: 'table' | Origin = 'table', caret?: number) {
@@ -497,7 +497,7 @@
 	 * showing pictures asked for it, so the column is a column of pictures,
 	 * and whatever a cell holds that cannot be drawn over (an address from
 	 * elsewhere) opens as a blank board, as it always has. Otherwise a stored
-	 * picture's own look with the way to the Images tray, or the words.
+	 * picture's own look with the way to the Pictures tray, or the words.
 	 */
 	/** Whether the panel shows the drawing board for this open cell. */
 	$effect(() => {
@@ -546,7 +546,7 @@
 	/**
 	 * The board in the panel, and whether it holds drawing not yet saved. Its
 	 * Save and Delete are in the panel's bar, beside the pager — where every
-	 * picture's are, the Images tray's included — so the bar asks the board.
+	 * picture's are, the Pictures tray's included — so the bar asks the board.
 	 * Closing with drawing unsaved drops it, as Cancel did; the pager waits
 	 * instead, because stepping away is not a way of saying "never mind".
 	 */
@@ -649,11 +649,11 @@
 		if (!toTable && to !== 'table') onleave?.(to);
 	}
 
-	/** The chevron: one step back — to the Images tray it came from, or else to the table. */
+	/** The chevron: one step back — to the Pictures tray it came from, or else to the table. */
 	const stepBack = () => closeBigCell(leaveTo !== 'images');
 
 	const leaveTitle = (dirty: boolean) =>
-		(dirty ? 'Close — the drawing not saved is dropped' : leaveTo === 'images' ? 'Back to Images' : leaveTo === 'card' ? 'Close' : 'Back to the table') + ' (Esc)';
+		(dirty ? 'Close — the drawing not saved is dropped' : leaveTo === 'images' ? 'Back to Pictures' : leaveTo === 'card' ? 'Close' : 'Back to the table') + ' (Esc)';
 
 	/**
 	 * Where the caret goes as the cell opens full size: where the finger
@@ -1880,7 +1880,7 @@
 									<!-- The picture in place of its base64, or of the name of a
 									     stored one. A press picks the row, as anywhere else on
 									     it; a double-click opens it — a drawing on the
-									     drawing surface, a stored picture large in Images. -->
+									     drawing surface, a stored picture large in Pictures. -->
 									<!-- A button round it, so it can be chosen as a cell is:
 									     the bar then offers Draw and says what it weighs. -->
 									<button
@@ -1917,7 +1917,7 @@
 											title={locked
 												? undefined
 												: localImageName(row[column])
-													? `${localImageName(row[column])} — double-click to open it in Images`
+													? `${localImageName(row[column])} — double-click to open it in Pictures`
 													: 'A drawing — double-click to draw on it'}
 											draggable="false"
 										/>
@@ -2084,9 +2084,9 @@
 			{@const value = dataset.rows[editing.row]?.[editing.column] ?? ''}
 			{#if cellPicture(value) || localImageName(value)}
 				<!-- A picture is chosen rather than typed in, and the way into it is
-				     the drawing surface — or, for a stored one, the Images tray. -->
+				     the drawing surface — or, for a stored one, the Pictures tray. -->
 				<button
-					title={localImageName(value) ? 'Open this picture in Images' : 'Draw on this picture'}
+					title={localImageName(value) ? 'Open this picture in Pictures' : 'Draw on this picture'}
 					disabled={locked}
 					onmousedown={(e) => e.preventDefault()}
 					onclick={() => editing && openBigCell(editing.row, editing.column)}
@@ -2388,14 +2388,14 @@
 	     table hid the card the words are for. It takes exactly the table's
 	     room — the rows and the bar under them — and gives it back on Done or
 	     Cancel. -->
-	<!-- The drawing editor's way back, as the Images tray's large view has it:
-	     one step — to Images if that is where it came from, else to the table
+	<!-- The drawing editor's way back, as the Pictures tray's large view has it:
+	     one step — to Pictures if that is where it came from, else to the table
 	     the drawing lives in. The × beside it closes to wherever it came from. -->
 	{#snippet back()}
 		<button
 			class="icon back"
-			title={leaveTo === 'images' ? 'Back to Images' : 'Back to the table'}
-			aria-label={leaveTo === 'images' ? 'Back to Images' : 'Back to the table'}
+			title={leaveTo === 'images' ? 'Back to Pictures' : 'Back to the table'}
+			aria-label={leaveTo === 'images' ? 'Back to Pictures' : 'Back to the table'}
 			onclick={stepBack}
 		>
 			<Icon name="chevron-left" size={16} />
@@ -2491,13 +2491,13 @@
 				{/key}
 			{:else if kind !== 'text'}
 				<!-- A stored picture landed on by the pager, or any picture in a
-				     locked table: itself, large. A stored one is the Images tray's
+				     locked table: itself, large. A stored one is the Pictures tray's
 				     to edit, and a press takes it there. -->
 				{@const stored = localImageName(text)}
 				<button
 					class="big-picture"
 					disabled={!stored}
-					title={stored ? `Open ${stored} in Images` : undefined}
+					title={stored ? `Open ${stored} in Pictures` : undefined}
 					onclick={() => stored && onopenimage(stored)}
 				><img src={drawingSource(text)} alt={open.column} /></button>
 			{:else}
@@ -2559,7 +2559,7 @@
 {/if}
 
 <!-- A picture's two acts, at the far end of the panel's bar as they are in
-     the Images tray: Delete in red, then Save, lit while there is drawing to
+     the Pictures tray: Delete in red, then Save, lit while there is drawing to
      keep. -->
 {#snippet drawingButtons(present: boolean, remove: () => void)}
 	<button class="danger" disabled={!present && !boardDirty} title="Delete this drawing" onclick={remove}>

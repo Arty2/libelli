@@ -236,7 +236,7 @@ export interface FontRef {
 	 */
 	kind?: FontKind;
 	/**
-	 * The kind chosen for it in the Images tray, over the one read off its
+	 * The kind chosen for it in the Pictures tray, over the one read off its
 	 * file or known to the app: for a file that says nothing, or says it
 	 * wrongly. Absent is Auto — `kind`, else what the app knows.
 	 */

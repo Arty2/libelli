@@ -405,7 +405,7 @@
 	}
 
 	/**
-	 * A crop, as the Images tray does one: press Crop, drag a frame over the
+	 * A crop, as the Pictures tray does one: press Crop, drag a frame over the
 	 * board, Apply. It used to trim the board to what was drawn on it, which
 	 * is what a repeating area already does as it is drawn (see `tile.ts`) and
 	 * left no way to keep a margin or cut into the drawing. The frame snaps to
@@ -1146,7 +1146,7 @@
 	}
 
 	/* What stays, lit; what goes, dimmed by the frame's own shadow — as the
-	   Images tray draws its crop. Clipped to the board by the stage. */
+	   Pictures tray draws its crop. Clipped to the board by the stage. */
 	.crop-frame {
 		position: absolute;
 		border: 1px dashed #fff;

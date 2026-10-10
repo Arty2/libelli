@@ -34,7 +34,7 @@ export const CURATED_GOOGLE_FONTS = [
  * Faces nearly every computer already has, offered beside the Google ones:
  * nothing to fetch and nothing to upload. Never asked of Google
  * (`ensureGoogleFont` refuses them), never declared in a template's fonts
- * (`fontRef`). The Images tray lists them, to be replaced like any other, but
+ * (`fontRef`). The Pictures tray lists them, to be replaced like any other, but
  * offers no upload: a design moved elsewhere finds them there, or falls back
  * as any page does without a face.
  */
@@ -94,7 +94,7 @@ const FALLBACKS: Record<FontKind, string> = {
 };
 
 /**
- * A family's kind, for its fallback: the one chosen for it in the Images tray
+ * A family's kind, for its fallback: the one chosen for it in the Pictures tray
  * (`fallback`), else the one read off its file (`kind`), else what the app
  * knows; undefined when none says.
  */
@@ -111,7 +111,7 @@ export function detectedKindOf(fonts: readonly FontRef[], family: string): FontK
 	return fonts.find((f) => f.family.toLowerCase() === key)?.kind ?? KNOWN_KINDS[key];
 }
 
-/** What the Images tray changes about a face: the kind its fallback is chosen by. */
+/** What the Pictures tray changes about a face: the kind its fallback is chosen by. */
 export interface FontTune {
 	/** the kind chosen for its fallback; undefined is Auto */
 	fallback?: FontKind;
@@ -618,7 +618,7 @@ export function previewFamilies(families: string[], editorFonts: FontRef[], decl
 
 // ---- the fonts a design carries, and repairing one -------------------------
 
-/** A font uploaded to this browser, as the Images tray lists it. */
+/** A font uploaded to this browser, as the Pictures tray lists it. */
 export interface StoredFontEntry {
 	ref: string;
 	family: string;

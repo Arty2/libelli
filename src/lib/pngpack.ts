@@ -10,7 +10,7 @@
  * a PNG is deflated already, and a second pass only adds its own header.
  *
  * Still a PNG, and still `data:image/png;base64`, so every reader of a cell —
- * the card, the PNG export, the Images tray, a spreadsheet's — reads it as it
+ * the card, the PNG export, the Pictures tray, a spreadsheet's — reads it as it
  * read the old ones, and the old ones stay as they are. Past 256 inks (a
  * photograph pasted onto the board) there is no palette to make, and the
  * caller keeps the canvas's own PNG.

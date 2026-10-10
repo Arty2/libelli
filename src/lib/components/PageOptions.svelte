@@ -764,12 +764,13 @@
 				<span class="unit">em</span>
 			</label>
 			<label class="field">
-				<span>Spacing</span>
+				<span>Kerning</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.05"
 					placeholder="0"
+					title="Kerning: space added between letters, in mm, for every area that does not set its own"
 					value={template.defaults.letterSpacing}
 					disabled={pageFrozen}
 					onchange={(e) =>

@@ -72,7 +72,7 @@ src/lib/
     Lightbox / SheetLightbox  one card, or one sheet, full screen
     CssEditor.svelte    the template's stylesheet: numbers, colour, tabs, wrap — over a real textarea
     BitmapEditor.svelte the drawing surface, hosted in DataTable; saves a base64 PNG
-    ImagesPanel.svelte  stored pictures, their weight, the folder; one large, to crop or turn
+    ImagesPanel.svelte  the Pictures tray: images, drawings, fonts; one large, to crop or turn
     Tooltip.svelte      every `title` as a tip: hover, or press and hold on touch
     PrintRoot, BoxMenu, SelectionTools, MenuSelect, ColorField, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy

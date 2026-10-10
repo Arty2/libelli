@@ -709,7 +709,7 @@ as a stroke.
 
 **Rotate, flip and crop are board transforms, not drawing.** None resamples:
 a quarter turn and a flip are the same pixels rearranged, and a crop keeps the
-ones inside its frame one to one. Crop is the Images tray's crop — a frame
+ones inside its frame one to one. Crop is the Pictures tray's crop — a frame
 dragged over the board, `photo.ts`'s fractions, snapped to whole pixels as it is
 drawn so what is shown is what is kept — not a trim to the ink, which a tiled
 area already does as it is drawn and which leaves no way to keep a margin or cut
@@ -786,10 +786,10 @@ its × then left the table showing — a panel nobody had asked for. Each reques
 now carries where it came from (`from` on `openRequest` and `areaRequest`):
 × goes back to the table only when the drawing was opened there or the table
 was already showing, back to Images when it came from there, and otherwise
-closes the panel (`onleave`). The ‹, as the Images tray's large view has it, is
+closes the panel (`onleave`). The ‹, as the Pictures tray's large view has it, is
 one step back — to Images, or to the table the drawing lives in.
 
-**Drawings are listed in the Images tray, not stored there.** A drawing lives
+**Drawings are listed in the Pictures tray, not stored there.** A drawing lives
 in its cell, or on an area with no column, on purpose (see `bitmap.ts` above),
 and so the tray — "every image this browser is holding" — was missing exactly
 the pictures made in the app. They are listed under the stored ones, read off
@@ -797,7 +797,7 @@ the table and the template as they stand, through `safeMediaUrl` as a cell's
 thumbnail is. No delete and no carry: they are not files, and a press opens
 the one editor that can change them.
 
-## `src/lib/photo.ts` and the Images tray's large view
+## `src/lib/photo.ts` and the Pictures tray's large view
 
 **Edits to a stored picture wait for Save.** Rotate, flip and crop draw on a canvas
 at the picture's own size; nothing reaches the store until Save, because these
@@ -824,7 +824,7 @@ beside it (a WeakMap — states are never changed once recorded) so the
 present is not serialised again at every commit.
 
 **A refinement can be folded into the last step (`amend`).** The page uses
-it for one thing: a Type chosen in the Images tray for a face just replaced
+it for one thing: a Type chosen in the Pictures tray for a face just replaced
 in from there joins the replace's entry (`fontSession`, `commit` in +page),
 so one undo goes back to the old face and one redo brings the new one back as
 chosen — two faces compared by flipping, not by stepping back through each
@@ -2904,7 +2904,7 @@ through, so no caller can forget — since Google would answer for a different
 face of the same name, or not at all, and the app makes no request nobody
 needed. `fontRef` gives a chosen family its source, and a system one is not
 declared in the template's fonts, as `replaceFamily` already left it out.
-The Images tray lists the ones in use — the list is every face the design
+The Pictures tray lists the ones in use — the list is every face the design
 is set in, each replaceable — with Upload off: a file under a system face's
 name would only shadow it in one browser. The
 cost: a design moved to a computer without the face falls back silently,
@@ -2938,7 +2938,7 @@ could. The value is the lowercase as a fraction of the size (`Box.xHeight`,
 loaded (`naturalXHeight`) and shown as the field's placeholder.
 
 **X-Height is an area's, and only beside the page's size.** It went round:
-per face in the page and area bars, then per face in the Images tray with
+per face in the page and area bars, then per face in the Pictures tray with
 size, spacing and leading beside it, applied on top of whatever the page and
 the areas set. Settings that change type from somewhere other than the bar
 the type is set in did not make sense to use, so the tray kept only Type, and
@@ -2995,7 +2995,7 @@ attribute without passing a chokepoint. A name that does not look like one is
 refused outright rather than cleaned, because a half-cleaned name is a family
 nobody asked for.
 
-**The Fonts list in the Images tray is for a design that changed computers.**
+**The Fonts list in the Pictures tray is for a design that changed computers.**
 A template names its fonts and the bytes stay behind, so a design opened
 elsewhere is set in a fallback without saying which face it wanted. The list
 says which fonts are **local** — a file in this browser — and which are
@@ -3009,11 +3009,14 @@ first, because another template in the library may still be set in it.
 
 ## `src/lib/assets.ts` and `src/lib/fonts.ts`
 
-**The Images bar uploads, and carries by pointer.** Without the folder —
+**The Pictures tray uploads, and carries by pointer.** Without the folder —
 Firefox, Safari, every phone — the only way in was dropping a file on an area,
-which a phone cannot do. So the bar has an Upload that writes where every
-picture is written. A stored picture reaches an area by being dragged out of
-the bar with pointer events rather than HTML drag and drop, which a touchscreen
+which a phone cannot do. So the tray has an Upload that writes where every
+picture is written. It and the folder are on the Images section's head, at
+its far end, not in a bar at the tray's foot: they are the images' alone — a
+drawing is made in the table, a font comes in on its own row — and a bar
+under three sections read as everyone's. A stored picture reaches an area by
+being dragged out of the tray with pointer events rather than HTML drag and drop, which a touchscreen
 does not have; where it is let go, `elementFromPoint` and the card's
 `data-box-id` say which area, and the page places it by the same rule as a
 dropped file. Pixel sizes are read off the thumbnails as they load rather than
@@ -3249,7 +3252,7 @@ trim's first child, so it paints over the grid and under every area, as a
 solid line. The trim edge stays outside the card, over everything.
 
 **One object URL per picture, until the picture changes.** Every resolve used
-to revoke and re-mint the URL for a name, and the card and the Images bar each
+to revoke and re-mint the URL for a name, and the card and the Pictures tray each
 resolve: a picture carried out of the bar a second time dragged a
 broken-image icon, its URL revoked by the card's resolve after the first drop.
 The cache now keeps a URL while the picture's version — a file's size and time,
@@ -3426,11 +3429,14 @@ surface, a hand-drawn edge, a QR — and nowhere else. Everything that measures,
 drags or writes the area back holds the stored one, so one card's color can
 never be saved as the template's.
 
-**Labels stay one word where one word was there.** Leading, Spacing, Draft,
+**Labels stay one word where one word was there.** Leading, Kerning, Draft,
 Width and Height were tried as longer, plainer phrases and put back: in a bar
 this dense a second word costs more than it explains, and the tip on each field
 says the rest. The group names are set in capitals like the labels, bold, which
-is what tells a group's name from a field's.
+is what tells a group's name from a field's. Spacing became Kerning, as asked:
+strictly, space added evenly between every letter is tracking and kerning is
+pairwise, but Kerning is the word the people setting these cards reach for,
+and Spacing read as space between lines or paragraphs.
 
 **A value taken from the page looks taken; one set here has an ×.** Blank was
 always how an area's field inherited, and nothing on screen said which ones

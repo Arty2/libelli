@@ -8,12 +8,12 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.28.47 — 2026-10-10
+## 0.28.48 — 2026-10-10
 
 - Phone: the table follows your finger — pull up from the status bar to open it, down to close it. A tap chooses a cell; tap again or hold to type where you tapped.
 - The nudge pad stays as you left it between Move and zoom and pan. One tab edits at a time: Use Here.
 - Lists: □ Open Square, ➤ Arrow, circles and squares sized alike; numbers as letters or Roman.
-- Shrink: an area keeps its height and sets each card's words smaller to fit. Fonts in the Images tray: find or replace a missing one. Font menus by source, with system fonts; a face's Type picks its fallback; an area's X-Height.
+- Shrink: an area keeps its height and sets each card's words smaller to fit. Images is Pictures: images, drawings and fonts; find or replace a missing font. Font menus by source, with system fonts; a face's Type picks its fallback; an area's X-Height.
 - Tab leaders: `Espresso %%% 2.20`; `%%toc:title%%` for a table of contents, as the starter's last card shows with an ISBN. Dragging shows the gaps in mm from the ringed handle, which X and Y now name.
 - Barcode: Code 128 and EAN-13 beside QR, with the digits; a layout from columns makes ISBNs barcodes. A bottom-set Grow area grows upwards. Draft borders rougher on short edges.
 
