@@ -258,7 +258,7 @@ fi
 # of related changes rather than one change, so a feature and the five switches
 # that came with it are one line. Three is the usual shape; six is the most a
 # release has ever needed. Say what changed and what it means, and leave how it
-# works to the README.
+# works to the guide.
 #
 # Overridable so the failure path is testable: `CHANGELOG_MAX=2 npm run gates`
 # should fail.
