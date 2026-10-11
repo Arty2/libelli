@@ -281,10 +281,14 @@ export function boxEdges(
 	const y: number[] = [];
 	for (const box of boxes) {
 		if (box.id === exceptId) continue;
-		x.push(box.x, box.x + box.w / 2, box.x + box.w);
-		const top = layout.tops[box.id] ?? box.y;
-		const height = layout.heights[box.id] ?? box.h;
-		y.push(top, top + height / 2, top + height);
+		// A turned box offers the edges of the shape it is drawn as.
+		const drawn = drawnBounds(
+			{ x: box.x, y: layout.tops[box.id] ?? box.y, w: box.w, h: layout.heights[box.id] ?? box.h },
+			box.rotation,
+			box.centre
+		);
+		x.push(drawn.x, drawn.x + drawn.w / 2, drawn.x + drawn.w);
+		y.push(drawn.y, drawn.y + drawn.h / 2, drawn.y + drawn.h);
 	}
 	return { x, y };
 }
@@ -532,6 +536,54 @@ export interface Rect {
 	y: number;
 	w: number;
 	h: number;
+}
+
+/**
+ * A point of an area as it is drawn: `fx`, `fy` of the way across and down
+ * the upright rectangle, turned `rotation` degrees clockwise about `centre`
+ * (percent of the area, the middle when absent) — the CSS transform the card
+ * draws it with, so the readouts and the snapping start where the eye sees
+ * the point. Measured upright, a turned area's reference corner was wherever
+ * that corner would have been before the turn: nowhere on the area drawn.
+ */
+export function turnedPoint(
+	rect: Rect,
+	rotation: number | undefined,
+	centre: { x: number; y: number } | undefined,
+	fx: number,
+	fy: number
+): { x: number; y: number } {
+	const x = rect.x + rect.w * fx;
+	const y = rect.y + rect.h * fy;
+	if (!rotation) return { x, y };
+	const px = rect.x + (rect.w * (centre?.x ?? 50)) / 100;
+	const py = rect.y + (rect.h * (centre?.y ?? 50)) / 100;
+	const turn = (rotation * Math.PI) / 180;
+	const cos = Math.cos(turn);
+	const sin = Math.sin(turn);
+	// y runs down the page, so this is a clockwise turn as CSS draws one.
+	return { x: px + (x - px) * cos - (y - py) * sin, y: py + (x - px) * sin + (y - py) * cos };
+}
+
+/**
+ * The upright rectangle that encloses an area as it is drawn — its four
+ * corners turned (`turnedPoint`). What a turned area is measured by, and what
+ * it lines up by: the edges of the shape on the page, not of the upright
+ * frame it is stored as, which is drawn nowhere.
+ */
+export function drawnBounds(rect: Rect, rotation: number | undefined, centre: { x: number; y: number } | undefined): Rect {
+	if (!rotation || !(((rotation % 360) + 360) % 360)) return rect;
+	const corners = [
+		[0, 0],
+		[1, 0],
+		[0, 1],
+		[1, 1]
+	].map(([fx, fy]) => turnedPoint(rect, rotation, centre, fx, fy));
+	const xs = corners.map((c) => c.x);
+	const ys = corners.map((c) => c.y);
+	const x = Math.min(...xs);
+	const y = Math.min(...ys);
+	return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
 }
 
 /** One distance shown while a box is dragged: a line from `from` to `to` along `axis`, at `at` across it. */

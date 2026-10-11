@@ -23,7 +23,9 @@ import {
 	resolveLayout,
 	snapTo,
 	snapToEdges,
-	latchSpan
+	latchSpan,
+	drawnBounds,
+	turnedPoint
 } from './layout';
 import { newBox } from './template';
 import type { Box } from './types';
@@ -472,6 +474,83 @@ describe('spacingReadouts from a reference point', () => {
 		const corner = { x: 10, y: 20, w: 10, h: 20 };
 		const r = spacingReadouts(box, [corner], page, { x: 40, y: 40 });
 		expect(r.find((s) => s.axis === 'x' && s.to === 40)!.from).toBe(0);
+	});
+});
+
+describe('a turned area, as drawn', () => {
+	const rect = { x: 0, y: 0, w: 20, h: 10 };
+	const near = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+		expect(a.x).toBeCloseTo(b.x, 6);
+		expect(a.y).toBeCloseTo(b.y, 6);
+	};
+
+	it('turns a point clockwise about the middle, or the pivot', () => {
+		// Upright, a point is where it is.
+		near(turnedPoint(rect, 0, undefined, 0, 0), { x: 0, y: 0 });
+		// A quarter turn clockwise about the middle (10, 5): the top-left corner
+		// goes to the top right of what is drawn.
+		near(turnedPoint(rect, 90, undefined, 0, 0), { x: 15, y: -5 });
+		// About its own top-left corner, that corner stays put and the far one swings down.
+		near(turnedPoint(rect, 90, { x: 0, y: 0 }, 0, 0), { x: 0, y: 0 });
+		near(turnedPoint(rect, 90, { x: 0, y: 0 }, 1, 0), { x: 0, y: 20 });
+		// The CSS turn is clockwise, so -90 is the other way.
+		near(turnedPoint(rect, -90, undefined, 0, 0), { x: 5, y: 15 });
+	});
+
+	it('is enclosed by the bounds of its turned corners', () => {
+		// Untouched upright, or turned a whole turn.
+		expect(drawnBounds(rect, 0, undefined)).toBe(rect);
+		expect(drawnBounds(rect, 360, undefined)).toBe(rect);
+		const quarter = drawnBounds(rect, 90, undefined);
+		expect(quarter.x).toBeCloseTo(5);
+		expect(quarter.y).toBeCloseTo(-5);
+		expect(quarter.w).toBeCloseTo(10);
+		expect(quarter.h).toBeCloseTo(20);
+		// At 45° a 20 × 10 area spans (20 + 10)/√2 each way, about its middle.
+		const eighth = drawnBounds(rect, 45, undefined);
+		expect(eighth.w).toBeCloseTo(30 / Math.SQRT2);
+		expect(eighth.h).toBeCloseTo(30 / Math.SQRT2);
+		expect(eighth.x + eighth.w / 2).toBeCloseTo(10);
+		expect(eighth.y + eighth.h / 2).toBeCloseTo(5);
+	});
+
+	it('every corner of a turned area is on the edge of its bounds', () => {
+		// Which is why a reference corner, turned, is a fair place to measure from.
+		for (const deg of [15, 30, 60, 120, 200, 330]) {
+			const b = drawnBounds(rect, deg, { x: 30, y: 70 });
+			for (const [fx, fy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+				const p = turnedPoint(rect, deg, { x: 30, y: 70 }, fx, fy);
+				const onEdge = [p.x - b.x, b.x + b.w - p.x, p.y - b.y, b.y + b.h - p.y].some((d) => Math.abs(d) < 1e-9);
+				expect(onEdge).toBe(true);
+			}
+		}
+	});
+
+	it('a turned neighbour offers the edges it is drawn with to snap to', () => {
+		const still = newBox({ id: 'a', x: 40, y: 40, w: 20, h: 10, rotation: 90 });
+		const mover = newBox({ id: 'm', x: 0, y: 0, w: 10, h: 10 });
+		const layout = resolveLayout({ boxes: [still, mover], measured: {}, hidden: new Set() });
+		const edges = boxEdges([still, mover], layout, 'm');
+		// Drawn 10 wide and 20 tall about its middle (50, 45).
+		expect(edges.x.map((v) => Math.round(v * 100) / 100)).toEqual([45, 50, 55]);
+		expect(edges.y.map((v) => Math.round(v * 100) / 100)).toEqual([35, 45, 55]);
+	});
+
+	it('is measured by what is drawn, from the reference point where it is drawn', () => {
+		// A neighbour turned upright-on-end at x 45–55, y 35–55; the moved
+		// area a quarter turn too, its top-left corner now its top right.
+		const page = { w: 100, h: 100 };
+		const neighbour = drawnBounds({ x: 40, y: 40, w: 20, h: 10 }, 90, undefined);
+		const moved = { x: 70, y: 40, w: 20, h: 10 };
+		const focus = turnedPoint(moved, 90, undefined, 0, 0);
+		const r = spacingReadouts(drawnBounds(moved, 90, undefined), [neighbour], page, focus);
+		const left = r.find((s) => s.axis === 'x' && s.to < 80)!;
+		// From the moved area's drawn left edge (75) to the neighbour's drawn right (55).
+		expect(left.from).toBeCloseTo(55);
+		expect(left.to).toBeCloseTo(75);
+		// Along the line through the turned corner, not the corner as stored.
+		expect(left.at).toBeCloseTo(focus.y);
+		expect(focus).toEqual({ x: expect.closeTo(85), y: expect.closeTo(35) });
 	});
 });
 

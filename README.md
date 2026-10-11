@@ -359,7 +359,10 @@ resize boxes directly, or type exact millimetres.
   **Double-click** either mark to put it back: the crosshair to the middle, the
   knob upright — getting back to either by dragging is pixel-hunting. A
   turned area still occupies the space it would have upright, so anchored areas
-  below it do not move — turning one thing never shuffles the card.
+  below it do not move — turning one thing never shuffles the card. But it is
+  lined up and measured as it is drawn: a move snaps the turned shape's edges,
+  the gaps shown while dragging start from its reference corner where that
+  corner has turned to, and a turned neighbour is measured to its drawn edge.
 - **Overflow** — a box whose content is taller than the box will let it be draws
   the cut: a dashed red line along its bottom edge, where the words are actually
   severed, with a pair of shears astride that line at the right-hand end —

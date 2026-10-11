@@ -41,6 +41,8 @@
 		latchSpan,
 		snapTo,
 		snapToEdges,
+		drawnBounds,
+		turnedPoint,
 		columnGaps,
 		shrinkScale,
 		spacingReadouts,
@@ -261,18 +263,19 @@
 	const readouts = $derived.by(() => {
 		const from = spaced ?? nudged;
 		if (!spacing || !from) return [];
-		const rectOf = (b: Box) => {
-			const drawn = placed(b);
-			return { x: drawn.x, y: layout.tops[b.id] ?? b.y, w: b.w, h: layout.heights[b.id] ?? b.h };
-		};
+		const uprightOf = (b: Box) => ({ x: placed(b).x, y: layout.tops[b.id] ?? b.y, w: b.w, h: layout.heights[b.id] ?? b.h });
+		// A turned area as it is drawn — its own extent and every neighbour's —
+		// so a gap is measured to what is seen, not to the upright frame.
+		const rectOf = (b: Box) => drawnBounds(uprightOf(b), placed(b).rotation, placed(b).centre);
 		const box = template.boxes.find((b) => b.id === from.id);
 		if (!box) return [];
 		const skip = new Set([from.id, ...from.with]);
 		const others = template.boxes.filter((b) => !skip.has(b.id) && !hidden.has(b.id)).map(rectOf);
-		// Read out from the reference point, the one the bar's X and Y name.
-		const rect = rectOf(box);
+		// Read out from the reference point, the one the bar's X and Y name —
+		// where it is drawn: on a turned area that corner has turned with it.
 		const { fx, fy } = referenceFor(box);
-		return spacingReadouts(rect, others, template.page, { x: rect.x + rect.w * fx, y: rect.y + rect.h * fy });
+		const focus = turnedPoint(uprightOf(box), placed(box).rotation, placed(box).centre, fx, fy);
+		return spacingReadouts(rectOf(box), others, template.page, focus);
 	});
 
 	/**
@@ -976,8 +979,8 @@
 		// A CSS transform does not touch layout, so a rotated box still reports the
 		// height it would have had upright — which is what `measure()` reads and
 		// what anchored boxes below follow. That is the intended bargain: turning a
-		// box does not shove the rest of the card around. Snapping sees the upright
-		// rectangle too.
+		// box does not shove the rest of the card around. Snapping a move and the
+		// spacing readouts do not: they take the shape as drawn (`drawnBounds`).
 		// As drawn: on a facing page a quarter turn is the opposite one, about
 		// the mirrored pivot — see `mirrorBox`.
 		if (drawn.rotation) {
@@ -1508,13 +1511,14 @@
 		const mode = flip ? MIRRORED_MODE[drag.mode] : drag.mode;
 		const next: Box = { ...origin };
 
-		const setTop = (deltaY: number, length?: number) => {
+		/** `shift`: how far the drawn shape's top is below the stored top, for a turned area. */
+		const setTop = (deltaY: number, length?: number, shift = 0) => {
 			// An anchored box has no independent top: move its gap instead, so the
 			// relationship the template author set up survives being dragged. No
 			// floor under it — dragged up past the area it follows, it overlaps
 			// that area, with a negative gap, rather than stopping dead.
 			if (origin.anchor) next.anchor = { ...origin.anchor, gap: size(origin.anchor.gap + deltaY) };
-			else next.y = place(origin.y + deltaY, 'y', length);
+			else next.y = shift ? round2(place(origin.y + shift + deltaY, 'y', length) - shift) : place(origin.y + deltaY, 'y', length);
 		};
 
 		switch (mode) {
@@ -1577,15 +1581,22 @@
 				// The held axis is left exactly where it was, not re-placed: placing
 				// snaps, and a snap on the axis that is meant to stand still is a
 				// line that is not straight.
-				if (along !== 'y') next.x = place(origin.x + dx, 'x', origin.w);
+				// A turned area lines up by the shape it is drawn as: its bounds'
+				// offset from the stored frame is fixed while it only moves, so
+				// the bounds are snapped and the frame follows by that offset.
+				const height = layout.heights[origin.id] ?? origin.h;
+				const upright = { x: origin.x, y: layout.tops[origin.id] ?? origin.y, w: origin.w, h: height };
+				const bounds = drawnBounds(upright, origin.rotation, origin.centre);
+				const off = { x: bounds.x - upright.x, y: bounds.y - upright.y };
+				if (along !== 'y') next.x = round2(place(origin.x + off.x + dx, 'x', bounds.w) - off.x);
 				if (along !== 'x') {
-					const height = layout.heights[origin.id] ?? origin.h;
 					// A Grow area set bottom or middle is drawn above its stored top,
 					// by however far its words grew it (`freedTop`). Snapped as drawn —
 					// the edges and the margins it latches to are the drawn ones —
 					// and stored back below by the same lift.
 					const lift = origin.anchor ? 0 : freedTop(origin, 0, height);
-					if (lift) next.y = round2(place(origin.y - lift + dy, 'y', height) + lift);
+					if (lift) next.y = round2(place(origin.y - lift + off.y + dy, 'y', bounds.h) + lift - off.y);
+					else if (off.y) setTop(dy, bounds.h, off.y);
 					else setTop(dy, height);
 				}
 				break;

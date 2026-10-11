@@ -8,7 +8,7 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.29.4 — 2026-10-11
+## 0.29.5 — 2026-10-11
 
 - Pictures: a connected folder is read in the background and is one line you open, with Folder add to connect it and Unlink to let it go.
 - Pictures: one Search box; a section of more than ten starts folded unless you folded or opened it.

@@ -1232,8 +1232,19 @@ would be unreachable.
 **Rotation is a transform, so it costs no layout.** `rotation` is degrees and
 `centre` is the pivot in *percent* of the box — the one thing in the format that
 is not mm, because a pivot in mm drifts towards a corner as the box grows. A CSS
-transform leaves `offsetHeight` alone, so `measure()`, anchoring and snapping all
-see the upright rectangle: turning one area never shuffles the rest of the card.
+transform leaves `offsetHeight` alone, so `measure()` and anchoring see the
+upright rectangle: turning one area never shuffles the rest of the card.
+
+**What is lined up and measured is what is drawn.** Snapping a move and the
+spacing readouts take a turned area by the upright box that encloses its drawn
+shape (`drawnBounds`), the moved area and every neighbour alike, and the
+readouts start from the reference point where it is drawn (`turnedPoint`).
+Taken upright, a turned area latched by edges nobody could see, and its
+readouts started at the corner as it was before the turn — off the area, at a
+point that looked random. Every corner of a turned rectangle lies on its
+bounds, so the turned reference corner is always on the box being measured. A
+resize still snaps its upright edge: it is sizing the frame, not placing the
+shape.
 The cost is that a resize handle on a turned box hands back a screen-space delta,
 which `moveDrag` rotates by −θ before reading it as a width; `move` is exempt,
 because a translation in the parent's space is the same whichever way the box
