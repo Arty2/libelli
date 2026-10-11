@@ -89,6 +89,13 @@ middle, so the number a drag shows and the number the bar shows are measured
 from the same place. It is the full Guides state only: the dash keeps the
 margins and alignment guides for a person who finds the numbers noisy.
 
+**The nudge pad shows the spacing too.** A nudge is a drag in steps, aimed by
+the same gaps, so `nudging` makes the card read them out from the first chosen
+area, skipping what moves with it as `startDrag` would collect it. They stay
+for a moment after the last press, because taps come one at a time and
+readouts that blinked off between them could not be read. Only the pad: an
+arrow key's nudge is made looking at the bar's X and Y.
+
 ## `src/lib/frame.ts`
 
 **A file gives each area at its reference point; memory keeps the top-left
@@ -3823,6 +3830,11 @@ bar itself, or the browser takes the drag for a scroll and cancels the pointer;
 and it swallows the click a release may be owed anywhere on the page, because
 by then the tray has risen under the finger and the click would land on the
 table's header — a column's name went into editing that way.
+
+**The pull brings back the tray put away last.** The table and Pictures share
+the room one at a time, so the one that was up last is the one a pull off the
+bar means; `UiState.lastTray` records it as the panels are saved, and survives
+a reload. Absent is the table, which is all the pull opened before.
 
 ## `src/routes/app.css` — the accent
 

@@ -1130,8 +1130,20 @@
 	 */
 	let pushed = $state<'up' | 'down' | 'left' | 'right' | 'centre' | null>(null);
 
+	/**
+	 * The card reads out the gaps while the pad is pressed, as it does under
+	 * a drag, and for a moment after: taps come one at a time, and readouts
+	 * that blinked off between them could not be read.
+	 */
+	let nudging = $state(false);
+	let nudgeLinger: ReturnType<typeof setTimeout> | null = null;
+	const NUDGE_LINGER_MS = 1200;
+
 	function startNudge(event: PointerEvent, dx: number, dy: number) {
 		pushed = dy < 0 ? 'up' : dy > 0 ? 'down' : dx < 0 ? 'left' : 'right';
+		if (nudgeLinger !== null) clearTimeout(nudgeLinger);
+		nudgeLinger = null;
+		nudging = true;
 		onnudge(dx, dy);
 		// Touch only, as every buzz in the app is (haptics.ts): a mouse held on
 		// an arrow has the pad going down under a pointer it can see.
@@ -1146,6 +1158,11 @@
 
 	function stopNudge() {
 		pushed = null;
+		if (nudging && nudgeLinger === null)
+			nudgeLinger = setTimeout(() => {
+				nudging = false;
+				nudgeLinger = null;
+			}, NUDGE_LINGER_MS);
 		if (repeat === null) return;
 		clearTimeout(repeat);
 		clearInterval(repeat);
@@ -1604,6 +1621,7 @@
 				{guides}
 				{smartGuides}
 				spacing={spacingGuides && guides && smartGuides}
+				{nudging}
 				{scale}
 				{pageNumber}
 				{theme}

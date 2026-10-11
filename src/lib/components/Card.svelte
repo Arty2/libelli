@@ -94,6 +94,12 @@
 		 * edge, drawn as it moves — `spacingReadouts`.
 		 */
 		spacing?: boolean;
+		/**
+		 * The nudge pad is being pressed, or was a moment ago: the spacing is
+		 * read out from the chosen areas as a drag would show it, since a nudge
+		 * is a drag in steps and the gaps are what it is aimed by.
+		 */
+		nudging?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
 		scale?: number;
 		interactive?: boolean;
@@ -181,6 +187,7 @@
 		guides = false,
 		smartGuides = false,
 		spacing = false,
+		nudging = false,
 		scale = 1,
 		interactive = false,
 		panning = false,
@@ -228,19 +235,33 @@
 	 */
 	let spaced = $state<{ id: string; with: string[] } | null>(null);
 	/**
+	 * The same, for a nudge: the first chosen area, with the rest of the
+	 * choice and whatever hangs off it — what moves with it, as a drag of it
+	 * would collect (`startDrag`).
+	 */
+	const nudged = $derived.by(() => {
+		if (!nudging || !spacing) return null;
+		const movers = template.boxes.filter((b) => selectedIds.includes(b.id) && !b.locked);
+		if (!movers.length) return null;
+		const along = new Set(movers.slice(1).map((b) => b.id));
+		for (const mover of movers) for (const b of dependentsOf(mover.id)) along.add(b.id);
+		return { id: movers[0].id, with: [...along] };
+	});
+	/**
 	 * The spacing readouts, in the frame the card is drawn in: on a left-hand
 	 * page a mirrored area is measured where it is seen, not where it is stored.
 	 * Hidden areas take no room, so nothing is measured to one.
 	 */
 	const readouts = $derived.by(() => {
-		if (!spacing || !spaced) return [];
+		const from = spaced ?? nudged;
+		if (!spacing || !from) return [];
 		const rectOf = (b: Box) => {
 			const drawn = placed(b);
 			return { x: drawn.x, y: layout.tops[b.id] ?? b.y, w: b.w, h: layout.heights[b.id] ?? b.h };
 		};
-		const box = template.boxes.find((b) => b.id === spaced!.id);
+		const box = template.boxes.find((b) => b.id === from.id);
 		if (!box) return [];
-		const skip = new Set([spaced.id, ...spaced.with]);
+		const skip = new Set([from.id, ...from.with]);
 		const others = template.boxes.filter((b) => !skip.has(b.id) && !hidden.has(b.id)).map(rectOf);
 		// Read out from the reference point, the one the bar's X and Y name.
 		const rect = rectOf(box);

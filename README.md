@@ -1737,7 +1737,9 @@ towards it and down is away. They repeat on a hold like the arrows do.
   to begin with in this mode, at any width; hold its middle to
   put it away, and the cross that appears under zoom and pan brings it back. On
   a touch screen the cross is there in **Move** too, with the pad put away to
-  begin with: press it for a nudge finer than a fingertip drags. Switching
+  begin with: press it for a nudge finer than a fingertip drags. While the
+  pad moves an area, and for a moment after, the gaps to its neighbours and
+  the page edge are shown in millimetres, as they are under a drag. Switching
   between the two modes leaves the pad as you last left it, out or put away.
   The resize handles and the
   lever still drag; they are small and grabbed on purpose. It starts **on**
@@ -1770,8 +1772,8 @@ towards it and down is away. They repeat on a hold like the arrows do.
 - **The tray follows your finger, both ways.** Pull its header down and it
   shrinks with you all the way, fading once it is smaller than it can stay;
   let go there and it folds away, as the Data button would, keeping its height
-  for next time. **Pull up from the status bar** and the table comes up under
-  your finger, staying as tall as you leave it — or, for a quick flick, as tall
+  for next time. **Pull up from the status bar** and the tray you put away
+  last — the table or **Pictures** — comes up under your finger, staying as tall as you leave it — or, for a quick flick, as tall
   as it last was. Let go of a pull too short to use and it goes back down. A
   tap on the bar's buttons is still a tap, and letting go of a pull never taps
   what the tray has brought under your finger.

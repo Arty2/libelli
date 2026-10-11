@@ -580,16 +580,20 @@
 	}
 
 	/**
-	 * The status bar pulled upwards, stacked: the table comes up under the
-	 * finger from nothing, and is dragged from there as its header would be.
-	 * Nothing to pull when a tray is up already.
+	 * The status bar pulled upwards, stacked: the tray put away last — the
+	 * table or the Pictures — comes up under the finger from nothing, and is
+	 * dragged from there as its head would be. Nothing to pull when a tray is
+	 * up already.
 	 */
 	function pullTray(phase: 'start' | 'move' | 'end', clientY: number, flick?: boolean): boolean | void {
 		if (phase === 'start') {
 			if (!stacked || dataOpen || imagesOpen) return false;
 			trayRestore = trayShare;
 			trayShare = 0;
-			dataOpen = true;
+			if (ui.lastTray === 'images') {
+				imageFocus = null;
+				imagesOpen = true;
+			} else dataOpen = true;
 			trayFrom = { y: clientY, share: 0 };
 			return true;
 		}
@@ -1853,7 +1857,10 @@
 		untrack(() => {
 			const was = ui.panels;
 			if (was && was.page === panels.page && was.data === panels.data && was.images === panels.images) return;
-			ui = { ...ui, panels };
+			// One tray at a time, so the one up now is the one a pull off the
+			// status bar should bring back once it has been put away.
+			const lastTray = panels.images ? 'images' : panels.data ? 'data' : ui.lastTray;
+			ui = { ...ui, panels, ...(lastTray ? { lastTray } : {}) };
 		});
 	});
 

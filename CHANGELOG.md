@@ -8,7 +8,13 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.28.52 — 2026-10-10
+## 0.29.0 — 2026-10-11
+
+- Pictures: a connected folder is read in the background and is one line you open, with Folder add to connect it and Unlink to let it go.
+- Pictures: one Search box; a section of more than ten starts folded unless you folded or opened it.
+- The nudge pad shows the gaps in mm as it moves an area. Pulling up from the status bar brings back the table or Pictures, whichever was last put away.
+
+## 0.28.51 — 2026-10-10
 
 - Phone: the table follows your finger — pull up from the status bar to open it, down to close it. A tap chooses a cell; tap again or hold to type where you tapped.
 - The nudge pad stays as you left it between Move and zoom and pan. One tab edits at a time: Use Here.

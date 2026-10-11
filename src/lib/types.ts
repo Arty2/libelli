@@ -622,6 +622,12 @@ export interface UiState {
 	 */
 	panels?: { page: boolean; data: boolean; images: boolean };
 	/**
+	 * Which of the two trays was up last — the table or the Pictures — so a
+	 * pull up off the status bar brings back the one that was put away.
+	 * Absent is the table, the one the pull always opened before.
+	 */
+	lastTray?: 'data' | 'images';
+	/**
 	 * The table's width beside the page, as a share of the working area, 0 to
 	 * 1. Absent is the stylesheet's own share. (A `trayWidth` in px written by
 	 * 0.16.0 is simply not read.)
