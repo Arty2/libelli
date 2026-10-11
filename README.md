@@ -1241,7 +1241,8 @@ sections, **Images**, **Drawings** and **Fonts**.
   **Fonts** under heads that say how many each holds and what they weigh; a
   press on a head folds its list shut or open, and this browser remembers
   which are shut, so the tray opens as it was left. A section you have not
-  folded or opened yourself starts folded once it holds more than ten. With
+  folded or opened yourself starts folded once it holds more than ten, a
+  connected folder counting as its one line. With
   eight images or more, **Search…** at the top of the tray narrows the list
   as you type, opening the Images section and the folder to show the matches.
 - **Onto the card** — drag a thumbnail out of the tray and let go over an area:

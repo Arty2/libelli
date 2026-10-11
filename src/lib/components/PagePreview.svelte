@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { flushSync, tick } from 'svelte';
+	import { flushSync, tick, untrack } from 'svelte';
 	import Card from './Card.svelte';
 	import type { Theme } from '$lib/theme';
 	import Icon from './Icon.svelte';
@@ -1139,6 +1139,27 @@
 	let nudgeLinger: ReturnType<typeof setTimeout> | null = null;
 	const NUDGE_LINGER_MS = 1200;
 
+	/**
+	 * Another choice ends the readouts at once: they were measured from what
+	 * the pad moved, and moving across to the next area would carry them onto
+	 * one that has not been nudged. Leaving the page ends the wait with it.
+	 */
+	function endNudging() {
+		if (nudgeLinger !== null) clearTimeout(nudgeLinger);
+		nudgeLinger = null;
+		nudging = false;
+	}
+	// A string, so a nudge that hands back the same choice in a new array
+	// (the page rebuilds it as the template changes) is not a new choice.
+	const choice = $derived(selectedIds.join(' '));
+	$effect(() => {
+		void choice;
+		untrack(() => {
+			if (nudging && !pushed) endNudging();
+		});
+	});
+	$effect(() => endNudging);
+
 	function startNudge(event: PointerEvent, dx: number, dy: number) {
 		pushed = dy < 0 ? 'up' : dy > 0 ? 'down' : dx < 0 ? 'left' : 'right';
 		if (nudgeLinger !== null) clearTimeout(nudgeLinger);
@@ -1159,10 +1180,7 @@
 	function stopNudge() {
 		pushed = null;
 		if (nudging && nudgeLinger === null)
-			nudgeLinger = setTimeout(() => {
-				nudging = false;
-				nudgeLinger = null;
-			}, NUDGE_LINGER_MS);
+			nudgeLinger = setTimeout(endNudging, NUDGE_LINGER_MS);
 		if (repeat === null) return;
 		clearTimeout(repeat);
 		clearInterval(repeat);

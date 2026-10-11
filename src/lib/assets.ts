@@ -42,6 +42,15 @@ function cacheObjectUrl(key: string, blob: Blob, version: string): string {
 	return url;
 }
 
+/**
+ * The two kinds of URL, each with its version spelled in one place: every
+ * caller has to spell it the same, or two of them holding one name would take
+ * each other for a changed picture and revoke what the other is showing.
+ */
+const urlForFile = (key: string, file: File) => cacheObjectUrl(key, file, `folder:${file.size}:${file.lastModified}`);
+const urlForStored = (key: string, stored: StoredImage) =>
+	cacheObjectUrl(key, new Blob([stored.bytes], { type: stored.type || 'image/png' }), `browser:${stored.bytes.byteLength}`);
+
 /** A picture was written or deleted here: the next resolve makes a fresh URL. */
 function forgetObjectUrl(key: string) {
 	const previous = objectUrls.get(key);
@@ -178,14 +187,10 @@ export async function resolveBackground(image: PageBackgroundImage | undefined):
 	// looked for in, for the same reason.
 	const folder = await readyFolder();
 	const file = folder ? await fileIn(folder, image.src) : null;
-	if (file) return cacheObjectUrl(key, file, `folder:${file.size}:${file.lastModified}`);
+	if (file) return urlForFile(key, file);
 	const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
 	if (!stored?.bytes) return null;
-	return cacheObjectUrl(
-		key,
-		new Blob([stored.bytes], { type: stored.type || 'image/png' }),
-		`browser:${stored.bytes.byteLength}`
-	);
+	return urlForStored(key, stored);
 }
 
 // ---- images a row carries ---------------------------------------------------
@@ -259,14 +264,9 @@ export async function resolveLocalImages(
 			// was chosen keeps rendering, and an image put in the folder
 			// afterwards is what a name means from then on.
 			const fromFolder = folder ? await fileIn(folder, name) : null;
-			if (fromFolder)
-				return [name, cacheObjectUrl(key, fromFolder, `folder:${fromFolder.size}:${fromFolder.lastModified}`)] as const;
+			if (fromFolder) return [name, urlForFile(key, fromFolder)] as const;
 			const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
-			if (!stored?.bytes) return [name, null] as const;
-			return [
-				name,
-				cacheObjectUrl(key, new Blob([stored.bytes], { type: stored.type || 'image/png' }), `browser:${stored.bytes.byteLength}`)
-			] as const;
+			return [name, stored?.bytes ? urlForStored(key, stored) : null] as const;
 		})
 	);
 	for (const [name, url] of found) {
@@ -399,26 +399,26 @@ export interface ImageRecord {
 
 const IMAGE_FILE = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
 
-/** The images this browser holds itself, with what they weigh. */
+/**
+ * The images this browser holds itself, with what they weigh — less any the
+ * open folder holds under the same name. That copy is never the one drawn
+ * (the folder is read first), and making a URL for it would replace the
+ * folder file's URL in the cache the card shares, revoking the picture the
+ * card is showing. Read all at once, as `resolveLocalImages` reads.
+ */
 export async function listBrowserImages(): Promise<ImageRecord[]> {
-	const out: ImageRecord[] = [];
-	if (typeof window === 'undefined') return out;
-	for (const key of await idbKeys(STORE_ASSETS)) {
-		if (!key.startsWith('image:')) continue;
-		const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
-		if (!stored?.bytes) continue;
-		out.push({
-			name: stored.name,
-			bytes: stored.bytes.byteLength,
-			where: 'browser',
-			url: cacheObjectUrl(
-				key,
-				new Blob([stored.bytes], { type: stored.type || 'image/png' }),
-				`browser:${stored.bytes.byteLength}`
-			)
-		});
-	}
-	return out;
+	if (typeof window === 'undefined') return [];
+	const folder = await readyFolder();
+	const keys = (await idbKeys(STORE_ASSETS)).filter((key) => key.startsWith('image:'));
+	const found = await Promise.all(
+		keys.map(async (key): Promise<ImageRecord | null> => {
+			const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
+			if (!stored?.bytes) return null;
+			if (folder && (await fileIn(folder, stored.name))) return null;
+			return { name: stored.name, bytes: stored.bytes.byteLength, where: 'browser', url: urlForStored(key, stored) };
+		})
+	);
+	return found.filter((record) => record !== null);
 }
 
 /**
@@ -443,7 +443,7 @@ export async function* folderImages(size = 32): AsyncGenerator<ImageRecord[]> {
 				handles.map(async (handle) => {
 					try {
 						const file = await handle.getFile();
-						const url = cacheObjectUrl(assetKey(file.name), file, `folder:${file.size}:${file.lastModified}`);
+						const url = urlForFile(assetKey(file.name), file);
 						return { name: file.name, bytes: file.size, where: 'folder', url } satisfies ImageRecord;
 					} catch {
 						// Gone between the listing and the read, or not ours to

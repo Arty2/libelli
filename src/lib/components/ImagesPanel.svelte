@@ -150,7 +150,12 @@
 				: {}
 	);
 	function toggleSection(key: string) {
-		folds = { ...folds, [key]: !isFolded(key) };
+		// Open only for the search: folding it is asking to put the search
+		// away too, or the press would store a fold and nothing would move.
+		if (key === 'images' && filter.trim()) {
+			filter = '';
+			folds = { ...folds, images: true };
+		} else folds = { ...folds, [key]: !isFolded(key) };
 		local.set(FOLDS_KEY, folds);
 	}
 
@@ -308,31 +313,48 @@
 	 * once, the folder's arrive a batch at a time behind them, and everything
 	 * else in the app goes on meanwhile. A refresh begun while another is
 	 * still reading takes over from it — the older one stops where it is.
+	 *
+	 * Streamed only into an empty list. Read again after an upload or a
+	 * delete, the folder's list as it was stays up until the new one is
+	 * whole: rebuilt a batch at a time, four hundred photographs dropped to
+	 * thirty-two and climbed back, and the list jumped under the reader.
 	 */
 	let refreshes = 0;
 
 	async function refresh() {
 		const run = ++refreshes;
-		folder = await imageFolder();
-		const browser = await listBrowserImages();
-		if (run !== refreshes) return;
-		held = browser;
-		busy = false;
-		if (!folder?.ready) {
-			inFolder = [];
-			reading = false;
-			return;
-		}
-		reading = true;
-		const found: ImageRecord[] = [];
-		for await (const batch of folderImages()) {
+		try {
+			folder = await imageFolder();
+			const browser = await listBrowserImages();
 			if (run !== refreshes) return;
-			found.push(...batch);
-			inFolder = [...found];
+			held = browser;
+			busy = false;
+			if (!folder?.ready) {
+				inFolder = [];
+				reading = false;
+				return;
+			}
+			reading = true;
+			const streaming = !inFolder.length;
+			const found: ImageRecord[] = [];
+			for await (const batch of folderImages()) {
+				if (run !== refreshes) return;
+				found.push(...batch);
+				if (streaming) inFolder = [...found];
+			}
+			if (run !== refreshes) return;
+			inFolder = found;
+		} catch {
+			// The folder renamed or deleted on disk, or its permission taken
+			// back, part way through. Said, and what was read is kept.
+			if (run !== refreshes) return;
+			onnotice(`${folder?.name ?? 'The folder'} could not be read to the end — it may have been moved or renamed.`, 'warning');
+		} finally {
+			if (run === refreshes) {
+				busy = false;
+				reading = false;
+			}
 		}
-		if (run !== refreshes) return;
-		inFolder = found;
-		reading = false;
 	}
 
 	/**
@@ -425,15 +447,6 @@
 
 	const total = $derived(images.reduce((sum, image) => sum + image.bytes, 0));
 
-	/** How many each section holds, for its fold before anyone has chosen one. */
-	const counts = $derived<Record<string, number>>({
-		images: images.length + missing.length,
-		drawings: drawings.length,
-		fonts: fonts.length
-	});
-	/** A search opens the images, whatever their fold: the matches are what was asked for. */
-	const isFolded = (key: string) =>
-		key === 'images' && filter.trim() ? false : (folds[key] ?? (counts[key] ?? 0) > FOLD_FROM);
 
 	/**
 	 * Unused first, then by name: the list is mostly consulted to clear out
@@ -443,13 +456,6 @@
 	const FILTER_FROM = 8;
 	let filter = $state('');
 	let searchInput = $state<HTMLInputElement | null>(null);
-	const byUse = (a: ImageRecord, b: ImageRecord) =>
-		Number(used.has(a.name)) - Number(used.has(b.name)) || a.name.localeCompare(b.name);
-	const matches = (image: ImageRecord) => !filter.trim() || image.name.toLowerCase().includes(filter.trim().toLowerCase());
-	const shownFolder = $derived(images.filter((image) => image.where === 'folder' && matches(image)).sort(byUse));
-	const shownHeld = $derived(images.filter((image) => image.where === 'browser' && matches(image)).sort(byUse));
-	/** In the order they are listed, for the large view's pager. */
-	const shown = $derived([...shownFolder, ...shownHeld]);
 
 	/**
 	 * The folder is one line, folded, until it is opened: a folder of
@@ -465,7 +471,38 @@
 		local.set(FOLDER_OPEN_KEY, folderOpen);
 	}
 	const folderShown = $derived(folderOpen || !!filter.trim());
+	const byUse = (a: ImageRecord, b: ImageRecord) =>
+		Number(used.has(a.name)) - Number(used.has(b.name)) || a.name.localeCompare(b.name);
+	const matches = (image: ImageRecord) => !filter.trim() || image.name.toLowerCase().includes(filter.trim().toLowerCase());
+	const shownFolder = $derived(images.filter((image) => image.where === 'folder' && matches(image)).sort(byUse));
+	const shownHeld = $derived(images.filter((image) => image.where === 'browser' && matches(image)).sort(byUse));
+	/**
+	 * In the order they are listed, for the large view's pager — the folder's
+	 * only while they are listed, or while one of them is the one being looked
+	 * at (a cell can open it with the folder folded).
+	 */
+	const shown = $derived(
+		folderShown || shownFolder.some((image) => image.name === focus) ? [...shownFolder, ...shownHeld] : shownHeld
+	);
 	const folderTotal = $derived(shownFolder.reduce((sum, image) => sum + image.bytes, 0));
+
+	/**
+	 * How many lines each section holds, for its fold before anyone has chosen
+	 * one. The folder is one line whatever it holds: it has a fold of its own,
+	 * and counting its pictures here folded the whole section shut the moment
+	 * the folder was opened — or part way through a read, as the count climbed.
+	 */
+	const counts = $derived<Record<string, number>>({
+		images:
+			held.length +
+			missing.length +
+			(folder ? 1 : 0),
+		drawings: drawings.length,
+		fonts: fonts.length
+	});
+	/** A search opens the images, whatever their fold: the matches are what was asked for. */
+	const isFolded = (key: string) =>
+		key === 'images' && filter.trim() ? false : (folds[key] ?? (counts[key] ?? 0) > FOLD_FROM);
 
 	/**
 	 * What a drawing is saved as: where it is, and the type its data URL says —
@@ -508,6 +545,10 @@
 
 	async function remove(image: ImageRecord) {
 		await deleteImage(image.name, image.where);
+		// Out of the list now: the folder is kept as it was until it is read
+		// again (`refresh`), and the picture just deleted should not be in it.
+		if (image.where === 'folder') inFolder = inFolder.filter((i) => i.name !== image.name);
+		else held = held.filter((i) => i.name !== image.name);
 		// Deleted from its own large view: there is nothing left to look at.
 		if (image.name === focus) onfocus?.(null);
 		onnotice(

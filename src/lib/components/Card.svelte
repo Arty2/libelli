@@ -235,13 +235,16 @@
 	 */
 	let spaced = $state<{ id: string; with: string[] } | null>(null);
 	/**
-	 * The same, for a nudge: the first chosen area, with the rest of the
+	 * The same, for a nudge: the area chosen first, with the rest of the
 	 * choice and whatever hangs off it — what moves with it, as a drag of it
-	 * would collect (`startDrag`).
+	 * would collect (`startDrag`). Only what the nudge can move: on a locked
+	 * page nothing does, and nothing is read out.
 	 */
 	const nudged = $derived.by(() => {
 		if (!nudging || !spacing) return null;
-		const movers = template.boxes.filter((b) => selectedIds.includes(b.id) && !b.locked);
+		const movers = selectedIds
+			.map((id) => template.boxes.find((b) => b.id === id))
+			.filter((b): b is Box => !!b && editable(b));
 		if (!movers.length) return null;
 		const along = new Set(movers.slice(1).map((b) => b.id));
 		for (const mover of movers) for (const b of dependentsOf(mover.id)) along.add(b.id);
