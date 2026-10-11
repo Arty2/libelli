@@ -1151,6 +1151,10 @@
 		if (!onsteps || event.button !== 0) return;
 		dropStepsHold();
 		stepsOpened = false;
+		// A new press: whatever release the window was waiting for did not
+		// come as a click (a long press on a phone may end in a menu), and
+		// this press must not be the one dropped in its place.
+		swallowStepClick = 0;
 		// Held to the button, so its release comes back here even with the list
 		// opened over it, and the click that follows is the one dropped.
 		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -1188,6 +1192,20 @@
 		act();
 	}
 	$effect(() => dropStepsHold);
+
+	/**
+	 * The way in without a held pointer: a right-click, or the keyboard's menu
+	 * key (Shift+F10) on the focused button. Not a finger's long press, which
+	 * is the hold above, timed past the tip; the menu it ends in would open
+	 * the list early, over the tip.
+	 */
+	function stepsMenu(event: MouseEvent, which: 'undo' | 'redo') {
+		if (!onsteps) return;
+		event.preventDefault();
+		if ((event as PointerEvent).pointerType === 'touch') return;
+		dropStepsHold();
+		onsteps(which);
+	}
 
 	/**
 	 * The card reads out the gaps while the pad is pressed, as it does under
@@ -1810,11 +1828,12 @@
 				class="square"
 				onclick={() => stepClick(onundo)}
 				onpointerdown={(e) => holdSteps(e, 'undo')}
+				oncontextmenu={(e) => stepsMenu(e, 'undo')}
 				onpointermove={moveSteps}
 				onpointerup={dropStepsHold}
 				onpointercancel={dropStepsHold}
 				disabled={!undoable}
-				title="{withKey('Undo', 'undo')} — hold for every step, to go back several at once"
+				title="{withKey('Undo', 'undo')} — hold, or right-click, for every step, to go back several at once"
 				aria-label="Undo"
 			>
 				<Icon name="undo" size={16} />
@@ -1823,11 +1842,12 @@
 				class="square"
 				onclick={() => stepClick(onredo)}
 				onpointerdown={(e) => holdSteps(e, 'redo')}
+				oncontextmenu={(e) => stepsMenu(e, 'redo')}
 				onpointermove={moveSteps}
 				onpointerup={dropStepsHold}
 				onpointercancel={dropStepsHold}
 				disabled={!redoable}
-				title="{withKey('Redo', 'redo')} — hold for every step, to go forward several at once"
+				title="{withKey('Redo', 'redo')} — hold, or right-click, for every step, to go forward several at once"
 				aria-label="Redo"
 			>
 				<Icon name="redo" size={16} />

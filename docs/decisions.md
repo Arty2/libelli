@@ -838,7 +838,12 @@ is `LIST_HOLD`, twice the tip's `TIP_HOLD`: on touch the tip has shown and been
 read before the list opens, and a press that only wanted the tip lets go in
 between, which Tooltip already makes a non-press. The button captures the
 pointer, so the release after the list opened comes back to it and its click is
-dropped — otherwise the list would open and an undo be taken at once.
+dropped — otherwise the list would open and an undo be taken at once. A
+right-click, or the keyboard's menu key, opens it too, so it is not reachable
+by holding alone; a finger's long press is excluded there, being the hold. The
+dialog keeps the two-Enter rule (`armDefault`, the nearest step the default),
+and a Redo whose steps the flush on opening has just cleared says so instead
+of opening on nothing.
 
 **A refinement can be folded into the last step (`amend`).** The page uses
 it for one thing: a Type chosen in the Pictures tray for a face just replaced
@@ -3135,7 +3140,11 @@ head mid-search puts the search away too, or the press would change nothing.
 **A browser copy the folder shadows is not listed.** It is never the one drawn,
 and making a URL for it replaced the folder file's in the cache the card
 shares, revoking the picture on the card. A re-read keeps the folder's list
-up until the new one is whole, and one that fails part way says so.
+up and swaps each picture in as its batch arrives, so one just saved or
+replaced has its new URL at once rather than a revoked one until the whole
+folder is read; another folder starts from an empty list, or the last one's
+rows would act on this one's files. One that fails part way says so and lists
+only what it read. The folder state is written by the newest refresh alone.
 
 **The search is one box.** The field and its Search button share a single
 border; the field had a frame of its own inside one the `.find` button rule

@@ -295,13 +295,12 @@
 	let reading = $state(false);
 
 	/**
-	 * Every image, the folder's first: a name in both places is the folder's,
-	 * because that is the copy a card is drawn from (`resolveLocalImages`).
+	 * Every image, the folder's first. A name in both places is listed once,
+	 * as the folder's: `listBrowserImages` leaves the other copy out by the
+	 * same lookup the card is drawn by, so there is one rule for "the same
+	 * name", not a second here that could disagree with it.
 	 */
-	const images = $derived.by(() => {
-		const seen = new Set(inFolder.map((image) => image.name.toLowerCase()));
-		return [...inFolder, ...held.filter((image) => !seen.has(image.name.toLowerCase()))];
-	});
+	const images = $derived([...inFolder, ...held]);
 	/** Object URLs for the thumbnails, by name — the same cache the card reads. */
 	const urls = $derived(Object.fromEntries(images.flatMap((image) => (image.url ? [[image.name, image.url]] : []))));
 	/** Pixel sizes, read off each thumbnail as it loads. Written into, not spread: one a picture. */
@@ -323,31 +322,47 @@
 
 	async function refresh() {
 		const run = ++refreshes;
+		const found: ImageRecord[] = [];
 		try {
-			folder = await imageFolder();
+			// Written only by the newest run: an older one answering late
+			// would put back a folder since forgotten, or swapped.
+			const state = await imageFolder();
 			const browser = await listBrowserImages();
 			if (run !== refreshes) return;
+			folder = state;
 			held = browser;
 			busy = false;
-			if (!folder?.ready) {
+			if (!state?.ready) {
 				inFolder = [];
-				reading = false;
 				return;
 			}
 			reading = true;
 			const streaming = !inFolder.length;
-			const found: ImageRecord[] = [];
 			for await (const batch of folderImages()) {
 				if (run !== refreshes) return;
 				found.push(...batch);
-				if (streaming) inFolder = [...found];
+				if (streaming) {
+					inFolder = [...found];
+					continue;
+				}
+				// Each picture read again takes its place in the list as it
+				// arrives: a picture just saved or replaced has a new URL,
+				// its old one revoked, and must not wait for the whole folder.
+				const fresh = new Map(batch.map((record) => [record.name, record]));
+				const listed = new Set(inFolder.map((record) => record.name));
+				inFolder = [
+					...inFolder.map((record) => fresh.get(record.name) ?? record),
+					...batch.filter((record) => !listed.has(record.name))
+				];
 			}
 			if (run !== refreshes) return;
 			inFolder = found;
 		} catch {
 			// The folder renamed or deleted on disk, or its permission taken
-			// back, part way through. Said, and what was read is kept.
+			// back, part way through. Said, and only what was read is listed:
+			// the rest may no longer be there to delete or replace.
 			if (run !== refreshes) return;
+			inFolder = found;
 			onnotice(`${folder?.name ?? 'The folder'} could not be read to the end — it may have been moved or renamed.`, 'warning');
 		} finally {
 			if (run === refreshes) {
@@ -521,6 +536,9 @@
 	async function choose() {
 		const chosen = await chooseImageFolder();
 		if (!chosen) return;
+		// Another folder: the list held is the last one's, and kept up while
+		// this one is read it would offer to delete files under its name here.
+		inFolder = [];
 		onnotice(`Images go into ${chosen.name} from now on. The ones already in this browser stay where they are.`);
 		await refresh();
 		onchanged();

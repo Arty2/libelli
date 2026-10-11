@@ -670,10 +670,6 @@
 	}
 	/** Give a dialog its first focus so Esc/Tab work without a mouse trip. */
 	const focusOnOpen = (node: HTMLElement) => node.focus();
-	/** The same, for the first of a list: the one Enter should take. */
-	const focusIf = (node: HTMLElement, first: boolean) => {
-		if (first) node.focus();
-	};
 
 	/**
 	 * What the CSS box says before anything is typed into it, and what Starter
@@ -1756,6 +1752,13 @@
 
 	function openSteps(which: 'undo' | 'redo') {
 		flushHistory();
+		// A change still inside the debounce is recorded by that flush, and a
+		// new change clears what was ahead: Redo can have had steps a moment
+		// ago and none now. Said, rather than a list of nothing.
+		if (which === 'redo' && !redoSteps(history).length) {
+			notify('Nothing to redo — the change just made took the place of what was undone.');
+			return;
+		}
 		stepsOpen = which;
 	}
 
@@ -4175,7 +4178,9 @@
 
 {#if stepsOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (stepsOpen = null)}></div>
-	<div class="modal steps" role="dialog" aria-modal="true" aria-labelledby="steps-title" use:dragByTitle>
+	<!-- The focus on the dialog, not the nearest step: a stray Return would
+	     otherwise take one back unasked (modal.ts). -->
+	<div class="modal steps" role="dialog" aria-modal="true" aria-labelledby="steps-title" use:dragByTitle use:armDefault>
 		<header class="modal-header drag-title" data-drag-handle>
 			<h2 id="steps-title">{stepsOpen === 'undo' ? 'Undo to…' : 'Redo to…'}</h2>
 			<button class="icon" onclick={() => (stepsOpen = null)} title="Close" aria-label="Close">
@@ -4188,7 +4193,7 @@
 			<li class="now">Now</li>
 			{#each stepList as label, i (i)}
 				<li>
-					<button class="as-typed" use:focusIf={i === 0} onclick={() => goSteps(i + 1)}>
+					<button class="as-typed" data-default={i === 0 ? '' : undefined} onclick={() => goSteps(i + 1)}>
 						<Icon name={stepsOpen} size={14} />
 						<span class="step-label">{label || 'A change'}</span>
 						<span class="step-count">{i + 1} {i === 0 ? 'step' : 'steps'}</span>

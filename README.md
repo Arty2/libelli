@@ -1587,7 +1587,8 @@ the alternation over, since "the last change" is then a different change.
 **Hold Undo or Redo** beside the page to go several steps at once. Held, it
 first shows its tip, as every control does; held on for about a second, a list
 opens of every step it could take, named for what each did, nearest first.
-Choose one and the page goes straight there — the same as pressing Undo that
+A right-click on either, or the keyboard's menu key on it, opens the same
+list. Choose one and the page goes straight there — the same as pressing Undo that
 many times, so Redo brings it all back. Letting go before the list opens is an
 ordinary press with a mouse, and with a finger only the tip.
 
