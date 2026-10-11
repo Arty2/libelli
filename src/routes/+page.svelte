@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { tick, untrack } from 'svelte';
+	import { flushSync, tick, untrack } from 'svelte';
 	import { base } from '$app/paths';
 	import BoxMenu from '$lib/components/BoxMenu.svelte';
-	import BitmapEditor from '$lib/components/BitmapEditor.svelte';
+	import CssEditor from '$lib/components/CssEditor.svelte';
 	import ImagesPanel from '$lib/components/ImagesPanel.svelte';
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Lightbox from '$lib/components/Lightbox.svelte';
@@ -16,14 +17,35 @@
 		localImageRef,
 		resolveBackground,
 		resolveLocalImages,
+		safeMediaUrl,
 		storeLocalImage,
 		uploadBackgroundImage
 	} from '$lib/assets';
-	import { download, slugify } from '$lib/download';
-	import { ensureGoogleFont, ensureTemplateFonts, uploadLocalFont } from '$lib/fonts';
+	import { download, fileStem } from '$lib/download';
+	import {
+		deleteStoredFont,
+		ensureGoogleFont,
+		ensureTemplateFonts,
+		fontChoices,
+		fontInventory,
+		fontRef,
+		listStoredFonts,
+		mergeFonts,
+		previewFamilies,
+		pruneFonts,
+		replaceFamily,
+		tuneFont,
+		type FontTune,
+		tuningOf,
+		uploadLocalFont,
+		type FontEntry,
+		type StoredFontEntry
+	} from '$lib/fonts';
+	import { pullUp, trayPull } from '$lib/gestures';
 	import {
 		canRedo,
 		canUndo,
+		amend,
 		createHistory,
 		record,
 		redo as redoStep,
@@ -31,7 +53,7 @@
 		undo as undoStep,
 		undoLabel
 	} from '$lib/history';
-	import { alignBoxes, bleedFor, type AlignEdge } from '$lib/layout';
+	import { alignBoxes, bleedFor, mirrors, pageSide, type AlignEdge } from '$lib/layout';
 	import {
 		ALIGN_LABELS,
 		applyStyle,
@@ -41,6 +63,7 @@
 		duplicateBoxes,
 		groupMembers,
 		nudgeBox as nudge,
+		followsInSet,
 		stepAlignment,
 		strayBoxes,
 		toggleGroup,
@@ -48,17 +71,27 @@
 		toggleSelection,
 		type BoxStyle
 	} from '$lib/boxops';
-	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport } from '$lib/keys';
+	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport, withKey } from '$lib/keys';
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
-	import { sampleDataset, starterTemplate } from '$lib/onboarding';
+	import { cssKit } from '$lib/csskit';
+	import { loadTurn, saveTurn, type OutputTurn } from '$lib/turn';
+	import { renamed, isStarterTemplate, sampleDataset, starterOfTable, starterOfTemplate, starterTemplate } from '$lib/onboarding';
 	import { applyUpdate, promptInstall, registerServiceWorker, watchInstall } from '$lib/pwa';
-	import { armDefault } from '$lib/modal';
+	import { armDefault, dragByTitle } from '$lib/modal';
+	import { codeStats } from '$lib/csscode';
 	import { watchPresses } from '$lib/haptics';
+	import { GONE_ROW, carryLookups, isKeyword, referencedColumns } from '$lib/placeholders';
+	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
+	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
+	import { applyTheme, loadTheme, nextTheme, peekTheme, saveTheme, THEME_ICONS, THEME_NAMES, type Theme } from '$lib/theme';
+	import { TIP_HOLD } from '$lib/tooltip';
+	import { applyTextSize, loadTextSize, saveTextSize, stepText, textChord, zoomAsText } from '$lib/textsize';
 	import {
 		autoMap,
 		blankTemplate,
 		exportTemplate,
+		importedTemplate,
 		newBox,
 		nextBoxId,
 		arrangeBoxes,
@@ -77,11 +110,15 @@
 		loadDatasetDoc,
 		loadDatasetId,
 		loadPreviousDatasetId,
+		loadPreviousTemplateId,
 		loadMapping,
 		loadTemplate,
 		loadTemplateDoc,
+		keepTemplateDocAsIs,
 		loadTemplateId,
 		loadUi,
+		loadEditorFonts,
+		saveEditorFonts,
 		migrateLegacyStorage,
 		nextDatasetId,
 		nextTemplateId,
@@ -89,6 +126,7 @@
 		saveDatasetDoc,
 		saveDatasetId,
 		savePreviousDatasetId,
+		savePreviousTemplateId,
 		saveMapping,
 		saveTemplate,
 		saveTemplateDoc,
@@ -98,7 +136,9 @@
 		type DatasetEntry,
 		type TemplateEntry
 	} from '$lib/storage';
-	import type { Box, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
+	import { REFERENCE_FRAME } from '$lib/frame';
+	import { claimEditor, type EditorLock } from '$lib/tablock';
+	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
@@ -110,27 +150,32 @@
 	let barFloor = $state(0);
 	let barHeight = $state(0);
 	/**
-	 * The page bar's library menu is open.
-	 *
-	 * On a narrow screen the bar gives up its height cap while a menu is up, so
-	 * the menu is not clipped by the bar's own scroller — a moment, and not a
-	 * height the bar ever needs to stand at. Taken as a floor it stayed: opening
-	 * the template switcher once left a band of empty grey under the bar for the
-	 * rest of the session, which is the bug this guard is for.
+	 * How tall the area bar would be at this width, measured off an invisible
+	 * one kept in the same row. The row is floored at the tallest bar it has
+	 * held, but that floor was only ever learnt by selecting something, so the
+	 * first selection still pushed the page down — the jump the floor exists to
+	 * stop. Measuring the area bar before it is needed lets the page bar stand
+	 * at its height from the start, on a desk and on a phone alike.
 	 */
-	let barMenuOpen = $state(false);
-
+	let probeHeight = $state(0);
+	/** A representative area for the probe: a bound Markdown field shows the most fields. */
+	const probeBox = newBox({ id: '__bar-probe', slot: 'field', mode: 'markdown', x: 0, y: 0, w: 60, h: 12 });
+	// The library menu used to make the bar taller on a phone while it was up,
+	// and this had to refuse that height as a floor. The menu is `fixed` now —
+	// see PageOptions — so every height the bar reports is one it stands at.
+	//
+	// Only a new height raises the floor, never the floor changing: reading
+	// `barFloor` here made the resize's reset to 0 re-run this at once, with the
+	// height measured at the old width, so a window widened from a phone kept
+	// the narrow width's wrapped height as its floor — a band of empty bar.
 	$effect(() => {
 		const height = barHeight;
-		// Read untracked on purpose: only a fresh measurement may raise the floor.
-		// Tracked, the flag going false at the end of a menu re-ran this while
-		// `barHeight` still held the uncapped height, and the floor took the very
-		// number the guard above exists to refuse.
-		if (untrack(() => barMenuOpen)) return;
-		if (height > barFloor) barFloor = height;
+		untrack(() => {
+			if (height > barFloor) barFloor = height;
+		});
 	});
 
-	let ui = $state<UiState>({ showBounds: true, showGrid: false, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
+	let ui = $state<UiState>({ showBounds: true, showTies: false, showGrid: false, showGuides: true, smartGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' });
 	let activeRow = $state(0);
 	let selectedIds = $state<string[]>([]);
 	let ready = $state(false);
@@ -157,21 +202,150 @@
 	 */
 	let excludedSheets = $state<Set<number>>(new Set());
 	let helpOpen = $state(false);
+	let whatsNewOpen = $state(false);
+	/** Open What's new, and count this version's list as read. */
+	function openWhatsNew() {
+		whatsNewOpen = true;
+		saveSeenVersion(VERSION);
+	}
+
+	/** Light or dark — see theme.ts. app.html has already applied it before the first paint. */
+	let theme = $state<Theme>('light');
+	/** The export's own Portrait / Landscape — turn.ts. This browser's, never the template's. */
+	let outputTurn = $state<OutputTurn>('auto');
+	/** What is on screen: the theme, or the other dark while a glance lasts — the page's `theme-…` class. */
+	let shownTheme = $state<Theme>('light');
+	function showTheme(shown: Theme) {
+		shownTheme = shown;
+		applyTheme(shown);
+	}
+	function setTheme(next: Theme) {
+		theme = next;
+		peeking = false;
+		showTheme(next);
+		saveTheme(next);
+	}
+
+	/**
+	 * The other dark, shown while the logo is hovered or held — see peekTheme.
+	 * Shown, never stored: letting go puts back the theme that was chosen.
+	 */
+	let peeking = false;
+	/** Pressed since the pointer came over: what it shows now is the choice. */
+	let peekSpent = false;
+	let peekTimer: ReturnType<typeof setTimeout> | null = null;
+	function peekStart(after: number) {
+		if (peekTimer) clearTimeout(peekTimer);
+		if (!peekTheme(theme) || peekSpent) return;
+		peekTimer = setTimeout(() => {
+			peekTimer = null;
+			peeking = true;
+			showTheme(peekTheme(theme) ?? theme);
+		}, after);
+	}
+	function peekEnd() {
+		if (peekTimer) clearTimeout(peekTimer);
+		peekTimer = null;
+		if (!peeking) return;
+		peeking = false;
+		showTheme(theme);
+	}
+
+	/**
+	 * What the logo and the theme button both do: a press steps the theme, a
+	 * hover or a hold glances at the other dark. Spread on each, so the two
+	 * cannot drift into answering differently.
+	 *
+	 * The hold is the tooltip's own (TIP_HOLD), so the tip still comes up with
+	 * it, and the Tooltip drops the click a held tip ends in — a glance is
+	 * never also a press. A short wait on a mouse, so crossing the control on
+	 * the way to Help does not flash the page. After a click the glance waits
+	 * for the pointer to leave: the theme just chosen is what it wants to see.
+	 */
+	const themeControl = {
+		onclick: () => {
+			// A glance still waiting to start would land on the theme just
+			// chosen and show its pair instead.
+			if (peekTimer) clearTimeout(peekTimer);
+			peekTimer = null;
+			setTheme(nextTheme(theme));
+			peekSpent = true;
+		},
+		onpointerenter: (e: PointerEvent) => {
+			peekSpent = false;
+			if (e.pointerType === 'mouse') peekStart(200);
+		},
+		onpointerleave: (e: PointerEvent) => {
+			if (e.pointerType === 'mouse') peekEnd();
+		},
+		onpointerdown: (e: PointerEvent) => {
+			if (e.pointerType !== 'touch') return;
+			peekSpent = false;
+			peekStart(TIP_HOLD);
+		},
+		onpointerup: (e: PointerEvent) => {
+			if (e.pointerType === 'touch') peekEnd();
+		},
+		onpointercancel: peekEnd
+	};
+
+	const themeTitle = $derived(
+		peekTheme(theme)
+			? `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}; hover or hold for a look at ${THEME_NAMES[peekTheme(theme) ?? theme].toLowerCase()}`
+			: `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}`
+	);
+
+	/** The interface's text size, as a multiple of the browser's default — see textsize.ts. */
+	let textSize = $state(1);
+	function setTextSize(scale: number) {
+		// The bars wrap round their text as they do round the window, so a new
+		// size is a new width as far as the row's floor goes — and no resize
+		// fires to drop it. Kept, the floor learnt at a larger size held the row
+		// at that height after the text came back down.
+		if (scale !== textSize) barFloor = 0;
+		textSize = scale;
+		applyTextSize(scale);
+		saveTextSize(scale);
+	}
 	let cssOpen = $state(false);
 	/**
-	 * The CSS as it stood when the dialog opened, so Cancel has something to put
-	 * back.
-	 *
-	 * The textarea commits on `change`, which fires as the focus leaves it — so
-	 * by the time a click reaches Cancel the edit is already in the template and
-	 * on the card behind. Cancel is therefore an undo of one known value rather
-	 * than a refusal to apply anything, which is also why Escape and the
-	 * backdrop go the same way: with a Cancel button on the row, the two other
-	 * ways out of the dialog that are not Done have to mean what it means.
+	 * The CSS dialog over the whole window, for a long sheet. Kept for the
+	 * session rather than reset on each open: someone who wanted the room for
+	 * one sheet wants it for the next. A phone opens it full screen every time
+	 * (`openCss`): there a dialog is the window less a gutter, and the gutter
+	 * is all the margin gives back.
 	 */
+	let cssFull = $state(false);
+	/**
+	 * A drag on the title of the full-screen dialog takes it out of full
+	 * screen, as a window's does — see `dragByTitle`. Drawn at once, so the
+	 * drag can measure the dialog at its own size and carry on from there.
+	 */
+	function detachCss(): boolean {
+		if (!cssFull) return false;
+		flushSync(() => (cssFull = false));
+		return true;
+	}
+	/** Long lines in the CSS editor wrap to its width; off, they scroll sideways. For the session. */
+	let cssWrap = $state(true);
+	/**
+	 * The sheet being edited, and the sheet the card is drawn with.
+	 *
+	 * The two are separate on purpose: the editor holds a draft, and Save puts it
+	 * on the card and leaves. Nothing reaches the template until Save is
+	 * pressed, so Cancel — and the ×,
+	 * the backdrop and Escape, which mean what it means — is a matter of closing
+	 * the dialog and putting back whatever was there when it opened.
+	 *
+	 * `cssBefore` is that value, kept out of `$state` because nothing renders it.
+	 */
+	let cssDraft = $state('');
 	let cssBefore: string | undefined;
-	let cssField = $state<HTMLTextAreaElement | null>(null);
-	// Page setup is a panel, not a mode: it opens on wide screens and stays out of
+	let cssEditor = $state<{ replaceAll: (text: string) => void } | null>(null);
+	/** The draft says something the card is not showing yet. */
+	const cssDirty = $derived((cssDraft.trim() || undefined) !== (template.css ?? undefined));
+	const cssCount = $derived(codeStats(cssDraft));
+	// The page bar is a panel, not a mode: it opens on wide screens and stays out of
 	// the way on a phone, where it would eat the preview it is there to serve.
 	let pageSetupOpen = $state(true);
 	// Same bargain for the table: on a phone the preview and the spreadsheet
@@ -209,6 +383,12 @@
 	}
 	/** Reset replaces the design, so it asks first — as deleting the data does. */
 	let resetting = $state(false);
+	/** The table's Reset, asking first like the template's. */
+	let resettingTable = $state(false);
+
+	/** The starters this template and this table began as, if they did — what Reset puts back. */
+	const templateStarter = $derived(starterOfTemplate(template));
+	const tableStarter = $derived(starterOfTable(dataset));
 	/**
 	 * Deleting asks for the same reason and one more: undo reaches what is on
 	 * screen, but the stored copy is gone the moment this runs.
@@ -223,6 +403,8 @@
 	 * without waiting on the database.
 	 */
 	let templateId = $state('');
+	/** the template the swap in the page bar goes back to, or '' while there is none */
+	let previousTemplate = $state('');
 	let library = $state<TemplateEntry[]>([]);
 
 	/** The order both pickers list in, and the order the two listings return. */
@@ -249,6 +431,33 @@
 	let deletingTable = $state(false);
 	const tableName = $derived(dataset.name?.trim() || UNTITLED_TABLE);
 
+	/**
+	 * Every template this browser holds, written once in the file's new frame —
+	 * each area at its reference point, with the marker that says so (frame.ts).
+	 * A template written before is read as it was written, top-left, and saved
+	 * back; one already marked is left alone, so this costs a read per template
+	 * and nothing more once it has run. Awaited at boot, before anything is
+	 * read for the screen or could be saved over it, so it never races the
+	 * autosave. One that will not read is left as it is, for boot to say so.
+	 *
+	 * The bridge is meant to be short — see LEGACY_TOP_LEFT_UNTIL: by then every
+	 * browser that has opened the app has been through this, and this goes too.
+	 */
+	async function rewriteStoredTemplates() {
+		const rewrite = async (raw: unknown, save: (t: Template) => Promise<unknown>) => {
+			if (!raw || (raw as Template).frame === REFERENCE_FRAME) return;
+			try {
+				await save(normaliseTemplate(raw));
+			} catch {
+				/* unreadable: left for boot to report */
+			}
+		};
+		await rewrite(await loadTemplate(), saveTemplate);
+		for (const { id } of await listTemplates()) {
+			await rewrite(await loadTemplateDoc(id), (t) => saveTemplateDoc(id, t));
+		}
+	}
+
 	async function refreshTables() {
 		tables = await listDatasets();
 	}
@@ -260,19 +469,63 @@
 	 * `matchMedia` so the two cannot drift apart by a pixel. `trayShare` is a
 	 * fraction of the working area rather than a height in px, so turning the
 	 * phone over keeps the proportion the hand chose instead of the number. It
-	 * is null until something drags it, which leaves the CSS default in charge —
-	 * and it is not stored: where the tray sits is where this session put it,
-	 * and a phone that opens on a table filling the screen has hidden the card
-	 * the app is for.
+	 * is null until something drags it, which leaves the CSS default in charge.
+	 * It is kept for next time, as the desk's width is — but brought back no
+	 * taller than `TRAY_RESTORE_MAX`, because a phone that opens on a table
+	 * filling the screen has hidden the card the app is for. Pulled taller in
+	 * the session, it goes as tall as it is pulled.
 	 */
 	let stacked = $state(false);
 	let mainEl = $state<HTMLElement | null>(null);
 	let asideEl = $state<HTMLElement | null>(null);
 	let trayShare = $state<number | null>(null);
 	let trayFrom: { y: number; share: number } | null = null;
+	/** Pulled down past its lowest: let go now, and the tray folds away. */
+	let trayShutting = $state(false);
 
 	/** Below this the tray is a row of buttons and no table, which is not a tray. */
 	const TRAY_MIN = 0.2;
+	const TRAY_RESTORE_MAX = 0.75;
+
+	/**
+	 * Beside the page, the table's width is dragged from its left edge, and
+	 * kept as a share of the working area rather than as pixels — the same
+	 * split on a smaller window, instead of a table that was a third of a big
+	 * screen taking most of a laptop's. Neither side may be squeezed out of
+	 * use: the table keeps room for a column and its gutter, the page room for
+	 * a card, and the stylesheet holds both limits again at whatever width
+	 * the window is now (`--tray-w` is a clamp).
+	 */
+	const TRAY_MIN_PX = 280;
+	const STAGE_MIN_PX = 320;
+	let trayResizing: { x: number; width: number } | null = $state(null);
+
+	function setTrayWidth(width: number) {
+		const room = mainEl?.getBoundingClientRect().width ?? window.innerWidth;
+		if (!room) return;
+		const clamped = Math.max(TRAY_MIN_PX, Math.min(room - STAGE_MIN_PX, width));
+		const share = Math.round((clamped / room) * 10000) / 10000;
+		if (share !== ui.trayWidthShare) ui = { ...ui, trayWidthShare: share };
+	}
+
+	function startTrayResize(event: PointerEvent) {
+		if (event.button !== 0 || !asideEl) return;
+		event.preventDefault();
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		trayResizing = { x: event.clientX, width: asideEl.getBoundingClientRect().width };
+	}
+
+	function moveTrayResize(event: PointerEvent) {
+		if (!trayResizing) return;
+		// The edge is on the table's left, so moving left widens it.
+		setTrayWidth(trayResizing.width + (trayResizing.x - event.clientX));
+	}
+
+	function endTrayResize(event: PointerEvent) {
+		if (!trayResizing) return;
+		(event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+		trayResizing = null;
+	}
 
 	$effect(() => {
 		const query = window.matchMedia('(max-width: 900px)');
@@ -282,20 +535,65 @@
 		return () => query.removeEventListener('change', sync);
 	});
 
-	function dragTray(phase: 'start' | 'move' | 'end', clientY: number) {
+	/**
+	 * The height the tray goes back to once a pull is over without leaving it
+	 * anywhere — folded away, or flicked open — so it comes back as tall as it
+	 * was. Null is the stylesheet's own.
+	 */
+	let trayRestore: number | null = null;
+
+	function dragTray(phase: 'start' | 'move' | 'end', clientY: number, flick = false) {
 		const height = mainEl?.getBoundingClientRect().height ?? 0;
 		if (!height || !asideEl) return;
 		if (phase === 'start') {
 			// Measured rather than read off `trayShare`, which is null until the
 			// first drag and stale after a resize.
 			trayFrom = { y: clientY, share: asideEl.getBoundingClientRect().height / height };
+			trayRestore = trayShare;
 			return;
 		}
 		if (!trayFrom) return;
 		// The finger is on the tray's top edge, so up is taller: the share it
-		// takes is what it had plus however far the edge has been pulled.
-		trayShare = Math.min(1, Math.max(TRAY_MIN, trayFrom.share + (trayFrom.y - clientY) / height));
-		if (phase === 'end') trayFrom = null;
+		// takes is what it had plus however far the edge has been pulled — all
+		// the way down to nothing, fading below its smallest, which says that
+		// letting go there folds it away, as the Data button would.
+		const pull = trayPull(trayFrom.share, trayFrom.y - clientY, height, TRAY_MIN);
+		trayShare = pull.share;
+		trayShutting = pull.shut;
+		if (phase === 'end') {
+			trayFrom = null;
+			trayShutting = false;
+			if (pull.shut && flick) {
+				// Flicked open from the status bar: a short quick pull is asking
+				// for the tray, not for a sliver of it.
+				trayShare = trayRestore;
+				return;
+			}
+			if (pull.shut) {
+				trayShare = trayRestore;
+				if (imagesOpen) imagesOpen = false;
+				else dataOpen = false;
+				return;
+			}
+			ui = { ...ui, trayHeightShare: Math.round(trayShare * 10000) / 10000 };
+		}
+	}
+
+	/**
+	 * The status bar pulled upwards, stacked: the table comes up under the
+	 * finger from nothing, and is dragged from there as its header would be.
+	 * Nothing to pull when a tray is up already.
+	 */
+	function pullTray(phase: 'start' | 'move' | 'end', clientY: number, flick?: boolean): boolean | void {
+		if (phase === 'start') {
+			if (!stacked || dataOpen || imagesOpen) return false;
+			trayRestore = trayShare;
+			trayShare = 0;
+			dataOpen = true;
+			trayFrom = { y: clientY, share: 0 };
+			return true;
+		}
+		dragTray(phase, clientY, flick);
 	}
 
 	let printing = $state(false);
@@ -314,7 +612,7 @@
 	let images = $state<Record<string, string>>({});
 	let imagesOpen = $state(false);
 	/**
-	 * Bumped when the Images panel changes what is stored. The resolver below is
+	 * Bumped when the Pictures panel changes what is stored. The resolver below is
 	 * keyed on the *names* a template and table use, and deleting a picture or
 	 * choosing a folder changes neither — so there has to be something else for
 	 * it to watch.
@@ -327,6 +625,9 @@
 	 * gets the warning mark and a color; everything else reads as before.
 	 */
 	let statusTone = $state<'info' | 'warning'>('info');
+
+	/** The status line, whole, in a dialog — it is one ellipsised row otherwise. */
+	let statusOpen = $state(false);
 
 	function notify(text: string, tone: 'info' | 'warning' = 'info') {
 		status = text;
@@ -363,43 +664,48 @@
 	const focusOnOpen = (node: HTMLElement) => node.focus();
 
 	/**
-	 * What the CSS box says before anything is typed into it.
-	 *
-	 * The names an author can reach, as working declarations rather than as a
-	 * paragraph describing them. Every selector here is real: `.trim` is the
-	 * card, `.box` is an area, `.page-number .of` is the slash between the count
-	 * and the total. Scoping happens in css.ts, which anchors everything to the
-	 * card, strips `@import` and refuses any `url()` that is not a `data:` one.
+	 * What the CSS box says before anything is typed into it, and what Starter
+	 * puts in it: this template's facts and the selectors it can reach — see
+	 * csskit.ts. The placeholder is the documentation, so it names what this
+	 * template actually has.
 	 */
-	const CSS_PLACEHOLDER = `.box { }              /* every area */
-h1, h2, h3 { }        /* Markdown headings */
-p, ul, li { }         /* Markdown blocks */
-em, strong, code { }
-hr { }
-.page-number { }      /* the number on the card */
-.page-number .of::before { content: ' of ' }
-
-h1 { letter-spacing: 0.4mm }
-em { color: #b42318 }`;
+	const cssPlaceholder = $derived(cssKit(template));
 
 	function openCss() {
 		cssBefore = template.css;
+		cssDraft = template.css ?? '';
+		if (stacked) cssFull = true;
 		cssOpen = true;
+	}
+
+	/** Put the draft on the card, and leave. */
+	function saveCss() {
+		if (!template.locked) writeCss(cssDraft.trim() || undefined);
+		cssOpen = false;
 	}
 
 	/** Put back what was there when the dialog opened, and close it. */
 	function cancelCss() {
-		// First, because the field commits on `change` and `change` fires as the
-		// focus leaves it. Blurring here puts that commit *before* the restore;
-		// without it, Escape closed the dialog, the textarea was unmounted, its
-		// change landed on the way out, and the CSS being cancelled was applied
-		// a moment after it had been put back.
-		cssField?.blur();
 		cssOpen = false;
 		if (template.css === cssBefore) return;
+		writeCss(cssBefore);
+	}
+
+	function writeCss(css: string | undefined) {
 		// Through stripUndefined for the usual reason: a template with no CSS has
 		// no `css` key, not a key holding undefined.
-		template = stripUndefined({ ...$state.snapshot(template), css: cssBefore }) as Template;
+		template = stripUndefined({ ...$state.snapshot(template), css }) as Template;
+	}
+
+	/**
+	 * Read every value under `value`, so the effect doing it runs again when
+	 * any of them changes — what `$state.snapshot` did as a side effect of
+	 * copying, without the copy. Walking a table is reading its cells; copying
+	 * it was allocating every row again, on every keystroke.
+	 */
+	function watchDeep(value: unknown): void {
+		if (typeof value !== 'object' || value === null) return;
+		for (const key in value) watchDeep((value as Record<string, unknown>)[key]);
 	}
 
 	const snapshot = (): Snapshot => ({
@@ -429,6 +735,26 @@ em { color: #b42318 }`;
 	const selected = $derived(
 		selectedIds.length === 1 ? (template.boxes.find((b) => b.id === selectedIds[0]) ?? null) : null
 	);
+	/**
+	 * The area the options row is about. None while the page is locked: every
+	 * field in the area bar would be greyed out, so opening it only swapped the
+	 * page bar for a wall of disabled controls. An area can still be selected on
+	 * a locked page — to type into it, or to reach its own padlock — and the row
+	 * stays as it was.
+	 */
+	const barBox = $derived(template.locked ? null : selected);
+	/**
+	 * The area bar put away by its own button, for the room it takes — on a
+	 * phone, a third of the screen. Until the next area is chosen, which is
+	 * when the settings are wanted again. Held as the area it was put away on
+	 * rather than as a flag, so every way an area comes to be chosen brings it
+	 * back — a new area, a duplicate, a paste — not only a click through
+	 * `selectBox`, which also clears it for a click on the same area again.
+	 * The page bar is not hidden by it: that has its own button.
+	 */
+	let barHiddenFor = $state<string | null>(null);
+	const barHidden = $derived(!!barBox && barBox.id === barHiddenFor);
+	const hideBar = () => (barHiddenFor = barBox?.id ?? null);
 	const selectedBoxes = $derived(template.boxes.filter((b) => selectedIds.includes(b.id)));
 	/** The box the menu was opened on, whether or not it is the only one chosen. */
 	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
@@ -449,11 +775,163 @@ em { color: #b42318 }`;
 	 */
 	const selectedColumn = $derived(selected?.slot ? (mapping[selected.slot] ?? null) : null);
 
-	// ---- boot ---------------------------------------------------------------
+	/**
+	 * The columns something on the card prints: bound to an area, named as
+	 * `%%column%%` in an area's own words, or named in a cell of a column that
+	 * is itself printed. One level and no further, because that is how far
+	 * substitution goes — see placeholders.ts — so a column named only from a
+	 * column nobody prints is still a column nobody prints.
+	 */
+	//
+	// In two halves, so a drag — the template replaced every frame — does not
+	// read the whole table again: what the template prints, as a string that
+	// comes out the same while nothing printed changes; and, from the table
+	// alone, what each column's cells name.
+	const printedByTemplate = $derived.by(() => {
+		const columns = dataset.columns;
+		const used = new Set<string>();
+		for (const box of template.boxes) {
+			const bound = box.slot ? mapping[box.slot] : undefined;
+			if (bound && columns.includes(bound)) used.add(bound);
+			for (const named of referencedColumns(box.static?.text ?? '', columns)) used.add(named);
+			// A column an area takes a color from is printed too, as a color.
+			for (const column of Object.values(box.colorFrom ?? {})) if (columns.includes(column)) used.add(column);
+		}
+		return [...used].sort().join('\u0000');
+	});
+	const namedByCells = $derived.by(() => {
+		const columns = dataset.columns;
+		const named = new Map<string, Set<string>>();
+		for (const column of columns) {
+			const found = new Set<string>();
+			for (const row of dataset.rows) for (const name of referencedColumns(row[column] ?? '', columns)) found.add(name);
+			if (found.size) named.set(column, found);
+		}
+		return named;
+	});
+	const usedColumns = $derived.by(() => {
+		const used = new Set(printedByTemplate ? printedByTemplate.split('\u0000') : []);
+		for (const column of [...used]) for (const name of namedByCells.get(column) ?? []) used.add(name);
+		return used;
+	});
+
+	/**
+	 * The rows in the order of the numbers the table shows them with — where
+	 * they arrived, not where a sort has put them — which is what
+	 * `%%lookup:N:…%%` counts in. See `Dataset.order`.
+	 */
+	const lookupRows = $derived(inArrivalOrder(dataset));
+
+	/**
+	 * Columns a keyword has taken — `today`, `lookup`, `page` — which `%%name%%` can
+	 * never reach. The table colours them; the status line says why, once per
+	 * set of them, so it is said when one appears and not on every keystroke.
+	 */
+	const keywordColumns = $derived(dataset.columns.filter(isKeyword));
+	let keywordsSaid = '';
+	$effect(() => {
+		const said = keywordColumns.join('\n');
+		if (said === keywordsSaid) return;
+		keywordsSaid = said;
+		if (!keywordColumns.length) return;
+		notify(
+			keywordColumns
+				.map((c) => `“${c}” is a reserved keyword. Rename the column to enable the %%${c.trim().toLowerCase()}%% placeholder.`)
+				.join(' '),
+			'warning'
+		);
+	});
+
+	/** What moving the lookups along did, in a sentence for the status line. */
+	function lookupNote({ renumbered, orphaned }: { renumbered: number; orphaned: number }) {
+		const n = (k: number) => `${k} lookup${k === 1 ? '' : 's'}`;
+		const parts = [
+			renumbered ? `${n(renumbered)} renumbered to follow ${renumbered === 1 ? 'its row' : 'their rows'}.` : '',
+			orphaned ? `${n(orphaned)} named a deleted row and now ${orphaned === 1 ? 'reads' : 'read'} %%lookup:${GONE_ROW}:…%%.` : ''
+		];
+		return { note: parts.filter(Boolean).join(' '), warning: orphaned > 0 };
+	}
+
+	// ---- one tab edits -------------------------------------------------------
+
+	/**
+	 * Whether this tab is the one editing — tablock.ts. `checking` until the
+	 * lock answers; `here` holds it and boots; `elsewhere` found it held and
+	 * never loads anything, so it has nothing to save over the other tab's
+	 * work; `handed` gave it to another tab, having saved first, and has
+	 * stopped saving.
+	 */
+	let editor = $state<'checking' | 'here' | 'elsewhere' | 'handed'>('checking');
+	let editorLock: EditorLock | null = null;
+	/** The boot under way, for a handover to wait out — see `handOver`. */
+	let booting: Promise<void> | null = null;
+	let takingOver = $state(false);
+
+	/**
+	 * Everything the autosave would write, written now and waited for: the tab
+	 * taking over reads storage the moment this resolves, so nothing may be
+	 * left in a debounce. Then the saves stop — `ready` gates every one of
+	 * them — and the page says why. With `save` false the lock was taken, not
+	 * asked for: the other tab is already editing, so this tab writes nothing.
+	 */
+	async function handOver(save: boolean) {
+		// Asked in the middle of boot: let it finish, so there is something to
+		// save and nothing left running to turn the autosave on afterwards —
+		// a boot still awaiting storage would set `ready` after this had
+		// handed over, and write this tab's copy over the other tab's work.
+		await booting?.catch(() => {});
+		if (ready && save) {
+			const template$ = $state.snapshot(template);
+			const dataset$ = $state.snapshot(dataset);
+			saveMapping(templateId, $state.snapshot(mapping));
+			saveUi($state.snapshot(ui));
+			await Promise.all([
+				saveTemplate(template$),
+				templateId ? saveTemplateDoc(templateId, template$) : null,
+				saveDataset(dataset$),
+				datasetId ? saveDatasetDoc(datasetId, dataset$) : null
+			]);
+		}
+		ready = false;
+		editor = 'handed';
+	}
 
 	$effect(() => {
-		if (ready) return;
-		void boot();
+		void claimEditor(handOver).then((lock) => {
+			editorLock = lock;
+			editor = lock.held ? 'here' : 'elsewhere';
+		});
+	});
+
+	/**
+	 * Bring the editing here. A tab that never loaded boots in place; one that
+	 * handed its work away is holding a copy older than what it handed on, so
+	 * it starts again from storage.
+	 */
+	async function useHere() {
+		if (!editorLock || takingOver) return;
+		takingOver = true;
+		await editorLock.takeOver();
+		// Only with the lock in hand: a request that came back empty leaves the
+		// other tab editing, and two tabs saving is what the lock is there for.
+		if (!editorLock.held) {
+			takingOver = false;
+			return;
+		}
+		if (editor === 'handed') location.reload();
+		else {
+			editor = 'here';
+			takingOver = false;
+		}
+	}
+
+	// ---- boot ---------------------------------------------------------------
+
+	// Only in the tab holding the lock, and only once: a tab that has handed
+	// its work on is not ready either, and must not start loading again.
+	$effect(() => {
+		if (ready || editor !== 'here') return;
+		booting = boot();
 	});
 
 	async function boot() {
@@ -464,8 +942,14 @@ em { color: #b42318 }`;
 		// a returning user would be told their month of work was sample data.
 		const storable = await storageAvailable();
 		let unreadable = false;
+		if (storable) await rewriteStoredTemplates();
 
 		const storedTemplate = await loadTemplate();
+		// A first visit lands on the starter card locked: it is the tour, read
+		// before it is edited, and a stray drag on a phone should not rearrange
+		// it. The padlock above Area unlocks it. The lock is the template's own
+		// now, so Reset and A5 Starter Booklet bring it back locked too.
+		if (!storedTemplate) template = starterTemplate();
 		if (storedTemplate) {
 			try {
 				template = normaliseTemplate(storedTemplate);
@@ -505,6 +989,12 @@ em { color: #b42318 }`;
 			datasetId = nextDatasetId();
 		}
 		saveDatasetId(datasetId);
+		// After an update, What's new opens by itself, once: a dot on the
+		// version asking to be pressed was easy to miss, and what changed is
+		// most worth reading the first time the new version is open. A first
+		// run has nothing it could have missed — see `seenAtBoot`.
+		if (seenAtBoot(loadSeenVersion(), firstRun, VERSION) !== VERSION) openWhatsNew();
+		else if (firstRun) saveSeenVersion(VERSION);
 		previousTable = loadPreviousDatasetId();
 		void refreshTables();
 
@@ -513,13 +1003,30 @@ em { color: #b42318 }`;
 		// id nobody has yet is minted here, which is how a browser that has only
 		// ever had one template acquires a library containing exactly that one.
 		templateId = loadTemplateId() || nextTemplateId();
+		// A saved template this build could not read is never saved over: the
+		// starter shown in its place goes into the library under a new id, and
+		// the one that could not be read stays where it was — kept as it was,
+		// in the library, if it was only ever the working copy — for a build
+		// that can read it. The autosave would otherwise have written the
+		// starter over it within a third of a second.
+		if (unreadable) {
+			if (!(await loadTemplateDoc(templateId))) await keepTemplateDocAsIs(templateId, storedTemplate);
+			templateId = nextTemplateId();
+		}
 		saveTemplateId(templateId);
+		previousTemplate = loadPreviousTemplateId();
 		void refreshLibrary();
 
 		const storedMapping = loadMapping(templateId, template.name);
 		mapping = Object.keys(storedMapping).length ? storedMapping : autoMap(usedSlots(template), dataset.columns);
 		ui = loadUi();
-		if (typeof window !== 'undefined' && window.innerWidth <= 900) {
+		if (ui.trayHeightShare) trayShare = Math.max(TRAY_MIN, Math.min(TRAY_RESTORE_MAX, ui.trayHeightShare));
+		if (ui.panels) {
+			// Whatever was open when the tab was last closed — see UiState.
+			pageSetupOpen = ui.panels.page;
+			dataOpen = ui.panels.data;
+			imagesOpen = ui.panels.images && !ui.panels.data;
+		} else if (typeof window !== 'undefined' && window.innerWidth <= 900) {
 			pageSetupOpen = false;
 			dataOpen = false;
 		}
@@ -535,10 +1042,14 @@ em { color: #b42318 }`;
 				'warning'
 			);
 		} else if (unreadable)
-			notify('The saved template could not be read, so this is the starter card. Your data is untouched.', 'warning');
+			notify(
+				'The saved template could not be read — perhaps a newer version of libelli wrote it — so this is the starter card. The saved one is kept in your templates, untouched, and your data too.',
+				'warning'
+			);
 		else if (firstRun)
 			notify('Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.');
 		missingFonts = await ensureTemplateFonts(template);
+		void refreshStoredFonts();
 
 		// Last, so the precache download is not competing with the first paint.
 		registerServiceWorker(() => {
@@ -567,8 +1078,39 @@ em { color: #b42318 }`;
 		)
 	);
 
+	// Not a family the design takes from a file in this browser: asking Google
+	// for it too would bring back the faces an upload replaced, and they would
+	// be matched in its place.
 	$effect(() => {
-		for (const family of familiesInUse) ensureGoogleFont(family);
+		const local = new Set(template.fonts.filter((f) => f.source === 'local').map((f) => f.family.toLowerCase()));
+		for (const family of familiesInUse) if (!local.has(family.toLowerCase())) ensureGoogleFont(family);
+	});
+
+	/**
+	 * Fonts this browser knows that no template is carrying — see storage.ts.
+	 * Read at once rather than at boot: it is a handful of names in
+	 * localStorage, and the font menus want it on their first render.
+	 */
+	let editorFonts = $state<FontRef[]>(loadEditorFonts());
+
+	/**
+	 * A template carries the families it is set in and no others.
+	 *
+	 * Checked on every change rather than at export, so what is saved, undone
+	 * and exported is always the same list. What is cut is handed to the
+	 * editor, not thrown away: a family chosen and then changed back is still
+	 * in the menu, under the rule. In the same tick as the change that made a
+	 * family unused, so the two land in one undo entry.
+	 */
+	$effect(() => {
+		if (!ready) return;
+		const { template: pruned, dropped } = pruneFonts(template);
+		if (!dropped.length) return;
+		untrack(() => {
+			editorFonts = mergeFonts(editorFonts, dropped);
+			saveEditorFonts($state.snapshot(editorFonts));
+			template = pruned;
+		});
 	});
 
 	/**
@@ -584,6 +1126,16 @@ em { color: #b42318 }`;
 	// No reactive reads, so this runs once and its return value is the cleanup.
 	$effect(() => watchInstall((available) => (installable = available)));
 
+	// Read once into the state Help shows. The root already has it: the
+	// script in app.html put it there before the first paint, so setting it
+	// again here changes nothing on screen.
+	$effect(() => {
+		untrack(() => setTextSize(loadTextSize()));
+		untrack(() => (theme = shownTheme = loadTheme()));
+		untrack(() => (outputTurn = loadTurn()));
+		return zoomAsText(() => untrack(() => textSize), setTextSize);
+	});
+
 	async function install() {
 		const outcome = await promptInstall();
 		// The offer is spent either way, so the button goes whatever they chose.
@@ -598,8 +1150,15 @@ em { color: #b42318 }`;
 	 * `local` image the browser has never been given resolves to null and is
 	 * asked for by name — the same bargain as a missing font.
 	 */
+	// Keyed on the reference as a string, which a drag does not change, and on
+	// `imagesVersion`, which a replaced file does: on the template itself, it
+	// read the picture back from storage on every frame of every drag.
+	const pageImageKey = $derived(JSON.stringify(template.page.image ?? null));
+	const printImageKey = $derived(JSON.stringify(template.print.background ?? null));
 	$effect(() => {
-		const image = template.page.image ? $state.snapshot(template.page.image) : undefined;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		imagesVersion;
+		const image = (JSON.parse(pageImageKey) ?? undefined) as Template['page']['image'];
 		let stale = false;
 		void (async () => {
 			const resolved = await resolveBackground(image);
@@ -614,7 +1173,9 @@ em { color: #b42318 }`;
 
 	/** Same bargain as the page background, kept as a separate reference so the two never collide. */
 	$effect(() => {
-		const image = template.print.background ? $state.snapshot(template.print.background) : undefined;
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+		imagesVersion;
+		const image = (JSON.parse(printImageKey) ?? undefined) as Template['print']['background'];
 		let stale = false;
 		void (async () => {
 			const resolved = await resolveBackground(image);
@@ -637,7 +1198,10 @@ em { color: #b42318 }`;
 	 * as a notice — the areas simply draw nothing, and a card that is blank for
 	 * a reason should say so.
 	 */
-	const imageNames = $derived.by(() => {
+	// The table's names and the template's, each on its own, so a drag does
+	// not read every cell again — the template's half, a string, comes out
+	// the same.
+	const cellImages = $derived.by(() => {
 		const names = new Set<string>();
 		for (const row of dataset.rows) {
 			for (const value of Object.values(row)) {
@@ -645,15 +1209,35 @@ em { color: #b42318 }`;
 				if (name) names.add(name);
 			}
 		}
-		for (const box of template.boxes) {
-			const name = localImageName(box.static?.url);
-			if (name) names.add(name);
-		}
+		return names;
+	});
+	const areaImages = $derived(
+		template.boxes
+			.map((box) => localImageName(box.static?.url))
+			.filter((name): name is string => !!name)
+			.sort()
+			.join('\u0000')
+	);
+	const imageNames = $derived.by(() => {
+		const names = new Set(cellImages);
+		for (const name of areaImages ? areaImages.split('\u0000') : []) names.add(name);
 		return [...names].sort();
 	});
+	/**
+	 * The same names as one string, which `$derived` compares by value: the
+	 * list above is a new array on every edit — a drag frame, a keystroke —
+	 * and the effect below, keyed on it, read every stored picture's bytes
+	 * back from IndexedDB or the folder each time. Keyed on this, it reads
+	 * them when the set of names changes, or `imagesVersion` says the bytes
+	 * did.
+	 */
+	const imageKey = $derived(imageNames.join('\u0000'));
+
+	/** Names the template or the table point at that this browser does not hold. */
+	let missingImages = $state<string[]>([]);
 
 	$effect(() => {
-		const wanted = imageNames;
+		const wanted = imageKey ? imageKey.split('\u0000') : [];
 		// A bare read, so $effect tracks it and a bump re-runs this.
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 		imagesVersion;
@@ -662,14 +1246,9 @@ em { color: #b42318 }`;
 			const { urls, missing } = await resolveLocalImages(wanted);
 			if (stale) return;
 			images = urls;
-			if (missing.length) {
-				notify(
-					`${missing.length === 1 ? 'An image' : `${missing.length} images`} named here ` +
-						`${missing.length === 1 ? 'is' : 'are'} not in this browser: ${missing.join(', ')}. ` +
-						'Drop the file onto the area again to put it back.',
-					'warning'
-				);
-			}
+			// Listed in the Pictures tray as placeholders, each with a way to put
+			// the file back — rather than said once in the status line and lost.
+			missingImages = missing;
 		})();
 		return () => {
 			stale = true;
@@ -685,8 +1264,99 @@ em { color: #b42318 }`;
 	 * message. An area bound to no column has nowhere in the table to put it, so
 	 * it keeps the reference itself and the picture is the same on every card.
 	 */
-	async function handleImageDrop(box: Box, file: File) {
+	/**
+	 * A picture stored from outside the Pictures tray — dropped on an area or on
+	 * the page. Under the file's own name, which may be one the page already
+	 * points at (a missing picture supplied, a second "image.png" pasted over
+	 * the first): the set of names is then unchanged, so `imagesVersion` says
+	 * the bytes are new, or the cards keep the old picture, or none.
+	 */
+	async function storeImage(file: File): Promise<string> {
 		const name = await storeLocalImage(file);
+		imagesVersion += 1;
+		return name;
+	}
+
+	async function handleImageDrop(box: Box, file: File) {
+		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
+		placeImage(box, await storeImage(file));
+	}
+
+	/**
+	 * A picture this browser already holds, carried from the Pictures tray onto
+	 * an area. The same placing as a file dropped from outside — into the row's
+	 * cell when the area is bound, onto the area otherwise — minus the storing,
+	 * which already happened when it was uploaded.
+	 */
+	function placeStoredImage(boxId: string, name: string) {
+		const box = template.boxes.find((b) => b.id === boxId);
+		if (!box) return;
+		// A bound area's picture goes into the row's cell, which answers to the
+		// table's lock rather than the area's or the design's; one holding its
+		// own picture is the design's, and a lock on either refuses it.
+		const bound = !!box.slot && !!mapping[box.slot];
+		if (!bound && (template.locked || box.locked)) {
+			notify('That area is locked — unlock it to put an image in it.', 'warning');
+			return;
+		}
+		if (bound && refuseLockedTable()) return;
+		placeImage(box, name);
+	}
+
+	/**
+	 * A picture let go over the page but not over an area: a new image area
+	 * for it, centred where it was let go, 40mm across and as tall as the
+	 * picture's own proportions make that. Static, on every card — a picture
+	 * carried from the bar is one picture, not a column.
+	 */
+	async function placeImageOnPage(name: string, clientX: number, clientY: number, file?: Blob) {
+		if (template.locked) {
+			notify('The design is locked — unlock it to add an area.', 'warning');
+			return;
+		}
+		const trim = document.querySelector<HTMLElement>('.viewport .trim');
+		if (!trim) return;
+		const rect = trim.getBoundingClientRect();
+		const { w: pageW, h: pageH } = template.page;
+		const at = { x: ((clientX - rect.left) / rect.width) * pageW, y: ((clientY - rect.top) / rect.height) * pageH };
+		// The picture's proportions, read off the picture itself: a square box
+		// round a banner is a box the first thing anyone does is resize.
+		// A file just dropped in is not resolved yet, so it is read from itself.
+		let aspect = 0.75;
+		const url = file ? URL.createObjectURL(file) : (images[name] ?? (await resolveLocalImages([name])).urls[name]);
+		if (url) {
+			const probe = new Image();
+			probe.src = url;
+			try {
+				await probe.decode();
+				if (probe.naturalWidth) aspect = probe.naturalHeight / probe.naturalWidth;
+			} catch {
+				// Undecodable here: the default proportions will do, and the area says so.
+			}
+			if (file) URL.revokeObjectURL(url);
+		}
+		const w = Math.min(40, pageW);
+		const h = Math.min(Math.round(w * aspect * 10) / 10, pageH);
+		const clamp = (v: number, size: number, max: number) => Math.round(Math.max(0, Math.min(max - size, v - size / 2)) * 10) / 10;
+		settleProvisional();
+		describe('Place an image');
+		const box = newBox({
+			id: nextBoxId(template.boxes),
+			x: clamp(at.x, w, pageW),
+			y: clamp(at.y, h, pageH),
+			w,
+			h,
+			mode: 'image',
+			fit: 'contain',
+			static: { url: localImageRef(name) }
+		});
+		template = { ...template, boxes: [...template.boxes, box] };
+		selectedIds = [box.id];
+		flash([box.id]);
+		notify(`${name} is on the card in an area of its own, the same on every card.`);
+	}
+
+	function placeImage(box: Box, name: string) {
 		const reference = localImageRef(name);
 		const column = box.slot ? mapping[box.slot] : undefined;
 		describe('Drop image');
@@ -701,17 +1371,48 @@ em { color: #b42318 }`;
 			};
 			notify(`${name} is in ${column} for this row, and stays in this browser.`);
 		} else {
-			updateBox({ ...next, static: { ...box.static, url: reference } });
+			// The picture dropped is what the area shows now: a drawing it held
+			// would otherwise win over it — see `setPictureAddress`.
+			const { dataUrl: _drawn, ...kept } = box.static ?? {};
+			updateBox({ ...next, static: { ...kept, url: reference } });
 			notify(`${name} is on this area, the same on every card, and stays in this browser.`);
 		}
 	}
 
-	/** the area whose picture is being drawn, if any — full screen, never in place */
-	let drawing = $state<string | null>(null);
-	const drawingBox = $derived(drawing ? (template.boxes.find((b) => b.id === drawing) ?? null) : null);
+	/**
+	 * A locked table is locked from the card too.
+	 *
+	 * The card writes into a cell three ways — typing in an area, dropping a
+	 * picture on one, finishing a drawing — and the table's own lock would be a
+	 * fence with three gaps in it if only the table's fields honoured it. Said
+	 * rather than silent, because a keystroke that goes nowhere looks broken.
+	 */
+	function refuseLockedTable(): boolean {
+		if (!dataset.locked) return false;
+		notify('The table is locked — unlock it under the table to change its cells.', 'warning');
+		return true;
+	}
 
 	/**
-	 * What the drawing surface opens on.
+	 * Open an area for typing — unless what it would type into is a cell of a
+	 * locked table. Refused at the door, not at the first keystroke: the field
+	 * used to open and then turn every key away, which looks broken. An area of
+	 * its own words is the design's, not the table's, and still opens. Null is
+	 * the card closing it, which is never refused.
+	 */
+	function beginEditing(id: string | null) {
+		if (id === null) {
+			editingId = null;
+			return;
+		}
+		const box = template.boxes.find((b) => b.id === id);
+		if (!box) return;
+		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
+		editingId = id;
+	}
+
+	/**
+	 * What an area with no column is drawn on top of.
 	 *
 	 * A data URL, or one of this browser's own images, can be drawn on top of.
 	 * An address from somewhere else cannot: drawing a cross-origin picture onto
@@ -719,49 +1420,165 @@ em { color: #b42318 }`;
 	 * drawn — so the drawing could never be saved. That one case opens blank
 	 * rather than opening on something it would lose.
 	 */
-	const drawingValue = $derived.by(() => {
-		const box = drawingBox;
-		if (!box) return '';
-		const column = box.slot ? mapping[box.slot] : undefined;
-		const written = column ? (row?.[column] ?? '') : (box.static?.dataUrl ?? box.static?.url ?? '');
-		const value = String(written).trim();
+	function areaDrawingValue(box: Box): string {
+		const value = String(box.static?.dataUrl ?? box.static?.url ?? '').trim();
 		if (value.startsWith('data:image/')) return value;
 		const name = localImageName(value);
 		return name ? (images[name] ?? '') : '';
-	});
+	}
+
+	/** An area with no column, asked to be drawn in the side panel. */
+	let areaRequest = $state<{ id: string; name: string; value: string; pixels?: { w: number; h: number }; ink: string; from?: 'card' | 'images' } | null>(null);
 
 	/**
-	 * A drawing goes where the words of that area go: into the row's cell when it
-	 * is bound to a column, so every row can have its own picture and it travels
-	 * with the table, and onto the area itself when it is not. One undo entry
-	 * however many strokes it took — the editor's own undo goes no further than
-	 * the editor.
+	 * A drawing onto an area with no column: it has no cell, so it goes onto
+	 * the area, replacing an address the area was showing — the same "last one
+	 * in is shown" the bar's Source field follows.
 	 */
-	function saveDrawing(dataUrl: string, pixels: { w: number; h: number } | undefined) {
-		const box = drawingBox;
-		drawing = null;
+	function saveAreaDrawing(id: string, dataUrl: string, pixels: { w: number; h: number } | undefined) {
+		const box = template.boxes.find((b) => b.id === id);
 		if (!box) return;
 		describe('Draw');
-		const column = box.slot ? mapping[box.slot] : undefined;
 		const current = $state.snapshot(box) as Box;
-		if (column && row) {
-			dataset = {
-				...dataset,
-				rows: dataset.rows.map((r, i) => (i === activeRow ? { ...r, [column]: dataUrl } : r))
-			};
-			// The drawing goes in the cell, but the board is remembered on the
-			// area: it is where the next row's drawing starts. A row that already
-			// holds a picture of another size still opens at that size — what is
-			// in the cell wins over what the area remembers.
-			if (JSON.stringify(pixels ?? null) !== JSON.stringify(box.pixels ?? null)) {
-				updateBox({ ...current, pixels });
-			}
-		} else {
-			updateBox({ ...current, pixels, static: { ...box.static, dataUrl } });
-		}
+		const { url: _address, ...kept } = current.static ?? {};
+		updateBox({ ...current, pixels, static: { ...kept, dataUrl } });
+	}
+
+	/** The area's picture gone, drawn or pointed at; its board size stays. */
+	function deleteAreaDrawing(id: string) {
+		const box = template.boxes.find((b) => b.id === id);
+		if (!box) return;
+		describe('Delete the drawing');
+		const current = $state.snapshot(box) as Box;
+		const { url: _address, dataUrl: _drawn, ...kept } = current.static ?? {};
+		updateBox({ ...current, static: Object.keys(kept).length ? kept : undefined });
 	}
 
 	// ---- undo/redo ----------------------------------------------------------
+
+	/**
+	 * A drawing saved from the side panel into a cell. The board is
+	 * remembered on the picture areas that print the column, as it is when the
+	 * drawing is opened from one of them: where the next row's drawing starts.
+	 */
+	function drawIntoCell(rowIndex: number, column: string, dataUrl: string, pixels: { w: number; h: number } | undefined) {
+		if (refuseLockedTable()) return;
+		describe('Draw');
+		dataset = {
+			...dataset,
+			rows: dataset.rows.map((r, i) => (i === rowIndex ? { ...r, [column]: dataUrl } : r))
+		};
+		for (const box of template.boxes) {
+			if (box.mode !== 'image' || !box.slot || mapping[box.slot] !== column) continue;
+			if (JSON.stringify(pixels ?? null) === JSON.stringify(box.pixels ?? null)) continue;
+			updateBox({ ...($state.snapshot(box) as Box), pixels });
+		}
+	}
+
+	/** The board and ink a drawing in this column is made with — its picture area's. */
+	function drawingFor(column: string) {
+		const area = template.boxes.find((b) => b.mode === 'image' && !!b.slot && mapping[b.slot] === column);
+		return { pixels: area?.pixels, ink: area?.color ?? template.defaults.color };
+	}
+
+	/**
+	 * Drawing, asked for from an area — always in the side panel. One bound to
+	 * a column draws into this row's cell, in the table's full-size editor,
+	 * with the pager to step down the rows. One with no column has no cell,
+	 * but draws in the same place, onto the area; a locked table is no reason
+	 * to refuse that, since nothing in the table changes.
+	 */
+	function drawArea(id: string, via: 'card' | 'images' = 'card') {
+		const box = template.boxes.find((b) => b.id === id);
+		const column = box?.slot ? mapping[box.slot] : undefined;
+		if (!box) return;
+		if (column && row && refuseLockedTable()) return;
+		// Where the editor's × goes back to. With the table already showing,
+		// that is the table; otherwise the panel was opened only to draw in,
+		// and closing the drawing closes it (or goes back to Pictures).
+		const from = via === 'images' ? via : dataOpen ? undefined : 'card';
+		dataOpen = true;
+		imagesOpen = false;
+		if (column && row) {
+			cellRequest = { row: activeRow, column, draw: true, from };
+			return;
+		}
+		areaRequest = {
+			from,
+			id,
+			name: box.slot?.trim() || 'Drawing',
+			value: areaDrawingValue(box),
+			pixels: box.pixels,
+			ink: box.color ?? template.defaults.color
+		};
+	}
+
+	/**
+	 * Every picture held in the table or on an area rather than in storage,
+	 * for the Pictures tray: a cell's drawing, by column and row, and a drawing
+	 * on an area with no column. Only `data:` pictures that pass the same
+	 * check a cell's thumbnail does — the cell is untrusted.
+	 */
+	const drawings = $derived.by(() => {
+		const out: Array<{ key: string; label: string; where: string; src: string }> = [];
+		dataset.rows.forEach((cells, i) => {
+			for (const column of dataset.columns) {
+				const text = cells[column]?.trim() ?? '';
+				const src = text.startsWith('data:image/') ? safeMediaUrl(text) : null;
+				if (src) out.push({ key: `cell:${i}:${column}`, label: column, where: `row ${i + 1}`, src });
+			}
+		});
+		for (const box of template.boxes) {
+			if (box.slot && mapping[box.slot]) continue;
+			const text = String(box.static?.dataUrl ?? '').trim();
+			const src = text.startsWith('data:image/') ? safeMediaUrl(text) : null;
+			if (src) out.push({ key: `area:${box.id}`, label: box.slot?.trim() || 'Drawing', where: 'on the area', src });
+		}
+		return out;
+	});
+
+	/** A drawing pressed in the Pictures tray, opened in the drawing editor it belongs to. */
+	function openDrawing(key: string) {
+		if (key.startsWith('area:')) {
+			drawArea(key.slice('area:'.length), 'images');
+			return;
+		}
+		const [, index, ...rest] = key.split(':');
+		const rowIndex = Number(index);
+		const column = rest.join(':');
+		if (!dataset.columns.includes(column) || !dataset.rows[rowIndex]) return;
+		if (refuseLockedTable()) return;
+		activeRow = rowIndex;
+		dataOpen = true;
+		imagesOpen = false;
+		cellRequest = { row: rowIndex, column, draw: true, from: 'images' };
+	}
+
+	/** A stored picture, opened large in the Pictures tray. */
+	let imageFocus = $state<string | null>(null);
+	/**
+	 * A picture being worked on in the side panel — the drawing board, or one
+	 * stored image open large to crop or turn. The options row goes away while
+	 * it is: on a phone the bar and the tray share the height, and with the area
+	 * bar up the tray could not open far enough to reach the board. It comes
+	 * back when the picture is closed.
+	 */
+	let drawingInTable = $state(false);
+	/**
+	 * Any cell open full size, words included. On a phone only: there the bar
+	 * and the tray share the height, and a cell being written in wants all of
+	 * it; on a desk the bar sits beside the table and costs it nothing.
+	 */
+	let fullCellInTable = $state(false);
+	const panelTakesRow = $derived(
+		(dataOpen && (drawingInTable || (stacked && fullCellInTable))) || (imagesOpen && imageFocus !== null)
+	);
+
+	function openImage(name: string) {
+		imageFocus = name;
+		imagesOpen = true;
+		dataOpen = false;
+	}
 
 	/**
 	 * What the user did, waiting to be attached to the entry it produces.
@@ -780,19 +1597,89 @@ em { color: #b42318 }`;
 	// Debounced, so a drag or a burst of typing becomes one entry. `record`
 	// ignores a state equal to the present, which is what stops an applied undo
 	// from recording itself straight back.
-	$effect(() => {
-		if (!ready) return;
-		const snap = snapshot();
-		const timer = setTimeout(() => {
+	//
+	// Two watchers, one timer: the template and the table are snapshotted by
+	// separate effects, each keeping its latest, so a drag — which changes the
+	// template on every frame — never clones the table, and a keystroke in a
+	// cell never clones the template. One snapshot of the whole state was
+	// taken on every change, before the debounce, and on a table of drawings
+	// that was most of a frame. An unchanged half is the same object as last
+	// time, which the history compares by reference before anything else.
+	let shotTemplate: { template: Template; templateId: string } | null = null;
+	let shotData: { dataset: Dataset; mapping: Mapping; datasetId: string } | null = null;
+	/** The table changed since `shotData` was taken: snapshot it when the debounce lands, once. */
+	let dataChanged = true;
+	let recordTimer: ReturnType<typeof setTimeout> | undefined;
+	function recordSoon() {
+		clearTimeout(recordTimer);
+		recordTimer = setTimeout(() => {
+			if (dataChanged) {
+				shotData = { dataset: $state.snapshot(dataset), mapping: $state.snapshot(mapping), datasetId };
+				dataChanged = false;
+			}
+			if (!shotTemplate || !shotData) return;
 			const before = history;
-			history = record(history, snap, pending);
+			history = commit({ ...shotTemplate, ...shotData });
 			// A fresh edit makes "the last change" a different change, so the
 			// alternating chord starts over rather than flipping the wrong one.
 			if (history !== before) toggledOff = false;
 			pending = '';
 		}, 350);
-		return () => clearTimeout(timer);
+	}
+	$effect(() => {
+		if (!ready) return;
+		shotTemplate = { template: $state.snapshot(template), templateId };
+		recordSoon();
 	});
+	$effect(() => {
+		if (!ready) return;
+		// Read, not copied: a keystroke in a cell is a change to watch for,
+		// and the copy waits for the debounce — one per burst of typing.
+		watchDeep(dataset);
+		watchDeep(mapping);
+		void datasetId;
+		dataChanged = true;
+		recordSoon();
+	});
+
+	/**
+	 * A font replaced from the Pictures tray, while it is still the last step:
+	 * its entry's label, and the face it put in. X-height set on that face
+	 * from the tray joins the replace's entry (`amend`) rather than following
+	 * it, so one undo goes back to the old face and one redo brings the new
+	 * one back as tuned — the way to compare two faces, flipping between
+	 * them, without stepping back through every nudge. Anything else recorded
+	 * in between makes the replace no longer the last step, and ends it.
+	 */
+	let fontSession: { label: string; family: string } | null = null;
+	/** The next recording is such a nudge: amend, if the replace is still the present entry. */
+	let amendNext = false;
+
+	/** Record `snap` — or fold it into the replace it tunes, per `fontSession`. */
+	function commit(snap: Snapshot): typeof history {
+		const joins = amendNext && fontSession !== null && history.present.label === fontSession.label && canUndo(history);
+		amendNext = false;
+		return joins ? amend(history, snap) : record(history, snap, pending);
+	}
+
+	/**
+	 * Record what is on screen now, without waiting out the debounce. Undo
+	 * (and redo) pressed within a third of a second of a change used to find that change
+	 * not yet in the history: it undid the one before it, or — on a fresh
+	 * session, where nothing had been recorded — nothing at all, and the drag
+	 * just made stayed where it was. The debounced recorder cannot record it a
+	 * second time: what undo applies changes the state, which cancels its
+	 * timer, and the state it then sees is the present.
+	 */
+	function flushHistory() {
+		if (!ready) return;
+		const before = history;
+		history = commit(snapshot());
+		if (history !== before) {
+			toggledOff = false;
+			pending = '';
+		}
+	}
 
 	function applySnapshot(next: Snapshot) {
 		template = structuredClone(next.template);
@@ -800,16 +1687,18 @@ em { color: #b42318 }`;
 		mapping = structuredClone(next.mapping);
 		if (next.templateId && next.templateId !== templateId) {
 			templateId = next.templateId;
-			saveTemplateId(templateId);
+			// Only the editor writes: every other path into storage waits on
+			// `ready`, and so does this one.
+			if (ready) saveTemplateId(templateId);
 			// A template undone back into existence is written out again by the
 			// autosave, under the id it had — which is what makes deleting one
 			// recoverable rather than merely reversible on screen.
 			void refreshLibrary();
 		}
 		if (next.datasetId && next.datasetId !== datasetId) {
-			rememberTable(datasetId);
+			if (ready) rememberTable(datasetId);
 			datasetId = next.datasetId;
-			saveDatasetId(datasetId);
+			if (ready) saveDatasetId(datasetId);
 			void refreshTables();
 		}
 		if (activeRow >= dataset.rows.length) activeRow = Math.max(0, dataset.rows.length - 1);
@@ -818,7 +1707,8 @@ em { color: #b42318 }`;
 	}
 
 	function undo() {
-		if (!undoable) return;
+		flushHistory();
+		if (!canUndo(history)) return;
 		toggledOff = false;
 		const what = undoLabel(history);
 		history = undoStep(history);
@@ -830,7 +1720,11 @@ em { color: #b42318 }`;
 	}
 
 	function redo() {
-		if (!redoable) return;
+		// Recorded first, as undo does: a change made since the undo, still
+		// inside the debounce, used to be thrown away by the redo that
+		// restored the future it should have cleared.
+		flushHistory();
+		if (!canRedo(history)) return;
 		toggledOff = false;
 		const what = redoLabel(history);
 		history = redoStep(history);
@@ -860,7 +1754,8 @@ em { color: #b42318 }`;
 			redo();
 			return;
 		}
-		if (!undoable) return;
+		flushHistory();
+		if (!canUndo(history)) return;
 		undo();
 		// After undo(), which clears it: the flag says "this chord took the last
 		// change off", and only this chord may put it back.
@@ -913,11 +1808,14 @@ em { color: #b42318 }`;
 
 	// The working copy and the library entry, on one debounce — the same
 	// arrangement the template above is saved under, and for the same reason.
+	// Read every cell to watch it, and copy the table once the typing pauses:
+	// a copy per keystroke was a whole table's clone each time.
 	$effect(() => {
 		if (!ready) return;
-		const saved = $state.snapshot(dataset);
+		watchDeep(dataset);
 		const id = datasetId;
 		const timer = setTimeout(() => {
+			const saved = $state.snapshot(dataset);
 			void saveDataset(saved).then(reportSave);
 			if (id) void saveDatasetDoc(id, saved);
 		}, 300);
@@ -942,6 +1840,21 @@ em { color: #b42318 }`;
 	$effect(() => {
 		if (!ready) return;
 		saveUi($state.snapshot(ui));
+	});
+
+	/**
+	 * The open bars and the table, carried into the stored UI so a reload
+	 * opens on the same screen. Written only when they differ, or every save of
+	 * `ui` would re-run this and write it straight back.
+	 */
+	$effect(() => {
+		if (!ready) return;
+		const panels = { page: pageSetupOpen, data: dataOpen, images: imagesOpen };
+		untrack(() => {
+			const was = ui.panels;
+			if (was && was.page === panels.page && was.data === panels.data && was.images === panels.images) return;
+			ui = { ...ui, panels };
+		});
 	});
 
 	// ---- template editing ---------------------------------------------------
@@ -972,7 +1885,7 @@ em { color: #b42318 }`;
 	 *
 	 * It used to arrive carrying the literal word "Text", so abandoning one left a
 	 * box on the card that said Text and had to be found and deleted. It starts
-	 * empty now, with the cursor already in the Text field — and it is provisional
+	 * empty now, its first typed character going into the Text field — and it is provisional
 	 * until it is given something: any text, a column to bind to, or any change to
 	 * how it looks. Moving and resizing do not count, because placing a box is
 	 * what you do while deciding whether you want it at all.
@@ -994,9 +1907,61 @@ em { color: #b42318 }`;
 		template = { ...template, boxes: [...template.boxes, box] };
 		selectedIds = [box.id];
 		provisional = box.id;
-		// After the bar has rendered for the new selection, or there is no field
-		// to put the cursor in yet.
-		void tick().then(() => boxBar?.focusText());
+		// The flash a cell's areas get when it is entered in the table: a new
+		// area is an empty frame, and on a busy page it is easy to lose.
+		flash([box.id]);
+		// No cursor in the Text field yet: the first key decides. Delete takes
+		// the area away and the arrows move it, as they would any area; a
+		// character goes into its Text field (see `onWindowKeydown`).
+	}
+
+	/**
+	 * An area for a column nothing prints yet, from the mark on its header.
+	 *
+	 * Named after the column — the area's name is its CSS id and the slot the
+	 * mapping keys on, and the column's own name is the obvious one — with a
+	 * number after it if an area already has that name. Placed where a new
+	 * area goes, selected, and one undo away.
+	 */
+	function placeColumn(column: string) {
+		if (template.locked) {
+			notify('The design is locked — unlock it to add an area.', 'warning');
+			return;
+		}
+		settleProvisional();
+		const taken = new Set(template.boxes.map((b) => b.slot).filter(Boolean));
+		let slot = column;
+		for (let n = 2; taken.has(slot); n++) slot = `${column}-${n}`;
+		describe('Place a column');
+		const box = newBox({ id: nextBoxId(template.boxes), slot, x: 14, y: 60, w: 80, h: 12, mode: 'plain' });
+		template = {
+			...template,
+			slots: template.slots.includes(slot) ? template.slots : [...template.slots, slot],
+			boxes: [...template.boxes, box]
+		};
+		mapping = { ...mapping, [slot]: column };
+		selectedIds = [box.id];
+		flash([box.id]);
+		notify(`${column} is on the card — drag the new area where it belongs.`);
+	}
+
+	/**
+	 * Entering a cell flashes the areas on the card that print it — bound to
+	 * its column, or naming it as `%%column%%` in their own words — in the
+	 * bounds' blue, briefly. The table and the card are side by side, and
+	 * which area a cell feeds is the question typing into it always raises.
+	 * The same flash a rescued area gets, so it reads as "here", not as a
+	 * selection.
+	 */
+	function flashColumn(column: string) {
+		const ids = template.boxes
+			.filter(
+				(b) =>
+					(b.slot && mapping[b.slot] === column) ||
+					referencedColumns(b.static?.text ?? '', dataset.columns).includes(column)
+			)
+			.map((b) => b.id);
+		if (ids.length) flash(ids);
 	}
 
 	// ---- positioning the areas from the columns -----------------------------
@@ -1007,7 +1972,7 @@ em { color: #b42318 }`;
 	 * It guesses from headings and cell shapes and it will sometimes be wrong,
 	 * and a page of boxes that silently decided your Reference column was the
 	 * title is worse than being asked. So the guess is shown first: one line per
-	 * column, the kind it was taken for, and Leave Out for the ones you do not
+	 * column, the kind it was taken for, and a tick to take off the ones you do not
 	 * want on the card at all.
 	 */
 	let magic = $state<FieldGuess[] | null>(null);
@@ -1050,7 +2015,7 @@ em { color: #b42318 }`;
 		template = { ...current, slots, boxes };
 		mapping = { ...bound };
 		selectedIds = [];
-		const skipped = roles.filter((role) => role.kind === 'skip').map((role) => role.column);
+		const skipped = roles.filter((role) => role.include === false).map((role) => role.column);
 		const notes = [
 			`${boxes.length} area${boxes.length === 1 ? '' : 's'} laid out from ${dataset.columns.length} column${dataset.columns.length === 1 ? '' : 's'}.`,
 			skipped.length ? `Left out: ${skipped.join(', ')}.` : '',
@@ -1106,11 +2071,31 @@ em { color: #b42318 }`;
 	 */
 	function resetTemplate() {
 		resetting = false;
+		const starter = templateStarter;
+		if (!starter) return;
 		describe('Reset the template');
-		template = starterTemplate();
+		// Under its own name: it is still this entry in the library, and a
+		// second copy is called "… 2" for a reason.
+		template = { ...starter.make(), name: template.name };
 		selectedIds = [];
 		mapping = autoMap(usedSlots(template), dataset.columns);
-		notify('Template reset to the starter card. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.');
+		notify(`Template reset to the ${starter.name}. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.`);
+	}
+
+	/**
+	 * The rows only, back to the starter the table began as. The design and
+	 * the name are left where they are; one snapshot is template and data
+	 * together, so one undo brings the rows back.
+	 */
+	function resetTable() {
+		resettingTable = false;
+		const starter = tableStarter;
+		if (!starter || dataset.locked) return;
+		describe('Reset the table');
+		dataset = { ...starter.make(), name: dataset.name };
+		activeRow = 0;
+		mapping = autoMap(usedSlots(template), dataset.columns);
+		notify(`Table reset to ${starter.name}. Your design is untouched, and Ctrl/Cmd+Z brings the old rows back.`);
 	}
 
 	// ---- the template library -----------------------------------------------
@@ -1151,6 +2136,9 @@ em { color: #b42318 }`;
 			return;
 		}
 		describe(`Load “${next.name}”`);
+		// Not when there is nothing to come back to — deleting switches away
+		// from an id that is already gone.
+		if (templateId) rememberTemplate(templateId);
 		templateId = id;
 		saveTemplateId(id);
 		template = next;
@@ -1160,6 +2148,22 @@ em { color: #b42318 }`;
 		mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(next), dataset.columns);
 		missingFonts = await ensureTemplateFonts(next);
 		notify(`“${next.name}” loaded. Your rows are untouched.`);
+	}
+
+	/**
+	 * The template being left behind is the one the swap in the page bar comes
+	 * back to — the same pair the table keeps. '' says there is no pair any more.
+	 */
+	function rememberTemplate(id: string) {
+		if (id === previousTemplate) return;
+		previousTemplate = id;
+		savePreviousTemplateId(id);
+	}
+
+	/** Back to the template before this one, and from there back again. */
+	function swapTemplate() {
+		if (!previousTemplate || previousTemplate === templateId) return;
+		void switchTemplate(previousTemplate);
 	}
 
 	/** A name nothing else in the library is already using. */
@@ -1182,6 +2186,7 @@ em { color: #b42318 }`;
 		describe('New template');
 		const next = blankTemplate();
 		next.name = freeName(next.name);
+		rememberTemplate(templateId);
 		templateId = nextTemplateId();
 		saveTemplateId(templateId);
 		template = next;
@@ -1191,6 +2196,55 @@ em { color: #b42318 }`;
 		await saveTemplateDoc(templateId, $state.snapshot(template));
 		await refreshLibrary();
 		notify(`“${next.name}” started. Your rows are untouched — press ${dataset.columns.length ? 'the shapes button beside the page to lay them out' : 'Import under the table to bring some in'}.`);
+	}
+
+	/**
+	 * A5 Starter Booklet: the design a first run lands on, as it came — the template
+	 * library's Getting Started.
+	 *
+	 * Never over the loaded template, and never over a copy anybody has changed:
+	 * it opens a copy of the starter already in the library untouched, if there
+	 * is one, and otherwise adds a fresh one beside the rest. Reset is the one
+	 * that puts the starter over what is open, and it asks first.
+	 */
+	async function a5Starter() {
+		const untouched = (raw: unknown) => {
+			try {
+				return isStarterTemplate(normaliseTemplate(raw));
+			} catch {
+				return false;
+			}
+		};
+		if (untouched($state.snapshot(template))) {
+			notify(`This is the A5 Starter Booklet, as it came.`);
+			return;
+		}
+		for (const entry of library) {
+			if (entry.id === templateId) continue;
+			const doc = await loadTemplateDoc(entry.id);
+			if (doc && untouched(doc)) {
+				await switchTemplate(entry.id);
+				return;
+			}
+		}
+		settleProvisional();
+		await flushTemplate();
+		describe('A5 Starter Booklet');
+		rememberTemplate(templateId);
+		templateId = nextTemplateId();
+		saveTemplateId(templateId);
+		// Named after the new id is in place: `freeName` skips the loaded
+		// template's own entry, and the one being left keeps its name.
+		const next = starterTemplate();
+		next.name = freeName(next.name);
+		template = next;
+		selectedIds = [];
+		editingId = null;
+		mapping = autoMap(usedSlots(next), dataset.columns);
+		missingFonts = await ensureTemplateFonts(next);
+		await saveTemplateDoc(templateId, $state.snapshot(template));
+		await refreshLibrary();
+		notify(`“${next.name}” added to your templates, as it came. Your other templates and your rows are untouched.`);
 	}
 
 	/**
@@ -1205,6 +2259,7 @@ em { color: #b42318 }`;
 		const gone = templateId;
 		const name = template.name;
 		await deleteTemplateDoc(gone);
+		if (previousTemplate === gone) rememberTemplate('');
 		const rest = library.filter((entry) => entry.id !== gone);
 		describe(`Delete “${name}”`);
 		if (rest.length) {
@@ -1365,7 +2420,9 @@ em { color: #b42318 }`;
 	function renameDataset(name: string) {
 		const wanted = name.trim();
 		describe('Rename the table');
-		dataset = wanted ? { ...dataset, name: wanted } : { columns: dataset.columns, rows: dataset.rows };
+		// Clearing the name removes it, and the lock and the rows' order stay.
+		// A starter table renamed stops being the starter (`renamed`).
+		dataset = renamed(dataset, wanted || undefined);
 	}
 
 	/**
@@ -1373,6 +2430,9 @@ em { color: #b42318 }`;
 	 * group is for. A modifier-click adds or drops that whole set.
 	 */
 	function selectBox(id: string | null, additive = false) {
+		// Choosing an area — this one again, or another — brings back a bar
+		// that was put away (`barHidden`).
+		if (id) barHiddenFor = null;
 		if (provisional && id !== provisional) settleProvisional();
 		// Typing into one area and then picking another ends the typing; the
 		// change is already in, so there is nothing to confirm or discard.
@@ -1431,7 +2491,7 @@ em { color: #b42318 }`;
 	function setBoxText(box: Box, value: string) {
 		if (box.slot) {
 			const column = mapping[box.slot];
-			if (!column || !row) return;
+			if (!column || !row || refuseLockedTable()) return;
 			describe('Edit the text');
 			dataset = {
 				...dataset,
@@ -1499,6 +2559,14 @@ em { color: #b42318 }`;
 		notify(`Style pasted onto ${targets.length} area${targets.length === 1 ? '' : 's'}.`);
 	}
 
+	/** The design's own lock, from the keyboard: the padlock above Area. */
+	function toggleDesignLock() {
+		const locking = !template.locked;
+		describe(locking ? 'Lock the design' : 'Unlock the design');
+		template = stripUndefined({ ...$state.snapshot(template), locked: locking ? true : undefined }) as Template;
+		notify(locking ? 'Design locked — nothing moves until it is unlocked.' : 'Design unlocked.');
+	}
+
 	function lockSelection() {
 		if (template.locked || !selectedBoxes.length) return;
 		describe(selectedBoxes.every((b) => b.locked) ? 'Unlock' : 'Lock');
@@ -1532,8 +2600,15 @@ em { color: #b42318 }`;
 		// Millimetres: the editor has no pixels, and a status line that invented
 		// them would be describing a different app.
 		describe(`Move ${Math.max(Math.abs(dx), Math.abs(dy))}mm`);
+		// Right is right on screen. On a left-hand page an area that follows the
+		// fold is drawn mirrored, so a step right there is a step left in the
+		// right-hand page's millimetres the template stores — the same undoing a
+		// mirrored drag goes through before it is written.
+		const verso = template.facing === true && pageSide(dataset.rows.length ? activeRow + 1 : null) === 'verso';
+		// An area following another that moves too goes down with it, gap kept.
+		const moving = new Set(targets.map((b) => b.id));
 		for (const box of targets) {
-			const next = nudge(box, dx, dy);
+			const next = nudge(box, verso && mirrors(box) ? -dx : dx, followsInSet(box, moving, template.boxes) ? 0 : dy);
 			if (next) updateBox(next);
 		}
 	}
@@ -1610,7 +2685,23 @@ em { color: #b42318 }`;
 		notify('Pasted as a new area, holding its own words. Ctrl/Cmd+Z takes it away.');
 	}
 
+	/**
+	 * A dialog of this page's own is up. Each handles its own keys on its own
+	 * element (modal.ts), so the page's handler stands down entirely, Escape
+	 * aside: otherwise Delete, Ctrl/Cmd+D or Enter acts on the card behind it,
+	 * where nobody can see what it did.
+	 */
+	const dialogOpen = $derived(
+		helpOpen || whatsNewOpen || statusOpen || cssOpen || resetting || resettingTable || deleting || deletingTable || magic !== null
+	);
+	/** Something in front of the stage, which then leaves the keys alone. */
+	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
+
 	function onWindowKeydown(event: KeyboardEvent) {
+		// A tab that is not the editor holds a stale copy behind its dialog:
+		// a delete or an undo there edits what nobody will see saved, and an
+		// undo across a template switch would write its id over the editor's.
+		if (editor !== 'here') return;
 		const target = event.target as HTMLElement | null;
 		const typing = target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
 		if (wantsExport(event)) {
@@ -1619,9 +2710,51 @@ em { color: #b42318 }`;
 			if (!previewOpen && !printing) requestPrint();
 			return;
 		}
+		// Ctrl +/− zooms the page on the stage; PagePreview answers it, except
+		// in a field or behind a dialog, where the browser would have zoomed the
+		// whole app. There it is the text size instead — the same conditions
+		// PagePreview steps aside on, so exactly one of the two answers.
+		const chord = textChord(event);
+		if (chord !== null && (typing || stageModalOpen)) {
+			event.preventDefault();
+			setTextSize(chord === 0 ? 1 : stepText(textSize, chord));
+			return;
+		}
 		// The lightbox is in front of everything and takes Escape and the arrows
 		// for itself; nothing back here should answer them underneath it.
 		if (lightboxOpen) return;
+		if (event.key === 'Escape' && (dialogOpen || boxMenu)) {
+			helpOpen = false;
+			whatsNewOpen = false;
+			statusOpen = false;
+			if (cssOpen) cancelCss();
+			resetting = false;
+			resettingTable = false;
+			deleting = false;
+			deletingTable = false;
+			magic = null;
+			boxMenu = null;
+			return;
+		}
+		if (dialogOpen) return;
+		// A new area waits for its first key. Delete, the arrows and every chord
+		// keep their meaning — remove it, move it, undo it — and anything that
+		// types a character puts the cursor in its Text field first, where the
+		// browser then types that same character. Focus moved during keydown
+		// takes the keypress with it, so nothing has to be re-inserted.
+		if (
+			!typing &&
+			provisional &&
+			selected?.id === provisional &&
+			!selected.static?.text &&
+			event.key.length === 1 &&
+			!event.ctrlKey &&
+			!event.metaKey &&
+			!event.altKey
+		) {
+			boxBar?.focusText(false);
+			return;
+		}
 		// While a field has focus, leave undo to the browser's own text history.
 		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
 			event.preventDefault();
@@ -1632,16 +2765,6 @@ em { color: #b42318 }`;
 		if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
 			event.preventDefault();
 			redo();
-			return;
-		}
-		if (event.key === 'Escape' && (helpOpen || cssOpen || boxMenu || resetting || deleting || deletingTable || magic)) {
-			helpOpen = false;
-			if (cssOpen) cancelCss();
-			resetting = false;
-			deleting = false;
-			deletingTable = false;
-			magic = null;
-			boxMenu = null;
 			return;
 		}
 		// The style clipboard, before the plain Ctrl/Cmd+C below sees the same key.
@@ -1672,7 +2795,7 @@ em { color: #b42318 }`;
 		// spreadsheet. A double-click on the area does the same thing.
 		if (event.key === 'Enter' && selected && !editingId) {
 			event.preventDefault();
-			editingId = selected.id;
+			beginEditing(selected.id);
 			return;
 		}
 		// The first-run notice tells people to press ? for the tour, and for a
@@ -1682,6 +2805,22 @@ em { color: #b42318 }`;
 			event.preventDefault();
 			helpOpen = true;
 			return;
+		}
+		// L for lock: with Shift the page, without it the chosen areas. Taken
+		// from the browser's own Ctrl/Cmd+L — the address bar — only where it
+		// means something here: never while typing, where the field keeps it.
+		if (!typing && (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'l') {
+			if (event.shiftKey) {
+				event.preventDefault();
+				toggleDesignLock();
+				return;
+			}
+			if (selectedIds.length) {
+				event.preventDefault();
+				if (template.locked) notify('The design is locked — unlock it (Ctrl/Cmd+Shift+L) to lock or unlock its areas.', 'warning');
+				else lockSelection();
+				return;
+			}
 		}
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd' && selectedIds.length) {
 			event.preventDefault();
@@ -1750,23 +2889,75 @@ em { color: #b42318 }`;
 	// ---- import / export ----------------------------------------------------
 
 	/**
-	 * The sample cards back, from a press and hold on Import. Data only: it hangs
-	 * off an import-data button and that is what it does — silently replacing a
-	 * template someone has built would be a far worse surprise than a card that
-	 * does not quite fit.
-	 *
-	 * No confirmation. A snapshot is template, data and mapping together, so
-	 * Ctrl/Cmd+Z brings their rows straight back, and the rule here is that
-	 * destructive things are undoable and only ask when undo cannot reach them.
+	 * The edit badge on a Data Field area: that area's cell for this row, full
+	 * size in the table. The table is opened for it if it was folded away; a
+	 * locked table says so rather than opening an editor it would refuse.
 	 */
-	function loadSample() {
-		describe('Load the sample cards');
-		dataset = sampleDataset();
-		// Remapped the way a first run maps: their template's slots against the
+	let cellRequest = $state<{ row: number; column: string; draw?: boolean; from?: 'card' | 'images' } | null>(null);
+
+	// A request is a one-off: the table reads it as it mounts, so one left
+	// standing when the panel closes would open the editor again the next time
+	// the Data button shows the table — the table was asked for, not the cell.
+	$effect(() => {
+		if (dataOpen) return;
+		cellRequest = null;
+		areaRequest = null;
+	});
+
+	function editCell(id: string) {
+		const box = template.boxes.find((b) => b.id === id);
+		const column = box?.slot ? mapping[box.slot] : undefined;
+		// Not refused for the area's own lock: the cell is the row's, and the
+		// table's lock is the one that guards it.
+		if (!box || !column || !row) return;
+		if (refuseLockedTable()) return;
+		// Where the editor's × goes back to, as for a drawing (`drawArea`): the
+		// table when it was already showing; otherwise it was opened only for
+		// this cell, and closing the cell closes it again.
+		const from = dataOpen ? undefined : 'card';
+		dataOpen = true;
+		cellRequest = { row: activeRow, column, from };
+	}
+
+	/**
+	 * Getting Started: the table of cards that walk through the app.
+	 *
+	 * It used to pour those rows into whatever table was open — undoable, but a
+	 * table someone had been working in was the wrong place to put them, and one
+	 * edited from the sample itself was overwritten without a word. So it opens
+	 * a table already holding them untouched, if there is one, and otherwise
+	 * starts a new one. Nothing anyone has typed is ever replaced by it.
+	 */
+	async function gettingStarted() {
+		const sample = sampleDataset();
+		const untouched = (d: Dataset) =>
+			JSON.stringify([d.columns, d.rows]) === JSON.stringify([sample.columns, sample.rows]);
+		if (untouched(dataset)) {
+			notify(`This is the Getting Started table, as it came.`);
+			return;
+		}
+		for (const entry of tables) {
+			if (entry.id === datasetId) continue;
+			const doc = await loadDatasetDoc(entry.id);
+			if (doc && untouched(doc)) {
+				await switchDataset(entry.id);
+				return;
+			}
+		}
+		settleProvisional();
+		await flushDataset();
+		describe('Getting Started');
+		rememberTable(datasetId);
+		datasetId = nextDatasetId();
+		saveDatasetId(datasetId);
+		dataset = { ...sample, name: freeTableName(sample.name ?? 'Getting Started') };
+		activeRow = 0;
+		// Mapped the way a first run maps: this template's slots against the
 		// sample's columns, so the cards render rather than coming up blank.
 		mapping = autoMap(usedSlots(template), dataset.columns);
-		activeRow = 0;
-		notify('Sample cards loaded. Ctrl/Cmd+Z puts your own rows back.');
+		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
+		await refreshTables();
+		notify(`“${dataset.name}” started, with the cards that walk through the app. Your other tables are untouched.`);
 	}
 
 	/**
@@ -1780,7 +2971,10 @@ em { color: #b42318 }`;
 	}
 
 	function doExportTemplate() {
-		download(`${slugify(template.name)}.json`, exportTemplate($state.snapshot(template)));
+		// The template's name, as written, spaces as dashes: the file is found
+		// under the name it was given, and imported back as that name. The
+		// browser numbers a second export of the same name itself.
+		download(`${fileStem(template.name)}.json`, exportTemplate($state.snapshot(template)));
 		notify('Template exported — fonts referenced by name.');
 	}
 
@@ -1792,11 +2986,12 @@ em { color: #b42318 }`;
 		try {
 			const raw = JSON.parse(await file.text());
 			await flushTemplate();
-			template = normaliseTemplate(raw);
+			template = importedTemplate(raw);
 			selectedIds = [];
 			// An import joins the library rather than replacing what is loaded:
 			// a file someone handed you is a template you now have, not a
 			// correction to the one you were working on.
+			rememberTemplate(templateId);
 			templateId = nextTemplateId();
 			saveTemplateId(templateId);
 			// Never assume the mapping: a template is shared between spreadsheets.
@@ -1817,9 +3012,18 @@ em { color: #b42318 }`;
 	async function handleFontUpload(file: File, family?: string) {
 		try {
 			const ref = await uploadLocalFont(file, family);
+			editorFonts = mergeFonts(editorFonts, [ref]);
+			saveEditorFonts($state.snapshot(editorFonts));
+			// The design's own entry keeps its tuning: a file supplied for a face
+			// that was missing, or a Google face made local, is the same face,
+			// and the design set it as it wanted.
+			// Its tuning only: what the old file said it was (`kind`) is the old
+			// file's, and the new one says for itself, or says nothing.
+			const old = template.fonts.find((f) => f.family.toLowerCase() === ref.family.toLowerCase());
 			const fonts = template.fonts.filter((f) => f.family.toLowerCase() !== ref.family.toLowerCase());
-			template = { ...template, fonts: [...fonts, ref] };
+			template = { ...template, fonts: [...fonts, { ...ref, ...tuningOf(old) }] };
 			missingFonts = missingFonts.filter((f) => (f.ref ?? f.family) !== (ref.ref ?? ref.family));
+			await refreshStoredFonts();
 			// Uploading from a box's Font dropdown is a way of choosing a font, not
 			// just of installing one: it used to leave the box on its old family,
 			// so the file landed and nothing on the card changed. Only when the
@@ -1836,7 +3040,7 @@ em { color: #b42318 }`;
 		try {
 			const image = await uploadBackgroundImage(file, template.page.image?.fit ?? 'cover', nameOverride);
 			template = { ...template, page: { ...template.page, image } };
-			notify(`${image.src} set as the page background — the picture stays in this browser, the template only names it.`);
+			notify(`${image.src} set as the page background — the image stays in this browser, the template only names it.`);
 		} catch {
 			notify('That image could not be read.', 'warning');
 		}
@@ -1855,7 +3059,7 @@ em { color: #b42318 }`;
 		try {
 			const image = await uploadBackgroundImage(file, template.print.background?.fit ?? 'cover', nameOverride);
 			template = { ...template, print: { ...template.print, background: image } };
-			notify(`${image.src} set as the sheet background — the picture stays in this browser, the template only names it.`);
+			notify(`${image.src} set as the sheet background — the image stays in this browser, the template only names it.`);
 		} catch {
 			notify('That image could not be read.', 'warning');
 		}
@@ -1866,6 +3070,68 @@ em { color: #b42318 }`;
 		const file = input.files?.[0];
 		input.value = '';
 		if (file && missingPrintImage) await handlePrintBackgroundUpload(file, missingPrintImage);
+	}
+
+	/**
+	 * The kind a face's fallback is chosen by, changed —
+	 * everywhere it is used. From the Pictures tray (`fromTray`), just after
+	 * that face was replaced in, it joins the replace's undo entry — see
+	 * `fontSession`; otherwise it is a step of its own.
+	 */
+	function setFontTune(family: string, change: FontTune, fromTray = false) {
+		if (template.locked) {
+			notify('The design is locked — unlock it to change its fonts.', 'warning');
+			return;
+		}
+		const tunes = fromTray && fontSession?.family === family.toLowerCase();
+		// Recorded already, and still the last step: fold into it. Otherwise a
+		// step of its own, named — `describe` keeps a label already waiting,
+		// so a tune inside the replace's own debounce lands under its name.
+		if (tunes && history.present.label === fontSession?.label) amendNext = true;
+		else describe(`Type of ${family}`);
+		template = tuneFont($state.snapshot(template) as Template, family, change, fontRef(family, editorFonts));
+	}
+
+	/** Every font uploaded to this browser — the Pictures tray's Fonts, beside the design's own. */
+	let storedFonts = $state<StoredFontEntry[]>([]);
+	const refreshStoredFonts = async () => (storedFonts = await listStoredFonts());
+	const fontEntries = $derived(fontInventory(template, storedFonts));
+	/** What a font can be swapped for: what the font menus offer (`fontChoices`). */
+	const fontFamilies = $derived(fontChoices(template, editorFonts));
+
+	/**
+	 * A font the design is set in swapped for another, everywhere — how a design
+	 * moved to a computer without its uploaded face is made to print, when the
+	 * file is not to hand. One undo puts it back. Says whether it happened: the
+	 * Pictures tray keeps the replacement where the font was, and only then.
+	 */
+	async function replaceFont(from: string, to: string): Promise<boolean> {
+		if (template.locked) {
+			notify('The design is locked — unlock it to change its fonts.', 'warning');
+			return false;
+		}
+		const held = storedFonts.find((f) => f.family.toLowerCase() === to.toLowerCase());
+		// What the editor knows of it — its kind, read when it was uploaded —
+		// with the file this browser holds.
+		const known = fontRef(to, editorFonts);
+		const ref: FontRef = held ? { ...known, family: held.family, source: 'local', ref: held.ref } : known;
+		const label = `Replace ${from} with ${to}`;
+		describe(label);
+		fontSession = { label, family: to.toLowerCase() };
+		template = replaceFamily($state.snapshot(template) as Template, from, ref);
+		missingFonts = await ensureTemplateFonts(template);
+		notify(`Everything set in ${from} is now in ${to}. Ctrl/Cmd+Z puts it back.`);
+		return true;
+	}
+
+	/** An upload nothing in the design uses, deleted from this browser — not from undo's reach, so it says so. */
+	async function forgetFont(font: FontEntry) {
+		if (!font.ref || font.used) return;
+		await deleteStoredFont(font.ref, font.family);
+		editorFonts = editorFonts.filter((f) => f.family.toLowerCase() !== font.family.toLowerCase());
+		saveEditorFonts($state.snapshot(editorFonts));
+		await refreshStoredFonts();
+		notify(`${font.family} deleted from this browser.`);
 	}
 
 	function pickMissingFont(font: FontRef) {
@@ -1931,6 +3197,8 @@ em { color: #b42318 }`;
      answer to a dropped image is to navigate to it, which leaves the design
      behind — and the one place a drop means something is the card, which takes
      it before this ever sees it. -->
+<Tooltip />
+
 <svelte:window
 	onkeydown={onWindowKeydown}
 	onafterprint={onAfterPrint}
@@ -1944,14 +3212,41 @@ em { color: #b42318 }`;
 
 <div class="app">
 	<header class="toolbar">
-		<img class="brand" src="{base}/logo.svg" alt="libelli" width="389" height="314" />
+		<!-- The mark, and the theme: each press steps light, dark, dark with the
+		     page inverted (theme.ts), and a hover or a hold glances at the other
+		     dark — the same as the theme button beside Help, see themeControl.
+		     Kept on the mark as well, where it was first. -->
+		<button
+			class="brand"
+			{...themeControl}
+			title={themeTitle}
+			aria-label="libelli — theme: {THEME_NAMES[theme]}, press for {THEME_NAMES[nextTheme(theme)].toLowerCase()}"
+		>
+			<img src="{base}/logo.svg" alt="" width="389" height="314" draggable="false" />
+		</button>
 		<span class="spacer"></span>
 		{#if installable}
-			<button class="install" onclick={() => void install()} title="Install libelli on this device">
-				<Icon name="package" size={15} /> Install
+			<button
+				class="install"
+				onclick={() => void install()}
+				title="Install libelli on this device"
+				aria-label="Install libelli"
+			>
+				<Icon name="package" size={15} /> <span class="install-word">Install</span>
 			</button>
 		{/if}
-		<button class="help" onclick={() => (helpOpen = true)} title="How this works, and the keys">
+		<!-- The theme, in words-free form: the glyph is the theme it is on.
+		     Left of Help, with the other two buttons about the app rather than
+		     the card. -->
+		<button
+			class="theme"
+			{...themeControl}
+			title={themeTitle}
+			aria-label="Theme: {THEME_NAMES[theme]}, press for {THEME_NAMES[nextTheme(theme)].toLowerCase()}"
+		>
+			<Icon name={THEME_ICONS[theme]} size={15} />
+		</button>
+		<button class="help" onclick={() => (helpOpen = true)} title={withKey("How this works, and the keys", "help")}>
 			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
 		<button
@@ -1960,32 +3255,41 @@ em { color: #b42318 }`;
 				// Not a plain toggle any more: the two bars share one row, so this
 				// says "show me the page" — which, with an area selected, means
 				// letting go of the area rather than stacking a second bar on top.
-				const showing = pageSetupOpen && !selected;
+				const showing = pageSetupOpen && !barBox;
 				pageSetupOpen = !showing;
-				if (!showing) selectBox(null);
+				if (!showing && barBox) selectBox(null);
 			}}
-			aria-pressed={pageSetupOpen && !selected}
-			aria-expanded={pageSetupOpen && !selected}
-			title={selected && pageSetupOpen
-				? 'Page setup — the area bar has the row; this takes it back'
-				: 'Show or hide the page setup'}
+			aria-pressed={pageSetupOpen && !barBox}
+			aria-expanded={pageSetupOpen && !barBox}
+			title={barBox && pageSetupOpen
+				? 'Page — the area bar has the row; this takes it back'
+				: 'Show or hide the page settings'}
 		>
-			<Icon name="document-configuration" size={15} /> <span class="label">Page Setup</span>
+			<Icon name="document-blank" size={15} /> <span class="label">Page</span>
 		</button>
-		<!-- Every stored picture, beside the two bars rather than inside one of
-		     them: the pictures are the browser's, not the page's — a row's own
-		     photograph is in there too — and Page Setup was a place you had to
-		     already know to look. -->
+		<!-- Every stored picture, in a tray of its own in the table's place: the
+		     pictures are the browser's, not the page's — a row's own photograph
+		     is in there too. Pictures and Data share that room, one at a time, so
+		     opening either closes the other. -->
 		<button
 			class="images"
-			onclick={() => (imagesOpen = true)}
-			title="Every picture this browser is holding — what each weighs, whether anything uses it, and where they are kept"
+			aria-pressed={imagesOpen}
+			aria-expanded={imagesOpen}
+			onclick={() => {
+				imagesOpen = !imagesOpen;
+				imageFocus = null;
+				if (imagesOpen) dataOpen = false;
+			}}
+			title="Pictures: the images, drawings and fonts of this design and this browser — what each weighs, whether anything uses it, and a way to replace it"
 		>
-			<Icon name="image" size={15} /> <span class="label">Images</span>
+			<Icon name="image" size={15} /> <span class="label">Pictures</span>
 		</button>
 		<button
 			class="data"
-			onclick={() => (dataOpen = !dataOpen)}
+			onclick={() => {
+				dataOpen = !dataOpen;
+				if (dataOpen) imagesOpen = false;
+			}}
 			aria-pressed={dataOpen}
 			aria-expanded={dataOpen}
 			title="Show or hide the table"
@@ -1996,7 +3300,7 @@ em { color: #b42318 }`;
 			class="primary export"
 			onclick={requestPrint}
 			disabled={!dataset.rows.length}
-			title="Open every card as a page to print or save"
+			title={withKey('Open every card as a page to print or save', 'export')}
 		>
 			<Icon name="document-multiple" size={15} /> <span class="label">Export…</span>
 		</button>
@@ -2018,7 +3322,7 @@ em { color: #b42318 }`;
 	     whole toolbar from the top of the window: the stage changed height, the
 	     fitted scale changed with it, and the page you were working on jumped and
 	     resized under the pointer. The area bar takes the row while an area is
-	     selected; Page Setup takes it back, and lets go of the area to do it.
+	     selected; Page takes it back, and lets go of the area to do it.
 
 	     That leaves the two bars being different heights, which is the same jump
 	     again, smaller. So the row never shrinks: it is floored at the tallest bar
@@ -2027,10 +3331,42 @@ em { color: #b42318 }`;
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if (pageSetupOpen && !selected) || selected}
-		<div class="bar-row" class:box={!!selected} style="min-height:{barFloor}px">
+	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden}
+		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
+			<!-- Never seen and never reached — `inert` takes it out of the focus
+			     order and the accessibility tree — only measured. -->
+			<div class="bar-probe" aria-hidden="true" inert bind:clientHeight={probeHeight}>
+				<OptionsBar
+					section="box"
+					{template}
+					{dataset}
+					{mapping}
+					selected={probeBox}
+					onboxchange={() => {}}
+					ontemplatechange={() => {}}
+					onmappingchange={() => {}}
+					onduplicate={() => {}}
+					ondelete={() => {}}
+					onhide={() => {}}
+					onresettemplate={() => {}}
+					{library}
+					{templateId}
+					{editorFonts}
+					onselecttemplate={() => {}}
+					onnewtemplate={() => {}}
+					onstartertemplate={() => {}}
+					ondeletetemplate={() => {}}
+					onuploadfont={() => {}}
+					onuploadbackground={() => {}}
+					onuploadprintbackground={() => {}}
+					onnotice={() => {}}
+					onimporttemplate={() => {}}
+					onexporttemplate={() => {}}
+					oneditcss={() => {}}
+				/>
+			</div>
 			<div class="bar-fit" bind:clientHeight={barHeight}>
-				{#if selected}
+				{#if barBox}
 					<!-- No menu here, and the guard above is only ever set by the page
 					     bar; the box bar taking the row clears it because the page bar
 					     unmounts with its menu. -->
@@ -2040,17 +3376,23 @@ em { color: #b42318 }`;
 						{template}
 						{dataset}
 						{mapping}
-						{selected}
+						{row}
+						selected={barBox}
 						onboxchange={updateBox}
 						ontemplatechange={applyTemplate}
 						onmappingchange={(m) => (mapping = m)}
 						onduplicate={duplicateBox}
 						ondelete={deleteBox}
-						onresettemplate={() => (resetting = true)}
+						onhide={hideBar}
+						onresettemplate={templateStarter ? () => (resetting = true) : undefined}
+						onmagiclayout={openMagic}
+						hasColumns={dataset.columns.length > 0}
 						{library}
 						{templateId}
+						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
+						onstartertemplate={() => void a5Starter()}
 						ondeletetemplate={() => (deleting = true)}
 						onuploadfont={(file) => handleFontUpload(file)}
 						onuploadbackground={(file) => void handleBackgroundUpload(file)}
@@ -2059,11 +3401,17 @@ em { color: #b42318 }`;
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
-						ondraw={(id) => (drawing = id)}
+						ondraw={drawArea}
+						onuploadimage={(id, file) => {
+							const box = template.boxes.find((b) => b.id === id);
+							if (box) void handleImageDrop(box, file);
+						}}
 					/>
 				{:else}
 					<OptionsBar
 						section="page"
+						{previousTemplate}
+						onswaptemplate={swapTemplate}
 						{template}
 						{dataset}
 						{mapping}
@@ -2073,21 +3421,28 @@ em { color: #b42318 }`;
 						onmappingchange={(m) => (mapping = m)}
 						onduplicate={duplicateBox}
 						ondelete={deleteBox}
-						onresettemplate={() => (resetting = true)}
+						onresettemplate={templateStarter ? () => (resetting = true) : undefined}
+						onmagiclayout={openMagic}
+						hasColumns={dataset.columns.length > 0}
 						{library}
 						{templateId}
+						{editorFonts}
 						onselecttemplate={(id) => void switchTemplate(id)}
 						onnewtemplate={() => void newTemplate()}
+						onstartertemplate={() => void a5Starter()}
 						ondeletetemplate={() => (deleting = true)}
 						onuploadfont={(file) => handleFontUpload(file)}
 						onuploadbackground={(file) => void handleBackgroundUpload(file)}
 						onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 						onnotice={notify}
-						onmenu={(open) => (barMenuOpen = open)}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
 						oneditcss={openCss}
-						ondraw={(id) => (drawing = id)}
+						ondraw={drawArea}
+						onuploadimage={(id, file) => {
+							const box = template.boxes.find((b) => b.id === id);
+							if (box) void handleImageDrop(box, file);
+						}}
 					/>
 				{/if}
 			</div>
@@ -2104,6 +3459,14 @@ em { color: #b42318 }`;
 			{#each missingFonts as font (font.ref ?? font.family)}
 				<button onclick={() => pickMissingFont(font)}>Choose {font.family} File…</button>
 			{/each}
+			<!-- No file to hand: the Pictures tray's Fonts swaps the face for another. -->
+			<button
+				onclick={() => {
+					imagesOpen = true;
+					dataOpen = false;
+					imageFocus = null;
+				}}
+			>Replace…</button>
 		</div>
 	{/if}
 
@@ -2111,7 +3474,7 @@ em { color: #b42318 }`;
 		<div class="banner" role="alert">
 			<span>
 				This template's background image, <strong>{missingImage}</strong>, is not in this browser. The template
-				carries its name, never the picture.
+				carries its name, never the file.
 			</span>
 			<button onclick={() => backgroundInput?.click()}>Choose {missingImage}…</button>
 			<button
@@ -2124,7 +3487,7 @@ em { color: #b42318 }`;
 		<div class="banner" role="alert">
 			<span>
 				This template's sheet background image, <strong>{missingPrintImage}</strong>, is not in this browser. The
-				template carries its name, never the picture.
+				template carries its name, never the file.
 			</span>
 			<button onclick={() => printBackgroundInput?.click()}>Choose {missingPrintImage}…</button>
 			<button
@@ -2153,21 +3516,33 @@ em { color: #b42318 }`;
 
 	<main
 		bind:this={mainEl}
-		class:no-data={!dataOpen}
-		style={stacked && trayShare !== null ? `--tray-h:${(trayShare * 100).toFixed(2)}%` : ''}
+		class:no-data={!dataOpen && !imagesOpen}
+		style={stacked
+			? trayShare !== null
+				? `--tray-h:${(trayShare * 100).toFixed(2)}%`
+				: ''
+			: ui.trayWidthShare
+				? `--tray-w:clamp(${TRAY_MIN_PX}px, ${(ui.trayWidthShare * 100).toFixed(2)}%, calc(100% - ${STAGE_MIN_PX}px))`
+				: ''}
 	>
 		<PagePreview
 			{template}
 			{row}
 			{mapping}
 			bounds={ui.showBounds}
+			ties={ui.showTies}
 			grid={ui.showGrid}
+			guides={ui.showGuides}
+			smartGuides={ui.smartGuides}
+			spacingGuides={ui.spacingGuides ?? true}
 			gridStyle={ui.gridStyle}
 			{selectedIds}
 			zoom={ui.zoom}
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
+			theme={shownTheme}
 			{activeRow}
 			rowCount={dataset.rows.length}
+			rows={lookupRows}
 			onactivate={(i) => (activeRow = i)}
 			onlightbox={() => (lightboxOpen = true)}
 			{background}
@@ -2175,9 +3550,11 @@ em { color: #b42318 }`;
 			onselect={selectBox}
 			onchange={updateBox}
 			onimagedrop={(box, file) => void handleImageDrop(box, file)}
+			onimagepagedrop={(file, x, y) => void (async () => placeImageOnPage(await storeImage(file), x, y, file))()}
 			onaction={describe}
-			onbounds={(show) => (ui = { ...ui, showBounds: show })}
+			onbounds={(show, ties) => (ui = { ...ui, showBounds: show, showTies: ties })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
+			onguides={(margins, smart, spacing) => (ui = { ...ui, showGuides: margins, smartGuides: smart, spacingGuides: spacing })}
 			ongridstyle={(gridStyle) => {
 				// A hold on a checkbox is a gesture nobody was taught, so it says what
 				// it did — and it turns the grid on if it was off, because changing
@@ -2192,8 +3569,6 @@ em { color: #b42318 }`;
 			onundo={undo}
 			onredo={redo}
 			onaddbox={addTextBox}
-			onmagiclayout={openMagic}
-			hasColumns={dataset.columns.length > 0}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
 			onmenuclose={() => (boxMenu = null)}
 			{editingId}
@@ -2202,19 +3577,13 @@ em { color: #b42318 }`;
 			{flashIds}
 			onstoppicking={() => (picking = false)}
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
-			onedit={(id) => (editingId = id)}
-			ondraw={(id) => (drawing = id)}
+			onrelock={() => applyTemplate({ ...$state.snapshot(template), locked: true } as Template)}
+			onedit={beginEditing}
+			ondraw={drawArea}
+			oneditcell={editCell}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
-			modalOpen={helpOpen ||
-				cssOpen ||
-				previewOpen ||
-				lightboxOpen ||
-				boxMenu !== null ||
-				deletingTable ||
-				editingId !== null ||
-				drawing !== null ||
-				magic !== null}
+			modalOpen={stageModalOpen}
 			{selectedBoxes}
 			onalign={alignSelection}
 			onarrange={arrange}
@@ -2224,8 +3593,64 @@ em { color: #b42318 }`;
 			ondelete={deleteBox}
 		/>
 
-		{#if dataOpen}
-		<aside bind:this={asideEl}>
+		{#if dataOpen || imagesOpen}
+		<aside bind:this={asideEl} class:shutting={trayShutting}>
+			{#if !stacked}
+				<!-- The edge between the page and the table, dragged to share the
+				     width between them. A separator in the ARIA sense, so the arrow
+				     keys move it too; a double-click hands the split back to the
+				     stylesheet. Stacked on a phone the table's own header is the
+				     grip instead, so this is not drawn there. -->
+				<!-- A focusable separator is a widget in ARIA — it has a value and
+				     the arrow keys change it — which the compiler's list of
+				     interactive roles does not know. -->
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+				<div
+					class="tray-grip"
+					class:on={trayResizing !== null}
+					role="separator"
+					aria-orientation="vertical"
+					aria-label="Table width"
+					aria-valuenow={ui.trayWidthShare ? Math.round(ui.trayWidthShare * 100) : undefined}
+					aria-valuemin={0}
+					aria-valuemax={100}
+					tabindex="0"
+					title="Drag to share the width between the page and the table — double-click to reset"
+					onpointerdown={startTrayResize}
+					onpointermove={moveTrayResize}
+					onpointerup={endTrayResize}
+					onpointercancel={endTrayResize}
+					ondblclick={() => (ui = { ...ui, trayWidthShare: undefined })}
+					onkeydown={(e) => {
+						if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+						e.preventDefault();
+						const now = asideEl?.getBoundingClientRect().width ?? 0;
+						setTrayWidth(now + (e.key === 'ArrowLeft' ? 24 : -24));
+					}}
+				></div>
+			{/if}
+			{#if imagesOpen}
+				<ImagesPanel
+					used={new Set(imageNames)}
+					missing={missingImages}
+					onplace={placeStoredImage}
+					onplacepage={(name, x, y) => void placeImageOnPage(name, x, y)}
+					onnotice={notify}
+					onchanged={() => (imagesVersion += 1)}
+					focus={imageFocus}
+					onfocus={(name) => (imageFocus = name)}
+					{drawings}
+					onopendrawing={openDrawing}
+					ontraydrag={stacked ? dragTray : undefined}
+					fonts={fontEntries}
+					{fontFamilies}
+					onfontsopen={() => previewFamilies(fontFamilies.google, editorFonts, template.fonts)}
+					onfontfile={(family, file) => void handleFontUpload(file, family)}
+					onreplacefont={replaceFont}
+					ondeletefont={(font) => void forgetFont(font)}
+					ontune={(family, change) => setFontTune(family, change, true)}
+				/>
+			{:else}
 			<DataTable
 				{dataset}
 				{tables}
@@ -2233,12 +3658,21 @@ em { color: #b42318 }`;
 				{previousTable}
 				onselecttable={(id) => void switchDataset(id)}
 				onnewtable={() => void newDataset()}
+				{usedColumns}
+				onplacecolumn={placeColumn}
+				oncellfocus={flashColumn}
+				onlock={(locked) => {
+					describe(locked ? 'Lock the table' : 'Unlock the table');
+					dataset = stripUndefined({ ...$state.snapshot(dataset), locked: locked || undefined }) as Dataset;
+				}}
 				ondeletetable={() => (deletingTable = true)}
 				onswaptable={swapDataset}
 				onrenametable={renameDataset}
 				trayDraggable={stacked}
 				ontraydrag={dragTray}
 				columnWidths={ui.columnWidths}
+				rowHeight={ui.rowHeight ?? 'medium'}
+				onrowheight={(rowHeight) => (ui = { ...ui, rowHeight })}
 				oncolumnwidths={(widths) => {
 					// Kept to the columns that exist, so an imported table does not
 					// carry the last one's widths around in this browser forever.
@@ -2251,64 +3685,251 @@ em { color: #b42318 }`;
 				{selectedColumn}
 				onactivate={(i) => (activeRow = i)}
 				onnotice={notify}
-				onloadsample={loadSample}
+				onwarn={(message) => {
+					notify(message, 'warning');
+					statusOpen = true;
+				}}
+				ongettingstarted={() => void gettingStarted()}
+				onresettable={tableStarter ? () => (resettingTable = true) : undefined}
+				openRequest={cellRequest}
+				{images}
+				{drawingFor}
+				ondrawn={drawIntoCell}
+				{areaRequest}
+				onsavearea={saveAreaDrawing}
+				ondeletearea={deleteAreaDrawing}
+				ondrawing={(on) => (drawingInTable = on)}
+				onfullcell={(on) => (fullCellInTable = on)}
+				onleave={(to) => {
+					dataOpen = false;
+					if (to === 'images') imagesOpen = true;
+				}}
+				onopenimage={openImage}
 				onrenamecolumn={(from, to) => {
 					// A rename is not a rebinding: every slot pointing at the old name
 					// follows it, so the card keeps rendering what it rendered before.
 					mapping = Object.fromEntries(
 						Object.entries(mapping).map(([slot, column]) => [slot, column === from ? to : column])
 					);
+					// And every color an area takes from it, which names the column
+					// itself rather than a slot. Only when one does, so a rename
+					// that touches no color leaves the template alone.
+					const remapSources = (sources: ColorSources) =>
+						Object.fromEntries(Object.entries(sources).map(([k, c]) => [k, c === from ? to : c]));
+					if (template.boxes.some((b) => Object.values(b.colorFrom ?? {}).includes(from))) {
+						template = {
+							...template,
+							boxes: template.boxes.map((b) => (b.colorFrom ? { ...b, colorFrom: remapSources(b.colorFrom) } : b))
+						};
+					}
 				}}
-				onchange={(next) => {
+				onchange={(next, moved) => {
 					// Every structural edit in the tray builds a fresh dataset, and most
 					// of them have no reason to think about what the table is called.
 					// Carried across here, where all of them arrive, rather than in each
 					// of them — the one thing that does mean to change it is the rename,
 					// which does not come through here.
-					dataset = next.name === undefined && dataset.name ? { ...next, name: dataset.name } : next;
+					// The lock the same way: it is the table's, and no edit in the
+					// tray means to change it — there is a button for that.
+					const named = next.name === undefined && dataset.name ? { ...next, name: dataset.name } : next;
+					let kept = dataset.locked ? { ...named, locked: true } : named;
+					// And which starter it began as: an import into the Getting
+					// Started table is still that table, and Reset still puts the
+					// tour back in it.
+					if (dataset.starter && kept.starter === undefined) kept = { ...kept, starter: dataset.starter };
+					// Rows deleted or moved by hand are renumbered, and every lookup
+					// that named one follows it — in the template and in the cells,
+					// in the same edit, so one undo puts both back.
+					const carried = moved ? carryLookups(template, kept, moved) : null;
+					if (carried) {
+						kept = carried.dataset;
+						if (carried.template !== template) template = carried.template;
+					}
+					dataset = kept;
 					if (!Object.keys(mapping).length) mapping = autoMap(usedSlots(template), next.columns);
+					return carried && (carried.renumbered || carried.orphaned) ? lookupNote(carried) : undefined;
 				}}
 			/>
+			{/if}
 		</aside>
 		{/if}
 	</main>
 
-	<footer class="status-bar">
-		<!-- `title` because the line is one ellipsised row: a long notice was
-		     otherwise cut off with no way to read the rest of it. -->
-		<span class="status" class:warning={statusTone === 'warning'} role="status" title={status}>
-			{#if statusTone === 'warning'}<Icon name="warning" size={12} />{/if}{status}
+	<!-- On a phone a pull up off the bar brings the table up under the finger:
+	     the bar is the tray's lip when it is folded away, and a thumb at the
+	     bottom of the screen is nearer this than the Data button at the top. -->
+	<footer class="status-bar" use:pullUp={pullTray}>
+		<!-- The interface's text size, when it is not the default: a pinch off the
+		     stage changes it without a word, and this is both where it says so and
+		     how it goes back. First in the bar, where the eye starts, so a size
+		     nobody meant to set is found before anything else is read. -->
+		{#if textSize !== 1}
+			<button
+				class="ui-size as-typed"
+				onclick={() => setTextSize(1)}
+				title="Interface text at {Math.round(textSize * 100)}% — press for the default size"
+				aria-label="Interface text at {Math.round(textSize * 100)}%, back to the default size"
+				>{Math.round(textSize * 100)}%</button
+			>
+		{/if}
+		<!-- One ellipsised row, so a long notice is cut off; a tap opens the
+		     whole of it. A button inside the live region rather than the region
+		     itself, so what a screen reader announces is still the notice. The
+		     `title` stays for a mouse that only wants a glance. -->
+		<span class="status" class:warning={statusTone === 'warning'} role="status">
+			<button class="status-text as-typed" title={status} disabled={!status} onclick={() => (statusOpen = true)}>
+				{#if statusTone === 'warning'}<Icon name="warning" size={12} />{/if}<span>{status}</span>
+			</button>
 		</span>
 		{#if updateReady}
 			<button class="reload" onclick={applyUpdate}>Update</button>
 		{/if}
-		<span class="version">v{VERSION}</span>
+		<!-- The version is the way to what it brought. After an update the list
+		     opens by itself (see boot), so there is no mark here for unread. -->
+		<button class="version as-typed" onclick={openWhatsNew} title="What's new">v{VERSION}</button>
 	</footer>
 </div>
 
+{#if editor === 'elsewhere' || editor === 'handed'}
+	<!-- Not dismissable: behind it is a tab that is not saving, and editing it
+	     would be work that goes nowhere. The one way on is to bring the editing
+	     here. -->
+	<div class="modal-backdrop" role="presentation"></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="elsewhere-title" aria-describedby="elsewhere-text">
+		<h2 id="elsewhere-title">Open in another tab</h2>
+		<p id="elsewhere-text">
+			{#if editor === 'handed'}
+				Your work moved to another tab, saved as you left it. This tab has stopped saving, so nothing here can
+				overwrite it.
+			{:else}
+				libelli is already open in another tab. One tab edits at a time, so that the two never save over each
+				other's work.
+			{/if}
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button class="primary" data-default disabled={takingOver} onclick={() => void useHere()}>
+				{takingOver ? 'Moving it here…' : 'Use Here'}
+			</button>
+		</div>
+	</div>
+{/if}
+
+{#if statusOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (statusOpen = false)}></div>
+	<div class="modal narrow" role="dialog" aria-modal="true" aria-label="Notice" use:armDefault>
+		<p class="status-full" class:warning={statusTone === 'warning'}>
+			{#if statusTone === 'warning'}<Icon name="warning" size={14} />{/if}
+			<span>{status}</span>
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button class="primary" data-default onclick={() => (statusOpen = false)}>OK</button>
+		</div>
+	</div>
+{/if}
+
 {#if cssOpen}
 	<div class="modal-backdrop" role="presentation" onclick={cancelCss}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="css-title">
-		<h2 id="css-title">CSS</h2>
+	<div
+		class="modal wide css-dialog"
+		class:full={cssFull}
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="css-title"
+		use:dragByTitle={{ detach: detachCss }}
+	>
+		<!-- The help dialog's header, and like it dragged by the title, so the
+		     card being styled can be seen beside it. The × is Cancel, as Esc
+		     and the backdrop are: only Save puts anything on the card.
+
+		     What the sheet is, beside its name: how many lines, and what it
+		     weighs. A template is meant to stay small enough to paste into a
+		     message, and its CSS is the part of it that grows without anybody
+		     noticing. -->
+		<!-- A double-click on the title is a window's own way to maximise, and
+		     does the same here; on the buttons it is two presses, not this. A
+		     shortcut for the pointer only: the full-screen button is the way
+		     there for a keyboard and a screen reader. -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<header
+			class="modal-header drag-title"
+			data-drag-handle
+			ondblclick={(e) => {
+				if ((e.target as HTMLElement).closest('button')) return;
+				cssFull = !cssFull;
+			}}
+		>
+			<h2 id="css-title">CSS</h2>
+			<span class="css-stats">
+				{cssCount.lines} line{cssCount.lines === 1 ? '' : 's'} · {cssCount.bytes < 1024
+					? `${cssCount.bytes} bytes`
+					: `${Math.round((cssCount.bytes / 1024) * 10) / 10} KB`}
+			</span>
+			<!-- Beside the ×, as a window's own controls sit: the room to work in,
+			     then the way out. -->
+			<button
+				class="icon"
+				onclick={() => (cssFull = !cssFull)}
+				aria-pressed={cssFull}
+				title={cssFull ? 'Back to a dialog' : 'Full screen — the whole window for the sheet'}
+				aria-label="Full screen"
+			>
+				<Icon name={cssFull ? 'minimize' : 'maximize'} size={16} />
+			</button>
+			<button class="icon" use:focusOnOpen onclick={cancelCss} title="Close without keeping changes" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
 		<!-- The placeholder is the documentation. It used to be two lines of
 		     example and two paragraphs of prose above and below it; what an author
 		     actually needs is the names of the things they can reach, and a
 		     placeholder is where they will look for them. The prose that was here
-		     is in the README, where prose belongs. -->
-		<textarea
-			bind:this={cssField}
-			class="code"
-			rows="14"
-			spellcheck="false"
-			use:focusOnOpen
-			placeholder={CSS_PLACEHOLDER}
-			value={template.css ?? ''}
-			onchange={(e) => (template = { ...template, css: e.currentTarget.value.trim() || undefined })}
-		></textarea>
-		<div class="modal-actions">
+		     is in the README, where prose belongs. Starter puts that same text
+		     in the editor in place of what is there, so the kit is the whole
+		     sheet rather than spliced into the middle of a template's own rules
+		     — undo or Cancel brings them back. -->
+		<CssEditor
+			bind:this={cssEditor}
+			bind:value={cssDraft}
+			placeholder={cssPlaceholder}
+			readonly={!!template.locked}
+			wrap={cssWrap}
+			onsave={saveCss}
+		/>
+		<!-- Left to right: the one button that puts text in and the one that
+		     changes how it is shown, then the two ways out — keeping nothing,
+		     and keeping the sheet. A locked template can be read and not
+		     written, so the buttons that write are not here at all: disabled
+		     buttons on a row this short read as something broken rather than as
+		     something withheld. -->
+		<div class="modal-actions css-actions">
+			{#if !template.locked}
+				<button
+					class="starter"
+					onclick={() => cssEditor?.replaceAll(cssPlaceholder)}
+					title="Replace the sheet with the starter kit: this template's facts and the selectors it can reach. Ctrl/Cmd + Z or Cancel brings the old sheet back."
+					aria-label="Starter sheet"
+				>
+					<Icon name="code-reference" size={15} /><span class="label">Starter</span>
+				</button>
+			{/if}
+			<!-- How the sheet is shown, not what is in it, so here for a locked
+			     template too: reading a long line needs it as much as writing one. -->
+			<button
+				class="wrap-toggle"
+				aria-pressed={cssWrap}
+				onclick={() => (cssWrap = !cssWrap)}
+				title={cssWrap ? 'Text wrap is on — long lines fold to the editor\'s width' : 'Text wrap is off — long lines scroll sideways'}
+				aria-label="Text wrap"
+			>
+				<Icon name="text-wrap" size={15} /><span class="label">Text Wrap</span>
+			</button>
 			<span class="spacer"></span>
-			<button onclick={cancelCss}>Cancel</button>
-			<button class="primary" onclick={() => (cssOpen = false)}>Done</button>
+			<button onclick={cancelCss}>{template.locked ? 'Close' : 'Cancel'}</button>
+			{#if !template.locked}
+				<button class="primary" onclick={saveCss} title="Put this on the card and close — Ctrl/Cmd + Enter">{cssDirty ? 'Save' : 'Done'}</button>
+			{/if}
 		</div>
 	</div>
 {/if}
@@ -2322,13 +3943,30 @@ em { color: #b42318 }`;
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the template?" use:armDefault>
 		<h2>Reset the template?</h2>
 		<p>
-			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the starter card. Your rows are
+			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the {templateStarter?.name}. Your rows are
 			not touched.
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button onclick={() => (resetting = false)}>Cancel</button>
 			<button class="danger-solid" data-default onclick={resetTemplate}>Reset Template</button>
+		</div>
+	</div>
+{/if}
+
+<!-- The table's Reset, the same shape: a count, and what is left alone. -->
+{#if resettingTable}
+	<div class="modal-backdrop" role="presentation" onclick={() => (resettingTable = false)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Reset the table?" use:armDefault>
+		<h2>Reset the table?</h2>
+		<p>
+			{dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'} go back to {tableStarter?.name}. Your design is
+			not touched.
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (resettingTable = false)}>Cancel</button>
+			<button class="danger-solid" data-default onclick={resetTable}>Reset Table</button>
 		</div>
 	</div>
 {/if}
@@ -2378,16 +4016,45 @@ em { color: #b42318 }`;
 <!-- What the auto layout thinks each column is, before it acts on any of it.
      The guessing is the whole feature, so it is shown rather than described:
      the list *is* the explanation, which is why there is no paragraph over it —
-     every row can be corrected, and a column set to Leave Out gets no area. -->
+     every row can be corrected, and a column unticked gets no area. -->
 {#if magic}
 	<div class="modal-backdrop" role="presentation" onclick={() => (magic = null)}></div>
-	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title" use:armDefault>
-		<h2 id="magic-title">Position Areas Automagically</h2>
+	<div class="modal magic" role="dialog" aria-modal="true" aria-labelledby="magic-title" use:armDefault use:dragByTitle>
+		<!-- The CSS dialog's header: a rule under the title, a × that cancels,
+		     and dragged by it, so the card it would replace can be seen. -->
+		<header class="modal-header drag-title" data-drag-handle>
+			<h2 id="magic-title">Automatic Layout</h2>
+			<button class="icon" onclick={() => (magic = null)} title="Close without laying anything out" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
 		<ul class="magic-list">
 			{#each magic as guess, index (guess.column)}
-				<li>
+				<li class:left-out={guess.include === false}>
+					<!-- In or out, apart from what it is: letting a column back in
+					     keeps whatever it was taken for. -->
+					<input
+						type="checkbox"
+						aria-label="Give {guess.column} an area"
+						title={guess.include === false ? 'Left out — tick to give it an area' : 'Untick to leave it off the card'}
+						checked={guess.include !== false}
+						onchange={(e) => {
+							const include = e.currentTarget.checked;
+							magic = magic!.map((one, i) => (i === index ? { ...one, include } : one));
+						}}
+					/>
 					<span class="magic-column" title={guess.column}>{guess.column}</span>
 					<span class="magic-sample" title={guess.sample}>{guess.sample.slice(0, 60) || '—'}</span>
+					<!-- Before the choice it qualifies, and a cell of its own either
+					     way, so the menus line up whether or not a row was guessed. -->
+					<span class="magic-guess">
+						{#if !guess.sure}
+							<span class="magic-unsure" title="Nothing but the length of the cells pointed at this">Guess</span>
+						{/if}
+					</span>
+					<!-- Not disabled when left out: a greyed native menu read as broken,
+					     and choosing what a column is before letting it back in is
+					     harmless — it keeps whatever it was taken for. -->
 					<select
 						aria-label="What {guess.column} is"
 						value={guess.kind}
@@ -2401,21 +4068,18 @@ em { color: #b42318 }`;
 							<option value={kind}>{KIND_LABELS[kind]}</option>
 						{/each}
 					</select>
-					{#if !guess.sure}
-						<span class="magic-unsure" title="Nothing but the length of the cells pointed at this">guess</span>
-					{/if}
 				</li>
 			{/each}
 		</ul>
 		<!-- Only where there is something to lose. The button says OK either way, so
 		     without this the destructive case and the harmless one read identically
-		     — and on a template with areas the only way in is a press and hold,
-		     which is easy to trigger without meaning to. -->
+		     — and the button that opens this is always there, even over a card
+		     somebody has built. -->
 		{#if template.boxes.length}
 			<p class="magic-warning" role="status">
 				<Icon name="warning" size={13} />
 				<span>
-					Replaces the {template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} already on this card.
+					Replaces the {template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} already on this template.
 					Ctrl/Cmd+Z puts {template.boxes.length === 1 ? 'it' : 'them'} back.
 				</span>
 			</p>
@@ -2428,219 +4092,55 @@ em { color: #b42318 }`;
 	</div>
 {/if}
 
+{#if whatsNewOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (whatsNewOpen = false)}></div>
+	<div class="modal whats-new" role="dialog" aria-modal="true" aria-labelledby="whats-new-title" use:dragByTitle>
+		<header class="modal-header drag-title" data-drag-handle>
+			<h2 id="whats-new-title">What's new</h2>
+			<button class="icon" use:focusOnOpen onclick={() => (whatsNewOpen = false)} title="Close" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
+		{#each RELEASES as release (release.version)}
+			<h3>
+				{release.version}{#if release.version === VERSION}<span class="current">· new</span>{/if}
+				<time datetime={release.date}>{release.date}</time>
+			</h3>
+			<ul>
+				{#each release.items as item, i (i)}
+					<li>
+						{#each item as run, j (j)}{#if run.code}<code>{run.text}</code>{:else}{run.text}{/if}{/each}
+					</li>
+				{/each}
+			</ul>
+		{/each}
+	</div>
+{/if}
+
 {#if helpOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (helpOpen = false)}></div>
-	<div class="modal help" role="dialog" aria-modal="true" aria-labelledby="help-title">
+	<div class="modal help" role="dialog" aria-modal="true" aria-labelledby="help-title" use:dragByTitle>
 		<!-- The header stays put while the rest scrolls: the way out of a long
-		     dialog should not be at the bottom of it. -->
-		<header class="modal-header">
+		     dialog should not be at the bottom of it. Dragged by it, as the CSS
+		     dialog is. -->
+		<header class="modal-header drag-title" data-drag-handle>
 			<h2 id="help-title">libelli</h2>
 			<button class="icon" use:focusOnOpen onclick={() => (helpOpen = false)} title="Close" aria-label="Close">
 				<Icon name="close" size={16} />
 			</button>
 		</header>
 
+		<!-- Brief on purpose: every control explains itself — rest the pointer
+		     on it, or press and hold it on a phone — and the README has the
+		     rest at length. What cannot be discovered by pointing is the keys. -->
 		<p>Rows of a spreadsheet in, print-ready cards out.</p>
 		<p>
-			All of it happens in this browser. Your rows, your template, the fonts and images you add — none of it is
-			uploaded, because there is no server to upload it to and no account to make. It works with the network off, a
-			template is a small file you can hand to somebody, and closing the tab is the only thing that deletes anything.
-			Where your browser offers it, <strong>Install</strong> gives libelli its own window; when a new version has
-			downloaded the status bar says so and waits for <strong>Update</strong>, because a restart nobody asked
-				for would take undo with it.
-		</p>
-
-		<h3>Areas</h3>
-		<p>
-			<em>+ Area</em> beside the page adds one. <strong>Content</strong> says where it gets what it shows:
-			<strong>Data Field</strong> binds it to a column, so it changes card to card, and <strong>Static Text</strong>
-			is typed into the template and says the same on every card. An area's <strong>Name</strong> is the template's own
-			word for what it holds — <em>title</em>, <em>body</em> — and <strong>Column</strong> beside it says which
-			spreadsheet column fills that. Rebinding the columns is how one template serves another spreadsheet.
+			Paste or import a table, put areas on the page and bind them to its columns, and print one card per row. It
+			all stays in this browser — nothing is uploaded, and it works offline.
 		</p>
 		<p>
-			The button under it — the one wearing three shapes — writes a whole card from your columns: a title, a
-			body, a picture, a footer and a QR code, sized for the page. It shows you what it took each column for
-			before it moves anything, and marks the ones it reached by guesswork. On an empty template it is that
-			button; on a template that already has areas it is <strong>press and hold</strong> on <em>+ Area</em>,
-			since it replaces every area you have. One Ctrl/Cmd+Z puts the old design back.
-		</p>
-		<p>
-			Double-click an area, or press <strong>Enter</strong> with one selected, to type into it on the card itself.
-			Bound areas write to the cell, static ones to the template. Selecting an area points the table at the cells that
-			fill it.
-		</p>
-		<p>
-			<strong>Content</strong> is where an area gets what it shows: a Data Field, Static Text, a Bitmap drawn
-			here, or an Image. A field then takes a <strong>Mode</strong> — Plain Text, Markdown, Bitmap, Image, Color
-			or QR Code. Color fills the area with what the cell says and ignores anything that is not one, in hex,
-			<code>rgb()</code>, <code>hsl()</code> or by name; Image shows a picture, and still accepts a color.
-		</p>
-		<p>
-			<code>&#123;&#123;date&#125;&#125;</code> anywhere in an area or a cell prints today's date, and
-			<code>&#123;&#123;date:YYYY-MM-DD&#125;&#125;</code> prints it your way — <code>YYYY</code>, <code>MM</code>,
-			<code>DD</code> for the numbers, <code>MMMM</code> and <code>dddd</code> for the names. Anything else in braces
-			is left as written.
-		</p>
-
-		<h3>Placing them</h3>
-		<p>
-			Drag areas on the page or type exact millimetres. An area latches onto the edges and centres of its neighbours as
-			it passes them; switch <strong>Grid</strong> on and it snaps to the 5mm subgrid instead. Grid off and
-			<strong>Bounds</strong> off is free movement, because an area should never latch onto a guide that is not drawn.
-			Press and <em>hold</em> the Grid box for a <strong>dot grid</strong> — the same grid and the same snapping,
-			drawn as a dot at each intersection rather than as ruled lines, which is quieter under a page of type. The
-			word beside the box says which of the two you are on.
-		</p>
-		<p>
-			<strong>Rotation</strong> has two marks on a selected area, because they do two different things. The
-			<strong>crosshair</strong> is the pivot: drag it to move the point the area turns about. The <strong>knob</strong>
-			on the arm below it is the lever: swing it to turn the area, holding <strong>Shift</strong> for 15° steps. The
-			<strong>X</strong> and <strong>Y</strong> beside the rotation place the pivot exactly, as a percentage of the
-			area's own size. A turned area still occupies the space it would have upright, so one rotation does not shuffle
-			the card.
-		</p>
-		<p>
-			Stacking order is the column beside the page: areas paint in the order they are listed, so <em>Bring to Front</em>
-			is a move to the end of that list. If an area ends up off the sheet — all of it, or a corner of it — a
-			button appears under <em>Area</em> to bring that area back on, and only that area: everything already on
-			the paper stays where it was put. Crossing into the bleed does not count, because that is what bleed is
-			for.
-		</p>
-
-		<h3>Marks on an area</h3>
-		<p>
-			A red corner means the content does not fit and the print will clip it. The <strong>plug</strong> says the area
-			carries its own words rather than a column's. The <strong>link</strong> and the <strong>buoy</strong> are the
-			two ends of an anchor — an anchored area takes its top from another area's rendered bottom, so dragging it
-			changes the gap rather than breaking the tie — and the <strong>padlock</strong> says the area is locked. All
-			three are buttons, and each undoes what it says: the link breaks this area's tie, the buoy casts off everything
-			moored to this one, the padlock unlocks the area. Neither anchor button moves anything. Each shows the icon of
-			its own undoing as you reach for it, so no two of them answer with the same mark. Selecting either end of an
-			anchor lights up the other — filled on what follows this area directly, outlined further down the chain, so a
-			stack of tied areas says how far the tie reaches. <strong>Bounds</strong> takes all of it away.
-		</p>
-
-		<h3>Several at once</h3>
-		<p>
-			Shift-click (or Ctrl/Cmd-click) to build a selection, Ctrl/Cmd+A for all of them; on a touchscreen,
-			<strong>Select Multiple</strong> in the right-click menu makes every press add or drop, with a chip beside
-			<em>+ Area</em> saying so until you press it or <strong>Esc</strong>. Dragging any one moves the
-			set, and a column of icons appears beside the page to line them up against the box enclosing them all, and to
-			group, lock, duplicate or delete the lot. <strong>Group</strong> makes a selection stick until you ungroup it. An
-			anchored area sits out of a vertical align, because an anchor would move it straight back.
-		</p>
-		<p>
-			<strong>Copy Style</strong> and <strong>Paste Style</strong> carry type, fill, border, padding and radius from one
-			area to any number of others. A paste is "make this look like that", so it takes away what the source did not have.
-		</p>
-
-		<h3>Templates</h3>
-		<p>
-			The <strong>Template</strong> field names the one you are working on; the caret beside it lists every
-			template saved in this browser, with <em>New template…</em> and <em>Delete this template…</em> under a rule.
-			Renaming is typing in the field. Deleting takes the loaded template and opens the next one — or a new empty
-			template, if it was the last — where <strong>Reset</strong>, in the row of buttons below, puts the starter
-			card back under the same name. Both ask first, and both are one Ctrl/Cmd+Z away. The list lives
-			in this browser only; <strong>Export</strong> is how a template leaves, and an import joins the list rather
-			than replacing what is open.
-		</p>
-
-		<h3>The sheet</h3>
-		<p>
-			<strong>Size</strong> has A6, A5, A4, A3 and a 4 × 6 inch postcard; picking one keeps the orientation you are
-			in, and <strong>⇄</strong> turns the page over. Neither moves anything on the card — coordinates are
-			measured from the trim edge, so trying a design the other way round costs nothing. Bleed is an outset on the
-			sheet, never an offset on the content — so it is also how you widen a card evenly without moving anything on
-			it, with <strong>Crop Marks</strong> left unticked.
-		</p>
-		<p>
-			Page setup holds the type defaults — family, size, leading, spacing, color. An area that leaves those fields
-			blank inherits them. It also sets the paper color and a background image, and can print a page number, optionally
-			as <em>3 / 12</em>.
-		</p>
-		<p>
-			<strong>CSS</strong> holds styles saved inside the template. Selectors are scoped to the card, and
-			<code>@import</code> and any <code>url()</code> pointing off this machine are stripped, so a template's
-			CSS cannot reach the network. What a template <em>can</em> ask for is a Google font by family name and a
-			background image by address — both only as names it is allowed to write, never as arbitrary requests.
-		</p>
-
-		<h3>Locking</h3>
-		<p>
-			<strong>Lock</strong> in either bar freezes what you have — no dragging, no resizing, no option changes. A page
-			lock covers every area and the page settings, greys every bound and says so above the sheet. The same button
-			unlocks.
-		</p>
-
-		<h3>Data</h3>
-		<p>
-			Column headers are editable in place, and the <strong>+</strong> at the end of the table adds a row or a column.
-			Drag the right edge of a header to set that column's width, or double-click that edge to hand it back the
-			default; the widths stay in this browser and follow a column through a rename.
-			Clicking a row previews it; the tick in the gutter chooses several, and <strong>Copy</strong> and delete for
-			those appear at the head of the buttons below. The row numbers travel with their rows through a
-			sort, and a column header sorts A-Z, then Z-A, then back to the order the rows arrived in.
-		</p>
-		<p>
-			<strong>Table</strong> at the left of that row names the table you are in; the caret opens the rest, with
-			<strong>New table…</strong> and <strong>Delete this table…</strong> under a rule at the bottom. The
-			<strong>⇄</strong> beside it goes back to the table you were on before, and back again — the two you are
-			working between, one press apart. A design and a table are kept apart on purpose: switching either leaves the
-			other exactly where it was, and bindings that still name a column that exists are kept across the switch.
-		</p>
-		<p>
-			<strong>Paste</strong> takes a block of cells off a spreadsheet with no header row and lands it in the columns
-			you already have. <strong>Import CSV…</strong> takes a whole file; press and <em>hold</em> it and the four sample
-			cards come back. <strong>Export CSV</strong> hands the table back as a file. Deleting a column asks, because it is
-			a field of every card at once; the red <strong>Delete</strong> empties the whole table. All of it is undoable, and
-			none of it touches the template — as <strong>Reset</strong> in page setup does not touch the data.
-		</p>
-
-		<h3>Getting cards out</h3>
-		<p>
-			<strong>Export</strong>, or <strong>Ctrl/Cmd+P</strong>, opens every card as a small page. The browser's own print
-			dialog is intercepted rather than left to fire, because it would print the editor. Untick any card you do not
-			want, then <strong>Print</strong>, or <strong>PNG</strong> for one 300 dpi file per page. The checklist under the
-			pages is four settings that decide whether what you saw is what comes out; a PNG needs none of them.
-		</p>
-		<p>
-			The count under the sheet — <em>3 / 12</em> — opens that card on its own, big, over everything; so does a
-			thumbnail on the export screen. The arrows either side, the left and right arrow keys, and a swipe step through
-			the run. Nothing is printed from there.
-		</p>
-
-		<h3>Dialogs</h3>
-		<p>
-			A dialog opens with nothing pressed. <strong>Enter</strong> moves onto the action it suggests, and a second
-			Enter presses it — so a stray Return arriving a beat late cannot delete a template or replace every row on its
-			own. <strong>Esc</strong> closes the dialog at any point — in the CSS dialog, which has a
-			<strong>Cancel</strong>, closing that way cancels, and the CSS that was there when it opened comes back.
-		</p>
-
-		<h3>On a touchscreen</h3>
-		<p>
-			<strong>Pinch to zoom</strong> the page, anywhere over the stage — over the areas as well as the ground
-			around them. A second finger never drags: an area that was moving goes back where it was, so a pinch zooms
-			and leaves the card alone. Every button answers a press with a few milliseconds of vibration, where the
-			device has it.
-		</p>
-		<p>
-			The <strong>cross of arrows</strong> by the page nudges the selection; its middle button cycles the step, and
-			holding it moves the pad out of the way. When the selection is <em>tied</em> to another area, the two vertical
-			arrows wear a link instead: <strong>hold</strong> one and you take hold of the area it hangs from, which is
-			the one that can still move up and down — or <strong>tap</strong> it three times to break the tie and leave the
-			area exactly where it sits.
-		</p>
-		<p>
-			<strong>Press and hold an area</strong> for its menu — and if the finger carries on, the menu goes and the
-			area moves with it: it was being dragged under the menu the whole time. Under the page, the data tray opens
-			at about half the screen and is <strong>dragged taller by the table's header</strong>; a press that goes
-			nowhere still presses the button underneath it.
-		</p>
-		<p>
-			A card opened <strong>full screen</strong> is the one place a pinch zooms the card itself, up to six times, with
-			a drag to move around it. Pinch back and it settles; a flick pages the run again.
+			To learn what something does, <strong>rest the pointer on it</strong>, or <strong>press and hold</strong> it on
+			a touchscreen. Double-click an area to type in it or draw in it; right-click it, or long-press it, for its menu.
 		</p>
 
 		<h3>Keys</h3>
@@ -2658,6 +4158,8 @@ em { color: #b42318 }`;
 			<dt>Shift + click<span>Ctrl / ⌘ + click</span></dt><dd>Add an area to the selection, or drop it</dd>
 			<dt>Ctrl/Cmd + A</dt><dd>Select every area</dd>
 			<dt>Ctrl/Cmd + D</dt><dd>Duplicate the selected areas</dd>
+			<dt>Ctrl/Cmd + L</dt><dd>Lock or unlock the selected areas</dd>
+			<dt>Ctrl/Cmd + Shift + L</dt><dd>Lock or unlock the design</dd>
 			<dt>Delete<span>Backspace</span></dt><dd>Remove the selected areas</dd>
 			<dt>Ctrl/Cmd + C</dt><dd>Copy the selected area's words</dd>
 			<dt>Ctrl/Cmd + V</dt><dd>Paste plain text as a new area</dd>
@@ -2665,16 +4167,28 @@ em { color: #b42318 }`;
 			<dt>Ctrl/Cmd + Shift + V</dt><dd>Paste that style onto the selection</dd>
 			<dt>Ctrl/Cmd + Shift + Arrows</dt><dd>Step the alignment — left, right, top, bottom</dd>
 			<dt>Ctrl/Cmd + Shift + scroll</dt><dd>Size the type in the area under the pointer</dd>
-			<dt>Ctrl/Cmd + scroll, pinch</dt><dd>Zoom the page</dd>
+			<dt>Ctrl/Cmd + scroll, pinch<span>on the page</span></dt><dd>Zoom the page — about the selected area, if there is one</dd>
 			<dt>Ctrl/Cmd + +<span>Ctrl/Cmd + −</span></dt><dd>Zoom the page in or out</dd>
 			<dt>Ctrl/Cmd + 0</dt><dd>Fit the page (Shift for 100%)</dd>
-			<dt>Ctrl/Cmd + ;<span>Ctrl/Cmd + H</span></dt><dd>Bounds on or off</dd>
-			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off (hold the Grid box for dots)</dd>
+			<dt>Pinch, Ctrl/Cmd + scroll<span>off the page</span></dt><dd>Text size — the interface itself never zooms</dd>
+			<dt>Ctrl/Cmd + +<span>in a field or here</span></dt><dd>Text size, in steps; Ctrl/Cmd + 0, or the percentage beside the version, puts it back</dd>
+			<dt>Ctrl/Cmd + H</dt><dd>Bounds on or off</dd>
+			<dt>Ctrl/Cmd + ;<span>|</span></dt><dd>Guides: all, without the spacing, off</dd>
+			<dt>Ctrl/Cmd + '<span>Ctrl/Cmd + #</span></dt><dd>Grid on or off</dd>
+			<dt>Ctrl/Cmd + S</dt><dd>Save the drawing, while drawing</dd>
 			<dt>Ctrl/Cmd + P</dt><dd>Export — press again from that screen to print</dd>
 			<dt>Ctrl/Cmd + Shift + S</dt><dd>Export, for the fingers that reach for that instead</dd>
 			<dt>?<span>/</span></dt><dd>This panel</dd>
 		</dl>
 
+		<!-- Where else the app lives, in the README's order: what it is, where
+		     to use it, and how it is made. Links a person follows, so none of
+		     them is a request the app makes on its own. -->
+		<ul class="elsewhere">
+			<li><a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Project page</a></li>
+			<li><a href="https://libelli.vercel.app" target="_blank" rel="noreferrer">Live instance</a></li>
+			<li><a href="https://github.com/Arty2/libelli" target="_blank" rel="noreferrer">Source</a></li>
+		</ul>
 
 		<p class="credit">
 			<a href="https://heracl.es/libelli" target="_blank" rel="noreferrer">Dialectic Acheiropoieton</a>
@@ -2709,6 +4223,7 @@ em { color: #b42318 }`;
 	<PrintPreview
 		{template}
 		{dataset}
+		{lookupRows}
 		{mapping}
 		{activeRow}
 		{background}
@@ -2725,6 +4240,11 @@ em { color: #b42318 }`;
 		}}
 		onexcludedsheetschange={(next) => (excludedSheets = next)}
 		onprint={printFromPreview}
+		turn={outputTurn}
+		onturnchange={(next) => {
+			outputTurn = next;
+			saveTurn(next);
+		}}
 		ontemplatechange={applyTemplate}
 		onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 		onnotice={notify}
@@ -2732,36 +4252,11 @@ em { color: #b42318 }`;
 	/>
 {/if}
 
-{#if imagesOpen}
-	<div class="modal-backdrop" role="presentation" onclick={() => (imagesOpen = false)}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-labelledby="images-title">
-		<h2 id="images-title">Images</h2>
-		<ImagesPanel
-			used={new Set(imageNames)}
-			onnotice={notify}
-			onchanged={() => (imagesVersion += 1)}
-		/>
-		<div class="modal-actions">
-			<span class="spacer"></span>
-			<button class="primary" onclick={() => (imagesOpen = false)}>Done</button>
-		</div>
-	</div>
-{/if}
-
-{#if drawingBox}
-	<BitmapEditor
-		box={drawingBox}
-		value={drawingValue}
-		ink={drawingBox.color ?? template.defaults.color}
-		onsave={saveDrawing}
-		oncancel={() => (drawing = null)}
-	/>
-{/if}
-
 {#if lightboxOpen && dataset.rows.length}
 	<Lightbox
 		{template}
 		{dataset}
+		{lookupRows}
 		{mapping}
 		{background}
 		{images}
@@ -2775,12 +4270,14 @@ em { color: #b42318 }`;
 	<PrintRoot
 		{template}
 		{dataset}
+		{lookupRows}
 		{mapping}
 		{background}
 		{images}
 		{printBackground}
 		excluded={excludedRows}
 		{excludedSheets}
+		turn={outputTurn}
 	/>
 {/if}
 
@@ -2788,9 +4285,17 @@ em { color: #b42318 }`;
 	.app {
 		display: flex;
 		flex-direction: column;
-		/* dvh, not vh: a phone's address bar otherwise hides the status bar and
-		   pushes the preview off the bottom of the screen. */
-		height: 100dvh;
+		/* Pinned to the window rather than given a height. `100dvh` was the one
+		   before — `vh` hid the status bar under a phone's address bar — but
+		   Chrome on Android, starting the installed app cold, can work `dvh` out
+		   before the window has settled and keep that shorter height until
+		   something resizes it: a strip of bare page under the status bar on
+		   some launches and not others. A fixed box with no offsets is the
+		   window's own size, whenever it is asked, and follows the address bar
+		   as `dvh` does. Nothing is lost by taking the app out of the flow: the
+		   document never scrolled, and every dialog is fixed already. */
+		position: fixed;
+		inset: 0;
 		min-height: 0;
 	}
 
@@ -2805,21 +4310,54 @@ em { color: #b42318 }`;
 		padding: 8px 16px;
 		background: #fff;
 		border-bottom: 1px solid #ddd;
-		font-size: 12px;
+		font-size: 0.75rem;
 		flex-wrap: wrap;
+		/* One height for every button in the row, with words or without: the
+		   15px icon, 6px of padding either side and a 1px border. The icon is
+		   in rem and the padding is not, so this is worked out rather than
+		   written as one rem value — a square set at 1.8125rem matched the
+		   labelled buttons at 100% only, and at 150% text stood 7px taller
+		   than Install beside it. */
+		--tool: calc(0.9375rem + 14px);
+	}
+
+	.toolbar > button {
+		box-sizing: border-box;
+		height: var(--tool);
+	}
+
+	/* A glyph with no word at any width: square, as the phone draws the rest. */
+	.toolbar .theme {
+		width: var(--tool);
+		padding: 0;
+		display: grid;
+		place-items: center;
+		flex: none;
 	}
 
 	/* The row the two option bars share. It owns the ground and the rule under
 	   it, so the band left over when the shorter bar is in it reads as part of
 	   the bar rather than as a gap above the stage. */
 	.bar-row {
+		position: relative;
 		background: #f7f7f7;
 		border-bottom: 1px solid #ddd;
 	}
 
+	/* Laid out at the row's width so it wraps as the real one would, and out of
+	   sight and out of the way. */
+	.bar-probe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		visibility: hidden;
+		pointer-events: none;
+	}
+
 	.bar-row.box {
-		background: #eef3fb;
-		border-bottom-color: #cfdcf3;
+		background: var(--accent-wash);
+		border-bottom-color: var(--accent-line);
 	}
 
 	.bar-row :global(.options) {
@@ -2833,9 +4371,33 @@ em { color: #b42318 }`;
 	   this was 13px of text. Width follows the intrinsic ratio; the width and
 	   height attributes on the tag hold the box before the file arrives, so the
 	   buttons do not shuffle sideways on load. */
+	/* The mark and the version are labels, not text anyone copies; a
+	   double-click near them should not paint them blue. */
 	.brand {
-		height: 29px;
+		display: block;
+		height: 1.8125rem;
+		padding: 0;
+		border: none;
+		background: none;
+		user-select: none;
+	}
+
+	.brand {
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	/* Not text and not a picture to take away: a press-and-hold on a phone
+	   selected it, or offered to save it, instead of changing the theme. */
+	.brand img {
+		display: block;
+		height: 100%;
 		width: auto;
+		user-select: none;
+		-webkit-user-select: none;
+		-webkit-user-drag: none;
+		-webkit-touch-callout: none;
+		pointer-events: none;
 	}
 
 	.spacer {
@@ -2845,8 +4407,45 @@ em { color: #b42318 }`;
 	main {
 		flex: 1;
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(360px, 40%);
+		/* `--tray-w` is the width the table's edge was dragged to; until then
+		   it is the share this always was. */
+		grid-template-columns: minmax(0, 1fr) var(--tray-w, minmax(360px, 40%));
 		min-height: 0;
+	}
+
+	/* Straddles the table's left edge; wider than it looks, because a 1px
+	   target is not a target. Lit while hovered, focused or held. */
+	.tray-grip {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: -4px;
+		width: 8px;
+		z-index: 5;
+		cursor: col-resize;
+		touch-action: none;
+	}
+
+	.tray-grip::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 3px;
+		width: 2px;
+		background: var(--accent);
+		opacity: 0;
+		transition: opacity 0.12s;
+	}
+
+	.tray-grip:hover::after,
+	.tray-grip:focus-visible::after,
+	.tray-grip.on::after {
+		opacity: 1;
+	}
+
+	.tray-grip:focus-visible {
+		outline: none;
 	}
 
 	main.no-data {
@@ -2882,7 +4481,7 @@ em { color: #b42318 }`;
 		padding: 8px 12px;
 		background: #fff8e1;
 		border-bottom: 1px solid #f0e0a8;
-		font-size: 12px;
+		font-size: 0.75rem;
 	}
 
 	.status-bar {
@@ -2890,7 +4489,7 @@ em { color: #b42318 }`;
 		align-items: center;
 		gap: 12px;
 		padding: 5px 12px;
-		font-size: 11px;
+		font-size: 0.6875rem;
 		color: #555;
 		background: #fff;
 		border-top: 1px solid #eee;
@@ -2907,20 +4506,115 @@ em { color: #b42318 }`;
 		white-space: nowrap;
 	}
 
+	/* The notice as a button, dressed as the line of text it is: it only has
+	   to say, on hover, that there is more of it to read. */
+	.status-text {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+		max-width: 100%;
+		padding: 0;
+		border: none;
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.status-text:disabled {
+		cursor: default;
+	}
+
+	.status-text > span {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.status-text:hover:not(:disabled) > span {
+		text-decoration: underline dotted;
+		text-underline-offset: 2px;
+	}
+
+	.status-full {
+		display: flex;
+		align-items: flex-start;
+		gap: 6px;
+		margin: 0 0 4px;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+		color: #222;
+	}
+
 	/* Something went wrong reads differently from something happened. The same
 	   mark the canvas uses for a box that is clipping what will print. */
-	.status.warning {
+	.status.warning,
+	.status-full.warning {
 		color: #b42318;
 	}
 
 	.status-bar .reload {
 		padding: 2px 8px;
-		font-size: 11px;
+		font-size: 0.6875rem;
 	}
 
-	.status-bar .version {
-		font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+	.status-bar .version,
+	.status-bar .ui-size {
+		position: relative;
+		padding: 2px 4px;
+		border-color: transparent;
+		background: none;
+		font: 400 0.6875rem ui-monospace, SFMono-Regular, Menlo, monospace;
 		color: #999;
+	}
+
+	.status-bar .version:hover,
+	.status-bar .ui-size:hover {
+		color: #555;
+	}
+
+	/* A finger's target with hardly a taller bar: the padding grows and most
+	   of it is taken back as margin — but not all, or the button ran past the
+	   bar's own padding to its very edge. 2px stays clear above and below. */
+	@media (pointer: coarse) {
+		.status-bar .version,
+		.status-bar .ui-size {
+			margin: -3px -4px -3px 0;
+			padding: 7px 8px;
+		}
+
+		/* At the left end, it gives its spare width back on that side. */
+		.status-bar .ui-size {
+			margin: -3px 0 -3px -8px;
+		}
+	}
+
+	.whats-new h3 {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+	}
+
+	.whats-new h3 time {
+		margin-left: auto;
+		font-weight: 400;
+	}
+
+	.whats-new .current {
+		text-transform: none;
+		letter-spacing: 0;
+	}
+
+	.whats-new ul {
+		margin: 0 0 8px;
+		padding-left: 1.2em;
+		color: #333;
+	}
+
+	.whats-new li + li {
+		margin-top: 2px;
 	}
 
 	.check {
@@ -2933,7 +4627,7 @@ em { color: #b42318 }`;
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-button);
@@ -2958,13 +4652,13 @@ em { color: #b42318 }`;
 	}
 
 	button[aria-pressed='true']:not(.primary):not(.danger-outline) {
-		border-color: #2563eb;
-		color: #2563eb;
-		background: #eaf1fe;
+		border-color: var(--accent);
+		color: var(--accent);
+		background: var(--accent-tint);
 	}
 
 	select {
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		padding: 4px 5px;
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-input);
@@ -3001,13 +4695,20 @@ em { color: #b42318 }`;
 		border-radius: 10px;
 		padding: 20px 22px;
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
-		font-size: 13px;
+		font-size: 0.8125rem;
 		line-height: 1.55;
 	}
 
 	.modal h2 {
 		margin: 0 0 6px;
-		font-size: 16px;
+		font-size: 1rem;
+	}
+
+	/* A dialog's title is where it is moved from — see `dragByTitle`. */
+	.drag-title {
+		cursor: move;
+		user-select: none;
+		touch-action: none;
 	}
 
 	/* Sticky against the modal's own padding, so the rule under it spans the
@@ -3033,8 +4734,8 @@ em { color: #b42318 }`;
 	.modal-header .icon {
 		display: grid;
 		place-items: center;
-		width: 26px;
-		height: 26px;
+		width: 1.625rem;
+		height: 1.625rem;
 		padding: 0;
 		border-color: transparent;
 		color: #555;
@@ -3046,7 +4747,7 @@ em { color: #b42318 }`;
 
 	.modal h3 {
 		margin: 16px 0 4px;
-		font-size: 11px;
+		font-size: 0.6875rem;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		color: #767676;
@@ -3057,14 +4758,106 @@ em { color: #b42318 }`;
 		color: #333;
 	}
 
-	.modal textarea.code {
-		width: 100%;
-		box-sizing: border-box;
-		font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-		padding: 8px;
-		border: 1px solid #ccc;
-		border-radius: var(--radius-input);
-		resize: vertical;
+	/* The CSS dialog is the one that holds an editor rather than a paragraph, and
+	   a stylesheet wrapped at 560px is a stylesheet nobody can read. */
+	.modal.wide {
+		width: min(760px, calc(100vw - 32px));
+	}
+
+	/* Full screen: no gutter, no corners, no drag — the window edge to edge,
+	   and the editor takes every row the header and the buttons leave. A
+	   column, so the editor's height is the room left rather than its own
+	   17rem. `translate` is where a drag left the dialog (modal.ts); full
+	   screen is not somewhere it can be dragged from. */
+	.modal.full {
+		inset: 0;
+		transform: none;
+		translate: none !important;
+		width: 100vw;
+		max-height: none;
+		height: 100dvh;
+		border-radius: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.modal.full .drag-title {
+		cursor: default;
+	}
+
+	/* No rule under the CSS dialog's title: the editor's own top border is
+	   right below it, and two lines a few pixels apart read as one thick one. */
+	.css-dialog .modal-header {
+		border-bottom: none;
+	}
+
+	/* Full screen gives the rows to the sheet: the title bar and the buttons
+	   under the editor come in to a tighter fit, half their dialog padding.
+	   The sides keep their 22px, which is what the editor reaches out
+	   through to meet the window's edges. */
+	.css-dialog.full {
+		padding-block: 10px;
+	}
+
+	.css-dialog.full .modal-header {
+		margin-top: -10px;
+		padding-top: 8px;
+		padding-bottom: 6px;
+		margin-bottom: 4px;
+		top: -10px;
+	}
+
+	.css-dialog.full .modal-actions {
+		margin-top: 10px;
+	}
+
+	/* The title is pressed and double-clicked, never read off: a double-click
+	   that also selected the word looked like the click had missed. On every
+	   child too, not just the header, so the stats beside it stay put. */
+	.drag-title,
+	.drag-title :global(*) {
+		user-select: none;
+		-webkit-user-select: none;
+	}
+
+	/* Drawn like the × beside it — a bare glyph — pressed or not: the glyph
+	   already says which way it goes, and the accent box a pressed button
+	   gets elsewhere made one of two window controls look like a tool.
+	   `.modal` in front for the weight: that global pressed rule counts an
+	   element and two `:not()`s, and this one has to outweigh it. */
+	.modal .modal-header .icon[aria-pressed='true'] {
+		border-color: transparent;
+		background: none;
+		color: #555;
+	}
+
+	.modal .modal-header .icon[aria-pressed='true']:hover {
+		background: #f3f3f3;
+	}
+
+	/* Edge to edge: out through the dialog's 22px of side padding to the
+	   window itself, which leaves its side borders and corners nothing to
+	   frame — the top and bottom rules still part it from the header and the
+	   buttons. The header and the buttons keep the padding. */
+	.modal.full :global(.editor) {
+		flex: 1;
+		min-height: 0;
+		height: auto;
+		resize: none;
+		margin-inline: -22px;
+		border-inline: none;
+		border-radius: 0;
+	}
+
+	/* Beside the title, in the header's own small print: what the sheet is, not
+	   something to press. */
+	.css-stats {
+		margin-right: auto;
+		align-self: center;
+		font-size: 0.6875rem;
+		color: #767676;
+		white-space: nowrap;
 	}
 
 	.keys {
@@ -3088,7 +4881,7 @@ em { color: #b42318 }`;
 
 	.keys dt {
 		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-		font-size: 11px;
+		font-size: 0.6875rem;
 		color: #111;
 		white-space: nowrap;
 	}
@@ -3129,9 +4922,10 @@ em { color: #b42318 }`;
 	}
 
 	.version {
-		font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+		font: 400 0.6875rem ui-monospace, SFMono-Regular, Menlo, monospace;
 		color: #767676;
 		vertical-align: 2px;
+		user-select: none;
 	}
 
 	/* The dialog takes the focus as it opens, so its first Enter has somewhere to
@@ -3141,16 +4935,31 @@ em { color: #b42318 }`;
 		outline: none;
 	}
 
-	.modal code {
-		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-		font-size: 11.5px;
-		background: #f3f3f3;
-		padding: 1px 4px;
-		border-radius: 3px;
-	}
-
 	.credit a {
 		color: inherit;
+	}
+
+	.elsewhere {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 4px 18px;
+		margin: 18px 0 0;
+		padding: 12px 0 0;
+		border-top: 1px solid #eee;
+		list-style: none;
+		font-size: 0.8125rem;
+	}
+
+	.elsewhere a {
+		color: var(--accent);
+	}
+
+	/* The rule above the links is the one between the help and the rest. */
+	.elsewhere + .credit {
+		margin-top: 10px;
+		padding-top: 0;
+		border-top: none;
 	}
 
 	.credit {
@@ -3180,9 +4989,16 @@ em { color: #b42318 }`;
 
 	.magic-list li {
 		display: grid;
-		grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr) 8.5rem auto;
+		grid-template-columns: auto minmax(4.5rem, auto) minmax(0, 1fr) auto 8.5rem;
 		align-items: center;
 		gap: 10px;
+	}
+
+	/* Out, but still listed: faded as a whole, so the tick is the thing that
+	   reads and the row is still legible — struck through and grey, it looked
+	   deleted rather than set aside. */
+	.magic-list li.left-out > :not(input) {
+		opacity: 0.5;
 	}
 
 	.magic-column {
@@ -3196,7 +5012,7 @@ em { color: #b42318 }`;
 	   because a body column would otherwise be a paragraph in a dialog. */
 	.magic-sample {
 		color: #767676;
-		font-size: 12px;
+		font-size: 0.75rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -3205,7 +5021,7 @@ em { color: #b42318 }`;
 	.magic-list select {
 		width: 100%;
 		font: inherit;
-		font-size: 12px;
+		font-size: 0.75rem;
 		padding: 3px 4px;
 		border: 1px solid #d5d5d5;
 		border-radius: 4px;
@@ -3228,7 +5044,7 @@ em { color: #b42318 }`;
 		border-radius: 5px;
 		background: #fdf4dc;
 		color: #8a6d1f;
-		font-size: 12px;
+		font-size: 0.75rem;
 		line-height: 1.45;
 	}
 
@@ -3241,7 +5057,7 @@ em { color: #b42318 }`;
 	/* Says which rows were reached by length alone. Quiet: it is a caveat on a
 	   choice you can already see and change, not a warning. */
 	.magic-unsure {
-		font-size: 10px;
+		font-size: 0.625rem;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		color: #8a6d1f;
@@ -3254,11 +5070,44 @@ em { color: #b42318 }`;
 		/* The sample is the first thing to go: it is there to check a guess, and
 		   on a phone the name and the control are what have to fit. */
 		.magic-list li {
-			grid-template-columns: minmax(0, 1fr) 8.5rem auto;
+			grid-template-columns: auto minmax(0, 1fr) auto 8.5rem;
 		}
 
 		.magic-sample {
 			display: none;
+		}
+	}
+
+	/* The CSS dialog's Starter and Text Wrap: a Carbon glyph each, and the
+	   word only where there is room for it, as the bars' buttons do. Without
+	   the word, square: as tall as the buttons on the right, and as wide.
+
+	   The row's line height is pinned so that height is a number rather than
+	   whatever `normal` comes to in this face — 0.75rem type at 1.25, its 6px
+	   of padding and its border — and the square is that number both ways.
+	   `aspect-ratio` would have been the shorter rule; a stretched flex item's
+	   height does not feed it, and the buttons came out 17px wide. */
+	.css-actions button {
+		line-height: 1.25;
+	}
+
+	.css-actions :is(.starter, .wrap-toggle) {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	@media (max-width: 900px) {
+		.css-actions :is(.starter, .wrap-toggle) .label {
+			display: none;
+		}
+
+		.css-actions :is(.starter, .wrap-toggle) {
+			--square: calc(0.75rem * 1.25 + 14px);
+			width: var(--square);
+			height: var(--square);
+			padding: 0;
+			justify-content: center;
 		}
 	}
 
@@ -3301,6 +5150,15 @@ em { color: #b42318 }`;
 			box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
 		}
 
+		/* Pulled past its lowest, the tray says it is about to go. */
+		aside {
+			transition: opacity 0.15s;
+		}
+
+		aside.shutting {
+			opacity: 0.45;
+		}
+
 		.toolbar {
 			gap: 6px;
 			/* Tighter top and bottom on a phone; the sides hold their 16, because
@@ -3320,11 +5178,13 @@ em { color: #b42318 }`;
 		   condition itself: exactly the buttons that lost their words. Install
 		   keeps its own, because an offer nobody recognises needs the word. */
 		.toolbar button:has(.label) {
-			width: 29px;
-			height: 29px;
+			width: var(--tool);
 			padding: 0;
 			display: grid;
 			place-items: center;
+			/* Or the row squeezes them before it gives up anything else, and a
+			   square at 200% text came out 32px wide and 58px tall. */
+			flex: none;
 		}
 
 		/* Phone order: what the app is on the left — Help first, because it is the
@@ -3339,6 +5199,7 @@ em { color: #b42318 }`;
 		   never the same width, so it would sit off to one side of the bar it is
 		   supposed to be the middle of. Out of the flow it also stops counting
 		   towards the row's height, which is the buttons' to set. */
+		.toolbar .theme,
 		.toolbar .help {
 			order: 1;
 		}
@@ -3356,7 +5217,7 @@ em { color: #b42318 }`;
 		}
 
 		/* Named and ordered like the rest: a button left out of this list keeps
-		   the initial `order: 0` and lands in front of Help, which is how Images
+		   the initial `order: 0` and lands in front of Help, which is how Pictures
 		   came to open the phone row. */
 		.toolbar .images {
 			order: 5;
@@ -3375,23 +5236,94 @@ em { color: #b42318 }`;
 			left: 50%;
 			top: 50%;
 			transform: translate(-50%, -50%);
-			/* Nothing to press, and it sits over the middle of the row: a tap that
-			   lands on it belongs to whatever is underneath. */
-			pointer-events: none;
 		}
 	}
 
 	/* 320px with an Install button in the row is where the two groups of
 	   controls meet in the middle, and a mark held in the centre of the bar
-	   would be under one of them. Out of the centre, back into the row: it keeps
-	   its place in the order, sitting against the left-hand group instead. The
+	   would be under one of them. Out of the centre, back into the row, at its
+	   left end as on a desk, with every button to the right of the space. The
 	   controls win the row, because they are the ones you press. */
+	/* Larger text makes larger buttons, and at 150% on a 412px phone Page
+	   ran under a mark centred over the row. For as long as the text is larger
+	   than default, the row is laid out as at 320px below: the mark at the left
+	   end, then the space, then every button — Install and Help in front of
+	   Page, as the wide bar has them. Help and Install had stayed at the
+	   left, either side of the mark, which split the controls into two groups
+	   with the logo between them. */
+	@media (max-width: 900px) {
+		:global(html[data-text-larger]) .brand {
+			position: static;
+			transform: none;
+			order: 0;
+			/* The one thing in the row that can give up width: at 200% the
+			   buttons alone nearly fill a phone, and wrapping put Export on a row
+			   of its own. The mark shrinks inside its box instead. */
+			flex: 0 1 auto;
+			min-width: 0;
+		}
+
+		:global(html[data-text-larger]) .brand img {
+			max-width: 100%;
+			object-fit: contain;
+			object-position: left center;
+		}
+
+		:global(html[data-text-larger]) .toolbar {
+			flex-wrap: nowrap;
+		}
+
+		:global(html[data-text-larger]) .toolbar .spacer {
+			order: 1;
+		}
+
+		:global(html[data-text-larger]) .toolbar .install {
+			order: 2;
+		}
+
+		/* Install keeps its word on a phone, because an offer nobody recognises
+		   needs one — but not with the text enlarged: at 150% on a 360px phone,
+		   and at 200% on a 412px one, the worded button pushed the row off the
+		   edge of the screen. There it is a square like its neighbours, and its
+		   tip says what it is. */
+		:global(html[data-text-larger]) .toolbar .install-word {
+			display: none;
+		}
+
+		:global(html[data-text-larger]) .toolbar .install {
+			width: var(--tool);
+			padding: 0;
+			display: grid;
+			place-items: center;
+			flex: none;
+		}
+
+		:global(html[data-text-larger]) .toolbar .theme,
+		:global(html[data-text-larger]) .toolbar .help {
+			order: 3;
+		}
+	}
+
 	@media (max-width: 320px) {
 		.brand {
 			position: static;
 			transform: none;
-			/* Level with the spacer, and first in the markup, so it lands between
-			   the left-hand group and the space that pushes the rest right. */
+			/* First, where a mark on the left sits on a desk — and with it on the
+			   left, Install and Help go back to where the wide bar has them: after
+			   the space, in front of Page, in that order. */
+			order: 0;
+		}
+
+		.toolbar .spacer {
+			order: 1;
+		}
+
+		.toolbar .install {
+			order: 2;
+		}
+
+		.toolbar .theme,
+		.toolbar .help {
 			order: 3;
 		}
 	}

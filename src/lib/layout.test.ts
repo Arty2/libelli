@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
 	FREE_STEP,
+	SHRINK_FLOOR,
+	boxHeight,
+	shrinkScale,
+	spacingReadouts,
+	referenceOf,
+	freedTop,
+	actualScale,
+	columnGaps,
 	GRID_MAJOR,
 	GRID_MINOR,
 	alignBoxes,
@@ -8,11 +16,14 @@ import {
 	boxEdges,
 	facingPosition,
 	mirrorBox,
+	quarterTurn,
+	facingRotation,
 	mirrors,
 	pageSide,
 	resolveLayout,
 	snapTo,
-	snapToEdges
+	snapToEdges,
+	latchSpan
 } from './layout';
 import { newBox } from './template';
 import type { Box } from './types';
@@ -224,6 +235,31 @@ describe('mirrorBox', () => {
 		expect(mirrored.rotation).toBe(12);
 		expect(mirrored.centre).toEqual({ x: 20, y: 80 });
 	});
+
+	it('reverses a quarter turn, about the mirrored pivot, so it faces the other outer edge', () => {
+		const up = newBox({ id: 'a', x: 130, w: 60, rotation: 90, centre: { x: 20, y: 80 } });
+		expect(mirrorBox(up, page).rotation).toBe(-90);
+		expect(mirrorBox(up, page).centre).toEqual({ x: 80, y: 80 });
+		expect(mirrorBox(newBox({ id: 'a', rotation: -90 }), page).rotation).toBe(90);
+		// however it is written, and with the pivot left absent when it is the middle
+		expect(mirrorBox({ ...newBox({ id: 'a' }), rotation: 270 }, page).rotation).toBe(-270);
+		expect(mirrorBox(newBox({ id: 'a', rotation: 90 }), page).centre).toBeUndefined();
+		// …and back again, since the facing page of the facing page is this one.
+		expect(mirrorBox(mirrorBox(up, page), page)).toEqual(up);
+	});
+});
+
+describe('quarterTurn and facingRotation', () => {
+	it('knows a quarter turn, and nothing else, as the one to reverse', () => {
+		expect([90, -90, 270, -270, 450].map(quarterTurn)).toEqual([true, true, true, true, true]);
+		expect([undefined, 0, 12, 89, 180, -180].map(quarterTurn)).toEqual([false, false, false, false, false, false]);
+	});
+
+	it('writes a facing page back to the stored one: -90° there is 90° here, a tilt is itself', () => {
+		expect(facingRotation(-90)).toBe(90);
+		expect(facingRotation(90)).toBe(-90);
+		expect(facingRotation(-7)).toBe(-7);
+	});
 });
 
 describe('mirrors', () => {
@@ -247,5 +283,237 @@ describe('facingPosition', () => {
 	it('leaves a position that already names a side alone', () => {
 		expect(facingPosition('bottom-left', 'verso')).toBe('bottom-left');
 		expect(facingPosition('top-center', 'verso')).toBe('top-center');
+	});
+});
+
+describe('actualScale', () => {
+	it('puts a real size to a Mac in whatever mode it is scaled to', () => {
+		// A 13-inch MacBook at its default "looks like 1440 × 900": the glass
+		// is 2560 px at 227 ppi, 11.28in holding 1440 CSS px — 128 to the
+		// inch against CSS's 96, so the card has to be drawn a third larger.
+		const standard = actualScale({ width: 1440, height: 900, ratio: 2 });
+		expect(standard.panel).toBe('13-inch MacBook');
+		expect(standard.scale).toBeCloseTo(1440 / (2560 / 227) / 96, 3);
+		expect(standard.scale).toBeGreaterThan(1.3);
+		// "More space" is the same glass holding more pixels: a larger zoom.
+		expect(actualScale({ width: 1680, height: 1050, ratio: 2 }).scale).toBeGreaterThan(standard.scale);
+		// Turned on its side, the same answer.
+		expect(actualScale({ width: 900, height: 1440, ratio: 2 }).scale).toBe(standard.scale);
+	});
+
+	it('reads a phone by its device pixels', () => {
+		const phone = actualScale({ width: 393, height: 852, ratio: 3 });
+		expect(phone.panel).toBe('6.1-inch iPhone');
+		expect(phone.estimate).toBe(false);
+	});
+
+	it('draws a coarse desk monitor a little smaller than nominal', () => {
+		// 92 CSS px to the inch on a 24-inch 1080p monitor, against 96.
+		expect(actualScale({ width: 1920, height: 1080, ratio: 1 }).scale).toBeCloseTo(92 / 96, 3);
+	});
+
+	it('tells a desk monitor from a laptop on the same grid by the ratio, and marks both as estimates', () => {
+		expect(actualScale({ width: 1920, height: 1080, ratio: 1 })).toMatchObject({ panel: '24-inch monitor', estimate: true });
+		expect(actualScale({ width: 1280, height: 720, ratio: 1.5 })).toMatchObject({ panel: '15.6-inch laptop', estimate: true });
+	});
+
+	it("falls back to CSS's own millimetre for a screen it does not know", () => {
+		expect(actualScale({ width: 1111, height: 777, ratio: 1 })).toEqual({ scale: 1, panel: null, estimate: true });
+	});
+});
+
+describe('latchSpan', () => {
+	it('lines a box up by its middle', () => {
+		// A 20mm box whose middle is 0.5mm off a 74mm centre line.
+		expect(latchSpan(63.5, 20, [74], 1.5)).toEqual({ start: 64, edge: 74 });
+	});
+
+	it('lines a box up by its far edge', () => {
+		expect(latchSpan(79, 20, [100], 1.5)).toEqual({ start: 80, edge: 100 });
+	});
+
+	it('takes the nearest of the three when more than one is in reach', () => {
+		// Left edge 1mm from 10, middle 0.2mm from 20.8.
+		expect(latchSpan(11, 10, [10, 16.2], 1.5)).toEqual({ start: 11.2, edge: 16.2 });
+	});
+
+	it('is nothing when no line is in reach', () => {
+		expect(latchSpan(30, 10, [0, 100], 1.5)).toBeNull();
+	});
+});
+
+describe('columnGaps', () => {
+	it('places each gap between equal columns, as fractions of the width', () => {
+		// 100mm, three columns, 5mm gaps: columns of 30mm.
+		expect(columnGaps(3, 5, 100)).toEqual([
+			[0.3, 0.35],
+			[0.65, 0.7]
+		]);
+		expect(columnGaps(2, 0, 80)).toEqual([[0.5, 0.5]]);
+	});
+
+	it('has none for one column, no width, or gaps that leave no column', () => {
+		expect(columnGaps(1, 5, 100)).toEqual([]);
+		expect(columnGaps(3, 5, 0)).toEqual([]);
+		expect(columnGaps(3, 60, 100)).toEqual([]);
+	});
+});
+
+describe('shrinkScale', () => {
+	it('leaves words that fit at their size, and tries nothing smaller', () => {
+		const tried: number[] = [];
+		expect(
+			shrinkScale((s) => {
+				tried.push(s);
+				return true;
+			})
+		).toBe(1);
+		expect(tried).toEqual([1]);
+	});
+
+	it('finds the largest size that fits, never over it', () => {
+		// Words that fit at 0.734 of the size and not above.
+		const scale = shrinkScale((s) => s <= 0.734);
+		expect(scale).toBeLessThanOrEqual(0.734);
+		expect(scale).toBeGreaterThanOrEqual(0.72);
+	});
+
+	it('stops at the floor when nothing fits', () => {
+		expect(shrinkScale(() => false)).toBe(SHRINK_FLOOR);
+		expect(shrinkScale((s) => s <= 0.3, 0.4)).toBe(0.4);
+	});
+
+	it('keeps its height, as a clip does', () => {
+		const box = newBox({ h: 20, overflow: 'shrink' });
+		expect(boxHeight(box, 50, false)).toBe(20);
+	});
+});
+
+describe('spacingReadouts', () => {
+	const page = { w: 100, h: 100 };
+
+	it('measures to the page edge where nothing is beside the box', () => {
+		const r = spacingReadouts({ x: 10, y: 20, w: 30, h: 10 }, [], page);
+		expect(r.map((s) => [s.axis, s.from, s.to, s.gap])).toEqual([
+			['x', 0, 10, 10],
+			['x', 40, 100, 60],
+			['y', 0, 20, 20],
+			['y', 30, 100, 70]
+		]);
+	});
+
+	it('measures to the nearest box beside it, level with the middle by default', () => {
+		const left = { x: 0, y: 0, w: 20, h: 40 };
+		const fartherLeft = { x: 0, y: 10, w: 5, h: 10 };
+		const r = spacingReadouts({ x: 25, y: 10, w: 20, h: 20 }, [fartherLeft, left], page);
+		const toLeft = r.find((s) => s.axis === 'x' && s.to === 25)!;
+		expect(toLeft.from).toBe(20);
+		expect(toLeft.gap).toBe(5);
+		// They share 10 to 30 down the page.
+		expect(toLeft.at).toBe(20);
+	});
+
+	it('ignores a box that overlaps, or one only diagonally off a corner', () => {
+		const overlapping = { x: 15, y: 15, w: 20, h: 20 };
+		const diagonal = { x: 0, y: 0, w: 5, h: 5 };
+		const r = spacingReadouts({ x: 10, y: 10, w: 20, h: 20 }, [overlapping, diagonal], page);
+		expect(r.find((s) => s.axis === 'x' && s.to === 10)!.from).toBe(0);
+		expect(r.find((s) => s.axis === 'y' && s.to === 10)!.from).toBe(0);
+	});
+
+	it('flags equal gaps either side, and leaves out a side with none', () => {
+		const a = { x: 0, y: 0, w: 20, h: 10 };
+		const b = { x: 60, y: 0, w: 20, h: 10 };
+		const r = spacingReadouts({ x: 30, y: 0, w: 20, h: 10 }, [a, b], page);
+		const across = r.filter((s) => s.axis === 'x');
+		expect(across.map((s) => [s.gap, s.equal])).toEqual([
+			[10, true],
+			[10, true]
+		]);
+		// Against the top edge: no gap there, so no readout.
+		expect(r.some((s) => s.axis === 'y' && s.to === 0)).toBe(false);
+	});
+});
+
+describe('referenceOf', () => {
+	it('is the corner the words are set from, or the middle where they are centred', () => {
+		expect(referenceOf('left', 'top')).toEqual({ fx: 0, fy: 0 });
+		expect(referenceOf('justify')).toEqual({ fx: 0, fy: 0 });
+		expect(referenceOf('right', 'bottom')).toEqual({ fx: 1, fy: 1 });
+		expect(referenceOf('center', 'middle')).toEqual({ fx: 0.5, fy: 0.5 });
+		expect(referenceOf('right', 'middle')).toEqual({ fx: 1, fy: 0.5 });
+	});
+});
+
+describe('spacingReadouts from a reference point', () => {
+	const page = { w: 100, h: 100 };
+	const box = { x: 40, y: 40, w: 20, h: 20 };
+
+	it('runs its lines level and plumb with the point, not the middle', () => {
+		const r = spacingReadouts(box, [], page, { x: 40, y: 40 });
+		expect(r.filter((s) => s.axis === 'x').every((s) => s.at === 40)).toBe(true);
+		expect(r.filter((s) => s.axis === 'y').every((s) => s.at === 40)).toBe(true);
+	});
+
+	it('measures to what that line meets, and nothing it misses', () => {
+		// Beside the box but only lower down: a line along the top misses it.
+		const low = { x: 10, y: 45, w: 10, h: 20 };
+		// Level with the top: it meets this one.
+		const level = { x: 0, y: 35, w: 5, h: 10 };
+		const r = spacingReadouts(box, [low, level], page, { x: 40, y: 40 });
+		expect(r.find((s) => s.axis === 'x' && s.to === 40)!.from).toBe(5);
+		// From the middle, the lower one is the nearer.
+		const m = spacingReadouts(box, [low, level], page);
+		expect(m.find((s) => s.axis === 'x' && s.to === 40)!.from).toBe(20);
+	});
+
+	it('takes a box ending on its edge line as a diagonal, not a neighbour', () => {
+		// Above and to the left, its bottom on the box's top line.
+		const corner = { x: 10, y: 20, w: 10, h: 20 };
+		const r = spacingReadouts(box, [corner], page, { x: 40, y: 40 });
+		expect(r.find((s) => s.axis === 'x' && s.to === 40)!.from).toBe(0);
+	});
+});
+
+describe('a growing area grows away from its reference point', () => {
+	const grown = (valign: 'top' | 'middle' | 'bottom', extra: Partial<Box> = {}) => {
+		const box = newBox({ id: 'g', x: 10, y: 50, w: 40, h: 10, overflow: 'grow', valign, ...extra });
+		return resolveLayout({ boxes: [box], measured: { g: 30 }, hidden: new Set() });
+	};
+
+	it('down from a top, up from a bottom, both ways from a middle', () => {
+		expect(grown('top').tops.g).toBe(50);
+		expect(grown('bottom').tops.g).toBe(30);
+		expect(grown('middle').tops.g).toBe(40);
+		// The reference point stays where it was declared: the bottom at 60.
+		const r = grown('bottom');
+		expect(r.tops.g + r.heights.g).toBe(60);
+	});
+
+	it('not when it fits, nor when it clips', () => {
+		const box = newBox({ id: 'g', y: 50, h: 10, overflow: 'grow', valign: 'bottom' });
+		expect(resolveLayout({ boxes: [box], measured: { g: 8 }, hidden: new Set() }).tops.g).toBe(50);
+		expect(grown('bottom', { overflow: 'clip' }).tops.g).toBe(50);
+	});
+
+	it('down, as always, when anchored or hidden', () => {
+		const head = newBox({ id: 'h', y: 10, h: 10, overflow: 'clip' });
+		const box = newBox({ id: 'g', y: 50, h: 10, overflow: 'grow', valign: 'bottom', anchor: { to: 'h', gap: 2 } });
+		expect(resolveLayout({ boxes: [head, box], measured: { g: 30 }, hidden: new Set() }).tops.g).toBe(22);
+		const lone = newBox({ id: 'g', y: 50, h: 10, overflow: 'grow', valign: 'bottom', hideWhenEmpty: true });
+		expect(resolveLayout({ boxes: [lone], measured: { g: 30 }, hidden: new Set(['g']) }).tops.g).toBe(50);
+	});
+});
+
+describe('freedTop', () => {
+	it('keeps a freed area where it is drawn, its growth reckoned out for one that grows up', () => {
+		const head = newBox({ id: 'h', y: 10, h: 10, overflow: 'clip' });
+		for (const valign of ['top', 'middle', 'bottom'] as const) {
+			const box = newBox({ id: 'g', y: 0, h: 10, overflow: 'grow', valign, anchor: { to: 'h', gap: 2 } });
+			const before = resolveLayout({ boxes: [head, box], measured: { g: 30 }, hidden: new Set() });
+			const freed = { ...box, anchor: null, y: freedTop(box, before.tops.g, before.heights.g) };
+			const after = resolveLayout({ boxes: [head, freed], measured: { g: 30 }, hidden: new Set() });
+			expect(after.tops.g).toBe(before.tops.g);
+		}
 	});
 });

@@ -23,15 +23,31 @@ const assetKey = (name: string) => `image:${name.trim().toLowerCase()}`;
  * Object URLs are handed to the browser, not garbage-collected with the value
  * that made them, so each one is kept until it is replaced and then revoked.
  * Without this, re-picking an image a few times leaks a copy each time.
+ *
+ * Replaced only when the picture has changed, not on every resolve. The card
+ * and the Pictures tray each hold the URLs they were given, and a resolve by one
+ * used to revoke what the other was still showing — a picture carried out of
+ * the bar a second time dragged a broken-image icon, its URL revoked by the
+ * card's resolve after the first drop. `version` says whether it is the same
+ * picture: a file's size and time, or a write made here (`forgetObjectUrl`).
  */
-const objectUrls = new Map<string, string>();
+const objectUrls = new Map<string, { url: string; version: string }>();
 
-function cacheObjectUrl(key: string, blob: Blob): string {
+function cacheObjectUrl(key: string, blob: Blob, version: string): string {
 	const previous = objectUrls.get(key);
-	if (previous) URL.revokeObjectURL(previous);
+	if (previous?.version === version) return previous.url;
+	if (previous) URL.revokeObjectURL(previous.url);
 	const url = URL.createObjectURL(blob);
-	objectUrls.set(key, url);
+	objectUrls.set(key, { url, version });
 	return url;
+}
+
+/** A picture was written or deleted here: the next resolve makes a fresh URL. */
+function forgetObjectUrl(key: string) {
+	const previous = objectUrls.get(key);
+	if (!previous) return;
+	URL.revokeObjectURL(previous.url);
+	objectUrls.delete(key);
 }
 
 /**
@@ -76,6 +92,33 @@ export function safeMediaUrl(raw: unknown): string | null {
 	return safeImageUrl(value);
 }
 
+/** Kilobytes under a megabyte, one decimal above it; nobody wants 1483 KB. */
+export const weigh = (bytes: number) =>
+	bytes >= 1024 * 1024 ? `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+/**
+ * What a `data:` URL's picture weighs as a file: its base64 decoded, four
+ * characters to three bytes, less the padding. Not the length of the text —
+ * that is a third more than what a download of it would be.
+ */
+export function dataUrlBytes(url: string): number {
+	const comma = url.indexOf(',');
+	if (comma === -1) return 0;
+	const head = url.slice(0, comma);
+	const body = url.slice(comma + 1).replace(/\s/g, '');
+	if (!/;base64$/i.test(head)) {
+		// A stray `%` is enough to make this throw, and a weight is not worth
+		// an error: the text's own length is near enough.
+		try {
+			return decodeURIComponent(body).length;
+		} catch {
+			return body.length;
+		}
+	}
+	const padding = body.endsWith('==') ? 2 : body.endsWith('=') ? 1 : 0;
+	return Math.max(0, Math.floor((body.length * 3) / 4) - padding);
+}
+
 /** A URL as it can be written inside a `url("…")`, quotes and all. */
 export const cssUrl = (src: string) => `url("${src.replace(/["\\]/g, '\\$&')}")`;
 
@@ -102,6 +145,7 @@ export async function uploadBackgroundImage(
  * under a name, and having two of these would mean one of them was wrong.
  */
 async function writeImage(name: string, file: File): Promise<void> {
+	forgetObjectUrl(assetKey(name));
 	const folder = await readyFolder();
 	if (folder) {
 		const handle = await folder.getFileHandle(name, { create: true });
@@ -134,10 +178,14 @@ export async function resolveBackground(image: PageBackgroundImage | undefined):
 	// looked for in, for the same reason.
 	const folder = await readyFolder();
 	const file = folder ? await fileIn(folder, image.src) : null;
-	if (file) return cacheObjectUrl(key, file);
+	if (file) return cacheObjectUrl(key, file, `folder:${file.size}:${file.lastModified}`);
 	const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
 	if (!stored?.bytes) return null;
-	return cacheObjectUrl(key, new Blob([stored.bytes], { type: stored.type || 'image/png' }));
+	return cacheObjectUrl(
+		key,
+		new Blob([stored.bytes], { type: stored.type || 'image/png' }),
+		`browser:${stored.bytes.byteLength}`
+	);
 }
 
 // ---- images a row carries ---------------------------------------------------
@@ -161,8 +209,10 @@ export const LOCAL_IMAGE = 'local:';
 /** The name in a `local:` reference, or null for anything else. */
 export function localImageName(raw: unknown): string | null {
 	if (typeof raw !== 'string') return null;
+	// Asked of every cell on every change: the prefix is lower-cased, not the
+	// cell, which can be a drawing's thirty kilobytes of base64.
 	const value = raw.trim();
-	if (!value.toLowerCase().startsWith(LOCAL_IMAGE)) return null;
+	if (value.slice(0, LOCAL_IMAGE.length).toLowerCase() !== LOCAL_IMAGE) return null;
 	const name = value.slice(LOCAL_IMAGE.length).trim();
 	return name || null;
 }
@@ -178,8 +228,10 @@ export const localImageRef = (name: string) => `${LOCAL_IMAGE}${name.trim()}`;
  * Into the chosen folder where there is one, and into this browser otherwise.
  * See `imageFolder` below for why that choice exists.
  */
-export async function storeLocalImage(file: File): Promise<string> {
-	const name = file.name.trim() || 'image';
+export async function storeLocalImage(file: File, as?: string): Promise<string> {
+	// `as` puts a file back under the name something already points at, which
+	// is rarely the name the file happens to have on this device.
+	const name = as?.trim() || file.name.trim() || 'image';
 	await writeImage(name, file);
 	return name;
 }
@@ -204,11 +256,16 @@ export async function resolveLocalImages(
 		// what a name means from then on.
 		const fromFolder = folder ? await fileIn(folder, name) : null;
 		if (fromFolder) {
-			urls[name] = cacheObjectUrl(key, fromFolder);
+			urls[name] = cacheObjectUrl(key, fromFolder, `folder:${fromFolder.size}:${fromFolder.lastModified}`);
 			continue;
 		}
 		const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
-		if (stored?.bytes) urls[name] = cacheObjectUrl(key, new Blob([stored.bytes], { type: stored.type || 'image/png' }));
+		if (stored?.bytes)
+			urls[name] = cacheObjectUrl(
+				key,
+				new Blob([stored.bytes], { type: stored.type || 'image/png' }),
+				`browser:${stored.bytes.byteLength}`
+			);
 		else missing.push(name);
 	}
 	return { urls, missing };
@@ -365,11 +422,7 @@ export async function listImages(): Promise<ImageRecord[]> {
 /** Delete one image, wherever it is being held. */
 export async function deleteImage(name: string, where: ImageWhere): Promise<void> {
 	const key = assetKey(name);
-	const url = objectUrls.get(key);
-	if (url) {
-		URL.revokeObjectURL(url);
-		objectUrls.delete(key);
-	}
+	forgetObjectUrl(key);
 	if (where === 'browser') {
 		await idbDelete(STORE_ASSETS, key);
 		return;

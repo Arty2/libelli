@@ -1,8 +1,24 @@
 import { describe, expect, it } from 'vitest';
+import { fromRgba } from './color';
 import {
 	BOX_MODES,
 	DEFAULT_DEFAULTS,
+	MAX_PARAGRAPH,
+	MIN_BOX,
+	MIN_LEADING,
+	colorsFromRow,
+	normaliseColorFrom,
 	MIN_PAPER,
+	MIN_SIZE,
+	DEFAULT_MARGIN,
+	marginsOf,
+	normaliseMargin,
+	normaliseParagraph,
+	normaliseList,
+	normaliseBaseline,
+	normaliseColumns,
+	baselineOf,
+	listOf,
 	arrangeBoxes,
 	autoMap,
 	normaliseCentre,
@@ -11,8 +27,12 @@ import {
 	normaliseRotation,
 	sidesOf,
 	builtinTemplate,
+	exportTemplate,
+	importedTemplate,
+	frameHeight,
 	newBox,
 	normaliseTemplate,
+	blankTemplate,
 	shownAsMedia,
 	takesADrawing,
 	usedSlots
@@ -22,20 +42,29 @@ describe('the built-in template', () => {
 	const template = builtinTemplate();
 
 	it('loads with its boxes, anchors and bleed intact', () => {
-		expect(template.name).toBe('A5 Instruction Card');
-		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff' });
-		expect(template.boxes.map((b) => b.id)).toEqual(['b_title', 'b_subtitle', 'b_body', 'b_category', 'b_qr']);
-		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 8 });
-		expect(template.boxes.find((b) => b.id === 'b_category')?.anchor).toBeNull();
+		expect(template.name).toBe('A5 Starter Booklet');
+		expect(template.page).toEqual({ w: 148, h: 210, unit: 'mm', background: '#ffffff', margin: { top: 11, right: 14, bottom: 8, left: 14 } });
+		expect(template.boxes.map((b) => b.id)).toEqual(['b_accent', 'b_category', 'b_title', 'b_subtitle', 'b_body', 'b_sketch', 'b_link', 'b_date', 'b_qr', 'b_isbn', 'b_notes']);
+		expect(template.boxes.find((b) => b.id === 'b_body')?.anchor).toEqual({ to: 'b_subtitle', gap: 6 });
+		expect(template.boxes.find((b) => b.id === 'b_title')?.anchor).toEqual({ to: 'b_category', gap: 5 });
 		expect(template.bleed).toEqual({ enabled: false, amount: 3, cropMarks: false });
-		expect(template.print.enabled).toBe(false);
+		// Printed as it says on card 4: two to an A4 sheet, in a zine's order.
+		expect(template.print).toMatchObject({ enabled: true, count: 2, order: 'zine', sheet: { w: 210, h: 297 } });
+	});
+
+	it('shows a barcode and a contents list, as card 4 says', () => {
+		// The ISBN row is drawn as the EAN-13 every book carries, with its digits.
+		expect(template.boxes.find((b) => b.id === 'b_isbn')).toMatchObject({ slot: 'isbn', mode: 'qr', qr: { kind: 'ean13' } });
+		expect(template.boxes.find((b) => b.id === 'b_isbn')?.qr?.hideDigits).toBeUndefined();
+		// The contents' page numbers are joined to the titles by dots.
+		expect(template.boxes.find((b) => b.id === 'b_body')?.leader).toBe('dotted');
 	});
 
 	it('keeps the markdown metrics on the body box', () => {
 		expect(template.boxes.find((b) => b.id === 'b_body')?.md?.list).toEqual({
-			indent: 7,
-			markerGap: 4,
-			itemSpacing: 1.5
+			indent: 6,
+			markerGap: 3,
+			itemSpacing: 1.2
 		});
 	});
 });
@@ -128,7 +157,7 @@ describe('normaliseTemplate', () => {
 		expect(t.boxes[0]).toMatchObject({
 			padding: 2,
 			borderWidth: 0.4,
-			borderColor: '#b42318',
+			borderColor: '#ff0000',
 			borderRadius: 1.5,
 			background: '#eee8d5'
 		});
@@ -201,7 +230,7 @@ describe('normaliseTemplate', () => {
 
 	it('falls back to the default text color when a template names an unusable one', () => {
 		expect(normaliseTemplate({ schema: 2, defaults: { color: 'burnt sienna' }, boxes: [] }).defaults.color).toBe('#000000');
-		expect(normaliseTemplate({ schema: 2, defaults: { color: 'navy' }, boxes: [] }).defaults.color).toBe('#14306b');
+		expect(normaliseTemplate({ schema: 2, defaults: { color: 'navy' }, boxes: [] }).defaults.color).toBe('#000080');
 	});
 
 	it('falls back to white for a page color it cannot parse', () => {
@@ -230,8 +259,8 @@ describe('normaliseTemplate', () => {
 				{ id: 'b', slot: 'link', x: 0, y: 0, w: 20, h: 20, mode: 'qr', qr: { level: 'X', margin: 99 } }
 			]
 		});
-		expect(t.boxes[0].qr).toEqual({ level: 'M', margin: 2 });
-		expect(t.boxes[1].qr).toEqual({ level: 'M', margin: 8 });
+		expect(t.boxes[0].qr).toEqual({ level: 'M' });
+		expect(t.boxes[1].qr).toEqual({ level: 'M' });
 	});
 
 	it('rejects anything that is not a template', () => {
@@ -367,6 +396,13 @@ describe('sidesOf', () => {
 		expect(sidesOf(sides)).toEqual(sides);
 		expect(sidesOf(undefined)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
 	});
+
+	it('frames a picture inside the padding and the border, not over them', () => {
+		expect(frameHeight({ h: 26 })).toBe(26);
+		expect(frameHeight({ h: 26, padding: 2, borderWidth: 0.5 })).toBe(21);
+		expect(frameHeight({ h: 26, padding: { top: 1, right: 0, bottom: 3, left: 0 } })).toBe(22);
+		expect(frameHeight({ h: 4, padding: 3 })).toBe(0);
+	});
 });
 
 describe('mapping', () => {
@@ -435,6 +471,16 @@ describe('newBox blending', () => {
 	});
 });
 
+describe('newBox x-height', () => {
+	it('keeps an x-height in range, to the hundredth, beside the page\'s size only', () => {
+		expect(newBox({ xHeight: 0.524 }).xHeight).toBe(0.52);
+		expect(newBox({ xHeight: 1.06 }).xHeight).toBeUndefined();
+		expect(newBox({ xHeight: 'big' as never }).xHeight).toBeUndefined();
+		// A size of its own is the area's answer; the x-height goes.
+		expect(newBox({ xHeight: 0.5, size: 12 }).xHeight).toBeUndefined();
+	});
+});
+
 describe('newBox opacity', () => {
 	it('keeps a value between 0 and 1, to the nearest hundredth', () => {
 		expect(newBox({ opacity: 0.5 }).opacity).toBe(0.5);
@@ -464,9 +510,9 @@ describe('newBox board size', () => {
 		expect(newBox({ pixels: { w: 64, h: 64 } }).pixels).toEqual({ w: 64, h: 64 });
 	});
 
-	it('spends a template down to the budget rather than trusting it', () => {
-		expect(newBox({ pixels: { w: 128, h: 128 } }).pixels).toEqual({ w: 128, h: 32 });
-		expect(newBox({ pixels: { w: 9999, h: 9999 } }).pixels).toEqual({ w: 512, h: 8 });
+	it('keeps a board of any size, but holds a template to the largest side', () => {
+		expect(newBox({ pixels: { w: 128, h: 128 } }).pixels).toEqual({ w: 128, h: 128 });
+		expect(newBox({ pixels: { w: 99999, h: 9999 } }).pixels).toEqual({ w: 2048, h: 2048 });
 	});
 
 	it('drops half a size rather than pairing it with a guess', () => {
@@ -490,7 +536,197 @@ describe('newBox modes', () => {
 	});
 
 	it('knows which modes draw and which take a drawing', () => {
-		expect(BOX_MODES.filter(shownAsMedia)).toEqual(['image', 'color', 'bitmap']);
-		expect(BOX_MODES.filter(takesADrawing)).toEqual(['image', 'bitmap']);
+		expect(BOX_MODES.filter(shownAsMedia)).toEqual(['image', 'color']);
+		expect(BOX_MODES.filter(takesADrawing)).toEqual(['image']);
+	});
+});
+
+describe('box floors', () => {
+	it('holds an area to a size that can still be clicked', () => {
+		const box = newBox({ w: 0, h: -5 });
+		expect(box.w).toBe(MIN_BOX);
+		expect(box.h).toBe(MIN_BOX);
+	});
+
+	it('floors type size and leading, and keeps weight inside the scale', () => {
+		const box = newBox({ size: 0, lineHeight: 0, weight: 2000 });
+		expect(box.size).toBe(MIN_SIZE);
+		expect(box.lineHeight).toBe(MIN_LEADING);
+		expect(box.weight).toBe(900);
+	});
+
+	it('lets an anchor gap go negative, but not stop being a number', () => {
+		expect(newBox({ anchor: { to: 'a', gap: -3 } }).anchor).toEqual({ to: 'a', gap: -3 });
+		expect(newBox({ anchor: { to: 'a', gap: 'x' as unknown as number } }).anchor).toEqual({ to: 'a', gap: 0 });
+	});
+
+	it('keeps a paragraph style it can read and drops one it cannot', () => {
+		expect(newBox({ paragraph: { mode: 'indent', amount: 1.5 } }).paragraph).toEqual({ mode: 'indent', amount: 1.5 });
+		expect(normaliseParagraph({ mode: 'space', amount: 99 })).toEqual({ mode: 'space', amount: MAX_PARAGRAPH });
+		expect(normaliseParagraph({ mode: 'tab', amount: 1 })).toBeUndefined();
+	});
+});
+
+describe('bitmap areas', () => {
+	it('are read as image areas, keeping the drawing', () => {
+		const box = newBox({ mode: 'bitmap' as never, static: { dataUrl: 'data:image/png;base64,AAAA' } });
+		expect(box.mode).toBe('image');
+		expect(box.static?.dataUrl).toBe('data:image/png;base64,AAAA');
+	});
+});
+
+describe('page margins', () => {
+	it('defaults to the same margin all round, and keeps 0 as a real answer', () => {
+		expect(marginsOf({ w: 148, h: 210, unit: 'mm' })).toEqual({ top: DEFAULT_MARGIN, right: DEFAULT_MARGIN, bottom: DEFAULT_MARGIN, left: DEFAULT_MARGIN });
+		expect(normaliseMargin(0)).toBe(0);
+		expect(normaliseMargin(-4)).toBe(0);
+		expect(normaliseMargin('x')).toBeUndefined();
+	});
+
+	it('collapses four equal edges to one number and keeps uneven ones', () => {
+		expect(normaliseMargin({ top: 8, right: 8, bottom: 8, left: 8 })).toBe(8);
+		expect(normaliseMargin({ top: 20, right: 8, bottom: 15, left: 12 })).toEqual({ top: 20, right: 8, bottom: 15, left: 12 });
+	});
+
+	it('survives a round trip through a template file', () => {
+		const t = normaliseTemplate({ ...blankTemplate(), page: { w: 148, h: 210, unit: 'mm', margin: { top: 20, right: 8, bottom: 15, left: 12 } } });
+		expect(t.page.margin).toEqual({ top: 20, right: 8, bottom: 15, left: 12 });
+	});
+});
+
+describe('list style and baseline', () => {
+	it('keeps only the list fields that make sense', () => {
+		expect(normaliseList({ marker: 'dash', indent: '4', leading: 0.1 })).toEqual({ marker: 'dash', indent: 4, leading: MIN_LEADING });
+		expect(normaliseList({ marker: 'arrow', leading: '1.25' })).toEqual({ marker: 'arrow', leading: 1.25 });
+		expect(normaliseList({ numbering: 'upperRoman' })).toEqual({ numbering: 'upperRoman' });
+		expect(normaliseList({ numbering: 'hebrew' })).toBeUndefined();
+		// The spacing a list briefly had is not carried: it does not convert.
+		expect(normaliseList({ spacing: 2 })).toBeUndefined();
+		expect(normaliseList({ marker: 'star', indent: 'x' })).toBeUndefined();
+		expect(normaliseList(null)).toBeUndefined();
+	});
+
+	it('clamps a baseline either way and drops zero', () => {
+		expect(normaliseBaseline('-0.05')).toBe(-0.05);
+		expect(normaliseBaseline(3)).toBe(1);
+		expect(normaliseBaseline(0)).toBeUndefined();
+		expect(normaliseBaseline('')).toBeUndefined();
+	});
+
+	it("gives the page's baseline only to areas in the page's face", () => {
+		const defaults = { ...DEFAULT_DEFAULTS, baseline: 0.1 };
+		expect(baselineOf({}, defaults)).toBe(0.1);
+		expect(baselineOf({ font: defaults.font }, defaults)).toBe(0.1);
+		expect(baselineOf({ font: 'Other Face' }, defaults)).toBe(0);
+		expect(baselineOf({ font: 'Other Face', baseline: -0.2 }, defaults)).toBe(-0.2);
+	});
+
+	it('merges an area list over the page list field by field', () => {
+		const defaults = { ...DEFAULT_DEFAULTS, list: { marker: 'disc' as const, indent: 3 } };
+		expect(listOf({ list: { indent: 9 } }, defaults)).toEqual({ marker: 'disc', indent: 9 });
+		expect(listOf({}, DEFAULT_DEFAULTS)).toBeUndefined();
+	});
+
+	it('survives a load on the page and on an area', () => {
+		const t = builtinTemplate();
+		const raw = JSON.parse(JSON.stringify({ ...t, defaults: { ...t.defaults, list: { marker: 'dash' }, baseline: 0.04 } }));
+		raw.boxes[0].list = { leading: 1.1 };
+		raw.boxes[0].baseline = -0.1;
+		const back = normaliseTemplate(raw);
+		expect(back.defaults.list).toEqual({ marker: 'dash' });
+		expect(back.defaults.baseline).toBe(0.04);
+		expect(back.boxes[0].list).toEqual({ leading: 1.1 });
+		expect(back.boxes[0].baseline).toBe(-0.1);
+	});
+});
+
+describe('colors from a column', () => {
+	const box = { ...builtinTemplate().boxes[0], color: '#111111', colorFrom: { text: 'ink', fill: 'paper', border: 'edge' } };
+
+	it('keeps only named columns, and none is no field', () => {
+		expect(normaliseColorFrom({ text: ' ink ', fill: '', border: 3 })).toEqual({ text: 'ink' });
+		expect(normaliseColorFrom({ text: '  ' })).toBeUndefined();
+		expect(normaliseColorFrom('ink')).toBeUndefined();
+	});
+
+	it("paints each color from the row's cell where the cell is a color", () => {
+		const drawn = colorsFromRow(box, { ink: '#c0392b', paper: 'teal', edge: 'rgb(0, 0, 255)' });
+		expect(drawn.color).toBe('#c0392b');
+		expect(drawn.background).toBe('#008080');
+		expect(drawn.borderColor).toBe('rgb(0, 0, 255)');
+	});
+
+	it("leaves the area's own color where a cell is empty, words, or missing", () => {
+		const drawn = colorsFromRow(box, { ink: 'urgent', paper: '' });
+		expect(drawn.color).toBe('#111111');
+		expect(drawn.background).toBe(box.background);
+		expect(drawn.borderColor).toBe(box.borderColor);
+		expect(colorsFromRow(box, null)).toBe(box);
+	});
+
+	it("keeps the area's opacity on the row's color", () => {
+		const faded = { ...box, background: 'rgba(255, 255, 255, 0.5)' };
+		expect(colorsFromRow(faded, { paper: '#ff0000' }).background).toBe(fromRgba({ r: 255, g: 0, b: 0, a: 0.5 }));
+		// Opaque stays exactly the cell as parsed.
+		expect(colorsFromRow(box, { ink: 'teal' }).color).toBe('#008080');
+	});
+
+	it('lets nothing but a color out of a cell', () => {
+		// A cell is untrusted: this must not reach a style attribute as written.
+		const drawn = colorsFromRow(box, { ink: 'red;background:url(https://x.example/)' });
+		expect(drawn.color).toBe('#111111');
+	});
+
+	it('survives a load', () => {
+		const t = builtinTemplate();
+		const raw = JSON.parse(JSON.stringify(t));
+		raw.boxes[0].colorFrom = { fill: 'status', text: '' };
+		expect(normaliseTemplate(raw).boxes[0].colorFrom).toEqual({ fill: 'status' });
+	});
+});
+
+describe('normaliseColumns', () => {
+	it('keeps two to six whole columns and a gap of nothing or more', () => {
+		expect(normaliseColumns({ count: 3, gap: 4 })).toEqual({ count: 3, gap: 4 });
+		expect(normaliseColumns({ count: '2', gap: '0' })).toEqual({ count: 2, gap: 0 });
+		expect(normaliseColumns({ count: 9, gap: -2 })).toEqual({ count: 6, gap: 0 });
+		expect(normaliseColumns({ count: 2.6 })).toEqual({ count: 3, gap: 5 });
+	});
+
+	it('is one column — no field — for fewer than two, or nothing readable', () => {
+		expect(normaliseColumns({ count: 1, gap: 5 })).toBeUndefined();
+		expect(normaliseColumns({ count: '', gap: 5 })).toBeUndefined();
+		expect(normaliseColumns('three')).toBeUndefined();
+		expect(normaliseColumns(undefined)).toBeUndefined();
+	});
+
+	it('keeps orphans and widows only where they differ from 2 and 3, as whole lines from 1 to 10', () => {
+		expect(normaliseColumns({ count: 2, gap: 5, orphans: 2, widows: 3 })).toEqual({ count: 2, gap: 5 });
+		expect(normaliseColumns({ count: 2, gap: 5, orphans: '4', widows: 1 })).toEqual({ count: 2, gap: 5, orphans: 4, widows: 1 });
+		expect(normaliseColumns({ count: 2, gap: 5, orphans: 0, widows: 99 })).toEqual({ count: 2, gap: 5, orphans: 1, widows: 10 });
+		expect(normaliseColumns({ count: 2, gap: 5, orphans: 'x', widows: '' })).toEqual({ count: 2, gap: 5 });
+	});
+
+	it('survives a template trip, and is dropped from one that does not say', () => {
+		const box = { id: 'a', slot: null, x: 0, y: 0, w: 50, h: 20, mode: 'plain', columns: { count: 4, gap: 3 } };
+		const t = normaliseTemplate({ ...builtinTemplate(), boxes: [box] });
+		expect(t.boxes[0].columns).toEqual({ count: 4, gap: 3 });
+		const plain = normaliseTemplate({ ...builtinTemplate(), boxes: [{ ...box, columns: undefined }] });
+		expect('columns' in plain.boxes[0]).toBe(false);
+	});
+});
+
+describe('exportTemplate', () => {
+	it('leaves the starter mark behind: it is this browser\'s, not the design\'s', () => {
+		const t = normaliseTemplate({ ...JSON.parse(JSON.stringify(builtinTemplate())), starter: 'a5-starter-booklet' });
+		expect(t.starter).toBe('a5-starter-booklet');
+		const file = JSON.parse(exportTemplate(t));
+		expect('starter' in file).toBe(false);
+		expect(file.name).toBe(t.name);
+	});
+
+	it('and an import leaves behind a mark an older file still carries', () => {
+		const old = { ...JSON.parse(JSON.stringify(builtinTemplate())), starter: 'a5-starter-booklet' };
+		expect('starter' in importedTemplate(old)).toBe(false);
 	});
 });

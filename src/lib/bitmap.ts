@@ -1,31 +1,27 @@
 /**
  * The pixel grid a drawn area gets, and the arithmetic for pointing at it.
  *
- * Drawings are deliberately small. What is drawn here is written into the table
- * as a base64 `data:` URL — so it travels with the CSV, and a row's picture is
- * as portable as its words — and a cell is not a file store: a PNG of a few
- * flat colours at these sizes is a kilobyte or two, which is a long cell but a
- * real one. The low resolution is the feature, not a limitation working its way
- * out.
+ * What is drawn here is written into the table as a base64 `data:` URL — so it
+ * travels with the CSV, and a row's picture is as portable as its words. Every
+ * drawing starts on 64 by 64, where a PNG of a few flat colours is a kilobyte
+ * or two; a board can be made any size after that. There was a fixed budget of
+ * 64 x 64 pixels, spent in any shape, and it was lifted: a banner or a detailed
+ * drawing wanted more than it allowed, and the weight is shown as the board is
+ * drawn on, so the cost of a large one is in view rather than forbidden.
  *
- * What is fixed is the *number* of pixels, not the shape: a board is 64 by 64
- * worth of them, spent however you like — 64 x 64, 128 x 32, 256 x 16. That is
- * the one thing the cell cares about, so it is the one thing held constant, and
- * a banner can be drawn on a banner without a square's worth of empty rows
- * going into the table with it.
+ * The one limit left is a side of `MAX_SIDE`, which is not a budget but a
+ * guard: a template is a file anyone can hand you, and a board it names is a
+ * canvas this browser allocates, thirty times over in the editor's undo.
  */
-
-/** How many pixels a board gets: 64 x 64 of them, in any arrangement. */
-export const BUDGET = 64 * 64;
 
 /** Both sides of the board every drawing starts on. */
 export const DEFAULT_SIDE = 64;
 
-/** No side shorter than this: eight pixels is already barely something to draw on. */
-export const MIN_SIDE = 8;
+/** A board of one pixel is still a board. */
+export const MIN_SIDE = 1;
 
-/** ...and so no side longer than the budget divided by that. */
-export const MAX_SIDE = BUDGET / MIN_SIDE;
+/** Past this a side is a photograph, not a drawing — see the note above. */
+export const MAX_SIDE = 2048;
 
 export interface Grid {
 	w: number;
@@ -39,21 +35,9 @@ export function clampSide(value: unknown): number | null {
 	return Math.max(MIN_SIDE, Math.min(MAX_SIDE, Math.round(n)));
 }
 
-/**
- * The nearest board to the one asked for that the budget can pay for. The width
- * is what is kept and the height is what gives — a side typed into the editor
- * should be the side you typed, with the other one moving to make room, rather
- * than both drifting away from what was asked for.
- */
+/** The board asked for, each side held to the limits; a side that is not a number is the usual one. */
 export function fitBoard(w: unknown, h: unknown): Grid {
-	const width = clampSide(w) ?? DEFAULT_SIDE;
-	const height = clampSide(h) ?? DEFAULT_SIDE;
-	if (width * height <= BUDGET) return { w: width, h: height };
-	const room = Math.floor(BUDGET / width);
-	// A width so great that even the shortest board overspends: the width is the
-	// side that has to give after all.
-	if (room < MIN_SIDE) return { w: Math.floor(BUDGET / MIN_SIDE), h: MIN_SIDE };
-	return { w: width, h: room };
+	return { w: clampSide(w) ?? DEFAULT_SIDE, h: clampSide(h) ?? DEFAULT_SIDE };
 }
 
 /** Whether a board is the one every drawing starts on, and so need not be stored. */
@@ -72,24 +56,16 @@ export function boardSize(box: { pixels?: Grid | null }): Grid {
 }
 
 /**
- * The board to open a picture on: its own size where the budget can pay for it,
- * and the largest board of its shape where it cannot. A drawing made here comes
- * back exactly as it was drawn — which is the whole point of preferring the
- * picture's size to the area's — while a photograph dropped on the area is a
- * million pixels and has to be resampled to be drawn on at all.
+ * The board to open a picture on: its own size, so a drawing made here comes
+ * back exactly as it was drawn. Only a picture with a side past `MAX_SIDE` is
+ * scaled — down to fit, keeping its shape.
  */
 export function boardFor(w: number, h: number): Grid {
 	const width = Math.round(w);
 	const height = Math.round(h);
 	if (!(width > 0) || !(height > 0)) return { w: DEFAULT_SIDE, h: DEFAULT_SIDE };
-	// A picture the budget can pay for keeps its own pixels; one smaller than the
-	// smallest board sits in the corner of that board rather than being blown up
-	// to fill it, because nearest-neighbour by 21.3 is not the picture any more.
-	if (width * height <= BUDGET) {
-		return fitBoard(Math.max(MIN_SIDE, width), Math.max(MIN_SIDE, height));
-	}
-	const scale = Math.sqrt(BUDGET / (width * height));
-	return fitBoard(Math.max(MIN_SIDE, Math.round(width * scale)), Math.round(height * scale));
+	const scale = Math.min(1, MAX_SIDE / Math.max(width, height));
+	return fitBoard(width * scale, height * scale);
 }
 
 /** A rectangle of the grid, in pixels. */
@@ -171,4 +147,94 @@ export function line(from: { x: number; y: number }, to: { x: number; y: number 
 			y += stepY;
 		}
 	}
+}
+
+type Point = { x: number; y: number };
+
+/**
+ * The far corner pulled in so the drag is a square — for the square and the
+ * circle. The longer side wins, so the shape reaches the pointer on the axis
+ * it was dragged furthest along, and each side keeps the direction it was
+ * dragged in.
+ */
+export function squareFrom(from: Point, to: Point): Point {
+	const side = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+	return { x: from.x + side * Math.sign(to.x - from.x || 1), y: from.y + side * Math.sign(to.y - from.y || 1) };
+}
+
+/** Every pixel of a rectangle's outline between two opposite corners, corners included, once each. */
+export function rectOutline(a: Point, b: Point): Point[] {
+	const x0 = Math.min(a.x, b.x);
+	const x1 = Math.max(a.x, b.x);
+	const y0 = Math.min(a.y, b.y);
+	const y1 = Math.max(a.y, b.y);
+	const points: Point[] = [];
+	for (let x = x0; x <= x1; x++) {
+		points.push({ x, y: y0 });
+		if (y1 !== y0) points.push({ x, y: y1 });
+	}
+	for (let y = y0 + 1; y < y1; y++) {
+		points.push({ x: x0, y });
+		if (x1 !== x0) points.push({ x: x1, y });
+	}
+	return points;
+}
+
+/**
+ * Every pixel of the ellipse inscribed in the rectangle between two opposite
+ * corners, once each. Zingl's midpoint ellipse in a rectangle: unlike the
+ * centre-and-radius form it handles an even width or height, where the centre
+ * falls between two pixels, so a 16-pixel circle is 16 pixels across and not
+ * 15 or 17. Pixel-exact rather than a canvas `ellipse()`, which would
+ * antialias its edge into colours that were never chosen.
+ */
+export function ellipseOutline(from: Point, to: Point): Point[] {
+	let x0 = Math.min(from.x, to.x);
+	let x1 = Math.max(from.x, to.x);
+	let y0 = Math.min(from.y, to.y);
+	let y1 = Math.max(from.y, to.y);
+	const seen = new Set<string>();
+	const points: Point[] = [];
+	const put = (x: number, y: number) => {
+		const key = `${x},${y}`;
+		if (seen.has(key)) return;
+		seen.add(key);
+		points.push({ x, y });
+	};
+	let a = x1 - x0;
+	const b = y1 - y0;
+	let b1 = b & 1;
+	let dx = 4 * (1 - a) * b * b;
+	let dy = 4 * (b1 + 1) * a * a;
+	let err = dx + dy + b1 * a * a;
+	y0 += (b + 1) >> 1;
+	y1 = y0 - b1;
+	a = 8 * a * a;
+	b1 = 8 * b * b;
+	do {
+		put(x1, y0);
+		put(x0, y0);
+		put(x0, y1);
+		put(x1, y1);
+		const e2 = 2 * err;
+		if (e2 <= dy) {
+			y0++;
+			y1--;
+			err += dy += a;
+		}
+		if (e2 >= dx || 2 * err > dy) {
+			x0++;
+			x1--;
+			err += dx += b1;
+		}
+	} while (x0 <= x1);
+	// A very flat ellipse finishes its tips here: the loop above runs out of
+	// columns before it has climbed the last rows at either end.
+	while (y0 - y1 <= b) {
+		put(x0 - 1, y0);
+		put(x1 + 1, y0++);
+		put(x0 - 1, y1);
+		put(x1 + 1, y1--);
+	}
+	return points;
 }

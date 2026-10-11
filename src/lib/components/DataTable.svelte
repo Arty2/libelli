@@ -1,13 +1,41 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import Icon from './Icon.svelte';
-	import { download } from '$lib/download';
-	import { hold } from '$lib/gestures';
+	import { download, fileStem } from '$lib/download';
+	import { completePlaceholders } from '$lib/complete';
+	import { HOLD_MS, vibrate } from '$lib/haptics';
+	import { touchOpen } from '$lib/gestures';
+	import { caretAt, caretPlace } from '$lib/caret';
 	import { armDefault } from '$lib/modal';
-	import { parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
-	import { indexAfterSort, moveColumn, sortRows, type SortDirection } from '$lib/table';
+	import { scrollEdges } from '$lib/scrolledge';
+	import { dataUrlBytes, localImageName, safeMediaUrl, weigh } from '$lib/assets';
+	import { parseColor } from '$lib/color';
+	import type { Grid } from '$lib/bitmap';
+	import BitmapEditor from './BitmapEditor.svelte';
+	import { columnName, parseTable, toCsv, toTsv, wouldEmptyTable } from '$lib/parse';
+	import { isKeyword } from '$lib/placeholders';
+	import {
+		appendRows,
+		countText,
+		deleteRows,
+		dropTarget,
+		indexAfterSort,
+		moveColumn,
+		moveRows,
+		moveRowsTo,
+		numberIn,
+		orderOf,
+		renumbering,
+		sortRows,
+		unsortRows,
+		withoutOrder,
+		type SortDirection
+	} from '$lib/table';
 	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
-	import type { Dataset, Row } from '$lib/types';
+	import type { Dataset, Row, RowHeight } from '$lib/types';
+
+	/** Where a drawing was opened from, other than the table itself. */
+	type Origin = 'card' | 'images';
 
 	interface Props {
 		dataset: Dataset;
@@ -19,6 +47,49 @@
 		previousTable: string;
 		onselecttable: (id: string) => void;
 		onnewtable: () => void;
+		/**
+		 * Columns something on the card draws from — bound to an area, or named
+		 * as `%%column%%` in an area's words or a cell it shows. A column not in
+		 * here is marked, because it is data no card will print.
+		 */
+		usedColumns: Set<string>;
+		/** put an area bound to this column on the card */
+		onplacecolumn: (column: string) => void;
+		/** a cell of this column has just been entered, so the card can point at it */
+		oncellfocus: (column: string) => void;
+		/**
+		 * Stored pictures by name, resolved — what a `local:name` cell shows as
+		 * its thumbnail, and what the drawing surface opens on when asked to
+		 * draw over one.
+		 */
+		images?: Record<string, string>;
+		/** The board and the ink a drawing in this column is made with. */
+		drawingFor: (column: string) => { pixels?: Grid; ink: string };
+		/** A drawing saved into a cell, from the side panel's Save. */
+		ondrawn: (row: number, column: string, dataUrl: string, pixels: Grid | undefined) => void;
+		/**
+		 * An area with no column, asked to be drawn in: it has no cell, but it
+		 * draws in the same side panel, and its drawing goes onto the area. A
+		 * new object each time, as `openRequest` is.
+		 */
+		areaRequest?: { id: string; name: string; value: string; pixels?: Grid; ink: string; from?: Origin } | null;
+		onsavearea: (id: string, dataUrl: string, pixels: Grid | undefined) => void;
+		ondeletearea: (id: string) => void;
+		/**
+		 * Whether the panel is showing the drawing board. The page puts its
+		 * options row away while it is, so on a phone the tray can open far
+		 * enough to draw in.
+		 */
+		ondrawing?: (drawing: boolean) => void;
+		/**
+		 * Whether a cell is open full size, words or drawing. On a phone the page
+		 * puts its options row away for it too, so the tray has the height.
+		 */
+		onfullcell?: (open: boolean) => void;
+		/** A stored picture, opened large in the Pictures tray to be looked at and edited. */
+		onopenimage: (name: string) => void;
+		/** lock or unlock the whole table; the page owns the dataset */
+		onlock: (locked: boolean) => void;
 		ondeletetable: () => void;
 		/** back to the table before this one — the two you are working between */
 		onswaptable: () => void;
@@ -32,22 +103,57 @@
 		ontraydrag: (phase: 'start' | 'move' | 'end', clientY: number) => void;
 		/** column widths in px, keyed by column name; owned by the app's UI state */
 		columnWidths: Record<string, number>;
+		/** how tall a row may be; owned by the app's UI state, like the widths */
+		rowHeight: RowHeight;
+		onrowheight: (next: RowHeight) => void;
 		oncolumnwidths: (widths: Record<string, number>) => void;
 		activeRow: number;
 		/** the column the selected area draws from, so its cells can be pointed at */
 		selectedColumn?: string | null;
 		onactivate: (index: number) => void;
-		onchange: (dataset: Dataset) => void;
+		/**
+		 * `moved` is set by the edits that renumber rows — a delete, a move by
+		 * hand — so the app can carry every `%%lookup:N:…%%` along with its row;
+		 * what comes back is a sentence about that, to say with the edit's own,
+		 * and whether it is a warning (a lookup lost its row).
+		 */
+		onchange: (
+			dataset: Dataset,
+			moved?: Map<number, number | null> | null
+		) => { note: string; warning: boolean } | void;
 		/** so bindings can follow a renamed column instead of pointing at a ghost */
 		onrenamecolumn: (from: string, to: string) => void;
-		/** press and hold Import: put the sample cards back */
-		onloadsample: () => void;
+		/**
+		 * A cell to open full size, asked for from outside — the edit badge on
+		 * a Data Field area. A new object each time, so asking twice for the
+		 * same cell opens it twice.
+		 */
+		openRequest?: { row: number; column: string; draw?: boolean; from?: Origin } | null;
+		/**
+		 * The editor closed on something that was not opened from the table: the
+		 * page puts back what was there before — the Pictures tray, or no panel at
+		 * all — rather than leaving the table showing, which nobody asked for.
+		 */
+		onleave?: (to: Origin) => void;
+		/** open the Getting Started table, or start one */
+		ongettingstarted: () => void;
+		/**
+		 * Put the starter this table began as back over it, after asking.
+		 * Absent on a table that began any other way, which has no starter to
+		 * go back to — see `starterOfTable`.
+		 */
+		onresettable?: () => void;
 		/**
 		 * Say something. The table used to have a line of its own under the
 		 * buttons, which meant the app had two places a notice could appear and
 		 * neither of them was where you were looking.
 		 */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
+		/**
+		 * Say something worth reading in full: the status line's warning, and
+		 * its dialog open on it. A warning pressed for, not one that turned up.
+		 */
+		onwarn?: (message: string) => void;
 	}
 
 	let {
@@ -57,6 +163,19 @@
 		previousTable,
 		onselecttable,
 		onnewtable,
+		usedColumns,
+		onplacecolumn,
+		oncellfocus,
+		images = {},
+		drawingFor,
+		ondrawn,
+		areaRequest = null,
+		onsavearea,
+		ondeletearea,
+		ondrawing,
+		onfullcell,
+		onopenimage,
+		onlock,
 		ondeletetable,
 		onswaptable,
 		onrenametable,
@@ -64,14 +183,28 @@
 		ontraydrag,
 		columnWidths,
 		oncolumnwidths,
+		rowHeight,
+		onrowheight,
 		activeRow,
 		selectedColumn = null,
 		onactivate,
 		onchange,
 		onrenamecolumn,
-		onloadsample,
-		onnotice
+		ongettingstarted,
+		onresettable,
+		openRequest = null,
+		onleave,
+		onnotice,
+		onwarn
 	}: Props = $props();
+
+	/**
+	 * Where the open editor was asked for from, and so where its × goes back
+	 * to. From the table itself, the table; from an area on the card, the
+	 * panel closes, since it was only opened to draw in; from the Pictures
+	 * tray, back to that.
+	 */
+	let leaveTo = $state<'table' | Origin>('table');
 
 	/**
 	 * The row the page is showing, brought into view. Paging the card with the
@@ -112,6 +245,486 @@
 
 	const tableName = $derived(dataset.name ?? '');
 
+	/**
+	 * Row height, cycled by one button: short, medium, and as tall as the
+	 * longest cell. Three states on one control rather than a menu, because it
+	 * is a view you flip through to find the one that suits the table, not a
+	 * setting you look up.
+	 */
+	const ROW_HEIGHTS: RowHeight[] = ['short', 'medium', 'full'];
+	const ROW_HEIGHT_LABELS: Record<RowHeight, string> = { short: 'Short', medium: 'Long', full: 'Full' };
+	/** Carbon's: the ruled table for one line a row, fit to screen, fit to height. */
+	const ROW_HEIGHT_ICONS: Record<RowHeight, string> = { short: 'table', medium: 'fit-to-screen', full: 'fit-to-height' };
+	const nextRowHeight = $derived(ROW_HEIGHTS[(ROW_HEIGHTS.indexOf(rowHeight) + 1) % ROW_HEIGHTS.length]);
+
+	/**
+	 * Full height by hand, for a browser with no `field-sizing` (Safari): the
+	 * field is set to the height its words scroll to, whenever they change or
+	 * its width does. Elsewhere this does nothing — the stylesheet has it.
+	 */
+	const sizesItself = typeof CSS !== 'undefined' && CSS.supports('field-sizing', 'content');
+
+	/**
+	 * The fields waiting to be measured — to be sized (`autosize`) or marked
+	 * as holding more than they show (`overflowMark`) — done together once a
+	 * frame: every write that resets a height, then every read, then every
+	 * write of what was read. Done one field at a time, each read came after
+	 * the last field's write and forced the whole table to lay out again: a
+	 * table of five hundred rows took seconds to open, sort or import.
+	 */
+	const toFit = new Set<HTMLTextAreaElement>();
+	const toMark = new Set<HTMLTextAreaElement>();
+	let measureFrame = 0;
+	const measureSoon = () => {
+		if (!measureFrame) measureFrame = requestAnimationFrame(measureAll);
+	};
+	function measureAll() {
+		measureFrame = 0;
+		const fits = [...toFit].filter((n) => n.isConnected);
+		toFit.clear();
+		for (const node of fits) node.style.height = 'auto';
+		const heights = fits.map((node) => node.scrollHeight);
+		fits.forEach((node, i) => (node.style.height = `${heights[i]}px`));
+		const marks = [...toMark].filter((n) => n.isConnected);
+		toMark.clear();
+		const more = marks.map((node) => node.scrollHeight > node.clientHeight + 1);
+		marks.forEach((node, i) => node.parentElement?.toggleAttribute('data-more', more[i]));
+	}
+	/** One observer for every field, each told apart by what it watches. */
+	let fieldObserver: ResizeObserver | null = null;
+	const fitting = new WeakMap<Element, HTMLTextAreaElement>();
+	const observeField = (target: Element) => {
+		fieldObserver ??= new ResizeObserver((entries) => {
+			for (const { target: seen } of entries) {
+				const field = fitting.get(seen);
+				if (field) toFit.add(field);
+				if (seen instanceof HTMLTextAreaElement) toMark.add(seen);
+			}
+			measureSoon();
+		});
+		fieldObserver.observe(target);
+	};
+
+	function autosize(node: HTMLTextAreaElement, on: boolean) {
+		let active = on && !sizesItself;
+		// Typing: at once, the one field — the words must not wait a frame.
+		const fit = () => {
+			if (!active) return;
+			node.style.height = 'auto';
+			node.style.height = `${node.scrollHeight}px`;
+		};
+		const cell = node.closest('td') ?? node;
+		const start = () => {
+			node.addEventListener('input', fit);
+			fitting.set(cell, node);
+			observeField(cell);
+			toFit.add(node);
+			measureSoon();
+		};
+		const stop = () => {
+			node.removeEventListener('input', fit);
+			fitting.delete(cell);
+			if (cell !== node) fieldObserver?.unobserve(cell);
+			toFit.delete(node);
+			node.style.height = '';
+		};
+		if (active) start();
+		return {
+			update(next: boolean) {
+				const wanted = next && !sizesItself;
+				if (wanted === active) {
+					if (active) {
+						toFit.add(node);
+						measureSoon();
+					}
+					return;
+				}
+				active = wanted;
+				if (active) start();
+				else stop();
+			},
+			destroy: stop
+		};
+	}
+
+	/**
+	 * Mark a cell whose words run past what its field shows.
+	 *
+	 * A textarea has no `text-overflow` of its own — that works on a single
+	 * line of an ordinary box, and a field of wrapped lines just stops at its
+	 * edge, which looks exactly like a cell that has nothing more in it. So
+	 * the field is measured instead: taller inside than it is drawn, and its
+	 * cell carries `data-more`, which the stylesheet turns into an ellipsis in
+	 * the corner. Measured again when the value changes from anywhere — typing,
+	 * undo, a paste — and whenever the field's own size does, which is what a
+	 * change of row height or column width is.
+	 */
+	function overflowMark(node: HTMLTextAreaElement, _value: string) {
+		const check = () => {
+			toMark.add(node);
+			measureSoon();
+		};
+		observeField(node);
+		node.addEventListener('input', check);
+		check();
+		return {
+			update: check,
+			destroy: () => {
+				fieldObserver?.unobserve(node);
+				toMark.delete(node);
+				node.removeEventListener('input', check);
+			}
+		};
+	}
+
+	/**
+	 * Rows shown at full height on their own, by index, whatever the table's
+	 * row height is. A look rather than a setting, so it is not stored, and a
+	 * different table or a sort clears it — the indices would point at other
+	 * rows.
+	 */
+	let expanded = $state<Set<number>>(new Set());
+
+	function toggleExpanded(index: number) {
+		const next = new Set(expanded);
+		if (next.has(index)) next.delete(index);
+		else next.add(index);
+		expanded = next;
+	}
+
+	/** Read-only, from here and from the card — see `Dataset.locked`. */
+	const locked = $derived(!!dataset.locked);
+
+	/**
+	 * The cell being typed in, for the count under it. Held by position rather
+	 * than read off `document.activeElement`, so the count is part of the
+	 * render and follows the value as it is typed.
+	 */
+	let editing = $state<{ row: number; column: string } | null>(null);
+	/**
+	 * Whether the press that is choosing a cell is a finger's. A cell a finger
+	 * taps is read-only, so the tap chooses it without the keyboard coming up
+	 * over half the screen; a second tap on it, however much later, or a long
+	 * press (`touchOpen`) opens it full size to type in. A mouse or a pen
+	 * types in place. Set on the way down, captured on the table, which is
+	 * before the cell takes focus — and focus is what brings a keyboard.
+	 *
+	 * Read-only rather than `inputmode="none"`, which kept the keyboard down
+	 * too and let the browser place a caret — and with the caret, Android's
+	 * own Paste bubble on the first tap, which nothing on a page can turn off.
+	 * A read-only cell has no caret, so where the finger was is measured
+	 * (`caretAt`) on the press that opens it.
+	 */
+	let byFinger = $state(false);
+
+	/** What a column a keyword has taken is told, here and in the status line. */
+	const keywordWarning = (column: string) =>
+		`“${column}” is a reserved keyword. Rename the column to enable the %%${column.trim().toLowerCase()}%% placeholder.`;
+
+	const countLabel = (value: string) => {
+		// A picture's words are base64 nobody counts; what it weighs is the
+		// number worth having — a drawing is what makes a table heavy.
+		const picture = cellPicture(value);
+		if (picture) return weigh(dataUrlBytes(picture));
+		const stored = localImageName(value);
+		if (stored) return stored;
+		const { characters, words } = countText(value);
+		return `${characters} character${characters === 1 ? '' : 's'} · ${words} word${words === 1 ? '' : 's'}`;
+	};
+
+	/**
+	 * A cell opened full size — its [...], or Edit in the bar
+	 * under the table while it is being typed in. A cell of a long body of
+	 * Markdown is a keyhole at the height a table row can spare, so the whole
+	 * of it gets the table's room. It edits the cell itself, live, as the small
+	 * field does: the card follows each keystroke, undo reaches every change,
+	 * and there is nothing to confirm — the × or Escape puts the table back.
+	 */
+	let bigCell = $state<{ row: number; column: string; draw?: boolean } | null>(null);
+	/** The bar's height: the full-size editor stops above it, so the bar stays. */
+	let barHeight = $state(0);
+
+	/**
+	 * `draw` is the card asking for the drawing surface on an area bound to
+	 * this column: then an empty cell, or one pointing at a stored picture, is
+	 * drawn on rather than typed in. Without it, a stored picture is not this
+	 * editor's to open at all — it goes to the Pictures tray, where it can be
+	 * seen large and cropped or turned.
+	 */
+	function openBigCell(rowIndex: number, column: string, draw = false, from: 'table' | Origin = 'table', caret?: number) {
+		const value = dataset.rows[rowIndex]?.[column];
+		if (value === undefined) return false;
+		const stored = localImageName(value);
+		if (stored && !draw) {
+			onopenimage(stored);
+			return;
+		}
+		// The small field under the press still has the focus, and would keep
+		// the outline lit behind the editor.
+		(document.activeElement as HTMLElement | null)?.blur();
+		drawingArea = null;
+		leaveTo = from;
+		openCaret = caret ?? null;
+		fingerMark = null;
+		bigCell = { row: rowIndex, column, draw: draw || undefined };
+		drawnValue = value;
+		onactivate(rowIndex);
+	}
+
+	// Only the request is tracked: a dataset or a lock changing under an open
+	// request must not open the cell again.
+	$effect(() => {
+		const ask = openRequest;
+		if (!ask) return;
+		untrack(() => {
+			if (!locked && dataset.columns.includes(ask.column)) openBigCell(ask.row, ask.column, !!ask.draw, ask.from ?? 'table');
+		});
+	});
+
+	/** The same column, a row up or down, as the card's pager steps cards. */
+	function stepBigCell(by: number) {
+		if (!bigCell) return;
+		const row = Math.max(0, Math.min(dataset.rows.length - 1, bigCell.row + by));
+		if (row === bigCell.row) return;
+		bigCell = { ...bigCell, row };
+		drawnValue = dataset.rows[row]?.[bigCell.column] ?? '';
+		onactivate(row);
+	}
+
+	/**
+	 * What the full-size editor is for this cell: the drawing surface for a
+	 * picture, and for any cell at all when it was opened to draw — an area
+	 * showing pictures asked for it, so the column is a column of pictures,
+	 * and whatever a cell holds that cannot be drawn over (an address from
+	 * elsewhere) opens as a blank board, as it always has. Otherwise a stored
+	 * picture's own look with the way to the Pictures tray, or the words.
+	 */
+	/** Whether the panel shows the drawing board for this open cell. */
+	$effect(() => {
+		ondrawing?.(!!drawingArea || (!!bigCell && boardShown(bigCell)));
+	});
+	$effect(() => {
+		onfullcell?.(!!drawingArea || !!bigCell);
+	});
+
+	const boardShown = (open: { row: number; column: string; draw?: boolean }) =>
+		!locked && bigKind(dataset.rows[open.row]?.[open.column] ?? '', open.draw) === 'drawing';
+
+	function bigKind(value: string, draw: boolean | undefined): 'drawing' | 'stored' | 'text' {
+		if (draw || cellPicture(value)) return 'drawing';
+		if (localImageName(value)) return 'stored';
+		return 'text';
+	}
+
+	/**
+	 * The drawing surface reads its picture once, when it opens. A cell changed
+	 * underneath it — undo, a paste into the table, the row stepped — has to
+	 * open it again on what is there now; a cell changed *by* it must not, or
+	 * every stroke would start the board afresh and lose its own undo.
+	 * `drawnValue` is the last value the surface knows about, and `drawEpoch`
+	 * the key that remounts it.
+	 */
+	let drawnValue = '';
+	let drawEpoch = $state(0);
+
+	$effect(() => {
+		const open = bigCell;
+		if (!open) return;
+		const now = dataset.rows[open.row]?.[open.column] ?? '';
+		untrack(() => {
+			if (now === drawnValue) return;
+			drawnValue = now;
+			drawEpoch += 1;
+		});
+	});
+
+	function drew(rowIndex: number, column: string, dataUrl: string, pixels: Grid | undefined) {
+		drawnValue = dataUrl;
+		ondrawn(rowIndex, column, dataUrl, pixels);
+	}
+
+	/**
+	 * The board in the panel, and whether it holds drawing not yet saved. Its
+	 * Save and Delete are in the panel's bar, beside the pager — where every
+	 * picture's are, the Pictures tray's included — so the bar asks the board.
+	 * Closing with drawing unsaved drops it, as Cancel did; the pager waits
+	 * instead, because stepping away is not a way of saying "never mind".
+	 */
+	let board = $state<ReturnType<typeof BitmapEditor> | null>(null);
+	/** Where the board puts its size row and its undo — see BitmapEditor's `head` and `bar`. */
+	let boardHead = $state<HTMLElement | null>(null);
+	let boardBar = $state<HTMLElement | null>(null);
+	let boardDirty = $state(false);
+
+	/** A drawing in the cell gone: the cell emptied, which the app's undo reaches. */
+	function deleteDrawing() {
+		if (!bigCell) return;
+		setCell(bigCell.row, bigCell.column, '');
+		// Still a board: an empty cell opened without asking to draw is words,
+		// and deleting a drawing is not a request to start typing.
+		bigCell = { ...bigCell, draw: true };
+		// Opened afresh even when the cell was already empty — a drawing not yet
+		// saved is on the board, not in the cell, and Delete means that too.
+		drawnValue = '';
+		drawEpoch += 1;
+	}
+
+	/** An area with no column, being drawn in — see `areaRequest`. */
+	let drawingArea = $state<{ id: string; name: string; value: string; pixels?: Grid; ink: string } | null>(null);
+	let areaEpoch = $state(0);
+
+	$effect(() => {
+		const ask = areaRequest;
+		if (!ask) return;
+		untrack(() => {
+			bigCell = null;
+			leaveTo = ask.from ?? 'table';
+			drawingArea = { ...ask };
+			areaEpoch += 1;
+		});
+	});
+
+	/**
+	 * By the area it was drawn for, not whichever is open: saving packs the
+	 * board first, which takes a moment, and a Save pressed just before the
+	 * panel closed used to find no area open by the time it landed, and drop
+	 * the drawing.
+	 */
+	function saveArea(id: string, dataUrl: string, pixels: Grid | undefined) {
+		if (drawingArea?.id === id) drawingArea = { ...drawingArea, value: dataUrl, pixels };
+		onsavearea(id, dataUrl, pixels);
+	}
+
+	function deleteArea() {
+		if (!drawingArea) return;
+		ondeletearea(drawingArea.id);
+		drawingArea = { ...drawingArea, value: '' };
+		areaEpoch += 1;
+	}
+
+	/** What the drawing surface opens on: the picture, or a stored one resolved. */
+	function drawingSource(value: string): string {
+		const picture = cellPicture(value);
+		if (picture) return picture;
+		const stored = localImageName(value);
+		return stored ? (images[stored] ?? '') : '';
+	}
+
+	/** A stored picture's resolved address, for its thumbnail. */
+	const storedPicture = (value: string | undefined) => {
+		const name = localImageName(value);
+		return name ? (images[name] ?? null) : null;
+	};
+
+	/**
+	 * A cell holding a picture — a drawing, or one pasted in as a data URL —
+	 * shown as the picture. Its words are a few hundred kilobytes of base64
+	 * that nobody reads or types into, and they pushed every other cell's
+	 * words off the row. Only a `data:` URL: an address is a request, and the
+	 * table makes none. Through `safeMediaUrl`, because the cell is untrusted
+	 * and a prefix is not a shape.
+	 */
+	function cellPicture(value: string | undefined): string | null {
+		// Asked of every cell on every render: tested in place first, so a
+		// cell of words is not copied whole by a trim just to be told no.
+		return value && /^\s*data:image\//.test(value) ? safeMediaUrl(value) : null;
+	}
+
+	/**
+	 * Close the editor, back to where it was opened from — or, `toTable`, to
+	 * the table regardless. A save that was pressed lands first: closing in the
+	 * middle of one would have said the drawing was dropped and then written it
+	 * anyway.
+	 */
+	async function closeBigCell(toTable = false) {
+		// What was open when Close was pressed: another cell opened while the
+		// save was still packing is not the one being closed.
+		const closing = { cell: bigCell, area: drawingArea };
+		await board?.settled();
+		if (bigCell !== closing.cell || drawingArea !== closing.area) return;
+		const to = leaveTo;
+		bigCell = null;
+		drawingArea = null;
+		leaveTo = 'table';
+		if (!toTable && to !== 'table') onleave?.(to);
+	}
+
+	/** The chevron: one step back — to the Pictures tray it came from, or else to the table. */
+	const stepBack = () => closeBigCell(leaveTo !== 'images');
+
+	const leaveTitle = (dirty: boolean) =>
+		(dirty ? 'Close — the drawing not saved is dropped' : leaveTo === 'images' ? 'Back to Pictures' : leaveTo === 'card' ? 'Close' : 'Back to the table') + ' (Esc)';
+
+	/**
+	 * Where the caret goes as the cell opens full size: where the finger
+	 * that opened it pressed the small one (`caretAt`), which the eye was on.
+	 * Used once — stepping to the next row with the pager opens a new field
+	 * at the end, as it always did.
+	 */
+	let openCaret: number | null = null;
+
+	/** The cell a press landed in, for `touchOpen`: a field or a picture, marked `data-opens`. */
+	const cellFrom = (target: EventTarget | null) =>
+		target instanceof Element ? target.closest<HTMLElement>('tbody [data-opens]') : null;
+	/**
+	 * The caret a finger's first tap put in a cell, drawn by the page: the
+	 * cell is read-only to a finger and its own caret hidden, so the browser
+	 * shows none, and a tap that left no mark looked like a tap that missed.
+	 * In px from the cell's top-left, where it is drawn; and its offset,
+	 * which Edit opens at.
+	 */
+	let fingerMark = $state<{ row: number; column: string; offset: number; left: number; top: number; height: number } | null>(null);
+
+	/** A finger's first tap on a cell: the cell is chosen, and the caret drawn where it landed. */
+	function chooseByFinger(cell: HTMLElement, at: { x: number; y: number }) {
+		const row = Number(cell.dataset.row);
+		const column = cell.dataset.column;
+		const td = cell.closest('td');
+		if (!(cell instanceof HTMLTextAreaElement) || !td || column === undefined || !Number.isInteger(row)) {
+			fingerMark = null;
+			return;
+		}
+		const place = caretPlace(cell, at.x, at.y);
+		// In the scroller's content, which it is drawn in: where it is on
+		// screen, plus how far the table is scrolled.
+		const box = scrollEl?.getBoundingClientRect();
+		if (!scrollEl || !box) return;
+		fingerMark = {
+			row,
+			column,
+			offset: place.offset,
+			left: place.x - box.left + scrollEl.scrollLeft,
+			top: place.top - box.top + scrollEl.scrollTop,
+			height: place.bottom - place.top
+		};
+	}
+
+	/** Edit in the bar: the cell full size, at the caret a finger's tap drew, if it drew one. */
+	function editChosen() {
+		if (!editing) return;
+		const mark = fingerMark && fingerMark.row === editing.row && fingerMark.column === editing.column ? fingerMark.offset : undefined;
+		openBigCell(editing.row, editing.column, false, 'table', mark);
+	}
+
+	/** A finger's second tap or long press on a cell: open it full size, the caret where it pressed. */
+	function openFromFinger(cell: HTMLElement, at: { x: number; y: number }) {
+		const row = Number(cell.dataset.row);
+		const column = cell.dataset.column;
+		if (locked || column === undefined || !Number.isInteger(row)) return;
+		openBigCell(row, column, false, 'table', cell instanceof HTMLTextAreaElement ? caretAt(cell, at.x, at.y) : undefined);
+	}
+	const focusOnOpen = (node: HTMLElement) => {
+		node.focus();
+		if (openCaret !== null && node instanceof HTMLTextAreaElement) node.setSelectionRange(openCaret, openCaret);
+		openCaret = null;
+	};
+
+	/** The open table at the top of its menu, the rest in the library's order. */
+	const tablesActiveFirst = $derived([
+		...tables.filter((t) => t.id === tableId),
+		...tables.filter((t) => t.id !== tableId)
+	]);
+
 	function togglePicker() {
 		if (pickerOpen) {
 			pickerOpen = false;
@@ -120,6 +733,8 @@
 		const box = pickerEl?.getBoundingClientRect();
 		// Upwards: this bar is at the bottom of the tray, so a menu hanging below
 		// it would be off the screen.
+		// Hung from its left edge, since the picker sits near the left-hand end
+		// of the bar; the clamp in the style keeps it on a narrow screen.
 		if (box) pickerAt = { left: box.left, bottom: window.innerHeight - box.top + 4 };
 		pickerOpen = true;
 	}
@@ -142,8 +757,8 @@
 		if (tableId === shown) return;
 		shown = tableId;
 		sortedBy = null;
-		unsorted = null;
 		selectedRows = new Set();
+		expanded = new Set();
 	});
 
 	/**
@@ -216,23 +831,182 @@
 		traying = null;
 		watchTray(false);
 		if (!dragged) return;
-		trayClick = true;
+		trayClick = performance.now() + 400;
 		ontraydrag('end', event.clientY);
 	}
 
 	/** The press that resized the tray is not also a press on what it started on. */
 	function swallowClick(event: MouseEvent) {
-		if (!trayClick) return;
-		trayClick = false;
+		if (performance.now() > trayClick) return;
+		trayClick = 0;
 		event.preventDefault();
 		event.stopPropagation();
 	}
 
-	let trayClick = false;
+	/**
+	 * Until when a click is the tail of a drag rather than a press. A moment,
+	 * not a flag: a finger's drag makes no click at all, and a flag left set by
+	 * one ate the next real tap — the × on the full-size editor, a header's sort.
+	 */
+	let trayClick = 0;
+
+	/**
+	 * Drag a header sideways to move its column.
+	 *
+	 * The same claim-the-movement arrangement as the tray grip above, turned on
+	 * its side: a press that goes nowhere is the name field or the button under
+	 * it, and a press that travels sideways is the column being carried. Not
+	 * HTML drag and drop, which cannot be started from inside a text field
+	 * without the field losing its text selection to the drag, and which has no
+	 * touch path at all.
+	 *
+	 * `before` is the gap the column would land in, 0 to the column count, so
+	 * the mark can be drawn on the edge the pointer is nearest.
+	 *
+	 * A finger has to lift the column first: hold still on the header for a
+	 * moment, feel the buzz, then carry. A sideways swipe on a header is how a
+	 * phone scrolls a wide table, and reading every such swipe as a move
+	 * rearranged columns nobody meant to touch. Until the lift, a sideways
+	 * finger scrolls the table by hand — the header claims touches for itself
+	 * (`touch-action: none`), so the browser's own pan is not there to do it.
+	 * A mouse carries straight away, as before: nobody scrolls with a drag.
+	 */
+	const LIFT_MS = 350;
+	let carrying = $state<{
+		id: number;
+		from: number;
+		x: number;
+		y: number;
+		on: boolean;
+		before: number;
+		touch: boolean;
+		lifted: boolean;
+		scroll: number;
+	} | null>(null);
+	let liftTimer: ReturnType<typeof setTimeout> | null = null;
+	let scrollEl = $state<HTMLElement | null>(null);
+	/** The sticky header's height, so the side shadows start below it. */
+	let headHeight = $state(0);
+	let headEls = $state<Array<HTMLElement | null>>([]);
+
+	function watchCarry(on: boolean) {
+		const method = on ? window.addEventListener : window.removeEventListener;
+		method('pointermove', moveCarry);
+		method('pointerup', endCarry);
+		method('pointercancel', endCarry);
+	}
+
+	$effect(() => () => watchCarry(false));
+
+	function startCarry(event: PointerEvent, index: number) {
+		if (locked || event.button !== 0 || dataset.columns.length < 2) return;
+		const target = event.target as HTMLElement;
+		if (target.closest('.resize, button')) return;
+		const touch = event.pointerType === 'touch';
+		carrying = {
+			id: event.pointerId,
+			from: index,
+			x: event.clientX,
+			y: event.clientY,
+			on: false,
+			before: index,
+			touch,
+			lifted: !touch,
+			scroll: scrollEl?.scrollLeft ?? 0
+		};
+		if (touch) {
+			liftTimer = setTimeout(() => {
+				liftTimer = null;
+				if (!carrying || carrying.lifted) return;
+				carrying.lifted = true;
+				vibrate(HOLD_MS);
+			}, LIFT_MS);
+		}
+		watchCarry(true);
+	}
+
+	function stopLift() {
+		if (liftTimer) clearTimeout(liftTimer);
+		liftTimer = null;
+	}
+
+	function moveCarry(event: PointerEvent) {
+		if (!carrying || carrying.id !== event.pointerId) return;
+		if (!carrying.lifted) {
+			// A finger that moves before the lift is not carrying anything:
+			// sideways it scrolls the table, and up or down it is the tray's.
+			const dx = event.clientX - carrying.x;
+			const dy = event.clientY - carrying.y;
+			if (Math.hypot(dx, dy) < TRAY_SLOP) return;
+			stopLift();
+			if (Math.abs(dx) > Math.abs(dy) && scrollEl) scrollEl.scrollLeft = carrying.scroll - dx;
+			return;
+		}
+		if (!carrying.on) {
+			const dx = Math.abs(event.clientX - carrying.x);
+			if (dx < TRAY_SLOP || dx < Math.abs(event.clientY - carrying.y)) return;
+			// Whichever gesture moved first has it: a tray already being pulled
+			// is not also a column being carried.
+			if (traying?.on) {
+				carrying = null;
+				watchCarry(false);
+				return;
+			}
+			traying = null;
+			watchTray(false);
+			carrying.on = true;
+			(document.activeElement as HTMLElement | null)?.blur();
+		}
+		window.getSelection()?.removeAllRanges();
+		let before = dataset.columns.length;
+		for (let i = 0; i < headEls.length; i++) {
+			const box = headEls[i]?.getBoundingClientRect();
+			if (box && event.clientX < box.left + box.width / 2) {
+				before = i;
+				break;
+			}
+		}
+		carrying.before = before;
+	}
+
+	function endCarry(event: PointerEvent) {
+		if (!carrying || carrying.id !== event.pointerId) return;
+		stopLift();
+		const { on, from, before } = carrying;
+		carrying = null;
+		watchCarry(false);
+		if (!on || event.type === 'pointercancel') return;
+		// The press that carried the column is not also a press on the name
+		// field or the button it was let go over.
+		trayClick = performance.now() + 400;
+		const to = dropTarget(from, before);
+		if (to !== from) onchange(moveColumn(dataset, from, to));
+	}
+
+	/**
+	 * A name that is not being edited is not there for the pointer.
+	 *
+	 * The name field fills most of each header, so most drags of the header —
+	 * the tray pulled up, the column carried sideways — begin on it, and a text
+	 * field answers a press with gestures of its own: a selection, the browser
+	 * dragging selected text, and on a phone its own text handling, which the
+	 * page cannot hold back from a pointerdown at all. Holding the press back
+	 * worked in every browser here and not on the phones it was for. So an
+	 * unfocused name takes no pointer events (see `.column-name` in the styles):
+	 * a press lands on the header, which drags, and a tap that went nowhere —
+	 * a drag swallows its own click — puts the name into editing, caret at the
+	 * end. Focused, the field takes the pointer back, to place the caret. The
+	 * keyboard reaches it by Tab as it always did.
+	 */
+	function takeName(event: MouseEvent) {
+		if ((event.target as Element).closest('button')) return;
+		const field = (event.currentTarget as HTMLElement).querySelector<HTMLInputElement>('input.column-name');
+		if (!field || document.activeElement === field) return;
+		field.focus();
+		field.setSelectionRange(field.value.length, field.value.length);
+	}
 
 	let pasteOpen = $state(false);
-	/** Emptying the table asks once — see the dialog for why once is enough. */
-	let clearing = $state(false);
 	/**
 	 * A column deletion asks too. A row is one card; a column is a field of every
 	 * card at once, and it takes the binding of any area that was drawing from it
@@ -248,13 +1022,6 @@
 	// Which column the rows were last sorted by, so the header can show it and
 	// a second click can turn it round.
 	let sortedBy = $state<{ column: string; direction: SortDirection } | null>(null);
-	/**
-	 * The order the rows were in before any of that. Sorting rewrites the array,
-	 * so "unsort" has nowhere to go unless the order is kept: this is taken once,
-	 * when an unsorted table is sorted, and handed back by the button in the
-	 * row-number header.
-	 */
-	let unsorted = $state<Row[] | null>(null);
 	let pasteText = $state('');
 	/** Two rows of two tab-separated cells: what comes off a spreadsheet. */
 	const PASTE_EXAMPLE = 'Bellwether\tA quiet start\nCatalogue\tThe second card';
@@ -278,8 +1045,13 @@
 
 	const widthOf = (column: string) => columnWidths[column] ?? COLUMN_DEFAULT;
 
-	/** As narrow as the widest row number it has to hold, and no narrower. */
-	const gutterWidth = $derived(36 + String(Math.max(dataset.rows.length, 1)).length * 7);
+	/**
+	 * As narrow as the widest row number it has to hold, and no narrower: 36px
+	 * of tick, gap and padding and 7px a digit at the default size. All of it
+	 * in `rem`, since the tick is an icon and grows with the text as the digits
+	 * do — see textsize.ts.
+	 */
+	const gutterWidth = $derived(`${2.25 + String(Math.max(dataset.rows.length, 1)).length * 0.4375}rem`);
 
 	/**
 	 * How wide the table has to be for every column to get what it asked for.
@@ -293,7 +1065,7 @@
 	 */
 	const GHOST_COLUMN = 40;
 	const tableWidth = $derived(
-		gutterWidth + dataset.columns.reduce((sum, c) => sum + widthOf(c), 0) + GHOST_COLUMN
+		`calc(${dataset.columns.reduce((sum, c) => sum + widthOf(c), 0) + GHOST_COLUMN}px + ${gutterWidth})`
 	);
 
 	let resizing = $state<{ column: string; from: number; x: number } | null>(null);
@@ -335,9 +1107,9 @@
 			// and closes something behind this.
 			event.stopPropagation();
 			pickerOpen = false;
-		} else if (clearing) {
+		} else if (bigCell || drawingArea) {
 			event.stopPropagation();
-			clearing = false;
+			closeBigCell();
 		} else if (confirmColumn !== null) {
 			event.stopPropagation();
 			confirmColumn = null;
@@ -347,48 +1119,43 @@
 		}
 	}
 
-	function clearData() {
-		clearing = false;
-		const rows = dataset.rows.length;
-		onchange({ columns: [], rows: [] });
-		onactivate(0);
-		sortedBy = null;
-		unsorted = null;
-		selectedRows = new Set();
-		onnotice(`Deleted every row and column — ${rows} row${rows === 1 ? '' : 's'} gone. Ctrl/Cmd+Z brings them back.`);
-	}
-
 	const emptyRow = (columns: string[]): Row => Object.fromEntries(columns.map((c) => [c, '']));
 
 	function setCell(rowIndex: number, column: string, value: string) {
+		if (locked) return;
 		const before = dataset.rows[rowIndex];
 		const after = { ...before, [column]: value };
-		// The label a row wears comes from finding it in `unsorted`, and rows are
-		// found there by identity — editing a cell makes a new object, so the copy
-		// held there has to be swapped for it or the number would fall back to the
-		// row's position and the labels would silently start renumbering again.
-		if (unsorted) unsorted = unsorted.map((r) => (r === before ? after : r));
 		onchange({ ...dataset, rows: dataset.rows.map((r, i) => (i === rowIndex ? after : r)) });
 	}
 
 	/**
-	 * The number a row wears.
-	 *
-	 * Its place in the order the rows arrived in, not its place in the table, so
-	 * sorting carries every number along with the row it belongs to and you can
-	 * see where a row came from. Falls back to the position whenever the row
-	 * cannot be found in that order — which is what makes this safe against every
-	 * structural edit, including the ones below that keep `unsorted` in step.
+	 * The table's sort, worked out once per change of the table rather than
+	 * once per label: every row asks for its number a dozen times — its tick,
+	 * its number, each cell's name — and finding the order checks the whole of
+	 * it, so a sorted table of five hundred rows did that six thousand times a
+	 * keystroke. The order is the same array across a cell's edit, so the rows
+	 * reading it are not run again either.
 	 */
-	function rowLabel(row: Row, index: number): number {
-		if (!unsorted) return index + 1;
-		const at = unsorted.indexOf(row);
-		return at === -1 ? index + 1 : at + 1;
-	}
+	const order = $derived(orderOf(dataset));
+	/**
+	 * The columns, for what every row and cell draws. A cell's edit gives a
+	 * new table with the same columns array, so this stays the same object
+	 * and the rows reading it are left alone; read off `dataset` instead,
+	 * every row's loop and every field's placeholder action ran again on each
+	 * keystroke.
+	 */
+	const columns = $derived(dataset.columns);
+	const rowLabel = (index: number): number => numberIn(order, index);
 
-	function renameColumn(index: number, name: string) {
+
+	function renameColumn(index: number, name: string, field?: HTMLInputElement) {
 		const from = dataset.columns[index];
-		const to = name.trim() || from;
+		// A column name is also a word written between `%%` marks — see columnName.
+		const to = columnName(name) || from;
+		// The field shows what was taken, not what was typed: Svelte will not
+		// rewrite a value whose state did not change, so a name reduced to the
+		// one it already had would sit in the header looking accepted.
+		if (field) field.value = to;
 		if (to === from) return;
 		if (dataset.columns.includes(to)) {
 			onnotice(`There is already a column called “${to}”.`, 'warning');
@@ -400,7 +1167,7 @@
 			for (const c of dataset.columns) next[c === from ? to : c] = row[c] ?? '';
 			return next;
 		});
-		onchange({ columns, rows });
+		onchange({ ...dataset, columns, rows });
 		onrenamecolumn(from, to);
 		// A width belongs to the column, not to the name it had at the time.
 		if (from in columnWidths) {
@@ -410,6 +1177,7 @@
 	}
 
 	function shiftColumn(index: number, by: number) {
+		if (locked) return;
 		const target = index + by;
 		if (target < 0 || target >= dataset.columns.length) return;
 		onchange(moveColumn(dataset, index, target));
@@ -424,6 +1192,9 @@
 	 * in. Pressing the same header a third time is the way out now.
 	 */
 	function sortBy(column: string) {
+		// Sorting reorders the rows, and row order is print order: a locked
+		// table is one whose cards do not change, their order included.
+		if (locked) return;
 		if (sortedBy?.column === column && sortedBy.direction === 'desc') {
 			clearSort();
 			return;
@@ -432,24 +1203,40 @@
 		const sorted = sortRows(dataset, column, direction);
 		// The previewed card follows its row rather than staying on a position.
 		const previewed = indexAfterSort(dataset, sorted, activeRow);
-		if (!sortedBy) unsorted = dataset.rows;
 		sortedBy = { column, direction };
 		selectedRows = new Set();
+		expanded = new Set();
 		onchange(sorted);
 		onactivate(previewed);
 	}
 
 	/** Back to the order the rows arrived in, wherever the sorting took them. */
 	function clearSort() {
-		if (!unsorted) return;
-		const restored = { ...dataset, rows: unsorted };
+		if (!orderOf(dataset) || locked) return;
+		const restored = unsortRows(dataset);
 		const previewed = indexAfterSort(dataset, restored, activeRow);
 		sortedBy = null;
-		unsorted = null;
 		selectedRows = new Set();
+		expanded = new Set();
 		onchange(restored);
 		onactivate(previewed);
 		onnotice('Back to the order the rows came in.');
+	}
+
+	/**
+	 * The order the rows stand in, sorted or not, becomes their order: the
+	 * numbers are taken afresh from where each row is, so the pages print in
+	 * this order and the third-press unsort comes back here rather than to
+	 * how the table arrived. The numbers move, so every `%%lookup:N:…%%` is
+	 * carried along with its row, the way a move by hand carries it. One edit,
+	 * so one undo puts the old numbers and the lookups back together.
+	 */
+	function reindex() {
+		if (!orderOf(dataset) || locked) return;
+		const next = withoutOrder(dataset);
+		sortedBy = null;
+		const said = onchange(next, renumbering(dataset, next));
+		onnotice(said ? `Reindexed in this order. ${said.note}` : 'Reindexed in this order — undo puts the old numbers back.', said?.warning ? 'warning' : 'info');
 	}
 
 	/**
@@ -458,7 +1245,8 @@
 	 * no name it still generates one, which is what an import path wants.
 	 */
 	function addColumn(name?: string) {
-		const wanted = name?.trim();
+		if (locked) return;
+		const wanted = name === undefined ? undefined : columnName(name) || undefined;
 		if (wanted && dataset.columns.includes(wanted)) {
 			onnotice(`There is already a column called \u201c${wanted}\u201d.`, 'warning');
 			return;
@@ -466,8 +1254,8 @@
 		let column = wanted ?? '';
 		if (!column) {
 			let n = dataset.columns.length + 1;
-			while (dataset.columns.includes(`Column ${n}`)) n++;
-			column = `Column ${n}`;
+			while (dataset.columns.includes(`Column-${n}`)) n++;
+			column = `Column-${n}`;
 		}
 		const columns = [...dataset.columns, column];
 		// The first column brings a row with it. A column with nothing under it
@@ -476,6 +1264,7 @@
 		// had one + in the header, and using it left you exactly as stuck.
 		const filling = !dataset.rows.length;
 		onchange({
+			...dataset,
 			columns,
 			rows: filling ? [emptyRow(columns)] : dataset.rows.map((r) => ({ ...r, [column]: '' }))
 		});
@@ -499,6 +1288,7 @@
 		const column = dataset.columns[index];
 		if (column === undefined) return;
 		onchange({
+			...dataset,
 			columns: dataset.columns.filter((_, i) => i !== index),
 			rows: dataset.rows.map((row) => {
 				const next = { ...row };
@@ -516,12 +1306,12 @@
 
 	/** The trailing placeholder row calls this with whatever was typed into it. */
 	function addRow(column?: string, value = '') {
+		if (locked) return;
 		const row = emptyRow(dataset.columns);
 		if (column) row[column] = value;
 		// Appended to the arrival order too, so it takes the next number rather
 		// than inheriting whichever row happens to sit where it landed.
-		if (unsorted) unsorted = [...unsorted, row];
-		onchange({ ...dataset, rows: [...dataset.rows, row] });
+		onchange(appendRows(dataset, [row]));
 		onactivate(dataset.rows.length);
 	}
 
@@ -532,7 +1322,95 @@
 	 * the set without moving the preview. Anywhere on the row counts except the
 	 * cell itself, which is a text box and belongs to whoever is typing in it.
 	 */
+	/**
+	 * A row carried by its number to another place in the table — which is
+	 * another place in the print order. A row among the chosen carries all of
+	 * them, as a block in their own order; any other carries itself. With a
+	 * mouse the carry starts once the pointer has travelled; with a finger it
+	 * waits for the same hold a column does, so a swipe over the numbers still
+	 * scrolls the table. A drop drops a sort, as the up and down buttons do.
+	 */
+	let rowDrag = $state<{
+		id: number;
+		from: number;
+		x: number;
+		y: number;
+		on: boolean;
+		lifted: boolean;
+		before: number;
+	} | null>(null);
+	let rowLiftTimer: ReturnType<typeof setTimeout> | null = null;
+	/** A carry that happened eats the click that ends it, or it would pick the row. */
+	let rowDragged = false;
+
+	function startRowDrag(event: PointerEvent, index: number) {
+		if (locked || event.button !== 0 || dataset.rows.length < 2) return;
+		const touch = event.pointerType === 'touch';
+		rowDrag = { id: event.pointerId, from: index, x: event.clientX, y: event.clientY, on: false, lifted: !touch, before: index };
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		if (touch) {
+			rowLiftTimer = setTimeout(() => {
+				rowLiftTimer = null;
+				if (!rowDrag || rowDrag.lifted) return;
+				rowDrag.lifted = true;
+				vibrate(HOLD_MS);
+			}, LIFT_MS);
+		}
+	}
+
+	function moveRowDrag(event: PointerEvent) {
+		if (!rowDrag || rowDrag.id !== event.pointerId) return;
+		if (!rowDrag.lifted) {
+			if (Math.hypot(event.clientX - rowDrag.x, event.clientY - rowDrag.y) < TRAY_SLOP) return;
+			// Moved before the hold: not a carry.
+			if (rowLiftTimer) clearTimeout(rowLiftTimer);
+			rowDrag = null;
+			return;
+		}
+		if (!rowDrag.on) {
+			if (Math.abs(event.clientY - rowDrag.y) < TRAY_SLOP) return;
+			rowDrag.on = true;
+			(document.activeElement as HTMLElement | null)?.blur();
+		}
+		window.getSelection()?.removeAllRanges();
+		let before = dataset.rows.length;
+		for (let i = 0; i < dataset.rows.length; i++) {
+			const box = rowEls[i]?.getBoundingClientRect();
+			if (box && event.clientY < box.top + box.height / 2) {
+				before = i;
+				break;
+			}
+		}
+		rowDrag.before = before;
+	}
+
+	function endRowDrag(event: PointerEvent) {
+		if (!rowDrag || rowDrag.id !== event.pointerId) return;
+		if (rowLiftTimer) clearTimeout(rowLiftTimer);
+		const { on, from, before } = rowDrag;
+		rowDrag = null;
+		if (!on || event.type === 'pointercancel') return;
+		rowDragged = true;
+		setTimeout(() => (rowDragged = false), 0);
+		const moving = selectedRows.has(from) ? chosenRows : [from];
+		const { rows } = moveRowsTo(dataset.rows, moving, before);
+		if (rows === dataset.rows) return;
+		const active = dataset.rows[activeRow];
+		// The choice follows its rows to where they went, and is not widened:
+		// carrying an unchosen row does not tick it.
+		const picked = new Set(chosenRows.map((i) => dataset.rows[i]));
+		sortedBy = null;
+		selectedRows = new Set(rows.flatMap((row, i) => (picked.has(row) ? [i] : [])));
+		// Moved by hand: where they now stand is their order, numbers included.
+		const next = withoutOrder({ ...dataset, rows });
+		const said = onchange(next, renumbering(dataset, next));
+		if (said) onnotice(said.note, said.warning ? 'warning' : 'info');
+		const at = rows.indexOf(active);
+		if (at !== -1 && at !== activeRow) onactivate(at);
+	}
+
 	function pickRow(index: number) {
+		if (rowDragged) return;
 		selectedRows = new Set([index]);
 		onactivate(index);
 	}
@@ -562,16 +1440,39 @@
 		selectedRows = allChosen ? new Set() : new Set(dataset.rows.map((_, i) => i));
 	}
 
+	/**
+	 * The chosen rows a step up or down — which is a step in print order, since
+	 * row order is print order. A moved row makes the order the table's own, so
+	 * a sort that was on is dropped rather than left claiming an order the rows
+	 * are no longer in; the numbers the rows wear go back to their places.
+	 */
+	function moveChosen(by: -1 | 1) {
+		if (locked || !chosenRows.length) return;
+		const { rows, chosen } = moveRows(dataset.rows, chosenRows, by);
+		if (rows === dataset.rows) return;
+		const active = dataset.rows[activeRow];
+		sortedBy = null;
+		selectedRows = new Set(chosen);
+		const next = withoutOrder({ ...dataset, rows });
+		const said = onchange(next, renumbering(dataset, next));
+		if (said) onnotice(said.note, said.warning ? 'warning' : 'info');
+		const at = rows.indexOf(active);
+		if (at !== -1 && at !== activeRow) onactivate(at);
+	}
+
 	function deleteChosen() {
+		if (locked) return;
 		const gone = new Set(chosenRows);
 		if (!gone.size) return;
-		const rows = dataset.rows.filter((_, i) => !gone.has(i));
-		const dropped = dataset.rows.filter((_, i) => gone.has(i));
-		if (unsorted) unsorted = unsorted.filter((r) => !dropped.includes(r));
+		const next = deleteRows(dataset, gone);
+		const rows = next.rows;
 		selectedRows = new Set();
-		onchange({ ...dataset, rows });
+		const said = onchange(next, renumbering(dataset, next));
 		if (activeRow >= rows.length) onactivate(Math.max(0, rows.length - 1));
-		onnotice(`Deleted ${gone.size} row${gone.size === 1 ? '' : 's'}. Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`);
+		onnotice(
+			`Deleted ${gone.size} row${gone.size === 1 ? '' : 's'}.${said ? ` ${said.note}` : ''} Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`,
+			said?.warning ? 'warning' : 'info'
+		);
 	}
 
 	/**
@@ -597,6 +1498,10 @@
 	}
 
 	function commitImport(parsed: Dataset, mode: 'replace' | 'append') {
+		if (locked) {
+			onnotice('The table is locked — unlock it to paste or import into it.', 'warning');
+			return;
+		}
 		// The one place the emptiness policy is decided, for the paste and the
 		// file import alike — see `wouldEmptyTable`. A mis-click in a file picker
 		// should not cost you the table.
@@ -607,13 +1512,12 @@
 		const rows = dataset.columns.length ? realign(parsed) : parsed.rows;
 		const columns = dataset.columns.length ? dataset.columns : parsed.columns;
 		if (mode === 'append') {
-			onchange({ columns, rows: [...dataset.rows, ...rows] });
+			onchange(appendRows({ ...dataset, columns }, rows));
 		} else {
 			onchange({ columns, rows });
 			onactivate(0);
 		}
 		sortedBy = null;
-		unsorted = null;
 		selectedRows = new Set();
 		onnotice(`${rows.length} row${rows.length === 1 ? '' : 's'} ${mode === 'append' ? 'added' : 'loaded'}.`);
 	}
@@ -673,21 +1577,32 @@
 
 	/** The table as it stands, back out as a file. Nothing leaves the browser. */
 	function exportCsv() {
-		download('card-data.csv', toCsv(dataset), 'text/csv');
+		// Named as the picker names it, so the file is found under the table's name.
+		download(`${fileStem(tableName, UNTITLED_TABLE)}.csv`, toCsv(dataset), 'text/csv');
 		onnotice(`${dataset.rows.length} row${dataset.rows.length === 1 ? '' : 's'} exported as CSV.`);
 	}
 </script>
 
 <svelte:window onkeydown={onKeydown} onpointerdown={onWindowPointer} />
 
-<section class="data" aria-label="Card data">
-	<div class="scroll">
-		<table style="min-width:{tableWidth}px">
+<section
+	class="data"
+	class:rows-short={rowHeight === 'short'}
+	class:rows-full={rowHeight === 'full'}
+	class:locked
+	aria-label="Card data"
+	style="--head-h:{headHeight}px; --gutter-w:{gutterWidth}; --bar-h:{barHeight}px"
+	use:scrollEdges={(section) => section.querySelector<HTMLElement>(':scope > .scroll')}
+>
+	<div class="scroll" bind:this={scrollEl}>
+		<table style="min-width:{tableWidth}" onpointerdowncapture={(e) => (byFinger = e.pointerType === 'touch')}
+			use:touchOpen={{ find: cellFrom, onopen: openFromFinger, onchoose: chooseByFinger }}
+		>
 			<!-- Widths belong to the columns, not to the cells: one place to set
 			     them, and `table-layout: fixed` above means they are obeyed rather
 			     than treated as a suggestion the widest cell can overrule. -->
 			<colgroup>
-				<col style="width:{gutterWidth}px" />
+				<col style="width:{gutterWidth}" />
 				{#each dataset.columns as column (column)}
 					<col style="width:{widthOf(column)}px" />
 				{/each}
@@ -698,6 +1613,7 @@
 			     control: on a phone the Data button opens the tray half way, and
 			     this is how it is pulled up to fill the screen. -->
 			<thead
+				bind:offsetHeight={headHeight}
 				class:draggable={trayDraggable}
 				onpointerdown={startTrayDrag}
 				onclickcapture={swallowClick}
@@ -714,7 +1630,10 @@
 					<th class="gutter" scope="col">
 						<!-- Where the row ticks are, and wearing the same mark, because it
 						     is the same act reaching every row at once. Only while there
-						     are rows: a tick over an empty table chooses nothing. -->
+						     are rows: a tick over an empty table chooses nothing. Laid out
+						     in the same row the rows' own ticks are, so it sits in the
+						     same column as theirs rather than centred on its own. -->
+						<span class="gutter-line">
 						{#if dataset.rows.length}
 							<button
 								class="tick"
@@ -723,30 +1642,95 @@
 								title={allChosen ? 'Drop every row' : 'Choose every row'}
 								aria-label={allChosen ? 'Drop every row' : 'Choose every row'}
 								onclick={toggleAll}
-							></button>
+							><Icon name={allChosen ? 'checkbox-checked' : someChosen ? 'checkbox-indeterminate' : 'checkbox'} size={14} /></button>
 						{/if}
-						{#if sortedBy}
+						{#if sortedBy || order}
+							<!-- A sort survives a reload, as the numbers it left on the rows;
+							     which column did it is only remembered for the session. -->
 							<button
 								class="icon unsort"
-								title="Sorted by “{sortedBy.column}” — press to put the rows back in the order they arrived in"
+								title="{sortedBy ? `Sorted by “${sortedBy.column}”` : 'Sorted'} — press to put the rows back in the order they arrived in"
 								aria-label="Clear the sorting"
+								disabled={locked}
 								onclick={clearSort}
 							><Icon name="activity" size={14} /></button>
 						{:else if !dataset.rows.length}
 							<span class="sr-only">Row</span>
 						{/if}
+						</span>
 					</th>
 					{#each dataset.columns as column, i (column)}
-						<th scope="col" aria-sort={sortedBy?.column === column ? (sortedBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
-							<span class="column-head">
+						<th
+							scope="col"
+							bind:this={headEls[i]}
+							class:carried={carrying?.on && carrying.from === i}
+							class:lifted={!!carrying?.touch && carrying.lifted && !carrying.on && carrying.from === i}
+							class:drop-before={carrying?.on && carrying.before === i}
+							class:drop-after={carrying?.on && i === dataset.columns.length - 1 && carrying.before === dataset.columns.length}
+							aria-sort={sortedBy?.column === column ? (sortedBy.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+							onpointerdown={(e) => startCarry(e, i)}
+							data-no-hold-tip
+						>
+							<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+							<span
+								class="column-head"
+								title={locked ? column : 'Rename this column — drag it sideways to move it'}
+								onclick={takeName}
+							>
+							<!-- Data nothing on the card prints: no area is bound to it and
+							     nothing names it as %%column%%. Worth saying, because it is
+							     either a column still to be placed or one that can go. -->
+							{#if !usedColumns.has(column)}
+								<!-- And the way to put it there: one press adds an area bound
+								     to the column, where a new area goes. -->
+								<button
+									class="icon unused"
+									title="No area uses “{column}” — press to place it on the card{isKeyword(column) ? '' : `, or write %%${column}%% in an area`}"
+									aria-label="Place {column} on the card"
+									onclick={() => onplacecolumn(column)}
+								><Icon name="unlink" size={12} /></button>
+							{/if}
+							<!-- A name a keyword has taken is red, and the red says nothing
+							     by itself — on a phone there is no hover to read the title
+							     by. The sign in front of it says there is something to read,
+							     and pressing it puts the sentence where sentences go. Not
+							     frozen by the lock: it changes nothing. -->
+							{#if isKeyword(column)}
+								<button
+									class="icon reserved"
+									title="Why this column is red"
+									aria-label="“{column}” is a reserved keyword — why"
+									onclick={(e) => {
+										e.stopPropagation();
+										const message = keywordWarning(column);
+										if (onwarn) onwarn(message);
+										else onnotice(message, 'warning');
+									}}
+								><Icon name="warning" size={12} /></button>
+							{/if}
 							<input
 								class="column-name"
+								class:keyword={isKeyword(column)}
+								title={isKeyword(column) ? keywordWarning(column) : undefined}
 								value={column}
+								readonly={locked}
 								aria-label="Rename column {column}"
-								title="Rename this column"
-								onchange={(e) => renameColumn(i, e.currentTarget.value)}
+								onchange={(e) => renameColumn(i, e.currentTarget.value, e.currentTarget)}
 							/>
 							<span class="column-tools">
+								<!-- Only on hover or while the header has the focus: three
+								     buttons in every header, always, were the name's room. The
+								     keyboard still reaches them, since a focused name shows them. -->
+								{#if !locked}
+									<span class="column-move">
+										<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
+										<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
+										<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
+									</span>
+								{/if}
+								<!-- Sort last, at the header's far edge: the move and delete
+								     buttons come and go before it, so it stays on the same
+								     spot whether they are showing or not. -->
 								<!-- Three states on the one control: A-Z, Z-A, and the order the
 								     rows came in. The icon says which of the three it is on. -->
 								<button
@@ -758,6 +1742,7 @@
 											: 'Back to the order the rows came in'
 										: `Sort rows by ${column}, A to Z`}
 									aria-label="Sort rows by {column}"
+									disabled={locked}
 									onclick={() => sortBy(column)}
 								>
 									<Icon
@@ -769,9 +1754,6 @@
 										size={14}
 									/>
 								</button>
-								<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
-								<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
-								<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
 							</span>
 							</span>
 							<!-- The right edge of the header is the grip, which is where
@@ -796,7 +1778,19 @@
 						     column and naming it are two things, and the header is
 						     already editable in place. -->
 						<th class="ghost" scope="col">
-							<button class="icon add" title="Add a column" aria-label="Add a column" onclick={() => addColumn()}>
+							<!-- Hidden on a locked table rather than taken away: it is the
+							     tallest thing in the header, and the row was 1.8px shorter
+							     without it, which moved every row under it. Locking should
+							     change the colour of the words and nothing else. -->
+							<button
+								class="icon add"
+								title="Add a column"
+								aria-label="Add a column"
+								disabled={locked}
+								tabindex={locked ? -1 : undefined}
+								style:visibility={locked ? 'hidden' : undefined}
+								onclick={() => addColumn()}
+							>
 								<Icon name="add" size={16} />
 							</button>
 						</th>
@@ -809,40 +1803,180 @@
 					     commonest thing anybody does in here — it used to be a 20px tick
 					     in the gutter. The cell belongs to whoever is typing in it. -->
 					<tr
+						class:expanded={expanded.has(i)}
 						class:active={i === activeRow}
 						class:chosen={selectedRows.has(i)}
+						class:carried={rowDrag?.on && (rowDrag.from === i || (selectedRows.has(rowDrag.from) && selectedRows.has(i)))}
+						class:row-drop-before={rowDrag?.on && rowDrag.before === i}
+						class:row-drop-after={rowDrag?.on && i === dataset.rows.length - 1 && rowDrag.before === dataset.rows.length}
 						bind:this={rowEls[i]}
 						onclick={() => pickRow(i)}
 					>
 						<td class="gutter">
+							<span class="gutter-line">
 							<button
 								class="tick"
 								role="checkbox"
 								aria-checked={selectedRows.has(i)}
 								title="Choose this row as well"
-								aria-label="Choose row {rowLabel(row, i)}"
+								aria-label="Choose row {rowLabel(i)}"
 								onclick={(e) => {
 									// Not the row's own click: the tick builds a set without
 									// moving the preview off the card you are looking at.
 									e.stopPropagation();
 									toggleRow(i);
 								}}
-							></button>
+							><Icon name={selectedRows.has(i) ? 'checkbox-checked' : 'checkbox'} size={14} /></button>
 							<!-- The number the row arrived with, not where it is sitting:
 							     sorting carries it along, so you can see where a row came
 							     from and find it again after unsorting. -->
-							<span class="number">{rowLabel(row, i)}</span>
+							<!-- Double-click for this one row at full height, and again to
+							     put it back: a look at one long row without switching the
+							     whole table to Full. -->
+							<!-- Also the grip a row is carried by: drag it up or down to move
+							     the row, or all the chosen rows if it is one of them. -->
+							<span
+								class="number"
+								class:grip={!locked}
+								data-no-hold-tip
+								role="presentation"
+								title={locked
+									? undefined
+									: `Drag to move this row${selectedRows.has(i) && selectedRows.size > 1 ? ' and the other chosen rows' : ''}. ${expanded.has(i) ? 'Double-click to put this row back' : 'Double-click to show this whole row'}`}
+								onpointerdown={(e) => startRowDrag(e, i)}
+								onpointermove={moveRowDrag}
+								onpointerup={endRowDrag}
+								onpointercancel={endRowDrag}
+								ondblclick={(e) => {
+									e.stopPropagation();
+									toggleExpanded(i);
+								}}
+							>{rowLabel(i)}</span>
+							</span>
 						</td>
-						{#each dataset.columns as column (column)}
-							<td class:bound={!!selectedColumn && column === selectedColumn}>
+						{#each columns as column, c (column)}
+							<!-- Read once: a drawing's cell is a long base64 string, and every
+							     check of it trims and tests the whole of it, on every render. -->
+							{@const drawing = cellPicture(row[column])}
+							{@const picture = drawing ?? storedPicture(row[column])}
+							<!-- The drop line runs down the whole column, not just its
+							     header, so it says which gap the column lands in however
+							     far down the table the eye is. -->
+							<!-- A press on the cell below a short field is a press on the
+							     field: the cell is the target, whatever its words fill. -->
+							<td
+								onclick={(e) => {
+									if (e.target !== e.currentTarget) return;
+									// As a press on the field itself: that does not pick the row.
+									e.stopPropagation();
+									const field = e.currentTarget.querySelector('textarea');
+									field?.focus();
+									field?.setSelectionRange(field.value.length, field.value.length);
+								}}
+								class:bound={!!selectedColumn && column === selectedColumn}
+								class:drop-before={carrying?.on && carrying.before === c}
+								class:drop-after={carrying?.on && c === columns.length - 1 && carrying.before === columns.length}
+							>
+								{#if picture}
+									<!-- The picture in place of its base64, or of the name of a
+									     stored one. A press picks the row, as anywhere else on
+									     it; a double-click opens it — a drawing on the
+									     drawing surface, a stored picture large in Pictures. -->
+									<!-- A button round it, so it can be chosen as a cell is:
+									     the bar then offers Draw and says what it weighs. -->
+									<button
+										class="cell-picture-pick"
+										aria-label="{column}, row {rowLabel(i)}: a picture"
+										onfocus={() => {
+											editing = { row: i, column };
+											onactivate(i);
+											oncellfocus(column);
+										}}
+										onblur={() => (editing = null)}
+										onkeydown={(e) => {
+											// Enter opens it, as a double-click does; a button's own
+											// Enter is a click, which here only chooses it.
+											if (e.key === 'Enter' && !locked) {
+												e.preventDefault();
+												openBigCell(i, column);
+											}
+											if (e.key === 'Escape') {
+												e.stopPropagation();
+												e.currentTarget.blur();
+											}
+										}}
+										onclick={(e) => e.stopPropagation()}
+										ondblclick={() => !locked && openBigCell(i, column)}
+										data-opens
+										data-row={i}
+										data-column={column}
+									>
+										<img
+											class="cell-picture"
+											src={picture}
+											alt=""
+											title={locked
+												? undefined
+												: localImageName(row[column])
+													? `${localImageName(row[column])} — double-click to open it in Pictures`
+													: 'A drawing — double-click to draw on it'}
+											draggable="false"
+										/>
+										{#if drawing}
+											<span class="ink-dot" style="background:{parseColor(drawingFor(column).ink) ?? '#000'}" aria-hidden="true"></span>
+										{/if}
+									</button>
+								{:else}
+								<!-- The whole cell, full size, is Edit in the bar while this is
+								     typed in, or the [...] when it holds more than it shows — and,
+								     for a finger, a second tap or a hold (`touchOpen` on the
+								     table, which finds the cell by `data-opens`). -->
 								<textarea
 									rows="1"
-									aria-label="{column}, row {rowLabel(row, i)}"
+									aria-label="{column}, row {rowLabel(i)}"
 									value={row[column] ?? ''}
-									onfocus={() => onactivate(i)}
+									readonly={locked || byFinger}
+									class:by-finger={byFinger && !locked}
+									data-opens
+									data-row={i}
+									data-column={column}
+									use:autosize={rowHeight === 'full' || expanded.has(i)}
+									use:overflowMark={row[column] ?? ''}
+									use:completePlaceholders={columns}
+									onfocus={() => {
+										editing = { row: i, column };
+										onactivate(i);
+										oncellfocus(column);
+									}}
+									onblur={() => (editing = null)}
 									onclick={(e) => e.stopPropagation()}
 									oninput={(e) => setCell(i, column, e.currentTarget.value)}
+									onkeydown={(e) => {
+										// Out of the cell, keeping what was typed (each key is already
+										// written): Escape leaves the field as it leaves every other.
+										// Stopped here so the page does not read it as "deselect" too.
+										if (e.key === 'Escape') {
+											e.stopPropagation();
+											e.currentTarget.blur();
+										}
+									}}
 								></textarea>
+								<!-- Drawn only when the cell holds more than it shows (see
+								     `overflowMark`), and a way into the rest: the same full-size
+								     editor Edit opens. Out of the tab order — the field before it is where
+								     the keyboard is, and it can scroll. -->
+								<button
+									class="more"
+									tabindex="-1"
+									disabled={locked}
+									title="Show all of this cell"
+									aria-label="Show all of {column}, row {rowLabel(i)}"
+									onclick={(e) => {
+										e.stopPropagation();
+										openBigCell(i, column);
+									}}
+								>[...]</button>
+								{/if}
 							</td>
 						{/each}
 						<td></td>
@@ -865,7 +1999,7 @@
 						</td>
 					</tr>
 				{/if}
-				{#if dataset.columns.length}
+				{#if dataset.columns.length && !locked}
 					<!-- One button under the last row, centred on the gutter it sits in. -->
 					<tr class="ghost-row">
 						<td class="gutter">
@@ -878,148 +2012,370 @@
 				{/if}
 			</tbody>
 		</table>
+		<!-- One caret for the whole table, where a finger's first tap chose a
+		     cell: drawn here, in the scroller's own coordinates, so it scrolls
+		     with the rows — not as a maybe in every cell, which a tap made
+		     every cell of a large table check again. -->
+		{#if fingerMark && editing?.row === fingerMark.row && editing.column === fingerMark.column}
+			<span
+				class="finger-caret"
+				style="left:{fingerMark.left}px;top:{fingerMark.top}px;height:{fingerMark.height}px"
+				aria-hidden="true"
+			></span>
+		{/if}
 	</div>
+	<!-- The shadows that say there is more past an edge, outside the scroller
+	     because inside it they would scroll away with the rows. Bottom and
+	     left and right: see the note on `.edge`. -->
+	<span class="edge bottom" aria-hidden="true"></span>
+	<span class="edge left" aria-hidden="true"></span>
+	<span class="edge right" aria-hidden="true"></span>
 
 	<!-- One line, always: this bar wrapping was costing the table a row of its
 	     own height every time the tray narrowed. -->
-	<div class="actions">
-		<!-- What table this is, in front of everything that acts on it. One
-		     design prints any number of tables, so this is not the template
-		     picker's second half: the two are switched independently, and
-		     switching either leaves the other exactly where it was. -->
-		<label class="picker" bind:this={pickerEl}>
-			<span>Table</span>
-			<input
-				value={tableName}
-				placeholder={UNTITLED_TABLE}
-				aria-label="Table name"
-				onchange={(e) => onrenametable(e.currentTarget.value)}
-			/>
+	<div class="actions" bind:offsetHeight={barHeight}>
+		{#if drawingArea}
+			<!-- An area's own drawing has no row to step to: its undo and redo at
+			     the far left, its Delete and its Save at the far right, where a
+			     cell's drawing has them. -->
+			<span class="board-bar" bind:this={boardBar}></span>
+			<span class="spacer"></span>
+			{@render drawingButtons(!!drawingArea.value, deleteArea)}
+		{:else if bigCell}
+			<!-- With a cell open full size the bar is about that cell, as it is
+			     while one is typed in: which row it is at the start, where the
+			     table's name usually is, and its count at the end, where the count
+			     always is. The editor above keeps the column's name and the ×. -->
+			<!-- Which row, and the way to the next one's cell: the same pager the
+			     card has under it, so reading one column down the rows full size
+			     is a press per row rather than close, find, hold, per row. -->
+			{@const at = bigCell.row}
+			{#if boardShown(bigCell)}
+				<!-- The board's undo and redo, first in the bar, moved in by it. -->
+				<span class="board-bar" bind:this={boardBar}></span>
+			{/if}
+			<span class="big-pager" role="group" aria-label="Row">
+				<button
+					class="icon step"
+					disabled={at <= 0 || boardShown(bigCell) && boardDirty}
+					title={boardShown(bigCell) && boardDirty ? 'Save the drawing first' : 'Previous row'}
+					aria-label="Previous row"
+					onclick={() => stepBigCell(-1)}
+				><Icon name="chevron-left" size={16} /></button>
+				<span class="big-row">{at + 1} / {dataset.rows.length}</span>
+				<button
+					class="icon step"
+					disabled={at >= dataset.rows.length - 1 || boardShown(bigCell) && boardDirty}
+					title={boardShown(bigCell) && boardDirty ? 'Save the drawing first' : 'Next row'}
+					aria-label="Next row"
+					onclick={() => stepBigCell(1)}
+				><Icon name="chevron-right" size={16} /></button>
+			</span>
+			<span class="spacer"></span>
+			{#if boardShown(bigCell)}
+				{@render drawingButtons(!!(dataset.rows[bigCell.row]?.[bigCell.column] ?? '').trim(), deleteDrawing)}
+			{:else if bigKind(dataset.rows[bigCell.row]?.[bigCell.column] ?? '', bigCell.draw) === 'text'}
+				<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
+			{/if}
+		{:else}
+		{#if editing && dataset.rows[editing.row]}
+			<!-- First in the bar while a cell is typed in: the way into the
+			     whole of it. Mousedown is held off, or the field would lose its
+			     focus, and with it this button, before the click. -->
+			{@const value = dataset.rows[editing.row]?.[editing.column] ?? ''}
+			{#if cellPicture(value) || localImageName(value)}
+				<!-- A picture is chosen rather than typed in, and the way into it is
+				     the drawing surface — or, for a stored one, the Pictures tray. -->
+				<button
+					title={localImageName(value) ? 'Open this picture in Pictures' : 'Draw on this picture'}
+					disabled={locked}
+					onmousedown={(e) => e.preventDefault()}
+					onclick={() => editing && openBigCell(editing.row, editing.column)}
+				><Icon name="edit" size={15} /> {localImageName(value) ? 'Open' : 'Draw'}</button>
+			{:else}
+				<button
+					title="Open this cell in the table's full room"
+					disabled={locked}
+					onmousedown={(e) => e.preventDefault()}
+					onclick={editChosen}
+				><Icon name="task-edit" size={15} /> Edit</button>
+			{/if}
+		{/if}
+		<!-- Which table, and its lock, gone while rows are chosen or a cell is
+		     typed in: the row actions or the cell's Edit and count take the bar
+		     then, and either with these beside them ran out of room on a phone. -->
+		{#if !chosenRows.length && !editing}
+			<!-- The state of the table named beside it, and the one thing here that
+			     is not an errand — the same reason the page bar keeps its Lock outside
+			     its menu. Never disabled by the lock it sets, or there would be no
+			     way out of it. -->
 			<button
-				class="caret"
-				aria-haspopup="menu"
-				aria-expanded={pickerOpen}
-				title="{tables.length} table{tables.length === 1 ? '' : 's'} in this browser"
-				aria-label="Saved tables"
-				onclick={togglePicker}
+				class="lock-toggle"
+				aria-pressed={locked}
+				title={locked ? 'Unlock the table' : 'Lock the table — no typing, no new rows or columns, no paste or import'}
+				onclick={() => onlock(!locked)}
 			>
-				<Icon name="caret-down" size={12} />
+				<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
+				{locked ? 'Unlock' : 'Lock'}
 			</button>
-			{#if pickerOpen}
-				<ul class="picker-menu" role="menu" style="left:clamp(8px, {pickerAt.left}px, 100vw - 13rem);bottom:{pickerAt.bottom}px">
-					{#each tables as entry (entry.id)}
+			<!-- Beside the lock, because like it this is about the table as a
+			     whole and how it prints, not an errand on some rows. Only does
+			     anything once a sort has moved rows off their numbers. -->
+			<button
+				class="reindex"
+				title={locked
+					? 'The table is locked — unlock it to reindex'
+					: order
+						? 'Reindex — make this order the rows\' own: the numbers follow it, and lookups with them'
+						: 'Reindex — the rows are already in the order of their numbers; sort the table first'}
+				aria-label="Reindex"
+				disabled={locked || !order}
+				onclick={reindex}
+			>
+				<Icon name="array-numbers" size={15} />
+				<span class="label">Reindex</span>
+			</button>
+			<!-- What table this is, beside its lock: the buttons act on it, and it
+			     is the one control here that is a name rather than an act. One
+			     design prints any number of tables, so this is not the template
+			     picker's second half: the two are switched independently. -->
+			<label class="picker" bind:this={pickerEl}>
+				<span>Table</span>
+				<input
+					value={tableName}
+					placeholder={UNTITLED_TABLE}
+					aria-label="Table name"
+					readonly={locked}
+					onchange={(e) => onrenametable(e.currentTarget.value)}
+				/>
+				<button
+					class="caret"
+					aria-haspopup="menu"
+					aria-expanded={pickerOpen}
+					title="{tables.length} table{tables.length === 1 ? '' : 's'} in this browser"
+					aria-label="Saved tables"
+					onclick={togglePicker}
+				>
+					<span class="picker-icon"><Icon name="table-split" size={15} /></span>
+					<Icon name="caret-down" size={18} />
+				</button>
+				{#if pickerOpen}
+					<ul
+						class="picker-menu"
+						role="menu"
+						style="left:clamp(8px, {pickerAt.left}px, 100vw - 13rem);bottom:{pickerAt.bottom}px"
+					>
+						{#each tablesActiveFirst as entry (entry.id)}
+							<li role="none">
+								<button
+									role="menuitemradio"
+									aria-checked={entry.id === tableId}
+									onclick={() => {
+										pickerOpen = false;
+										if (entry.id !== tableId) onselecttable(entry.id);
+									}}
+								>
+									<span class="mark" aria-hidden="true">
+										{#if entry.id === tableId}<Icon name="checkmark" size={16} />{/if}
+									</span>
+									{entry.name}
+								</button>
+							</li>
+						{/each}
+						<!-- Below the rule, tables to start rather than open: an empty one,
+						     or the one that walks through the app. -->
+						<li role="separator"><hr /></li>
 						<li role="none">
 							<button
-								role="menuitemradio"
-								aria-checked={entry.id === tableId}
+								role="menuitem"
 								onclick={() => {
 									pickerOpen = false;
-									if (entry.id !== tableId) onselecttable(entry.id);
+									onnewtable();
 								}}
 							>
-								<span class="mark" aria-hidden="true">{entry.id === tableId ? '•' : ''}</span>
-								{entry.name}
+								<span class="mark" aria-hidden="true"><Icon name="add" size={14} /></span>
+								New Table
 							</button>
 						</li>
-					{/each}
-					<!-- Below the rule is a thing to do, not a table to open. -->
-					<li role="separator"><hr /></li>
-					<li role="none">
-						<button
-							role="menuitem"
-							onclick={() => {
-								pickerOpen = false;
-								onnewtable();
-							}}
-						>
-							<span class="mark" aria-hidden="true"></span>
-							<Icon name="add" size={12} /> New table…
-						</button>
-					</li>
-					<li role="none">
-						<button
-							class="danger"
-							role="menuitem"
-							title="Delete this table from this browser. Your design is not touched."
-							onclick={() => {
-								pickerOpen = false;
-								ondeletetable();
-							}}
-						>
-							<span class="mark" aria-hidden="true"></span>
-							<Icon name="trash" size={12} /> Delete this table…
-						</button>
-					</li>
-				</ul>
-			{/if}
-		</label>
-		<!-- The pair you are working between, one press apart. Two tables is the
-		     case that actually happens — this year's list and last year's, the
-		     real one and the one you are trying something on — and reaching the
-		     second through a menu each time is the whole cost of having split
-		     them up. -->
-		<button
-			class="icon"
-			disabled={!previousTable}
-			title={previousTable
-				? `Back to “${tables.find((t) => t.id === previousTable)?.name ?? UNTITLED_TABLE}”`
-				: 'Nothing to swap back to yet — this is the only table you have opened'}
-			aria-label="Swap to the previous table"
-			onclick={onswaptable}
-		><Icon name="arrows-horizontal" size={15} /></button>
-		<span class="rule"></span>
-		{#if chosenRows.length}
-			<!-- What you can do to the rows you have chosen, in front of the things
-			     that act on the whole table, with a rule between the two. It appears
+						<!-- Never over the open table's rows: it opens a table that already
+						     holds the cards untouched, or starts one — so it is not the
+						     lock's business, and a lock does not disable it. -->
+						<li role="none">
+							<button
+								role="menuitem"
+								title="The cards that walk through the app, in a table of their own — your tables are untouched"
+								onclick={() => {
+									pickerOpen = false;
+									ongettingstarted();
+								}}
+							>
+								<span class="mark" aria-hidden="true"><Icon name="information-square" size={14} /></span>
+								Getting Started
+							</button>
+						</li>
+						<!-- And below the next, what can be done to the open table: rows in,
+						     rows out, and the table gone. -->
+						<li role="separator"><hr /></li>
+						<li role="none">
+							<button
+								role="menuitem"
+								disabled={locked}
+								title="Paste a block of cells straight off a spreadsheet"
+								onclick={() => {
+									pickerOpen = false;
+									pasteOpen = true;
+								}}
+							>
+								<span class="mark" aria-hidden="true"><Icon name="task-add" size={14} /></span>
+								Paste…
+							</button>
+						</li>
+						<li role="none">
+							<button
+								role="menuitem"
+								disabled={locked}
+								title="Replace the rows with a CSV file"
+								onclick={() => {
+									pickerOpen = false;
+									fileInput?.click();
+								}}
+							>
+								<span class="mark" aria-hidden="true"><Icon name="table-shortcut" size={14} /></span>
+								Import…
+							</button>
+						</li>
+						<li role="none">
+							<button
+								role="menuitem"
+								disabled={!dataset.columns.length}
+								title="Save the rows as a CSV file"
+								onclick={() => {
+									pickerOpen = false;
+									exportCsv();
+								}}
+							>
+								<span class="mark" aria-hidden="true"><Icon name="table-built" size={14} /></span>
+								Export
+							</button>
+						</li>
+						<!-- The two that lose something, together and in red, as under the
+						     template's name. Reset only on a table that began as a starter. -->
+						<li role="separator"><hr /></li>
+						{#if onresettable}
+							<li role="none">
+								<button
+									class="danger"
+									role="menuitem"
+									disabled={locked}
+									title="Put the starter this table began as back over it. Your design is not touched."
+									onclick={() => {
+										pickerOpen = false;
+										onresettable();
+									}}
+								>
+									<span class="mark" aria-hidden="true"><Icon name="reset" size={14} /></span>
+									Reset…
+								</button>
+							</li>
+						{/if}
+						<li role="none">
+							<button
+								class="danger"
+								role="menuitem"
+								disabled={locked}
+								title="Delete this table from this browser. Your design is not touched."
+								onclick={() => {
+									pickerOpen = false;
+									ondeletetable();
+								}}
+							>
+								<span class="mark" aria-hidden="true"><Icon name="trash" size={14} /></span>
+								Delete…
+							</button>
+						</li>
+					</ul>
+				{/if}
+			</label>
+			<!-- The pair you are working between, one press apart. Two tables is the
+			     case that actually happens — this year's list and last year's, the
+			     real one and the one you are trying something on — and reaching the
+			     second through a menu each time is the whole cost of having split
+			     them up. -->
+			<button
+				class="icon"
+				disabled={!previousTable}
+				title={previousTable
+					? `Back to “${tables.find((t) => t.id === previousTable)?.name ?? UNTITLED_TABLE}”`
+					: 'Nothing to swap back to yet — this is the only table you have opened'}
+				aria-label="Swap to the previous table"
+				onclick={onswaptable}
+			><Icon name="compare" size={15} /></button>
+		{/if}
+		<span class="spacer"></span>
+		{#if editing && dataset.rows[editing.row]}
+			<!-- While a cell is being typed in, the bar is about that cell: how
+			     long it is, and the way into the whole of it. The row actions come back when the
+			     cell is left. Mousedown is held off the Edit button, or the field
+			     would lose its focus, and with it this bar, before the click. -->
+			{@const cell = editing}
+			<span class="rule"></span>
+			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[cell.row]?.[cell.column] ?? '')}</span>
+		{:else if chosenRows.length}
+			<!-- What you can do to the rows you have chosen, at the far end of the
+			     bar after the things that act on the whole table, with a rule
+			     between the two. It appears
 			     only when there is a selection, so the bar is its usual length the
 			     rest of the time.
 
-			     Two things in one order: out of the app, gone.
-
 			     Copy is one word and the glyph does the rest: a clipboard with
-			     something leaving it, which is the only question a copy button
-			     raises here — this app has a clipboard for looks as well, and a
-			     Duplicate on the card, and neither of them is this. It carries
-			     the word because two overlapping squares could be any of the
-			     three.
-
-			     Duplicating rows is gone with the icon that stood for it: it was a
-			     third mark to tell apart in the smallest bar in the app, and
-			     copying the rows and pasting them back is the same act in two
-			     presses that say what they do. -->
-			<span class="chosen-count">{chosenRows.length}</span>
+			     something leaving it. Delete is a word too, rather than a bare bin
+			     in red: it is the one button here that takes rows away, and it
+			     should read as a button that does, not as a mark beside a count. -->
+			<span class="rule"></span>
+			<!-- "3 rows"; one row says nothing — the tick beside it already does. -->
+			{#if chosenRows.length > 1}<span class="chosen-count">{chosenRows.length} rows</span>{/if}
+			<!-- Up and down first: they are about where the rows are, before what
+			     is done with them. Icon-only, the pair reads as one control. -->
+			<button
+				class="icon"
+				title="Move the chosen rows up — earlier in print order"
+				aria-label="Move the chosen rows up"
+				disabled={locked || chosenRows[0] === 0}
+				onclick={() => moveChosen(-1)}
+			><span class="nudge-up"><Icon name="chevron-sort-up" size={20} /></span></button>
+			<button
+				class="icon"
+				title="Move the chosen rows down — later in print order"
+				aria-label="Move the chosen rows down"
+				disabled={locked || chosenRows[chosenRows.length - 1] === dataset.rows.length - 1}
+				onclick={() => moveChosen(1)}
+			><span class="nudge-down"><Icon name="chevron-sort-down" size={20} /></span></button>
 			<button
 				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
 				onclick={copyTsv}
 			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
 			<button
-				class="icon danger"
+				class="danger"
 				title="Delete the chosen rows"
-				aria-label="Delete the chosen rows"
+				disabled={locked}
 				onclick={deleteChosen}
-			><Icon name="trash" size={15} /></button>
-			<span class="rule"></span>
+			><Icon name="trash" size={15} /> Delete</button>
 		{/if}
-		<button title="Paste a block of cells straight off a spreadsheet" onclick={() => (pasteOpen = true)}>
-			<Icon name="task-add" size={15} /> Paste
-		</button>
+		<!-- How tall a row may be: one line, a few, or all of its longest cell.
+		     Last in the bar, at its far end, and always there: it is about how
+		     the table is read, not about what is in it, so it stands apart from
+		     the things that act on the table and its rows. The label says the height the rows
+		     are at; the title, the next. -->
 		<button
-			use:hold={onloadsample}
-			title="Import a CSV file — press and hold to load the sample cards instead"
-			onclick={() => fileInput?.click()}><Icon name="table-shortcut" size={15} /> Import CSV…</button
+			class="row-height"
+			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
+			aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
+			onclick={() => onrowheight(nextRowHeight)}
 		>
-		<button onclick={exportCsv} disabled={!dataset.columns.length}>
-			<Icon name="table-built" size={15} /> Export CSV
+			<Icon name={ROW_HEIGHT_ICONS[rowHeight]} size={15} />
+			<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
 		</button>
-		<span class="spacer"></span>
-		<button
-			class="danger"
-			title="Delete every row and column"
-			disabled={!dataset.columns.length && !dataset.rows.length}
-			onclick={() => (clearing = true)}
-		>
-			<Icon name="trash" size={15} /> Delete
-		</button>
+		{/if}
 		<input
 			bind:this={fileInput}
 			type="file"
@@ -1028,26 +2384,141 @@
 			onchange={importFile}
 		/>
 	</div>
-</section>
-
-<!-- One question, and it is a count rather than a paragraph. It used to ask
-     twice and explain undo both times; a warning nobody reads is not a warning,
-     and the second press was only ever a way of not reading the first. -->
-{#if clearing}
-	<div class="modal-backdrop" role="presentation" onclick={() => (clearing = false)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete all data?" use:armDefault>
-		<h2>Delete all data?</h2>
-		<p>
-			{dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'}, {dataset.columns.length}
-			column{dataset.columns.length === 1 ? '' : 's'}.
-		</p>
-		<div class="modal-actions">
-			<span class="spacer"></span>
-			<button onclick={() => (clearing = false)}>Cancel</button>
-			<button class="danger-solid" data-default onclick={clearData}>Delete All Data</button>
+	<!-- A cell opened whole, over the table rather than over the app: it is
+	     the table's business, and a third dialog on top of the page and the
+	     table hid the card the words are for. It takes exactly the table's
+	     room — the rows and the bar under them — and gives it back on Done or
+	     Cancel. -->
+	<!-- The drawing editor's way back, as the Pictures tray's large view has it:
+	     one step — to Pictures if that is where it came from, else to the table
+	     the drawing lives in. The × beside it closes to wherever it came from. -->
+	{#snippet back()}
+		<button
+			class="icon back"
+			title={leaveTo === 'images' ? 'Back to Pictures' : 'Back to the table'}
+			aria-label={leaveTo === 'images' ? 'Back to Pictures' : 'Back to the table'}
+			onclick={stepBack}
+		>
+			<Icon name="chevron-left" size={16} />
+		</button>
+	{/snippet}
+	{#if drawingArea}
+		{@const area = drawingArea}
+		<div class="cell-editor drawing" role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
+			<!-- The editor's head is the tray's grip too, as the table's header row
+			     is: the editor covers that row, and on a phone a drawing wants
+			     more of the height than the tray opened with. -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="cell-editor-head"
+				class:draggable={trayDraggable}
+				onpointerdown={startTrayDrag}
+				onclickcapture={swallowClick}
+			>
+				<!-- The title's room holds the board's own row instead — its size,
+				     the paper, its weight — moved in by the board; the name stays
+				     for a screen reader. -->
+				{@render back()}
+				<h2 id="cell-editor-title" class="sr-only">{area.name}</h2>
+				<span class="board-head" bind:this={boardHead}></span>
+				<button class="icon close" title={leaveTitle(boardDirty)} aria-label="Close" onclick={() => closeBigCell()}>
+					<Icon name="close" size={18} />
+				</button>
+			</div>
+			{#key `${area.id}:${areaEpoch}`}
+				<BitmapEditor
+					bind:this={board}
+					box={{ pixels: area.pixels }}
+					value={area.value}
+					ink={area.ink}
+					onsave={((id) => (dataUrl: string, pixels: Grid | undefined) => saveArea(id, dataUrl, pixels))(area.id)}
+					ondirty={(d) => (boardDirty = d)}
+					head={boardHead}
+					bar={boardBar}
+					{onnotice}
+				/>
+			{/key}
 		</div>
-	</div>
-{/if}
+	{:else if bigCell}
+		{@const open = bigCell}
+		{@const text = dataset.rows[open.row]?.[open.column] ?? ''}
+		{@const kind = bigKind(text, open.draw)}
+		<div class="cell-editor" class:drawing={boardShown(bigCell)} role="dialog" aria-labelledby="cell-editor-title" style="bottom:{barHeight}px">
+			<!-- The editor's head is the tray's grip too, as the table's header row
+			     is: the editor covers that row, and on a phone a drawing wants
+			     more of the height than the tray opened with. -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="cell-editor-head"
+				class:draggable={trayDraggable}
+				onpointerdown={startTrayDrag}
+				onclickcapture={swallowClick}
+			>
+				{#if boardShown(open)}
+					{@render back()}
+					<h2 id="cell-editor-title" class="sr-only">{open.column}</h2>
+					<span class="board-head" bind:this={boardHead}></span>
+				{:else}
+					<h2 id="cell-editor-title">{open.column}</h2>
+					<span class="spacer"></span>
+				{/if}
+				<button class="icon close" title={leaveTitle(boardShown(open) && boardDirty)} aria-label="Close" onclick={() => closeBigCell()}>
+					<Icon name="close" size={18} />
+				</button>
+			</div>
+			<!-- One editor for a cell, whatever it holds: words are typed, a
+			     drawing is drawn — on the same surface the card opens, in this
+			     same room, with the pager below stepping down the column through
+			     either, and the drawing's Delete and Save beside it. Keyed on the cell, so each row's drawing starts
+			     with its own board and its own undo. A locked table shows the
+			     picture and nothing to draw with. -->
+			{#if kind === 'drawing' && !locked}
+				{@const look = drawingFor(open.column)}
+				{#key `${open.row}:${open.column}:${drawEpoch}`}
+					<BitmapEditor
+						bind:this={board}
+						box={{ pixels: look.pixels }}
+						value={drawingSource(text)}
+						ink={look.ink}
+						onsave={((row, column) => (dataUrl: string, pixels: Grid | undefined) => drew(row, column, dataUrl, pixels))(
+							open.row,
+							open.column
+						)}
+						ondirty={(d) => (boardDirty = d)}
+						head={boardHead}
+						bar={boardBar}
+						{onnotice}
+					/>
+				{/key}
+			{:else if kind !== 'text'}
+				<!-- A stored picture landed on by the pager, or any picture in a
+				     locked table: itself, large. A stored one is the Pictures tray's
+				     to edit, and a press takes it there. -->
+				{@const stored = localImageName(text)}
+				<button
+					class="big-picture"
+					disabled={!stored}
+					title={stored ? `Open ${stored} in Pictures` : undefined}
+					onclick={() => stored && onopenimage(stored)}
+				><img src={drawingSource(text)} alt={open.column} /></button>
+			{:else}
+			<textarea
+				value={text}
+				readonly={locked}
+				use:focusOnOpen
+				use:completePlaceholders={dataset.columns}
+				oninput={(e) => setCell(open.row, open.column, e.currentTarget.value)}
+				onkeydown={(e) => {
+					if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+						e.preventDefault();
+						closeBigCell();
+					}
+				}}
+			></textarea>
+			{/if}
+		</div>
+	{/if}
+</section>
 
 {#if confirmColumn !== null && dataset.columns[confirmColumn]}
 	{@const column = dataset.columns[confirmColumn]}
@@ -1088,8 +2559,25 @@
 	</div>
 {/if}
 
+<!-- A picture's two acts, at the far end of the panel's bar as they are in
+     the Pictures tray: Delete in red, then Save, lit while there is drawing to
+     keep. -->
+{#snippet drawingButtons(present: boolean, remove: () => void)}
+	<button class="danger" disabled={!present && !boardDirty} title="Delete this drawing" onclick={remove}>
+		<Icon name="trash" size={15} /> Delete
+	</button>
+	<button class="primary" disabled={!boardDirty} title="Save this drawing (Ctrl/Cmd+S)" onclick={() => board?.save()}>
+		Save
+	</button>
+{/snippet}
+
 <style>
 	.data {
+		/* The cell editor is laid over the table inside this. */
+		position: relative;
+		/* One line of a cell's text: its size times its leading. The gutter
+		   and the row-height modes are measured in it. */
+		--cell-line: calc(0.75rem * 1.45);
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
@@ -1100,8 +2588,72 @@
 		background: #fff;
 	}
 
+	/* A shadow on the bottom, left and right edges of the scroller when there
+	   is more past them — the edges come from scrolledge.ts, which marks this
+	   section.
+
+	   None under the header. It is frozen, always there whatever has scrolled
+	   under it, and a shadow only made it look lifted — more important than
+	   the rows — without telling anybody anything; it gets a 2px rule instead,
+	   as furniture (see `thead th`). The row numbers are frozen too and have
+	   the same rule, but sideways the shadow beside them stays: a column
+	   scrolled out of sight on the left is otherwise invisible, where a row
+	   scrolled up past the header still shows in the row numbers' count.
+
+	   Short of the scroller's own bars, where a classic one takes room, of
+	   the action bar under it, of the header, and of the row numbers. Over
+	   the cells and their sticky parts (z-index 4 at most), under the cell
+	   editor. */
+	.edge {
+		position: absolute;
+		z-index: 5;
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 0.15s;
+	}
+
+	.edge.bottom {
+		left: 0;
+		right: var(--scrollbar-y, 0px);
+		bottom: calc(var(--bar-h, 0px) + var(--scrollbar-x, 0px));
+		height: 27px;
+		background: linear-gradient(to top, var(--edge-shadow), transparent);
+	}
+
+	.edge.left,
+	.edge.right {
+		top: var(--head-h, 0px);
+		bottom: calc(var(--bar-h, 0px) + var(--scrollbar-x, 0px));
+		width: 27px;
+	}
+
+	.edge.left {
+		left: var(--gutter-w, 0px);
+		background: linear-gradient(to right, var(--edge-shadow), transparent);
+	}
+
+	.edge.right {
+		right: var(--scrollbar-y, 0px);
+		background: linear-gradient(to left, var(--edge-shadow), transparent);
+	}
+
+	/* `:global` only for the marks, which the action sets and the compiler
+	   cannot see. */
+	.data:global([data-more-bottom]) .edge.bottom,
+	.data:global([data-more-left]) .edge.left,
+	.data:global([data-more-right]) .edge.right {
+		opacity: 1;
+	}
+
+	/* Sideways on a phone too. There the table is a column or two wide and
+	   nearly always scrolls on, so the right-hand shadow is nearly always
+	   there — but it was asked for: without it nothing says the columns go
+	   on, and the left-hand one is the only sign of columns scrolled past. */
+
 	.scroll {
 		flex: 1;
+		/* Holds the finger's caret, placed in its scrolled content. */
+		position: relative;
 		overflow: auto;
 		min-height: 0;
 		/* Scrolled to the top and flicked down, this would otherwise reload. */
@@ -1132,7 +2684,7 @@
 		table-layout: fixed;
 		/* The floor is set inline, from the columns themselves — see tableWidth. */
 		width: 100%;
-		font: 12px/1.4 ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem/1.4 ui-sans-serif, system-ui, sans-serif;
 	}
 
 	th,
@@ -1144,13 +2696,29 @@
 		padding: 0;
 	}
 
+	/* A locked table's words — its cells and its column names — are faded a
+	   little, so the state is on the thing it applies to and not only on the
+	   button: read-only cells otherwise look exactly like cells that refuse
+	   your typing for no reason. It used to be ruled in the accent instead,
+	   which made a table you could not change the loudest thing on the
+	   screen. Faded, not greyed out: it is still there to be read. Before the
+	   keyword red below, which still wins: a column name that will never
+	   print is worth saying even on a locked table. */
+	.locked td textarea,
+	.locked .column-name {
+		color: #6b6b6b;
+	}
+
 	/* The table's own outside, which no cell's right or bottom edge covers. */
 	tr > :first-child {
 		border-left-width: 1px;
 	}
 
+	/* The line the rows slide under, twice the others, in place of a shadow —
+	   see `.edge`. */
 	thead th {
 		border-top-width: 1px;
+		border-bottom-width: 2px;
 	}
 
 	/* Where the tray is dragged taller from. `touch-action: none` because the
@@ -1189,31 +2757,143 @@
 		min-width: 0;
 	}
 
+	/* The same field the bars use — a rule under the value, no well around it —
+	   because it is the same act: typing a name into something. A white box
+	   popping up over the header on hover read as a different kind of control
+	   from every other field in the app. */
+	/* Not the pointer's until it has the focus — see `takeName`. The header
+	   under it is, so a press here drags the tray or the column. */
+	.column-name:not(:focus) {
+		pointer-events: none;
+	}
+
+	.column-head {
+		cursor: text;
+	}
+
+	.column-head :global(button) {
+		cursor: pointer;
+	}
+
 	.column-name {
-		border: 1px solid transparent;
-		border-radius: var(--radius-input);
+		border: none;
+		border-bottom: 1px solid transparent;
+		border-radius: 0;
 		background: transparent;
-		font: 600 12px ui-sans-serif, system-ui, sans-serif;
+		font: 600 0.75rem ui-sans-serif, system-ui, sans-serif;
 		flex: 1 1 auto;
 		min-width: 0;
-		padding: 3px;
+		padding: 3px 2px;
 	}
 
-	.column-name:hover {
-		border-color: #ddd;
-		background: #fff;
+	/* A name a keyword has taken: `%%today%%` will never print this column,
+	   and nothing else would say so — the template reads fine and prints the
+	   date. The warning red the status line and the card's marks use. */
+	/* The sign before a reserved name, in the name's own red. */
+	.column-head .icon.reserved {
+		width: 1.125rem;
+		height: 1.125rem;
+		color: #b42318;
+		flex: none;
 	}
 
-	.column-name:focus {
-		border-color: #2563eb;
-		background: #fff;
+	.column-name.keyword {
+		color: #b42318;
 	}
 
-	.column-tools {
+	.column-head:hover .column-name:not([readonly]) {
+		border-bottom-color: var(--border-control-hover);
+	}
+
+	/* Editing: the underline turns the accent and doubles, as the bars' fields
+	   do — no ring round it and no ground under it. */
+	.column-head .column-name:not([readonly]):focus {
+		outline: none;
+		border-bottom-color: var(--accent);
+		box-shadow: 0 1px 0 var(--accent);
+	}
+
+	.column-tools,
+	.column-move {
 		display: inline-flex;
 		flex: none;
 		gap: 1px;
+	}
+
+	.column-tools {
 		opacity: 0.35;
+	}
+
+	/* Moving and deleting only when the header is being pointed at or has the
+	   focus; the sort stays, because it is also where the sort order is shown. */
+	.column-move {
+		display: none;
+	}
+
+	th:hover .column-move,
+	th:focus-within .column-move {
+		display: inline-flex;
+	}
+
+	/* No area prints this column. Quiet, because it is a fact about the data
+	   and not a fault: a column held back for later is a legitimate thing. */
+	.icon.unused {
+		width: 1.125rem;
+		height: 1.125rem;
+		flex: none;
+		color: #b26a00;
+	}
+
+	.icon.unused:hover {
+		color: var(--accent-strong);
+		background: var(--accent-tint);
+	}
+
+	/* A column being carried, and the gap it would land in. */
+	th.carried {
+		opacity: 0.45;
+	}
+
+	/* Held long enough to be lifted: raised off the row, ready to go. */
+	th.lifted {
+		background: var(--accent-tint);
+		box-shadow: inset 0 -2px 0 var(--accent);
+	}
+
+	/* The header claims a touch for itself, so a finger can lift a column
+	   from it; a sideways swipe that is not a lift is scrolled by hand. */
+	thead th {
+		touch-action: none;
+	}
+
+	th.drop-before {
+		box-shadow: inset 3px 0 0 var(--accent);
+	}
+
+	th.drop-after {
+		box-shadow: inset -3px 0 0 var(--accent);
+	}
+
+	/* A cell's field fills it and would cover an inset shadow, so the body's
+	   share of the line is drawn over the field instead. */
+	td.drop-before::after,
+	td.drop-after::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 3px;
+		background: var(--accent);
+		pointer-events: none;
+		z-index: 2;
+	}
+
+	td.drop-before::after {
+		left: 0;
+	}
+
+	td.drop-after::after {
+		right: 0;
 	}
 
 	/* The grip straddles the rule between two columns, which is where the
@@ -1237,7 +2917,7 @@
 		position: absolute;
 		inset: 2px 3px;
 		border-radius: 1px;
-		background: #2563eb;
+		background: var(--accent);
 		opacity: 0;
 	}
 
@@ -1273,29 +2953,257 @@
 
 	   The old `min-width` is gone with it: the colgroup owns the widths now, and
 	   a field that refused to go under 9rem was a floor under every column. */
+	/* A block, not the inline-block a textarea is by default: inline, it sat
+	   on the line's baseline with a descender's worth of cell under it, so the
+	   field never reached the bottom of its own cell.
+
+	   The fixed height is the fallback, for a browser without
+	   `field-sizing` (Safari, so every browser on an iPhone): three lines and
+	   a scroll, which is the one standing exception AGENTS.md names. It used to
+	   be `height: 100%` everywhere, and there that percentage resolved against
+	   the cell's declared `height: 1px` below rather than the row's real
+	   height — a field collapsed to its own padding, with the text inside it
+	   cut off where nobody could see it. */
 	td textarea {
+		display: block;
 		width: 100%;
 		min-width: 0;
-		height: 100%;
+		height: calc(var(--cell-line) * 3 + 7px);
 		border: none;
 		background: transparent;
-		resize: vertical;
-		font: 12px/1.45 ui-sans-serif, system-ui, sans-serif;
-		padding: 5px 6px;
+		/* No grip: the field is the cell, and the cell's height is the row's.
+		   A handle that sized one field inside a row sized by another was a
+		   control that could only ever make the two disagree. */
+		resize: none;
+		font: 0.75rem/1.45 ui-sans-serif, system-ui, sans-serif;
+		/* No bottom padding, and a height of whole lines plus a sliver: a cell
+		   that holds more than it shows then stops on a line's edge, rather
+		   than showing the tops of the next line's letters in its padding. */
+		padding: 5px 6px 0;
 		box-sizing: border-box;
-		field-sizing: content;
-		max-height: 6.5rem;
+		max-height: calc(var(--cell-line) * 5 + 7px);
+		/* No scrollbar at rest: the [...] mark already says there is more,
+		   and a bar down every long cell was a second, louder way of saying it.
+		   Hidden by not scrolling rather than by styling the bar away —
+		   `scrollbar-width` is only newly Baseline — and back the moment the
+		   cell is typed in, where the caret has to be able to reach the end. A
+		   wheel over a resting cell now scrolls the table, as it should. */
+		overflow: hidden;
 	}
 
 	td textarea:focus {
-		outline: 2px solid #2563eb;
-		outline-offset: -2px;
+		overflow: auto;
+	}
+
+	tbody td {
+		position: relative;
+	}
+
+	/* Where the field can size itself to its words, it does — and only that:
+	   its height is its content's, capped by the row height below. It used to
+	   fill the row as well, by a `height: 100%` against a cell of `height: 1px`,
+	   which Chromium resolves against the row as drawn and Firefox resolves
+	   against the 1px: in a Firefox that has `field-sizing`, every Long and
+	   Full cell collapsed to its padding, the words out of sight and the rows
+	   never growing. The band under a short field is still the cell's target:
+	   a press on it focuses the field (see the cell's `onclick`). */
+	@supports (field-sizing: content) {
+		td textarea {
+			height: auto;
+			field-sizing: content;
+		}
+	}
+
+	/* More in the cell than it shows: a [...] in the bottom corner, on the
+	   cell's own background so it covers the words it sits over. Gone while
+	   the cell is being typed in — the field scrolls then, and the count has
+	   that corner. */
+	.more {
+		display: none;
+		position: absolute;
+		right: 0;
+		/* On the last line the field shows: its line box ends the sliver of
+		   height above the cell's bottom edge. */
+		bottom: 2px;
+		height: var(--cell-line);
+		padding: 0 6px 0 1.5em;
+		border: none;
+		border-radius: 0;
+		/* Fading in from the left, so the words under it trail off into the
+		   mark rather than being cut by a box. */
+		background: linear-gradient(to right, transparent, var(--cell-bg) 1.2em);
+		color: #555;
+		font: 0.75rem/var(--cell-line) ui-sans-serif, system-ui, sans-serif;
+		cursor: pointer;
+		z-index: 1;
+	}
+
+	.more:hover:not(:disabled) {
+		color: var(--accent-strong);
+	}
+
+	/* Still drawn on a locked table, where it says only that there is more:
+	   the full-size editor is a way to type, and a lock is no typing. */
+	.more:disabled {
+		cursor: default;
+	}
+
+	td:global([data-more]) .more {
+		display: block;
+	}
+
+	/* Gone while the field is being typed in — not on `:focus-within`, which
+	   the mark itself sets the moment it is pressed, and would hide it before
+	   the click that pressed it could land. */
+	td:global([data-more]):has(textarea:focus) .more {
+		display: none;
+	}
+
+	td textarea:read-only {
+		cursor: default;
+	}
+
+	/* The caret a finger's tap drew, where the browser draws none: a line the
+	   width and blink of the system's caret — one pixel — in the accent, as
+	   the selection is. */
+	.finger-caret {
+		position: absolute;
+		/* Over the field, which lifts itself while it has the focus. */
+		z-index: 3;
+		width: 1px;
+		margin-left: -0.5px;
+		background: var(--accent-strong);
+		pointer-events: none;
+		animation: finger-caret 1.1s steps(1) infinite;
+	}
+
+	@keyframes finger-caret {
+		50% {
+			opacity: 0;
+		}
+	}
+
+	/* A finger's cell: a long press opens it, so it must not also start a
+	   text selection with its handles and its menu; and it is chosen, not
+	   typed in, so no caret blinks in it to say otherwise. */
+	td textarea.by-finger {
+		-webkit-user-select: none;
+		user-select: none;
+		caret-color: transparent;
+	}
+
+
+	td textarea:focus {
+		outline: none;
 		max-height: 18rem;
 		position: relative;
 	}
 
+	/* The ring goes round the cell, not the field in it: the field is only as
+	   tall as its own text, and a row made taller by a neighbour left a ring
+	   round the top of the cell and a band of unmarked cell under it. */
+	tbody td:has(> textarea:focus) {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+	}
+
+	/* Row height, from the toggle under the table — see `rowHeight`. Short is
+	   one line and padding, and opens like medium while typed in. Full lifts the cap, so a
+	   row is as tall as its longest cell; where there is no `field-sizing`
+	   the `autosize` action does that measuring by hand. Medium is the
+	   stylesheet as it stands above. */
+	/* An expanded row in a short table takes its content's height, where the
+	   field can size itself; elsewhere `autosize` writes the height inline. */
+	@supports (field-sizing: content) {
+		.data.rows-short tr.expanded td textarea {
+			height: auto;
+		}
+	}
+
+	/* Short is the first line and the same sliver under it as medium — at
+	   rest. The cell being typed in opens as medium's does, to its text up to
+	   18rem: a one-line field is no place to edit a paragraph, and the row it
+	   pushes down is one row, while you are in it. */
+	.data.rows-short td textarea:not(:focus) {
+		height: calc(var(--cell-line) + 7px);
+		max-height: calc(var(--cell-line) + 7px);
+	}
+
+	.data.rows-full td textarea,
+	.data.rows-full td textarea:focus,
+	.data tr.expanded td textarea,
+	.data tr.expanded td textarea:focus {
+		max-height: none;
+		/* Nothing is ever cut off here, so the bottom padding comes back. */
+		padding-bottom: 5px;
+	}
+
+	/* A picture sits where the cell's first lines would, as tall as they are
+	   at each row height, so an image cell sets no row taller than its
+	   neighbours' words do. */
+	.cell-picture {
+		display: block;
+		box-sizing: border-box;
+		max-width: 100%;
+		height: calc(var(--cell-line) * 3 + 7px);
+		padding: 4px 6px;
+		object-fit: contain;
+		object-position: left center;
+		cursor: default;
+	}
+
+	/* The picture's button: no chrome of its own, the cell's whole width, and
+	   the focus ring the text fields have. */
+	.cell-picture-pick {
+		display: block;
+		position: relative;
+		width: 100%;
+		padding: 0;
+		border: 0;
+		background: none;
+		text-align: left;
+		cursor: default;
+	}
+
+	.cell-picture-pick:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+	}
+
+	/* A drawing can be faint ink on white at the size a row allows, and read
+	   as an empty cell: a dot in its ink, where the first letter of a text
+	   cell would stand, says something is there. */
+	.ink-dot {
+		position: absolute;
+		top: 5px;
+		left: 6px;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		pointer-events: none;
+		box-shadow: 0 0 0 1px #fff;
+	}
+
+	.data.rows-short .cell-picture {
+		height: calc(var(--cell-line) + 7px);
+		padding: 2px 6px;
+	}
+
+	.data.rows-full .cell-picture,
+	.data tr.expanded .cell-picture {
+		height: auto;
+		max-height: 12rem;
+	}
+
+	/* Each cell's ground as a custom property as well as a background, so the
+	   overflow mark can fade into whatever the cell is painted. */
+	tbody td {
+		--cell-bg: #fff;
+	}
+
 	tr.active td {
-		background: #eff5ff;
+		--cell-bg: var(--accent-wash);
+		background: var(--accent-wash);
 	}
 
 	/* As narrow as a two-digit number and its tick: every millimetre here is a
@@ -1308,6 +3216,9 @@
 		position: sticky;
 		left: 0;
 		z-index: 2;
+		/* Twice the other rules, like the header's: the line the columns slide
+		   under — see `.edge`. */
+		border-right-width: 2px;
 		white-space: nowrap;
 		padding: 5px 6px 3px;
 		color: #767676;
@@ -1320,60 +3231,121 @@
 	thead th.gutter {
 		z-index: 4;
 		background: #fafafa;
+		/* Level with the sort marks in the column heads, which are centred in
+		   theirs. The rows' gutters are padded low to sit on the text's line;
+		   the header has no line of text to sit on. */
+		padding-top: 4px;
+		padding-bottom: 4px;
+		vertical-align: middle;
 	}
 
 	/* The active and chosen tints have to be repainted here: the gutter carries
 	   its own opaque background now, so the row's would not show through it. */
 	tr.active .gutter {
-		background: #eff5ff;
+		background: var(--accent-wash);
 	}
 
 	tr.chosen .gutter {
-		background: #dbe7fd;
-		color: #1d4ed8;
+		background: var(--accent-soft);
+		color: var(--accent-strong);
 	}
 
 	/* Sized and coloured like the sort control in a column header, because it is
 	   the same act — it just reaches every column at once. */
+	/* Out of the flow, over where the row numbers sit below it: in the flow, a
+	   22px button in a row of 11px ticks made the header taller the moment a
+	   sort came on, and the corner tick dropped by half the difference. The
+	   corner is sticky, so it is the button's containing block. */
 	.unsort {
-		color: #1d4ed8;
+		position: absolute;
+		top: 50%;
+		right: 1px;
+		width: 1.125rem;
+		height: 1.125rem;
+		transform: translateY(-50%);
+		color: var(--accent-strong);
+	}
+
+	/* The tick and what follows it — the row's number, or in the header the
+	   unsort mark — as one flex row, centred on each other vertically and
+	   starting at the same x in every row, header included. As inline boxes they
+	   sat on a baseline, so the number's line box and the tick's nudge decided
+	   where each landed, and the header's lone tick was centred in the cell
+	   while the rows' ticks sat left of their numbers. */
+	.gutter-line {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	/* In a row, the line is exactly one line of a cell's text — the same size,
+	   the same leading, starting the same 5px down as a field's padding — so
+	   the number set in it lands on the cells' first baseline, and the tick,
+	   centred in the same line, is middle-aligned with the number. */
+	tbody .gutter-line {
+		height: var(--cell-line);
+	}
+
+	/* The row's grip. `touch-action: none` so a held finger can carry it; the
+	   rest of the row still scrolls. */
+	.gutter .number.grip {
+		cursor: grab;
+		touch-action: none;
+	}
+
+	/* The rows being carried, and the gap they will land in: a line across the
+	   whole row, drawn over the fields as the column's drop line is. */
+	tr.carried td {
+		opacity: 0.55;
+	}
+
+	tr.row-drop-before > td::before,
+	tr.row-drop-after > td::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: var(--accent);
+		pointer-events: none;
+		z-index: 3;
+	}
+
+	tr.row-drop-before > td::before {
+		top: -1px;
+	}
+
+	tr.row-drop-after > td::before {
+		bottom: -1px;
 	}
 
 	.gutter .number {
 		min-width: 1.2em;
-		display: inline-block;
 		text-align: right;
+		font-size: 0.75rem;
+		line-height: var(--cell-line);
 	}
 
-	/* A square, not a radio: several rows can be chosen at once, and the
-	   checkboxes on the export screen are square too. */
+	/* Carbon's three checkbox icons, the ones every checkbox in the app is
+	   drawn as (see app.css): empty, ticked, and the dash for some-but-not-all
+	   in the header. A button of our own rather than an input, because it
+	   carries the tri-state the gutter needs; the icon is inside it, so its
+	   focus ring is its own. */
 	.tick {
-		width: 11px;
-		height: 11px;
-		margin-right: 4px;
+		display: grid;
+		place-items: center;
+		width: 0.875rem;
+		height: 0.875rem;
+		flex: none;
 		padding: 0;
-		vertical-align: -1px;
-		border: 1px solid #bbb;
-		border-radius: var(--radius-input);
-		background: #fff;
+		border: none;
+		background: none;
+		color: #555;
 		cursor: pointer;
 	}
 
-	.tick[aria-checked='true'] {
-		border-color: #2563eb;
-		background: #2563eb;
-		box-shadow: inset 0 0 0 2px #fff;
-	}
-
-	/* Some but not all: a dash, which is what every tri-state checkbox draws and
-	   the one mark that is neither the empty square nor the filled one. A
-	   smaller version of the filled square would have read as "chosen" at the
-	   size this tick actually is. */
-	.tick[aria-checked='mixed'] {
-		border-color: #2563eb;
-		background:
-			linear-gradient(#2563eb, #2563eb) center / 5px 2px no-repeat,
-			#fff;
+	.tick:is([aria-checked='true'], [aria-checked='mixed']) {
+		color: var(--accent);
 	}
 
 	tbody tr {
@@ -1389,10 +3361,12 @@
 	/* Which cells fill the area selected on the page. Quiet — it is an answer to
 	   "where does this come from", not a selection of its own. */
 	td.bound {
+		--cell-bg: #fbf7e8;
 		background: #fbf7e8;
 	}
 
 	tr.active td.bound {
+		--cell-bg: #eaf0ea;
 		background: #eaf0ea;
 	}
 
@@ -1402,7 +3376,7 @@
 	}
 
 	.ghost .icon.add {
-		width: 22px;
+		width: 1.375rem;
 	}
 
 	th.ghost {
@@ -1414,8 +3388,8 @@
 	.icon {
 		display: inline-grid;
 		place-items: center;
-		width: 22px;
-		height: 22px;
+		width: 1.375rem;
+		height: 1.375rem;
 		border: none;
 		background: transparent;
 		cursor: pointer;
@@ -1441,6 +3415,7 @@
 		padding: 18px;
 		color: #767676;
 		text-align: center;
+		user-select: none;
 	}
 
 	.actions {
@@ -1463,23 +3438,20 @@
 	   of what the two buttons beside it are about to act on, and at 11px it read
 	   as a footnote to them rather than as their subject. */
 	.actions .chosen-count {
-		font: 600 15px ui-sans-serif, system-ui, sans-serif;
-		color: #1d4ed8;
+		font: 600 0.8125rem ui-sans-serif, system-ui, sans-serif;
+		color: var(--accent-strong);
 		padding: 0 2px;
+		white-space: nowrap;
 	}
 
 	.actions .icon {
 		display: grid;
 		place-items: center;
-		width: 28px;
-		height: 28px;
+		width: 1.75rem;
+		height: 1.75rem;
 		padding: 0;
 	}
 
-	.actions .icon.danger {
-		border-color: #b42318;
-		color: #b42318;
-	}
 
 	/* The field is a value with a line under it, and the caret sits against that
 	   line rather than carrying a frame of its own — the same shape the page
@@ -1497,32 +3469,43 @@
 	   stylesheet rather than in the markup, so what a screen reader announces
 	   stays in sentence case. */
 	.picker > span {
-		font-size: 10px;
+		font-size: 0.625rem;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
 		white-space: nowrap;
 	}
 
+	/* Narrower than it was, so the bar fits a phone with a cell open and its
+	   Edit showing; a longer name still scrolls within the field. */
 	.picker input {
-		width: 7.5rem;
+		width: 6rem;
 		min-width: 0;
 		padding: 3px 2px;
 		border: none;
 		border-bottom: 1px solid var(--border-control);
 		background: none;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		color: #111;
+		/* As the template's: an ellipsis, not a cut letter, at the field's end. */
+		text-overflow: ellipsis;
 	}
 
 	.picker input:focus {
 		outline: none;
-		border-bottom-color: #2563eb;
+		border-bottom-color: var(--accent);
+		box-shadow: 0 1px 0 var(--accent);
 	}
 
 	.picker .caret {
+		display: grid;
+		grid-auto-flow: column;
+		place-items: center;
 		border: none;
 		background: none;
-		padding: 2px;
+		/* As the template's caret: a target, not just the glyph's 18px. */
+		min-width: 1.75rem;
+		min-height: 1.75rem;
+		padding: 0 3px;
 		margin-left: -2px;
 		color: #555;
 		border-radius: 3px;
@@ -1531,6 +3514,28 @@
 	.picker .caret:hover {
 		background: #eaeaea;
 		color: #111;
+	}
+
+	/* The toolbar's Data glyph, in the caret, for when the name has no room. */
+	.picker .picker-icon {
+		display: none;
+	}
+
+	/* Too narrow for a name worth reading, the picker is the toolbar's Data
+	   glyph and its caret: one button that opens the menu, rather than a
+	   sliver of name with the caret run over the swap beside it. Asked of the
+	   picker's own width — a container — because what squeezes it is the text
+	   size as much as the screen. Renaming waits for the menu's room. */
+	@container (max-width: 5rem) {
+		.picker > span:first-child,
+		.picker input {
+			display: none;
+		}
+
+		.picker .picker-icon {
+			display: grid;
+			padding-left: 2px;
+		}
 	}
 
 	/* Fixed, and placed from a measurement: the bar it sits in scrolls sideways,
@@ -1561,7 +3566,7 @@
 		background: none;
 		padding: 5px 8px;
 		border-radius: 4px;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		text-align: left;
 		/* A long name wraps rather than widening the menu past its cap. */
 		overflow-wrap: anywhere;
@@ -1584,8 +3589,14 @@
 	   and would lend the menu a column of empty boxes. */
 	.picker-menu .mark {
 		flex: none;
-		width: 0.7rem;
-		color: #1a5fb4;
+		display: inline-grid;
+		place-items: center;
+		width: 1rem;
+		color: var(--accent-strong);
+	}
+
+	.picker-menu button.danger .mark {
+		color: inherit;
 	}
 
 	.picker-menu hr {
@@ -1606,11 +3617,12 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		padding: 6px 10px;
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-button);
 		background: #fff;
+		color: #111;
 		cursor: pointer;
 	}
 
@@ -1618,8 +3630,12 @@
 		border-color: var(--border-control-hover);
 	}
 
+	/* As the bars' disabled buttons are (options-bar.css): the words kept
+	   dark and the whole faded. Left to the browser, a disabled button's words
+	   are its own faint grey, and faded again on top of that they were all but
+	   gone — invisible altogether once the dark themes turned them over. */
 	button:disabled {
-		opacity: 0.4;
+		opacity: 0.5;
 		cursor: default;
 	}
 
@@ -1645,6 +3661,75 @@
 
 	.actions .spacer {
 		flex: 1;
+	}
+
+	/* As wide in every mode as in its widest, so pressing it does not shift
+	   what is beside it: the word sits in a box that fits "Short". */
+	.row-height .label {
+		display: inline-block;
+		width: 2.9em;
+		text-align: left;
+	}
+
+	/* On a phone the bar is short of width, and the icon already says which
+	   height it is; the title says it in words. After the rule above, not
+	   before it: the two are equally specific, so the later one wins, and
+	   written first this one never did — the word showed on every phone. */
+	@media (max-width: 900px) {
+		.row-height .label,
+		.reindex .label {
+			display: none;
+		}
+
+		.reindex {
+			box-sizing: border-box;
+			width: 1.8125rem;
+			padding-inline: 0;
+			justify-content: center;
+		}
+
+		/* An icon alone, so a square — as tall as it is wide, like every other
+		   icon-only button; it kept the padding it had for the word, and read as
+		   a button with its label missing. */
+		.row-height {
+			box-sizing: border-box;
+			/* The bar's buttons are 29px tall; aspect-ratio cannot say so here,
+			   since the height is the content's and the width would follow the
+			   icon down to 17px instead. */
+			width: 1.8125rem;
+			padding-inline: 0;
+			justify-content: center;
+		}
+
+		/* The field says it is a table by what is in it; the word is the room. */
+		.picker > span:first-child {
+			display: none;
+		}
+
+		/* The name takes whatever the bar has left: the lock and the picker
+		   step aside while a cell is typed in or rows are chosen, so when the
+		   picker is here it has the bar to itself. Grown far ahead of the
+		   spacer, which would otherwise take half of what is left. */
+		.picker {
+			flex: 100 1 6rem;
+			/* Sized by the bar rather than by its name, so the container query
+			   above can ask it how much room it has. The floor is the glyph
+			   and the caret. */
+			container-type: inline-size;
+			min-width: calc(2rem + 4px);
+		}
+
+		.picker input {
+			flex: 1;
+			width: auto;
+			min-width: 0;
+		}
+	}
+
+	.actions button[aria-pressed='true'] {
+		border-color: var(--accent);
+		color: var(--accent);
+		background: var(--accent-tint);
 	}
 
 	button.primary {
@@ -1677,7 +3762,7 @@
 		border-radius: 10px;
 		padding: 18px;
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
-		font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+		font: 0.8125rem/1.5 ui-sans-serif, system-ui, sans-serif;
 	}
 
 	/* Focused as it opens so its first Enter is caught — see modal.ts — and not
@@ -1688,7 +3773,7 @@
 
 	.modal h2 {
 		margin: 0 0 6px;
-		font-size: 15px;
+		font-size: 0.9375rem;
 	}
 
 	.modal p {
@@ -1699,12 +3784,184 @@
 	.modal textarea {
 		width: 100%;
 		box-sizing: border-box;
-		font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+		font: 0.75rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
 		padding: 8px;
 		border: 1px solid #ccc;
 		border-radius: var(--radius-input);
 		resize: vertical;
 	}
+
+	.cell-editor {
+		position: absolute;
+		inset: 0;
+		z-index: 6;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 12px;
+		background: #fff;
+		font: 0.8125rem/1.5 ui-sans-serif, system-ui, sans-serif;
+	}
+
+	/* A drawing wants every pixel of the room: a thinner margin, and what does
+	   not fit — the tool rows, when the tray is pulled right down — slides
+	   under the bottom bar rather than squeezing the board. */
+	.cell-editor.drawing {
+		gap: 6px;
+		padding: 6px 8px 8px;
+		overflow: hidden;
+	}
+
+	.cell-editor-head {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	/* The board's row, centred in the head: a spacer of the close button's
+	   width on the left keeps it centred on the panel rather than on what is
+	   left beside the ×. */
+	.board-head {
+		flex: 1;
+		display: flex;
+		justify-content: center;
+		min-width: 0;
+	}
+
+	/* The chevron on the left, the × on the right: the same width each, so the
+	   board's row between them is centred on the panel. */
+	.cell-editor .back {
+		flex: none;
+		width: 1.75rem;
+		height: 1.75rem;
+	}
+
+	.board-bar {
+		display: inline-flex;
+		gap: 4px;
+	}
+
+	.board-bar:empty {
+		display: none;
+	}
+
+	/* The same bargain as the table's header row: the drag is the tray's, so
+	   the browser's own scroll gives way. Padding lends it a finger's height. */
+	.cell-editor-head.draggable {
+		touch-action: none;
+		margin: -12px -12px 0;
+		padding: 12px 12px 4px;
+		cursor: ns-resize;
+	}
+
+	.cell-editor.drawing .cell-editor-head.draggable {
+		margin: -6px -8px 0;
+		padding: 6px 8px 2px;
+	}
+
+	.cell-editor-head.draggable :global(button) {
+		cursor: pointer;
+	}
+
+	.cell-editor h2 {
+		margin: 0;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* Where the table's name usually is, while a cell is open full size. */
+	.actions .big-pager {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+	}
+
+	.actions .big-row {
+		font: 500 0.75rem ui-sans-serif, system-ui, sans-serif;
+		color: #555;
+		white-space: nowrap;
+		min-width: 2.75rem;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* Carbon's two halves of chevron--sort each sit in their own half of the
+	   box, so alone in a button the up one rode high and the down one low.
+	   Moved by a quarter of the glyph to the middle. */
+	.nudge-up,
+	.nudge-down {
+		display: grid;
+	}
+
+	.nudge-up {
+		transform: translateY(25%);
+	}
+
+	.nudge-down {
+		transform: translateY(-25%);
+	}
+
+	.cell-editor .close {
+		flex: none;
+		width: 1.75rem;
+		height: 1.75rem;
+	}
+
+	/* The count of the cell being typed in, where the row actions were. */
+	.actions .cell-count {
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
+		color: #555;
+		white-space: nowrap;
+		font-variant-numeric: tabular-nums;
+		/* The one thing in the bar that gives way: at the far end now, and a
+		   long count would otherwise push Edit out past the edge. */
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	/* A picture landed on by the pager, in the room the text would take. */
+	.big-picture {
+		flex: 1;
+		min-height: 0;
+		width: 100%;
+		padding: 8px;
+		border: 1px solid #ccc;
+		border-radius: var(--radius-input);
+		background: #fff;
+		cursor: pointer;
+	}
+
+	.big-picture:disabled {
+		cursor: default;
+	}
+
+	.big-picture img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
+
+	.cell-editor textarea {
+		flex: 1;
+		min-height: 0;
+		width: 100%;
+		box-sizing: border-box;
+		padding: 8px;
+		border: 1px solid #ccc;
+		border-radius: var(--radius-input);
+		/* Twice the table's: this is where a long cell is read and written at
+		   length, with the whole tray to do it in. In px, not rem, and the one
+		   type in the interface that is: it is already large, and at twice the
+		   text size it was 52px, a few words a line across a phone. */
+		font: 26px/1.5 ui-sans-serif, system-ui, sans-serif; /* fixed type */
+		resize: none;
+	}
+
 
 	.modal-actions {
 		display: flex;

@@ -1,4 +1,4 @@
-import type { Align, Box, PageNumberPosition, PageSide } from './types';
+import type { Align, Box, PageNumberPosition, PageSide, VAlign } from './types';
 
 /**
  * Millimetre geometry: unit conversion and anchor resolution.
@@ -56,7 +56,8 @@ export interface LayoutResult {
 
 export function boxHeight(box: Box, measured: number | undefined, hidden: boolean): number {
 	if (hidden) return 0;
-	if (box.overflow === 'clip') return box.h;
+	// Shrink keeps its height, as a clip does: it is the words that change size.
+	if (box.overflow === 'clip' || box.overflow === 'shrink') return box.h;
 	return Math.max(box.h, measured ?? 0);
 }
 
@@ -84,6 +85,7 @@ export function resolveLayout({ boxes, measured, hidden }: LayoutInput): LayoutR
 		resolving.add(box.id);
 
 		let value = box.y;
+		let anchored = false;
 		if (box.anchor) {
 			let target = byId.get(box.anchor.to);
 			// Walk past hidden boxes so they cost nothing, not even their gap.
@@ -96,7 +98,20 @@ export function resolveLayout({ boxes, measured, hidden }: LayoutInput): LayoutR
 				seen.add(target.id);
 				target = target.anchor ? byId.get(target.anchor.to) : undefined;
 			}
-			if (target && target.id !== box.id) value = top(target) + height(target) + box.anchor.gap;
+			if (target && target.id !== box.id) {
+				value = top(target) + height(target) + box.anchor.gap;
+				anchored = true;
+			}
+		}
+		// A growing area grows away from its reference point: down from a top,
+		// up from a bottom, both ways from a middle — so the point the bar
+		// names stays where it says on every card, however long the words.
+		// Not an anchored area, whose top is its anchor's to decide and which
+		// grows down as it always has; not a hidden one, which collapses to
+		// its own top as it always has, so what follows it does not move.
+		if (!anchored && box.overflow === 'grow' && !hidden.has(box.id)) {
+			const { fy } = referenceOf('left', box.valign);
+			if (fy) value = box.y - (height(box) - box.h) * fy;
 		}
 
 		resolving.delete(box.id);
@@ -137,17 +152,40 @@ const FACING_ALIGN: Partial<Record<Align, Align>> = { left: 'right', right: 'lef
  * area deliberately pushed against one edge is the other case, and it hugs the
  * outer edge on both pages.
  *
- * Placement only: rotation and the pivot are left alone, so turning a box does
- * not also flip it on the facing page. A mirror of the *appearance* would put
+ * Placement, and a quarter turn. A tilt is left alone: a sticker at -7° is
+ * the same sticker on either page, and a mirror of the *appearance* would put
  * a signature or a corner flourish on its head, which is never what a spread
- * wants. This is derived at render time and never stored — the template holds
- * one set of millimetres, measured on the right-hand page.
+ * wants. A quarter turn is not a tilt but a direction — words run up the
+ * outer edge, their tops towards it — and the facing page's outer edge is the
+ * other one, so 90° there is -90°, turned about the mirrored pivot. The words
+ * themselves still read forwards; only which way they face changes.
+ *
+ * Derived at render time and never stored — the template holds one set of
+ * millimetres, measured on the right-hand page. Its own inverse, which is what
+ * lets a drag on the facing page be written back through it.
  */
 export function mirrorBox(box: Box, pageW: number): Box {
 	const x = Math.round((pageW - box.x - box.w) * 1000) / 1000;
 	const align = box.align ? FACING_ALIGN[box.align] : undefined;
-	return align ? { ...box, x, align } : { ...box, x };
+	const mirrored: Box = align ? { ...box, x, align } : { ...box, x };
+	if (!quarterTurn(box.rotation)) return mirrored;
+	mirrored.rotation = -box.rotation!;
+	if (box.centre) mirrored.centre = { x: Math.round((100 - box.centre.x) * 10) / 10, y: box.centre.y };
+	return mirrored;
 }
+
+/** 90° or -90°, however it is written: the turns `mirrorBox` reverses. */
+export function quarterTurn(rotation: number | undefined): boolean {
+	if (!rotation) return false;
+	const turn = ((rotation % 360) + 360) % 360;
+	return turn === 90 || turn === 270;
+}
+
+/**
+ * A rotation as drawn on a facing page, back to the one stored — and the
+ * other way, since reversing a quarter turn twice is where it started.
+ */
+export const facingRotation = (rotation: number): number => (quarterTurn(rotation) ? -rotation : rotation);
 
 /**
  * An `outer`/`inner` page-number position resolved to the edge it lands on.
@@ -195,6 +233,34 @@ export function snapToEdges(value: number, edges: number[], tolerance: number): 
 		if (distance < bestDistance) {
 			bestDistance = distance;
 			best = edge;
+		}
+	}
+	return best;
+}
+
+/**
+ * A box being moved, latched by whichever of its three lines comes nearest an
+ * edge: its start, its middle or its end — left, centre and right across, top,
+ * middle and bottom down. Only the start used to be tried, so a box could be
+ * lined up by its left edge and never by its middle, which is the alignment a
+ * centred card is built on. Returns where the box's start goes and the edge
+ * it caught, for the guide to be drawn at; null when nothing is in reach.
+ */
+export function latchSpan(
+	start: number,
+	length: number,
+	edges: number[],
+	tolerance: number
+): { start: number; edge: number } | null {
+	let best: { start: number; edge: number } | null = null;
+	let bestDistance = tolerance;
+	for (const offset of [0, length / 2, length]) {
+		for (const edge of edges) {
+			const distance = Math.abs(start + offset - edge);
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				best = { start: edge - offset, edge };
+			}
 		}
 	}
 	return best;
@@ -277,4 +343,268 @@ export function alignBoxes(boxes: Box[], ids: string[], edge: AlignEdge): Box[] 
 		const value = Math.round(place(box) * 100) / 100;
 		return horizontal ? { ...box, x: value } : { ...box, y: value };
 	});
+}
+
+// ---- the paper at its real size ---------------------------------------------
+
+/**
+ * What a screen tells a page about itself: its size in CSS pixels, and how
+ * many device pixels make one of those.
+ */
+export interface ScreenFacts {
+	width: number;
+	height: number;
+	ratio: number;
+}
+
+/**
+ * Screens this can put a real size to.
+ *
+ * No browser reports how big an inch of glass is, and CSS's own millimetre
+ * assumes 96 pixels to the inch, which is right for almost nothing sold this
+ * decade. What a page can read is the screen's size in CSS pixels and the
+ * pixel ratio, and for most screens those name the panel:
+ *
+ * - `grid` is the device-pixel grid, the CSS size times the ratio. On a phone,
+ *   an iPad or Windows that is the panel itself, so it names the model — and
+ *   it survives browser zoom and display scaling, which change the size and
+ *   the ratio together.
+ * - `looks` is for a Mac. macOS draws a scaled mode ("looks like 1440 × 900")
+ *   into a bigger framebuffer and shrinks it onto the glass, so the grid a
+ *   page sees is not the panel's and two Macs can report the same one. The
+ *   "looks like" sizes a panel offers are its own, so they are listed instead.
+ *
+ * Either way the answer is the panel's long side in inches; every mode of one
+ * panel shares it. `estimate` marks a grid that more than one common size of
+ * screen reports, where the commonest is taken — the zoom menu says so.
+ */
+interface Panel {
+	name: string;
+	/** long side of the glass, in inches */
+	inches: number;
+	grid?: [number, number];
+	looks?: Array<[number, number]>;
+	ratio?: [number, number];
+	estimate?: boolean;
+}
+
+const inch = (px: number, ppi: number) => px / ppi;
+
+const PANELS: Panel[] = [
+	{ name: '13-inch MacBook', inches: inch(2560, 227), looks: [[1024, 640], [1280, 800], [1440, 900], [1680, 1050]] },
+	{ name: '13-inch MacBook Air', inches: inch(2560, 224), looks: [[1024, 665], [1280, 832], [1470, 956], [1710, 1112]] },
+	{ name: '15-inch MacBook Air', inches: inch(2880, 224), looks: [[1440, 932], [1710, 1107], [1920, 1243]] },
+	{ name: '14-inch MacBook Pro', inches: inch(3024, 254), looks: [[1147, 745], [1352, 878], [1512, 982], [1800, 1169]] },
+	{ name: '16-inch MacBook Pro', inches: inch(3456, 254), looks: [[1312, 848], [1496, 967], [1728, 1117], [2056, 1329]] },
+	{ name: '15-inch MacBook Pro', inches: inch(2880, 220), looks: [[1680, 1050], [1920, 1200]] },
+	{ name: '27-inch iMac or Studio Display', inches: inch(5120, 218), looks: [[2048, 1152], [2304, 1296], [2560, 1440], [2880, 1620], [3200, 1800]], ratio: [2, 2] },
+	{ name: '24-inch iMac', inches: inch(4480, 218), looks: [[2240, 1260]], ratio: [2, 2] },
+	{ name: '12.9-inch iPad Pro', inches: inch(2732, 264), grid: [2732, 2048] },
+	{ name: '11-inch iPad Pro', inches: inch(2388, 264), grid: [2388, 1668] },
+	{ name: '10.9-inch iPad', inches: inch(2360, 264), grid: [2360, 1640] },
+	{ name: 'iPad mini', inches: inch(2266, 326), grid: [2266, 1488] },
+	{ name: '6.1-inch iPhone', inches: inch(2556, 460), grid: [2556, 1179] },
+	{ name: '6.7-inch iPhone', inches: inch(2796, 460), grid: [2796, 1290] },
+	{ name: '6.1-inch iPhone', inches: inch(2532, 460), grid: [2532, 1170] },
+	{ name: '6.7-inch iPhone', inches: inch(2778, 458), grid: [2778, 1284] },
+	{ name: '5.8-inch iPhone', inches: inch(2436, 458), grid: [2436, 1125] },
+	{ name: '6.1-inch iPhone', inches: inch(1792, 326), grid: [1792, 828] },
+	{ name: '4.7-inch iPhone', inches: inch(1334, 326), grid: [1334, 750] },
+	// Grids shared by screens of several sizes: the commonest, marked. A 1080p
+	// grid drawn at a ratio of 1 is nearly always a desk monitor; drawn larger,
+	// a laptop scaling its panel up.
+	{ name: '24-inch monitor', inches: inch(1920, 92), grid: [1920, 1080], ratio: [0, 1], estimate: true },
+	{ name: '15.6-inch laptop', inches: inch(1920, 141), grid: [1920, 1080], ratio: [1.1, 4], estimate: true },
+	{ name: '27-inch monitor', inches: inch(2560, 109), grid: [2560, 1440], ratio: [0, 1], estimate: true },
+	{ name: '27-inch 4K monitor', inches: inch(3840, 163), grid: [3840, 2160], estimate: true },
+	{ name: '34-inch ultrawide', inches: inch(3440, 110), grid: [3440, 1440], estimate: true }
+];
+
+/** How far a measured size may be off a listed one — fractional ratios round. */
+const SLOP = 4;
+
+const near = (a: number, b: number) => Math.abs(a - b) <= SLOP;
+
+/**
+ * The zoom at which the card is its real size on this screen, and what it was
+ * worked out from. A screen nothing here recognises gets CSS's own millimetre,
+ * a scale of 1, and says it is a guess.
+ */
+export function actualScale(screen: ScreenFacts): { scale: number; panel: string | null; estimate: boolean } {
+	const cssLong = Math.max(screen.width, screen.height);
+	const cssShort = Math.min(screen.width, screen.height);
+	const ratio = screen.ratio || 1;
+	const gridLong = cssLong * ratio;
+	const gridShort = cssShort * ratio;
+	const fits = (p: Panel) => !p.ratio || (ratio >= p.ratio[0] && ratio <= p.ratio[1]);
+	// "Looks like" first: on a Mac the grid is a framebuffer and could match
+	// another panel's native one by coincidence.
+	const panel =
+		PANELS.find((p) => fits(p) && p.looks?.some(([w, h]) => near(w, cssLong) && near(h, cssShort) && ratio >= 2)) ??
+		PANELS.find((p) => fits(p) && p.grid && near(p.grid[0], gridLong) && near(p.grid[1], gridShort));
+	if (!panel || !cssLong) return { scale: 1, panel: null, estimate: true };
+	// The glass's long side holds `cssLong` CSS pixels, so an inch of it holds
+	// cssLong / inches of them; the card's millimetres assume 96. A dense
+	// screen at a small scaling therefore wants a zoom above 100%.
+	const scale = Math.round((cssLong / panel.inches / 96) * 1000) / 1000;
+	return { scale, panel: panel.name, estimate: !!panel.estimate };
+}
+
+/**
+ * Where the gaps between an area's columns fall, as [left, right] fractions of
+ * the width its words have — the area less its borders and padding, which is
+ * what the browser's multi-column layout divides: `count` equal columns with
+ * `gap` between each pair. In the same unit as `width` and `gap`, mm. Nothing
+ * for one column, or for a width the gaps alone would fill.
+ */
+export function columnGaps(count: number, gap: number, width: number): Array<[number, number]> {
+	if (count < 2 || width <= 0) return [];
+	const column = (width - gap * (count - 1)) / count;
+	if (column <= 0) return [];
+	return Array.from({ length: count - 1 }, (_, i) => {
+		const left = (i + 1) * column + i * gap;
+		return [left / width, (left + gap) / width];
+	});
+}
+
+/** How small Shrink may set an area's words: half the size, and no further. */
+export const SHRINK_FLOOR = 0.5;
+
+/**
+ * The largest scale of an area's words at which `fits` says they fit, to the
+ * nearest hundredth: 1 if they fit as set, `SHRINK_FLOOR` if nothing does.
+ *
+ * A bisection, because a fit is monotonic in the size — smaller words never
+ * take more room — and each try is a layout the browser has to do. Seven
+ * halvings of the half between the floor and full size land within a
+ * hundredth, which is a quarter of a point on 24pt type.
+ */
+export function shrinkScale(fits: (scale: number) => boolean, floor = SHRINK_FLOOR): number {
+	if (fits(1)) return 1;
+	let lo = floor;
+	let hi = 1;
+	if (!fits(lo)) return floor;
+	while (hi - lo > 0.005) {
+		const mid = (lo + hi) / 2;
+		if (fits(mid)) lo = mid;
+		else hi = mid;
+	}
+	return Math.floor(lo * 100) / 100;
+}
+
+// ---- the reference point ---------------------------------------------------
+
+/**
+ * Where on an area its position is said from, as fractions of its width and
+ * height: the point its words are set from. Left (or justified) and top is
+ * the top-left corner, right and bottom the bottom-right; centred on an axis,
+ * the middle of that axis. One point for everything that names a place on
+ * the area — the ring on its handle, the X and Y in the bar, the spacing a
+ * drag shows, the edge a typed W or H keeps, and the point a file gives an
+ * area at (frame.ts) — so they never disagree about which corner is meant.
+ * In memory an area is still its top-left corner; frame.ts converts.
+ */
+export function referenceOf(align: Align, valign: VAlign = 'top'): { fx: 0 | 0.5 | 1; fy: 0 | 0.5 | 1 } {
+	return {
+		fx: align === 'right' ? 1 : align === 'center' ? 0.5 : 0,
+		fy: valign === 'bottom' ? 1 : valign === 'middle' ? 0.5 : 0
+	};
+}
+
+/**
+ * The `y` an area must store to stay where it is drawn once nothing anchors
+ * it: drawn with its top at `top` and `height` tall. Its own top as a rule —
+ * but a growing area set to the bottom or the middle grows away from that
+ * point once it is free (`resolveLayout`), so its stored top is where its
+ * declared frame sits, its growth reckoned back out; written as the drawn top,
+ * it would jump up by however far its words had grown it.
+ */
+export function freedTop(box: Box, top: number, height: number): number {
+	const { fy } = referenceOf('left', box.valign);
+	const y = box.overflow === 'grow' && fy ? top + (height - box.h) * fy : top;
+	return Math.round(y * 100) / 100;
+}
+
+// ---- spacing readouts ------------------------------------------------------
+
+export interface Rect {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+}
+
+/** One distance shown while a box is dragged: a line from `from` to `to` along `axis`, at `at` across it. */
+export interface SpacingReadout {
+	axis: 'x' | 'y';
+	from: number;
+	to: number;
+	at: number;
+	/** mm, `to - from` */
+	gap: number;
+	/** the gap on the other side is the same: the box is centred between them */
+	equal: boolean;
+}
+
+/** Within this many mm two gaps read as the same — a twentieth, under any rounding the fields show. */
+const EQUAL_GAP = 0.05;
+
+/**
+ * The distances a dragged box has on each side, InDesign's smart spacing kept
+ * to its useful half, measured out from `focus` — the box's reference point
+ * (`referenceOf`), its middle when none is given. Across, a line runs level
+ * with the focus to the nearest box it meets, or to the page's trim edge
+ * where it meets none; down, a line runs plumb with it. Each is drawn with its
+ * millimetres; where a side's gap matches the opposite side's, both are
+ * flagged, which is how a box is centred between two others by eye.
+ *
+ * A focus on the box's own edge is looked along from just inside it, so a box
+ * sitting on that edge's line — above a top-left focus, say — is a diagonal
+ * neighbour and not one beside it; nor is a box overlapping the dragged one,
+ * which is beside nothing.
+ */
+export function spacingReadouts(
+	box: Rect,
+	others: Rect[],
+	page: { w: number; h: number },
+	focus: { x: number; y: number } = { x: box.x + box.w / 2, y: box.y + box.h / 2 }
+): SpacingReadout[] {
+	const inside = (at: number, lo: number, hi: number) => (at <= lo + 0.001 ? at + 0.01 : at >= hi - 0.001 ? at - 0.01 : at);
+	const probe = { x: inside(focus.x, box.x, box.x + box.w), y: inside(focus.y, box.y, box.y + box.h) };
+	const beside = (a: Rect, axis: 'x' | 'y') =>
+		axis === 'x' ? a.y < probe.y && probe.y < a.y + a.h : a.x < probe.x && probe.x < a.x + a.w;
+	const round = (n: number) => Math.round(n * 100) / 100;
+
+	const sides: Array<{ axis: 'x' | 'y'; from: number; to: number }> = [];
+	for (const axis of ['x', 'y'] as const) {
+		const start = axis === 'x' ? box.x : box.y;
+		const end = axis === 'x' ? box.x + box.w : box.y + box.h;
+		let beforeEdge = 0;
+		let afterEdge = axis === 'x' ? page.w : page.h;
+		for (const other of others) {
+			if (!beside(other, axis)) continue;
+			const oStart = axis === 'x' ? other.x : other.y;
+			const oEnd = oStart + (axis === 'x' ? other.w : other.h);
+			if (oEnd <= start + 0.01 && oEnd > beforeEdge) beforeEdge = oEnd;
+			if (oStart >= end - 0.01 && oStart < afterEdge) afterEdge = oStart;
+		}
+		sides.push({ axis, from: beforeEdge, to: start }, { axis, from: end, to: afterEdge });
+	}
+
+	const readouts = sides.map(({ axis, from, to }) => ({
+		axis,
+		from: round(from),
+		to: round(to),
+		at: round(axis === 'x' ? focus.y : focus.x),
+		gap: round(to - from),
+		equal: false
+	}));
+	for (const [a, b] of [
+		[0, 1],
+		[2, 3]
+	]) {
+		if (readouts[a].gap > 0 && Math.abs(readouts[a].gap - readouts[b].gap) < EQUAL_GAP) readouts[a].equal = readouts[b].equal = true;
+	}
+	// A box against something has no gap there to show.
+	return readouts.filter((r) => r.gap > 0);
 }

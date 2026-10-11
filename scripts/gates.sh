@@ -100,8 +100,8 @@ fi
 
 # ── 4. No runtime dependencies ───────────────────────────────────────────────
 # The Markdown renderer, the CSV parser and the QR encoder are hand-written so
-# the app works offline and nothing can rot underneath it. jsqr and the
-# toolchain are dev dependencies; a `dependencies` block means something now
+# the app works offline and nothing can rot underneath it. The toolchain is a
+# dev dependency; a `dependencies` block means something now
 # ships to the browser that nobody here maintains.
 runtime_deps=$(node -e 'const d=require("./package.json").dependencies||{};console.log(Object.keys(d).join(" "))' 2>/dev/null)
 
@@ -201,6 +201,141 @@ else
 	fail "AGENTS.md is missing or unreadable" \
 		"the instructions file is the one thing this project cannot work without" \
 		"instructions-file-budget"
+fi
+
+# ── 9. The interface's type is in rem ────────────────────────────────────────
+# A zoom does not magnify the app; it sets the root font size (textsize.ts),
+# and only type written in `rem` follows it. One label left in `px` stays small
+# while everything round it grows — the one field nobody at 150% can read. The
+# card's type is in `pt`, set from the template, and is not what this is about.
+# Matches a `font:` shorthand or a `font-size:` whose size is a pixel length;
+# `font: inherit` and a pixel line-height after the slash are left alone. A
+# size that must not grow says so on its own line with `/* fixed type */`, and
+# its comment above says why — the full-size cell editor is the one.
+pxtype=$(grep -rnE --include='*.svelte' --include='*.css' \
+	'font(-size)?[[:space:]]*:[^;/]*[^-a-z0-9.][0-9.]+px' src 2>/dev/null |
+	grep -vF '/* fixed type */')
+
+if [ -n "$pxtype" ]; then
+	fail "interface type sized in px — write it in rem, 16px to the rem" "$pxtype" "type-in-rem"
+else
+	pass "interface type sized in rem" "type-in-rem"
+fi
+
+# ── 10. Every version says what changed ──────────────────────────────────────
+# CHANGELOG.md is what a person reads under What's new, and a list that stops a
+# few versions back reads as a list of everything. So the top release heading
+# has to be the version being shipped: a bump, patch or minor, is not done
+# until the changelog says what it brought. A patch rewrites its minor's
+# heading rather than adding one — the file keeps one section per minor.
+# The same shape changelog.ts lists — a version, a dash, an ISO date — so a
+# heading this accepts is never one the What's new dialog silently skips.
+top_release=$(sed -n 's/^## \([0-9]*\.[0-9]*\.[0-9]*\) .* \([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)[[:space:]]*$/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)
+
+heading="## $src_version — $(date -u +%Y-%m-%d)"
+if [ "$top_release" != "$src_version" ]; then
+	# Say which of the two it is: a patch keeps its minor's section, so the
+	# fix is to rename that heading, and only a new minor starts one.
+	if [ "${top_release%.*}" = "${src_version%.*}" ]; then
+		todo="rewrite '## $top_release' as '$heading' and add this patch's lines under it"
+	else
+		todo="start a section headed '$heading' above it"
+	fi
+	fail "CHANGELOG.md does not open with version $src_version" \
+		"its top release heading is '${top_release:-none}' — $todo" \
+		"changelog-current"
+else
+	pass "CHANGELOG.md opens with $src_version" "changelog-current"
+fi
+
+# ── 11. A version says what it brought, briefly ──────────────────────────────
+# What's new is read in a dialog on a phone by somebody who has just updated,
+# and it is the one thing here written for them rather than for us. A section
+# that runs to a screenful is a release note nobody finishes, and it grows the
+# same way AGENTS.md does: every line individually defensible. So it is a
+# budget of lines that say something — blank ones are not counted, because
+# wrapping is the writer's business and the reading is not. A line is a group
+# of related changes rather than one change, so a feature and the five switches
+# that came with it are one line. Three is the usual shape; six is the most a
+# release has ever needed. Say what changed and what it means, and leave how it
+# works to the README.
+#
+# Overridable so the failure path is testable: `CHANGELOG_MAX=2 npm run gates`
+# should fail.
+CHANGELOG_MAX="${CHANGELOG_MAX:-6}"
+
+if [ -r CHANGELOG.md ]; then
+	long=$(awk -v max="$CHANGELOG_MAX" '
+		/^## / {
+			if (name != "" && len > max) printf "%s — %d lines\n", name, len
+			name = $0
+			len = 0
+			next
+		}
+		name != "" && $0 != "" { len++ }
+		END { if (name != "" && len > max) printf "%s — %d lines\n", name, len }
+	' CHANGELOG.md)
+	if [ -n "$long" ]; then
+		fail "a CHANGELOG.md section is over $CHANGELOG_MAX lines" \
+			"$long
+cut it to what a user needs to know, or raise CHANGELOG_MAX on purpose" \
+			"changelog-section-budget"
+	else
+		pass "every CHANGELOG.md section is $CHANGELOG_MAX lines or fewer" "changelog-section-budget"
+	fi
+else
+	fail "CHANGELOG.md is missing or unreadable" \
+		"the release it heads is what the app shows under What's new" \
+		"changelog-section-budget"
+fi
+
+# ── 12. A release's lines are plain text ────────────────────────────────────
+# The What's new dialog parses this file rather than rendering it — raw markup
+# stays in the three renderers that earn it (§ 2) — and reads plain text with
+# `code` spans and nothing else. So a `**bold**` written here is shown with its
+# asterisks to everybody who opens the dialog, which is the one audience the
+# file has. Bullets only: the preamble above the first release is for whoever
+# opens the file, and never reaches the dialog.
+markup=$(awk '
+	/^## [0-9]/ { release = 1; next }
+	/^## / { release = 0; next }
+	release && /^- / && (/\*\*/ || /\[[^]]*\]\(/ || /^- #/) { printf "%d: %s\n", NR, $0 }
+' CHANGELOG.md 2>/dev/null)
+
+if [ -n "$markup" ]; then
+	fail "CHANGELOG.md markup the What's new dialog cannot read" \
+		"$markup
+it shows as typed — plain text and \`code\` spans are all that dialog reads" \
+		"changelog-plain-text"
+else
+	pass "CHANGELOG.md entries are plain text and code spans" "changelog-plain-text"
+fi
+
+# ── 13. The top-left bridge is dropped on time ──────────────────────────────
+# A template file gives each area at its reference point (src/lib/frame.ts);
+# files written before that gave top-left corners, and are read that way only
+# until LEGACY_TOP_LEFT_UNTIL — by then every browser that has opened the app
+# has rewritten its own. A promise to delete code later is the kind that is
+# never kept, so this fails the version it falls due: delete the top-left
+# reading (`fromFile`'s unmarked path, `rewriteStoredTemplates` in +page) and
+# this check with it. One format, one way to read it.
+legacy_until=$(sed -n "s/^export const LEGACY_TOP_LEFT_UNTIL = '\(.*\)';$/\1/p" src/lib/frame.ts 2>/dev/null)
+if [ -n "$legacy_until" ] && [ -n "$src_version" ]; then
+	due=$(node -e '
+		const [a, b] = process.argv.slice(1).map((v) => v.split(".").map(Number));
+		const cmp = a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+		console.log(cmp >= 0 ? "due" : "");
+	' "$src_version" "$legacy_until")
+	if [ -n "$due" ]; then
+		fail "the top-left template reading is past its date" \
+			"VERSION $src_version has reached LEGACY_TOP_LEFT_UNTIL $legacy_until
+delete the unmarked path in src/lib/frame.ts, rewriteStoredTemplates in +page.svelte, and this check" \
+			"legacy-top-left-dropped"
+	else
+		pass "the top-left template reading is due in $legacy_until" "legacy-top-left-dropped"
+	fi
+else
+	pass "no top-left template reading left to drop" "legacy-top-left-dropped"
 fi
 
 # ── local, gitignored log — see the header comment ───────────────────────────

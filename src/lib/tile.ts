@@ -29,7 +29,7 @@ function drawn(src: string): Promise<HTMLImageElement> {
 	return new Promise((resolve, reject) => {
 		const image = new Image();
 		image.onload = () => resolve(image);
-		image.onerror = () => reject(new Error('That picture did not load.'));
+		image.onerror = () => reject(new Error('That image did not load.'));
 		image.src = src;
 	});
 }

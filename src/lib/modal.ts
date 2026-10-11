@@ -63,3 +63,115 @@ export function armDefault(node: HTMLElement) {
 		destroy: () => node.removeEventListener('keydown', onKeydown)
 	};
 }
+
+/**
+ * How far a dialog may be dragged: anywhere, so long as a strip of its title
+ * stays on the screen to drag it back by. `rect` is the dialog as it sits
+ * with no offset; the answer is the offset clamped to keep `keep` pixels of
+ * its top edge inside the window on every side.
+ */
+export function clampDrag(
+	offset: { x: number; y: number },
+	rect: { left: number; top: number; width: number },
+	view: { width: number; height: number },
+	keep = 48
+): { x: number; y: number } {
+	const minX = keep - (rect.left + rect.width);
+	const maxX = view.width - keep - rect.left;
+	const minY = -rect.top;
+	const maxY = view.height - keep - rect.top;
+	return {
+		x: Math.min(maxX, Math.max(minX, offset.x)),
+		y: Math.min(maxY, Math.max(minY, offset.y))
+	};
+}
+
+/**
+ * Where a dialog goes when a drag pulls it out of full screen: under the
+ * pointer, held by the same point of its title — as far across it, as a
+ * fraction of its width, and as far down from its top — as the full-screen
+ * one was when it was grabbed. `grab` is the pointer at the press, `full` the
+ * full-screen rect, `home` the dialog's rect as it sits again with no offset,
+ * `now` the pointer when it lets go of full screen. The answer is the offset.
+ */
+export function detachedOffset(
+	grab: { x: number; y: number },
+	full: { left: number; top: number; width: number },
+	home: { left: number; top: number; width: number },
+	now: { x: number; y: number }
+): { x: number; y: number } {
+	const across = full.width ? (grab.x - full.left) / full.width : 0.5;
+	const down = Math.min(grab.y - full.top, 40);
+	return { x: now.x - across * home.width - home.left, y: now.y - down - home.top };
+}
+
+/** How far a press moves before it is a drag rather than a click or a double-click. */
+const DRAG_SLOP = 4;
+
+/**
+ * A dialog moved by its title. Applied to the dialog; the element marked
+ * `data-drag-handle` inside it is what is grabbed, so a press on a field or
+ * a button is never a drag. The move is the `translate` property rather than
+ * the `transform` the dialogs centre themselves with, so the two add up and
+ * neither has to know the other's numbers. Nothing is remembered: a dialog
+ * opens centred every time, which is where anyone would look for it.
+ */
+export function dragByTitle(node: HTMLElement, options: { detach?: () => boolean } = {}) {
+	let offset = { x: 0, y: 0 };
+	let moved = false;
+	let start: { x: number; y: number; from: { x: number; y: number }; rect: DOMRect } | null = null;
+
+	const onDown = (event: PointerEvent) => {
+		const handle = (event.target as HTMLElement | null)?.closest('[data-drag-handle]');
+		if (!handle || !node.contains(handle) || event.button !== 0) return;
+		if ((event.target as HTMLElement).closest('button, input, select, textarea, a')) return;
+		event.preventDefault();
+		const now = node.getBoundingClientRect();
+		// The rect as it would sit with no offset, so the clamp is against home.
+		const rect = new DOMRect(now.left - offset.x, now.top - offset.y, now.width, now.height);
+		start = { x: event.clientX, y: event.clientY, from: offset, rect };
+		moved = false;
+		(handle as HTMLElement).setPointerCapture(event.pointerId);
+	};
+	const onMove = (event: PointerEvent) => {
+		if (!start) return;
+		if (!moved) {
+			if (Math.hypot(event.clientX - start.x, event.clientY - start.y) < DRAG_SLOP) return;
+			moved = true;
+			// Full screen is not somewhere to drag from: the first real move
+			// takes it out, as a window's title does, and the drag carries on
+			// with the dialog under the pointer. `detach` answers whether it
+			// did, having already drawn the dialog at its own size.
+			const full = node.getBoundingClientRect();
+			if (options.detach?.()) {
+				node.style.translate = '';
+				const home = node.getBoundingClientRect();
+				offset = detachedOffset(start, full, home, { x: event.clientX, y: event.clientY });
+				start = { x: event.clientX, y: event.clientY, from: offset, rect: home };
+			}
+		}
+		offset = clampDrag(
+			{ x: start.from.x + event.clientX - start.x, y: start.from.y + event.clientY - start.y },
+			start.rect,
+			{ width: window.innerWidth, height: window.innerHeight }
+		);
+		node.style.translate = `${offset.x}px ${offset.y}px`;
+	};
+	const onUp = () => (start = null);
+
+	node.addEventListener('pointerdown', onDown);
+	node.addEventListener('pointermove', onMove);
+	node.addEventListener('pointerup', onUp);
+	node.addEventListener('pointercancel', onUp);
+	return {
+		update(next: { detach?: () => boolean } = {}) {
+			options = next;
+		},
+		destroy() {
+			node.removeEventListener('pointerdown', onDown);
+			node.removeEventListener('pointermove', onMove);
+			node.removeEventListener('pointerup', onUp);
+			node.removeEventListener('pointercancel', onUp);
+		}
+	};
+}

@@ -24,6 +24,36 @@ export function downloadBlob(filename: string, blob: Blob) {
 	requestAnimationFrame(() => URL.revokeObjectURL(url));
 }
 
+/**
+ * Save what is already behind an address — an object URL the app made, or a
+ * data URL — under a file name. Nothing is fetched: a link with `download` is
+ * how a browser is asked to save one, and the address stays the caller's to
+ * revoke.
+ */
+export function downloadUrl(filename: string, url: string) {
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = filename;
+	link.click();
+}
+
+/**
+ * A file named after the thing it holds: the name as it is written — its
+ * case, its accents, a Greek or Japanese name whole — with each run of spaces
+ * a dash, and only what a file system refuses taken out. For the template and
+ * the table, which somebody named and will look for by that name; `slugify`
+ * below would turn "Κάρτες" into `untitled`.
+ */
+export const fileStem = (name: string, fallback = 'untitled') =>
+	name
+		// Control characters too: a file system refuses them, and they are
+		// exactly what a pasted name can carry unseen.
+		// eslint-disable-next-line no-control-regex
+		.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
+		.trim()
+		.replace(/\s+/g, '-')
+		.replace(/^\.+/, '') || fallback.replace(/\s+/g, '-');
+
 /** A filename stem from a human name: lowercase, hyphens, nothing surprising. */
 export const slugify = (name: string) =>
 	name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'untitled';

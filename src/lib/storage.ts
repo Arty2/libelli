@@ -1,4 +1,5 @@
-import type { Dataset, Mapping, Template, UiState } from './types';
+import type { Dataset, FontRef, Mapping, Template, UiState } from './types';
+import { toFile } from './frame';
 
 /**
  * Client-side persistence. Nothing here ever leaves the browser.
@@ -98,18 +99,47 @@ export const loadMapping = (id: string, templateName: string): Mapping => {
 };
 export const saveMapping = (id: string, mapping: Mapping) => local.set(mappingKey(id), mapping);
 
-const UI_DEFAULTS: UiState = { showBounds: true, showGrid: false, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' };
+const UI_DEFAULTS: UiState = { showBounds: true, showTies: false, showGrid: false, showGuides: true, smartGuides: true, gridStyle: 'lines', columnWidths: {}, zoom: 'fit' };
 
 // Merged, not returned raw: a settings blob written by an older build is missing
 // whatever was added since, and an undefined toggle renders as neither on nor off.
 // `showOutlines` is what this toggle was called before it was renamed to Bounds;
 // read it once so nobody's preference is silently flipped back on by a rename.
 export const loadUi = (): UiState => {
-	const stored = local.get<Partial<UiState> & { showOutlines?: boolean }>('ui', {});
-	const { showOutlines, ...rest } = stored;
-	return { ...UI_DEFAULTS, ...(showOutlines === undefined ? {} : { showBounds: showOutlines }), ...rest };
+	const stored = local.get<Partial<UiState> & { showOutlines?: boolean; trayWidth?: number }>('ui', {});
+	// `trayWidth` was px, in 0.16.0; the width is a share now, and a stale
+	// number carried along in every save would only be something to misread.
+	const { showOutlines, trayWidth: _px, ...rest } = stored;
+	// Before the spacing, the Guides box's dash was the temporary guides
+	// without the margins; now it is both without the spacing. Read as the
+	// dash it was, so the box's tip, which names the margins, is true of it.
+	const oldDash = rest.spacingGuides === undefined && rest.showGuides === false && rest.smartGuides === true;
+	return {
+		...UI_DEFAULTS,
+		...(showOutlines === undefined ? {} : { showBounds: showOutlines }),
+		...rest,
+		...(oldDash ? { showGuides: true, spacingGuides: false } : {})
+	};
 };
 export const saveUi = (ui: UiState) => local.set('ui', ui);
+
+
+/**
+ * The editor's own fonts: families this browser has been given — a file
+ * uploaded, a Google name typed in — that no template currently carries. A
+ * template keeps only the families it is set in (see `pruneFonts`); the rest
+ * live here, so a face dropped from one card is still in the menu for the
+ * next. Names and references only; the bytes of an upload are in IndexedDB.
+ */
+export const loadEditorFonts = (): FontRef[] => {
+	const stored = local.get<unknown>('fonts', []);
+	if (!Array.isArray(stored)) return [];
+	return stored.filter(
+		(f): f is FontRef =>
+			!!f && typeof f.family === 'string' && ['google', 'local', 'system'].includes(f.source)
+	);
+};
+export const saveEditorFonts = (fonts: FontRef[]) => local.set('fonts', fonts);
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
@@ -168,7 +198,11 @@ export const idbKeys = (store: string) => tx<IDBValidKey[]>(store, 'readonly', (
  */
 export const storageAvailable = () => openDb().then((db) => db !== null);
 
-export const saveTemplate = (t: Template) => idbSet(STORE_KV, KEY_TEMPLATE, t);
+/**
+ * Both template writes go through `toFile`: what is stored is a file, with
+ * each area at its reference point and the marker that says so — frame.ts.
+ */
+export const saveTemplate = (t: Template) => idbSet(STORE_KV, KEY_TEMPLATE, toFile(t));
 export const loadTemplate = () => idbGet<Template>(STORE_KV, KEY_TEMPLATE);
 export const saveDataset = (d: Dataset) => idbSet(STORE_KV, KEY_DATASET, d);
 export const loadDataset = () => idbGet<Dataset>(STORE_KV, KEY_DATASET);
@@ -208,8 +242,14 @@ const mintId = (prefix: string): string =>
 
 const templateDocKey = (id: string) => `${KEY_TEMPLATE_PREFIX}${id}`;
 
-export const saveTemplateDoc = (id: string, t: Template) => idbSet(STORE_KV, templateDocKey(id), t);
+export const saveTemplateDoc = (id: string, t: Template) => idbSet(STORE_KV, templateDocKey(id), toFile(t));
 export const loadTemplateDoc = (id: string) => idbGet<Template>(STORE_KV, templateDocKey(id));
+/**
+ * A template kept exactly as it was read, not passed through `toFile`: one
+ * this build cannot read — a newer schema, say — must not be converted by a
+ * build that does not understand it, only kept until one that does.
+ */
+export const keepTemplateDocAsIs = (id: string, raw: unknown) => idbSet(STORE_KV, templateDocKey(id), raw);
 export const deleteTemplateDoc = (id: string) => idbDelete(STORE_KV, templateDocKey(id));
 
 /**
@@ -269,6 +309,10 @@ export const saveDatasetId = (id: string) => local.set('dataset:id', id);
  */
 export const loadPreviousDatasetId = (): string => local.get<string>('dataset:previous', '');
 export const savePreviousDatasetId = (id: string) => local.set('dataset:previous', id);
+
+/** The template that was open before this one, for the same swap in the page bar. */
+export const loadPreviousTemplateId = (): string => local.get<string>('template:previous', '');
+export const savePreviousTemplateId = (id: string) => local.set('template:previous', id);
 
 export const nextDatasetId = (): string => mintId('d');
 

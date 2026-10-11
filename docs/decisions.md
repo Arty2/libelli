@@ -27,22 +27,15 @@ is a positive measurement, clamped in `normaliseBleed` rather than guarded at
 each call: a boundary that establishes an invariant is worth more than six
 guards that re-check it.
 
-**A bleed has no negative form, and two attempts at one came out.** The first
-read a negative amount as the mirror image: the paper stopping short of the
-trim, the artwork running off it, the margin cropped away. That is the tidier
-symmetry and the wrong feature — a print setting that silently cuts the design
-is a destructive edit hiding in a settings bar, and it is not what anyone typing
-a minus sign into that field is after.
-
-The second kept the band instead: a negative amount grew the paper and marked
-none of it, so the card came out bigger with a margin all round. It did what was
-wanted, and it was still removed, because the app could already do it. A
-positive bleed with **Crop Marks** unticked produces the identical sheet, the
-identical PDF and the identical PNG — measured side by side at ±8mm: the same
-164 × 226 paper, the same 8mm inset, the same content position. The only thing
-the negative bought was the absence of one editor hairline. Two ways to make one
-printed page is worse than a field that means one thing, so what remains is: a
-bleed is paper outside the page; whether it is *waste* is what the Crop Marks
+**A bleed has no negative form; both readings of one were tried.** Read as the
+mirror image — the paper stopping short of the trim, the design cropped away —
+it is a destructive edit hiding in a settings bar, and not what anyone typing a
+minus sign is after. Read as paper grown with none of it marked, it duplicates
+what exists: a positive bleed with **Crop Marks** unticked produces the
+identical sheet, PDF and PNG (measured side by side at ±8mm). Two ways to make
+one printed page is worse than a field that means one thing, so: a bleed is
+paper outside the page; whether it is *waste* is what the Crop Marks tick says;
+and widening a card evenly is a bleed with that tick left alone.
 tick says; and widening a card evenly is a bleed with that tick left alone.
 
 **A left-hand page is derived, never stored.** `mirrorBox` is a pure function of
@@ -54,10 +47,21 @@ right-hand page; `pageSide` reads the parity of the page number the card was
 handed, which is why the editor shows the fold as it pages through the rows
 without being told about it separately.
 
-**Mirroring places a box; it does not turn it over.** Rotation and the pivot are
+**Mirroring places a box; it does not turn it over.** A tilt and its pivot are
 carried across untouched. A true mirror of the *appearance* would stand a
-signature or a corner flourish on its head, which no spread wants, and a box
-that means to be turned the other way on the other page can say so itself.
+signature or a corner flourish on its head, which no spread wants.
+
+**Except a quarter turn, which is reversed.** 90° is not a tilt but a
+direction: words running up the outer edge, their tops towards it. The facing
+page's outer edge is the other one, so there it is -90° (and -90° is 90°),
+about the mirrored pivot — which leaves the whole box exactly the reflection of
+the stored one, words still reading forwards. Only exact quarter turns:
+reversing every angle would flip a tilted sticker too, and a box at 89° is a
+tilt someone chose. It stays its own inverse, so a drag on a left-hand page
+writes back through the same function (`facingRotation`): the lever turns the
+angle as drawn, and one dragged to -90° there is stored as 90°. The handles
+un-rotate by the drawn angle for the same reason, and the pivot's drag is
+flipped back when — only when — the pivot itself was mirrored.
 
 **Only an alignment that was chosen mirrors.** An explicit `left` or `right`
 swaps, because that is an area deliberately pushed against an edge and the edge
@@ -65,6 +69,86 @@ it wants is the outer one. An absent alignment stays absent and keeps inheriting
 the page default: that is body text, and body text reads the same way on both
 sides of a spread. The rule is one sentence and it is the difference between a
 mirrored margin and a mirrored paragraph.
+
+**Shrink keeps the height and scales the words, never below half.** Grow and
+Clip were the only answers to a long cell, and a card set in a fixed grid
+wants neither: Shrink sets one card's words smaller until they fit the area as
+drawn. The scale is a bisection (`shrinkScale`) because a fit only gets easier
+as the words get smaller, and each try is a layout the browser does; it stops
+at `SHRINK_FLOOR`, half the size, because words below that are not read, and
+an area that still does not fit shows its red corner as a clipped one does.
+A shrinking area is measured as Clip is, at its declared height, so nothing
+anchored to it moves when its words do.
+
+**The spacing a drag shows is measured from the reference point.** InDesign's
+smart spacing, kept to the useful half: from the point X and Y name
+(`spacingReadouts`), level and plumb to the nearest area or the trim edge,
+each gap in millimetres, and a pair of equal gaps marked, which is how an area
+is centred between two by eye. From the reference point rather than the
+middle, so the number a drag shows and the number the bar shows are measured
+from the same place. It is the full Guides state only: the dash keeps the
+margins and alignment guides for a person who finds the numbers noisy.
+
+## `src/lib/frame.ts`
+
+**A file gives each area at its reference point; memory keeps the top-left
+corner.** The reference point (`referenceOf`) is where an area's words are set
+from, and the bar's X and Y, the ring and the spacing all name it — so the file
+says it too, and a growing area grows away from it. But the drag, the snapping,
+the layout and the mirror are hundreds of lines written in top-left corners,
+and none of them was rewritten: `toFile` and `fromFile` are the only place the
+two meet, at the two writes in storage.ts, at export, and inside
+`normaliseTemplate`, which every read goes through. Changing an alignment keeps
+the corner in memory, so nothing moves; the file's numbers follow it the next
+time it is written. Both directions use the declared width and height, and
+round to a ten-thousandth of a millimetre, so a round trip is exact.
+
+**The marker, not the schema, says which.** A file in the new frame carries
+`frame: 'reference'`. Anything without it is read top-left — an old file, and
+equally a template in memory — so a save path that somehow missed `toFile`
+writes a file that still reads true rather than one off by an area's width. The
+schema went to 6 as well, but only so that an older build, a cached install on
+another device, refuses a new file instead of reading it top-left.
+
+**Changed once, then the bridge goes.** Boot rewrites every stored template
+without the marker (`rewriteStoredTemplates`), awaited before anything is read
+for the screen, so it cannot race the autosave. The top-left reading stays
+until `LEGACY_TOP_LEFT_UNTIL` (0.30.0) for files people exported; at that
+version `npm run gates` fails until the unmarked path, the boot rewrite and the
+gate itself are deleted, leaving one format read one way. A file exported before
+0.28.0 and opened after that is read as reference points, and an area aligned
+right or bottom lands off by its width or height — the accepted cost of not
+carrying two formats forever.
+
+**Growing away from the reference point** is `resolveLayout`'s: an unanchored
+growing area set to the bottom grows up, one set to the middle grows both ways.
+An anchored one grows down as ever, its top being its anchor's, and a hidden one
+collapses to its own top, so what follows it does not move. A template whose
+unanchored, bottom- or middle-set growing area overflowed now overflows the
+other way — the feature, and the one visible change the new frame makes.
+
+## `src/lib/tablock.ts`
+
+**A locked-out tab never loads.** Every write in +page waits on `ready`, which
+only the tab holding the Web Lock ever sets — so a second tab cannot save what
+it never read, and no write path had to learn about tabs. Gating each save
+instead would have been a dozen guards, and the next save added would be the
+one without one.
+
+**Handed over, not stolen.** Use Here asks the holder over a
+BroadcastChannel; the holder writes everything at once, without the 300ms
+debounce, waits for it, stops, and only then lets go — so the new tab reads
+the latest of everything. A holder that does not answer in four seconds has the
+lock stolen; the browser tells it, and it stops all the same, but its last
+save can then land after the new tab has read: the one case that can still
+lose a few hundred milliseconds of typing, and only from a tab already frozen.
+A request left waiting when the steal happens is called off, or it would be
+granted later and take the lock back from the tab it went to. A tab that handed
+its work on reloads when it takes it back, since what it holds is older than
+what it gave.
+
+Web Locks and BroadcastChannel are both Baseline Widely available. Without
+them — no secure context — every tab edits, as before.
 
 ## `src/lib/template.ts`
 
@@ -78,11 +162,10 @@ end being moved towards so they cannot swap past each other.
 keeps the millimetres it was given until someone asks it to reflow. The starter
 template's title and body say `grow` for themselves.
 
-**`blankTemplate` is genuinely blank.** It used to arrive carrying a title and a
-body — a guess at a card made before anything was known about the data. Now that
-the columns can be laid out on request, an empty page is not a gap in the offer
-but the state that *makes* it: the button that fills a page from the spreadsheet
-only appears where there is nothing to overwrite.
+**`blankTemplate` is genuinely blank.** No title, no body — those would be a
+guess at a card made before anything is known about the data. An empty page is
+the state that *makes* the offer: the button that fills a page from the
+spreadsheet only appears where there is nothing to overwrite.
 
 **A border width is one number or four, and so is a padding.** `normaliseSides`
 collapses four equal edges back to one, so a template never grows structure it
@@ -101,6 +184,49 @@ no card in it and the whole design still inside, unreachable. Neither threw;
 that is what makes it worth writing down.
 
 ## `src/lib/autolayout.ts`
+
+**A heading is lowercased, then read word by word from the end.** Every hint
+is lowercase, so `PHOTO` and `Photo` are one heading. The whole heading run
+together is tried first (`Sub-title`), then its words from the last, because an
+English heading ends on the noun it is about — `Product image` is an image and
+`Note number` a number, where reading from the front took both for what their
+first word names. A hint found inside a word comes last, and only for hints of
+four letters or more.
+
+**Two small lines have a place of their own: `detail` and `credit`.** A
+medium, a duration, a size belong to the heading they describe, so a detail
+stacks under the subtitle, anchored like the rest of the head; a credit line
+is owed rather than chosen, so it is the foot's last line and the one kept
+when the foot is full. Both are roles, but a heading naming one beats a
+column of numbers — a Duration of 90 is a detail, not a figure in the foot.
+
+**A person takes the title over a Title column.** Where a heading names a
+person (`PEOPLE`) and another is plain Title, the card is about the person and
+the Title column is the name of their work, so it becomes the subtitle, ahead
+of a column that only called itself one; a second subtitle becomes a detail
+line. Without a person, Title keeps the title, as before.
+
+**An image is known by its cells before its heading.** A column whose every
+filled cell is a `data:image` URL, a `local:name` or an address ending in an
+image file is an image whatever it is called — and that test runs before the
+prose test, since a drawing is a long cell and read as a body otherwise. The
+dialog calls the kind *Image*, the word the rest of the app uses.
+
+**Inside the page margins; grid steps within them.** For one release every
+generated edge was on the 5mm grid, which on a page that is not a whole number
+of steps wide made the side margins uneven (10 and 13mm on A5). Even margins
+won: the layout now reads the page's own margin (`marginsOf`), places the
+frame there, and keeps whole grid steps only for heights and the gaps between
+areas, so the stack lines up with the grid down the page. A body that fills to
+the footer rounds its height down; where the bottom margin is not a grid line,
+the gap above the footer takes the difference.
+
+**Leaving a column out is a switch, not a kind.** It was the last entry in the
+kind menu, which made it a thing a column *is* — and putting one back meant
+choosing again what it had been taken for. `include` sits beside the kind, the
+kind survives being switched off, and an empty column arrives switched off as a
+small line. Arbitration ignores what is switched off, so a left-out column can
+never be the title.
 
 **It guesses about columns, never about words.** Nothing in here reads a cell to
 decide what a card should *say*; it reads cells to find out how long they are and
@@ -138,6 +264,16 @@ out cannot quietly add a family the template then has to carry.
 
 ## `src/lib/storage.ts`
 
+**A starter is marked, not recognised.** A template or table that began as a
+bundled starter carries `starter: <id>` (`STARTER_TEMPLATES`, `STARTER_TABLES`
+in onboarding.ts), and that alone offers Reset and says what it resets to.
+Comparing against the starter, as `isStarterTemplate` does to avoid adding a
+second untouched copy, cannot answer this: the copy most worth resetting is
+the one somebody has changed. A copy stored before the mark existed is known by
+its name — the starter's, or that numbered by `freeName` — and only when it has
+no mark at all. The mark is kept through a table's import, as its name and
+lock are, so the Getting Started table stays that table.
+
 **`template:current` is still the working copy.** The library did not replace it:
 boot reads it first, every edit writes it, and a browser that has never opened
 the picker behaves exactly as it did before. The library is a *second* place the
@@ -162,10 +298,10 @@ mapping. The name is still read as a fallback, because that is what mappings wer
 keyed by before, and because an *imported* template arrives with a name and no id
 — the one case where the name is the better key.
 
-**Deleting the last template leaves a new empty one, not the starter card.** It
-used to rebuild the starter card, which meant deleting the template a first run
-lands on appeared to do nothing at all — the name came back and so did the areas,
-and the only honest reading was that this one template could not be deleted.
+**Deleting the last template leaves a new empty one, not the starter card.**
+Rebuilding the starter card would make deleting the template a first run lands
+on appear to do nothing — the name comes back and so do the areas, and the only
+honest reading is that this one template cannot be deleted.
 
 **Undo carries the template id.** Undoing across a switch or a delete restores the
 design you came from, and without the id travelling in the same snapshot the
@@ -183,12 +319,11 @@ any number of tables and one table is printed by any number of designs, which is
 the whole premise of the app, so the two libraries are switched independently
 and neither knows the other exists.
 
-**The id is what says this browser has been here before.** Boot used to read
-`dataset:current` and treat an empty table as a first run, which was right when
-there was no other way to tell them apart. Now an id beside it means a table
-somebody emptied stays empty, and no id at all means a genuine first run and the
-sample rows. Anybody arriving from a build before the library takes the
-no-id path once, keeps their rows, and has an id from then on.
+**The id is what says this browser has been here before.** An empty
+`dataset:current` cannot tell a first run from a table somebody emptied; an id
+beside it can. With an id, an emptied table stays empty; with none, it is a
+genuine first run and the sample rows. A browser whose data predates the library
+takes the no-id path once, keeps its rows, and has an id from then on.
 
 **The table's name lives in the dataset, not beside it.** It has to travel with
 the document for the listing to read it, and it has to be in the undo snapshot
@@ -217,7 +352,7 @@ already existed, rather than a third state to keep in step.
 
 **An area's name is its CSS id, and `cssIdent` is the one place a name becomes
 one.** A template's own CSS is the escape hatch for everything the bar does not
-offer, and it was reaching areas by nothing but `.box` — all of them at once.
+offer, and it was reaching areas by nothing but `.box` (now `.area`) — all of them at once.
 Naming one needs a selector, and the area already has a name the author typed;
 `cssIdent` is what turns that name into something a selector can carry. Case is
 kept, because the name as typed is what the author is looking at while writing
@@ -232,6 +367,89 @@ not an id. Duplicating an area deliberately still produces two boxes with one
 name, because a copy that kept its name kept its binding with it, and a rule
 written for `#Job-Title` means both of them — CSS matches every element wearing
 an id, which is exactly the behaviour that case wants.
+
+## `src/lib/csskit.ts`
+
+**The Starter sheet is generated, never written.** It is what someone pastes
+into a chat with a language model, so it carries the template's facts — page,
+margins, text defaults, fonts, every area's id, mode and frame — under a
+comment, and the selectors under that. All of it is read from the template as
+the sheet is made: a fact written out by hand is one more thing to update
+when the app changes, and the first to be wrong.
+
+**A comment, so pasting it back sets nothing.** The facts are context, not
+rules; a rule restating the page size would fight the bar that sets it. The
+bars' settings are inline styles and win anyway, which is what the sheet's
+rules tell the model: leave them to the bars, `!important` only on purpose.
+
+**The variables are one list, `cardVars`.** Card writes them on the card and
+the header names them from the same function, so the comment cannot promise
+a variable the card does not set. On the card rather than the trim, so a
+template's `:root` (which css.ts maps to `.trim`) can still redefine one for
+its own rules without the card's value overwriting it. Margins are the stored
+right-hand page's: a mirrored left-hand page does not swap them.
+
+## `src/lib/csscode.ts` and `src/lib/components/CssEditor.svelte`
+
+**A textarea under a coloured copy of itself.** The editor is three layers on
+one grid: a gutter of line numbers, a `<pre>` holding the coloured text, and the
+real textarea on top with `color: transparent` and a visible `caret-color`. The
+textarea is the only one that scrolls and the other two are moved to match it.
+Nothing replaces a real field — the caret, the selection, an IME, autocomplete
+and every accessibility affordance are the browser's, and a `contenteditable`
+would have to reimplement all of them — so the field stays and the colour goes
+underneath. The cost is that the three layers have to agree on every metric:
+font, line-height, padding and `tab-size` are set once on the wrapper and
+inherited, none of the three may wrap (hence `white-space: pre` and a sideways
+scroll, since a wrapped line would put the numbers out of step with the text),
+and the editor's height is on the wrapper rather than on either layer — a gutter
+tall enough for its own numbers made the row as tall as the sheet.
+
+**A line is a block element, not text and a newline.** The `<pre>` renders each
+line as a `span` with `display: block` and a `min-height` of one line box, so an
+empty line keeps its place and the last line does not get a newline nobody
+asked for. It also keeps the whole thing inside Svelte's escaping: the
+highlighter hands back runs of text, the template writes them as text nodes, and
+`{@html}` — which the gates forbid outside three renderers — never comes into
+it. A highlighter that built a string of markup would be a fourth injection
+sink for the one piece of the app an author types CSS into.
+
+**The highlighter is a colourer, not a parser.** One pass over the source with
+two bits of state — how deep in braces, and whether a colon has been passed —
+and comments and strings taken whole so a brace inside either does not move the
+depth. It is allowed to be wrong: it has no opinion about invalid CSS, and
+`css.ts` is what actually decides what the card will accept. Two things it gets
+wrong knowingly: CSS nesting (`&:hover` inside a declaration block reads as a
+property, because telling a nested selector from a declaration needs a lookahead
+this does not do), and an at-rule nobody listed in `NESTS` is taken to hold
+declarations, which is the commoner shape.
+
+**Edits go in through `execCommand('insertText')`.** It is deprecated and it is
+the only way to change a textarea's text and keep the browser's own undo stack:
+assigning `value` or calling `setRangeText` clears it, so Ctrl/Cmd + Z after a
+Tab would throw away everything typed before it. `setRangeText` is the fallback
+— a browser that drops the call still types, it just forgets. The trade-off
+taken with it: Tab no longer leaves the field. Escape is the way out of the
+dialog, and a code field where Tab moves the focus is one where indenting is
+impossible.
+
+**The dialog holds a draft, and two buttons decide what happens to it.**
+Nothing reaches the template until Save is pressed, which is what makes
+Cancel — and the ×, the backdrop and Escape, which mean what it means — a matter
+of putting back one known value and closing. It replaced a field that committed
+on `change`, where Cancel had to blur the field first so the commit landed
+*before* the restore rather than after it. There was an Apply as well, to put
+the draft on the card and stay open; it went, because a third way out that
+was neither keeping nor leaving read as one too many, and Ctrl/Cmd+Enter,
+which had been Apply's, is Save's. The primary button says Save while the
+draft differs from what the card has and Done when it does not, so the one
+button answers "is there anything of mine not on the card yet".
+
+**A locked template opens here to read.** The lock is on writing, and a sheet
+somebody else wrote is the thing in a locked template most worth reading. The
+buttons that write — Starter and Save — are not rendered rather
+than disabled: on a row this short a line of greyed buttons reads as something
+broken, and the field itself is `readonly`, which is the honest signal.
 
 ## `src/lib/imposition.ts`
 
@@ -317,10 +535,10 @@ returns cells, not pages, for exactly this reason.
 
 **Ordering is pure, and one function serves both renderings.** `planSheets` is
 what `PrintRoot.svelte` prints and what `PrintPreview.svelte` draws thumbnails
-of. The preview used to do its own slicing beside a comment promising it
-matched — a promise the next change to either would have quietly broken. A fold
-is much easier to get wrong than a slice, so the two now share the arithmetic
-rather than a comment about it.
+of. A preview doing its own slicing beside a comment promising it matched is a
+promise the next change to either would quietly break, and a fold is much easier
+to get wrong than a slice, so the two share the arithmetic rather than a comment
+about it.
 
 **The sheet's own background is a second, separate reference.** A card's
 background (`template.page.image`) and the sheet's (`template.print.background`)
@@ -331,6 +549,22 @@ mean turning imposition off could silently reach for a picture nobody chose
 for that context.
 
 ## `src/lib/hand.ts`
+
+**A stamp is a border style, and a shape rather than a line.** It sits in the
+style menu beside dashed and dotted because it is one more way of drawing the
+same edge, but no CSS border can draw it, so it is the one style that always
+goes to the SVG layer — `borderHand` only decides whether it wobbles. It is
+one closed path filled with the *border* color, which is the paper, and the
+area's fill is the field printed on it, inside the padding, which is the
+margin. That is how a stamp is made, and it gives both colors a job: it
+started as the fill on the paper alone, which left no way to have a white
+margin round a colored picture. The paper is drawn under the fill, the one
+drawn border that is — every other goes over, as a CSS border would. Spread to
+the border box, the fill would fill the holes back in, and a `drop-shadow()`
+would trace the rectangle instead of the perforations. One width for all four edges, the heaviest, because a stamp is
+torn along one row of holes; the radius is ignored, as on every perforated
+stamp. The holes are sized to the line, not the area, and spaced to fit each
+edge exactly, half a gap from each corner, so all four corners come out alike.
 
 **The wobble is seeded, not random.** A border drawn from `Math.random` is a
 different border on every keystroke, every re-measure and every page of the
@@ -344,6 +578,14 @@ physical amount whatever it is drawing around, so a small box is not drawn more
 neatly than a large one, and the same border drawn on an A7 zine page and an A3
 poster is the same *hand*. It is the rule the rest of this codebase already
 follows, for once for a reason that is about ink rather than about geometry.
+
+**Except that a short edge is drawn with a heavier hand.** In millimetres
+alone, a 9mm step left an edge under about 18mm one bend in the middle, and
+printed small it read as a ruled line gone slightly wrong rather than as one
+drawn. So under 40mm an edge bends more often (steps down to 4mm) and further
+(up to 1.75 times), by its full measure at 10mm; a long edge is drawn exactly
+as before. A sketchier hand all round — 0.7mm, two passes, crossed corners —
+was tried and taken back: right on a small card, too much on a large one.
 
 **The CSS border stays, painted in nothing.** A hand border could have replaced
 the CSS one, and then switching it on would have changed the box's content
@@ -365,6 +607,19 @@ where two strokes should join does not read as hand-drawn — it reads as broken
 
 ## `src/lib/bitmap.ts`, `src/lib/tile.ts` and `src/lib/components/BitmapEditor.svelte`
 
+**Smaller as a palette PNG, not gzipped.** Gzip was asked for and measured: the
+starter's drawing went from 856 bytes to 879, because a PNG's pixels are
+deflated already and a second pass only adds a header. The weight was the
+canvas writing four bytes a pixel for one ink on nothing. `pngpack.ts` writes
+colour type 3 at the fewest bits the palette needs (290 bytes for that
+drawing, 410 characters of base64 against 1,166), with the browser's own
+`CompressionStream` for the deflate and the CRC zip.ts already had. Still a
+PNG, so every reader of a cell is untouched and no stored drawing needs
+migrating; the starter's was re-encoded by hand, pixel for pixel the same.
+Over 256 colours, the canvas's own PNG. Saving and the live weight are
+asynchronous now: the weight is taken 120ms after the last stroke and only
+the latest kept, and Save marks as saved only the edits it actually packed.
+
 **The drawing goes in the cell, as base64.** Not into this browser's store like
 a dropped file: a drawing made here has no existence anywhere else, and a
 picture that lives beside the table would be lost the moment the CSV was handed
@@ -372,36 +627,45 @@ to someone. In the cell it travels with the words, and a row's picture is
 exactly as portable as its text. The cost is a long cell, which is why the next
 decision is what it is.
 
-**One ink, and it is the area's own.** There is no palette here. An area is set
-to a colour in the bar, and a drawing made in it should be that colour rather
-than a second decision made in a second place — so the pen is that colour and the
-only other tool is the rubber. The trade-off is that the ink is fixed at the
-moment of drawing: this is a PNG, not a mask, so changing the area's colour
-afterwards does not recolour what was drawn.
+**The ink starts as the area's own.** An area is set to a colour in the bar,
+and a drawing in it should start as that colour rather than as a second decision
+made in a second place. The picker beside the nib is for a drawing that wants
+two, and it opens on the area's colour, so the one-decision case costs nothing.
+The ink is fixed at the moment of drawing either way: this is a PNG, not a mask,
+so changing the area's colour afterwards does not recolour what was drawn.
 
-**Low resolution is the feature, and it is a budget rather than a shape.** A
-board is 64 by 64 pixels' worth — 4096 of them — spent in any arrangement:
-64 x 64, 128 x 32, 512 x 8. What a cell cares about is how many pixels it is
-being asked to hold, not how they are arranged, so that is the one thing held
-constant; a kilobyte or two of base64 is a long cell but one a spreadsheet can
-hold and a person can scroll past. The header says what the drawing is costing
-as it is drawn, so the limit is visible rather than a rule that bites later.
+**Shapes are rasterised by hand, not by the canvas.** `rectOutline` and
+`ellipseOutline` return the pixels, which the nib paints like a stroke's; a
+canvas `ellipse()` would antialias its edge into shades that were never chosen,
+the one thing a pixel drawing cannot have. The ellipse is Zingl's midpoint
+ellipse in a rectangle, because the centre-and-radius form cannot draw an even
+width: a circle dragged 16 pixels across came out 15 or 17. Square and circle
+are a second press on the tool rather than a tool each — the row had to fit a
+phone — timed in the component rather than left to `dblclick`, which a phone
+may not send for two taps; Shift flips it for one drag, as everywhere else.
 
-**The board does not follow the area.** It did at first — the area's own
-proportions, longest side pinned — and that tied a drawing's cost to the
-millimetres of the box it sat in: resizing an area on the page changed the size
-of every drawing made in it afterwards, for no reason the person resizing it
-would recognise. An area is millimetres on paper and a board is pixels in a
-cell. A board set by hand is stored on the box and is where the next drawing
-starts, and absent means the 64 x 64 square, the same "absent is the default"
-rule the rest of the format follows.
+**Small by default, not by rule.** Every board starts at 64 x 64, where a
+drawing is a kilobyte or two of base64 — a long cell, but one a spreadsheet can
+hold and a person can scroll past. It was a budget: 64 x 64 pixels' worth,
+spent in any shape (128 x 32, 512 x 8). That was lifted when a banner and a
+detailed drawing both wanted more than it allowed. The title bar says what the
+drawing is costing as it is drawn, so a large board's cost is in view rather
+than forbidden. What is left is `MAX_SIDE`, 2048 a side: not a budget but a
+guard, because a template is a file anyone can hand you and the board it names
+is a canvas the browser allocates, thirty times over in the editor's undo.
+
+**The board does not follow the area.** Taking the area's proportions would tie
+a drawing's cost to the millimetres of the box it sits in: resizing an area on
+the page would change the size of every drawing made in it afterwards, for no
+reason the person resizing it would recognise. An area is millimetres on paper
+and a board is pixels in a cell. A board set by hand is stored on the box and is
+where the next drawing starts, and absent means the 64 x 64 square, the same
+"absent is the default" rule the rest of the format follows.
 
 **A picture already in the cell opens at its own size.** The thing being edited
 is what is in the cell, and opening it on the board the area remembers would
-resample a picture nobody asked to resize. Only one too big for the budget — a
-photograph dropped on the area, not a drawing — is scaled down to fit, and one
-smaller than the smallest board sits in the corner of it rather than being blown
-up by a fraction.
+resample a picture nobody asked to resize. Only one with a side past
+`MAX_SIDE` is scaled down to fit, keeping its shape.
 
 **A resize scales what is drawn; undo restores the board and the detail.**
 Refusing to resize once anything is drawn would make the size a decision you had
@@ -424,18 +688,17 @@ taints it and refuses `toDataURL`. The cost is that the crop is asynchronous: a
 card drawn in the very first frame tiles the whole board until the crop lands.
 
 **Content is one question with four answers, and the format did not change.**
-A drawing used to be reached by setting a static area's *mode* to "Image /
-Color", which asked the person placing it to know that a paragraph and a drawing
-are the same kind of thing with a different renderer. They are not, to anyone
-placing them. **Data Field**, **Static Text**, **Bitmap** and **Image** are now
-the one question the bar asks first, derived from the slot, the mode and which
-of `static`'s fields holds the value — so no template written before this reads
-any differently, and none written after this carries anything new. Which field
-is *present* decides between the last two, not which one has something in it: a
-bitmap nobody has drawn yet and an address nobody has typed yet are both empty,
-and they are not the same area. Static Text no longer offers the image mode at
-all, because the two picture answers are that answer, said where the question is
-asked.
+Reaching a drawing by setting a static area's *mode* to "Image / Color" asks the
+person placing it to know that a paragraph and a drawing are the same kind of
+thing with a different renderer. They are not, to anyone placing them. **Data
+Field**, **Static Text**, **Bitmap** and **Image** are the one question the bar
+asks first, derived from the slot, the mode and which of `static`'s fields holds
+the value — so every template reads as it did, and none carries anything new.
+Which field is *present* decides between the last two, not which one has
+something in it: a bitmap nobody has drawn yet and an address nobody has typed
+yet are both empty, and they are not the same area. Static Text does not offer
+the image mode, because the two picture answers are that answer, said where the
+question is asked.
 
 **The line tool previews from the board, not from the last preview.** A line is
 drawn again on every pointer report while the drag is going on, so each one
@@ -444,12 +707,14 @@ line around leaves a fan of every line it passed through. The copy is the
 editor's own, not a history entry: the whole drag is one step in undo, the same
 as a stroke.
 
-**Rotate and crop are board transforms, not drawing.** Both could be done by
-hand with the pen and neither should have to be: a quarter turn resamples
-nothing (the same pixels, arranged the other way up, and the budget cannot
-notice because w x h is unchanged), and cropping to the ink is the same
-rectangle a tiled area repeats, made permanent. Each one is a single entry in
-the editor's own stack, board and all, so either is one undo away.
+**Rotate, flip and crop are board transforms, not drawing.** None resamples:
+a quarter turn and a flip are the same pixels rearranged, and a crop keeps the
+ones inside its frame one to one. Crop is the Pictures tray's crop — a frame
+dragged over the board, `photo.ts`'s fractions, snapped to whole pixels as it is
+drawn so what is shown is what is kept — not a trim to the ink, which a tiled
+area already does as it is drawn and which leaves no way to keep a margin or cut
+into the drawing. Each is one entry in the editor's own stack, board and all, so
+any is one undo away.
 
 **Copy and paste go through the system clipboard as a PNG.** Not an internal
 buffer: the point is to get a drawing out to another program and a picture in
@@ -460,36 +725,44 @@ wants a gesture it recognises, and a page without the permission gets nothing �
 is told out loud in the header, because a copy that did not happen looks exactly
 like one that did until you paste.
 
-**The board sits above its tools, and leaving is a tool.** Cancel and Done used
-to be a row of their own under the board, which put the two most final buttons
-furthest from the hand that had been drawing, and pushed the board up under the
-header. One toolbar, one place to look.
+**The board sits above its tools, its size above it.** The tools are two rows:
+what you draw with — tool, nib, undo, the checkerboard — and what you do to the
+whole board, ending in Delete (in words and red like every Delete here),
+Cancel and Done. The size sits over the board it sizes, not in the toolbar, which is where the eye already is when it is changed.
 
-**There is no pinch on the board.** It had one for a day. The fingers that would
-make a pinch are the fingers drawing on it, and a stroke that turns into a zoom
-halfway through is worse than no zoom at all — so the board fits the viewport by
-itself and Ctrl and the wheel step it from there. The pinch stays what it was
-everywhere else: the page editor's zoom.
+**The board is always fitted, and there is no zoom.** The board is drawn as
+large as its room, measured off the stage itself, so a zoom in could only push
+part of it out of view behind a scrollbar — and a pinch would be made by the
+fingers that are drawing. The fit is not whole screen pixels per board pixel,
+which on a phone leaves up to a third of the tray empty: `image-rendering:
+pixelated` keeps the edges hard, and the cost is that a column of pixels here
+and there is a screen pixel wider than its neighbours, which at these sizes
+reads as nothing. The checkerboard is one check per pixel, so the pattern that
+says "nothing painted here" is also the grid.
 
-**The zoom steps through whole numbers.** Whole screen pixels per pixel of the
-board, pinch and Ctrl+wheel included: a board at 7.5 screen pixels a side lands
-half its pixels on half a screen pixel, and a pixel editor that blurs its own
-edges is no use. It is also what lets the checkerboard behind the board be one
-check per pixel — a CSS gradient sized from the same number — so the pattern
-that says "nothing painted here" is also the grid. The pinch is held by the
-whole surface rather than by the board, because a pinch that starts with a
-finger on the dark around it is still a pinch.
+**At its least, the board keeps its room and the tools give way.** The tool
+rows never shrink and the board has a floor, so a tray pulled right down clips
+the rows under the panel's bottom bar instead of squeezing the board to a
+strip: what you pull the tray down to look at is the drawing.
 
-**Full screen, never in place.** Every other kind of area is edited where it
-sits, and this one cannot be: areas are frequently a centimetre across, which is
+**A dialog, never in place.** Every other kind of area is edited where it sits,
+and this one cannot be: areas are frequently a centimetre across, which is
 somewhere to show a drawing and nowhere to make one. The same double-click that
-opens words for typing opens this instead.
+opens words for typing opens this instead. It was a full-screen surface of its
+own; it is a dialog now, the CSS editor's shape, so the card it is drawing for
+stays in view round it — and like that editor it is dragged by its title
+(`dragByTitle` in modal.ts), clamped so a strip of the title always stays on
+screen to drag it back by.
 
-**Nothing is written until Done, and it is one undo entry.** The editor keeps
-its own stack of whole canvases — at this size a canvas is nothing — so undo in
-there is strokes, and undo out here is the drawing. Mixing the two would have
-made a fifty-stroke drawing fifty steps of the app's history, and the app's
-undo is snapshots of the whole editable state.
+**Nothing is written until Save, and each save is one undo entry.** The editor
+keeps its own stack of whole canvases — at this size a canvas is nothing — so
+undo in there is strokes, and undo out here is the drawing. Mixing the two would
+have made a fifty-stroke drawing fifty steps of the app's history, and the app's
+undo is snapshots of the whole editable state. Save and Delete are the side
+panel's, in its bar, not the board's: the board calls `save()` when asked, and
+reports whether it holds anything unsaved so the bar can light Save and hold the
+pager. Unsaved is a count of edits against the count at the last save, not the
+length of `history`, which is capped and stops growing.
 
 **A picture from off this machine opens blank.** Drawing a cross-origin image
 onto a canvas taints it, and a tainted canvas refuses `toDataURL` — so the
@@ -497,7 +770,75 @@ surface would open on a photo, take a stroke, and fail to save at the very end.
 Opening blank is the honest version of that, and a `blob:` URL from this
 browser's own store is same-origin and draws in fine.
 
+**Always in the side panel.** It was a dialog; it now lives in the table's
+full-size editor, for a cell and for an area with no column alike (the second
+has no row, so no pager, and writes onto the area). The table keys the surface
+on the cell plus an epoch that moves only when the cell changes *under* it —
+undo, a paste, Delete — so a save's own write does not remount it and throw its
+undo away. Every key but Escape stops at the board: the app's shortcuts listen
+on the window, and a Delete meant for the board would delete an area. A stroke
+focuses the board, because its press is held back from the page and would not
+otherwise move the focus off the Save just pressed.
+
+**The drawing editor closes to where it was opened from.** It lives in the
+table's panel, so opening it from an area on the card opened the table, and
+its × then left the table showing — a panel nobody had asked for. Each request
+now carries where it came from (`from` on `openRequest` and `areaRequest`):
+× goes back to the table only when the drawing was opened there or the table
+was already showing, back to Images when it came from there, and otherwise
+closes the panel (`onleave`). The ‹, as the Pictures tray's large view has it, is
+one step back — to Images, or to the table the drawing lives in.
+
+**Drawings are listed in the Pictures tray, not stored there.** A drawing lives
+in its cell, or on an area with no column, on purpose (see `bitmap.ts` above),
+and so the tray — "every image this browser is holding" — was missing exactly
+the pictures made in the app. They are listed under the stored ones, read off
+the table and the template as they stand, through `safeMediaUrl` as a cell's
+thumbnail is. No delete and no carry: they are not files, and a press opens
+the one editor that can change them.
+
+## `src/lib/photo.ts` and the Pictures tray's large view
+
+**Edits to a stored picture wait for Save.** Rotate, flip and crop draw on a canvas
+at the picture's own size; nothing reaches the store until Save, because these
+are the picture's bytes and the app's undo holds template and table only. The
+name is kept — it is what cells point at — and so is the type it promises:
+`editableType` answers PNG, JPEG or WebP from the name and nothing else, and a
+blob that comes back as another type (Safari asked for WebP) is refused rather
+than written as a PNG under a `.webp` name. The crop frame is fractions of the
+picture, so the one rectangle means the same on screen and at full size.
+The tools sit in a row under the picture, as the drawing editor's do, and
+rotate is one button, clockwise, as it is there: three presses are the other
+way, and a row that fits a phone is worth the two extra taps.
+
 ## `src/lib/history.ts`
+
+**Two snapshots, one debounce; equal by reference first.** The recorder in
++page snapshots the template and the table in separate effects, each keeping
+its latest, and one timer records them together: a drag changes the
+template on every frame and never clones the table, a keystroke in a cell
+never clones the template. The half nobody touched is the very object the
+present holds, so `same` compares a state field by field and takes a shared
+reference as equal without serialising it; a state's serialisation is kept
+beside it (a WeakMap — states are never changed once recorded) so the
+present is not serialised again at every commit.
+
+**A refinement can be folded into the last step (`amend`).** The page uses
+it for one thing: a Type chosen in the Pictures tray for a face just replaced
+in from there joins the replace's entry (`fontSession`, `commit` in +page),
+so one undo goes back to the old face and one redo brings the new one back as
+chosen — two faces compared by flipping, not by stepping back through each
+choice. Anything recorded in between makes the replace no longer the present
+entry, and the next choice is a step of its own.
+
+**Undo records first.** History is written on a 350ms debounce, so Undo pressed
+inside that third of a second used to find the latest change not yet recorded:
+it undid the change before, or on a fresh session nothing, and a drag just made
+stayed put. Undo, and the alternating chord, record what is on screen before
+stepping back. The debounced recorder cannot then record it again, since the
+state undo applies cancels its timer. Two actions inside the debounce are still
+one entry — an unlock and the drag straight after it go back together — which
+is the debounce's own bargain, kept.
 
 **A label rides alongside each state, never inside it.** States are compared by
 value to decide whether anything changed, and that comparison is what stops an
@@ -531,6 +872,97 @@ would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
 
+**Columns are the browser's.** `Box.columns` (2–6, a gap in mm) is
+`column-count` and `column-gap` on the area's content, not on the box, so the
+padding, border and fill stay one frame round all the columns. Balanced rather
+than filled in turn: a fixed-height area cuts what runs past its height as it
+would one column, and a growing one grows to the longest. Words only — a
+picture or a QR code split into columns is a broken picture. Absent is one
+column; a count under two is read as absent.
+
+**A page's own ids and classes sit on box-less wrappers inside the trim.**
+`#page-N`, `#cover`, `#inside-cover`, `#inside-back-cover`, `#back-cover`,
+`.recto` and `.verso` let a template's CSS style a page as a whole. The places
+are ids, not classes, because there is one of each and at most one a page; an
+element has one id and `#page-N` holds the outer wrapper's, so the place is on
+a second wrapper inside it. css.ts scopes every rule to `.trim …`, so
+`#cover .area` becomes `.trim #cover .area`, and the hook has to be on
+something between the two: classes on the trim
+itself would never match, and moving the scope out to the card would have
+changed what `:root` means in every stylesheet already written. The wrapper is
+`display: contents`, so nothing is laid out or measured against it. Inside
+covers need four pages, or a two-page run would call its back cover the inside
+of its front. The id repeats wherever the same page is drawn twice — the
+editor and a thumbnail — as an area's id already does.
+
+**The theme it is seen in is a class on the same wrapper.** `.theme-light`,
+`.theme-dark` or `.theme-dark-page`, because the interface's own
+`data-theme` is on `<html>`, and css.ts maps `html` to the card: a
+template had no way to say "in the dark". Three exclusive classes rather
+than one `.theme-dark` for both, because the two darks need opposite
+answers — in `dark` the page is turned back and shows colours as written;
+in `dark-page` its words and shadows are inverted but a fill is not, so the
+same rule that makes a word light in one makes it dark in the other. Only
+the editor's page takes the theme (+page.svelte's `shownTheme`, which
+follows a glance too); every other Card defaults to light, because print, an
+exported PNG and the lightbox all show the page the right way round, and a
+dark rule leaking into print would be printed.
+
+**A touch on the card drops the click that lands off it.** A touch's click
+is aimed at what is under the finger when it lifts. Pressing an area selects
+it on the way down, and on a phone that brings the area bar into the options
+row and pushes the card down a bar's height, so the click landed on the font
+menu or an alignment button that had just slid under the finger. The card now
+arms a one-shot guard on a non-mouse press: the next click is dropped if its
+target is outside the card, and the guard stands down 350ms after the finger
+lifts, so a drag (which makes no click) cannot leave it to eat a later tap.
+
+**The temporary guides are the Guides box's middle state, and a box moves by
+its middle too.** They were tied to Boxes being on and the grid being off, so
+turning the grid on — or the margins off — took them away without a word, and a
+moving box only ever tried its left and top edges, so nothing lined up by its
+middle. Now Guides goes round three states (margins, temporary guides and the
+spacing; the same without the spacing as the dash; neither), the temporary guides include the
+page's centre lines, a moving box tries start, middle and end (`latchSpan`),
+and an alignment in reach beats the grid. The margins still win over both,
+because a margin that is not a whole number of grid steps would otherwise have
+an edge nothing could be placed against.
+
+**Every tie at once is the Boxes box's dash.** A thread is drawn while a tie
+badge is pointed at, and the badges only on the selected area's chain, which
+alone leaves no way to see how a card's areas hang together short of pointing at
+each one. So Boxes goes round on, the dash, off: the dash shows the
+tie badges on every tied area and draws every thread, measured off the badges a
+frame after each layout, zoom or selection change (an anchored area's place is
+only known once what it hangs from is measured). It is after the tick rather
+than before it, as Guides' dash is, because it is more rather than less, and the
+threads mean nothing without the boxes they join. A locked template still shows
+none of it, as it shows no badges.
+
+**An empty area's name is part of the bounds.** It stands in whenever an area
+is empty, in the accent and the area's own type, because an empty area is
+otherwise an outline of unknown purpose — and it goes with the bounds, because
+it is the same kind of furniture and turning the bounds off is how you look at
+what prints. Hiding is a separate question: an area set to hide when empty
+still hides on a row whose column is blank, and still stays put where it has no
+column at all, whatever the bounds are doing.
+
+**Paragraph style is in lines, and in em.** An amount in lines of the area's own
+leading keeps its proportion when the size or the leading changes, which a
+millimetre figure does not; it is written as `amount × leading` em rather than
+in `lh`, which only recently became widely available and would take the whole
+declaration with it where it is not.
+
+**The grown-edge line is one line tall, not zero.** It was an SVG with a height
+of 0, and an SVG with a zero dimension is not rendered at all, so the line was
+in the page and never on the screen — the check that counted it passed while
+nobody could see it.
+
+**A grown area remembers its height as a line, not a number.** The dashed
+original bottom edge is drawn in the bounds' own color and weight but sparse, so
+it reads as the same outline, remembered, rather than as a second warning beside
+the red cut line a clipped area gets.
+
 **An area with nothing to draw from draws its own name.** Set to *Hide When
 Empty*, such an area collapses to no height and no visibility, and a sheet of
 those cannot be clicked, selected, moved or renamed: the design is still there
@@ -541,11 +973,14 @@ The line is between an area with *nothing* to draw from and one whose cell is
 merely blank. Nothing means either there is no row at all — an empty table, or
 one just cleared — or the area is bound to a column the data has not got: an
 unmapped slot, or one still pointing at a column that has been renamed or
-deleted. Either way it will be empty on every card there is, so hiding it shows
+deleted — or it is not bound at all and holds its own words, and none of them.
+Either way it will be empty on every card there is, so hiding it shows
 nobody what this row prints. The second half of that matters as much as the
 first: clearing the table and adding a column back gives you one empty row, at
 which point "no row at all" no longer holds and every area would have collapsed
-again one click after being rescued.
+again one click after being rescued. The area bar says as much: for an empty area holding its
+own words, Hide When Empty is shown disabled, still ticked if it was, because
+the setting is kept but does not apply there.
 
 An area bound to a column that *does* exist and happens to be blank here is left
 alone — hiding is exactly what it was asked to do, and the editor has to show
@@ -556,7 +991,7 @@ its old behaviour there.
 
 **The area's name is the element's `id`.** That is the whole point of a name you
 can type: `#Job-Title { … }` in the template's own CSS reaches one area, where
-`.box` reaches all of them. It is spread as an object rather than written as
+`.area` reaches all of them. It is spread as an object rather than written as
 `id={…}` so an unnamed area carries no `id` attribute at all rather than an
 empty one. The trade-off, said out loud: a sheet of several cards renders the
 same design several times, so each id appears once per card. CSS is happy with
@@ -566,14 +1001,13 @@ answer with the first. Nothing in the app looks an area up that way: the editor
 addresses `data-box-id`, which is generated and stays unique.
 
 **The rotation lever points right, not down.** The knob hangs off the pivot on a
-30px arm, and that arm used to run downward — straight at the south handle and
-the two corners either side of it. An area is usually wider than it is tall, so
-that was the axis with the least room to give: on a shallow area the knob sat on
-top of the handles you resize with, and reaching for the bottom edge turned the
-area instead. Rightward the arm has the long axis to itself and only the east
-handle to clear. Nothing about the drag maths changes — rotation is the angle
-from the pivot to the pointer against the angle it started at, so where the knob
-rests is presentation.
+30px arm. An area is usually wider than it is tall, so downward is the axis with
+the least room to give: there the arm runs straight at the south handle and the
+corners either side, and on a shallow area reaching for the bottom edge would
+turn the area instead. Rightward the arm has the long axis to itself and only
+the east handle to clear. Nothing about the drag maths depends on it — rotation
+is the angle from the pivot to the pointer against the angle it started at, so
+where the knob rests is presentation.
 
 **A crop mark is two ticks with a gap, not an L of borders.** These were a
 corner-sized box carrying two borders, so the two lines met exactly at the
@@ -586,11 +1020,11 @@ straightedge to cut against. `max(0mm, …)` on the length is what keeps a bleed
 thinner than the gap from drawing a negative mark.
 
 **A box's content lives in `.content`.** Handles and badges are absolutely
-positioned children of `.box` that hang past its edges, so measuring the box's
+positioned children of `.area` that hang past its edges, so measuring the box's
 own `scrollHeight` reports overflow on every selected box. The wrapper is what
 gets measured, and it is also the single flex item `justify-content` places.
 
-**Vertical alignment makes a box a flex column.** That is why `.box` is
+**Vertical alignment makes a box a flex column.** That is why `.area` is
 `display: flex`: `justify-content` is the only thing that places content
 vertically in a box whose height may be a `min-height`. The cost is that child
 margins no longer collapse out of the box, which the existing
@@ -607,11 +1041,10 @@ the scaled card, so a 14px handle is nine pixels under the finger at 62%.
 `--ui-scale` on `.card` is `1 / scale`, and every screen-only measure is
 multiplied by it, so a target is the size it was drawn at whatever the zoom.
 
-**A clipped box cuts its content, not its chrome.** `overflow: clip` on a box
-used to be an inline style on `.box` — the same element the handles, pivot and
-badges hang off, so a clipped box ate its own selection chrome. The clip is CSS
-now, on `.box.clipped > .content`, because those are all siblings of `.content`
-rather than children of it. The alternative was to suppress the clip in the
+**A clipped box cuts its content, not its chrome.** The clip is CSS on
+`.area.clipped > .content`, never on `.area`: the handles, pivot and badges hang
+off `.area` as siblings of `.content`, so a clip on `.area` would eat its own
+selection chrome. The alternative was to suppress the clip in the
 editor the way `.card.editing` does, but a box is set to clip precisely so its
 content is cut at its edge: not cutting it in the editor would break WYSIWYG for
 the one setting whose whole purpose is visible. `min-height: 0` on that rule is
@@ -627,13 +1060,32 @@ boxes that did not need it. A `MutationObserver` on the box's subtree catches
 the content change itself. It settles rather than looping, because `read()`
 writes state only when a number actually moved.
 
+**Measured on the observer's first report, not at mount.** A read as the box
+mounts is an `offsetHeight` in the middle of mounting everything else: a forced
+layout per area per card, which opening Export with a thousand cards turned
+into half a minute. A `ResizeObserver` reports every box it is given once,
+after the layout the browser does anyway and before that frame is painted, so
+nothing is drawn unmeasured. The codes a card draws are cached for every card
+at once, in the module, for the same thousand: each drew the same picture.
+
+**Only a clipped box can be cut.** A growing box is a `min-height`, so it is
+always as tall as its lines, and `scrollHeight` beating its height does not make
+it cut: a face whose ascent and descent outrun a tight line height — Patrick
+Hand at 1.05, say — hangs its last line's inline box a few pixels below the
+line, and `scrollHeight` counts that. It shows only on two-line titles, where a
+minimum height has no slack left to hide it.
+
+**A picture is framed inside the padding** — see *A QR's quiet zone is the
+area's padding* for why. The arithmetic is `frameHeight` in `template.ts`, so a
+test can hold it, and `mediaHeight` is only its unit.
+
 **Anchoring shows at both ends, and moves at both ends.** A box that hangs off
-another wears a link; the box it hangs from wears a harbour buoy. Until now only one
-end was visible, and the box being followed gave no sign that moving it would
-take anything with it. Moving it now does take them: `resolveLayout` already
-carried dependents *downwards*, because their top is read from the target's
-bottom, so a drag hands them the sideways half of the move and nothing else —
-applying the vertical delta as well would move them twice.
+another wears a link; the box it hangs from wears a harbour buoy, or it would
+give no sign that moving it takes anything with it. Moving it does take them:
+`resolveLayout` already carries dependents *downwards*, because their top is
+read from the target's bottom, so a drag hands them the sideways half of the
+move and nothing else — applying the vertical delta as well would move them
+twice.
 
 **The overflow corner is a badge that happens to be red.** Same size, radius and
 standing-clear-of-the-edge as the others, at the bottom right where the words run
@@ -671,10 +1123,10 @@ overlays are `pointer-events: none` and hidden in print — as elements they no
 longer fail safe by being inside `@media screen`, and a line on the paper is a
 printing error rather than a cosmetic one.
 
-The grid is finer still — a half-pixel hairline in both rules, with the 10mm
+The grid is finer still — one device pixel in both rules, with the 10mm
 rhythm carried by darkness rather than thickness — and keeps its weight for a
-different reason: it sits outside the transform and was always measured in screen
-pixels.
+different reason: it is drawn in device pixels to begin with (see
+`PagePreview.svelte`).
 
 **A badge is an annotation, not a control.** They are grey on white, smaller than
 the blue chrome, and clear of the box rather than straddling its corner, where
@@ -709,14 +1161,14 @@ swings the box through tens of degrees. A lever has an angle to measure from the
 first pixel and needs no deadzone to paper over it.
 
 Three things this arrangement has to get right. The arm is drawn but not grabbed:
-it runs from the knob down to the pivot, so leaving it hit-testable put a
+it runs from the knob down to the pivot, so a hit-testable arm would put a
 lever-shaped hole over the pivot and the point the box turns about could never be
 picked up. The pivot sits above the lever, which sits above the resize handles,
 because their targets overlap near the centre and the one you mean there is
 always the pivot — the lever has its knob. And the lever is in the
-`pointer: coarse` block: the old edge-mounted handle was left out of it entirely,
-which is why rotation could not be worked on a phone at all — it kept the
-fine-pointer 8px reach on a mark floating outside the box.
+`pointer: coarse` block, or rotation cannot be worked on a phone at all: the
+fine-pointer 8px reach on a mark floating outside the box is no target for a
+finger.
 
 The pivot's page position is read from layout rather than from
 `getBoundingClientRect`, which on a turned box reports the upright rectangle that
@@ -756,11 +1208,22 @@ while `--reach` grows by the same amount, so the target stays 48px for a handle
 and 44px for the pivot. That separation is the point of the `::before`: what you
 see and what you can hit are set independently.
 
-**Snapping is the two view toggles, not a modifier.** The grid beats sibling
-edges, sibling edges beat plain `FREE_STEP` rounding, and there is no key to
-hold: Grid off and Bounds off is free movement, because a box must never latch
+**Snapping is the view toggles, not a modifier.** The margins (with Guides)
+beat the grid, the grid beats sibling edges, sibling edges beat plain
+`FREE_STEP` rounding, and there is no key to hold: all three off is free
+movement, because a box must never latch
 onto a guide that is not being drawn — a snap to an invisible edge reads as a
 bug. An anchored box always snaps its `gap`, never its `y`.
+
+**A box moving with the box it follows keeps its gap** (`followsInSet`). It
+already comes down behind that box, so adding the move to its gap as well
+moved it twice: a grouped heading and the line anchored under it drifted
+apart by the whole of every drag and nudge. When the box under the pointer is
+the follower, its move is read and handed to the rest of the set — the head of
+the chain takes it — and its own gap is put back. Up the whole chain, not one
+link: grouping a heading with the line two below it, the line between left
+out, the lower line hung from a box that was not moving yet came down all the
+same, and it too moved twice.
 
 **The editor does not clip, the output does.** `.card` is `overflow: hidden` so a
 print or a PNG never spills onto its neighbour; `.card.editing` — the interactive
@@ -777,6 +1240,20 @@ cut line is drawn on anything meant to be cut, and in the same rhythm as the
 bound it sits on so the two are one language. The other three edges are left
 alone: only one of them is doing the cutting, and saying so on all four would
 say nothing.
+
+**The shears are a switch.** Red astride the cut, a press lets the area grow;
+on an area that has grown, a faint blue pair beside the trim line — its given
+height, drawn sparser than a bound so it is not read as an edge — clips it back
+at that height. The cut and the offer are the same glyph in the two states a
+toggle is drawn in. They hang in line with the badge column, and step down
+below its last badge where the edge they mark is higher than the column is
+long — `max()` of the edge and the column's length, which is known in CSS
+from the badge count. A second column out past the badges stops the overlap
+too, and puts the one mark out of line with all the others.
+
+**A selected area has one outline.** The selection is drawn and the dashed
+bound is not: two lines on every edge said nothing the one did not. The trim
+line stays, in the selection's blue.
 
 The badge is hollow — red on nothing, where every other mark here is a filled
 chip. A solid red square at the corner was the heaviest thing on a card whose
@@ -817,16 +1294,16 @@ words itself: a bound area's text is a cell of the dataset and a static one's is
 a field of the template, and only `+page.svelte` knows which it is holding.
 
 **A picture, a fill and a drawing are three modes, and `image` still answers to
-two of them.** They began as one mode — a column of brand colors and a column of
-logo URLs are the same job, and a template author should not have to know which
-the data holds. What that missed is that a *person* does know, and being told
-"Image / Color" when the column is plainly one of them is an answer to a question
-nobody asked. So `bitmap`, `image` and `color` are separate now: `color` refuses
-anything that is not a color, `bitmap` refuses anything that is not a picture,
-and `image` keeps answering to both because it was the only mode for both and
-every template written until now relies on that. The cost is one mode that is
-less strict than its name; the alternative was breaking files we cannot inspect,
-since whether a column holds colors is a fact about the data, not the template.
+two of them.** One mode for both is tidy for the template — a column of brand
+colors and a column of logo URLs are the same job — but a *person* knows which
+the data holds, and being told "Image / Color" when the column is plainly one of
+them is an answer to a question nobody asked. So `bitmap`, `image` and `color`
+are separate: `color` refuses anything that is not a color, `bitmap` refuses
+anything that is not a picture, and `image` keeps answering to both because
+templates from when it was the only mode rely on that. The cost is one mode that
+is less strict than its name; the alternative was breaking files we cannot
+inspect, since whether a column holds colors is a fact about the data, not the
+template.
 
 The schema stays at 5 and nothing migrates. Adding names to an enum is not a
 change to the shape of the file, and bumping the number would have made every
@@ -854,7 +1331,10 @@ is empty and its glyph comes from CSS, precisely so a template's own stylesheet
 can reach it — `content: ' of '`, or nothing. A literal `" / "` in the markup
 would have been unaddressable.
 
-**Press and hold the pivot or the lever to put it back.** Both marks are dragged
+**Double-click the pivot or the lever to put it back.** (It was a press and
+hold, until a hold came to mean "show me the tooltip" — see `Tooltip.svelte`.
+The double-click stops at the mark, or it would also open the area for typing.)
+Both marks are dragged
 to a value with no number written anywhere on the card, and both have a resting
 state that is the only one most cards want — the middle, and upright. Dragging
 back to either is pixel-hunting, and the fields in the bar are three clicks away
@@ -906,12 +1386,50 @@ step further away" where a second color would say "a different kind of tie".
 Upwards it stays one hop, as it always did: what this area follows is a
 relationship it has, and what that one follows is not.
 
-**The tie badge sits at the other end of the area from the rest.** Every badge
-used to stack at the top corner, and on a shallow area four of them are taller
-than the area they are about. The tie is the one an area carries most often, so
-moving it to the bottom corner halves that column in the common case — and it
-clears the shears by their own half-height when the area is cutting its words
-off, because two marks on one corner is worse than either alone.
+**The badges are above the handles.** The top corner handles reach past the box
+to where the first badge in the right-hand column sits, and a press meant for
+the badge went to the handle. The column is click-through, so raising it over
+every handle gives the badges — and only them — the press.
+
+**Every area carries its content and its mode as classes** —
+`content-field|static|image` and `mode-*` — beside its id, for a template's CSS.
+Prefixed, because the card already uses `.plain` and the like inside an area,
+and a bare `.image` on the box would have been restyled by the card's own
+rules. The CSS editor's placeholder lists them with this template's own ids.
+
+**The anchor's badges sit off the top-left corner, in a column of their own.**
+Stacked at the top right with the rest, four badges on a shallow area are taller
+than the area they are about. The tie and the buoy are the ones areas most often
+carry, and they are one relationship, so they sit together — the tie above the
+buoy where an area has both. Not the bottom corner: on an area shorter than the
+badge, the tie would stack up over the top line. Consecutive shallow areas in a
+chain can still bring one area's buoy down to the next one's tie.
+
+**The point the words are set from has a ring in its handle.** It was told
+apart by square corners alone, which at 14px read as a rendering quirk rather
+than a meaning; with the ring to say it, the handle is rounded like the other
+seven. A ring rather than a cross, which is the pivot's mark; an SVG, like the
+pivot's, so its weight holds at every zoom. Left and top alignment
+make it the top-left, right and bottom the bottom-right; centred on one axis
+it is the middle of an edge, and centred both ways it is the area's middle,
+where no handle is, so none has a ring. It is worked
+out as drawn, so on a mirrored left-hand page it is the mirrored corner.
+
+**Pointing at a tie draws its thread.** The link and the buoy are at two
+corners of two areas, often with others between, and the lit glyph on the far
+one is a thing to hunt for. Hovering either draws a dotted S between the two
+badges, sagging with its length. The dots walk from the tie to the buoy
+whichever is pointed at — the direction the relationship runs — and which
+threads are drawn is decided by the badge pointed at, not by the area: a middle
+link wears both, and its buoy must not thread up to its own parent. Where the
+two ends are nearly one above the other the curve is bowed out to the left by
+what they lack of being side by side, or its upright handles would fall on one
+line and it would draw as a straight dotted rule. The S is the inverted one: it
+leaves each badge vertically, down, rather than level, which reads as a thread
+hanging between two pins rather than a wire routed between two ports. It is
+measured off the badges as drawn — `getBoundingClientRect`, divided back by the
+zoom — because a badge is a fixed number of screen pixels off a box that may be
+turned, mirrored and grown, and the DOM already knows where all of that put it.
 
 **A drawing is drawn hard.** An area whose picture is a `data:` URL renders
 with `image-rendering: pixelated`. The drawing surface is the only thing that
@@ -949,7 +1467,88 @@ handle sit outside that, because mirroring places a box without flipping what is
 inside it. The latch guide carries a `flip` flag for the same reason: it is
 measured against stored edges and drawn where the eye sees them.
 
+**The fold is dot and dash.** With Recto / Verso on, the guides draw the fold
+as a dot-dash line just outside the inner trim edge — past any bleed, so it is
+never read as artwork — the convention for a fold on anything printed to be
+folded. An area that follows the fold draws its inner side in the same rhythm
+in place of a plain dash, and selected, with a longer dash, so the fold still
+reads against the solid selection. So the one side can be styled, the bound is
+four `<line>`s in percentages rather than a rect. A zigzag was tried first and
+read as a tear rather than a fold.
+
+**`#` is a swatch's placeholder.** An area with no words of its own that takes a
+color from a column shows `#` in the editor rather than "Area", and an area the
+row fills is never hidden as empty — it has something to draw.
+
 ## `src/lib/components/PagePreview.svelte`
+
+**With nothing chosen, a pinch holds the paper.** The zoom's hold — a point kept
+still on screen across a change of scale — falls back to the sheet when no area
+is chosen, unclamped, so what is under the fingers or the wheel stays under
+them even on the grey past the edge. The keys have no position and still zoom
+as they always did.
+
+**The page stays put when the stage's edge moves.** Choosing an area opens its
+options above the stage, on a phone a third of the screen, and the stage's top
+coming down carried the page with it: the area just tapped slid down the
+screen, which read as the view jumping to the bar. A resize of the scroller now
+scrolls by however far its top-left corner moved, so the page holds still where
+the scroll allows; and if the chosen area is still out of sight after that, it
+is scrolled into view by the least distance. Only on a resize, never on a
+change of selection alone, so an area dragged off the edge stays where it was
+put.
+
+Both ways. Closing the bar makes the stage taller, which shortens what can be
+scrolled, and the browser clamps the scroll before the resize is heard of — its
+scroll event even comes first, in the same frame. Made up for from that clamped
+value, a page near the bottom moved twice the bar's height on deselect; so a
+scroll in the frame of the resize is taken to be the clamp, and the value
+before it used. What was chosen until a moment ago (a second) is revealed as
+well, so the area deselected, or joined by a second, stays in sight.
+
+**The nudge pad goes somewhere.** Put away by a hold on its middle, or thrown
+24px on past the edge it stops at, it shrinks into the button that brings it
+back, worked out a tick after it starts so that button has been drawn. It used
+to vanish where it stood, and nothing said where it went. A thrown pad comes
+back to its home corner, not hanging off the edge it was thrown at.
+
+**The pad is one choice across both modes.** It used to be two flags, out by
+default under zoom and pan and put away in Move, so every switch of mode
+brought it or took it — a second thing changing that the switch was not about.
+Now the switch settles it as it is seen and leaves it there; until the first
+choice, the mode the stage opens in decides.
+
+**A gesture brings its own room to scroll.** The hold keeps a point still by
+scrolling, and below Fit — and for a while past it — the page is centred and
+there is nothing to scroll: the page grew about its middle, then lurched back
+under the fingers the moment it could scroll (measured: 55px off, put right in
+two steps). For the length of a pinch or a zooming wheel the page has a stage's
+worth of margin on every side, taken on and off with the scroll moved to match,
+so the hold always has room; its removal at the end, which recentres a page
+below Fit, plays as a 0.2s slide. A transform for the shortfall was tried
+first and fails where the scroll is at its end: shifting the page left takes
+its own width off the scroll range and the scroll gives the shift back. Pinch
+steps are also held to one a frame, since phones report fingers at 120Hz.
+
+**Actual is measured, not assumed.** CSS's millimetre is a 96th of an inch per
+3.78 pixels, right for almost no screen sold this decade: a 13-inch MacBook at
+its default scaling holds about 128 CSS pixels to the inch, so "100%" drew an
+A5 card at three quarters of its size. No browser reports a screen's density,
+but `actualScale` in layout.ts can name most panels from what a page can read.
+On phones, iPads and Windows the device-pixel grid (size × ratio) is the panel.
+On a Mac it is not — a scaled mode renders into a larger framebuffer and
+shrinks it onto the glass, so a 13-inch Air at 1440 × 900 reports the same
+grid as a 15-inch Pro at native — so Macs are matched by their "looks like"
+sizes instead, every one of which shares the panel's width in inches. Grids
+several monitor sizes share take the commonest and say it is an estimate; an
+unknown screen gets CSS's millimetre and says so. A calibration against a
+ruler would be exact everywhere and was not asked for.
+
+**The scaler is `width: max-content`.** A block fills its parent, so the element
+carrying `transform: scale()` was the sheet's width before the transform, and
+scaled up that width scaled with it: every zoom above 100% hung an invisible
+band off the sheet's right edge and gave the stage a scrollbar with nothing to
+scroll to. Sized to the card, it scales to exactly the sheet.
 
 **The pager's swipe lives on a chip, not on the row.** The row spans the whole
 stage so the count stays centred under the sheet rather than on whatever is left
@@ -971,21 +1570,22 @@ which is exactly what it was doing: the swipe worked under synthetic events and
 did nothing under a real finger. `pan-y` rather than `none` so a flick that was
 meant for the page still scrolls it.
 
-**On a phone the view toggles lose their words, not their row.** Grid and Bounds
-side by side reach far enough into the bottom band that the pager's first arrow,
-centred in the same band, lands on top of "Bounds". They used to stack into a
-column for that, which halved the width by growing a two-line panel up over the
-sheet. Now the words go instead — a `#` for the grid, a `B` for the bounds —
-beside ticks that already say whether they are on, which is the part doing the
-work. Both forms are in the DOM at every width and CSS picks one, and the
-checkbox carries an `aria-label` either way, so nothing read aloud is ever
-reduced to a single letter.
+**On a phone the view toggles lose their words, not their row.** Grid, Guides
+and Boxes side by side reach far enough into the bottom band that the pager's
+first arrow, centred in the same band, lands on top of them. Stacking them into
+a column grows a panel up over the sheet, so the words go instead — a `#` for
+the grid, a `|` for the guides, a `B` for the boxes (Boxes, not Bounds: guides
+are bounds of a kind too, and only one of them is areas') — beside ticks that
+already say whether they are on, which is the part doing the work. Both forms
+are in the DOM at every width and CSS picks one, and the checkbox carries an
+`aria-label` either way, so nothing read aloud is ever reduced to a single
+letter.
 
 **Fit measured the thing its own answer resized.** The stage is observed to
 derive the scale, the scale sizes the sheet, the sheet's height decides whether a
 vertical scrollbar appears, and that scrollbar takes about fifteen pixels off the
 width the measurement started from. At a marginal size that oscillates until the
-browser's own resize-observer bail-out stops it, and closing Page Setup landed
+browser's own resize-observer bail-out stops it, and closing the page bar landed
 right in it. `scrollbar-gutter: stable` removes the causal edge rather than
 damping the swing; the observer is also coalesced to a frame and held to whole
 pixels so it cannot start again for some other reason. Reserving the *horizontal*
@@ -1004,14 +1604,29 @@ accumulated and spent a point at a time: a mouse notch is one fat event and a
 trackpad is a stream of small ones, so reading them one-for-one would make the
 same flick one step on one machine and forty on another.
 
+**Past Fit, the page can be scrolled clear of every toolbar.** The toolbars
+float over the stage and the scroller's padding is a flat 24px, so scrolled to an
+edge a zoomed page had its corner under undo, the view toggles or the zoom — the
+part you had scrolled there to see. Each fixed toolbar is measured and cleared by
+whichever stage edge it is nearer to, each side takes its deepest toolbar plus a
+16px gap, and that is a margin on the page rather than padding on the scroller:
+Fit is measured off the scroller's content box, and padding would have shrunk Fit
+to clear toolbars that a centred page at Fit is already clear of. Watched with a
+`ResizeObserver`, since the selection's tools grow the column under undo. The
+nudge pad is left out: it can be dragged off whatever it covers.
+
 **The pager reserves its own height.** The sheet and the pager are one column, so
 `fit` subtracts the pager's measured height and the column gap before it sizes
 the page — otherwise the count is the first thing off the bottom of a short
 stage. Measured, not assumed: it is text and icons, and it is absent when there
-are no rows. The page-lock band above the sheet is in that column for the same
-reason, rather than hung off the sheet on a negative offset: on a phone the stage
-has eight pixels of padding, and anything overhanging it is scrolled off the top
-with no way to reach it.
+are no rows. The page-lock band was in that column too, and was taken out of
+it: in the column it was a band's height more to scroll at every zoom but Fit,
+so a page that fitted grew a scrollbar the moment it was locked. It is pinned
+to the top of the stage now, as the pager is to the bottom, and at Fit only the
+viewport's top padding keeps a band clear for it — at any other zoom it may lie
+over the sheet, like the pager, rather than push it. It was never hung off the
+sheet on a negative offset, and still is not: on a phone anything overhanging
+the sheet is scrolled off the top with no way to reach it.
 
 **The stage is two elements: a frame that never scrolls and a viewport that
 does.** Undo, the view toggles, the zoom and the pager were absolutely
@@ -1054,72 +1669,78 @@ changed a number the pad does not show was the worse of the two.
 
 **The nudge pad can be picked up.** It parks over the bottom-right corner of the
 page, which on a phone is exactly the corner of the card you reached for it to
-nudge. The second gesture goes on the middle button because the four arrows
-already use press-and-hold to repeat, and the pad is clamped to the stage — a
+nudge. The second gesture goes on the middle button: a tap cycles the step, a
+drag past a few pixels carries the pad (it was a hold, before holds became
+tooltips), and the pad is clamped to the stage — a
 control dragged off the edge of a phone is a control you do not get back.
 
 **Controls sit next to what they act on.** Undo and redo are a column at the
 page's top-left corner, with stacking order under them whenever anything is
-selected and the multi-selection tools under that; *+ Area* is at the top-right,
+selected and the multi-selection tools under that (on a phone only the six
+alignments; the count, group, lock and delete go under the top-right column,
+since ten buttons down the left were as tall as the page they sat over, and
+Duplicate stays in the area's menu); *+ Area* is at the top-right,
 the view toggles are along the bottom edge and the card pager sits under the
 sheet. The window toolbar holds only what is about the whole app. Tools that come
 and go with a selection belong on that rail rather than in the options bar, where
 they would shove every other control sideways each time a second box was picked
 up.
 
-**The view toggles stack on a phone rather than shrink.** *Grid* and *Bounds*
-side by side measure a fixed 124px of the bottom band, and the card pager is
-centred in that same band: at 390px the previous-card arrow already sat on top
-of *Bounds*, and at 320px it overlapped by 41px, so a press meant for one could
-land on the other. Below 520px — the same width the export screen calls narrow —
-the two labels become a column instead. The block keeps its `bottom`, so it
-grows upward into empty stage rather than sideways into the pager, which buys
-back roughly half the width: 15px of clearance at 320px and 50px at 390px, 10px
-at 320px with the widest counter a deck can show. Icons in place of the words
-were tried first and read as two anonymous chips; the words are what make the
-toggles guessable, and a column keeps them.
+**The grid is geometry, not a background.** Not `repeating-linear-gradient`s:
+a repeating gradient is rasterised once as a tile and then repeated, so the
+tile's period is rounded to whole device pixels and that rounding is multiplied
+by however many tiles fit. On a 5mm subgrid the period is fractional at nearly
+every scale, so lines land on the same pixel as their neighbour and vanish — and
+*which* lines vanish changes with the zoom. Measured at the periods the app
+uses, gradients painted 47 of 89 lines at 0.5 and 23 of 45 at 1.0. Every line is
+placed from its own millimetre and handed to one `<path>` per weight — two
+paths, whatever the page size, and no rounding between the measurement and the
+mark. The SVG sits outside the card's transform, so the hairline is in screen
+pixels and does not thicken with the zoom, the same bargain the trim line
+makes.
 
-**The grid is geometry, not a background.** It used to be four
-`repeating-linear-gradient`s. A repeating gradient is rasterised once as a tile
-and then repeated, so the tile's period is rounded to whole device pixels and
-that rounding is multiplied by however many tiles fit. On a 5mm subgrid the
-period is fractional at nearly every scale, so lines landed on the same pixel as
-their neighbour and vanished — and *which* lines vanished changed with the zoom,
-which is what "the grid does not show all its lines" looked like from the
-outside. A standalone check of the old rule at the periods the app actually used
-painted 47 of 89 lines at 0.5, 23 of 45 at 1.0, with gaps of two, three and four
-times the period. Every line is now placed from its own millimetre and handed to
-one `<path>` per weight — two paths, whatever the page size, and no rounding
-between the measurement and the mark. The SVG sits outside the card's transform,
-so the hairline is in screen pixels and does not thicken with the zoom, the same
-bargain the trim line makes.
+**Every grid mark sits on a device pixel.** A line between two device pixels is
+drawn as two at half strength, so the half-pixel hairline the grid used to be
+read as a grey smear, and a round dot under a pixel across as a faint blur —
+measured, the rules came out 243–248 on white at a ratio of 1, next to nothing.
+The viewBox now counts device pixels; where the SVG's corner falls inside a pixel
+is measured off `getBoundingClientRect` (the page is centred and scaled, so it
+can be anywhere) and every tick is snapped to the pixel it falls in: a rule is
+one device pixel down its middle, a dot a filled square of whole pixels, under
+`crispEdges`. Re-measured on a zoom, a resize, a scroll and a change of screen,
+and set only on a change, so drawing from the measurement cannot loop. The rules
+keep their strengths, which on one pixel rather than two reads darker than
+before. The dots are one size, about a CSS pixel, at 60% of the ink (#666 on
+white, or white at 60% on a dark paper): much lighter is too little ink in a dot
+to survive every screen, and full black — then 80% — was the heaviest thing on
+the card at a desktop's density. They were told apart by size once, a 2x2 at every 10mm, and that was
+four times the ink of the rest; on the dots the 10mm rhythm is given up, and the
+ruled grid is the one that carries it.
 
-**Press and hold the Grid box for a dot grid.** Same millimetres, same snapping,
-a dot at each intersection instead of a line across the card — quieter to lay
-type over. Dots are one path too: a zero-length subpath with a round cap is a
-dot, so an A3 page is one `d` string rather than five thousand circles. The
-gesture is `hold` on the label, so the click it swallows does not toggle the
-checkbox under it; the word beside the box changes to *Dots*, because a mode with
-no visible sign is a trap, and the hold turns the grid *on* if it was off — there
-is no answering "which way is it drawn" about something invisible.
+**The Grid box goes round three states: off, ruled, dots.** Same millimetres,
+same snapping, a dot at each intersection instead of a line across the card —
+quieter to lay type over. Dots are one path too: each filled square is a
+four-step subpath, so an A3 page is one `d` string rather than five thousand
+rectangles. It was a hold on the box until a hold came to mean "show me the
+tooltip"; a third state costs a press but no gesture nobody was taught. The
+word beside the box says *Dots* while dots are drawn, because a mode with no
+visible sign is a trap; the keyboard's grid key still toggles on and off.
 
 **A major line is drawn once.** Every major tick is also a minor one; drawing
 both would double the ink exactly where the grid must stay quietest, so the minor
-path has the major positions taken out of it. In dot mode that subtraction is of
-*intersections*, not of coordinates: a minor dot sitting on a major column is
-still a minor dot unless its row is major too.
+path has the major positions taken out of it. The dots, all one size, have no
+majors to take out: the minor ticks are every intersection.
 
-**The nudge pad is one cross, not five tiles.** It was five rounded rectangles
-with a gap between them, which read as five buttons that happened to be arranged
-in a plus. The grid is still 3 x 3; what changed is that the cells touch, share a
-ground, and carry a border only on the edges that are on the outside of the
-cross — twelve segments, each drawn once by the cell that owns it, with the four
-re-entrant corners where two of them meet at a point. The corner cells stay
-empty, so the card under them is still reachable. The edge facing the middle
-carries no border at all, so the arms run into the centre without a seam; the
-room that border used to take is given back as padding on the same edge,
-because a cell inset on three sides and not the fourth centres its glyph half a
-pixel off.
+**The nudge pad is one cross, not five tiles.** Five rounded rectangles with a
+gap between them read as five buttons that happen to be arranged in a plus. The
+grid is 3 x 3, and the cells touch, share a ground, and carry a border only on
+the edges that are on the outside of the cross — twelve segments, each drawn
+once by the cell that owns it, with the four re-entrant corners where two of
+them meet at a point. The corner cells stay empty, so the card under them is
+still reachable. The edge facing the middle carries no border at all, so the
+arms run into the centre without a seam; that border's room is given back as
+padding on the same edge, because a cell inset on three sides and not the
+fourth centres its glyph half a pixel off.
 
 **And the arrowheads are centred, which needed saying in numbers.** Carbon's
 carets are drawn with the triangle 1/32 of the viewBox towards the point they
@@ -1153,19 +1774,19 @@ arms meet. Flat, lit once by the bevel on the perimeter — which is the only
 place the light needs to be said, because that is where the shape turns.
 
 **The whole pad goes down at the pressed edge, and nothing changes colour.**
-Pressing a key used to swap that key's bevel and darken its face, which made it
-look redrawn rather than pushed — and five keys that each go down on their own
-read as five buttons that happen to touch. The pad now takes a perspective skew
-toward the key being held: the pressed edge is both lower and *further away*, so
-it shortens and the cross goes trapezoid rather than parallelogram. That is the
-difference between a thing pushed into the page and a thing sheared across it —
-a plain `skew` was tried and is a parallelogram, which reads as the shape being
-distorted rather than tipped. The perspective is short (220px) and the angle wide
-(14 degrees) because a cross 96 pixels across has to say this at a glance; a long
-perspective and a small angle read as a rendering artefact. The axis is the one
-the press tips it about: from the side, the vertical one. The middle goes
-straight down instead, because it is not a direction, and a pad being carried
-does not skew at all — skewed and moving at once reads as a bug in the drag.
+Swapping the pressed key's bevel and darkening its face makes it look redrawn
+rather than pushed — and five keys that each go down on their own read as five
+buttons that happen to touch. The pad takes a perspective skew toward the key
+being held: the pressed edge is both lower and *further away*, so it shortens
+and the cross goes trapezoid rather than parallelogram. That is the difference
+between a thing pushed into the page and a thing sheared across it — a plain
+`skew` is a parallelogram, which reads as the shape being distorted rather than
+tipped. The perspective is short (220px) and the angle wide (14 degrees) because
+a cross 96 pixels across has to say this at a glance; a long perspective and a
+small angle read as a rendering artefact. The axis is the one the press tips it
+about: from the side, the vertical one. The middle goes straight down instead,
+because it is not a direction, and a pad being carried does not skew at all —
+skewed and moving at once reads as a bug in the drag.
 
 **One shadow, thrown by the shape.** `filter: drop-shadow` on the pad rather
 than a `box-shadow` on each key, so the cross casts a single shadow and the
@@ -1181,12 +1802,13 @@ itself — which is the same reason every cell carries a transparent border on a
 four edges. On a touch screen this is the one control with no cursor to say it
 is a control, and a flat outline was doing nothing to say so.
 
-**A tied key is not disabled, it is refused.** The two vertical keys of the pad
-can do nothing for an anchored area, but `disabled` makes a button dead to the
-pointer — and the hold that walks the selection up the tie has to arrive
-somehow. So the press is refused in the handler instead, and the key keeps the
-pad's own face with only its mark faded: a fully faded key reads as a hole in
-the cross rather than as a direction this area cannot go.
+**A tied key moves the gap.** On an anchored area the pad's vertical keys
+change the Gap — what `nudgeBox` already does for the arrow keys on a keyboard —
+with the ordinary press-and-repeat, not a hold that walks up the tie or taps
+that break it, neither of which anybody would guess. They wear Carbon's
+stop-and-triangle turned to point along the key: the bar is the followed area's
+edge, so the mark says towards and away rather than up and down. Breaking a tie
+is the badge on the area's corner.
 
 **A pinch zooms the page, wherever it lands.** It briefly sized the type of the
 area under it instead, on the reasoning that the page has a zoom menu, a wheel
@@ -1198,9 +1820,9 @@ look and an edit. Type size is the Size field in the bar, and
 Ctrl/Cmd+Shift+scroll where there is a wheel.
 
 **The pinch listens in the capture phase.** An area swallows its own pointer
-events, so the bubbling listeners this used to have saw two fingers on the grey
-around the page and never saw them on the page itself — which on a card that has
-been laid out is most of what there is to pinch.
+events, so a bubbling listener sees two fingers on the grey around the page and
+never on the page itself — which on a card that has been laid out is most of
+what there is to pinch.
 
 **A run of taps on a tied key breaks the tie.** The hold walks the selection up
 to the area this one is following; the taps are the other way out, for when what
@@ -1236,6 +1858,170 @@ rounding of a few hundredths of a millimetre, from going through pixels and back
 
 ## `src/lib/components/DataTable.svelte`
 
+**A picture cell is a button.** A drawing has no field to focus, so it could
+not be chosen, and the bar under the table had nothing to say about it. Wrapped
+in a button it focuses like a text field, and the bar treats it as the cell
+being worked on: Draw where a text cell has Edit, and its weight (the base64
+decoded, `dataUrlBytes`) where a text cell has its count. A dot in the column's
+ink, through `parseColor` like every colour in a style, marks it, because a
+faint drawing at row height reads as an empty cell. The side shadows now show
+on a phone too: there the right-hand one is nearly always on, but it was the
+only sign the columns go on.
+
+**Reindex is `withoutOrder` with the lookups carried.** A sort reorders the
+rows but keeps their numbers, so that a lookup and the unsort both mean the
+order the table arrived in. Reindex is the way to say the sorted order is the
+real one now: it drops the saved order, which numbers the rows from where they
+stand, and goes through the same `renumbering` a move by hand does, so every
+`%%lookup:N:…%%` follows its row in the same undo step. It sits beside the
+Lock rather than among the row actions because it is about the whole table and
+how it prints; disabled with nothing sorted, since there would be nothing to
+change, and with the table locked, since a locked table's numbers are part of
+what it promised not to change. Icon only on a phone, like the row height.
+
+**The gutter is set in the cells' own line.** Each row's number and tick sit in a
+box exactly one line of cell text tall — 12px at 1.45, starting the same 5px
+down a field's padding does — so the number lands on the cells' first baseline
+and the tick, centred in that line, is middle-aligned with it. `--cell-line` is
+the one place that measurement lives; the row-height modes are counted in it.
+The header's tick is the exception: the header has no line of text to sit on,
+so its gutter is padded evenly and middle-aligned, level with the sort marks
+in the column heads.
+
+**The bar under the table reads from the table to the rows.** Lock, the
+table's name and its swap, then the row height — what the table is and how it
+is held — at the left; what you are doing to the rows you have chosen, or the
+cell you are in, at the far right after a rule, where it can come and go
+without moving anything else. The cell's count is the one thing in the bar
+that gives way, ellipsised before it pushes Edit off the end.
+
+**Getting Started never lands on the open table.** It pours the sample into a
+new table, or opens one that already holds it untouched (compared by columns
+and rows), so an edited copy is never overwritten and pressing it twice does
+not make two. The open table, undoable or not, is the wrong one to put them in
+most of the times it is pressed.
+
+**Moving rows drops the sort.** `moveRows` in table.ts moves the chosen rows
+as a block, each past its unchosen neighbour, holding at the ends. After a move
+the rows are in an order the table owns, so a sort still claiming to be on
+would be lying about it, and the numbers the rows wear go back to their places.
+
+**A resting cell does not scroll.** Its field is `overflow: hidden` until it
+has the focus, which is what took the scrollbar off every long cell: the [...]
+mark already says there is more. Not `scrollbar-width: none`, which is only
+newly Baseline; hiding the overflow is the old, universal way, and a wheel over
+a resting cell now scrolls the table, as it should.
+
+**The full-size editor leaves the bar.** It covers the rows and stops at the
+bar's measured height; the bar, while it is open, says which row it is at the
+left and the count at the right — where both sit in every other state — so the
+editor's own head is only the column's name and the ×. A Data Field area's
+edit badge opens it from the card, through an `openRequest` the page hands the
+table; only the request is tracked, so a dataset changing under an old request
+does not open the cell again.
+
+**A lock closes the full-size editor too.** Edit and the ellipsis open it (a
+press and hold did too, until holds became tooltips), and it is a way to type:
+on a locked table both are off. The ellipsis stays drawn, disabled, because it still says a cell holds
+more than it shows.
+
+**Overflow is measured, because a textarea cannot say it.** `text-overflow`
+works on one line of an ordinary box; a field of wrapped lines just stops at its
+edge, which looks exactly like a cell with nothing more in it. So each field is
+measured — taller inside than drawn — and its cell carries `data-more`, drawn
+as an ellipsis fading in from the left on the cell's own ground (`--cell-bg`,
+kept beside each background the cell can have). For the mark to sit on a line
+rather than across one, a capped field is a whole number of lines plus a sliver
+with no bottom padding, so what it cuts off is a line boundary and not the tops
+of the next line's letters.
+
+**Row height is a view, cycled on one button.** Short, medium, full: a view you
+flip through to find what suits the table, so three presses on one control
+rather than a menu, kept in the UI state beside the column widths. Short does
+not grow on focus, because a row that did would shove every row under it; full
+lifts the cap, and where there is no `field-sizing` an `autosize` action sets
+each field to its scroll height instead. That action, and the mark for a field cut
+short, measure through one queue: every field reads first and then every one
+writes, once a frame. A field measuring itself read and wrote in turn, and each
+write made the next field's read lay the table out again — once per cell.
+
+**The bar under the table is the picker and the lock.** Paste, Import and
+Export are errands done with a table, so they sit in its menu with New and
+Delete; what is left in the bar is what acts on chosen rows, the name of the
+table, and its lock — last, after the name it qualifies, the same reason the
+page bar keeps its Lock outside its menu.
+
+**A column name is a word you can write between `%%` marks.** Spaces become dashes
+and anything but letters, digits, `-` and `_` is dropped — on a typed rename, a
+new column, and every header a file or a paste brings in — because since
+`%%column%%` a header is also something written inside an area's words, and
+`%%Year (est.)%%` is not something anybody can be expected to get right twice.
+Letters are Unicode letters: a Greek header is as writable as an English one.
+Stored tables are not rewritten on load — that would silently break the
+mappings that name their columns — and `findColumn` reads an old spaced name
+through the same shaping, so nothing already working stops.
+
+**Columns are carried by a pointer gesture, not HTML drag and drop.** A drag
+that starts in a header's name field would, under native DnD, either never start
+(the field wants the press) or take the text selection with it; and native DnD
+has no touch path. So the header claims the *movement*, as the tray grip does:
+a press that stays put is the field or a button, a press that travels sideways
+is the column being carried, and the click that follows a carry is swallowed.
+The tray grip claims vertical movement and this horizontal, and whichever moved
+first keeps the gesture.
+
+**The lock is the table's, and the card honours it.** `Dataset.locked` travels
+with the table and its snapshots. The card writes into cells three ways — typing
+in an area, dropping a picture, finishing a drawing — and each goes through
+`refuseLockedTable` on the page, because a lock that only the table's own fields
+respected would be a fence with three gaps in it. Sorting is locked too: it
+changes no card's words, but row order is print order, and a lock that still
+lets the run be reordered is not a lock anybody can rely on before printing.
+
+**A finger lifts a column before it carries it.** The header claims touches
+(`touch-action: none`) so a column can be carried at all, which took the
+browser's own sideways pan with it — and every sideways swipe on a header
+became a reorder. Now a touch has to hold still for 350ms, with a buzz, before
+it carries; a swipe before that scrolls the table by hand. A mouse still
+carries at once: nobody scrolls by dragging a header with one.
+
+**The cell editor edits the cell, not a copy.** It writes through like the
+small field — Cancel and Done over a draft would make it the one place in the
+table where typing does not show on the card until confirmed — undo covers it
+the same way, and closing is all there is to do: an × and Esc. While the small
+field has the focus, the bar under the table is about that cell: its count, off
+the words rather than over them, and the Edit button that opens it whole.
+
+**A cell opened whole takes the table's room, not the screen's.** It was a
+modal over everything, the third layer after the page and the table, and it
+hid the card whose words were being edited. Laid over the table inside its own
+section, it has exactly the room the table had and leaves the card in view — so
+the flash below, and the card itself, can be watched while typing.
+
+**Entering a cell flashes what it feeds.** The same short blue flash a rescued
+area gets, on every area bound to the cell's column or naming it as
+`%%column%%`: a pointer from the cell to the card, not a selection, so it
+changes nothing about what is selected.
+
+**The overflow mark is a button.** It opens the full-size editor. It hides while the
+field is focused through `:has(textarea:focus)` rather than `:focus-within`,
+which the mark itself sets the instant it is pressed — hiding it before its own
+click could land.
+
+**The cell field fills its cell with `height: 1px` on the `td` — where
+`field-sizing` exists.** A percentage height inside a table cell resolves only
+against a definite height; the table stretches every cell to the row anyway, so
+the 1px is never drawn, and without it the field stopped short of its cell. But
+that trick is only safe where the fields' own content sets the row's height.
+Applied everywhere, a browser without `field-sizing` (Safari, so every iPhone)
+resolved the 100% against the declared 1px and collapsed the field to its own
+padding, text cut off inside it. So it is inside `@supports (field-sizing:
+content)`, and elsewhere a field is a fixed three lines that scroll — the
+fallback AGENTS.md already names. The field is `display: block` in both, since
+an inline one sits on a baseline with a descender's gap of cell under it. With
+the field the full height, its resize grip had nothing to do except make one
+cell disagree with its row, so it is gone.
+
 **The first column brings a row with it.** The button that adds a row is drawn
 under the row numbers, which only exist once there is a column — so a table with
 nothing in it had exactly one `+`, in the header, and pressing it left you with
@@ -1266,20 +2052,20 @@ to name the columns of a blank table, and appending nothing takes nothing away;
 only replacing rows that exist with none of them is refused. That line is where
 the unit tests sit, because it is the part that will be got wrong again.
 
-**Copy is Paste's opposite number, and it writes tabs.** The tray could take a
-block of cells off a spreadsheet and could write a CSV file, and had no way to
-put cells *back* on the clipboard — so getting forty edited rows into a sheet
-meant a download and an import. Tab-separated rather than comma-separated
+**Copy is Paste's opposite number, and it writes tabs.** Without it, the tray
+takes a block of cells off a spreadsheet but has no way to put them *back* on
+the clipboard — getting forty edited rows into a sheet would mean a download
+and an import. Tab-separated rather than comma-separated
 because that is what a spreadsheet reads off a clipboard: a TSV paste lands in
 cells, a CSV paste arrives as one long column and needs a text-import dialog to
 undo. The header goes with it, so the paste lands under column names. A refused
-clipboard says so and points at Export CSV rather than falling back to the old
+clipboard says so and points at Export CSV rather than falling back to the
 `execCommand` path, which needs a visible selection and a hidden textarea to
 have one.
 
-**It is a row action, not a table action.** It first sat beside Paste and copied
-the whole table when nothing was chosen, which made it the one button in the bar
-whose subject changed underneath you. It is now in the chosen-rows group with
+**It is a row action, not a table action.** Beside Paste, copying the whole
+table when nothing is chosen, it would be the one button in the bar whose
+subject changes underneath you. It is in the chosen-rows group with
 Duplicate and Delete, where "these ones" means the same thing for all three, and
 the tri-state tick in the header's corner says *all of them* in one press —
 a clearer way to ask for the whole table than a button that quietly reinterprets
@@ -1322,15 +2108,97 @@ the seam was along its top.
 
 **The sample rows are the tour.** A first run lands on four cards that explain
 the app rather than on invented filler, because they are the first thing anyone
-sees and they are rendered by the very machinery they describe: a row is a card,
-a column is a field, the Markdown subset is on the page in front of you. Card 2
-leaves its `link` cell empty on purpose, so its QR disappears and the card can
-point at the gap — one row teaching `hideWhenEmpty` by not having it. They stay
-inside what `markdown.ts` actually supports, and the QR URLs are decoded by an
-independent decoder in the verification pass, because a QR that does not scan
-looks exactly like one that does.
+sees and they are rendered by the very machinery they describe. Each card is one
+subject — the row, the cell, the design, the way out — and says what to *do*,
+not what the interface looks like: anything a click finds unaided is left for
+the click. The voice is conversational on purpose; a tour that reads like a
+manual gets skimmed like one.
 
-**Press and hold Import to bring them back.** The actions bar is deliberately one
+The rows carry the features by being them rather than describing them. Card 2
+leaves its `link` empty so its QR disappears, and is the only row with an
+`accent` — a Color area bound to a column — so color, inline and per area, is
+one page's subject instead of decoration on all four. Card 3 is the only row
+with a `sketch`, a 64 x 64 Bitmap drawing stored in the cell, shown in an area
+that is rotated, padded and hand-bordered: the styles are on the page to be
+selected and read back. The starter template has facing pages on, so the four
+rows are exactly one 2-up zine, and card 4 says how to fold it; the kicker, title,
+subtitle and sticker opt out of the mirror so a left-hand page does not push its
+title to the right.
+
+The template also carries what a row cannot: two areas of its own text in the
+footer — `%%link%%`, which empties and so hides on a row with no link, beside
+the QR that hides with it, and `%%today:YYYY-MM-DD%%` — and a paragraph indent
+on the body. The band, the QR and the page number follow the fold to the outer
+edge; the link and date follow with them, set right-aligned against the code so
+that the mirror, which flips alignment too, sets them left-aligned against it on
+a left-hand page rather than stranded mid-page. Card 2 shows `%%title%%` filled in inside a cell and `%%column%%`
+left as written, which is the literal form for free — no column is called
+`column`, and an unrecognised name is never eaten. A date cannot be shown that
+way, since `%%today…%%` is always replaced, so the card points at the footer
+instead of spelling it out.
+
+Four families, each with a job, as a book would set them: Fraunces for titles
+and, through the template's own CSS, the headings inside the body; Ysabeau
+Office, a humanist sans at weight 300, for the subtitle, so it reads as a quiet
+second voice rather than a smaller title; Instrument Sans for the body; and IBM
+Plex Mono for every small line — the kicker, the link, the date, the page
+number and `code` in the body. No hand face: the drawn sticker is personality
+enough, and a fifth voice is one too many. Ysabeau Office because it is
+variable across the whole weight range, which is the one request `fonts.ts`
+tries first — a static humanist family (Alegreya Sans, Fira Sans) would arrive
+with 400 and 700 only, and the light cut would silently be regular.
+
+Off the page's outer edge sits a post-it, bound to a `notes` column: an area
+on the pasteboard never prints, so it is the place for a note to yourself. Set
+in Patrick Hand — the one hand face left, on the one thing written by hand —
+with a `box-shadow` curl and a glue strip from `::after` in the CSS, locked so
+the rescue button leaves it where it is (see `boxops.ts`). In both darks it
+keeps its daylight colours rather than going dark: dark turns the page back
+by itself, and under `.theme-dark-page` the note is turned back as a whole,
+with `filter: none !important` on its `.surface`, which app.css had already
+turned back and a second turn would invert again.
+
+It prints as card 4 says to: two to an A4 sheet, in a zine's order, so
+Export opens on the booklet rather than on four loose pages — hence the name.
+The accent band on card 2, every title and the stamp's field share one
+printer's red, `#d0362b` — a warm, slightly orange red, the kind a press
+carries as a second ink; it was a sage green. The title sets it in its own area,
+where the bar shows it and a color field changes it, and takes its text color
+from the `accent` column too, so on card 2 the band and the title answer to the
+same cell: typing `orange` there, which is that card's lesson, changes both. On
+the other cards the cell is empty and the title keeps its own red. The stamp's
+field takes it from `--accent-color` in the template's CSS, reached through its
+`.surface`, inset to the padding. Titles and body headings both at weight 200:
+with one ink, Fraunces' hairline cuts are the whole of the color there is.
+
+The rest is chosen to show one of each thing the tour mentions, without a
+paragraph of its own: the kicker is a per-edge border (a hairline under it)
+with uppercase and tracking; the drawing is a stamp, hand-perforated, with a
+`drop-shadow()` from the template's CSS that follows the holes; the accent band multiplies rather than covers;
+the body's list uses the em dash marker; card 2 runs a `==highlighter==` over a
+word and draws a `---` rule, which the body sets as a pale hairline; the CSS box is not empty, so opening it
+shows what a template's stylesheet can reach (`#body h2`, `.page-number`).
+The page number is the one small line with no area of its own, so the CSS sets
+it with `!important` over the inline style it takes from the page defaults.
+
+**A5 Starter Booklet in the template menu, beside Reset.** The table has had Getting
+Started since there was more than one table; the template had only Reset, which
+puts the starter over whatever is open. A5 Starter Booklet is the non-destructive twin:
+it opens a copy of the starter nobody has changed if the library has one, and
+otherwise adds a fresh one. "Nobody has changed" ignores the name and the
+padlock (`isStarterTemplate`) — a first run lands on it locked — and nothing
+else, so a copy with one area nudged is theirs and is never handed back as the
+original. Like Getting Started, the lock does not disable it.
+
+They stay inside what `markdown.ts` actually supports, and the QR URLs are
+decoded by an independent decoder in the verification pass, because a QR that
+does not scan looks exactly like one that does. Every card is checked to end
+above its footer in the real faces, since the body grows and a growing box
+never shows the shears.
+
+**Press and hold Import to bring them back** (since replaced by *Getting
+Started* in the Table menu — kept as the reason the samples are one step
+away). The actions bar is deliberately one
 line, so a fifth button would cost the table a row of its own height every time
 the tray narrowed; the gesture hangs off the button whose job is closest. A held
 mouse button and a held finger are the same pointer events, so there is no
@@ -1365,15 +2233,14 @@ it safe against anything that forgets.
 **Chosen and previewed are two different things**, and usually the same row. The
 previewed row is the card on the page; the chosen set is what duplicate and
 delete act on. Clicking anywhere on a row that is not the text does both, because
-a row is a card and picking one is the commonest act in here — it used to be a
-20px tick in the gutter. The tick now builds a set *without* moving the preview
-off the card you are looking at, and the chosen marker is on the gutter alone so
-a large selection does not repaint half the table.
+a row is a card and picking one is the commonest act in here — too common for a
+20px tick. The tick in the gutter builds a set *without* moving the preview off
+the card you are looking at, and the chosen marker is on the gutter alone so a
+large selection does not repaint half the table.
 
 **Sorting is three states on one control.** A-Z, Z-A, and back to the order the
-rows arrived in. Unsorting used to be a separate button in the row-number gutter,
-which is two controls for one question with the way out a long way from the way
-in.
+rows arrived in. A separate unsort button would be two controls for one
+question, with the way out a long way from the way in.
 
 **A paste is a block of cells; a file is a table.** Insisting on a header row
 meant copying cells out of a sheet and pasting them here quietly ate the first
@@ -1430,9 +2297,9 @@ undo.
 and put on another — the style clipboard, which never leaves the app.
 `copy-to-clipboard` is rows leaving for a spreadsheet, and the glyph says so: a
 clipboard with something coming out of it. `replicate` is "make another one
-right here". They were one mark until two of them landed in the same menu, and
-the word beside the row action is now just **Copy**, because the picture
-carries the rest. The tray's **Paste** wears `task-add` rather than a document
+right here". Two of them share a menu, so they cannot share a mark, and the
+word beside the row action is just **Copy**, because the picture carries the
+rest. The tray's **Paste** wears `task-add` rather than a document
 leaving a clipboard: it is a block of cells arriving from a spreadsheet, not the
 style clipboard's paste.
 
@@ -1470,6 +2337,58 @@ anchored to. It stays a child of the field in the DOM — that is what lets the
 dismissal be a containment check rather than a full-screen backdrop — and opens
 upwards, because the row is at the bottom of the tray.
 
+**A finger does not type in a cell; it chooses it.** Every cell is a
+textarea, so a tap focused one and the keyboard came up over half a phone's
+screen — for a tap that was usually choosing a row, or a scroll that
+started on a cell. A cell a finger presses is read-only (`byFinger`, read on
+the table's capturing pointerdown, which comes before focus), so a tap
+chooses it, Edit appears, and nothing else moves; a second tap on the chosen
+cell or a long press (`touchOpen` in gestures.ts) opens the cell full size,
+where typing is what was asked for. Per press, not per device: a laptop with
+a touch screen still types in place under its mouse.
+
+A second tap, not a double tap: it counts however long after the first it
+comes, since a person reads the cell they chose before deciding to type, and
+the 350ms of a double tap asked them to decide first. A quick double tap is
+the same thing faster, and still how a picture cell's button opens on iOS,
+where a tap does not focus a button.
+
+**The caret goes where the opening press was, measured.** A read-only cell
+has no caret to read, and no browser says where a point falls inside a form
+control's text, so `caretAt` lays a hidden copy of the cell over it — same
+box, type and wrapping — and measures its characters, stopping at the first
+line below the point: a small cell shows a few lines, so that is a few
+hundred characters at most. It was `inputmode="none"` for a while instead,
+which kept the keyboard down and let the browser place the caret exactly —
+but a caret a person places is one Android puts its own Paste bubble on, on
+the first tap, and nothing on a page can turn that off. The measuring is an
+imitation of the browser's layout, so right-to-left text may land a
+character off.
+
+**The browser never handles a finger's tap on a cell.** Read-only was not
+enough: a tap the browser handles on a text field still puts its caret
+there, and Android reads a second tap near that caret as a tap on it and
+offers Paste. So `touchOpen` cancels every tap's `touchend` on a cell —
+which stops the browser's focus, mouse events and click for that tap — and
+focuses the cell itself; a focus from a script draws no handles, and the
+finger's cell hides its caret (`caret-color: transparent`). So that a tap
+still shows where it landed, the page draws a caret of its own there
+(`caretPlace`, the same measuring the opening press uses, which also gives
+the edge it sits against), and Edit opens at it. A scroll that
+started on a cell is not a tap, is never cancelled, and scrolls as before.
+
+**The gesture is listened for on the table, not on each cell.** `touchOpen`
+takes a `find` that names the cell a press landed in (`data-opens`, with the
+row and column beside it), so a table of a few hundred rows has six
+listeners for it, not six on each of its thousands of cells, and a mouse
+press stops at the first check. The lift that opens a cell is cancelled at
+`touchend`, or its click lands on the editor just opened and selects a word;
+a long press also swallows Android's context menu, and the finger's cell
+turns off text selection so a hold raises no handles. The cost: a quick fix
+to one cell on a phone is two taps and a close, where it was one tap; and the
+long press that opens a cell is the one that would otherwise show a tip,
+which a cell has none of.
+
 ## Pull-to-refresh
 
 **A reload is the one accident this app cannot absorb, so the browser is not
@@ -1506,12 +2425,16 @@ what says which of the two you are looking at without reading the counter.
 Still dark and still desaturated, because what sits on it is being judged for
 print.
 
-**No drag guard, because there is no drag.** `Lightbox` tracks pointer
-movement so that turning the card and releasing over the ground does not also
-put it away; here a swipe is the only gesture, and Chromium suppresses the
-click after a touch that travels past tap-slop, so the backdrop's close and
-the swipe cannot fire together. Driven and confirmed in a real browser rather
-than assumed.
+**Every zoom is the sheet's.** A pinch, Ctrl + wheel and Ctrl +/− would
+otherwise have reached `textsize.ts` and grown the counter, which is the one
+thing on this screen nobody wants larger. The screen is `data-own-pinch`; the
+wheel is a non-passive listener that cancels it, and the keys are taken on
+the window in the capture phase, because the page's own key handler is on the
+same window and was mounted first. The zoom is `scale` and `translate` on the
+stage about its centre, as in `Lightbox`, so the fit-to-window scale is left
+alone and the paper under the pointer stays there. With a zoom there is a
+drag again — to move about the sheet — so the backdrop's close is guarded the
+way `Lightbox`'s is, and a swipe only pages while the sheet is at rest.
 
 ## `src/lib/components/Lightbox.svelte`
 
@@ -1659,8 +2582,11 @@ the orientation, so picking A4 under Auto keeps the sheet the way it is sitting.
 places — `PageOptions.svelte`, where every other page-level setting lives,
 and `PrintPreview.svelte`, so a sheet size or count picked wrong does not
 send you back to the editor before you can print. Both pass the same
-`template`/`ontemplatechange` shape the rest of the page-setup bar uses; the
+`template`/`ontemplatechange` shape the rest of the page bar uses; the
 panel itself does not know or care which screen it is in.
+
+**Its groups are fieldsets, with their names showing on both screens**, Bleed
+and Printing — the same as every other group in the page bar.
 
 **A `<select>`'s `value=` binding loses a selection that is not the first
 option, on a fresh mount.** The browser applies `<select>.value` against
@@ -1744,9 +2670,7 @@ identical component — same props, same DOM — inside a scaled thumbnail for
 the Sheet Preview, and again as the element a PNG export of a sheet reads.
 Nothing about layout, background or card scaling is duplicated or
 approximated for the preview, so there is no way for the preview to promise
-something the print or the export does not deliver. It was pulled out of
-`PrintRoot.svelte`, which used to inline this per-sheet markup directly —
-splitting it was what let the preview reuse it at all.
+something the print or the export does not deliver.
 
 **The sheet's bleed is padding too.** The block is centred with padding,
 deliberately — a top margin on the first child collapses out of the sheet and
@@ -1755,20 +2679,72 @@ paper: the cards keep their places and the sheet grows around them.
 
 ## `src/lib/components/PrintPreview.svelte`
 
+**A thumbnail is filled in as it comes near.** Each one is a whole card behind a
+transform, and five hundred rows made a thousand of them, pages and sheets, all
+laid out before the screen could open. The buttons are sized from the template
+and not from what is inside them, so a card arriving later moves nothing. An
+`IntersectionObserver` fills in the ones within a screen of view and a few on
+either side of each, the count being for a phone's sideways strip, which clips
+at its own edge where a margin on the viewport does not reach. A card once in
+stays. Export to PNG reads these cards, so it fills in the rest first and waits
+two frames for their words to be measured.
+
+**Output turns what goes out, not the template.** Portrait or Landscape is
+for the tray that takes paper one way round, or a PNG wanted sideways — a
+fact about this printer, so it is kept in this browser (`turn.ts`, beside the
+theme) and a template handed on does not arrive turned. It sits before the
+lock because the lock freezes the template's settings and this is not one.
+Auto, the default, turns nothing and so follows the page settings — the
+page's own shape, or the sheet as Print Settings' Orientation tiled it — and
+Portrait or Landscape turns a quarter only when the output is not that way
+already, so picking the way it is costs nothing. Not a second sheet
+orientation: that one re-tiles, this one only turns what was tiled. The PNG is drawn turned onto its canvas
+(`elementToPng`'s `turn`), one encode. Print lays each sheet, as PrintSheet
+draws it, on a paper the other way round and rotates it there — no second
+layout. The paper is `contain: strict` as well as clipped: clipping alone
+hid the turned sheet's overflow, but Chrome's print still counted it and
+shrank every page to 70%. The page break moved from the sheet to the paper
+for the same reason it had to: the sheet is now its paper's only child, and
+its last-child exception would have cancelled every break. The previews do
+not turn: they show the design, and a sideways thumbnail of every page is
+harder to check than a label saying what the files will be.
+
+**The settings strip carries the lock, and on a phone is one line.** The print
+settings are the template's, greyed out on a locked design, so the design's
+lock sits at the head of the strip, as in the page bar: unlocking no longer
+means leaving the preview. On a phone the shared bar styles stack every group
+on a line of its own, a dozen rows between the two previews; here they are one
+row that scrolls sideways, each group whole and ruled off at its side.
+
+**A page's side of the fold is its number's, ticked or not.** For a while a page
+left out turned every page after it over — page 3 printed after page 1 became a
+verso — so the run kept alternating. Taken back: leaving a page out of one
+print is not a request to re-impose the booklet, and whoever wants that
+deletes or moves the row, which renumbers the run. The caption's R or V is the
+number's side.
+
+**Spreads are the numbers' pairs.** With facing pages the thumbnails are
+grouped into spreads, page 1 alone with an empty page-width to its left, then
+2 and 3, 4 and 5, so a pair never wraps across two rows. The grid becomes a
+wrapping flex row there, since a pair is two pages wide. The fold is a
+dot-dash line out in the gap on each printing page's bound side, not a narrower
+gap: a narrower gap was tried, and pages that close read as cramped rather than
+bound. A verso and the recto after it, both printing, would draw their lines on
+the same spot, so the verso draws it for both.
+
 **One door to the printer.** Print opens the preview; the preview prints. The
 page selection lives there, keyed by row index and reset every time it opens —
 sorting or deleting a row moves those indices, and a stale exclusion would drop a
 different card than the one that was unticked.
 
-**Two rows, each with one item at either end.** The header carried a 14px
-title, two 28px buttons and a close in one row, and no vertical alignment
-reads as deliberate between things that different in height — it looks like a
-mistake rather than a choice. The name of the screen and the way out take the
-first row; what is going and what to do with it take the second. Nothing sits
-in the middle of either, so `justify-content: space-between` is the whole
-layout, the two right-hand ends line up with each other down the edge, and no
-width needs a rule of its own: PNG and Print no longer have to be positioned
-out of the flow to stay put, because there is nothing left in the flow to
+**Two rows, each with one item at either end.** A 14px title, two 28px buttons
+and a close in one row have no vertical alignment that reads as deliberate —
+things that different in height look like a mistake rather than a choice. The
+name of the screen and the way out take the first row; what is going and what to
+do with it take the second. Nothing sits in the middle of either, so
+`justify-content: space-between` is the whole layout, the two right-hand ends
+line up with each other down the edge, and no width needs a rule of its own: PNG
+and Print need no positioning out of the flow, because nothing in the flow can
 shove them.
 
 **The count in the title *is* the select-all control.** There were two buttons
@@ -1815,11 +2791,11 @@ than the preview showing a grouping the print will not match.
 
 **Print Settings sits between the two grids.** It is what turns the pages
 above it into the sheets below it, so standing there it separates them and the
-sheets need no heading of its own — which is why they no longer have one. It
-runs edge to edge, like the toolbar it is: its own padding is the inset, and a
-second one around it only made the strip look narrower than the grids it
-divides. The checklist stays at the bottom: that one is about the browser's
-print dialog, which is the last thing that happens.
+sheets need no heading of their own. It runs edge to edge, like the toolbar it
+is: its own padding is the inset, and a second one around it only made the
+strip look narrower than the grids it divides. The checklist stays at the
+bottom: that one is about the browser's print dialog, which is the last thing
+that happens.
 
 **The title counts pages and sheets.** *Export — 4 pages / 2 sheets*, so how
 many sheets a run comes to is answered before scrolling to them. It replaced a
@@ -1847,7 +2823,38 @@ was asked for — a PNG of the *sheet* is, so the export switches to reading
 `stem-sheet_N.png` rather than `stem_N.png` so the two exports are never
 confused for each other in a directory listing.
 
+## `src/lib/changelog.ts` and `CHANGELOG.md`
+
+**The changelog is for the person using the app; git is the history.** One
+section per minor, in a user's words, headed by the last version that minor
+shipped as — the early numbering was reset twice, and the backfill follows the
+numbers that stuck. It does not repeat commit messages, and this file does not
+repeat it: a decision is written here as it stands now, and how it came to be is
+in the commits that made it.
+
+**The top heading is the version being shipped** (gate 10), so a patch rewrites
+its minor's heading rather than adding a section. Stricter than one entry per
+minor, and just as simple to check.
+
+**Parsed, not rendered.** An entry is plain text with `code` spans, split into
+runs the page prints as text. Rendering it through `markdown.ts` would need a
+fourth file allowed raw markup, for a document we write ourselves.
+
+**After an update the list opens by itself, once.** A dot on the version
+asking to be pressed was easy to miss, and what changed is most worth reading
+the first time the new version is open. A first run marks the current version
+read — the starter card is the introduction — and a returning visitor who has
+never opened the list has news. Opening it, by hand or at start, marks this
+version read, so it does not open again.
+
 ## `src/lib/sw-policy.ts` and `src/service-worker.ts`
+
+**A tab come back to looks for an update.** The browser checks for a new worker
+only when the page loads, and an app left open in a tab can go days without
+one. Coming back to the tab after ten minutes or more (`dueForUpdateCheck`)
+calls `registration.update()`; what it finds is announced in the status bar
+like any update and waits for Reload. Ten minutes so that glancing away and
+back is not a request every time.
 
 **The worker only ever touches same-origin GETs.** `sw-policy.ts` decides, and it
 passes everything cross-origin straight through: the app promises to fetch
@@ -1889,6 +2896,89 @@ address is fetched once per card however many areas share it.
 
 ## `src/lib/fonts.ts`
 
+**System faces are offered, and never fetched.** Arial, Georgia, Times New
+Roman, Courier New, Consolas and Verdana (`SYSTEM_FONTS`) are on nearly every
+computer, so a menu offers them beside Google's, under their own heading.
+`ensureGoogleFont` refuses them — the one door every Google request goes
+through, so no caller can forget — since Google would answer for a different
+face of the same name, or not at all, and the app makes no request nobody
+needed. `fontRef` gives a chosen family its source, and a system one is not
+declared in the template's fonts, as `replaceFamily` already left it out.
+The Pictures tray lists the ones in use — the list is every face the design
+is set in, each replaceable — with Upload off: a file under a system face's
+name would only shadow it in one browser. The
+cost: a design moved to a computer without the face falls back silently,
+the way any web page does, where an upload would be marked missing.
+
+**A face falls back to its own kind.** A card's `font-family` is the face,
+then a stack of its kind (`FALLBACKS` by `kindOf`): a serif after a serif, a
+monospace after a monospace, so a design opened without its upload or its
+system face keeps its texture and a price list its columns. The app knows the
+kinds of the faces it offers (`KNOWN_KINDS`); an upload is read once, as it
+arrives (`fontKindOf`), from what its own tables say — `post.isFixedPitch`,
+PANOSE, the OS/2 IBM family class — and the kind is kept on the template's
+font entry so it travels with the design. WOFF is zlib, which
+`DecompressionStream` reads; WOFF2 is Brotli, which a page cannot decompress,
+so it, and a file that says nothing, stays sans-serif. A file can say nothing,
+or say it wrongly, so the tray's **Type** can choose one (`fallback`, over
+`kind`); Auto is the detected kind, shown in brackets beside the word. Measuring the face on
+a canvas could tell a monospace but not a serif from a sans; the tables say
+both, for the files that have them.
+
+**X-height is `font-size-adjust`, taken knowingly.** It is *Newly*
+available (2024), not *Widely*; asked for, and its failure is the right one:
+a browser without it ignores the declaration and draws the face at its own
+x-height, as before there was a setting. A scale on the size would be an
+imitation: the size and every em in the area would move, and a list or heading
+with its own leading would open up. `font-size-adjust` leaves the size alone,
+so the leading and everything measured in em stay as set — and it brings a
+fallback standing in for a missing face to the same x-height, which no scale
+could. The value is the lowercase as a fraction of the size (`Box.xHeight`,
+0.2 to 1); blank is the face's own, measured on a canvas once the face has
+loaded (`naturalXHeight`) and shown as the field's placeholder.
+
+**X-Height is an area's, and only beside the page's size.** It went round:
+per face in the page and area bars, then per face in the Pictures tray with
+size, spacing and leading beside it, applied on top of whatever the page and
+the areas set. Settings that change type from somewhere other than the bar
+the type is set in did not make sense to use, so the tray kept only Type, and
+X-Height came back to the area bar as the area's. It is enabled only while the
+area takes the page's size: a size of its own is already the area's answer
+to how big its words are, and two answers to one question is how a card ends
+up looking wrong with neither field showing why. Typing a Size clears it, and
+`newBox` drops one beside a size, so the rule holds for a pasted style or a
+template from elsewhere too. The tray's per-face tuning was never on main;
+its keys on a font entry are dropped on load.
+
+**Font menus are grouped by source, local first.** Local files, then Google
+Fonts, then System (`fontChoices`, drawn by `familyItems`): the faces
+somebody went to the trouble of bringing come first. The design's own
+families were the first run before; now they are found in their source's
+run, each name in its own face.
+
+**A template names only the families it is set in.** Every family in a template
+is a request the next browser makes, and for an uploaded face a banner asking
+for a file nobody on the card uses. `pruneFonts` runs on every template change
+in the page, in the same tick as the change that made a family unused, so the
+cut lands in the same undo entry and what is saved, undone and exported is
+always the same list. What is cut goes to the editor's own list in
+localStorage, so it stays in the menus under the rule — a family is a thing this
+browser knows, not a thing this card needs.
+
+**Which request answered is remembered.** Walking all-weights, then
+regular-and-bold, then bare cost a single-cut family two refused requests on
+every visit. The index that loaded is kept per family in localStorage and tried
+first; if it is refused now, the walk restarts once from the richest, and a
+family nothing answers for is forgotten.
+
+**The weight menu reads the faces.** Google refuses a css2 request for a weight
+a family lacks, so asking for every weight, then regular and bold, then the
+family bare, leaves `document.fonts` holding exactly the cuts that exist; the
+menu lists those. The cost is up to two refused requests for a family with one
+cut, which is the price of not shipping a metadata table that would rot. A
+family nothing has declared (a system face) gets the old fixed list rather than
+nothing.
+
 **A font is asked for when it is chosen, not when the app starts.** Requesting a
 family only at boot and on import meant choosing one from a dropdown wrote the
 name into the template and stopped there: nothing fetched the face, the box fell
@@ -1905,7 +2995,41 @@ attribute without passing a chokepoint. A name that does not look like one is
 refused outright rather than cleaned, because a half-cleaned name is a family
 nobody asked for.
 
+**The Fonts list in the Pictures tray is for a design that changed computers.**
+A template names its fonts and the bytes stay behind, so a design opened
+elsewhere is set in a fallback without saying which face it wanted. The list
+says which fonts are **local** — a file in this browser — and which are
+**missing**; a Google family is neither, since it arrives by itself, and
+tagging every one would bury the two that need a person. Every font gets
+Upload…, because a file installed under a family's name replaces whatever
+supplied it (a Google link, an older upload), so it is also how a Google family
+is made local. Replace… is only on fonts the design uses — renaming an unused
+one changes nothing — and an unused local file gets Delete instead, asking
+first, because another template in the library may still be set in it.
+
 ## `src/lib/assets.ts` and `src/lib/fonts.ts`
+
+**The Pictures tray uploads, and carries by pointer.** Without the folder —
+Firefox, Safari, every phone — the only way in was dropping a file on an area,
+which a phone cannot do. So the tray has an Upload that writes where every
+picture is written. It and the folder are on the Images section's head, at
+its far end, not in a bar at the tray's foot: they are the images' alone — a
+drawing is made in the table, a font comes in on its own row — and a bar
+under three sections read as everyone's. A stored picture reaches an area by
+being dragged out of the tray with pointer events rather than HTML drag and drop, which a touchscreen
+does not have; where it is let go, `elementFromPoint` and the card's
+`data-box-id` say which area, and the page places it by the same rule as a
+dropped file. Pixel sizes are read off the thumbnails as they load rather than
+stored, since the bytes are what is kept and they already say it.
+
+**Deleting a picture asks; a missing one is listed.** Undo is snapshots of the
+template, the table and the mapping — the bytes of a picture are in neither, so
+a deleted one cannot be brought back by it, and a destructive step nothing can
+undo gets a dialog. A name the rows or the page point at with no bytes behind it
+is a line in the Images list, where the fix is, not a status notice that says
+what is wrong and goes away: **Find…** stores the chosen file under the
+referenced name (`storeLocalImage`'s `as`), so nothing that points at it has to
+change.
 
 **Big things are referenced, never embedded.** A template names a font family and
 a background image; the bytes live in IndexedDB, keyed by that name, and a file
@@ -1925,12 +3049,12 @@ a *name*, and the bytes under it sit in the same store as the backgrounds — an
 image is an image, and one uploaded as a background can be put in a row without
 uploading it twice.
 
-**An address has to say what it is.** `safeImageUrl` used to parse against the
-page's own location, so `paper.jpg` became `https://this-app/paper.jpg` and was
-duly fetched — and *every* string in an image-bound cell is a relative address,
-so a column of prose in an image area was a column of requests to the app. It is
-parsed with no base now: an address that does not name http or https is not an
-address.
+**An address has to say what it is.** `safeImageUrl` parses with no base.
+Against the page's own location, `paper.jpg` would become
+`https://this-app/paper.jpg` and be fetched — and *every* string in an
+image-bound cell is a relative address, so a column of prose in an image area
+would be a column of requests to the app. An address that does not name http or
+https is not an address.
 
 **The prefix is load-bearing.** A bare `sketch.png` in a cell is
 indistinguishable from a relative URL, and a relative URL resolves against the
@@ -1973,7 +3097,278 @@ trap.
 in a cell full of words must not send the whole run back to IndexedDB. A run of
 forty cards sharing one logo reads it once and holds one object URL for it.
 
+## Bitmap and Image are one mode
+
+A drawing made here and a picture brought from somewhere were two modes and two
+Content types, and they were the same thing with two ways in: the renderer
+already decided what to draw by what the value is — a data URL, an address, a
+stored name — and drew a drawing in an image area, hard-edged, without being
+told. Keeping them apart bought two bugs. Image areas took a drawing (the
+double-click and the pen counted both), so Image looked like Bitmap; and a
+switch between them kept one of `static.dataUrl` and `static.url` and dropped
+the other, so a drawing vanished on the way through Image and back. Now there
+is `image`, `newBox` reads `bitmap` as it, the bar offers the Source field and
+Draw… together, and the last thing put in wins: typing an address, dropping a
+picture or finishing a drawing clears the other. Switching Content away and
+back keeps everything the area held. What `bitmap` refused that `image`
+accepts is a color in a drawing's column, which is harmless.
+
+## Page margins
+
+**A margin is a page setting, drawn with the grid and snapped to.** It is
+`page.margin`, a `SideValue` like an area's padding — one number or four —
+except that 0 is kept, since a page worked to its trim is a real choice.
+Absent is `DEFAULT_MARGIN` all round. It is stored in the right-hand page's
+frame like everything else, so with facing pages its `left` is the inner edge
+and its `right` the outer, which is what the bar calls them; a left-hand page
+draws them swapped. The guide has a toggle of its own, **Guides**, beside Grid
+and Boxes, not the grid's: a page wants its margins to place against far more
+often than it wants a ruling over the whole of it. With it on, a margin within
+reach beats a grid line or a sibling's edge: a margin that is not a whole number
+of steps would otherwise be an edge nothing could land on. The keys are
+Photoshop's Ctrl+; and Inkscape's bare `|`; Boxes keeps Ctrl+H, Photoshop's for
+its extras. Far edges snap only when they are the edges being moved, so a box
+is never stretched to reach a guide it was not heading for.
+
+## A QR's quiet zone is the area's padding
+
+The area's padding, in mm, is the one control for space round a code, as it is
+for every other area: a quiet zone of the code's own, in modules, would add to
+it. `QrSettings.margin` is dropped on load. The code is drawn at the area's
+height less its padding and border, as every picture is, or padding pushes it
+out of the bottom. The trade-off: a template that relied on a quiet zone of
+modules opens with its code to the area's edge until it is given padding; the
+starter card's QR carries 1mm, and Position Automagically gives one 2mm. The
+padding guide is an SVG sized from the insets, never `auto`, which for an SVG is
+300 × 150px.
+
+## `src/lib/barcode.ts`
+
+**The QR mode learned barcodes rather than a new mode joining it.** A code is
+a code to the person choosing it, and every template already says `qr`, so
+`QrSettings.kind` is absent for a QR and nothing migrates. Code 128 takes any
+printable ASCII, packing runs of digits two to a symbol; EAN-13 takes twelve
+digits (the check is worked out), thirteen (the check must be right) or an
+ISBN-10, which becomes the 978 code every book since 2007 carries.
+
+**A barcode fills its area, so it has no Fit.** A scanner reads the ratio of
+bars, not their width, so stretching every bar alike costs nothing, and an
+area drawn wide and short is the shape the code wants. Contain or cover would
+only leave white the person then has to size away by hand.
+
+**The digits are type, in the area's own face and size.** Show Digits is on
+by default because every packet prints them and a code nobody can read back by
+eye cannot be checked. Set in HTML beside an SVG of the bars rather than as SVG
+text, so they take the area's font, size, weight and color like any other
+words, and the bar shows those controls for a barcode with digits. EAN-13 is
+laid out as retail does — the first digit in the left quiet zone, six under
+each half, the guard bars running down between — which needs the bars'
+viewBox seven modules wider on the left.
+
+**Encoders are pinned, not decoded on every run.** Each was read back once
+with an independent decoder and its modules are pinned in the tests; the
+decoders left the dev dependencies, so changing an encoder means decoding its
+output once more by hand before pinning it again.
+
+## Screen lines are drawn so the zoom cannot round them
+
+Everything on the card is inside one `transform: scale()`, and a box's edges
+and borders are snapped to whole pixels *of that frame* before the scale is
+applied. So a line one `--line` wide — half a pixel at 200% — came out two
+screen pixels thick, and a handle's border, a badge's, a snap guide and the
+pivot's gradients all drifted in weight and shape with the zoom. What does not
+round: an SVG stroke, a box-shadow, and a gradient's stops. So the pivot is a
+15-unit SVG scaled whole with its mark, handle and badge edges are inset
+shadows, and the lever's arm and the snap guides are a gradient line down the
+middle of a box three lines wide. The margin guide's dashed outline is the one
+line left as a border; it has no SVG cousin yet.
+
+## Lists and the baseline
+
+`TextStyle.list` is a marker (`bullet`, `disc`, `circle`, `square`,
+`openSquare`, `dash`, `emdash`, `arrow`, `none`), a numbering for ordered lists
+(`1`, `a`, `A`, `i`, `I`), an indent and a leading, each optional and each
+merged over the page's on its own, so an area can change its indent and keep the
+page's marker. They are type units — the indent in em, the leading a bare
+multiple of the size — as a paragraph's are. They were mm for a round, which was
+the one pair of type settings that did not scale with the type. Left blank,
+`md.list` (mm) still sets the indent and the gap between items, and a list with
+no leading takes the area's, so a template that never named one renders as it
+did.
+
+**Leading replaced an item spacing, and was not migrated.** The spacing was
+lines of the leading between one item and the next; it lived four days, no
+shipped template used it, and the two do not convert — a gap between items is
+not a line height. So `normaliseList` drops a stored `spacing` rather than
+carrying a field nothing on screen can edit or clear. The leading goes on the
+top `<ul>` as `line-height`, which the items and any nested list inherit.
+
+The text markers are a text node in the item, so they are set in the area's
+face; a face without the glyph falls back through the area's stack like any
+missing character. The four round and square ones (`drawnMarker`) are drawn
+instead, in the text's color at sizes of their own: faces that have `●` or `■`
+draw them anywhere from half a capital to a whole one, and in a handwriting
+face the fallback was a different size again.
+
+A cell that quotes its own column (`self` in `applyPlaceholders`) is not
+filled in: filling it once only prints the placeholder back.
+It is marked in the editor as an unknown name is, since it is the same mistake.
+
+`TextStyle.baseline` is em of the area's size, either sign. The page's is a
+correction for the page's face, so an area in another face never inherits it
+(`baselineOf`); an area's own always applies. It is turned into points in the
+box's style rather than handed down in em, because a custom property holding
+`em` resolves at each element that uses it and a heading would have moved
+twice as far as the paragraph under it. It moves `.content`'s children with
+`position: relative` — not `.content`, whose edge is where a clipped area
+cuts — so nothing is measured differently and nothing anchored below moves.
+
+## What an area paints, and what it does not
+
+**The fill and border are a surface layer, not the box's own.** Opacity on the
+box faded everything hung off it — bounds, handles, badges, the selection —
+because an element's opacity reaches all its children. So the fill, a color or
+tile out of the data, the border and the radius are painted by a `.surface`
+child spanning the border box, and opacity is a custom property (`--ink`) that
+the surface, a hand-drawn border and `.content` read. The box keeps the
+border's room, transparent, so no measurement changes. The trade-off: the
+parts fade one by one rather than as a group, so text at 50% over a fill at
+50% lets the fill show through the letters, where one group opacity would not.
+The alternative — moving every piece of chrome out of the box into a sibling —
+was the larger change for a difference only visible under a loupe.
+
+**Every color field has an alpha.** `<input type="color">` has none (its
+`alpha` attribute is not Baseline), so `ColorField` puts an opacity in percent
+beside the platform's swatch, reading and writing through `toRgba`/`fromRgba`
+in color.ts. Opaque colors are still stored as six-digit hex, so nothing
+already saved changes form.
+
+**The grid is under the areas.** It was a sibling drawn over the scaled card,
+so it crossed every area's words. It is handed to the card now as an
+`underlay` snippet and drawn inside it, before the trim — still in screen
+pixels, by a viewBox of the sheet's on-screen size in an element of its
+pre-zoom size, which the card's transform scales back. The margin guide is the
+trim's first child, so it paints over the grid and under every area, as a
+solid line. The trim edge stays outside the card, over everything.
+
+**One object URL per picture, until the picture changes.** Every resolve used
+to revoke and re-mint the URL for a name, and the card and the Pictures tray each
+resolve: a picture carried out of the bar a second time dragged a
+broken-image icon, its URL revoked by the card's resolve after the first drop.
+The cache now keeps a URL while the picture's version — a file's size and time,
+or a stored copy's length — is unchanged, and writes and deletes here forget it.
+
+**Switching an area's Content drops what the new choice does not show.**
+Keeping everything, so going back finds it, leaves static words carried into an
+image or a data field in the template, read by anything that looks at an area's
+words. Undo is the way back, as for every other destructive edit.
+
+## Rows, files and keys
+
+**A row is dragged by its number.** The number is the one part of a row that
+is not a field or a tick, so it is the grip: pointer events, captured, and a
+finger holds before it carries, as a column does, so a swipe over the numbers
+still scrolls. A chosen row carries every chosen row, in their own order —
+`moveRowsTo` in table.ts, tested — and the choice follows its rows rather than
+ticking the row that was dragged. The drop line is drawn on every cell of the
+row it lands before, over the fields, as the column's is.
+
+**Several PNGs are one ZIP.** A run of fifty was fifty downloads, which a
+browser either asks about each time or stops allowing after a few. `zip.ts`
+writes stored entries — a PNG is already compressed, and storing needs no
+deflate, so no dependency — with a CRC-32 each and a central directory; the
+tests check the structure and the standard CRC check value, and the file was
+opened with Python's `zipfile` to be sure. No ZIP64: it refuses past 4 GB. The
+cost is that nothing is saved until the end, so a failure part-way saves none.
+
+**One table of shortcut labels.** A title that named its key by hand drifted:
+Redo's said Ctrl+Shift+Z, the A/B toggle. `SHORTCUTS` and `withKey` in keys.ts
+are where a tooltip gets a key from, and the right-click menu prints them too.
+
+**No unsaved dot.** There was one for a release — a mark beside the template's
+name while the design differed from its last export — and it was taken out
+again: templates autosave in this browser, so it was a mark about a file most
+people never write, on a field they look at all the time.
+
+**An export is named as its thing is named.** The template's file is its
+name and the table's CSV the table's name, as written — case, accents, a
+Greek name whole — with spaces as dashes and only what a file system refuses
+taken out (`fileStem`). They were `slugify`d and dated, then, and the CSV was
+always `card-data.csv`: a file is looked for by the name somebody gave it,
+`slugify` turned any name outside ASCII into `untitled`, and a browser
+numbers a second download of one name itself. The PNGs keep `slugify`, since
+they run in numbered series where the stem is only a prefix.
+
+**Pictures is a tray, not a bar.** It was a third bar in the options row, where a
+list of pictures had nine rows' height at most and the page bar had to give it
+the row. It takes the table's room now, one of the two at a time, at the same
+width or height, and the options row is the page bar and the area bar only.
+
+**A cell's field is as tall as its words, and the cell is the target.** It
+filled the row by `height: 100%` against a cell of `height: 1px`, which
+Chromium resolves against the row as drawn and Firefox — once it has
+`field-sizing` — against the 1px: every Long and Full cell collapsed to its
+padding there. The field sizes to its content now, and a press on the band
+under it focuses it.
+
+## `src/lib/components/MenuSelect.svelte`
+
+**One menu, drawn like the template picker.** The zoom and both font menus were
+native selects: they could not look like the picker beside them, and no styling
+reaches inside a native list on every platform to set a font's name in its
+face. This is the picker's shape — value on a line, caret against it, a fixed,
+measured menu with a tick and rules — as a component, with the arrow keys,
+Home, End and Escape a list is owed. It opens down where there is room and up
+where there is more, and from the trigger's right edge when the trigger is in
+the right half of the window: the zoom's menu, hung rightwards, ran under the
+table.
+
+**Previews are fetched when a font menu opens.** Drawing each family's name in
+its face needs the face, so opening the menu asks for every Google family it
+lists, through the same `ensureGoogleFont` a choice uses — a request made
+because somebody is choosing a font, which is the rule's line. Uploaded faces
+are already here and are never requested.
+
 ## `src/lib/components/PageOptions.svelte`
+
+**The page bar's head is a line of its own on a phone only.** With Import,
+Export and Reset in the menu the head is the template's name and its lock, and
+on a phone, where the bar wraps to a column of short rows anyway, it takes a
+full-width first line ruled off in the bar's border grey. On a desk the same
+line cost the bar a whole row and pushed the page down for the sake of a rule,
+so there the head wraps in with the groups.
+
+**The head reads Lock, the template and its menu, the swap, then CSS.** The swap
+is the table's, for templates: the one open before this one, one press away and
+kept across a reload, because working between two designs — the real one and a
+variation — is the case that happens, and a menu each time is its whole cost.
+Every way the open template changes remembers the one left behind, except undo,
+which puts back a state rather than choosing one. The lock does not disable it:
+opening another template changes nothing in this one. The swap is drawn as the
+table's is — a bare glyph in the tools' grey, filled on hover, faded to 30% with
+nothing to go back to — because it is the same control for the other half of
+the work, and a bordered square beside one and a bare glyph beside the other
+read as two. On a phone CSS keeps its glyph and loses the word, as the window
+toolbar's buttons do, and is square. A template with styles of its own is said by the border in
+full ink rather than a dot after the word: the dot went with the word on a phone,
+and it was the only sign there.
+
+**A square button is square at every text size.** Its side is worked out the way
+its height is — the icon, in rem, plus padding and border in px — and not written
+as one rem value, which matched only at 100%: the bar's squares were 40.5 by 33
+at 150%, and the window toolbar's 34 by 43.5, squeezed by a row that would not
+give up anything else first. The toolbar has one height for every button in it,
+`--tool`, words or not, and the squares do not shrink. With the text enlarged on
+a phone, Install drops its word too: at 150% on a 360px phone the worded button
+pushed the row off the screen.
+
+**Everything that acts on the template as a whole is in the picker's menu;
+Lock is not.** Import, Export and Reset were a row of buttons under the name,
+which is a second line of chrome in a bar that already wraps. They are errands —
+done once and gone — so they belong with New and Delete behind the caret. Lock
+is a state, and a state has to be visible without opening anything, so it stays
+beside the field. The two that lose something, Reset and Delete, sit together in
+red under their own rule.
 
 **The template picker is built by hand rather than being an `<input list>` and a
 `<datalist>`**, which is the native shape of exactly this control. A datalist
@@ -1990,9 +3385,73 @@ next thing you press is usually the next thing you meant to do.
 
 ## `src/lib/components/OptionsBar.svelte`
 
-**Both option bars read in groups**, outward from the subject: what the thing is,
-then its type, then how it looks, then where it sits, then what you can do to it.
-A new control goes in the group it belongs to rather than on the end.
+**Both option bars are one bar of named groups, most-used first.** Every setting
+stays in view — a tabbed version was tried and read as messier, not calmer: a
+press to reach anything, and a bar whose height changed with the tab. The
+grouping and the order:
+
+- The page bar: the template, then **Page** (size, margin, left & right),
+  **Text**, **Paragraphs**, **Lists**, **Paper**, **Page Number**, and the
+  print panel's **Bleed** and **Printing**.
+- An area: the name, then **Content**, **Barcode** when it is one, **Align**
+  — ahead of the type, because it is what is reached for most — **Text** (font,
+  size, x-height, weight, color, letter spacing, case), **Position** (X, Y, W, H, anchor, fold follow,
+  rotation), **Lines**, **Lists** for Markdown, **Box** (fill, border, padding,
+  overflow), **Effects** (blend, opacity).
+
+Each group is a fieldset whose legend, floated, is the first item of the run and
+set in bold capitals, heavier than the labels; a wider gap separates runs, and no
+rule, because the bar wraps and a rule lands wherever the wrap does. A label that
+only repeated its group's name is left to screen readers. A new control goes in
+the group it belongs to rather than on the end.
+
+**Recto / Verso on the page, Fold Follow on an area.** The page's switch is the
+book's own words: a right-hand page and the left-hand page facing it, with a
+plain slash — a ⧘ for the fold was tried and set too small to read in the bar's
+capitals. The area's switch once used the same words and meant something else — not "this is
+a spread" but "this area mirrors across it" — so it is named for what it does:
+it follows the fold, the dot-dash line the guides draw at the inner edge. Off, the area
+keeps its millimetres on both pages.
+
+**A color from a column is a link beside the swatch, not a mode.** Text color,
+fill and border color each get the same small link button; pressed, a column
+picker appears beside it. The swatch stays: it is what a row whose cell is not a
+color still shows, so the link reads as "this, unless the row says otherwise".
+One pattern for all three, and nothing new in the bar until it is asked for. While
+linked, the swatch previews the shown row: that cell's color at full strength and
+without a frame — a sample, not a control, and never faded, since faded it would
+show the wrong color — or, where the cell holds no color, the area's own, framed
+and settable, because that is what that card draws. The opacity stays live and
+applies to the row's color, multiplied with any alpha the cell has of its own, so
+a linked fill can still be a tint.
+
+The link names a column, not a slot, as `%%column%%` does — it is the row's
+value, not a field the area is bound to — so a rename rewrites it, and the table
+counts the column as used. Only the cell's *color* is read, through
+`parseColor`, the same door every color has to a style attribute; there is no
+value-to-color list (Late → red). That was offered and left for later: a
+spreadsheet can already turn a word into a color in a column of its own.
+
+`colorsFromRow` resolves the area per row where Card paints it — the style, the
+surface, a hand-drawn edge, a QR — and nowhere else. Everything that measures,
+drags or writes the area back holds the stored one, so one card's color can
+never be saved as the template's.
+
+**Labels stay one word where one word was there.** Leading, Tracking, Draft,
+Width and Height were tried as longer, plainer phrases and put back: in a bar
+this dense a second word costs more than it explains, and the tip on each field
+says the rest. The group names are set in capitals like the labels, bold, which
+is what tells a group's name from a field's. Spacing became Tracking: space
+added evenly between every letter is what Photoshop, Illustrator and
+InDesign call it (kerning is pairwise, which this is not), and Spacing read
+as space between lines or paragraphs.
+
+**A value taken from the page looks taken; one set here has an ×.** Blank was
+always how an area's field inherited, and nothing on screen said which ones
+were doing it. A placeholder or a *Default: …* option is set in italics, in a
+grey that still reads; a set value is upright, with a `ResetButton` beside it
+that removes the key — "back to the page's" is an absent key, as everywhere
+else.
 
 **A right-click menu on a box carries the same actions its bar does** — neither is
 the only way to reach them. Only the primary pointer button drags: a right-click
@@ -2007,11 +3466,11 @@ slop `hold` gives up at, because under that nobody meant to move anything — an
 the area, which was already being dragged underneath, comes with it. Card does
 not know a menu is open; it says "this is a drag now" and the page acts on it.
 Where a browser cancels the pointer stream to show its own menu, the drag simply
-ends and the menu stays, which is what used to happen every time.
+ends and the menu stays.
 
 **The menu is `user-select: none`.** It is pressed, never read: a press that
-travels across it used to paint a selection over the labels, and on a phone that
-is the grey smear and the magnifier instead of the area moving.
+travels across it would otherwise paint a selection over the labels, and on a
+phone that is the grey smear and the magnifier instead of the area moving.
 
 **A lock is a button in the bar, and the badge on the area undoes it.** The
 button that *sets* a lock belongs with the rest of that subject's settings and is
@@ -2023,29 +3482,35 @@ also undid what they said, sent the pointer to the wrong one. The buoy has stopp
 wearing an open padlock when armed for the same reason — it casts off, so it shows
 a boat. No two badges answer with the same mark.
 
-**The page bar and the area bar share one row, and the row never shrinks.** They
-used to stack, so every selection and deselection added or removed a whole toolbar
-from the top of the window: the stage lost that much height, the fitted scale
-changed with it, and the page jumped and resized under the pointer. Selecting an
-area now gives it the row and Page Setup takes it back, letting go of the area to
-do it — pressing Page Setup means "show me the page", not "stack a second bar".
+**The page bar and the area bar share one row, and the row never shrinks.**
+Stacked, every selection and deselection would add or remove a whole toolbar
+from the top of the window: the stage would lose that much height, the fitted
+scale would change with it, and the page would jump under the pointer. Selecting
+an area gives it the row and Page takes it back, letting go of the area to
+do it — pressing Page means "show me the page", not "stack a second bar".
 That leaves the two bars being different heights, which is the same jump again
 and smaller, so the row is floored at the tallest bar it has held at this window
 size. The trade-off is a band of the bar's own colour under the shorter of the
 two; it buys a page that does not move when you pick something up. The floor is
 dropped on a resize, because both bars wrap and neither height survives a change
-of width.
+of width — and only a new measurement raises it again. The effect that raised
+it used to read the floor too, so the reset re-ran it at once with the height
+from the old width: a window widened from narrow kept the narrow bar's wrapped
+height, as a band of empty bar.
 
-**A transient height is not a floor.** The reserved row above took its floor
-from the tallest bar it had seen, which on a narrow screen included a height the
-bar only ever stands at for a moment: `.options.menu-open` gives up the 26dvh
-cap while the template switcher is up, so the menu is not clipped by the bar's
-own scroller. Opening that switcher once left a band of empty grey under the bar
-for the rest of the session. The bar now says when its menu is open and the floor
-declines to move while it is — and reads that flag *untracked*, because the flag
-going false at the end of a menu would otherwise re-run the floor with the
-measured height still holding the uncapped number, taking the very value the
-guard exists to refuse. Only a fresh measurement raises the floor.
+**The page bar stands at the area bar's height before any area is picked.**
+The row was floored at the tallest bar it had held, so the page stopped jumping
+on the second selection but not the first. An invisible area bar — a bound
+Markdown field, the kind with the most fields — is kept in the row, `inert` and
+`visibility: hidden`, laid out at the row's width so it wraps as the real one
+would, and its height is part of the floor. It costs one extra bar's worth of
+components mounted and never seen.
+
+**A menu is not a height.** The template switcher is `position: fixed`, placed
+from a measurement as it opens, as the table's picker is. Hung absolutely inside
+the bar, on a phone where the bar scrolls, it would grow the bar to hold it, and
+the row above would have to refuse that height as a floor; fixed, the bar never
+changes height for it.
 
 **The right-click menu carries no key hints.** The two items that had them were
 the only two that did, so the column of grey chords read as a property of those
@@ -2069,12 +3534,17 @@ same thing, so there is one path and not two.
 
 ## `src/lib/boxops.ts` and `src/routes/+page.svelte`
 
-**A new area is provisional until it is given something.** It used to arrive
-carrying the literal word "Text", so abandoning one left a box on the card that
-said Text and had to be hunted down. It starts empty with the cursor already in
-the Text field, and is dropped again unless it is given words, a column, or a
-change to how it looks. Moving and resizing do not count: placing a box is what
-you do while deciding whether you want it at all.
+**A nudge is in screen directions.** On a left-hand page an area that follows
+the fold is drawn mirrored, so `nudgeBox` flips `dx` for it before writing the
+stored right-hand frame — the same undoing a mirrored drag goes through. Without
+it, the pad's right arrow moved the area left.
+
+**A new area is provisional until it is given something.** Arriving with the
+literal word "Text" would leave a box that says Text on the card whenever one is
+abandoned. It starts empty with the cursor already in the Text field, and is
+dropped again unless it is given words, a column, or a change to how it looks.
+Moving and resizing do not count: placing a box is what you do while deciding
+whether you want it at all.
 
 **A group is a shared name, not a container.** `Box.group` keeps the box list
 flat, so grouping cannot disturb anchoring, stacking or measurement; selecting one
@@ -2085,15 +3555,12 @@ otherwise undo the alignment on the next render.
 **Destructive things are undoable, and only ask when undo cannot reach them.**
 Deleting a row or a box happens straight away and says so, and so does Reset —
 it replaces the template and leaves the data alone, and one snapshot carries
-both, so Ctrl/Cmd+Z reaches it. (This paragraph used to say Reset asked twice
-"because it clears browser storage and uploaded fonts". It does neither, and has
-not for some time.) Two things do ask once, and neither is about undo: deleting
-a *column* is a
-field of every card at once and takes cells under a header you may not have
-scrolled to, and deleting the whole table is not one row you can retype. Both
-questions are a count rather than a paragraph — a warning nobody reads is not a
-warning, and the second press the table used to ask for was only ever a way of
-not reading the first.
+both, so Ctrl/Cmd+Z reaches it. Two things do ask once, and neither is about
+undo: deleting a *column* is a field of every card at once and takes cells under
+a header you may not have scrolled to, and deleting the whole table is not one
+row you can retype. Both questions are a count rather than a paragraph — a
+warning nobody reads is not a warning, and a second press would only be a way
+of not reading the first.
 
 **The CSS dialog cancels by putting one value back, and blurs first.** What is
 typed there is committed as the field loses the focus, so by the time a click
@@ -2113,14 +3580,14 @@ writes every key including the ones the source lacked, because a paste is "make
 this look like that" and a source with no border has to take the target's border
 away.
 
-**An area is stray when it is not wholly on the paper — half off counts.** It
-used to ask for *no overlap at all*, which meant the button stayed away while a
-corner of an area sat outside the sheet being quietly cut off every print. Both
-are the same problem at different sizes, and the half-off one is the harder to
-notice: the editor does not clip, so on screen the area looks whole. The paper is
-the trim *plus the bleed*, so a deliberate full-bleed panel is still not stray —
-that is what the bleed is for, and dragging every one of them back inside the
-trim would be worse than saying nothing.
+**An area is stray when it is not wholly on the paper — half off counts.**
+Asking for *no overlap at all* would keep the button away while a corner of an
+area sat outside the sheet, quietly cut off every print. Both are the same
+problem at different sizes, and the half-off one is the harder to notice: the
+editor does not clip, so on screen the area looks whole. The paper is the trim
+*plus the bleed*, so a deliberate full-bleed panel is still not stray — that is
+what the bleed is for, and dragging every one of them back inside the trim
+would be worse than saying nothing.
 
 **Only the strays move.** A card is a composition and the areas that are where
 they were put are not part of this problem, so `bringOnPage` is handed the stray
@@ -2137,25 +3604,157 @@ x alone; its vertical position is the Gap field in the bar. For the same reason
 the handler counts the *unlocked* strays: a locked area is not this button's to
 move, and when every stray is locked it says so rather than doing nothing.
 
+**A locked area wholly off the paper is parked, not stray.** The pasteboard is
+a place to keep things — the A5 Starter Booklet keeps a post-it of the row's `notes`
+there — and an area put there on purpose lit the rescue button for good, and
+pressing it dragged the note onto the card. Both conditions are needed: wholly
+off alone is exactly what a shrunk page leaves behind, the case the button is
+for, and a locked area half off the edge is still cut in half by every print.
+The cost is that a parked note is locked, so it is typed into from the table,
+not on the card.
+
 ## `src/lib/placeholders.ts`
 
-**`{{date}}` is not a template language, and must not become one.** No
-conditionals, no loops, no field references: a card that can compute is a card
-whose output depends on something other than the row it was given. Anything
-unrecognised is returned exactly as written, which is what stops a cell that
-happens to contain braces being eaten. No time of day either — a card is printed
+**A contents is a placeholder, and the leader is three percent signs.**
+`%%toc:column%%` writes a line per page whose column holds anything —
+the value, `%%%`, the page number — and the renderer sets each `%%%` as a tab
+leader (`tabSplit` in markdown.ts). Three, exactly: two is a placeholder's edge,
+and a name cannot begin with `%`, so `%%a%%%%%%%b%%` is a name, a leader and a
+name, and a placeholder left unfilled is never mistaken for one. `^t` came
+first and lasted a day: it could not be told from text, and `%%%` is the
+family the rest of the placeholders belong to. Page numbers are a row's place
+in the run (`dataset.rows`), not its arrival number, which is what lookups
+use; the cards are handed the arrival list, so `inArrivalOrder` remembers the
+run it was made from (`runOf`) rather than a second list being threaded
+through every component that draws a card. It writes only the lines — a
+heading is the page's own words — and never lists the page it is printed on;
+a cell holding the placeholder is left out wherever it is quoted, since
+substitution runs once and would print it raw.
+
+**Find and replace is two parts after a column, never a pattern.**
+`%%column:find:replace%%` is a literal, case-sensitive swap of every
+occurrence — the spreadsheet's Find, not a regex, so nothing typed into a cell
+can become a pattern that runs away. It takes both colons: a single part after
+a column means nothing, rather than quietly becoming a deletion, and
+`%%today:FORMAT%%` is a date format whether or not it holds a colon. The find ends at the first colon, so the replacement may hold
+one; neither part is trimmed, since a space is the commonest thing to replace.
+It runs inside the same single pass, so a replacement is never read for
+placeholders either.
+
+**A column by name, once, and nothing more.** `%%title%%` fills from the row the
+card is drawing, in an area's own words and in a cell alike — a card still
+depends on nothing but its row, which was the reason this refused field
+references before; the row is exactly what it now reads. There are still no
+conditionals and no loops, and substitution is a single `replace`: the value a
+placeholder becomes is never scanned again. That one pass is the whole of the
+guard against recursion — a cell naming itself, or two naming each other,
+cannot loop because there is no second pass to loop in — and it is simpler to
+trust than a depth limit, which would print a half-expanded chain. Names are matched as written, then in
+column-name shape (`columnName` in parse.ts), then ignoring case, so a template
+written against `Artist Name` keeps working after the header is normalised.
+Anything unrecognised is returned exactly as written, which is what stops a
+cell that happens to contain `%%` being eaten. No time of day either — a card is printed
 once and read for months, and a timestamp on paper is stale before the ink dries.
+
+**Keywords beat columns.** `today` and `lookup` always mean themselves, and a
+column that happens to be called either cannot be reached as `%%name%%`.
+Letting the date give way to a column of its name would make what a template
+says depend on the table under it: the same placeholder printing today on one
+table and a cell on the next. A keyword reads the same everywhere, and the
+cost, a column that cannot be quoted by name, is made loud instead of silent:
+DataTable titles it red, and the app says so in the status line once each time
+the set of such columns changes, not on every edit. It is still reachable from
+another row, `%%lookup:N:today%%`, and bound to an area it prints as ever.
+
+**Double percent signs, not double braces.** Placeholders were `{{name}}`
+until 0.23, and double braces are Hugo's own template syntax (Jinja's and
+Mustache's too): text written for a Hugo site and for a card could not share
+a placeholder, because whichever read it first ate it. So `%%name%%`, with
+no reading of the old form — no template in use was written with it, so
+there was nothing to carry, and a migration would have had to guess which
+`{{…}}` in a cell was meant for Hugo. Doubled because a single `%` is
+ordinary prose: `50% off, 20% more` read with single signs made a name of
+the words between the two percentages, and ruling that out took rules about
+digits and spaces that also ruled out real names. The name holds only what a column
+name can — letters, digits, `-`, `_`, and spaces, which find the dashed
+name — so ``type `%%` to…`` in a card's own text is not read as a name
+running on to the next placeholder and swallowing it. Nothing spans a line,
+and a format may hold a lone `%`. The mark opens and closes alike, which braces did not, so
+the autocomplete blanks the placeholders already closed on the line before
+looking for an open `%%`. `today` is the date's only name; `date` is a
+column like any other.
+
+**A lookup names a row by its number, not by a key.** `%%lookup:3:price%%` is
+the row wearing 3 in the table, because a value to search for could sit in any
+column and in several rows, and a lookup that silently took the first match
+would print the wrong price with nothing to mark it. The number, not the
+place: sorting rewrites `dataset.rows`, and a sort done to read the table must
+not change what every card quotes. So the numbers are stored with the table,
+as `Dataset.order` — one arrival number per position — rather than as row
+objects held in the session: those are found by identity, and every edit that
+rebuilds rows (a column renamed, a cell written from the card, an undo) makes
+new objects, so the numbers would quietly fall back to positions and the
+lookups move with them. By position, an edit in place keeps them for free; the
+edits that do move rows say what happens to the numbers, in table.ts: a sort
+carries them, new rows take the next ones, a delete closes the gap, and a move
+by hand or a replaced table forgets them, since where rows are put by hand is
+their order. Being part of the dataset, the order is saved, reloaded and undone
+with it. `orderOf` checks it fits before anything believes it, and an order
+that says nothing the positions do not is left off. `rowNumber` is the one rule
+the row labels and `inArrivalOrder`, which the lookups read, both use, so the
+two cannot drift apart; the table holds the checked order once and labels
+through `numberIn`, the same rule, since checking it per label was a pass over
+the table for every row. It is still one pass, so what a lookup finds is never
+read for placeholders, and reaching a cell's own column in its own row is
+marked the way `%%self%%` is. `Card` takes `rows` as a required prop rather
+than a defaulted one: a renderer that forgot it would print the placeholder on
+paper while the editor showed the value.
+
+**A delete or a move rewrites the lookups that followed it.** Numbers close
+up after a delete, and a move by hand makes the positions the numbers, so a
+lookup naming row 7 would quietly start quoting a neighbour. The table says
+how the numbers moved (`renumbering`, by row identity — only the edits that
+keep their row objects may ask, since a cell edit makes a new one and would
+read as a deletion), and the page rewrites every lookup in the current
+template's areas and in every cell in the same assignment, so one undo puts
+table and template back together. Rewriting is one regex pass per text that
+contains `%%`, and anything unchanged is handed back as the same object. A
+lookup whose row was deleted becomes `%%lookup:?:…%%` rather than keeping a
+number that now belongs to another row: marked as naming nothing beats
+printing the wrong row. Keeping numbers stable instead (gaps after a delete)
+would have spared the rewrite, but the table would show 1, 2, 4, and a moved
+row would still need one. Only the open template is rewritten — templates
+and tables are not paired — which the README says.
 
 Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
 mode; `rawContentOf` beside it is what the inline editor shows, because typing
 over a substituted date would mean typing over yesterday's.
 
+## `src/lib/complete.ts`
+
+**One action for four fields.** The column list that `%%` opens is needed in a
+table cell, the full-size cell dialog, the area's Text in the bar and the
+editor laid over the card — four elements in three components, each with
+handlers of its own. An action attaches to any of them, builds its list with
+`textContent` only (column names are cell data), positions it `fixed` so no
+scroller clips it, and writes a choice back with `input` and `change` events so
+each field's own handler sees it as typed. Its keys stop propagating only while
+the list is open, so Escape closes the list and not the dialog behind it.
+
+**Unknown names are marked in the render, by sentinels.** `applyPlaceholders`
+can wrap a `%%name%%` nothing answers to in two Private Use characters, and
+`flagUnknown` in markdown.ts turns those into a span — in text between tags
+only, after the leaf has been escaped, and never inside an attribute. Plain
+text splits on the same characters and lets Svelte escape each piece. Only the
+editor asks for the marks, and only with the bounds on: nothing printed,
+measured for emptiness or encoded in a QR ever carries them.
+
 ## `src/lib/modal.ts`
 
-**Enter in a dialog is two presses.** A dialog used to open with the focus
-already on a button, so a stray Return — the one that dismissed whatever was on
-screen a moment ago, arriving a beat late — pressed it. Deleting a template,
-replacing every row, throwing away a design: each was one keystroke nobody aimed.
+**Enter in a dialog is two presses.** A dialog that opens with the focus
+already on a button lets a stray Return — the one that dismissed whatever was on
+screen a moment ago, arriving a beat late — press it: deleting a template,
+replacing every row, throwing away a design, each one keystroke nobody aimed.
 The focus lands on the dialog itself instead; the first Enter moves it onto the
 default action, where it is outlined and named, and the second is the browser's
 own. Nothing intercepts that second press, which is what makes it trustworthy —
@@ -2169,20 +3768,13 @@ that press *is* the second one.
 
 ## `src/lib/gestures.ts`
 
-**A hold is always the bigger of a button's two actions, and always one undo
-away.** `hold` exists because both bars are fighting for width and a second
-button costs a row; it is only ever used where the two actions are the same
-*kind* of thing — import a file or import the samples, add an area or lay every
-area out. A gesture nobody was taught has to be survivable when it fires by
-accident, which is what the undo entry is for. The click behind a completed hold
-is swallowed, or the tap action runs straight after the hold action.
-
-**A hold gives up as soon as the pointer moves.** It used to end only on
-pointerup or pointerleave, which is enough for a button but not for a mark that
-is also a drag target: the pivot and the rotation lever both reset on a hold and
-both move on a drag, and a slow drag would sit still long enough to fire the
-reset it was trying to avoid. A few pixels of slop, because a finger is never
-still and a deliberate drag clears it in the first moment.
+**There is no `hold` any more.** It was a second action on a button — import
+or import the samples, add an area or lay them all out, reset the pivot, dots
+for the grid — until a press and hold came to mean one thing everywhere: *what
+is this?* (see `Tooltip.svelte` below). Each second action found another way:
+a double-click, a third state, a visible button, a drag. What is left here is
+`HOLD_SLOP`, the few pixels a finger may wander and still be pressing rather
+than dragging, which the area menu uses.
 
 **Reading a swipe is a pure function; feeding it events is an action.** A flick
 has to beat both a minimum distance and a slope, because a drag at 45 degrees is
@@ -2191,10 +3783,196 @@ under them is worse than doing nothing. Touch only: a mouse has a wheel and two
 arrows either side of the count, and treating a click-drag as a swipe would page
 the cards every time somebody tried to select the counter's text.
 
-**A hold buzzes as it fires.** A hold is the one gesture with nothing on screen
-to say it has happened until its action does, and on touch that vibration is the
-whole of the feedback. Touch only: a mouse hold on a touchscreen laptop should
-not shake the machine.
+**The tray follows the finger, and `trayPull` is the one reading for it**: up
+to the whole area and down to nothing, closing when let go below its
+minimum. It used to stop at the minimum and close only on a second pull past
+it, which read as stuck; and the status bar used to open it when a flick
+ended, which read as a lag. `pullUp` reports the pull as it moves, from the
+first few pixels upward, so the tray rises from nothing under the finger; a
+quick flick (`FLICK_MS`, the same slope as a swipe) that ends short opens it to
+its last height instead of closing. The action sets `touch-action: none` on the
+bar itself, or the browser takes the drag for a scroll and cancels the pointer;
+and it swallows the click a release may be owed anywhere on the page, because
+by then the tray has risen under the finger and the click would land on the
+table's header — a column's name went into editing that way.
+
+## `src/routes/app.css` — the accent
+
+**Every blue is the accent, and the accent is the system's.** Pressed buttons,
+locks, focus rings, selection chrome, the previewed row: all read `--accent`
+or a token mixed from it (`--accent-strong` with black, `--accent-line`,
+`-soft`, `-tint` and `-wash` with white, translucent ones inline as a mix with
+`transparent`). `--accent` is `AccentColor` — the colour the platform draws its
+own checkboxes in — behind `@supports`, because the keyword is not Baseline
+Widely and Chromium does not know it yet; there it is the blue these all were.
+A named `blue` in `color.ts` is content, not chrome, and stays a fixed colour.
+`color-mix` is Widely available; relative colour syntax is not yet, which is
+why the tints are mixes rather than `rgb(from …)`.
+
+**A button's words are capitals, unless they are data.** `button` is
+`text-transform: uppercase` with a little tracking, the way the bars' own labels
+already were: LOCK, SAVE, CANCEL. Not where the words are something written
+rather than a command — a menu's items and the value a menu button shows
+(`[role^='menuitem']`, `[aria-haspopup]`: a font, a template, a table), the
+notice in the status bar, the version, the text size and a drawing's row in
+Images, which carry `as-typed`. Capitals there would misstate what was written.
+A command that names something, *Choose Inter File…*, takes the capitals with
+it: rare, and a name in capitals is still the name. Capitals are inherited, and
+the Export screen's thumbnails are buttons, so a card sets its own type back
+(`button :where(.card)`, at a type selector's weight so a template's CSS still
+wins) — without it every card there came out in capitals.
+
+**The guides are the accent's inverse.** The page margins and the snap guides
+are drawn over the areas' outlines, which are the accent, so they take
+`--accent-inverse` — the colour furthest from it — rather than a fixed magenta
+that sat beside a blue outline well and beside a pink or purple system accent
+not at all. The true inverse needs relative colour syntax, which is Baseline
+Newly, so it is behind `@supports`; without it the guides are `#da9c14`, the
+inverse of the fallback blue, worked out by hand.
+
+## `src/lib/scrolledge.ts` — the shadow at an edge with more
+
+**A scroller that stops on a row boundary looks finished.** The bars on a phone
+are capped and scroll, and the table scrolls both ways; nothing on screen said
+so. Each edge with more past it gets a soft shadow, gone at the end.
+
+**Script, not CSS.** The old `background-attachment: local` trick paints under
+the content, and every cell and every field here is opaque. Scroll-driven
+animations would do it in CSS alone but are not Baseline Widely available. So
+an action reads the four edges (`overflowEdges`, tested) and marks a frame
+round the scroller with `data-more-*`; the component draws the shadows. A frame
+because a shadow drawn inside a scroller scrolls away with it: the bars get a
+`.bar-frame` in `OptionsBar`, the table uses its own section, which holds only
+the scroller and the action bar.
+
+**The table has no shadow under its header.** It is frozen, always there
+whatever has scrolled under it; a shadow there only made it look lifted, more
+important than the rows, without saying anything. It gets a 2px rule instead —
+twice the others, as furniture rather than a signal — and so do the row
+numbers. Sideways the shadow beside the row numbers stays, though: a column
+scrolled off to the left is otherwise invisible, where a row scrolled up still
+shows in the numbering. So the table's shadows are the bottom and, on a desk,
+left and right, which start below the header. Not the sides on a phone: the
+table is a column or two wide there and nearly always scrolls sideways, so they
+would be a fixture, not a hint. The bars wrap and never scroll sideways, so they
+have top and bottom.
+
+**27px at 18% black.** Started at 10px and 12%, which read as a hairline; grown
+in two steps on asking.
+
+## `src/lib/textsize.ts`, the viewport, and type in `rem`
+
+**The app is pinned to the window, not given a height.** `.app` is
+`position: fixed; inset: 0` rather than `height: 100dvh`. `dvh` was chosen over
+`vh` so a phone's address bar did not hide the status bar, but Chrome on
+Android, starting the installed app cold, can work `dvh` out before the window
+has settled and keep that shorter height until something resizes it — a strip of
+bare page under the status bar, on some launches and not others. A fixed box
+with no offsets is the window's own size whenever it is asked. Taking the app
+out of the flow costs nothing: the document never scrolled, and every dialog is
+fixed already. A fixed box is also a stacking context; nothing inside the app
+has to paint over a dialog, and the dialogs, the tooltip and the `%%` list all
+sit outside it.
+
+**The interface does not zoom; its text does.** On a phone, touching a cell at
+the right of the table slid the interface left and made the whole app larger.
+Two things were doing it. iOS zooms in on any focused field whose text is under
+16px, and every field here is 12px. And the document was wider than the phone:
+the label a screen reader reads for the paragraph field is `.sr-only`,
+`position: absolute`, and its containing block was the bar row *outside* the
+options bar's scroller — an absolute box is clipped only by a scroller that is
+also its containing block's ancestor, so at its static position, 900px along a
+row scrolled out of sight, it stretched the document to 905px on a 412px
+screen. A phone then lets a finger pan sideways and zooms out to show it.
+`.sr-only` is pinned to `top: 0; left: 0` now, which keeps it inside whatever
+holds it; ImagesPanel's private copy of the rule is gone for the shared one.
+
+The viewport says `minimum-scale=1, maximum-scale=1, user-scalable=no`, and the
+root says `touch-action: pan-x pan-y`. The first stops iOS's leap into a field
+and Android's pinch; the second stops the pinch everywhere a browser honours it;
+Safari ignores `user-scalable` for a pinch, so `textsize.ts` also refuses its
+`gesture*` events. **The trade-off, said out loud:** refusing zoom is what an
+accessibility audit flags, because zoom is how people who need larger text get
+it. So the zoom is not taken away, it is redirected: a pinch off the stage, a
+Ctrl+wheel off the stage, Ctrl +/− in a field or a dialog, and **Text size** in
+Help all set `--text-scale`, which multiplies the root font size. The browser's
+own default font size is the 100%, so a larger default set there still counts.
+The stage and the full-screen lightbox mark themselves `data-own-pinch` and
+keep their own pinch, which zooms the page or the card as before.
+
+**Every size of interface type is in `rem`**, 16px to the rem, so it follows the
+root; gate 9 in `scripts/gates.sh` fails a `px` one. A card's type is `pt` from
+the template and never reads the root. Boxes are mostly padded round their
+labels and grow with them, and so do the icons: `Icon.svelte` sizes itself in
+`rem`, so the toolbar, the stage's corner buttons, the table bar's and every
+other icon button grow with their labels, and their fixed boxes are in `rem`
+too (the Lock buttons, the row-number gutter, the square icon buttons). The
+exception is the badges drawn on an area, which belong to the page they sit
+on and pass `fixed`. An options bar group wraps inside itself once it is wider
+than the bar, which on a desk it now can be.
+
+**The size says itself, and that is how it goes back.** Away from 100%, the
+percentage sits at the left end of the status bar, where the eye starts, and
+pressing it puts the size back. It used to be the logo that did that, which nobody could
+have guessed and a pinch gave no hint of; a number in the corner is both the
+sign that something changed and the way out. Help no longer has size buttons
+either — the keys list says what the chords do, like every other chord.
+
+On a phone the mark is centred over the toolbar, which only has room for it
+while the buttons are small; with the text larger than default,
+`applyTextSize` (and the pre-paint script) set `data-text-larger` on the root,
+and the row is laid out as at 320px: the mark at the left, shrinking before
+anything wraps, and every button after the space — Install and Help in front of
+Page. At 150% on a 412px phone a centred mark had sat over Page;
+and with Help and Install left where they were, the logo split the controls in
+two.
+
+A pinch arrives as a ratio of the spread at its start, so it is snapped to 5%
+each time without drifting. A wheel arrives as dozens of small deltas, and each
+one snapped on its own would round back to where it began, so the wheel keeps
+its own unsnapped total. Its rate is 600 per e-fold against the stage's 220:
+the stage's rate took the interface from 100% to the ceiling in two notches.
+
+The stored size goes on the root from a few lines of inline script in
+`app.html`, before the first paint. Applied from the app's own first effect, a
+larger size arrived after the page had drawn at 100% and everything jumped
+once. The script repeats the storage key and the bounds, and
+`textsize.test.ts` reads `app.html` to hold them to `textsize.ts`'s. It is the
+app's one inline script; the CSP is `frame-ancestors` only, so nothing refuses
+it — a `script-src` added later has to allow it by hash.
+
+Without JavaScript there is nothing to size: the app renders in the browser
+only, so `app.html` carries a `<noscript>` that says, under the app's name, why it needs JavaScript — it all runs in the browser — with a link to the project page,
+centred over the whole viewport and styled inline, since app.css arrives with
+the scripts.
+
+**The full-size cell editor's type does not scale.** It is 26px, twice the
+table's, already large; at 200% it was 52px, a few words a line on a phone. It
+is the one `px` size gate 9 lets through, marked `/* fixed type */` on its line.
+
+## `src/lib/components/Tooltip.svelte` and `src/lib/tooltip.ts`
+
+**One tooltip, for every `title`.** The browser's own cannot be styled, arrives
+late, and on a touchscreen never arrives at all — so every hint written into a
+title was out of reach on a phone. This one is mounted once and listens on the
+document, so the hundreds of `title`s already written need nothing more, and
+there stays one place to write a hint. While the pointer is on an element its
+title is moved into `data-tip`, which is what keeps the native tip from
+appearing under this one, and put back when the pointer leaves; a title Svelte
+sets again under the pointer is taken up on the next move. Disabled buttons get
+theirs too — Chromium dispatches pointer events to them.
+
+**A press and hold is a question, not a press.** On touch, a still finger shows
+the tip above itself (the finger covers what is under it), gives the firmer
+buzz, and the click its release would make is dropped — you were asking. It is
+not offered in text fields, where a long press is how a phone pastes, or where
+a hold already means something: `data-no-hold-tip` on the nudge pad (its arrows
+repeat), a column header and a row number (they lift before a drag). Areas have
+no title, so a long press on one still reaches the browser's context menu.
+
+**Square, an em from the pointer.** Below and right of a mouse, flipped where
+it would leave the window, clamped where neither side has room — a tip half off
+the screen says half of what it says. The placement is `tooltip.ts`, tested.
 
 ## `src/lib/haptics.ts`
 
@@ -2286,9 +4064,9 @@ win the row, because they are the ones you press.
 
 **Response headers, because a static host is the only place this app can have
 any.** There is no backend and no server code — every page is prerendered — so
-the deployment config is the one place a header can be set at all. Until now it
-set none, and an app that renders untrusted cell content had exactly the
-protections the browser gives by default.
+the deployment config is the one place a header can be set at all. Without
+them, an app that renders untrusted cell content has exactly the protections
+the browser gives by default.
 
 These are the cheap ones: the subset of `osseus`'s block that costs this app
 nothing to carry, chosen by reading what the app actually does rather than by
@@ -2340,28 +4118,12 @@ same without them.
 
 ## `eslint.config.js`
 
-**The linter that four comments had been claiming for months.** Four
-`eslint-disable-next-line svelte/no-at-html-tags` comments sat in `Card.svelte`
-and `Icon.svelte` naming a rule from a plugin this repo did not have — no
-config, no script, nothing to run. They read as protection and were decoration.
-ESLint with `eslint-plugin-svelte` is now installed, scripted, and run in CI
-after the gates.
-
-It earned itself on the first run, and not mainly through the 85 findings:
-
-- **Two `{@html}` sites had no stated justification at all** — the fourth one in
-  `Card.svelte` and the `@page` rule in `PrintRoot.svelte` — and `Icon.svelte`'s
-  comment sat on the line before the `<svg>` tag rather than before the `{@html}`
-  two lines down, so it suppressed nothing. Every site now names its chokepoint,
-  and the rule is what checks that rather than the honour system. This is the
-  half `html-blocks-allowlisted` cannot do: the gate knows *which files* may use
-  `{@html}`, the linter knows *whether each use said why*.
-- **Thirty-one dead imports** in the two option bars, left when they were split
-  out of one shared component, plus a `$state` and the whole `$effect` that fed
-  it — `fontsLoading`, built for a "still loading" indicator that is not in the
-  markup. Removing it cascaded into three more dead names, which is what dead
-  code does.
-- **Three `svelte-ignore` comments** suppressing warnings Svelte no longer emits.
+**ESLint with `eslint-plugin-svelte`, run in CI after the gates.** Its one
+project-specific job is `svelte/no-at-html-tags`: every `{@html}` site carries
+a disable comment naming its chokepoint. The gate knows *which files* may use
+`{@html}`; the linter knows *whether each use said why*. A disable comment
+counts only on the line directly before the construct — one above an enclosing
+tag suppresses nothing, and reads as protection while being decoration.
 
 **Where a rule is off, the reason sits beside it.** A rule switched off silently
 is worse than one never switched on, because the next reader cannot tell a
@@ -2396,7 +4158,7 @@ So the checkable ones are checked, first in CI, before the tests and the build.
 The gate list is in the script and mirrored in one paragraph of `AGENTS.md`;
 the script is the copy that counts.
 
-Three conventions for adding one, each learned by getting it wrong:
+Three conventions for adding one:
 
 - **A check that cannot run must fail, not pass.** The version gate reports
   failure when it cannot read either file, and the line-budget gate fails when
@@ -2412,43 +4174,48 @@ Three conventions for adding one, each learned by getting it wrong:
   believed. The list is the decision, written down where adding to it is a
   commit.
 
-**The threshold on `AGENTS.md` is a budget, not a request.** The file opens by
-asking to be kept short, which is worth nothing on its own: the session that
-added this very section grew it by 45% in one sitting, every addition
-individually defensible. A budget makes that growth a decision — raise the
-number deliberately, in the commit that earns it, or move the detail into this
-file, where nobody pays for it on every turn.
+**Two budgets, and they are budgets rather than requests.** The file opens by
+asking to be kept short, which is worth nothing on its own: every addition is
+individually defensible, and a session can grow it by half without any one of
+them looking wrong. A budget makes that growth a decision — raise the number
+deliberately, in the commit that earns it, or move the detail into this file,
+where nobody pays for it on every turn. `CHANGELOG_MAX` is the same bargain
+pointed the other way: a release section is read in a dialog on a phone by
+somebody who has just updated, so it is capped at what they will finish — six
+lines that say something, three being the usual shape, with how it works left
+to the README. A line is a group of related changes rather than one change: a
+feature and the five switches that came with it are one line. Blank lines are
+not counted, because where a line wraps is the writer's business and how much
+there is to read is not.
 
-**The first review of these gates found two of them not doing their job**,
-which is worth recording because it is the argument for reviewing them at all —
-and because both faults were the same one the gates exist to catch.
+**And the dialog reads the file rather than rendering it.** `changelog.ts`
+parses bullets into plain text and `code` spans, because raw markup stays in
+the three renderers that earn it — so a `**bold**` written in the changelog is
+shown with its asterisks to the only audience the file has.
+`changelog-plain-text` catches that, on release bullets only: the preamble
+above the first release is for whoever opens the file and never reaches the
+dialog.
 
-`color-not-colour` could not fail. Its pattern required a non-letter before
-`colour` and allowed no `?`, so `fillColour: string` and `borderColour?: string`
-both slipped past — every way anyone would actually introduce the mistake. It
-reported "ok" for a week guarding nothing, and a green check is worse than a
-missing one, because it stops anyone looking.
+**Test a pattern against the mistake it is for.** A `colour` check that wants a
+non-letter before the word and allows no `?` passes `fillColour: string` and
+`borderColour?: string` — every way anyone would actually make the mistake. A
+green check guarding nothing is worse than a missing one, because it stops
+anyone looking.
 
-`app-fetches-nothing` was named for a claim broader than it checked. It greps
-for `fetch` and `XMLHttpRequest`; it cannot see `fonts.ts` appending a `<link>`
-to `fonts.googleapis.com`, which `ensureTemplateFonts` does for every family a
-template names, on import. So an imported template does reach the network, the
-gate was green, and `AGENTS.md` said in as many words that a template "must not
-be able to" — the protection was documented, gated, and absent. Renamed to
-`no-unlisted-fetch`, which is what it actually enforces, and the rule in
-`AGENTS.md` rewritten to describe the three real paths out and where the guard
-actually is: `safeFamily` and `safeImageUrl` restrict what a template can
-*name*, which is the control that exists. The gate's comment now says what it
-cannot see, because a gate implying wider cover than it has is the more
-dangerous shape.
+**A gate is named for what it checks, and its comment says what it cannot
+see.** `no-unlisted-fetch` greps for `fetch` and `XMLHttpRequest`; it cannot see
+`fonts.ts` appending a `<link>` for a Google family, so a template does reach
+the network, and the guard is on what it can *name* (`safeFamily`,
+`safeImageUrl`). A gate implying wider cover than it has is the more dangerous
+shape.
 
-Nothing was removed. Each of the others guards a rule whose breach has a
-consequence — injection, an unnoticed network call, a dependency that can rot,
-a lost security header, a shipped version that misreports itself, an
-instructions file nobody finishes reading — and none duplicates another or
-anything a type-checker already does. `color-not-colour` is the one guarding
-taste rather than consequence, and is therefore the first to watch in the log:
-if it never fires, it goes.
+**Each gate guards a consequence** — injection, an unnoticed network call, a
+dependency that can rot, a lost security header, a shipped version that
+misreports itself or says nothing of what it brought, an instructions file
+nobody finishes reading — and none duplicates another or anything a
+type-checker already does. `color-not-colour` is the one guarding taste rather
+than consequence, and is therefore the first to watch in the log: if it never
+fires, it goes.
 
 **Every run appends one line to `.claude/logs/gates.jsonl`** — timestamp,
 commit, and a pass or fail per named check. It is gitignored and deliberately
@@ -2493,3 +4260,75 @@ Two things worth knowing before trusting a green run:
   needs `Blob`, `URL.createObjectURL` and `indexedDB`. It is the one place where
   "needs no DOM" and "is tested" come apart, and it is why the suite stays on
   `environment: 'node'` without that being a claim of coverage.
+
+## `src/lib/theme.ts` — dark by inversion
+
+**The launch follows the theme, as far as anything can.** An installed app's
+splash is drawn by the system from the manifest, before a line of ours runs,
+so it cannot read the theme. What the page can do is name a different
+manifest: `manifest-dark.webmanifest` (same `id`, so the same installed app)
+with a `#111` background and the dark icons, swapped in by app.html before
+the first paint and by `applyTheme` after it (`THEME_ASSETS`, held to
+app.html's names by theme.test.ts). Chrome takes it up when it next refreshes
+the installed app, so a change lands a launch or a day late, and a changed
+icon may ask the user to confirm. iOS shows this app no splash at all. The
+blank moment before the bundle arrives is ours, and follows at once: app.html
+paints `#111`, and app.css sets `#eee` under its filter, which shows as the
+same `#111`, because the root's filter inverts the window's own background
+too.
+
+**With the page inverted, fills and pictures are turned back.** An area's fill
+layer and a photo in it keep their colours in `dark-page`; the words, the paper,
+drawings and QR codes stay inverted. Turning those back was tried: they are ink
+on transparent ground, and the right way round they were black on the inverted
+black paper — invisible. A drawing is told apart by the `drawn` class Card puts
+on a hand-drawn `<img>`.
+
+**One filter on the root, not a second palette.** The interface's colours are
+written where they are used, across every component; a dark palette would mean
+a token for each of them and a dark value for each token, and anything missed
+stays a white box in a black room. `invert(1) hue-rotate(180deg)` on `html`
+turns everything at once; the hue turn puts the accent and the warning red
+back where they were, since invert and hue-rotate commute and two of each
+cancel — near enough: a filter clamps between steps, so a colour saturated
+past what the turn keeps in gamut comes back a shade duller. On the root because a filter on any lower element becomes the
+containing block of every `position: fixed` inside it, and the menus are
+placed against the window.
+
+**What keeps its own colours is turned back.** Pictures, `<canvas>`, a colour
+input's swatch, the lightboxes (`data-true-color`, which have a dark ground of
+their own already) and the page (`data-page`, on `Card` and `PrintSheet`) —
+each only where nothing around it was turned back already, or a picture on
+the page would be inverted twice. In `dark-page` the page is the one thing
+not turned back, except inside a lightbox, where it is turned over again to
+match the stage.
+
+**The trade-off:** greys come out as exact inverses of the light theme's, not
+chosen for the dark — `#f7f7f7` bars are `#080808` — and the logo goes white
+with the rest, which is what it should do. Screen only; print and PNG never
+see it. No `prefers-color-scheme`: the logo is the switch, and the app is
+light until it is pressed.
+
+**Two controls, one behaviour.** The theme button left of Help wears the
+theme it is on (Carbon's `light`; `contrast` for dark, half and half because
+the page stays white; `asleep`, the moon, for the page inverted too); the logo, where the
+theme started, keeps working. Both spread one `themeControl` object, so they
+cannot drift apart.
+
+**A glance at the other dark, never stored.** Hovering either (after
+200ms, so crossing it does not flash the page) or holding it (the tooltip's
+own `TIP_HOLD`, so the tip comes up with it) applies the other dark until the
+pointer leaves or lifts; the stored theme never changes. The Tooltip already
+swallows the click a held tip ends in, so a glance is never also a press. A
+click while the mouse is still over the logo spends the glance until the
+pointer leaves — otherwise the theme just chosen would be hidden under the
+preview of its pair; and a click clears a glance still waiting to start,
+which would otherwise land on the new theme a moment later.
+
+**The template and table pickers fold to a glyph.** Each is a size container
+(`container-type: inline-size`, Widely available) with a set natural width,
+so a query can ask how much of it the row has left without the answer
+changing the question; under 10rem (the template's) or 5rem (the table's, on a
+phone) the label and the name go and the toolbar's glyph sits in the caret
+button. A name squeezed further than that was a sliver under its caret, and
+the caret ran over the swap button beside it.

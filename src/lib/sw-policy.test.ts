@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { handle, precachePaths, SHELL, type RequestFacts } from './sw-policy';
+import { dueForUpdateCheck, handle, precachePaths, SHELL, UPDATE_CHECK_GAP, type RequestFacts } from './sw-policy';
 
 const ORIGIN = 'https://libelli.example';
 
@@ -91,5 +91,13 @@ describe('precachePaths', () => {
 
 	it('ignores anything that is not an absolute path', () => {
 		expect(precachePaths(['https://cdn.example/x.js', './rel.js'], [], [])).toEqual([SHELL]);
+	});
+});
+
+describe('dueForUpdateCheck', () => {
+	it('looks again only after the gap, so a glance away and back asks nothing', () => {
+		expect(dueForUpdateCheck(1000, 1000)).toBe(false);
+		expect(dueForUpdateCheck(1000 + UPDATE_CHECK_GAP - 1, 1000)).toBe(false);
+		expect(dueForUpdateCheck(1000 + UPDATE_CHECK_GAP, 1000)).toBe(true);
 	});
 });

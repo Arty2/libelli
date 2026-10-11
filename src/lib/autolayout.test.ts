@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { GRID_MINOR } from './layout';
+import { DEFAULT_MARGIN } from './template';
 import {
 	autoLayout,
 	charsPerLine,
@@ -27,6 +29,13 @@ describe('columnStats', () => {
 });
 
 describe('classifyColumn', () => {
+	it('reads notes by their heading, singular or plural, however long the cells', () => {
+		const long = 'A note that runs on for long enough to be taken for a body anywhere else. '.repeat(3);
+		expect(kindOf('Footnote', [long, long])).toBe('notes');
+		expect(kindOf('Note', [long, long])).toBe('notes');
+		expect(kindOf('notes', [long, long])).toBe('notes');
+	});
+
 	it('reads a column of links', () => {
 		expect(kindOf('Where', ['https://example.com/a', 'https://example.com/b'])).toBe('link');
 	});
@@ -59,9 +68,31 @@ describe('classifyColumn', () => {
 		expect(kindOf('Subtitle', ['One two three', 'Four five six'])).toBe('subtitle');
 	});
 
+	it('reads a heading lowercased, whatever case it was typed in', () => {
+		expect(kindOf('PHOTO', ['a', 'b'])).toBe('image');
+		expect(kindOf('Category', ['Alpha', 'Beta'])).toBe(kindOf('category', ['Alpha', 'Beta']));
+	});
+
+	it('reads a heading by its last word first, the noun it is about', () => {
+		expect(kindOf('Product Image', ['a', 'b'])).toBe('image');
+		expect(kindOf('note_number', ['a', 'b'])).toBe('number');
+		expect(kindOf('Sub-title', ['One two three', 'Four five six'])).toBe('subtitle');
+	});
+
+	it('knows an image by its cells, whatever the column is called', () => {
+		const drawing = 'data:image/png;base64,' + 'A'.repeat(400);
+		expect(kindOf('Notes', [drawing, drawing])).toBe('image');
+		expect(kindOf('Sketch', ['local:cat.png', '', 'local:dog.jpg'])).toBe('image');
+		expect(kindOf('Stuff', [drawing, 'local:cat.png', 'https://example.com/a.jpg'])).toBe('image');
+	});
+
+	it('does not take one image among words for a column of images', () => {
+		expect(kindOf('Notes', ['local:cat.png', 'a line of words'])).not.toBe('image');
+	});
+
 	it('matches a heading exactly before matching it loosely', () => {
 		// "no" is a number alias; "Notes" must not become one on a substring.
-		expect(kindOf('Notes', ['a note', 'another note'])).toBe('body');
+		expect(kindOf('Notes', ['a note', 'another note'])).toBe('notes');
 	});
 
 	it('lets prose overrule the heading', () => {
@@ -79,11 +110,21 @@ describe('classifyColumn', () => {
 	});
 
 	it('leaves an empty column out', () => {
-		expect(classifyColumn('Spare', ['', '']).kind).toBe('skip');
+		expect(classifyColumn('Spare', ['', '']).include).toBe(false);
 	});
 });
 
 describe('guessRoles', () => {
+	it('makes a prose Notes column the body when nothing else is one, and leaves it notes beside a body', () => {
+		const long = 'Paragraph after paragraph of the card’s own words, which run on well past any footnote. '.repeat(3);
+		const alone = guessRoles(['Title', 'Notes'], [{ Title: 'One', Notes: long }, { Title: 'Two', Notes: long }]);
+		expect(alone.find((g) => g.column === 'Notes')?.kind).toBe('body');
+		const beside = guessRoles(['Title', 'Body', 'Notes'], [{ Title: 'One', Body: long, Notes: long }]);
+		expect(beside.find((g) => g.column === 'Notes')?.kind).toBe('notes');
+		const short = guessRoles(['Title', 'Notes'], [{ Title: 'One', Notes: 'See p. 4' }]);
+		expect(short.find((g) => g.column === 'Notes')?.kind).toBe('notes');
+	});
+
 	const rows = (columns: Record<string, string[]>): Row[] => {
 		const names = Object.keys(columns);
 		const length = Math.max(...names.map((n) => columns[n].length));
@@ -213,14 +254,55 @@ describe('autoLayout', () => {
 		expect(run()).toEqual(run());
 	});
 
+	it('puts a footnote under the body, in small Markdown, and leaves it room above the foot', () => {
+		const withNote = sample.map((r, i) => ({ ...r, footnote: i ? 'See [the guide](https://example.com).' : 'Printed on recycled paper.' }));
+		const { boxes } = autoLayout({ page, defaults, columns: [...columns, 'footnote'], rows: withNote });
+		const bySlot = Object.fromEntries(boxes.map((b) => [b.slot, b]));
+		const note = bySlot.footnote;
+		expect(note.mode).toBe('markdown');
+		expect(note.anchor?.to).toBe(bySlot.body.id);
+		expect(note.size).toBeLessThan(bySlot.body.size!);
+		// The body stops short of the foot by the note's line and a gap, so the
+		// note lands above the foot rather than over it.
+		const footTop = Math.min(...boxes.filter((b) => !b.anchor && b.y > bySlot.body.y).map((b) => b.y));
+		expect(bySlot.body.y + bySlot.body.h + GRID_MINOR + note.h).toBeLessThanOrEqual(footTop);
+	});
+
 	it('takes the roles it is given over the ones it would guess', () => {
 		const roles: FieldGuess[] = [
 			{ column: 'title', kind: 'body', sure: true, sample: 'Start here' },
-			{ column: 'body', kind: 'skip', sure: true, sample: '' }
+			{ column: 'body', kind: 'body', sure: true, sample: '', include: false }
 		];
 		const { boxes } = autoLayout({ page, defaults, columns, rows: sample, roles });
 		expect(boxes.find((b) => b.slot === 'title')?.mode).toBe('markdown');
 		expect(boxes.some((b) => b.slot === 'body')).toBe(false);
+	});
+
+	it('lays out inside the page margins, the same all round by default', () => {
+		for (const size of [page, { ...page, w: page.h, h: page.w }, { ...page, w: 90, h: 55 }]) {
+			const { boxes } = autoLayout({ page: size, defaults, columns, rows: sample });
+			const lefts = boxes.map((b) => b.x);
+			const rights = boxes.map((b) => size.w - (b.x + b.w));
+			expect(Math.min(...lefts)).toBeCloseTo(DEFAULT_MARGIN, 6);
+			expect(Math.min(...rights)).toBeCloseTo(DEFAULT_MARGIN, 6);
+			expect(Math.min(...boxes.map((b) => b.y))).toBeCloseTo(DEFAULT_MARGIN, 6);
+			// Heights in whole grid steps, and the stack from the top margin down
+			// on the grid. The footer sits on the bottom margin instead, which is
+			// only a grid line where the page's height allows.
+			for (const b of boxes) expect(b.h % GRID_MINOR).toBeCloseTo(0, 6);
+			const bottom = size.h - DEFAULT_MARGIN;
+			for (const b of boxes.filter((b) => (b.anchor || b.y === DEFAULT_MARGIN) && b.y + b.h < bottom - 1e-6)) {
+				expect(b.y % GRID_MINOR).toBeCloseTo(0, 6);
+			}
+		}
+	});
+
+	it('follows margins the page sets, edge by edge', () => {
+		const framed = { ...page, margin: { top: 20, right: 8, bottom: 15, left: 12 } };
+		const { boxes } = autoLayout({ page: framed, defaults, columns, rows: sample });
+		expect(Math.min(...boxes.map((b) => b.x))).toBe(12);
+		expect(Math.min(...boxes.map((b) => framed.w - (b.x + b.w)))).toBeCloseTo(8, 6);
+		expect(Math.min(...boxes.map((b) => b.y))).toBe(20);
 	});
 
 	it('has nothing to lay out when there are no columns', () => {
@@ -263,5 +345,142 @@ describe('autoLayout', () => {
 			result.boxes.find((b) => b.slot === 'title')?.size ?? 0;
 		expect(titleSize(small)).toBeLessThan(titleSize(large));
 		for (const box of small.boxes) expect(box.x + box.w).toBeLessThanOrEqual(74);
+	});
+});
+
+describe('an exhibition label', () => {
+	const rows: Row[] = [
+		{
+			Artist: 'Ada Example',
+			'Artwork title': 'Tide Line',
+			Medium: 'Oil on linen',
+			Description: 'A long horizon painted over a week of low tides, '.repeat(4),
+			Duration: '90',
+			Credits: 'Courtesy of the artist and Example Gallery'
+		},
+		{
+			Artist: 'Bo Sample',
+			'Artwork title': 'Night Shift',
+			Medium: 'Single-channel video',
+			Description: 'Twelve hours of a harbour crane, cut to the length of one song. '.repeat(3),
+			Duration: '12',
+			Credits: 'Collection of the Example Foundation'
+		}
+	];
+	const columns = ['Artist', 'Artwork title', 'Medium', 'Description', 'Duration', 'Credits'];
+	const kinds = () => Object.fromEntries(guessRoles(columns, rows).map((g) => [g.column, g.kind]));
+
+	it('takes the artist for the title and the work for the subtitle', () => {
+		const k = kinds();
+		expect(k.Artist).toBe('title');
+		expect(k['Artwork title']).toBe('subtitle');
+	});
+
+	it('reads the medium and the duration as detail lines, the credits as the credit line', () => {
+		const k = kinds();
+		expect(k.Medium).toBe('detail');
+		// A Duration of plain numbers is still a detail, by its heading.
+		expect(k.Duration).toBe('detail');
+		expect(k.Description).toBe('body');
+		expect(k.Credits).toBe('credit');
+	});
+
+	it('does the same for a plain Title beside a person', () => {
+		const k = Object.fromEntries(
+			guessRoles(['Title', 'Author'], [{ Title: 'A Book', Author: 'Cy Writer' }]).map((g) => [g.column, g.kind])
+		);
+		expect(k).toEqual({ Title: 'subtitle', Author: 'title' });
+	});
+
+	it('stacks the details under the subtitle and puts the credit at the very bottom', () => {
+		const { boxes } = autoLayout({ page, defaults, columns, rows });
+		const by = Object.fromEntries(boxes.map((b) => [b.slot, b]));
+		const id = (slot: string) => by[slot].id;
+		expect(by['Artwork title'].anchor?.to).toBe(id('Artist'));
+		expect(by.Medium.anchor?.to).toBe(id('Artwork title'));
+		expect(by.Duration.anchor?.to).toBe(id('Medium'));
+		expect(by.Description.anchor?.to).toBe(id('Duration'));
+		const lowest = Math.max(...boxes.map((b) => b.y + b.h));
+		expect(by.Credits.y + by.Credits.h).toBeCloseTo(lowest, 6);
+		expect(by.Credits.anchor).toBeNull();
+	});
+
+	it('keeps the credit line when the foot runs out of room', () => {
+		const many = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].map((c) => `Tag ${c}`);
+		const cols = [...many, 'Credits'];
+		const row = Object.fromEntries(cols.map((c) => [c, c === 'Credits' ? 'Courtesy of someone' : 'x']));
+		const roles: FieldGuess[] = cols.map((c) => ({ column: c, kind: c === 'Credits' ? 'credit' : 'label', sure: true, sample: '' }));
+		const { boxes, left } = autoLayout({ page, defaults, columns: cols, rows: [row], roles });
+		expect(boxes.some((b) => b.slot === 'Credits')).toBe(true);
+		expect(left).not.toContain('Credits');
+	});
+});
+
+
+describe('codes from the cells', () => {
+	it('reads a column of addresses a phone opens as links — www., mailto:, tel: as well', () => {
+		const kind = (values: string[]) => classifyColumn('Where', values).kind;
+		expect(kind(['https://a.example/1', 'http://b.example'])).toBe('link');
+		expect(kind(['www.a.example', 'www.b.example/page'])).toBe('link');
+		expect(kind(['mailto:hi@a.example', 'tel:+301234567'])).toBe('link');
+		// A file name is as often a file as a site.
+		expect(kind(['notes.txt', 'plan.pdf'])).not.toBe('link');
+	});
+
+	it('reads a column of ISBNs or retail numbers as a barcode, by their check digits', () => {
+		expect(classifyColumn('Book', ['978-0-306-40615-7', '0-8044-2957-X']).kind).toBe('barcode');
+		expect(classifyColumn('Product', ['4006381333931', '5901234123457']).kind).toBe('barcode');
+		// Called ISBN, but not one: text, since a barcode would print nothing.
+		expect(classifyColumn('ISBN', ['978-0-306-40615-8', 'tbc']).kind).toBe('code');
+		// Thirteen digits that happen to pass once are not a column of them.
+		expect(classifyColumn('Phone', ['4006381333931', '2101234567891']).kind).not.toBe('barcode');
+	});
+
+	it('keeps one barcode, and prints another column of them as text', () => {
+		const rows = [
+			{ title: 'One', isbn: '9780306406157', ean: '4006381333931' },
+			{ title: 'Two', isbn: '0-8044-2957-X', ean: '5901234123457' }
+		];
+		const kinds = guessRoles(['title', 'isbn', 'ean'], rows).map((g) => g.kind);
+		expect(kinds.filter((k) => k === 'barcode')).toHaveLength(1);
+		expect(kinds).toContain('code');
+	});
+
+	it('puts the barcode in the foot, left of the QR, the lines short of both', () => {
+		const rows = [
+			{ title: 'Ferns of the north', isbn: '9780306406157', link: 'https://a.example/1', shelf: 'B2' },
+			{ title: 'Mosses', isbn: '9780804429573', link: 'https://a.example/2', shelf: 'C4' }
+		];
+		const { boxes } = autoLayout({ page, defaults: DEFAULT_DEFAULTS, columns: ['title', 'isbn', 'link', 'shelf'], rows });
+		const code = boxes.find((b) => b.slot === 'isbn')!;
+		const qr = boxes.find((b) => b.slot === 'link')!;
+		const shelf = boxes.find((b) => b.slot === 'shelf')!;
+		expect(code.mode).toBe('qr');
+		expect(code.qr?.kind).toBe('ean13');
+		expect(qr.qr?.kind).toBeUndefined();
+		// Side by side, the barcode first, neither over the other.
+		expect(code.x + code.w).toBeLessThanOrEqual(qr.x);
+		expect(code.y + code.h).toBeCloseTo(qr.y + qr.h);
+		// The foot's lines stop short of the barcode.
+		expect(shelf.x + shelf.w).toBeLessThanOrEqual(code.x);
+	});
+});
+
+describe('codes from the cells, at the edges', () => {
+	it('does not take twelve-digit numbers for barcodes', () => {
+		expect(classifyColumn('Phone', ['447700900123', '447700900456']).kind).not.toBe('barcode');
+	});
+
+	it('prints the code as a line on a card too narrow for a barcode beside the words', () => {
+		const narrow: PageSpec = { w: 54, h: 86, unit: 'mm', background: '#ffffff' };
+		const rows = [
+			{ title: 'Ferns', isbn: '9780306406157', link: 'https://a.example/1' },
+			{ title: 'Mosses', isbn: '9780804429573', link: 'https://a.example/2' }
+		];
+		const { boxes } = autoLayout({ page: narrow, defaults, columns: ['title', 'isbn', 'link'], rows });
+		const code = boxes.find((b) => b.slot === 'isbn')!;
+		expect(code.mode).toBe('plain');
+		for (const box of boxes) expect(box.w).toBeGreaterThan(0);
+		for (const box of boxes) expect(box.x).toBeGreaterThanOrEqual(0);
 	});
 });

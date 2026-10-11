@@ -30,11 +30,25 @@
 		ontemplatechange: (template: Template) => void;
 		onuploadbackground: (file: File) => void;
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
+		/**
+		 * Recto / Verso, the page setting, repeated here. Only on the print screen:
+		 * it decides which edge is outer, and so the order a zine folds in, and
+		 * that is where it is found wanting — in the page bar it is already beside
+		 * the page size.
+		 */
+		showFacing?: boolean;
 	}
 
-	let { template, pageFrozen, ontemplatechange, onuploadbackground, onnotice }: Props = $props();
+	let { template, pageFrozen, ontemplatechange, onuploadbackground, onnotice, showFacing = false }: Props = $props();
 
 	let imageInput = $state<HTMLInputElement | null>(null);
+	/**
+	 * The bookbinder's name for a sheet carrying that many pages a side: folded
+	 * once it is a folio, twice a quarto, three times an octavo. Six has no fold
+	 * and so no name.
+	 */
+	const FORMAT_NAMES: Partial<Record<number, string>> = { 2: 'Folio', 4: 'Quarto', 8: 'Octavo' };
+
 	let perSheetSelect = $state<HTMLSelectElement | null>(null);
 	let sheetPresetSelect = $state<HTMLSelectElement | null>(null);
 
@@ -191,10 +205,11 @@
 	}
 </script>
 
-<!-- The card's own bleed, here rather than only in the Card size group: it is a
-     print decision, and the print screen is where you are when you notice the
-     cards need one. -->
-<span class="group" role="group" aria-label="Page bleed">
+<!-- The card's own bleed, here as well as in the page bar: it is a print
+     decision, and the print screen is where you are when you notice the cards
+     need one. -->
+<fieldset class="group">
+	<legend>Bleed</legend>
 	<label class="check">
 		<input
 			type="checkbox"
@@ -276,9 +291,22 @@
 			</label>
 		{/if}
 	{/if}
-</span>
+</fieldset>
 
-<span class="group" role="group" aria-label="Print Settings">
+<fieldset class="group sheet-group">
+	<legend>Printing</legend>
+	{#if showFacing}
+		<label class="check">
+			<input
+				type="checkbox"
+				checked={!!template.facing}
+				title="Odd rows are right-hand pages and even rows their facing left-hand pages — the same setting as Recto / Verso in the page bar"
+				disabled={pageFrozen}
+				onchange={(e) => ontemplatechange({ ...template, facing: e.currentTarget.checked || undefined })}
+			/>
+			Recto / Verso
+		</label>
+	{/if}
 	<label class="field">
 		<span>Pages per Sheet</span>
 		<select
@@ -296,7 +324,7 @@
 		>
 			<option value="">Off</option>
 			{#each IMPOSITION_COUNTS as count (count)}
-				<option value={count}>{count}-up</option>
+				<option value={count}>{count}-up{FORMAT_NAMES[count] ? ` · ${FORMAT_NAMES[count]}` : ''}</option>
 			{/each}
 		</select>
 	</label>
@@ -305,12 +333,12 @@
 			<span>Order</span>
 			<select
 				value={template.print.order}
-				title="Sequential fills each sheet in reading order, to cut apart. Zinemaker lays the pages out so that folding the sheet gives a booklet that reads 1, 2, 3"
+				title="Sequential fills each sheet in reading order, to cut apart. Zine lays the pages out so that folding the sheet gives a booklet that reads 1, 2, 3"
 				disabled={pageFrozen}
 				onchange={(e) => patchPrint({ order: e.currentTarget.value as SheetOrder })}
 			>
 				<option value="sequential">Sequential</option>
-				<option value="zine">Zinemaker</option>
+				<option value="zine">Zine</option>
 			</select>
 		</label>
 		{#if zineHint}
@@ -391,7 +419,7 @@
 				Scaled to {Math.round(fit.scale * 100)}%
 			</span>
 		{/if}
-		<span class="field-label">Sheet Image</span>
+		<span class="field-label">Image</span>
 		{#if template.print.background}
 			<span class="asset" title={template.print.background.src}>
 				<Icon name={template.print.background.source === 'url' ? 'link' : 'image'} size={12} />
@@ -420,14 +448,14 @@
 		{:else}
 			<button
 				disabled={pageFrozen}
-				title="A file from this machine; the picture stays in this browser, the template only names it"
-				onclick={() => imageInput?.click()}>Upload…</button
+				title="A file from this machine; the image stays in this browser, the template only names it"
+				onclick={() => imageInput?.click()}><Icon name="image-reference" size={14} /> Upload…</button
 			>
 			<button disabled={pageFrozen} title="An http(s) address the template will carry as written" onclick={linkBackground}
-				>URL…</button
+				><Icon name="copy-link" size={14} /> URL…</button
 			>
 		{/if}
 	{/if}
-</span>
+</fieldset>
 
 <input bind:this={imageInput} type="file" accept="image/*" hidden onchange={uploadBackground} />

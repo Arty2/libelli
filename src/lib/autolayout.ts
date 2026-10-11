@@ -1,5 +1,8 @@
+import { localImageName } from './assets';
+import { eanDigits } from './barcode';
 import { parseColor } from './color';
-import { newBox } from './template';
+import { GRID_MINOR } from './layout';
+import { marginsOf, newBox } from './template';
 import type { Box, Defaults, Mapping, PageSpec, Row } from './types';
 
 /**
@@ -31,22 +34,36 @@ import type { Box, Defaults, Mapping, PageSpec, Row } from './types';
  * What a column is *for*. Two sorts of thing, and the difference matters when
  * the signals disagree:
  *
- * `image`, `link`, `number` and `date` are shapes — checkable facts about the
- * cells, so the data wins over the heading. `title`, `subtitle`, `body`,
+ * `image`, `link`, `barcode`, `number` and `date` are shapes — checkable facts
+ * about the cells, so the data wins over the heading. A `barcode` is a column
+ * of retail numbers or ISBNs that pass their check digits, drawn as EAN-13; a
+ * column only called ISBN, holding anything else, is a `code` printed as text,
+ * since a barcode refuses what it cannot encode and would print nothing. `title`, `subtitle`, `body`,
  * `label` and `code` are roles — nothing in a string of forty characters says
  * whether it is a heading or a caption, so the heading wins over the data.
+ *
+ * Two roles are small lines with a place of their own. A `detail` stacks under
+ * the subtitle — the medium of a work, a film's duration, a size — because it
+ * belongs to the heading it describes. A `credit` is the very last line of the
+ * card, under the rest of the foot, where a credit line is printed. A
+ * `notes` is small type straight under the body — Markdown, like the body,
+ * since a note is often a sentence with a link in it — and the body leaves it
+ * room above the foot rather than running down to it.
  */
 export type FieldKind =
 	| 'title'
 	| 'subtitle'
+	| 'detail'
 	| 'body'
+	| 'notes'
 	| 'label'
+	| 'credit'
 	| 'number'
 	| 'date'
 	| 'image'
 	| 'link'
-	| 'code'
-	| 'skip';
+	| 'barcode'
+	| 'code';
 
 /** A column, what it was taken for, and how much of that was a guess. */
 export interface FieldGuess {
@@ -60,37 +77,68 @@ export interface FieldGuess {
 	sure: boolean;
 	/** the first non-empty cell, for the dialog to show beside the choice */
 	sample: string;
+	/**
+	 * Whether the column gets an area at all. A switch beside the kind rather
+	 * than one more kind: leaving a column out is not a thing a column *is*,
+	 * and folding it into the same menu meant that putting one back asked you
+	 * to guess again what it had been taken for. Absent counts as included,
+	 * which is what every guess made before this existed was.
+	 */
+	include?: boolean;
 }
 
 export const FIELD_KINDS: FieldKind[] = [
 	'title',
 	'subtitle',
+	'detail',
 	'body',
+	'notes',
 	'label',
 	'number',
 	'date',
 	'image',
 	'link',
+	'barcode',
 	'code',
-	'skip'
+	'credit'
 ];
 
 export const KIND_LABELS: Record<FieldKind, string> = {
 	title: 'Title',
 	subtitle: 'Subtitle',
+	detail: 'Detail',
 	body: 'Body',
-	label: 'Small line',
+	notes: 'Notes',
+	label: 'Byline',
 	number: 'Number',
 	date: 'Date',
-	image: 'Picture',
+	image: 'Image',
 	link: 'QR code',
+	barcode: 'Barcode',
 	code: 'Code',
-	skip: 'Leave out'
+	credit: 'Credit'
 };
 
 // ---- reading a column ------------------------------------------------------
 
-const normalise = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+/**
+ * A heading, lowercased first — every hint below is lowercase, and `Photo`,
+ * `PHOTO` and `photo` are one heading — then taken apart into its words.
+ * Letters and digits in any script count, so a heading in Greek is words
+ * rather than nothing; the hints themselves are English.
+ */
+const headingWords = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+/**
+ * Headings that name a person. A person is the title of their own card — an
+ * artist's name over the work, a speaker's over the talk — so where one of
+ * these sits beside a column called Title, the person takes the title and the
+ * Title column, which is then the name of the work, becomes the subtitle. See
+ * `guessRoles`.
+ */
+const PEOPLE = ['artist', 'artists', 'author', 'authors', 'creator', 'maker', 'designer', 'photographer', 'illustrator', 'architect', 'director', 'composer', 'performer', 'musician', 'band', 'speaker', 'presenter', 'host', 'guest', 'writer', 'poet', 'curator', 'person', 'who', 'by', 'student', 'member', 'employee', 'player'];
+
+const isPerson = (column: string) => headingWords(column).some((word) => PEOPLE.includes(word));
 
 /**
  * Headings that name a role outright. Longest-standing spreadsheet habits
@@ -98,31 +146,55 @@ const normalise = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
  * cells, which is the more reliable signal anyway.
  */
 const NAME_HINTS: Array<[FieldKind, string[]]> = [
-	['title', ['title', 'name', 'heading', 'header', 'card', 'product', 'item', 'term', 'word', 'question']],
-	['subtitle', ['subtitle', 'sub', 'tagline', 'caption', 'role', 'byline', 'strapline', 'summary']],
-	['body', ['body', 'content', 'text', 'description', 'notes', 'note', 'detail', 'details', 'answer', 'markdown', 'definition']],
-	['label', ['category', 'tag', 'tags', 'section', 'group', 'type', 'kind', 'class', 'status', 'level', 'set']],
-	['number', ['price', 'cost', 'amount', 'qty', 'quantity', 'count', 'number', 'no', 'num', 'score', 'points', 'value', 'weight', 'size']],
-	['date', ['date', 'day', 'when', 'year', 'created', 'updated', 'due', 'expires', 'published']],
-	['image', ['image', 'img', 'photo', 'picture', 'logo', 'avatar', 'cover', 'thumbnail', 'thumb', 'icon', 'art', 'illustration', 'color', 'colour', 'background']],
-	['link', ['link', 'url', 'qr', 'website', 'web', 'href', 'address', 'permalink']],
-	['code', ['code', 'id', 'sku', 'ref', 'reference', 'isbn', 'serial', 'barcode', 'slug']]
+	// `detail` and `credit` first: they are the most specific, and a heading
+	// that names one — Running time, Photo credit — is sure of it.
+	['detail', ['medium', 'media', 'material', 'materials', 'technique', 'dimensions', 'duration', 'runtime', 'runningtime', 'length', 'edition', 'format', 'instrumentation', 'ingredients']],
+	// Notes, under either name and in either number: a column called Note is
+	// as much a note as one called Footnotes, and it used to be read as body.
+	['notes', ['note', 'notes', 'footnote', 'footnotes', 'endnote', 'endnotes', 'annotation', 'annotations', 'sidenote', 'sidenotes', 'aside', 'fn']],
+	['credit', ['credit', 'credits', 'photocredit', 'copyright', 'courtesy', 'acknowledgement', 'acknowledgements', 'acknowledgment', 'rights', 'license', 'licence', 'collection', 'lender', 'provenance', 'source', 'sponsor', 'sponsors', 'funding']],
+	['title', ['title', 'name', 'heading', 'header', 'headline', 'card', 'product', 'item', 'term', 'word', 'question', ...PEOPLE]],
+	['subtitle', ['subtitle', 'sub', 'tagline', 'caption', 'role', 'byline', 'strapline', 'summary', 'artwork', 'work', 'piece', 'series', 'album', 'track', 'song', 'film', 'book', 'show', 'project', 'position', 'jobtitle', 'affiliation', 'organisation', 'organization', 'company']],
+	['body', ['body', 'content', 'text', 'description', 'desc', 'detail', 'details', 'answer', 'markdown', 'definition', 'about', 'bio', 'biography', 'statement', 'abstract', 'synopsis', 'blurb', 'story', 'excerpt', 'quote', 'comment', 'comments', 'review', 'overview', 'info', 'information']],
+	['label', ['category', 'tag', 'tags', 'section', 'group', 'type', 'kind', 'class', 'status', 'level', 'set', 'genre', 'theme', 'topic', 'location', 'venue', 'place', 'room', 'city', 'country', 'origin', 'language', 'department']],
+	['number', ['price', 'cost', 'amount', 'qty', 'quantity', 'count', 'number', 'no', 'num', 'score', 'points', 'value', 'weight', 'size', 'rating', 'rank', 'total', 'pages', 'age', 'fee']],
+	['date', ['date', 'dates', 'day', 'when', 'year', 'created', 'updated', 'due', 'expires', 'published', 'released', 'born', 'died', 'time', 'period', 'era', 'season', 'deadline']],
+	['image', ['image', 'img', 'photo', 'picture', 'logo', 'avatar', 'cover', 'thumbnail', 'thumb', 'icon', 'art', 'illustration', 'color', 'colour', 'background', 'portrait', 'headshot', 'still', 'poster']],
+	['link', ['link', 'url', 'qr', 'website', 'web', 'href', 'address', 'permalink', 'site', 'homepage', 'instagram']],
+	['code', ['code', 'id', 'sku', 'ref', 'reference', 'isbn', 'serial', 'barcode', 'slug', 'catalogue', 'catalog', 'inventory', 'accession', 'lot']]
 ];
 
 const nameKind = (column: string): FieldKind | undefined => {
-	const key = normalise(column);
+	const words = headingWords(column);
+	const key = words.join('');
 	if (!key) return undefined;
-	// Exact match first: a column called "Notes" is a body, but "Note number"
-	// should not become one on the strength of its first word.
-	for (const [kind, words] of NAME_HINTS) if (words.includes(key)) return kind;
-	for (const [kind, words] of NAME_HINTS) {
-		if (words.some((word) => word.length > 3 && key.includes(word))) return kind;
+	const known = (word: string) => NAME_HINTS.find(([, hints]) => hints.includes(word))?.[0];
+	// The whole heading, run together, first: "Sub-title" is a subtitle.
+	const whole = known(key);
+	if (whole) return whole;
+	// Then word by word, from the last: in English the noun a heading is about
+	// comes last, so "Product image" is an image and "Note number" a number —
+	// read from the front, both were taken for what their first word names.
+	for (const word of [...words].reverse()) {
+		const kind = known(word);
+		if (kind) return kind;
+	}
+	// Last, a hint inside a word, for headings written as one: "coverphoto".
+	// Only hints of four letters or more, so "no" is not found in "Notes".
+	for (const [kind, hints] of NAME_HINTS) {
+		if (hints.some((hint) => hint.length > 3 && key.includes(hint))) return kind;
 	}
 	return undefined;
 };
 
 const IMAGE_FILE = /\.(png|jpe?g|gif|webp|avif|svg|bmp)(\?|#|$)/i;
 const HTTP_URL = /^https?:\/\/\S+$/i;
+/**
+ * Something a phone opens when it scans it: a web address, with its scheme or
+ * starting `www.`, or a `mailto:` or `tel:`. Not a bare `name.ext`, which is as
+ * often a file as a site.
+ */
+const SCANNABLE = /^(?:https?:\/\/|www\.[^\s.]+\.|mailto:|tel:)\S+$/i;
 // A number, with the punctuation people actually type: currency, thousands
 // separators, a trailing percent, a leading minus.
 const NUMERIC = /^[-+]?[£$€¥]?\s?\d{1,3}(?:[ ,]\d{3})*(?:[.,]\d+)?\s?%?$/;
@@ -169,8 +241,27 @@ function shapeKind(values: string[]): FieldKind | undefined {
 	const filled = values.map((v) => (v ?? '').trim()).filter(Boolean);
 	if (!filled.length) return undefined;
 	const every = (test: (v: string) => boolean) => filled.every(test);
-	if (every((v) => HTTP_URL.test(v))) return every((v) => IMAGE_FILE.test(v)) ? 'image' : 'link';
-	// A column of colors is a picture as far as a box is concerned: an `image`
+	// Images, by what the cell holds rather than what the column is called:
+	// a drawing or a pasted picture is a `data:image` URL, a stored one is
+	// `local:name`, and an address from elsewhere ends in an image file's name.
+	// First, because a drawing is a long cell and would otherwise read as prose.
+	const isImage = (v: string) =>
+		/^data:image\//i.test(v) || localImageName(v) !== null || (HTTP_URL.test(v) && IMAGE_FILE.test(v));
+	if (every(isImage)) return 'image';
+	if (every((v) => SCANNABLE.test(v))) return 'link';
+	// Every cell a retail number or an ISBN with a right check digit. Before
+	// numbers, which a run of thirteen digits never matches anyway, and more
+	// than one cell, since one number in ten passes a check digit by chance.
+	// Whole codes only: thirteen digits that carry their own check, or an
+	// ISBN-10 with its own. Twelve would be given a check digit by the encoder,
+	// and any twelve-digit phone number or order id would pass.
+	const whole = (v: string) => {
+		const digits = v.replace(/[\s-]/g, '');
+		return (digits.length === 13 || digits.length === 10) && eanDigits(v) !== null;
+	};
+	if (filled.length > 1 && every(whole)) return 'barcode';
+	if (filled.length === 1 && whole(filled[0]) && /^97[89]/.test(eanDigits(filled[0])!)) return 'barcode';
+	// A column of colors is an image as far as a box is concerned: an `image`
 	// box shows whatever its source resolves to, and a color resolves to a fill.
 	if (every((v) => parseColor(v) !== null)) return 'image';
 	if (every((v) => NUMERIC.test(v))) return 'number';
@@ -194,12 +285,25 @@ export function classifyColumn(column: string, values: string[]): FieldGuess {
 	const shape = shapeKind(values);
 	const named = nameKind(column);
 
-	if (stats.filled === 0) return { column, kind: 'skip', sure: false, sample };
+	// Nothing in it to print, so it starts left out — as a small line, which is
+	// what it becomes if it is let back in and then filled.
+	if (stats.filled === 0) return { column, kind: 'label', sure: false, sample, include: false };
 
+	// A footnote is named, never measured: it is prose by nature, and the
+	// heading is the one thing that tells it from the body it sits under.
+	if (named === 'notes' && shape !== 'image' && shape !== 'link' && shape !== 'barcode') {
+		return { column, kind: 'notes', sure: true, sample };
+	}
 	// Prose is the one thing that overrules a shape: a column of long text is a
 	// body even where every cell happens to parse as something else.
 	const prose = stats.median > BODY_LENGTH || values.some((v) => MARKUP.test(v ?? ''));
 	if (prose && shape !== 'image' && shape !== 'link') return { column, kind: 'body', sure: true, sample };
+	// A heading that names a detail or a credit outright beats a column of
+	// numbers: a Duration of 90 is still the line under the subtitle, not a
+	// figure in the foot. Pictures and links are facts about the cells, and win.
+	if (shape === 'number' && (named === 'detail' || named === 'credit')) {
+		return { column, kind: named, sure: true, sample };
+	}
 	if (shape) return { column, kind: shape, sure: true, sample };
 	if (named) return { column, kind: named, sure: true, sample };
 
@@ -226,21 +330,49 @@ export function guessRoles(columns: string[], rows: Row[]): FieldGuess[] {
 		classifyColumn(column, rows.map((row) => row[column] ?? ''))
 	);
 
-	const only = (kind: FieldKind, keep: (g: FieldGuess) => boolean) => {
+	// A Notes column is notes beside a body. Where nothing else is prose and
+	// it is — paragraphs, not a line — it is the card's text, and laying it
+	// out as a grey footnote under an empty body was the wrong way round. The
+	// first such one, in column order; any others stay notes.
+	if (!guesses.some((g) => g.kind === 'body' && g.include !== false)) {
+		const prose = guesses.find((g) => {
+			if (g.kind !== 'notes' || g.include === false) return false;
+			const values = rows.map((row) => row[g.column] ?? '');
+			return columnStats(values).median > BODY_LENGTH || values.some((v) => MARKUP.test(v));
+		});
+		if (prose) prose.kind = 'body';
+	}
+
+	const only = (kind: FieldKind, keep: (g: FieldGuess) => boolean, demote: FieldKind = 'label') => {
 		let kept = false;
 		for (const guess of guesses) {
-			if (guess.kind !== kind) continue;
+			if (guess.kind !== kind || guess.include === false) continue;
 			if (!kept && keep(guess)) {
 				kept = true;
 				continue;
 			}
 			// Demoted rather than dropped: a second title is still worth printing,
 			// just not as the title.
-			guess.kind = 'label';
+			guess.kind = demote;
 			guess.sure = false;
 		}
 		return kept;
 	};
+
+	// A person and a title both claim the title: the person has it, and the
+	// Title column — the name of their work — is the subtitle, ahead of any
+	// column that only called itself a subtitle. An artist over the artwork,
+	// an author over the book.
+	const titled = guesses.filter((g) => g.kind === 'title' && g.include !== false);
+	const person = titled.find((g) => isPerson(g.column));
+	let work: FieldGuess | undefined;
+	if (person) {
+		for (const guess of titled) {
+			if (guess === person || isPerson(guess.column)) continue;
+			guess.kind = 'subtitle';
+			work ??= guess;
+		}
+	}
 
 	// The body is the longest of the candidates rather than the first: where two
 	// columns both read as prose, the card wants the one with more in it. By the
@@ -256,14 +388,19 @@ export function guessRoles(columns: string[], rows: Row[]): FieldGuess[] {
 			null
 		);
 	only('body', (g) => g === widest);
+	// One barcode to a card's foot; another column of them is printed as text.
+	only('barcode', () => true, 'code');
 
-	const hasTitle = only('title', () => true);
-	only('subtitle', () => true);
+	const hasTitle = only('title', (g) => !person || g === person);
+	// A second subtitle is a line under the first rather than one in the foot.
+	only('subtitle', (g) => !work || g === work, 'detail');
 
 	// No column said it was the title, so the first line-length column becomes
 	// one. A card with no heading at all reads as a paragraph on a page.
 	if (!hasTitle) {
-		const candidate = guesses.find((g) => g.kind === 'label' || g.kind === 'subtitle');
+		const candidate = guesses.find(
+			(g) => g.include !== false && (g.kind === 'label' || g.kind === 'subtitle')
+		);
 		if (candidate) {
 			candidate.kind = 'title';
 			candidate.sure = false;
@@ -338,12 +475,31 @@ export interface AutoLayoutResult {
 export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	const { page, defaults, columns, rows } = input;
 	const nextId = input.nextId ?? autoId();
-	const guesses = (input.roles ?? guessRoles(columns, rows)).filter((g) => columns.includes(g.column));
+	const guesses = (input.roles ?? guessRoles(columns, rows)).filter(
+		(g) => columns.includes(g.column) && g.include !== false
+	);
 
-	const margin = clamp(Math.round(Math.min(page.w, page.h) * 0.08), 6, 14);
-	const contentW = Math.max(10, page.w - margin * 2);
-	const contentH = Math.max(10, page.h - margin * 2);
-	const gap = round(margin * 0.45);
+	/*
+	 * Inside the page's own margins — the ones the page bar sets and the guides
+	 * draw — so a generated card sits in the same frame a hand-placed one snaps
+	 * to, the same distance from every edge unless the margins say otherwise.
+	 * Within that frame, heights and the gaps between areas are whole grid
+	 * steps, so the stack lines up with the grid down the page; the widths run
+	 * margin to margin whatever that comes to, because a page need not be a
+	 * whole number of steps wide and equal margins matter more than a right
+	 * edge on a grid line.
+	 */
+	const G = GRID_MINOR;
+	const up = (v: number) => Math.ceil(v / G - 1e-9) * G;
+	const down = (v: number) => Math.floor(v / G + 1e-9) * G;
+	const frame = marginsOf(page);
+	const margin = frame.left;
+	const top = frame.top;
+	const rightEdge = Math.max(margin + 2 * G, page.w - frame.right);
+	const bottomEdge = Math.max(top + 2 * G, page.h - frame.bottom);
+	const contentW = rightEdge - margin;
+	const contentH = bottomEdge - top;
+	const gap = G;
 
 	const boxes: Box[] = [];
 	const mapping: Mapping = {};
@@ -362,22 +518,45 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	// ---- the foot, measured first so the middle knows where it ends ----------
 
 	const smallSize = round(clamp(contentW * 0.075, 6, 9.5), 1);
-	const smallH = round(textHeight(smallSize, 1.2), 1);
+	const smallH = up(textHeight(smallSize, 1.2));
 
 	const linkField = pick('link');
-	const qrSide = linkField ? round(clamp(contentW * 0.16, 14, 26)) : 0;
+	const qrSide = linkField ? up(clamp(contentW * 0.16, 14, 26)) : 0;
+	// An EAN-13 is 37mm wide at its nominal size and prints well down to about
+	// 80%; wide and short, with the digits under it.
+	// Only where the foot keeps room for a line of words beside it: on a card
+	// too narrow for both, the code is printed as text, as a second one is.
+	const FOOT_TEXT_MIN = 24;
+	const fits = contentW - (qrSide ? qrSide + gap : 0) - (up(clamp(contentW * 0.42, 30, 45)) + gap) >= FOOT_TEXT_MIN;
+	const wantedBarcode = pick('barcode');
+	const barcodeField = fits ? wantedBarcode : undefined;
+	const barcodeW = barcodeField ? up(clamp(contentW * 0.42, 30, 45)) : 0;
+	const barcodeH = barcodeField ? up(clamp(barcodeW * 0.5, 14, 22)) : 0;
 
 	// Whatever is short and not already spoken for, in column order. Capped by
 	// the room a foot may take rather than by a count: a quarter of the card is
 	// as much as a footer can have before it is a second body, and how many
 	// lines that buys depends on the page, not on a number chosen here.
-	const footFields = guesses.filter((g) => ['label', 'number', 'date', 'code'].includes(g.kind));
+	// Credits last, at the very bottom, and kept first when the room runs out:
+	// a credit line is the one line of a foot that is owed rather than chosen.
+	const credits = guesses.filter((g) => g.kind === 'credit');
+	const footFields = [
+		...guesses.filter(
+			(g) => ['label', 'number', 'date', 'code'].includes(g.kind) || (g === wantedBarcode && !barcodeField)
+		),
+		...credits
+	];
 	const footCapacity = Math.max(1, Math.floor((contentH * 0.25) / smallH));
-	const footLines = footFields.slice(0, footCapacity);
-	const footH = Math.max(footLines.length * smallH, qrSide);
-	const footTop = round(page.h - margin - footH);
-	// The foot's left column stops short of the QR rather than running under it.
-	const footW = round(qrSide ? contentW - qrSide - gap : contentW);
+	const keptCredits = credits.slice(0, footCapacity);
+	const footLines = [
+		...footFields.filter((g) => g.kind !== 'credit').slice(0, footCapacity - keptCredits.length),
+		...keptCredits
+	];
+	const footH = Math.max(footLines.length * smallH, qrSide, barcodeH);
+	const footTop = bottomEdge - footH;
+	// The foot's left column stops short of the QR and the barcode rather than
+	// running under them.
+	const footW = contentW - (qrSide ? qrSide + gap : 0) - (barcodeW ? barcodeW + gap : 0);
 
 	footLines.forEach((field, index) => {
 		place({
@@ -398,21 +577,42 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	if (linkField) {
 		place({
 			slot: linkField.column,
-			x: round(page.w - margin - qrSide),
-			y: round(page.h - margin - qrSide),
+			x: rightEdge - qrSide,
+			y: bottomEdge - qrSide,
 			w: qrSide,
 			h: qrSide,
 			mode: 'qr',
 			overflow: 'clip',
 			fit: 'contain',
 			anchor: null,
-			qr: { level: 'M', margin: 1 }
+			qr: { level: 'M' },
+			// The quiet zone a scanner needs, as the area's own padding.
+			padding: 2
+		});
+	}
+
+	if (barcodeField) {
+		place({
+			slot: barcodeField.column,
+			// Left of the QR where there is one, its foot on the same line.
+			x: rightEdge - (qrSide ? qrSide + gap : 0) - barcodeW,
+			y: bottomEdge - barcodeH,
+			w: barcodeW,
+			h: barcodeH,
+			mode: 'qr',
+			overflow: 'clip',
+			anchor: null,
+			qr: { level: 'M', kind: 'ean13' },
+			// The digits are set in the area's type: small, like the rest of the foot.
+			size: round(clamp(smallSize, 6, 8.5), 1),
+			// Room either side for the quiet zone, the first digit sitting in the left one.
+			padding: 1
 		});
 	}
 
 	// Past that there is genuinely no room, and saying so is better than a card
 	// with two lines of type printed over its own footer.
-	for (const field of footFields.slice(footCapacity)) left.push(field.column);
+	for (const field of footFields) if (!footLines.includes(field)) left.push(field.column);
 
 	// ---- the head ------------------------------------------------------------
 
@@ -420,6 +620,9 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	const subtitleField = pick('subtitle');
 	const bodyField = pick('body');
 	const imageField = pick('image');
+	const footnotes = guesses.filter((g) => g.kind === 'notes');
+	/** A line each, and a gap above them — what the body leaves room for. */
+	const footnoteRoom = footnotes.length ? footnotes.length * smallH + gap : 0;
 
 	let previous: Box | null = null;
 	/**
@@ -430,18 +633,18 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	 * read. Kept walking down the page so a generated card that loses its
 	 * anchors is untidy rather than a pile at the top margin.
 	 */
-	let cursor = margin;
+	let cursor = top;
 
 	/** Anchor to whatever came before, or sit at the top margin when first. */
 	const stack = (partial: Partial<Box>, before: number): Box => {
-		const top = previous ? cursor + before : margin;
+		const at = previous ? cursor + before : top;
 		const box = place({
 			...partial,
-			y: round(top),
+			y: round(at),
 			...(previous ? { anchor: { to: previous.id, gap: before } } : { anchor: null })
 		});
 		previous = box;
-		cursor = top + box.h;
+		cursor = at + box.h;
 		return box;
 	};
 
@@ -452,7 +655,7 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 				slot: titleField.column,
 				x: margin,
 				w: contentW,
-				h: round(textHeight(size, 1.1)),
+				h: up(textHeight(size, 1.1)),
 				size,
 				lineHeight: 1.1,
 				weight: 700,
@@ -471,13 +674,35 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 				slot: subtitleField.column,
 				x: margin,
 				w: contentW,
-				h: round(textHeight(size, 1.25)),
+				h: up(textHeight(size, 1.25)),
 				size,
 				lineHeight: 1.25,
 				mode: 'plain',
 				overflow: 'grow'
 			},
-			round(gap * 0.4)
+			// Tight under the title: a subtitle belongs to it. Zero rather than
+			// a fraction of a step, which would put everything below off the grid.
+			0
+		);
+	}
+
+	// Detail lines, under the subtitle — or the title, where there is none — in
+	// column order, tight to it and to each other: the medium and the duration
+	// belong to the heading they describe, not to the foot.
+	for (const field of guesses.filter((g) => g.kind === 'detail')) {
+		stack(
+			{
+				slot: field.column,
+				x: margin,
+				w: contentW,
+				h: smallH,
+				size: smallSize,
+				lineHeight: 1.2,
+				color: '#555555',
+				mode: 'plain',
+				overflow: 'grow'
+			},
+			0
 		);
 	}
 
@@ -486,7 +711,7 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	if (imageField) {
 		// Wide rather than tall: a picture that takes half the card leaves the
 		// body nowhere to go, and a card is usually read for its words.
-		const height = round(clamp(contentW * 0.6, 20, contentH * 0.4));
+		const height = Math.max(G, down(clamp(contentW * 0.6, 20, contentH * 0.4)));
 		stack(
 			{
 				slot: imageField.column,
@@ -506,8 +731,11 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 		// Down to the foot, or three lines' worth when the head has already eaten
 		// the page — it grows, so the floor only has to be a sane starting height.
 		const height = Math.max(
-			round(textHeight(size, defaults.lineHeight, 3)),
-			round(footTop - gap - (previous ? cursor + gap : margin))
+			up(textHeight(size, defaults.lineHeight, 3)),
+			// Whole steps, rounded down: where the footer sits off the grid — on a
+			// bottom margin that is not a grid line — the gap above it takes the
+			// difference, not the body's height.
+			down(footTop - gap - footnoteRoom - (previous ? cursor + gap : top))
 		);
 		stack(
 			{
@@ -534,6 +762,26 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 		);
 	}
 
+	// Footnotes, straight under the body, in column order: small, grey and
+	// Markdown, like the body they annotate. They grow, so the line each was
+	// given above is a starting height, not a limit.
+	footnotes.forEach((field, index) => {
+		stack(
+			{
+				slot: field.column,
+				x: margin,
+				w: contentW,
+				h: smallH,
+				size: smallSize,
+				lineHeight: 1.3,
+				color: '#555555',
+				mode: 'markdown',
+				overflow: 'grow'
+			},
+			index === 0 && previous ? gap : 0
+		);
+	});
+
 	// Anything left that is neither foot nor head — a second picture, a second
 	// thing to scan — follows the body as a small line, so it is on the card and
 	// can be moved rather than quietly discarded. As a *line*, whatever it was
@@ -541,7 +789,7 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 	// own, and one line of its address is at least a box pointing at the column.
 	const placed = new Set(boxes.map((b) => b.slot));
 	for (const field of guesses) {
-		if (field.kind === 'skip' || placed.has(field.column) || left.includes(field.column)) continue;
+		if (placed.has(field.column) || left.includes(field.column)) continue;
 		const box = stack(
 			{
 				slot: field.column,
@@ -554,13 +802,13 @@ export function autoLayout(input: AutoLayoutInput): AutoLayoutResult {
 				mode: 'plain',
 				overflow: 'grow'
 			},
-			round(gap * 0.5)
+			0
 		);
 		// These follow a body that has already reached the foot, so their declared
 		// tops are the one place in this pass that can walk off the bottom of the
 		// page. The anchor still puts them under the body where they belong; this
 		// only keeps the fallback somewhere you can see it.
-		box.y = Math.min(box.y, round(page.h - margin - box.h));
+		box.y = Math.min(box.y, bottomEdge - box.h);
 		placed.add(field.column);
 	}
 

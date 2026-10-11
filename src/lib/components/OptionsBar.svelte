@@ -9,8 +9,9 @@
 	 */
 	import BoxOptions from './BoxOptions.svelte';
 	import PageOptions from './PageOptions.svelte';
+	import { scrollEdges } from '$lib/scrolledge';
 	import type { TemplateEntry } from '$lib/storage';
-	import type { Box, Dataset, Mapping, Template } from '$lib/types';
+	import type { Box, Dataset, FontRef, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
 		/** which half of the editor this instance is: the two never share a row */
@@ -18,30 +19,42 @@
 		template: Template;
 		dataset: Dataset;
 		mapping: Mapping;
+		/** the row the page is showing, for what a linked color previews */
+		row?: Row | null;
 		selected: Box | null;
 		onboxchange: (box: Box) => void;
 		ontemplatechange: (template: Template) => void;
 		onmappingchange: (mapping: Mapping) => void;
 		onduplicate: () => void;
 		ondelete: () => void;
-		onresettemplate: () => void;
+		onhide?: () => void;
+		/** absent where there is no starter to reset to — see `starterOfTemplate` */
+		onresettemplate?: () => void;
+		onmagiclayout?: () => void;
+		hasColumns?: boolean;
 		library: TemplateEntry[];
+		/** fonts this browser knows that the template is not carrying */
+		editorFonts: FontRef[];
 		templateId: string;
 		onselecttemplate: (id: string) => void;
+		/** the template the swap goes back to, or '' while there is none */
+		previousTemplate?: string;
+		onswaptemplate?: () => void;
 		onnewtemplate: () => void;
+		/** open the A5 Starter Booklet as it came, or add it to the library */
+		onstartertemplate: () => void;
 		ondeletetemplate: () => void;
 		onuploadfont: (file: File) => void;
 		onuploadbackground: (file: File) => void;
 		onuploadprintbackground: (file: File) => void;
 		/** say something in the status bar; the bar has nowhere of its own to say it */
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
-		/** the page bar's library menu opened or closed; the box bar has no menu */
-		onmenu?: (open: boolean) => void;
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
 		oneditcss: () => void;
 		/** open the drawing surface for the selected area */
 		ondraw?: (id: string) => void;
+		onuploadimage?: (id: string, file: File) => void;
 	}
 
 	let { section, ...rest }: Props = $props();
@@ -49,13 +62,17 @@
 	let boxBar = $state<BoxOptions | null>(null);
 
 	/** Forwarded so the page can put the cursor in a new area's Text field. */
-	export function focusText() {
-		boxBar?.focusText();
+	export function focusText(select = true) {
+		boxBar?.focusText(select);
 	}
 </script>
 
-{#if section === 'page'}
-	<PageOptions {...rest} />
-{:else if rest.selected}
-	<BoxOptions bind:this={boxBar} {...rest} selected={rest.selected} />
-{/if}
+<!-- A frame for the shadow that says the bar scrolls on: drawn inside the bar,
+     it would scroll away with the settings it is pointing at. -->
+<div class="bar-frame" use:scrollEdges={(frame) => frame.querySelector<HTMLElement>(':scope > .options')}>
+	{#if section === 'page'}
+		<PageOptions {...rest} />
+	{:else if rest.selected}
+		<BoxOptions bind:this={boxBar} {...rest} selected={rest.selected} />
+	{/if}
+</div>

@@ -1,5 +1,3 @@
-import { HOLD_MS, vibrate } from './haptics';
-
 /**
  * Pointer gestures that more than one component needs.
  *
@@ -34,98 +32,15 @@ export function swipeStep(dx: number, dy: number): -1 | 0 | 1 {
 	return dx < 0 ? 1 : -1;
 }
 
-/** How long a button has to be held before the second action fires. */
-export const HOLD_DELAY = 600;
-
 /**
- * How far the pointer may wander during a hold before it stops being one.
+ * How far a finger may wander during a press before it is a drag.
  *
  * A finger is never still, so this cannot be zero; it is small enough that a
- * deliberate drag clears it in the first few pixels. It matters wherever a hold
- * shares an element with a drag — the pivot and the rotation lever on an area
- * both reset on a hold and both move on a drag — because there the alternative
- * is a slow drag quietly firing the reset it was trying to avoid.
+ * deliberate drag clears it in the first few pixels. The area menu uses it: a
+ * long press opens the menu, and a finger that then carries on was dragging the
+ * area all along, so the menu goes.
  */
 export const HOLD_SLOP = 8;
-
-/**
- * Press and hold, as a second action on a button that already has one.
- *
- * Where a button's two actions are the same *kind* of thing — import a file or
- * import the samples, add an area or add all of them — a hold is cheaper than a
- * second button, and both bars here are already fighting for width. It is
- * always the *bigger* of the two actions, and always one undo away, because a
- * gesture nobody was taught has to be survivable when it fires by accident.
- *
- * A held mouse button and a held finger are the same pointer events, so there
- * is no separate touch path. The click that follows a completed hold has to be
- * swallowed, or the tap action runs straight after the hold action — a file
- * picker opening on top of the rows just loaded.
- *
- * An action that returns `false` is saying it found nothing to do — a hold on a
- * key whose second action is not available right now. Nothing buzzes for that:
- * the vibration below is the only thing that says the hold fired, and saying so
- * when nothing happened is worse than saying nothing.
- */
-export function hold(node: HTMLElement, action: () => unknown) {
-	let timer: ReturnType<typeof setTimeout> | null = null;
-	let fired = false;
-	let handler = action;
-	let from: { x: number; y: number } | null = null;
-
-	const cancel = () => {
-		if (timer) clearTimeout(timer);
-		timer = null;
-		from = null;
-	};
-	const down = (event: PointerEvent) => {
-		// Only the primary button: a right-click opens a menu, not a hold.
-		if (event.button !== 0) return;
-		fired = false;
-		from = { x: event.clientX, y: event.clientY };
-		const touch = event.pointerType === 'touch';
-		timer = setTimeout(() => {
-			timer = null;
-			fired = true;
-			// A hold fires with nothing let go of and nothing on screen to say so —
-			// the whole gesture is invisible until its action happens. On a phone
-			// this is the only thing that says the wait is over.
-			if (handler() !== false && touch) vibrate(HOLD_MS);
-		}, HOLD_DELAY);
-	};
-	// Moving off is how you change your mind, and on an element that is also a
-	// drag target it is how you say you meant to drag.
-	const move = (event: PointerEvent) => {
-		if (!from) return;
-		if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > HOLD_SLOP) cancel();
-	};
-	const click = (event: MouseEvent) => {
-		if (!fired) return;
-		event.preventDefault();
-		event.stopPropagation();
-		fired = false;
-	};
-
-	node.addEventListener('pointerdown', down);
-	node.addEventListener('pointermove', move);
-	// Moving off the button is how you change your mind mid-press.
-	node.addEventListener('pointerup', cancel);
-	node.addEventListener('pointerleave', cancel);
-	node.addEventListener('pointercancel', cancel);
-	node.addEventListener('click', click, true);
-	return {
-		update: (next: () => unknown) => (handler = next),
-		destroy: () => {
-			cancel();
-			node.removeEventListener('pointerdown', down);
-			node.removeEventListener('pointermove', move);
-			node.removeEventListener('pointerup', cancel);
-			node.removeEventListener('pointerleave', cancel);
-			node.removeEventListener('pointercancel', cancel);
-			node.removeEventListener('click', click, true);
-		}
-	};
-}
 
 /**
  * Turn horizontal flicks over a node into steps.
@@ -161,6 +76,279 @@ export function swipe(node: HTMLElement, onswipe: (by: -1 | 1) => void) {
 			node.removeEventListener('pointerdown', down);
 			node.removeEventListener('pointerup', up);
 			node.removeEventListener('pointercancel', cancel);
+		}
+	};
+}
+
+/**
+ * Whether a drag reads as a swipe up: the same distance and slope as a
+ * sideways one, turned on its side. Down is not a swipe here — the only thing
+ * that answers one is the status bar, which has nowhere further down to go.
+ */
+export function swipeUpward(dx: number, dy: number): boolean {
+	return -dy >= SWIPE_MIN && Math.abs(dy) >= Math.abs(dx) * SWIPE_SLOPE;
+}
+
+/**
+ * The tray's share of the working area after its edge has been pulled `dy`
+ * pixels up (negative is down) from `from`, and whether letting go there folds
+ * it away.
+ *
+ * It follows the finger all the way: up to the whole area, and down to
+ * nothing — it used to stop at `min` and want a second pull past it, which
+ * read as stuck. Let go below `min` and it closes; above, it stays as tall as
+ * it was left. The same reading opens it from the status bar, pulled up from
+ * nothing.
+ */
+export function trayPull(from: number, dy: number, height: number, min: number): { share: number; shut: boolean } {
+	const share = Math.min(1, Math.max(0, from + dy / height));
+	return { share, shut: share < min };
+}
+
+/** A quick flick, rather than a pull: let go within this, and the pull's direction is what counts. */
+export const FLICK_MS = 300;
+
+/**
+ * The status bar pulled upwards, followed as it moves — the tray comes up
+ * under the finger, as a drawer does, rather than all at once when the finger
+ * lifts. Touch only, as `swipe` is.
+ *
+ * `onpull('start')` is asked once the finger has moved far enough, and more
+ * upwards than sideways, to be pulling rather than tapping; it answers whether
+ * there is anything to pull (false: the tray is open already, say), and only
+ * then do `move` and `end` follow. `end` says whether it was a flick — quick
+ * and decidedly upwards — so a short flick can open the tray all the way.
+ *
+ * A pull is never also a press. The click it may be owed is swallowed
+ * wherever it lands — on a button of the bar it started on, or on whatever
+ * the tray has brought under the finger by the time it lifts, which was how
+ * letting go over the table's header put a column's name into editing.
+ */
+export function pullUp(
+	node: HTMLElement,
+	onpull: (phase: 'start' | 'move' | 'end', clientY: number, flick?: boolean) => boolean | void
+) {
+	let start: { x: number; y: number; id: number; at: number; pulling: boolean } | null = null;
+	// Read from pointer events, so the browser must not take the finger for a
+	// scroll: it would cancel the pointer a few pixels in. Said here, by the
+	// gesture that needs it, rather than left to a stylesheet. Nothing in the
+	// bar scrolls, and a pinch read from touch events still reaches them.
+	const touchAction = node.style.touchAction;
+	node.style.touchAction = 'none';
+	let handler = onpull;
+	let swallowUntil = 0;
+
+	const down = (event: PointerEvent) => {
+		if (event.pointerType !== 'touch') return;
+		start = { x: event.clientX, y: event.clientY, id: event.pointerId, at: performance.now(), pulling: false };
+	};
+
+	// A touch pointer stays with the element it went down on, so these keep
+	// arriving here as the finger travels up over the page.
+	const move = (event: PointerEvent) => {
+		if (!start || event.pointerId !== start.id) return;
+		const dx = event.clientX - start.x;
+		const dy = event.clientY - start.y;
+		if (!start.pulling) {
+			if (-dy < HOLD_SLOP || Math.abs(dy) < Math.abs(dx)) return;
+			if (handler('start', event.clientY) === false) {
+				start = null;
+				return;
+			}
+			start.pulling = true;
+		}
+		handler('move', event.clientY);
+	};
+
+	const up = (event: PointerEvent) => {
+		if (!start || event.pointerId !== start.id) return;
+		const { pulling, x, y, at } = start;
+		start = null;
+		if (!pulling) return;
+		swallowUntil = performance.now() + 400;
+		const flick = performance.now() - at < FLICK_MS && swipeUpward(event.clientX - x, event.clientY - y);
+		handler('end', event.clientY, flick);
+	};
+
+	const cancel = (event: PointerEvent) => {
+		if (start?.pulling && event.pointerId === start.id) handler('end', start.y);
+		start = null;
+	};
+
+	const click = (event: MouseEvent) => {
+		if (performance.now() > swallowUntil) return;
+		swallowUntil = 0;
+		event.preventDefault();
+		event.stopPropagation();
+	};
+
+	node.addEventListener('pointerdown', down);
+	node.addEventListener('pointermove', move);
+	node.addEventListener('pointerup', up);
+	node.addEventListener('pointercancel', cancel);
+	window.addEventListener('click', click, true);
+	return {
+		update: (next: typeof onpull) => (handler = next),
+		destroy: () => {
+			node.removeEventListener('pointerdown', down);
+			node.removeEventListener('pointermove', move);
+			node.removeEventListener('pointerup', up);
+			node.removeEventListener('pointercancel', cancel);
+			window.removeEventListener('click', click, true);
+			node.style.touchAction = touchAction;
+		}
+	};
+}
+
+/** How soon a second tap has to follow the first to make a double tap — Card's figure. */
+export const DOUBLE_TAP_MS = 350;
+/** How long a finger rests before it is a long press — a tooltip's hold. */
+export const LONG_PRESS_MS = 450;
+
+export interface Tap {
+	x: number;
+	y: number;
+	at: number;
+}
+
+/**
+ * Whether `now` is the second tap of a double tap begun by `last`: soon
+ * enough, and near enough — three times a press's slop, since the second tap
+ * of two lands a little apart from the first on a phone held in one hand.
+ */
+export function isDoubleTap(last: Tap | null, now: Tap): boolean {
+	if (!last) return false;
+	return now.at - last.at < DOUBLE_TAP_MS && Math.hypot(now.x - last.x, now.y - last.y) <= HOLD_SLOP * 3;
+}
+
+/**
+ * A second tap or a long press with a finger on one of the cells inside
+ * `node`, as one "open this". Touch only: a mouse has its double-click, and a
+ * held mouse button is a selection.
+ *
+ * Listened for once, on the table, not on every cell: `find` says which cell
+ * a press landed in, or none, and every press that lands nowhere — or comes
+ * from a mouse — stops there. A table of a few hundred rows had six
+ * listeners on each of its thousands of cells for this.
+ *
+ * For a table cell on a phone, where a single tap must not bring the
+ * keyboard up — the first tap chooses the cell, and this is the way in. A
+ * second tap is a tap on the cell while it already has the focus, however
+ * long after the first: a person reads what they chose before deciding to
+ * type, and a double tap's few hundred milliseconds asked them to decide
+ * before they had looked. A quick double tap is the same thing faster.
+ *
+ * Every tap on a cell is the page's, not the browser's: its lift is
+ * cancelled (`touchend`, which stops the browser's own handling of the tap —
+ * its focus, its mouse events, its click) and the first tap focuses the cell
+ * from here. A tap the browser handles on a text field puts its own caret
+ * there, read-only or not, and Android reads the next tap near that caret as
+ * a tap on it and offers Paste; nothing on a page turns that bubble off, so
+ * the browser is never given the tap. Focus from a script draws no handles.
+ * After an open, the cancelled lift also keeps its click off the editor just
+ * opened, where it would select a word.
+ *
+ * `onopen` is told where the opening press was, for the caret. A long press
+ * swallows the context menu Android follows it with. A finger that wanders
+ * is scrolling, not pressing — and a scroll was never a tap, so it is never
+ * cancelled.
+ */
+export function touchOpen(
+	node: HTMLElement,
+	options: {
+		find: (target: EventTarget | null) => HTMLElement | null;
+		onopen: (cell: HTMLElement, at: { x: number; y: number }) => void;
+		/** the first tap, which chose the cell: where it was, so a caret can be drawn there */
+		onchoose?: (cell: HTMLElement, at: { x: number; y: number }) => void;
+	}
+) {
+	let { find, onopen, onchoose } = options;
+	let press: { id: number; x: number; y: number; cell: HTMLElement; focused: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
+	let last: (Tap & { cell: HTMLElement }) | null = null;
+	let held = false;
+	/** The lift that ends a tap on a cell: the browser's handling of it is the page's. */
+	let swallow = false;
+
+	const clear = () => {
+		if (press) clearTimeout(press.timer);
+		press = null;
+	};
+	const open = (cell: HTMLElement, at: { x: number; y: number }) => {
+		last = null;
+		swallow = true;
+		onopen(cell, at);
+	};
+	const down = (event: PointerEvent) => {
+		clear();
+		held = false;
+		swallow = false;
+		if (event.pointerType !== 'touch') return;
+		const cell = find(event.target);
+		if (!cell) return;
+		const at = { x: event.clientX, y: event.clientY };
+		press = {
+			id: event.pointerId,
+			...at,
+			cell,
+			// Read on the way down: the first tap's focus lands after its lift.
+			focused: document.activeElement === cell,
+			timer: setTimeout(() => {
+				press = null;
+				held = true;
+				open(cell, at);
+			}, LONG_PRESS_MS)
+		};
+	};
+	const move = (event: PointerEvent) => {
+		if (press && event.pointerId === press.id && Math.hypot(event.clientX - press.x, event.clientY - press.y) > HOLD_SLOP) {
+			clear();
+			last = null;
+		}
+	};
+	const up = (event: PointerEvent) => {
+		if (!press || event.pointerId !== press.id) return;
+		const { cell, focused } = press;
+		clear();
+		const tap = { x: event.clientX, y: event.clientY, at: event.timeStamp || performance.now(), cell };
+		if (focused || (last?.cell === cell && isDoubleTap(last, tap))) open(cell, tap);
+		else {
+			last = tap;
+			swallow = true;
+			cell.focus({ preventScroll: true });
+			onchoose?.(cell, tap);
+		}
+	};
+	const cancel = () => {
+		clear();
+		last = null;
+	};
+	const lift = (event: TouchEvent) => {
+		if (!swallow) return;
+		swallow = false;
+		if (event.cancelable) event.preventDefault();
+	};
+	const menu = (event: Event) => {
+		if (!held) return;
+		held = false;
+		event.preventDefault();
+	};
+
+	node.addEventListener('pointerdown', down);
+	node.addEventListener('pointermove', move);
+	node.addEventListener('pointerup', up);
+	node.addEventListener('pointercancel', cancel);
+	node.addEventListener('contextmenu', menu);
+	node.addEventListener('touchend', lift);
+	return {
+		update: (next: typeof options) => ({ find, onopen, onchoose } = next),
+		destroy: () => {
+			clear();
+			node.removeEventListener('pointerdown', down);
+			node.removeEventListener('pointermove', move);
+			node.removeEventListener('pointerup', up);
+			node.removeEventListener('pointercancel', cancel);
+			node.removeEventListener('contextmenu', menu);
+			node.removeEventListener('touchend', lift);
 		}
 	};
 }

@@ -1,9 +1,13 @@
 import { safeImageUrl } from './assets';
 import { clampSide, fitBoard } from './bitmap';
-import { parseColor } from './color';
+import { fromRgba, parseColor, toRgba } from './color';
 import defaultCard from './templates/default-card.json';
 import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
+import { fromFile, toFile } from './frame';
 import type {
+	Anchor,
+	ColorSources,
+	Row,
 	BackgroundFit,
 	BlendMode,
 	BorderStyle,
@@ -11,19 +15,27 @@ import type {
 	BoxMode,
 	Centre,
 	Defaults,
+	FontKind,
 	FontRef,
+	ListMarker,
+	ListNumbering,
+	Leader,
+	ListStyle,
 	Mapping,
 	PageBackgroundImage,
 	PageNumberPosition,
 	PageNumberSpec,
+	PageSpec,
+	ParagraphStyle,
 	PrintSettings,
 	QrSettings,
 	SheetOrientation,
 	SideValue,
 	Sides,
-	Template
+	Template,
+	TextColumns
 } from './types';
-import { SCHEMA_VERSION } from './types';
+import { FONT_KINDS, SCHEMA_VERSION, clampXHeight } from './types';
 
 /**
  * Template defaults, validation and import/export.
@@ -67,6 +79,277 @@ export const SHEET_ORIENTATIONS: SheetOrientation[] = ['auto', 'portrait', 'land
  * that paper exists; anything above it is the designer's business.
  */
 export const MIN_PAPER = 1;
+
+/**
+ * The smallest an area may be, in mm, either way. A box of 0 or less has no
+ * inside to click and no edge to drag, and a negative one draws nowhere at
+ * all — the same trap the paper's own floor exists for, one level down.
+ */
+export const MIN_BOX = 1;
+
+/** The page margin a template without one of its own has, in mm, every edge. */
+export const DEFAULT_MARGIN = 10;
+
+/**
+ * A page margin as read from a file: a number of mm, or four. Unlike a
+ * border, 0 is a real answer — a page worked to its trim edge — so it is kept,
+ * and only something that is not a margin at all falls back to the default.
+ */
+export function normaliseMargin(raw: unknown): SideValue | undefined {
+	if (typeof raw === 'number') return Number.isFinite(raw) ? Math.max(0, raw) : undefined;
+	if (!raw || typeof raw !== 'object') return undefined;
+	const side = (value: unknown) => Math.max(0, num(value, DEFAULT_MARGIN));
+	const sides: Sides = {
+		top: side((raw as any).top),
+		right: side((raw as any).right),
+		bottom: side((raw as any).bottom),
+		left: side((raw as any).left)
+	};
+	const { top, right, bottom, left } = sides;
+	return top === right && right === bottom && bottom === left ? top : sides;
+}
+
+/** The page's margin on each edge, whatever shape it is stored in. */
+export const marginsOf = (page: PageSpec): Sides => sidesOf(page.margin ?? DEFAULT_MARGIN);
+
+/** The smallest type size, in points, and the tightest leading, as a multiple. */
+export const MIN_SIZE = 1;
+export const MIN_LEADING = 0.5;
+
+/** How far apart paragraphs may be set, in lines — past this it is a layout, not a style. */
+export const MAX_PARAGRAPH = 10;
+
+/** A number at or above `floor`, or the fallback when it is not a number at all. */
+export const atLeast = (value: unknown, floor: number, fallback: number) => Math.max(floor, num(value, fallback));
+
+/** An optional number held to a floor; absent, or not a number, stays absent. */
+function optionalAtLeast(value: unknown, floor: number): number | undefined {
+	if (value === undefined || value === null || value === '') return undefined;
+	const n = Number(value);
+	return Number.isFinite(n) ? Math.max(floor, n) : undefined;
+}
+
+/**
+ * A paragraph style, or nothing. An amount of 0 is kept — paragraphs set
+ * tight on purpose is a style — but one that is not a number is not.
+ */
+export function normaliseParagraph(raw: unknown): ParagraphStyle | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const { mode, amount } = raw as Record<string, unknown>;
+	if (mode !== 'space' && mode !== 'indent') return undefined;
+	const n = Number(amount);
+	if (!Number.isFinite(n)) return undefined;
+	return { mode, amount: Math.round(Math.max(0, Math.min(MAX_PARAGRAPH, n)) * 100) / 100 };
+}
+
+export const LIST_MARKERS: ListMarker[] = [
+	'bullet',
+	'disc',
+	'circle',
+	'square',
+	'openSquare',
+	'dash',
+	'emdash',
+	'arrow',
+	'none'
+];
+
+/** Said with the glyph, since the glyph is the choice. */
+export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
+	bullet: '• Bullet',
+	disc: '● Disc',
+	circle: '○ Circle',
+	square: '■ Square',
+	openSquare: '□ Open Square',
+	dash: '– Dash',
+	emdash: '— Em Dash',
+	arrow: '➤ Arrow',
+	none: 'None'
+};
+
+/**
+ * How a numbered list may count, in the order the menu offers them: numbers,
+ * then letters, then Roman numerals, small before capital.
+ */
+export const LIST_NUMBERINGS: ListNumbering[] = ['decimal', 'lowerAlpha', 'upperAlpha', 'lowerRoman', 'upperRoman'];
+
+/** Said with the first three, since the count is the choice. */
+export const LIST_NUMBERING_LABELS: Record<ListNumbering, string> = {
+	decimal: '1, 2, 3 Numbers',
+	lowerAlpha: 'a, b, c Letters',
+	upperAlpha: 'A, B, C Capitals',
+	lowerRoman: 'i, ii, iii Roman',
+	upperRoman: 'I, II, III Roman Capitals'
+};
+
+/** The tab leaders, in the order the menu offers them. */
+export const LEADERS: Leader[] = ['none', 'dotted', 'dashed', 'solid'];
+
+export const LEADER_LABELS: Record<Leader, string> = {
+	none: 'None',
+	dotted: 'Dotted',
+	dashed: 'Dashed',
+	solid: 'Solid'
+};
+
+/** A leader the format names, or nothing. */
+export function normaliseLeader(raw: unknown): Leader | undefined {
+	return LEADERS.includes(raw as Leader) ? (raw as Leader) : undefined;
+}
+
+/** How far a list may be indented, in em. */
+export const MAX_LIST = 10;
+
+/** How far the baseline may move, in em: past a line either way is no correction. */
+export const MAX_BASELINE = 1;
+
+/** A list style with only the fields that make sense; none of them, nothing. */
+export function normaliseList(raw: unknown): ListStyle | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const { marker, numbering, indent, leading } = raw as Record<string, unknown>;
+	const number = (v: unknown, floor: number, ceiling: number) => {
+		if (v === undefined || v === null || v === '') return undefined;
+		const n = Number(v);
+		return Number.isFinite(n) ? Math.round(Math.max(floor, Math.min(ceiling, n)) * 100) / 100 : undefined;
+	};
+	const list = stripUndefined({
+		// `ring` was a circle the disc's size, for a few days in 0.28, and read
+		// as the circle twice over; a template that chose it gets the circle.
+		marker: marker === 'ring' ? 'circle' : LIST_MARKERS.includes(marker as ListMarker) ? (marker as ListMarker) : undefined,
+		numbering: LIST_NUMBERINGS.includes(numbering as ListNumbering) ? (numbering as ListNumbering) : undefined,
+		indent: number(indent, 0, MAX_LIST),
+		// The same floor an area's own leading has; past 3 lines is not leading.
+		leading: number(leading, MIN_LEADING, 3)
+	});
+	return Object.keys(list).length ? list : undefined;
+}
+
+/** Column names only, trimmed; an empty one is no source, and no sources is none. */
+export function normaliseColorFrom(raw: unknown): ColorSources | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const name = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+	const { text, fill, border } = raw as Record<string, unknown>;
+	const from = stripUndefined({ text: name(text), fill: name(fill), border: name(border) });
+	return Object.keys(from).length ? from : undefined;
+}
+
+/**
+ * The area as this row draws it: each color with a column behind it replaced
+ * by the row's cell, where the cell is a color. Everything else — the area's
+ * own color where a cell is empty or is words, and every field that is not a
+ * color — is the area's. Only ever drawn from, never written back: the row's
+ * color is the row's, and storing it would put one card's color on all of them.
+ *
+ * The cell goes through `parseColor`, the one door a color has to a style
+ * attribute, like every other color the card draws.
+ */
+export function colorsFromRow(box: Box, row: Row | null | undefined): Box {
+	const from = box.colorFrom;
+	if (!from || !row) return box;
+	// The hue is the row's; the opacity is still the area's, so a fill linked to
+	// a column can be a tint. The two multiply: a cell with an alpha of its own
+	// keeps it, faded further by the area's.
+	const cell = (column: string | undefined, own: string | undefined) => {
+		const hue = column ? parseColor(row[column]) : null;
+		if (!hue) return null;
+		const alpha = toRgba(own)?.a ?? 1;
+		const channels = toRgba(hue);
+		return alpha < 1 && channels ? fromRgba({ ...channels, a: channels.a * alpha }) : hue;
+	};
+	const text = cell(from.text, box.color);
+	const fill = cell(from.fill, box.background);
+	const border = cell(from.border, box.borderColor);
+	if (!text && !fill && !border) return box;
+	return {
+		...box,
+		...(text ? { color: text } : {}),
+		...(fill ? { background: fill } : {}),
+		...(border ? { borderColor: border } : {})
+	};
+}
+
+/** Columns an area's words may be set in: two at least, or it is not columns. */
+export const MIN_COLUMNS = 2;
+export const MAX_COLUMNS = 6;
+/** The gap a fresh pair of columns gets, in mm. */
+export const DEFAULT_COLUMN_GAP = 5;
+/**
+ * Lines a paragraph keeps together at a column's foot and head. Above the
+ * browser's own 2 for widows: a paragraph's last line alone at the top of a
+ * column reads as a stray more than a lone first line does at the bottom.
+ */
+export const DEFAULT_ORPHANS = 2;
+export const DEFAULT_WIDOWS = 3;
+/** More than this many lines held together stops being a column break and starts being a hole. */
+export const MAX_KEEP_LINES = 10;
+
+/**
+ * Columns as a file may write them: a whole count from two to six and a gap of
+ * no less than nothing, in mm. A count under two is one column, which is the
+ * absence of the field; one over six is six.
+ */
+export function normaliseColumns(raw: unknown): TextColumns | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const { count, gap, orphans, widows } = raw as { count?: unknown; gap?: unknown; orphans?: unknown; widows?: unknown };
+	const n = Math.round(Number(count));
+	if (!Number.isFinite(n) || n < MIN_COLUMNS) return undefined;
+	const g = Number(gap);
+	const columns: TextColumns = {
+		count: Math.min(MAX_COLUMNS, n),
+		gap: Number.isFinite(g) ? Math.max(0, Math.round(g * 100) / 100) : DEFAULT_COLUMN_GAP
+	};
+	// Kept only where they differ from the defaults: the default is the
+	// absent key, as every other "not set" is.
+	const lines = (value: unknown, fallback: number) => {
+		if (value === undefined || value === null || value === '') return undefined;
+		const v = Math.round(Number(value));
+		if (!Number.isFinite(v)) return undefined;
+		const kept = Math.min(MAX_KEEP_LINES, Math.max(1, v));
+		return kept === fallback ? undefined : kept;
+	};
+	const o = lines(orphans, DEFAULT_ORPHANS);
+	const w = lines(widows, DEFAULT_WIDOWS);
+	if (o !== undefined) columns.orphans = o;
+	if (w !== undefined) columns.widows = w;
+	return columns;
+}
+
+/** A baseline shift in em, negative allowed; zero is no shift and is dropped. */
+export function normaliseBaseline(raw: unknown): number | undefined {
+	if (raw === undefined || raw === null || raw === '') return undefined;
+	const n = Number(raw);
+	if (!Number.isFinite(n)) return undefined;
+	const v = Math.round(Math.max(-MAX_BASELINE, Math.min(MAX_BASELINE, n)) * 1000) / 1000;
+	return v === 0 ? undefined : v;
+}
+
+/**
+ * The baseline shift an area is set with. Its own, when it has one; the
+ * page's only when the area is in the page's face, because the page's is a
+ * correction for that face — carried onto another it would move text that
+ * sat right to begin with.
+ */
+export function baselineOf(box: Pick<Box, 'font' | 'baseline'>, defaults: Defaults): number {
+	if (box.baseline !== undefined) return box.baseline;
+	return (box.font ?? defaults.font) === defaults.font ? (defaults.baseline ?? 0) : 0;
+}
+
+/** An area's list style: its own fields over the page's, field by field. */
+export const listOf = (box: Pick<Box, 'list'>, defaults: Defaults): ListStyle | undefined =>
+	box.list || defaults.list ? { ...defaults.list, ...box.list } : undefined;
+
+/**
+ * An anchor with a gap that is a number. The gap may be negative — an area
+ * tucked up under the one it follows, overlapping it, is a layout people ask
+ * for — so it is only checked for being a number at all.
+ */
+function normaliseAnchor(raw: unknown): Anchor | null | undefined {
+	if (raw === null) return null;
+	if (!raw || typeof raw !== 'object') return undefined;
+	const { to, gap } = raw as Record<string, unknown>;
+	if (typeof to !== 'string' || !to) return undefined;
+	return { to, gap: num(gap, 0) };
+}
 
 export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
 	enabled: false,
@@ -141,14 +424,19 @@ export function nextBoxId(existing: Box[] = []): string {
 }
 
 /** Every mode the format names. Anything else in a file is read as words. */
-export const BOX_MODES: BoxMode[] = ['plain', 'markdown', 'image', 'color', 'bitmap', 'qr'];
+export const BOX_MODES: BoxMode[] = ['plain', 'markdown', 'image', 'color', 'qr'];
 
 /** The modes that draw something rather than set something: a picture or a fill. */
-export const shownAsMedia = (mode: BoxMode) =>
-	mode === 'image' || mode === 'color' || mode === 'bitmap';
+export const shownAsMedia = (mode: BoxMode) => mode === 'image' || mode === 'color';
 
-/** The modes a drawing can be made in — the two that hold a picture. */
-export const takesADrawing = (mode: BoxMode) => mode === 'image' || mode === 'bitmap';
+/** The mode a drawing can be made in — the one that holds a picture. */
+export const takesADrawing = (mode: BoxMode) => mode === 'image';
+
+/** A mode as a file spells it: `bitmap`, from before drawings were images, is one. */
+function readMode(raw: unknown): BoxMode {
+	if (raw === 'bitmap') return 'image';
+	return BOX_MODES.includes(raw as BoxMode) ? (raw as BoxMode) : 'plain';
+}
 
 export function newBox(partial: Partial<Box> = {}): Box {
 	return {
@@ -156,19 +444,25 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		slot: partial.slot ?? null,
 		x: num(partial.x, 12),
 		y: num(partial.y, 12),
-		w: num(partial.w, 60),
-		h: num(partial.h, 12),
+		w: atLeast(partial.w, MIN_BOX, 60),
+		h: atLeast(partial.h, MIN_BOX, 12),
 		// A mode decides which renderer a cell reaches, so a word this format does
 		// not name is read as words rather than trusted.
-		mode: BOX_MODES.includes(partial.mode as BoxMode) ? (partial.mode as BoxMode) : 'plain',
-		overflow: partial.overflow ?? 'clip',
+		mode: readMode(partial.mode),
+		// Read, not trusted: a word this format does not name is the default.
+		overflow: partial.overflow === 'grow' || partial.overflow === 'shrink' ? partial.overflow : 'clip',
 		// Anything optional that is not named here is dropped on load: this list
 		// is the box format, so a new field has to be added in both places.
 		...stripUndefined({
 			font: partial.font,
-			size: partial.size,
-			weight: partial.weight,
-			lineHeight: partial.lineHeight,
+			size: optionalAtLeast(partial.size, MIN_SIZE),
+			weight: partial.weight === undefined ? undefined : Math.max(100, Math.min(900, num(partial.weight, 400))),
+			lineHeight: optionalAtLeast(partial.lineHeight, MIN_LEADING),
+			paragraph: normaliseParagraph(partial.paragraph),
+			leader: normaliseLeader(partial.leader),
+			list: normaliseList(partial.list),
+			baseline: normaliseBaseline(partial.baseline),
+			columns: normaliseColumns(partial.columns),
 			// Every color on a box goes through the parser before it can reach a
 			// style attribute; one that is not recognised is dropped rather than
 			// guessed at, the same rule the markdown renderer follows.
@@ -178,14 +472,18 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			italic: partial.italic,
 			letterSpacing: partial.letterSpacing,
 			textCase: partial.textCase,
+			// Only beside the page's size, as the bar offers it: a box with a
+			// size of its own keeps that and drops this.
+			xHeight: partial.size === undefined ? clampXHeight(partial.xHeight === undefined ? undefined : Number(partial.xHeight)) : undefined,
 			md: partial.md,
 			qr: partial.mode === 'qr' ? normaliseQr(partial.qr) : partial.qr,
-			anchor: partial.anchor,
+			anchor: normaliseAnchor(partial.anchor),
 			rotation: normaliseRotation(partial.rotation),
 			centre: normaliseCentre(partial.centre),
 			hideWhenEmpty: partial.hideWhenEmpty,
 			static: partial.static,
 			background: color(partial.background),
+			colorFrom: normaliseColorFrom(partial.colorFrom),
 			// A blend mode is written straight into a style attribute, so nothing
 			// but one of these thirteen words may reach it.
 			blend: BLEND_MODES.includes(partial.blend as BlendMode) ? partial.blend : undefined,
@@ -193,7 +491,7 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			borderWidth: normaliseSides(partial.borderWidth),
 			borderStyle: BORDER_STYLES.includes(partial.borderStyle as BorderStyle) ? partial.borderStyle : undefined,
 			borderColor: color(partial.borderColor),
-			borderRadius: partial.borderRadius,
+			borderRadius: optionalAtLeast(partial.borderRadius, 0),
 			borderHand: partial.borderHand ? true : undefined,
 			fit: BOX_FITS.includes(partial.fit as BoxFit) ? partial.fit : undefined,
 			pixels: normalisePixels(partial.pixels),
@@ -222,7 +520,28 @@ export function normaliseTemplate(raw: unknown): Template {
 	}
 	if (!Array.isArray(t.boxes)) throw new Error('Template has no boxes.');
 
-	const boxes: Box[] = t.boxes.map((b: any) => newBox(b));
+	// The defaults first: an area inheriting the page's alignment is placed
+	// by it, so its corner cannot be found from the file until they are read.
+	const defaults = stripUndefined({
+		...DEFAULT_DEFAULTS,
+		...stripUndefined(t.defaults ?? {}),
+		color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color,
+		size: atLeast(t.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
+		lineHeight: atLeast(t.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
+		paragraph: normaliseParagraph(t.defaults?.paragraph),
+		// The page's `none` is the same as none at all, so it is not kept.
+		leader: normaliseLeader(t.defaults?.leader) === 'none' ? undefined : normaliseLeader(t.defaults?.leader),
+		list: normaliseList(t.defaults?.list),
+		baseline: normaliseBaseline(t.defaults?.baseline)
+	}) as Defaults;
+	// Top-left corners in memory, whichever way the file gave them — frame.ts.
+	// A file without the marker was written with top-left corners, and is read
+	// that way until LEGACY_TOP_LEFT_UNTIL.
+	const boxes: Box[] = fromFile(
+		t.boxes.map((b: any) => newBox(b)),
+		defaults,
+		t.frame
+	);
 	const ids = new Set(boxes.map((b) => b.id));
 	// Drop anchors that point nowhere rather than letting layout guess.
 	for (const box of boxes) {
@@ -241,34 +560,36 @@ export function normaliseTemplate(raw: unknown): Template {
 			h: paper(t.page?.h, 210),
 			unit: 'mm',
 			background: parseColor(t.page?.background) ?? '#ffffff',
-			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image) })
+			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image), margin: normaliseMargin(t.page?.margin) })
 		},
 		bleed: normaliseBleed(t.bleed),
 		print: normalisePrintSettings(t.print),
 		pageNumber: normalisePageNumber(t.pageNumber),
 		fonts: normaliseFonts(t.fonts),
-		defaults: {
-			...DEFAULT_DEFAULTS,
-			...stripUndefined(t.defaults ?? {}),
-			color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color
-		},
+		defaults,
 		slots,
 		boxes,
 		...stripUndefined({
 			facing: t.facing ? true : undefined,
 			css: typeof t.css === 'string' && t.css.trim() ? t.css : undefined,
-			locked: t.locked ? true : undefined
+			locked: t.locked ? true : undefined,
+			starter: typeof t.starter === 'string' && t.starter.trim() ? t.starter.trim() : undefined
 		})
 	};
 }
 
-export const DEFAULT_QR: QrSettings = { level: 'M', margin: 2 };
+export const DEFAULT_QR: QrSettings = { level: 'M' };
 
 function normaliseQr(raw: any): QrSettings {
 	const level = ['L', 'M', 'Q', 'H'].includes(raw?.level) ? raw.level : DEFAULT_QR.level;
-	const margin = Math.max(0, Math.min(8, num(raw?.margin, DEFAULT_QR.margin)));
 	const background = parseColor(raw?.background);
-	return { level, margin, ...(background ? { background } : {}) };
+	const kind = raw?.kind === 'code128' || raw?.kind === 'ean13' ? raw.kind : undefined;
+	return {
+		...(kind ? { kind } : {}),
+		...(kind && raw?.hideDigits === true ? { hideDigits: true as const } : {}),
+		level,
+		...(background ? { background } : {})
+	};
 }
 
 function normaliseBleed(raw: any): Template['bleed'] {
@@ -344,12 +665,20 @@ function normaliseFonts(raw: any): FontRef[] {
 		const family = typeof f === 'string' ? f : String(f.family ?? '').trim();
 		if (!family) continue;
 		const source: FontRef['source'] = f?.source === 'local' ? 'local' : f?.source === 'system' ? 'system' : 'google';
-		out.push({ family, source, ...(f?.ref ? { ref: String(f.ref) } : {}) });
+		const kind = FONT_KINDS.includes(f?.kind) ? (f.kind as FontKind) : undefined;
+		const fallback = FONT_KINDS.includes(f?.fallback) ? (f.fallback as FontKind) : undefined;
+		out.push({
+			family,
+			source,
+			...(f?.ref ? { ref: String(f.ref) } : {}),
+			...(kind ? { kind } : {}),
+			...(fallback ? { fallback } : {})
+		});
 	}
 	return out;
 }
 
-export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'double'];
+export const BORDER_STYLES: BorderStyle[] = ['solid', 'dashed', 'dotted', 'double', 'stamp'];
 
 export const BLEND_MODES: BlendMode[] = [
 	'multiply',
@@ -504,9 +833,9 @@ export function normaliseRotation(raw: unknown): number | undefined {
 /**
  * The board a drawing gets, if this box names one. Both sides or neither: half
  * a size is not a size, and the board every drawing starts on is a better
- * answer than one measurement paired with a guess. Held to the pixel budget
+ * answer than one measurement paired with a guess. Held to the largest side
  * here as well as in the editor, because a template is a file someone can hand
- * you and a board of a million pixels is a cell nobody can open.
+ * you and the board it names is a canvas this browser allocates.
  */
 export function normalisePixels(raw: unknown): { w: number; h: number } | undefined {
 	if (!raw || typeof raw !== 'object') return undefined;
@@ -538,6 +867,18 @@ export function normaliseCentre(raw: unknown): Centre | undefined {
 export function sidesOf(width: SideValue | undefined): Sides {
 	if (typeof width === 'number') return { top: width, right: width, bottom: width, left: width };
 	return width ?? { top: 0, right: 0, bottom: 0, left: 0 };
+}
+
+/**
+ * The height left for a picture or a QR once the padding and the border have
+ * taken theirs, in mm. `.box` is border-box, so both come out of the declared
+ * height; a frame of the whole `h` spilled out of the bottom of any padded
+ * area, cropping the picture and flagging the area as cut.
+ */
+export function frameHeight(box: Pick<Box, 'h' | 'padding' | 'borderWidth'>): number {
+	const pad = sidesOf(box.padding);
+	const border = sidesOf(box.borderWidth);
+	return Math.max(0, box.h - pad.top - pad.bottom - border.top - border.bottom);
 }
 
 /** A recognised color, or nothing at all — never the string it was handed. */
@@ -613,6 +954,23 @@ export function missingLocalFonts(t: Template, available: Set<string>): FontRef[
 	return t.fonts.filter((f) => f.source === 'local' && !available.has(f.ref ?? f.family));
 }
 
+/**
+ * A template read from a file somebody handed over. It arrives without a
+ * starter mark even when the file has one — one exported before files left it
+ * out — because Reset would put our starter over the design they sent.
+ */
+export function importedTemplate(raw: unknown): Template {
+	const { starter: _starter, ...template } = normaliseTemplate(raw);
+	return template;
+}
+
+/**
+ * A template as a file. Without its starter mark: the mark says which bundled
+ * starter this copy began as in this browser, and in somebody else's library
+ * it would offer them a Reset that replaces the design they were sent with
+ * our starter.
+ */
 export function exportTemplate(t: Template): string {
-	return JSON.stringify(t, null, 2);
+	const { starter: _starter, ...shared } = toFile(t);
+	return JSON.stringify(shared, null, 2);
 }

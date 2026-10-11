@@ -1,0 +1,274 @@
+import { parseColor } from './color';
+import { escapeHtml } from './markdown';
+
+/**
+ * One-dimensional barcodes: Code 128 for any printable ASCII, EAN-13 for a
+ * retail number. Hand-written like the QR encoder, so the app keeps working
+ * offline and nothing can rot underneath it.
+ *
+ * Both come out as a row of modules — `true` a bar — and are drawn as an SVG
+ * one module wide per unit. A barcode is read across, so it is stretched to the
+ * area both ways: every bar widens by the same factor, which a scanner does not
+ * mind, and it is as tall as the area makes it.
+ *
+ * No quiet zone of its own, as with the QR: the space a scanner needs either
+ * side is the area's padding. Ten modules is what the specifications ask for.
+ */
+
+/**
+ * Code 128's 107 patterns, as the widths of bar, space, bar, space, bar,
+ * space — eleven modules each; the stop, 106, has a seventh bar and is thirteen.
+ */
+const CODE128 = [
+	'212222', '222122', '222221', '121223', '121322', '131222', '122213', '122312', '132212', '221213',
+	'221312', '231212', '112232', '122132', '122231', '113222', '123122', '123221', '223211', '221132',
+	'221231', '213212', '223112', '312131', '311222', '321122', '321221', '312212', '322112', '322211',
+	'212123', '212321', '232121', '111323', '131123', '131321', '112313', '132113', '132311', '211313',
+	'231113', '231311', '112133', '112331', '132131', '113123', '113321', '133121', '313121', '211331',
+	'231131', '213113', '213311', '213131', '311123', '311321', '331121', '312113', '312311', '332111',
+	'314111', '221411', '431111', '111224', '111422', '121124', '121421', '141122', '141221', '112214',
+	'112412', '122114', '122411', '142112', '142211', '241211', '221114', '413111', '241112', '134111',
+	'111242', '121142', '121241', '114212', '124112', '124211', '411212', '421112', '421211', '212141',
+	'214121', '412121', '111143', '111341', '131141', '114113', '114311', '411113', '411311', '113141',
+	'114131', '311141', '411131', '211412', '211214', '211232', '2331112'
+];
+const START_B = 104;
+const START_C = 105;
+const TO_C = 99;
+const TO_B = 100;
+const STOP = 106;
+
+export type BarcodeKind = 'code128' | 'ean13';
+
+/** Widths, bar first, laid out as modules. */
+function widths(pattern: string, out: boolean[], barFirst = true) {
+	let bar = barFirst;
+	for (const w of pattern) {
+		for (let i = 0; i < Number(w); i++) out.push(bar);
+		bar = !bar;
+	}
+}
+
+/** How many digits run from `at`. */
+function digitsFrom(text: string, at: number): number {
+	let n = 0;
+	while (at + n < text.length && text[at + n] >= '0' && text[at + n] <= '9') n++;
+	return n;
+}
+
+/**
+ * The symbol values for `text`: code set B for anything printable, switching
+ * to C — two digits to a symbol — for a run of digits long enough to repay the
+ * switch: four at either end of the text, six in the middle. Without it a
+ * long number is half as wide again as it needs to be.
+ */
+export function code128Values(text: string): number[] {
+	if (!text) throw new Error('Nothing to encode.');
+	for (const ch of text) {
+		const code = ch.charCodeAt(0);
+		if (code < 32 || code > 126) throw new Error(`Code 128 cannot encode ${JSON.stringify(ch)}.`);
+	}
+	const values: number[] = [];
+	let set: 'B' | 'C';
+	let i = 0;
+	const lead = digitsFrom(text, 0);
+	if (lead >= 4 || (lead === text.length && lead >= 2 && lead % 2 === 0)) {
+		set = 'C';
+		values.push(START_C);
+	} else {
+		set = 'B';
+		values.push(START_B);
+	}
+	while (i < text.length) {
+		const run = digitsFrom(text, i);
+		if (set === 'C') {
+			if (run >= 2) {
+				values.push(Number(text.slice(i, i + 2)));
+				i += 2;
+				continue;
+			}
+			values.push(TO_B);
+			set = 'B';
+		}
+		const toEnd = i + run === text.length;
+		if (run >= 6 || (toEnd && run >= 4)) {
+			// An odd run spends its first digit in B, so C takes whole pairs.
+			if (run % 2) {
+				values.push(text.charCodeAt(i) - 32);
+				i++;
+			}
+			values.push(TO_C);
+			set = 'C';
+			continue;
+		}
+		values.push(text.charCodeAt(i) - 32);
+		i++;
+	}
+	let sum = values[0];
+	for (let k = 1; k < values.length; k++) sum += values[k] * k;
+	values.push(sum % 103, STOP);
+	return values;
+}
+
+/** Code 128 as modules. */
+export function code128(text: string): boolean[] {
+	const out: boolean[] = [];
+	for (const v of code128Values(text)) widths(CODE128[v], out);
+	return out;
+}
+
+/** EAN's L set, as space, bar, space, bar; R is the same widths bar first, G is R reversed. */
+const EAN_L = ['3211', '2221', '2122', '1411', '1132', '1231', '1114', '1312', '1213', '3112'];
+/** Which of the left six digits are set from G, by the first digit, which is never drawn itself. */
+const EAN_PARITY = ['LLLLLL', 'LLGLGG', 'LLGGLG', 'LLGGGL', 'LGLLGG', 'LGGLLG', 'LGGGLL', 'LGLGLG', 'LGLGGL', 'LGGLGL'];
+
+/** The check digit of an EAN's first twelve. */
+export function eanCheck(twelve: string): number {
+	let sum = 0;
+	for (let i = 0; i < 12; i++) sum += Number(twelve[i]) * (i % 2 ? 3 : 1);
+	return (10 - (sum % 10)) % 10;
+}
+
+/**
+ * The thirteen digits an EAN-13 of `text` would print, or null where it cannot
+ * be one. Twelve digits get their check digit; thirteen must already end in
+ * the right one. An ISBN-10 — nine digits and a check that may be X, valid —
+ * becomes the 978 EAN every book since 2007 carries. Spaces and hyphens, as an
+ * ISBN is written, are let through.
+ */
+export function eanDigits(text: string): string | null {
+	const digits = text.replace(/[\s-]/g, '').toUpperCase();
+	if (/^\d{9}[\dX]$/.test(digits)) {
+		let sum = 0;
+		for (let i = 0; i < 10; i++) sum += (digits[i] === 'X' ? 10 : Number(digits[i])) * (10 - i);
+		if (sum % 11 !== 0) return null;
+		const twelve = `978${digits.slice(0, 9)}`;
+		return twelve + eanCheck(twelve);
+	}
+	if (!/^\d{12,13}$/.test(digits)) return null;
+	const check = eanCheck(digits);
+	if (digits.length === 13 && Number(digits[12]) !== check) return null;
+	return digits.slice(0, 12) + check;
+}
+
+/** EAN-13 as modules, for whatever `eanDigits` accepts. */
+export function ean13(text: string): boolean[] {
+	const all = eanDigits(text);
+	if (!all) throw new Error('EAN-13 takes 12 or 13 digits, with a right check digit, or an ISBN-10.');
+	const out: boolean[] = [];
+	widths('111', out);
+	const parity = EAN_PARITY[Number(all[0])];
+	for (let i = 1; i <= 6; i++) {
+		const l = EAN_L[Number(all[i])];
+		// L starts with a space; G is R reversed, and R starts with a bar, so
+		// G read left to right also starts with a space.
+		widths(parity[i - 1] === 'L' ? l : [...l].reverse().join(''), out, false);
+	}
+	widths('11111', out, false);
+	for (let i = 7; i <= 12; i++) widths(EAN_L[Number(all[i])], out);
+	widths('111', out);
+	return out;
+}
+
+export interface BarcodeSvgOptions {
+	color?: string;
+	background?: string;
+	/**
+	 * The human-readable line under the bars, as every retail code is printed:
+	 * EAN-13's thirteen digits in their three groups, Code 128's text centred.
+	 */
+	digits?: boolean;
+}
+
+/** One path of bars, x offset by `shift` modules, for those modules `keep` lets through. */
+function barsPath(modules: boolean[], shift = 0, keep: (x: number) => boolean = () => true): string {
+	let path = '';
+	for (let x = 0; x < modules.length; ) {
+		if (!modules[x] || !keep(x)) {
+			x++;
+			continue;
+		}
+		let w = 1;
+		while (modules[x + w] && keep(x + w)) w++;
+		path += `M${x + shift} 0h${w}v1h-${w}z`;
+		x += w;
+	}
+	return path;
+}
+
+/** Bars stretched to their box, one unit per module and one unit tall. */
+function barsSvg(path: string, width: number, color: string, label: string, style = ''): string {
+	return (
+		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} 1" width="100%" height="100%"` +
+		` preserveAspectRatio="none" shape-rendering="crispEdges"${label ? ` role="img" aria-label="${label}"` : ' aria-hidden="true"'}` +
+		`${style ? ` style="${style}"` : ''}><path d="${path}" fill="${color}"/></svg>`
+	);
+}
+
+/**
+ * The code as markup for the card: the bars alone, stretched to the area, or
+ * — with `digits` — the bars over the line a person reads, in the area's own
+ * face and size (it inherits both), so the digits are as large as the area's
+ * type says.
+ *
+ * EAN-13 is laid out as every packet prints it: the first digit outside the
+ * bars on the left, in the quiet zone that is otherwise blank, six digits under
+ * each half, and the three guard patterns running on down between the groups.
+ * The bars' viewBox grows by seven modules on the left to make that room. Code
+ * 128's text is simply centred under the bars.
+ *
+ * Every color goes through color.ts, and the text through escapeHtml: a Code
+ * 128 value is whatever the cell holds.
+ */
+export function barcodeSvg(text: string, kind: BarcodeKind, options: BarcodeSvgOptions = {}): string {
+	const modules = kind === 'ean13' ? ean13(text) : code128(text);
+	const color = parseColor(options.color ?? null) ?? '#000000';
+	const background = parseColor(options.background ?? null);
+	const label = kind === 'ean13' ? 'EAN-13 barcode' : 'Code 128 barcode';
+	if (!options.digits) {
+		return barsSvg(barsPath(modules), modules.length, color, label).replace(
+			'><path',
+			`>${background ? `<rect width="${modules.length}" height="1" fill="${background}"/>` : ''}<path`
+		);
+	}
+	const box = [
+		'display:flex',
+		'flex-direction:column',
+		'width:100%',
+		'height:100%',
+		'line-height:1',
+		'font-variant-numeric:tabular-nums',
+		`color:${color}`,
+		...(background ? [`background:${background}`] : [])
+	].join(';');
+	// Height is the bars' own, past the stylesheet that sizes every picture
+	// in an area to the whole of it: the digits' row needs its room.
+	const stretch = 'flex:1 1 0;min-height:0;height:auto';
+	const row = 'position:relative;flex:none;height:1.15em';
+	const at = (from: number, width: number, total: number) =>
+		`position:absolute;top:0.1em;left:${((from / total) * 100).toFixed(3)}%;width:${((width / total) * 100).toFixed(3)}%`;
+	if (kind === 'code128') {
+		return (
+			`<span style="${box}" role="img" aria-label="${label}: ${escapeHtml(text)}">` +
+			barsSvg(barsPath(modules), modules.length, color, '', stretch) +
+			`<span style="position:relative;flex:none;height:1.3em;padding-top:0.15em;box-sizing:border-box;text-align:center;white-space:nowrap;overflow:hidden" aria-hidden="true">${escapeHtml(text)}</span></span>`
+		);
+	}
+	const digits = eanDigits(text)!;
+	const LEFT = 7;
+	const total = LEFT + modules.length;
+	// The guards: 101 at either end, 01010 in the middle.
+	const guard = (x: number) => x < 3 || (x >= 45 && x < 50) || x >= 92;
+	const group = (chars: string) =>
+		[...chars].map((d) => `<span style="flex:1;text-align:center">${d}</span>`).join('');
+	return (
+		`<span style="${box}" role="img" aria-label="${label}: ${digits}">` +
+		barsSvg(barsPath(modules, LEFT), total, color, '', stretch) +
+		`<span style="${row}" aria-hidden="true">` +
+		barsSvg(barsPath(modules, LEFT, guard), total, color, '', 'position:absolute;inset:0;height:100%') +
+		`<span style="${at(0, LEFT - 1, total)};text-align:center">${digits[0]}</span>` +
+		`<span style="${at(LEFT + 3, 42, total)};display:flex">${group(digits.slice(1, 7))}</span>` +
+		`<span style="${at(LEFT + 50, 42, total)};display:flex">${group(digits.slice(7))}</span>` +
+		`</span></span>`
+	);
+}

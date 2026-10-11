@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { handBorder } from './hand';
+import { handBorder, shortness } from './hand';
 import type { Sides } from './types';
 
 const even = (width: number): Sides => ({ top: width, right: width, bottom: width, left: width });
@@ -99,9 +99,57 @@ describe('handBorder', () => {
 		expect(start(strokes[4].d)).toBe('2.5 2.5');
 	});
 
+	it('draws a short edge with a heavier hand, and a long one as before', () => {
+		expect(shortness(60)).toBe(0);
+		expect(shortness(40)).toBe(0);
+		expect(shortness(25)).toBe(0.5);
+		expect(shortness(10)).toBe(1);
+		expect(shortness(3)).toBe(1);
+		// A 15mm edge bends more than once, and further than a long one may.
+		const [top] = border({ w: 15, h: 15 });
+		expect(top.d.match(/Q/g)?.length ?? 0).toBeGreaterThan(1);
+		const strays = (d: string) =>
+			Math.max(...[...d.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => Math.abs(Number(m[2]) - 0.25)));
+		const seeds = ['a', 'b', 'c', 'd', 'e', 'f'];
+		const shortMost = Math.max(...seeds.map((seed) => strays(border({ w: 15, h: 15, seed })[0].d)));
+		expect(shortMost).toBeGreaterThan(0.32);
+		expect(shortMost).toBeLessThanOrEqual(0.56);
+	});
+
 	it('wobbles a long edge more often than a short one', () => {
 		const long = border({ w: 200 })[0].d.match(/Q/g)?.length ?? 0;
 		const short = border({ w: 20 })[0].d.match(/Q/g)?.length ?? 0;
 		expect(long).toBeGreaterThan(short);
+	});
+});
+
+describe('a stamp', () => {
+	const stamp = (over: Partial<Parameters<typeof handBorder>[0]> = {}) => border({ style: 'stamp', ...over });
+
+	it('is one closed outline, as wide as the heaviest edge', () => {
+		const strokes = stamp({ widths: { top: 0.2, right: 0.5, bottom: 0, left: 0.3 } });
+		expect(strokes).toHaveLength(1);
+		expect(strokes[0].closed).toBe(true);
+		expect(strokes[0].width).toBe(0.5);
+		expect(strokes[0].d.endsWith('Z')).toBe(true);
+	});
+
+	it('bites a hole out of every edge, spaced to fit it', () => {
+		const holes = (d: string) => (d.match(/A/g) ?? []).length;
+		const steady = stamp({ steady: true })[0].d;
+		// 60 by 40 at 0.5mm: holes of 1.2mm on a 3.36mm pitch — 18 and 12 a side.
+		expect(holes(steady)).toBe(2 * 18 + 2 * 12);
+		// Drawn by hand the holes wander, but there are as many of them.
+		expect(holes(stamp()[0].d)).toBe(holes(steady));
+		expect(stamp()[0].d).not.toBe(steady);
+	});
+
+	it('is drawn true when steady, whatever the seed', () => {
+		expect(stamp({ steady: true, seed: 'a' })).toEqual(stamp({ steady: true, seed: 'b' }));
+		expect(start(stamp({ steady: true })[0].d)).toBe('0.25 0.25');
+	});
+
+	it('draws nothing without a width', () => {
+		expect(stamp({ widths: even(0) })).toEqual([]);
 	});
 });

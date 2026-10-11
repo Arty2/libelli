@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canRedo, canUndo, createHistory, record, redo, redoLabel, reset, undo, undoLabel } from './history';
+import { amend, canRedo, canUndo, createHistory, record, redo, redoLabel, reset, undo, undoLabel } from './history';
 
 const steps = (...values: string[]) => values.reduce((h, v) => record(h, v), createHistory('a'));
 /** What the history is showing, without the label riding alongside it. */
@@ -83,5 +83,28 @@ describe('history', () => {
 		expect(at(h)).toBe('z');
 		expect(canUndo(h)).toBe(false);
 		expect(canRedo(h)).toBe(false);
+	});
+});
+
+describe('amend', () => {
+	it('folds a refinement into the last step, so one undo and one redo take both', () => {
+		let h = createHistory({ font: 'Alpha', x: 1 });
+		h = record(h, { font: 'Beta', x: 1 }, 'Replace Alpha with Beta');
+		h = amend(h, { font: 'Beta', x: 1.04 });
+		h = amend(h, { font: 'Beta', x: 1.06 });
+		expect(h.past).toHaveLength(1);
+		expect(undoLabel(h)).toBe('Replace Alpha with Beta');
+		h = undo(h);
+		expect(h.present.state).toEqual({ font: 'Alpha', x: 1 });
+		h = redo(h);
+		expect(h.present.state).toEqual({ font: 'Beta', x: 1.06 });
+	});
+
+	it('drops what was ahead, and is a no-op for the same state', () => {
+		let h = record(createHistory(1), 2, 'two');
+		h = undo(h);
+		h = amend(h, 3);
+		expect(canRedo(h)).toBe(false);
+		expect(amend(h, 3)).toBe(h);
 	});
 });

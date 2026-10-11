@@ -3,11 +3,13 @@
 	import Icon from './Icon.svelte';
 	import { swipe } from '$lib/gestures';
 	import { bleedFor, mmToPx } from '$lib/layout';
-	import type { Dataset, Mapping, Template } from '$lib/types';
+	import type { Dataset, Mapping, Row, Template } from '$lib/types';
 
 	interface Props {
 		template: Template;
 		dataset: Dataset;
+		/** the rows in the order the table numbers them, for a card's `%%lookup:…%%` */
+		lookupRows: readonly Row[];
 		mapping: Mapping;
 		/** which row is shown, and what the arrows step through */
 		index: number;
@@ -18,7 +20,7 @@
 		onclose: () => void;
 	}
 
-	let { template, dataset, mapping, index, background, images = {}, onactivate, onclose }: Props =
+	let { template, dataset, lookupRows, mapping, index, background, images = {}, onactivate, onclose }: Props =
 		$props();
 
 	let viewport = $state({ w: 1200, h: 800 });
@@ -503,6 +505,8 @@
 <div
 	class="full"
 	role="presentation"
+	data-own-pinch
+	data-true-color
 	onclick={() => {
 		// A drag that ends over the ground either side of the card is a drag, not
 		// a click on the backdrop, and must not put the card away.
@@ -560,6 +564,7 @@
 				{mapping}
 				pageNumber={index + 1}
 				pageCount={dataset.rows.length}
+				rows={lookupRows}
 				{background}
 				{images}
 			/>
@@ -580,7 +585,7 @@
 	     screen-width apart from what they act on. -->
 	<div class="nav-bar" role="presentation" onclick={(e) => e.stopPropagation()}>
 		<button class="plain" disabled={index === 0} onclick={() => step(index - 1)} aria-label="Previous card">
-			<Icon name="caret-left" size={26} />
+			<Icon name="chevron-left" size={26} />
 		</button>
 		<span class="counter">{index + 1} / {dataset.rows.length}</span>
 		<button
@@ -589,7 +594,7 @@
 			onclick={() => step(index + 1)}
 			aria-label="Next card"
 		>
-			<Icon name="caret-right" size={26} />
+			<Icon name="chevron-right" size={26} />
 		</button>
 	</div>
 </div>
@@ -719,7 +724,7 @@
 
 	.counter {
 		color: #fff;
-		font: 24px ui-sans-serif, system-ui, sans-serif;
+		font: 1.5rem ui-sans-serif, system-ui, sans-serif;
 		min-width: 6rem;
 		text-align: center;
 	}

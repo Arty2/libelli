@@ -14,30 +14,18 @@
 const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
 /**
- * A short, print-sensible set of names, so `[warning]{red}` works without a hex.
+ * Names that are not CSS keywords, so a cell can say them anyway. The CSS
+ * keywords below are the names: `red` is #ff0000, as in any browser, so a
+ * color named in a cell is the same color as that name anywhere else.
  *
- * These deliberately shadow the CSS keywords of the same name below: CSS `red`
- * is #ff0000, which is a screen color and comes off a press as a shout. Anyone
- * who wants that exact value can write the hex.
+ * There used to be a print palette here that shadowed the CSS names — `red`
+ * as a press red, `green` a darker one — on the reasoning that screen colors
+ * come off a press as a shout. It made a name mean something different here
+ * from everywhere else, which is the worse surprise; a softer red is a hex
+ * away, and says so.
  */
 export const NAMED_COLORS: Record<string, string> = {
-	black: '#000000',
-	white: '#ffffff',
-	grey: '#767676',
-	gray: '#767676',
-	silver: '#b3b3b3',
-	red: '#b42318',
-	orange: '#c4520a',
-	amber: '#b25e09',
-	yellow: '#a88600',
-	green: '#177245',
-	teal: '#0f6f70',
-	blue: '#1d4ed8',
-	navy: '#14306b',
-	purple: '#6b21a8',
-	magenta: '#a4176b',
-	pink: '#c2477f',
-	brown: '#6b4423'
+	amber: '#b25e09'
 };
 
 function expand(packed: string): Record<string, string> {
@@ -57,8 +45,8 @@ function expand(packed: string): Record<string, string> {
  *
  * Here at all because an area can take its fill from a spreadsheet column, and
  * a spreadsheet that holds colors holds them the way people write them:
- * `crimson`, `cornflowerblue`, `rebeccapurple`. The print palette above still
- * wins on the seventeen names it defines.
+ * `crimson`, `cornflowerblue`, `rebeccapurple`. They are the names; the one
+ * above is only for what CSS does not name.
  */
 const CSS_KEYWORDS = expand(
 	"aliceblue f0f8ff antiquewhite faebd7 aqua 00ffff aquamarine 7fffd4 azure f0ffff " +
@@ -140,7 +128,71 @@ export function parseColor(raw: string | undefined | null): string | null {
 	if (!raw) return null;
 	const value = raw.trim().toLowerCase();
 	if (HEX.test(value)) return value;
-	if (NAMED_COLORS[value]) return NAMED_COLORS[value];
 	if (CSS_KEYWORDS[value]) return CSS_KEYWORDS[value];
+	if (NAMED_COLORS[value]) return NAMED_COLORS[value];
 	return parseFunctional(value);
+}
+
+/** A color as its four channels: 0-255 each, alpha 0-1. */
+export interface Rgba {
+	r: number;
+	g: number;
+	b: number;
+	a: number;
+}
+
+/**
+ * Any color this module accepts, as its channels — for the color fields,
+ * which show a swatch and an opacity, and for `isDark`. Null for what
+ * `parseColor` refuses, and for anything it accepts without a fixed value.
+ */
+export function toRgba(raw: string | undefined | null): Rgba | null {
+	const value = parseColor(raw);
+	if (!value) return null;
+	let hex = /^#([0-9a-f]{3,8})$/.exec(value)?.[1];
+	if (hex) {
+		if (hex.length <= 4) hex = [...hex].map((c) => c + c).join('');
+		const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex!.slice(i, i + 2), 16));
+		const a = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1;
+		return { r, g, b, a: round(a) };
+	}
+	const parts = /^(rgba?|hsla?)\(([^)]*)\)$/.exec(value);
+	if (!parts) return null;
+	const n = parts[2].split(',').map((p) => parseFloat(p));
+	const a = n.length > 3 ? n[3] : 1;
+	if (parts[1].startsWith('rgb')) return { r: n[0], g: n[1], b: n[2], a };
+	// hsl -> rgb, the CSS Color 4 formula.
+	const [h, s, l] = [n[0], n[1] / 100, n[2] / 100];
+	const f = (k: number) => {
+		const t = (k + h / 30) % 12;
+		return Math.round(255 * (l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(t - 3, 9 - t, 1))));
+	};
+	return { r: f(0), g: f(8), b: f(4), a };
+}
+
+/**
+ * A color back out of its channels: a six-digit hex when it is opaque — what
+ * a template has always held — and `rgba()` when it is not.
+ */
+export function fromRgba({ r, g, b, a }: Rgba): string {
+	const c = (v: number) => Math.round(Math.max(0, Math.min(255, v)));
+	if (a >= 1) return `#${[r, g, b].map((v) => c(v).toString(16).padStart(2, '0')).join('')}`;
+	return `rgba(${c(r)}, ${c(g)}, ${c(b)}, ${round(Math.max(0, a))})`;
+}
+
+/**
+ * Whether a color reads as dark — relative luminance under the point where
+ * black and white contrast equally with it. For screen furniture that has to
+ * stand out against the paper, such as the grid. A color this module cannot
+ * read, or a mostly transparent one, is taken as light: the paper behind it is.
+ */
+export function isDark(raw: string | undefined | null): boolean {
+	const rgba = toRgba(raw);
+	if (!rgba || rgba.a < 0.5) return false;
+	const [r, g, b] = [rgba.r, rgba.g, rgba.b].map((c) => {
+		const v = c / 255;
+		return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+	});
+	// Equal contrast against black and white falls at a luminance of about 0.18.
+	return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.18;
 }

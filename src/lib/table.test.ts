@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { compareCells, indexAfterSort, moveColumn, sortRows } from './table';
+import {
+	appendRows,
+	compareCells,
+	countText,
+	deleteRows,
+	dropTarget,
+	inArrivalOrder,
+	runOf,
+	indexAfterSort,
+	moveColumn,
+	moveRows,
+	moveRowsTo,
+	orderOf,
+	renumbering,
+	numberIn,
+	rowNumber,
+	sortRows,
+	unsortRows,
+	withoutOrder
+} from './table';
 import type { Dataset } from './types';
 
 const data = (): Dataset => ({
@@ -70,5 +89,146 @@ describe('indexAfterSort', () => {
 		const after = sortRows(before, 'title', 'asc');
 		expect(indexAfterSort(before, after, 0)).toBe(1); // Ferns moves to the middle
 		expect(indexAfterSort(before, after, 1)).toBe(0);
+	});
+});
+
+describe('countText', () => {
+	it('counts code points and runs of non-space', () => {
+		expect(countText('')).toEqual({ characters: 0, words: 0 });
+		expect(countText('  two  words\n')).toEqual({ characters: 13, words: 2 });
+		expect(countText('é🙂')).toEqual({ characters: 2, words: 1 });
+	});
+});
+
+describe('dropTarget', () => {
+	it('reads the gap a column is dropped into as its new index', () => {
+		expect(dropTarget(0, 0)).toBe(0);
+		expect(dropTarget(0, 1)).toBe(0);
+		expect(dropTarget(0, 3)).toBe(2);
+		expect(dropTarget(2, 0)).toBe(0);
+		expect(dropTarget(2, 2)).toBe(2);
+	});
+});
+
+describe('moveRows', () => {
+	const rows = ['a', 'b', 'c', 'd', 'e'];
+
+	it('moves a block up and down by one', () => {
+		expect(moveRows(rows, [1, 2], -1)).toEqual({ rows: ['b', 'c', 'a', 'd', 'e'], chosen: [0, 1] });
+		expect(moveRows(rows, [1, 2], 1)).toEqual({ rows: ['a', 'd', 'b', 'c', 'e'], chosen: [2, 3] });
+	});
+
+	it('holds rows at the edge and keeps a run in shape against it', () => {
+		expect(moveRows(rows, [0, 1, 3], -1)).toEqual({ rows: ['a', 'b', 'd', 'c', 'e'], chosen: [0, 1, 2] });
+		const still = moveRows(rows, [3, 4], 1);
+		expect(still.rows).toBe(rows);
+		expect(still.chosen).toEqual([3, 4]);
+	});
+
+	it('moves scattered rows each past its neighbour', () => {
+		expect(moveRows(rows, [0, 2, 4], 1).rows).toEqual(['b', 'a', 'd', 'c', 'e']);
+	});
+});
+
+describe('moveRowsTo', () => {
+	const rows = ['a', 'b', 'c', 'd', 'e'];
+
+	it('moves one row into a gap above or below it', () => {
+		expect(moveRowsTo(rows, [3], 1)).toEqual({ rows: ['a', 'd', 'b', 'c', 'e'], chosen: [1] });
+		expect(moveRowsTo(rows, [0], 5)).toEqual({ rows: ['b', 'c', 'd', 'e', 'a'], chosen: [4] });
+	});
+
+	it('moves a scattered set together, in their own order', () => {
+		expect(moveRowsTo(rows, [4, 1], 0)).toEqual({ rows: ['b', 'e', 'a', 'c', 'd'], chosen: [0, 1] });
+		expect(moveRowsTo(rows, [0, 2], 4)).toEqual({ rows: ['b', 'd', 'a', 'c', 'e'], chosen: [2, 3] });
+	});
+
+	it('gives the same rows back for a drop where they already are', () => {
+		const same = moveRowsTo(rows, [2], 3);
+		expect(same.rows).toBe(rows);
+		expect(same.chosen).toEqual([2]);
+		expect(moveRowsTo(rows, [2], 2).rows).toBe(rows);
+	});
+});
+
+describe('row numbers and the arrival order', () => {
+	const a = { t: 'a' };
+	const b = { t: 'b' };
+	const c = { t: 'c' };
+	const table = (rows: Dataset['rows'], order?: number[]): Dataset => ({ columns: ['t'], rows, ...(order ? { order } : {}) });
+
+	it('writes the order down on the first sort, and carries it through the next', () => {
+		const once = sortRows(table([b, c, a]), 't', 'asc');
+		expect(once.rows).toEqual([a, b, c]);
+		expect(once.order).toEqual([2, 0, 1]);
+		const twice = sortRows(once, 't', 'desc');
+		expect(twice.rows).toEqual([c, b, a]);
+		expect(twice.order).toEqual([1, 0, 2]);
+		expect([0, 1, 2].map((i) => rowNumber(twice, i))).toEqual([2, 1, 3]);
+		// The table's labels, from the order checked once, say the same.
+		expect([0, 1, 2].map((i) => numberIn(orderOf(twice), i))).toEqual([2, 1, 3]);
+		expect(numberIn(null, 4)).toBe(5);
+	});
+
+	it('leaves no order on a table that stands where it arrived', () => {
+		expect('order' in sortRows(table([a, b, c]), 't', 'asc')).toBe(false);
+		expect('order' in unsortRows(sortRows(table([b, a]), 't', 'asc'))).toBe(false);
+	});
+
+	it('puts the rows back in the order of their numbers, for a lookup and for unsort', () => {
+		const sorted = sortRows(table([b, c, a]), 't', 'desc');
+		expect(inArrivalOrder(sorted)).toEqual([b, c, a]);
+		expect(unsortRows(sorted).rows).toEqual([b, c, a]);
+		// An edit that rebuilds every row keeps the numbers, being by position.
+		const renamed = { ...sorted, rows: sorted.rows.map((r) => ({ ...r })) };
+		expect(inArrivalOrder(renamed).map((r) => r.t)).toEqual(['b', 'c', 'a']);
+	});
+
+	it('ignores an order that does not fit its rows', () => {
+		expect(orderOf(table([a, b], [0]))).toBeNull();
+		expect(orderOf(table([a, b], [1, 1]))).toBeNull();
+		expect(orderOf(table([a, b], [0, 2]))).toBeNull();
+		expect(rowNumber(table([a, b], [5, 0]), 0)).toBe(1);
+	});
+
+	it('numbers new rows next, closes up after a delete, and forgets on a move', () => {
+		const sorted = table([c, a, b], [2, 0, 1]);
+		const added = appendRows(sorted, [{ t: 'd' }]);
+		expect(added.order).toEqual([2, 0, 1, 3]);
+		const deleted = deleteRows(added, new Set([1]));
+		expect(deleted.rows.map((r) => r.t)).toEqual(['c', 'b', 'd']);
+		expect(deleted.order).toEqual([1, 0, 2]);
+		expect('order' in withoutOrder(sorted)).toBe(false);
+	});
+
+	it('says how numbers moved on a delete or a move, and nothing when none did', () => {
+		const t = table([a, b, c]);
+		expect(renumbering(t, deleteRows(t, new Set([1])))).toEqual(
+			new Map([
+				[1, 1],
+				[2, null],
+				[3, 2]
+			])
+		);
+		const sorted = sortRows(table([b, c, a]), 't', 'asc');
+		expect(renumbering(table([b, c, a]), sorted)).toBeNull();
+		// Moved by hand while sorted: the positions become the numbers.
+		expect(renumbering(sorted, withoutOrder(sorted))).toEqual(
+			new Map([
+				[3, 1],
+				[1, 2],
+				[2, 3]
+			])
+		);
+	});
+});
+
+describe('runOf', () => {
+	it('finds the order the rows print in from the arrival-ordered list made of them', () => {
+		const dataset = { columns: ['n'], rows: [{ n: 'b' }, { n: 'a' }] };
+		const arrival = inArrivalOrder(dataset);
+		expect(runOf(arrival)).toBe(dataset.rows);
+		expect(runOf([...arrival])).toBeUndefined();
+		expect(runOf(undefined)).toBeUndefined();
 	});
 });

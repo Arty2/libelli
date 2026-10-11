@@ -34,6 +34,18 @@ export const SHELL = '/';
 export const SKIP_WAITING = 'libelli:skip-waiting';
 
 /**
+ * How long since the last look before coming back to the tab is worth asking
+ * the server whether there is a newer app. A browser checks on its own only
+ * when the page loads, and an app left open in a tab for a week never loads;
+ * every return to the tab, though, would be a request for nothing most times
+ * someone glances away and back.
+ */
+export const UPDATE_CHECK_GAP = 10 * 60 * 1000;
+
+/** Whether a tab that has just come back into view should look for an update. */
+export const dueForUpdateCheck = (now: number, lastChecked: number): boolean => now - lastChecked >= UPDATE_CHECK_GAP;
+
+/**
  * Every path the worker holds a copy of, as pathnames rather than URLs: the
  * decision below keys on `pathname`, so a link carrying a query string a static
  * host ignores still finds the cached page.

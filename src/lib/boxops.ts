@@ -118,16 +118,40 @@ export function toggleGroup(boxes: Box[], ids: string[]): { boxes: Box[]; groupe
 }
 
 /**
+ * Whether a box moved as one of `moving` keeps its gap: the box it hangs from
+ * comes down the page with the move, so it already follows — resolveLayout
+ * takes its top from that box's bottom. Changing its gap as well would move it
+ * twice and pull a group apart; this is what holds an anchored group together
+ * under a drag or a nudge.
+ *
+ * Up the whole chain, not one link: a box can hang from one that is not
+ * moving itself but hangs from one that is — a group of a heading and the
+ * line two below it, with the line between left out — and that box comes down
+ * just the same. `boxes` is where the chain is read; a loop ends the walk.
+ */
+export function followsInSet(box: Box, moving: ReadonlySet<string>, boxes: readonly Box[]): boolean {
+	const seen = new Set([box.id]);
+	let to = box.anchor?.to;
+	while (to && !seen.has(to)) {
+		if (moving.has(to)) return true;
+		seen.add(to);
+		to = boxes.find((b) => b.id === to)?.anchor?.to;
+	}
+	return false;
+}
+
+/**
  * Move a box by whole millimetres. An anchored box moves its gap rather than
  * its y — the same rule dragging follows — so a nudge cannot quietly break an
- * anchor chain. Returns null when there is nothing to move.
+ * anchor chain. The gap may go below zero, overlapping the area it follows,
+ * as it may when dragged. Returns null when there is nothing to move.
  */
 export function nudgeBox(box: Box, dx: number, dy: number): Box | null {
 	if (box.locked) return null;
 	const round = (v: number) => Math.round(v * 100) / 100;
 	const next: Box = { ...box, x: round(box.x + dx) };
 	if (dy) {
-		if (box.anchor) next.anchor = { ...box.anchor, gap: Math.max(0, round(box.anchor.gap + dy)) };
+		if (box.anchor) next.anchor = { ...box.anchor, gap: round(box.anchor.gap + dy) };
 		else next.y = round(box.y + dy);
 	}
 	return next;
@@ -194,8 +218,10 @@ export const STYLE_KEYS = [
 	'valign',
 	'italic',
 	'letterSpacing',
+	'xHeight',
 	'textCase',
 	'md',
+	'columns',
 	'background',
 	'padding',
 	'borderWidth',
@@ -250,13 +276,33 @@ export function applyStyle(box: Box, style: BoxStyle): Box {
  * box on a number nothing will write is a button that lights up and then does
  * nothing when pressed. The Gap field in the bar is where that box's vertical
  * position lives.
+ *
+ * One exception: a *locked* box *wholly* off the paper is parked, not lost —
+ * a note beside the page, on the pasteboard where it will never print. Both
+ * halves of that are needed. Wholly off alone is exactly the box a shrunk page
+ * leaves behind, the case this exists for; locked alone is not a reason, since
+ * a locked box half off the edge is still being cut in half by every print.
+ * Together they are somebody saying "here, and on purpose", and a rescue
+ * button lit for good over a note is a button nobody believes any more.
  */
 export function strayBoxes(boxes: Box[], page: PageSpec, bleed = 0): Box[] {
 	const off = (start: number, size: number, limit: number) =>
 		start < -bleed || start + size > limit + bleed;
 	return boxes.filter(
-		(box) => off(box.x, box.w, page.w) || (!box.anchor && off(box.y, box.h, page.h))
+		(box) =>
+			!isParked(box, page, bleed) && (off(box.x, box.w, page.w) || (!box.anchor && off(box.y, box.h, page.h)))
 	);
+}
+
+/**
+ * A locked box wholly off the paper — see `strayBoxes`. Also why the card
+ * draws no dashed bound round it: the bound says where on the page an area
+ * sits, and a parked note is not on the page; its own fill is its edge.
+ */
+export function isParked(box: Box, page: PageSpec, bleed = 0): boolean {
+	const clear = (start: number, size: number, limit: number) =>
+		start + size <= -bleed || start >= limit + bleed;
+	return !!box.locked && (clear(box.x, box.w, page.w) || (!box.anchor && clear(box.y, box.h, page.h)));
 }
 
 /**

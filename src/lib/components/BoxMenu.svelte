@@ -47,7 +47,7 @@
 	}: Props = $props();
 
 	const many = $derived(selectedBoxes.length > 1);
-	const plural = $derived(many ? ` ${selectedBoxes.length} Boxes` : '');
+	const plural = $derived(many ? ` ${selectedBoxes.length} Areas` : '');
 	const grouped = $derived(
 		many && selectedBoxes.every((b) => b.group) && new Set(selectedBoxes.map((b) => b.group)).size === 1
 	);
@@ -201,13 +201,13 @@
 		border-radius: var(--radius-button);
 		background: transparent;
 		color: #111;
-		font: 12px ui-sans-serif, system-ui, sans-serif;
+		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		text-align: left;
 		cursor: pointer;
 	}
 
 	button:hover:not(:disabled) {
-		background: #eef3fb;
+		background: var(--accent-wash);
 	}
 
 	button:disabled {
@@ -221,7 +221,7 @@
 	   all of them. */
 
 	button.on {
-		color: #2563eb;
+		color: var(--accent);
 	}
 
 	button.danger {

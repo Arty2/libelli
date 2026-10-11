@@ -16,12 +16,12 @@
 	padding: 8px 12px;
 	border-bottom: 1px solid #ddd;
 	background: #f7f7f7;
-	font: 12px ui-sans-serif, system-ui, sans-serif;
+	font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 }
 
 .box-options {
-	background: #eef3fb;
-	border-bottom-color: #cfdcf3;
+	background: var(--accent-wash);
+	border-bottom-color: var(--accent-line);
 }
 
 .options .context {
@@ -29,7 +29,7 @@
 	color: #767676;
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
-	font-size: 10px;
+	font-size: 0.625rem;
 }
 
 .options .field {
@@ -45,8 +45,8 @@
    is excluded: `MM` and `PT` are not how anyone writes a unit, and the point of
    setting them small and grey was that they read as an annotation rather than
    as a second label. */
-.options .field > span:not(.unit) {
-	font-size: 10px;
+.options .field > span:not(.unit):not(.menu-select) {
+	font-size: 0.625rem;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	white-space: nowrap;
@@ -55,7 +55,7 @@
 /* A checkbox's words are its label too, and a bar where half the labels shout
    and half do not looks broken rather than considered. */
 .options .check {
-	font-size: 10px;
+	font-size: 0.625rem;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 }
@@ -66,21 +66,21 @@
 
 .options .edge {
 	color: #999;
-	font-size: 10px;
+	font-size: 0.625rem;
 	width: 0.7rem;
 	text-align: right;
 }
 
 .options .unit {
 	color: #999;
-	font-size: 10px;
+	font-size: 0.625rem;
 }
 
 /* A label with no field of its own to sit inside — the background image is two
    buttons or a name and a menu, depending on whether there is one. Set like
    every other label in the bar, which is what it is. */
 .options .field-label {
-	font-size: 10px;
+	font-size: 0.625rem;
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	white-space: nowrap;
@@ -97,19 +97,79 @@
 	color: #b42318;
 }
 
-/* Related controls are one group with a rule either side, so the bar reads as
-   a handful of subjects rather than thirty loose fields. */
+/* Each subject is one run: its name in bold, then its controls, with a wider
+   gap before the next run than between two fields. The name is the only thing
+   in the bar set heavier than the labels, so it marks where a run starts. No
+   rule between runs: the bar wraps, and a rule lands wherever the wrap does —
+   dangling at the end of a line, or between two runs that have nothing to do
+   with each other.
+
+   A group wraps inside itself once it is wider than the bar. At the default
+   text size that is only ever a phone; at a larger text size it is a desk too,
+   where an unwrapped group ran off the window and widened the document. */
 .options .group {
 	display: inline-flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
-	padding: 2px 8px;
-	border-left: 1px solid #ddd;
-	border-right: 1px solid #ddd;
+	max-width: 100%;
+	box-sizing: border-box;
+	margin: 0;
+	/* A fieldset brings a min-content floor, which is what would stop a group
+	   wrapping inside itself on a phone; it goes, with the browser's frame. */
+	min-inline-size: 0;
+	padding: 2px 0;
+	border: none;
+	margin-right: 12px;
 }
 
-.box-options .group {
-	border-color: #cfdcf3;
+/* Floated, a legend is no longer the one drawn into the fieldset's border but
+   an ordinary child — here the first item of the run. */
+.options .group > legend {
+	float: left;
+	padding: 0;
+	margin: 0;
+	white-space: nowrap;
+	font-size: 0.625rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: #222;
+}
+
+/* A value taken from somewhere else — the page's size, its font, its list
+   marker — is shown in italics, in a grey that still reads, where a value
+   set here is upright and black and has an × beside it. The placeholder rule
+   covers every blank-inherits field at once, and a real placeholder elsewhere
+   in the bar (a width, a template name) reads as the suggestion it is. */
+.options input::placeholder {
+	color: #6b6b6b;
+	font-style: italic;
+	opacity: 1;
+}
+
+.options select.inherits,
+.options .inherits .menu-select .value,
+.options .inherits .color-field .alpha {
+	font-style: italic;
+	color: #6b6b6b;
+}
+
+.options button.reset {
+	flex: none;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: none;
+	color: #767676;
+}
+
+.options button.reset:hover:not(:disabled) {
+	background: #e3e3e3;
+	color: #111;
 }
 
 /* The image is named, not shown: a thumbnail in a toolbar this dense reads as
@@ -122,7 +182,7 @@
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
-	font-size: 11px;
+	font-size: 0.6875rem;
 	color: #555;
 }
 
@@ -132,6 +192,11 @@
 	gap: 4px;
 	color: #555;
 	white-space: nowrap;
+}
+
+/* A checkbox that does not apply greys its words with it. */
+.options .check:has(input:disabled) {
+	color: #999;
 }
 
 /* A field is a line under a value, not a box around it.
@@ -144,7 +209,7 @@
    has to look like one. */
 .options input,
 .options select {
-	font: 12px ui-sans-serif, system-ui, sans-serif;
+	font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 	padding: 3px 2px;
 	border: none;
 	border-bottom: 1px solid var(--border-control);
@@ -162,6 +227,18 @@
 	border-bottom-color: var(--border-control-hover);
 }
 
+/* Focused, the line under the value is the whole of the sign: it turns the
+   accent and doubles (a shadow under the border, so nothing moves), where the
+   app-wide focus ring would draw a box round a field that has none — the one
+   frame these fields went without a frame to avoid. The table's name field
+   and its column headers do the same. */
+.options input:not([type='checkbox']):not([type='color']):focus,
+.options select:focus {
+	outline: none;
+	border-bottom-color: var(--accent);
+	box-shadow: 0 1px 0 var(--accent);
+}
+
 /* Nothing to fill in, so nothing to underline: a disabled field is a value
    being reported rather than one being asked for. */
 .options input:disabled,
@@ -175,6 +252,20 @@
 .options input[type='color'] {
 	border: 1px solid var(--border-control);
 	border-radius: var(--radius-input);
+}
+
+/* As tall as the buttons beside it, at every text size: the browser's own
+   color input is a fixed height (27px in Chrome, taller on a phone), so it
+   stood out of the row as soon as the text was sized up or down. A button is
+   one line of its type, its 5px of padding either side and its border; the
+   swatch is given that type and measured the same way, in `lh` — one line of
+   its own — because the line height of `normal` is the font's to round, and a
+   sum in rem came out a pixel short. `lh` is Baseline Widely (2026); without
+   it the declaration drops and the swatch keeps its own height. */
+.options .color-field .swatch {
+	box-sizing: border-box;
+	font: 0.75rem ui-sans-serif, system-ui, sans-serif;
+	height: calc(1lh + 12px);
 }
 
 /* Sized to the widest value each one actually holds, not to a grid: every rem
@@ -220,7 +311,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	font: 12px ui-sans-serif, system-ui, sans-serif;
+	font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 	padding: 5px 10px;
 	border: 1px solid var(--border-control);
 	border-radius: var(--radius-button);
@@ -238,16 +329,59 @@
 	cursor: default;
 }
 
+/* Square at every text size: the 14px icon (in rem), 5px of padding either
+   side and a 1px border, the sum the button's height already comes to. A
+   width of 1.6875rem matched it at 100% only — 27 by 26 there, and 40.5 by 33
+   at 150%. */
 .options button.square {
+	--square: calc(0.875rem + 12px);
 	padding: 5px;
-	width: 27px;
+	width: var(--square);
+	height: var(--square);
 	justify-content: center;
+	flex: none;
+}
+
+/* The template swap is drawn as the table's is (DataTable's `.icon`): the
+   same button, doing the same thing for the other half of the work, and a
+   bordered square here beside a bare glyph there read as two different
+   controls — the third control in a row of two fields, when what it is is a
+   shortcut. No border, the tools' grey, a fill on hover, and faded further
+   than the bar's other disabled buttons when there is nothing to go back to. */
+.options button.swap {
+	display: inline-grid;
+	place-items: center;
+	/* The table bar's size for its tools (`.actions .icon`), not the table's
+	   own smaller cell-tool size. */
+	width: 1.75rem;
+	height: 1.75rem;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: #767676;
+	flex: none;
+}
+
+.options button.swap:hover:not(:disabled) {
+	background: #eee;
+	color: #111;
+}
+
+.options button.swap:disabled {
+	opacity: 0.3;
+}
+
+/* The template carries styles of its own: the border in full ink, the way a
+   field with something in it reads darker than an empty one. */
+.options button.css.has-css,
+.options button.css.has-css:hover:not(:disabled) {
+	border-color: #111;
 }
 
 .options button[aria-pressed='true'] {
-	border-color: #2563eb;
-	color: #2563eb;
-	background: #eaf1fe;
+	border-color: var(--accent);
+	color: var(--accent);
+	background: var(--accent-tint);
 }
 
 .options button.danger-outline {
@@ -298,7 +432,7 @@
 }
 
 .box-options .head {
-	border-right-color: #cfdcf3;
+	border-right-color: var(--accent-line);
 }
 
 .options .head-row {
@@ -307,9 +441,84 @@
 	gap: 8px;
 }
 
-/* The template name and the library behind it. The menu is positioned against
-   this, so it has to establish the containing block; `overflow` stays visible
-   here even though the bar scrolls on a phone — see the media query below. */
+/* The area bar's way to put itself away: a bare glyph like the CSS
+   dialog's window controls, square, filled only under the pointer. */
+.options .head-row button.bar-hide {
+	display: grid;
+	place-items: center;
+	width: 1.75rem;
+	height: 1.75rem;
+	padding: 0;
+	border-color: transparent;
+	background: none;
+	color: #555;
+}
+
+.options .head-row button.bar-hide:hover:not(:disabled) {
+	border-color: transparent;
+	background: #f3f3f3;
+}
+
+/* Its buttons hold their one line: squeezed, the row gave way at the space in
+   "</> CSS •" and stacked the icon over the word, when it is the name field
+   beside them that has room to give. */
+.options .head-row > button {
+	flex: none;
+	white-space: nowrap;
+}
+
+/* …and the name field is what gives. On a phone the row is wider than the
+   screen, and with the buttons held to one line the caret was pushed off the
+   right edge; the name shrinks to fit instead, down to a few letters. */
+.options .head,
+.options .head-row {
+	max-width: 100%;
+	box-sizing: border-box;
+}
+.options .head-row .field.picker {
+	/* Its own natural width — the label, an 8.5rem name and the caret — but
+	   set rather than measured, so the container query below can ask how
+	   much of it the row has left. The floor is the glyph and the caret. */
+	container-type: inline-size;
+	flex: 0 1 auto;
+	width: calc(12.5rem + 26px);
+	min-width: calc(2rem + 4px);
+}
+.options .head-row .field.picker input {
+	flex: 1 1 auto;
+	min-width: 0;
+	/* A name longer than the field ends in an ellipsis rather than a cut
+	   letter; the whole of it is there to read the moment it is typed in. */
+	text-overflow: ellipsis;
+}
+
+/* The toolbar's Page glyph, in the caret, for when the name has no room. */
+.options .field.picker .picker-icon {
+	display: none;
+}
+
+/* Too narrow for a name worth reading, the picker is the glyph and the
+   caret: one button that opens the menu, rather than a sliver of name with
+   the caret run over the swap beside it. Renaming waits for a wider row.
+   5rem, as the table's picker: it was 10rem when a long name was cut off
+   mid-letter, and once Layout joined the row that put an ordinary phone
+   under it — the name gone and the room it left standing empty — where an
+   ellipsis now reads fine at half that. */
+@container (max-width: 5rem) {
+	.options .field.picker > span:first-child,
+	.options .field.picker input {
+		display: none;
+	}
+
+	.options .field.picker .picker-icon {
+		display: grid;
+		padding-left: 2px;
+	}
+}
+
+/* The template name and the library behind it. The menu is `position: fixed`
+   and placed from a measurement — see PageOptions — so nothing here has to
+   make room for it. */
 .options .field.picker {
 	position: relative;
 }
@@ -318,9 +527,16 @@
    the field is a value with a line under it, and a bordered button beside it
    would read as a second control rather than as this one's handle. */
 .options .field.picker .caret {
+	display: grid;
+	grid-auto-flow: column;
+	place-items: center;
 	border: none;
 	background: none;
-	padding: 2px;
+	/* A target worth aiming at: it was the glyph's own 18px, the smallest
+	   thing to press in the bar and the one that opens the most. */
+	min-width: 1.75rem;
+	min-height: 1.75rem;
+	padding: 0 3px;
 	margin-left: -2px;
 	color: #555;
 	cursor: pointer;
@@ -333,11 +549,9 @@
 }
 
 .options .picker-menu {
-	position: absolute;
+	position: fixed;
 	z-index: 30;
-	top: calc(100% + 4px);
-	left: 0;
-	min-width: max(100%, 12rem);
+	min-width: 12rem;
 	max-width: 20rem;
 	max-height: 60dvh;
 	overflow-y: auto;
@@ -361,7 +575,7 @@
 	padding: 5px 8px;
 	border-radius: 4px;
 	font: inherit;
-	font-size: 12px;
+	font-size: 0.75rem;
 	text-align: left;
 	cursor: pointer;
 	/* A long template name wraps rather than widening the menu past its cap. */
@@ -381,8 +595,14 @@
    is the loaded template. */
 .options .picker-menu .tick {
 	flex: none;
-	width: 0.7rem;
-	color: #1a5fb4;
+	display: inline-grid;
+	place-items: center;
+	width: 1rem;
+	color: var(--accent-strong);
+}
+
+.options .picker-menu button.danger .tick {
+	color: inherit;
 }
 
 .options .picker-menu hr {
@@ -412,6 +632,47 @@
 	gap: 8px;
 }
 
+/* The bar's frame, for the shadows below. */
+.bar-frame {
+	position: relative;
+}
+
+/* A bar capped short of its settings scrolls, and one that stops on a row
+   boundary looks finished. A soft shadow on the edge with more past it is the
+   hint — the edges come from scrolledge.ts. Vertical only: the bars wrap, so
+   they never scroll sideways. Over the fields, because a shadow drawn under
+   them is covered by every opaque one; under the pickers' menus, which are
+   fixed at 30, and never in the way of a press. At 1, no higher: the tray is
+   at 1 too and comes later, so a menu opened from the tray — fixed, but
+   inside the tray's layer — is drawn over this shadow, not under it. */
+.bar-frame::before,
+.bar-frame::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	z-index: 1;
+	height: 27px;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+
+.bar-frame::before {
+	top: 0;
+	background: linear-gradient(to bottom, var(--edge-shadow), transparent);
+}
+
+.bar-frame::after {
+	bottom: 0;
+	background: linear-gradient(to top, var(--edge-shadow), transparent);
+}
+
+.bar-frame[data-more-top]::before,
+.bar-frame[data-more-bottom]::after {
+	opacity: 1;
+}
+
 /* On a phone these bars wrap to a dozen rows and swallow the page they are
    meant to be editing. Capped and scrolled instead, so the preview keeps the
    larger share of the screen. */
@@ -424,13 +685,36 @@
 		padding: 6px 8px;
 	}
 
-	/* The bar scrolls at this width, which would cut the picker's menu off at
-	   whatever the 26dvh cap left of it. While the menu is open the bar gives up
-	   its cap instead: it is a moment, the menu is the thing being looked at,
-	   and a list you can only see three of is not a list. */
-	.options.menu-open {
-		max-height: none;
-		overflow: visible;
+	/* The page bar's head — the template and its lock — on a line of its own,
+	   ruled off from the settings under it in the bar's border grey. Only
+	   here: on a phone the bar wraps to a column of short rows whatever
+	   happens, and the name of what you are setting up is worth a line. On a
+	   desk the same line cost the whole bar a row, pushing the page down for
+	   a rule, so there the head wraps in with the groups like the area bar's. */
+	.options .head.page-head {
+		flex: 1 0 100%;
+		padding: 0 0 6px;
+		border-bottom: 1px solid #ddd;
+	}
+
+	/* The CSS button keeps its glyph and loses the word, as the app's own
+	   toolbar buttons do at this width: the head has to hold a lock, a name,
+	   its menu and two buttons on one line. Square without it, like the swap
+	   button beside it, rather than a box drawn for a word that is not there.
+	   The area bar's Delete the same, so the name gets the room. */
+	.options .head-row .label {
+		display: none;
+	}
+
+	.options .head-row button.css,
+	.options .head-row button.layout,
+	.options .head-row button.delete {
+		--square: calc(0.875rem + 12px);
+		padding: 5px;
+		width: var(--square);
+		height: var(--square);
+		justify-content: center;
+		flex: none;
 	}
 
 	/* On a phone the bar is one column of wrapped controls anyway, so the head's
@@ -438,5 +722,51 @@
 	.options .head {
 		border-right: none;
 		padding-right: 0;
+	}
+
+	/* The area bar's head is its first row, edge to edge: Lock and Delete
+	   keep their size, and the name takes everything left between them,
+	   where it had a fixed 4.6rem and the row ended in empty space. */
+	.box-options .head {
+		flex: 1 0 100%;
+		align-items: stretch;
+	}
+
+	.box-options .head-row {
+		display: flex;
+	}
+
+	.box-options .head-row .area-name {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	/* The label on one line; the field beside it is what gives way. */
+	.box-options .head-row .context {
+		white-space: nowrap;
+	}
+
+	.box-options .head-row .area-name input {
+		flex: 1 1 auto;
+		width: auto;
+		min-width: 0;
+	}
+
+	/* One run to a line, ruled underneath rather than at the side, where a
+	   rule would stand at the end of a line of nothing. */
+	.options .group {
+		flex: 1 1 100%;
+		padding: 0 0 6px;
+		border-right: none;
+		border-bottom: 1px solid #e0e0e0;
+	}
+
+	.box-options .group {
+		border-bottom-color: var(--accent-line);
+	}
+
+	.options .group:last-of-type {
+		border-bottom: none;
+		padding-bottom: 0;
 	}
 }

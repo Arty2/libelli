@@ -6,25 +6,46 @@
  * print convention beats consistency.
  */
 
-export const SCHEMA_VERSION = 5;
+/**
+ * 6: a file gives each area's x and y at its reference point, and says so
+ * with `frame` — see frame.ts. Raised so a build from before refuses such a
+ * file rather than placing every right- or bottom-aligned area wrong.
+ */
+export const SCHEMA_VERSION = 6;
 
 /**
  * What an area draws, given what its cell or its template says.
  *
- * `bitmap` is a drawing made in the app and kept as base64 in the cell,
- * `image` is a picture from somewhere — an address, or a name this browser is
- * holding — and `color` is a fill. `image` also accepts a color, because it
- * used to be the only mode for both and templates written then rely on it; a
- * column of brand colors is better off saying `color`, which refuses anything
- * that is not one.
+ * `image` is a picture, whichever way it was made: a drawing made in the app
+ * and kept as base64 in the cell or the template, an address, or a name this
+ * browser is holding — what the value is says which, and the renderer reads
+ * it. `color` is a fill: templates written with it still draw, but the menu
+ * no longer offers it, because a fill linked to a column (`colorFrom`) does
+ * the same on any area and keeps its words. `image` also accepts a color,
+ * because it used to be the only mode for both and templates written then
+ * rely on it.
+ *
+ * There was a `bitmap` mode beside `image` for drawings. It was the same
+ * picture with a different way in, and switching between the two dropped
+ * whichever the area held; a template that says `bitmap` is read as `image`.
  */
-export type BoxMode = 'plain' | 'markdown' | 'image' | 'color' | 'bitmap' | 'qr';
-export type Overflow = 'clip' | 'grow';
+export type BoxMode = 'plain' | 'markdown' | 'image' | 'color' | 'qr';
+/**
+ * What an area does with words that do not fit: cut them off, get taller, or
+ * keep its height and set them smaller until they fit — down to `SHRINK_FLOOR`
+ * of the size, past which it cuts as a clip does.
+ */
+export type Overflow = 'clip' | 'grow' | 'shrink';
 export type Align = 'left' | 'center' | 'right' | 'justify';
 /** vertical placement of a box's content within its own frame */
 export type VAlign = 'top' | 'middle' | 'bottom';
 export type TextCase = 'none' | 'smallcaps' | 'uppercase';
-export type BorderStyle = 'solid' | 'dashed' | 'dotted' | 'double';
+/**
+ * `stamp` is the one no CSS border can draw: a postage stamp's perforated
+ * edge. It is always drawn as SVG, like a border drawn by hand, and whether it
+ * wobbles is still `borderHand`'s to say.
+ */
+export type BorderStyle = 'solid' | 'dashed' | 'dotted' | 'double' | 'stamp';
 
 /**
  * How an area's ink meets what is under it — the paper, its background image,
@@ -108,6 +129,14 @@ export interface PageSpec {
 	/** paper color; printed only when the browser's background graphics are on */
 	background?: string;
 	image?: PageBackgroundImage;
+	/**
+	 * mm inside the trim edge where the page's working area starts: drawn as a
+	 * guide with the grid, snapped to, and what Position Automagically lays out
+	 * inside. One number is every edge; an object is per edge, in the stored
+	 * right-hand page's frame — so with facing pages its `left` is the inner
+	 * edge and its `right` the outer. Absent is `DEFAULT_MARGIN` all round.
+	 */
+	margin?: SideValue;
 }
 
 export interface BleedSpec {
@@ -182,11 +211,86 @@ export interface PageNumberSpec {
 	showTotal?: boolean;
 }
 
+/** What kind of face a font is, for the fallback a card names after it. */
+export type FontKind = 'serif' | 'sans-serif' | 'monospace' | 'handwriting';
+export const FONT_KINDS: readonly FontKind[] = ['serif', 'sans-serif', 'monospace', 'handwriting'];
+
+/**
+ * An x-height an area may be set to, as a fraction of its size: 0.2 to 1, to
+ * the hundredth. Anything else is none — the face's own.
+ */
+export function clampXHeight(value: number | undefined): number | undefined {
+	if (value === undefined || !Number.isFinite(value) || value < 0.2 || value > 1) return undefined;
+	return Math.round(value * 100) / 100;
+}
+
 export interface FontRef {
 	family: string;
 	source: 'google' | 'local' | 'system';
 	/** IndexedDB key for `source: 'local'` fonts, e.g. `font:studio-sans` */
 	ref?: string;
+	/**
+	 * What kind of face it is, read off an uploaded file when it arrived: the
+	 * fallback the card names after it, for a computer that has not got the
+	 * file. Absent, a family the app knows (`kindOf`) — or sans-serif.
+	 */
+	kind?: FontKind;
+	/**
+	 * The kind chosen for it in the Pictures tray, over the one read off its
+	 * file or known to the app: for a file that says nothing, or says it
+	 * wrongly. Absent is Auto — `kind`, else what the app knows.
+	 */
+	fallback?: FontKind;
+}
+
+/**
+ * How one paragraph is told from the next: a space after it, or the first line
+ * of the next one indented — the two conventions print has. A space is in
+ * lines of the area's own leading, an indent in em of its size, so either
+ * keeps its proportion when the type size or the leading changes.
+ */
+/** How a tab leader is drawn — see `TextStyle.leader`. */
+export type Leader = 'none' | 'dotted' | 'dashed' | 'solid';
+
+export interface ParagraphStyle {
+	mode: 'space' | 'indent';
+	/** lines of the leading for a space; em of the type size for an indent */
+	amount: number;
+}
+
+/** What a Markdown bullet list is marked with: `•`, `●`, `○`, `■`, `□`, `–`, `—`, `➤`, or nothing. */
+export type ListMarker =
+	| 'bullet'
+	| 'disc'
+	| 'circle'
+	| 'square'
+	| 'openSquare'
+	| 'dash'
+	| 'emdash'
+	| 'arrow'
+	| 'none';
+
+/** How a numbered list counts: 1, a, A, i, I — each followed by a full stop. */
+export type ListNumbering = 'decimal' | 'lowerAlpha' | 'upperAlpha' | 'lowerRoman' | 'upperRoman';
+
+/**
+ * How a Markdown list is set. Each field on its own: an area can take the
+ * page's marker and change only its indent. In type units, like a paragraph
+ * style, so a list keeps its proportions when the type changes size.
+ */
+export interface ListStyle {
+	marker?: ListMarker;
+	/** how a numbered list counts; absent, 1, 2, 3 */
+	numbering?: ListNumbering;
+	/** em of the area's size, from its edge to the marker */
+	indent?: number;
+	/**
+	 * the list's own leading, as a multiple of its size like the area's; absent,
+	 * a list is set in the area's leading. It replaced a spacing between items,
+	 * in lines, which lived four days and was dropped rather than migrated —
+	 * the two do not convert, and the items keep the gap `md.list` gives them.
+	 */
+	leading?: number;
 }
 
 export interface TextStyle {
@@ -201,11 +305,51 @@ export interface TextStyle {
 	italic?: boolean;
 	/** mm */
 	letterSpacing?: number;
+	/** absent inherits the page's; absent there too is each renderer's own */
+	paragraph?: ParagraphStyle;
+	/**
+	 * A line with `%%%` in it — or a real tab, once a leader is set
+	 * — sets what follows the last one against the right edge, joined to what
+	 * comes before by this line: a price list's dots. Absent inherits the
+	 * page's, absent there too is none: `%%%` still sets the words at the right
+	 * edge, with nothing drawn between, and a tab is only a space. `none` is an
+	 * area saying so over a page that has one.
+	 */
+	leader?: Leader;
+	/** absent inherits the page's, field by field; Markdown areas only */
+	list?: ListStyle;
+	/**
+	 * Em of the area's size to raise the text by, below 0 to lower it: a face
+	 * that sits high or low on its line is set straight here. The page's
+	 * applies only to areas in the page's face — it corrects a font, and a
+	 * correction for one face is wrong for any other.
+	 */
+	baseline?: number;
+	/**
+	 * The words set in columns, side by side within the area, the gap between
+	 * them in mm. Two to six; absent is one column, which is every area that
+	 * has not asked.
+	 */
+	columns?: TextColumns;
+}
+
+/** See `TextStyle.columns`. */
+export interface TextColumns {
+	count: number;
+	gap: number;
+	/**
+	 * The fewest lines of a paragraph left at the foot of a column before it
+	 * breaks, and carried to the head of the next. Absent is the defaults,
+	 * `DEFAULT_ORPHANS` and `DEFAULT_WIDOWS`.
+	 */
+	orphans?: number;
+	widows?: number;
 }
 
 export type Defaults = Required<
 	Pick<TextStyle, 'font' | 'size' | 'lineHeight' | 'weight' | 'color' | 'align' | 'letterSpacing'>
->;
+> &
+	Pick<TextStyle, 'paragraph' | 'list' | 'baseline' | 'leader'>;
 
 /** Markdown block metrics. `size` values are multipliers of the box size; every spacing is mm. */
 export interface MarkdownStyle {
@@ -217,12 +361,21 @@ export interface MarkdownStyle {
 	rule?: { spaceBefore?: number; spaceAfter?: number; color?: string };
 }
 
-/** QR rendering options for a `qr` box; the value encoded is the bound cell. */
+/**
+ * Code options for a `qr` box; the value encoded is the bound cell. The mode
+ * kept its name when it learned barcodes — every template already made says
+ * `qr` — so a code with no `kind` is a QR code, and nothing needed migrating.
+ */
 export interface QrSettings {
-	/** error correction: L 7%, M 15%, Q 25%, H 30% of the code recoverable */
+	/** absent is a QR code; Code 128 takes any printable ASCII, EAN-13 a retail number */
+	kind?: 'code128' | 'ean13';
+	/** a barcode's bars without the digits a person reads under them; absent, the digits show */
+	hideDigits?: true;
+	/** error correction: L 7%, M 15%, Q 25%, H 30% of the code recoverable; a QR's only */
 	level: 'L' | 'M' | 'Q' | 'H';
-	/** quiet zone in modules — the white border a scanner needs */
-	margin: number;
+	// No quiet zone of its own: the white border a scanner needs is the area's
+	// padding, like the space round anything else. A `margin` in an older
+	// file is dropped when it is read.
 	/** absent means transparent: the paper (or the box background) shows through */
 	background?: string;
 }
@@ -264,6 +417,14 @@ export interface Box extends TextStyle {
 	mode: BoxMode;
 	overflow: Overflow;
 	textCase?: TextCase;
+	/**
+	 * The area's words drawn with their lowercase this fraction of the size
+	 * (`font-size-adjust`, 0.2 to 1): faces of one size differ by a fifth in
+	 * how big their lowercase looks, and this makes one sit like another. Only
+	 * while the area takes the page's size — a size of its own is already the
+	 * area's own answer to how big its words are. Absent, the face's own.
+	 */
+	xHeight?: number;
 	md?: MarkdownStyle;
 	qr?: QrSettings;
 	anchor?: Anchor | null;
@@ -287,6 +448,13 @@ export interface Box extends TextStyle {
 	borderStyle?: BorderStyle;
 	/** absent falls back to the box's own text color */
 	borderColor?: string;
+	/**
+	 * Colors this area takes from the row it is drawing: for each, the name of a
+	 * column whose cell holds a color. A cell that is not one — empty, or words —
+	 * leaves the area's own color, which is why the swatch stays beside it. By
+	 * column name, as `%%column%%` is: it is the row's value, not a bound field.
+	 */
+	colorFrom?: ColorSources;
 	/** mm, applied to the whole box */
 	borderRadius?: number;
 	/**
@@ -344,6 +512,12 @@ export interface Template {
 	slots: string[];
 	boxes: Box[];
 	/**
+	 * In a file only: `reference` says each area's x and y are at its
+	 * reference point rather than its top-left corner — frame.ts. Never on a
+	 * template in memory, whose areas are always top-left.
+	 */
+	frame?: 'reference';
+	/**
 	 * Left and right pages. Off is a run of identical pages — the card case,
 	 * and what every template without this field is. On, an odd page is a
 	 * right-hand page and an even one its facing left-hand page: boxes mirror
@@ -355,6 +529,15 @@ export interface Template {
 	css?: string;
 	/** freezes the whole design: no dragging, no resizing, no option changes */
 	locked?: boolean;
+	/**
+	 * Which of the bundled starters this template began as, by id — see
+	 * `STARTER_TEMPLATES` in onboarding.ts. What offers Reset, and what it
+	 * resets to. Kept through every edit, since a starter somebody has worked
+	 * in is the one most worth being able to put back — except a rename by
+	 * hand, which says the copy is somebody's own now (`renamed`). Never
+	 * exported (`exportTemplate`), and absent on anything started any other way.
+	 */
+	starter?: string;
 }
 
 /** Runtime state — never written into a template file. */
@@ -368,9 +551,32 @@ export interface Dataset {
 	 * somebody types one.
 	 */
 	name?: string;
+	/**
+	 * Read-only: no cell, column or row can change, from the table or from the
+	 * card, and it cannot be sorted, since row order is print order. Rows can
+	 * still be chosen. Absent is unlocked.
+	 */
+	locked?: boolean;
+	/**
+	 * Where each row arrived, 0-based, by position: `order[i]` is the number,
+	 * less one, the row at `rows[i]` wears. Written by a sort, which rewrites
+	 * `rows` (row order is print order) but must not renumber them, since
+	 * `%%lookup:N:…%%` names a row by its number. Stored with the table so a
+	 * reload, and undo, keep it. Absent means the rows stand where they arrived.
+	 */
+	order?: number[];
+	/** Which bundled starter table this began as; see `Template.starter`. A rename by hand drops it. */
+	starter?: string;
 }
 
 export type Row = Record<string, string>;
+
+/** Which column each of an area's colors comes from; see `Box.colorFrom`. */
+export interface ColorSources {
+	text?: string;
+	fill?: string;
+	border?: string;
+}
 
 /** slot name -> column name */
 export type Mapping = Record<string, string>;
@@ -378,7 +584,27 @@ export type Mapping = Record<string, string>;
 export interface UiState {
 	/** dashed box bounds and the trim edge; screen furniture, never printed */
 	showBounds: boolean;
+	/**
+	 * Every tie drawn as its thread, all the time rather than on pointing at a
+	 * badge — the Boxes box's dash. Only means anything with the bounds on.
+	 */
+	showTies: boolean;
 	showGrid: boolean;
+	/** the page margins, drawn and snapped to; screen furniture, never printed */
+	showGuides: boolean;
+	/**
+	 * The temporary guides a drag lines up on — other areas' edges and middles,
+	 * the page's centre. With the margins off and these on, the Guides box shows
+	 * its dash.
+	 */
+	smartGuides: boolean;
+	/**
+	 * The millimetres a dragged area has to its neighbours and the page edge,
+	 * drawn as it moves. Only with the Guides box ticked; its dash keeps the
+	 * margins and the temporary guides without these. Absent, from an older
+	 * build, is on.
+	 */
+	spacingGuides?: boolean;
 	/** how the grid draws itself: ruled lines, or a dot at every intersection */
 	gridStyle: GridStyle;
 	/**
@@ -387,7 +613,27 @@ export interface UiState {
 	 * renamed column, and is dropped for a column that no longer exists.
 	 */
 	columnWidths: Record<string, number>;
-	zoom: 'fit' | number;
+	/** `actual` is the paper's real size on this screen — see `actualScale` */
+	zoom: 'fit' | 'actual' | number;
+	/**
+	 * Which of the bars and the table were open, so a reload comes back to the
+	 * screen it left. Absent until something is toggled, which is what lets a
+	 * first visit on a phone still start with everything folded away.
+	 */
+	panels?: { page: boolean; data: boolean; images: boolean };
+	/**
+	 * The table's width beside the page, as a share of the working area, 0 to
+	 * 1. Absent is the stylesheet's own share. (A `trayWidth` in px written by
+	 * 0.16.0 is simply not read.)
+	 */
+	trayWidthShare?: number;
+	/** The stacked tray's height on a phone, as a share of the working area. */
+	trayHeightShare?: number;
+	/** How tall a table row may be; absent is `medium`, the height it always was. */
+	rowHeight?: RowHeight;
 }
+
+/** One line, a few lines, or as tall as the row's longest cell. */
+export type RowHeight = 'short' | 'medium' | 'full';
 
 export type GridStyle = 'lines' | 'dots';

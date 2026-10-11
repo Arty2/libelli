@@ -1,6 +1,6 @@
 import { dev } from '$app/environment';
 import { base } from '$app/paths';
-import { SKIP_WAITING } from './sw-policy';
+import { SKIP_WAITING, dueForUpdateCheck } from './sw-policy';
 
 /**
  * Registering the service worker, and the two pieces of chrome that come with
@@ -48,6 +48,19 @@ export function registerServiceWorker(onUpdateReady: () => void): void {
 					// being replaced and there is nothing to announce.
 					if (installing.state === 'installed' && navigator.serviceWorker.controller) onUpdateReady();
 				});
+			});
+
+			// Back to the tab after a while away: look again. Registering is the
+			// browser's only look of its own, and a tab can stay open for days
+			// without a load. What turns up is announced as any update is — by
+			// `updatefound` above — and waits for Reload, never forced.
+			let lastChecked = Date.now();
+			document.addEventListener('visibilitychange', () => {
+				if (document.visibilityState !== 'visible' || !registration) return;
+				if (!dueForUpdateCheck(Date.now(), lastChecked)) return;
+				lastChecked = Date.now();
+				// Offline, or the server down: it costs nothing to have asked.
+				registration.update().catch(() => {});
 			});
 		} catch {
 			// A blocked or unsupported worker costs offline use and nothing else,
