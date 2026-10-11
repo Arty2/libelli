@@ -8,12 +8,12 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.29.5 — 2026-10-11
+## 0.29.6 — 2026-10-11
 
 - Pictures: a connected folder is read in the background and is one line you open, with Folder add to connect it and Unlink to let it go.
 - Pictures: one Search box; a section of more than ten starts folded unless you folded or opened it.
 - Hold or right-click Undo or Redo for the list of steps, and go back or forward several at once. On a phone, Select Multiple is beside the page once an area is chosen.
-- The nudge pad shows the gaps in mm as it moves an area. Pulling up from the status bar brings back the table or Pictures, whichever was last put away.
+- The nudge pad shows the gaps in mm as it moves an area; placing a pivot shows its mm to the area's edges, and turning shows the angle. Pulling up from the status bar brings back the table or Pictures, whichever was last put away.
 
 ## 0.28.51 — 2026-10-10
 

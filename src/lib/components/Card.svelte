@@ -43,6 +43,8 @@
 		snapToEdges,
 		drawnBounds,
 		turnedPoint,
+		pivotReadouts,
+		turnReadout,
 		columnGaps,
 		shrinkScale,
 		spacingReadouts,
@@ -239,6 +241,23 @@
 	 * where `drag` is not, so the readouts follow the layout as it changes.
 	 */
 	let spaced = $state<{ id: string; with: string[] } | null>(null);
+	/** The area whose pivot is being placed, or which is being turned, once it has moved. */
+	let turning = $state<{ id: string; mode: 'centre' | 'rotate' } | null>(null);
+	/**
+	 * Its readouts, as drawn: the pivot's distances to the area's own edges
+	 * (`pivotReadouts`), or the turn as a protractor on it (`turnReadout`).
+	 * Under the same switch as the gaps.
+	 */
+	const turnGuide = $derived.by(() => {
+		if (!spacing || !turning) return null;
+		const box = template.boxes.find((b) => b.id === turning!.id);
+		if (!box) return null;
+		const drawn = placed(box);
+		const rect = { x: drawn.x, y: layout.tops[box.id] ?? box.y, w: box.w, h: layout.heights[box.id] ?? box.h };
+		return turning.mode === 'centre'
+			? { mode: 'centre' as const, lines: pivotReadouts(rect, drawn.rotation, drawn.centre) }
+			: { mode: 'rotate' as const, ...turnReadout(rect, drawn.rotation, drawn.centre) };
+	});
 	/**
 	 * The same, for a nudge: the area chosen first, with the rest of the
 	 * choice and whatever hangs off it — what moves with it, as a drag of it
@@ -1276,6 +1295,7 @@
 		drag = null;
 		guide = { x: null, y: null };
 		spaced = null;
+		turning = null;
 	}
 
 	function startDrag(event: PointerEvent, box: Box, mode: DragMode) {
@@ -1464,10 +1484,10 @@
 		if (!drag.named) {
 			drag.named = true;
 			onaction?.(DRAG_LABELS[drag.mode]);
-			// Moving or sizing; a turn is about its angle, not its gaps.
-			if (drag.mode !== 'rotate' && drag.mode !== 'centre') {
-				spaced = { id: drag.id, with: [...drag.others, ...drag.held].map((b) => b.id) };
-			}
+			// Moving or sizing reads out the gaps; a turn reads out its angle, and
+			// placing the pivot its distances in from the area's own edges.
+			if (drag.mode === 'rotate' || drag.mode === 'centre') turning = { id: drag.id, mode: drag.mode };
+			else spaced = { id: drag.id, with: [...drag.others, ...drag.held].map((b) => b.id) };
 		}
 		// Past the slop, this is a drag rather than a hand that will not keep
 		// still, so a menu the same press opened gets out of the way. The same
@@ -1790,6 +1810,7 @@
 		drag = null;
 		guide = { x: null, y: null };
 		spaced = null;
+		turning = null;
 	}
 
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -2828,6 +2849,38 @@
 		{/if}
 		{#if guide.y !== null}
 			<span class="guide horizontal" style="top:{guide.y}mm"></span>
+		{/if}
+		<!-- Placing the pivot: its distance in from each of the area's edges.
+		     Turning: a protractor on the pivot, 0° level, the angle on the arc.
+		     Drawn in millimetres, the page's own units, like everything here. -->
+		{#if turnGuide}
+			<svg
+				class="chrome turn-guide"
+				aria-hidden="true"
+				viewBox="0 0 {template.page.w} {template.page.h}"
+				preserveAspectRatio="none"
+			>
+				{#if turnGuide.mode === 'centre'}
+					{#each turnGuide.lines as l, i (i)}
+						<line x1={l.from.x} y1={l.from.y} x2={l.to.x} y2={l.to.y} />
+					{/each}
+				{:else}
+					<line class="level" x1={turnGuide.pivot.x} y1={turnGuide.pivot.y} x2={turnGuide.level.x} y2={turnGuide.level.y} />
+					<line x1={turnGuide.pivot.x} y1={turnGuide.pivot.y} x2={turnGuide.along.x} y2={turnGuide.along.y} />
+					{#if turnGuide.arc}<path class="arc" d={turnGuide.arc} />{/if}
+				{/if}
+			</svg>
+			{#if turnGuide.mode === 'centre'}
+				{#each turnGuide.lines as l, i (i)}
+					<span class="spacing-label turn-label" style="left:{(l.from.x + l.to.x) / 2}mm;top:{(l.from.y + l.to.y) / 2}mm"
+						>{Math.round(l.gap * 10) / 10}</span
+					>
+				{/each}
+			{:else}
+				<span class="spacing-label turn-label" style="left:{turnGuide.label.x}mm;top:{turnGuide.label.y}mm"
+					>{Math.round(turnGuide.degrees * 10) / 10}°</span
+				>
+			{/if}
 		{/if}
 		<!-- The gaps: a line from edge to edge with its millimetres, the pair
 		     either side marked = when they match. -->
@@ -3902,6 +3955,42 @@
 		.spacing.across { height: 0; border-top: var(--line) dashed currentColor; }
 		.spacing.down { width: 0; border-left: var(--line) dashed currentColor; }
 		.spacing.equal { border-style: solid; }
+
+		.turn-guide {
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			overflow: visible;
+			pointer-events: none;
+			z-index: 4;
+		}
+
+		/* Drawn in mm on a page that is zoomed, so the line keeps its screen
+		   width rather than growing with the page. */
+		.turn-guide line,
+		.turn-guide path {
+			fill: none;
+			stroke: var(--accent-inverse);
+			stroke-width: var(--line);
+			stroke-dasharray: 4 3;
+			vector-effect: non-scaling-stroke;
+		}
+
+		.turn-guide .level {
+			stroke-dasharray: 1 3;
+		}
+
+		.turn-guide .arc {
+			stroke-dasharray: none;
+		}
+
+		.turn-label {
+			position: absolute;
+			z-index: 5;
+			pointer-events: none;
+			transform: translate(-50%, -50%);
+		}
 
 		.spacing-label {
 			font: 600 calc(0.625rem * var(--ui-scale)) / 1 system-ui, sans-serif;

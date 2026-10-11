@@ -1245,6 +1245,15 @@ point that looked random. Every corner of a turned rectangle lies on its
 bounds, so the turned reference corner is always on the box being measured. A
 resize still snaps its upright edge: it is sizing the frame, not placing the
 shape.
+
+**The pivot and the turn read out too, each in its own terms.** Placing the
+pivot shows its distance in from each of the area's own edges
+(`pivotReadouts`), drawn turned with the area: the pivot is a point of the
+area, stored as a percentage of it, so the area's edges are what it is placed
+against, not the page's or a neighbour's. Turning shows a protractor on the
+pivot (`turnReadout`): a level line for 0°, the area's own line now, the arc
+between and the angle. Under the same switch as the gaps. Drawn as an SVG in
+the page's millimetres, its strokes kept at screen width as the page zooms.
 The cost is that a resize handle on a turned box hands back a screen-space delta,
 which `moveDrag` rotates by −θ before reading it as a width; `move` is exempt,
 because a translation in the parent's space is the same whichever way the box

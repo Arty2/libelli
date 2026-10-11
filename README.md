@@ -363,6 +363,9 @@ resize boxes directly, or type exact millimetres.
   lined up and measured as it is drawn: a move snaps the turned shape's edges,
   the gaps shown while dragging start from its reference corner where that
   corner has turned to, and a turned neighbour is measured to its drawn edge.
+  Dragging the crosshair shows how far the pivot is in from each of the area's
+  own edges, in millimetres; dragging the knob lays a protractor on the pivot —
+  a level line for 0°, the area's line now, the arc between and the angle.
 - **Overflow** — a box whose content is taller than the box will let it be draws
   the cut: a dashed red line along its bottom edge, where the words are actually
   severed, with a pair of shears astride that line at the right-hand end —

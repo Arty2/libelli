@@ -25,7 +25,9 @@ import {
 	snapToEdges,
 	latchSpan,
 	drawnBounds,
-	turnedPoint
+	turnedPoint,
+	pivotReadouts,
+	turnReadout
 } from './layout';
 import { newBox } from './template';
 import type { Box } from './types';
@@ -534,6 +536,41 @@ describe('a turned area, as drawn', () => {
 		// Drawn 10 wide and 20 tall about its middle (50, 45).
 		expect(edges.x.map((v) => Math.round(v * 100) / 100)).toEqual([45, 50, 55]);
 		expect(edges.y.map((v) => Math.round(v * 100) / 100)).toEqual([35, 45, 55]);
+	});
+
+	it('reads out the pivot to the area\'s own edges, turned with it', () => {
+		// Upright, the middle: half the width each way, half the height each way.
+		const mid = pivotReadouts(rect, undefined, undefined);
+		expect(mid.map((r) => r.gap)).toEqual([10, 10, 5, 5]);
+		expect(mid[0].from).toEqual({ x: 10, y: 5 });
+		expect(mid[0].to).toEqual({ x: 0, y: 5 });
+		// Moved to 25% across, 0% down: on the top edge, so no line up.
+		const placed = pivotReadouts(rect, undefined, { x: 25, y: 0 });
+		expect(placed.map((r) => r.gap)).toEqual([5, 15, 10]);
+		// Turned a quarter, the line to the left edge points up the page.
+		const turned = pivotReadouts(rect, 90, undefined);
+		near(turned[0].from, { x: 10, y: 5 });
+		near(turned[0].to, { x: 10, y: -5 });
+		expect(turned[0].gap).toBe(10);
+	});
+
+	it('reads out a turn as a protractor on the pivot', () => {
+		const t = turnReadout({ x: 0, y: 0, w: 40, h: 20 }, 90, undefined);
+		near(t.pivot, { x: 20, y: 10 });
+		// 0° runs level to the right, 90° straight down the page.
+		near(t.level, { x: 40, y: 10 });
+		near(t.along, { x: 20, y: 30 });
+		expect(t.degrees).toBe(90);
+		// Clockwise for a positive turn, the other way for a negative one.
+		expect(t.arc).toMatch(/ 0 0 1 /);
+		expect(turnReadout({ x: 0, y: 0, w: 40, h: 20 }, -30, undefined).arc).toMatch(/ 0 0 0 /);
+		// Upright, there is nothing to sweep.
+		expect(turnReadout({ x: 0, y: 0, w: 40, h: 20 }, undefined, undefined).arc).toBe('');
+		// Long enough to read on a small area, short of the page on a big one.
+		const small = turnReadout({ x: 0, y: 0, w: 4, h: 4 }, 10, undefined);
+		expect(Math.hypot(small.level.x - small.pivot.x, small.level.y - small.pivot.y)).toBeCloseTo(8);
+		const big = turnReadout({ x: 0, y: 0, w: 140, h: 200 }, 10, undefined);
+		expect(Math.hypot(big.level.x - big.pivot.x, big.level.y - big.pivot.y)).toBeCloseTo(25);
 	});
 
 	it('is measured by what is drawn, from the reference point where it is drawn', () => {
