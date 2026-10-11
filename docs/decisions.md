@@ -830,6 +830,16 @@ reference as equal without serialising it; a state's serialisation is kept
 beside it (a WeakMap — states are never changed once recorded) so the
 present is not serialised again at every commit.
 
+**Held, Undo and Redo list their steps; a choice is that many single steps.**
+`undoSteps` and `redoSteps` are the labels the single steps already carry,
+nearest first, and `undoTimes` / `redoTimes` apply the single step n times, so
+skipping back is no new kind of move and redo returns from it exactly. The hold
+is `LIST_HOLD`, twice the tip's `TIP_HOLD`: on touch the tip has shown and been
+read before the list opens, and a press that only wanted the tip lets go in
+between, which Tooltip already makes a non-press. The button captures the
+pointer, so the release after the list opened comes back to it and its click is
+dropped — otherwise the list would open and an undo be taken at once.
+
 **A refinement can be folded into the last step (`amend`).** The page uses
 it for one thing: a Type chosen in the Pictures tray for a face just replaced
 in from there joins the replace's entry (`fontSession`, `commit` in +page),

@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { amend, canRedo, canUndo, createHistory, record, redo, redoLabel, reset, undo, undoLabel } from './history';
+import {
+	amend,
+	canRedo,
+	canUndo,
+	createHistory,
+	record,
+	redo,
+	redoLabel,
+	redoSteps,
+	redoTimes,
+	reset,
+	undo,
+	undoLabel,
+	undoSteps,
+	undoTimes
+} from './history';
 
 const steps = (...values: string[]) => values.reduce((h, v) => record(h, v), createHistory('a'));
 /** What the history is showing, without the label riding alongside it. */
@@ -106,5 +121,41 @@ describe('amend', () => {
 		h = amend(h, 3);
 		expect(canRedo(h)).toBe(false);
 		expect(amend(h, 3)).toBe(h);
+	});
+});
+
+describe('steps, for skipping back and forward', () => {
+	// a → b → c → d, each named for the change into it.
+	const built = () => {
+		let h = createHistory('a');
+		h = record(h, 'b', 'into b');
+		h = record(h, 'c', 'into c');
+		return record(h, 'd', 'into d');
+	};
+
+	it('lists what undo would take back, nearest first, and none at the oldest', () => {
+		expect(undoSteps(built())).toEqual(['into d', 'into c', 'into b']);
+		expect(undoSteps(createHistory('a'))).toEqual([]);
+	});
+
+	it('undoing n times lands where the nth step started', () => {
+		const h = built();
+		expect(undoTimes(h, 1).present.state).toBe('c');
+		expect(undoTimes(h, 3).present.state).toBe('a');
+		// More than there are stops at the oldest rather than failing.
+		expect(undoTimes(h, 9).present.state).toBe('a');
+	});
+
+	it('lists what redo would put back, nearest first, and redoing n times returns', () => {
+		const back = undoTimes(built(), 3);
+		expect(redoSteps(back)).toEqual(['into b', 'into c', 'into d']);
+		expect(redoTimes(back, 2).present.state).toBe('c');
+		expect(redoTimes(back, 3)).toEqual(built());
+	});
+
+	it('the step lists are the single labels, stepped', () => {
+		const h = built();
+		expect(undoSteps(h)[0]).toBe(undoLabel(h));
+		expect(redoSteps(undo(h))[0]).toBe(redoLabel(undo(h)));
 	});
 });

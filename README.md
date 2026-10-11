@@ -1584,6 +1584,13 @@ the change and the page without it, as many times as it takes — and neither
 Anything else touching the history — a fresh edit, a plain undo, a redo — starts
 the alternation over, since "the last change" is then a different change.
 
+**Hold Undo or Redo** beside the page to go several steps at once. Held, it
+first shows its tip, as every control does; held on for about a second, a list
+opens of every step it could take, named for what each did, nearest first.
+Choose one and the page goes straight there — the same as pressing Undo that
+many times, so Redo brings it all back. Letting go before the list opens is an
+ordinary press with a mouse, and with a finger only the tip.
+
 ## Dialogs
 
 Every dialog with an action opens with **nothing** pressed, and the focus on the

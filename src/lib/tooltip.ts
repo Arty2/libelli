@@ -21,6 +21,14 @@ export const TIP_DELAY = 450;
  */
 export const TIP_HOLD = 450;
 
+/**
+ * Held on past its tip, a control with a list behind it opens the list —
+ * Undo and Redo, their steps. Twice the tip's wait, so the tip has shown and
+ * been read before anything else happens: a press that only wanted the tip
+ * lets go in between, and nothing opens.
+ */
+export const LIST_HOLD = TIP_HOLD * 2;
+
 /** How far a finger may wander and still be holding rather than dragging. */
 export const TIP_SLOP = 8;
 

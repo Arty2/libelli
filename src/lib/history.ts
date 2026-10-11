@@ -122,6 +122,32 @@ export function redo<T>(history: History<T>): History<T> {
 	return { ...history, past: [...history.past, history.present], present, future };
 }
 
+/**
+ * Every step undo could take back, nearest first: the step into the present,
+ * then the one into each state before it — all but the oldest, which is where
+ * undoing stops. Choosing the nth (from 1) is undoing n times. The list a held
+ * Undo opens, to skip back past several at once.
+ */
+export const undoSteps = <T>(history: History<T>): string[] =>
+	canUndo(history) ? [history.present.label, ...history.past.slice(1).map((entry) => entry.label).reverse()] : [];
+
+/** Every step redo could put back, nearest first. Choosing the nth is redoing n times. */
+export const redoSteps = <T>(history: History<T>): string[] => history.future.map((entry) => entry.label);
+
+/** Undo `times` steps at once — as many single undos, so nothing differs but the count. */
+export function undoTimes<T>(history: History<T>, times: number): History<T> {
+	let next = history;
+	for (let i = 0; i < times && canUndo(next); i++) next = undo(next);
+	return next;
+}
+
+/** Redo `times` steps at once. */
+export function redoTimes<T>(history: History<T>, times: number): History<T> {
+	let next = history;
+	for (let i = 0; i < times && canRedo(next); i++) next = redo(next);
+	return next;
+}
+
 /** Start again from a known state — after a reset or a template import. */
 export function reset<T>(history: History<T>, present: T, label = ''): History<T> {
 	return { ...history, past: [], present: { state: present, label }, future: [] };

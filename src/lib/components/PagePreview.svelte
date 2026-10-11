@@ -11,6 +11,7 @@
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { swipe } from '$lib/gestures';
 	import { HOLD_MS, TAP_MS, vibrate } from '$lib/haptics';
+	import { LIST_HOLD, TIP_SLOP } from '$lib/tooltip';
 	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
@@ -76,6 +77,8 @@
 		redoable: boolean;
 		onundo: () => void;
 		onredo: () => void;
+		/** Undo or Redo held on past its tip: the list of steps, to skip several */
+		onsteps?: (which: 'undo' | 'redo') => void;
 		onaddbox: () => void;
 		onmenu: (id: string, x: number, y: number) => void;
 		/** the drag under an open menu has become a drag; see Card's own prop */
@@ -150,6 +153,7 @@
 		redoable,
 		onundo,
 		onredo,
+		onsteps,
 		onaddbox,
 		onmenu,
 		onmenuclose,
@@ -1131,6 +1135,61 @@
 	let pushed = $state<'up' | 'down' | 'left' | 'right' | 'centre' | null>(null);
 
 	/**
+	 * Undo and Redo, held: past the tip (`LIST_HOLD`, twice its wait) the list
+	 * of steps opens, to skip back or forward several at once. A press that
+	 * lets go sooner is a click, or — on a touch screen, where the hold showed
+	 * the tip — nothing, as any held tip is (Tooltip). The click a release
+	 * after the list opened would make is dropped here, or the list would
+	 * open and the step under the finger be taken at once.
+	 */
+	let stepsHold: { id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
+	let stepsOpened = false;
+	/** Until when a click on Undo or Redo is the release of a hold that opened the list. */
+	let swallowStepClick = 0;
+
+	function holdSteps(event: PointerEvent, which: 'undo' | 'redo') {
+		if (!onsteps || event.button !== 0) return;
+		dropStepsHold();
+		stepsOpened = false;
+		// Held to the button, so its release comes back here even with the list
+		// opened over it, and the click that follows is the one dropped.
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		const at = { id: event.pointerId, x: event.clientX, y: event.clientY };
+		stepsHold = {
+			...at,
+			timer: setTimeout(() => {
+				stepsHold = null;
+				stepsOpened = true;
+				vibrate(event.pointerType === 'touch' ? HOLD_MS : 0);
+				onsteps?.(which);
+			}, LIST_HOLD)
+		};
+	}
+
+	function moveSteps(event: PointerEvent) {
+		if (stepsHold?.id === event.pointerId && Math.hypot(event.clientX - stepsHold.x, event.clientY - stepsHold.y) > TIP_SLOP)
+			dropStepsHold();
+	}
+
+	function dropStepsHold() {
+		if (stepsHold) clearTimeout(stepsHold.timer);
+		stepsHold = null;
+		if (!stepsOpened) return;
+		stepsOpened = false;
+		swallowStepClick = performance.now() + 700;
+	}
+
+	/** The click, unless it is the release of the hold that opened the list. */
+	function stepClick(act: () => void) {
+		if (performance.now() < swallowStepClick) {
+			swallowStepClick = 0;
+			return;
+		}
+		act();
+	}
+	$effect(() => dropStepsHold);
+
+	/**
 	 * The card reads out the gaps while the pad is pressed, as it does under
 	 * a drag, and for a moment after: taps come one at a time, and readouts
 	 * that blinked off between them could not be read.
@@ -1747,10 +1806,30 @@
 	     toggles are along the bottom. -->
 	<div class="rail">
 		<div class="corner">
-			<button class="square" onclick={onundo} disabled={!undoable} title={withKey('Undo', 'undo')} aria-label="Undo">
+			<button
+				class="square"
+				onclick={() => stepClick(onundo)}
+				onpointerdown={(e) => holdSteps(e, 'undo')}
+				onpointermove={moveSteps}
+				onpointerup={dropStepsHold}
+				onpointercancel={dropStepsHold}
+				disabled={!undoable}
+				title="{withKey('Undo', 'undo')} — hold for every step, to go back several at once"
+				aria-label="Undo"
+			>
 				<Icon name="undo" size={16} />
 			</button>
-			<button class="square" onclick={onredo} disabled={!redoable} title={withKey('Redo', 'redo')} aria-label="Redo">
+			<button
+				class="square"
+				onclick={() => stepClick(onredo)}
+				onpointerdown={(e) => holdSteps(e, 'redo')}
+				onpointermove={moveSteps}
+				onpointerup={dropStepsHold}
+				onpointercancel={dropStepsHold}
+				disabled={!redoable}
+				title="{withKey('Redo', 'redo')} — hold for every step, to go forward several at once"
+				aria-label="Redo"
+			>
 				<Icon name="redo" size={16} />
 			</button>
 		</div>

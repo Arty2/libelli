@@ -50,8 +50,12 @@
 		record,
 		redo as redoStep,
 		redoLabel,
+		redoSteps,
+		redoTimes,
 		undo as undoStep,
-		undoLabel
+		undoLabel,
+		undoSteps,
+		undoTimes
 	} from '$lib/history';
 	import { alignBoxes, bleedFor, mirrors, pageSide, type AlignEdge } from '$lib/layout';
 	import {
@@ -666,6 +670,10 @@
 	}
 	/** Give a dialog its first focus so Esc/Tab work without a mouse trip. */
 	const focusOnOpen = (node: HTMLElement) => node.focus();
+	/** The same, for the first of a list: the one Enter should take. */
+	const focusIf = (node: HTMLElement, first: boolean) => {
+		if (first) node.focus();
+	};
 
 	/**
 	 * What the CSS box says before anything is typed into it, and what Starter
@@ -1738,6 +1746,36 @@
 	}
 
 	/**
+	 * Undo or Redo held on past its tip: every step it could take, nearest
+	 * first, in a dialog as Help is — pressing one goes there in one move, as
+	 * that many single undos would, and says so once. Flushed on opening, so
+	 * a change still inside the debounce is in the list and not lost to it.
+	 */
+	let stepsOpen = $state<'undo' | 'redo' | null>(null);
+	const stepList = $derived(stepsOpen === 'undo' ? undoSteps(history) : stepsOpen === 'redo' ? redoSteps(history) : []);
+
+	function openSteps(which: 'undo' | 'redo') {
+		flushHistory();
+		stepsOpen = which;
+	}
+
+	function goSteps(count: number) {
+		const which = stepsOpen;
+		stepsOpen = null;
+		flushHistory();
+		const steps = which === 'undo' ? undoSteps(history) : redoSteps(history);
+		if (!which || !steps.length) return;
+		const n = Math.min(count, steps.length);
+		const what = steps[n - 1] || 'a change';
+		history = which === 'undo' ? undoTimes(history, n) : redoTimes(history, n);
+		applySnapshot(history.present.state);
+		toggledOff = false;
+		pending = '';
+		const word = n === 1 ? 'step' : 'steps';
+		notify(which === 'undo' ? `Undone ${n} ${word}, back to before: ${what}` : `Redone ${n} ${word}, up to: ${what}`);
+	}
+
+	/**
 	 * Ctrl/Cmd+Shift+Z: the last change off, and on again.
 	 *
 	 * Undo and redo each have a key of their own — Ctrl/Cmd+Z and Ctrl/Cmd+Y —
@@ -2699,7 +2737,16 @@
 	 * where nobody can see what it did.
 	 */
 	const dialogOpen = $derived(
-		helpOpen || whatsNewOpen || statusOpen || cssOpen || resetting || resettingTable || deleting || deletingTable || magic !== null
+		helpOpen ||
+			whatsNewOpen ||
+			statusOpen ||
+			cssOpen ||
+			resetting ||
+			resettingTable ||
+			deleting ||
+			deletingTable ||
+			magic !== null ||
+			stepsOpen !== null
 	);
 	/** Something in front of the stage, which then leaves the keys alone. */
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
@@ -2734,6 +2781,7 @@
 			helpOpen = false;
 			whatsNewOpen = false;
 			statusOpen = false;
+			stepsOpen = null;
 			if (cssOpen) cancelCss();
 			resetting = false;
 			resettingTable = false;
@@ -3575,6 +3623,7 @@
 			{redoable}
 			onundo={undo}
 			onredo={redo}
+			onsteps={openSteps}
 			onaddbox={addTextBox}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
 			onmenuclose={() => (boxMenu = null)}
@@ -4124,6 +4173,32 @@
 	</div>
 {/if}
 
+{#if stepsOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (stepsOpen = null)}></div>
+	<div class="modal steps" role="dialog" aria-modal="true" aria-labelledby="steps-title" use:dragByTitle>
+		<header class="modal-header drag-title" data-drag-handle>
+			<h2 id="steps-title">{stepsOpen === 'undo' ? 'Undo to…' : 'Redo to…'}</h2>
+			<button class="icon" onclick={() => (stepsOpen = null)} title="Close" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
+		<!-- Nearest first, from where the page is now: each line is a change,
+		     and pressing it takes back (or puts back) it and every one above it. -->
+		<ol class="step-list">
+			<li class="now">Now</li>
+			{#each stepList as label, i (i)}
+				<li>
+					<button class="as-typed" use:focusIf={i === 0} onclick={() => goSteps(i + 1)}>
+						<Icon name={stepsOpen} size={14} />
+						<span class="step-label">{label || 'A change'}</span>
+						<span class="step-count">{i + 1} {i === 0 ? 'step' : 'steps'}</span>
+					</button>
+				</li>
+			{/each}
+		</ol>
+	</div>
+{/if}
+
 {#if helpOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (helpOpen = false)}></div>
 	<div class="modal help" role="dialog" aria-modal="true" aria-labelledby="help-title" use:dragByTitle>
@@ -4596,6 +4671,58 @@
 		.status-bar .ui-size {
 			margin: -3px 0 -3px -8px;
 		}
+	}
+
+	.step-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		max-height: 60vh;
+		overflow-y: auto;
+	}
+
+	/* Where the page is: the head of the list, and not a step to choose. */
+	.step-list .now {
+		padding: 6px 8px;
+		font: 600 0.6875rem ui-sans-serif, system-ui, sans-serif;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: #767676;
+	}
+
+	.step-list button {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 6px 8px;
+		border: 1px solid transparent;
+		border-radius: var(--radius-button);
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.step-list button:hover,
+	.step-list button:focus-visible {
+		border-color: #ddd;
+		background: #fafafa;
+	}
+
+	.step-label {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.step-count {
+		color: #767676;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
 	}
 
 	.whats-new h3 {
