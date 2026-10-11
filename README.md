@@ -148,9 +148,10 @@ resize boxes directly, or type exact millimetres.
   column beside the page, under undo and redo — not in either bar and not in the
   right-click menu.
 - **Several at once** — shift-click (or Ctrl/Cmd-click) to build a selection,
-  Ctrl/Cmd+A for all of them; on a touchscreen, **Select Multiple** at the top of
-  the right-click menu makes every press add or drop. A chip appears beside
-  *+ Area* while it is on — a mode with no visible sign is a trap — and pressing
+  Ctrl/Cmd+A for all of them; on a touchscreen, **Select Multiple** — a chip
+  beside the page as soon as an area is chosen, and at the top of the
+  long-press menu — makes every tap add or drop one, with no handles in the
+  way. The chip stays, pressed, while it is on — a mode with no visible sign is a trap — and pressing
   that, or <kbd>Esc</kbd>, leaves it. Dragging any one moves the set; a column of icons
   appears beside the page, under undo and redo, to line them up against the box
   that encloses them all — left, centre, right, top, middle, bottom — and to

@@ -3635,6 +3635,7 @@
 			{picking}
 			{flashIds}
 			onstoppicking={() => (picking = false)}
+			onstartpicking={() => (picking = true)}
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
 			onrelock={() => applyTemplate({ ...$state.snapshot(template), locked: true } as Template)}
 			onedit={beginEditing}

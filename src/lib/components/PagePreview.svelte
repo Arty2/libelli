@@ -106,6 +106,8 @@
 		flashIds?: string[];
 		/** leave Select Multiple */
 		onstoppicking?: () => void;
+		/** enter it: on a touch screen, from the stage, with an area chosen */
+		onstartpicking?: () => void;
 		/** unlock the design, from the band that says it is locked */
 		onunlock?: () => void;
 		/** lock it again, from the same button while it still shows the open padlock */
@@ -171,6 +173,7 @@
 		ontext,
 		onrescue,
 		onstoppicking,
+		onstartpicking,
 		onunlock,
 		onrelock,
 		flashIds = []
@@ -1717,6 +1720,7 @@
 				{smartGuides}
 				spacing={spacingGuides && guides && smartGuides}
 				{nudging}
+				{picking}
 				{scale}
 				{pageNumber}
 				{theme}
@@ -1998,6 +2002,19 @@
 				title="Selecting several — every press adds an area or drops it. Press to stop, or Esc."
 			>
 				<Icon name="checkbox-checked" size={16} /><span class="sr-only">Stop selecting multiple</span>
+			</button>
+		{:else if coarse && selectedIds.length && onstartpicking}
+			<!-- The way in on a touch screen, which has no Shift to add an area
+			     with. It was only in the area's long-press menu, and a long press
+			     on an area is also the start of dragging it: Android does not
+			     reliably open the menu at all, so several could not be chosen. -->
+			<button
+				class="square"
+				aria-pressed="false"
+				onclick={onstartpicking}
+				title="Select multiple — then every tap adds an area or drops it"
+			>
+				<Icon name="checkbox" size={16} /><span class="sr-only">Select multiple</span>
 			</button>
 		{/if}
 		{#if strayIds.length}

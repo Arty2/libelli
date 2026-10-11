@@ -894,6 +894,24 @@ would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
 
+**A finger's tap that chooses an area sends no click.** Choosing opens the
+area's bar above the stage, which moves the page down under the finger, and the
+click the browser sends when the finger lifts lands on whatever is there by
+then: on a phone a menu in the new bar opened, a button in it could be pressed,
+and the choice seemed to go. `dropTapClick` cancels the touchend of that touch
+(a touch keeps reporting to where it began, however far the page has moved), so
+there is no click at all. Not after a double tap, which opens the area for
+typing and wants the tap's focus.
+
+**Select Multiple is a chip on a touch screen, and takes the handles away.** It
+was only in the long-press menu, and a long press on an area is also the start
+of dragging it, which Android does not reliably turn into a menu, so several
+areas could not be chosen. The chip shows beside the page once an area is
+chosen. While it is on, a lone choice draws no handles: a tap is pulled to the
+nearest control, a handle reaching over the next area took the tap meant for
+it, and a press on a handle chose its own area again, which in this mode took
+it back out. A handle press never changes the selection now.
+
 **Columns are the browser's.** `Box.columns` (2–6, a gap in mm) is
 `column-count` and `column-gap` on the area's content, not on the box, so the
 padding, border and fill stay one frame round all the columns. Balanced rather

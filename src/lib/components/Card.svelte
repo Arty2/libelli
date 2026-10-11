@@ -100,6 +100,8 @@
 		 * is a drag in steps and the gaps are what it is aimed by.
 		 */
 		nudging?: boolean;
+		/** Select Multiple is on: every press chooses, so no area offers its handles */
+		picking?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
 		scale?: number;
 		interactive?: boolean;
@@ -188,6 +190,7 @@
 		smartGuides = false,
 		spacing = false,
 		nudging = false,
+		picking = false,
 		scale = 1,
 		interactive = false,
 		panning = false,
@@ -1170,8 +1173,13 @@
 		onimagedrop(box, file);
 	}
 	const isSelected = (box: Box) => selectedIds.includes(box.id);
-	/** Handles belong to a single box: with several chosen, the bar does the work. */
-	const soleSelection = $derived(selectedIds.length === 1);
+	/**
+	 * Handles belong to a single box: with several chosen, the bar does the
+	 * work. Nor while Select Multiple is on, with only one chosen so far: a
+	 * finger's tap is pulled to the nearest control, and a handle reaching
+	 * over the next area took the tap meant for it.
+	 */
+	const soleSelection = $derived(selectedIds.length === 1 && !picking);
 
 	/** The eight handles, as against moving, turning and the pivot. */
 	const RESIZE_MODES = new Set(['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']);
@@ -1301,6 +1309,7 @@
 				return;
 			}
 			lastTap = { id: box.id, at: now };
+			choseByTouch = true;
 		}
 		// Selecting comes first and is never refused: a lock stops a box moving,
 		// not being picked — otherwise the only control that could unlock it
@@ -1316,7 +1325,10 @@
 		// one is not known until the pointer moves, so the toggle waits for the
 		// release (`endDrag`) and happens only if it did not.
 		if (additive && event.shiftKey && isSelected(box) && editable(box)) pendingToggle = box.id;
-		else onselect?.(box.id, additive);
+		// A handle is only on the area already chosen, so a press on one
+		// chooses nothing — and while Select Multiple is on, choosing it again
+		// would have taken it back out.
+		else if (mode === 'move' || !isSelected(box)) onselect?.(box.id, additive);
 		if (!editable(box)) return;
 		// Snapshotted at the start: moving several boxes applies one delta to
 		// each of these, so a box cannot drift by accumulating rounding.
@@ -1706,6 +1718,24 @@
 	 */
 	let panTap: { id: string; pointer: number; x: number; y: number; additive: boolean; touch: boolean } | null = null;
 
+	/**
+	 * A finger chose an area, so the tap's click is dropped (`dropTapClick`).
+	 * Choosing opens the area's bar above the stage, the stage moves down
+	 * under the finger, and the click the browser sends once the finger lifts
+	 * lands on whatever is there now: a menu in the new bar opened, a button
+	 * in it was pressed, the choice seemed to vanish. Not after a double tap,
+	 * which opens the area for typing and wants the tap's focus.
+	 */
+	let choseByTouch = false;
+
+	function dropTapClick(event: TouchEvent) {
+		if (!choseByTouch) return;
+		choseByTouch = false;
+		// On touchend, which a touch keeps sending to where it began however
+		// far the page has moved: cancelled, there is no click at all.
+		if (event.cancelable) event.preventDefault();
+	}
+
 	function endPanTap(event: PointerEvent) {
 		const tap = panTap;
 		panTap = null;
@@ -1723,6 +1753,7 @@
 				return;
 			}
 			lastTap = { id: box.id, at: now };
+			choseByTouch = true;
 		}
 		onselect?.(box.id, tap.additive);
 	}
@@ -2367,7 +2398,11 @@
 				data-box-id={box.id}
 				use:measure={box.id}
 				use:fitWords={box.overflow === 'shrink' && (box.mode === 'plain' || box.mode === 'markdown') ? box.id : null}
-				onpointerdown={(e) => startDrag(e, box, 'move')}
+				onpointerdown={(e) => {
+					choseByTouch = false;
+					startDrag(e, box, 'move');
+				}}
+				ontouchend={dropTapClick}
 				ondblclick={(e) => {
 					if (!interactive) return;
 					e.preventDefault();
