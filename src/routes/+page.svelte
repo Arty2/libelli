@@ -48,10 +48,10 @@
 		amend,
 		createHistory,
 		record,
-		redo as redoStep,
-		redoLabel,
-		undo as undoStep,
-		undoLabel
+		redoSteps,
+		redoTimes,
+		undoSteps,
+		undoTimes
 	} from '$lib/history';
 	import { alignBoxes, bleedFor, mirrors, pageSide, type AlignEdge } from '$lib/layout';
 	import {
@@ -580,16 +580,20 @@
 	}
 
 	/**
-	 * The status bar pulled upwards, stacked: the table comes up under the
-	 * finger from nothing, and is dragged from there as its header would be.
-	 * Nothing to pull when a tray is up already.
+	 * The status bar pulled upwards, stacked: the tray put away last — the
+	 * table or the Pictures — comes up under the finger from nothing, and is
+	 * dragged from there as its head would be. Nothing to pull when a tray is
+	 * up already.
 	 */
 	function pullTray(phase: 'start' | 'move' | 'end', clientY: number, flick?: boolean): boolean | void {
 		if (phase === 'start') {
 			if (!stacked || dataOpen || imagesOpen) return false;
 			trayRestore = trayShare;
 			trayShare = 0;
-			dataOpen = true;
+			if (ui.lastTray === 'images') {
+				imageFocus = null;
+				imagesOpen = true;
+			} else dataOpen = true;
 			trayFrom = { y: clientY, share: 0 };
 			return true;
 		}
@@ -1706,31 +1710,66 @@
 		selectedIds = selectedIds.filter((id) => template.boxes.some((b) => b.id === id));
 	}
 
-	function undo() {
+	/**
+	 * Undo or redo `count` steps — one from the buttons and the keys, several
+	 * from the list a held button opens. One path, so the bookkeeping around a
+	 * step cannot differ between taking one and taking five.
+	 */
+	function stepHistory(which: 'undo' | 'redo', count = 1) {
+		// Recorded first: a change made since the last step, still inside the
+		// debounce, used to be thrown away by the redo that restored the
+		// future it should have cleared.
 		flushHistory();
-		if (!canUndo(history)) return;
+		const steps = which === 'undo' ? undoSteps(history) : redoSteps(history);
+		if (!steps.length) return;
+		const n = Math.min(count, steps.length);
+		const what = steps[n - 1];
 		toggledOff = false;
-		const what = undoLabel(history);
-		history = undoStep(history);
+		history = which === 'undo' ? undoTimes(history, n) : redoTimes(history, n);
 		applySnapshot(history.present.state);
-		// Cleared, or the label of whatever was pending when undo landed would
-		// attach itself to the user's next action instead.
+		// Cleared, or the label of whatever was pending when the step landed
+		// would attach itself to the user's next action instead.
 		pending = '';
-		notify(what ? `Undone: ${what}` : 'Undone.');
+		const done = which === 'undo' ? 'Undone' : 'Redone';
+		if (n === 1) notify(what ? `${done}: ${what}` : `${done}.`);
+		else
+			notify(
+				which === 'undo'
+					? `Undone ${n} steps, back to before: ${what || 'a change'}`
+					: `Redone ${n} steps, up to: ${what || 'a change'}`
+			);
 	}
 
-	function redo() {
-		// Recorded first, as undo does: a change made since the undo, still
-		// inside the debounce, used to be thrown away by the redo that
-		// restored the future it should have cleared.
+	const undo = () => stepHistory('undo');
+	const redo = () => stepHistory('redo');
+
+	/**
+	 * Undo or Redo held on past its tip: every step it could take, nearest
+	 * first, in a dialog as Help is — pressing one goes there in one move, as
+	 * that many single undos would, and says so once. Flushed on opening, so
+	 * a change still inside the debounce is in the list and not lost to it.
+	 */
+	let stepsOpen = $state<'undo' | 'redo' | null>(null);
+	const stepList = $derived(stepsOpen === 'undo' ? undoSteps(history) : stepsOpen === 'redo' ? redoSteps(history) : []);
+
+	function openSteps(which: 'undo' | 'redo') {
 		flushHistory();
-		if (!canRedo(history)) return;
-		toggledOff = false;
-		const what = redoLabel(history);
-		history = redoStep(history);
-		applySnapshot(history.present.state);
-		pending = '';
-		notify(what ? `Redone: ${what}` : 'Redone.');
+		// A change still inside the debounce is recorded by that flush, and a
+		// new change clears what was ahead: Redo can have had steps a moment
+		// ago and none now. Said, rather than a list of nothing.
+		if (!(which === 'undo' ? undoSteps(history) : redoSteps(history)).length) {
+			notify(
+				which === 'redo' ? 'Nothing to redo — the change just made took the place of what was undone.' : 'Nothing to undo.'
+			);
+			return;
+		}
+		stepsOpen = which;
+	}
+
+	function goSteps(count: number) {
+		const which = stepsOpen;
+		stepsOpen = null;
+		if (which) stepHistory(which, count);
 	}
 
 	/**
@@ -1853,7 +1892,10 @@
 		untrack(() => {
 			const was = ui.panels;
 			if (was && was.page === panels.page && was.data === panels.data && was.images === panels.images) return;
-			ui = { ...ui, panels };
+			// One tray at a time, so the one up now is the one a pull off the
+			// status bar should bring back once it has been put away.
+			const lastTray = panels.images ? 'images' : panels.data ? 'data' : ui.lastTray;
+			ui = { ...ui, panels, ...(lastTray ? { lastTray } : {}) };
 		});
 	});
 
@@ -2692,7 +2734,16 @@
 	 * where nobody can see what it did.
 	 */
 	const dialogOpen = $derived(
-		helpOpen || whatsNewOpen || statusOpen || cssOpen || resetting || resettingTable || deleting || deletingTable || magic !== null
+		helpOpen ||
+			whatsNewOpen ||
+			statusOpen ||
+			cssOpen ||
+			resetting ||
+			resettingTable ||
+			deleting ||
+			deletingTable ||
+			magic !== null ||
+			stepsOpen !== null
 	);
 	/** Something in front of the stage, which then leaves the keys alone. */
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
@@ -2727,6 +2778,7 @@
 			helpOpen = false;
 			whatsNewOpen = false;
 			statusOpen = false;
+			stepsOpen = null;
 			if (cssOpen) cancelCss();
 			resetting = false;
 			resettingTable = false;
@@ -3568,6 +3620,7 @@
 			{redoable}
 			onundo={undo}
 			onredo={redo}
+			onsteps={openSteps}
 			onaddbox={addTextBox}
 			onmenu={(id, x, y) => (boxMenu = { id, x, y })}
 			onmenuclose={() => (boxMenu = null)}
@@ -3576,6 +3629,7 @@
 			{picking}
 			{flashIds}
 			onstoppicking={() => (picking = false)}
+			onstartpicking={() => (picking = true)}
 			onunlock={() => applyTemplate({ ...$state.snapshot(template), locked: undefined } as Template)}
 			onrelock={() => applyTemplate({ ...$state.snapshot(template), locked: true } as Template)}
 			onedit={beginEditing}
@@ -4117,6 +4171,34 @@
 	</div>
 {/if}
 
+{#if stepsOpen}
+	<div class="modal-backdrop" role="presentation" onclick={() => (stepsOpen = null)}></div>
+	<!-- The focus on the dialog, not the nearest step: a stray Return would
+	     otherwise take one back unasked (modal.ts). -->
+	<div class="modal steps" role="dialog" aria-modal="true" aria-labelledby="steps-title" use:dragByTitle use:armDefault>
+		<header class="modal-header drag-title" data-drag-handle>
+			<h2 id="steps-title">{stepsOpen === 'undo' ? 'Undo to…' : 'Redo to…'}</h2>
+			<button class="icon" onclick={() => (stepsOpen = null)} title="Close" aria-label="Close">
+				<Icon name="close" size={16} />
+			</button>
+		</header>
+		<!-- Nearest first, from where the page is now: each line is a change,
+		     and pressing it takes back (or puts back) it and every one above it. -->
+		<ol class="step-list">
+			<li class="now">Now</li>
+			{#each stepList as label, i (i)}
+				<li>
+					<button class="as-typed" data-default={i === 0 ? '' : undefined} onclick={() => goSteps(i + 1)}>
+						<Icon name={stepsOpen} size={14} />
+						<span class="step-label">{label || 'A change'}</span>
+						<span class="step-count">{i + 1} {i === 0 ? 'step' : 'steps'}</span>
+					</button>
+				</li>
+			{/each}
+		</ol>
+	</div>
+{/if}
+
 {#if helpOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (helpOpen = false)}></div>
 	<div class="modal help" role="dialog" aria-modal="true" aria-labelledby="help-title" use:dragByTitle>
@@ -4589,6 +4671,58 @@
 		.status-bar .ui-size {
 			margin: -3px 0 -3px -8px;
 		}
+	}
+
+	.step-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		max-height: 60vh;
+		overflow-y: auto;
+	}
+
+	/* Where the page is: the head of the list, and not a step to choose. */
+	.step-list .now {
+		padding: 6px 8px;
+		font: 600 0.6875rem ui-sans-serif, system-ui, sans-serif;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: #767676;
+	}
+
+	.step-list button {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 6px 8px;
+		border: 1px solid transparent;
+		border-radius: var(--radius-button);
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.step-list button:hover,
+	.step-list button:focus-visible {
+		border-color: #ddd;
+		background: #fafafa;
+	}
+
+	.step-label {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.step-count {
+		color: #767676;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
 	}
 
 	.whats-new h3 {

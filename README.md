@@ -148,9 +148,10 @@ resize boxes directly, or type exact millimetres.
   column beside the page, under undo and redo — not in either bar and not in the
   right-click menu.
 - **Several at once** — shift-click (or Ctrl/Cmd-click) to build a selection,
-  Ctrl/Cmd+A for all of them; on a touchscreen, **Select Multiple** at the top of
-  the right-click menu makes every press add or drop. A chip appears beside
-  *+ Area* while it is on — a mode with no visible sign is a trap — and pressing
+  Ctrl/Cmd+A for all of them; on a touchscreen, **Select Multiple** — a chip
+  beside the page as soon as an area is chosen, and at the top of the
+  long-press menu — makes every tap add or drop one, with no handles in the
+  way. The chip stays, pressed, while it is on — a mode with no visible sign is a trap — and pressing
   that, or <kbd>Esc</kbd>, leaves it. Dragging any one moves the set; a column of icons
   appears beside the page, under undo and redo, to line them up against the box
   that encloses them all — left, centre, right, top, middle, bottom — and to
@@ -358,7 +359,13 @@ resize boxes directly, or type exact millimetres.
   **Double-click** either mark to put it back: the crosshair to the middle, the
   knob upright — getting back to either by dragging is pixel-hunting. A
   turned area still occupies the space it would have upright, so anchored areas
-  below it do not move — turning one thing never shuffles the card.
+  below it do not move — turning one thing never shuffles the card. But it is
+  lined up and measured as it is drawn: a move snaps the turned shape's edges,
+  the gaps shown while dragging start from its reference corner where that
+  corner has turned to, and a turned neighbour is measured to its drawn edge.
+  Dragging the crosshair shows how far the pivot is in from each of the area's
+  own edges, in millimetres; dragging the knob lays a protractor on the pivot —
+  a level line for 0°, the area's line now, the arc between and the angle.
 - **Overflow** — a box whose content is taller than the box will let it be draws
   the cut: a dashed red line along its bottom edge, where the words are actually
   severed, with a pair of shears astride that line at the right-hand end —
@@ -1240,22 +1247,31 @@ sections, **Images**, **Drawings** and **Fonts**.
 - **Sections that fold** — the Pictures tray lists **Images**, **Drawings** and
   **Fonts** under heads that say how many each holds and what they weigh; a
   press on a head folds its list shut or open, and this browser remembers
-  which are shut, so the tray opens as it was left.
+  which are shut, so the tray opens as it was left. A section you have not
+  folded or opened yourself starts folded once it holds more than ten, a
+  connected folder counting as its one line. With
+  eight images or more, **Search…** at the top of the tray narrows the list
+  as you type, opening the Images section and the folder to show the matches.
 - **Onto the card** — drag a thumbnail out of the tray and let go over an area:
   the image goes where a dropped file would, into this row's cell when the
   area is bound to a column and onto the area otherwise. The area under the
   pointer is outlined while you carry it. It works with a finger as well as a
   mouse.
-- **A folder of your own** — press the **folder** at the far end of the
+- **A folder of your own** — press **Folder add** at the far end of the
   **Images** head, beside Upload, and images are written
   there as ordinary files from then on: replace one from a photo editor and the
   card follows, back them up with the rest of your work, and clear them out with
-  your file manager rather than through this app. The folder is remembered
+  your file manager rather than through this app. Once connected, the folder
+  is one line at the top of **Images** — its name, how many pictures and what
+  they weigh — folded until you press it, so a folder of hundreds of
+  photographs does not crowd out the rest; a search shows its matches either
+  way. It is read in the background, filling in as it goes, and its
+  thumbnails are drawn only as you scroll to them. The folder is remembered
   between visits, but a browser asks to be let into it once per visit — the
-  tray's head says it is not opened, and **Open** on the Images head opens
-  it — and until then images come
-  from browser storage as before. The **×** beside the folder lets go of it;
-  nothing in it is deleted.
+  folder's line says it is not opened, and its **Open** opens it — and until
+  then images come from browser storage as before. On the same line, the
+  **folder** button picks another and **Unlink** disconnects it; nothing in
+  it is deleted.
 - **Where that works** — the File System Access API is Chromium's: Chrome, Edge,
   Opera and Arc have it; Firefox and Safari do not. Everywhere else the app keeps
   images in IndexedDB exactly as it always did. The folder button is there
@@ -1575,6 +1591,14 @@ the change and the page without it, as many times as it takes — and neither
 Anything else touching the history — a fresh edit, a plain undo, a redo — starts
 the alternation over, since "the last change" is then a different change.
 
+**Hold Undo or Redo** beside the page to go several steps at once. Held, it
+first shows its tip, as every control does; held on for about a second, a list
+opens of every step it could take, named for what each did, nearest first.
+A right-click on either, or the keyboard's menu key on it, opens the same
+list. Choose one and the page goes straight there — the same as pressing Undo that
+many times, so Redo brings it all back. Letting go before the list opens is an
+ordinary press with a mouse, and with a finger only the tip.
+
 ## Dialogs
 
 Every dialog with an action opens with **nothing** pressed, and the focus on the
@@ -1729,7 +1753,9 @@ towards it and down is away. They repeat on a hold like the arrows do.
   to begin with in this mode, at any width; hold its middle to
   put it away, and the cross that appears under zoom and pan brings it back. On
   a touch screen the cross is there in **Move** too, with the pad put away to
-  begin with: press it for a nudge finer than a fingertip drags. Switching
+  begin with: press it for a nudge finer than a fingertip drags. While the
+  pad moves an area, and for a moment after, the gaps to its neighbours and
+  the page edge are shown in millimetres, as they are under a drag. Switching
   between the two modes leaves the pad as you last left it, out or put away.
   The resize handles and the
   lever still drag; they are small and grabbed on purpose. It starts **on**
@@ -1762,8 +1788,8 @@ towards it and down is away. They repeat on a hold like the arrows do.
 - **The tray follows your finger, both ways.** Pull its header down and it
   shrinks with you all the way, fading once it is smaller than it can stay;
   let go there and it folds away, as the Data button would, keeping its height
-  for next time. **Pull up from the status bar** and the table comes up under
-  your finger, staying as tall as you leave it — or, for a quick flick, as tall
+  for next time. **Pull up from the status bar** and the tray you put away
+  last — the table or **Pictures** — comes up under your finger, staying as tall as you leave it — or, for a quick flick, as tall
   as it last was. Let go of a pull too short to use and it goes back down. A
   tap on the bar's buttons is still a tap, and letting go of a pull never taps
   what the tray has brought under your finger.
@@ -1947,7 +1973,8 @@ than it has to.
   **Pictures** and **Data** in the window toolbar each close the other. Its
   sections — **Images**, **Drawings**, **Fonts** — fill the height, each head
   saying how many and how much they weigh; the ways in are the images' alone,
-  so **Upload** and the **folder** are on the Images head, at its far end,
+  so **Upload** and the **folder** are on the Images head, at its far end —
+  the folder on its own line under it once one is connected —
   and the tray has no bar at its foot. On a phone its head is the grip that
   shares the height with the page, as the table's header row is. Carry one onto an area to put it there, or onto the **page** between
   areas for a new image area of its own, centred where it was let go, 40mm

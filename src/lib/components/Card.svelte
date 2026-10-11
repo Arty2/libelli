@@ -41,6 +41,10 @@
 		latchSpan,
 		snapTo,
 		snapToEdges,
+		drawnBounds,
+		turnedPoint,
+		pivotReadouts,
+		turnReadout,
 		columnGaps,
 		shrinkScale,
 		spacingReadouts,
@@ -94,6 +98,14 @@
 		 * edge, drawn as it moves — `spacingReadouts`.
 		 */
 		spacing?: boolean;
+		/**
+		 * The nudge pad is being pressed, or was a moment ago: the spacing is
+		 * read out from the chosen areas as a drag would show it, since a nudge
+		 * is a drag in steps and the gaps are what it is aimed by.
+		 */
+		nudging?: boolean;
+		/** Select Multiple is on: every press chooses, so no area offers its handles */
+		picking?: boolean;
 		/** preview scale, used only to convert pointer deltas back to mm */
 		scale?: number;
 		interactive?: boolean;
@@ -181,6 +193,8 @@
 		guides = false,
 		smartGuides = false,
 		spacing = false,
+		nudging = false,
+		picking = false,
 		scale = 1,
 		interactive = false,
 		panning = false,
@@ -227,25 +241,60 @@
 	 * where `drag` is not, so the readouts follow the layout as it changes.
 	 */
 	let spaced = $state<{ id: string; with: string[] } | null>(null);
+	/** The area whose pivot is being placed, or which is being turned, once it has moved. */
+	let turning = $state<{ id: string; mode: 'centre' | 'rotate' } | null>(null);
+	/**
+	 * Its readouts, as drawn: the pivot's distances to the area's own edges
+	 * (`pivotReadouts`), or the turn as a protractor on it (`turnReadout`).
+	 * Under the same switch as the gaps.
+	 */
+	const turnGuide = $derived.by(() => {
+		if (!spacing || !turning) return null;
+		const box = template.boxes.find((b) => b.id === turning!.id);
+		if (!box) return null;
+		const drawn = placed(box);
+		const rect = { x: drawn.x, y: layout.tops[box.id] ?? box.y, w: box.w, h: layout.heights[box.id] ?? box.h };
+		return turning.mode === 'centre'
+			? { mode: 'centre' as const, lines: pivotReadouts(rect, drawn.rotation, drawn.centre) }
+			: { mode: 'rotate' as const, ...turnReadout(rect, drawn.rotation, drawn.centre) };
+	});
+	/**
+	 * The same, for a nudge: the area chosen first, with the rest of the
+	 * choice and whatever hangs off it — what moves with it, as a drag of it
+	 * would collect (`startDrag`). Only what the nudge can move: on a locked
+	 * page nothing does, and nothing is read out.
+	 */
+	const nudged = $derived.by(() => {
+		if (!nudging || !spacing) return null;
+		const movers = selectedIds
+			.map((id) => template.boxes.find((b) => b.id === id))
+			.filter((b): b is Box => !!b && editable(b));
+		if (!movers.length) return null;
+		const along = new Set(movers.slice(1).map((b) => b.id));
+		for (const mover of movers) for (const b of dependentsOf(mover.id)) along.add(b.id);
+		return { id: movers[0].id, with: [...along] };
+	});
 	/**
 	 * The spacing readouts, in the frame the card is drawn in: on a left-hand
 	 * page a mirrored area is measured where it is seen, not where it is stored.
 	 * Hidden areas take no room, so nothing is measured to one.
 	 */
 	const readouts = $derived.by(() => {
-		if (!spacing || !spaced) return [];
-		const rectOf = (b: Box) => {
-			const drawn = placed(b);
-			return { x: drawn.x, y: layout.tops[b.id] ?? b.y, w: b.w, h: layout.heights[b.id] ?? b.h };
-		};
-		const box = template.boxes.find((b) => b.id === spaced!.id);
+		const from = spaced ?? nudged;
+		if (!spacing || !from) return [];
+		const uprightOf = (b: Box) => ({ x: placed(b).x, y: layout.tops[b.id] ?? b.y, w: b.w, h: layout.heights[b.id] ?? b.h });
+		// A turned area as it is drawn — its own extent and every neighbour's —
+		// so a gap is measured to what is seen, not to the upright frame.
+		const rectOf = (b: Box) => drawnBounds(uprightOf(b), placed(b).rotation, placed(b).centre);
+		const box = template.boxes.find((b) => b.id === from.id);
 		if (!box) return [];
-		const skip = new Set([spaced.id, ...spaced.with]);
+		const skip = new Set([from.id, ...from.with]);
 		const others = template.boxes.filter((b) => !skip.has(b.id) && !hidden.has(b.id)).map(rectOf);
-		// Read out from the reference point, the one the bar's X and Y name.
-		const rect = rectOf(box);
+		// Read out from the reference point, the one the bar's X and Y name —
+		// where it is drawn: on a turned area that corner has turned with it.
 		const { fx, fy } = referenceFor(box);
-		return spacingReadouts(rect, others, template.page, { x: rect.x + rect.w * fx, y: rect.y + rect.h * fy });
+		const focus = turnedPoint(uprightOf(box), placed(box).rotation, placed(box).centre, fx, fy);
+		return spacingReadouts(rectOf(box), others, template.page, focus);
 	});
 
 	/**
@@ -949,8 +998,8 @@
 		// A CSS transform does not touch layout, so a rotated box still reports the
 		// height it would have had upright — which is what `measure()` reads and
 		// what anchored boxes below follow. That is the intended bargain: turning a
-		// box does not shove the rest of the card around. Snapping sees the upright
-		// rectangle too.
+		// box does not shove the rest of the card around. Snapping a move and the
+		// spacing readouts do not: they take the shape as drawn (`drawnBounds`).
 		// As drawn: on a facing page a quarter turn is the opposite one, about
 		// the mirrored pivot — see `mirrorBox`.
 		if (drawn.rotation) {
@@ -1146,8 +1195,13 @@
 		onimagedrop(box, file);
 	}
 	const isSelected = (box: Box) => selectedIds.includes(box.id);
-	/** Handles belong to a single box: with several chosen, the bar does the work. */
-	const soleSelection = $derived(selectedIds.length === 1);
+	/**
+	 * Handles belong to a single box: with several chosen, the bar does the
+	 * work. Nor while Select Multiple is on, with only one chosen so far: a
+	 * finger's tap is pulled to the nearest control, and a handle reaching
+	 * over the next area took the tap meant for it.
+	 */
+	const soleSelection = $derived(selectedIds.length === 1 && !picking);
 
 	/** The eight handles, as against moving, turning and the pivot. */
 	const RESIZE_MODES = new Set(['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']);
@@ -1241,6 +1295,7 @@
 		drag = null;
 		guide = { x: null, y: null };
 		spaced = null;
+		turning = null;
 	}
 
 	function startDrag(event: PointerEvent, box: Box, mode: DragMode) {
@@ -1277,6 +1332,9 @@
 				return;
 			}
 			lastTap = { id: box.id, at: now };
+			// Only when the choice changes, which is when the bar does: a drag
+			// or long press on the area already chosen keeps its release.
+			choseByTouch = picking || !isSelected(box);
 		}
 		// Selecting comes first and is never refused: a lock stops a box moving,
 		// not being picked — otherwise the only control that could unlock it
@@ -1292,7 +1350,10 @@
 		// one is not known until the pointer moves, so the toggle waits for the
 		// release (`endDrag`) and happens only if it did not.
 		if (additive && event.shiftKey && isSelected(box) && editable(box)) pendingToggle = box.id;
-		else onselect?.(box.id, additive);
+		// A handle is only on the area already chosen, so a press on one
+		// chooses nothing — and while Select Multiple is on, choosing it again
+		// would have taken it back out.
+		else if (mode === 'move' || !isSelected(box)) onselect?.(box.id, additive);
 		if (!editable(box)) return;
 		// Snapshotted at the start: moving several boxes applies one delta to
 		// each of these, so a box cannot drift by accumulating rounding.
@@ -1423,10 +1484,10 @@
 		if (!drag.named) {
 			drag.named = true;
 			onaction?.(DRAG_LABELS[drag.mode]);
-			// Moving or sizing; a turn is about its angle, not its gaps.
-			if (drag.mode !== 'rotate' && drag.mode !== 'centre') {
-				spaced = { id: drag.id, with: [...drag.others, ...drag.held].map((b) => b.id) };
-			}
+			// Moving or sizing reads out the gaps; a turn reads out its angle, and
+			// placing the pivot its distances in from the area's own edges.
+			if (drag.mode === 'rotate' || drag.mode === 'centre') turning = { id: drag.id, mode: drag.mode };
+			else spaced = { id: drag.id, with: [...drag.others, ...drag.held].map((b) => b.id) };
 		}
 		// Past the slop, this is a drag rather than a hand that will not keep
 		// still, so a menu the same press opened gets out of the way. The same
@@ -1470,13 +1531,14 @@
 		const mode = flip ? MIRRORED_MODE[drag.mode] : drag.mode;
 		const next: Box = { ...origin };
 
-		const setTop = (deltaY: number, length?: number) => {
+		/** `shift`: how far the drawn shape's top is below the stored top, for a turned area. */
+		const setTop = (deltaY: number, length?: number, shift = 0) => {
 			// An anchored box has no independent top: move its gap instead, so the
 			// relationship the template author set up survives being dragged. No
 			// floor under it — dragged up past the area it follows, it overlaps
 			// that area, with a negative gap, rather than stopping dead.
 			if (origin.anchor) next.anchor = { ...origin.anchor, gap: size(origin.anchor.gap + deltaY) };
-			else next.y = place(origin.y + deltaY, 'y', length);
+			else next.y = shift ? round2(place(origin.y + shift + deltaY, 'y', length) - shift) : place(origin.y + deltaY, 'y', length);
 		};
 
 		switch (mode) {
@@ -1539,15 +1601,22 @@
 				// The held axis is left exactly where it was, not re-placed: placing
 				// snaps, and a snap on the axis that is meant to stand still is a
 				// line that is not straight.
-				if (along !== 'y') next.x = place(origin.x + dx, 'x', origin.w);
+				// A turned area lines up by the shape it is drawn as: its bounds'
+				// offset from the stored frame is fixed while it only moves, so
+				// the bounds are snapped and the frame follows by that offset.
+				const height = layout.heights[origin.id] ?? origin.h;
+				const upright = { x: origin.x, y: layout.tops[origin.id] ?? origin.y, w: origin.w, h: height };
+				const bounds = drawnBounds(upright, origin.rotation, origin.centre);
+				const off = { x: bounds.x - upright.x, y: bounds.y - upright.y };
+				if (along !== 'y') next.x = round2(place(origin.x + off.x + dx, 'x', bounds.w) - off.x);
 				if (along !== 'x') {
-					const height = layout.heights[origin.id] ?? origin.h;
 					// A Grow area set bottom or middle is drawn above its stored top,
 					// by however far its words grew it (`freedTop`). Snapped as drawn —
 					// the edges and the margins it latches to are the drawn ones —
 					// and stored back below by the same lift.
 					const lift = origin.anchor ? 0 : freedTop(origin, 0, height);
-					if (lift) next.y = round2(place(origin.y - lift + dy, 'y', height) + lift);
+					if (lift) next.y = round2(place(origin.y - lift + off.y + dy, 'y', bounds.h) + lift - off.y);
+					else if (off.y) setTop(dy, bounds.h, off.y);
 					else setTop(dy, height);
 				}
 				break;
@@ -1682,6 +1751,24 @@
 	 */
 	let panTap: { id: string; pointer: number; x: number; y: number; additive: boolean; touch: boolean } | null = null;
 
+	/**
+	 * A finger changed the choice, so the tap's click is dropped (`dropTapClick`).
+	 * Choosing opens the area's bar above the stage, the stage moves down
+	 * under the finger, and the click the browser sends once the finger lifts
+	 * lands on whatever is there now: a menu in the new bar opened, a button
+	 * in it was pressed, the choice seemed to vanish. Not after a double tap,
+	 * which opens the area for typing and wants the tap's focus.
+	 */
+	let choseByTouch = false;
+
+	function dropTapClick(event: TouchEvent) {
+		if (!choseByTouch) return;
+		choseByTouch = false;
+		// On touchend, which a touch keeps sending to where it began however
+		// far the page has moved: cancelled, there is no click at all.
+		if (event.cancelable) event.preventDefault();
+	}
+
 	function endPanTap(event: PointerEvent) {
 		const tap = panTap;
 		panTap = null;
@@ -1699,6 +1786,9 @@
 				return;
 			}
 			lastTap = { id: box.id, at: now };
+			// Only when the choice changes, which is when the bar does: a drag
+			// or long press on the area already chosen keeps its release.
+			choseByTouch = picking || !isSelected(box);
 		}
 		onselect?.(box.id, tap.additive);
 	}
@@ -1720,6 +1810,7 @@
 		drag = null;
 		guide = { x: null, y: null };
 		spaced = null;
+		turning = null;
 	}
 
 	const HANDLES: DragMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -2343,7 +2434,11 @@
 				data-box-id={box.id}
 				use:measure={box.id}
 				use:fitWords={box.overflow === 'shrink' && (box.mode === 'plain' || box.mode === 'markdown') ? box.id : null}
-				onpointerdown={(e) => startDrag(e, box, 'move')}
+				onpointerdown={(e) => {
+					choseByTouch = false;
+					startDrag(e, box, 'move');
+				}}
+				ontouchend={dropTapClick}
 				ondblclick={(e) => {
 					if (!interactive) return;
 					e.preventDefault();
@@ -2754,6 +2849,38 @@
 		{/if}
 		{#if guide.y !== null}
 			<span class="guide horizontal" style="top:{guide.y}mm"></span>
+		{/if}
+		<!-- Placing the pivot: its distance in from each of the area's edges.
+		     Turning: a protractor on the pivot, 0° level, the angle on the arc.
+		     Drawn in millimetres, the page's own units, like everything here. -->
+		{#if turnGuide}
+			<svg
+				class="chrome turn-guide"
+				aria-hidden="true"
+				viewBox="0 0 {template.page.w} {template.page.h}"
+				preserveAspectRatio="none"
+			>
+				{#if turnGuide.mode === 'centre'}
+					{#each turnGuide.lines as l, i (i)}
+						<line x1={l.from.x} y1={l.from.y} x2={l.to.x} y2={l.to.y} />
+					{/each}
+				{:else}
+					<line class="level" x1={turnGuide.pivot.x} y1={turnGuide.pivot.y} x2={turnGuide.level.x} y2={turnGuide.level.y} />
+					<line x1={turnGuide.pivot.x} y1={turnGuide.pivot.y} x2={turnGuide.along.x} y2={turnGuide.along.y} />
+					{#if turnGuide.arc}<path class="arc" d={turnGuide.arc} />{/if}
+				{/if}
+			</svg>
+			{#if turnGuide.mode === 'centre'}
+				{#each turnGuide.lines as l, i (i)}
+					<span class="spacing-label turn-label" style="left:{(l.from.x + l.to.x) / 2}mm;top:{(l.from.y + l.to.y) / 2}mm"
+						>{Math.round(l.gap * 10) / 10}</span
+					>
+				{/each}
+			{:else}
+				<span class="spacing-label turn-label" style="left:{turnGuide.label.x}mm;top:{turnGuide.label.y}mm"
+					>{Math.round(turnGuide.degrees * 10) / 10}°</span
+				>
+			{/if}
 		{/if}
 		<!-- The gaps: a line from edge to edge with its millimetres, the pair
 		     either side marked = when they match. -->
@@ -3828,6 +3955,42 @@
 		.spacing.across { height: 0; border-top: var(--line) dashed currentColor; }
 		.spacing.down { width: 0; border-left: var(--line) dashed currentColor; }
 		.spacing.equal { border-style: solid; }
+
+		.turn-guide {
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			overflow: visible;
+			pointer-events: none;
+			z-index: 4;
+		}
+
+		/* Drawn in mm on a page that is zoomed, so the line keeps its screen
+		   width rather than growing with the page. */
+		.turn-guide line,
+		.turn-guide path {
+			fill: none;
+			stroke: var(--accent-inverse);
+			stroke-width: var(--line);
+			stroke-dasharray: 4 3;
+			vector-effect: non-scaling-stroke;
+		}
+
+		.turn-guide .level {
+			stroke-dasharray: 1 3;
+		}
+
+		.turn-guide .arc {
+			stroke-dasharray: none;
+		}
+
+		.turn-label {
+			position: absolute;
+			z-index: 5;
+			pointer-events: none;
+			transform: translate(-50%, -50%);
+		}
 
 		.spacing-label {
 			font: 600 calc(0.625rem * var(--ui-scale)) / 1 system-ui, sans-serif;

@@ -12,10 +12,10 @@
 		weigh,
 		folderAvailable,
 		forgetImageFolder,
+		folderImages,
 		imageFolder,
-		listImages,
+		listBrowserImages,
 		reopenImageFolder,
-		resolveLocalImages,
 		storeLocalImage,
 		type FolderState,
 		type ImageRecord
@@ -127,16 +127,36 @@
 	const UPLOAD_LABEL = 'Upload…';
 
 	/**
-	 * The sections folded shut — `images`, `drawings`, `fonts` — kept in this
-	 * browser, so the tray opens as it was left: a person who never draws
-	 * need not scroll past the drawings to reach the fonts every time.
+	 * Each section's fold — `images`, `drawings`, `fonts` — as the person last
+	 * left it, kept in this browser, so the tray opens as it was left: a
+	 * person who never draws need not scroll past the drawings to reach the
+	 * fonts every time. A section nobody has folded or opened is folded once
+	 * it holds more than `FOLD_FROM`, so a long one does not bury the others;
+	 * a choice made by hand always wins over that.
+	 *
+	 * Stored as the choices themselves, not a list of the folded: the list
+	 * could not tell "opened on purpose" from "never touched". The list a
+	 * tray kept before is read as choices to fold — all it ever recorded.
 	 */
-	const COLLAPSED_KEY = 'images-collapsed';
-	const stored = local.get<unknown>(COLLAPSED_KEY, []);
-	let collapsed = $state<string[]>(Array.isArray(stored) ? stored.filter((k): k is string => typeof k === 'string') : []);
+	const FOLDS_KEY = 'images-folds';
+	const FOLD_FROM = 10;
+	const storedFolds = local.get<unknown>(FOLDS_KEY, null);
+	const foldedBefore = local.get<unknown>('images-collapsed', []);
+	let folds = $state<Record<string, boolean>>(
+		storedFolds && typeof storedFolds === 'object' && !Array.isArray(storedFolds)
+			? Object.fromEntries(Object.entries(storedFolds).filter(([, v]) => typeof v === 'boolean'))
+			: Array.isArray(foldedBefore)
+				? Object.fromEntries(foldedBefore.filter((k): k is string => typeof k === 'string').map((k) => [k, true]))
+				: {}
+	);
 	function toggleSection(key: string) {
-		collapsed = collapsed.includes(key) ? collapsed.filter((k) => k !== key) : [...collapsed, key];
-		local.set(COLLAPSED_KEY, collapsed);
+		// Open only for the search: folding it is asking to put the search
+		// away too, or the press would store a fold and nothing would move.
+		if (key === 'images' && filter.trim()) {
+			filter = '';
+			folds = { ...folds, images: true };
+		} else folds = { ...folds, [key]: !isFolded(key) };
+		local.set(FOLDS_KEY, folds);
 	}
 
 	/**
@@ -266,20 +286,104 @@
 
 	const available = folderAvailable();
 	let folder = $state<FolderState | null>(null);
-	let images = $state<ImageRecord[]>([]);
+	/** What this browser holds itself, and what the folder does: read apart, as they arrive apart. */
+	let held = $state<ImageRecord[]>([]);
+	let inFolder = $state<ImageRecord[]>([]);
+	/** Only until this browser's own are listed: the folder is never waited on. */
 	let busy = $state(true);
+	/** The folder is still being read; the list fills as it is. */
+	let reading = $state(false);
 
+	/**
+	 * Every image, the folder's first. A name in both places is listed once,
+	 * as the folder's: `listBrowserImages` leaves the other copy out by the
+	 * same lookup the card is drawn by, so there is one rule for "the same
+	 * name", not a second here that could disagree with it.
+	 */
+	const images = $derived([...inFolder, ...held]);
 	/** Object URLs for the thumbnails, by name — the same cache the card reads. */
-	let urls = $state<Record<string, string>>({});
-	/** Pixel sizes, read off each thumbnail as it loads. */
+	const urls = $derived(Object.fromEntries(images.flatMap((image) => (image.url ? [[image.name, image.url]] : []))));
+	/** Pixel sizes, read off each thumbnail as it loads. Written into, not spread: one a picture. */
 	let sizes = $state<Record<string, { w: number; h: number }>>({});
 
+	/**
+	 * Looked again. A folder of a few hundred photographs takes a while to
+	 * read, so the tray does not wait for it: this browser's own are listed at
+	 * once, the folder's arrive a batch at a time behind them, and everything
+	 * else in the app goes on meanwhile. A refresh begun while another is
+	 * still reading takes over from it — the older one stops where it is.
+	 *
+	 * Streamed only into an empty list. Read again after an upload or a
+	 * delete, the folder's list as it was stays up until the new one is
+	 * whole: rebuilt a batch at a time, four hundred photographs dropped to
+	 * thirty-two and climbed back, and the list jumped under the reader.
+	 */
+	let refreshes = 0;
+
 	async function refresh() {
-		busy = true;
-		folder = await imageFolder();
-		images = await listImages();
-		urls = (await resolveLocalImages(images.map((image) => image.name))).urls;
+		const run = ++refreshes;
+		const found: ImageRecord[] = [];
+		// What this browser holds, and which folder: read apart from the
+		// folder's files, so a failure here is not reported as the folder
+		// having moved, and does not empty a folder already listed.
+		let state: FolderState | null;
+		let browser: ImageRecord[];
+		try {
+			state = await imageFolder();
+			browser = await listBrowserImages();
+		} catch {
+			if (run !== refreshes) return;
+			busy = false;
+			reading = false;
+			onnotice('The pictures kept in this browser could not be read — the list may be out of date.', 'warning');
+			return;
+		}
+		if (run !== refreshes) return;
+		// Written only by the newest run: an older one answering late would
+		// put back a folder since forgotten, or swapped.
+		folder = state;
+		held = browser;
 		busy = false;
+		if (!state?.ready) {
+			inFolder = [];
+			reading = false;
+			return;
+		}
+		try {
+			reading = true;
+			const streaming = !inFolder.length;
+			for await (const batch of folderImages()) {
+				if (run !== refreshes) return;
+				found.push(...batch);
+				if (streaming) {
+					inFolder = [...found];
+					continue;
+				}
+				// Each picture read again takes its place in the list as it
+				// arrives: a picture just saved or replaced has a new URL,
+				// its old one revoked, and must not wait for the whole folder.
+				const fresh = new Map(batch.map((record) => [record.name, record]));
+				const listed = new Set(inFolder.map((record) => record.name));
+				inFolder = [
+					...inFolder.map((record) => fresh.get(record.name) ?? record),
+					...batch.filter((record) => !listed.has(record.name))
+				];
+			}
+			if (run !== refreshes) return;
+			inFolder = found;
+		} catch {
+			// The folder renamed or deleted on disk, or its permission taken
+			// back, part way through. Said, and only what was read is listed:
+			// the rest may no longer be there to delete or replace.
+			if (run !== refreshes) return;
+			inFolder = found;
+			onnotice(`${folder?.name ?? 'The folder'} could not be read to the end — it may have been moved or renamed.`, 'warning');
+		} finally {
+			if (run === refreshes) {
+				busy = false;
+				reading = false;
+			}
+		}
 	}
 
 	/**
@@ -372,6 +476,7 @@
 
 	const total = $derived(images.reduce((sum, image) => sum + image.bytes, 0));
 
+
 	/**
 	 * Unused first, then by name: the list is mostly consulted to clear out
 	 * what nothing points at, so that is what should be at the top. A filter
@@ -379,14 +484,54 @@
 	 */
 	const FILTER_FROM = 8;
 	let filter = $state('');
+	let searchInput = $state<HTMLInputElement | null>(null);
+
+	/**
+	 * The folder is one line, folded, until it is opened: a folder of
+	 * photographs is often most of what there is, and listed in full it pushed
+	 * this browser's own pictures, the drawings and the fonts out of sight.
+	 * Its contents show while a search is typed, since they may be what is
+	 * being looked for. Kept in this browser, as the sections' folds are.
+	 */
+	const FOLDER_OPEN_KEY = 'images-folder-open';
+	let folderOpen = $state(local.get<unknown>(FOLDER_OPEN_KEY, false) === true);
+	function toggleFolder() {
+		folderOpen = !folderOpen;
+		local.set(FOLDER_OPEN_KEY, folderOpen);
+	}
+	const folderShown = $derived(folderOpen || !!filter.trim());
+	const byUse = (a: ImageRecord, b: ImageRecord) =>
+		Number(used.has(a.name)) - Number(used.has(b.name)) || a.name.localeCompare(b.name);
+	const matches = (image: ImageRecord) => !filter.trim() || image.name.toLowerCase().includes(filter.trim().toLowerCase());
+	const shownFolder = $derived(images.filter((image) => image.where === 'folder' && matches(image)).sort(byUse));
+	const shownHeld = $derived(images.filter((image) => image.where === 'browser' && matches(image)).sort(byUse));
+	/**
+	 * In the order they are listed, for the large view's pager — the folder's
+	 * only while they are listed, or while one of them is the one being looked
+	 * at (a cell can open it with the folder folded).
+	 */
 	const shown = $derived(
-		images
-			.filter((image) => !filter.trim() || image.name.toLowerCase().includes(filter.trim().toLowerCase()))
-			.sort(
-				(a, b) =>
-					Number(used.has(a.name)) - Number(used.has(b.name)) || a.name.localeCompare(b.name)
-			)
+		folderShown || shownFolder.some((image) => image.name === focus) ? [...shownFolder, ...shownHeld] : shownHeld
 	);
+	const folderTotal = $derived(shownFolder.reduce((sum, image) => sum + image.bytes, 0));
+
+	/**
+	 * How many lines each section holds, for its fold before anyone has chosen
+	 * one. The folder is one line whatever it holds: it has a fold of its own,
+	 * and counting its pictures here folded the whole section shut the moment
+	 * the folder was opened — or part way through a read, as the count climbed.
+	 */
+	const counts = $derived<Record<string, number>>({
+		images:
+			held.length +
+			missing.length +
+			(folder ? 1 : 0),
+		drawings: drawings.length,
+		fonts: fonts.length
+	});
+	/** A search opens the images, whatever their fold: the matches are what was asked for. */
+	const isFolded = (key: string) =>
+		key === 'images' && filter.trim() ? false : (folds[key] ?? (counts[key] ?? 0) > FOLD_FROM);
 
 	/**
 	 * What a drawing is saved as: where it is, and the type its data URL says —
@@ -405,6 +550,9 @@
 	async function choose() {
 		const chosen = await chooseImageFolder();
 		if (!chosen) return;
+		// Another folder: the list held is the last one's, and kept up while
+		// this one is read it would offer to delete files under its name here.
+		inFolder = [];
 		onnotice(`Images go into ${chosen.name} from now on. The ones already in this browser stay where they are.`);
 		await refresh();
 		onchanged();
@@ -422,13 +570,17 @@
 
 	async function forget() {
 		await forgetImageFolder();
-		onnotice('Let go of the folder. Nothing in it was deleted — this app has simply stopped reading it.');
+		onnotice('Folder disconnected. Nothing in it was deleted — this app has simply stopped reading it.');
 		await refresh();
 		onchanged();
 	}
 
 	async function remove(image: ImageRecord) {
 		await deleteImage(image.name, image.where);
+		// Out of the list now: the folder is kept as it was until it is read
+		// again (`refresh`), and the picture just deleted should not be in it.
+		if (image.where === 'folder') inFolder = inFolder.filter((i) => i.name !== image.name);
+		else held = held.filter((i) => i.name !== image.name);
 		// Deleted from its own large view: there is nothing left to look at.
 		if (image.name === focus) onfocus?.(null);
 		onnotice(
@@ -642,19 +794,21 @@
 		{:else}
 		<span class="context">Pictures</span>
 		{/if}
-		{#if folder && !focus}
-			<span class="where">
-				{#if folder.ready}
-					<Icon name="folder" size={12} /> {folder.name}
-				{:else}
-					{folder.name} — not opened
-				{/if}
-			</span>
-		{/if}
 		{#if images.length >= FILTER_FROM && !focus}
-			<label class="find">
-				<span class="sr-only">Find an image</span>
-				<input type="search" placeholder="Find…" bind:value={filter} />
+			<!-- One box: the field and its button inside a single border. The
+			     list narrows as it is typed, so the button only puts the caret
+			     in the field — it is there to say what the field is for. -->
+			<label class="search">
+				<span class="sr-only">Search the images</span>
+				<input type="search" placeholder="Search…" bind:value={filter} bind:this={searchInput} />
+				<button
+					title="Search the images"
+					aria-label="Search the images"
+					onclick={(e) => {
+						e.preventDefault();
+						searchInput?.focus();
+					}}><Icon name="search" size={12} /></button
+				>
 			</label>
 		{/if}
 	</div>
@@ -664,8 +818,8 @@
 		<div class="viewer" bind:clientWidth={room.w} bind:clientHeight={room.h}>
 			{#if !focusUrl}
 				<p class="empty">
-					{busy ? '…' : `${focus} is not in this browser.`}
-					{#if !busy && missing.includes(focus)}
+					{busy || reading ? '…' : `${focus} is not in this browser.`}
+					{#if !busy && !reading && missing.includes(focus)}
 						<button class="find" onclick={() => findFor(focus!)}><Icon name="image-reference" size={13} /> Find…</button>
 					{/if}
 				</p>
@@ -702,10 +856,10 @@
 			<h3 class="section">
 				<!-- After the name, as an accordion's: down to open what is folded,
 				     up to fold what is open. -->
-				<button class="section-toggle" aria-expanded={!collapsed.includes(key)} onclick={() => toggleSection(key)}>
+				<button class="section-toggle" aria-expanded={!isFolded(key)} onclick={() => toggleSection(key)}>
 					{label}
 					<span class="total">{total}</span>
-					<Icon name={collapsed.includes(key) ? 'chevron-down' : 'chevron-up'} size={18} />
+					<Icon name={isFolded(key) ? 'chevron-down' : 'chevron-up'} size={18} />
 				</button>
 				{#if actions}<span class="section-actions">{@render actions()}</span>{/if}
 			</h3>
@@ -715,108 +869,166 @@
 		     its far end, rather than in a bar under every section. Upload is
 		     every browser's, a phone included; the folder is Chromium's. -->
 		{#snippet imageWays()}
-			{#if available && folder && !folder.ready}
-				<button class="open-folder" title="Open {folder.name} again, to read the images in it" onclick={reopen}>Open {folder.name}</button>
-			{/if}
 			<button class="square save" title="Upload images from this device" aria-label="Upload images" onclick={() => fileInput?.click()}>
 				<Icon name="upload" size={12} />
 			</button>
-			<!-- Shown where it cannot work too, off, so a phone or Firefox says
-			     why there is no folder rather than leaving it to be wondered at. -->
-			<button
-				class="square save"
-				disabled={!available}
-				title={!available
-					? 'A folder of your own needs Chrome or Edge on a computer — this browser cannot keep images in one, so they stay in its own storage'
-					: folder
-						? `Another folder — images are kept in ${folder.name} now`
-						: "Keep images as ordinary files in a folder of your own, rather than in this browser's storage"}
-				aria-label={folder ? 'Choose another folder' : 'Choose a folder'}
-				onclick={choose}><Icon name="folder" size={12} /></button
-			>
-			{#if available && folder}
-				<button class="square" title="Stop reading {folder.name}. Nothing in it is deleted" aria-label="Forget {folder.name}" onclick={forget}>
-					<Icon name="close" size={12} />
-				</button>
+			<!-- Once one is connected, the folder's own line carries it. Shown
+			     where it cannot work too, off, so a phone or Firefox says why
+			     there is no folder rather than leaving it to be wondered at. -->
+			{#if !folder}
+				<button
+					class="square save"
+					disabled={!available}
+					title={available
+						? "Keep images as ordinary files in a folder of your own, rather than in this browser's storage"
+						: 'A folder of your own needs Chrome or Edge on a computer — this browser cannot keep images in one, so they stay in its own storage'}
+					aria-label="Connect a folder"
+					onclick={choose}><Icon name="folder-add" size={12} /></button
+				>
 			{/if}
+		{/snippet}
+		<!-- One picture a line: what it looks like, what it is called, how big
+		     it is in pixels and in bytes, and whether anything uses it. The
+		     thumbnail is also the handle it is carried onto an area by. Lazy,
+		     and decoded off the main thread: a folder can be hundreds of
+		     full-size photographs, and only the ones scrolled to are drawn. -->
+		{#snippet imageRow(image: ImageRecord)}
+			<li
+				class:unused={!used.has(image.name)}
+				class:in-folder={image.where === 'folder'}
+				title="{image.name} — {image.where === 'folder' ? `in ${folder?.name ?? 'the folder'}` : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}"
+			>
+				<span
+					class="thumb"
+					class:carrying={carry?.on && carry.name === image.name}
+					role="button"
+					tabindex="-1"
+					aria-label="Drag {image.name} onto an area"
+					title="Drag onto an area, or onto the page for an area of its own"
+					onpointerdown={(e) => startCarry(e, image.name)}
+					onpointermove={moveCarry}
+					onpointerup={endCarry}
+					onpointercancel={endCarry}
+				>
+					{#if image.url}
+						<img
+							src={image.url}
+							alt=""
+							draggable="false"
+							loading="lazy"
+							decoding="async"
+							onload={(e) => {
+								const img = e.currentTarget as HTMLImageElement;
+								sizes[image.name] = { w: img.naturalWidth, h: img.naturalHeight };
+							}}
+						/>
+					{/if}
+				</span>
+				<span class="name">{image.name}</span>
+				<span class="size">{[
+					sizes[image.name] ? `${sizes[image.name].w} × ${sizes[image.name].h} px` : '',
+					weigh(image.bytes)
+				]
+					.filter(Boolean)
+					.join(' · ')}</span>
+				{#if !used.has(image.name)}<span class="tag">unused</span>{/if}
+				<!-- A new file under the same name: every card and page that shows
+				     this picture shows the new one, with nothing to re-point. The
+				     arrow out of a tray, as a font's upload is. -->
+				<button
+					class="square save"
+					title="Replace {image.name} with another file, under the same name — everything showing it shows the new one"
+					aria-label="Replace {image.name}"
+					onclick={() => findFor(image.name, true)}
+				>
+					<Icon name="upload" size={12} />
+				</button>
+				{#if image.url}
+					<button
+						class="square save"
+						title="Download {image.name}"
+						aria-label="Download {image.name}"
+						onclick={() => downloadUrl(image.name, image.url!)}
+					>
+						<Icon name="download" size={12} />
+					</button>
+				{/if}
+				<button
+					class="square"
+					title="Delete {image.name}"
+					aria-label="Delete {image.name}"
+					onclick={() => (confirming = image)}
+				>
+					<Icon name="trash" size={12} />
+				</button>
+			</li>
 		{/snippet}
 		{#if busy}
 			<p class="empty">…</p>
 		{:else}
-			<!-- One picture a line: what it looks like, what it is called, how big
-			     it is in pixels and in bytes, and whether anything uses it. The
-			     thumbnail is also the handle it is carried onto an area by. The
-			     head is there with none, for its ways in. -->
+			<!-- The head is there with none, for its ways in. -->
 			{@render sectionHead('images', 'Images', `${images.length + missing.length}${images.length ? ` · ${weigh(total)}` : ''}`, imageWays)}
-			{#if !collapsed.includes('images')}
-			{#if !images.length && !missing.length}
+			{#if !isFolded('images')}
+			{#if !images.length && !missing.length && !folder}
 				<p class="empty">No images yet — upload one, or drop it on an area.</p>
 			{/if}
 			<ul class="images">
-				{#each shown as image (image.where + image.name)}
-					<li class:unused={!used.has(image.name)} title="{image.name} — {image.where === 'folder' ? 'in the folder' : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}">
-						<span
-							class="thumb"
-							class:carrying={carry?.on && carry.name === image.name}
-							role="button"
-							tabindex="-1"
-							aria-label="Drag {image.name} onto an area"
-							title="Drag onto an area, or onto the page for an area of its own"
-							onpointerdown={(e) => startCarry(e, image.name)}
-							onpointermove={moveCarry}
-							onpointerup={endCarry}
-							onpointercancel={endCarry}
-						>
-							{#if urls[image.name]}
-								<img
-									src={urls[image.name]}
-									alt=""
-									draggable="false"
-									onload={(e) => {
-										const img = e.currentTarget as HTMLImageElement;
-										sizes = { ...sizes, [image.name]: { w: img.naturalWidth, h: img.naturalHeight } };
-									}}
-								/>
-							{/if}
-						</span>
-						<span class="name">{image.name}</span>
-						<span class="size">{[
-							sizes[image.name] ? `${sizes[image.name].w} × ${sizes[image.name].h} px` : '',
-							weigh(image.bytes)
-						]
-							.filter(Boolean)
-							.join(' · ')}</span>
-						{#if !used.has(image.name)}<span class="tag">unused</span>{/if}
-						<!-- A new file under the same name: every card and page that shows
-						     this picture shows the new one, with nothing to re-point. The
-						     arrow out of a tray, as a font's upload is. -->
+				<!-- The folder is one line — its name, how many, what they weigh —
+				     and opens to its pictures, under it; this browser's own and the
+				     missing follow, outside it. The line is also where it is opened
+				     again after a restart, swapped, or disconnected. -->
+				{#if folder}
+					<li class="folder-line" class:shut={!folder.ready}>
 						<button
-							class="square save"
-							title="Replace {image.name} with another file, under the same name — everything showing it shows the new one"
-							aria-label="Replace {image.name}"
-							onclick={() => findFor(image.name, true)}
+							class="folder-toggle as-typed"
+							aria-expanded={folder.ready ? folderShown : undefined}
+							disabled={!folder.ready}
+							title={folder.ready
+								? `${folderShown ? 'Fold' : 'Show'} the images in ${folder.name}`
+								: `${folder.name} is not open — the browser asks again after a restart`}
+							onclick={toggleFolder}
 						>
-							<Icon name="upload" size={12} />
+							<span class="thumb folder-thumb" aria-hidden="true"><Icon name="folder" size={16} /></span>
+							<span class="name">{folder.name}</span>
+							<span class="size">
+								{#if !folder.ready}
+									not opened
+								{:else if reading}
+									{shownFolder.length ? `${shownFolder.length} so far…` : 'reading…'}
+								{:else}
+									{shownFolder.length}{folderTotal ? ` · ${weigh(folderTotal)}` : ''}
+								{/if}
+							</span>
+							{#if folder.ready}
+								<Icon name={folderShown ? 'chevron-up' : 'chevron-down'} size={16} />
+							{/if}
 						</button>
-						{#if urls[image.name]}
+						{#if available && !folder.ready}
+							<button class="open-folder" title="Open {folder.name} again, to read the images in it" onclick={reopen}>Open</button>
+						{/if}
+						{#if available}
 							<button
 								class="square save"
-								title="Download {image.name}"
-								aria-label="Download {image.name}"
-								onclick={() => downloadUrl(image.name, urls[image.name])}
+								title="Another folder — images are kept in {folder.name} now"
+								aria-label="Choose another folder"
+								onclick={choose}><Icon name="folder" size={12} /></button
 							>
-								<Icon name="download" size={12} />
-							</button>
 						{/if}
 						<button
 							class="square"
-							title="Delete {image.name}"
-							aria-label="Delete {image.name}"
-							onclick={() => (confirming = image)}
+							title="Disconnect {folder.name}. Nothing in it is deleted; new images go into this browser"
+							aria-label="Disconnect {folder.name}"
+							onclick={forget}><Icon name="unlink" size={12} /></button
 						>
-							<Icon name="trash" size={12} />
-						</button>
 					</li>
+					{#if folder.ready && folderShown}
+						{#each shownFolder as image (image.where + image.name)}
+							{@render imageRow(image)}
+						{/each}
+					{/if}
+				{/if}
+				{#each shownHeld as image (image.where + image.name)}
+					{@render imageRow(image)}
 				{/each}
 				{#each missing as name (name)}
 					<li class="missing" title="{name} — pointed at, but not in this browser">
@@ -836,7 +1048,7 @@
 			     column: not files, so nothing to delete or carry here — a press
 			     opens one to draw on, in the side panel. -->
 			{@render sectionHead('drawings', 'Drawings', `${drawings.length} · ${weigh(drawings.reduce((sum, d) => sum + d.src.length * 0.75, 0))}`)}
-			{#if !collapsed.includes('drawings')}
+			{#if !isFolded('drawings')}
 			<ul class="images">
 				{#each drawings as drawing (drawing.key)}
 					<li>
@@ -880,7 +1092,7 @@
 			     Any font can be given a file under its own name, or swapped for
 			     another everywhere it is used. -->
 			{@render sectionHead('fonts', 'Fonts', `${fonts.length}${fonts.some((f) => f.bytes) ? ` · ${weigh(fonts.reduce((sum, f) => sum + (f.bytes ?? 0), 0))}` : ''}`)}
-			{#if !collapsed.includes('fonts')}
+			{#if !isFolded('fonts')}
 			<ul class="images fonts">
 				{#each shownFonts as font (font.family)}
 					<li
@@ -1163,16 +1375,45 @@
 		color: #555;
 	}
 
-	.find {
+	.search {
 		margin-left: auto;
+		display: inline-flex;
+		align-items: center;
+		border: 1px solid #d5d5d5;
+		border-radius: var(--radius-input);
+		background: #fff;
 	}
 
-	.find input {
+	.search:focus-within {
+		border-color: #888;
+	}
+
+	/* The box's border is the field's: the field has none of its own, nor
+	   the browser's ring, which would draw a second frame inside the first. */
+	.search input {
 		width: 9rem;
 		font: inherit;
 		padding: 3px 6px;
-		border: 1px solid #d5d5d5;
-		border-radius: var(--radius-input);
+		border: none;
+		outline: none;
+		background: none;
+	}
+
+	.search button {
+		flex: none;
+		display: inline-grid;
+		place-items: center;
+		width: 1.375rem;
+		height: 1.375rem;
+		padding: 0;
+		border: none;
+		background: none;
+		color: #767676;
+		cursor: pointer;
+	}
+
+	.search button:hover {
+		color: #111;
 	}
 
 	.list {
@@ -1394,17 +1635,6 @@
 		overflow: hidden;
 	}
 
-	.where {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		color: #111;
-		max-width: 14rem;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
 	.images {
 		display: flex;
 		flex-direction: column;
@@ -1431,6 +1661,50 @@
 
 	.images li.unused .name {
 		color: #767676;
+	}
+
+	/* The folder's line reads as the head of what it holds: the name in the
+	   list's own weight, its pictures stepped in under it while it is open. */
+	.folder-toggle {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 0;
+		border: none;
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.folder-toggle:disabled {
+		cursor: default;
+	}
+
+	.folder-line .name {
+		font-weight: 600;
+	}
+
+	.folder-line.shut .name {
+		color: #767676;
+	}
+
+	.folder-toggle :global(svg) {
+		flex: none;
+		color: #555;
+	}
+
+	.thumb.folder-thumb {
+		background: #fafafa;
+		color: #555;
+		cursor: inherit;
+	}
+
+	.images li.in-folder {
+		margin-left: 1.25rem;
 	}
 
 	/* The grip. `touch-action: none` because a carry is a drag, and the
@@ -1630,7 +1904,7 @@
 		font-weight: 400;
 	}
 
-	.section-actions .open-folder {
+	.open-folder {
 		font: 0.75rem ui-sans-serif, system-ui, sans-serif;
 		padding: 2px 8px;
 		margin-right: 4px;
