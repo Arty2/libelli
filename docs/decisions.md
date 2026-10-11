@@ -3104,6 +3104,19 @@ scrolled to are decoded, and a size read off one is written into the map
 rather than spreading it, which was a copy of the map per picture.
 `resolveLocalImages` asks for every name at once for the same reason.
 
+**A long section starts folded; a hand-made fold always wins.** More than
+ten in a section buried the ones under it, so a section nobody has folded or
+opened starts folded past that. The tray stores each choice made by hand
+(`images-folds`, a key to true or false) rather than the list of what is
+folded, which could not tell "opened on purpose" from "never touched"; the
+old list is read once as choices to fold. A search opens Images regardless,
+since its matches are what was asked for.
+
+**The search is one box.** The field and its Search button share a single
+border; the field had a frame of its own inside one the `.find` button rule
+gave its label, which was two. The button only focuses the field, since the
+list narrows as it is typed.
+
 **The folder is listed by extension.** It is an ordinary folder that may hold
 anything, and a panel offering to delete a file this app never wrote would be a
 trap.

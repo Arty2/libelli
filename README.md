@@ -1240,13 +1240,16 @@ sections, **Images**, **Drawings** and **Fonts**.
 - **Sections that fold** — the Pictures tray lists **Images**, **Drawings** and
   **Fonts** under heads that say how many each holds and what they weigh; a
   press on a head folds its list shut or open, and this browser remembers
-  which are shut, so the tray opens as it was left.
+  which are shut, so the tray opens as it was left. A section you have not
+  folded or opened yourself starts folded once it holds more than ten. With
+  eight images or more, **Search…** at the top of the tray narrows the list
+  as you type, opening the Images section and the folder to show the matches.
 - **Onto the card** — drag a thumbnail out of the tray and let go over an area:
   the image goes where a dropped file would, into this row's cell when the
   area is bound to a column and onto the area otherwise. The area under the
   pointer is outlined while you carry it. It works with a finger as well as a
   mouse.
-- **A folder of your own** — press the **folder** at the far end of the
+- **A folder of your own** — press **Folder add** at the far end of the
   **Images** head, beside Upload, and images are written
   there as ordinary files from then on: replace one from a photo editor and the
   card follows, back them up with the rest of your work, and clear them out with
@@ -1259,7 +1262,7 @@ sections, **Images**, **Drawings** and **Fonts**.
   between visits, but a browser asks to be let into it once per visit — the
   folder's line says it is not opened, and its **Open** opens it — and until
   then images come from browser storage as before. On the same line, the
-  **folder** button picks another and **Disconnect** lets go of it; nothing in
+  **folder** button picks another and **Unlink** disconnects it; nothing in
   it is deleted.
 - **Where that works** — the File System Access API is Chromium's: Chrome, Edge,
   Opera and Arc have it; Firefox and Safari do not. Everywhere else the app keeps

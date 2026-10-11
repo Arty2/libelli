@@ -127,16 +127,31 @@
 	const UPLOAD_LABEL = 'Upload…';
 
 	/**
-	 * The sections folded shut — `images`, `drawings`, `fonts` — kept in this
-	 * browser, so the tray opens as it was left: a person who never draws
-	 * need not scroll past the drawings to reach the fonts every time.
+	 * Each section's fold — `images`, `drawings`, `fonts` — as the person last
+	 * left it, kept in this browser, so the tray opens as it was left: a
+	 * person who never draws need not scroll past the drawings to reach the
+	 * fonts every time. A section nobody has folded or opened is folded once
+	 * it holds more than `FOLD_FROM`, so a long one does not bury the others;
+	 * a choice made by hand always wins over that.
+	 *
+	 * Stored as the choices themselves, not a list of the folded: the list
+	 * could not tell "opened on purpose" from "never touched". The list a
+	 * tray kept before is read as choices to fold — all it ever recorded.
 	 */
-	const COLLAPSED_KEY = 'images-collapsed';
-	const stored = local.get<unknown>(COLLAPSED_KEY, []);
-	let collapsed = $state<string[]>(Array.isArray(stored) ? stored.filter((k): k is string => typeof k === 'string') : []);
+	const FOLDS_KEY = 'images-folds';
+	const FOLD_FROM = 10;
+	const storedFolds = local.get<unknown>(FOLDS_KEY, null);
+	const foldedBefore = local.get<unknown>('images-collapsed', []);
+	let folds = $state<Record<string, boolean>>(
+		storedFolds && typeof storedFolds === 'object' && !Array.isArray(storedFolds)
+			? Object.fromEntries(Object.entries(storedFolds).filter(([, v]) => typeof v === 'boolean'))
+			: Array.isArray(foldedBefore)
+				? Object.fromEntries(foldedBefore.filter((k): k is string => typeof k === 'string').map((k) => [k, true]))
+				: {}
+	);
 	function toggleSection(key: string) {
-		collapsed = collapsed.includes(key) ? collapsed.filter((k) => k !== key) : [...collapsed, key];
-		local.set(COLLAPSED_KEY, collapsed);
+		folds = { ...folds, [key]: !isFolded(key) };
+		local.set(FOLDS_KEY, folds);
 	}
 
 	/**
@@ -410,6 +425,16 @@
 
 	const total = $derived(images.reduce((sum, image) => sum + image.bytes, 0));
 
+	/** How many each section holds, for its fold before anyone has chosen one. */
+	const counts = $derived<Record<string, number>>({
+		images: images.length + missing.length,
+		drawings: drawings.length,
+		fonts: fonts.length
+	});
+	/** A search opens the images, whatever their fold: the matches are what was asked for. */
+	const isFolded = (key: string) =>
+		key === 'images' && filter.trim() ? false : (folds[key] ?? (counts[key] ?? 0) > FOLD_FROM);
+
 	/**
 	 * Unused first, then by name: the list is mostly consulted to clear out
 	 * what nothing points at, so that is what should be at the top. A filter
@@ -417,6 +442,7 @@
 	 */
 	const FILTER_FROM = 8;
 	let filter = $state('');
+	let searchInput = $state<HTMLInputElement | null>(null);
 	const byUse = (a: ImageRecord, b: ImageRecord) =>
 		Number(used.has(a.name)) - Number(used.has(b.name)) || a.name.localeCompare(b.name);
 	const matches = (image: ImageRecord) => !filter.trim() || image.name.toLowerCase().includes(filter.trim().toLowerCase());
@@ -696,9 +722,20 @@
 		<span class="context">Pictures</span>
 		{/if}
 		{#if images.length >= FILTER_FROM && !focus}
-			<label class="find">
-				<span class="sr-only">Find an image</span>
-				<input type="search" placeholder="Find…" bind:value={filter} />
+			<!-- One box: the field and its button inside a single border. The
+			     list narrows as it is typed, so the button only puts the caret
+			     in the field — it is there to say what the field is for. -->
+			<label class="search">
+				<span class="sr-only">Search the images</span>
+				<input type="search" placeholder="Search…" bind:value={filter} bind:this={searchInput} />
+				<button
+					title="Search the images"
+					aria-label="Search the images"
+					onclick={(e) => {
+						e.preventDefault();
+						searchInput?.focus();
+					}}><Icon name="search" size={12} /></button
+				>
 			</label>
 		{/if}
 	</div>
@@ -746,10 +783,10 @@
 			<h3 class="section">
 				<!-- After the name, as an accordion's: down to open what is folded,
 				     up to fold what is open. -->
-				<button class="section-toggle" aria-expanded={!collapsed.includes(key)} onclick={() => toggleSection(key)}>
+				<button class="section-toggle" aria-expanded={!isFolded(key)} onclick={() => toggleSection(key)}>
 					{label}
 					<span class="total">{total}</span>
-					<Icon name={collapsed.includes(key) ? 'chevron-down' : 'chevron-up'} size={18} />
+					<Icon name={isFolded(key) ? 'chevron-down' : 'chevron-up'} size={18} />
 				</button>
 				{#if actions}<span class="section-actions">{@render actions()}</span>{/if}
 			</h3>
@@ -773,7 +810,7 @@
 						? "Keep images as ordinary files in a folder of your own, rather than in this browser's storage"
 						: 'A folder of your own needs Chrome or Edge on a computer — this browser cannot keep images in one, so they stay in its own storage'}
 					aria-label="Connect a folder"
-					onclick={choose}><Icon name="folder" size={12} /></button
+					onclick={choose}><Icon name="folder-add" size={12} /></button
 				>
 			{/if}
 		{/snippet}
@@ -858,7 +895,7 @@
 		{:else}
 			<!-- The head is there with none, for its ways in. -->
 			{@render sectionHead('images', 'Images', `${images.length + missing.length}${images.length ? ` · ${weigh(total)}` : ''}`, imageWays)}
-			{#if !collapsed.includes('images')}
+			{#if !isFolded('images')}
 			{#if !images.length && !missing.length && !folder}
 				<p class="empty">No images yet — upload one, or drop it on an area.</p>
 			{/if}
@@ -908,7 +945,7 @@
 							class="square"
 							title="Disconnect {folder.name}. Nothing in it is deleted; new images go into this browser"
 							aria-label="Disconnect {folder.name}"
-							onclick={forget}><Icon name="unplug" size={12} /></button
+							onclick={forget}><Icon name="unlink" size={12} /></button
 						>
 					</li>
 					{#if folder.ready && folderShown}
@@ -938,7 +975,7 @@
 			     column: not files, so nothing to delete or carry here — a press
 			     opens one to draw on, in the side panel. -->
 			{@render sectionHead('drawings', 'Drawings', `${drawings.length} · ${weigh(drawings.reduce((sum, d) => sum + d.src.length * 0.75, 0))}`)}
-			{#if !collapsed.includes('drawings')}
+			{#if !isFolded('drawings')}
 			<ul class="images">
 				{#each drawings as drawing (drawing.key)}
 					<li>
@@ -982,7 +1019,7 @@
 			     Any font can be given a file under its own name, or swapped for
 			     another everywhere it is used. -->
 			{@render sectionHead('fonts', 'Fonts', `${fonts.length}${fonts.some((f) => f.bytes) ? ` · ${weigh(fonts.reduce((sum, f) => sum + (f.bytes ?? 0), 0))}` : ''}`)}
-			{#if !collapsed.includes('fonts')}
+			{#if !isFolded('fonts')}
 			<ul class="images fonts">
 				{#each shownFonts as font (font.family)}
 					<li
@@ -1265,16 +1302,45 @@
 		color: #555;
 	}
 
-	.find {
+	.search {
 		margin-left: auto;
+		display: inline-flex;
+		align-items: center;
+		border: 1px solid #d5d5d5;
+		border-radius: var(--radius-input);
+		background: #fff;
 	}
 
-	.find input {
+	.search:focus-within {
+		border-color: #888;
+	}
+
+	/* The box's border is the field's: the field has none of its own, nor
+	   the browser's ring, which would draw a second frame inside the first. */
+	.search input {
 		width: 9rem;
 		font: inherit;
 		padding: 3px 6px;
-		border: 1px solid #d5d5d5;
-		border-radius: var(--radius-input);
+		border: none;
+		outline: none;
+		background: none;
+	}
+
+	.search button {
+		flex: none;
+		display: inline-grid;
+		place-items: center;
+		width: 1.375rem;
+		height: 1.375rem;
+		padding: 0;
+		border: none;
+		background: none;
+		color: #767676;
+		cursor: pointer;
+	}
+
+	.search button:hover {
+		color: #111;
 	}
 
 	.list {
