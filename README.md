@@ -1,8 +1,8 @@
 # libelli
 
-**libelli** is a web app that turns the rows of a spreadsheet into print-ready
-cards. It runs entirely in the browser: there is no server, no account, and
-nothing is uploaded.
+**libelli** is a free, open-source web app that turns the rows of a
+spreadsheet into print-ready cards. It runs entirely in the browser: there is
+no server and no account, nothing is uploaded, and it keeps working offline.
 
 - **Project page** — https://heracl.es/libelli
 - **Live instance** — https://libelli.vercel.app
@@ -16,16 +16,17 @@ dragonflies whose name is thought to come from the same word.
 
 ## Overview
 
-The user brings a table and designs a single card. Each area on the card is
-linked to a column of the table, and the app produces one card per row. Typical
-uses are labels, recipe cards, exhibition captions, revision cards, programmes
-and small booklets.
+A user pastes or imports a table, designs one card, and links each area on
+the card to a column. libelli then produces one card per row. Typical uses are
+labels, recipe cards, exhibition captions, revision cards, programmes and small
+booklets.
 
-The card is laid out on a page measured in millimetres. Areas can take their
-words from a column, hold fixed text, or show an image or a barcode. They can
-follow one another down the page, grow or shrink to fit their content, and
-disappear when their column is empty, so a card without a subtitle has no gap
-where the subtitle would be. The editor and the printed page use the same
+The card is laid out on a page measured in millimetres. An area can take its
+words from a column, hold fixed text, or show an image, a drawing or a barcode.
+Areas can follow one another down the page, grow or shrink to fit their
+content, and disappear when their column is empty, so a card without a subtitle
+has no gap where the subtitle would be. **Layout** can also read the columns and
+propose a first draft of the card. The editor and the printed page share one
 layout, so what is on screen is what is printed.
 
 Every control in the app has a tooltip: hover over it, or press and hold it on
@@ -44,9 +45,9 @@ those characters, not bold type.
 Column names contain no spaces: spaces become hyphens, and other punctuation is
 removed. This keeps every name usable as a placeholder (below).
 
-Several tables and several templates can be kept side by side. Tables and
-templates are independent of each other: one design can print any table, and
-one table can be printed with any design.
+Several tables and templates can be kept side by side, and they are
+independent of each other: one design can print any table, and one table can be
+printed with any design. A table exports as CSV; a template as JSON.
 
 ## Placeholders
 
@@ -89,7 +90,8 @@ card, and `@import` and external `url()` references are removed.
   `.area` matches every area.
 - Areas also carry classes for their content (`.content-field`,
   `.content-static`, `.content-image`) and mode (`.mode-plain`,
-  `.mode-markdown`, `.mode-image`, `.mode-qr`), and `.columns` when set in
+  `.mode-markdown`, `.mode-image`, `.mode-color`, `.mode-qr`), and `.columns`
+  when set in
   columns.
 - Pages are reachable as `#page-3`, `#cover`, `#back-cover`,
   `#inside-cover` and `#inside-back-cover`, and as `.recto` and `.verso` when
@@ -104,9 +106,9 @@ or handed to an AI model to style.
 
 ## Printing
 
-**Export** opens a preview of every card before anything is printed. Untick a
-card to leave it out. From there the run can be printed, or saved as 300 dpi
-PNG files (several are bundled into one ZIP).
+**Export** opens a preview of every card before anything is printed; untick a
+card to leave it out. From there the run can be printed, or saved as 300 dpi PNG
+files, bundled into one ZIP when there are several.
 
 For the print to match the screen, set these in the browser's print dialog:
 
@@ -121,7 +123,8 @@ For the print to match the screen, set these in the browser's print dialog:
 crop marks. Its **Order** setting can also arrange the pages for folding:
 
 - **2-up (folio)** — a stapled booklet. Print double-sided, flipping on the
-  long edge, fold the stack in half and staple the spine.
+  long edge (if the backs come out upside down, use the other flip setting),
+  fold the stack in half and staple the spine.
 - **8-up (octavo)** — the one-sheet mini zine. Print one side, fold in half
   three times, cut the centre of the middle fold, and fold into a booklet.
 
@@ -137,7 +140,7 @@ right-hand ones across the fold.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>y</kbd> | Redo |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>z</kbd> | Toggle the last change off and on, to compare |
 | <kbd>Enter</kbd> | Type into the selected area |
-| <kbd>Esc</kbd> | Stop typing, deselect, or close what is open |
+| <kbd>Esc</kbd> | Stop typing, leave Select Multiple, deselect, or close what is open |
 | Arrows | Nudge the selection 1 mm; with <kbd>⇧</kbd> 5 mm, with <kbd>Alt</kbd> <kbd>⇧</kbd> 10 mm |
 | Arrows, <kbd>PageUp</kbd> / <kbd>PageDown</kbd> | Move between cards, with nothing selected |
 | <kbd>⇧</kbd> / <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + click | Add an area to the selection, or remove it |
@@ -157,10 +160,13 @@ right-hand ones across the fold.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> or <kbd>#</kbd> | Show or hide the grid |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>s</kbd> | Save the drawing, while drawing |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>p</kbd> | Export; press again to print |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>p</kbd> or <kbd>s</kbd> | Export |
 | <kbd>?</kbd> or <kbd>/</kbd> | Help |
 
-On a touchscreen, a pinch on the page zooms it, and **zoom and pan** (under
-*+ Area*) adds an on-screen pad for nudging.
+While typing in a field, undo and <kbd>Delete</kbd> act on the text, as usual.
+On a touchscreen, a pinch on the page zooms it; **zoom and pan** (under
+*+ Area*) lets one finger scroll the page and adds an on-screen pad for
+nudging; and a long press on an area opens its menu.
 
 ## Storage and offline use
 
@@ -170,6 +176,9 @@ opens it is asked for any image or font they do not have. Drawings made in the
 app are the exception: they are saved inside the table cell, so they travel
 with the data. In Chromium-based browsers, images can be kept in a folder on
 disk instead.
+
+Undo history is kept in memory, so it lasts until the page is reloaded; an
+update waits for the user to accept it for the same reason.
 
 The app keeps a copy of itself and works offline after the first visit. Where
 the browser supports it, it can be installed as an app. Only one tab edits at a
@@ -204,11 +213,12 @@ npm run verify   # project rules, lint, unit tests and type checks
 npm run build    # static output in ./build, for any static host
 ```
 
-| Change | Version |
-| --- | --- |
-| A fix | 0.28.51 → 0.28.52 |
-| A feature | 0.28.51 → 0.29.0 |
-| Either | The leading zero never changes |
+Versions are numbered `0.minor.patch`, and the leading zero never changes:
+
+| Change | Bumps | Example |
+| --- | --- | --- |
+| A fix | the patch | 0.28.51 → 0.28.52 |
+| A feature | the minor | 0.28.51 → 0.29.0 |
 
 [`AGENTS.md`](AGENTS.md) explains the codebase and its rules,
 [`docs/decisions.md`](docs/decisions.md) the reasoning behind each module, and
@@ -219,4 +229,4 @@ npm run build    # static output in ./build, for any static host
 [Dialectic Acheiropoieton](https://heracl.es/libelli) of Heracles Papatheodorou
 and&nbsp;Claude
 
-MIT License.
+Released under the [MIT License](LICENSE).
