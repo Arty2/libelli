@@ -48,12 +48,8 @@
 		amend,
 		createHistory,
 		record,
-		redo as redoStep,
-		redoLabel,
 		redoSteps,
 		redoTimes,
-		undo as undoStep,
-		undoLabel,
 		undoSteps,
 		undoTimes
 	} from '$lib/history';
@@ -1714,32 +1710,38 @@
 		selectedIds = selectedIds.filter((id) => template.boxes.some((b) => b.id === id));
 	}
 
-	function undo() {
+	/**
+	 * Undo or redo `count` steps — one from the buttons and the keys, several
+	 * from the list a held button opens. One path, so the bookkeeping around a
+	 * step cannot differ between taking one and taking five.
+	 */
+	function stepHistory(which: 'undo' | 'redo', count = 1) {
+		// Recorded first: a change made since the last step, still inside the
+		// debounce, used to be thrown away by the redo that restored the
+		// future it should have cleared.
 		flushHistory();
-		if (!canUndo(history)) return;
+		const steps = which === 'undo' ? undoSteps(history) : redoSteps(history);
+		if (!steps.length) return;
+		const n = Math.min(count, steps.length);
+		const what = steps[n - 1];
 		toggledOff = false;
-		const what = undoLabel(history);
-		history = undoStep(history);
+		history = which === 'undo' ? undoTimes(history, n) : redoTimes(history, n);
 		applySnapshot(history.present.state);
-		// Cleared, or the label of whatever was pending when undo landed would
-		// attach itself to the user's next action instead.
+		// Cleared, or the label of whatever was pending when the step landed
+		// would attach itself to the user's next action instead.
 		pending = '';
-		notify(what ? `Undone: ${what}` : 'Undone.');
+		const done = which === 'undo' ? 'Undone' : 'Redone';
+		if (n === 1) notify(what ? `${done}: ${what}` : `${done}.`);
+		else
+			notify(
+				which === 'undo'
+					? `Undone ${n} steps, back to before: ${what || 'a change'}`
+					: `Redone ${n} steps, up to: ${what || 'a change'}`
+			);
 	}
 
-	function redo() {
-		// Recorded first, as undo does: a change made since the undo, still
-		// inside the debounce, used to be thrown away by the redo that
-		// restored the future it should have cleared.
-		flushHistory();
-		if (!canRedo(history)) return;
-		toggledOff = false;
-		const what = redoLabel(history);
-		history = redoStep(history);
-		applySnapshot(history.present.state);
-		pending = '';
-		notify(what ? `Redone: ${what}` : 'Redone.');
-	}
+	const undo = () => stepHistory('undo');
+	const redo = () => stepHistory('redo');
 
 	/**
 	 * Undo or Redo held on past its tip: every step it could take, nearest
@@ -1755,8 +1757,10 @@
 		// A change still inside the debounce is recorded by that flush, and a
 		// new change clears what was ahead: Redo can have had steps a moment
 		// ago and none now. Said, rather than a list of nothing.
-		if (which === 'redo' && !redoSteps(history).length) {
-			notify('Nothing to redo — the change just made took the place of what was undone.');
+		if (!(which === 'undo' ? undoSteps(history) : redoSteps(history)).length) {
+			notify(
+				which === 'redo' ? 'Nothing to redo — the change just made took the place of what was undone.' : 'Nothing to undo.'
+			);
 			return;
 		}
 		stepsOpen = which;
@@ -1765,17 +1769,7 @@
 	function goSteps(count: number) {
 		const which = stepsOpen;
 		stepsOpen = null;
-		flushHistory();
-		const steps = which === 'undo' ? undoSteps(history) : redoSteps(history);
-		if (!which || !steps.length) return;
-		const n = Math.min(count, steps.length);
-		const what = steps[n - 1] || 'a change';
-		history = which === 'undo' ? undoTimes(history, n) : redoTimes(history, n);
-		applySnapshot(history.present.state);
-		toggledOff = false;
-		pending = '';
-		const word = n === 1 ? 'step' : 'steps';
-		notify(which === 'undo' ? `Undone ${n} ${word}, back to before: ${what}` : `Redone ${n} ${word}, up to: ${what}`);
+		if (which) stepHistory(which, count);
 	}
 
 	/**

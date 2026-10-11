@@ -323,19 +323,33 @@
 	async function refresh() {
 		const run = ++refreshes;
 		const found: ImageRecord[] = [];
+		// What this browser holds, and which folder: read apart from the
+		// folder's files, so a failure here is not reported as the folder
+		// having moved, and does not empty a folder already listed.
+		let state: FolderState | null;
+		let browser: ImageRecord[];
 		try {
-			// Written only by the newest run: an older one answering late
-			// would put back a folder since forgotten, or swapped.
-			const state = await imageFolder();
-			const browser = await listBrowserImages();
+			state = await imageFolder();
+			browser = await listBrowserImages();
+		} catch {
 			if (run !== refreshes) return;
-			folder = state;
-			held = browser;
 			busy = false;
-			if (!state?.ready) {
-				inFolder = [];
-				return;
-			}
+			reading = false;
+			onnotice('The pictures kept in this browser could not be read — the list may be out of date.', 'warning');
+			return;
+		}
+		if (run !== refreshes) return;
+		// Written only by the newest run: an older one answering late would
+		// put back a folder since forgotten, or swapped.
+		folder = state;
+		held = browser;
+		busy = false;
+		if (!state?.ready) {
+			inFolder = [];
+			reading = false;
+			return;
+		}
+		try {
 			reading = true;
 			const streaming = !inFolder.length;
 			for await (const batch of folderImages()) {

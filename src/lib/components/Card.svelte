@@ -1309,7 +1309,9 @@
 				return;
 			}
 			lastTap = { id: box.id, at: now };
-			choseByTouch = true;
+			// Only when the choice changes, which is when the bar does: a drag
+			// or long press on the area already chosen keeps its release.
+			choseByTouch = picking || !isSelected(box);
 		}
 		// Selecting comes first and is never refused: a lock stops a box moving,
 		// not being picked — otherwise the only control that could unlock it
@@ -1719,7 +1721,7 @@
 	let panTap: { id: string; pointer: number; x: number; y: number; additive: boolean; touch: boolean } | null = null;
 
 	/**
-	 * A finger chose an area, so the tap's click is dropped (`dropTapClick`).
+	 * A finger changed the choice, so the tap's click is dropped (`dropTapClick`).
 	 * Choosing opens the area's bar above the stage, the stage moves down
 	 * under the finger, and the click the browser sends once the finger lifts
 	 * lands on whatever is there now: a menu in the new bar opened, a button
@@ -1753,7 +1755,9 @@
 				return;
 			}
 			lastTap = { id: box.id, at: now };
-			choseByTouch = true;
+			// Only when the choice changes, which is when the bar does: a drag
+			// or long press on the area already chosen keeps its release.
+			choseByTouch = picking || !isSelected(box);
 		}
 		onselect?.(box.id, tap.additive);
 	}

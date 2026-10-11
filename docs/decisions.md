@@ -3162,7 +3162,16 @@ up and swaps each picture in as its batch arrives, so one just saved or
 replaced has its new URL at once rather than a revoked one until the whole
 folder is read; another folder starts from an empty list, or the last one's
 rows would act on this one's files. One that fails part way says so and lists
-only what it read. The folder state is written by the newest refresh alone.
+only what it read. The folder state is written by the newest refresh alone,
+and a failure to read this browser's own pictures is said as that, not as the
+folder having moved.
+
+**The URL cache keeps a folder's files apart, by their exact names.** Under
+the stored pictures' lower-cased key, `Logo.png` here and `logo.png` in a
+folder on a case-sensitive disk — or `photo.JPG` and `photo.jpg` in one folder
+— were one entry, and each lookup revoked the other's URL. A folder's URLs are
+let go with the folder, on Unlink or a switch; four hundred photographs
+otherwise held four hundred for the life of the tab.
 
 **The search is one box.** The field and its Search button share a single
 border; the field had a frame of its own inside one the `.find` button rule

@@ -46,17 +46,37 @@ function cacheObjectUrl(key: string, blob: Blob, version: string): string {
  * The two kinds of URL, each with its version spelled in one place: every
  * caller has to spell it the same, or two of them holding one name would take
  * each other for a changed picture and revoke what the other is showing.
+ *
+ * Kept apart by kind, and a folder file by its exact name. Under the stored
+ * pictures' lower-cased key, `Logo.png` in this browser and `logo.png` in a
+ * folder on a case-sensitive disk — or `photo.JPG` and `photo.jpg` side by
+ * side in one — were one entry, and each lookup revoked the other's URL.
  */
-const urlForFile = (key: string, file: File) => cacheObjectUrl(key, file, `folder:${file.size}:${file.lastModified}`);
+const FILE_URL = 'file:';
+const urlForFile = (file: File) => cacheObjectUrl(FILE_URL + file.name, file, `folder:${file.size}:${file.lastModified}`);
 const urlForStored = (key: string, stored: StoredImage) =>
 	cacheObjectUrl(key, new Blob([stored.bytes], { type: stored.type || 'image/png' }), `browser:${stored.bytes.byteLength}`);
 
-/** A picture was written or deleted here: the next resolve makes a fresh URL. */
-function forgetObjectUrl(key: string) {
+function revokeUrl(key: string) {
 	const previous = objectUrls.get(key);
 	if (!previous) return;
 	URL.revokeObjectURL(previous.url);
 	objectUrls.delete(key);
+}
+
+/** A picture was written or deleted here: the next resolve makes a fresh URL, from either place. */
+function forgetObjectUrl(name: string) {
+	revokeUrl(assetKey(name));
+	revokeUrl(FILE_URL + name);
+}
+
+/**
+ * Every URL made for a folder's files, let go when the folder is: a folder of
+ * four hundred photographs otherwise held four hundred for the life of the tab.
+ * Whatever still shows one is resolved again by the caller (`onchanged`).
+ */
+function forgetFolderUrls() {
+	for (const key of [...objectUrls.keys()]) if (key.startsWith(FILE_URL)) revokeUrl(key);
 }
 
 /**
@@ -154,7 +174,7 @@ export async function uploadBackgroundImage(
  * under a name, and having two of these would mean one of them was wrong.
  */
 async function writeImage(name: string, file: File): Promise<void> {
-	forgetObjectUrl(assetKey(name));
+	forgetObjectUrl(name);
 	const folder = await readyFolder();
 	if (folder) {
 		const handle = await folder.getFileHandle(name, { create: true });
@@ -187,7 +207,7 @@ export async function resolveBackground(image: PageBackgroundImage | undefined):
 	// looked for in, for the same reason.
 	const folder = await readyFolder();
 	const file = folder ? await fileIn(folder, image.src) : null;
-	if (file) return urlForFile(key, file);
+	if (file) return urlForFile(file);
 	const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
 	if (!stored?.bytes) return null;
 	return urlForStored(key, stored);
@@ -264,7 +284,7 @@ export async function resolveLocalImages(
 			// was chosen keeps rendering, and an image put in the folder
 			// afterwards is what a name means from then on.
 			const fromFolder = folder ? await fileIn(folder, name) : null;
-			if (fromFolder) return [name, urlForFile(key, fromFolder)] as const;
+			if (fromFolder) return [name, urlForFile(fromFolder)] as const;
 			const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
 			return [name, stored?.bytes ? urlForStored(key, stored) : null] as const;
 		})
@@ -365,6 +385,8 @@ export async function chooseImageFolder(): Promise<FolderState | null> {
 		const state = (await handle.requestPermission?.({ mode: 'readwrite' })) ?? 'granted';
 		if (state !== 'granted') return null;
 		await idbSet(STORE_ASSETS, FOLDER_KEY, handle);
+		// Another folder: the last one's files are not this one's.
+		forgetFolderUrls();
 		return { name: folderName(handle), ready: true };
 	} catch {
 		// The picker was dismissed, which is not a failure.
@@ -383,6 +405,7 @@ export async function reopenImageFolder(): Promise<FolderState | null> {
 /** Let go of the folder. The files stay where they are; this app stops reading them. */
 export async function forgetImageFolder(): Promise<void> {
 	await idbDelete(STORE_ASSETS, FOLDER_KEY);
+	forgetFolderUrls();
 }
 
 // ---- what is stored, and getting rid of it ---------------------------------
@@ -443,7 +466,7 @@ export async function* folderImages(size = 32): AsyncGenerator<ImageRecord[]> {
 				handles.map(async (handle) => {
 					try {
 						const file = await handle.getFile();
-						const url = urlForFile(assetKey(file.name), file);
+						const url = urlForFile(file);
 						return { name: file.name, bytes: file.size, where: 'folder', url } satisfies ImageRecord;
 					} catch {
 						// Gone between the listing and the read, or not ours to
@@ -466,7 +489,7 @@ export async function* folderImages(size = 32): AsyncGenerator<ImageRecord[]> {
 /** Delete one image, wherever it is being held. */
 export async function deleteImage(name: string, where: ImageWhere): Promise<void> {
 	const key = assetKey(name);
-	forgetObjectUrl(key);
+	forgetObjectUrl(name);
 	if (where === 'browser') {
 		await idbDelete(STORE_ASSETS, key);
 		return;
