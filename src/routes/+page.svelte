@@ -3885,7 +3885,7 @@
 		     example and two paragraphs of prose above and below it; what an author
 		     actually needs is the names of the things they can reach, and a
 		     placeholder is where they will look for them. The prose that was here
-		     is in docs/guide.md, where prose belongs. Starter puts that same text
+		     is in the README, where prose belongs. Starter puts that same text
 		     in the editor in place of what is there, so the kit is the whole
 		     sheet rather than spliced into the middle of a template's own rules
 		     — undo or Cancel brings them back. -->
@@ -4131,7 +4131,7 @@
 		</header>
 
 		<!-- Brief on purpose: every control explains itself — rest the pointer
-		     on it, or press and hold it on a phone — and docs/guide.md has the
+		     on it, or press and hold it on a phone — and the README has the
 		     rest at length. What cannot be discovered by pointing is the keys. -->
 		<p>Rows of a spreadsheet in, print-ready cards out.</p>
 		<p>

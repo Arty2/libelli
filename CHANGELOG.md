@@ -3,7 +3,7 @@
 What libelli gained, newest first, in a few words each. One section per minor
 version, headed by the last version it shipped as: a patch rewrites its minor's
 heading to the new number and adds its lines there, never a section of its own.
-Features only — not fixes, not why, not how; that is the guide's. Three lines
+Features only — not fixes, not why, not how; that is the README's. Three lines
 to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.

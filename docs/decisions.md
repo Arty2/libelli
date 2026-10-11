@@ -2207,7 +2207,7 @@ the file picker would open on top of the rows just loaded. It replaces the data
 and leaves the template alone — it hangs off an import-*data* button — and it
 does not ask, because a snapshot carries data as well as design and Ctrl/Cmd+Z
 reaches it. A hidden gesture costs discoverability, which is paid back in the
-button's `title`, the Help dialog and the guide rather than in the bar.
+button's `title`, the Help dialog and the README rather than in the bar.
 
 **The table follows the pager, and does not take focus.** Paging the card scrolls
 the active row into view with `block: 'nearest'`, which leaves a row already on
@@ -3724,7 +3724,7 @@ number that now belongs to another row: marked as naming nothing beats
 printing the wrong row. Keeping numbers stable instead (gaps after a delete)
 would have spared the rewrite, but the table would show 1, 2, 4, and a moved
 row would still need one. Only the open template is rewritten — templates
-and tables are not paired — which the guide says.
+and tables are not paired — which the README says.
 
 Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
 mode; `rawContentOf` beside it is what the inline editor shows, because typing
@@ -4183,7 +4183,7 @@ where nobody pays for it on every turn. `CHANGELOG_MAX` is the same bargain
 pointed the other way: a release section is read in a dialog on a phone by
 somebody who has just updated, so it is capped at what they will finish — six
 lines that say something, three being the usual shape, with how it works left
-to the guide. A line is a group of related changes rather than one change: a
+to the README. A line is a group of related changes rather than one change: a
 feature and the five switches that came with it are one line. Blank lines are
 not counted, because where a line wraps is the writer's business and how much
 there is to read is not.

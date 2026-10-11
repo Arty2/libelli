@@ -3,8 +3,7 @@
 Notes for whoever — human or agent — picks this up next. `CLAUDE.md` imports
 this file; edit this one.
 
-`README.md` is the app as a user meets it, in a page; `docs/guide.md` every
-control at length; `CHANGELOG.md` what each version
+`README.md` is the app as a user meets it, `CHANGELOG.md` what each version
 brought it, `docs/decisions.md` the why behind each module as it stands (history
 is git's), `PLAN.md` the original decisions. **This file is only
 what you need before touching anything**, read in full every session, so it is

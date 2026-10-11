@@ -59,7 +59,7 @@ export function isAlignChord(event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey' | 
  * Every shortcut as a tooltip says it, in one place. A key named in a title
  * by hand drifted from the key actually listened for — Redo's title said
  * Ctrl+Shift+Z, which is the A/B toggle, while Redo is Ctrl+Y — so a title
- * that names a key takes it from here, and the guide's table is the other
+ * that names a key takes it from here, and the README's table is the other
  * copy to keep in step.
  */
 export const SHORTCUTS = {
