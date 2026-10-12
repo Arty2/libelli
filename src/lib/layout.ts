@@ -281,10 +281,14 @@ export function boxEdges(
 	const y: number[] = [];
 	for (const box of boxes) {
 		if (box.id === exceptId) continue;
-		x.push(box.x, box.x + box.w / 2, box.x + box.w);
-		const top = layout.tops[box.id] ?? box.y;
-		const height = layout.heights[box.id] ?? box.h;
-		y.push(top, top + height / 2, top + height);
+		// A turned box offers the edges of the shape it is drawn as.
+		const drawn = drawnBounds(
+			{ x: box.x, y: layout.tops[box.id] ?? box.y, w: box.w, h: layout.heights[box.id] ?? box.h },
+			box.rotation,
+			box.centre
+		);
+		x.push(drawn.x, drawn.x + drawn.w / 2, drawn.x + drawn.w);
+		y.push(drawn.y, drawn.y + drawn.h / 2, drawn.y + drawn.h);
 	}
 	return { x, y };
 }
@@ -532,6 +536,114 @@ export interface Rect {
 	y: number;
 	w: number;
 	h: number;
+}
+
+/**
+ * A point of an area as it is drawn: `fx`, `fy` of the way across and down
+ * the upright rectangle, turned `rotation` degrees clockwise about `centre`
+ * (percent of the area, the middle when absent) — the CSS transform the card
+ * draws it with, so the readouts and the snapping start where the eye sees
+ * the point. Measured upright, a turned area's reference corner was wherever
+ * that corner would have been before the turn: nowhere on the area drawn.
+ */
+export function turnedPoint(
+	rect: Rect,
+	rotation: number | undefined,
+	centre: { x: number; y: number } | undefined,
+	fx: number,
+	fy: number
+): { x: number; y: number } {
+	const x = rect.x + rect.w * fx;
+	const y = rect.y + rect.h * fy;
+	if (!rotation) return { x, y };
+	const px = rect.x + (rect.w * (centre?.x ?? 50)) / 100;
+	const py = rect.y + (rect.h * (centre?.y ?? 50)) / 100;
+	const turn = (rotation * Math.PI) / 180;
+	const cos = Math.cos(turn);
+	const sin = Math.sin(turn);
+	// y runs down the page, so this is a clockwise turn as CSS draws one.
+	return { x: px + (x - px) * cos - (y - py) * sin, y: py + (x - px) * sin + (y - py) * cos };
+}
+
+/**
+ * What dragging an area's pivot reads out: a line from the pivot to each of
+ * the area's own four edges, with its millimetres, drawn turned with the
+ * area. Its own edges and not the page's or a neighbour's, because the pivot
+ * is a point of the area (stored as a percentage of it) and moves with it:
+ * 6mm in from the left is what placing it means. A side the pivot sits on
+ * has no line.
+ */
+export function pivotReadouts(
+	rect: Rect,
+	rotation: number | undefined,
+	centre: { x: number; y: number } | undefined
+): Array<{ from: { x: number; y: number }; to: { x: number; y: number }; gap: number }> {
+	const fx = (centre?.x ?? 50) / 100;
+	const fy = (centre?.y ?? 50) / 100;
+	const from = turnedPoint(rect, rotation, centre, fx, fy);
+	const round = (n: number) => Math.round(n * 100) / 100;
+	return [
+		{ at: [0, fy], gap: rect.w * fx },
+		{ at: [1, fy], gap: rect.w * (1 - fx) },
+		{ at: [fx, 0], gap: rect.h * fy },
+		{ at: [fx, 1], gap: rect.h * (1 - fy) }
+	]
+		.filter((side) => side.gap > 0.05)
+		.map((side) => ({ from, to: turnedPoint(rect, rotation, centre, side.at[0], side.at[1]), gap: round(side.gap) }));
+}
+
+/**
+ * What turning an area reads out, at its pivot: a level line for 0°, a line
+ * along the area's own width as it is turned now, the arc between them and
+ * the angle — a protractor laid on the pivot. Long enough to read on a small
+ * area, and not so long it crosses the page on a large one. The arc is an SVG
+ * path in millimetres, clockwise for a positive turn as CSS draws one.
+ */
+export function turnReadout(
+	rect: Rect,
+	rotation: number | undefined,
+	centre: { x: number; y: number } | undefined
+): {
+	pivot: { x: number; y: number };
+	level: { x: number; y: number };
+	along: { x: number; y: number };
+	arc: string;
+	label: { x: number; y: number };
+	degrees: number;
+} {
+	const degrees = rotation ?? 0;
+	const pivot = turnedPoint(rect, rotation, centre, (centre?.x ?? 50) / 100, (centre?.y ?? 50) / 100);
+	const reach = Math.min(25, Math.max(8, Math.max(rect.w, rect.h) / 2));
+	const turn = (degrees * Math.PI) / 180;
+	const at = (r: number, angle: number) => ({ x: pivot.x + r * Math.cos(angle), y: pivot.y + r * Math.sin(angle) });
+	const r = reach * 0.6;
+	const start = at(r, 0);
+	const end = at(r, turn);
+	const f = (n: number) => Math.round(n * 1000) / 1000;
+	// Never more than half a turn: a rotation is stored between -180 and 180.
+	const arc = degrees ? `M${f(start.x)} ${f(start.y)} A${f(r)} ${f(r)} 0 0 ${degrees > 0 ? 1 : 0} ${f(end.x)} ${f(end.y)}` : '';
+	return { pivot, level: at(reach, 0), along: at(reach, turn), arc, label: at(r + 4, turn / 2), degrees };
+}
+
+/**
+ * The upright rectangle that encloses an area as it is drawn — its four
+ * corners turned (`turnedPoint`). What a turned area is measured by, and what
+ * it lines up by: the edges of the shape on the page, not of the upright
+ * frame it is stored as, which is drawn nowhere.
+ */
+export function drawnBounds(rect: Rect, rotation: number | undefined, centre: { x: number; y: number } | undefined): Rect {
+	if (!rotation || !(((rotation % 360) + 360) % 360)) return rect;
+	const corners = [
+		[0, 0],
+		[1, 0],
+		[0, 1],
+		[1, 1]
+	].map(([fx, fy]) => turnedPoint(rect, rotation, centre, fx, fy));
+	const xs = corners.map((c) => c.x);
+	const ys = corners.map((c) => c.y);
+	const x = Math.min(...xs);
+	const y = Math.min(...ys);
+	return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
 }
 
 /** One distance shown while a box is dragged: a line from `from` to `to` along `axis`, at `at` across it. */

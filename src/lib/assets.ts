@@ -42,12 +42,41 @@ function cacheObjectUrl(key: string, blob: Blob, version: string): string {
 	return url;
 }
 
-/** A picture was written or deleted here: the next resolve makes a fresh URL. */
-function forgetObjectUrl(key: string) {
+/**
+ * The two kinds of URL, each with its version spelled in one place: every
+ * caller has to spell it the same, or two of them holding one name would take
+ * each other for a changed picture and revoke what the other is showing.
+ *
+ * Kept apart by kind, and a folder file by its exact name. Under the stored
+ * pictures' lower-cased key, `Logo.png` in this browser and `logo.png` in a
+ * folder on a case-sensitive disk — or `photo.JPG` and `photo.jpg` side by
+ * side in one — were one entry, and each lookup revoked the other's URL.
+ */
+const FILE_URL = 'file:';
+const urlForFile = (file: File) => cacheObjectUrl(FILE_URL + file.name, file, `folder:${file.size}:${file.lastModified}`);
+const urlForStored = (key: string, stored: StoredImage) =>
+	cacheObjectUrl(key, new Blob([stored.bytes], { type: stored.type || 'image/png' }), `browser:${stored.bytes.byteLength}`);
+
+function revokeUrl(key: string) {
 	const previous = objectUrls.get(key);
 	if (!previous) return;
 	URL.revokeObjectURL(previous.url);
 	objectUrls.delete(key);
+}
+
+/** A picture was written or deleted here: the next resolve makes a fresh URL, from either place. */
+function forgetObjectUrl(name: string) {
+	revokeUrl(assetKey(name));
+	revokeUrl(FILE_URL + name);
+}
+
+/**
+ * Every URL made for a folder's files, let go when the folder is: a folder of
+ * four hundred photographs otherwise held four hundred for the life of the tab.
+ * Whatever still shows one is resolved again by the caller (`onchanged`).
+ */
+function forgetFolderUrls() {
+	for (const key of [...objectUrls.keys()]) if (key.startsWith(FILE_URL)) revokeUrl(key);
 }
 
 /**
@@ -145,7 +174,7 @@ export async function uploadBackgroundImage(
  * under a name, and having two of these would mean one of them was wrong.
  */
 async function writeImage(name: string, file: File): Promise<void> {
-	forgetObjectUrl(assetKey(name));
+	forgetObjectUrl(name);
 	const folder = await readyFolder();
 	if (folder) {
 		const handle = await folder.getFileHandle(name, { create: true });
@@ -178,14 +207,10 @@ export async function resolveBackground(image: PageBackgroundImage | undefined):
 	// looked for in, for the same reason.
 	const folder = await readyFolder();
 	const file = folder ? await fileIn(folder, image.src) : null;
-	if (file) return cacheObjectUrl(key, file, `folder:${file.size}:${file.lastModified}`);
+	if (file) return urlForFile(file);
 	const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
 	if (!stored?.bytes) return null;
-	return cacheObjectUrl(
-		key,
-		new Blob([stored.bytes], { type: stored.type || 'image/png' }),
-		`browser:${stored.bytes.byteLength}`
-	);
+	return urlForStored(key, stored);
 }
 
 // ---- images a row carries ---------------------------------------------------
@@ -249,23 +274,23 @@ export async function resolveLocalImages(
 	const missing: string[] = [];
 	if (typeof window === 'undefined') return { urls, missing };
 	const folder = await readyFolder();
-	for (const name of new Set(names)) {
-		const key = assetKey(name);
-		// The folder first, then this browser: a run made before a folder was
-		// chosen keeps rendering, and an image put in the folder afterwards is
-		// what a name means from then on.
-		const fromFolder = folder ? await fileIn(folder, name) : null;
-		if (fromFolder) {
-			urls[name] = cacheObjectUrl(key, fromFolder, `folder:${fromFolder.size}:${fromFolder.lastModified}`);
-			continue;
-		}
-		const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
-		if (stored?.bytes)
-			urls[name] = cacheObjectUrl(
-				key,
-				new Blob([stored.bytes], { type: stored.type || 'image/png' }),
-				`browser:${stored.bytes.byteLength}`
-			);
+	// Every name asked for at once rather than one after another: each is a
+	// wait on the disk or on IndexedDB, and a run of forty awaited in turn
+	// kept the cards blank for the sum of them.
+	const found = await Promise.all(
+		[...new Set(names)].map(async (name) => {
+			const key = assetKey(name);
+			// The folder first, then this browser: a run made before a folder
+			// was chosen keeps rendering, and an image put in the folder
+			// afterwards is what a name means from then on.
+			const fromFolder = folder ? await fileIn(folder, name) : null;
+			if (fromFolder) return [name, urlForFile(fromFolder)] as const;
+			const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
+			return [name, stored?.bytes ? urlForStored(key, stored) : null] as const;
+		})
+	);
+	for (const [name, url] of found) {
+		if (url) urls[name] = url;
 		else missing.push(name);
 	}
 	return { urls, missing };
@@ -360,6 +385,8 @@ export async function chooseImageFolder(): Promise<FolderState | null> {
 		const state = (await handle.requestPermission?.({ mode: 'readwrite' })) ?? 'granted';
 		if (state !== 'granted') return null;
 		await idbSet(STORE_ASSETS, FOLDER_KEY, handle);
+		// Another folder: the last one's files are not this one's.
+		forgetFolderUrls();
 		return { name: folderName(handle), ready: true };
 	} catch {
 		// The picker was dismissed, which is not a failure.
@@ -378,6 +405,7 @@ export async function reopenImageFolder(): Promise<FolderState | null> {
 /** Let go of the folder. The files stay where they are; this app stops reading them. */
 export async function forgetImageFolder(): Promise<void> {
 	await idbDelete(STORE_ASSETS, FOLDER_KEY);
+	forgetFolderUrls();
 }
 
 // ---- what is stored, and getting rid of it ---------------------------------
@@ -388,41 +416,80 @@ export interface ImageRecord {
 	name: string;
 	bytes: number;
 	where: ImageWhere;
+	/** an object URL for its thumbnail, from the same cache the card reads */
+	url?: string;
 }
 
 const IMAGE_FILE = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
 
 /**
- * Every image this app can see, with what it weighs.
- *
- * The folder is listed by extension rather than wholesale: it is an ordinary
- * folder that may hold anything, and a panel offering to delete a file this app
- * never wrote would be a trap.
+ * The images this browser holds itself, with what they weigh — less any the
+ * open folder holds under the same name. That copy is never the one drawn
+ * (the folder is read first), and making a URL for it would replace the
+ * folder file's URL in the cache the card shares, revoking the picture the
+ * card is showing. Read all at once, as `resolveLocalImages` reads.
  */
-export async function listImages(): Promise<ImageRecord[]> {
-	const out: ImageRecord[] = [];
+export async function listBrowserImages(): Promise<ImageRecord[]> {
+	if (typeof window === 'undefined') return [];
 	const folder = await readyFolder();
-	if (folder?.values) {
-		for await (const entry of folder.values()) {
-			if (entry.kind !== 'file' || !IMAGE_FILE.test(entry.name)) continue;
-			const file = await (entry as FileSystemFileHandle).getFile();
-			out.push({ name: file.name, bytes: file.size, where: 'folder' });
-		}
+	const keys = (await idbKeys(STORE_ASSETS)).filter((key) => key.startsWith('image:'));
+	const found = await Promise.all(
+		keys.map(async (key): Promise<ImageRecord | null> => {
+			const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
+			if (!stored?.bytes) return null;
+			if (folder && (await fileIn(folder, stored.name))) return null;
+			return { name: stored.name, bytes: stored.bytes.byteLength, where: 'browser', url: urlForStored(key, stored) };
+		})
+	);
+	return found.filter((record) => record !== null);
+}
+
+/**
+ * The images in the chosen folder, a batch at a time, so a folder of four
+ * hundred photographs fills the list as it is read instead of holding the
+ * tray on "…" until the last one is. Each batch's files are asked for
+ * together — the browser reads them off the main thread and answers each
+ * as it can — and a batch is handed over before the next is begun, so
+ * whoever renders them gets a turn in between.
+ *
+ * Listed by extension rather than wholesale: it is an ordinary folder that
+ * may hold anything, and a panel offering to delete a file this app never
+ * wrote would be a trap.
+ */
+export async function* folderImages(size = 32): AsyncGenerator<ImageRecord[]> {
+	const folder = await readyFolder();
+	if (!folder?.values) return;
+	let pending: FileSystemFileHandle[] = [];
+	const read = async (handles: FileSystemFileHandle[]) =>
+		(
+			await Promise.all(
+				handles.map(async (handle) => {
+					try {
+						const file = await handle.getFile();
+						const url = urlForFile(file);
+						return { name: file.name, bytes: file.size, where: 'folder', url } satisfies ImageRecord;
+					} catch {
+						// Gone between the listing and the read, or not ours to
+						// read: not in the list, which is what a look would find.
+						return null;
+					}
+				})
+			)
+		).filter((record) => record !== null);
+	for await (const entry of folder.values()) {
+		if (entry.kind !== 'file' || !IMAGE_FILE.test(entry.name)) continue;
+		pending.push(entry as FileSystemFileHandle);
+		if (pending.length < size) continue;
+		yield await read(pending);
+		pending = [];
 	}
-	const seen = new Set(out.map((i) => i.name.toLowerCase()));
-	for (const key of await idbKeys(STORE_ASSETS)) {
-		if (!key.startsWith('image:')) continue;
-		const stored = await idbGet<StoredImage>(STORE_ASSETS, key);
-		if (!stored?.bytes || seen.has(stored.name.toLowerCase())) continue;
-		out.push({ name: stored.name, bytes: stored.bytes.byteLength, where: 'browser' });
-	}
-	return out.sort((a, b) => a.name.localeCompare(b.name));
+	if (pending.length) yield await read(pending);
 }
 
 /** Delete one image, wherever it is being held. */
 export async function deleteImage(name: string, where: ImageWhere): Promise<void> {
 	const key = assetKey(name);
-	forgetObjectUrl(key);
+	forgetObjectUrl(name);
 	if (where === 'browser') {
 		await idbDelete(STORE_ASSETS, key);
 		return;

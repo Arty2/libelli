@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { flushSync, tick } from 'svelte';
+	import { flushSync, tick, untrack } from 'svelte';
 	import Card from './Card.svelte';
 	import type { Theme } from '$lib/theme';
 	import Icon from './Icon.svelte';
@@ -11,6 +11,7 @@
 	import { takesADrawing, type Arrange } from '$lib/template';
 	import { swipe } from '$lib/gestures';
 	import { HOLD_MS, TAP_MS, vibrate } from '$lib/haptics';
+	import { LIST_HOLD, TIP_SLOP } from '$lib/tooltip';
 	import { GRID_MAJOR, GRID_MINOR, actualScale, bleedFor, mmToPx } from '$lib/layout';
 	import type { Box, GridStyle, Mapping, Row, Template } from '$lib/types';
 
@@ -76,6 +77,8 @@
 		redoable: boolean;
 		onundo: () => void;
 		onredo: () => void;
+		/** Undo or Redo held on past its tip: the list of steps, to skip several */
+		onsteps?: (which: 'undo' | 'redo') => void;
 		onaddbox: () => void;
 		onmenu: (id: string, x: number, y: number) => void;
 		/** the drag under an open menu has become a drag; see Card's own prop */
@@ -103,6 +106,8 @@
 		flashIds?: string[];
 		/** leave Select Multiple */
 		onstoppicking?: () => void;
+		/** enter it: on a touch screen, from the stage, with an area chosen */
+		onstartpicking?: () => void;
 		/** unlock the design, from the band that says it is locked */
 		onunlock?: () => void;
 		/** lock it again, from the same button while it still shows the open padlock */
@@ -150,6 +155,7 @@
 		redoable,
 		onundo,
 		onredo,
+		onsteps,
 		onaddbox,
 		onmenu,
 		onmenuclose,
@@ -167,6 +173,7 @@
 		ontext,
 		onrescue,
 		onstoppicking,
+		onstartpicking,
 		onunlock,
 		onrelock,
 		flashIds = []
@@ -1130,8 +1137,114 @@
 	 */
 	let pushed = $state<'up' | 'down' | 'left' | 'right' | 'centre' | null>(null);
 
+	/**
+	 * Undo and Redo, held: past the tip (`LIST_HOLD`, twice its wait) the list
+	 * of steps opens, to skip back or forward several at once. A press that
+	 * lets go sooner is a click, or — on a touch screen, where the hold showed
+	 * the tip — nothing, as any held tip is (Tooltip). The click a release
+	 * after the list opened would make is dropped here, or the list would
+	 * open and the step under the finger be taken at once.
+	 */
+	let stepsHold: { id: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
+	let stepsOpened = false;
+	/** Until when a click on Undo or Redo is the release of a hold that opened the list. */
+	let swallowStepClick = 0;
+
+	function holdSteps(event: PointerEvent, which: 'undo' | 'redo') {
+		if (!onsteps || event.button !== 0) return;
+		dropStepsHold();
+		stepsOpened = false;
+		// A new press: whatever release the window was waiting for did not
+		// come as a click (a long press on a phone may end in a menu), and
+		// this press must not be the one dropped in its place.
+		swallowStepClick = 0;
+		// Held to the button, so its release comes back here even with the list
+		// opened over it, and the click that follows is the one dropped.
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		const at = { id: event.pointerId, x: event.clientX, y: event.clientY };
+		stepsHold = {
+			...at,
+			timer: setTimeout(() => {
+				stepsHold = null;
+				stepsOpened = true;
+				vibrate(event.pointerType === 'touch' ? HOLD_MS : 0);
+				onsteps?.(which);
+			}, LIST_HOLD)
+		};
+	}
+
+	function moveSteps(event: PointerEvent) {
+		if (stepsHold?.id === event.pointerId && Math.hypot(event.clientX - stepsHold.x, event.clientY - stepsHold.y) > TIP_SLOP)
+			dropStepsHold();
+	}
+
+	function dropStepsHold() {
+		if (stepsHold) clearTimeout(stepsHold.timer);
+		stepsHold = null;
+		if (!stepsOpened) return;
+		stepsOpened = false;
+		swallowStepClick = performance.now() + 700;
+	}
+
+	/** The click, unless it is the release of the hold that opened the list. */
+	function stepClick(act: () => void) {
+		if (performance.now() < swallowStepClick) {
+			swallowStepClick = 0;
+			return;
+		}
+		act();
+	}
+	$effect(() => dropStepsHold);
+
+	/**
+	 * The way in without a held pointer: a right-click, or the keyboard's menu
+	 * key (Shift+F10) on the focused button. Not a finger's long press, which
+	 * is the hold above, timed past the tip; the menu it ends in would open
+	 * the list early, over the tip.
+	 */
+	function stepsMenu(event: MouseEvent, which: 'undo' | 'redo') {
+		if (!onsteps) return;
+		event.preventDefault();
+		if ((event as PointerEvent).pointerType === 'touch') return;
+		dropStepsHold();
+		onsteps(which);
+	}
+
+	/**
+	 * The card reads out the gaps while the pad is pressed, as it does under
+	 * a drag, and for a moment after: taps come one at a time, and readouts
+	 * that blinked off between them could not be read.
+	 */
+	let nudging = $state(false);
+	let nudgeLinger: ReturnType<typeof setTimeout> | null = null;
+	const NUDGE_LINGER_MS = 1200;
+
+	/**
+	 * Another choice ends the readouts at once: they were measured from what
+	 * the pad moved, and moving across to the next area would carry them onto
+	 * one that has not been nudged. Leaving the page ends the wait with it.
+	 */
+	function endNudging() {
+		if (nudgeLinger !== null) clearTimeout(nudgeLinger);
+		nudgeLinger = null;
+		nudging = false;
+	}
+	// A string, so a nudge that hands back the same choice in a new array
+	// (the page rebuilds it as the template changes) is not a new choice.
+	const choice = $derived(selectedIds.join(' '));
+	$effect(() => {
+		void choice;
+		untrack(() => {
+			if (nudging && !pushed) endNudging();
+		});
+	});
+	$effect(() => endNudging);
+
 	function startNudge(event: PointerEvent, dx: number, dy: number) {
 		pushed = dy < 0 ? 'up' : dy > 0 ? 'down' : dx < 0 ? 'left' : 'right';
+		if (nudgeLinger !== null) clearTimeout(nudgeLinger);
+		nudgeLinger = null;
+		nudging = true;
 		onnudge(dx, dy);
 		// Touch only, as every buzz in the app is (haptics.ts): a mouse held on
 		// an arrow has the pad going down under a pointer it can see.
@@ -1146,6 +1259,8 @@
 
 	function stopNudge() {
 		pushed = null;
+		if (nudging && nudgeLinger === null)
+			nudgeLinger = setTimeout(endNudging, NUDGE_LINGER_MS);
 		if (repeat === null) return;
 		clearTimeout(repeat);
 		clearInterval(repeat);
@@ -1604,6 +1719,8 @@
 				{guides}
 				{smartGuides}
 				spacing={spacingGuides && guides && smartGuides}
+				{nudging}
+				{picking}
 				{scale}
 				{pageNumber}
 				{theme}
@@ -1711,10 +1828,32 @@
 	     toggles are along the bottom. -->
 	<div class="rail">
 		<div class="corner">
-			<button class="square" onclick={onundo} disabled={!undoable} title={withKey('Undo', 'undo')} aria-label="Undo">
+			<button
+				class="square"
+				onclick={() => stepClick(onundo)}
+				onpointerdown={(e) => holdSteps(e, 'undo')}
+				oncontextmenu={(e) => stepsMenu(e, 'undo')}
+				onpointermove={moveSteps}
+				onpointerup={dropStepsHold}
+				onpointercancel={dropStepsHold}
+				disabled={!undoable}
+				title="{withKey('Undo', 'undo')} — hold, or right-click, for every step, to go back several at once"
+				aria-label="Undo"
+			>
 				<Icon name="undo" size={16} />
 			</button>
-			<button class="square" onclick={onredo} disabled={!redoable} title={withKey('Redo', 'redo')} aria-label="Redo">
+			<button
+				class="square"
+				onclick={() => stepClick(onredo)}
+				onpointerdown={(e) => holdSteps(e, 'redo')}
+				oncontextmenu={(e) => stepsMenu(e, 'redo')}
+				onpointermove={moveSteps}
+				onpointerup={dropStepsHold}
+				onpointercancel={dropStepsHold}
+				disabled={!redoable}
+				title="{withKey('Redo', 'redo')} — hold, or right-click, for every step, to go forward several at once"
+				aria-label="Redo"
+			>
 				<Icon name="redo" size={16} />
 			</button>
 		</div>
@@ -1863,6 +2002,19 @@
 				title="Selecting several — every press adds an area or drops it. Press to stop, or Esc."
 			>
 				<Icon name="checkbox-checked" size={16} /><span class="sr-only">Stop selecting multiple</span>
+			</button>
+		{:else if coarse && selectedIds.length && onstartpicking}
+			<!-- The way in on a touch screen, which has no Shift to add an area
+			     with. It was only in the area's long-press menu, and a long press
+			     on an area is also the start of dragging it: Android does not
+			     reliably open the menu at all, so several could not be chosen. -->
+			<button
+				class="square"
+				aria-pressed="false"
+				onclick={onstartpicking}
+				title="Select multiple — then every tap adds an area or drops it"
+			>
+				<Icon name="checkbox" size={16} /><span class="sr-only">Select multiple</span>
 			</button>
 		{/if}
 		{#if strayIds.length}

@@ -89,6 +89,13 @@ middle, so the number a drag shows and the number the bar shows are measured
 from the same place. It is the full Guides state only: the dash keeps the
 margins and alignment guides for a person who finds the numbers noisy.
 
+**The nudge pad shows the spacing too.** A nudge is a drag in steps, aimed by
+the same gaps, so `nudging` makes the card read them out from the first chosen
+area, skipping what moves with it as `startDrag` would collect it. They stay
+for a moment after the last press, because taps come one at a time and
+readouts that blinked off between them could not be read. Only the pad: an
+arrow key's nudge is made looking at the bar's X and Y.
+
 ## `src/lib/frame.ts`
 
 **A file gives each area at its reference point; memory keeps the top-left
@@ -823,6 +830,21 @@ reference as equal without serialising it; a state's serialisation is kept
 beside it (a WeakMap — states are never changed once recorded) so the
 present is not serialised again at every commit.
 
+**Held, Undo and Redo list their steps; a choice is that many single steps.**
+`undoSteps` and `redoSteps` are the labels the single steps already carry,
+nearest first, and `undoTimes` / `redoTimes` apply the single step n times, so
+skipping back is no new kind of move and redo returns from it exactly. The hold
+is `LIST_HOLD`, twice the tip's `TIP_HOLD`: on touch the tip has shown and been
+read before the list opens, and a press that only wanted the tip lets go in
+between, which Tooltip already makes a non-press. The button captures the
+pointer, so the release after the list opened comes back to it and its click is
+dropped — otherwise the list would open and an undo be taken at once. A
+right-click, or the keyboard's menu key, opens it too, so it is not reachable
+by holding alone; a finger's long press is excluded there, being the hold. The
+dialog keeps the two-Enter rule (`armDefault`, the nearest step the default),
+and a Redo whose steps the flush on opening has just cleared says so instead
+of opening on nothing.
+
 **A refinement can be folded into the last step (`amend`).** The page uses
 it for one thing: a Type chosen in the Pictures tray for a face just replaced
 in from there joins the replace's entry (`fontSession`, `commit` in +page),
@@ -871,6 +893,24 @@ undo or a redo, "the last change" is a different change and an alternating key
 would be flipping the wrong one. Redo keeps Ctrl/Cmd+Y.
 
 ## `src/lib/components/Card.svelte`
+
+**A finger's tap that chooses an area sends no click.** Choosing opens the
+area's bar above the stage, which moves the page down under the finger, and the
+click the browser sends when the finger lifts lands on whatever is there by
+then: on a phone a menu in the new bar opened, a button in it could be pressed,
+and the choice seemed to go. `dropTapClick` cancels the touchend of that touch
+(a touch keeps reporting to where it began, however far the page has moved), so
+there is no click at all. Not after a double tap, which opens the area for
+typing and wants the tap's focus.
+
+**Select Multiple is a chip on a touch screen, and takes the handles away.** It
+was only in the long-press menu, and a long press on an area is also the start
+of dragging it, which Android does not reliably turn into a menu, so several
+areas could not be chosen. The chip shows beside the page once an area is
+chosen. While it is on, a lone choice draws no handles: a tap is pulled to the
+nearest control, a handle reaching over the next area took the tap meant for
+it, and a press on a handle chose its own area again, which in this mode took
+it back out. A handle press never changes the selection now.
 
 **Columns are the browser's.** `Box.columns` (2–6, a gap in mm) is
 `column-count` and `column-gap` on the area's content, not on the box, so the
@@ -1192,8 +1232,28 @@ would be unreachable.
 **Rotation is a transform, so it costs no layout.** `rotation` is degrees and
 `centre` is the pivot in *percent* of the box — the one thing in the format that
 is not mm, because a pivot in mm drifts towards a corner as the box grows. A CSS
-transform leaves `offsetHeight` alone, so `measure()`, anchoring and snapping all
-see the upright rectangle: turning one area never shuffles the rest of the card.
+transform leaves `offsetHeight` alone, so `measure()` and anchoring see the
+upright rectangle: turning one area never shuffles the rest of the card.
+
+**What is lined up and measured is what is drawn.** Snapping a move and the
+spacing readouts take a turned area by the upright box that encloses its drawn
+shape (`drawnBounds`), the moved area and every neighbour alike, and the
+readouts start from the reference point where it is drawn (`turnedPoint`).
+Taken upright, a turned area latched by edges nobody could see, and its
+readouts started at the corner as it was before the turn — off the area, at a
+point that looked random. Every corner of a turned rectangle lies on its
+bounds, so the turned reference corner is always on the box being measured. A
+resize still snaps its upright edge: it is sizing the frame, not placing the
+shape.
+
+**The pivot and the turn read out too, each in its own terms.** Placing the
+pivot shows its distance in from each of the area's own edges
+(`pivotReadouts`), drawn turned with the area: the pivot is a point of the
+area, stored as a percentage of it, so the area's edges are what it is placed
+against, not the page's or a neighbour's. Turning shows a protractor on the
+pivot (`turnReadout`): a level line for 0°, the area's own line now, the arc
+between and the angle. Under the same switch as the gaps. Drawn as an SVG in
+the page's millimetres, its strokes kept at screen width as the page zooms.
 The cost is that a resize handle on a turned box hands back a screen-space delta,
 which `moveDrag` rotates by −θ before reading it as a width; `move` is exempt,
 because a translation in the parent's space is the same whichever way the box
@@ -3089,6 +3149,55 @@ list is what is stored, what it weighs, where it is, and whether anything
 currently points at it. That last one is the question — *which of these can I
 delete* — and nothing else in the app could answer it.
 
+**The folder is read in the background, and is one line.** A folder can be
+hundreds of full-size photographs. Read in one pass, the tray sat on "…"
+until the last file had been asked for, one after another; listed in full,
+it pushed this browser's own pictures, the drawings and the fonts out of
+sight. So this browser's own are listed at once and the folder's arrive in
+batches behind them (`folderImages`, an async generator: each batch's files
+asked for together, handed over before the next is begun), a newer refresh
+taking over from an older one still reading. The folder is a single line —
+name, count, weight, Open, another folder, Disconnect — folded until pressed,
+and opened by a search, since its contents may be what is being looked for.
+Thumbnails are `loading="lazy"` and `decoding="async"`, so only the ones
+scrolled to are decoded, and a size read off one is written into the map
+rather than spreading it, which was a copy of the map per picture.
+`resolveLocalImages` asks for every name at once for the same reason.
+
+**A long section starts folded; a hand-made fold always wins.** More than
+ten in a section buried the ones under it, so a section nobody has folded or
+opened starts folded past that. The tray stores each choice made by hand
+(`images-folds`, a key to true or false) rather than the list of what is
+folded, which could not tell "opened on purpose" from "never touched"; the
+old list is read once as choices to fold. A connected folder counts as its one
+line: it has its own fold, and counting its pictures folded the section shut
+the moment the folder was opened, or part way through a read. A search opens
+Images regardless, since its matches are what was asked for, and folding the
+head mid-search puts the search away too, or the press would change nothing.
+
+**A browser copy the folder shadows is not listed.** It is never the one drawn,
+and making a URL for it replaced the folder file's in the cache the card
+shares, revoking the picture on the card. A re-read keeps the folder's list
+up and swaps each picture in as its batch arrives, so one just saved or
+replaced has its new URL at once rather than a revoked one until the whole
+folder is read; another folder starts from an empty list, or the last one's
+rows would act on this one's files. One that fails part way says so and lists
+only what it read. The folder state is written by the newest refresh alone,
+and a failure to read this browser's own pictures is said as that, not as the
+folder having moved.
+
+**The URL cache keeps a folder's files apart, by their exact names.** Under
+the stored pictures' lower-cased key, `Logo.png` here and `logo.png` in a
+folder on a case-sensitive disk — or `photo.JPG` and `photo.jpg` in one folder
+— were one entry, and each lookup revoked the other's URL. A folder's URLs are
+let go with the folder, on Unlink or a switch; four hundred photographs
+otherwise held four hundred for the life of the tab.
+
+**The search is one box.** The field and its Search button share a single
+border; the field had a frame of its own inside one the `.find` button rule
+gave its label, which was two. The button only focuses the field, since the
+list narrows as it is typed.
+
 **The folder is listed by extension.** It is an ordinary folder that may hold
 anything, and a panel offering to delete a file this app never wrote would be a
 trap.
@@ -3795,6 +3904,11 @@ bar itself, or the browser takes the drag for a scroll and cancels the pointer;
 and it swallows the click a release may be owed anywhere on the page, because
 by then the tray has risen under the finger and the click would land on the
 table's header — a column's name went into editing that way.
+
+**The pull brings back the tray put away last.** The table and Pictures share
+the room one at a time, so the one that was up last is the one a pull off the
+bar means; `UiState.lastTray` records it as the panels are saved, and survives
+a reload. Absent is the table, which is all the pull opened before.
 
 ## `src/routes/app.css` — the accent
 

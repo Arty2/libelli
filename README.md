@@ -163,6 +163,9 @@ right-hand ones across the fold.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>p</kbd> or <kbd>s</kbd> | Export |
 | <kbd>?</kbd> or <kbd>/</kbd> | Help |
 
+Holding **Undo** or **Redo** beside the page, or right-clicking either, lists
+every step it could take, so several can be skipped at once.
+
 While typing in a field, undo and <kbd>Delete</kbd> act on the text, as usual.
 On a touchscreen, a pinch on the page zooms it; **zoom and pan** (under
 *+ Area*) lets one finger scroll the page and adds an on-screen pad for
@@ -217,8 +220,8 @@ Versions are numbered `0.minor.patch`, and the leading zero never changes:
 
 | Change | Bumps | Example |
 | --- | --- | --- |
-| A fix | the patch | 0.28.51 → 0.28.52 |
-| A feature | the minor | 0.28.51 → 0.29.0 |
+| A fix | the patch | 0.29.6 → 0.29.7 |
+| A feature | the minor | 0.29.6 → 0.30.0 |
 
 [`AGENTS.md`](AGENTS.md) explains the codebase and its rules,
 [`docs/decisions.md`](docs/decisions.md) the reasoning behind each module, and
