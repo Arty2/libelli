@@ -408,7 +408,7 @@
 	 * every bar widened alike.
 	 */
 	function qrFor(box: Box): string {
-		const value = contentOf(box).trim() || box.static?.text?.trim() || '';
+		const value = contentOf(box).trim();
 		if (!value) return '';
 		const key = JSON.stringify([value, box.qr?.kind, box.qr?.level, box.qr?.background, box.qr?.hideDigits, box.color ?? template.defaults.color, box.fit]);
 		const known = drawnCodes.get(key);

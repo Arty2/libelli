@@ -516,8 +516,20 @@ export function placeholderChoices(query: string, columns: readonly string[]): s
 }
 
 function ranked(query: string, names: readonly string[]): string[] {
-	const q = query.trim().toLowerCase();
-	const starts = names.filter((n) => n.toLowerCase().startsWith(q));
-	const within = names.filter((n) => !n.toLowerCase().startsWith(q) && n.toLowerCase().includes(q));
+	// As written, and as `findColumn` would read it: `%%first na` is on its way
+	// to the column stored as `first-name`, and the spaces matched against the
+	// dashes offered nothing until the name was finished by hand. As written
+	// too, because the shaped form drops the colon of `page:cu`.
+	const typed = query.trim().toLowerCase();
+	const shaped = columnName(typed).toLowerCase();
+	const starts = names.filter((n) => {
+		const name = n.toLowerCase();
+		return name.startsWith(typed) || name.startsWith(shaped);
+	});
+	const first = new Set(starts);
+	const within = names.filter((n) => {
+		const name = n.toLowerCase();
+		return !first.has(n) && (name.includes(typed) || name.includes(shaped));
+	});
 	return [...starts, ...within];
 }

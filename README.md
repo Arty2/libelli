@@ -154,7 +154,8 @@ right-hand ones across the fold.
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + arrows | Change the alignment |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>⇧</kbd> + scroll | Change the type size of the area under the pointer |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll, or pinch | Zoom the page; off the page, the interface's text size |
-| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd> | Zoom in, out, or fit (<kbd>⇧</kbd> <kbd>0</kbd> for 100%) |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> | With areas selected, make their type a point larger or smaller |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd> | With nothing selected, zoom the page in, out, or fit (<kbd>⇧</kbd> <kbd>0</kbd> for 100%) |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>h</kbd> | Show or hide area outlines |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>;</kbd> or <kbd>\|</kbd> | Cycle the guides |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>'</kbd> or <kbd>#</kbd> | Show or hide the grid |

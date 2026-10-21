@@ -65,6 +65,7 @@
 		nudgeBox as nudge,
 		followsInSet,
 		stepAlignment,
+		stepTextSize,
 		strayBoxes,
 		toggleGroup,
 		toggleLock,
@@ -92,6 +93,7 @@
 		blankTemplate,
 		exportTemplate,
 		importedTemplate,
+		MIN_SIZE,
 		newBox,
 		nextBoxId,
 		arrangeBoxes,
@@ -2000,6 +2002,8 @@
 			.filter(
 				(b) =>
 					(b.slot && mapping[b.slot] === column) ||
+					// Bound to a column whose cells quote this one: `%%column%%` in a cell prints it too.
+					(b.slot && namedByCells.get(mapping[b.slot] ?? '')?.has(column)) ||
 					referencedColumns(b.static?.text ?? '', dataset.columns).includes(column)
 			)
 			.map((b) => b.id);
@@ -2655,6 +2659,15 @@
 		}
 	}
 
+	/** Ctrl/Cmd +/− on the chosen areas: their type a point larger or smaller. */
+	function sizeSelectedText(direction: 1 | -1) {
+		if (template.locked) return;
+		const changed = stepTextSize(template.boxes, selectedIds, template.defaults.size, direction, MIN_SIZE);
+		if (!changed.length) return;
+		describe(direction > 0 ? 'Larger text' : 'Smaller text');
+		for (const box of changed) updateBox($state.snapshot(box) as Box);
+	}
+
 	/** Move every chosen box one step along an axis of alignment. */
 	function stepAlign(axis: 'h' | 'v', direction: -1 | 1) {
 		if (template.locked) return;
@@ -2766,6 +2779,15 @@
 		// whole app. There it is the text size instead — the same conditions
 		// PagePreview steps aside on, so exactly one of the two answers.
 		const chord = textChord(event);
+		// With an area chosen, +/− is that area's type — one point a press — and
+		// neither the stage nor the interface zooms: the key means one thing at a
+		// time, and what is chosen decides which. In a field or behind a dialog
+		// it stays the interface's, or the browser would zoom the lot.
+		if ((chord === 1 || chord === -1) && selectedIds.length && !typing && !stageModalOpen) {
+			event.preventDefault();
+			sizeSelectedText(chord);
+			return;
+		}
 		if (chord !== null && (typing || stageModalOpen)) {
 			event.preventDefault();
 			setTextSize(chord === 0 ? 1 : stepText(textSize, chord));

@@ -331,3 +331,21 @@ export function bringOnPage(boxes: Box[], ids: string[], page: PageSpec): Box[] 
 	});
 	return moved ? next : boxes;
 }
+
+/**
+ * Ctrl/Cmd +/− on chosen areas: a point larger or smaller, from the size each
+ * is drawn at — its own, or the page's where it has none, whose first step is
+ * what gives it one. Locked areas keep theirs. Returns only the areas that
+ * changed, so the caller writes nothing for a size already at the floor.
+ */
+export function stepTextSize(boxes: readonly Box[], ids: readonly string[], pageSize: number, direction: 1 | -1, floor = 1): Box[] {
+	const chosen = new Set(ids);
+	const changed: Box[] = [];
+	for (const box of boxes) {
+		if (!chosen.has(box.id) || box.locked) continue;
+		const from = box.size ?? pageSize;
+		const size = Math.round(Math.max(floor, from + direction) * 10) / 10;
+		if (size !== from) changed.push({ ...box, size });
+	}
+	return changed;
+}

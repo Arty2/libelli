@@ -76,7 +76,7 @@ export const SHORTCUTS = {
 	grid: "Ctrl/Cmd+' or Ctrl/Cmd+#",
 	guides: 'Ctrl/Cmd+; or |',
 	boxes: 'Ctrl/Cmd+H',
-	zoom: 'Ctrl/Cmd + and −, Ctrl/Cmd+0 to fit',
+	zoom: 'Ctrl/Cmd + and −, Ctrl/Cmd+0 to fit; with an area chosen, + and − size its type',
 	cards: 'arrows or PageUp/PageDown, with nothing selected',
 	type: 'Enter'
 } as const;

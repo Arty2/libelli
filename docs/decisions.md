@@ -3850,6 +3850,14 @@ scroller clips it, and writes a choice back with `input` and `change` events so
 each field's own handler sees it as typed. Its keys stop propagating only while
 the list is open, so Escape closes the list and not the dialog behind it.
 
+**The query is matched as `findColumn` reads a name.** `%%first na` is on its
+way to the column stored as `first-name`, so the list matches the query both as
+typed and shaped like a column name (spaces to dashes) — as typed too, because
+shaping drops the colon of `page:cu`. Choosing swallows what is left of a name
+the caret sits inside (`%%ti|tle%%`) as well as a closing `%%`, and a frame
+waiting to draw the list is cancelled with the action, or a late one opens a
+list on a field that is gone.
+
 **Unknown names are marked in the render, by sentinels.** `applyPlaceholders`
 can wrap a `%%name%%` nothing answers to in two Private Use characters, and
 `flagUnknown` in markdown.ts turns those into a span — in text between tags
@@ -3857,6 +3865,19 @@ only, after the leaf has been escaped, and never inside an attribute. Plain
 text splits on the same characters and lets Svelte escape each piece. Only the
 editor asks for the marks, and only with the bounds on: nothing printed,
 measured for emptiness or encoded in a QR ever carries them.
+
+## Ctrl/Cmd +/− and the chosen areas
+
+**The chord means one thing at a time, and the selection decides which.** With
+areas chosen it is their type, a point a press (`stepTextSize` in boxops.ts:
+each from its own size or the page's, locked ones left alone); with nothing
+chosen it is the stage's zoom; in a field or behind a dialog it is the
+interface's text size. `PagePreview` steps aside when anything is chosen, and
+`onWindowKeydown` answers first, before the field and dialog branch — and
+prevents the key, so the browser does not zoom underneath. The cost: to zoom
+the stage with an area chosen, deselect it (Escape) or use the Zoom menu. A
+patch, not a minor, took it: 0.30.0 is when `npm run gates` demands the
+top-left bridge be deleted, which is its own piece of work.
 
 ## `src/lib/modal.ts`
 
