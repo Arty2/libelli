@@ -8,8 +8,9 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.29.6 — 2026-10-11
+## 0.29.7 — 2026-10-21
 
+- Ctrl/Cmd + or − with areas chosen sets their type a point larger or smaller; the page and the interface do not zoom then. With nothing chosen, it zooms the page as before.
 - Pictures: a connected folder is read in the background and is one line you open, with Folder add to connect it and Unlink to let it go.
 - Pictures: one Search box; a section of more than ten starts folded unless you folded or opened it.
 - Hold or right-click Undo or Redo for the list of steps, and go back or forward several at once. On a phone, Select Multiple is beside the page once an area is chosen.

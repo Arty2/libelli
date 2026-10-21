@@ -968,6 +968,24 @@ and an alignment in reach beats the grid. The margins still win over both,
 because a margin that is not a whole number of grid steps would otherwise have
 an edge nothing could be placed against.
 
+**The grid snaps the edge, not the size, and as it is drawn.** A handle used to
+round the new width or height to a grid step, so an area that began off the grid
+kept an edge off it — the right edge went on a grid of its own, shifted by
+wherever the area started. Every handle now places the edge it moves (`place`,
+margins and sibling edges first, the grid last) and derives the size from that,
+the opposite edge held where it was. The same holds for an anchored area: its
+gap is not a position, so the resolved top at pointerdown (`drag.top`, not the
+live layout, which moves with the drag) is what goes on a line, and the gap
+follows. A mirrored drag is worked in the stored frame, where the drawn left is
+the stored right, so on a page whose width is not a whole number of steps (A5,
+148mm) the stored number's grid is not the one on screen; the grid is snapped as
+drawn and mirrored back (`onGrid`). The margins are tried at a moving area's
+far edge as well as its start, ahead of its siblings — the far-edge pass that
+used to follow, and lost to any sibling in reach, is gone. Heights and widths
+are kept to four decimals so an edge against a measured top is not left a
+hundredth off. Verified in a browser on a recto card; the mirrored branch is
+checked by reading only.
+
 **Every tie at once is the Boxes box's dash.** A thread is drawn while a tie
 badge is pointed at, and the badges only on the selected area's chain, which
 alone leaves no way to see how a card's areas hang together short of pointing at
@@ -3850,6 +3868,14 @@ scroller clips it, and writes a choice back with `input` and `change` events so
 each field's own handler sees it as typed. Its keys stop propagating only while
 the list is open, so Escape closes the list and not the dialog behind it.
 
+**The query is matched as `findColumn` reads a name.** `%%first na` is on its
+way to the column stored as `first-name`, so the list matches the query both as
+typed and shaped like a column name (spaces to dashes) — as typed too, because
+shaping drops the colon of `page:cu`. Choosing swallows what is left of a name
+the caret sits inside (`%%ti|tle%%`) as well as a closing `%%`, and a frame
+waiting to draw the list is cancelled with the action, or a late one opens a
+list on a field that is gone.
+
 **Unknown names are marked in the render, by sentinels.** `applyPlaceholders`
 can wrap a `%%name%%` nothing answers to in two Private Use characters, and
 `flagUnknown` in markdown.ts turns those into a span — in text between tags
@@ -3857,6 +3883,19 @@ only, after the leaf has been escaped, and never inside an attribute. Plain
 text splits on the same characters and lets Svelte escape each piece. Only the
 editor asks for the marks, and only with the bounds on: nothing printed,
 measured for emptiness or encoded in a QR ever carries them.
+
+## Ctrl/Cmd +/− and the chosen areas
+
+**The chord means one thing at a time, and the selection decides which.** With
+areas chosen it is their type, a point a press (`stepTextSize` in boxops.ts:
+each from its own size or the page's, locked ones left alone); with nothing
+chosen it is the stage's zoom; in a field or behind a dialog it is the
+interface's text size. `PagePreview` steps aside when anything is chosen, and
+`onWindowKeydown` answers first, before the field and dialog branch — and
+prevents the key, so the browser does not zoom underneath. The cost: to zoom
+the stage with an area chosen, deselect it (Escape) or use the Zoom menu. A
+patch, not a minor, took it: 0.30.0 is when `npm run gates` demands the
+top-left bridge be deleted, which is its own piece of work.
 
 ## `src/lib/modal.ts`
 

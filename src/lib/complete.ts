@@ -38,7 +38,9 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 		const after = node.value.slice(caret);
 		// Swallow a closing `%%` that is already there, so choosing inside
 		// `%%ti%%` does not leave `%%title%%%%`.
-		const rest = after.startsWith('%%') ? after.slice(2) : after;
+		// Likewise the rest of a name the caret is in the middle of: `%%ti|tle%%`.
+		const tail = /^[\p{L}\p{N}_-]*%%/u.exec(after);
+		const rest = tail ? after.slice(tail[0].length) : after;
 		const inserted = `%%${name}%%`;
 		node.value = node.value.slice(0, open.start) + inserted + rest;
 		const at = open.start + inserted.length;
@@ -129,7 +131,13 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 
 	// After the field's own handlers have seen the keystroke, so the caret
 	// is where the typed character put it.
-	const onInput = () => requestAnimationFrame(update);
+	// One frame at a time, and none once the field is gone: a late one would
+	// open a list on a detached field that nothing then closes.
+	let frame = 0;
+	const onInput = () => {
+		cancelAnimationFrame(frame);
+		frame = requestAnimationFrame(update);
+	};
 	const onBlur = () => close();
 
 	// Listened on as a plain element: TypeScript cannot pick an overload of
@@ -143,6 +151,7 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 			names = next;
 		},
 		destroy() {
+			cancelAnimationFrame(frame);
 			close();
 			el.removeEventListener('input', onInput);
 			el.removeEventListener('keydown', onKeydown);

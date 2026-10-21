@@ -12,7 +12,8 @@ import {
 	strayBoxes,
 	toggleGroup,
 	toggleLock,
-	toggleSelection
+	toggleSelection,
+	stepTextSize
 } from './boxops';
 import { newBox } from './template';
 import type { Box, PageSpec } from './types';
@@ -313,5 +314,25 @@ describe('followsInSet', () => {
 		const x = { id: 'x', anchor: { to: 'y', gap: 0 } } as Box;
 		const y = { id: 'y', anchor: { to: 'x', gap: 0 } } as Box;
 		expect(followsInSet(x, new Set(['x']), [x, y])).toBe(false);
+	});
+});
+
+describe('stepTextSize', () => {
+	const box = (id: string, extra: Partial<Box> = {}): Box => newBox({ id, ...extra });
+
+	it('steps each area from its own size, or the page\u2019s when it has none', () => {
+		const boxes = [box('a', { size: 12 }), box('b'), box('c', { size: 9 })];
+		const up = stepTextSize(boxes, ['a', 'b'], 10, 1);
+		expect(up.map((b) => [b.id, b.size])).toEqual([
+			['a', 13],
+			['b', 11]
+		]);
+		expect(stepTextSize(boxes, ['a', 'b'], 10, -1).map((b) => b.size)).toEqual([11, 9]);
+	});
+
+	it('leaves locked areas and areas at the floor alone', () => {
+		const boxes = [box('a', { size: 12, locked: true }), box('b', { size: 1 })];
+		expect(stepTextSize(boxes, ['a', 'b'], 10, 1).map((b) => b.id)).toEqual(['b']);
+		expect(stepTextSize(boxes, ['a', 'b'], 10, -1)).toEqual([]);
 	});
 });

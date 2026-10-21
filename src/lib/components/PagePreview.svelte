@@ -1077,13 +1077,17 @@
 		if (!event.ctrlKey && !event.metaKey) return;
 
 		switch (event.key) {
+			// With an area chosen +/− sizes its type instead — the page answers,
+			// `onWindowKeydown` — and the stage does not zoom as well.
 			case '=':
 			case '+':
+				if (selectedIds.length) return;
 				event.preventDefault();
 				zoomBy(1.25);
 				return;
 			case '-':
 			case '_':
+				if (selectedIds.length) return;
 				event.preventDefault();
 				zoomBy(1 / 1.25);
 				return;

@@ -186,6 +186,11 @@ describe('typing a placeholder', () => {
 		expect(openPlaceholder('%%title%', 8)).toBeNull();
 	});
 
+	it('finds a dashed column from the name typed with spaces', () => {
+		expect(placeholderChoices('first na', ['first-name', 'title'])).toEqual(['first-name']);
+		expect(placeholderChoices('First Na', ['first-name'])).toEqual(['first-name']);
+	});
+
 	it('offers columns that start with it first, then ones that contain it, and today', () => {
 		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual(['title', 'today', 'subtitle', 'page:current', 'page:total']);
 		expect(placeholderChoices('', ['a', 'date'])).toEqual(['a', 'date', 'today', 'page:current', 'page:total']);
