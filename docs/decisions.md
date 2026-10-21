@@ -968,6 +968,24 @@ and an alignment in reach beats the grid. The margins still win over both,
 because a margin that is not a whole number of grid steps would otherwise have
 an edge nothing could be placed against.
 
+**The grid snaps the edge, not the size, and as it is drawn.** A handle used to
+round the new width or height to a grid step, so an area that began off the grid
+kept an edge off it — the right edge went on a grid of its own, shifted by
+wherever the area started. Every handle now places the edge it moves (`place`,
+margins and sibling edges first, the grid last) and derives the size from that,
+the opposite edge held where it was. The same holds for an anchored area: its
+gap is not a position, so the resolved top at pointerdown (`drag.top`, not the
+live layout, which moves with the drag) is what goes on a line, and the gap
+follows. A mirrored drag is worked in the stored frame, where the drawn left is
+the stored right, so on a page whose width is not a whole number of steps (A5,
+148mm) the stored number's grid is not the one on screen; the grid is snapped as
+drawn and mirrored back (`onGrid`). The margins are tried at a moving area's
+far edge as well as its start, ahead of its siblings — the far-edge pass that
+used to follow, and lost to any sibling in reach, is gone. Heights and widths
+are kept to four decimals so an edge against a measured top is not left a
+hundredth off. Verified in a browser on a recto card; the mirrored branch is
+checked by reading only.
+
 **Every tie at once is the Boxes box's dash.** A thread is drawn while a tie
 badge is pointed at, and the badges only on the selected area's chain, which
 alone leaves no way to see how a card's areas hang together short of pointing at

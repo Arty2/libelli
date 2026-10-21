@@ -1156,6 +1156,8 @@
 		startX: number;
 		startY: number;
 		origin: Box;
+		/** where the area was drawn at pointerdown: an anchored one's top is not its `y`, and the live layout moves with the drag */
+		top: number;
 		others: Box[];
 		/** boxes anchored to this one: they take the x delta and nothing else */
 		held: Box[];
@@ -1380,6 +1382,7 @@
 			startX: event.clientX,
 			startY: event.clientY,
 			origin: { ...box },
+			top: layout.tops[box.id] ?? box.y,
 			others,
 			held: [...held.values()]
 		};
@@ -1450,13 +1453,39 @@
 			x: [margins.left, template.page.w - margins.right],
 			y: [margins.top, template.page.h - margins.bottom]
 		};
-		/** `length` is the box's extent on this axis when the whole box is moving. */
+		/**
+		 * The grid as it is drawn: lines every step from the trim corner of the
+		 * page as it looks. A mirrored drag works in the stored frame, where the
+		 * drawn left is the stored right, so on a page whose width is not a whole
+		 * number of steps — A5 is 148mm — snapping the stored number lands on a
+		 * grid that is not the one on screen. Snapped as drawn and mirrored back.
+		 * `length` is given for a whole box moving, whose drawn left is the one
+		 * that goes on a line.
+		 */
+		const onGrid = (value: number, axis: 'x' | 'y', length = 0): number => {
+			if (!grid) return snapTo(value, FREE_STEP);
+			if (!(flip && axis === 'x')) return snapTo(value, GRID_MINOR);
+			const w = template.page.w;
+			return Math.round((w - length - snapTo(w - length - value, GRID_MINOR)) * 1000) / 1000;
+		};
+		/**
+		 * Where a position goes, strongest first: a margin, another area's edge
+		 * or middle, the grid. Margins and edges are the more specific thing to
+		 * have meant, so the grid is only the fallback and never beats one in
+		 * reach. `length` is the box's extent on this axis when the whole box is
+		 * moving, so its far edge and middle are tried as well as its start;
+		 * without it `value` is a single edge — a handle's.
+		 */
 		const place = (value: number, axis: 'x' | 'y', length?: number): number => {
 			if (guides) {
-				const hit = snapToEdges(value, marginEdges[axis], SNAP_TOLERANCE);
+				const hit =
+					length === undefined
+						? snapToEdges(value, marginEdges[axis], SNAP_TOLERANCE)
+						: latchSpan(value, length, marginEdges[axis], SNAP_TOLERANCE, [0, length]);
 				if (hit !== null) {
-					latched[axis] = hit;
-					return hit;
+					const edge = typeof hit === 'number' ? hit : hit.edge;
+					latched[axis] = edge;
+					return typeof hit === 'number' ? hit : round2(hit.start);
 				}
 			}
 			if (length !== undefined) {
@@ -1472,10 +1501,8 @@
 					return hit;
 				}
 			}
-			return snapTo(value, grid ? GRID_MINOR : FREE_STEP);
+			return onGrid(value, axis, length);
 		};
-		// A size is not a position: it rounds, but it never latches onto an edge.
-		const size = (value: number) => snapTo(value, grid ? GRID_MINOR : FREE_STEP);
 
 		// Named on the first movement rather than at pointerdown, and once only.
 		// Selecting a box goes through startDrag too, so naming it there labelled
@@ -1531,14 +1558,48 @@
 		const mode = flip ? MIRRORED_MODE[drag.mode] : drag.mode;
 		const next: Box = { ...origin };
 
-		/** `shift`: how far the drawn shape's top is below the stored top, for a turned area. */
-		const setTop = (deltaY: number, length?: number, shift = 0) => {
-			// An anchored box has no independent top: move its gap instead, so the
-			// relationship the template author set up survives being dragged. No
-			// floor under it — dragged up past the area it follows, it overlaps
-			// that area, with a negative gap, rather than stopping dead.
-			if (origin.anchor) next.anchor = { ...origin.anchor, gap: size(origin.anchor.gap + deltaY) };
-			else next.y = shift ? round2(place(origin.y + shift + deltaY, 'y', length) - shift) : place(origin.y + deltaY, 'y', length);
+		/**
+		 * The top an anchored area is drawn at; its stored `y` means nothing to
+		 * it. Every edge below is worked from where the area is *drawn*, so a
+		 * snap lands on the grid or the guide and not a step away from it.
+		 */
+		const top0 = origin.anchor ? drag.top : origin.y;
+		/**
+		 * Place the top, and return where it went. `shift`: how far the drawn
+		 * shape's top is below the stored top, for a turned area. An anchored
+		 * box has no independent top: its gap takes the move instead, so the
+		 * relationship the template author set up survives being dragged. No
+		 * floor under it — dragged up past the area it follows, it overlaps
+		 * that area, with a negative gap, rather than stopping dead. `atMost`
+		 * keeps a handle from carrying the top past the edge it is not moving.
+		 */
+		const setTop = (deltaY: number, length?: number, shift = 0, atMost = Infinity): number => {
+			const placed = place(top0 + shift + deltaY, 'y', length) - shift;
+			const top = Math.min(shift ? round2(placed) : placed, atMost);
+			if (origin.anchor) next.anchor = { ...origin.anchor, gap: Math.round((origin.anchor.gap + top - top0) * 10000) / 10000 };
+			else next.y = top;
+			return top;
+		};
+		/** The edge a handle is not moving stays where it is; this one goes on a line. */
+		// Four decimals, not two: an anchored area's top is a measured number, and
+		// a height rounded to hundredths against it leaves the edge a hair off the line.
+		const fine = (v: number) => Math.round(v * 10000) / 10000;
+		const MIN_W = 4;
+		const MIN_H = 3;
+		const dragRight = () => {
+			next.w = Math.max(MIN_W, fine(place(origin.x + origin.w + dx, 'x') - origin.x));
+		};
+		const dragBottom = () => {
+			next.h = Math.max(MIN_H, fine(place(top0 + origin.h + dy, 'y') - top0));
+		};
+		const dragLeft = () => {
+			const right = origin.x + origin.w;
+			next.x = Math.min(place(origin.x + dx, 'x'), right - MIN_W);
+			next.w = fine(right - next.x);
+		};
+		const dragTop = () => {
+			const bottom = top0 + origin.h;
+			next.h = fine(bottom - setTop(dy, undefined, 0, bottom - MIN_H));
 		};
 
 		switch (mode) {
@@ -1622,62 +1683,34 @@
 				break;
 			}
 			case 'e':
-				next.w = Math.max(4, size(origin.w + dx));
+				dragRight();
 				break;
 			case 'w':
-				next.x = place(origin.x + dx, 'x');
-				next.w = Math.max(4, size(origin.w - dx));
+				dragLeft();
 				break;
 			case 's':
-				next.h = Math.max(3, size(origin.h + dy));
+				dragBottom();
 				break;
 			case 'n':
-				setTop(dy);
-				next.h = Math.max(3, size(origin.h - dy));
+				dragTop();
 				break;
 			case 'se':
-				next.w = Math.max(4, size(origin.w + dx));
-				next.h = Math.max(3, size(origin.h + dy));
+				dragRight();
+				dragBottom();
 				break;
 			case 'sw':
-				next.x = place(origin.x + dx, 'x');
-				next.w = Math.max(4, size(origin.w - dx));
-				next.h = Math.max(3, size(origin.h + dy));
+				dragLeft();
+				dragBottom();
 				break;
 			case 'ne':
-				next.w = Math.max(4, size(origin.w + dx));
-				setTop(dy);
-				next.h = Math.max(3, size(origin.h - dy));
+				dragRight();
+				dragTop();
 				break;
 			case 'nw':
-				next.x = place(origin.x + dx, 'x');
-				next.w = Math.max(4, size(origin.w - dx));
-				setTop(dy);
-				next.h = Math.max(3, size(origin.h - dy));
+				dragLeft();
+				dragTop();
 				break;
 		}
-		// The far edges against the margins too, with the guides on: a move whose
-		// right or bottom edge comes within reach of the margin puts it there,
-		// and so does a handle dragging that edge. Only the edge being moved —
-		// a box is never stretched to reach a guide it was not heading for.
-		if (guides) {
-			const nearTo = (a: number, b: number) => Math.abs(a - b) < SNAP_TOLERANCE;
-			const [, right] = marginEdges.x;
-			const [, bottom] = marginEdges.y;
-			const east = mode === 'move' || mode === 'e' || mode === 'ne' || mode === 'se';
-			const south = !origin.anchor && (mode === 'move' || mode === 's' || mode === 'se' || mode === 'sw');
-			if (east && latched.x === null && nearTo(next.x + next.w, right)) {
-				if (mode === 'move') next.x = round2(right - next.w);
-				else next.w = round2(right - next.x);
-				latched.x = right;
-			}
-			if (south && latched.y === null && nearTo(next.y + next.h, bottom)) {
-				if (mode === 'move') next.y = round2(bottom - next.h);
-				else next.h = round2(bottom - next.y);
-				latched.y = bottom;
-			}
-		}
-
 		// With Shift, a handle resizes from the edge the words are aligned to,
 		// the way a typed W or H does in the bar: the size is whatever the
 		// handle made it, and the box is then placed so its right edge stays

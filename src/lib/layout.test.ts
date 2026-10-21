@@ -633,3 +633,12 @@ describe('freedTop', () => {
 		}
 	});
 });
+
+describe('latchSpan with chosen lines', () => {
+	it('lets only the named lines latch', () => {
+		// The middle (at 50) is on the edge; the ends are not.
+		expect(latchSpan(40, 20, [50], 1.5)).toEqual({ start: 40, edge: 50 });
+		expect(latchSpan(40, 20, [50], 1.5, [0, 20])).toBeNull();
+		expect(latchSpan(31, 20, [50], 1.5, [0, 20])).toEqual({ start: 30, edge: 50 });
+	});
+});

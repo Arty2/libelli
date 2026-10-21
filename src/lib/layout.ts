@@ -245,16 +245,19 @@ export function snapToEdges(value: number, edges: number[], tolerance: number): 
  * lined up by its left edge and never by its middle, which is the alignment a
  * centred card is built on. Returns where the box's start goes and the edge
  * it caught, for the guide to be drawn at; null when nothing is in reach.
+ * `offsets` narrows which of the box's lines may latch: the margins are for
+ * its two edges, not its middle.
  */
 export function latchSpan(
 	start: number,
 	length: number,
 	edges: number[],
-	tolerance: number
+	tolerance: number,
+	offsets: readonly number[] = [0, length / 2, length]
 ): { start: number; edge: number } | null {
 	let best: { start: number; edge: number } | null = null;
 	let bestDistance = tolerance;
-	for (const offset of [0, length / 2, length]) {
+	for (const offset of offsets) {
 		for (const edge of edges) {
 			const distance = Math.abs(start + offset - edge);
 			if (distance < bestDistance) {
