@@ -98,7 +98,10 @@ an area's own text and inside cells, and Markdown around them still applies.
 | `%%%` | A tab: what follows is pushed to the right edge, as in `Espresso %%% 2.20`. The area's **Leader** fills the gap with dots, dashes or a line. |
 
 A placeholder that matches nothing is underlined in wavy red in the editor.
-Typing `%%` in any text field offers the column names. A single `%` is ordinary
+Typing `%%` in any text field offers what can go there: the built-in ones
+first — `today`, `today:countdown:…`, `page:current`, `page:total`, `lookup`
+and `toc` — then, under a rule, the table's columns. One that needs more typed
+after it leaves the caret inside it. A single `%` is ordinary
 text. `today`, `lookup`, `page` and `toc` are reserved words; a column with one
 of those names has to be renamed, or reached with `lookup`.
 

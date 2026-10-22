@@ -201,6 +201,10 @@ reviewer may already have read the last one.
 - **Build the risky thing first.** **Tests cover the pure logic**; components are verified by driving them.
 - **Small commits with real messages.** What changed, why that shape, and what
   was verified. No model names in anything that lands in the repo.
+- **A button without a visible label is square**, as wide as it is tall — and
+  so is one whose label a narrow screen hides: left with the padding it had
+  for the word, it reads as a button with its label missing. Its name moves to
+  `title` and `aria-label`.
 - **Comments explain the why.** Not what the line does — why it is that way, and
   what breaks otherwise. Delete a comment that only restates the code.
 - **British spelling in prose and in identifiers** (`normalise`, `centre`) —

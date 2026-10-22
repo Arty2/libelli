@@ -1,7 +1,10 @@
+import { caretPoint } from './caret';
 import { openPlaceholder, placeholderChoices } from './placeholders';
 
 /**
- * Column names offered as `%%` is typed, in any field that can hold one.
+ * Placeholders offered as `%%` is typed, in any field that can hold one: what
+ * the app knows by itself first (`today`, `page:current`…), then a rule, then
+ * the table's columns.
  *
  * `%%title%%` only works if you know the column is called `title`, and the
  * table is often folded away or scrolled off while you type into an area. So
@@ -22,7 +25,10 @@ type Field = HTMLInputElement | HTMLTextAreaElement;
 export function completePlaceholders(node: Field, columns: readonly string[]) {
 	let names = columns;
 	let list: HTMLUListElement | null = null;
+	/** Everything offered, in order — the built-ins, then the columns — so the arrows run through both. */
 	let choices: string[] = [];
+	/** How many of `choices` are built in, for the rule after them. */
+	let builtIns = 0;
 	let active = 0;
 	let open: { start: number; query: string } | null = null;
 
@@ -43,7 +49,10 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 		const rest = tail ? after.slice(tail[0].length) : after;
 		const inserted = `%%${name}%%`;
 		node.value = node.value.slice(0, open.start) + inserted + rest;
-		const at = open.start + inserted.length;
+		// One that wants more typed after it — `today:countdown:`, `toc:` — keeps
+		// the caret inside, before its closing `%%`, where the input below opens
+		// the next list (the columns, for a lookup or a contents).
+		const at = open.start + inserted.length - (name.endsWith(':') ? 2 : 0);
 		node.setSelectionRange(at, at);
 		close();
 		// Both: a field that commits on `change` (the area's Text in the bar)
@@ -71,28 +80,44 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 			});
 			document.body.appendChild(list);
 		}
-		list.replaceChildren(
-			...choices.map((name, i) => {
-				const item = document.createElement('li');
-				item.setAttribute('role', 'option');
-				item.setAttribute('aria-selected', String(i === active));
-				item.dataset.name = name;
-				item.textContent = `%%${name}%%`;
-				return item;
-			})
-		);
-		// Under the field, or over it where there is no room below — a table
-		// cell near the bottom of a phone screen, most often.
-		const box = node.getBoundingClientRect();
-		const below = window.innerHeight - box.bottom;
-		list.style.left = `${Math.max(8, Math.min(box.left, window.innerWidth - 200))}px`;
-		if (below < 160 && box.top > below) {
-			list.style.top = '';
-			list.style.bottom = `${window.innerHeight - box.top + 2}px`;
-		} else {
-			list.style.bottom = '';
-			list.style.top = `${box.bottom + 2}px`;
+		const items: HTMLLIElement[] = choices.map((name, i) => {
+			const item = document.createElement('li');
+			item.setAttribute('role', 'option');
+			item.setAttribute('aria-selected', String(i === active));
+			item.dataset.name = name;
+			// One still to be finished says so: `%%today:countdown:…%%`.
+			item.textContent = `%%${name}${name.endsWith(':') ? '…' : ''}%%`;
+			return item;
+		});
+		// A rule between what the app knows and what the table holds, when both are there.
+		if (builtIns && builtIns < choices.length) {
+			const rule = document.createElement('li');
+			rule.setAttribute('role', 'separator');
+			rule.className = 'rule';
+			items.splice(builtIns, 0, rule);
 		}
+		list.replaceChildren(...items);
+		place();
+		list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+	};
+
+	/**
+	 * At the caret, not the field: the full-size editor is most of the window,
+	 * and under it or over it was off the screen. Under the caret's line, or
+	 * over it where the list will not fit below; then kept inside the window
+	 * on every side, by its own measured size.
+	 */
+	const place = () => {
+		if (!list) return;
+		const gap = 8;
+		const caret = caretPoint(node, node.selectionStart ?? node.value.length);
+		list.style.left = '0px';
+		list.style.top = '0px';
+		const { width, height } = list.getBoundingClientRect();
+		const below = caret.bottom + 2;
+		const top = below + height <= window.innerHeight - gap ? below : caret.top - height - 2;
+		list.style.top = `${Math.max(gap, Math.min(top, window.innerHeight - height - gap))}px`;
+		list.style.left = `${Math.max(gap, Math.min(caret.x, window.innerWidth - width - gap))}px`;
 	};
 
 	const update = () => {
@@ -105,7 +130,11 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 		const query = found.query;
 		if (!open || open.query !== query) active = 0;
 		open = found;
-		choices = placeholderChoices(query, names).slice(0, 8);
+		const offered = placeholderChoices(query, names);
+		// Not the one already typed in full: `%%toc:` offers the columns, not `toc:` again.
+		const builtIn = offered.builtIn.filter((name) => name !== query.trim()).slice(0, 7);
+		choices = [...builtIn, ...offered.columns.slice(0, 8)];
+		builtIns = builtIn.length;
 		draw();
 	};
 

@@ -3519,7 +3519,11 @@ action fits a table cell and the full-size editor alike, and is placed by the
 two boxes on screen, since a table cell is a field's `offsetParent` without
 positioning anything. Built from text nodes, never HTML. Only on the cell being
 typed in and the full-size editor: on every cell it would be a second copy of
-the table. Off, the action costs nothing — no layer, observer or listener.
+the table. Off, the action costs nothing — no layer, observer or listener. It
+scrolls by moving an inner sheet (a transform), not by scrolling the layer,
+whose own scroll stops short of a textarea's; and it draws from the text it is
+handed, since stepping rows in the full-size editor reaches the action before
+the field's value changes.
 
 ## `src/lib/components/MenuSelect.svelte`
 
@@ -3981,6 +3985,16 @@ handlers of its own. An action attaches to any of them, builds its list with
 scroller clips it, and writes a choice back with `input` and `change` events so
 each field's own handler sees it as typed. Its keys stop propagating only while
 the list is open, so Escape closes the list and not the dialog behind it.
+
+**Built-ins first, then the columns, and at the caret.** `placeholderChoices`
+returns two groups — `BUILT_IN_CHOICES`, the same in every table, then the
+columns — drawn with a rule between. A built-in ending in `:` is put in with the
+caret before its `%%`, where the next list (columns, for `lookup`, `toc` and a
+countdown's target) takes over. The list opens under the caret's line, or over
+it, and is kept inside the window by its own measured size: placed against the
+field, it ran off the screen from the full-size editor, which is most of the
+window. `caretPoint` (caret.ts) finds the caret with the same hidden copy
+`caretPlace` uses, one range on one character.
 
 **The query is matched as `findColumn` reads a name.** `%%first na` is on its
 way to the column stored as `first-name`, so the list matches the query both as

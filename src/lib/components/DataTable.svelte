@@ -3758,7 +3758,8 @@
 		/* An icon alone, so a square — as tall as it is wide, like every other
 		   icon-only button; it kept the padding it had for the word, and read as
 		   a button with its label missing. */
-		.row-height {
+		.row-height,
+		.whitespace {
 			box-sizing: border-box;
 			/* The bar's buttons are 29px tall; aspect-ratio cannot say so here,
 			   since the height is the content's and the width would follow the

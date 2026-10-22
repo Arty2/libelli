@@ -272,9 +272,6 @@ function pastTheEnd(lookup: LookupSpec, rows: readonly Row[] | undefined, row: R
 /** The words `%%…%%` means before it means any column. */
 export const KEYWORDS = ['today', 'lookup', 'page', 'toc'] as const;
 
-/** What `%%page:…%%` can ask for, as the completion offers them. */
-export const PAGE_PLACEHOLDERS = ['page:current', 'page:total'] as const;
-
 /**
  * A column whose name a keyword takes: `%%name%%` can never reach it,
  * because names are matched ignoring case and the keyword is tried first.
@@ -682,19 +679,41 @@ export function openPlaceholder(text: string, caret: number): { start: number; q
 }
 
 /**
- * What to offer for a query: the columns, then `today` and the page's two, those starting with
- * what was typed ahead of those merely containing it, ignoring case.
+ * What `%%` offers, built in: the keywords, as they are written. One ending
+ * in `:` wants more typed after it — a moment, a row, a column — and is put
+ * in with the caret before its closing `%%` (complete.ts), where the next
+ * list, of columns, takes over for `lookup` and `toc`.
  */
-export function placeholderChoices(query: string, columns: readonly string[]): string[] {
+export const BUILT_IN_CHOICES = [
+	'today',
+	'today:countdown:',
+	'page:current',
+	'page:total',
+	'lookup:next:',
+	'lookup:previous:',
+	'toc:'
+] as const;
+
+/**
+ * What to offer for a query, in two groups: what the app knows by itself —
+ * `today` and the rest, first, since it is the same in every table — and then
+ * the table's columns. In each, those starting with what was typed come ahead
+ * of those merely containing it, ignoring case.
+ */
+export function placeholderChoices(query: string, columns: readonly string[]): { builtIn: string[]; columns: string[] } {
 	// Past `lookup:3:`, what is being typed is a column again, and a choice
 	// has to keep the row it was typed with.
 	const lookup = /^(\s*lookup\s*:[^:]*:)([^:]*)$/i.exec(query);
-	if (lookup) return ranked(lookup[2], columns).map((name) => lookup[1] + name);
+	if (lookup) return { builtIn: [], columns: ranked(lookup[2], columns).map((name) => lookup[1] + name) };
+	// Past `today:countdown:`, a column, for a deadline in each row — or a
+	// moment typed in, which no list can offer.
+	const countdown = /^(\s*today\s*:\s*countdown\s*:)([^:]*)$/i.exec(query);
+	if (countdown) return { builtIn: [], columns: ranked(countdown[2], columns).map((name) => countdown[1] + name) };
 	// Past `toc:`, the same: a column, as the contents will list.
 	const toc = /^(\s*toc\s*:)([^:]*)$/i.exec(query);
-	if (toc) return ranked(toc[2], columns).map((name) => toc[1] + name);
+	if (toc) return { builtIn: [], columns: ranked(toc[2], columns).map((name) => toc[1] + name) };
 	// A column a keyword has taken is not offered: choosing it would print the keyword.
-	return ranked(query, [...columns.filter((c) => !isKeyword(c)), 'today', ...PAGE_PLACEHOLDERS]);
+	return { builtIn: ranked(query, BUILT_IN_CHOICES), columns: ranked(query, columns.filter((c) => !isKeyword(c))) };
 }
 
 function ranked(query: string, names: readonly string[]): string[] {

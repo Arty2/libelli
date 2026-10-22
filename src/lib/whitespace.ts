@@ -61,6 +61,7 @@ function ensureStyles() {
 	style.textContent = `
 .ws-layer { position: absolute; margin: 0; pointer-events: none; overflow: hidden; color: transparent;
 	border-style: solid; border-color: transparent; background: none; z-index: 1; }
+.ws-layer .ws-sheet { white-space: inherit; overflow-wrap: inherit; word-break: inherit; will-change: transform; }
 .ws-layer span { position: relative; }
 .ws-layer span::after { position: absolute; top: 0; color: var(--accent, #2563eb); opacity: 0.6; }
 .ws-layer .ws-space::after { content: '·'; left: 50%; transform: translateX(-50%); }
@@ -72,13 +73,18 @@ function ensureStyles() {
 
 /**
  * The action: `use:showWhitespace={{ on, text }}`. Off, it costs nothing — no
- * layer, no observer, no listener. On, it redraws on input and on a new
- * `text`, follows the field's scroll, and moves with its size.
+ * layer, no observer, no listener. On, it redraws when the text changes —
+ * typed, or handed over from outside, the next row in the full-size editor —
+ * follows the field's scroll, and is measured again only when the field's
+ * size changes.
  */
 export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOptions) {
 	let layer: HTMLDivElement | null = null;
+	/** The marks themselves, moved by the field's scroll as one sheet. */
+	let sheet: HTMLDivElement | null = null;
 	let observer: ResizeObserver | null = null;
 	let drawn: string | null = null;
+	let scrollFrame = 0;
 
 	const place = () => {
 		if (!layer) return;
@@ -99,11 +105,27 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		layer.style.paddingRight = `calc(${style.paddingRight} + ${field.offsetWidth - field.clientWidth - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth)}px)`;
 	};
 
-	const draw = () => {
-		if (!layer || drawn === field.value) return;
-		drawn = field.value;
+	/**
+	 * Scrolled by moving the sheet, not by scrolling the layer: a layer's own
+	 * scroll stops at its own height, which is not quite the field's — a
+	 * textarea scrolls its bottom padding into view, and its last line ends
+	 * where the layer's does not — so near the end the marks stopped and the
+	 * words went on. A transform has no end, and costs no layout.
+	 */
+	const sync = () => {
+		scrollFrame = 0;
+		if (sheet) sheet.style.transform = `translate(${-field.scrollLeft}px, ${-field.scrollTop}px)`;
+	};
+	const onScroll = () => {
+		if (!scrollFrame) scrollFrame = requestAnimationFrame(sync);
+	};
+
+	/** Drawn from `text` when it is handed over, since the field's own value may not have caught up yet. */
+	const draw = (text: string = field.value) => {
+		if (!sheet || drawn === text) return;
+		drawn = text;
 		const fragment = document.createDocumentFragment();
-		for (const run of whitespaceRuns(field.value)) {
+		for (const run of whitespaceRuns(text)) {
 			if (run.kind === 'text') {
 				fragment.append(run.text);
 				continue;
@@ -117,26 +139,26 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		}
 		// A trailing newline would collapse; a space after it keeps the last line.
 		fragment.append(' ');
-		layer.replaceChildren(fragment);
-		sync();
+		sheet.replaceChildren(fragment);
+		// A new row may arrive scrolled anywhere: the field sets its scroll
+		// when its value changes, after this, so the sheet follows a frame on.
+		onScroll();
 	};
-
-	const sync = () => {
-		if (!layer) return;
-		layer.scrollTop = field.scrollTop;
-		layer.scrollLeft = field.scrollLeft;
-	};
+	const onInput = () => draw();
 
 	const start = () => {
 		ensureStyles();
 		layer = document.createElement('div');
 		layer.className = 'ws-layer';
 		layer.setAttribute('aria-hidden', 'true');
+		sheet = document.createElement('div');
+		sheet.className = 'ws-sheet';
+		layer.append(sheet);
 		field.after(layer);
 		place();
-		draw();
-		field.addEventListener('input', draw);
-		field.addEventListener('scroll', sync);
+		draw(options.text);
+		field.addEventListener('input', onInput);
+		field.addEventListener('scroll', onScroll, { passive: true });
 		observer = new ResizeObserver(() => {
 			place();
 			sync();
@@ -147,10 +169,12 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 	const stop = () => {
 		observer?.disconnect();
 		observer = null;
-		field.removeEventListener('input', draw);
-		field.removeEventListener('scroll', sync);
+		cancelAnimationFrame(scrollFrame);
+		scrollFrame = 0;
+		field.removeEventListener('input', onInput);
+		field.removeEventListener('scroll', onScroll);
 		layer?.remove();
-		layer = null;
+		layer = sheet = null;
 		drawn = null;
 	};
 
@@ -160,10 +184,9 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		update(next: WhitespaceOptions) {
 			if (next.on && !layer) start();
 			else if (!next.on && layer) stop();
-			else if (layer) {
-				place();
-				draw();
-			}
+			// Only the text: the table re-renders for many reasons, and measuring
+			// the field again for each is what the resize observer is for.
+			else if (layer) draw(next.text);
 		},
 		destroy: stop
 	};

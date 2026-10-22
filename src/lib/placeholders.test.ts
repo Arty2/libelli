@@ -11,6 +11,7 @@ import {
 	formatDate,
 	openPlaceholder,
 	placeholderChoices,
+	BUILT_IN_CHOICES,
 	referencedColumns,
 	COUNTDOWN_CLOSE,
 	COUNTDOWN_OPEN,
@@ -195,26 +196,33 @@ describe('typing a placeholder', () => {
 	});
 
 	it('finds a dashed column from the name typed with spaces', () => {
-		expect(placeholderChoices('first na', ['first-name', 'title'])).toEqual(['first-name']);
-		expect(placeholderChoices('First Na', ['first-name'])).toEqual(['first-name']);
+		expect(placeholderChoices('first na', ['first-name', 'title']).columns).toEqual(['first-name']);
+		expect(placeholderChoices('First Na', ['first-name']).columns).toEqual(['first-name']);
 	});
 
 	it('offers nothing for a query that shaping would empty, rather than everything', () => {
-		// Only the page's own, which do hold a colon.
-		expect(placeholderChoices(':', ['title', 'body'])).toEqual(['page:current', 'page:total']);
-		expect(placeholderChoices('.', ['title', 'body'])).toEqual([]);
+		// Only the built-ins, which do hold a colon.
+		expect(placeholderChoices(':', ['title', 'body']).columns).toEqual([]);
+		expect(placeholderChoices(':', ['title', 'body']).builtIn).toContain('page:current');
+		expect(placeholderChoices('.', ['title', 'body'])).toEqual({ builtIn: [], columns: [] });
 		// And still finds a name that does hold what was typed.
-		expect(placeholderChoices(':', ['a:b'])).toEqual(['a:b', 'page:current', 'page:total']);
+		expect(placeholderChoices(':', ['a:b']).columns).toEqual(['a:b']);
 	});
 
 	it('offers columns that start with it first, then ones that contain it, and today', () => {
-		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual(['title', 'today', 'subtitle', 'page:current', 'page:total']);
-		expect(placeholderChoices('', ['a', 'date'])).toEqual(['a', 'date', 'today', 'page:current', 'page:total']);
-		expect(placeholderChoices('page:t', ['title'])).toEqual(['page:total']);
+		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual({
+			builtIn: ['today', 'today:countdown:', 'toc:', 'page:current', 'page:total', 'lookup:next:'],
+			columns: ['title', 'subtitle']
+		});
+		expect(placeholderChoices('', ['a', 'date'])).toEqual({ builtIn: [...BUILT_IN_CHOICES], columns: ['a', 'date'] });
+		expect(placeholderChoices('page:t', ['title'])).toEqual({ builtIn: ['page:total'], columns: [] });
+		expect(placeholderChoices('today:c', [])).toEqual({ builtIn: ['today:countdown:'], columns: [] });
+		// Past the keyword, a countdown's target can be a column.
+		expect(placeholderChoices('today:countdown:de', ['deadline', 'title'])).toEqual({ builtIn: [], columns: ['today:countdown:deadline'] });
 		// A column a keyword has taken is not offered as itself…
-		expect(placeholderChoices('', ['Today', 'lookup', 'Page', 'a'])).toEqual(['a', 'today', 'page:current', 'page:total']);
+		expect(placeholderChoices('', ['Today', 'lookup', 'Page', 'a']).columns).toEqual(['a']);
 		// …but is, after a lookup, which is the one way to reach it.
-		expect(placeholderChoices('lookup:2:', ['Today'])).toEqual(['lookup:2:Today']);
+		expect(placeholderChoices('lookup:2:', ['Today'])).toEqual({ builtIn: [], columns: ['lookup:2:Today'] });
 	});
 });
 
@@ -361,15 +369,15 @@ describe('a lookup into another row', () => {
 	});
 
 	it('offers columns once the row is typed, keeping the row', () => {
-		expect(placeholderChoices('lookup:3:pr', ['title', 'price'])).toEqual(['lookup:3:price']);
-		expect(placeholderChoices('lookup:3:', ['title'])).toEqual(['lookup:3:title']);
+		expect(placeholderChoices('lookup:3:pr', ['title', 'price']).columns).toEqual(['lookup:3:price']);
+		expect(placeholderChoices('lookup:3:', ['title']).columns).toEqual(['lookup:3:title']);
 	});
 });
 
 describe('%%toc:…%%', () => {
 	it('counts its column as used, and is offered as toc: and a column', () => {
 		expect(referencedColumns('%%toc:title%%', ['title', 'body'])).toEqual(['title']);
-		expect(placeholderChoices('toc:ti', ['title', 'body'])).toEqual(['toc:title']);
+		expect(placeholderChoices('toc:ti', ['title', 'body']).columns).toEqual(['toc:title']);
 		expect(isKeyword('toc')).toBe(true);
 	});
 });

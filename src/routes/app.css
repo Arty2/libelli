@@ -236,6 +236,24 @@ html, body {
 	font: 0.75rem ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* Kept to the window: placed at the caret (complete.ts), it scrolls rather
+   than running off a short screen. */
+.placeholder-complete {
+	max-height: calc(100dvh - 16px);
+	overflow-y: auto;
+}
+
+/* Between what the app knows and the table's columns. */
+.placeholder-complete li.rule {
+	height: 0;
+	margin: 4px 2px;
+	padding: 0;
+	border-top: 1px solid #e2e2e2;
+	border-radius: 0;
+	cursor: default;
+	pointer-events: none;
+}
+
 .placeholder-complete li {
 	padding: 4px 8px;
 	border-radius: 4px;
