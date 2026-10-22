@@ -31,6 +31,13 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 	let builtIns = 0;
 	let active = 0;
 	let open: { start: number; query: string } | null = null;
+	/**
+	 * A choice still to be finished was put in without `change`: owed to the
+	 * field, then, if it is left before a choice that finishes it — the value
+	 * was set from here, so the browser will not fire one on its own, and a
+	 * field that saves on `change` would quietly drop the edit.
+	 */
+	let changeOwed = false;
 
 	const close = () => {
 		list?.remove();
@@ -61,7 +68,8 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 		// placeholder that names nothing, and an undo step nobody wanted; the
 		// choice from the list that follows commits it whole.
 		node.dispatchEvent(new Event('input', { bubbles: true }));
-		if (!name.endsWith(':')) node.dispatchEvent(new Event('change', { bubbles: true }));
+		changeOwed = name.endsWith(':');
+		if (!changeOwed) node.dispatchEvent(new Event('change', { bubbles: true }));
 	};
 
 	const draw = () => {
@@ -85,12 +93,11 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 			});
 			document.body.appendChild(list);
 		}
-		const items: HTMLLIElement[] = choices.map((name, i) => {
+		// The highlight is `mark`'s, below, as it is for the arrow keys.
+		const items: HTMLLIElement[] = choices.map((name) => {
 			const item = document.createElement('li');
 			item.setAttribute('role', 'option');
-			item.setAttribute('aria-selected', String(i === active));
 			item.dataset.name = name;
-			item.dataset.index = String(i);
 			// One still to be finished says so: `%%today:countdown:…%%`.
 			item.textContent = `%%${name}${name.endsWith(':') ? '…' : ''}%%`;
 			return item;
@@ -104,7 +111,7 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 		}
 		list.replaceChildren(...items);
 		place();
-		list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+		mark();
 	};
 
 	/**
@@ -133,9 +140,7 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 	 */
 	const mark = () => {
 		if (!list) return;
-		for (const item of list.querySelectorAll<HTMLElement>('li[data-name]')) {
-			item.setAttribute('aria-selected', String(item.dataset.index === String(active)));
-		}
+		list.querySelectorAll<HTMLElement>('li[data-name]').forEach((item, i) => item.setAttribute('aria-selected', String(i === active)));
 		list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
 	};
 
@@ -186,7 +191,12 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 		cancelAnimationFrame(frame);
 		frame = requestAnimationFrame(update);
 	};
-	const onBlur = () => close();
+	const onBlur = () => {
+		close();
+		if (!changeOwed) return;
+		changeOwed = false;
+		node.dispatchEvent(new Event('change', { bubbles: true }));
+	};
 
 	// Listened on as a plain element: TypeScript cannot pick an overload of
 	// `addEventListener` for a union of two element types.

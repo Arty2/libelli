@@ -109,7 +109,8 @@ export function caretPoint(field: HTMLTextAreaElement | HTMLInputElement, offset
 		range.setEnd(node, after ? at + 1 : at);
 		const r = range.getBoundingClientRect();
 		if (!after && text[at - 1] === '\n') {
-			const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
+			// The line's start, scrolled sideways as the field is — the copy is.
+			const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft) - field.scrollLeft;
 			return { x: left, top: r.bottom, bottom: r.bottom + line };
 		}
 		return { x: after ? r.left : r.right, top: r.top, bottom: r.top + Math.max(r.height, line) };

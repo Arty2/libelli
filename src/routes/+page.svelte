@@ -644,11 +644,10 @@
 			// By what the rows hold, not by which objects they are: a lock, an
 			// undo, a live update rebuild every row and move none of them. A
 			// value is a string, so this compares references, not text.
-			const same = (a: Row, b: Row) => {
-				const x = Object.values(a);
-				const y = Object.values(b);
-				return x.length === y.length && x.every((v, k) => v === y[k]);
-			};
+			// Column by column, so a value moved to another column is a change,
+			// and nothing is allocated for a table of a thousand rows.
+			const columns = dataset.columns;
+			const same = (a: Row, b: Row) => columns.every((c) => a[c] === b[c]);
 			let moved = before.length !== rows.length;
 			for (let i = 0, changed = 0; !moved && i < rows.length; i++) {
 				if (rows[i] !== before[i] && !same(rows[i], before[i]) && ++changed > 1) moved = true;
@@ -1109,6 +1108,17 @@
 	 */
 	const quiet = $derived(editor === 'readonly' || editor === 'elsewhere' || editor === 'handed');
 
+	/**
+	 * Nothing of anybody's work read yet, so nothing drawn on the stage: what
+	 * it would draw is the app's default card, placeholders bare. While the
+	 * dialog waits in a tab that found the editor elsewhere; while a read-only
+	 * tab reads storage; while a tab that is the editor boots — on every start,
+	 * which used to flash the default card before the saved one.
+	 */
+	const unloaded = $derived.by(
+		() => editor === 'elsewhere' || (editor === 'readonly' && viewBooting) || (editor === 'here' && !ready)
+	);
+
 	/** The dialog brought back by the eye on the stage, in a read-only tab. */
 	let readOnlyAsk = $state(false);
 
@@ -1122,7 +1132,7 @@
 	/** How many — state, so the send effect skips its walk of the table while it is none. */
 	let watcherCount = $state(0);
 	/** A read-only tab still reading storage: a state sent meanwhile waits, or boot would write the older save over it. */
-	let viewBooting = false;
+	let viewBooting = $state(false);
 	let pendingLive: LiveState | null = null;
 
 	function applyLive(next: LiveState) {
@@ -3090,6 +3100,10 @@
 		if (editor === 'readonly' && event.key === 'Escape') {
 			if (helpOpen || whatsNewOpen || statusOpen) {
 				helpOpen = whatsNewOpen = statusOpen = false;
+			} else if (stageModalOpen) {
+				// Whatever else is over the stage closes, or stays — never has
+				// the read-only dialog put over it.
+				lightboxOpen = previewOpen = false;
 			} else if (!readOnlyAsk) readOnlyAsk = true;
 			return;
 		}
@@ -3814,7 +3828,7 @@
 	</div>
 {/if}
 
-<div class="app" class:view-only={quiet} class:unloaded={editor === 'elsewhere'} class:bare ondblclick={() => bare && (readOnlyAsk = true)} role="presentation">
+<div class="app" class:view-only={quiet} class:unloaded class:bare ondblclick={() => bare && (readOnlyAsk = true)} role="presentation">
 	<header class="toolbar">
 		<!-- The mark, and the theme: each press steps light, dark, dark with the
 		     page inverted (theme.ts), and a hover or a hold glances at the other

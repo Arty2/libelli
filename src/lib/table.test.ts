@@ -245,6 +245,13 @@ describe('printedText', () => {
 		expect(printedText('Espresso %%% 2.20')).toBe('Espresso  2.20');
 		// The README's own line: the leader, then a placeholder.
 		expect(printedText('Coffee %%% %%price%%')).toBe('Coffee  ');
+		// Two placeholders back to back are not a leader.
+		expect(printedText('%%first%%%%last%%')).toBe('');
+	});
+
+	it('pairs marks within a line only, as markdown.ts renders a line at a time', () => {
+		expect(printedText('**Note\nbody**')).toBe('**Note\nbody**');
+		expect(printedText('a `x\ny` b')).toBe('a `x\ny` b');
 	});
 
 	it('reads what markdown.ts reads: __bold__, and code as typed', () => {
