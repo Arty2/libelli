@@ -85,7 +85,7 @@ function ensureStyles() {
 .ws-layer .ws-space::after, .ws-layer .ws-nbsp::after { content: ''; top: 50%; left: 50%;
 	width: 0.24em; height: 0.24em; border-radius: 50%; box-sizing: border-box; transform: translate(-50%, -50%); opacity: 0.75; }
 .ws-layer .ws-space::after { background: var(--accent, #2563eb); }
-.ws-layer .ws-space.ws-wrap::after { background: none; border: 0.07em solid var(--accent, #2563eb); width: 0.32em; height: 0.32em; }
+.ws-layer .ws-space.ws-wrap::after { background: none; border: 0.085em solid var(--accent, #2563eb); }
 .ws-layer .ws-nbsp::after { background: var(--accent, #2563eb); border-radius: 0; }
 .ws-layer.ws-under { z-index: 0; }
 .ws-layer .ws-ph { color: var(--accent, #2563eb); }
