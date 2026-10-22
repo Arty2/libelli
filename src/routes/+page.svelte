@@ -230,7 +230,12 @@
 		theme = next;
 		peeking = false;
 		showTheme(next);
-		saveTheme(next);
+		// A read-only tab's theme is its own, for as long as it is open: the
+		// theme is stored for the browser, and storing it here would hand it to
+		// the editing tab the next time that one loads. Storage refuses a
+		// read-only tab's writes anyway (storage.ts); said here so it is not
+		// left to that. No tab follows another's theme as it changes.
+		if (editor !== 'readonly') saveTheme(next);
 	}
 
 	/**
@@ -296,10 +301,12 @@
 		onpointercancel: peekEnd
 	};
 
-	const themeTitle = $derived(
-		peekTheme(theme)
-			? `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}; hover or hold for a look at ${THEME_NAMES[peekTheme(theme) ?? theme].toLowerCase()}`
-			: `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}`
+	const themeTitle = $derived.by(
+		() =>
+			(peekTheme(theme)
+				? `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}; hover or hold for a look at ${THEME_NAMES[peekTheme(theme) ?? theme].toLowerCase()}`
+				: `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}`) +
+			(editor === 'readonly' ? ' — this read-only tab only, until it is closed' : '')
 	);
 
 	/** The interface's text size, as a multiple of the browser's default — see textsize.ts. */
@@ -4422,17 +4429,17 @@
 		{#if closeRefused}
 			<p class="close-refused">This browser only lets a tab close itself when a script opened it — close it from the tab bar.</p>
 		{/if}
-		<!-- In the order asked for, right to left: Close, Read Only, Open Here.
-		     Read Only is the default: looking is the safe answer to "it is open
-		     somewhere else", and Enter should not take the editing away from the
-		     other tab. -->
+		<!-- Close Tab at the far left, apart from the two ways of staying; then
+		     Open Here, and Read Only last, the default: looking is the safe answer
+		     to "it is open somewhere else", and Enter should not take the editing
+		     away from the other tab. -->
 		<div class="modal-actions">
+			<button disabled={takingOver} onclick={closeTab} title="Close this tab; the other one keeps editing">Close Tab</button>
 			<span class="spacer"></span>
 			<button disabled={takingOver} onclick={() => void useHere()} title="Edit here; the other tab stops editing">
 				{takingOver ? 'Moving it here…' : 'Open Here'}
 			</button>
 			<button class="primary" data-default disabled={takingOver} onclick={readOnlyHere} title="Show the card being edited in the other tab, as it changes; nothing here is saved">Read Only</button>
-			<button disabled={takingOver} onclick={closeTab}>Close</button>
 		</div>
 	</div>
 {/if}

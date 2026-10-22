@@ -8,7 +8,7 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.30.1 — 2026-10-22
+## 0.30.2 — 2026-10-22
 
 - Drag a CSV, TSV or template JSON onto the app to open it as a new table or template; what was open is saved first. A file it cannot read is named in the status bar with the reason.
 - Import in the table menu opens a CSV as a new table too; Paste still fills the open one. A file already in your library opens that copy instead of a second one. Whitespace, beside the row height, shows spaces, tabs and line ends where you type.
