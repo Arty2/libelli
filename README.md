@@ -36,7 +36,9 @@ Open libelli in a second tab and it asks what to do, because only one tab
 edits at a time: **Open Here** moves the editing to this tab, **Read Only**
 shows the card being edited in the other tab, updating as it changes and
 following the row it is on, and **Close** closes this tab. A read-only tab
-saves nothing; the eye beside the card brings the choice back.
+saves nothing; the eye beside the card brings the choice back. Put a
+read-only tab in full screen and it shows the card alone, fitted to the
+screen, as a display; leaving full screen brings the rest back.
 
 ## Data
 

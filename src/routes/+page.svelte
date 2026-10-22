@@ -972,6 +972,38 @@
 		setTimeout(() => (closeRefused = true), 300);
 	}
 
+	/**
+	 * Whether the window is full screen, either way it gets there: the
+	 * Fullscreen API for a page that asked, and the window filling the screen
+	 * for the browser's own (F11, ⌃⌘F), which that API does not report and
+	 * `display-mode: fullscreen` reports only in some browsers. The size is
+	 * compared within a pixel, for the rounding a zoomed display does.
+	 */
+	let fullscreen = $state(false);
+	$effect(() => {
+		const query = matchMedia('(display-mode: fullscreen)');
+		const read = () =>
+			(fullscreen =
+				!!document.fullscreenElement ||
+				query.matches ||
+				(Math.abs(window.innerWidth - screen.width) <= 1 && Math.abs(window.innerHeight - screen.height) <= 1));
+		read();
+		document.addEventListener('fullscreenchange', read);
+		query.addEventListener('change', read);
+		window.addEventListener('resize', read);
+		return () => {
+			document.removeEventListener('fullscreenchange', read);
+			query.removeEventListener('change', read);
+			window.removeEventListener('resize', read);
+		};
+	});
+	/**
+	 * Read only and full screen: the card and nothing else, as a display — no
+	 * toolbar, no status line, no eye. Leaving full screen brings them back,
+	 * which is the way out, so nothing on screen has to say it.
+	 */
+	const bare = $derived(editor === 'readonly' && fullscreen);
+
 	/** The dialog brought back by the eye on the stage, in a read-only tab. */
 	let readOnlyAsk = $state(false);
 
@@ -3626,7 +3658,7 @@
 	</div>
 {/if}
 
-<div class="app" class:view-only={editor === 'readonly'}>
+<div class="app" class:view-only={editor === 'readonly'} class:bare>
 	<header class="toolbar">
 		<!-- The mark, and the theme: each press steps light, dark, dark with the
 		     page inverted (theme.ts), and a hover or a hold glances at the other
@@ -3955,7 +3987,7 @@
 			spacingGuides={ui.spacingGuides ?? true}
 			gridStyle={ui.gridStyle}
 			{selectedIds}
-			zoom={ui.zoom}
+			zoom={editor === 'readonly' ? 'fit' : ui.zoom}
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
 			theme={shownTheme}
 			{activeRow}
@@ -5221,6 +5253,13 @@
 	/* Read only: the card and nothing to work it with — the mark stays, for
 	   the theme, and the status line, which says what this tab is. */
 	.view-only .toolbar > :not(.brand) {
+		display: none;
+	}
+
+	/* Full screen as well: the card alone, on the stage's ground. */
+	.bare .toolbar,
+	.bare .status-bar,
+	.bare :global(.view-eye) {
 		display: none;
 	}
 

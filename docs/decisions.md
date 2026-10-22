@@ -175,6 +175,17 @@ the table per settled change while somebody watches. Close calls
 `window.close()`, which a browser honours only for a tab a script opened; when
 it does not, the dialog says to close it from the tab bar.
 
+**Full screen and read only is the card alone** (`bare` in +page): no toolbar,
+status line or eye, and a read-only stage is always at Fit. Full screen is read
+three ways, because each misses a case: `document.fullscreenElement` for a page
+that asked, `display-mode: fullscreen` where a browser reports its own, and the
+window filling the screen to a pixel for F11 or ⌃⌘F where it does not — which
+also counts a borderless window the size of the screen, an acceptable miss for
+a tab that is only showing a card. Leaving full screen is the way back, so
+nothing on screen has to say it. (Playwright's `setViewportSize` resizes the
+emulated screen with the window; testing this takes CDP's
+`Emulation.setDeviceMetricsOverride` with the screen size held apart.)
+
 ## `src/lib/template.ts`
 
 **Stacking is array order**, not a z-index: `arrangeBoxes` moves boxes within the
