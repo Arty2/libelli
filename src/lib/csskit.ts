@@ -82,7 +82,7 @@ function header(template: Template): string[] {
 		(f): f is string => !!f
 	);
 	return [
-		`/* Page ${round(page.w)} × ${round(page.h)} mm, margins ${round(m.top)} ${round(m.right)} ${round(m.bottom)} ${round(m.left)}, bleed ${round(bleedFor(template.bleed))}${template.facing ? ', facing pages' : ''}.`,
+		`/* Page ${round(page.w)} × ${round(page.h)} mm, margins ${round(m.top)} ${round(m.right)} ${round(m.bottom)} ${round(m.left)}, bleed ${round(bleedFor(template.bleed))}${template.facing ? ', facing pages' : ''}, lang ${template.lang ?? 'en'}.`,
 		`   Text ${inComment(d.font)} ${round(d.size)}pt/${round(d.lineHeight)} ${inComment(d.color)}.`,
 		...wrap(`Fonts: ${inComment(fonts.join(', '))}.`, '   '),
 		// Read-only, and it says so: they are the page settings coming out to the
@@ -133,6 +133,11 @@ function selectors(template: Template): string[] {
 		'.area { }',
 		...areas,
 		'.page-number { }',
+		// Only where a countdown is, since that is the only place they exist:
+		// its words are CSS, for translating with :lang() as the separator is.
+		...(template.boxes.some((b) => /countdown/i.test(b.static?.text ?? ''))
+			? [`${'.countdown-unit.days::before { }'.padEnd(21)} /* also .day .hour(s) .minute(s); .countdown.past::after is "ago" */`]
+			: []),
 		// A page's id and classes sit on box-less wrappers (`display: contents`),
 		// so a rule on one of them itself paints nothing: written in front of
 		// what they style, which is the form the kit shows.

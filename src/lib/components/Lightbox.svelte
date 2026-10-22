@@ -16,11 +16,13 @@
 		background: string | null;
 		/** stored images by name, for the areas whose cells point at one */
 		images?: Record<string, string>;
+		/** the page's clock, so a countdown shown full screen moves on as the stage's does — see Card */
+		clock?: number;
 		onactivate: (index: number) => void;
 		onclose: () => void;
 	}
 
-	let { template, dataset, lookupRows, mapping, index, background, images = {}, onactivate, onclose }: Props =
+	let { template, dataset, lookupRows, mapping, index, background, images = {}, clock = 0, onactivate, onclose }: Props =
 		$props();
 
 	let viewport = $state({ w: 1200, h: 800 });
@@ -567,6 +569,7 @@
 				rows={lookupRows}
 				{background}
 				{images}
+				{clock}
 			/>
 		</span>
 		{#if sensed}

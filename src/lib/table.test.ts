@@ -3,6 +3,7 @@ import {
 	appendRows,
 	compareCells,
 	countText,
+	printedText,
 	deleteRows,
 	dropTarget,
 	inArrivalOrder,
@@ -230,5 +231,43 @@ describe('runOf', () => {
 		expect(runOf(arrival)).toBe(dataset.rows);
 		expect(runOf([...arrival])).toBeUndefined();
 		expect(runOf(undefined)).toBeUndefined();
+	});
+});
+
+describe('printedText', () => {
+	it('leaves out the Markdown that only marks words up', () => {
+		expect(printedText('## A **bold** and *quiet* ~~old~~ ==lit== `code` word')).toBe('A bold and quiet old lit code word');
+		expect(printedText('- one\n2. two\n---\n[link](https://a.example) and [red]{#c00}')).toBe('one\ntwo\n\nlink and red');
+	});
+
+	it('leaves out placeholders and tab leaders, whose letters never print', () => {
+		expect(printedText('Dear %%name%%, %%today:YYYY%%')).toBe('Dear , ');
+		expect(printedText('Espresso %%% 2.20')).toBe('Espresso  2.20');
+		// The README's own line: the leader, then a placeholder.
+		expect(printedText('Coffee %%% %%price%%')).toBe('Coffee  ');
+		// Two placeholders back to back are not a leader.
+		expect(printedText('%%first%%%%last%%')).toBe('');
+	});
+
+	it('pairs marks within a line only, as markdown.ts renders a line at a time', () => {
+		expect(printedText('**Note\nbody**')).toBe('**Note\nbody**');
+		expect(printedText('a `x\ny` b')).toBe('a `x\ny` b');
+	});
+
+	it('reads what markdown.ts reads: __bold__, and code as typed', () => {
+		expect(printedText('__Hi__')).toBe('Hi');
+		expect(printedText('`**x**` and **y**')).toBe('**x** and y');
+	});
+
+	it('counts a mark that is not notation as the text it is', () => {
+		// One `*` alone is printed; two on a line are italics to markdown.ts too.
+		expect(printedText('5 * 3 = 15, #tag')).toBe('5 * 3 = 15, #tag');
+		expect(printedText('50% off, 20% more')).toBe('50% off, 20% more');
+	});
+});
+
+describe('countText, as printed', () => {
+	it('counts the words, not their markup', () => {
+		expect(countText('**Hi** %%name%%')).toEqual({ characters: 3, words: 1 });
 	});
 });

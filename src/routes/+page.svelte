@@ -7,6 +7,7 @@
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
+	import OverflowProbe from '$lib/components/OverflowProbe.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Lightbox from '$lib/components/Lightbox.svelte';
 	import OptionsBar from '$lib/components/OptionsBar.svelte';
@@ -22,6 +23,8 @@
 		uploadBackgroundImage
 	} from '$lib/assets';
 	import { download, fileStem } from '$lib/download';
+	import { droppedKind, mightTakeDrag, sameTable, sameTemplate, tableNameFrom } from '$lib/dropfile';
+	import { parseTable } from '$lib/parse';
 	import {
 		deleteStoredFont,
 		ensureGoogleFont,
@@ -81,7 +84,7 @@
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { codeStats } from '$lib/csscode';
 	import { watchPresses } from '$lib/haptics';
-	import { GONE_ROW, carryLookups, isKeyword, referencedColumns } from '$lib/placeholders';
+	import { GONE_ROW, carryLookups, isKeyword, placeholderWait, referencedColumns } from '$lib/placeholders';
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
 	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
@@ -136,11 +139,13 @@
 		storageAvailable,
 		saveUi,
 		type DatasetEntry,
-		type TemplateEntry
+		type TemplateEntry,
+		setReadOnly
 	} from '$lib/storage';
-	import { REFERENCE_FRAME } from '$lib/frame';
+	import { mayHaveMoved, toFile } from '$lib/frame';
+	import { openLive, type LiveState } from '$lib/live';
 	import { claimEditor, type EditorLock } from '$lib/tablock';
-	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
+	import type { Box, ColorSources, Dataset, FontRef, Mapping, Row, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
@@ -225,7 +230,12 @@
 		theme = next;
 		peeking = false;
 		showTheme(next);
-		saveTheme(next);
+		// A read-only tab's theme is its own, for as long as it is open: the
+		// theme is stored for the browser, and storing it here would hand it to
+		// the editing tab the next time that one loads. Storage refuses a
+		// read-only tab's writes anyway (storage.ts); said here so it is not
+		// left to that. No tab follows another's theme as it changes.
+		if (editor !== 'readonly') saveTheme(next);
 	}
 
 	/**
@@ -291,10 +301,12 @@
 		onpointercancel: peekEnd
 	};
 
-	const themeTitle = $derived(
-		peekTheme(theme)
-			? `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}; hover or hold for a look at ${THEME_NAMES[peekTheme(theme) ?? theme].toLowerCase()}`
-			: `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}`
+	const themeTitle = $derived.by(
+		() =>
+			(peekTheme(theme)
+				? `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}; hover or hold for a look at ${THEME_NAMES[peekTheme(theme) ?? theme].toLowerCase()}`
+				: `${THEME_NAMES[theme]} — press for ${THEME_NAMES[nextTheme(theme)].toLowerCase()}`) +
+			(editor === 'readonly' ? ' — this read-only tab only, until it is closed' : '')
 	);
 
 	/** The interface's text size, as a multiple of the browser's default — see textsize.ts. */
@@ -432,33 +444,6 @@
 	/** Deleting a table asks, for the same reason deleting a template does. */
 	let deletingTable = $state(false);
 	const tableName = $derived(dataset.name?.trim() || UNTITLED_TABLE);
-
-	/**
-	 * Every template this browser holds, written once in the file's new frame —
-	 * each area at its reference point, with the marker that says so (frame.ts).
-	 * A template written before is read as it was written, top-left, and saved
-	 * back; one already marked is left alone, so this costs a read per template
-	 * and nothing more once it has run. Awaited at boot, before anything is
-	 * read for the screen or could be saved over it, so it never races the
-	 * autosave. One that will not read is left as it is, for boot to say so.
-	 *
-	 * The bridge is meant to be short — see LEGACY_TOP_LEFT_UNTIL: by then every
-	 * browser that has opened the app has been through this, and this goes too.
-	 */
-	async function rewriteStoredTemplates() {
-		const rewrite = async (raw: unknown, save: (t: Template) => Promise<unknown>) => {
-			if (!raw || (raw as Template).frame === REFERENCE_FRAME) return;
-			try {
-				await save(normaliseTemplate(raw));
-			} catch {
-				/* unreadable: left for boot to report */
-			}
-		};
-		await rewrite(await loadTemplate(), saveTemplate);
-		for (const { id } of await listTemplates()) {
-			await rewrite(await loadTemplateDoc(id), (t) => saveTemplateDoc(id, t));
-		}
-	}
 
 	async function refreshTables() {
 		tables = await listDatasets();
@@ -635,6 +620,61 @@
 	/** The status line, whole, in a dialog — it is one ellipsised row otherwise. */
 	let statusOpen = $state(false);
 
+	/**
+	 * Rows whose card runs off the page, and the areas that do it, by id — from
+	 * OverflowProbe, while the table is open. Named here rather than there, so
+	 * a rename shows at once without waiting for the next pass.
+	 */
+	let overflowRows = $state(new Map<number, string[]>());
+	/**
+	 * The marks are by row index, and a pass takes a moment to come back: a row
+	 * added, deleted or moved shifts every index after it, and the marks would
+	 * sit on the wrong cards until then. So they go the moment the rows move,
+	 * and come back with the pass. An edit replaces one row; a move or a sort
+	 * replaces several places at once, and that is what is told apart here.
+	 */
+	let markedRows: readonly Row[] = [];
+	$effect(() => {
+		const rows = dataset.rows;
+		// Compared without subscribing to every row: only the array is watched.
+		untrack(() => {
+			const before = markedRows;
+			markedRows = rows;
+			if (before === rows || !overflowRows.size) return;
+			// By what the rows hold, not by which objects they are: a lock, an
+			// undo, a live update rebuild every row and move none of them. A
+			// value is a string, so this compares references, not text.
+			// Column by column, so a value moved to another column is a change,
+			// and nothing is allocated for a table of a thousand rows.
+			const columns = dataset.columns;
+			const same = (a: Row, b: Row) => columns.every((c) => a[c] === b[c]);
+			let moved = before.length !== rows.length;
+			for (let i = 0, changed = 0; !moved && i < rows.length; i++) {
+				if (rows[i] !== before[i] && !same(rows[i], before[i]) && ++changed > 1) moved = true;
+			}
+			if (moved) overflowRows = new Map();
+		});
+	});
+	const overflowAreas = $derived(
+		new Map(
+			[...overflowRows].map(([i, ids]) => [
+				i,
+				ids.map((id) => template.boxes.find((b) => b.id === id)?.slot ?? 'an unnamed area')
+			])
+		)
+	);
+
+	/** A line for the status bar, not yet shown — so several can become one. */
+	type Said = { text: string; tone: 'info' | 'warning' };
+
+	/**
+	 * Said of a template saved before 0.28 that has areas set right, centre or
+	 * bottom: it is read at reference points now (frame.ts), so those areas
+	 * may sit off by their width or height, and the next save keeps that.
+	 */
+	const MAY_HAVE_MOVED =
+		'It was saved before libelli 0.28, so areas aligned right, centre or bottom may have moved by their width or height — check them before printing.';
+
 	function notify(text: string, tone: 'info' | 'warning' = 'info') {
 		status = text;
 		statusTone = tone;
@@ -765,6 +805,51 @@
 	/** The box the menu was opened on, whether or not it is the only one chosen. */
 	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
 	const row = $derived(dataset.rows[activeRow] ?? null);
+
+	/**
+	 * The clock a live `%%today…%%` runs on — a countdown, or a date at midnight.
+	 *
+	 * Not a timer that ticks: it works out, from the card on screen, when the
+	 * first thing on it would next read differently (`placeholderWait`), and
+	 * sleeps until exactly then — a minute for a count in minutes, hours for
+	 * one in days, and not at all for a card with nothing live on it. Asked
+	 * again when the card changes, which costs an `includes` per text without
+	 * one. Stopped while the tab is hidden, and woken when it is shown again,
+	 * since that is when anybody can see it. `clockTick` only says "fill the words
+	 * again"; the time is read then (Card), so it is never a stale one.
+	 */
+	let clockTick = $state(0);
+	let tabHidden = $state(false);
+	const liveTexts = $derived.by(() => {
+		const texts: string[] = [];
+		// One level down as well: a static area's words are `static.text`.
+		for (const box of template.boxes)
+			for (const value of Object.values(box)) {
+				if (typeof value === 'string') texts.push(value);
+				else if (value && typeof value === 'object')
+					for (const inner of Object.values(value)) if (typeof inner === 'string') texts.push(inner);
+			}
+		if (row) for (const value of Object.values(row)) texts.push(value);
+		return texts;
+	});
+	$effect(() => {
+		void clockTick;
+		if (tabHidden) return;
+		const wait = placeholderWait(liveTexts, row, Date.now());
+		if (!Number.isFinite(wait)) return;
+		// setTimeout holds 32 bits of milliseconds — 24.8 days; a longer wait
+		// wakes then and works it out again.
+		const timer = setTimeout(() => clockTick++, Math.min(wait, 2 ** 31 - 1));
+		return () => clearTimeout(timer);
+	});
+	$effect(() => {
+		const seen = () => {
+			tabHidden = document.hidden;
+			if (!tabHidden) clockTick++;
+		};
+		document.addEventListener('visibilitychange', seen);
+		return () => document.removeEventListener('visibilitychange', seen);
+	});
 	const slots = $derived(usedSlots(template));
 	/** Areas that are not wholly on the sheet, half off or all off — see `strayBoxes`. */
 	const strays = $derived(
@@ -865,9 +950,12 @@
 	 * lock answers; `here` holds it and boots; `elsewhere` found it held and
 	 * never loads anything, so it has nothing to save over the other tab's
 	 * work; `handed` gave it to another tab, having saved first, and has
-	 * stopped saving.
+	 * stopped saving; `readonly` was asked to show what is saved while
+	 * another tab edits, and can write nothing (`setReadOnly` in storage.ts).
 	 */
-	let editor = $state<'checking' | 'here' | 'elsewhere' | 'handed'>('checking');
+	let editor = $state<'checking' | 'here' | 'elsewhere' | 'handed' | 'readonly'>('checking');
+	/** Close was pressed and the browser kept the tab open: only a tab a script opened may close itself. */
+	let closeRefused = $state(false);
 	let editorLock: EditorLock | null = null;
 	/** The boot under way, for a handover to wait out — see `handOver`. */
 	let booting: Promise<void> | null = null;
@@ -924,12 +1012,212 @@
 			takingOver = false;
 			return;
 		}
-		if (editor === 'handed') location.reload();
+		// A read-only copy is as old as the moment it was read, and storage
+		// is still switched off in it: a fresh start is the honest way back.
+		if (editor === 'handed' || editor === 'readonly') location.reload();
 		else {
 			editor = 'here';
 			takingOver = false;
 		}
 	}
+
+	/**
+	 * Show what is saved, and write none of it. A tab that never loaded reads
+	 * storage now, as boot does, with every write already refused; one that
+	 * handed its work on is holding exactly what it saved, so it keeps that.
+	 */
+	function readOnlyHere() {
+		readOnlyAsk = false;
+		if (editor === 'readonly') return;
+		setReadOnly(true);
+		const loaded = editor === 'handed';
+		editor = 'readonly';
+		if (!loaded) {
+			viewBooting = true;
+			booting = boot(true).finally(() => {
+				viewBooting = false;
+				if (pendingLive) applyLive(pendingLive);
+				pendingLive = null;
+			});
+		} else {
+			notify(READ_ONLY_NOTE);
+			live?.post({ kind: 'watching', id: liveId });
+		}
+	}
+
+	/** The status line in read-only mode, which is where it is said: there is no other furniture. */
+	const READ_ONLY_NOTE =
+		'Read only — showing the card being edited in another tab, as it changes. Nothing here is saved. Press the eye for Open Here.';
+
+	/**
+	 * A browser lets a tab close itself only when a script opened it, so a tab
+	 * opened by a person usually stays: then the dialog says to close it from
+	 * the tab bar, rather than the button doing nothing.
+	 */
+	function closeTab() {
+		window.close();
+		setTimeout(() => (closeRefused = true), 300);
+	}
+
+	/**
+	 * Whether the window is full screen, either way it gets there: the
+	 * Fullscreen API for a page that asked, and the window filling the screen
+	 * for the browser's own (F11, ⌃⌘F), which that API does not report and
+	 * `display-mode: fullscreen` reports only in some browsers. The size is
+	 * compared within a pixel, for the rounding a zoomed display does.
+	 */
+	let fullscreen = $state(false);
+	$effect(() => {
+		const query = matchMedia('(display-mode: fullscreen)');
+		// The size test only in an ordinary browser window: an installed app
+		// on a tablet fills the screen without being full screen, and would
+		// otherwise lose its controls the moment it went read only.
+		const browser = matchMedia('(display-mode: browser)');
+		const read = () =>
+			(fullscreen =
+				!!document.fullscreenElement ||
+				query.matches ||
+				(browser.matches && Math.abs(window.innerWidth - screen.width) <= 1 && Math.abs(window.innerHeight - screen.height) <= 1));
+		read();
+		document.addEventListener('fullscreenchange', read);
+		query.addEventListener('change', read);
+		window.addEventListener('resize', read);
+		return () => {
+			document.removeEventListener('fullscreenchange', read);
+			query.removeEventListener('change', read);
+			window.removeEventListener('resize', read);
+		};
+	});
+	/**
+	 * Read only and full screen: the card and nothing else, as a display — no
+	 * toolbar, no status line, no eye. Leaving full screen brings them back;
+	 * and since a guess at full screen can be wrong — a borderless window the
+	 * size of the screen — Escape or a double-click brings the dialog back too,
+	 * so the way out never depends on the guess.
+	 */
+	const bare = $derived(editor === 'readonly' && fullscreen);
+
+	/**
+	 * The pared-down view: read only, and also while the open-in-another-tab
+	 * dialog is waiting for an answer — found the editor elsewhere, or handed
+	 * the editing on. The bars and the table start closed behind the dialog
+	 * rather than open and then put away, so what it sits over is already
+	 * close to the read-only view most people choose. Not while the lock is
+	 * still being asked (`checking`): the editing tab passes through that on
+	 * every start, and its bars would flash shut and open again.
+	 */
+	const quiet = $derived(editor === 'readonly' || editor === 'elsewhere' || editor === 'handed');
+
+	/**
+	 * Nothing of anybody's work read yet, so nothing drawn on the stage: what
+	 * it would draw is the app's default card, placeholders bare. While the
+	 * dialog waits in a tab that found the editor elsewhere; while a read-only
+	 * tab reads storage; while a tab that is the editor boots — on every start,
+	 * which used to flash the default card before the saved one.
+	 */
+	const unloaded = $derived.by(
+		() => editor === 'elsewhere' || (editor === 'readonly' && viewBooting) || (editor === 'here' && !ready)
+	);
+
+	/** The dialog brought back by the eye on the stage, in a read-only tab. */
+	let readOnlyAsk = $state(false);
+
+	/**
+	 * Live read-only (live.ts): the editing tab sends what is on its screen
+	 * while a read-only tab is watching, and a read-only tab shows what it is
+	 * sent — the template, the table and the row being edited.
+	 */
+	/** The read-only tabs watching this one, by their ids — see live.ts. */
+	const watchers = new Set<string>();
+	/** How many — state, so the send effect skips its walk of the table while it is none. */
+	let watcherCount = $state(0);
+	/** A read-only tab still reading storage: a state sent meanwhile waits, or boot would write the older save over it. */
+	let viewBooting = $state(false);
+	let pendingLive: LiveState | null = null;
+
+	function applyLive(next: LiveState) {
+		const fontsChanged = JSON.stringify(next.template.fonts) !== JSON.stringify(template.fonts);
+		template = next.template;
+		dataset = next.dataset;
+		mapping = next.mapping;
+		templateId = next.templateId;
+		datasetId = next.datasetId;
+		activeRow = Math.max(0, Math.min(next.activeRow, next.dataset.rows.length - 1));
+		// A face the editor has just added: registered here as well, or this
+		// tab draws it in the fallback until it reloads.
+		if (fontsChanged) void ensureTemplateFonts(next.template).then((missing) => (missingFonts = missing));
+	}
+	/** This tab's id, should it be read-only. */
+	const liveId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Math.random());
+	const live = openLive((message) => {
+		if (message.kind === 'watching' && editor === 'here') {
+			watchers.add(message.id);
+			watcherCount = watchers.size;
+			sendLive();
+		} else if (message.kind === 'unwatching') {
+			watchers.delete(message.id);
+			watcherCount = watchers.size;
+		}
+		else if (message.kind === 'editor' && editor === 'readonly') live?.post({ kind: 'watching', id: liveId });
+		else if (message.kind === 'state' && editor === 'readonly') {
+			if (viewBooting) pendingLive = message.state;
+			else applyLive(message.state);
+		}
+	});
+
+	function sendLive() {
+		if (!live || !ready || !watchers.size) return;
+		live.post({
+			kind: 'state',
+			state: {
+				template: $state.snapshot(template),
+				dataset: $state.snapshot(dataset),
+				mapping: $state.snapshot(mapping),
+				activeRow,
+				templateId,
+				datasetId
+			}
+		});
+	}
+
+	// A moment after anything changes, as the autosave waits: a drag is one
+	// message when it settles, not one a frame.
+	$effect(() => {
+		if (!ready || !watcherCount) return;
+		watchDeep(template);
+		watchDeep(dataset);
+		watchDeep(mapping);
+		void [activeRow, templateId, datasetId];
+		const timer = setTimeout(sendLive, 250);
+		return () => clearTimeout(timer);
+	});
+
+	// A new editor says so, so that a read-only tab opened before it is
+	// watching it too.
+	$effect(() => {
+		if (ready) untrack(() => live?.post({ kind: 'editor' }));
+	});
+
+	// Gone for good — closed, reloaded, navigated away: the editor stops
+	// sending to it. `pagehide`, not `unload`, which a page in the back/forward
+	// cache never fires.
+	$effect(() => {
+		const leave = () => {
+			if (editor === 'readonly') live?.post({ kind: 'unwatching', id: liveId });
+		};
+		// Back from the back/forward cache, the same tab: it said it was going,
+		// so it says it is watching again.
+		const back = (event: PageTransitionEvent) => {
+			if (event.persisted && editor === 'readonly') live?.post({ kind: 'watching', id: liveId });
+		};
+		window.addEventListener('pagehide', leave);
+		window.addEventListener('pageshow', back);
+		return () => {
+			window.removeEventListener('pagehide', leave);
+			window.removeEventListener('pageshow', back);
+			live?.close();
+		};
+	});
 
 	// ---- boot ---------------------------------------------------------------
 
@@ -940,7 +1228,8 @@
 		booting = boot();
 	});
 
-	async function boot() {
+	/** `viewOnly`: a read-only tab — it reads as boot always does, and never turns the autosave on. */
+	async function boot(viewOnly = false) {
 		await migrateLegacyStorage();
 		// Asked before anything is read, because every read below resolves rather
 		// than rejecting: without this, a browser that is refusing to store
@@ -948,7 +1237,6 @@
 		// a returning user would be told their month of work was sample data.
 		const storable = await storageAvailable();
 		let unreadable = false;
-		if (storable) await rewriteStoredTemplates();
 
 		const storedTemplate = await loadTemplate();
 		// A first visit lands on the starter card locked: it is the tour, read
@@ -999,7 +1287,9 @@
 		// version asking to be pressed was easy to miss, and what changed is
 		// most worth reading the first time the new version is open. A first
 		// run has nothing it could have missed — see `seenAtBoot`.
-		if (seenAtBoot(loadSeenVersion(), firstRun, VERSION) !== VERSION) openWhatsNew();
+		if (viewOnly) {
+			/* What's new is for the tab you work in */
+		} else if (seenAtBoot(loadSeenVersion(), firstRun, VERSION) !== VERSION) openWhatsNew();
 		else if (firstRun) saveSeenVersion(VERSION);
 		previousTable = loadPreviousDatasetId();
 		void refreshTables();
@@ -1037,6 +1327,13 @@
 			dataOpen = false;
 		}
 		history = createHistory(snapshot());
+		if (viewOnly) {
+			notify(READ_ONLY_NOTE);
+			live?.post({ kind: 'watching', id: liveId });
+			missingFonts = await ensureTemplateFonts(template);
+			void refreshStoredFonts();
+			return;
+		}
 		ready = true;
 		if (!storable) {
 			// The autosave warning would otherwise land on top of this one a
@@ -1052,6 +1349,7 @@
 				'The saved template could not be read — perhaps a newer version of libelli wrote it — so this is the starter card. The saved one is kept in your templates, untouched, and your data too.',
 				'warning'
 			);
+		else if (mayHaveMoved(storedTemplate)) notify(`“${template.name}” is open. ${MAY_HAVE_MOVED}`, 'warning');
 		else if (firstRun)
 			notify('Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.');
 		missingFonts = await ensureTemplateFonts(template);
@@ -2193,7 +2491,8 @@
 		const stored = loadMapping(id, next.name);
 		mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(next), dataset.columns);
 		missingFonts = await ensureTemplateFonts(next);
-		notify(`“${next.name}” loaded. Your rows are untouched.`);
+		if (mayHaveMoved(doc)) notify(`“${next.name}” loaded. ${MAY_HAVE_MOVED}`, 'warning');
+		else notify(`“${next.name}” loaded. Your rows are untouched.`);
 	}
 
 	/**
@@ -2261,7 +2560,9 @@
 				return false;
 			}
 		};
-		if (untouched($state.snapshot(template))) {
+		// Through toFile: `untouched` reads a file, and the open template is
+		// memory — top-left — which a file reader would move (frame.ts).
+		if (untouched(toFile($state.snapshot(template)))) {
 			notify(`This is the A5 Starter Booklet, as it came.`);
 			return;
 		}
@@ -2386,16 +2687,28 @@
 		saveDatasetId(id);
 		dataset = doc;
 		activeRow = 0;
-		const kept = Object.fromEntries(
-			Object.entries(mapping).filter(([, column]) => doc.columns.includes(column))
-		);
-		mapping = Object.keys(kept).length ? kept : autoMap(usedSlots(template), doc.columns);
+		mapping = carriedMapping(doc.columns);
 		notify(`“${name}” opened — ${doc.rows.length} row${doc.rows.length === 1 ? '' : 's'}. Your design is untouched.`);
 	}
 
-	/** A name nothing else in the library is already using. */
-	function freeTableName(wanted: string): string {
-		const taken = new Set(tables.filter((e) => e.id !== datasetId).map((e) => e.name));
+	/**
+	 * The bindings a table opened in place of this one keeps. Those that still
+	 * point at a column that exists stay, because the usual reason to have two
+	 * tables is that they have the same columns; when none survives, the
+	 * columns are guessed at afresh rather than left pointing at nothing.
+	 */
+	function carriedMapping(columns: string[]): Mapping {
+		const kept = Object.fromEntries(Object.entries(mapping).filter(([, column]) => columns.includes(column)));
+		return Object.keys(kept).length ? kept : autoMap(usedSlots(template), columns);
+	}
+
+	/**
+	 * A name nothing else in the library is already using. The open table's
+	 * own name counts as free — renaming it to itself is no clash — unless
+	 * the name is for a new table beside it.
+	 */
+	function freeTableName(wanted: string, beside = false): string {
+		const taken = new Set(tables.filter((e) => beside || e.id !== datasetId).map((e) => e.name));
 		if (!taken.has(wanted)) return wanted;
 		let n = 2;
 		while (taken.has(`${wanted} ${n}`)) n++;
@@ -2414,7 +2727,7 @@
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
 		saveDatasetId(datasetId);
-		dataset = { columns: [], rows: [], name: freeTableName('New table') };
+		dataset = { columns: [], rows: [], name: freeTableName('New table', true) };
 		activeRow = 0;
 		mapping = {};
 		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
@@ -2661,11 +2974,28 @@
 
 	/** Ctrl/Cmd +/− on the chosen areas: their type a point larger or smaller. */
 	function sizeSelectedText(direction: 1 | -1) {
-		if (template.locked) return;
+		// The chord was taken from the stage either way, so a press that changes
+		// nothing says why rather than looking like a key that does not work.
+		if (template.locked) {
+			notify('The template is locked — unlock it to change the type.', 'warning');
+			return;
+		}
 		const changed = stepTextSize(template.boxes, selectedIds, template.defaults.size, direction, MIN_SIZE);
-		if (!changed.length) return;
+		if (!changed.length) {
+			const allLocked = selectedBoxes.length > 0 && selectedBoxes.every((b) => b.locked);
+			notify(
+				allLocked
+					? 'The chosen areas are locked — unlock them to change the type, or press Escape and Ctrl/Cmd +/− zooms the page.'
+					: `The type is already at the smallest, ${MIN_SIZE} pt.`,
+				'warning'
+			);
+			return;
+		}
 		describe(direction > 0 ? 'Larger text' : 'Smaller text');
-		for (const box of changed) updateBox($state.snapshot(box) as Box);
+		// One replacement for all of them, not one per area: each would re-run
+		// the layout, the undo debounce and the autosave.
+		const byId = new Map(changed.map((box) => [box.id, stripUndefined($state.snapshot(box)) as Box]));
+		template = { ...template, boxes: template.boxes.map((b) => byId.get(b.id) ?? b) };
 	}
 
 	/** Move every chosen box one step along an axis of alignment. */
@@ -2762,6 +3092,21 @@
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
 
 	function onWindowKeydown(event: KeyboardEvent) {
+		// The one key a read-only tab answers. A dialog it can open — Help, What's
+		// new, the notice — is closed by it, as anywhere; with none open, it
+		// brings the read-only dialog, the only control there is when the card is
+		// shown alone. Never the second over the first: that one cannot be
+		// dismissed, and the first would be left under it.
+		if (editor === 'readonly' && event.key === 'Escape') {
+			if (helpOpen || whatsNewOpen || statusOpen) {
+				helpOpen = whatsNewOpen = statusOpen = false;
+			} else if (stageModalOpen) {
+				// Whatever else is over the stage closes, or stays — never has
+				// the read-only dialog put over it.
+				lightboxOpen = previewOpen = false;
+			} else if (!readOnlyAsk) readOnlyAsk = true;
+			return;
+		}
 		// A tab that is not the editor holds a stale copy behind its dialog:
 		// a delete or an undo there edits what nobody will see saved, and an
 		// undo across a template switch would write its id over the editor's.
@@ -3024,7 +3369,7 @@
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
 		saveDatasetId(datasetId);
-		dataset = { ...sample, name: freeTableName(sample.name ?? 'Getting Started') };
+		dataset = { ...sample, name: freeTableName(sample.name ?? 'Getting Started', true) };
 		activeRow = 0;
 		// Mapped the way a first run maps: this template's slots against the
 		// sample's columns, so the cards render rather than coming up blank.
@@ -3057,30 +3402,217 @@
 		const file = input.files?.[0];
 		input.value = '';
 		if (!file) return;
+		const said = await importTemplateFile(file);
+		notify(said.text, said.tone);
+	}
+
+	/**
+	 * A template file, opened as a new entry in the library. Shared by the
+	 * picker and a drop, and it reports rather than notifies so a drop of
+	 * several files can say what happened to each in one line.
+	 *
+	 * The file is read and checked before anything is saved or switched: one
+	 * that will not import leaves the design on screen exactly as it was.
+	 */
+	async function importTemplateFile(file: File): Promise<Said> {
+		// A read-only tab would say "saved in your templates" of a save that
+		// storage refused; a drop is refused before this, the picker here.
+		if (editor !== 'here') return { text: 'Read only — press Open Here to import into your templates.', tone: 'warning' };
+		let next: Template;
+		let raw: unknown;
 		try {
-			const raw = JSON.parse(await file.text());
-			await flushTemplate();
-			template = importedTemplate(raw);
-			selectedIds = [];
-			// An import joins the library rather than replacing what is loaded:
-			// a file someone handed you is a template you now have, not a
-			// correction to the one you were working on.
-			rememberTemplate(templateId);
-			templateId = nextTemplateId();
-			saveTemplateId(templateId);
-			// Never assume the mapping: a template is shared between spreadsheets.
-			// By name here, since a file arrives with no id — the one case where
-			// the name is the better key.
-			const stored = loadMapping(templateId, template.name);
-			mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(template), dataset.columns);
-			mappingPrompt = true;
-			missingFonts = await ensureTemplateFonts(template);
-			await saveTemplateDoc(templateId, $state.snapshot(template));
-			await refreshLibrary();
-			notify(`Loaded “${template.name}”.`);
+			raw = JSON.parse(await file.text());
+			next = importedTemplate(raw);
 		} catch (error) {
-			notify(error instanceof Error ? error.message : 'That file is not a template.', 'warning');
+			// JSON.parse's own message names a token and a column, which is the
+			// parser talking; what someone needs is which file, and that it is
+			// not a template.
+			const why = error instanceof SyntaxError
+				? 'it is not valid JSON'
+				: error instanceof Error ? error.message.replace(/\.$/, '') : 'it is not a template';
+			return { text: `“${file.name}” was not imported — ${why}.`, tone: 'warning' };
 		}
+		// The same file twice is the same template: opened, not copied again.
+		// What is open counts too, before it is saved over by the flush below.
+		if (sameTemplate(next, toFile($state.snapshot(template)))) {
+			return { text: `“${template.name}” is the template already open — nothing to import.`, tone: 'info' };
+		}
+		// Read at once rather than one after another: a library of forty is
+		// forty IndexedDB round trips before the drop does anything.
+		const others = library.filter((entry) => entry.id !== templateId);
+		const docs = await Promise.all(others.map((entry) => loadTemplateDoc(entry.id)));
+		const held = others.find((_, i) => sameTemplate(next, docs[i]));
+		if (held) {
+			await switchTemplate(held.id);
+			return { text: `“${file.name}” is already in your templates as “${template.name}” — opened that one.`, tone: 'info' };
+		}
+		settleProvisional();
+		// Both, though only the design is replaced: the table goes into the
+		// library at the same moment, so the pair you were on is what is saved,
+		// not one half of it and the other half on the autosave's next tick.
+		await Promise.all([flushTemplate(), flushDataset()]);
+		describe(`Import “${next.name}”`);
+		template = next;
+		selectedIds = [];
+		editingId = null;
+		// An import joins the library rather than replacing what is loaded:
+		// a file someone handed you is a template you now have, not a
+		// correction to the one you were working on.
+		rememberTemplate(templateId);
+		templateId = nextTemplateId();
+		saveTemplateId(templateId);
+		// Never assume the mapping: a template is shared between spreadsheets.
+		// By name here, since a file arrives with no id — the one case where
+		// the name is the better key.
+		const stored = loadMapping(templateId, template.name);
+		mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(template), dataset.columns);
+		mappingPrompt = true;
+		missingFonts = await ensureTemplateFonts(template);
+		await saveTemplateDoc(templateId, $state.snapshot(template));
+		await refreshLibrary();
+		const said = `Loaded “${template.name}” as a new template — the one you had is saved in your templates.`;
+		return mayHaveMoved(raw) ? { text: `${said} ${MAY_HAVE_MOVED}`, tone: 'warning' } : { text: said, tone: 'info' };
+	}
+
+	/**
+	 * A CSV or TSV file, opened as a new table in the library.
+	 *
+	 * Not poured into the open table: a file is a list you now have, and the
+	 * rows you were working on should still be there to go back to — the same
+	 * rule a template import follows. A drop and the table menu's Import both
+	 * come here; Paste is the way to fill the open table. Being a new table,
+	 * the open table's lock does not stand in its way.
+	 */
+	async function importTableFile(file: File): Promise<Said> {
+		if (editor !== 'here') return { text: 'Read only — press Open Here to import into your tables.', tone: 'warning' };
+		let parsed: Dataset;
+		try {
+			parsed = parseTable(await file.text());
+		} catch {
+			return { text: `“${file.name}” could not be read.`, tone: 'warning' };
+		}
+		// The emptiness policy for this caller: there is no table to lose, so a
+		// file of headers alone is a fine way to start one; a file of nothing
+		// is not a table.
+		if (!parsed.columns.length) {
+			return { text: `“${file.name}” was not imported — nothing in it reads as a table.`, tone: 'warning' };
+		}
+		// As Getting Started does: a table already in the library, untouched,
+		// is opened rather than copied, so a file imported twice is one table.
+		if (sameTable(parsed, dataset)) {
+			return { text: `“${tableName}” already holds exactly these rows — nothing to import.`, tone: 'info' };
+		}
+		const others = tables.filter((entry) => entry.id !== datasetId);
+		const docs = await Promise.all(others.map((entry) => loadDatasetDoc(entry.id)));
+		const held = others.find((_, i) => {
+			const doc = docs[i];
+			return !!doc && sameTable(parsed, doc);
+		});
+		if (held) {
+			await switchDataset(held.id);
+			return { text: `“${file.name}” is already in your tables as “${tableName}” — opened that one.`, tone: 'info' };
+		}
+		settleProvisional();
+		await Promise.all([flushTemplate(), flushDataset()]);
+		const name = freeTableName(tableNameFrom(file.name) || UNTITLED_TABLE, true);
+		describe(`Import “${name}”`);
+		rememberTable(datasetId);
+		datasetId = nextDatasetId();
+		saveDatasetId(datasetId);
+		dataset = { ...parsed, name };
+		activeRow = 0;
+		mapping = carriedMapping(parsed.columns);
+		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
+		await refreshTables();
+		const count = `${parsed.rows.length} row${parsed.rows.length === 1 ? '' : 's'}`;
+		return { text: `“${name}” imported as a new table, ${count} — the table you had is saved in your tables.`, tone: 'info' };
+	}
+
+	/**
+	 * Something being dragged over the app that it might take, for the hint
+	 * that says where it will go. A count rather than a flag: `dragenter` and
+	 * `dragleave` fire for every child the pointer crosses, in pairs. Cleared
+	 * by `onWindowDropCapture`.
+	 */
+	let dragDepth = $state(0);
+	const dragHint = $derived(dragDepth > 0);
+
+	function onWindowDragEnter(event: DragEvent) {
+		if (!event.dataTransfer?.types.includes('Files')) return;
+		if (!mightTakeDrag(Array.from(event.dataTransfer.items, (item) => item.type))) return;
+		dragDepth++;
+	}
+
+	function onWindowDragLeave(event: DragEvent) {
+		if (dragDepth > 0 && event.dataTransfer?.types.includes('Files')) dragDepth--;
+	}
+
+	/**
+	 * Drops that reached the window with nobody having taken them. The page
+	 * and an area take a picture and say so with `preventDefault` — an area
+	 * also stops the event, so the window never sees it bubble — and this is
+	 * how the drop, settled, tells the two cases apart.
+	 */
+	const unclaimedDrops = new WeakSet<Event>();
+
+	function onWindowDropBubble(event: DragEvent) {
+		if (!event.defaultPrevented) unclaimedDrops.add(event);
+		// Always: the browser's own answer to a dropped file is to navigate to
+		// it, which leaves the design behind.
+		event.preventDefault();
+	}
+
+	/**
+	 * Every drop, on its way down, before anything below can stop it. The files
+	 * are copied now — the list is emptied once the event is over — and dealt
+	 * with once the drop has settled, when it is known whether the page or an
+	 * area took a picture from it.
+	 */
+	function onWindowDropCapture(event: DragEvent) {
+		// Here rather than on the way back up: an area that takes a picture
+		// stops the event there, and the hint would outlive the drag.
+		dragDepth = 0;
+		const files = Array.from(event.dataTransfer?.files ?? []);
+		if (!files.length) return;
+		setTimeout(() => void settleDrop(files, !unclaimedDrops.has(event)));
+	}
+
+	/**
+	 * A dropped set of files, once the page has had its turn. When it took a
+	 * picture — the first in the set, as both of its drop targets take — the
+	 * rest still count: a picture dropped with a CSV used to place the
+	 * picture and lose the CSV without a word.
+	 *
+	 * Files one at a time, in order, so that a template and its table dropped
+	 * together arrive as a pair: each import saves what is open first, and two
+	 * at once would race over which was "open".
+	 */
+	async function settleDrop(files: File[], claimed: boolean) {
+		const placed = claimed ? files.find((f) => f.type.startsWith('image/')) : undefined;
+		const rest = files.filter((f) => f !== placed);
+		if (!rest.length) return;
+		// As the keys are refused there (`onWindowKeydown`): a tab that is not
+		// the editor holds a stale copy, and an import saves what is open first
+		// — over what the editing tab has saved since.
+		if (editor !== 'here') {
+			notify('Another tab is editing — press Open Here first, then drop the file again.', 'warning');
+			return;
+		}
+		const said: Said[] = placed ? [{ text: `“${placed.name}” placed.`, tone: 'info' }] : [];
+		for (const file of rest) {
+			const kind = droppedKind(file);
+			if (kind === 'template') said.push(await importTemplateFile(file));
+			else if (kind === 'table') said.push(await importTableFile(file));
+			else if (kind === 'image')
+				said.push({
+					text: placed
+						? `“${file.name}” was not placed — one picture goes in at a time.`
+						: `“${file.name}” is a picture — drop it on the page or on an area to place it.`,
+					tone: 'warning'
+				});
+			else said.push({ text: `“${file.name}” is not a file libelli can import — drop a CSV, TSV or template JSON.`, tone: 'warning' });
+		}
+		notify(said.map((s) => s.text).join(' '), said.some((s) => s.tone === 'warning') ? 'warning' : 'info');
 	}
 
 	async function handleFontUpload(file: File, family?: string) {
@@ -3267,10 +3799,10 @@
 
 </script>
 
-<!-- A file dropped anywhere but on an area is swallowed here. The browser's own
-     answer to a dropped image is to navigate to it, which leaves the design
-     behind — and the one place a drop means something is the card, which takes
-     it before this ever sees it. -->
+<!-- A file dropped anywhere the card did not take it ends up here — see
+     `settleDrop`. A template or a table is imported; anything else is
+     refused in the status line rather than left to the browser, whose answer
+     to a dropped file is to navigate to it. -->
 <Tooltip />
 
 <svelte:window
@@ -3278,13 +3810,25 @@
 	onafterprint={onAfterPrint}
 	onresize={() => (barFloor = 0)}
 	ondragover={(e) => e.preventDefault()}
-	ondrop={(e) => e.preventDefault()}
+	ondragenter={onWindowDragEnter}
+	ondragleave={onWindowDragLeave}
+	ondropcapture={onWindowDropCapture}
+	ondrop={onWindowDropBubble}
 />
 <svelte:head>
 	<title>libelli</title>
 </svelte:head>
 
-<div class="app">
+<!-- Where a dragged file will go, said before it is let go. It never takes the
+     pointer, so the page and its areas still see the drag and a picture can
+     still be dropped on one. -->
+{#if dragHint}
+	<div class="drop-hint" aria-hidden="true">
+		<p>Drop a CSV or a template JSON to open it as a new table or template — what is open now is saved first.</p>
+	</div>
+{/if}
+
+<div class="app" class:view-only={quiet} class:unloaded class:bare ondblclick={() => bare && (readOnlyAsk = true)} role="presentation">
 	<header class="toolbar">
 		<!-- The mark, and the theme: each press steps light, dark, dark with the
 		     page inverted (theme.ts), and a hover or a hold glances at the other
@@ -3405,7 +3949,7 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden}
+	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden && !quiet}
 		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
@@ -3590,7 +4134,7 @@
 
 	<main
 		bind:this={mainEl}
-		class:no-data={!dataOpen && !imagesOpen}
+		class:no-data={(!dataOpen && !imagesOpen) || quiet}
 		style={stacked
 			? trayShare !== null
 				? `--tray-h:${(trayShare * 100).toFixed(2)}%`
@@ -3600,6 +4144,10 @@
 				: ''}
 	>
 		<PagePreview
+			clock={clockTick}
+			viewOnly={quiet}
+			{bare}
+			onviewonly={() => (readOnlyAsk = true)}
 			{template}
 			{row}
 			{mapping}
@@ -3611,7 +4159,7 @@
 			spacingGuides={ui.spacingGuides ?? true}
 			gridStyle={ui.gridStyle}
 			{selectedIds}
-			zoom={ui.zoom}
+			zoom={quiet ? 'fit' : ui.zoom}
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
 			theme={shownTheme}
 			{activeRow}
@@ -3623,8 +4171,8 @@
 			{images}
 			onselect={selectBox}
 			onchange={updateBox}
-			onimagedrop={(box, file) => void handleImageDrop(box, file)}
-			onimagepagedrop={(file, x, y) => void (async () => placeImageOnPage(await storeImage(file), x, y, file))()}
+			onimagedrop={quiet ? undefined : (box, file) => void handleImageDrop(box, file)}
+			onimagepagedrop={quiet ? undefined : (file, x, y) => void (async () => placeImageOnPage(await storeImage(file), x, y, file))()}
 			onaction={describe}
 			onbounds={(show, ties) => (ui = { ...ui, showBounds: show, showTies: ties })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
@@ -3669,7 +4217,7 @@
 			ondelete={deleteBox}
 		/>
 
-		{#if dataOpen || imagesOpen}
+		{#if (dataOpen || imagesOpen) && !quiet}
 		<aside bind:this={asideEl} class:shutting={trayShutting}>
 			{#if !stacked}
 				<!-- The edge between the page and the table, dragged to share the
@@ -3727,13 +4275,29 @@
 					ontune={(family, change) => setFontTune(family, change, true)}
 				/>
 			{:else}
+			<!-- Mounted with the table, and only then: the mark it feeds is shown
+			     nowhere else, and the pass is work done behind someone typing. -->
+			<OverflowProbe
+				{template}
+				rows={dataset.rows}
+				{lookupRows}
+				{mapping}
+				{background}
+				{images}
+				onresult={(found) => (overflowRows = found)}
+			/>
 			<DataTable
+				{overflowAreas}
 				{dataset}
 				{tables}
 				tableId={datasetId}
 				{previousTable}
 				onselecttable={(id) => void switchDataset(id)}
 				onnewtable={() => void newDataset()}
+				onimportfile={async (file) => {
+					const said = await importTableFile(file);
+					notify(said.text, said.tone);
+				}}
 				{usedColumns}
 				onplacecolumn={placeColumn}
 				oncellfocus={flashColumn}
@@ -3749,6 +4313,8 @@
 				columnWidths={ui.columnWidths}
 				rowHeight={ui.rowHeight ?? 'medium'}
 				onrowheight={(rowHeight) => (ui = { ...ui, rowHeight })}
+				whitespace={!!ui.showWhitespace}
+				onwhitespace={(show) => (ui = { ...ui, showWhitespace: show || undefined })}
 				oncolumnwidths={(widths) => {
 					// Kept to the columns that exist, so an imported table does not
 					// carry the last one's widths around in this browser forever.
@@ -3866,30 +4432,43 @@
 	</footer>
 </div>
 
-{#if editor === 'elsewhere' || editor === 'handed'}
+{#if editor === 'elsewhere' || editor === 'handed' || (editor === 'readonly' && readOnlyAsk)}
 	<!-- Not dismissable: behind it is a tab that is not saving, and editing it
-	     would be work that goes nowhere. The one way on is to bring the editing
-	     here. -->
+	     would be work that goes nowhere. Three ways on: bring the editing here,
+	     look without editing, or leave. -->
 	<div class="modal-backdrop" role="presentation"></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="elsewhere-title" aria-describedby="elsewhere-text">
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="elsewhere-title" aria-describedby="elsewhere-text" use:armDefault>
 		<h2 id="elsewhere-title">Open in another tab</h2>
 		<p id="elsewhere-text">
-			{#if editor === 'handed'}
+			{#if editor === 'readonly'}
+				This tab is read only: it shows the card being edited in another tab, and saves nothing.
+			{:else if editor === 'handed'}
 				Your work moved to another tab, saved as you left it. This tab has stopped saving, so nothing here can
 				overwrite it.
 			{:else}
 				libelli is already open in another tab. One tab edits at a time, so that the two never save over each
 				other's work.
 			{/if}
+			Open it here to edit, or read it here without saving anything.
 		</p>
+		{#if closeRefused}
+			<p class="close-refused">This browser only lets a tab close itself when a script opened it — close it from the tab bar.</p>
+		{/if}
+		<!-- Close Tab at the far left, apart from the two ways of staying; then
+		     Open Here, and Read Only last, the default: looking is the safe answer
+		     to "it is open somewhere else", and Enter should not take the editing
+		     away from the other tab. -->
 		<div class="modal-actions">
+			<button disabled={takingOver} onclick={closeTab} title="Close this tab; the other one keeps editing">Close Tab</button>
 			<span class="spacer"></span>
-			<button class="primary" data-default disabled={takingOver} onclick={() => void useHere()}>
-				{takingOver ? 'Moving it here…' : 'Use Here'}
+			<button disabled={takingOver} onclick={() => void useHere()} title="Edit here; the other tab stops editing">
+				{takingOver ? 'Moving it here…' : 'Open Here'}
 			</button>
+			<button class="primary" data-default disabled={takingOver} onclick={readOnlyHere} title="Show the card being edited in the other tab, as it changes; nothing here is saved">Read Only</button>
 		</div>
 	</div>
 {/if}
+
 
 {#if statusOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (statusOpen = false)}></div>
@@ -4358,6 +4937,7 @@
 
 {#if lightboxOpen && dataset.rows.length}
 	<Lightbox
+		clock={clockTick}
 		{template}
 		{dataset}
 		{lookupRows}
@@ -4819,6 +5399,62 @@
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-input);
 		background: #fff;
+	}
+
+	.drop-hint {
+		position: fixed;
+		inset: 8px;
+		z-index: 39;
+		pointer-events: none;
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		border: 2px dashed var(--accent);
+		border-radius: 6px;
+		background: color-mix(in srgb, var(--accent-wash) 60%, transparent);
+	}
+
+	.drop-hint p {
+		margin: 0 16px 48px;
+		padding: 8px 12px;
+		max-width: 32rem;
+		border-radius: var(--radius-button);
+		background: var(--accent);
+		color: #fff;
+		font-size: 0.75rem;
+		text-align: center;
+	}
+
+	/* Read only: the card and nothing to work it with — the mark stays, for
+	   the theme, and the status line, which says what this tab is. */
+	/* Only what is about the app rather than the work: the theme, and Help
+	   with the about in it. Everything that edits or opens the design goes. */
+	.view-only .toolbar > :not(.brand, .spacer, .theme, .help) {
+		display: none;
+	}
+
+	/* On a phone the mark is centred out of the flow (below), and the bar took
+	   its height from the buttons beside it; read only has none, and the bar
+	   shut over the mark. As tall as the mark, with the phone's padding. */
+	.view-only .toolbar {
+		min-height: calc(1.8125rem + 12px);
+	}
+
+	/* Full screen as well: the card alone, on the stage's ground. */
+	.bare .toolbar,
+	.bare .status-bar {
+		display: none;
+	}
+
+	/* Found the editor elsewhere and read nothing yet: what the stage would
+	   draw is the app's default, not anybody's work — placeholders and all —
+	   so behind the dialog it draws nothing until a choice loads the real one. */
+	.unloaded :global(.stage .page) {
+		visibility: hidden;
+	}
+
+	.close-refused {
+		color: #b42318;
 	}
 
 	.modal-backdrop {

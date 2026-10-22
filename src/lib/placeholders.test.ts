@@ -11,8 +11,17 @@ import {
 	formatDate,
 	openPlaceholder,
 	placeholderChoices,
-	referencedColumns
+	BUILT_IN_CHOICES,
+	referencedColumns,
+	COUNTDOWN_CLOSE,
+	COUNTDOWN_OPEN,
+	countdownMark,
+	countdownOf,
+	countdownWait,
+	momentOf,
+	placeholderWait
 } from './placeholders';
+import { flagCountdowns, renderMarkdown } from './markdown';
 import { normaliseTemplate } from './template';
 
 // Midday, so no timezone the test could run in can push it onto another day.
@@ -187,18 +196,33 @@ describe('typing a placeholder', () => {
 	});
 
 	it('finds a dashed column from the name typed with spaces', () => {
-		expect(placeholderChoices('first na', ['first-name', 'title'])).toEqual(['first-name']);
-		expect(placeholderChoices('First Na', ['first-name'])).toEqual(['first-name']);
+		expect(placeholderChoices('first na', ['first-name', 'title']).columns).toEqual(['first-name']);
+		expect(placeholderChoices('First Na', ['first-name']).columns).toEqual(['first-name']);
+	});
+
+	it('offers nothing for a query that shaping would empty, rather than everything', () => {
+		// Only the built-ins, which do hold a colon.
+		expect(placeholderChoices(':', ['title', 'body']).columns).toEqual([]);
+		expect(placeholderChoices(':', ['title', 'body']).builtIn).toContain('page:current');
+		expect(placeholderChoices('.', ['title', 'body'])).toEqual({ builtIn: [], columns: [] });
+		// And still finds a name that does hold what was typed.
+		expect(placeholderChoices(':', ['a:b']).columns).toEqual(['a:b']);
 	});
 
 	it('offers columns that start with it first, then ones that contain it, and today', () => {
-		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual(['title', 'today', 'subtitle', 'page:current', 'page:total']);
-		expect(placeholderChoices('', ['a', 'date'])).toEqual(['a', 'date', 'today', 'page:current', 'page:total']);
-		expect(placeholderChoices('page:t', ['title'])).toEqual(['page:total']);
+		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual({
+			builtIn: ['today', 'today:countdown:', 'toc:', 'page:current', 'page:total', 'lookup:next:'],
+			columns: ['title', 'subtitle']
+		});
+		expect(placeholderChoices('', ['a', 'date'])).toEqual({ builtIn: [...BUILT_IN_CHOICES], columns: ['a', 'date'] });
+		expect(placeholderChoices('page:t', ['title'])).toEqual({ builtIn: ['page:total'], columns: [] });
+		expect(placeholderChoices('today:c', [])).toEqual({ builtIn: ['today:countdown:'], columns: [] });
+		// Past the keyword, a countdown's target can be a column.
+		expect(placeholderChoices('today:countdown:de', ['deadline', 'title'])).toEqual({ builtIn: [], columns: ['today:countdown:deadline'] });
 		// A column a keyword has taken is not offered as itself…
-		expect(placeholderChoices('', ['Today', 'lookup', 'Page', 'a'])).toEqual(['a', 'today', 'page:current', 'page:total']);
+		expect(placeholderChoices('', ['Today', 'lookup', 'Page', 'a']).columns).toEqual(['a']);
 		// …but is, after a lookup, which is the one way to reach it.
-		expect(placeholderChoices('lookup:2:', ['Today'])).toEqual(['lookup:2:Today']);
+		expect(placeholderChoices('lookup:2:', ['Today'])).toEqual({ builtIn: [], columns: ['lookup:2:Today'] });
 	});
 });
 
@@ -345,15 +369,129 @@ describe('a lookup into another row', () => {
 	});
 
 	it('offers columns once the row is typed, keeping the row', () => {
-		expect(placeholderChoices('lookup:3:pr', ['title', 'price'])).toEqual(['lookup:3:price']);
-		expect(placeholderChoices('lookup:3:', ['title'])).toEqual(['lookup:3:title']);
+		expect(placeholderChoices('lookup:3:pr', ['title', 'price']).columns).toEqual(['lookup:3:price']);
+		expect(placeholderChoices('lookup:3:', ['title']).columns).toEqual(['lookup:3:title']);
 	});
 });
 
 describe('%%toc:…%%', () => {
 	it('counts its column as used, and is offered as toc: and a column', () => {
 		expect(referencedColumns('%%toc:title%%', ['title', 'body'])).toEqual(['title']);
-		expect(placeholderChoices('toc:ti', ['title', 'body'])).toEqual(['toc:title']);
+		expect(placeholderChoices('toc:ti', ['title', 'body']).columns).toEqual(['toc:title']);
 		expect(isKeyword('toc')).toBe(true);
+	});
+});
+
+describe('%%today:countdown:…%%', () => {
+	const at = (s: string) => new Date(s);
+	const now = at('2026-12-20T10:00');
+	const fill = (text: string, row: Record<string, string> | null = null, when = now) => applyPlaceholders(text, { now: when, row });
+
+	it('picks one unit, rounding down as a countdown clock does', () => {
+		expect(fill('%%today:countdown:2026-12-25%%')).toBe('4 days');
+		expect(fill('%%today:countdown:2026-12-20T15:30%%')).toBe('5 hours');
+		expect(fill('%%today:countdown:2026-12-20T10:40%%')).toBe('40 minutes');
+		expect(fill('%%today:countdown:2026-12-21T10:00%%')).toBe('1 day');
+		expect(fill('%%today:countdown:2026-12-20T11:00%%')).toBe('1 hour');
+	});
+
+	it('takes a unit on the end, and a time whose colon is not one', () => {
+		expect(fill('%%today:countdown:2026-12-25:hours%%')).toBe('110 hours');
+		expect(fill('%%today:countdown:2026-12-20 18:00:m%%')).toBe('480 minutes');
+		expect(fill('%%today:countdown:2026-12-20T18:00%%')).toBe('8 hours');
+	});
+
+	it('counts up once the moment has passed', () => {
+		expect(fill('%%today:countdown:2026-12-17%%')).toBe('3 days ago');
+		expect(fill('%%today:countdown:2026-12-20T09:59%%')).toBe('1 minute ago');
+		expect(fill('%%today:countdown:2026-12-20T10:00%%')).toBe('0 minutes');
+	});
+
+	it('reads the target from a column, and marks a cell that is not a date', () => {
+		expect(fill('%%today:countdown:deadline%%', { deadline: '2026-12-22' })).toBe('1 day');
+		expect(fill('%%today:countdown:Due Date%%', { 'Due-Date': '2026-12-20T12:00' })).toBe('2 hours');
+		expect(fill('%%today:countdown:deadline%%', { deadline: '22/12/2026' })).toBe('%%today:countdown:deadline%%');
+		expect(applyPlaceholders('%%today:countdown:nope%%', { now, markUnknown: true })).toContain('today:countdown:nope');
+	});
+
+	it('takes a time in the hour a clock springs forward over, as the browser reads it', () => {
+		// Whatever this machine's zone: a real date and a real time of day.
+		expect(momentOf('2026-03-29T02:30')).not.toBeNull();
+		expect(momentOf('2026-03-08T02:30')).not.toBeNull();
+	});
+
+	it('refuses a date that rolled over', () => {
+		expect(momentOf('2026-04-31')).toBeNull();
+		expect(momentOf('2026-12-20T25:00')).toBeNull();
+		expect(momentOf('2026-12-20')).toBe(at('2026-12-20T00:00').getTime());
+	});
+
+	it('leaves the date formats as they were', () => {
+		expect(fill('%%today:YYYY-MM-DD%%')).toBe('2026-12-20');
+		expect(countdownOf('YYYY')).toBeNull();
+	});
+});
+
+describe('when the clock should next wake', () => {
+	const t = (s: string) => new Date(s).getTime();
+
+	it('wakes when the number turns over, in the unit it is shown in', () => {
+		// 4 days 14 hours left: the count drops to 3 days in 14 hours.
+		expect(countdownWait(t('2026-12-25'), t('2026-12-20T10:00'))).toBe(14 * 3_600_000 + 1);
+		// 40 minutes 30 seconds: in 30 seconds.
+		expect(countdownWait(t('2026-12-20T10:40'), t('2026-12-20T09:59:30'))).toBe(30_000 + 1);
+		// Counting up 3 days 2 hours: 4 days in 22 hours.
+		expect(countdownWait(t('2026-12-17T08:00'), t('2026-12-20T10:00'))).toBe(22 * 3_600_000);
+	});
+
+	it('never spins faster than a second, even on a boundary', () => {
+		expect(countdownWait(t('2026-12-20T10:01'), t('2026-12-20T10:00'))).toBe(1000);
+	});
+
+	it('is the soonest of every placeholder, midnight for a date, and Infinity for none', () => {
+		// Twenty seconds past the minute, as a real clock is.
+		const now = t('2026-12-20T23:30:20');
+		expect(placeholderWait(['%%today%%'], null, now)).toBe(29 * 60_000 + 40_000);
+		expect(placeholderWait(['no placeholders', '%%title%%'], null, now)).toBe(Infinity);
+		expect(placeholderWait(['%%today:countdown:2026-12-20T23:45%%', '%%today%%'], null, now)).toBe(40_000 + 1);
+		expect(placeholderWait(['%%today:countdown:deadline%%'], { deadline: '2026-12-21T00:10' }, now)).toBe(40_000 + 1);
+	});
+});
+
+describe('a countdown drawn as elements', () => {
+	const now = new Date('2026-12-20T10:00');
+
+	it('is marked for the card, and words for anything that reads text', () => {
+		const marked = applyPlaceholders('in %%today:countdown:2026-12-25%%', { now, markCountdown: true });
+		expect(marked).toBe(`in ${COUNTDOWN_OPEN}+4 days${COUNTDOWN_CLOSE}`);
+		expect(applyPlaceholders('%%today:countdown:2026-12-17%%', { now, markCountdown: true })).toBe(`${COUNTDOWN_OPEN}-3 days${COUNTDOWN_CLOSE}`);
+		expect(applyPlaceholders('in %%today:countdown:2026-12-25%%', { now })).toBe('in 4 days');
+	});
+
+	it('reads a mark back, and only one this file could have written', () => {
+		expect(countdownMark('+1 day')).toEqual({ past: false, n: 1, word: 'day' });
+		expect(countdownMark('-3 hours')).toEqual({ past: true, n: 3, word: 'hours' });
+		expect(countdownMark('+1 day"><b>')).toBeNull();
+		expect(countdownMark('+1 weeks')).toBeNull();
+	});
+
+	it('cannot be forged by a cell, with placeholders or without, or through one', () => {
+		const mark = `${COUNTDOWN_OPEN}-5 days${COUNTDOWN_CLOSE}`;
+		expect(applyPlaceholders(`plain ${mark}`, { markCountdown: true })).toBe('plain -5 days');
+		expect(applyPlaceholders('%%note%%', { markCountdown: true, row: { note: mark } })).toBe('-5 days');
+		// Left alone where nothing will read it as a mark.
+		expect(applyPlaceholders(`plain ${mark}`, {})).toBe(`plain ${mark}`);
+	});
+
+	it('cannot be forged by a cell holding the marks', () => {
+		const forged = `${COUNTDOWN_OPEN}+9 days${COUNTDOWN_CLOSE}`;
+		expect(applyPlaceholders(forged, { markCountdown: true })).toBe('+9 days');
+		expect(applyPlaceholders(`${forged} %%today%%`, { now, markCountdown: true })).toBe('+9 days 20 December 2026');
+	});
+
+	it('becomes fixed elements in rendered Markdown, and words inside an attribute', () => {
+		const html = flagCountdowns(renderMarkdown(applyPlaceholders('**%%today:countdown:2026-12-17%%**', { now, markCountdown: true }), { size: 10 }));
+		expect(html).toContain('<strong><span class="countdown past"><span class="countdown-number">3</span><span class="countdown-unit days"></span></span></strong>');
+		expect(flagCountdowns(`<a href="x${COUNTDOWN_OPEN}+2 hours${COUNTDOWN_CLOSE}">y</a>`)).toBe('<a href="x2 hours">y</a>');
 	});
 });

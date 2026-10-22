@@ -525,6 +525,12 @@ export interface Template {
 	 * know which edge they are on.
 	 */
 	facing?: boolean;
+	/**
+	 * The language the cards are in, as a tag (`el`, `pt-BR`): the card's
+	 * `lang`, for `:lang()` rules in `css`, hyphenation and quotes — lang.ts.
+	 * Absent is English.
+	 */
+	lang?: string;
 	/** author's own CSS, scoped to the card at render time */
 	css?: string;
 	/** freezes the whole design: no dragging, no resizing, no option changes */
@@ -637,6 +643,8 @@ export interface UiState {
 	trayHeightShare?: number;
 	/** How tall a table row may be; absent is `medium`, the height it always was. */
 	rowHeight?: RowHeight;
+	/** Spaces, tabs and line ends drawn in the cell being typed in and the full-size editor — whitespace.ts. */
+	showWhitespace?: boolean;
 }
 
 /** One line, a few lines, or as tall as the row's longest cell. */

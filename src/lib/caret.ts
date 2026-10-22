@@ -54,6 +54,71 @@ export interface CaretPlace {
 	bottom: number;
 }
 
+/** The hidden copy: the field's box, type and wrapping, laid where it is drawn and scrolled as it is. */
+function copyOf(field: HTMLTextAreaElement | HTMLInputElement, box: DOMRect, style: CSSStyleDeclaration): HTMLDivElement {
+	const copy = document.createElement('div');
+	for (const name of COPIED) copy.style[name] = style[name];
+	Object.assign(copy.style, {
+		position: 'fixed',
+		left: `${box.left - field.scrollLeft}px`,
+		// Scrolled as the field is, so the lines are where they are drawn.
+		top: `${box.top - field.scrollTop}px`,
+		width: `${box.width}px`,
+		height: 'auto',
+		visibility: 'hidden',
+		pointerEvents: 'none',
+		// A textarea wraps as pre-wrap does; an input keeps one line.
+		whiteSpace: field instanceof HTMLTextAreaElement ? 'pre-wrap' : 'pre',
+		overflowWrap: field instanceof HTMLTextAreaElement ? 'break-word' : 'normal'
+	});
+	return copy;
+}
+
+/**
+ * Where the caret at `offset` is drawn, in client pixels — the other way
+ * round from `caretPlace`: for a list that opens at the caret (complete.ts),
+ * which in a tall field is nowhere near the field's own edges. One range on
+ * one character, so it costs a layout, not a scan.
+ */
+export function caretPoint(field: HTMLTextAreaElement | HTMLInputElement, offset: number): { x: number; top: number; bottom: number } {
+	const text = field.value;
+	const box = field.getBoundingClientRect();
+	const style = getComputedStyle(field);
+	const line = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+	// Before any text at all — an empty field, or the caret at the very start
+	// of one that opens with a line break, where there is no character before
+	// it to measure and the one after it is the break: the first line's start,
+	// inside the border and padding, scrolled as the field is.
+	if (!text || (offset <= 0 && text[0] === '\n')) {
+		const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft) - field.scrollLeft;
+		const top = box.top + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop) - field.scrollTop;
+		return { x: left, top, bottom: top + line };
+	}
+	const copy = copyOf(field, box, style);
+	const node = document.createTextNode(text);
+	copy.append(node);
+	document.body.append(copy);
+	try {
+		const range = document.createRange();
+		// The character after the caret, at its left edge; at the very end, the
+		// last one, at its right — unless that is a line break, after which the
+		// caret starts the next line.
+		const at = Math.min(Math.max(offset, 0), text.length);
+		const after = at < text.length && text[at] !== '\n';
+		range.setStart(node, after ? at : Math.max(0, at - 1));
+		range.setEnd(node, after ? at + 1 : at);
+		const r = range.getBoundingClientRect();
+		if (!after && text[at - 1] === '\n') {
+			// The line's start, scrolled sideways as the field is — the copy is.
+			const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft) - field.scrollLeft;
+			return { x: left, top: r.bottom, bottom: r.bottom + line };
+		}
+		return { x: after ? r.left : r.right, top: r.top, bottom: r.top + Math.max(r.height, line) };
+	} finally {
+		copy.remove();
+	}
+}
+
 /**
  * The caret offset in `field` nearest the point (`x`, `y`, in client
  * pixels): before the character the point is on, or after it when the point
@@ -80,21 +145,7 @@ export function caretPlace(field: HTMLTextAreaElement | HTMLInputElement, x: num
 		const line = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
 		return { offset: 0, x: left, top, bottom: top + line };
 	}
-	const copy = document.createElement('div');
-	for (const name of COPIED) copy.style[name] = style[name];
-	Object.assign(copy.style, {
-		position: 'fixed',
-		left: `${box.left}px`,
-		// Scrolled as the field is, so the lines are where they are drawn.
-		top: `${box.top - field.scrollTop}px`,
-		width: `${box.width}px`,
-		height: 'auto',
-		visibility: 'hidden',
-		pointerEvents: 'none',
-		// A textarea wraps as pre-wrap does; an input keeps one line.
-		whiteSpace: field instanceof HTMLTextAreaElement ? 'pre-wrap' : 'pre',
-		overflowWrap: field instanceof HTMLTextAreaElement ? 'break-word' : 'normal'
-	});
+	const copy = copyOf(field, box, style);
 	const node = document.createTextNode(text);
 	copy.append(node);
 	document.body.append(copy);

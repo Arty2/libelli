@@ -110,22 +110,21 @@ the corner in memory, so nothing moves; the file's numbers follow it the next
 time it is written. Both directions use the declared width and height, and
 round to a ten-thousandth of a millimetre, so a round trip is exact.
 
-**The marker, not the schema, says which.** A file in the new frame carries
-`frame: 'reference'`. Anything without it is read top-left — an old file, and
-equally a template in memory — so a save path that somehow missed `toFile`
-writes a file that still reads true rather than one off by an area's width. The
-schema went to 6 as well, but only so that an older build, a cached install on
-another device, refuses a new file instead of reading it top-left.
+**One format, read one way.** A file carries `frame: 'reference'`, and every
+file is read at reference points whether it does or not. From 0.28 until 0.30
+an unmarked file was read top-left and boot rewrote every stored template once
+(`rewriteStoredTemplates`); at 0.30 that bridge, and the gate that held its
+date, were deleted. A file exported before 0.28 and opened now is read as
+reference points, and an area aligned right or bottom lands off by its width or
+height — the accepted cost of not carrying two formats forever. The schema went
+to 6 so an older build refuses a new file rather than reading it top-left.
 
-**Changed once, then the bridge goes.** Boot rewrites every stored template
-without the marker (`rewriteStoredTemplates`), awaited before anything is read
-for the screen, so it cannot race the autosave. The top-left reading stays
-until `LEGACY_TOP_LEFT_UNTIL` (0.30.0) for files people exported; at that
-version `npm run gates` fails until the unmarked path, the boot rewrite and the
-gate itself are deleted, leaving one format read one way. A file exported before
-0.28.0 and opened after that is read as reference points, and an area aligned
-right or bottom lands off by its width or height — the accepted cost of not
-carrying two formats forever.
+**The marker is now `toFile`'s guard, and memory must pass through it.** A
+template in memory is top-left and unmarked, which used to be harmless: it read
+as an old file, true. Now anything unmarked is read as reference points, so an
+in-memory template handed to `normaliseTemplate` — or to anything that reads a
+file, as A5 Starter's "untouched?" and an import's "already held?" do — goes
+through `toFile` first, or every area not set top-left moves.
 
 **Growing away from the reference point** is `resolveLayout`'s: an unanchored
 growing area set to the bottom grows up, one set to the middle grows both ways.
@@ -142,7 +141,7 @@ it never read, and no write path had to learn about tabs. Gating each save
 instead would have been a dozen guards, and the next save added would be the
 one without one.
 
-**Handed over, not stolen.** Use Here asks the holder over a
+**Handed over, not stolen.** Open Here (once Use Here) asks the holder over a
 BroadcastChannel; the holder writes everything at once, without the 300ms
 debounce, waits for it, stops, and only then lets go — so the new tab reads
 the latest of everything. A holder that does not answer in four seconds has the
@@ -156,6 +155,40 @@ what it gave.
 
 Web Locks and BroadcastChannel are both Baseline Widely available. Without
 them — no secure context — every tab edits, as before.
+
+**Read only is a switch in storage.ts, not a guard at each save.** A tab told
+another is editing offers Open Here, Read Only and Close. Read Only calls
+`setReadOnly`, after which `local`, every read-write IndexedDB transaction, the
+folder writes in assets.ts and the whole-database deletes do nothing — so no
+control left reachable can write, whatever it is. The tab boots as usual with
+`ready` never set, so no autosave or undo runs, and shows the card alone: no
+bars, no table, no pager, and an eye where the padlock goes, which brings the
+dialog back. Read Only is the dialog's default, since Enter should not take the
+editing away from the other tab.
+
+**Live, by sending the state, not a "saved".** `live.ts`: the editing tab posts
+its template, table, bindings and open row a quarter-second after a change, and
+only once a read-only tab has said it is watching; a read-only tab says so when
+it opens and whenever a new editor announces itself. Re-reading storage on a
+signal would race the save it was told about. The cost is a structured clone of
+the table per settled change while somebody watches. Close calls
+`window.close()`, which a browser honours only for a tab a script opened; when
+it does not, the dialog says to close it from the tab bar.
+
+**Full screen and read only is the card alone** (`bare` in +page): no toolbar,
+status line or eye, no shadow, on black, and a read-only stage is always at Fit
+— its own window's, refitted on every resize; the editing tab's zoom is not
+sent, since the two windows are different sizes. The stage is `data-true-color`
+and `data-display` then (app.css), so a dark theme neither turns the black white
+nor, in dark-page, turns the card over: a display shows it as it prints. Full screen is read
+three ways, because each misses a case: `document.fullscreenElement` for a page
+that asked, `display-mode: fullscreen` where a browser reports its own, and the
+window filling the screen to a pixel for F11 or ⌃⌘F where it does not — which
+also counts a borderless window the size of the screen, an acceptable miss for
+a tab that is only showing a card. Leaving full screen is the way back, so
+nothing on screen has to say it. (Playwright's `setViewportSize` resizes the
+emulated screen with the window; testing this takes CDP's
+`Emulation.setDeviceMetricsOverride` with the screen size held apart.)
 
 ## `src/lib/template.ts`
 
@@ -3438,6 +3471,60 @@ Chromium resolves against the row as drawn and Firefox — once it has
 padding there. The field sizes to its content now, and a press on the band
 under it focuses it.
 
+**A file dropped on the app opens as a new entry, never into the open one.**
+`dropfile.ts` sorts a drop by extension first, MIME type second — Windows
+reports a `.csv` as `application/vnd.ms-excel` wherever Excel is installed —
+and `settleDrop` in +page imports each file in order: a template through the
+same path as the picker, a table as a new table in the library, the way Getting
+Started starts one. Both save the open template and table first. The table
+menu's Import goes the same way: it used to replace the open table's rows,
+which made a file a correction to the list you had rather than a list of its
+own; Paste is how the open table is filled. A file whose contents the library
+already holds (`sameTable`, `sameTemplate` — a template compared as the file it
+would export) opens that copy instead of making "rows 2". Each file is read and checked before anything
+is switched, so one that fails leaves the screen as it was and says why, by
+name, in the status line. The page and an area take the first picture in a
+drop and call `preventDefault` (an area also stops the event), so the window
+copies the files on the way down (`ondropcapture`), notes on the way up whether
+anyone claimed the drop, and settles it a tick later: what the page did not
+take is still imported, so a picture and a CSV dropped together lose neither.
+
+**A template saved before 0.28 says so when it opens.** Unmarked files are read
+at reference points now (`frame.ts`), so one written top-left with areas set
+right, centre or bottom draws them off by their width or height. `mayHaveMoved`
+spots exactly those, and opening one — at boot, from the library, or by import
+— says to check them before printing, rather than leaving it to the paper.
+
+**A row is marked when its card runs off the page.** `grownPast` in layout.ts
+lays the areas out twice, at their designed size (no measurements) and at their
+measured one, and names each area that crosses a margin or the trim edge drawn
+the second way but not the first — so a Grow area that outgrows the page, and
+one anchored under it that it pushes off, count, while an area put in a margin
+on purpose counts only once it grows past the edge. Words have to be laid out to
+be measured and only the open row is on screen, so `OverflowProbe` renders the
+rest off-screen, twelve Cards at a time with three frames each to settle, after
+the inputs have stood still for 0.7 s, and again when a font finishes loading.
+It is mounted with the table and only then. About 3 s for 300 rows in headless
+Chromium, without slowing typing. The cost: a picture that loads after its
+batch has settled is not counted until the next pass, and the check is made on
+the right-hand page only — a mirror moves an area and its margins together.
+
+**Whitespace is a layer over the field, and only where the caret is.**
+`whitespace.ts`: a textarea cannot style a character, so the marks are a div
+laid over it holding the same text, transparent, each space and tab in a span
+whose mark is a zero-width `::after` — so nothing changes width, the layer wraps
+where the field wraps, and every mark sits on its character in any font. It
+copies the field's computed metrics rather than sharing a stylesheet, so one
+action fits a table cell and the full-size editor alike, and is placed by the
+two boxes on screen, since a table cell is a field's `offsetParent` without
+positioning anything. Built from text nodes, never HTML. Only on the cell being
+typed in and the full-size editor: on every cell it would be a second copy of
+the table. Off, the action costs nothing — no layer, observer or listener. It
+scrolls by moving an inner sheet (a transform), not by scrolling the layer,
+whose own scroll stops short of a textarea's; and it draws from the text it is
+handed, since stepping rows in the full-size editor reaches the action before
+the field's value changes.
+
 ## `src/lib/components/MenuSelect.svelte`
 
 **One menu, drawn like the template picker.** The zoom and both font menus were
@@ -3857,6 +3944,37 @@ Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
 mode; `rawContentOf` beside it is what the inline editor shows, because typing
 over a substituted date would mean typing over yesterday's.
 
+**A countdown is a format of `today`, and its clock sleeps.**
+`%%today:countdown:TARGET[:UNIT]%%` rides on `today` so no new keyword is taken
+from the columns (`date` would have been, and is a common one). The target is
+`YYYY-MM-DD[THH:MM]` or a column holding one — only that shape, since
+`03/04/2026` is a different month in different countries; anything else is
+marked. One unit, rounded down, picked by the span; past the moment it counts
+up. On screen it moves on without a ticking timer: `placeholderWait` works out
+from the card's texts when the first `%%today…%%` on it would next read
+differently — a countdown's next turn, or midnight for a date — and +page sleeps
+until then, so a count in days wakes once a day and a card with nothing live
+never wakes. It is asked again when the card changes, stopped while the tab is
+hidden, and woken when it is shown. What reaches Card is a counter (`clock`), not
+a time: the time is read as the words are filled, so it cannot be a stale one.
+Printing and PNGs read the time as they draw, as they always did.
+
+**A countdown's words are CSS, like the page number's separator.** Drawn, it
+is marked (`markCountdown`) and becomes `.countdown.past|future >
+.countdown-number + .countdown-unit.days`, the unit's word and "ago" being
+`::before`/`::after` content in Card's stylesheet — under `:where()`, so any
+rule a template writes wins, `:lang(el)` or not. The marks are two more
+private-use characters, turned into fixed spans after escaping (`flagCountdowns`
+for Markdown, the `marked` snippet for plain text) and read back through
+`countdownMark`, which accepts only digits and the six unit words, so a cell
+holding the characters cannot make markup. Anything that reads the words as text
+— a QR, an emptiness test — asks without the marks and gets English. Two plural
+forms only (one, other); a language with more gets the two.
+
+**The template's language is the card's `lang`** (lang.ts): a tag from the Page
+bar's list, or any valid one a file names, absent for English — which the card
+was hard-coded to, and which hyphenation was quietly using for every language.
+
 ## `src/lib/complete.ts`
 
 **One action for four fields.** The column list that `%%` opens is needed in a
@@ -3867,6 +3985,16 @@ handlers of its own. An action attaches to any of them, builds its list with
 scroller clips it, and writes a choice back with `input` and `change` events so
 each field's own handler sees it as typed. Its keys stop propagating only while
 the list is open, so Escape closes the list and not the dialog behind it.
+
+**Built-ins first, then the columns, and at the caret.** `placeholderChoices`
+returns two groups — `BUILT_IN_CHOICES`, the same in every table, then the
+columns — drawn with a rule between. A built-in ending in `:` is put in with the
+caret before its `%%`, where the next list (columns, for `lookup`, `toc` and a
+countdown's target) takes over. The list opens under the caret's line, or over
+it, and is kept inside the window by its own measured size: placed against the
+field, it ran off the screen from the full-size editor, which is most of the
+window. `caretPoint` (caret.ts) finds the caret with the same hidden copy
+`caretPlace` uses, one range on one character.
 
 **The query is matched as `findColumn` reads a name.** `%%first na` is on its
 way to the column stored as `first-name`, so the list matches the query both as

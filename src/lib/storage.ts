@@ -42,6 +42,20 @@ export const KEY_TEMPLATE_PREFIX = 'template:doc:';
 
 const hasWindow = () => typeof window !== 'undefined';
 
+/**
+ * A read-only tab: libelli is editing in another tab, and this one was asked
+ * only to show what is saved. Every write in the app comes through here —
+ * `local`, `tx` in read-write mode, the folder writes in assets.ts and the two
+ * deletes of the whole database — so this one switch stops them all, whatever
+ * the interface lets somebody press. The other way, a guard at each save, is
+ * a dozen guards and the next save added is the one without one.
+ */
+let readOnly = false;
+export const setReadOnly = (on: boolean) => {
+	readOnly = on;
+};
+export const isReadOnly = () => readOnly;
+
 export const local = {
 	get<T>(key: string, fallback: T): T {
 		if (!hasWindow()) return fallback;
@@ -53,7 +67,7 @@ export const local = {
 		}
 	},
 	set(key: string, value: unknown): void {
-		if (!hasWindow()) return;
+		if (!hasWindow() || readOnly) return;
 		try {
 			window.localStorage.setItem(`${PREFIX}:${key}`, JSON.stringify(value));
 		} catch {
@@ -61,7 +75,7 @@ export const local = {
 		}
 	},
 	remove(key: string): void {
-		if (!hasWindow()) return;
+		if (!hasWindow() || readOnly) return;
 		try {
 			window.localStorage.removeItem(`${PREFIX}:${key}`);
 		} catch {
@@ -69,7 +83,7 @@ export const local = {
 		}
 	},
 	clear(): void {
-		if (!hasWindow()) return;
+		if (!hasWindow() || readOnly) return;
 		try {
 			for (const key of Object.keys(window.localStorage)) {
 				if (key.startsWith(`${PREFIX}:`)) window.localStorage.removeItem(key);
@@ -167,6 +181,8 @@ function openDb(): Promise<IDBDatabase | null> {
 }
 
 function tx<T>(store: string, mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest): Promise<T | undefined> {
+	// Resolves as a failed write does, so every caller already knows what to do.
+	if (readOnly && mode !== 'readonly') return Promise.resolve(undefined);
 	return openDb().then(
 		(db) =>
 			new Promise<T | undefined>((resolve) => {
@@ -347,7 +363,7 @@ export async function listDatasets(): Promise<DatasetEntry[]> {
  * copying, so a second run finds nothing to do.
  */
 export async function migrateLegacyStorage(): Promise<void> {
-	if (!hasWindow()) return;
+	if (!hasWindow() || readOnly) return;
 
 	try {
 		for (const key of Object.keys(window.localStorage)) {
@@ -405,6 +421,7 @@ export async function migrateLegacyStorage(): Promise<void> {
 
 /** "Reset everything": drop every trace of this app from the browser. */
 export async function resetAll(): Promise<void> {
+	if (readOnly) return;
 	local.clear();
 	const db = await openDb();
 	if (db) {

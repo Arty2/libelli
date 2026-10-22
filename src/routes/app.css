@@ -74,7 +74,9 @@
    Inverted back, outermost first and once each: what keeps its own colours
    (`data-true-color`: the lightboxes, a swatch), a picture, and the page
    (`data-page`) — except in `dark-page`, where the page stays inverted and
-   only a page inside a `data-true-color` screen needs turning over again.
+   only a page inside a `data-true-color` screen needs turning over again —
+   except a display (`data-display`: a read-only tab in full screen), which
+   shows the card as it prints, on black, in every theme.
 
    Screen only: what prints is the page, and it is never inverted. */
 @media screen {
@@ -97,7 +99,7 @@
 			[data-true-color] *,
 			[data-page] *
 		),
-	:root[data-theme='dark-page'] [data-true-color] [data-page]:not([data-page] *) {
+	:root[data-theme='dark-page'] [data-true-color]:not([data-display]) [data-page]:not([data-page] *) {
 		filter: invert(1) hue-rotate(180deg);
 	}
 
@@ -232,6 +234,24 @@ html, body {
 	border-radius: 6px;
 	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
 	font: 0.75rem ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Kept to the window: placed at the caret (complete.ts), it scrolls rather
+   than running off a short screen. */
+.placeholder-complete {
+	max-height: calc(100dvh - 16px);
+	overflow-y: auto;
+}
+
+/* Between what the app knows and the table's columns. */
+.placeholder-complete li.rule {
+	height: 0;
+	margin: 4px 2px;
+	padding: 0;
+	border-top: 1px solid #e2e2e2;
+	border-radius: 0;
+	cursor: default;
+	pointer-events: none;
 }
 
 .placeholder-complete li {

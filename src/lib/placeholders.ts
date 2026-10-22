@@ -72,6 +72,14 @@ export interface PlaceholderContext {
 	 */
 	markUnknown?: boolean;
 	/**
+	 * Write a countdown as `COUNTDOWN_OPEN…COUNTDOWN_CLOSE` around its number
+	 * and unit rather than as English words, so the card can draw it as
+	 * elements whose words come from CSS — and a template can translate them
+	 * (`countdownMark`). For what is drawn; anything that reads the words as
+	 * text (a QR, a test for emptiness) leaves it off and gets English.
+	 */
+	markCountdown?: boolean;
+	/**
 	 * The column the text itself came out of, when it is a cell. A placeholder
 	 * naming it is a cell quoting itself: it is not filled in — once was always
 	 * the limit, and once only ever printed the placeholder back — and it is marked
@@ -102,6 +110,11 @@ export const TAB_MARK = '%%%';
 export const UNKNOWN_OPEN = '\uE010';
 export const UNKNOWN_CLOSE = '\uE011';
 const UNKNOWN_CHARS = /[\uE010\uE011]/g;
+
+/** Around a countdown drawn as elements — see `markCountdown`. Two more of the private-use characters. */
+export const COUNTDOWN_OPEN = '\uE012';
+export const COUNTDOWN_CLOSE = '\uE013';
+const COUNTDOWN_CHARS = /[\uE012\uE013]/g;
 
 const MONTHS = [
 	'January',
@@ -259,9 +272,6 @@ function pastTheEnd(lookup: LookupSpec, rows: readonly Row[] | undefined, row: R
 /** The words `%%…%%` means before it means any column. */
 export const KEYWORDS = ['today', 'lookup', 'page', 'toc'] as const;
 
-/** What `%%page:…%%` can ask for, as the completion offers them. */
-export const PAGE_PLACEHOLDERS = ['page:current', 'page:total'] as const;
-
 /**
  * A column whose name a keyword takes: `%%name%%` can never reach it,
  * because names are matched ignoring case and the keyword is tried first.
@@ -416,6 +426,159 @@ export function carryLookups(
 	};
 }
 
+// ---- countdowns ---------------------------------------------------------
+
+/**
+ * `%%today:countdown:TARGET%%`: the time to a moment, in one unit picked for
+ * it — "12 days", then "5 hours", then "40 minutes" — and once it has passed,
+ * the time since: "3 days ago". A unit on the end forces one:
+ * `%%today:countdown:2026-12-25:hours%%` is "300 hours".
+ *
+ * On `today` rather than a keyword of its own, so no new word is taken from
+ * the columns (see the top of this file): a format starting `countdown:` was
+ * never a useful date format.
+ *
+ * TARGET is a moment written `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM` (a space for
+ * the T will do), in this browser's time, or else a column, whose cell holds
+ * one written the same way — each row its own deadline. Only that shape, not
+ * whatever `Date.parse` accepts: `03/04/2026` is March in one country and
+ * April in the next, and a card that guessed would count to the wrong day
+ * unmarked. A cell that is not one is marked, as an unknown name is.
+ *
+ * A day is 24 hours and the number is rounded down, as a countdown clock
+ * reads: a day and twenty-three hours is "1 day".
+ */
+export type CountdownUnit = 'minutes' | 'hours' | 'days';
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+const UNIT_MS: Record<CountdownUnit, number> = { minutes: MINUTE, hours: HOUR, days: DAY };
+const UNIT_NAMES: Record<string, CountdownUnit> = {
+	m: 'minutes', minute: 'minutes', minutes: 'minutes',
+	h: 'hours', hour: 'hours', hours: 'hours',
+	d: 'days', day: 'days', days: 'days'
+};
+
+/** What follows `today:` when it is a countdown, split into its target and its unit; null when it is a date format. */
+export function countdownOf(format: string): { target: string; unit?: CountdownUnit } | null {
+	const match = /^\s*countdown\s*:(.*)$/i.exec(format);
+	if (!match) return null;
+	const rest = match[1];
+	// The unit is the last part only when it is one: a time's own colon
+	// (`18:00`) must not be read as a unit that is not there.
+	const colon = rest.lastIndexOf(':');
+	const unit = colon === -1 ? undefined : UNIT_NAMES[rest.slice(colon + 1).trim().toLowerCase()];
+	return { target: (unit ? rest.slice(0, colon) : rest).trim(), unit };
+}
+
+/** A moment written `YYYY-MM-DD` or `YYYY-MM-DD[T ]HH:MM`, in local time; null for anything else. */
+export function momentOf(text: string): number | null {
+	const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{1,2}):(\d{2}))?$/.exec(text.trim());
+	if (!m) return null;
+	const [y, mo, d, h, mi] = [m[1], m[2], m[3], m[4] ?? '0', m[5] ?? '0'].map(Number);
+	if (h > 23 || mi > 59) return null;
+	const date = new Date(y, mo - 1, d, h, mi);
+	// Rolled over — the 31st of April — is a typo, not a date. The day is the
+	// check, not the hour: a time in the hour a clock springs forward over
+	// (02:30 on the last Sunday of March, in Europe) does not exist, the
+	// browser reads it an hour on, and refusing it would mark a real deadline
+	// as a mistake.
+	if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return null;
+	return date.getTime();
+}
+
+const unitFor = (span: number, unit?: CountdownUnit): CountdownUnit =>
+	unit ?? (span >= DAY ? 'days' : span >= HOUR ? 'hours' : 'minutes');
+
+/** A countdown's parts: the number, its unit word as the count needs it (`day` for one, `days` otherwise), and whether it is time since. */
+export interface CountdownParts {
+	n: number;
+	word: 'minute' | 'minutes' | 'hour' | 'hours' | 'day' | 'days';
+	past: boolean;
+}
+
+export function countdownParts(target: number, now: number, unit?: CountdownUnit): CountdownParts {
+	const span = Math.abs(target - now);
+	const u = unitFor(span, unit);
+	const n = Math.floor(span / UNIT_MS[u]);
+	return { n, word: n === 1 ? (u.slice(0, -1) as CountdownParts['word']) : u, past: target < now && n > 0 };
+}
+
+/** The words a countdown prints: "12 days", "1 hour", "3 days ago", "0 minutes". */
+export function formatCountdown(target: number, now: number, unit?: CountdownUnit): string {
+	const { n, word, past } = countdownParts(target, now, unit);
+	return past ? `${n} ${word} ago` : `${n} ${word}`;
+}
+
+/**
+ * What a marked countdown holds, read back: `+12 days` or `-3 days` between
+ * the marks. Null for anything else — a mark only this file writes, but a
+ * cell is text and could hold the characters, so it is checked, not trusted.
+ */
+export function countdownMark(inner: string): CountdownParts | null {
+	const m = /^([+-])(\d+) (minutes?|hours?|days?)$/.exec(inner);
+	return m ? { past: m[1] === '-', n: Number(m[2]), word: m[3] as CountdownParts['word'] } : null;
+}
+
+/**
+ * How long until that countdown would print something else, in ms: the
+ * moment the number in its unit turns over, which is also where an unforced
+ * unit changes, since every boundary between units is a whole number of the
+ * smaller one. A clock that wakes then and only then — once a minute at
+ * most, once a day for a count in days — is all a card needs.
+ */
+export function countdownWait(target: number, now: number, unit?: CountdownUnit): number {
+	const diff = target - now;
+	const span = Math.abs(diff);
+	const step = UNIT_MS[unitFor(span, unit)];
+	// Counting down, the number drops when the span falls to the multiple
+	// below it; counting up, it rises when the span reaches the one above.
+	const wait = diff > 0 ? span - Math.floor(span / step) * step + 1 : (Math.floor(span / step) + 1) * step - span;
+	// Never sooner than a second: a boundary landed on exactly is not a reason to spin.
+	return Math.max(1000, wait);
+}
+
+/** Milliseconds to the next local midnight, when `%%today%%` turns over. */
+function untilMidnight(now: number): number {
+	const d = new Date(now);
+	return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime() - now;
+}
+
+/** A countdown's target, as a moment, for this row: written in, or read from a column; null when it is neither. */
+function countdownTarget(target: string, row: Row | null): number | null {
+	const written = momentOf(target);
+	if (written !== null) return written;
+	if (!row) return null;
+	const column = findColumn(target, Object.keys(row));
+	return column ? momentOf(String(row[column] ?? '')) : null;
+}
+
+/**
+ * How long until any `%%today…%%` in these texts would print something else:
+ * a countdown's next turn, or midnight for a date. Infinity when none would,
+ * which is when the clock should not run at all. Cheap on purpose — it is
+ * asked again every time the clock wakes and every time the card changes: a
+ * text with no `%%today` costs one `includes`.
+ */
+export function placeholderWait(texts: Iterable<string>, row: Row | null, now: number): number {
+	let soonest = Infinity;
+	for (const text of texts) {
+		if (!text || !text.includes('%%') || !/today/i.test(text)) continue;
+		for (const match of text.matchAll(PLACEHOLDER)) {
+			if (match[1].toLowerCase() !== 'today') continue;
+			const countdown = match[2] === undefined ? null : countdownOf(match[2]);
+			if (!countdown) {
+				soonest = Math.min(soonest, untilMidnight(now));
+				continue;
+			}
+			const target = countdownTarget(countdown.target, row);
+			if (target !== null) soonest = Math.min(soonest, countdownWait(target, now, countdown.unit));
+		}
+	}
+	return soonest;
+}
+
 /**
  * `find:replace` split at its first colon that is not written `\:`, or null
  * when there is none. `\:` is a colon in either part — the only escape, so a
@@ -430,9 +593,17 @@ function findReplace(spec: string): { find: string; replace: string } | null {
 }
 
 export function applyPlaceholders(text: string, context: PlaceholderContext = {}): string {
-	if (!text || !text.includes('%%')) return text;
-	// A cell cannot smuggle a mark in: the characters are the editor's.
-	if (context.markUnknown) text = text.replace(UNKNOWN_CHARS, '');
+	if (!text) return text;
+	// A cell cannot smuggle a mark in: the characters are the editor's. Before
+	// the test for `%%`, since a cell with none is drawn from this all the same,
+	// and on every value a placeholder brings in, since those are cells too.
+	const clean = (value: string) => {
+		if (context.markUnknown) value = value.replace(UNKNOWN_CHARS, '');
+		if (context.markCountdown) value = value.replace(COUNTDOWN_CHARS, '');
+		return value;
+	};
+	text = clean(text);
+	if (!text.includes('%%')) return text;
 	const row = context.row ?? null;
 	const columns = row ? Object.keys(row) : [];
 	let now: Date | undefined;
@@ -449,11 +620,11 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 			// Its own cell, reached the long way round, is still a cell quoting
 			// itself — see `self`.
 			if (!target || !column || (target === row && column === context.self)) return unknown(whole);
-			return String(target[column] ?? '');
+			return clean(String(target[column] ?? ''));
 		}
 		if (isToc(name)) {
 			const listed = format === undefined ? undefined : contents(format, context.run, row);
-			return listed === undefined ? unknown(whole) : listed;
+			return listed === undefined ? unknown(whole) : clean(listed);
 		}
 		if (name.toLowerCase() === 'page') {
 			// Left as written, and marked, where there is no run to count — the
@@ -464,13 +635,21 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 		}
 		if (name.toLowerCase() === 'today') {
 			now ??= context.now ?? new Date();
+			const countdown = format === undefined ? null : countdownOf(format);
+			if (countdown) {
+				const target = countdownTarget(countdown.target, row);
+				if (target === null) return unknown(whole);
+				if (!context.markCountdown) return formatCountdown(target, now.getTime(), countdown.unit);
+				const { n, word, past } = countdownParts(target, now.getTime(), countdown.unit);
+				return `${COUNTDOWN_OPEN}${past ? '-' : '+'}${n} ${word}${COUNTDOWN_CLOSE}`;
+			}
 			return formatDate(now, format?.trim() || DEFAULT_DATE_FORMAT);
 		}
 		const swap = format === undefined ? null : findReplace(format);
 		if ((format === undefined || swap) && row) {
 			const column = findColumn(name, columns);
 			if (column && column !== context.self) {
-				const value = String(row[column] ?? '');
+				const value = clean(String(row[column] ?? ''));
 				// An empty find would put the replacement between every letter.
 				return swap && swap.find ? value.split(swap.find).join(swap.replace) : value;
 			}
@@ -500,19 +679,41 @@ export function openPlaceholder(text: string, caret: number): { start: number; q
 }
 
 /**
- * What to offer for a query: the columns, then `today` and the page's two, those starting with
- * what was typed ahead of those merely containing it, ignoring case.
+ * What `%%` offers, built in: the keywords, as they are written. One ending
+ * in `:` wants more typed after it — a moment, a row, a column — and is put
+ * in with the caret before its closing `%%` (complete.ts), where the next
+ * list, of columns, takes over for `lookup` and `toc`.
  */
-export function placeholderChoices(query: string, columns: readonly string[]): string[] {
+export const BUILT_IN_CHOICES = [
+	'today',
+	'today:countdown:',
+	'page:current',
+	'page:total',
+	'lookup:next:',
+	'lookup:previous:',
+	'toc:'
+] as const;
+
+/**
+ * What to offer for a query, in two groups: what the app knows by itself —
+ * `today` and the rest, first, since it is the same in every table — and then
+ * the table's columns. In each, those starting with what was typed come ahead
+ * of those merely containing it, ignoring case.
+ */
+export function placeholderChoices(query: string, columns: readonly string[]): { builtIn: string[]; columns: string[] } {
 	// Past `lookup:3:`, what is being typed is a column again, and a choice
 	// has to keep the row it was typed with.
 	const lookup = /^(\s*lookup\s*:[^:]*:)([^:]*)$/i.exec(query);
-	if (lookup) return ranked(lookup[2], columns).map((name) => lookup[1] + name);
+	if (lookup) return { builtIn: [], columns: ranked(lookup[2], columns).map((name) => lookup[1] + name) };
+	// Past `today:countdown:`, a column, for a deadline in each row — or a
+	// moment typed in, which no list can offer.
+	const countdown = /^(\s*today\s*:\s*countdown\s*:)([^:]*)$/i.exec(query);
+	if (countdown) return { builtIn: [], columns: ranked(countdown[2], columns).map((name) => countdown[1] + name) };
 	// Past `toc:`, the same: a column, as the contents will list.
 	const toc = /^(\s*toc\s*:)([^:]*)$/i.exec(query);
-	if (toc) return ranked(toc[2], columns).map((name) => toc[1] + name);
+	if (toc) return { builtIn: [], columns: ranked(toc[2], columns).map((name) => toc[1] + name) };
 	// A column a keyword has taken is not offered: choosing it would print the keyword.
-	return ranked(query, [...columns.filter((c) => !isKeyword(c)), 'today', ...PAGE_PLACEHOLDERS]);
+	return { builtIn: ranked(query, BUILT_IN_CHOICES), columns: ranked(query, columns.filter((c) => !isKeyword(c))) };
 }
 
 function ranked(query: string, names: readonly string[]): string[] {
@@ -521,7 +722,10 @@ function ranked(query: string, names: readonly string[]): string[] {
 	// dashes offered nothing until the name was finished by hand. As written
 	// too, because the shaped form drops the colon of `page:cu`.
 	const typed = query.trim().toLowerCase();
-	const shaped = columnName(typed).toLowerCase();
+	// Only when shaping left something: `%%:` shapes to nothing, and every name
+	// starts with nothing, so the list offered every column for a character
+	// none of them holds.
+	const shaped = columnName(typed).toLowerCase() || typed;
 	const starts = names.filter((n) => {
 		const name = n.toLowerCase();
 		return name.startsWith(typed) || name.startsWith(shaped);

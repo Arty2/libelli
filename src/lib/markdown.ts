@@ -1,6 +1,6 @@
 import { parseColor } from './color';
 import type { Leader, ListMarker, ListNumbering, ListStyle, MarkdownStyle, ParagraphStyle } from './types';
-import { UNKNOWN_CLOSE, UNKNOWN_OPEN } from './placeholders';
+import { COUNTDOWN_CLOSE, COUNTDOWN_OPEN, UNKNOWN_CLOSE, UNKNOWN_OPEN, countdownMark, type CountdownParts } from './placeholders';
 
 /**
  * A deliberately small Markdown subset, written by hand so the app stays
@@ -563,4 +563,45 @@ export function flagUnknown(html: string): string {
 			gt + text.replace(MARKED, '<span class="unknown-placeholder">%%$1%%</span>')
 		)
 		.replace(STRAY, '%%');
+}
+
+/**
+ * A countdown drawn as elements, so its words can come from CSS: the number as
+ * text, and the unit and the "ago" as empty elements the card's stylesheet
+ * fills — `.countdown-unit.days::before { content: ' days' }` — which a
+ * template's own CSS can say in another language, as it can the page number's
+ * separator. `past` is on the whole, so a language that puts its "ago" first
+ * can use `::before` on it instead.
+ *
+ * Fixed markup: the number is digits and the unit one of six words, both
+ * checked by `countdownMark`, so nothing from a cell reaches a tag or a class.
+ * The plain-text renderer in Card builds the same elements from the same parts.
+ */
+export function countdownHtml(parts: CountdownParts): string {
+	return `<span class="countdown ${parts.past ? 'past' : 'future'}"><span class="countdown-number">${parts.n}</span><span class="countdown-unit ${parts.word}"></span></span>`;
+}
+
+const COUNTDOWN = new RegExp(`${COUNTDOWN_OPEN}([^${COUNTDOWN_OPEN}${COUNTDOWN_CLOSE}<>]*)${COUNTDOWN_CLOSE}`, 'g');
+const COUNTDOWN_STRAY = new RegExp(`[${COUNTDOWN_OPEN}${COUNTDOWN_CLOSE}]`, 'g');
+
+/**
+ * The marked countdowns in rendered Markdown, as elements — between tags only,
+ * as `flagUnknown` does. One that landed inside an attribute (a link's
+ * address) is put back as English words, which is what it would have been.
+ */
+export function flagCountdowns(html: string): string {
+	if (!html.includes(COUNTDOWN_OPEN)) return html;
+	const words = (inner: string) => {
+		const parts = countdownMark(inner);
+		return parts ? `${parts.n} ${parts.word}${parts.past ? ' ago' : ''}` : '';
+	};
+	return html
+		.replace(/(^|>)([^<]*)/g, (_whole, gt: string, text: string) =>
+			gt + text.replace(COUNTDOWN, (_m, inner: string) => {
+				const parts = countdownMark(inner);
+				return parts ? countdownHtml(parts) : '';
+			})
+		)
+		.replace(COUNTDOWN, (_m, inner: string) => words(inner))
+		.replace(COUNTDOWN_STRAY, '');
 }

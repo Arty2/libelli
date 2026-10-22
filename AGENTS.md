@@ -35,6 +35,7 @@ src/lib/
   keys.ts         keyboard chords -> intents, so the page only has to dispatch them
   gestures.ts     swipe; tooltip.ts where a tip goes; haptics.ts the buzz for a press
   caret.ts        the character of a text field a point lands on
+  whitespace.ts   spaces, tabs and line ends marked over a textarea, as a layer
   scrolledge.ts   which edges of a scroller have more, for the shadow that says so
   complete.ts     the column names `%%` offers; placeholders.ts what `%%name%%` resolves to
   modal.ts        the two-Enter rule every dialog with a default action shares
@@ -49,9 +50,12 @@ src/lib/
   table.ts        column reorder, row sorting
   imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
   download.ts     hand the browser a file; zip.ts packs several into one
+  dropfile.ts     what a file dropped on the app is: a template, a table, or neither
   template.ts     defaults (templates/default-card.json), validation, migration, import/export
-  frame.ts        a file's x, y at the reference point; memory's top-left; the bridge to 0.30
+  frame.ts        a file's x, y at the reference point; memory's top-left, through toFile
+  lang.ts         the template's language: the card's lang, for :lang() and hyphenation
   tablock.ts      one tab edits: a Web Lock, handed over on request after a save
+  live.ts         a read-only tab fed what the editing tab shows, over a BroadcastChannel
   fonts.ts        Google families + local files via FontFace/IndexedDB
   assets.ts       images — page backgrounds and a row's own; bytes in a folder or IndexedDB
   history.ts      undo/redo snapshots
@@ -74,6 +78,7 @@ src/lib/
     BitmapEditor.svelte the drawing surface, hosted in DataTable; saves a base64 PNG
     ImagesPanel.svelte  the Pictures tray: images, drawings, fonts; one large, to crop or turn
     Tooltip.svelte      every `title` as a tip: hover, or press and hold on touch
+    OverflowProbe       every row's card off-screen, for the table's runs-off-the-page mark
     PrintRoot, BoxMenu, SelectionTools, MenuSelect, ColorField, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   app state and wiring                                 (~4k)
@@ -196,6 +201,10 @@ reviewer may already have read the last one.
 - **Build the risky thing first.** **Tests cover the pure logic**; components are verified by driving them.
 - **Small commits with real messages.** What changed, why that shape, and what
   was verified. No model names in anything that lands in the repo.
+- **A button without a visible label is square**, as wide as it is tall — and
+  so is one whose label a narrow screen hides: left with the padding it had
+  for the word, it reads as a button with its label missing. Its name moves to
+  `title` and `aria-label`.
 - **Comments explain the why.** Not what the line does — why it is that way, and
   what breaks otherwise. Delete a comment that only restates the code.
 - **British spelling in prose and in identifiers** (`normalise`, `centre`) —

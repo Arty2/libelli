@@ -195,11 +195,57 @@ export function renumbering(before: Dataset, after: Dataset): Map<number, number
  * character limit means by it. Words are runs of anything that is not space.
  */
 export function countText(text: string): { characters: number; words: number } {
-	const trimmed = text.trim();
+	const printed = printedText(text);
+	const trimmed = printed.trim();
 	return {
-		characters: [...text].length,
+		characters: [...printed].length,
 		words: trimmed ? trimmed.split(/\s+/u).length : 0
 	};
+}
+
+/**
+ * The words a cell puts on the card, for counting: without the Markdown that
+ * only marks them up and without `%%placeholders%%`, whose own letters never
+ * print — what they stand for is another cell's to count — nor the `%%%` of a
+ * tab leader. The inline patterns are markdown.ts's own (`renderInline`), in
+ * its order, code spans lifted out first so what is inside one counts as
+ * typed; the block marks are its headings, bullets, numbers and rules. A mark
+ * the renderer would print as typed — a lone `*`, `#word` — is counted.
+ */
+export function printedText(text: string): string {
+	const inline = (part: string) =>
+		part
+			.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, '$1')
+			.replace(/\[([^\]]*)\]\{([^}\s]{1,32})\}/g, '$1')
+			.replace(/\*\*([^*]+)\*\*/g, '$1')
+			.replace(/__([^_]+)__/g, '$1')
+			.replace(/~~([^~]+)~~/g, '$1')
+			.replace(/==(?=[^\s=])([^=]*?[^\s=])==/g, '$1')
+			.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1$2');
+	// Line by line, as markdown.ts renders: a pair split by a line break is
+	// two lone marks there, printed as typed, and must count as such here.
+	// Odd pieces of a line are code, kept as typed; even ones are marked up.
+	const line = (text: string) =>
+		text
+			.split(/`([^`]+)`/)
+			.map((part, i) => (i % 2 ? part : inline(part)))
+			.join('');
+	return (
+		text
+			// A tab leader is exactly three signs (markdown.ts): `%%a%%%%b%%`
+			// holds four in a row, two placeholders back to back, not a leader.
+			// The leader first all the same, or `Coffee %%% %%price%%` would read
+			// `%% %%` as a placeholder, from the leader's middle to the price's start.
+			.replace(/(?<!%)%%%(?!%)/g, '')
+			.replace(/%%[^%\n]+?%%/g, '')
+			.replace(/^[ \t]*#{1,3}[ \t]+/gm, '')
+			.replace(/^[ \t]*[-*][ \t]+/gm, '')
+			.replace(/^[ \t]*\d+\.[ \t]+/gm, '')
+			.replace(/^[ \t]*-{3,}[ \t]*$/gm, '')
+			.split('\n')
+			.map(line)
+			.join('\n')
+	);
 }
 
 /**

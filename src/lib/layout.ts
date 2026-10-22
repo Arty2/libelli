@@ -126,6 +126,51 @@ export function resolveLayout({ boxes, measured, hidden }: LayoutInput): LayoutR
 	return { tops, heights };
 }
 
+/**
+ * The areas this card's words push off the page: drawn at their measured size,
+ * an area crosses a margin or the trim edge that the same area did not cross
+ * at the size it was designed at. A Grow area that grows past them, and one
+ * anchored under it that it pushes past them, are the cases — what the person
+ * sees as "this card ran off the page".
+ *
+ * Against the design rather than against the margins alone: an area put in a
+ * margin on purpose — a folio, a tab on the edge — is not overflow, but the
+ * same area grown off the paper is. Measured only on the stored (right-hand)
+ * page; a mirror moves an area and its margins together, so a crossing on one
+ * page is the same crossing on the other.
+ */
+export function grownPast(
+	boxes: Box[],
+	measured: Record<string, number>,
+	hidden: Set<string>,
+	page: { w: number; h: number },
+	margins: { top: number; right: number; bottom: number; left: number }
+): string[] {
+	const designed = resolveLayout({ boxes, measured: {}, hidden });
+	const drawn = resolveLayout({ boxes, measured, hidden });
+	// A hair past a line is the rounding of a measured height, not words cut off.
+	const EPS = 0.05;
+	const crossings = (r: Rect) => [
+		r.y < margins.top - EPS,
+		r.y < -EPS,
+		r.y + r.h > page.h - margins.bottom + EPS,
+		r.y + r.h > page.h + EPS,
+		r.x < margins.left - EPS,
+		r.x < -EPS,
+		r.x + r.w > page.w - margins.right + EPS,
+		r.x + r.w > page.w + EPS
+	];
+	const rectIn = (box: Box, layout: LayoutResult) =>
+		drawnBounds({ x: box.x, y: layout.tops[box.id] ?? box.y, w: box.w, h: layout.heights[box.id] ?? box.h }, box.rotation, box.centre);
+	return boxes
+		.filter((box) => {
+			if (hidden.has(box.id)) return false;
+			const before = crossings(rectIn(box, designed));
+			return crossings(rectIn(box, drawn)).some((crossed, i) => crossed && !before[i]);
+		})
+		.map((box) => box.id);
+}
+
 // ---- facing pages -----------------------------------------------------------
 
 /**

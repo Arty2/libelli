@@ -16,7 +16,7 @@
 	import Icon from './Icon.svelte';
 	import { backgroundStyle, cssUrl, localImageName, safeMediaUrl } from '$lib/assets';
 	import { parseColor } from '$lib/color';
-	import { UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders } from '$lib/placeholders';
+	import { COUNTDOWN_CLOSE, COUNTDOWN_OPEN, UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders, countdownMark, type CountdownParts } from '$lib/placeholders';
 	import { cssIdent, isPageId, scopeCss, styleTag } from '$lib/css';
 	import { cardVars } from '$lib/csskit';
 	import { fontStack, kindOf } from '$lib/fonts';
@@ -49,9 +49,10 @@
 		shrinkScale,
 		spacingReadouts,
 		referenceOf,
-		freedTop
+		freedTop,
+		grownPast
 	} from '$lib/layout';
-	import { flagUnknown, leaderStyle, renderMarkdown, tabSplit } from '$lib/markdown';
+	import { flagCountdowns, flagUnknown, leaderStyle, renderMarkdown, tabSplit } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
 	import { DEFAULT_ORPHANS, DEFAULT_WIDOWS, baselineOf, colorsFromRow, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
@@ -179,6 +180,26 @@
 		 * the template, and only the app knows which of the two it is holding.
 		 */
 		ontext?: (box: Box, value: string) => void;
+		/**
+		 * The areas this card's words push off the page (`grownPast`), each time
+		 * a measurement changes it — for the table's overflow mark, which renders
+		 * cards off-screen to read it.
+		 */
+		onoverflow?: (ids: string[]) => void;
+		/**
+		 * Bumped when a `%%today…%%` on the card would read differently — the
+		 * page's clock (`placeholderWait`). Only a signal: the time is read
+		 * when the words are filled, so it can never be a stale one.
+		 */
+		clock?: number;
+		/**
+		 * Fetch nothing: a picture at an http(s) address is counted as there but
+		 * not drawn, and the page's own is left off. For OverflowProbe, which
+		 * draws every row out of sight — five hundred rows were five hundred
+		 * requests nobody asked for (AGENTS.md). A picture's area is the size
+		 * it is given, so what it measures does not depend on the bytes.
+		 */
+		offline?: boolean;
 	}
 
 	let {
@@ -216,7 +237,10 @@
 		ondraw,
 		oneditcell,
 		underlay,
-		ontext
+		ontext,
+		onoverflow,
+		clock = 0,
+		offline = false
 	}: Props = $props();
 
 	let measured = $state<Record<string, number>>({});
@@ -317,7 +341,8 @@
 	 */
 	/** The rows in the order they print, for a contents — `runOf`. */
 	const run = $derived(runOf(rows));
-	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount });
+	// `clock` read for its change alone: it is what makes a countdown move on.
+	const contentOf = (box: Box): string => (void clock, applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount }));
 
 	/** The column a bound area's words come out of — the one they may not quote. */
 	const selfOf = (box: Box): string | undefined => (box.slot ? mapping[box.slot] : undefined);
@@ -331,20 +356,39 @@
 	 * measured for emptiness, or encoded into a QR.
 	 */
 	const shownTextOf = (box: Box): string =>
-		applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds });
+		(void clock, applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds, markCountdown: true }));
 
 	/** Text split around the marks, for plain text, which Svelte escapes itself. */
-	function segments(text: string): Array<{ text: string; unknown: boolean }> {
-		if (!text.includes(UNKNOWN_OPEN)) return [{ text, unknown: false }];
-		const out: Array<{ text: string; unknown: boolean }> = [];
-		for (const part of text.split(UNKNOWN_OPEN)) {
-			const end = part.indexOf(UNKNOWN_CLOSE);
+	type Segment = { text: string; unknown: boolean; countdown?: CountdownParts };
+
+	/** The countdowns in a run of plain text, as parts to draw — see `countdownHtml` in markdown.ts. */
+	function countdowns(text: string): Segment[] {
+		if (!text.includes(COUNTDOWN_OPEN)) return [{ text, unknown: false }];
+		const out: Segment[] = [];
+		for (const part of text.split(COUNTDOWN_OPEN)) {
+			const end = part.indexOf(COUNTDOWN_CLOSE);
+			const parts = end === -1 ? null : countdownMark(part.slice(0, end));
 			if (end === -1) {
 				if (part) out.push({ text: part, unknown: false });
 				continue;
 			}
-			out.push({ text: `%%${part.slice(0, end)}%%`, unknown: true });
+			if (parts) out.push({ text: '', unknown: false, countdown: parts });
 			if (end + 1 < part.length) out.push({ text: part.slice(end + 1), unknown: false });
+		}
+		return out;
+	}
+
+	function segments(text: string): Segment[] {
+		if (!text.includes(UNKNOWN_OPEN)) return countdowns(text);
+		const out: Segment[] = [];
+		for (const part of text.split(UNKNOWN_OPEN)) {
+			const end = part.indexOf(UNKNOWN_CLOSE);
+			if (end === -1) {
+				if (part) out.push(...countdowns(part));
+				continue;
+			}
+			out.push({ text: `%%${part.slice(0, end)}%%`, unknown: true });
+			if (end + 1 < part.length) out.push(...countdowns(part.slice(end + 1)));
 		}
 		return out;
 	}
@@ -363,7 +407,7 @@
 	 * reaching a `src` attribute: a cell is untrusted, and `safeMediaUrl` is the
 	 * only door between one and an `<img>`.
 	 */
-	function mediaOf(box: Box): { svg?: string; src?: string; color?: string } {
+	function mediaOf(box: Box): { svg?: string; src?: string; color?: string; remote?: true } {
 		if (box.static?.svg) return { svg: box.static.svg };
 		const written = box.slot ? contentOf(box) : (box.static?.dataUrl ?? box.static?.url ?? '');
 		const value = written.trim();
@@ -387,13 +431,14 @@
 			if (color) return { color };
 		}
 		const src = safeMediaUrl(value);
+		if (src && offline && /^https?:/i.test(src)) return { remote: true };
 		return src ? { src } : {};
 	}
 
 	const isEmpty = (box: Box) => {
 		if (shownAsMedia(box.mode)) {
 			const media = mediaOf(box);
-			return !(media.svg || media.src || media.color);
+			return !(media.svg || media.src || media.color || media.remote);
 		}
 		return contentOf(box).trim() === '';
 	};
@@ -546,6 +591,11 @@
 	);
 	const layout = $derived(resolveLayout({ boxes: template.boxes, measured, hidden }));
 
+	$effect(() => {
+		if (!onoverflow) return;
+		onoverflow(grownPast(template.boxes, measured, hidden, template.page, marginsOf(template.page)));
+	});
+
 	const bleed = $derived(bleedFor(template.bleed));
 	const customCss = $derived(scopeCss(template.css ?? '', '.trim'));
 
@@ -576,7 +626,7 @@
 			// The page's numbers, for the template's CSS to read — csskit.ts.
 			...cardVars(template).map(([name, value]) => `${name}:${value}`),
 			`background-color:${template.page.background ?? '#ffffff'}`,
-			...backgroundStyle(template.page.image, background)
+			...(offline ? [] : backgroundStyle(template.page.image, background))
 		].join(';');
 	}
 
@@ -941,8 +991,9 @@
 			// box's own offsetHeight is unchanged, so anchoring still measures right.
 			`justify-content:${VALIGN_TO_FLEX[box.valign ?? 'top']}`
 		];
-		// Justified text without hyphenation opens rivers; the card is `lang="en"`
-		// so the browser has a dictionary to break with.
+		// Justified text without hyphenation opens rivers; the card carries the
+		// template's language (`lang`, English unless it says) so the browser
+		// has the right dictionary to break with.
 		if (align === 'justify') parts.push('hyphens:auto');
 		if (box.italic) parts.push('font-style:italic');
 		if (box.textCase === 'uppercase') parts.push('text-transform:uppercase');
@@ -1158,6 +1209,8 @@
 		origin: Box;
 		/** where the area was drawn at pointerdown: an anchored one's top is not its `y`, and the live layout moves with the drag */
 		top: number;
+		/** how tall it was drawn at pointerdown: a handle changes the height it would otherwise be read from */
+		height: number;
 		others: Box[];
 		/** boxes anchored to this one: they take the x delta and nothing else */
 		held: Box[];
@@ -1383,6 +1436,7 @@
 			startY: event.clientY,
 			origin: { ...box },
 			top: layout.tops[box.id] ?? box.y,
+			height: layout.heights[box.id] ?? box.h,
 			others,
 			held: [...held.values()]
 		};
@@ -1523,6 +1577,7 @@
 		if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > HOLD_SLOP) onmenuclose?.();
 
 		const origin = drag.origin;
+		const startHeight = drag.height;
 		// The handles turn with the box, so a pointer delta arrives in screen space
 		// and has to come back through the rotation before it can be read as a
 		// width or a height. Moving is exempt: a translation in the parent's space
@@ -1599,7 +1654,29 @@
 		};
 		const dragTop = () => {
 			const bottom = top0 + origin.h;
-			next.h = fine(bottom - setTop(dy, undefined, 0, bottom - MIN_H));
+			// A Grow area set bottom or middle is drawn above its stored top, by
+			// however far its words grew it (`freedTop`), and that is where the
+			// handle is. The height as it was at pointerdown: read live, it grows
+			// with the handle, and the edge ran away from the pointer.
+			const lift = origin.anchor ? 0 : freedTop(origin, 0, startHeight);
+			if (!lift) {
+				next.h = fine(bottom - setTop(dy, undefined, 0, bottom - MIN_H));
+				return;
+			}
+			// Worked as drawn: the top goes where the pointer and the snap put it
+			// and the drawn bottom stays. Once the area is taller than its words
+			// it is drawn as its frame, so the frame is that span exactly; short
+			// of them it is drawn as tall as they are, whatever its frame, so the
+			// handle has nothing to move and the area stays as it was. Setting a
+			// frame there anyway moved a middle-set area's bottom, its growth
+			// split differently about a different frame.
+			const drawnTop = origin.y - lift;
+			const drawnBottom = drawnTop + startHeight;
+			const top = place(drawnTop + dy, 'y');
+			if (drawnBottom - top >= startHeight) {
+				next.y = top;
+				next.h = fine(drawnBottom - top);
+			}
 		};
 
 		switch (mode) {
@@ -2119,7 +2196,10 @@
 	 * layout, the zoom or the selection (which moves badges) changes.
 	 */
 	let allThreads = $state<string[]>([]);
-	const showsAllTies = $derived(ties && bounds && !template.locked);
+	// On a locked page too: the ties are how a design hangs together, worth
+	// reading most on the starter, which opens locked. Their badges are drawn
+	// for the threads to run between, and refused as everything there is.
+	const showsAllTies = $derived(ties && bounds);
 
 	$effect(() => {
 		if (!showsAllTies) {
@@ -2343,7 +2423,7 @@
 	{/if}
 {/snippet}
 
-{#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.unknown}<span class="unknown-placeholder" title="No column called this in the table — or the cell naming its own column">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
+{#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.countdown}<span class="countdown {part.countdown.past ? 'past' : 'future'}"><span class="countdown-number">{part.countdown.n}</span><span class="countdown-unit {part.countdown.word}"></span></span>{:else if part.unknown}<span class="unknown-placeholder" title="No column called this in the table — or the cell naming its own column">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
 
 <!-- The shears, which are also the switch between cutting and growing. Red and
      astride the cut on an area that is cutting its words off, where pressing
@@ -2390,7 +2470,7 @@
 	class:frozen={interactive && !!template.locked}
 	class:panning={interactive && panning}
 	style={cardStyle()}
-	lang="en"
+	lang={template.lang ?? 'en'}
 >
 	{#if underlay}
 		<div class="underlay" aria-hidden="true">{@render underlay()}</div>
@@ -2515,15 +2595,15 @@
 					{#if placeholderFor(box)}
 						<span class="placeholder">{placeholderFor(box)}</span>
 					{:else if box.mode === 'markdown'}
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf; flagUnknown writes a fixed span around text it has already escaped -->
-						{@html flagUnknown(renderMarkdown(shownTextOf(box), {
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf; flagUnknown and flagCountdowns write fixed spans around text it has already escaped -->
+						{@html flagCountdowns(flagUnknown(renderMarkdown(shownTextOf(box), {
 							size: box.size ?? template.defaults.size,
 							md: box.md,
 							paragraph: paragraphOf(box),
 							lineHeight: leadingOf(box),
 							list: listOf(box, template.defaults),
 							leader: leaderOf(box)
-						}))}
+						})))}
 					{:else if box.mode === 'qr'}
 						<span class="media" style="height:{mediaHeight(box)}">
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
@@ -2659,14 +2739,13 @@
 					{@render shears(box, true)}
 				{/if}
 
-				<!-- Every badge here says why *this* area will not do what you might
-				     ask of it, and on a locked page that is the same answer for all
-				     of them: the page is locked. The band over the sheet says it once,
-				     so the column of per-area reasons is noise — and two of these are
-				     buttons that would be refused anyway. The overflow mark below is
-				     not one of these: it is about what will print, which a lock does
-				     not change. -->
-				{#if bounds && !template.locked && (showsBadges(box) || showsAllTies) && (box.anchor || anchorTargets.has(box.id))}
+				<!-- The anchor's ends. On a locked page only for Boxes with ties
+				     (`showsAllTies`), where they are what the threads run between —
+				     disabled, as everything on a locked page is. Otherwise not there:
+				     as buttons they would only be refused, and the band over the sheet
+				     says once why. The overflow mark below is not one of these: it is
+				     about what will print, which a lock does not change. -->
+				{#if bounds && (showsAllTies || (!template.locked && showsBadges(box))) && (box.anchor || anchorTargets.has(box.id))}
 					<!-- The anchor's two ends, in a row of their own off the top-left
 					     corner: the buoy in the corner on one that others follow, and to
 					     its left the tie on an area that follows another — a middle link
@@ -3105,6 +3184,22 @@
 		content: ' / ';
 		white-space: pre;
 	}
+
+	/* A countdown's words, in English, from CSS — see `countdownHtml`. Under
+	   :where, so they weigh nothing: any rule in a template's stylesheet beats
+	   them, `:lang(el) .countdown-unit.days::before { content: ' ημέρες' }` or
+	   a plain `.countdown.past::after { content: '' }`. */
+	:global(:where(.card .countdown-unit)::before),
+	:global(:where(.card .countdown.past)::after) {
+		white-space: pre;
+	}
+	:global(:where(.card .countdown-unit.minute)::before) { content: ' minute'; }
+	:global(:where(.card .countdown-unit.minutes)::before) { content: ' minutes'; }
+	:global(:where(.card .countdown-unit.hour)::before) { content: ' hour'; }
+	:global(:where(.card .countdown-unit.hours)::before) { content: ' hours'; }
+	:global(:where(.card .countdown-unit.day)::before) { content: ' day'; }
+	:global(:where(.card .countdown-unit.days)::before) { content: ' days'; }
+	:global(:where(.card .countdown.past)::after) { content: ' ago'; }
 
 	/* Laid over the content it is replacing, inheriting everything: what you
 	   type is set in the face, size, color and alignment it will print in.

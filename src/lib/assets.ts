@@ -1,4 +1,4 @@
-import { STORE_ASSETS, idbDelete, idbGet, idbKeys, idbSet } from './storage';
+import { STORE_ASSETS, idbDelete, idbGet, idbKeys, idbSet, isReadOnly } from './storage';
 import type { PageBackgroundImage } from './types';
 
 /**
@@ -174,6 +174,8 @@ export async function uploadBackgroundImage(
  * under a name, and having two of these would mean one of them was wrong.
  */
 async function writeImage(name: string, file: File): Promise<void> {
+	// The folder is written around storage.ts, so its read-only switch is asked here.
+	if (isReadOnly()) throw new Error('This tab is read only.');
 	forgetObjectUrl(name);
 	const folder = await readyFolder();
 	if (folder) {
@@ -494,6 +496,7 @@ export async function deleteImage(name: string, where: ImageWhere): Promise<void
 		await idbDelete(STORE_ASSETS, key);
 		return;
 	}
+	if (isReadOnly()) return;
 	const folder = await readyFolder();
 	await folder?.removeEntry(name);
 }

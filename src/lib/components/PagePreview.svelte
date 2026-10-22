@@ -50,6 +50,8 @@
 		rowCount: number;
 		/** every row, for a card's `%%lookup:…%%` */
 		rows: readonly Row[];
+		/** the page's clock, for a live `%%today…%%` — see Card */
+		clock?: number;
 		onactivate: (index: number) => void;
 		/** open the card full screen; the count under the page is the door */
 		onlightbox: () => void;
@@ -112,6 +114,19 @@
 		onunlock?: () => void;
 		/** lock it again, from the same button while it still shows the open padlock */
 		onrelock?: () => void;
+		/**
+		 * A read-only tab: the card alone, as it prints, with an eye where the
+		 * padlock goes and nothing else of the stage's — no pager, zoom, undo or
+		 * Area — since there is nothing here to work it with.
+		 */
+		viewOnly?: boolean;
+		/** the eye pressed: what this tab is, and the ways out of it */
+		onviewonly?: () => void;
+		/**
+		 * Read only and full screen: a display. The card on black, as it
+		 * prints — no shadow, no eye — and fitted, as read only always is.
+		 */
+		bare?: boolean;
 	}
 
 	let {
@@ -176,6 +191,10 @@
 		onstartpicking,
 		onunlock,
 		onrelock,
+		viewOnly = false,
+		bare = false,
+		clock = 0,
+		onviewonly,
 		flashIds = []
 	}: Props = $props();
 
@@ -1664,7 +1683,11 @@
 	{/if}
 {/snippet}
 
-<div class="stage" bind:this={stage}>
+<!-- Bare, the stage is drawn true to colour — `data-true-color`, app.css: a
+     dark theme turns the interface inside out, and would turn the black
+     white and, in dark-page, the card's own colours over. A display shows
+     the card as it prints, whatever the theme. -->
+<div class="stage" class:view-only={viewOnly} class:bare data-true-color={bare || undefined} data-display={bare || undefined} bind:this={stage}>
 <div
 	class="viewport"
 	bind:this={host}
@@ -1716,13 +1739,13 @@
 				{row}
 				{rows}
 				{mapping}
-				{bounds}
-				{ties}
+				bounds={bounds && !viewOnly}
+				ties={ties && !viewOnly}
 				{loadingFonts}
-				{grid}
-				{guides}
-				{smartGuides}
-				spacing={spacingGuides && guides && smartGuides}
+				grid={grid && !viewOnly}
+				guides={guides && !viewOnly}
+				smartGuides={smartGuides && !viewOnly}
+				spacing={spacingGuides && guides && smartGuides && !viewOnly}
 				{nudging}
 				{picking}
 				{scale}
@@ -1730,7 +1753,8 @@
 				{theme}
 				{background}
 				{images}
-				interactive={true}
+				interactive={!viewOnly}
+				{clock}
 				{panning}
 				pageCount={rowCount}
 				{editingId}
@@ -1746,7 +1770,7 @@
 				{ondraw}
 				{oneditcell}
 				{ontext}
-				underlay={gridArt ? gridLayer : undefined}
+				underlay={gridArt && !viewOnly ? gridLayer : undefined}
 			/>
 		</div>
 
@@ -1907,6 +1931,14 @@
 	     lock: it is pressed once at the start, if at all. -->
 	<!-- The right-hand column, and under it, on a phone, what acts on a set
 	     of areas (SelectionTools' `side`). -->
+	{#if viewOnly}
+		<!-- Where the padlock is on a locked design, and the one control here. -->
+		<div class="corner top right view-eye">
+			<button class="square" title="Read only — the card being edited in another tab. Press for Open Here, Read Only or Close." aria-label="Read only" onclick={() => onviewonly?.()}>
+				<Icon name="view" size={16} />
+			</button>
+		</div>
+	{/if}
 	<div class="side-rail">
 	<div class="corner top right stacked">
 		<!-- The page's lock, while it is locked: a padlock and no word, at the
@@ -2059,9 +2091,10 @@
 	     side by side reach far enough into the band that the pager's first arrow,
 	     centred in the same band, lands on top of "Boxes". They used to stack
 	     into a column for that, which grew a two-line panel up over the sheet;
-	     now the words go instead and the ticks keep their row — a # for the
-	     grid, a | for the guides and a B for the boxes, beside checkboxes that
-	     already say whether they are on. The full word stays the accessible name either way, so nothing
+	     now the words go instead and the ticks keep their row — a mark for each,
+	     which also says which of its modes it is in: ⋕ ruled and ∷ dots for the
+	     grid, ∣ with the spacing and ∤ without it for the guides, ⊡ boxes and ⊞
+	     boxes with their ties — beside checkboxes that say whether they are on. The full word stays the accessible name either way, so nothing
 	     read aloud is reduced to a single letter. -->
 	<div class="corner left">
 		<!-- Three presses round: off, ruled, dots — a dot at every intersection,
@@ -2092,7 +2125,7 @@
 				}}
 			/>
 			<span class="wide">{grid && gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
-			<span class="narrow" aria-hidden="true">#</span>
+			<span class="narrow" aria-hidden="true">{grid && gridStyle === 'dots' ? '\u2237' : '\u22d5'}</span>
 		</label>
 		<label
 			title={withKey(
@@ -2117,7 +2150,7 @@
 				}}
 			/>
 			<span class="wide">Guides</span>
-			<span class="narrow" aria-hidden="true">|</span>
+			<span class="narrow" aria-hidden="true">{guidesFull ? '\u2223' : '\u2224'}</span>
 		</label>
 		<label
 			title={withKey(
@@ -2141,7 +2174,7 @@
 				}}
 			/>
 			<span class="wide">Boxes</span>
-			<span class="narrow" aria-hidden="true">□</span>
+			<span class="narrow" aria-hidden="true">{bounds && ties ? '\u229e' : '\u22a1'}</span>
 		</label>
 	</div>
 
@@ -2161,7 +2194,7 @@
 		/>
 	</div>
 
-	{#if padUsable && padOpen}
+	{#if padUsable && padOpen && !viewOnly}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
 		     hopeless. Shown only where there is no keyboard to fall back on, and
 		     only while there is something it could actually move. Its arrows
@@ -2232,6 +2265,28 @@
 </div>
 
 <style>
+	/* Read only: the stage keeps the card and the eye, and drops the rest. */
+	.view-only .pager,
+	.view-only .rail,
+	.view-only .side-rail,
+	.view-only .corner:not(.view-eye) {
+		display: none;
+	}
+
+	/* Full screen as well: the card on black, nothing else — not the eye,
+	   not the shadow that lifts the sheet off the editor's grey. */
+	.stage.bare {
+		background: #000;
+	}
+
+	.bare .sheet {
+		box-shadow: none;
+	}
+
+	.bare .view-eye {
+		display: none;
+	}
+
 	/* The frame: it holds every control and never scrolls, so nothing on it can
 	   slide away with the page. */
 	.stage {
@@ -2322,7 +2377,7 @@
 	}
 
 	/* Close about the count, so the chevrons stay clear of the chips in the
-	   two corners: on a narrow phone the arrows sat under the # | B on one
+	   two corners: on a narrow phone the arrows sat under the grid, guides and boxes marks on one
 	   side and the zoom on the other. */
 	.pager .controls {
 		display: flex;

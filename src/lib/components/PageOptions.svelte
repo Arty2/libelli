@@ -7,6 +7,7 @@
 	import { renamed } from '$lib/onboarding';
 	import { fontChoices, fontRef, previewFamilies } from '$lib/fonts';
 	import MenuSelect, { familyItems } from './MenuSelect.svelte';
+	import { DEFAULT_LANG, LANGUAGES, languageName } from '$lib/lang';
 	import { withKey } from '$lib/keys';
 	import {
 		MAX_PARAGRAPH,
@@ -688,6 +689,25 @@
 					onchange={(e) => patchTemplate({ facing: e.currentTarget.checked || undefined })}
 				/>
 				Recto / Verso
+			</label>
+			<!-- The card's lang: what the template's :lang() rules answer to,
+			     and the dictionary justified text is hyphenated with. -->
+			<label class="field">
+				<span>Language</span>
+				<select
+					value={template.lang ?? DEFAULT_LANG}
+					title="The language the cards are written in. Sets the page's lang, so the template's CSS can say :lang(el) — a countdown's words, the page number's separator — and justified text hyphenates with the right dictionary"
+					disabled={pageFrozen}
+					onchange={(e) => patchTemplate({ lang: e.currentTarget.value === DEFAULT_LANG ? undefined : e.currentTarget.value })}
+				>
+					{#each LANGUAGES as tag (tag)}
+						<option value={tag}>{languageName(tag)}</option>
+					{/each}
+					<!-- A file may name one the list does not; it is kept, and shown. -->
+					{#if template.lang && !(LANGUAGES as readonly string[]).includes(template.lang)}
+						<option value={template.lang}>{languageName(template.lang)}</option>
+					{/if}
+				</select>
 			</label>
 		</fieldset>
 		<fieldset class="group">

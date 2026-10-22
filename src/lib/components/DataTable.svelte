@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { showWhitespace } from '$lib/whitespace';
 	import Icon from './Icon.svelte';
 	import { download, fileStem } from '$lib/download';
 	import { completePlaceholders } from '$lib/complete';
@@ -47,6 +48,14 @@
 		previousTable: string;
 		onselecttable: (id: string) => void;
 		onnewtable: () => void;
+		/** a CSV or TSV file chosen with Import, to open as a new table */
+		onimportfile: (file: File) => void;
+		/**
+		 * Rows whose card runs off the page — a Grow area grown past a margin or
+		 * the edge, or an area it pushed there — by row, with those areas' names.
+		 * Only rows that have any.
+		 */
+		overflowAreas?: Map<number, string[]>;
 		/**
 		 * Columns something on the card draws from — bound to an area, or named
 		 * as `%%column%%` in an area's words or a cell it shows. A column not in
@@ -106,6 +115,9 @@
 		/** how tall a row may be; owned by the app's UI state, like the widths */
 		rowHeight: RowHeight;
 		onrowheight: (next: RowHeight) => void;
+		/** spaces, tabs and line ends shown where text is being typed */
+		whitespace?: boolean;
+		onwhitespace?: (show: boolean) => void;
 		oncolumnwidths: (widths: Record<string, number>) => void;
 		activeRow: number;
 		/** the column the selected area draws from, so its cells can be pointed at */
@@ -163,6 +175,8 @@
 		previousTable,
 		onselecttable,
 		onnewtable,
+		onimportfile,
+		overflowAreas = new Map(),
 		usedColumns,
 		onplacecolumn,
 		oncellfocus,
@@ -185,6 +199,8 @@
 		oncolumnwidths,
 		rowHeight,
 		onrowheight,
+		whitespace = false,
+		onwhitespace,
 		activeRow,
 		selectedColumn = null,
 		onactivate,
@@ -1502,9 +1518,10 @@
 			onnotice('The table is locked — unlock it to paste or import into it.', 'warning');
 			return;
 		}
-		// The one place the emptiness policy is decided, for the paste and the
-		// file import alike — see `wouldEmptyTable`. A mis-click in a file picker
-		// should not cost you the table.
+		// The one place the emptiness policy is decided for the open table — see
+		// `wouldEmptyTable`. A stray paste should not cost you the table. (A file
+		// import opens a table of its own, so it has nothing to lose; the page
+		// decides its own policy.)
 		if (wouldEmptyTable(dataset, parsed, mode)) {
 			onnotice('Nothing readable as rows in there — the table is unchanged.', 'warning');
 			return;
@@ -1535,14 +1552,17 @@
 		});
 	}
 
-	async function importFile(event: Event) {
+	/**
+	 * A file is a whole table, header and all — unlike a paste, which is a block
+	 * of cells lifted out of the middle of one — so it opens as a table of its
+	 * own and leaves this one as it is. The page owns the library, so it is
+	 * handed up.
+	 */
+	function importFile(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
-		if (!file) return;
-		// A file is a whole table, header and all — unlike a paste, which is a
-		// block of cells lifted out of the middle of one.
-		commitImport(parseTable(await file.text()), 'replace');
 		input.value = '';
+		if (file) onimportfile(file);
 	}
 
 	/**
@@ -1853,6 +1873,18 @@
 								}}
 							>{rowLabel(i)}</span>
 							</span>
+							<!-- Under the tick and the number, where the eye runs down the
+							     rows: this card's words run off the page. A press on it is a
+							     press on the row, which opens that card to see it. -->
+							{#if overflowAreas.has(i)}
+								{@const areas = overflowAreas.get(i) ?? []}
+								<span
+									class="runs-off"
+									role="img"
+									aria-label="Runs off the page"
+									title="Card {rowLabel(i)} runs off the page: {areas.map((a) => `“${a}”`).join(', ')} {areas.length === 1 ? 'grows' : 'grow'} past the margin or the edge. Shorten the words, or give the area more room."
+								><Icon name="warning" size={12} /></span>
+							{/if}
 						</td>
 						{#each columns as column, c (column)}
 							<!-- Read once: a drawing's cell is a long base64 string, and every
@@ -1943,6 +1975,7 @@
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
 									use:completePlaceholders={columns}
+									use:showWhitespace={{ on: whitespace && editing?.row === i && editing?.column === column, text: row[column] ?? '' }}
 									onfocus={() => {
 										editing = { row: i, column };
 										onactivate(i);
@@ -2076,6 +2109,9 @@
 				{@render drawingButtons(!!(dataset.rows[bigCell.row]?.[bigCell.column] ?? '').trim(), deleteDrawing)}
 			{:else if bigKind(dataset.rows[bigCell.row]?.[bigCell.column] ?? '', bigCell.draw) === 'text'}
 				<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
+				<!-- Right of the count, in the editor it marks: the table's own
+				     button is not in this bar while the cell is open full size. -->
+				{@render whitespaceButton()}
 			{/if}
 		{:else}
 		{#if editing && dataset.rows[editing.row]}
@@ -2099,6 +2135,16 @@
 					onmousedown={(e) => e.preventDefault()}
 					onclick={editChosen}
 				><Icon name="task-edit" size={15} /> Edit</button>
+				<!-- An empty cell can be written in or drawn in; there is nothing to
+				     count yet, so the count makes room for the other way in. -->
+				{#if !value}
+					<button
+						title="Draw in this cell — a picture made here, kept in the table"
+						disabled={locked}
+						onmousedown={(e) => e.preventDefault()}
+						onclick={() => editing && openBigCell(editing.row, editing.column, true)}
+					><Icon name="edit" size={15} /> Draw</button>
+				{/if}
 			{/if}
 		{/if}
 		<!-- Which table, and its lock, gone while rows are chosen or a cell is
@@ -2233,8 +2279,7 @@
 						<li role="none">
 							<button
 								role="menuitem"
-								disabled={locked}
-								title="Replace the rows with a CSV file"
+								title="Open a CSV or TSV file as a new table — this one is kept as it is"
 								onclick={() => {
 									pickerOpen = false;
 									fileInput?.click();
@@ -2318,24 +2363,40 @@
 			     cell is left. Mousedown is held off the Edit button, or the field
 			     would lose its focus, and with it this bar, before the click. -->
 			{@const cell = editing}
-			<span class="rule"></span>
-			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[cell.row]?.[cell.column] ?? '')}</span>
+			{@const value = dataset.rows[cell.row]?.[cell.column] ?? ''}
+			<!-- Nothing to count in an empty cell: Draw stands beside Edit instead. -->
+			{#if value}
+				<span class="rule"></span>
+				<span class="cell-count" aria-live="polite">{countLabel(value)}</span>
+			{/if}
 		{:else if chosenRows.length}
 			<!-- What you can do to the rows you have chosen, at the far end of the
-			     bar after the things that act on the whole table, with a rule
-			     between the two. It appears
-			     only when there is a selection, so the bar is its usual length the
-			     rest of the time.
+			     bar after the things that act on the whole table. It appears only
+			     when there is a selection, so the bar is its usual length the rest
+			     of the time.
 
 			     Copy is one word and the glyph does the rest: a clipboard with
 			     something leaving it. Delete is a word too, rather than a bare bin
 			     in red: it is the one button here that takes rows away, and it
-			     should read as a button that does, not as a mark beside a count. -->
-			<span class="rule"></span>
-			<!-- "3 rows"; one row says nothing — the tick beside it already does. -->
+			     should read as a button that does — on a phone its word goes, the
+			     bar being short, and the red bin is a square of its own. -->
+			<button
+				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
+				onclick={copyTsv}
+			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
+			<button
+				class="danger delete-rows"
+				title="Delete the chosen rows"
+				aria-label="Delete the chosen rows"
+				disabled={locked}
+				onclick={deleteChosen}
+			><Icon name="trash" size={15} /> <span class="label">Delete</span></button>
+			<!-- After what is done with them, how many and where they go: the count
+			     names what the arrows move. No rule before any of it — the row
+			     actions follow on from the table's as one run. "3 rows"; one row
+			     says nothing, the tick beside it already does. -->
 			{#if chosenRows.length > 1}<span class="chosen-count">{chosenRows.length} rows</span>{/if}
-			<!-- Up and down first: they are about where the rows are, before what
-			     is done with them. Icon-only, the pair reads as one control. -->
+			<!-- Icon-only, the pair reads as one control. -->
 			<button
 				class="icon"
 				title="Move the chosen rows up — earlier in print order"
@@ -2350,22 +2411,13 @@
 				disabled={locked || chosenRows[chosenRows.length - 1] === dataset.rows.length - 1}
 				onclick={() => moveChosen(1)}
 			><span class="nudge-down"><Icon name="chevron-sort-down" size={20} /></span></button>
-			<button
-				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
-				onclick={copyTsv}
-			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
-			<button
-				class="danger"
-				title="Delete the chosen rows"
-				disabled={locked}
-				onclick={deleteChosen}
-			><Icon name="trash" size={15} /> Delete</button>
 		{/if}
 		<!-- How tall a row may be: one line, a few, or all of its longest cell.
 		     Last in the bar, at its far end, and always there: it is about how
 		     the table is read, not about what is in it, so it stands apart from
 		     the things that act on the table and its rows. The label says the height the rows
 		     are at; the title, the next. -->
+		{@render whitespaceButton()}
 		<button
 			class="row-height"
 			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
@@ -2507,6 +2559,7 @@
 				readonly={locked}
 				use:focusOnOpen
 				use:completePlaceholders={dataset.columns}
+				use:showWhitespace={{ on: whitespace, text }}
 				oninput={(e) => setCell(open.row, open.column, e.currentTarget.value)}
 				onkeydown={(e) => {
 					if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -2562,6 +2615,27 @@
 <!-- A picture's two acts, at the far end of the panel's bar as they are in
      the Pictures tray: Delete in red, then Save, lit while there is drawing to
      keep. -->
+<!-- Spaces, tabs and line ends, drawn where text is being typed: the cell
+     with the caret in it and the full-size editor — not every cell, which
+     would be a second copy of the table. In the table's bar beside the row
+     height, being about how the table is read, and in the full-size editor's
+     beside its count. -->
+{#snippet whitespaceButton()}
+	<button
+		class="whitespace"
+		aria-pressed={whitespace}
+		title={whitespace
+			? 'Whitespace shown in the cell being typed in and the full-size editor: a dot for a space (a ring where a line wraps at it), → for a tab, a square for a no-break space, ¶ for a line end. Press to hide it'
+			: 'Show whitespace — spaces, tabs and line ends — in the cell being typed in and the full-size editor'}
+		aria-label="Show whitespace"
+		onmousedown={(e) => e.preventDefault()}
+		onclick={() => onwhitespace?.(!whitespace)}
+	>
+		<Icon name="paragraph" size={15} />
+		<span class="label">Whitespace</span>
+	</button>
+{/snippet}
+
 {#snippet drawingButtons(present: boolean, remove: () => void)}
 	<button class="danger" disabled={!present && !boardDirty} title="Delete this drawing" onclick={remove}>
 		<Icon name="trash" size={15} /> Delete
@@ -3220,7 +3294,8 @@
 		   under — see `.edge`. */
 		border-right-width: 2px;
 		white-space: nowrap;
-		padding: 5px 6px 3px;
+		/* More on the right: the number stood against the column's rule. */
+		padding: 5px 10px 3px 6px;
 		color: #767676;
 		text-align: center;
 		background: #fff;
@@ -3276,6 +3351,15 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
+	}
+
+	/* The warning red the status line uses (app.css keeps it red in dark). On
+	   a line of its own, centred under the tick and the number. */
+	.runs-off {
+		display: flex;
+		justify-content: center;
+		margin-top: 2px;
+		color: #b42318;
 	}
 
 	/* In a row, the line is exactly one line of a cell's text — the same size,
@@ -3677,6 +3761,8 @@
 	   written first this one never did — the word showed on every phone. */
 	@media (max-width: 900px) {
 		.row-height .label,
+		.whitespace .label,
+		.delete-rows .label,
 		.reindex .label {
 			display: none;
 		}
@@ -3691,7 +3777,9 @@
 		/* An icon alone, so a square — as tall as it is wide, like every other
 		   icon-only button; it kept the padding it had for the word, and read as
 		   a button with its label missing. */
-		.row-height {
+		.row-height,
+		.whitespace,
+		.delete-rows {
 			box-sizing: border-box;
 			/* The bar's buttons are 29px tall; aspect-ratio cannot say so here,
 			   since the height is the content's and the width would follow the
