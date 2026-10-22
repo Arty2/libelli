@@ -1098,6 +1098,17 @@
 	 */
 	const bare = $derived(editor === 'readonly' && fullscreen);
 
+	/**
+	 * The pared-down view: read only, and also while the open-in-another-tab
+	 * dialog is waiting for an answer — found the editor elsewhere, or handed
+	 * the editing on. The bars and the table start closed behind the dialog
+	 * rather than open and then put away, so what it sits over is already
+	 * close to the read-only view most people choose. Not while the lock is
+	 * still being asked (`checking`): the editing tab passes through that on
+	 * every start, and its bars would flash shut and open again.
+	 */
+	const quiet = $derived(editor === 'readonly' || editor === 'elsewhere' || editor === 'handed');
+
 	/** The dialog brought back by the eye on the stage, in a read-only tab. */
 	let readOnlyAsk = $state(false);
 
@@ -3803,7 +3814,7 @@
 	</div>
 {/if}
 
-<div class="app" class:view-only={editor === 'readonly'} class:bare ondblclick={() => bare && (readOnlyAsk = true)} role="presentation">
+<div class="app" class:view-only={quiet} class:unloaded={editor === 'elsewhere'} class:bare ondblclick={() => bare && (readOnlyAsk = true)} role="presentation">
 	<header class="toolbar">
 		<!-- The mark, and the theme: each press steps light, dark, dark with the
 		     page inverted (theme.ts), and a hover or a hold glances at the other
@@ -3924,7 +3935,7 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden && editor !== 'readonly'}
+	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden && !quiet}
 		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
@@ -4109,7 +4120,7 @@
 
 	<main
 		bind:this={mainEl}
-		class:no-data={(!dataOpen && !imagesOpen) || editor === 'readonly'}
+		class:no-data={(!dataOpen && !imagesOpen) || quiet}
 		style={stacked
 			? trayShare !== null
 				? `--tray-h:${(trayShare * 100).toFixed(2)}%`
@@ -4120,7 +4131,7 @@
 	>
 		<PagePreview
 			clock={clockTick}
-			viewOnly={editor === 'readonly'}
+			viewOnly={quiet}
 			{bare}
 			onviewonly={() => (readOnlyAsk = true)}
 			{template}
@@ -4134,7 +4145,7 @@
 			spacingGuides={ui.spacingGuides ?? true}
 			gridStyle={ui.gridStyle}
 			{selectedIds}
-			zoom={editor === 'readonly' ? 'fit' : ui.zoom}
+			zoom={quiet ? 'fit' : ui.zoom}
 			pageNumber={dataset.rows.length ? activeRow + 1 : null}
 			theme={shownTheme}
 			{activeRow}
@@ -4146,8 +4157,8 @@
 			{images}
 			onselect={selectBox}
 			onchange={updateBox}
-			onimagedrop={editor === 'readonly' ? undefined : (box, file) => void handleImageDrop(box, file)}
-			onimagepagedrop={editor === 'readonly' ? undefined : (file, x, y) => void (async () => placeImageOnPage(await storeImage(file), x, y, file))()}
+			onimagedrop={quiet ? undefined : (box, file) => void handleImageDrop(box, file)}
+			onimagepagedrop={quiet ? undefined : (file, x, y) => void (async () => placeImageOnPage(await storeImage(file), x, y, file))()}
 			onaction={describe}
 			onbounds={(show, ties) => (ui = { ...ui, showBounds: show, showTies: ties })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
@@ -4192,7 +4203,7 @@
 			ondelete={deleteBox}
 		/>
 
-		{#if (dataOpen || imagesOpen) && editor !== 'readonly'}
+		{#if (dataOpen || imagesOpen) && !quiet}
 		<aside bind:this={asideEl} class:shutting={trayShutting}>
 			{#if !stacked}
 				<!-- The edge between the page and the table, dragged to share the
@@ -5419,6 +5430,13 @@
 	.bare .toolbar,
 	.bare .status-bar {
 		display: none;
+	}
+
+	/* Found the editor elsewhere and read nothing yet: what the stage would
+	   draw is the app's default, not anybody's work — placeholders and all —
+	   so behind the dialog it draws nothing until a choice loads the real one. */
+	.unloaded :global(.stage .page) {
+		visibility: hidden;
 	}
 
 	.close-refused {
