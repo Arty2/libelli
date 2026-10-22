@@ -521,7 +521,10 @@ function ranked(query: string, names: readonly string[]): string[] {
 	// dashes offered nothing until the name was finished by hand. As written
 	// too, because the shaped form drops the colon of `page:cu`.
 	const typed = query.trim().toLowerCase();
-	const shaped = columnName(typed).toLowerCase();
+	// Only when shaping left something: `%%:` shapes to nothing, and every name
+	// starts with nothing, so the list offered every column for a character
+	// none of them holds.
+	const shaped = columnName(typed).toLowerCase() || typed;
 	const starts = names.filter((n) => {
 		const name = n.toLowerCase();
 		return name.startsWith(typed) || name.startsWith(shaped);

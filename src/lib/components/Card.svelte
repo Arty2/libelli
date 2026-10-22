@@ -1158,6 +1158,8 @@
 		origin: Box;
 		/** where the area was drawn at pointerdown: an anchored one's top is not its `y`, and the live layout moves with the drag */
 		top: number;
+		/** how tall it was drawn at pointerdown: a handle changes the height it would otherwise be read from */
+		height: number;
 		others: Box[];
 		/** boxes anchored to this one: they take the x delta and nothing else */
 		held: Box[];
@@ -1383,6 +1385,7 @@
 			startY: event.clientY,
 			origin: { ...box },
 			top: layout.tops[box.id] ?? box.y,
+			height: layout.heights[box.id] ?? box.h,
 			others,
 			held: [...held.values()]
 		};
@@ -1523,6 +1526,7 @@
 		if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > HOLD_SLOP) onmenuclose?.();
 
 		const origin = drag.origin;
+		const startHeight = drag.height;
 		// The handles turn with the box, so a pointer delta arrives in screen space
 		// and has to come back through the rotation before it can be read as a
 		// width or a height. Moving is exempt: a translation in the parent's space
@@ -1599,7 +1603,15 @@
 		};
 		const dragTop = () => {
 			const bottom = top0 + origin.h;
-			next.h = fine(bottom - setTop(dy, undefined, 0, bottom - MIN_H));
+			// A Grow area set bottom or middle is drawn above its stored top, by
+			// however far its words grew it (`freedTop`), and that is where the
+			// handle is. Worked from there, so the pointer and the snap meet the
+			// edge as drawn; from the stored top the handle did nothing for that
+			// many millimetres and then landed off the line by them. The height
+			// as it was at pointerdown: read live, it grows with the handle, and
+			// the lift with it, and the edge ran away from the pointer.
+			const lift = origin.anchor ? 0 : freedTop(origin, 0, startHeight);
+			next.h = fine(bottom - setTop(dy - lift, undefined, 0, bottom - MIN_H));
 		};
 
 		switch (mode) {

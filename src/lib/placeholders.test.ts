@@ -191,6 +191,14 @@ describe('typing a placeholder', () => {
 		expect(placeholderChoices('First Na', ['first-name'])).toEqual(['first-name']);
 	});
 
+	it('offers nothing for a query that shaping would empty, rather than everything', () => {
+		// Only the page's own, which do hold a colon.
+		expect(placeholderChoices(':', ['title', 'body'])).toEqual(['page:current', 'page:total']);
+		expect(placeholderChoices('.', ['title', 'body'])).toEqual([]);
+		// And still finds a name that does hold what was typed.
+		expect(placeholderChoices(':', ['a:b'])).toEqual(['a:b', 'page:current', 'page:total']);
+	});
+
 	it('offers columns that start with it first, then ones that contain it, and today', () => {
 		expect(placeholderChoices('t', ['subtitle', 'title', 'body'])).toEqual(['title', 'today', 'subtitle', 'page:current', 'page:total']);
 		expect(placeholderChoices('', ['a', 'date'])).toEqual(['a', 'date', 'today', 'page:current', 'page:total']);

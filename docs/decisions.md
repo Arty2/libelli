@@ -3440,7 +3440,7 @@ under it focuses it.
 **A file dropped on the app opens as a new entry, never into the open one.**
 `dropfile.ts` sorts a drop by extension first, MIME type second — Windows
 reports a `.csv` as `application/vnd.ms-excel` wherever Excel is installed —
-and `onWindowDrop` in +page imports each file in order: a template through the
+and `settleDrop` in +page imports each file in order: a template through the
 same path as the picker, a table as a new table in the library, the way Getting
 Started starts one. Both save the open template and table first. The table
 menu's Import goes the same way: it used to replace the open table's rows,
@@ -3449,9 +3449,17 @@ own; Paste is how the open table is filled. A file whose contents the library
 already holds (`sameTable`, `sameTemplate` — a template compared as the file it
 would export) opens that copy instead of making "rows 2". Each file is read and checked before anything
 is switched, so one that fails leaves the screen as it was and says why, by
-name, in the status line. The window sees a drop only after the page and its
-areas have had theirs; an area that takes a picture calls `preventDefault`,
-which is how the window knows to stay out of it.
+name, in the status line. The page and an area take the first picture in a
+drop and call `preventDefault` (an area also stops the event), so the window
+copies the files on the way down (`ondropcapture`), notes on the way up whether
+anyone claimed the drop, and settles it a tick later: what the page did not
+take is still imported, so a picture and a CSV dropped together lose neither.
+
+**A template saved before 0.28 says so when it opens.** Unmarked files are read
+at reference points now (`frame.ts`), so one written top-left with areas set
+right, centre or bottom draws them off by their width or height. `mayHaveMoved`
+spots exactly those, and opening one — at boot, from the library, or by import
+— says to check them before printing, rather than leaving it to the paper.
 
 ## `src/lib/components/MenuSelect.svelte`
 

@@ -140,7 +140,7 @@
 		type DatasetEntry,
 		type TemplateEntry
 	} from '$lib/storage';
-	import { toFile } from '$lib/frame';
+	import { mayHaveMoved, toFile } from '$lib/frame';
 	import { claimEditor, type EditorLock } from '$lib/tablock';
 	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
@@ -613,6 +613,14 @@
 	/** A line for the status bar, not yet shown — so several can become one. */
 	type Said = { text: string; tone: 'info' | 'warning' };
 
+	/**
+	 * Said of a template saved before 0.28 that has areas set right, centre or
+	 * bottom: it is read at reference points now (frame.ts), so those areas
+	 * may sit off by their width or height, and the next save keeps that.
+	 */
+	const MAY_HAVE_MOVED =
+		'It was saved before libelli 0.28, so areas aligned right, centre or bottom may have moved by their width or height — check them before printing.';
+
 	function notify(text: string, tone: 'info' | 'warning' = 'info') {
 		status = text;
 		statusTone = tone;
@@ -1029,6 +1037,7 @@
 				'The saved template could not be read — perhaps a newer version of libelli wrote it — so this is the starter card. The saved one is kept in your templates, untouched, and your data too.',
 				'warning'
 			);
+		else if (mayHaveMoved(storedTemplate)) notify(`“${template.name}” is open. ${MAY_HAVE_MOVED}`, 'warning');
 		else if (firstRun)
 			notify('Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.');
 		missingFonts = await ensureTemplateFonts(template);
@@ -2170,7 +2179,8 @@
 		const stored = loadMapping(id, next.name);
 		mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(next), dataset.columns);
 		missingFonts = await ensureTemplateFonts(next);
-		notify(`“${next.name}” loaded. Your rows are untouched.`);
+		if (mayHaveMoved(doc)) notify(`“${next.name}” loaded. ${MAY_HAVE_MOVED}`, 'warning');
+		else notify(`“${next.name}” loaded. Your rows are untouched.`);
 	}
 
 	/**
@@ -2652,11 +2662,28 @@
 
 	/** Ctrl/Cmd +/− on the chosen areas: their type a point larger or smaller. */
 	function sizeSelectedText(direction: 1 | -1) {
-		if (template.locked) return;
+		// The chord was taken from the stage either way, so a press that changes
+		// nothing says why rather than looking like a key that does not work.
+		if (template.locked) {
+			notify('The template is locked — unlock it to change the type.', 'warning');
+			return;
+		}
 		const changed = stepTextSize(template.boxes, selectedIds, template.defaults.size, direction, MIN_SIZE);
-		if (!changed.length) return;
+		if (!changed.length) {
+			const allLocked = selectedBoxes.length > 0 && selectedBoxes.every((b) => b.locked);
+			notify(
+				allLocked
+					? 'The chosen areas are locked — unlock them to change the type, or press Escape and Ctrl/Cmd +/− zooms the page.'
+					: `The type is already at the smallest, ${MIN_SIZE} pt.`,
+				'warning'
+			);
+			return;
+		}
 		describe(direction > 0 ? 'Larger text' : 'Smaller text');
-		for (const box of changed) updateBox($state.snapshot(box) as Box);
+		// One replacement for all of them, not one per area: each would re-run
+		// the layout, the undo debounce and the autosave.
+		const byId = new Map(changed.map((box) => [box.id, stripUndefined($state.snapshot(box)) as Box]));
+		template = { ...template, boxes: template.boxes.map((b) => byId.get(b.id) ?? b) };
 	}
 
 	/** Move every chosen box one step along an axis of alignment. */
@@ -3062,8 +3089,10 @@
 	 */
 	async function importTemplateFile(file: File): Promise<Said> {
 		let next: Template;
+		let raw: unknown;
 		try {
-			next = importedTemplate(JSON.parse(await file.text()));
+			raw = JSON.parse(await file.text());
+			next = importedTemplate(raw);
 		} catch (error) {
 			// JSON.parse's own message names a token and a column, which is the
 			// parser talking; what someone needs is which file, and that it is
@@ -3078,9 +3107,13 @@
 		if (sameTemplate(next, toFile($state.snapshot(template)))) {
 			return { text: `“${template.name}” is the template already open — nothing to import.`, tone: 'info' };
 		}
-		for (const entry of library) {
-			if (entry.id === templateId || !sameTemplate(next, await loadTemplateDoc(entry.id))) continue;
-			await switchTemplate(entry.id);
+		// Read at once rather than one after another: a library of forty is
+		// forty IndexedDB round trips before the drop does anything.
+		const others = library.filter((entry) => entry.id !== templateId);
+		const docs = await Promise.all(others.map((entry) => loadTemplateDoc(entry.id)));
+		const held = others.find((_, i) => sameTemplate(next, docs[i]));
+		if (held) {
+			await switchTemplate(held.id);
 			return { text: `“${file.name}” is already in your templates as “${template.name}” — opened that one.`, tone: 'info' };
 		}
 		settleProvisional();
@@ -3107,7 +3140,8 @@
 		missingFonts = await ensureTemplateFonts(template);
 		await saveTemplateDoc(templateId, $state.snapshot(template));
 		await refreshLibrary();
-		return { text: `Loaded “${template.name}” as a new template — the one you had is saved in your templates.`, tone: 'info' };
+		const said = `Loaded “${template.name}” as a new template — the one you had is saved in your templates.`;
+		return mayHaveMoved(raw) ? { text: `${said} ${MAY_HAVE_MOVED}`, tone: 'warning' } : { text: said, tone: 'info' };
 	}
 
 	/**
@@ -3137,11 +3171,14 @@
 		if (sameTable(parsed, dataset)) {
 			return { text: `“${tableName}” already holds exactly these rows — nothing to import.`, tone: 'info' };
 		}
-		for (const entry of tables) {
-			if (entry.id === datasetId) continue;
-			const doc = await loadDatasetDoc(entry.id);
-			if (!doc || !sameTable(parsed, doc)) continue;
-			await switchDataset(entry.id);
+		const others = tables.filter((entry) => entry.id !== datasetId);
+		const docs = await Promise.all(others.map((entry) => loadDatasetDoc(entry.id)));
+		const held = others.find((_, i) => {
+			const doc = docs[i];
+			return !!doc && sameTable(parsed, doc);
+		});
+		if (held) {
+			await switchDataset(held.id);
 			return { text: `“${file.name}” is already in your tables as “${tableName}” — opened that one.`, tone: 'info' };
 		}
 		settleProvisional();
@@ -3164,8 +3201,7 @@
 	 * Something being dragged over the app that it might take, for the hint
 	 * that says where it will go. A count rather than a flag: `dragenter` and
 	 * `dragleave` fire for every child the pointer crosses, in pairs. Cleared
-	 * on the way down to a drop, not on its way back up: an area that takes a
-	 * picture stops the event there, and the hint would outlive the drag.
+	 * by `onWindowDropCapture`.
 	 */
 	let dragDepth = $state(0);
 	const dragHint = $derived(dragDepth > 0);
@@ -3181,21 +3217,49 @@
 	}
 
 	/**
-	 * A file dropped anywhere the card did not take it. An image on an area or
-	 * on the page has already been placed, and its handler said so with
-	 * `preventDefault`; everything else lands here — a template, a table, or
-	 * something this app cannot read, which says so rather than vanishing.
+	 * Drops that reached the window with nobody having taken them. The page
+	 * and an area take a picture and say so with `preventDefault` — an area
+	 * also stops the event, so the window never sees it bubble — and this is
+	 * how the drop, settled, tells the two cases apart.
+	 */
+	const unclaimedDrops = new WeakSet<Event>();
+
+	function onWindowDropBubble(event: DragEvent) {
+		if (!event.defaultPrevented) unclaimedDrops.add(event);
+		// Always: the browser's own answer to a dropped file is to navigate to
+		// it, which leaves the design behind.
+		event.preventDefault();
+	}
+
+	/**
+	 * Every drop, on its way down, before anything below can stop it. The files
+	 * are copied now — the list is emptied once the event is over — and dealt
+	 * with once the drop has settled, when it is known whether the page or an
+	 * area took a picture from it.
+	 */
+	function onWindowDropCapture(event: DragEvent) {
+		// Here rather than on the way back up: an area that takes a picture
+		// stops the event there, and the hint would outlive the drag.
+		dragDepth = 0;
+		const files = Array.from(event.dataTransfer?.files ?? []);
+		if (!files.length) return;
+		setTimeout(() => void settleDrop(files, !unclaimedDrops.has(event)));
+	}
+
+	/**
+	 * A dropped set of files, once the page has had its turn. When it took a
+	 * picture — the first in the set, as both of its drop targets take — the
+	 * rest still count: a picture dropped with a CSV used to place the
+	 * picture and lose the CSV without a word.
 	 *
 	 * Files one at a time, in order, so that a template and its table dropped
 	 * together arrive as a pair: each import saves what is open first, and two
 	 * at once would race over which was "open".
 	 */
-	async function onWindowDrop(event: DragEvent) {
-		const handled = event.defaultPrevented;
-		// Always: the browser's own answer to a dropped file is to navigate to
-		// it, which leaves the design behind.
-		event.preventDefault();
-		if (handled) return;
+	async function settleDrop(files: File[], claimed: boolean) {
+		const placed = claimed ? files.find((f) => f.type.startsWith('image/')) : undefined;
+		const rest = files.filter((f) => f !== placed);
+		if (!rest.length) return;
 		// As the keys are refused there (`onWindowKeydown`): a tab that is not
 		// the editor holds a stale copy, and an import saves what is open first
 		// — over what the editing tab has saved since.
@@ -3203,14 +3267,18 @@
 			notify('Another tab is editing — press Use Here first, then drop the file again.', 'warning');
 			return;
 		}
-		const files = Array.from(event.dataTransfer?.files ?? []);
-		if (!files.length) return;
-		const said: Said[] = [];
-		for (const file of files) {
+		const said: Said[] = placed ? [{ text: `“${placed.name}” placed.`, tone: 'info' }] : [];
+		for (const file of rest) {
 			const kind = droppedKind(file);
 			if (kind === 'template') said.push(await importTemplateFile(file));
 			else if (kind === 'table') said.push(await importTableFile(file));
-			else if (kind === 'image') said.push({ text: `“${file.name}” is a picture — drop it on the page or on an area to place it.`, tone: 'warning' });
+			else if (kind === 'image')
+				said.push({
+					text: placed
+						? `“${file.name}” was not placed — one picture goes in at a time.`
+						: `“${file.name}” is a picture — drop it on the page or on an area to place it.`,
+					tone: 'warning'
+				});
 			else said.push({ text: `“${file.name}” is not a file libelli can import — drop a CSV, TSV or template JSON.`, tone: 'warning' });
 		}
 		notify(said.map((s) => s.text).join(' '), said.some((s) => s.tone === 'warning') ? 'warning' : 'info');
@@ -3401,7 +3469,7 @@
 </script>
 
 <!-- A file dropped anywhere the card did not take it ends up here — see
-     `onWindowDrop`. A template or a table is imported; anything else is
+     `settleDrop`. A template or a table is imported; anything else is
      refused in the status line rather than left to the browser, whose answer
      to a dropped file is to navigate to it. -->
 <Tooltip />
@@ -3413,8 +3481,8 @@
 	ondragover={(e) => e.preventDefault()}
 	ondragenter={onWindowDragEnter}
 	ondragleave={onWindowDragLeave}
-	ondropcapture={() => (dragDepth = 0)}
-	ondrop={(e) => void onWindowDrop(e)}
+	ondropcapture={onWindowDropCapture}
+	ondrop={onWindowDropBubble}
 />
 <svelte:head>
 	<title>libelli</title>

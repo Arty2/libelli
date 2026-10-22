@@ -1,5 +1,5 @@
 import { referenceOf } from './layout';
-import type { Box, Defaults, Template } from './types';
+import type { Align, Box, Defaults, Template, VAlign } from './types';
 
 /**
  * Where a template file says an area is.
@@ -63,5 +63,22 @@ export function fromFile(boxes: Box[], defaults: Defaults): Box[] {
 	return boxes.map((box) => {
 		const { dx, dy } = offsetOf(box, defaults);
 		return { ...box, x: r4(box.x - dx), y: r4(box.y - dy) };
+	});
+}
+
+/**
+ * Whether a raw template, as stored or as a file, may have been written top-left
+ * and so be drawn off where it was designed: it lacks the marker, and it has an
+ * area whose reference point is not its top-left corner — the only ones the
+ * frame moves. Nothing reads such a file top-left any more; this is so the
+ * person can be told, rather than finding out on paper.
+ */
+export function mayHaveMoved(raw: unknown): boolean {
+	if (!raw || typeof raw !== 'object') return false;
+	const t = raw as { frame?: unknown; boxes?: unknown; defaults?: { align?: unknown } };
+	if (t.frame === REFERENCE_FRAME || !Array.isArray(t.boxes)) return false;
+	return t.boxes.some((b: { align?: unknown; valign?: unknown }) => {
+		const { fx, fy } = referenceOf((b?.align ?? t.defaults?.align ?? 'left') as Align, (b?.valign ?? 'top') as VAlign);
+		return fx !== 0 || fy !== 0;
 	});
 }

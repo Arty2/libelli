@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { REFERENCE_FRAME, fromFile, toFile } from './frame';
+import { REFERENCE_FRAME, fromFile, mayHaveMoved, toFile } from './frame';
 import { exportTemplate, importedTemplate, newBox, normaliseTemplate } from './template';
 import type { Template } from './types';
 
@@ -90,5 +90,22 @@ describe('reading a file', () => {
 	it('leaves a top-left area where the file put it', () => {
 		const boxes = [newBox({ x: 1, y: 2, w: 3, h: 4, align: 'left' })];
 		expect(fromFile(boxes, memory().defaults)[0]).toMatchObject({ x: 1, y: 2 });
+	});
+});
+
+describe('mayHaveMoved', () => {
+	const box = (extra: object) => ({ id: 'b', x: 0, y: 0, w: 10, h: 10, ...extra });
+
+	it('flags an unmarked file with an area not set from its top-left', () => {
+		expect(mayHaveMoved({ boxes: [box({ align: 'right' })] })).toBe(true);
+		expect(mayHaveMoved({ boxes: [box({ valign: 'bottom' })] })).toBe(true);
+		expect(mayHaveMoved({ defaults: { align: 'center' }, boxes: [box({})] })).toBe(true);
+	});
+
+	it('leaves alone a marked file, and one whose areas the frame does not move', () => {
+		expect(mayHaveMoved({ frame: REFERENCE_FRAME, boxes: [box({ align: 'right' })] })).toBe(false);
+		expect(mayHaveMoved({ boxes: [box({ align: 'left' }), box({ align: 'justify' })] })).toBe(false);
+		expect(mayHaveMoved(toFile(memory()))).toBe(false);
+		expect(mayHaveMoved(null)).toBe(false);
 	});
 });
