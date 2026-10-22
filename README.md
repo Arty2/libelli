@@ -60,7 +60,8 @@ sign to see which areas.
 **Whitespace**, beside the row height under the table, shows the spaces, tabs
 and line ends in the cell you are typing in and in the full-size editor: a dot
 for a space (a ring where a line wraps at it), `→` for a tab, a square for a
-no-break space, `¶` for the end of a line. Pressing it leaves the caret where it was. It is for
+no-break space, `¶` for the end of a line. In the full-size editor, `%%placeholders%%`
+are always shown in the accent colour. Pressing it leaves the caret where it was. It is for
 finding the double space or the trailing one that sets a line askew.
 
 Cell content is always treated as text. A cell containing `<b>x</b>` prints

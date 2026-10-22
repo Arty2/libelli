@@ -2559,7 +2559,7 @@
 				readonly={locked}
 				use:focusOnOpen
 				use:completePlaceholders={dataset.columns}
-				use:showWhitespace={{ on: whitespace, text }}
+				use:showWhitespace={{ on: whitespace, text, color: true }}
 				oninput={(e) => setCell(open.row, open.column, e.currentTarget.value)}
 				onkeydown={(e) => {
 					if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

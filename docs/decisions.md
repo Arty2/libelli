@@ -3525,6 +3525,15 @@ whose own scroll stops short of a textarea's; and it draws from the text it is
 handed, since stepping rows in the full-size editor reaches the action before
 the field's value changes.
 
+**Placeholders in the accent colour, by the same layer turned under.** A
+textarea draws its words in one colour, so in the full-size editor the layer
+goes under the field and draws the words itself, each `%%…%%` in the accent,
+while the field above is made transparent but for its caret — CssEditor's
+arrangement, and the field keeps the caret, the selection and the typing. It
+follows a scroll in the same event rather than a frame later, since visible
+words that trail the caret show. A tab leader's `%%%` is matched as its own
+token so it cannot open a placeholder that runs on to the next one.
+
 ## `src/lib/components/MenuSelect.svelte`
 
 **One menu, drawn like the template picker.** The zoom and both font menus were

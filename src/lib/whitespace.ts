@@ -49,10 +49,27 @@ const METRICS = [
 ];
 
 export interface WhitespaceOptions {
+	/** the whitespace marks */
 	on: boolean;
 	/** The field's value, passed in so a change made from outside — the next row — redraws it too. */
 	text: string;
+	/**
+	 * `%%placeholders%%` in the accent colour. A textarea draws its words in
+	 * one colour, so the layer goes under the field instead of over it and
+	 * draws the words itself, the field's own made transparent above it — the
+	 * caret, the selection and the typing stay the field's, as in CssEditor.
+	 */
+	color?: boolean;
 }
+
+/**
+ * A placeholder as the field shows it, `%%` to `%%` on one line — or a tab
+ * leader's `%%%`, matched as a token of its own so that it is passed over
+ * whole: left in the text, its last two signs would open a placeholder that
+ * ran on to the next one's first (`%%% 2.20 %%price%%`). Two placeholders
+ * back to back, `%%a%%%%b%%`, are still two.
+ */
+const PLACEHOLDER_SPAN = /(?<!%)%%%(?!%)|%%(?!%)[^%\n]+?%%/g;
 
 /** The layer's own look; one stylesheet in the head, added once, rather than a style attribute per mark. */
 function ensureStyles() {
@@ -70,6 +87,8 @@ function ensureStyles() {
 .ws-layer .ws-space::after { background: var(--accent, #2563eb); }
 .ws-layer .ws-space.ws-wrap::after { background: none; border: 0.07em solid var(--accent, #2563eb); width: 0.32em; height: 0.32em; }
 .ws-layer .ws-nbsp::after { background: var(--accent, #2563eb); border-radius: 0; }
+.ws-layer.ws-under { z-index: 0; }
+.ws-layer .ws-ph { color: var(--accent, #2563eb); }
 .ws-layer .ws-tab::after { content: '→'; left: 0; }
 .ws-layer .ws-newline::after { content: '¶'; left: 0.1em; }`;
 	document.head.append(style);
@@ -90,6 +109,10 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 	let drawn: string | null = null;
 	let scrollFrame = 0;
 	let settleFrame = 0;
+	let marks = options.on;
+	let tinted = !!options.color;
+	/** The field's own look, taken before it is made transparent and given back after. */
+	let own: { color: string; background: string; style: string } | null = null;
 
 	const place = () => {
 		if (!layer) return;
@@ -108,6 +131,10 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		// The field's scrollbar takes width from its text; the layer has none,
 		// so it stops short by the same amount or it would wrap later.
 		layer.style.paddingRight = `calc(${style.paddingRight} + ${field.offsetWidth - field.clientWidth - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth)}px)`;
+		// Under the field, the layer is what shows: the field's words and its
+		// ground, as they were before the field gave them up.
+		layer.style.color = own ? own.color : 'transparent';
+		layer.style.background = own ? own.background : 'none';
 	};
 
 	/**
@@ -122,7 +149,10 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		if (sheet) sheet.style.transform = `translate(${-field.scrollLeft}px, ${-field.scrollTop}px)`;
 	};
 	const onScroll = () => {
-		if (!scrollFrame) scrollFrame = requestAnimationFrame(sync);
+		// Words drawn under the field follow it in the same frame, or they
+		// trail the caret while it scrolls; marks alone can wait for the next.
+		if (tinted) sync();
+		else if (!scrollFrame) scrollFrame = requestAnimationFrame(sync);
 	};
 
 	/** Drawn from `text` when it is handed over, since the field's own value may not have caught up yet. */
@@ -130,17 +160,38 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		if (!sheet || drawn === text) return;
 		drawn = text;
 		const fragment = document.createDocumentFragment();
-		for (const run of whitespaceRuns(text)) {
-			if (run.kind === 'text') {
-				fragment.append(run.text);
-				continue;
+		/** A run of the text into `into`: with its marks when they are shown, as it is otherwise. */
+		const put = (part: string, into: DocumentFragment | HTMLElement) => {
+			if (!marks) {
+				into.append(part);
+				return;
 			}
-			const mark = document.createElement('span');
-			mark.className = `ws-${run.kind}`;
-			// The newline's mark sits before the break; the break itself follows.
-			if (run.kind !== 'newline') mark.textContent = run.text;
-			fragment.append(mark);
-			if (run.kind === 'newline') fragment.append('\n');
+			for (const run of whitespaceRuns(part)) {
+				if (run.kind === 'text') {
+					into.append(run.text);
+					continue;
+				}
+				const mark = document.createElement('span');
+				mark.className = `ws-${run.kind}`;
+				// The newline's mark sits before the break; the break itself follows.
+				if (run.kind !== 'newline') mark.textContent = run.text;
+				into.append(mark);
+				if (run.kind === 'newline') into.append('\n');
+			}
+		};
+		if (!tinted) put(text, fragment);
+		else {
+			let at = 0;
+			for (const match of text.matchAll(PLACEHOLDER_SPAN)) {
+				if (match[0] === '%%%') continue;
+				put(text.slice(at, match.index), fragment);
+				const span = document.createElement('span');
+				span.className = 'ws-ph';
+				put(match[0], span);
+				fragment.append(span);
+				at = match.index + match[0].length;
+			}
+			put(text.slice(at), fragment);
 		}
 		// A trailing newline would collapse; a space after it keeps the last line.
 		fragment.append(' ');
@@ -215,6 +266,17 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		sheet = document.createElement('div');
 		sheet.className = 'ws-sheet';
 		layer.append(sheet);
+		if (tinted) {
+			const style = getComputedStyle(field);
+			own = { color: style.color, background: style.backgroundColor, style: field.getAttribute('style') ?? '' };
+			layer.classList.add('ws-under');
+			// Above the layer, and see-through to it, but for the caret.
+			if (style.position === 'static') field.style.position = 'relative';
+			field.style.zIndex = '1';
+			field.style.color = 'transparent';
+			field.style.background = 'transparent';
+			field.style.caretColor = own.color;
+		}
 		field.after(layer);
 		place();
 		draw(field.value);
@@ -237,15 +299,27 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		layer?.remove();
 		layer = sheet = null;
 		drawn = null;
+		if (own) {
+			if (own.style) field.setAttribute('style', own.style);
+			else field.removeAttribute('style');
+			own = null;
+		}
 	};
 
-	if (options.on) start();
+	if (marks || tinted) start();
 
 	return {
 		update(next: WhitespaceOptions) {
-			if (next.on && !layer) start();
-			else if (!next.on && layer) stop();
-			else if (layer) {
+			// A change of what is drawn is a change of where: over the field for
+			// marks alone, under it for colour. Started again, which costs one draw.
+			if (next.on !== marks || !!next.color !== tinted) {
+				stop();
+				marks = next.on;
+				tinted = !!next.color;
+				if (marks || tinted) start();
+				return;
+			}
+			if (layer) {
 				draw(next.text);
 				settle();
 			}
