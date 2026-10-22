@@ -999,7 +999,7 @@
 		if (!loaded) booting = boot(true);
 		else {
 			notify(READ_ONLY_NOTE);
-			live?.post({ kind: 'watching' });
+			live?.post({ kind: 'watching', id: liveId });
 		}
 	}
 
@@ -1057,12 +1057,16 @@
 	 * while a read-only tab is watching, and a read-only tab shows what it is
 	 * sent — the template, the table and the row being edited.
 	 */
-	let watched = false;
+	/** The read-only tabs watching this one, by their ids — see live.ts. */
+	const watchers = new Set<string>();
+	/** This tab's id, should it be read-only. */
+	const liveId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Math.random());
 	const live = openLive((message) => {
 		if (message.kind === 'watching' && editor === 'here') {
-			watched = true;
+			watchers.add(message.id);
 			sendLive();
-		} else if (message.kind === 'editor' && editor === 'readonly') live?.post({ kind: 'watching' });
+		} else if (message.kind === 'unwatching') watchers.delete(message.id);
+		else if (message.kind === 'editor' && editor === 'readonly') live?.post({ kind: 'watching', id: liveId });
 		else if (message.kind === 'state' && editor === 'readonly') {
 			const next = message.state;
 			template = next.template;
@@ -1075,7 +1079,7 @@
 	});
 
 	function sendLive() {
-		if (!live || !ready || !watched) return;
+		if (!live || !ready || !watchers.size) return;
 		live.post({
 			kind: 'state',
 			state: {
@@ -1107,7 +1111,19 @@
 		if (ready) untrack(() => live?.post({ kind: 'editor' }));
 	});
 
-	$effect(() => () => live?.close());
+	// Gone for good — closed, reloaded, navigated away: the editor stops
+	// sending to it. `pagehide`, not `unload`, which a page in the back/forward
+	// cache never fires.
+	$effect(() => {
+		const leave = () => {
+			if (editor === 'readonly') live?.post({ kind: 'unwatching', id: liveId });
+		};
+		window.addEventListener('pagehide', leave);
+		return () => {
+			window.removeEventListener('pagehide', leave);
+			live?.close();
+		};
+	});
 
 	// ---- boot ---------------------------------------------------------------
 
@@ -1219,7 +1235,7 @@
 		history = createHistory(snapshot());
 		if (viewOnly) {
 			notify(READ_ONLY_NOTE);
-			live?.post({ kind: 'watching' });
+			live?.post({ kind: 'watching', id: liveId });
 			missingFonts = await ensureTemplateFonts(template);
 			void refreshStoredFonts();
 			return;
@@ -3470,7 +3486,7 @@
 		// the editor holds a stale copy, and an import saves what is open first
 		// — over what the editing tab has saved since.
 		if (editor !== 'here') {
-			notify('Another tab is editing — press Use Here first, then drop the file again.', 'warning');
+			notify('Another tab is editing — press Open Here first, then drop the file again.', 'warning');
 			return;
 		}
 		const said: Said[] = placed ? [{ text: `“${placed.name}” placed.`, tone: 'info' }] : [];
@@ -4045,8 +4061,8 @@
 			{images}
 			onselect={selectBox}
 			onchange={updateBox}
-			onimagedrop={(box, file) => void handleImageDrop(box, file)}
-			onimagepagedrop={(file, x, y) => void (async () => placeImageOnPage(await storeImage(file), x, y, file))()}
+			onimagedrop={editor === 'readonly' ? undefined : (box, file) => void handleImageDrop(box, file)}
+			onimagepagedrop={editor === 'readonly' ? undefined : (file, x, y) => void (async () => placeImageOnPage(await storeImage(file), x, y, file))()}
 			onaction={describe}
 			onbounds={(show, ties) => (ui = { ...ui, showBounds: show, showTies: ties })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}

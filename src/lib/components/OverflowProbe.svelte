@@ -46,6 +46,13 @@
 	async function run(id: number) {
 		const result = new Map<number, string[]>();
 		for (let start = 0; start < rows.length; start += BATCH) {
+			// Emptied first, so every card of the batch is mounted afresh and
+			// says what it finds: a pass cut short leaves its batch standing,
+			// and the next one asking for the same rows would get the same
+			// cards back, which report only when something they read changes.
+			batch = [];
+			await tick();
+			if (id !== pass) return;
 			found = {};
 			batch = Array.from({ length: Math.min(BATCH, rows.length - start) }, (_, k) => start + k);
 			await tick();
@@ -72,14 +79,23 @@
 	});
 
 	// A face that finishes loading after a pass changes every measurement it
-	// took, so it takes another.
+	// took, so it takes another — once the loading has settled, as the inputs
+	// do: the font menus preview faces one after another, and a pass per face
+	// was work nobody would see. Cleared with the table, and the pass counter
+	// moved on, so nothing runs against a probe that is gone.
 	$effect(() => {
+		let timer: ReturnType<typeof setTimeout> | undefined;
 		const again = () => {
+			clearTimeout(timer);
 			const id = ++pass;
-			setTimeout(() => void run(id), SETTLE_MS);
+			timer = setTimeout(() => void run(id), SETTLE_MS);
 		};
 		document.fonts.addEventListener('loadingdone', again);
-		return () => document.fonts.removeEventListener('loadingdone', again);
+		return () => {
+			clearTimeout(timer);
+			pass++;
+			document.fonts.removeEventListener('loadingdone', again);
+		};
 	});
 </script>
 

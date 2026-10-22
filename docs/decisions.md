@@ -141,7 +141,7 @@ it never read, and no write path had to learn about tabs. Gating each save
 instead would have been a dozen guards, and the next save added would be the
 one without one.
 
-**Handed over, not stolen.** Use Here asks the holder over a
+**Handed over, not stolen.** Open Here (once Use Here) asks the holder over a
 BroadcastChannel; the holder writes everything at once, without the 300ms
 debounce, waits for it, stops, and only then lets go — so the new tab reads
 the latest of everything. A holder that does not answer in four seconds has the

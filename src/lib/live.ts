@@ -10,8 +10,11 @@ import type { Dataset, Mapping, Template } from './types';
  * was told about, and the message is the same snapshot the autosave writes.
  *
  * Only while someone is watching: a read-only tab says so when it opens, and
- * again whenever a new editor says it has started, so a tab that edits alone
- * never clones its table for nobody. Without BroadcastChannel (no secure
+ * again whenever a new editor says it has started, and says it has gone when
+ * its page is hidden for good — so a tab that edits alone, or alone again,
+ * never clones its table for nobody. A read-only tab that crashes cannot say
+ * so; the editor then keeps sending to it until it reloads, which costs a
+ * clone per settled change and nothing worse. Without BroadcastChannel (no secure
  * context, as for the tab lock) read-only is a snapshot, as it was.
  */
 export interface LiveState {
@@ -24,7 +27,9 @@ export interface LiveState {
 }
 
 export type LiveMessage =
-	| { kind: 'watching' }
+	/** a read-only tab, by an id of its own, so the editor knows when the last one has gone */
+	| { kind: 'watching'; id: string }
+	| { kind: 'unwatching'; id: string }
 	| { kind: 'editor' }
 	| { kind: 'state'; state: LiveState };
 

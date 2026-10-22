@@ -480,9 +480,14 @@ export function momentOf(text: string): number | null {
 	const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{1,2}):(\d{2}))?$/.exec(text.trim());
 	if (!m) return null;
 	const [y, mo, d, h, mi] = [m[1], m[2], m[3], m[4] ?? '0', m[5] ?? '0'].map(Number);
+	if (h > 23 || mi > 59) return null;
 	const date = new Date(y, mo - 1, d, h, mi);
-	// Rolled over — the 31st of April, hour 25 — is a typo, not a date.
-	if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d || date.getHours() !== h) return null;
+	// Rolled over — the 31st of April — is a typo, not a date. The day is the
+	// check, not the hour: a time in the hour a clock springs forward over
+	// (02:30 on the last Sunday of March, in Europe) does not exist, the
+	// browser reads it an hour on, and refusing it would mark a real deadline
+	// as a mistake.
+	if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return null;
 	return date.getTime();
 }
 
@@ -591,10 +596,17 @@ function findReplace(spec: string): { find: string; replace: string } | null {
 }
 
 export function applyPlaceholders(text: string, context: PlaceholderContext = {}): string {
-	if (!text || !text.includes('%%')) return text;
-	// A cell cannot smuggle a mark in: the characters are the editor's.
-	if (context.markUnknown) text = text.replace(UNKNOWN_CHARS, '');
-	if (context.markCountdown) text = text.replace(COUNTDOWN_CHARS, '');
+	if (!text) return text;
+	// A cell cannot smuggle a mark in: the characters are the editor's. Before
+	// the test for `%%`, since a cell with none is drawn from this all the same,
+	// and on every value a placeholder brings in, since those are cells too.
+	const clean = (value: string) => {
+		if (context.markUnknown) value = value.replace(UNKNOWN_CHARS, '');
+		if (context.markCountdown) value = value.replace(COUNTDOWN_CHARS, '');
+		return value;
+	};
+	text = clean(text);
+	if (!text.includes('%%')) return text;
 	const row = context.row ?? null;
 	const columns = row ? Object.keys(row) : [];
 	let now: Date | undefined;
@@ -611,11 +623,11 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 			// Its own cell, reached the long way round, is still a cell quoting
 			// itself — see `self`.
 			if (!target || !column || (target === row && column === context.self)) return unknown(whole);
-			return String(target[column] ?? '');
+			return clean(String(target[column] ?? ''));
 		}
 		if (isToc(name)) {
 			const listed = format === undefined ? undefined : contents(format, context.run, row);
-			return listed === undefined ? unknown(whole) : listed;
+			return listed === undefined ? unknown(whole) : clean(listed);
 		}
 		if (name.toLowerCase() === 'page') {
 			// Left as written, and marked, where there is no run to count — the
@@ -640,7 +652,7 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 		if ((format === undefined || swap) && row) {
 			const column = findColumn(name, columns);
 			if (column && column !== context.self) {
-				const value = String(row[column] ?? '');
+				const value = clean(String(row[column] ?? ''));
 				// An empty find would put the replacement between every letter.
 				return swap && swap.find ? value.split(swap.find).join(swap.replace) : value;
 			}

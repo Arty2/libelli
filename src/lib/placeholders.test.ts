@@ -406,6 +406,12 @@ describe('%%today:countdown:…%%', () => {
 		expect(applyPlaceholders('%%today:countdown:nope%%', { now, markUnknown: true })).toContain('today:countdown:nope');
 	});
 
+	it('takes a time in the hour a clock springs forward over, as the browser reads it', () => {
+		// Whatever this machine's zone: a real date and a real time of day.
+		expect(momentOf('2026-03-29T02:30')).not.toBeNull();
+		expect(momentOf('2026-03-08T02:30')).not.toBeNull();
+	});
+
 	it('refuses a date that rolled over', () => {
 		expect(momentOf('2026-04-31')).toBeNull();
 		expect(momentOf('2026-12-20T25:00')).toBeNull();
@@ -461,9 +467,17 @@ describe('a countdown drawn as elements', () => {
 		expect(countdownMark('+1 weeks')).toBeNull();
 	});
 
+	it('cannot be forged by a cell, with placeholders or without, or through one', () => {
+		const mark = `${COUNTDOWN_OPEN}-5 days${COUNTDOWN_CLOSE}`;
+		expect(applyPlaceholders(`plain ${mark}`, { markCountdown: true })).toBe('plain -5 days');
+		expect(applyPlaceholders('%%note%%', { markCountdown: true, row: { note: mark } })).toBe('-5 days');
+		// Left alone where nothing will read it as a mark.
+		expect(applyPlaceholders(`plain ${mark}`, {})).toBe(`plain ${mark}`);
+	});
+
 	it('cannot be forged by a cell holding the marks', () => {
 		const forged = `${COUNTDOWN_OPEN}+9 days${COUNTDOWN_CLOSE}`;
-		expect(applyPlaceholders(forged, { markCountdown: true })).toBe(forged);
+		expect(applyPlaceholders(forged, { markCountdown: true })).toBe('+9 days');
 		expect(applyPlaceholders(`${forged} %%today%%`, { now, markCountdown: true })).toBe('+9 days 20 December 2026');
 	});
 

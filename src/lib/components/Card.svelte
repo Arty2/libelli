@@ -1646,13 +1646,27 @@
 			const bottom = top0 + origin.h;
 			// A Grow area set bottom or middle is drawn above its stored top, by
 			// however far its words grew it (`freedTop`), and that is where the
-			// handle is. Worked from there, so the pointer and the snap meet the
-			// edge as drawn; from the stored top the handle did nothing for that
-			// many millimetres and then landed off the line by them. The height
-			// as it was at pointerdown: read live, it grows with the handle, and
-			// the lift with it, and the edge ran away from the pointer.
+			// handle is. The height as it was at pointerdown: read live, it grows
+			// with the handle, and the edge ran away from the pointer.
 			const lift = origin.anchor ? 0 : freedTop(origin, 0, startHeight);
-			next.h = fine(bottom - setTop(dy - lift, undefined, 0, bottom - MIN_H));
+			if (!lift) {
+				next.h = fine(bottom - setTop(dy, undefined, 0, bottom - MIN_H));
+				return;
+			}
+			// Worked as drawn: the top goes where the pointer and the snap put it
+			// and the drawn bottom stays. Once the area is taller than its words
+			// it is drawn as its frame, so the frame is that span exactly; short
+			// of them it is drawn as tall as they are, whatever its frame, so the
+			// handle has nothing to move and the area stays as it was. Setting a
+			// frame there anyway moved a middle-set area's bottom, its growth
+			// split differently about a different frame.
+			const drawnTop = origin.y - lift;
+			const drawnBottom = drawnTop + startHeight;
+			const top = place(drawnTop + dy, 'y');
+			if (drawnBottom - top >= startHeight) {
+				next.y = top;
+				next.h = fine(drawnBottom - top);
+			}
 		};
 
 		switch (mode) {
