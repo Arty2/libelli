@@ -4,11 +4,13 @@ import { eanDigits } from './barcode';
 import { renderMarkdown } from './markdown';
 import { applyPlaceholders } from './placeholders';
 import { normaliseTemplate } from './template';
+import { toFile } from './frame';
 
 describe('isStarterTemplate', () => {
 	it('knows the starter as it came, and after a trip through storage', () => {
 		expect(isStarterTemplate(starterTemplate())).toBe(true);
-		expect(isStarterTemplate(normaliseTemplate(JSON.parse(JSON.stringify(starterTemplate()))))).toBe(true);
+		// Storage writes a file (`toFile`), and reading takes one.
+		expect(isStarterTemplate(normaliseTemplate(JSON.parse(JSON.stringify(toFile(starterTemplate())))))).toBe(true);
 	});
 
 	it('ignores the name and the padlock, which a first run and a rename change', () => {

@@ -534,13 +534,11 @@ export function normaliseTemplate(raw: unknown): Template {
 		list: normaliseList(t.defaults?.list),
 		baseline: normaliseBaseline(t.defaults?.baseline)
 	}) as Defaults;
-	// Top-left corners in memory, whichever way the file gave them — frame.ts.
-	// A file without the marker was written with top-left corners, and is read
-	// that way until LEGACY_TOP_LEFT_UNTIL.
+	// Top-left corners in memory, from the reference points a file gives —
+	// frame.ts. Unmarked files too: the top-left reading is gone.
 	const boxes: Box[] = fromFile(
 		t.boxes.map((b: any) => newBox(b)),
-		defaults,
-		t.frame
+		defaults
 	);
 	const ids = new Set(boxes.map((b) => b.id));
 	// Drop anchors that point nowhere rather than letting layout guess.

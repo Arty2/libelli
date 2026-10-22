@@ -110,22 +110,21 @@ the corner in memory, so nothing moves; the file's numbers follow it the next
 time it is written. Both directions use the declared width and height, and
 round to a ten-thousandth of a millimetre, so a round trip is exact.
 
-**The marker, not the schema, says which.** A file in the new frame carries
-`frame: 'reference'`. Anything without it is read top-left — an old file, and
-equally a template in memory — so a save path that somehow missed `toFile`
-writes a file that still reads true rather than one off by an area's width. The
-schema went to 6 as well, but only so that an older build, a cached install on
-another device, refuses a new file instead of reading it top-left.
+**One format, read one way.** A file carries `frame: 'reference'`, and every
+file is read at reference points whether it does or not. From 0.28 until 0.30
+an unmarked file was read top-left and boot rewrote every stored template once
+(`rewriteStoredTemplates`); at 0.30 that bridge, and the gate that held its
+date, were deleted. A file exported before 0.28 and opened now is read as
+reference points, and an area aligned right or bottom lands off by its width or
+height — the accepted cost of not carrying two formats forever. The schema went
+to 6 so an older build refuses a new file rather than reading it top-left.
 
-**Changed once, then the bridge goes.** Boot rewrites every stored template
-without the marker (`rewriteStoredTemplates`), awaited before anything is read
-for the screen, so it cannot race the autosave. The top-left reading stays
-until `LEGACY_TOP_LEFT_UNTIL` (0.30.0) for files people exported; at that
-version `npm run gates` fails until the unmarked path, the boot rewrite and the
-gate itself are deleted, leaving one format read one way. A file exported before
-0.28.0 and opened after that is read as reference points, and an area aligned
-right or bottom lands off by its width or height — the accepted cost of not
-carrying two formats forever.
+**The marker is now `toFile`'s guard, and memory must pass through it.** A
+template in memory is top-left and unmarked, which used to be harmless: it read
+as an old file, true. Now anything unmarked is read as reference points, so an
+in-memory template handed to `normaliseTemplate` — or to anything that reads a
+file, as A5 Starter's "untouched?" and an import's "already held?" do — goes
+through `toFile` first, or every area not set top-left moves.
 
 **Growing away from the reference point** is `resolveLayout`'s: an unanchored
 growing area set to the bottom grows up, one set to the middle grows both ways.

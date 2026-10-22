@@ -140,7 +140,7 @@
 		type DatasetEntry,
 		type TemplateEntry
 	} from '$lib/storage';
-	import { REFERENCE_FRAME, toFile } from '$lib/frame';
+	import { toFile } from '$lib/frame';
 	import { claimEditor, type EditorLock } from '$lib/tablock';
 	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
@@ -434,33 +434,6 @@
 	/** Deleting a table asks, for the same reason deleting a template does. */
 	let deletingTable = $state(false);
 	const tableName = $derived(dataset.name?.trim() || UNTITLED_TABLE);
-
-	/**
-	 * Every template this browser holds, written once in the file's new frame —
-	 * each area at its reference point, with the marker that says so (frame.ts).
-	 * A template written before is read as it was written, top-left, and saved
-	 * back; one already marked is left alone, so this costs a read per template
-	 * and nothing more once it has run. Awaited at boot, before anything is
-	 * read for the screen or could be saved over it, so it never races the
-	 * autosave. One that will not read is left as it is, for boot to say so.
-	 *
-	 * The bridge is meant to be short — see LEGACY_TOP_LEFT_UNTIL: by then every
-	 * browser that has opened the app has been through this, and this goes too.
-	 */
-	async function rewriteStoredTemplates() {
-		const rewrite = async (raw: unknown, save: (t: Template) => Promise<unknown>) => {
-			if (!raw || (raw as Template).frame === REFERENCE_FRAME) return;
-			try {
-				await save(normaliseTemplate(raw));
-			} catch {
-				/* unreadable: left for boot to report */
-			}
-		};
-		await rewrite(await loadTemplate(), saveTemplate);
-		for (const { id } of await listTemplates()) {
-			await rewrite(await loadTemplateDoc(id), (t) => saveTemplateDoc(id, t));
-		}
-	}
 
 	async function refreshTables() {
 		tables = await listDatasets();
@@ -953,7 +926,6 @@
 		// a returning user would be told their month of work was sample data.
 		const storable = await storageAvailable();
 		let unreadable = false;
-		if (storable) await rewriteStoredTemplates();
 
 		const storedTemplate = await loadTemplate();
 		// A first visit lands on the starter card locked: it is the tour, read
@@ -2266,7 +2238,9 @@
 				return false;
 			}
 		};
-		if (untouched($state.snapshot(template))) {
+		// Through toFile: `untouched` reads a file, and the open template is
+		// memory — top-left — which a file reader would move (frame.ts).
+		if (untouched(toFile($state.snapshot(template)))) {
 			notify(`This is the A5 Starter Booklet, as it came.`);
 			return;
 		}

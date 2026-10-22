@@ -51,7 +51,7 @@ src/lib/
   download.ts     hand the browser a file; zip.ts packs several into one
   dropfile.ts     what a file dropped on the app is: a template, a table, or neither
   template.ts     defaults (templates/default-card.json), validation, migration, import/export
-  frame.ts        a file's x, y at the reference point; memory's top-left; the bridge to 0.30
+  frame.ts        a file's x, y at the reference point; memory's top-left, through toFile
   tablock.ts      one tab edits: a Web Lock, handed over on request after a save
   fonts.ts        Google families + local files via FontFace/IndexedDB
   assets.ts       images — page backgrounds and a row's own; bytes in a folder or IndexedDB

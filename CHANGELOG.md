@@ -8,6 +8,12 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
+## 0.30.0 — 2026-10-22
+
+- Drag a CSV, TSV or template JSON onto the app to open it as a new table or template; what was open is saved first. A file it cannot read is named in the status bar with the reason.
+- Import in the table menu opens a CSV as a new table too; Paste still fills the open one. A file already in your library opens that copy instead of a second one.
+- Template files from before 0.28 are now read like any other: an area aligned right or bottom may need moving back.
+
 ## 0.29.7 — 2026-10-21
 
 - Ctrl/Cmd + or − with areas chosen sets their type a point larger or smaller; the page and the interface do not zoom then. With nothing chosen, it zooms the page as before.
