@@ -2109,6 +2109,9 @@
 				{@render drawingButtons(!!(dataset.rows[bigCell.row]?.[bigCell.column] ?? '').trim(), deleteDrawing)}
 			{:else if bigKind(dataset.rows[bigCell.row]?.[bigCell.column] ?? '', bigCell.draw) === 'text'}
 				<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[bigCell.row]?.[bigCell.column] ?? '')}</span>
+				<!-- Right of the count, in the editor it marks: the table's own
+				     button is not in this bar while the cell is open full size. -->
+				{@render whitespaceButton()}
 			{/if}
 		{:else}
 		{#if editing && dataset.rows[editing.row]}
@@ -2398,22 +2401,7 @@
 		     the table is read, not about what is in it, so it stands apart from
 		     the things that act on the table and its rows. The label says the height the rows
 		     are at; the title, the next. -->
-		<!-- Spaces, tabs and line ends, drawn where text is being typed: the cell
-		     with the caret in it and the full-size editor — not every cell, which
-		     would be a second copy of the table. Beside the row height, being
-		     about how the table is read. -->
-		<button
-			class="whitespace"
-			aria-pressed={whitespace}
-			title={whitespace
-				? 'Whitespace shown in the cell being typed in and the full-size editor: · a space, → a tab, ° a no-break space, ¶ a line end. Press to hide it'
-				: 'Show whitespace — spaces, tabs and line ends — in the cell being typed in and the full-size editor'}
-			aria-label="Show whitespace"
-			onclick={() => onwhitespace?.(!whitespace)}
-		>
-			<Icon name="paragraph" size={15} />
-			<span class="label">Whitespace</span>
-		</button>
+		{@render whitespaceButton()}
 		<button
 			class="row-height"
 			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
@@ -2611,6 +2599,26 @@
 <!-- A picture's two acts, at the far end of the panel's bar as they are in
      the Pictures tray: Delete in red, then Save, lit while there is drawing to
      keep. -->
+<!-- Spaces, tabs and line ends, drawn where text is being typed: the cell
+     with the caret in it and the full-size editor — not every cell, which
+     would be a second copy of the table. In the table's bar beside the row
+     height, being about how the table is read, and in the full-size editor's
+     beside its count. -->
+{#snippet whitespaceButton()}
+	<button
+		class="whitespace"
+		aria-pressed={whitespace}
+		title={whitespace
+			? 'Whitespace shown in the cell being typed in and the full-size editor: · a space, → a tab, ° a no-break space, ¶ a line end. Press to hide it'
+			: 'Show whitespace — spaces, tabs and line ends — in the cell being typed in and the full-size editor'}
+		aria-label="Show whitespace"
+		onclick={() => onwhitespace?.(!whitespace)}
+	>
+		<Icon name="paragraph" size={15} />
+		<span class="label">Whitespace</span>
+	</button>
+{/snippet}
+
 {#snippet drawingButtons(present: boolean, remove: () => void)}
 	<button class="danger" disabled={!present && !boardDirty} title="Delete this drawing" onclick={remove}>
 		<Icon name="trash" size={15} /> Delete
