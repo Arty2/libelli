@@ -2091,9 +2091,10 @@
 	     side by side reach far enough into the band that the pager's first arrow,
 	     centred in the same band, lands on top of "Boxes". They used to stack
 	     into a column for that, which grew a two-line panel up over the sheet;
-	     now the words go instead and the ticks keep their row — a # for the
-	     grid, a | for the guides and a B for the boxes, beside checkboxes that
-	     already say whether they are on. The full word stays the accessible name either way, so nothing
+	     now the words go instead and the ticks keep their row — a mark for each,
+	     which also says which of its modes it is in: ⋕ ruled and ∷ dots for the
+	     grid, ≢ without the spacing and ≡ with it for the guides, ⊡ boxes and ⊞
+	     boxes with their ties — beside checkboxes that say whether they are on. The full word stays the accessible name either way, so nothing
 	     read aloud is reduced to a single letter. -->
 	<div class="corner left">
 		<!-- Three presses round: off, ruled, dots — a dot at every intersection,
@@ -2124,7 +2125,7 @@
 				}}
 			/>
 			<span class="wide">{grid && gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
-			<span class="narrow" aria-hidden="true">#</span>
+			<span class="narrow" aria-hidden="true">{grid && gridStyle === 'dots' ? '\u2237' : '\u22d5'}</span>
 		</label>
 		<label
 			title={withKey(
@@ -2149,7 +2150,7 @@
 				}}
 			/>
 			<span class="wide">Guides</span>
-			<span class="narrow" aria-hidden="true">|</span>
+			<span class="narrow" aria-hidden="true">{guidesFull ? '\u2261' : '\u2262'}</span>
 		</label>
 		<label
 			title={withKey(
@@ -2173,7 +2174,7 @@
 				}}
 			/>
 			<span class="wide">Boxes</span>
-			<span class="narrow" aria-hidden="true">□</span>
+			<span class="narrow" aria-hidden="true">{bounds && ties ? '\u229e' : '\u22a1'}</span>
 		</label>
 	</div>
 
@@ -2376,7 +2377,7 @@
 	}
 
 	/* Close about the count, so the chevrons stay clear of the chips in the
-	   two corners: on a narrow phone the arrows sat under the # | B on one
+	   two corners: on a narrow phone the arrows sat under the grid, guides and boxes marks on one
 	   side and the zoom on the other. */
 	.pager .controls {
 		display: flex;

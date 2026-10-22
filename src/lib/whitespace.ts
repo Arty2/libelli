@@ -1,5 +1,5 @@
 /**
- * Whitespace, shown: a dot for a space, an arrow for a tab, a degree sign for a
+ * Whitespace, shown: a dot for a space, an arrow for a tab, a ring for a
  * no-break space and a pilcrow at each line's end, drawn over a textarea.
  *
  * A textarea draws its own text and nothing can be styled inside it, so the
@@ -64,8 +64,10 @@ function ensureStyles() {
 .ws-layer .ws-sheet { white-space: inherit; overflow-wrap: inherit; word-break: inherit; will-change: transform; }
 .ws-layer span { position: relative; }
 .ws-layer span::after { position: absolute; top: 0; color: var(--accent, #2563eb); opacity: 0.6; }
-.ws-layer .ws-space::after { content: '·'; left: 50%; transform: translateX(-50%); }
-.ws-layer .ws-nbsp::after { content: '°'; left: 50%; transform: translateX(-50%); }
+.ws-layer .ws-space::after, .ws-layer .ws-nbsp::after { content: ''; top: 50%; left: 50%;
+	width: 0.24em; height: 0.24em; border-radius: 50%; box-sizing: border-box; transform: translate(-50%, -50%); opacity: 0.75; }
+.ws-layer .ws-space::after { background: var(--accent, #2563eb); }
+.ws-layer .ws-nbsp::after { border: 0.07em solid var(--accent, #2563eb); width: 0.32em; height: 0.32em; }
 .ws-layer .ws-tab::after { content: '→'; left: 0; }
 .ws-layer .ws-newline::after { content: '¶'; left: 0.1em; }`;
 	document.head.append(style);
@@ -85,6 +87,7 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 	let observer: ResizeObserver | null = null;
 	let drawn: string | null = null;
 	let scrollFrame = 0;
+	let settleFrame = 0;
 
 	const place = () => {
 		if (!layer) return;
@@ -146,6 +149,25 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 	};
 	const onInput = () => draw();
 
+	/**
+	 * The field is what is on screen, and the one thing to trust: the text
+	 * handed over can be the table's, a keystroke behind it, and the field's
+	 * own value can be a row behind when the full-size editor steps. So both,
+	 * the handed text now and the field a frame later, when whatever was
+	 * updating has finished — and the field measured again then too, since it
+	 * can move without changing size, as a cell does when the bar beside the
+	 * table changes. Once a frame at most, however often the table renders.
+	 */
+	const settle = () => {
+		if (settleFrame) return;
+		settleFrame = requestAnimationFrame(() => {
+			settleFrame = 0;
+			place();
+			draw(field.value);
+			sync();
+		});
+	};
+
 	const start = () => {
 		ensureStyles();
 		layer = document.createElement('div');
@@ -156,7 +178,8 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		layer.append(sheet);
 		field.after(layer);
 		place();
-		draw(options.text);
+		draw(field.value);
+		settle();
 		field.addEventListener('input', onInput);
 		field.addEventListener('scroll', onScroll, { passive: true });
 		observer = new ResizeObserver(() => {
@@ -170,7 +193,8 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		observer?.disconnect();
 		observer = null;
 		cancelAnimationFrame(scrollFrame);
-		scrollFrame = 0;
+		cancelAnimationFrame(settleFrame);
+		scrollFrame = settleFrame = 0;
 		field.removeEventListener('input', onInput);
 		field.removeEventListener('scroll', onScroll);
 		layer?.remove();
@@ -184,9 +208,10 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		update(next: WhitespaceOptions) {
 			if (next.on && !layer) start();
 			else if (!next.on && layer) stop();
-			// Only the text: the table re-renders for many reasons, and measuring
-			// the field again for each is what the resize observer is for.
-			else if (layer) draw(next.text);
+			else if (layer) {
+				draw(next.text);
+				settle();
+			}
 		},
 		destroy: stop
 	};

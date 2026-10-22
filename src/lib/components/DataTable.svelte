@@ -2135,6 +2135,16 @@
 					onmousedown={(e) => e.preventDefault()}
 					onclick={editChosen}
 				><Icon name="task-edit" size={15} /> Edit</button>
+				<!-- An empty cell can be written in or drawn in; there is nothing to
+				     count yet, so the count makes room for the other way in. -->
+				{#if !value}
+					<button
+						title="Draw in this cell — a picture made here, kept in the table"
+						disabled={locked}
+						onmousedown={(e) => e.preventDefault()}
+						onclick={() => editing && openBigCell(editing.row, editing.column, true)}
+					><Icon name="edit" size={15} /> Draw</button>
+				{/if}
 			{/if}
 		{/if}
 		<!-- Which table, and its lock, gone while rows are chosen or a cell is
@@ -2353,24 +2363,40 @@
 			     cell is left. Mousedown is held off the Edit button, or the field
 			     would lose its focus, and with it this bar, before the click. -->
 			{@const cell = editing}
-			<span class="rule"></span>
-			<span class="cell-count" aria-live="polite">{countLabel(dataset.rows[cell.row]?.[cell.column] ?? '')}</span>
+			{@const value = dataset.rows[cell.row]?.[cell.column] ?? ''}
+			<!-- Nothing to count in an empty cell: Draw stands beside Edit instead. -->
+			{#if value}
+				<span class="rule"></span>
+				<span class="cell-count" aria-live="polite">{countLabel(value)}</span>
+			{/if}
 		{:else if chosenRows.length}
 			<!-- What you can do to the rows you have chosen, at the far end of the
-			     bar after the things that act on the whole table, with a rule
-			     between the two. It appears
-			     only when there is a selection, so the bar is its usual length the
-			     rest of the time.
+			     bar after the things that act on the whole table. It appears only
+			     when there is a selection, so the bar is its usual length the rest
+			     of the time.
 
 			     Copy is one word and the glyph does the rest: a clipboard with
 			     something leaving it. Delete is a word too, rather than a bare bin
 			     in red: it is the one button here that takes rows away, and it
-			     should read as a button that does, not as a mark beside a count. -->
-			<span class="rule"></span>
-			<!-- "3 rows"; one row says nothing — the tick beside it already does. -->
+			     should read as a button that does — on a phone its word goes, the
+			     bar being short, and the red bin is a square of its own. -->
+			<button
+				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
+				onclick={copyTsv}
+			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
+			<button
+				class="danger delete-rows"
+				title="Delete the chosen rows"
+				aria-label="Delete the chosen rows"
+				disabled={locked}
+				onclick={deleteChosen}
+			><Icon name="trash" size={15} /> <span class="label">Delete</span></button>
+			<!-- After what is done with them, how many and where they go: the count
+			     names what the arrows move. No rule before any of it — the row
+			     actions follow on from the table's as one run. "3 rows"; one row
+			     says nothing, the tick beside it already does. -->
 			{#if chosenRows.length > 1}<span class="chosen-count">{chosenRows.length} rows</span>{/if}
-			<!-- Up and down first: they are about where the rows are, before what
-			     is done with them. Icon-only, the pair reads as one control. -->
+			<!-- Icon-only, the pair reads as one control. -->
 			<button
 				class="icon"
 				title="Move the chosen rows up — earlier in print order"
@@ -2385,16 +2411,6 @@
 				disabled={locked || chosenRows[chosenRows.length - 1] === dataset.rows.length - 1}
 				onclick={() => moveChosen(1)}
 			><span class="nudge-down"><Icon name="chevron-sort-down" size={20} /></span></button>
-			<button
-				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
-				onclick={copyTsv}
-			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
-			<button
-				class="danger"
-				title="Delete the chosen rows"
-				disabled={locked}
-				onclick={deleteChosen}
-			><Icon name="trash" size={15} /> Delete</button>
 		{/if}
 		<!-- How tall a row may be: one line, a few, or all of its longest cell.
 		     Last in the bar, at its far end, and always there: it is about how
@@ -2609,9 +2625,10 @@
 		class="whitespace"
 		aria-pressed={whitespace}
 		title={whitespace
-			? 'Whitespace shown in the cell being typed in and the full-size editor: · a space, → a tab, ° a no-break space, ¶ a line end. Press to hide it'
+			? 'Whitespace shown in the cell being typed in and the full-size editor: a dot for a space, → for a tab, a ring for a no-break space, ¶ for a line end. Press to hide it'
 			: 'Show whitespace — spaces, tabs and line ends — in the cell being typed in and the full-size editor'}
 		aria-label="Show whitespace"
+		onmousedown={(e) => e.preventDefault()}
 		onclick={() => onwhitespace?.(!whitespace)}
 	>
 		<Icon name="paragraph" size={15} />
@@ -3277,7 +3294,8 @@
 		   under — see `.edge`. */
 		border-right-width: 2px;
 		white-space: nowrap;
-		padding: 5px 6px 3px;
+		/* More on the right: the number stood against the column's rule. */
+		padding: 5px 10px 3px 6px;
 		color: #767676;
 		text-align: center;
 		background: #fff;
@@ -3744,6 +3762,7 @@
 	@media (max-width: 900px) {
 		.row-height .label,
 		.whitespace .label,
+		.delete-rows .label,
 		.reindex .label {
 			display: none;
 		}
@@ -3759,7 +3778,8 @@
 		   icon-only button; it kept the padding it had for the word, and read as
 		   a button with its label missing. */
 		.row-height,
-		.whitespace {
+		.whitespace,
+		.delete-rows {
 			box-sizing: border-box;
 			/* The bar's buttons are 29px tall; aspect-ratio cannot say so here,
 			   since the height is the content's and the width would follow the

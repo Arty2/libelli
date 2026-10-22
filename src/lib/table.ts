@@ -195,11 +195,37 @@ export function renumbering(before: Dataset, after: Dataset): Map<number, number
  * character limit means by it. Words are runs of anything that is not space.
  */
 export function countText(text: string): { characters: number; words: number } {
-	const trimmed = text.trim();
+	const printed = printedText(text);
+	const trimmed = printed.trim();
 	return {
-		characters: [...text].length,
+		characters: [...printed].length,
 		words: trimmed ? trimmed.split(/\s+/u).length : 0
 	};
+}
+
+/**
+ * The words a cell puts on the card, for counting: without the Markdown that
+ * only marks them up (markdown.ts's subset — headings, bullets, numbers, bold,
+ * italic, strikethrough, highlight, code, links, colored runs, rules) and
+ * without `%%placeholders%%`, whose own letters never print — what they stand
+ * for is another cell's to count — nor the `%%%` of a tab leader. Only marks
+ * in pairs come out, so a lone `*` or `#word` counts as the text it is.
+ */
+export function printedText(text: string): string {
+	return text
+		.replace(/%%[^%\n]+?%%/g, '')
+		.replace(/%%%/g, '')
+		.replace(/^[ \t]*#{1,3}[ \t]+/gm, '')
+		.replace(/^[ \t]*[-*][ \t]+/gm, '')
+		.replace(/^[ \t]*\d+\.[ \t]+/gm, '')
+		.replace(/^[ \t]*-{3,}[ \t]*$/gm, '')
+		.replace(/\[([^\]\n]*)\]\([^)\n]*\)/g, '$1')
+		.replace(/\[([^\]\n]*)\]\{[^}\n]*\}/g, '$1')
+		.replace(/\*\*(?=\S)(.+?)\*\*/g, '$1')
+		.replace(/~~(?=\S)(.+?)~~/g, '$1')
+		.replace(/==(?=\S)(.+?)==/g, '$1')
+		.replace(/`([^`\n]+)`/g, '$1')
+		.replace(/\*(?=\S)([^*\n]+?)\*/g, '$1');
 }
 
 /**

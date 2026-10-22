@@ -2196,7 +2196,10 @@
 	 * layout, the zoom or the selection (which moves badges) changes.
 	 */
 	let allThreads = $state<string[]>([]);
-	const showsAllTies = $derived(ties && bounds && !template.locked);
+	// On a locked page too: the ties are how a design hangs together, worth
+	// reading most on the starter, which opens locked. Their badges are drawn
+	// for the threads to run between, and refused as everything there is.
+	const showsAllTies = $derived(ties && bounds);
 
 	$effect(() => {
 		if (!showsAllTies) {
@@ -2743,7 +2746,7 @@
 				     buttons that would be refused anyway. The overflow mark below is
 				     not one of these: it is about what will print, which a lock does
 				     not change. -->
-				{#if bounds && !template.locked && (showsBadges(box) || showsAllTies) && (box.anchor || anchorTargets.has(box.id))}
+				{#if bounds && (showsAllTies || (!template.locked && showsBadges(box))) && (box.anchor || anchorTargets.has(box.id))}
 					<!-- The anchor's two ends, in a row of their own off the top-left
 					     corner: the buoy in the corner on one that others follow, and to
 					     its left the tie on an area that follows another — a middle link

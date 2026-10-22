@@ -3,6 +3,7 @@ import {
 	appendRows,
 	compareCells,
 	countText,
+	printedText,
 	deleteRows,
 	dropTarget,
 	inArrivalOrder,
@@ -230,5 +231,28 @@ describe('runOf', () => {
 		expect(runOf(arrival)).toBe(dataset.rows);
 		expect(runOf([...arrival])).toBeUndefined();
 		expect(runOf(undefined)).toBeUndefined();
+	});
+});
+
+describe('printedText', () => {
+	it('leaves out the Markdown that only marks words up', () => {
+		expect(printedText('## A **bold** and *quiet* ~~old~~ ==lit== `code` word')).toBe('A bold and quiet old lit code word');
+		expect(printedText('- one\n2. two\n---\n[link](https://a.example) and [red]{#c00}')).toBe('one\ntwo\n\nlink and red');
+	});
+
+	it('leaves out placeholders and tab leaders, whose letters never print', () => {
+		expect(printedText('Dear %%name%%, %%today:YYYY%%')).toBe('Dear , ');
+		expect(printedText('Espresso %%% 2.20')).toBe('Espresso  2.20');
+	});
+
+	it('counts a mark that is not notation as the text it is', () => {
+		expect(printedText('5 * 3 = 15, #tag, a*b')).toBe('5 * 3 = 15, #tag, a*b');
+		expect(printedText('50% off, 20% more')).toBe('50% off, 20% more');
+	});
+});
+
+describe('countText, as printed', () => {
+	it('counts the words, not their markup', () => {
+		expect(countText('**Hi** %%name%%')).toEqual({ characters: 3, words: 1 });
 	});
 });
