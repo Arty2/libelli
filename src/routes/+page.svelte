@@ -143,7 +143,7 @@
 		setReadOnly
 	} from '$lib/storage';
 	import { mayHaveMoved, toFile } from '$lib/frame';
-	import { openLive } from '$lib/live';
+	import { openLive, type LiveState } from '$lib/live';
 	import { claimEditor, type EditorLock } from '$lib/tablock';
 	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
@@ -619,6 +619,23 @@
 	 * a rename shows at once without waiting for the next pass.
 	 */
 	let overflowRows = $state(new Map<number, string[]>());
+	/**
+	 * The marks are by row index, and a pass takes a moment to come back: a row
+	 * added, deleted or moved shifts every index after it, and the marks would
+	 * sit on the wrong cards until then. So they go the moment the rows move,
+	 * and come back with the pass. An edit replaces one row; a move or a sort
+	 * replaces several places at once, and that is what is told apart here.
+	 */
+	let markedRows: readonly unknown[] = [];
+	$effect(() => {
+		const rows = dataset.rows;
+		const before = untrack(() => markedRows);
+		markedRows = rows;
+		if (before === rows || !untrack(() => overflowRows.size)) return;
+		let moved = before.length !== rows.length;
+		for (let i = 0, changed = 0; !moved && i < rows.length; i++) if (rows[i] !== before[i] && ++changed > 1) moved = true;
+		if (moved) overflowRows = new Map();
+	});
 	const overflowAreas = $derived(
 		new Map(
 			[...overflowRows].map(([i, ids]) => [
@@ -996,8 +1013,14 @@
 		setReadOnly(true);
 		const loaded = editor === 'handed';
 		editor = 'readonly';
-		if (!loaded) booting = boot(true);
-		else {
+		if (!loaded) {
+			viewBooting = true;
+			booting = boot(true).finally(() => {
+				viewBooting = false;
+				if (pendingLive) applyLive(pendingLive);
+				pendingLive = null;
+			});
+		} else {
 			notify(READ_ONLY_NOTE);
 			live?.post({ kind: 'watching', id: liveId });
 		}
@@ -1027,11 +1050,15 @@
 	let fullscreen = $state(false);
 	$effect(() => {
 		const query = matchMedia('(display-mode: fullscreen)');
+		// The size test only in an ordinary browser window: an installed app
+		// on a tablet fills the screen without being full screen, and would
+		// otherwise lose its controls the moment it went read only.
+		const browser = matchMedia('(display-mode: browser)');
 		const read = () =>
 			(fullscreen =
 				!!document.fullscreenElement ||
 				query.matches ||
-				(Math.abs(window.innerWidth - screen.width) <= 1 && Math.abs(window.innerHeight - screen.height) <= 1));
+				(browser.matches && Math.abs(window.innerWidth - screen.width) <= 1 && Math.abs(window.innerHeight - screen.height) <= 1));
 		read();
 		document.addEventListener('fullscreenchange', read);
 		query.addEventListener('change', read);
@@ -1044,8 +1071,10 @@
 	});
 	/**
 	 * Read only and full screen: the card and nothing else, as a display — no
-	 * toolbar, no status line, no eye. Leaving full screen brings them back,
-	 * which is the way out, so nothing on screen has to say it.
+	 * toolbar, no status line, no eye. Leaving full screen brings them back;
+	 * and since a guess at full screen can be wrong — a borderless window the
+	 * size of the screen — Escape or a double-click brings the dialog back too,
+	 * so the way out never depends on the guess.
 	 */
 	const bare = $derived(editor === 'readonly' && fullscreen);
 
@@ -1059,22 +1088,39 @@
 	 */
 	/** The read-only tabs watching this one, by their ids — see live.ts. */
 	const watchers = new Set<string>();
+	/** How many — state, so the send effect skips its walk of the table while it is none. */
+	let watcherCount = $state(0);
+	/** A read-only tab still reading storage: a state sent meanwhile waits, or boot would write the older save over it. */
+	let viewBooting = false;
+	let pendingLive: LiveState | null = null;
+
+	function applyLive(next: LiveState) {
+		const fontsChanged = JSON.stringify(next.template.fonts) !== JSON.stringify(template.fonts);
+		template = next.template;
+		dataset = next.dataset;
+		mapping = next.mapping;
+		templateId = next.templateId;
+		datasetId = next.datasetId;
+		activeRow = Math.max(0, Math.min(next.activeRow, next.dataset.rows.length - 1));
+		// A face the editor has just added: registered here as well, or this
+		// tab draws it in the fallback until it reloads.
+		if (fontsChanged) void ensureTemplateFonts(next.template).then((missing) => (missingFonts = missing));
+	}
 	/** This tab's id, should it be read-only. */
 	const liveId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Math.random());
 	const live = openLive((message) => {
 		if (message.kind === 'watching' && editor === 'here') {
 			watchers.add(message.id);
+			watcherCount = watchers.size;
 			sendLive();
-		} else if (message.kind === 'unwatching') watchers.delete(message.id);
+		} else if (message.kind === 'unwatching') {
+			watchers.delete(message.id);
+			watcherCount = watchers.size;
+		}
 		else if (message.kind === 'editor' && editor === 'readonly') live?.post({ kind: 'watching', id: liveId });
 		else if (message.kind === 'state' && editor === 'readonly') {
-			const next = message.state;
-			template = next.template;
-			dataset = next.dataset;
-			mapping = next.mapping;
-			templateId = next.templateId;
-			datasetId = next.datasetId;
-			activeRow = Math.max(0, Math.min(next.activeRow, next.dataset.rows.length - 1));
+			if (viewBooting) pendingLive = message.state;
+			else applyLive(message.state);
 		}
 	});
 
@@ -1096,7 +1142,7 @@
 	// A moment after anything changes, as the autosave waits: a drag is one
 	// message when it settles, not one a frame.
 	$effect(() => {
-		if (!ready) return;
+		if (!ready || !watcherCount) return;
 		watchDeep(template);
 		watchDeep(dataset);
 		watchDeep(mapping);
@@ -1118,9 +1164,16 @@
 		const leave = () => {
 			if (editor === 'readonly') live?.post({ kind: 'unwatching', id: liveId });
 		};
+		// Back from the back/forward cache, the same tab: it said it was going,
+		// so it says it is watching again.
+		const back = (event: PageTransitionEvent) => {
+			if (event.persisted && editor === 'readonly') live?.post({ kind: 'watching', id: liveId });
+		};
 		window.addEventListener('pagehide', leave);
+		window.addEventListener('pageshow', back);
 		return () => {
 			window.removeEventListener('pagehide', leave);
+			window.removeEventListener('pageshow', back);
 			live?.close();
 		};
 	});
@@ -2998,6 +3051,12 @@
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
 
 	function onWindowKeydown(event: KeyboardEvent) {
+		// The one key a read-only tab answers: the dialog, with its ways out —
+		// the only control there is when the card is shown alone.
+		if (editor === 'readonly' && event.key === 'Escape' && !readOnlyAsk) {
+			readOnlyAsk = true;
+			return;
+		}
 		// A tab that is not the editor holds a stale copy behind its dialog:
 		// a delete or an undo there edits what nobody will see saved, and an
 		// undo across a template switch would write its id over the editor's.
@@ -3719,7 +3778,7 @@
 	</div>
 {/if}
 
-<div class="app" class:view-only={editor === 'readonly'} class:bare>
+<div class="app" class:view-only={editor === 'readonly'} class:bare ondblclick={() => bare && (readOnlyAsk = true)} role="presentation">
 	<header class="toolbar">
 		<!-- The mark, and the theme: each press steps light, dark, dark with the
 		     page inverted (theme.ts), and a hover or a hold glances at the other
@@ -4827,6 +4886,7 @@
 
 {#if lightboxOpen && dataset.rows.length}
 	<Lightbox
+		clock={clockTick}
 		{template}
 		{dataset}
 		{lookupRows}

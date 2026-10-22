@@ -111,6 +111,7 @@
 			{background}
 			{images}
 			onoverflow={(ids) => (found[i] = ids)}
+			offline
 		/>
 	{/each}
 </div>

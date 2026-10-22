@@ -192,6 +192,14 @@
 		 * when the words are filled, so it can never be a stale one.
 		 */
 		clock?: number;
+		/**
+		 * Fetch nothing: a picture at an http(s) address is counted as there but
+		 * not drawn, and the page's own is left off. For OverflowProbe, which
+		 * draws every row out of sight — five hundred rows were five hundred
+		 * requests nobody asked for (AGENTS.md). A picture's area is the size
+		 * it is given, so what it measures does not depend on the bytes.
+		 */
+		offline?: boolean;
 	}
 
 	let {
@@ -231,7 +239,8 @@
 		underlay,
 		ontext,
 		onoverflow,
-		clock = 0
+		clock = 0,
+		offline = false
 	}: Props = $props();
 
 	let measured = $state<Record<string, number>>({});
@@ -398,7 +407,7 @@
 	 * reaching a `src` attribute: a cell is untrusted, and `safeMediaUrl` is the
 	 * only door between one and an `<img>`.
 	 */
-	function mediaOf(box: Box): { svg?: string; src?: string; color?: string } {
+	function mediaOf(box: Box): { svg?: string; src?: string; color?: string; remote?: true } {
 		if (box.static?.svg) return { svg: box.static.svg };
 		const written = box.slot ? contentOf(box) : (box.static?.dataUrl ?? box.static?.url ?? '');
 		const value = written.trim();
@@ -422,13 +431,14 @@
 			if (color) return { color };
 		}
 		const src = safeMediaUrl(value);
+		if (src && offline && /^https?:/i.test(src)) return { remote: true };
 		return src ? { src } : {};
 	}
 
 	const isEmpty = (box: Box) => {
 		if (shownAsMedia(box.mode)) {
 			const media = mediaOf(box);
-			return !(media.svg || media.src || media.color);
+			return !(media.svg || media.src || media.color || media.remote);
 		}
 		return contentOf(box).trim() === '';
 	};
@@ -616,7 +626,7 @@
 			// The page's numbers, for the template's CSS to read — csskit.ts.
 			...cardVars(template).map(([name, value]) => `${name}:${value}`),
 			`background-color:${template.page.background ?? '#ffffff'}`,
-			...backgroundStyle(template.page.image, background)
+			...(offline ? [] : backgroundStyle(template.page.image, background))
 		].join(';');
 	}
 
