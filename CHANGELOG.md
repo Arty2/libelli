@@ -11,7 +11,7 @@ file under **What's new** — press the version number in the status bar.
 ## 0.30.0 — 2026-10-22
 
 - Drag a CSV, TSV or template JSON onto the app to open it as a new table or template; what was open is saved first. A file it cannot read is named in the status bar with the reason.
-- Import in the table menu opens a CSV as a new table too; Paste still fills the open one. A file already in your library opens that copy instead of a second one.
+- Import in the table menu opens a CSV as a new table too; Paste still fills the open one. A file already in your library opens that copy instead of a second one. Whitespace, beside the row height, shows spaces, tabs and line ends where you type.
 - A row whose card runs off the page — a Grow area grown past the margin or the edge — is marked under its number in the table.
 - Open in another tab: Read Only shows the card being edited there, live, following its row, and in full screen the card alone; or Open Here, or Close.
 - `%%today:countdown:2026-12-25%%` counts the days, hours or minutes to a moment, or from a column, and moves on by itself. Language in the Page bar sets the cards' `lang`, so the template's CSS can put its words in another language.

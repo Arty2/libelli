@@ -643,6 +643,8 @@ export interface UiState {
 	trayHeightShare?: number;
 	/** How tall a table row may be; absent is `medium`, the height it always was. */
 	rowHeight?: RowHeight;
+	/** Spaces, tabs and line ends drawn in the cell being typed in and the full-size editor — whitespace.ts. */
+	showWhitespace?: boolean;
 }
 
 /** One line, a few lines, or as tall as the row's longest cell. */

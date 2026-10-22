@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { showWhitespace } from '$lib/whitespace';
 	import Icon from './Icon.svelte';
 	import { download, fileStem } from '$lib/download';
 	import { completePlaceholders } from '$lib/complete';
@@ -114,6 +115,9 @@
 		/** how tall a row may be; owned by the app's UI state, like the widths */
 		rowHeight: RowHeight;
 		onrowheight: (next: RowHeight) => void;
+		/** spaces, tabs and line ends shown where text is being typed */
+		whitespace?: boolean;
+		onwhitespace?: (show: boolean) => void;
 		oncolumnwidths: (widths: Record<string, number>) => void;
 		activeRow: number;
 		/** the column the selected area draws from, so its cells can be pointed at */
@@ -195,6 +199,8 @@
 		oncolumnwidths,
 		rowHeight,
 		onrowheight,
+		whitespace = false,
+		onwhitespace,
 		activeRow,
 		selectedColumn = null,
 		onactivate,
@@ -1969,6 +1975,7 @@
 									use:autosize={rowHeight === 'full' || expanded.has(i)}
 									use:overflowMark={row[column] ?? ''}
 									use:completePlaceholders={columns}
+									use:showWhitespace={{ on: whitespace && editing?.row === i && editing?.column === column, text: row[column] ?? '' }}
 									onfocus={() => {
 										editing = { row: i, column };
 										onactivate(i);
@@ -2391,6 +2398,22 @@
 		     the table is read, not about what is in it, so it stands apart from
 		     the things that act on the table and its rows. The label says the height the rows
 		     are at; the title, the next. -->
+		<!-- Spaces, tabs and line ends, drawn where text is being typed: the cell
+		     with the caret in it and the full-size editor — not every cell, which
+		     would be a second copy of the table. Beside the row height, being
+		     about how the table is read. -->
+		<button
+			class="whitespace"
+			aria-pressed={whitespace}
+			title={whitespace
+				? 'Whitespace shown in the cell being typed in and the full-size editor: · a space, → a tab, ° a no-break space, ¶ a line end. Press to hide it'
+				: 'Show whitespace — spaces, tabs and line ends — in the cell being typed in and the full-size editor'}
+			aria-label="Show whitespace"
+			onclick={() => onwhitespace?.(!whitespace)}
+		>
+			<Icon name="paragraph" size={15} />
+			<span class="label">Whitespace</span>
+		</button>
 		<button
 			class="row-height"
 			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
@@ -2532,6 +2555,7 @@
 				readonly={locked}
 				use:focusOnOpen
 				use:completePlaceholders={dataset.columns}
+				use:showWhitespace={{ on: whitespace, text }}
 				oninput={(e) => setCell(open.row, open.column, e.currentTarget.value)}
 				onkeydown={(e) => {
 					if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -3711,6 +3735,7 @@
 	   written first this one never did — the word showed on every phone. */
 	@media (max-width: 900px) {
 		.row-height .label,
+		.whitespace .label,
 		.reindex .label {
 			display: none;
 		}

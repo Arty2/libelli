@@ -53,6 +53,11 @@ edge, or an area anchored under one that it pushes there; an area placed in the
 margin on purpose is marked only once it grows past the edge. Hover or hold the
 sign to see which areas.
 
+**Whitespace**, beside the row height under the table, shows the spaces, tabs
+and line ends in the cell you are typing in and in the full-size editor: `·` a
+space, `→` a tab, `°` a no-break space, `¶` the end of a line. It is for
+finding the double space or the trailing one that sets a line askew.
+
 Cell content is always treated as text. A cell containing `<b>x</b>` prints
 those characters, not bold type.
 

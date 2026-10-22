@@ -3505,6 +3505,18 @@ Chromium, without slowing typing. The cost: a picture that loads after its
 batch has settled is not counted until the next pass, and the check is made on
 the right-hand page only — a mirror moves an area and its margins together.
 
+**Whitespace is a layer over the field, and only where the caret is.**
+`whitespace.ts`: a textarea cannot style a character, so the marks are a div
+laid over it holding the same text, transparent, each space and tab in a span
+whose mark is a zero-width `::after` — so nothing changes width, the layer wraps
+where the field wraps, and every mark sits on its character in any font. It
+copies the field's computed metrics rather than sharing a stylesheet, so one
+action fits a table cell and the full-size editor alike, and is placed by the
+two boxes on screen, since a table cell is a field's `offsetParent` without
+positioning anything. Built from text nodes, never HTML. Only on the cell being
+typed in and the full-size editor: on every cell it would be a second copy of
+the table. Off, the action costs nothing — no layer, observer or listener.
+
 ## `src/lib/components/MenuSelect.svelte`
 
 **One menu, drawn like the template picker.** The zoom and both font menus were
