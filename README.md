@@ -49,9 +49,12 @@ Several tables and templates can be kept side by side, and they are
 independent of each other: one design can print any table, and one table can be
 printed with any design. A table exports as CSV; a template as JSON.
 
-A CSV, TSV or template JSON can also be dragged onto the app from your files.
-It opens as a new table or a new template, and the ones you had open are saved
-first, so nothing is overwritten; Ctrl/Cmd+Z goes back to them. A file that is
+A CSV, TSV or template JSON can be dragged onto the app from your files, and
+the table menu's Import opens a CSV or TSV the same way. Each opens as a new
+table or a new template, and the ones you had open are saved first, so nothing
+is overwritten; Ctrl/Cmd+Z goes back to them. A file already in your library,
+unchanged, opens that copy rather than making a second one. To fill the open
+table instead, use Paste. A file that is
 not one of those, or that does not read, is named in the status bar with the
 reason. A picture is dropped on the page or on an area instead.
 

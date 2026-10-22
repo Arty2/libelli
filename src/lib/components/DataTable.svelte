@@ -47,6 +47,8 @@
 		previousTable: string;
 		onselecttable: (id: string) => void;
 		onnewtable: () => void;
+		/** a CSV or TSV file chosen with Import, to open as a new table */
+		onimportfile: (file: File) => void;
 		/**
 		 * Columns something on the card draws from — bound to an area, or named
 		 * as `%%column%%` in an area's words or a cell it shows. A column not in
@@ -163,6 +165,7 @@
 		previousTable,
 		onselecttable,
 		onnewtable,
+		onimportfile,
 		usedColumns,
 		onplacecolumn,
 		oncellfocus,
@@ -1502,9 +1505,10 @@
 			onnotice('The table is locked — unlock it to paste or import into it.', 'warning');
 			return;
 		}
-		// The one place the emptiness policy is decided, for the paste and the
-		// file import alike — see `wouldEmptyTable`. A mis-click in a file picker
-		// should not cost you the table.
+		// The one place the emptiness policy is decided for the open table — see
+		// `wouldEmptyTable`. A stray paste should not cost you the table. (A file
+		// import opens a table of its own, so it has nothing to lose; the page
+		// decides its own policy.)
 		if (wouldEmptyTable(dataset, parsed, mode)) {
 			onnotice('Nothing readable as rows in there — the table is unchanged.', 'warning');
 			return;
@@ -1535,14 +1539,17 @@
 		});
 	}
 
-	async function importFile(event: Event) {
+	/**
+	 * A file is a whole table, header and all — unlike a paste, which is a block
+	 * of cells lifted out of the middle of one — so it opens as a table of its
+	 * own and leaves this one as it is. The page owns the library, so it is
+	 * handed up.
+	 */
+	function importFile(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
-		if (!file) return;
-		// A file is a whole table, header and all — unlike a paste, which is a
-		// block of cells lifted out of the middle of one.
-		commitImport(parseTable(await file.text()), 'replace');
 		input.value = '';
+		if (file) onimportfile(file);
 	}
 
 	/**
@@ -2233,8 +2240,7 @@
 						<li role="none">
 							<button
 								role="menuitem"
-								disabled={locked}
-								title="Replace the rows with a CSV file"
+								title="Open a CSV or TSV file as a new table — this one is kept as it is"
 								onclick={() => {
 									pickerOpen = false;
 									fileInput?.click();

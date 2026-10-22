@@ -12,6 +12,9 @@
  * reads them to report (see AGENTS.md, "A parser reports; the caller decides").
  */
 
+import { exportTemplate, importedTemplate } from './template';
+import type { Dataset, Template } from './types';
+
 export type DroppedKind = 'template' | 'table' | 'image' | 'unknown';
 
 /** Anything with the two facts a `File` carries, so tests need no DOM. */
@@ -59,4 +62,29 @@ export function tableNameFrom(fileName: string): string {
 	const dot = fileName.lastIndexOf('.');
 	const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
 	return stem.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Whether an incoming table is one the library already holds, so importing
+ * the same file twice opens the first copy rather than making "rows 2".
+ * The cells only: a name or a lock set since is not a different list.
+ */
+export function sameTable(a: Pick<Dataset, 'columns' | 'rows'>, b: Pick<Dataset, 'columns' | 'rows'>): boolean {
+	if (a.columns.length !== b.columns.length || a.rows.length !== b.rows.length) return false;
+	if (a.columns.some((c, i) => c !== b.columns[i])) return false;
+	return a.rows.every((row, i) => a.columns.every((c) => (row[c] ?? '') === (b.rows[i][c] ?? '')));
+}
+
+/**
+ * The same, for a template: compared as the file each would export, which is
+ * the one form both pass through whatever way they were stored. A template
+ * edited since it was imported is a different design, and a fresh import of
+ * the original is a copy of its own.
+ */
+export function sameTemplate(incoming: Template, stored: unknown): boolean {
+	try {
+		return exportTemplate(incoming) === exportTemplate(importedTemplate(stored));
+	} catch {
+		return false;
+	}
 }

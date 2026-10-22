@@ -3443,10 +3443,12 @@ under it focuses it.
 reports a `.csv` as `application/vnd.ms-excel` wherever Excel is installed —
 and `onWindowDrop` in +page imports each file in order: a template through the
 same path as the picker, a table as a new table in the library, the way Getting
-Started starts one. Both save the open template and table first. The table's
-own Import button still replaces the open table's rows, on purpose: pressing a
-button under a table is asking to fill it, while a file dragged in from
-elsewhere is a list you now have. Each file is read and checked before anything
+Started starts one. Both save the open template and table first. The table
+menu's Import goes the same way: it used to replace the open table's rows,
+which made a file a correction to the list you had rather than a list of its
+own; Paste is how the open table is filled. A file whose contents the library
+already holds (`sameTable`, `sameTemplate` — a template compared as the file it
+would export) opens that copy instead of making "rows 2". Each file is read and checked before anything
 is switched, so one that fails leaves the screen as it was and says why, by
 name, in the status line. The window sees a drop only after the page and its
 areas have had theirs; an area that takes a picture calls `preventDefault`,

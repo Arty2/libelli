@@ -22,7 +22,7 @@
 		uploadBackgroundImage
 	} from '$lib/assets';
 	import { download, fileStem } from '$lib/download';
-	import { droppedKind, mightTakeDrag, tableNameFrom } from '$lib/dropfile';
+	import { droppedKind, mightTakeDrag, sameTable, sameTemplate, tableNameFrom } from '$lib/dropfile';
 	import { parseTable } from '$lib/parse';
 	import {
 		deleteStoredFont,
@@ -140,7 +140,7 @@
 		type DatasetEntry,
 		type TemplateEntry
 	} from '$lib/storage';
-	import { REFERENCE_FRAME } from '$lib/frame';
+	import { REFERENCE_FRAME, toFile } from '$lib/frame';
 	import { claimEditor, type EditorLock } from '$lib/tablock';
 	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
@@ -3087,6 +3087,16 @@
 				: error instanceof Error ? error.message.replace(/\.$/, '') : 'it is not a template';
 			return { text: `“${file.name}” was not imported — ${why}.`, tone: 'warning' };
 		}
+		// The same file twice is the same template: opened, not copied again.
+		// What is open counts too, before it is saved over by the flush below.
+		if (sameTemplate(next, toFile($state.snapshot(template)))) {
+			return { text: `“${template.name}” is the template already open — nothing to import.`, tone: 'info' };
+		}
+		for (const entry of library) {
+			if (entry.id === templateId || !sameTemplate(next, await loadTemplateDoc(entry.id))) continue;
+			await switchTemplate(entry.id);
+			return { text: `“${file.name}” is already in your templates as “${template.name}” — opened that one.`, tone: 'info' };
+		}
 		settleProvisional();
 		// Both, though only the design is replaced: the table goes into the
 		// library at the same moment, so the pair you were on is what is saved,
@@ -3117,11 +3127,11 @@
 	/**
 	 * A CSV or TSV file, opened as a new table in the library.
 	 *
-	 * Not poured into the open table, which is what the table's own Import
-	 * does: a file dragged onto the app from elsewhere is a list you now have,
-	 * and the rows you were working on should still be there to go back to —
-	 * the same rule a template import follows. Being a new table, the open
-	 * table's lock does not stand in its way.
+	 * Not poured into the open table: a file is a list you now have, and the
+	 * rows you were working on should still be there to go back to — the same
+	 * rule a template import follows. A drop and the table menu's Import both
+	 * come here; Paste is the way to fill the open table. Being a new table,
+	 * the open table's lock does not stand in its way.
 	 */
 	async function importTableFile(file: File): Promise<Said> {
 		let parsed: Dataset;
@@ -3135,6 +3145,18 @@
 		// is not a table.
 		if (!parsed.columns.length) {
 			return { text: `“${file.name}” was not imported — nothing in it reads as a table.`, tone: 'warning' };
+		}
+		// As Getting Started does: a table already in the library, untouched,
+		// is opened rather than copied, so a file imported twice is one table.
+		if (sameTable(parsed, dataset)) {
+			return { text: `“${tableName}” already holds exactly these rows — nothing to import.`, tone: 'info' };
+		}
+		for (const entry of tables) {
+			if (entry.id === datasetId) continue;
+			const doc = await loadDatasetDoc(entry.id);
+			if (!doc || !sameTable(parsed, doc)) continue;
+			await switchDataset(entry.id);
+			return { text: `“${file.name}” is already in your tables as “${tableName}” — opened that one.`, tone: 'info' };
 		}
 		settleProvisional();
 		await Promise.all([flushTemplate(), flushDataset()]);
@@ -3869,6 +3891,10 @@
 				{previousTable}
 				onselecttable={(id) => void switchDataset(id)}
 				onnewtable={() => void newDataset()}
+				onimportfile={async (file) => {
+					const said = await importTableFile(file);
+					notify(said.text, said.tone);
+				}}
 				{usedColumns}
 				onplacecolumn={placeColumn}
 				oncellfocus={flashColumn}

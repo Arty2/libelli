@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { droppedKind, mightTakeDrag, tableNameFrom } from './dropfile';
+import { droppedKind, mightTakeDrag, sameTable, sameTemplate, tableNameFrom } from './dropfile';
+import { BUILTIN_TEMPLATE_JSON, exportTemplate, importedTemplate, normaliseTemplate } from './template';
+import { toFile } from './frame';
 
 describe('droppedKind', () => {
 	it('reads the extension first', () => {
@@ -56,5 +58,39 @@ describe('tableNameFrom', () => {
 		expect(tableNameFrom('guest-list_2026.csv')).toBe('guest list 2026');
 		expect(tableNameFrom('Wine List.tsv')).toBe('Wine List');
 		expect(tableNameFrom('rows')).toBe('rows');
+	});
+});
+
+describe('sameTable', () => {
+	const t = { columns: ['a', 'b'], rows: [{ a: '1', b: '2' }] };
+
+	it('matches the same cells, whatever the name', () => {
+		expect(sameTable(t, { ...t, rows: [{ a: '1', b: '2' }] })).toBe(true);
+	});
+
+	it('tells apart a changed cell, a reordered column and an extra row', () => {
+		expect(sameTable(t, { columns: ['a', 'b'], rows: [{ a: '1', b: '3' }] })).toBe(false);
+		expect(sameTable(t, { columns: ['b', 'a'], rows: [{ a: '1', b: '2' }] })).toBe(false);
+		expect(sameTable(t, { columns: ['a', 'b'], rows: [...t.rows, { a: '', b: '' }] })).toBe(false);
+	});
+});
+
+describe('sameTemplate', () => {
+	const file = JSON.parse(exportTemplate(normaliseTemplate(BUILTIN_TEMPLATE_JSON)));
+
+	it('knows a file it has already stored', () => {
+		const incoming = importedTemplate(file);
+		// As the library keeps it: written through toFile, starter mark and all.
+		const stored = { ...toFile(normaliseTemplate(file)), starter: 'default' };
+		expect(sameTemplate(incoming, stored)).toBe(true);
+	});
+
+	it('does not match one edited since', () => {
+		const incoming = importedTemplate(file);
+		expect(sameTemplate(incoming, { ...file, name: `${file.name} (edited)` })).toBe(false);
+	});
+
+	it('does not match something that is not a template', () => {
+		expect(sameTemplate(importedTemplate(file), { nope: true })).toBe(false);
 	});
 });
