@@ -2365,16 +2365,28 @@
 		saveDatasetId(id);
 		dataset = doc;
 		activeRow = 0;
-		const kept = Object.fromEntries(
-			Object.entries(mapping).filter(([, column]) => doc.columns.includes(column))
-		);
-		mapping = Object.keys(kept).length ? kept : autoMap(usedSlots(template), doc.columns);
+		mapping = carriedMapping(doc.columns);
 		notify(`“${name}” opened — ${doc.rows.length} row${doc.rows.length === 1 ? '' : 's'}. Your design is untouched.`);
 	}
 
-	/** A name nothing else in the library is already using. */
-	function freeTableName(wanted: string): string {
-		const taken = new Set(tables.filter((e) => e.id !== datasetId).map((e) => e.name));
+	/**
+	 * The bindings a table opened in place of this one keeps. Those that still
+	 * point at a column that exists stay, because the usual reason to have two
+	 * tables is that they have the same columns; when none survives, the
+	 * columns are guessed at afresh rather than left pointing at nothing.
+	 */
+	function carriedMapping(columns: string[]): Mapping {
+		const kept = Object.fromEntries(Object.entries(mapping).filter(([, column]) => columns.includes(column)));
+		return Object.keys(kept).length ? kept : autoMap(usedSlots(template), columns);
+	}
+
+	/**
+	 * A name nothing else in the library is already using. The open table's
+	 * own name counts as free — renaming it to itself is no clash — unless
+	 * the name is for a new table beside it.
+	 */
+	function freeTableName(wanted: string, beside = false): string {
+		const taken = new Set(tables.filter((e) => beside || e.id !== datasetId).map((e) => e.name));
 		if (!taken.has(wanted)) return wanted;
 		let n = 2;
 		while (taken.has(`${wanted} ${n}`)) n++;
@@ -2393,7 +2405,7 @@
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
 		saveDatasetId(datasetId);
-		dataset = { columns: [], rows: [], name: freeTableName('New table') };
+		dataset = { columns: [], rows: [], name: freeTableName('New table', true) };
 		activeRow = 0;
 		mapping = {};
 		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
@@ -3003,7 +3015,7 @@
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
 		saveDatasetId(datasetId);
-		dataset = { ...sample, name: freeTableName(sample.name ?? 'Getting Started') };
+		dataset = { ...sample, name: freeTableName(sample.name ?? 'Getting Started', true) };
 		activeRow = 0;
 		// Mapped the way a first run maps: this template's slots against the
 		// sample's columns, so the cards render rather than coming up blank.
@@ -3134,19 +3146,14 @@
 		}
 		settleProvisional();
 		await Promise.all([flushTemplate(), flushDataset()]);
-		const name = freeTableName(tableNameFrom(file.name) || UNTITLED_TABLE);
+		const name = freeTableName(tableNameFrom(file.name) || UNTITLED_TABLE, true);
 		describe(`Import “${name}”`);
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
 		saveDatasetId(datasetId);
 		dataset = { ...parsed, name };
 		activeRow = 0;
-		// As switching tables keeps them: bindings to columns this file also
-		// has stay, and when none does they are guessed afresh.
-		const kept = Object.fromEntries(
-			Object.entries(mapping).filter(([, column]) => parsed.columns.includes(column))
-		);
-		mapping = Object.keys(kept).length ? kept : autoMap(usedSlots(template), parsed.columns);
+		mapping = carriedMapping(parsed.columns);
 		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
 		await refreshTables();
 		const count = `${parsed.rows.length} row${parsed.rows.length === 1 ? '' : 's'}`;
@@ -3189,6 +3196,13 @@
 		// it, which leaves the design behind.
 		event.preventDefault();
 		if (handled) return;
+		// As the keys are refused there (`onWindowKeydown`): a tab that is not
+		// the editor holds a stale copy, and an import saves what is open first
+		// — over what the editing tab has saved since.
+		if (editor !== 'here') {
+			notify('Another tab is editing — press Use Here first, then drop the file again.', 'warning');
+			return;
+		}
 		const files = Array.from(event.dataTransfer?.files ?? []);
 		if (!files.length) return;
 		const said: Said[] = [];
