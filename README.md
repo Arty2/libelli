@@ -32,6 +32,12 @@ layout, so what is on screen is what is printed.
 Every control in the app has a tooltip: hover over it, or press and hold it on
 a touchscreen. This page covers what a tooltip cannot.
 
+Open libelli in a second tab and it asks what to do, because only one tab
+edits at a time: **Open Here** moves the editing to this tab, **Read Only**
+shows the card being edited in the other tab, updating as it changes and
+following the row it is on, and **Close** closes this tab. A read-only tab
+saves nothing; the eye beside the card brings the choice back.
+
 ## Data
 
 A table can be pasted straight from Excel, Google Sheets, Coda or any other

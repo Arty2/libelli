@@ -53,6 +53,7 @@ src/lib/
   template.ts     defaults (templates/default-card.json), validation, migration, import/export
   frame.ts        a file's x, y at the reference point; memory's top-left, through toFile
   tablock.ts      one tab edits: a Web Lock, handed over on request after a save
+  live.ts         a read-only tab fed what the editing tab shows, over a BroadcastChannel
   fonts.ts        Google families + local files via FontFace/IndexedDB
   assets.ts       images — page backgrounds and a row's own; bytes in a folder or IndexedDB
   history.ts      undo/redo snapshots

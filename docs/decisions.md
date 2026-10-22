@@ -156,6 +156,25 @@ what it gave.
 Web Locks and BroadcastChannel are both Baseline Widely available. Without
 them — no secure context — every tab edits, as before.
 
+**Read only is a switch in storage.ts, not a guard at each save.** A tab told
+another is editing offers Open Here, Read Only and Close. Read Only calls
+`setReadOnly`, after which `local`, every read-write IndexedDB transaction, the
+folder writes in assets.ts and the whole-database deletes do nothing — so no
+control left reachable can write, whatever it is. The tab boots as usual with
+`ready` never set, so no autosave or undo runs, and shows the card alone: no
+bars, no table, no pager, and an eye where the padlock goes, which brings the
+dialog back. Read Only is the dialog's default, since Enter should not take the
+editing away from the other tab.
+
+**Live, by sending the state, not a "saved".** `live.ts`: the editing tab posts
+its template, table, bindings and open row a quarter-second after a change, and
+only once a read-only tab has said it is watching; a read-only tab says so when
+it opens and whenever a new editor announces itself. Re-reading storage on a
+signal would race the save it was told about. The cost is a structured clone of
+the table per settled change while somebody watches. Close calls
+`window.close()`, which a browser honours only for a tab a script opened; when
+it does not, the dialog says to close it from the tab bar.
+
 ## `src/lib/template.ts`
 
 **Stacking is array order**, not a z-index: `arrangeBoxes` moves boxes within the

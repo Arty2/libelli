@@ -112,6 +112,14 @@
 		onunlock?: () => void;
 		/** lock it again, from the same button while it still shows the open padlock */
 		onrelock?: () => void;
+		/**
+		 * A read-only tab: the card alone, as it prints, with an eye where the
+		 * padlock goes and nothing else of the stage's — no pager, zoom, undo or
+		 * Area — since there is nothing here to work it with.
+		 */
+		viewOnly?: boolean;
+		/** the eye pressed: what this tab is, and the ways out of it */
+		onviewonly?: () => void;
 	}
 
 	let {
@@ -176,6 +184,8 @@
 		onstartpicking,
 		onunlock,
 		onrelock,
+		viewOnly = false,
+		onviewonly,
 		flashIds = []
 	}: Props = $props();
 
@@ -1664,7 +1674,7 @@
 	{/if}
 {/snippet}
 
-<div class="stage" bind:this={stage}>
+<div class="stage" class:view-only={viewOnly} bind:this={stage}>
 <div
 	class="viewport"
 	bind:this={host}
@@ -1716,13 +1726,13 @@
 				{row}
 				{rows}
 				{mapping}
-				{bounds}
-				{ties}
+				bounds={bounds && !viewOnly}
+				ties={ties && !viewOnly}
 				{loadingFonts}
-				{grid}
-				{guides}
-				{smartGuides}
-				spacing={spacingGuides && guides && smartGuides}
+				grid={grid && !viewOnly}
+				guides={guides && !viewOnly}
+				smartGuides={smartGuides && !viewOnly}
+				spacing={spacingGuides && guides && smartGuides && !viewOnly}
 				{nudging}
 				{picking}
 				{scale}
@@ -1730,7 +1740,7 @@
 				{theme}
 				{background}
 				{images}
-				interactive={true}
+				interactive={!viewOnly}
 				{panning}
 				pageCount={rowCount}
 				{editingId}
@@ -1746,7 +1756,7 @@
 				{ondraw}
 				{oneditcell}
 				{ontext}
-				underlay={gridArt ? gridLayer : undefined}
+				underlay={gridArt && !viewOnly ? gridLayer : undefined}
 			/>
 		</div>
 
@@ -1907,6 +1917,14 @@
 	     lock: it is pressed once at the start, if at all. -->
 	<!-- The right-hand column, and under it, on a phone, what acts on a set
 	     of areas (SelectionTools' `side`). -->
+	{#if viewOnly}
+		<!-- Where the padlock is on a locked design, and the one control here. -->
+		<div class="corner top right view-eye">
+			<button class="square" title="Read only — the card being edited in another tab. Press for Open Here, Read Only or Close." aria-label="Read only" onclick={() => onviewonly?.()}>
+				<Icon name="view" size={16} />
+			</button>
+		</div>
+	{/if}
 	<div class="side-rail">
 	<div class="corner top right stacked">
 		<!-- The page's lock, while it is locked: a padlock and no word, at the
@@ -2161,7 +2179,7 @@
 		/>
 	</div>
 
-	{#if padUsable && padOpen}
+	{#if padUsable && padOpen && !viewOnly}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
 		     hopeless. Shown only where there is no keyboard to fall back on, and
 		     only while there is something it could actually move. Its arrows
@@ -2232,6 +2250,14 @@
 </div>
 
 <style>
+	/* Read only: the stage keeps the card and the eye, and drops the rest. */
+	.view-only .pager,
+	.view-only .rail,
+	.view-only .side-rail,
+	.view-only .corner:not(.view-eye) {
+		display: none;
+	}
+
 	/* The frame: it holds every control and never scrolls, so nothing on it can
 	   slide away with the page. */
 	.stage {

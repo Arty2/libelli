@@ -139,9 +139,11 @@
 		storageAvailable,
 		saveUi,
 		type DatasetEntry,
-		type TemplateEntry
+		type TemplateEntry,
+		setReadOnly
 	} from '$lib/storage';
 	import { mayHaveMoved, toFile } from '$lib/frame';
+	import { openLive } from '$lib/live';
 	import { claimEditor, type EditorLock } from '$lib/tablock';
 	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
 
@@ -867,9 +869,12 @@
 	 * lock answers; `here` holds it and boots; `elsewhere` found it held and
 	 * never loads anything, so it has nothing to save over the other tab's
 	 * work; `handed` gave it to another tab, having saved first, and has
-	 * stopped saving.
+	 * stopped saving; `readonly` was asked to show what is saved while
+	 * another tab edits, and can write nothing (`setReadOnly` in storage.ts).
 	 */
-	let editor = $state<'checking' | 'here' | 'elsewhere' | 'handed'>('checking');
+	let editor = $state<'checking' | 'here' | 'elsewhere' | 'handed' | 'readonly'>('checking');
+	/** Close was pressed and the browser kept the tab open: only a tab a script opened may close itself. */
+	let closeRefused = $state(false);
 	let editorLock: EditorLock | null = null;
 	/** The boot under way, for a handover to wait out — see `handOver`. */
 	let booting: Promise<void> | null = null;
@@ -926,12 +931,106 @@
 			takingOver = false;
 			return;
 		}
-		if (editor === 'handed') location.reload();
+		// A read-only copy is as old as the moment it was read, and storage
+		// is still switched off in it: a fresh start is the honest way back.
+		if (editor === 'handed' || editor === 'readonly') location.reload();
 		else {
 			editor = 'here';
 			takingOver = false;
 		}
 	}
+
+	/**
+	 * Show what is saved, and write none of it. A tab that never loaded reads
+	 * storage now, as boot does, with every write already refused; one that
+	 * handed its work on is holding exactly what it saved, so it keeps that.
+	 */
+	function readOnlyHere() {
+		readOnlyAsk = false;
+		if (editor === 'readonly') return;
+		setReadOnly(true);
+		const loaded = editor === 'handed';
+		editor = 'readonly';
+		if (!loaded) booting = boot(true);
+		else {
+			notify(READ_ONLY_NOTE);
+			live?.post({ kind: 'watching' });
+		}
+	}
+
+	/** The status line in read-only mode, which is where it is said: there is no other furniture. */
+	const READ_ONLY_NOTE =
+		'Read only — showing the card being edited in another tab, as it changes. Nothing here is saved. Press the eye for Open Here.';
+
+	/**
+	 * A browser lets a tab close itself only when a script opened it, so a tab
+	 * opened by a person usually stays: then the dialog says to close it from
+	 * the tab bar, rather than the button doing nothing.
+	 */
+	function closeTab() {
+		window.close();
+		setTimeout(() => (closeRefused = true), 300);
+	}
+
+	/** The dialog brought back by the eye on the stage, in a read-only tab. */
+	let readOnlyAsk = $state(false);
+
+	/**
+	 * Live read-only (live.ts): the editing tab sends what is on its screen
+	 * while a read-only tab is watching, and a read-only tab shows what it is
+	 * sent — the template, the table and the row being edited.
+	 */
+	let watched = false;
+	const live = openLive((message) => {
+		if (message.kind === 'watching' && editor === 'here') {
+			watched = true;
+			sendLive();
+		} else if (message.kind === 'editor' && editor === 'readonly') live?.post({ kind: 'watching' });
+		else if (message.kind === 'state' && editor === 'readonly') {
+			const next = message.state;
+			template = next.template;
+			dataset = next.dataset;
+			mapping = next.mapping;
+			templateId = next.templateId;
+			datasetId = next.datasetId;
+			activeRow = Math.max(0, Math.min(next.activeRow, next.dataset.rows.length - 1));
+		}
+	});
+
+	function sendLive() {
+		if (!live || !ready || !watched) return;
+		live.post({
+			kind: 'state',
+			state: {
+				template: $state.snapshot(template),
+				dataset: $state.snapshot(dataset),
+				mapping: $state.snapshot(mapping),
+				activeRow,
+				templateId,
+				datasetId
+			}
+		});
+	}
+
+	// A moment after anything changes, as the autosave waits: a drag is one
+	// message when it settles, not one a frame.
+	$effect(() => {
+		if (!ready) return;
+		watchDeep(template);
+		watchDeep(dataset);
+		watchDeep(mapping);
+		void [activeRow, templateId, datasetId];
+		const timer = setTimeout(sendLive, 250);
+		return () => clearTimeout(timer);
+	});
+
+	// A new editor says so, so that a read-only tab opened before it is
+	// watching it too.
+	$effect(() => {
+		if (ready) untrack(() => live?.post({ kind: 'editor' }));
+	});
+
+	$effect(() => () => live?.close());
 
 	// ---- boot ---------------------------------------------------------------
 
@@ -942,7 +1041,8 @@
 		booting = boot();
 	});
 
-	async function boot() {
+	/** `viewOnly`: a read-only tab — it reads as boot always does, and never turns the autosave on. */
+	async function boot(viewOnly = false) {
 		await migrateLegacyStorage();
 		// Asked before anything is read, because every read below resolves rather
 		// than rejecting: without this, a browser that is refusing to store
@@ -1000,7 +1100,9 @@
 		// version asking to be pressed was easy to miss, and what changed is
 		// most worth reading the first time the new version is open. A first
 		// run has nothing it could have missed — see `seenAtBoot`.
-		if (seenAtBoot(loadSeenVersion(), firstRun, VERSION) !== VERSION) openWhatsNew();
+		if (viewOnly) {
+			/* What's new is for the tab you work in */
+		} else if (seenAtBoot(loadSeenVersion(), firstRun, VERSION) !== VERSION) openWhatsNew();
 		else if (firstRun) saveSeenVersion(VERSION);
 		previousTable = loadPreviousDatasetId();
 		void refreshTables();
@@ -1038,6 +1140,13 @@
 			dataOpen = false;
 		}
 		history = createHistory(snapshot());
+		if (viewOnly) {
+			notify(READ_ONLY_NOTE);
+			live?.post({ kind: 'watching' });
+			missingFonts = await ensureTemplateFonts(template);
+			void refreshStoredFonts();
+			return;
+		}
 		ready = true;
 		if (!storable) {
 			// The autosave warning would otherwise land on top of this one a
@@ -3104,6 +3213,9 @@
 	 * that will not import leaves the design on screen exactly as it was.
 	 */
 	async function importTemplateFile(file: File): Promise<Said> {
+		// A read-only tab would say "saved in your templates" of a save that
+		// storage refused; a drop is refused before this, the picker here.
+		if (editor !== 'here') return { text: 'Read only — press Open Here to import into your templates.', tone: 'warning' };
 		let next: Template;
 		let raw: unknown;
 		try {
@@ -3170,6 +3282,7 @@
 	 * the open table's lock does not stand in its way.
 	 */
 	async function importTableFile(file: File): Promise<Said> {
+		if (editor !== 'here') return { text: 'Read only — press Open Here to import into your tables.', tone: 'warning' };
 		let parsed: Dataset;
 		try {
 			parsed = parseTable(await file.text());
@@ -3513,7 +3626,7 @@
 	</div>
 {/if}
 
-<div class="app">
+<div class="app" class:view-only={editor === 'readonly'}>
 	<header class="toolbar">
 		<!-- The mark, and the theme: each press steps light, dark, dark with the
 		     page inverted (theme.ts), and a hover or a hold glances at the other
@@ -3634,7 +3747,7 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden}
+	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden && editor !== 'readonly'}
 		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
@@ -3819,7 +3932,7 @@
 
 	<main
 		bind:this={mainEl}
-		class:no-data={!dataOpen && !imagesOpen}
+		class:no-data={(!dataOpen && !imagesOpen) || editor === 'readonly'}
 		style={stacked
 			? trayShare !== null
 				? `--tray-h:${(trayShare * 100).toFixed(2)}%`
@@ -3829,6 +3942,8 @@
 				: ''}
 	>
 		<PagePreview
+			viewOnly={editor === 'readonly'}
+			onviewonly={() => (readOnlyAsk = true)}
 			{template}
 			{row}
 			{mapping}
@@ -3898,7 +4013,7 @@
 			ondelete={deleteBox}
 		/>
 
-		{#if dataOpen || imagesOpen}
+		{#if (dataOpen || imagesOpen) && editor !== 'readonly'}
 		<aside bind:this={asideEl} class:shutting={trayShutting}>
 			{#if !stacked}
 				<!-- The edge between the page and the table, dragged to share the
@@ -4111,30 +4226,43 @@
 	</footer>
 </div>
 
-{#if editor === 'elsewhere' || editor === 'handed'}
+{#if editor === 'elsewhere' || editor === 'handed' || (editor === 'readonly' && readOnlyAsk)}
 	<!-- Not dismissable: behind it is a tab that is not saving, and editing it
-	     would be work that goes nowhere. The one way on is to bring the editing
-	     here. -->
+	     would be work that goes nowhere. Three ways on: bring the editing here,
+	     look without editing, or leave. -->
 	<div class="modal-backdrop" role="presentation"></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="elsewhere-title" aria-describedby="elsewhere-text">
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="elsewhere-title" aria-describedby="elsewhere-text" use:armDefault>
 		<h2 id="elsewhere-title">Open in another tab</h2>
 		<p id="elsewhere-text">
-			{#if editor === 'handed'}
+			{#if editor === 'readonly'}
+				This tab is read only: it shows the card being edited in another tab, and saves nothing.
+			{:else if editor === 'handed'}
 				Your work moved to another tab, saved as you left it. This tab has stopped saving, so nothing here can
 				overwrite it.
 			{:else}
 				libelli is already open in another tab. One tab edits at a time, so that the two never save over each
 				other's work.
 			{/if}
+			Open it here to edit, or read it here without saving anything.
 		</p>
+		{#if closeRefused}
+			<p class="close-refused">This browser only lets a tab close itself when a script opened it — close it from the tab bar.</p>
+		{/if}
+		<!-- In the order asked for, right to left: Close, Read Only, Open Here.
+		     Read Only is the default: looking is the safe answer to "it is open
+		     somewhere else", and Enter should not take the editing away from the
+		     other tab. -->
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button class="primary" data-default disabled={takingOver} onclick={() => void useHere()}>
-				{takingOver ? 'Moving it here…' : 'Use Here'}
+			<button disabled={takingOver} onclick={() => void useHere()} title="Edit here; the other tab stops editing">
+				{takingOver ? 'Moving it here…' : 'Open Here'}
 			</button>
+			<button class="primary" data-default disabled={takingOver} onclick={readOnlyHere} title="Show the card being edited in the other tab, as it changes; nothing here is saved">Read Only</button>
+			<button disabled={takingOver} onclick={closeTab}>Close</button>
 		</div>
 	</div>
 {/if}
+
 
 {#if statusOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (statusOpen = false)}></div>
@@ -5088,6 +5216,16 @@
 		color: #fff;
 		font-size: 0.75rem;
 		text-align: center;
+	}
+
+	/* Read only: the card and nothing to work it with — the mark stays, for
+	   the theme, and the status line, which says what this tab is. */
+	.view-only .toolbar > :not(.brand) {
+		display: none;
+	}
+
+	.close-refused {
+		color: #b42318;
 	}
 
 	.modal-backdrop {
