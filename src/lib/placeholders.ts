@@ -72,6 +72,14 @@ export interface PlaceholderContext {
 	 */
 	markUnknown?: boolean;
 	/**
+	 * Write a countdown as `COUNTDOWN_OPEN…COUNTDOWN_CLOSE` around its number
+	 * and unit rather than as English words, so the card can draw it as
+	 * elements whose words come from CSS — and a template can translate them
+	 * (`countdownMark`). For what is drawn; anything that reads the words as
+	 * text (a QR, a test for emptiness) leaves it off and gets English.
+	 */
+	markCountdown?: boolean;
+	/**
 	 * The column the text itself came out of, when it is a cell. A placeholder
 	 * naming it is a cell quoting itself: it is not filled in — once was always
 	 * the limit, and once only ever printed the placeholder back — and it is marked
@@ -102,6 +110,11 @@ export const TAB_MARK = '%%%';
 export const UNKNOWN_OPEN = '\uE010';
 export const UNKNOWN_CLOSE = '\uE011';
 const UNKNOWN_CHARS = /[\uE010\uE011]/g;
+
+/** Around a countdown drawn as elements — see `markCountdown`. Two more of the private-use characters. */
+export const COUNTDOWN_OPEN = '\uE012';
+export const COUNTDOWN_CLOSE = '\uE013';
+const COUNTDOWN_CHARS = /[\uE012\uE013]/g;
 
 const MONTHS = [
 	'January',
@@ -476,13 +489,34 @@ export function momentOf(text: string): number | null {
 const unitFor = (span: number, unit?: CountdownUnit): CountdownUnit =>
 	unit ?? (span >= DAY ? 'days' : span >= HOUR ? 'hours' : 'minutes');
 
-/** The words a countdown prints: "12 days", "1 hour", "3 days ago", "0 minutes". */
-export function formatCountdown(target: number, now: number, unit?: CountdownUnit): string {
+/** A countdown's parts: the number, its unit word as the count needs it (`day` for one, `days` otherwise), and whether it is time since. */
+export interface CountdownParts {
+	n: number;
+	word: 'minute' | 'minutes' | 'hour' | 'hours' | 'day' | 'days';
+	past: boolean;
+}
+
+export function countdownParts(target: number, now: number, unit?: CountdownUnit): CountdownParts {
 	const span = Math.abs(target - now);
 	const u = unitFor(span, unit);
 	const n = Math.floor(span / UNIT_MS[u]);
-	const words = `${n} ${n === 1 ? u.slice(0, -1) : u}`;
-	return target < now && n > 0 ? `${words} ago` : words;
+	return { n, word: n === 1 ? (u.slice(0, -1) as CountdownParts['word']) : u, past: target < now && n > 0 };
+}
+
+/** The words a countdown prints: "12 days", "1 hour", "3 days ago", "0 minutes". */
+export function formatCountdown(target: number, now: number, unit?: CountdownUnit): string {
+	const { n, word, past } = countdownParts(target, now, unit);
+	return past ? `${n} ${word} ago` : `${n} ${word}`;
+}
+
+/**
+ * What a marked countdown holds, read back: `+12 days` or `-3 days` between
+ * the marks. Null for anything else — a mark only this file writes, but a
+ * cell is text and could hold the characters, so it is checked, not trusted.
+ */
+export function countdownMark(inner: string): CountdownParts | null {
+	const m = /^([+-])(\d+) (minutes?|hours?|days?)$/.exec(inner);
+	return m ? { past: m[1] === '-', n: Number(m[2]), word: m[3] as CountdownParts['word'] } : null;
 }
 
 /**
@@ -560,6 +594,7 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 	if (!text || !text.includes('%%')) return text;
 	// A cell cannot smuggle a mark in: the characters are the editor's.
 	if (context.markUnknown) text = text.replace(UNKNOWN_CHARS, '');
+	if (context.markCountdown) text = text.replace(COUNTDOWN_CHARS, '');
 	const row = context.row ?? null;
 	const columns = row ? Object.keys(row) : [];
 	let now: Date | undefined;
@@ -594,7 +629,10 @@ export function applyPlaceholders(text: string, context: PlaceholderContext = {}
 			const countdown = format === undefined ? null : countdownOf(format);
 			if (countdown) {
 				const target = countdownTarget(countdown.target, row);
-				return target === null ? unknown(whole) : formatCountdown(target, now.getTime(), countdown.unit);
+				if (target === null) return unknown(whole);
+				if (!context.markCountdown) return formatCountdown(target, now.getTime(), countdown.unit);
+				const { n, word, past } = countdownParts(target, now.getTime(), countdown.unit);
+				return `${COUNTDOWN_OPEN}${past ? '-' : '+'}${n} ${word}${COUNTDOWN_CLOSE}`;
 			}
 			return formatDate(now, format?.trim() || DEFAULT_DATE_FORMAT);
 		}

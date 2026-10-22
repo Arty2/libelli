@@ -14,7 +14,7 @@ file under **What's new** — press the version number in the status bar.
 - Import in the table menu opens a CSV as a new table too; Paste still fills the open one. A file already in your library opens that copy instead of a second one.
 - A row whose card runs off the page — a Grow area grown past the margin or the edge — is marked under its number in the table.
 - Open in another tab: Read Only shows the card being edited there, live, following its row, and in full screen the card alone; or Open Here, or Close.
-- `%%today:countdown:2026-12-25%%` counts the days, hours or minutes to a moment, or from a column, and on once it has passed; it moves on by itself on screen.
+- `%%today:countdown:2026-12-25%%` counts the days, hours or minutes to a moment, or from a column, and moves on by itself. Language in the Page bar sets the cards' `lang`, so the template's CSS can put its words in another language.
 - Template files from before 0.28 are now read like any other: an area aligned right or bottom may need moving back.
 
 ## 0.29.7 — 2026-10-21

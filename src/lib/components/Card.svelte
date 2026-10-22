@@ -16,7 +16,7 @@
 	import Icon from './Icon.svelte';
 	import { backgroundStyle, cssUrl, localImageName, safeMediaUrl } from '$lib/assets';
 	import { parseColor } from '$lib/color';
-	import { UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders } from '$lib/placeholders';
+	import { COUNTDOWN_CLOSE, COUNTDOWN_OPEN, UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders, countdownMark, type CountdownParts } from '$lib/placeholders';
 	import { cssIdent, isPageId, scopeCss, styleTag } from '$lib/css';
 	import { cardVars } from '$lib/csskit';
 	import { fontStack, kindOf } from '$lib/fonts';
@@ -52,7 +52,7 @@
 		freedTop,
 		grownPast
 	} from '$lib/layout';
-	import { flagUnknown, leaderStyle, renderMarkdown, tabSplit } from '$lib/markdown';
+	import { flagCountdowns, flagUnknown, leaderStyle, renderMarkdown, tabSplit } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
 	import { croppable, cropToInk, tileOf } from '$lib/tile';
 	import { DEFAULT_ORPHANS, DEFAULT_WIDOWS, baselineOf, colorsFromRow, frameHeight, listOf, marginsOf, normaliseRotation, shownAsMedia, sidesOf, takesADrawing } from '$lib/template';
@@ -347,20 +347,39 @@
 	 * measured for emptiness, or encoded into a QR.
 	 */
 	const shownTextOf = (box: Box): string =>
-		(void clock, applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds }));
+		(void clock, applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds, markCountdown: true }));
 
 	/** Text split around the marks, for plain text, which Svelte escapes itself. */
-	function segments(text: string): Array<{ text: string; unknown: boolean }> {
-		if (!text.includes(UNKNOWN_OPEN)) return [{ text, unknown: false }];
-		const out: Array<{ text: string; unknown: boolean }> = [];
-		for (const part of text.split(UNKNOWN_OPEN)) {
-			const end = part.indexOf(UNKNOWN_CLOSE);
+	type Segment = { text: string; unknown: boolean; countdown?: CountdownParts };
+
+	/** The countdowns in a run of plain text, as parts to draw — see `countdownHtml` in markdown.ts. */
+	function countdowns(text: string): Segment[] {
+		if (!text.includes(COUNTDOWN_OPEN)) return [{ text, unknown: false }];
+		const out: Segment[] = [];
+		for (const part of text.split(COUNTDOWN_OPEN)) {
+			const end = part.indexOf(COUNTDOWN_CLOSE);
+			const parts = end === -1 ? null : countdownMark(part.slice(0, end));
 			if (end === -1) {
 				if (part) out.push({ text: part, unknown: false });
 				continue;
 			}
-			out.push({ text: `%%${part.slice(0, end)}%%`, unknown: true });
+			if (parts) out.push({ text: '', unknown: false, countdown: parts });
 			if (end + 1 < part.length) out.push({ text: part.slice(end + 1), unknown: false });
+		}
+		return out;
+	}
+
+	function segments(text: string): Segment[] {
+		if (!text.includes(UNKNOWN_OPEN)) return countdowns(text);
+		const out: Segment[] = [];
+		for (const part of text.split(UNKNOWN_OPEN)) {
+			const end = part.indexOf(UNKNOWN_CLOSE);
+			if (end === -1) {
+				if (part) out.push(...countdowns(part));
+				continue;
+			}
+			out.push({ text: `%%${part.slice(0, end)}%%`, unknown: true });
+			if (end + 1 < part.length) out.push(...countdowns(part.slice(end + 1)));
 		}
 		return out;
 	}
@@ -962,8 +981,9 @@
 			// box's own offsetHeight is unchanged, so anchoring still measures right.
 			`justify-content:${VALIGN_TO_FLEX[box.valign ?? 'top']}`
 		];
-		// Justified text without hyphenation opens rivers; the card is `lang="en"`
-		// so the browser has a dictionary to break with.
+		// Justified text without hyphenation opens rivers; the card carries the
+		// template's language (`lang`, English unless it says) so the browser
+		// has the right dictionary to break with.
 		if (align === 'justify') parts.push('hyphens:auto');
 		if (box.italic) parts.push('font-style:italic');
 		if (box.textCase === 'uppercase') parts.push('text-transform:uppercase');
@@ -2376,7 +2396,7 @@
 	{/if}
 {/snippet}
 
-{#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.unknown}<span class="unknown-placeholder" title="No column called this in the table — or the cell naming its own column">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
+{#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.countdown}<span class="countdown {part.countdown.past ? 'past' : 'future'}"><span class="countdown-number">{part.countdown.n}</span><span class="countdown-unit {part.countdown.word}"></span></span>{:else if part.unknown}<span class="unknown-placeholder" title="No column called this in the table — or the cell naming its own column">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
 
 <!-- The shears, which are also the switch between cutting and growing. Red and
      astride the cut on an area that is cutting its words off, where pressing
@@ -2423,7 +2443,7 @@
 	class:frozen={interactive && !!template.locked}
 	class:panning={interactive && panning}
 	style={cardStyle()}
-	lang="en"
+	lang={template.lang ?? 'en'}
 >
 	{#if underlay}
 		<div class="underlay" aria-hidden="true">{@render underlay()}</div>
@@ -2548,15 +2568,15 @@
 					{#if placeholderFor(box)}
 						<span class="placeholder">{placeholderFor(box)}</span>
 					{:else if box.mode === 'markdown'}
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf; flagUnknown writes a fixed span around text it has already escaped -->
-						{@html flagUnknown(renderMarkdown(shownTextOf(box), {
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown escapes every leaf; flagUnknown and flagCountdowns write fixed spans around text it has already escaped -->
+						{@html flagCountdowns(flagUnknown(renderMarkdown(shownTextOf(box), {
 							size: box.size ?? template.defaults.size,
 							md: box.md,
 							paragraph: paragraphOf(box),
 							lineHeight: leadingOf(box),
 							list: listOf(box, template.defaults),
 							leader: leaderOf(box)
-						}))}
+						})))}
 					{:else if box.mode === 'qr'}
 						<span class="media" style="height:{mediaHeight(box)}">
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -- generated here, not user markup -->
@@ -3138,6 +3158,22 @@
 		content: ' / ';
 		white-space: pre;
 	}
+
+	/* A countdown's words, in English, from CSS — see `countdownHtml`. Under
+	   :where, so they weigh nothing: any rule in a template's stylesheet beats
+	   them, `:lang(el) .countdown-unit.days::before { content: ' ημέρες' }` or
+	   a plain `.countdown.past::after { content: '' }`. */
+	:global(:where(.card .countdown-unit)::before),
+	:global(:where(.card .countdown.past)::after) {
+		white-space: pre;
+	}
+	:global(:where(.card .countdown-unit.minute)::before) { content: ' minute'; }
+	:global(:where(.card .countdown-unit.minutes)::before) { content: ' minutes'; }
+	:global(:where(.card .countdown-unit.hour)::before) { content: ' hour'; }
+	:global(:where(.card .countdown-unit.hours)::before) { content: ' hours'; }
+	:global(:where(.card .countdown-unit.day)::before) { content: ' day'; }
+	:global(:where(.card .countdown-unit.days)::before) { content: ' days'; }
+	:global(:where(.card .countdown.past)::after) { content: ' ago'; }
 
 	/* Laid over the content it is replacing, inheriting everything: what you
 	   type is set in the face, size, color and alignment it will print in.

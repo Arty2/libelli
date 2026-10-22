@@ -52,6 +52,7 @@ src/lib/
   dropfile.ts     what a file dropped on the app is: a template, a table, or neither
   template.ts     defaults (templates/default-card.json), validation, migration, import/export
   frame.ts        a file's x, y at the reference point; memory's top-left, through toFile
+  lang.ts         the template's language: the card's lang, for :lang() and hyphenation
   tablock.ts      one tab edits: a Web Lock, handed over on request after a save
   live.ts         a read-only tab fed what the editing tab shows, over a BroadcastChannel
   fonts.ts        Google families + local files via FontFace/IndexedDB

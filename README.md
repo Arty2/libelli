@@ -82,7 +82,7 @@ an area's own text and inside cells, and Markdown around them still applies.
 | `%%title%%` | The `title` column of this card's row. Case is ignored. |
 | `%%title:find:replace%%` | The column, with every `find` replaced. The replacement may be empty; a literal colon is written `\:`. |
 | `%%today%%` | Today's date. `%%today:YYYY-MM-DD%%` sets the format, with `YYYY`, `YY`, `MM`, `DD`, `MMMM`, `MMM`, `dddd` and `ddd`. |
-| `%%today:countdown:2026-12-25%%` | The time to a moment: "4 days", then "5 hours", then "40 minutes", rounded down; once it has passed, "3 days ago". The moment is `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM` in this browser's time, or a column holding one, for a deadline per row. A unit on the end fixes it: `%%today:countdown:2026-12-25:hours%%`. On screen it moves on by itself. |
+| `%%today:countdown:2026-12-25%%` | The time to a moment: "4 days", then "5 hours", then "40 minutes", rounded down; once it has passed, "3 days ago". The moment is `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM` in this browser's time, or a column holding one, for a deadline per row. A unit on the end fixes it: `%%today:countdown:2026-12-25:hours%%`. On screen it moves on by itself. Its words come from CSS, so a template can translate them — see Language. |
 | `%%lookup:3:price%%` | The `price` column of row 3. Row numbers follow their rows when the table is sorted or rearranged. |
 | `%%lookup:next:title%%` | The same column in the next row; `previous` for the one before. |
 | `%%page:current%%`, `%%page:total%%` | The card's page number, and how many pages there are. |
@@ -155,6 +155,26 @@ crop marks. Its **Order** setting can also arrange the pages for folding:
 A booklet is padded with blank pages to a multiple of four (eight for the mini
 zine). With **Recto / Verso** on, left-hand pages mirror the layout of the
 right-hand ones across the fold.
+
+## Language
+
+**Language** in the Page bar says what language the cards are in. It sets the
+page's `lang`, which picks the dictionary justified text hyphenates with, and
+which the template's CSS can test with `:lang()`. Words the app adds itself
+come from CSS for this reason, in English unless the template says otherwise:
+the page number's separator, and a countdown's units and "ago".
+
+```css
+:lang(el) .countdown-unit.days::before { content: ' ημέρες'; }
+:lang(el) .countdown-unit.day::before { content: ' ημέρα'; }
+:lang(el) .countdown.past::after { content: ''; }
+:lang(el) .countdown.past::before { content: 'πριν από '; }
+:lang(el) .page-number .of::before { content: ' από '; }
+```
+
+The units are `.minute`, `.minutes`, `.hour`, `.hours`, `.day` and `.days`, one
+for a count of one and the other for every other count; a language with more
+plural forms than that gets the two.
 
 ## Keyboard shortcuts
 

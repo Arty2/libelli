@@ -12,11 +12,15 @@ import {
 	openPlaceholder,
 	placeholderChoices,
 	referencedColumns,
+	COUNTDOWN_CLOSE,
+	COUNTDOWN_OPEN,
+	countdownMark,
 	countdownOf,
 	countdownWait,
 	momentOf,
 	placeholderWait
 } from './placeholders';
+import { flagCountdowns, renderMarkdown } from './markdown';
 import { normaliseTemplate } from './template';
 
 // Midday, so no timezone the test could run in can push it onto another day.
@@ -437,5 +441,35 @@ describe('when the clock should next wake', () => {
 		expect(placeholderWait(['no placeholders', '%%title%%'], null, now)).toBe(Infinity);
 		expect(placeholderWait(['%%today:countdown:2026-12-20T23:45%%', '%%today%%'], null, now)).toBe(40_000 + 1);
 		expect(placeholderWait(['%%today:countdown:deadline%%'], { deadline: '2026-12-21T00:10' }, now)).toBe(40_000 + 1);
+	});
+});
+
+describe('a countdown drawn as elements', () => {
+	const now = new Date('2026-12-20T10:00');
+
+	it('is marked for the card, and words for anything that reads text', () => {
+		const marked = applyPlaceholders('in %%today:countdown:2026-12-25%%', { now, markCountdown: true });
+		expect(marked).toBe(`in ${COUNTDOWN_OPEN}+4 days${COUNTDOWN_CLOSE}`);
+		expect(applyPlaceholders('%%today:countdown:2026-12-17%%', { now, markCountdown: true })).toBe(`${COUNTDOWN_OPEN}-3 days${COUNTDOWN_CLOSE}`);
+		expect(applyPlaceholders('in %%today:countdown:2026-12-25%%', { now })).toBe('in 4 days');
+	});
+
+	it('reads a mark back, and only one this file could have written', () => {
+		expect(countdownMark('+1 day')).toEqual({ past: false, n: 1, word: 'day' });
+		expect(countdownMark('-3 hours')).toEqual({ past: true, n: 3, word: 'hours' });
+		expect(countdownMark('+1 day"><b>')).toBeNull();
+		expect(countdownMark('+1 weeks')).toBeNull();
+	});
+
+	it('cannot be forged by a cell holding the marks', () => {
+		const forged = `${COUNTDOWN_OPEN}+9 days${COUNTDOWN_CLOSE}`;
+		expect(applyPlaceholders(forged, { markCountdown: true })).toBe(forged);
+		expect(applyPlaceholders(`${forged} %%today%%`, { now, markCountdown: true })).toBe('+9 days 20 December 2026');
+	});
+
+	it('becomes fixed elements in rendered Markdown, and words inside an attribute', () => {
+		const html = flagCountdowns(renderMarkdown(applyPlaceholders('**%%today:countdown:2026-12-17%%**', { now, markCountdown: true }), { size: 10 }));
+		expect(html).toContain('<strong><span class="countdown past"><span class="countdown-number">3</span><span class="countdown-unit days"></span></span></strong>');
+		expect(flagCountdowns(`<a href="x${COUNTDOWN_OPEN}+2 hours${COUNTDOWN_CLOSE}">y</a>`)).toBe('<a href="x2 hours">y</a>');
 	});
 });

@@ -3939,6 +3939,22 @@ hidden, and woken when it is shown. What reaches Card is a counter (`clock`), no
 a time: the time is read as the words are filled, so it cannot be a stale one.
 Printing and PNGs read the time as they draw, as they always did.
 
+**A countdown's words are CSS, like the page number's separator.** Drawn, it
+is marked (`markCountdown`) and becomes `.countdown.past|future >
+.countdown-number + .countdown-unit.days`, the unit's word and "ago" being
+`::before`/`::after` content in Card's stylesheet — under `:where()`, so any
+rule a template writes wins, `:lang(el)` or not. The marks are two more
+private-use characters, turned into fixed spans after escaping (`flagCountdowns`
+for Markdown, the `marked` snippet for plain text) and read back through
+`countdownMark`, which accepts only digits and the six unit words, so a cell
+holding the characters cannot make markup. Anything that reads the words as text
+— a QR, an emptiness test — asks without the marks and gets English. Two plural
+forms only (one, other); a language with more gets the two.
+
+**The template's language is the card's `lang`** (lang.ts): a tag from the Page
+bar's list, or any valid one a file names, absent for English — which the card
+was hard-coded to, and which hyphenation was quietly using for every language.
+
 ## `src/lib/complete.ts`
 
 **One action for four fields.** The column list that `%%` opens is needed in a

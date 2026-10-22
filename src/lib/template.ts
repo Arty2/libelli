@@ -4,6 +4,7 @@ import { fromRgba, parseColor, toRgba } from './color';
 import defaultCard from './templates/default-card.json';
 import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
 import { fromFile, toFile } from './frame';
+import { DEFAULT_LANG, safeLang } from './lang';
 import type {
 	Anchor,
 	ColorSources,
@@ -569,6 +570,8 @@ export function normaliseTemplate(raw: unknown): Template {
 		boxes,
 		...stripUndefined({
 			facing: t.facing ? true : undefined,
+			// English is the absence of the field, as it was before there was one.
+			lang: safeLang(t.lang) === DEFAULT_LANG ? undefined : safeLang(t.lang),
 			css: typeof t.css === 'string' && t.css.trim() ? t.css : undefined,
 			locked: t.locked ? true : undefined,
 			starter: typeof t.starter === 'string' && t.starter.trim() ? t.starter.trim() : undefined
