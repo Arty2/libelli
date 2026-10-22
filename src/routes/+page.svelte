@@ -22,6 +22,8 @@
 		uploadBackgroundImage
 	} from '$lib/assets';
 	import { download, fileStem } from '$lib/download';
+	import { droppedKind, mightTakeDrag, tableNameFrom } from '$lib/dropfile';
+	import { parseTable } from '$lib/parse';
 	import {
 		deleteStoredFont,
 		ensureGoogleFont,
@@ -634,6 +636,9 @@
 
 	/** The status line, whole, in a dialog — it is one ellipsised row otherwise. */
 	let statusOpen = $state(false);
+
+	/** A line for the status bar, not yet shown — so several can become one. */
+	type Said = { text: string; tone: 'info' | 'warning' };
 
 	function notify(text: string, tone: 'info' | 'warning' = 'info') {
 		status = text;
@@ -3057,30 +3062,148 @@
 		const file = input.files?.[0];
 		input.value = '';
 		if (!file) return;
+		const said = await importTemplateFile(file);
+		notify(said.text, said.tone);
+	}
+
+	/**
+	 * A template file, opened as a new entry in the library. Shared by the
+	 * picker and a drop, and it reports rather than notifies so a drop of
+	 * several files can say what happened to each in one line.
+	 *
+	 * The file is read and checked before anything is saved or switched: one
+	 * that will not import leaves the design on screen exactly as it was.
+	 */
+	async function importTemplateFile(file: File): Promise<Said> {
+		let next: Template;
 		try {
-			const raw = JSON.parse(await file.text());
-			await flushTemplate();
-			template = importedTemplate(raw);
-			selectedIds = [];
-			// An import joins the library rather than replacing what is loaded:
-			// a file someone handed you is a template you now have, not a
-			// correction to the one you were working on.
-			rememberTemplate(templateId);
-			templateId = nextTemplateId();
-			saveTemplateId(templateId);
-			// Never assume the mapping: a template is shared between spreadsheets.
-			// By name here, since a file arrives with no id — the one case where
-			// the name is the better key.
-			const stored = loadMapping(templateId, template.name);
-			mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(template), dataset.columns);
-			mappingPrompt = true;
-			missingFonts = await ensureTemplateFonts(template);
-			await saveTemplateDoc(templateId, $state.snapshot(template));
-			await refreshLibrary();
-			notify(`Loaded “${template.name}”.`);
+			next = importedTemplate(JSON.parse(await file.text()));
 		} catch (error) {
-			notify(error instanceof Error ? error.message : 'That file is not a template.', 'warning');
+			// JSON.parse's own message names a token and a column, which is the
+			// parser talking; what someone needs is which file, and that it is
+			// not a template.
+			const why = error instanceof SyntaxError
+				? 'it is not valid JSON'
+				: error instanceof Error ? error.message.replace(/\.$/, '') : 'it is not a template';
+			return { text: `“${file.name}” was not imported — ${why}.`, tone: 'warning' };
 		}
+		settleProvisional();
+		// Both, though only the design is replaced: the table goes into the
+		// library at the same moment, so the pair you were on is what is saved,
+		// not one half of it and the other half on the autosave's next tick.
+		await Promise.all([flushTemplate(), flushDataset()]);
+		describe(`Import “${next.name}”`);
+		template = next;
+		selectedIds = [];
+		editingId = null;
+		// An import joins the library rather than replacing what is loaded:
+		// a file someone handed you is a template you now have, not a
+		// correction to the one you were working on.
+		rememberTemplate(templateId);
+		templateId = nextTemplateId();
+		saveTemplateId(templateId);
+		// Never assume the mapping: a template is shared between spreadsheets.
+		// By name here, since a file arrives with no id — the one case where
+		// the name is the better key.
+		const stored = loadMapping(templateId, template.name);
+		mapping = Object.keys(stored).length ? stored : autoMap(usedSlots(template), dataset.columns);
+		mappingPrompt = true;
+		missingFonts = await ensureTemplateFonts(template);
+		await saveTemplateDoc(templateId, $state.snapshot(template));
+		await refreshLibrary();
+		return { text: `Loaded “${template.name}” as a new template — the one you had is saved in your templates.`, tone: 'info' };
+	}
+
+	/**
+	 * A CSV or TSV file, opened as a new table in the library.
+	 *
+	 * Not poured into the open table, which is what the table's own Import
+	 * does: a file dragged onto the app from elsewhere is a list you now have,
+	 * and the rows you were working on should still be there to go back to —
+	 * the same rule a template import follows. Being a new table, the open
+	 * table's lock does not stand in its way.
+	 */
+	async function importTableFile(file: File): Promise<Said> {
+		let parsed: Dataset;
+		try {
+			parsed = parseTable(await file.text());
+		} catch {
+			return { text: `“${file.name}” could not be read.`, tone: 'warning' };
+		}
+		// The emptiness policy for this caller: there is no table to lose, so a
+		// file of headers alone is a fine way to start one; a file of nothing
+		// is not a table.
+		if (!parsed.columns.length) {
+			return { text: `“${file.name}” was not imported — nothing in it reads as a table.`, tone: 'warning' };
+		}
+		settleProvisional();
+		await Promise.all([flushTemplate(), flushDataset()]);
+		const name = freeTableName(tableNameFrom(file.name) || UNTITLED_TABLE);
+		describe(`Import “${name}”`);
+		rememberTable(datasetId);
+		datasetId = nextDatasetId();
+		saveDatasetId(datasetId);
+		dataset = { ...parsed, name };
+		activeRow = 0;
+		// As switching tables keeps them: bindings to columns this file also
+		// has stay, and when none does they are guessed afresh.
+		const kept = Object.fromEntries(
+			Object.entries(mapping).filter(([, column]) => parsed.columns.includes(column))
+		);
+		mapping = Object.keys(kept).length ? kept : autoMap(usedSlots(template), parsed.columns);
+		await saveDatasetDoc(datasetId, $state.snapshot(dataset));
+		await refreshTables();
+		const count = `${parsed.rows.length} row${parsed.rows.length === 1 ? '' : 's'}`;
+		return { text: `“${name}” imported as a new table, ${count} — the table you had is saved in your tables.`, tone: 'info' };
+	}
+
+	/**
+	 * Something being dragged over the app that it might take, for the hint
+	 * that says where it will go. A count rather than a flag: `dragenter` and
+	 * `dragleave` fire for every child the pointer crosses, in pairs. Cleared
+	 * on the way down to a drop, not on its way back up: an area that takes a
+	 * picture stops the event there, and the hint would outlive the drag.
+	 */
+	let dragDepth = $state(0);
+	const dragHint = $derived(dragDepth > 0);
+
+	function onWindowDragEnter(event: DragEvent) {
+		if (!event.dataTransfer?.types.includes('Files')) return;
+		if (!mightTakeDrag(Array.from(event.dataTransfer.items, (item) => item.type))) return;
+		dragDepth++;
+	}
+
+	function onWindowDragLeave(event: DragEvent) {
+		if (dragDepth > 0 && event.dataTransfer?.types.includes('Files')) dragDepth--;
+	}
+
+	/**
+	 * A file dropped anywhere the card did not take it. An image on an area or
+	 * on the page has already been placed, and its handler said so with
+	 * `preventDefault`; everything else lands here — a template, a table, or
+	 * something this app cannot read, which says so rather than vanishing.
+	 *
+	 * Files one at a time, in order, so that a template and its table dropped
+	 * together arrive as a pair: each import saves what is open first, and two
+	 * at once would race over which was "open".
+	 */
+	async function onWindowDrop(event: DragEvent) {
+		const handled = event.defaultPrevented;
+		// Always: the browser's own answer to a dropped file is to navigate to
+		// it, which leaves the design behind.
+		event.preventDefault();
+		if (handled) return;
+		const files = Array.from(event.dataTransfer?.files ?? []);
+		if (!files.length) return;
+		const said: Said[] = [];
+		for (const file of files) {
+			const kind = droppedKind(file);
+			if (kind === 'template') said.push(await importTemplateFile(file));
+			else if (kind === 'table') said.push(await importTableFile(file));
+			else if (kind === 'image') said.push({ text: `“${file.name}” is a picture — drop it on the page or on an area to place it.`, tone: 'warning' });
+			else said.push({ text: `“${file.name}” is not a file libelli can import — drop a CSV, TSV or template JSON.`, tone: 'warning' });
+		}
+		notify(said.map((s) => s.text).join(' '), said.some((s) => s.tone === 'warning') ? 'warning' : 'info');
 	}
 
 	async function handleFontUpload(file: File, family?: string) {
@@ -3267,10 +3390,10 @@
 
 </script>
 
-<!-- A file dropped anywhere but on an area is swallowed here. The browser's own
-     answer to a dropped image is to navigate to it, which leaves the design
-     behind — and the one place a drop means something is the card, which takes
-     it before this ever sees it. -->
+<!-- A file dropped anywhere the card did not take it ends up here — see
+     `onWindowDrop`. A template or a table is imported; anything else is
+     refused in the status line rather than left to the browser, whose answer
+     to a dropped file is to navigate to it. -->
 <Tooltip />
 
 <svelte:window
@@ -3278,11 +3401,23 @@
 	onafterprint={onAfterPrint}
 	onresize={() => (barFloor = 0)}
 	ondragover={(e) => e.preventDefault()}
-	ondrop={(e) => e.preventDefault()}
+	ondragenter={onWindowDragEnter}
+	ondragleave={onWindowDragLeave}
+	ondropcapture={() => (dragDepth = 0)}
+	ondrop={(e) => void onWindowDrop(e)}
 />
 <svelte:head>
 	<title>libelli</title>
 </svelte:head>
+
+<!-- Where a dragged file will go, said before it is let go. It never takes the
+     pointer, so the page and its areas still see the drag and a picture can
+     still be dropped on one. -->
+{#if dragHint}
+	<div class="drop-hint" aria-hidden="true">
+		<p>Drop a CSV or a template JSON to open it as a new table or template — what is open now is saved first.</p>
+	</div>
+{/if}
 
 <div class="app">
 	<header class="toolbar">
@@ -4819,6 +4954,30 @@
 		border: 1px solid var(--border-control);
 		border-radius: var(--radius-input);
 		background: #fff;
+	}
+
+	.drop-hint {
+		position: fixed;
+		inset: 8px;
+		z-index: 39;
+		pointer-events: none;
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		border: 2px dashed var(--accent);
+		border-radius: 6px;
+		background: color-mix(in srgb, var(--accent-wash) 60%, transparent);
+	}
+
+	.drop-hint p {
+		margin: 0 16px 48px;
+		padding: 8px 12px;
+		max-width: 32rem;
+		border-radius: var(--radius-button);
+		background: var(--accent);
+		color: #fff;
+		font-size: 0.75rem;
+		text-align: center;
 	}
 
 	.modal-backdrop {

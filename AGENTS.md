@@ -49,6 +49,7 @@ src/lib/
   table.ts        column reorder, row sorting
   imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
   download.ts     hand the browser a file; zip.ts packs several into one
+  dropfile.ts     what a file dropped on the app is: a template, a table, or neither
   template.ts     defaults (templates/default-card.json), validation, migration, import/export
   frame.ts        a file's x, y at the reference point; memory's top-left; the bridge to 0.30
   tablock.ts      one tab edits: a Web Lock, handed over on request after a save

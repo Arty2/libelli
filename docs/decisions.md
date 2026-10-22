@@ -3438,6 +3438,20 @@ Chromium resolves against the row as drawn and Firefox — once it has
 padding there. The field sizes to its content now, and a press on the band
 under it focuses it.
 
+**A file dropped on the app opens as a new entry, never into the open one.**
+`dropfile.ts` sorts a drop by extension first, MIME type second — Windows
+reports a `.csv` as `application/vnd.ms-excel` wherever Excel is installed —
+and `onWindowDrop` in +page imports each file in order: a template through the
+same path as the picker, a table as a new table in the library, the way Getting
+Started starts one. Both save the open template and table first. The table's
+own Import button still replaces the open table's rows, on purpose: pressing a
+button under a table is asking to fill it, while a file dragged in from
+elsewhere is a list you now have. Each file is read and checked before anything
+is switched, so one that fails leaves the screen as it was and says why, by
+name, in the status line. The window sees a drop only after the page and its
+areas have had theirs; an area that takes a picture calls `preventDefault`,
+which is how the window knows to stay out of it.
+
 ## `src/lib/components/MenuSelect.svelte`
 
 **One menu, drawn like the template picker.** The zoom and both font menus were
