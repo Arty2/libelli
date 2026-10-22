@@ -2625,7 +2625,7 @@
 		class="whitespace"
 		aria-pressed={whitespace}
 		title={whitespace
-			? 'Whitespace shown in the cell being typed in and the full-size editor: a dot for a space, → for a tab, a ring for a no-break space, ¶ for a line end. Press to hide it'
+			? 'Whitespace shown in the cell being typed in and the full-size editor: a dot for a space (a ring where a line wraps at it), → for a tab, a square for a no-break space, ¶ for a line end. Press to hide it'
 			: 'Show whitespace — spaces, tabs and line ends — in the cell being typed in and the full-size editor'}
 		aria-label="Show whitespace"
 		onmousedown={(e) => e.preventDefault()}

@@ -1,6 +1,7 @@
 /**
- * Whitespace, shown: a dot for a space, an arrow for a tab, a ring for a
- * no-break space and a pilcrow at each line's end, drawn over a textarea.
+ * Whitespace, shown: a dot for a space (a ring where a line wraps at it), an
+ * arrow for a tab, a square for a no-break space and a pilcrow at each line's
+ * end, drawn over a textarea.
  *
  * A textarea draws its own text and nothing can be styled inside it, so the
  * marks are a layer laid exactly over it — the shape CssEditor uses for its
@@ -67,7 +68,8 @@ function ensureStyles() {
 .ws-layer .ws-space::after, .ws-layer .ws-nbsp::after { content: ''; top: 50%; left: 50%;
 	width: 0.24em; height: 0.24em; border-radius: 50%; box-sizing: border-box; transform: translate(-50%, -50%); opacity: 0.75; }
 .ws-layer .ws-space::after { background: var(--accent, #2563eb); }
-.ws-layer .ws-nbsp::after { border: 0.07em solid var(--accent, #2563eb); width: 0.32em; height: 0.32em; }
+.ws-layer .ws-space.ws-wrap::after { background: none; border: 0.07em solid var(--accent, #2563eb); width: 0.32em; height: 0.32em; }
+.ws-layer .ws-nbsp::after { background: var(--accent, #2563eb); border-radius: 0; }
 .ws-layer .ws-tab::after { content: '→'; left: 0; }
 .ws-layer .ws-newline::after { content: '¶'; left: 0.1em; }`;
 	document.head.append(style);
@@ -147,7 +149,43 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		// when its value changes, after this, so the sheet follows a frame on.
 		onScroll();
 	};
-	const onInput = () => draw();
+	const onInput = () => {
+		draw();
+		settle();
+	};
+
+	/** Where a character of `node` is drawn: its first, or its last. */
+	const rectOf = (node: Node, last: boolean): DOMRect | null => {
+		if (node instanceof Element) return node.getBoundingClientRect();
+		const length = node.textContent?.length ?? 0;
+		if (!length) return null;
+		const range = document.createRange();
+		range.setStart(node, last ? length - 1 : 0);
+		range.setEnd(node, last ? length : 1);
+		return range.getBoundingClientRect();
+	};
+
+	/**
+	 * The spaces a line wraps at, drawn as a ring rather than the dot: a space
+	 * there has no room of its own — a browser hangs it past the edge of the
+	 * line, or carries it to the start of the next — and a dot drawn where it
+	 * landed read as a mark out of place, under the line it belongs to. Found
+	 * by where its neighbours are drawn: the next character on a later line,
+	 * or the one before on an earlier one. After a redraw or a change of width,
+	 * once a frame at most, and only on the one field the layer is over.
+	 */
+	const markWraps = () => {
+		if (!sheet) return;
+		for (const space of sheet.querySelectorAll<HTMLElement>('.ws-space')) {
+			const at = space.getBoundingClientRect();
+			const next = space.nextSibling ? rectOf(space.nextSibling, false) : null;
+			const before = space.previousSibling;
+			// After a line break a space starts its line by right, not by a wrap.
+			const prev = before && !(before instanceof Element && before.classList.contains('ws-newline')) && before.textContent !== '\n' ? rectOf(before, true) : null;
+			const wraps = (!!next && next.height > 0 && next.top > at.top + 1) || (!!prev && prev.height > 0 && at.top > prev.top + 1);
+			space.classList.toggle('ws-wrap', wraps);
+		}
+	};
 
 	/**
 	 * The field is what is on screen, and the one thing to trust: the text
@@ -165,6 +203,7 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 			place();
 			draw(field.value);
 			sync();
+			markWraps();
 		});
 	};
 
@@ -182,10 +221,8 @@ export function showWhitespace(field: HTMLTextAreaElement, options: WhitespaceOp
 		settle();
 		field.addEventListener('input', onInput);
 		field.addEventListener('scroll', onScroll, { passive: true });
-		observer = new ResizeObserver(() => {
-			place();
-			sync();
-		});
+		// A new width moves the wraps too, so the whole settling, not only the place.
+		observer = new ResizeObserver(settle);
 		observer.observe(field);
 	};
 

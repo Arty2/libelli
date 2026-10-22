@@ -2093,7 +2093,7 @@
 	     into a column for that, which grew a two-line panel up over the sheet;
 	     now the words go instead and the ticks keep their row — a mark for each,
 	     which also says which of its modes it is in: ⋕ ruled and ∷ dots for the
-	     grid, ≢ without the spacing and ≡ with it for the guides, ⊡ boxes and ⊞
+	     grid, ∣ with the spacing and ∤ without it for the guides, ⊡ boxes and ⊞
 	     boxes with their ties — beside checkboxes that say whether they are on. The full word stays the accessible name either way, so nothing
 	     read aloud is reduced to a single letter. -->
 	<div class="corner left">
@@ -2150,7 +2150,7 @@
 				}}
 			/>
 			<span class="wide">Guides</span>
-			<span class="narrow" aria-hidden="true">{guidesFull ? '\u2261' : '\u2262'}</span>
+			<span class="narrow" aria-hidden="true">{guidesFull ? '\u2223' : '\u2224'}</span>
 		</label>
 		<label
 			title={withKey(
