@@ -38,7 +38,10 @@ shows the card being edited in the other tab, updating as it changes and
 following the row it is on, and **Close** closes this tab. A read-only tab
 saves nothing; the eye beside the card brings the choice back. Put a
 read-only tab in full screen and it shows the card alone, fitted to the
-screen, as a display; leaving full screen brings the rest back.
+screen, on black and in the colours it prints in, whatever the theme — a
+display; leaving full screen brings the rest back, as do Escape and a
+double-click. A read-only tab always fits the card to its own window; it does
+not follow the editing tab's zoom.
 
 ## Data
 

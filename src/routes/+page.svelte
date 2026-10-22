@@ -4096,6 +4096,7 @@
 		<PagePreview
 			clock={clockTick}
 			viewOnly={editor === 'readonly'}
+			{bare}
 			onviewonly={() => (readOnlyAsk = true)}
 			{template}
 			{row}
@@ -5382,8 +5383,7 @@
 
 	/* Full screen as well: the card alone, on the stage's ground. */
 	.bare .toolbar,
-	.bare .status-bar,
-	.bare :global(.view-eye) {
+	.bare .status-bar {
 		display: none;
 	}
 

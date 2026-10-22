@@ -122,6 +122,11 @@
 		viewOnly?: boolean;
 		/** the eye pressed: what this tab is, and the ways out of it */
 		onviewonly?: () => void;
+		/**
+		 * Read only and full screen: a display. The card on black, as it
+		 * prints — no shadow, no eye — and fitted, as read only always is.
+		 */
+		bare?: boolean;
 	}
 
 	let {
@@ -187,6 +192,7 @@
 		onunlock,
 		onrelock,
 		viewOnly = false,
+		bare = false,
 		clock = 0,
 		onviewonly,
 		flashIds = []
@@ -1677,7 +1683,11 @@
 	{/if}
 {/snippet}
 
-<div class="stage" class:view-only={viewOnly} bind:this={stage}>
+<!-- Bare, the stage is drawn true to colour — `data-true-color`, app.css: a
+     dark theme turns the interface inside out, and would turn the black
+     white and, in dark-page, the card's own colours over. A display shows
+     the card as it prints, whatever the theme. -->
+<div class="stage" class:view-only={viewOnly} class:bare data-true-color={bare || undefined} data-display={bare || undefined} bind:this={stage}>
 <div
 	class="viewport"
 	bind:this={host}
@@ -2259,6 +2269,20 @@
 	.view-only .rail,
 	.view-only .side-rail,
 	.view-only .corner:not(.view-eye) {
+		display: none;
+	}
+
+	/* Full screen as well: the card on black, nothing else — not the eye,
+	   not the shadow that lifts the sheet off the editor's grey. */
+	.stage.bare {
+		background: #000;
+	}
+
+	.bare .sheet {
+		box-shadow: none;
+	}
+
+	.bare .view-eye {
 		display: none;
 	}
 

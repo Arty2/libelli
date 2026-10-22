@@ -176,7 +176,11 @@ the table per settled change while somebody watches. Close calls
 it does not, the dialog says to close it from the tab bar.
 
 **Full screen and read only is the card alone** (`bare` in +page): no toolbar,
-status line or eye, and a read-only stage is always at Fit. Full screen is read
+status line or eye, no shadow, on black, and a read-only stage is always at Fit
+— its own window's, refitted on every resize; the editing tab's zoom is not
+sent, since the two windows are different sizes. The stage is `data-true-color`
+and `data-display` then (app.css), so a dark theme neither turns the black white
+nor, in dark-page, turns the card over: a display shows it as it prints. Full screen is read
 three ways, because each misses a case: `document.fullscreenElement` for a page
 that asked, `display-mode: fullscreen` where a browser reports its own, and the
 window filling the screen to a pixel for F11 or ⌃⌘F where it does not — which
