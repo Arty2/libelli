@@ -5381,6 +5381,13 @@
 		display: none;
 	}
 
+	/* On a phone the mark is centred out of the flow (below), and the bar took
+	   its height from the buttons beside it; read only has none, and the bar
+	   shut over the mark. As tall as the mark, with the phone's padding. */
+	.view-only .toolbar {
+		min-height: calc(1.8125rem + 12px);
+	}
+
 	/* Full screen as well: the card alone, on the stage's ground. */
 	.bare .toolbar,
 	.bare .status-bar {
