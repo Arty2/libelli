@@ -85,9 +85,13 @@ export function caretPoint(field: HTMLTextAreaElement | HTMLInputElement, offset
 	const box = field.getBoundingClientRect();
 	const style = getComputedStyle(field);
 	const line = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
-	if (!text) {
-		const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
-		const top = box.top + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop);
+	// Before any text at all — an empty field, or the caret at the very start
+	// of one that opens with a line break, where there is no character before
+	// it to measure and the one after it is the break: the first line's start,
+	// inside the border and padding, scrolled as the field is.
+	if (!text || (offset <= 0 && text[0] === '\n')) {
+		const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft) - field.scrollLeft;
+		const top = box.top + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop) - field.scrollTop;
 		return { x: left, top, bottom: top + line };
 	}
 	const copy = copyOf(field, box, style);

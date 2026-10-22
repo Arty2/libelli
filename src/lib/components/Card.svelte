@@ -2739,13 +2739,12 @@
 					{@render shears(box, true)}
 				{/if}
 
-				<!-- Every badge here says why *this* area will not do what you might
-				     ask of it, and on a locked page that is the same answer for all
-				     of them: the page is locked. The band over the sheet says it once,
-				     so the column of per-area reasons is noise — and two of these are
-				     buttons that would be refused anyway. The overflow mark below is
-				     not one of these: it is about what will print, which a lock does
-				     not change. -->
+				<!-- The anchor's ends. On a locked page only for Boxes with ties
+				     (`showsAllTies`), where they are what the threads run between —
+				     disabled, as everything on a locked page is. Otherwise not there:
+				     as buttons they would only be refused, and the band over the sheet
+				     says once why. The overflow mark below is not one of these: it is
+				     about what will print, which a lock does not change. -->
 				{#if bounds && (showsAllTies || (!template.locked && showsBadges(box))) && (box.anchor || anchorTargets.has(box.id))}
 					<!-- The anchor's two ends, in a row of their own off the top-left
 					     corner: the buoy in the corner on one that others follow, and to

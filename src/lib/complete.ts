@@ -57,8 +57,11 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 		close();
 		// Both: a field that commits on `change` (the area's Text in the bar)
 		// takes a choice as a commit, and one that follows `input` sees it too.
+		// Not `change` for one still to be finished: `%%toc:%%` committed is a
+		// placeholder that names nothing, and an undo step nobody wanted; the
+		// choice from the list that follows commits it whole.
 		node.dispatchEvent(new Event('input', { bubbles: true }));
-		node.dispatchEvent(new Event('change', { bubbles: true }));
+		if (!name.endsWith(':')) node.dispatchEvent(new Event('change', { bubbles: true }));
 	};
 
 	const draw = () => {
@@ -73,10 +76,12 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 			// Mousedown, not click: the field would lose its focus, and its caret
 			// with it, before a click arrived.
 			list.addEventListener('mousedown', (event) => {
-				const item = (event.target as HTMLElement).closest('li');
-				if (!item) return;
+				// Held off for every press on the list, the rule and its padding
+				// too: one that reached the page would take the field's focus, and
+				// the list and the caret with it.
 				event.preventDefault();
-				choose(item.dataset.name ?? '');
+				const item = (event.target as HTMLElement).closest('li[data-name]') as HTMLElement | null;
+				if (item) choose(item.dataset.name ?? '');
 			});
 			document.body.appendChild(list);
 		}
@@ -85,6 +90,7 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 			item.setAttribute('role', 'option');
 			item.setAttribute('aria-selected', String(i === active));
 			item.dataset.name = name;
+			item.dataset.index = String(i);
 			// One still to be finished says so: `%%today:countdown:…%%`.
 			item.textContent = `%%${name}${name.endsWith(':') ? '…' : ''}%%`;
 			return item;
@@ -120,6 +126,19 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 		list.style.left = `${Math.max(gap, Math.min(caret.x, window.innerWidth - width - gap))}px`;
 	};
 
+	/**
+	 * The highlight moved, and nothing else: the items and the place are as
+	 * they were, so neither is built or measured again — the place costs a
+	 * copy of the field's whole text, and a held arrow asks thirty times a second.
+	 */
+	const mark = () => {
+		if (!list) return;
+		for (const item of list.querySelectorAll<HTMLElement>('li[data-name]')) {
+			item.setAttribute('aria-selected', String(item.dataset.index === String(active)));
+		}
+		list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+	};
+
 	const update = () => {
 		const caret = node.selectionStart ?? node.value.length;
 		const found = openPlaceholder(node.value, caret);
@@ -145,7 +164,7 @@ export function completePlaceholders(node: Field, columns: readonly string[]) {
 			event.stopPropagation();
 			const step = event.key === 'ArrowDown' ? 1 : -1;
 			active = (active + step + choices.length) % choices.length;
-			draw();
+			mark();
 		} else if (event.key === 'Enter' || event.key === 'Tab') {
 			event.preventDefault();
 			event.stopPropagation();

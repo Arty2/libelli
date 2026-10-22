@@ -145,7 +145,7 @@
 	import { mayHaveMoved, toFile } from '$lib/frame';
 	import { openLive, type LiveState } from '$lib/live';
 	import { claimEditor, type EditorLock } from '$lib/tablock';
-	import type { Box, ColorSources, Dataset, FontRef, Mapping, Template, UiState } from '$lib/types';
+	import type { Box, ColorSources, Dataset, FontRef, Mapping, Row, Template, UiState } from '$lib/types';
 
 	let template = $state<Template>(starterTemplate());
 	let dataset = $state<Dataset>({ columns: [], rows: [] });
@@ -626,15 +626,28 @@
 	 * and come back with the pass. An edit replaces one row; a move or a sort
 	 * replaces several places at once, and that is what is told apart here.
 	 */
-	let markedRows: readonly unknown[] = [];
+	let markedRows: readonly Row[] = [];
 	$effect(() => {
 		const rows = dataset.rows;
-		const before = untrack(() => markedRows);
-		markedRows = rows;
-		if (before === rows || !untrack(() => overflowRows.size)) return;
-		let moved = before.length !== rows.length;
-		for (let i = 0, changed = 0; !moved && i < rows.length; i++) if (rows[i] !== before[i] && ++changed > 1) moved = true;
-		if (moved) overflowRows = new Map();
+		// Compared without subscribing to every row: only the array is watched.
+		untrack(() => {
+			const before = markedRows;
+			markedRows = rows;
+			if (before === rows || !overflowRows.size) return;
+			// By what the rows hold, not by which objects they are: a lock, an
+			// undo, a live update rebuild every row and move none of them. A
+			// value is a string, so this compares references, not text.
+			const same = (a: Row, b: Row) => {
+				const x = Object.values(a);
+				const y = Object.values(b);
+				return x.length === y.length && x.every((v, k) => v === y[k]);
+			};
+			let moved = before.length !== rows.length;
+			for (let i = 0, changed = 0; !moved && i < rows.length; i++) {
+				if (rows[i] !== before[i] && !same(rows[i], before[i]) && ++changed > 1) moved = true;
+			}
+			if (moved) overflowRows = new Map();
+		});
 	});
 	const overflowAreas = $derived(
 		new Map(
@@ -3051,10 +3064,15 @@
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
 
 	function onWindowKeydown(event: KeyboardEvent) {
-		// The one key a read-only tab answers: the dialog, with its ways out —
-		// the only control there is when the card is shown alone.
-		if (editor === 'readonly' && event.key === 'Escape' && !readOnlyAsk) {
-			readOnlyAsk = true;
+		// The one key a read-only tab answers. A dialog it can open — Help, What's
+		// new, the notice — is closed by it, as anywhere; with none open, it
+		// brings the read-only dialog, the only control there is when the card is
+		// shown alone. Never the second over the first: that one cannot be
+		// dismissed, and the first would be left under it.
+		if (editor === 'readonly' && event.key === 'Escape') {
+			if (helpOpen || whatsNewOpen || statusOpen) {
+				helpOpen = whatsNewOpen = statusOpen = false;
+			} else if (!readOnlyAsk) readOnlyAsk = true;
 			return;
 		}
 		// A tab that is not the editor holds a stale copy behind its dialog:
@@ -5377,7 +5395,9 @@
 
 	/* Read only: the card and nothing to work it with — the mark stays, for
 	   the theme, and the status line, which says what this tab is. */
-	.view-only .toolbar > :not(.brand) {
+	/* Only what is about the app rather than the work: the theme, and Help
+	   with the about in it. Everything that edits or opens the design goes. */
+	.view-only .toolbar > :not(.brand, .spacer, .theme, .help) {
 		display: none;
 	}
 

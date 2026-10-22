@@ -243,10 +243,18 @@ describe('printedText', () => {
 	it('leaves out placeholders and tab leaders, whose letters never print', () => {
 		expect(printedText('Dear %%name%%, %%today:YYYY%%')).toBe('Dear , ');
 		expect(printedText('Espresso %%% 2.20')).toBe('Espresso  2.20');
+		// The README's own line: the leader, then a placeholder.
+		expect(printedText('Coffee %%% %%price%%')).toBe('Coffee  ');
+	});
+
+	it('reads what markdown.ts reads: __bold__, and code as typed', () => {
+		expect(printedText('__Hi__')).toBe('Hi');
+		expect(printedText('`**x**` and **y**')).toBe('**x** and y');
 	});
 
 	it('counts a mark that is not notation as the text it is', () => {
-		expect(printedText('5 * 3 = 15, #tag, a*b')).toBe('5 * 3 = 15, #tag, a*b');
+		// One `*` alone is printed; two on a line are italics to markdown.ts too.
+		expect(printedText('5 * 3 = 15, #tag')).toBe('5 * 3 = 15, #tag');
 		expect(printedText('50% off, 20% more')).toBe('50% off, 20% more');
 	});
 });
