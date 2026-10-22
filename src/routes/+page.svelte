@@ -7,6 +7,7 @@
 	import PrintPreview from '$lib/components/PrintPreview.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
+	import OverflowProbe from '$lib/components/OverflowProbe.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Lightbox from '$lib/components/Lightbox.svelte';
 	import OptionsBar from '$lib/components/OptionsBar.svelte';
@@ -609,6 +610,21 @@
 
 	/** The status line, whole, in a dialog — it is one ellipsised row otherwise. */
 	let statusOpen = $state(false);
+
+	/**
+	 * Rows whose card runs off the page, and the areas that do it, by id — from
+	 * OverflowProbe, while the table is open. Named here rather than there, so
+	 * a rename shows at once without waiting for the next pass.
+	 */
+	let overflowRows = $state(new Map<number, string[]>());
+	const overflowAreas = $derived(
+		new Map(
+			[...overflowRows].map(([i, ids]) => [
+				i,
+				ids.map((id) => template.boxes.find((b) => b.id === id)?.slot ?? 'an unnamed area')
+			])
+		)
+	);
 
 	/** A line for the status bar, not yet shown — so several can become one. */
 	type Said = { text: string; tone: 'info' | 'warning' };
@@ -3940,7 +3956,19 @@
 					ontune={(family, change) => setFontTune(family, change, true)}
 				/>
 			{:else}
+			<!-- Mounted with the table, and only then: the mark it feeds is shown
+			     nowhere else, and the pass is work done behind someone typing. -->
+			<OverflowProbe
+				{template}
+				rows={dataset.rows}
+				{lookupRows}
+				{mapping}
+				{background}
+				{images}
+				onresult={(found) => (overflowRows = found)}
+			/>
 			<DataTable
+				{overflowAreas}
 				{dataset}
 				{tables}
 				tableId={datasetId}

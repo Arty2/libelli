@@ -12,6 +12,7 @@ file under **What's new** — press the version number in the status bar.
 
 - Drag a CSV, TSV or template JSON onto the app to open it as a new table or template; what was open is saved first. A file it cannot read is named in the status bar with the reason.
 - Import in the table menu opens a CSV as a new table too; Paste still fills the open one. A file already in your library opens that copy instead of a second one.
+- A row whose card runs off the page — a Grow area grown past the margin or the edge — is marked under its number in the table.
 - Template files from before 0.28 are now read like any other: an area aligned right or bottom may need moving back.
 
 ## 0.29.7 — 2026-10-21

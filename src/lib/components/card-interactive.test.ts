@@ -85,6 +85,8 @@ describe('who renders an interactive card', () => {
 		const quiet = sites.filter((site) => !site.tags.some((tag) => SETS_INTERACTIVE.test(tag)));
 		expect(quiet.map((site) => named(site.path)).sort()).toEqual([
 			'Lightbox.svelte',
+			// Measures cards as they print, so it must not carry the editor's furniture either.
+			'OverflowProbe.svelte',
 			'PrintPreview.svelte',
 			'PrintSheet.svelte'
 		]);

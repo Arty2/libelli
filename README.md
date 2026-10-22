@@ -39,6 +39,12 @@ spreadsheet, or imported as a CSV or TSV file. Quoted fields and line breaks
 inside a cell are kept. When pasting into a table that already has columns, no
 header row is needed: the cells fill the existing columns from left to right.
 
+A row whose card runs off the page is marked with a warning sign under its
+number. That is a Grow area whose words grow it past the page margin or the
+edge, or an area anchored under one that it pushes there; an area placed in the
+margin on purpose is marked only once it grows past the edge. Hover or hold the
+sign to see which areas.
+
 Cell content is always treated as text. A cell containing `<b>x</b>` prints
 those characters, not bold type.
 

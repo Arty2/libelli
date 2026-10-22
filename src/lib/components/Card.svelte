@@ -49,7 +49,8 @@
 		shrinkScale,
 		spacingReadouts,
 		referenceOf,
-		freedTop
+		freedTop,
+		grownPast
 	} from '$lib/layout';
 	import { flagUnknown, leaderStyle, renderMarkdown, tabSplit } from '$lib/markdown';
 	import { completePlaceholders } from '$lib/complete';
@@ -179,6 +180,12 @@
 		 * the template, and only the app knows which of the two it is holding.
 		 */
 		ontext?: (box: Box, value: string) => void;
+		/**
+		 * The areas this card's words push off the page (`grownPast`), each time
+		 * a measurement changes it — for the table's overflow mark, which renders
+		 * cards off-screen to read it.
+		 */
+		onoverflow?: (ids: string[]) => void;
 	}
 
 	let {
@@ -216,7 +223,8 @@
 		ondraw,
 		oneditcell,
 		underlay,
-		ontext
+		ontext,
+		onoverflow
 	}: Props = $props();
 
 	let measured = $state<Record<string, number>>({});
@@ -545,6 +553,11 @@
 		)
 	);
 	const layout = $derived(resolveLayout({ boxes: template.boxes, measured, hidden }));
+
+	$effect(() => {
+		if (!onoverflow) return;
+		onoverflow(grownPast(template.boxes, measured, hidden, template.page, marginsOf(template.page)));
+	});
 
 	const bleed = $derived(bleedFor(template.bleed));
 	const customCss = $derived(scopeCss(template.css ?? '', '.trim'));

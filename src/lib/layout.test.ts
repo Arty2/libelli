@@ -3,6 +3,7 @@ import {
 	FREE_STEP,
 	SHRINK_FLOOR,
 	boxHeight,
+	grownPast,
 	shrinkScale,
 	spacingReadouts,
 	referenceOf,
@@ -640,5 +641,42 @@ describe('latchSpan with chosen lines', () => {
 		expect(latchSpan(40, 20, [50], 1.5)).toEqual({ start: 40, edge: 50 });
 		expect(latchSpan(40, 20, [50], 1.5, [0, 20])).toBeNull();
 		expect(latchSpan(31, 20, [50], 1.5, [0, 20])).toEqual({ start: 30, edge: 50 });
+	});
+});
+
+describe('grownPast', () => {
+	const page = { w: 100, h: 150 };
+	const margins = { top: 10, right: 10, bottom: 10, left: 10 };
+	const grow = (extra: Partial<Box> = {}) => newBox({ id: 'g', x: 10, y: 100, w: 80, h: 20, overflow: 'grow', ...extra });
+
+	it('flags a Grow area that grows past the bottom margin', () => {
+		expect(grownPast([grow()], { g: 45 }, new Set(), page, margins)).toEqual(['g']);
+	});
+
+	it('leaves it alone while its words still fit inside the margins', () => {
+		expect(grownPast([grow()], { g: 30 }, new Set(), page, margins)).toEqual([]);
+	});
+
+	it('flags a bottom-set Grow area growing up past the top margin', () => {
+		const up = grow({ y: 20, h: 20, valign: 'bottom' });
+		expect(grownPast([up], { g: 35 }, new Set(), page, margins)).toEqual(['g']);
+	});
+
+	it('flags an area pushed off the page by the Grow area it is anchored under', () => {
+		const below = newBox({ id: 'b', x: 10, y: 0, w: 80, h: 10, anchor: { to: 'g', gap: 2 } });
+		expect(grownPast([grow({ y: 60 }), below], { g: 70 }, new Set(), page, margins)).toEqual(['b']);
+		expect(grownPast([grow({ y: 60 }), below], { g: 85 }, new Set(), page, margins)).toEqual(['g', 'b']);
+	});
+
+	it('does not flag an area designed in the margin, only one grown past the edge', () => {
+		const folio = grow({ y: 141, h: 5 });
+		expect(grownPast([folio], { g: 8 }, new Set(), page, margins)).toEqual([]);
+		expect(grownPast([folio], { g: 12 }, new Set(), page, margins)).toEqual(['g']);
+	});
+
+	it('ignores a clipped area and a hidden one, whatever they hold', () => {
+		const clipped = grow({ overflow: 'clip' });
+		expect(grownPast([clipped], { g: 90 }, new Set(), page, margins)).toEqual([]);
+		expect(grownPast([grow()], { g: 90 }, new Set(['g']), page, margins)).toEqual([]);
 	});
 });

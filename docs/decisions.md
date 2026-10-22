@@ -3461,6 +3461,20 @@ right, centre or bottom draws them off by their width or height. `mayHaveMoved`
 spots exactly those, and opening one — at boot, from the library, or by import
 — says to check them before printing, rather than leaving it to the paper.
 
+**A row is marked when its card runs off the page.** `grownPast` in layout.ts
+lays the areas out twice, at their designed size (no measurements) and at their
+measured one, and names each area that crosses a margin or the trim edge drawn
+the second way but not the first — so a Grow area that outgrows the page, and
+one anchored under it that it pushes off, count, while an area put in a margin
+on purpose counts only once it grows past the edge. Words have to be laid out to
+be measured and only the open row is on screen, so `OverflowProbe` renders the
+rest off-screen, twelve Cards at a time with three frames each to settle, after
+the inputs have stood still for 0.7 s, and again when a font finishes loading.
+It is mounted with the table and only then. About 3 s for 300 rows in headless
+Chromium, without slowing typing. The cost: a picture that loads after its
+batch has settled is not counted until the next pass, and the check is made on
+the right-hand page only — a mirror moves an area and its margins together.
+
 ## `src/lib/components/MenuSelect.svelte`
 
 **One menu, drawn like the template picker.** The zoom and both font menus were

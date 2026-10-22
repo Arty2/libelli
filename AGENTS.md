@@ -75,6 +75,7 @@ src/lib/
     BitmapEditor.svelte the drawing surface, hosted in DataTable; saves a base64 PNG
     ImagesPanel.svelte  the Pictures tray: images, drawings, fonts; one large, to crop or turn
     Tooltip.svelte      every `title` as a tip: hover, or press and hold on touch
+    OverflowProbe       every row's card off-screen, for the table's runs-off-the-page mark
     PrintRoot, BoxMenu, SelectionTools, MenuSelect, ColorField, Icon
 src/service-worker.ts     the offline cache, thin over sw-policy
 src/routes/+page.svelte   app state and wiring                                 (~4k)

@@ -50,6 +50,12 @@
 		/** a CSV or TSV file chosen with Import, to open as a new table */
 		onimportfile: (file: File) => void;
 		/**
+		 * Rows whose card runs off the page — a Grow area grown past a margin or
+		 * the edge, or an area it pushed there — by row, with those areas' names.
+		 * Only rows that have any.
+		 */
+		overflowAreas?: Map<number, string[]>;
+		/**
 		 * Columns something on the card draws from — bound to an area, or named
 		 * as `%%column%%` in an area's words or a cell it shows. A column not in
 		 * here is marked, because it is data no card will print.
@@ -166,6 +172,7 @@
 		onselecttable,
 		onnewtable,
 		onimportfile,
+		overflowAreas = new Map(),
 		usedColumns,
 		onplacecolumn,
 		oncellfocus,
@@ -1860,6 +1867,18 @@
 								}}
 							>{rowLabel(i)}</span>
 							</span>
+							<!-- Under the tick and the number, where the eye runs down the
+							     rows: this card's words run off the page. A press on it is a
+							     press on the row, which opens that card to see it. -->
+							{#if overflowAreas.has(i)}
+								{@const areas = overflowAreas.get(i) ?? []}
+								<span
+									class="runs-off"
+									role="img"
+									aria-label="Runs off the page"
+									title="Card {rowLabel(i)} runs off the page: {areas.map((a) => `“${a}”`).join(', ')} {areas.length === 1 ? 'grows' : 'grow'} past the margin or the edge. Shorten the words, or give the area more room."
+								><Icon name="warning" size={12} /></span>
+							{/if}
 						</td>
 						{#each columns as column, c (column)}
 							<!-- Read once: a drawing's cell is a long base64 string, and every
@@ -3282,6 +3301,15 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
+	}
+
+	/* The warning red the status line uses (app.css keeps it red in dark). On
+	   a line of its own, centred under the tick and the number. */
+	.runs-off {
+		display: flex;
+		justify-content: center;
+		margin-top: 2px;
+		color: #b42318;
 	}
 
 	/* In a row, the line is exactly one line of a cell's text — the same size,
