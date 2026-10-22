@@ -11,7 +11,11 @@ import {
 	formatDate,
 	openPlaceholder,
 	placeholderChoices,
-	referencedColumns
+	referencedColumns,
+	countdownOf,
+	countdownWait,
+	momentOf,
+	placeholderWait
 } from './placeholders';
 import { normaliseTemplate } from './template';
 
@@ -363,5 +367,75 @@ describe('%%toc:…%%', () => {
 		expect(referencedColumns('%%toc:title%%', ['title', 'body'])).toEqual(['title']);
 		expect(placeholderChoices('toc:ti', ['title', 'body'])).toEqual(['toc:title']);
 		expect(isKeyword('toc')).toBe(true);
+	});
+});
+
+describe('%%today:countdown:…%%', () => {
+	const at = (s: string) => new Date(s);
+	const now = at('2026-12-20T10:00');
+	const fill = (text: string, row: Record<string, string> | null = null, when = now) => applyPlaceholders(text, { now: when, row });
+
+	it('picks one unit, rounding down as a countdown clock does', () => {
+		expect(fill('%%today:countdown:2026-12-25%%')).toBe('4 days');
+		expect(fill('%%today:countdown:2026-12-20T15:30%%')).toBe('5 hours');
+		expect(fill('%%today:countdown:2026-12-20T10:40%%')).toBe('40 minutes');
+		expect(fill('%%today:countdown:2026-12-21T10:00%%')).toBe('1 day');
+		expect(fill('%%today:countdown:2026-12-20T11:00%%')).toBe('1 hour');
+	});
+
+	it('takes a unit on the end, and a time whose colon is not one', () => {
+		expect(fill('%%today:countdown:2026-12-25:hours%%')).toBe('110 hours');
+		expect(fill('%%today:countdown:2026-12-20 18:00:m%%')).toBe('480 minutes');
+		expect(fill('%%today:countdown:2026-12-20T18:00%%')).toBe('8 hours');
+	});
+
+	it('counts up once the moment has passed', () => {
+		expect(fill('%%today:countdown:2026-12-17%%')).toBe('3 days ago');
+		expect(fill('%%today:countdown:2026-12-20T09:59%%')).toBe('1 minute ago');
+		expect(fill('%%today:countdown:2026-12-20T10:00%%')).toBe('0 minutes');
+	});
+
+	it('reads the target from a column, and marks a cell that is not a date', () => {
+		expect(fill('%%today:countdown:deadline%%', { deadline: '2026-12-22' })).toBe('1 day');
+		expect(fill('%%today:countdown:Due Date%%', { 'Due-Date': '2026-12-20T12:00' })).toBe('2 hours');
+		expect(fill('%%today:countdown:deadline%%', { deadline: '22/12/2026' })).toBe('%%today:countdown:deadline%%');
+		expect(applyPlaceholders('%%today:countdown:nope%%', { now, markUnknown: true })).toContain('today:countdown:nope');
+	});
+
+	it('refuses a date that rolled over', () => {
+		expect(momentOf('2026-04-31')).toBeNull();
+		expect(momentOf('2026-12-20T25:00')).toBeNull();
+		expect(momentOf('2026-12-20')).toBe(at('2026-12-20T00:00').getTime());
+	});
+
+	it('leaves the date formats as they were', () => {
+		expect(fill('%%today:YYYY-MM-DD%%')).toBe('2026-12-20');
+		expect(countdownOf('YYYY')).toBeNull();
+	});
+});
+
+describe('when the clock should next wake', () => {
+	const t = (s: string) => new Date(s).getTime();
+
+	it('wakes when the number turns over, in the unit it is shown in', () => {
+		// 4 days 14 hours left: the count drops to 3 days in 14 hours.
+		expect(countdownWait(t('2026-12-25'), t('2026-12-20T10:00'))).toBe(14 * 3_600_000 + 1);
+		// 40 minutes 30 seconds: in 30 seconds.
+		expect(countdownWait(t('2026-12-20T10:40'), t('2026-12-20T09:59:30'))).toBe(30_000 + 1);
+		// Counting up 3 days 2 hours: 4 days in 22 hours.
+		expect(countdownWait(t('2026-12-17T08:00'), t('2026-12-20T10:00'))).toBe(22 * 3_600_000);
+	});
+
+	it('never spins faster than a second, even on a boundary', () => {
+		expect(countdownWait(t('2026-12-20T10:01'), t('2026-12-20T10:00'))).toBe(1000);
+	});
+
+	it('is the soonest of every placeholder, midnight for a date, and Infinity for none', () => {
+		// Twenty seconds past the minute, as a real clock is.
+		const now = t('2026-12-20T23:30:20');
+		expect(placeholderWait(['%%today%%'], null, now)).toBe(29 * 60_000 + 40_000);
+		expect(placeholderWait(['no placeholders', '%%title%%'], null, now)).toBe(Infinity);
+		expect(placeholderWait(['%%today:countdown:2026-12-20T23:45%%', '%%today%%'], null, now)).toBe(40_000 + 1);
+		expect(placeholderWait(['%%today:countdown:deadline%%'], { deadline: '2026-12-21T00:10' }, now)).toBe(40_000 + 1);
 	});
 });

@@ -50,6 +50,8 @@
 		rowCount: number;
 		/** every row, for a card's `%%lookup:…%%` */
 		rows: readonly Row[];
+		/** the page's clock, for a live `%%today…%%` — see Card */
+		clock?: number;
 		onactivate: (index: number) => void;
 		/** open the card full screen; the count under the page is the door */
 		onlightbox: () => void;
@@ -185,6 +187,7 @@
 		onunlock,
 		onrelock,
 		viewOnly = false,
+		clock = 0,
 		onviewonly,
 		flashIds = []
 	}: Props = $props();
@@ -1741,6 +1744,7 @@
 				{background}
 				{images}
 				interactive={!viewOnly}
+				{clock}
 				{panning}
 				pageCount={rowCount}
 				{editingId}

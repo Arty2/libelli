@@ -82,6 +82,7 @@ an area's own text and inside cells, and Markdown around them still applies.
 | `%%title%%` | The `title` column of this card's row. Case is ignored. |
 | `%%title:find:replace%%` | The column, with every `find` replaced. The replacement may be empty; a literal colon is written `\:`. |
 | `%%today%%` | Today's date. `%%today:YYYY-MM-DD%%` sets the format, with `YYYY`, `YY`, `MM`, `DD`, `MMMM`, `MMM`, `dddd` and `ddd`. |
+| `%%today:countdown:2026-12-25%%` | The time to a moment: "4 days", then "5 hours", then "40 minutes", rounded down; once it has passed, "3 days ago". The moment is `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM` in this browser's time, or a column holding one, for a deadline per row. A unit on the end fixes it: `%%today:countdown:2026-12-25:hours%%`. On screen it moves on by itself. |
 | `%%lookup:3:price%%` | The `price` column of row 3. Row numbers follow their rows when the table is sorted or rearranged. |
 | `%%lookup:next:title%%` | The same column in the next row; `previous` for the one before. |
 | `%%page:current%%`, `%%page:total%%` | The card's page number, and how many pages there are. |

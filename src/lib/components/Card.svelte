@@ -186,6 +186,12 @@
 		 * cards off-screen to read it.
 		 */
 		onoverflow?: (ids: string[]) => void;
+		/**
+		 * Bumped when a `%%today…%%` on the card would read differently — the
+		 * page's clock (`placeholderWait`). Only a signal: the time is read
+		 * when the words are filled, so it can never be a stale one.
+		 */
+		clock?: number;
 	}
 
 	let {
@@ -224,7 +230,8 @@
 		oneditcell,
 		underlay,
 		ontext,
-		onoverflow
+		onoverflow,
+		clock = 0
 	}: Props = $props();
 
 	let measured = $state<Record<string, number>>({});
@@ -325,7 +332,8 @@
 	 */
 	/** The rows in the order they print, for a contents — `runOf`. */
 	const run = $derived(runOf(rows));
-	const contentOf = (box: Box): string => applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount });
+	// `clock` read for its change alone: it is what makes a countdown move on.
+	const contentOf = (box: Box): string => (void clock, applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount }));
 
 	/** The column a bound area's words come out of — the one they may not quote. */
 	const selfOf = (box: Box): string | undefined => (box.slot ? mapping[box.slot] : undefined);
@@ -339,7 +347,7 @@
 	 * measured for emptiness, or encoded into a QR.
 	 */
 	const shownTextOf = (box: Box): string =>
-		applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds });
+		(void clock, applyPlaceholders(rawContentOf(box), { row, rows, run, self: selfOf(box), page: pageNumber, pageCount, markUnknown: interactive && bounds }));
 
 	/** Text split around the marks, for plain text, which Svelte escapes itself. */
 	function segments(text: string): Array<{ text: string; unknown: boolean }> {

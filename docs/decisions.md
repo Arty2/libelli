@@ -3924,6 +3924,21 @@ Substitution happens in `Card`'s `contentOf`, which is one chokepoint for every
 mode; `rawContentOf` beside it is what the inline editor shows, because typing
 over a substituted date would mean typing over yesterday's.
 
+**A countdown is a format of `today`, and its clock sleeps.**
+`%%today:countdown:TARGET[:UNIT]%%` rides on `today` so no new keyword is taken
+from the columns (`date` would have been, and is a common one). The target is
+`YYYY-MM-DD[THH:MM]` or a column holding one — only that shape, since
+`03/04/2026` is a different month in different countries; anything else is
+marked. One unit, rounded down, picked by the span; past the moment it counts
+up. On screen it moves on without a ticking timer: `placeholderWait` works out
+from the card's texts when the first `%%today…%%` on it would next read
+differently — a countdown's next turn, or midnight for a date — and +page sleeps
+until then, so a count in days wakes once a day and a card with nothing live
+never wakes. It is asked again when the card changes, stopped while the tab is
+hidden, and woken when it is shown. What reaches Card is a counter (`clock`), not
+a time: the time is read as the words are filled, so it cannot be a stale one.
+Printing and PNGs read the time as they draw, as they always did.
+
 ## `src/lib/complete.ts`
 
 **One action for four fields.** The column list that `%%` opens is needed in a

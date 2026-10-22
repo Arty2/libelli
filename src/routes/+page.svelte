@@ -84,7 +84,7 @@
 	import { armDefault, dragByTitle } from '$lib/modal';
 	import { codeStats } from '$lib/csscode';
 	import { watchPresses } from '$lib/haptics';
-	import { GONE_ROW, carryLookups, isKeyword, referencedColumns } from '$lib/placeholders';
+	import { GONE_ROW, carryLookups, isKeyword, placeholderWait, referencedColumns } from '$lib/placeholders';
 	import { inArrivalOrder } from '$lib/table';
 	import { VERSION } from '$lib/version';
 	import { loadSeenVersion, RELEASES, saveSeenVersion, seenAtBoot } from '$lib/changelog';
@@ -769,6 +769,51 @@
 	/** The box the menu was opened on, whether or not it is the only one chosen. */
 	const menuBox = $derived(boxMenu ? (template.boxes.find((b) => b.id === boxMenu!.id) ?? null) : null);
 	const row = $derived(dataset.rows[activeRow] ?? null);
+
+	/**
+	 * The clock a live `%%today…%%` runs on — a countdown, or a date at midnight.
+	 *
+	 * Not a timer that ticks: it works out, from the card on screen, when the
+	 * first thing on it would next read differently (`placeholderWait`), and
+	 * sleeps until exactly then — a minute for a count in minutes, hours for
+	 * one in days, and not at all for a card with nothing live on it. Asked
+	 * again when the card changes, which costs an `includes` per text without
+	 * one. Stopped while the tab is hidden, and woken when it is shown again,
+	 * since that is when anybody can see it. `clockTick` only says "fill the words
+	 * again"; the time is read then (Card), so it is never a stale one.
+	 */
+	let clockTick = $state(0);
+	let tabHidden = $state(false);
+	const liveTexts = $derived.by(() => {
+		const texts: string[] = [];
+		// One level down as well: a static area's words are `static.text`.
+		for (const box of template.boxes)
+			for (const value of Object.values(box)) {
+				if (typeof value === 'string') texts.push(value);
+				else if (value && typeof value === 'object')
+					for (const inner of Object.values(value)) if (typeof inner === 'string') texts.push(inner);
+			}
+		if (row) for (const value of Object.values(row)) texts.push(value);
+		return texts;
+	});
+	$effect(() => {
+		void clockTick;
+		if (tabHidden) return;
+		const wait = placeholderWait(liveTexts, row, Date.now());
+		if (!Number.isFinite(wait)) return;
+		// setTimeout holds 32 bits of milliseconds — 24.8 days; a longer wait
+		// wakes then and works it out again.
+		const timer = setTimeout(() => clockTick++, Math.min(wait, 2 ** 31 - 1));
+		return () => clearTimeout(timer);
+	});
+	$effect(() => {
+		const seen = () => {
+			tabHidden = document.hidden;
+			if (!tabHidden) clockTick++;
+		};
+		document.addEventListener('visibilitychange', seen);
+		return () => document.removeEventListener('visibilitychange', seen);
+	});
 	const slots = $derived(usedSlots(template));
 	/** Areas that are not wholly on the sheet, half off or all off — see `strayBoxes`. */
 	const strays = $derived(
@@ -3974,6 +4019,7 @@
 				: ''}
 	>
 		<PagePreview
+			clock={clockTick}
 			viewOnly={editor === 'readonly'}
 			onviewonly={() => (readOnlyAsk = true)}
 			{template}
