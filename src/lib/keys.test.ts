@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALIGN_KEYS, NUDGES, SHORTCUTS, isAlignChord, nudgeStep, wantsExport, withKey } from './keys';
+import { ALIGN_KEYS, NUDGES, SHORTCUTS, isAlignChord, nudgeStep, presentStep, wantsExport, withKey } from './keys';
 
 const chord = (over: Partial<KeyboardEvent> = {}) =>
 	({ key: '', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...over }) as KeyboardEvent;
@@ -74,5 +74,28 @@ describe('withKey', () => {
 	it('puts the shortcut after the title, in brackets', () => {
 		expect(withKey('Redo', 'redo')).toBe('Redo (Ctrl/Cmd+Y)');
 		expect(SHORTCUTS.undo).toBe('Ctrl/Cmd+Z');
+	});
+});
+
+describe('presentStep', () => {
+	it('steps forward on what a clicker or a hand sends for next', () => {
+		for (const key of ['ArrowRight', 'ArrowDown', 'PageDown', ' ']) expect(presentStep(chord({ key }))).toBe(1);
+	});
+
+	it('steps back on the opposites, Shift+Space among them', () => {
+		for (const key of ['ArrowLeft', 'ArrowUp', 'PageUp']) expect(presentStep(chord({ key }))).toBe(-1);
+		expect(presentStep(chord({ key: ' ', shiftKey: true }))).toBe(-1);
+	});
+
+	it('goes to the ends on Home and End', () => {
+		expect(presentStep(chord({ key: 'Home' }))).toBe('first');
+		expect(presentStep(chord({ key: 'End' }))).toBe('last');
+	});
+
+	it('leaves chords and other keys alone', () => {
+		expect(presentStep(chord({ key: 'ArrowRight', ctrlKey: true }))).toBeNull();
+		expect(presentStep(chord({ key: 'ArrowLeft', altKey: true }))).toBeNull();
+		expect(presentStep(chord({ key: 'Escape' }))).toBeNull();
+		expect(presentStep(chord({ key: 'a' }))).toBeNull();
 	});
 });

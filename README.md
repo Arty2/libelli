@@ -45,6 +45,11 @@ double-click. A read-only tab always fits the card to its own window; it does
 not follow the editing tab's zoom. Its logo asks for full screen, and brings
 the choice back when the browser says no or it is full screen already.
 
+Full screen with the card alone is a presentation: the arrow keys, Page Up
+and Page Down (what most clickers send), Space, Home and End page the cards,
+as does a swipe sideways. Paging in the editing tab moves any read-only tabs
+along with it; a read-only tab pages on its own until the editing tab moves.
+
 In the editing tab, the logo hides everything but the card — the same view,
 without giving up the editing — and asks the browser for full screen, to
 show the card alone; if the browser says no, it stays read only in the

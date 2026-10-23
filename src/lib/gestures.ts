@@ -51,21 +51,32 @@ export const HOLD_SLOP = 8;
  */
 export function swipe(node: HTMLElement, onswipe: (by: -1 | 1) => void) {
 	let start: { x: number; y: number; id: number } | null = null;
+	/**
+	 * Fingers down now. A second one makes it a pinch, which is no swipe
+	 * whichever way the first then moves, and none starts again until all
+	 * have lifted — the bare stage zooms on a pinch and pages on a flick.
+	 */
+	const touching = new Set<number>();
 	let handler = onswipe;
 
 	const down = (event: PointerEvent) => {
 		if (event.pointerType !== 'touch') return;
-		start = { x: event.clientX, y: event.clientY, id: event.pointerId };
+		touching.add(event.pointerId);
+		start = touching.size === 1 ? { x: event.clientX, y: event.clientY, id: event.pointerId } : null;
 	};
 
 	const up = (event: PointerEvent) => {
+		touching.delete(event.pointerId);
 		if (!start || event.pointerId !== start.id) return;
 		const step = swipeStep(event.clientX - start.x, event.clientY - start.y);
 		start = null;
 		if (step) handler(step);
 	};
 
-	const cancel = () => (start = null);
+	const cancel = (event: PointerEvent) => {
+		touching.delete(event.pointerId);
+		start = null;
+	};
 
 	node.addEventListener('pointerdown', down);
 	node.addEventListener('pointerup', up);

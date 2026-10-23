@@ -83,3 +83,34 @@ export const SHORTCUTS = {
 
 /** A title with its shortcut after it, in brackets, the way every tooltip says one. */
 export const withKey = (title: string, key: keyof typeof SHORTCUTS) => `${title} (${SHORTCUTS[key]})`;
+
+/**
+ * The card a key moves to while the card is shown alone, full screen — a
+ * presentation, so the keys a slide clicker or a presenter's hand reaches
+ * for: the arrows, Page Up/Down (what most clickers send), Space and
+ * Shift+Space, Home and End. `first` and `last` are ends, not steps; `null`
+ * for anything else, and for any chord, which is the browser's or the app's.
+ */
+export function presentStep(
+	event: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>
+): -1 | 1 | 'first' | 'last' | null {
+	if (event.metaKey || event.ctrlKey || event.altKey) return null;
+	switch (event.key) {
+		case 'ArrowRight':
+		case 'ArrowDown':
+		case 'PageDown':
+			return 1;
+		case 'ArrowLeft':
+		case 'ArrowUp':
+		case 'PageUp':
+			return -1;
+		case ' ':
+			return event.shiftKey ? -1 : 1;
+		case 'Home':
+			return 'first';
+		case 'End':
+			return 'last';
+		default:
+			return null;
+	}
+}

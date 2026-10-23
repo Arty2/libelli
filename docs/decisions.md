@@ -4616,7 +4616,16 @@ dialog first. Turning it on also asks for full screen, inside the press that
 is the gesture the request needs; a refusal is swallowed, since read only in
 the window is still what was asked for. Turning it off leaves full screen
 only if the logo entered it (`wentFullscreen`, cleared when full screen is
-left by hand), so a window someone made full screen themselves stays so. In a read-only tab the logo asks for full screen in the same way,
+left by hand), so a window someone made full screen themselves stays so.
+
+**Bare is a presentation.** `presentStep` (keys.ts) reads the keys a clicker
+or a presenter's hand sends — arrows, Page Up/Down, Space, Home, End — and the
+page steps `activeRow` on them while `bare` and nothing is open over the card.
+The whole stage takes a swipe then, the pager being hidden, with its
+`touch-action` narrowed to `pan-y` so the browser does not cancel a sideways
+flick as a pan; a second finger makes it a pinch, never a swipe. In the
+editing tab the step is the editor's row, so read-only tabs follow; in a
+read-only tab it is local until the editor's next state. In a read-only tab the logo asks for full screen in the same way,
 and opens the Open Here / Read Only choice, as the eye does, when the
 browser refuses or the tab is full screen already — so the dialog is still
 one press away, and bare full screen keeps Escape and a double-click.

@@ -1687,7 +1687,18 @@
      dark theme turns the interface inside out, and would turn the black
      white and, in dark-page, the card's own colours over. A display shows
      the card as it prints, whatever the theme. -->
-<div class="stage" class:view-only={viewOnly} class:bare data-true-color={bare || undefined} data-display={bare || undefined} bind:this={stage}>
+<!-- Bare, the whole stage takes a swipe, as the pager's chip does when it is
+     there: a full-screen card is a presentation, and a flick anywhere is
+     the next slide. Only bare — otherwise a flick over the page is a drag. -->
+<div
+	class="stage"
+	class:view-only={viewOnly}
+	class:bare
+	data-true-color={bare || undefined}
+	data-display={bare || undefined}
+	bind:this={stage}
+	use:swipe={(by) => bare && rowCount > 0 && onactivate(Math.max(0, Math.min(rowCount - 1, activeRow + by)))}
+>
 <div
 	class="viewport"
 	bind:this={host}
@@ -2285,6 +2296,14 @@
 
 	.bare .view-eye {
 		display: none;
+	}
+
+	/* Bare, a sideways flick is the next card (the stage's swipe), so the
+	   browser is not to read it as a pan and cancel the pointer, as the pager's
+	   chip says too. The card is fitted there; the cost is a page pinched
+	   larger than the screen, which then scrolls up and down but not across. */
+	.bare .viewport {
+		touch-action: pan-y;
 	}
 
 	/* The frame: it holds every control and never scrolls, so nothing on it can

@@ -75,7 +75,7 @@
 		toggleSelection,
 		type BoxStyle
 	} from '$lib/boxops';
-	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, wantsExport, withKey } from '$lib/keys';
+	import { ALIGN_KEYS, NUDGES, isAlignChord, nudgeStep, presentStep, wantsExport, withKey } from '$lib/keys';
 	import { FIELD_KINDS, KIND_LABELS, autoLayout, guessRoles, type FieldGuess } from '$lib/autolayout';
 	import { cssKit } from '$lib/csskit';
 	import { loadTurn, saveTurn, type OutputTurn } from '$lib/turn';
@@ -3161,6 +3161,19 @@
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
 
 	function onWindowKeydown(event: KeyboardEvent) {
+		// The card alone, full screen, is a presentation: the arrows, Page
+		// Up/Down, Space, Home and End page the cards, in either tab. Nothing
+		// else is on screen to take the keys, unless a dialog was opened over it.
+		if (bare && !stageModalOpen && !readOnlyAsk && dataset.rows.length) {
+			const step = presentStep(event);
+			if (step !== null) {
+				event.preventDefault();
+				if (step === 'first') activeRow = 0;
+				else if (step === 'last') activeRow = dataset.rows.length - 1;
+				else stepRow(step);
+				return;
+			}
+		}
 		// The one key a read-only tab answers. A dialog it can open — Help, What's
 		// new, the notice — is closed by it, as anywhere; with none open, it
 		// brings the read-only dialog, the only control there is when the card is
