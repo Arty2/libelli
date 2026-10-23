@@ -32,6 +32,11 @@ layout, so what is on screen is what is printed.
 Every control in the app has a tooltip: hover over it, or press and hold it on
 a touchscreen. This page covers what a tooltip cannot.
 
+The interface's accent — pressed buttons, the selection, focus rings, ticked
+boxes — is the colour your system uses for its own controls, in browsers that
+share it with a page, such as Firefox and Safari. Chrome, Edge and other
+Chromium browsers do not, so there it is a fixed blue.
+
 Open libelli in a second tab and it asks what to do, because only one tab
 edits at a time: **Open Here** moves the editing to this tab, **Read Only**
 shows the card being edited in the other tab, updating as it changes and

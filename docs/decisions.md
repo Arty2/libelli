@@ -4095,6 +4095,18 @@ or a token mixed from it (`--accent-strong` with black, `--accent-line`,
 `transparent`). `--accent` is `AccentColor` — the colour the platform draws its
 own checkboxes in — behind `@supports`, because the keyword is not Baseline
 Widely and Chromium does not know it yet; there it is the blue these all were.
+`accent-color` on the root ties the native controls to the same token.
+
+**In Chromium the accent is the blue, and nothing detects otherwise.** Chrome,
+Edge and the rest answer `CSS.supports('color', 'AccentColor')` with false
+(checked in Chromium 141), and there is no other way in: no script API, and
+the colour a native checkbox is drawn in cannot be read back from a page. This
+is not a regression — Chromium has shown the blue since the accent arrived in
+0.18.2 — and it is kept, said in the README, rather than worked around. Two
+ways round it were weighed and left: `Highlight` is the selection colour, pale
+or a fixed blue depending on the OS, so it would follow the device unreliably
+and badly as a fill; a picker would follow nothing, only ask. When Chromium
+ships the keyword, the `@supports` query takes it with no change here.
 A named `blue` in `color.ts` is content, not chrome, and stays a fixed colour.
 `color-mix` is Widely available; relative colour syntax is not yet, which is
 why the tints are mixes rather than `rgb(from …)`.
