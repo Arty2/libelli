@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MANIFEST, PackageError, pictureType, picturesNamed, readPackage, writePackage } from './package';
+import { enc, idml } from './idml.fixture';
+import { bleedNote, matchFonts, MANIFEST, PackageError, picturesNamed, readInDesign, readPackage, writePackage } from './package';
 import { blankTemplate, newBox } from './template';
 import type { Dataset, Template } from './types';
-import { unzip } from './zip';
-
-const enc = (text: string) => new TextEncoder().encode(text);
+import { unzip, zipStore } from './zip';
 
 const template = (): Template => ({
 	...blankTemplate(),
@@ -72,10 +71,82 @@ describe('a package', () => {
 	});
 });
 
-describe('pictureType', () => {
-	it('names an SVG as one, which a blob needs to be drawn', () => {
-		expect(pictureType('logo.SVG')).toBe('image/svg+xml');
-		expect(pictureType('photo.jpg')).toBe('image/jpeg');
-		expect(pictureType('notes.txt')).toBe('');
+/** InDesign's File › Package folder, zipped by macOS, with the artwork added. */
+function packageFolder(extra: Array<{ name: string; data: Uint8Array }> = [], options: { background?: boolean } = {}) {
+	const layout = zipStore([...idml()].map(([name, data]) => ({ name, data })));
+	return new Map<string, Uint8Array>([
+		['Concert/Concert.idml', layout],
+		['Concert/Concert.indd', enc('indd')],
+		['Concert/Links/hall view.jpg', enc('hall')],
+		['Concert/Document fonts/SourceSerif4-Regular.otf', enc('font')],
+		['__MACOSX/Concert/._Concert.idml', enc('junk')],
+		...(options.background === false ? [] : ([['Concert/Concert background.png', enc('art')]] as Array<[string, Uint8Array]>)),
+		...extra.map((e) => [e.name, e.data] as [string, Uint8Array])
+	]);
+}
+
+describe('readInDesign', () => {
+	it('reads an IDML on its own', async () => {
+		const read = await readInDesign(idml(), 'Concert.idml');
+		expect(read.layout.template.name).toBe('Concert');
+		expect(read.background).toBeNull();
+	});
+
+	it('finds the IDML in a package folder, its linked pictures, its fonts and the artwork', async () => {
+		const read = await readInDesign(packageFolder(), 'Concert.zip');
+		expect(read.layout.template.boxes.map((b) => b.slot)).toEqual(['title', 'Text-2', 'photo']);
+		expect(read.pictures).toEqual([{ name: 'hall view.jpg', bytes: enc('hall') }]);
+		expect(read.background).toEqual({ name: 'Concert background.png', bytes: enc('art') });
+		expect(read.fontFiles.map((f) => f.name)).toEqual(['SourceSerif4-Regular.otf']);
+		expect(read.notes).toEqual([]);
+	});
+
+	it('picks the artwork named so among several pictures, and says it chose', async () => {
+		const read = await readInDesign(packageFolder([{ name: 'Concert/proof.jpg', data: enc('proof') }]), 'Concert.zip');
+		expect(read.background?.name).toBe('Concert background.png');
+		expect(read.notes[0]).toMatch(/Several pictures/);
+	});
+
+	it('says how to export the artwork when there is none, and why a PDF will not do', async () => {
+		const none = await readInDesign(packageFolder([], { background: false }), 'Concert.zip');
+		expect(none.notes.join(' ')).toMatch(/No picture of the page artwork/);
+		const pdf = await readInDesign(packageFolder([{ name: 'Concert/Concert.pdf', data: enc('%PDF') }], { background: false }), 'Concert.zip');
+		expect(pdf.notes.join(' ')).toMatch(/is a PDF, which a browser cannot draw/);
+	});
+
+	it('asks for the IDML when only the InDesign document is there', async () => {
+		const files = packageFolder();
+		files.delete('Concert/Concert.idml');
+		await expect(readInDesign(files, 'Concert.zip')).rejects.toThrow(/InDesign Markup \(IDML\)/);
+	});
+});
+
+describe('matchFonts', () => {
+	it('matches files to the families the layout uses, by the family the file names', () => {
+		const files = [
+			{ name: 'MinionPro-Regular.otf', family: 'Minion Pro', weight: 400, italic: false },
+			{ name: 'MinionPro-It.otf', family: 'Minion Pro', weight: 400, italic: true },
+			{ name: 'Other.otf', family: 'Other Sans', weight: 400, italic: false }
+		];
+		const { families, missing } = matchFonts(
+			[
+				{ family: 'Minion Pro', weight: 400, italic: false },
+				{ family: 'Gill Sans', weight: 400, italic: false }
+			],
+			files
+		);
+		expect(families.get('Minion Pro')?.map((f) => f.name)).toEqual(['MinionPro-Regular.otf', 'MinionPro-It.otf']);
+		expect(missing).toEqual(['Gill Sans']);
+	});
+});
+
+describe('bleedNote', () => {
+	const page = { w: 148, h: 210 };
+	it('speaks up for artwork of the trim alone', () => {
+		expect(bleedNote({ w: 1748, h: 2480 }, page, 3)).toMatch(/without its bleed/);
+	});
+	it('stays quiet for artwork with its bleed, or no bleed to have', () => {
+		expect(bleedNote({ w: 1819, h: 2551 }, page, 3)).toBeNull();
+		expect(bleedNote({ w: 1748, h: 2480 }, page, 0)).toBeNull();
 	});
 });

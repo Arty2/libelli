@@ -21,7 +21,8 @@ describe('droppedKind', () => {
 		expect(droppedKind({ name: 'notes.pdf', type: 'application/pdf' })).toBe('unknown');
 	});
 
-	it('takes a ZIP as an archive, whatever type the system gives it', () => {
+	it('takes an IDML and a ZIP as archives, whatever type the system gives them', () => {
+		expect(droppedKind({ name: 'Poster.idml', type: '' })).toBe('archive');
 		expect(droppedKind({ name: 'Poster package.zip', type: 'application/x-zip-compressed' })).toBe('archive');
 		expect(droppedKind({ name: 'Poster', type: 'application/zip' })).toBe('archive');
 	});

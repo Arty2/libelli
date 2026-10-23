@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	detectedKindOf,
+	fontFacts,
 	fontChoices,
 	fontInventory,
 	fontKindOf,
@@ -268,5 +269,66 @@ describe('replaceFamily', () => {
 
 	it('leaves a design that never names it alone', () => {
 		expect(replaceFamily(design, 'Nothing', { family: 'Inter', source: 'google' })).toBe(design);
+	});
+});
+
+/** The smallest sfnt `fontFacts` reads: a `name` table and an `OS/2` one, nothing else. */
+function namedSfnt(names: Record<number, string>, weightClass: number, selection: number): ArrayBuffer {
+	const ids = Object.keys(names).map(Number);
+	const strings = ids.map((id) => {
+		const s = names[id];
+		const out = new Uint8Array(s.length * 2);
+		for (let i = 0; i < s.length; i++) new DataView(out.buffer).setUint16(i * 2, s.charCodeAt(i));
+		return out;
+	});
+	const nameLength = 6 + ids.length * 12 + strings.reduce((n, s) => n + s.length, 0);
+	const os2Length = 96;
+	const nameAt = 12 + 2 * 16;
+	const os2At = nameAt + nameLength;
+	const buffer = new ArrayBuffer(os2At + os2Length);
+	const v = new DataView(buffer);
+	v.setUint32(0, 0x00010000);
+	v.setUint16(4, 2);
+	const table = (i: number, tag: string, at: number, length: number) => {
+		for (let j = 0; j < 4; j++) v.setUint8(12 + i * 16 + j, tag.charCodeAt(j));
+		v.setUint32(12 + i * 16 + 8, at);
+		v.setUint32(12 + i * 16 + 12, length);
+	};
+	table(0, 'name', nameAt, nameLength);
+	table(1, 'OS/2', os2At, os2Length);
+	v.setUint16(nameAt + 2, ids.length);
+	v.setUint16(nameAt + 4, 6 + ids.length * 12);
+	let offset = 0;
+	ids.forEach((id, i) => {
+		const r = nameAt + 6 + i * 12;
+		v.setUint16(r, 3);
+		v.setUint16(r + 2, 1);
+		v.setUint16(r + 4, 0x409);
+		v.setUint16(r + 6, id);
+		v.setUint16(r + 8, strings[i].length);
+		v.setUint16(r + 10, offset);
+		new Uint8Array(buffer).set(strings[i], nameAt + 6 + ids.length * 12 + offset);
+		offset += strings[i].length;
+	});
+	v.setUint16(os2At + 4, weightClass);
+	v.setUint16(os2At + 62, selection);
+	return buffer;
+}
+
+describe('fontFacts', () => {
+	it('reads the family, the weight and the slant a file says it is', async () => {
+		expect(await fontFacts(namedSfnt({ 1: 'Studio Serif', 2: 'Bold Italic' }, 700, 1))).toEqual({ family: 'Studio Serif', weight: 700, italic: true });
+	});
+
+	it('takes the typographic family over the legacy one, which splits off a semibold', async () => {
+		expect(await fontFacts(namedSfnt({ 1: 'Studio Serif SmBd', 2: 'Regular', 16: 'Studio Serif', 17: 'Semibold' }, 600, 0))).toEqual({
+			family: 'Studio Serif',
+			weight: 600,
+			italic: false
+		});
+	});
+
+	it('is null for what is not a font it can read', async () => {
+		expect(await fontFacts(new TextEncoder().encode('wOF2 is brotli').buffer)).toBeNull();
 	});
 });

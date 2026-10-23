@@ -15,7 +15,10 @@
 import { exportTemplate, importedTemplate } from './template';
 import type { Dataset, Template } from './types';
 
-/** `archive` is a ZIP: a libelli package, which package.ts reads and checks. */
+/**
+ * `archive` is a ZIP: a libelli package, an InDesign IDML (itself a ZIP), or
+ * a folder holding one — package.ts tells them apart by what is inside.
+ */
 export type DroppedKind = 'template' | 'table' | 'archive' | 'image' | 'unknown';
 
 /** Anything with the two facts a `File` carries, so tests need no DOM. */
@@ -37,7 +40,7 @@ export function droppedKind(file: FileFacts): DroppedKind {
 	const ext = extension(file.name);
 	if (ext === 'json') return 'template';
 	if (TABLE_EXTENSIONS.includes(ext)) return 'table';
-	if (ext === 'zip') return 'archive';
+	if (ext === 'idml' || ext === 'zip') return 'archive';
 	// A known extension that is neither is taken at its word, whatever type
 	// the system attached: a `.xlsx` reported as `text/plain` is not a CSV.
 	const type = file.type.toLowerCase().split(';')[0].trim();

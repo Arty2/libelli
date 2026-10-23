@@ -1,21 +1,31 @@
 /**
- * A package: what a designer sends a writer. One ZIP holding the template,
- * its table, every picture the two name and — only when the designer says
- * the licences allow it — the font files. A template on its own is a name for
+ * Archives in and out: a template handed from a designer to a writer, and an
+ * InDesign layout brought in.
+ *
+ * **A package** is what a designer sends: one ZIP holding the template, its
+ * table, every picture the two name and — only when the designer says the
+ * licences allow it — the font files. A template on its own is a name for
  * each of those things (AGENTS.md, "Big things are referenced, never
  * embedded"), which is right for a file pasted into a message and wrong for
  * a writer who has none of them. A package opens for copy editing
- * (`Template.copy`): the design locked, the words and the pictures free.
+ * (`Template.copy`): the design locked, the words and the marked pictures
+ * free.
+ *
+ * **An InDesign archive** is a folder zipped: InDesign's own File › Package
+ * output (an IDML beside it, `Links/`, `Document fonts/`) with the page's
+ * artwork exported as a picture. Or an IDML on its own, which is itself a
+ * ZIP. `idml.ts` reads the layout; this sorts out the rest.
  *
  * Pure: bytes in, bytes and records out. Storing a picture or installing a
  * face is the page's work, since both reach the browser's storage.
  */
 
 import { localImageName } from './assets';
+import { readIdml, type IdmlFace, type IdmlImport } from './idml';
 import { parseTable, toCsv } from './parse';
 import { exportTemplate, importedTemplate } from './template';
 import type { Dataset, Mapping, Template } from './types';
-import { zipStore } from './zip';
+import { unzip, zipStore, ZipError } from './zip';
 
 /** The file in a package that says it is one, and what it holds. */
 export const MANIFEST = 'libelli.json';
@@ -164,6 +174,10 @@ export function readPackage(files: Map<string, Uint8Array>, tableName: string): 
 	return { template, dataset, mapping, pictures, fonts };
 }
 
+// ---- InDesign ---------------------------------------------------------------------
+
+const IMAGE = /\.(png|jpe?g|gif|webp|svg)$/i;
+
 const TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
 
 /**
@@ -171,3 +185,140 @@ const TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpe
  * browser draws an SVG from a blob only when the blob says it is one.
  */
 export const pictureType = (name: string) => TYPES[name.split('.').pop()?.toLowerCase() ?? ''] ?? '';
+const FONT = /\.(otf|ttf|woff2?)$/i;
+
+const base = (path: string) => path.split('/').pop() ?? path;
+
+/** Files a zipping tool adds that nobody put in the folder: macOS's `__MACOSX/` and `._` twins, and dotfiles. */
+const isClutter = (path: string) => path.startsWith('__MACOSX/') || path.split('/').some((part) => part.startsWith('.'));
+
+export interface InDesignContents {
+	layout: IdmlImport;
+	/** the page's artwork, to be the background: the one picture the layout does not link to */
+	background: PackagePicture | null;
+	/** the pictures the layout links to, by the names its cells use */
+	pictures: PackagePicture[];
+	fontFiles: PackagePicture[];
+	notes: string[];
+}
+
+/**
+ * Which of several pictures is the page's artwork: the one named so, else
+ * the one named after the layout, else the first, said.
+ */
+function pickBackground(candidates: PackagePicture[], layoutName: string, notes: string[]): PackagePicture | null {
+	if (!candidates.length) return null;
+	if (candidates.length === 1) return candidates[0];
+	const stem = layoutName.replace(/\.[^.]+$/, '').toLowerCase();
+	const pick =
+		candidates.find((c) => /background|artwork|\bbg\b/i.test(base(c.name))) ??
+		candidates.find((c) => base(c.name).toLowerCase().startsWith(stem)) ??
+		candidates[0];
+	notes.push(`Several pictures could be the page's artwork; “${base(pick.name)}” was made the background. Name the one you mean “background”.`);
+	return pick;
+}
+
+/**
+ * An archive that is an IDML, or holds one, as a layout with its pictures
+ * and font files. `archiveName` is the file it came in, for the template's
+ * name. Throws `PackageError` when there is no IDML to be found.
+ */
+export async function readInDesign(files: Map<string, Uint8Array>, archiveName: string): Promise<InDesignContents> {
+	const stemOf = (name: string) => base(name).replace(/\.[^.]+$/, '');
+	// The archive is the IDML itself.
+	if (files.has('designmap.xml')) {
+		const layout = readIdml(files, stemOf(archiveName));
+		return { layout, background: null, pictures: [], fontFiles: [], notes: [] };
+	}
+	const paths = [...files.keys()].filter((p) => !isClutter(p));
+	const idmls = paths.filter((p) => /\.idml$/i.test(p));
+	if (!idmls.length) {
+		const indd = paths.some((p) => /\.indd$/i.test(p));
+		throw new PackageError(
+			indd
+				? 'There is an InDesign document in this archive but no IDML — in InDesign, use File › Export… › InDesign Markup (IDML), and put it in the folder.'
+				: 'There is no IDML or libelli package in this archive.'
+		);
+	}
+	const notes: string[] = [];
+	if (idmls.length > 1) notes.push(`The archive holds ${idmls.length} IDML files; “${base(idmls[0])}” was brought in.`);
+	let inner: Map<string, Uint8Array>;
+	try {
+		inner = await unzip(files.get(idmls[0])!);
+	} catch (error) {
+		throw new PackageError(`“${base(idmls[0])}” is damaged: ${error instanceof ZipError ? error.message : 'it is not an IDML'}`);
+	}
+	const layout = readIdml(inner, stemOf(idmls[0]));
+
+	const linked = new Set(layout.links.map((l) => l.toLowerCase()));
+	const pictures: PackagePicture[] = [];
+	const candidates: PackagePicture[] = [];
+	for (const path of paths.filter((p) => IMAGE.test(p))) {
+		const picture = { name: base(path), bytes: files.get(path)! };
+		if (linked.has(picture.name.toLowerCase())) {
+			// Under the name the cells use, whatever case the file has here.
+			const name = layout.links.find((l) => l.toLowerCase() === picture.name.toLowerCase())!;
+			pictures.push({ ...picture, name });
+		} else if (!/(^|\/)links\//i.test(path)) candidates.push({ name: path, bytes: picture.bytes });
+	}
+	const chosen = pickBackground(candidates, base(idmls[0]), notes);
+	const background = chosen ? { name: base(chosen.name), bytes: chosen.bytes } : null;
+	if (!background) {
+		const pdf = paths.some((p) => /\.pdf$/i.test(p) && !/(^|\/)links\//i.test(p));
+		notes.push(
+			pdf
+				? 'The page artwork is a PDF, which a browser cannot draw — export it from InDesign as PNG or JPG instead, with the Editable layer hidden and the bleed included, and add it to the archive.'
+				: 'No picture of the page artwork was in the archive. Export page 1 from InDesign as PNG or JPG with the Editable layer hidden and the bleed included, then set it as the background in Page.'
+		);
+	}
+	for (const name of layout.links) {
+		if (!pictures.some((p) => p.name === name) && IMAGE.test(name)) notes.push(`The picture “${name}” is not in the archive; the field shows it once it is added in Pictures.`);
+	}
+	const fontFiles = paths.filter((p) => FONT.test(p)).map((p) => ({ name: base(p), bytes: files.get(p)! }));
+	return { layout, background, pictures, fontFiles, notes };
+}
+
+/** A font file and what it says it is, for matching against the faces a layout uses. */
+export interface FontFileFacts {
+	name: string;
+	family: string;
+	weight: number;
+	italic: boolean;
+}
+
+const familyMatch = (name: string) => name.toLowerCase().replace(/[\s_-]+/g, '');
+
+/**
+ * Which font files are the families the layout is set in: each family that
+ * has a file is installed whole, every face of it the archive has, since a
+ * writer's Markdown may reach for a bold the designer's words did not use.
+ * A family with no file is named, so the designer knows what to add.
+ */
+export function matchFonts(faces: IdmlFace[], files: FontFileFacts[]): { families: Map<string, FontFileFacts[]>; missing: string[] } {
+	const families = new Map<string, FontFileFacts[]>();
+	const missing: string[] = [];
+	for (const family of new Set(faces.map((f) => f.family))) {
+		const found = files.filter((f) => familyMatch(f.family) === familyMatch(family));
+		if (found.length) families.set(family, found);
+		else missing.push(family);
+	}
+	return { families, missing };
+}
+
+/**
+ * Whether the artwork picture was exported with the bleed, from its
+ * proportions: the background covers the trim and the bleed, so a picture
+ * of the trim alone is stretched past its edges by the bleed's width — and
+ * every field lands that far off what it was drawn over. A note when it
+ * looks like the trim; nothing when it fits, or nobody can tell.
+ */
+export function bleedNote(picture: { w: number; h: number }, page: { w: number; h: number }, bleed: number): string | null {
+	if (!picture.w || !picture.h || bleed <= 0) return null;
+	const ratio = picture.w / picture.h;
+	const withBleed = (page.w + bleed * 2) / (page.h + bleed * 2);
+	const trim = page.w / page.h;
+	if (Math.abs(ratio - trim) < Math.abs(ratio - withBleed) && Math.abs(ratio - trim) < 0.01) {
+		return 'The artwork looks exported without its bleed, so it is stretched over the bleed and sits slightly off the fields. Export it again with the bleed included (Use Document Bleed Settings).';
+	}
+	return null;
+}
