@@ -573,7 +573,10 @@ export function normaliseTemplate(raw: unknown): Template {
 			// English is the absence of the field, as it was before there was one.
 			lang: safeLang(t.lang) === DEFAULT_LANG ? undefined : safeLang(t.lang),
 			css: typeof t.css === 'string' && t.css.trim() ? t.css : undefined,
-			locked: t.locked ? true : undefined,
+			// Copy editing is a locked design with its controls put away; a file
+			// that says copy without locked would hide the controls and still let
+			// every area be dragged.
+			locked: t.locked || t.copy ? true : undefined,
 			copy: t.copy ? true : undefined,
 			starter: typeof t.starter === 'string' && t.starter.trim() ? t.starter.trim() : undefined
 		})

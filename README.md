@@ -219,7 +219,9 @@ and nothing else. In the template menu, **Package for Copy Editing…** saves
 one ZIP with the design, its table and every picture they use. Tick
 **Include the fonts** only if their licences let you share the files.
 
-Whoever receives it drops the ZIP on libelli. It opens locked, with a note
+Whoever receives it drops the ZIP on libelli. If it brings a picture or a font
+they already have under the same name but different, libelli asks which to
+keep. Opening the same package again opens the copy already there. It opens locked, with a note
 above the page instead of the design's controls. Double-click a field to
 change its words, or a picture to choose another; a picture can also be
 dropped on it. A red line under a field means its words do not fit and will

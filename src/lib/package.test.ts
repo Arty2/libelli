@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { enc, idml } from './idml.fixture';
-import { bleedNote, matchFonts, MANIFEST, PackageError, picturesNamed, readInDesign, readPackage, writePackage } from './package';
+import {
+	bleedNote,
+	matchFonts,
+	MANIFEST,
+	PackageError,
+	pictureType,
+	picturesNamed,
+	readInDesign,
+	readPackage,
+	sameBytes,
+	safePictureName,
+	writePackage
+} from './package';
 import { blankTemplate, newBox } from './template';
 import type { Dataset, Template } from './types';
 import { unzip, zipStore } from './zip';
@@ -148,5 +160,51 @@ describe('bleedNote', () => {
 	it('stays quiet for artwork with its bleed, or no bleed to have', () => {
 		expect(bleedNote({ w: 1819, h: 2551 }, page, 3)).toBeNull();
 		expect(bleedNote({ w: 1748, h: 2480 }, page, 0)).toBeNull();
+	});
+});
+
+describe('reading a package strictly', () => {
+	it('keeps a one-column table whole, tabs and semicolons in its words', async () => {
+		const notes: Dataset = { columns: ['note'], rows: [{ note: 'x\ty' }, { note: 'p;q' }] };
+		const files = await unzip(writePackage({ template: template(), dataset: notes, mapping: {}, pictures: [], fonts: [] }));
+		expect(readPackage(files, 'x').dataset).toMatchObject({ columns: ['note'], rows: notes.rows });
+	});
+
+	it('refuses a picture whose name is a path, before anything is read', async () => {
+		const files = await unzip(bytesWith({ pictures: ['../escape.png'] }));
+		expect(() => readPackage(files, 'x')).toThrow(/not plain file names: \.\.\/escape\.png/);
+	});
+});
+
+/** A package whose manifest says what a test needs it to. */
+function bytesWith(manifest: Record<string, unknown>) {
+	const files = [
+		{ name: MANIFEST, data: enc(JSON.stringify({ format: 'libelli-package', version: 1, mapping: {}, pictures: [], fonts: [], ...manifest })) },
+		{ name: 'template.json', data: enc(JSON.stringify(template())) },
+		{ name: 'table.csv', data: enc('a\n1') }
+	];
+	return zipStore(files);
+}
+
+describe('safePictureName', () => {
+	it('is a file name, never a path or nothing', () => {
+		expect(safePictureName('hall view.jpg')).toBe(true);
+		for (const bad of ['a/b.png', 'a\\b.png', '..', '.', '  ', 3]) expect(safePictureName(bad)).toBe(false);
+	});
+});
+
+describe('sameBytes', () => {
+	it('compares every byte', () => {
+		expect(sameBytes(enc('abc'), enc('abc'))).toBe(true);
+		expect(sameBytes(enc('abc'), enc('abd'))).toBe(false);
+		expect(sameBytes(enc('abc'), enc('ab'))).toBe(false);
+	});
+});
+
+describe('pictureType', () => {
+	it('names an SVG as one, which a blob needs to be drawn', () => {
+		expect(pictureType('logo.SVG')).toBe('image/svg+xml');
+		expect(pictureType('photo.jpg')).toBe('image/jpeg');
+		expect(pictureType('notes.txt')).toBe('');
 	});
 });

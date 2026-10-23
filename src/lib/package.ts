@@ -126,6 +126,17 @@ export function writePackage(input: {
 
 export class PackageError extends Error {}
 
+/** A picture's name a package may store: a file name, not a path. */
+export const safePictureName = (name: unknown): name is string =>
+	typeof name === 'string' && !!name.trim() && !/[/\\]/.test(name) && name !== '.' && name !== '..';
+
+/** Whether two files are the same bytes: a picture or a face already here is no clash. */
+export function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+	return true;
+}
+
 /** What a package holds, read and checked. Throws `PackageError` with what is wrong. */
 export function readPackage(files: Map<string, Uint8Array>, tableName: string): PackageContents {
 	const text = (name: string) => {
@@ -147,17 +158,24 @@ export function readPackage(files: Map<string, Uint8Array>, tableName: string): 
 	} catch (error) {
 		throw new PackageError(`The package's template could not be read: ${(error as Error).message.replace(/\.$/, '')}.`);
 	}
-	const dataset = { ...parseTable(text('table.csv')), name: tableName };
+	// Always commas: the package wrote it, so nothing is guessed. Sniffing
+	// took a one-column table with tabs in its words for two columns.
+	const dataset = { ...parseTable(text('table.csv'), { delimiter: ',' }), name: tableName };
 	const mapping: Mapping = {};
 	// A mapping names columns; one this table has not got is left unmapped
 	// rather than pointing at nothing.
 	for (const [slot, column] of Object.entries(manifest.mapping ?? {})) {
 		if (typeof column === 'string' && dataset.columns.includes(column)) mapping[slot] = column;
 	}
+	const names = Array.isArray(manifest.pictures) ? manifest.pictures : [];
+	// A name is stored as it is, into this browser or a connected folder, so
+	// one that is a path is refused before anything is written, not halfway.
+	const unsafe = names.filter((name) => !safePictureName(name));
+	if (unsafe.length) throw new PackageError(`The package names pictures that are not plain file names: ${unsafe.map(String).join(', ')}.`);
 	const pictures: PackagePicture[] = [];
-	for (const name of Array.isArray(manifest.pictures) ? manifest.pictures : []) {
+	for (const name of names as string[]) {
 		const bytes = files.get(`pictures/${name}`);
-		if (typeof name === 'string' && bytes) pictures.push({ name, bytes });
+		if (bytes) pictures.push({ name, bytes });
 	}
 	const fonts: PackageFont[] = [];
 	for (const font of Array.isArray(manifest.fonts) ? manifest.fonts : []) {

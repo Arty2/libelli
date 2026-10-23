@@ -34,6 +34,7 @@
 		picturesNamed,
 		readInDesign,
 		readPackage,
+		sameBytes,
 		writePackage,
 		type FontFileFacts,
 		type PackageFont,
@@ -50,6 +51,7 @@
 		fontFacts,
 		fontInventory,
 		fontRef,
+		fontRefKey,
 		installFontFaces,
 		storedFaces,
 		type FaceFile,
@@ -3716,6 +3718,65 @@
 	/** Pictures into this browser's store (or the folder), under the names the cells use. */
 	async function storePictures(pictures: PackagePicture[]) {
 		for (const p of pictures) await storeLocalImage(new File([p.bytes as BlobPart], p.name, { type: pictureType(p.name) }), p.name);
+		if (pictures.length) imagesVersion += 1;
+	}
+
+	/** A picture or a font family a package brings that this browser already holds, different. */
+	interface Clash {
+		kind: 'picture' | 'font';
+		name: string;
+		/** use the package's; unticked keeps this browser's */
+		replace: boolean;
+	}
+
+	/** The clashes being asked about, and the import waiting on the answer. */
+	let clashAsk = $state<{ items: Clash[]; resolve: (items: Clash[] | null) => void } | null>(null);
+
+	/** Ask which of the clashing files to replace: what to keep as it is here (`kind:name`), or null for Cancel. */
+	function askClashes(items: Clash[]): Promise<Set<string> | null> {
+		return new Promise((resolve) => {
+			clashAsk = {
+				items,
+				resolve: (answer) => {
+					clashAsk = null;
+					resolve(answer && new Set(answer.filter((c) => !c.replace).map((c) => `${c.kind}:${c.name.toLowerCase()}`)));
+				}
+			};
+		});
+	}
+
+	/**
+	 * What an import would replace that this browser already holds, with
+	 * different bytes — a package's or an InDesign folder's pictures and
+	 * fonts alike — to be asked about before anything is written.
+	 */
+	async function clashesWith(pictures: PackagePicture[], byFamily: Map<string, FaceFile[]>): Promise<Clash[]> {
+		const clashes: Clash[] = [];
+		for (const picture of pictures) {
+			const have = await readLocalImage(picture.name);
+			if (have && !sameBytes(new Uint8Array(await have.arrayBuffer()), picture.bytes)) clashes.push({ kind: 'picture', name: picture.name, replace: true });
+		}
+		for (const [family, faces] of byFamily) {
+			const have = await storedFaces(fontRefKey(family));
+			const same = faces.every((f) => have.some((h) => sameBytes(h.bytes, new Uint8Array(f.bytes))));
+			if (have.length && !same) clashes.push({ kind: 'font', name: family, replace: true });
+		}
+		return clashes;
+	}
+
+	/**
+	 * The pictures stored and the families installed, but for those kept as
+	 * this browser has them; a kept family's font is pointed at this
+	 * browser's file. Returns the design with its fonts pointed right.
+	 */
+	async function storeAssets(next: Template, pictures: PackagePicture[], byFamily: Map<string, FaceFile[]>, kept: Set<string>, notes: string[]): Promise<Template> {
+		await storePictures(pictures.filter((p) => !kept.has(`picture:${p.name.toLowerCase()}`)));
+		const install = new Map([...byFamily].filter(([family]) => !kept.has(`font:${family.toLowerCase()}`)));
+		const installed = await installFamilies(next, install, notes);
+		return {
+			...installed,
+			fonts: installed.fonts.map((f) => (kept.has(`font:${f.family.toLowerCase()}`) ? { ...f, source: 'local' as const, ref: fontRefKey(f.family) } : f))
+		};
 	}
 
 	/** A picture's size in pixels, or null where the browser cannot say (an SVG, often). */
@@ -3733,12 +3794,20 @@
 	/**
 	 * Each family's faces installed, and the design's fonts pointed at them:
 	 * a package made in another browser names that browser's keys, and the
-	 * faces are stored here under this one's.
+	 * faces are stored here under this one's. A family whose files will not
+	 * load is named, and left as this browser had it.
 	 */
-	async function installFamilies(next: Template, byFamily: Map<string, FaceFile[]>): Promise<Template> {
+	async function installFamilies(next: Template, byFamily: Map<string, FaceFile[]>, notes: string[]): Promise<Template> {
 		if (!byFamily.size) return next;
 		const refs: FontRef[] = [];
-		for (const [family, faces] of byFamily) refs.push(await installFontFaces(family, faces));
+		for (const [family, faces] of byFamily) {
+			try {
+				refs.push(await installFontFaces(family, faces));
+			} catch {
+				notes.push(`The ${family} files in the package are damaged and were not installed.`);
+			}
+		}
+		if (!refs.length) return next;
 		editorFonts = mergeFonts(editorFonts, refs);
 		saveEditorFonts($state.snapshot(editorFonts));
 		await refreshStoredFonts();
@@ -3772,30 +3841,58 @@
 		await Promise.all([refreshLibrary(), refreshTables()]);
 	}
 
+	/**
+	 * The template and table of a package already in the library, unchanged,
+	 * as the other imports find theirs. The fonts are left out of the
+	 * comparison: opening a package points them at this browser's keys.
+	 */
+	async function heldPair(contents: ReturnType<typeof readPackage>): Promise<{ templateId: string; datasetId: string } | null> {
+		await Promise.all([flushTemplate(), flushDataset()]);
+		const bare = { ...contents.template, fonts: [] };
+		const templateDocs = await Promise.all(library.map((entry) => loadTemplateDoc(entry.id)));
+		const t = library.find((_, i) => !!templateDocs[i] && sameTemplate(bare, { ...(templateDocs[i] as object), fonts: [] }));
+		if (!t) return null;
+		const tableDocs = await Promise.all(tables.map((entry) => loadDatasetDoc(entry.id)));
+		const d = tables.find((_, i) => !!tableDocs[i] && sameTable(contents.dataset, tableDocs[i]!));
+		return d ? { templateId: t.id, datasetId: d.id } : null;
+	}
+
 	async function openPackage(contents: ReturnType<typeof readPackage>): Promise<Said> {
-		await storePictures(contents.pictures);
 		const byFamily = new Map<string, FaceFile[]>();
 		for (const font of contents.fonts) {
 			const faces = byFamily.get(font.family) ?? [];
 			faces.push({ name: `${font.family}.${font.format}`, format: font.format, bytes: font.bytes.slice().buffer, weight: font.weight, italic: font.italic });
 			byFamily.set(font.family, faces);
 		}
-		const next = await installFamilies(contents.template, byFamily);
+
+		const clashes = await clashesWith(contents.pictures, byFamily);
+		// The same package again — its design, its table and its files all
+		// as held here — opens what is held rather than making a second pair.
+		// A picture that differs makes it a new version, imported as one.
+		const held = clashes.length ? null : await heldPair(contents);
+		if (held) {
+			await switchTemplate(held.templateId);
+			await switchDataset(held.datasetId);
+			return { text: `“${contents.template.name}” is already in your templates, with its table, unchanged — opened those.`, tone: 'info' };
+		}
+		const kept = clashes.length ? await askClashes(clashes) : new Set<string>();
+		if (!kept) return { text: `“${contents.template.name}” was not imported — nothing was changed.`, tone: 'info' };
+		const notes: string[] = [];
+		const next = await storeAssets(contents.template, contents.pictures, byFamily, kept, notes);
 		await adoptPair(next, contents.dataset, contents.mapping);
+		const keptCount = kept.size ? ` ${kept.size === 1 ? 'One of your own files was' : `${kept.size} of your own files were`} kept in place of the package's.` : '';
 		const missing = missingFonts.length ? ` ${missingFonts.length === 1 ? 'One font is' : `${missingFonts.length} fonts are`} not included — see above the page.` : '';
 		return {
-			text: `“${next.name}” opened for copy editing: change the words and the pictures, then Export… to print.${missing}`,
-			tone: missing ? 'warning' : 'info'
+			text: `“${next.name}” opened for copy editing: change the words and the pictures, then Export… to print.${keptCount}${missing}${notes.length ? ` ${notes.join(' ')}` : ''}`,
+			tone: missing || notes.length ? 'warning' : 'info'
 		};
 	}
 
 	async function openInDesign(contents: Awaited<ReturnType<typeof readInDesign>>): Promise<Said> {
 		const { layout } = contents;
 		const notes = [...layout.notes, ...contents.notes];
-		await storePictures(contents.pictures);
 		let next = layout.template;
 		if (contents.background) {
-			await storePictures([contents.background]);
 			next = { ...next, page: { ...next.page, image: { src: contents.background.name, source: 'local', fit: 'cover' } } };
 			const size = await pictureSize(contents.background);
 			const note = size && bleedNote(size, next.page, bleedFor(next.bleed));
@@ -3815,7 +3912,11 @@
 				files.map((f) => ({ name: f.name, bytes: contents.fontFiles.find((x) => x.name === f.name)!.bytes.slice().buffer, weight: f.weight, italic: f.italic }))
 			);
 		}
-		next = await installFamilies(next, byFamily);
+		const pictures = contents.background ? [...contents.pictures, contents.background] : contents.pictures;
+		const clashes = await clashesWith(pictures, byFamily);
+		const kept = clashes.length ? await askClashes(clashes) : new Set<string>();
+		if (!kept) return { text: `“${next.name}” was not imported — nothing was changed.`, tone: 'info' };
+		next = await storeAssets(next, pictures, byFamily, kept, notes);
 		if (missing.length) {
 			notes.push(
 				`No font file for ${missing.join(', ')} was in the archive; the fields are set in a fallback until one is added (Pictures › Fonts), or until InDesign's “Document fonts” folder is included.`
@@ -3833,6 +3934,12 @@
 	/** The package dialog, and whether the fonts go in it. */
 	let packaging = $state(false);
 	let packageFonts = $state(false);
+	/** Unticked every time: a licence is a fact about these fonts, not a preference to remember. */
+	function openPackaging() {
+		packageFonts = false;
+		packaging = true;
+	}
+
 	/** The uploaded families this design is set in: what Include Fonts would put in. */
 	const packagedFamilies = $derived(template.fonts.filter((f) => f.source === 'local' && f.ref).map((f) => f.family));
 
@@ -3853,10 +3960,20 @@
 			else absent.push(name);
 		}
 		const fonts: PackageFont[] = [];
-		if (packageFonts) for (const f of t.fonts) if (f.source === 'local' && f.ref) fonts.push(...(await storedFaces(f.ref)));
+		const fileless: string[] = [];
+		if (packageFonts) {
+			for (const f of t.fonts) {
+				if (f.source !== 'local' || !f.ref) continue;
+				const faces = await storedFaces(f.ref);
+				if (faces.length) fonts.push(...faces);
+				else fileless.push(f.family);
+			}
+		}
 		const bytes = writePackage({ template: t, dataset: d, mapping: $state.snapshot(mapping), pictures, fonts });
 		downloadBlob(`${fileStem(t.name)}.zip`, new Blob([bytes], { type: 'application/zip' }));
-		const missing = absent.length ? ` ${absent.length} picture${absent.length === 1 ? ' is' : 's are'} missing from this browser and not in it: ${absent.join(', ')}.` : '';
+		const missing =
+			(absent.length ? ` ${absent.length} picture${absent.length === 1 ? ' is' : 's are'} missing from this browser and not in it: ${absent.join(', ')}.` : '') +
+			(fileless.length ? ` No file for ${fileless.join(', ')} is in this browser, so ${fileless.length === 1 ? 'it is' : 'they are'} not in it.` : '');
 		notify(
 			`Package saved: the design, ${d.rows.length} row${d.rows.length === 1 ? '' : 's'}, ${pictures.length} picture${pictures.length === 1 ? '' : 's'}${fonts.length ? ` and ${fonts.length} font file${fonts.length === 1 ? '' : 's'}` : ''}. It opens for copy editing.${missing}`,
 			missing ? 'warning' : 'info'
@@ -4376,7 +4493,7 @@
 						onnotice={notify}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
-						onexportpackage={() => (packaging = true)}
+						onexportpackage={openPackaging}
 						oneditcss={openCss}
 						ondraw={drawArea}
 						onuploadimage={(id, file) => {
@@ -4414,7 +4531,7 @@
 						onnotice={notify}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
-						onexportpackage={() => (packaging = true)}
+						onexportpackage={openPackaging}
 						oneditcss={openCss}
 						ondraw={drawArea}
 						onuploadimage={(id, file) => {
@@ -4984,6 +5101,34 @@
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button class="primary" data-default onclick={() => (importReport = null)}>OK</button>
+		</div>
+	</div>
+{/if}
+
+<!-- A package brings files this browser already has under the same names,
+     different: asked about before anything is written, each one, since only
+     the person importing knows whether theirs or the designer's is the one
+     to keep. Ticked uses the package's, so the design prints as it was made. -->
+{#if clashAsk}
+	{@const ask = clashAsk}
+	<div class="modal-backdrop" role="presentation" onclick={() => ask.resolve(null)}></div>
+	<div class="modal narrow clashes" role="dialog" aria-modal="true" aria-labelledby="clash-title" use:armDefault>
+		<h2 id="clash-title">Replace your own files?</h2>
+		<p>This package brings files you already have under the same names, but different. Ticked ones are replaced by the package's; unticked ones keep yours.</p>
+		<ul>
+			{#each ask.items as item (item.kind + item.name)}
+				<li>
+					<label class="check">
+						<input type="checkbox" bind:checked={item.replace} />
+						<span>{item.kind === 'font' ? `The font ${item.name}` : `The picture “${item.name}”`}</span>
+					</label>
+				</li>
+			{/each}
+		</ul>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => ask.resolve(null)}>Cancel Import</button>
+			<button class="primary" data-default onclick={() => ask.resolve($state.snapshot(ask.items))}>Import</button>
 		</div>
 	</div>
 {/if}
@@ -5993,6 +6138,16 @@
 
 	.import-report li + li {
 		margin-top: 6px;
+	}
+
+	.clashes ul {
+		margin: 0 0 12px;
+		padding: 0;
+		list-style: none;
+	}
+
+	.clashes label.check {
+		margin: 2px 0;
 	}
 
 	/* A tick with a sentence beside it, wrapping under itself rather than under the box. */

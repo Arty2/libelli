@@ -284,7 +284,33 @@ pictures, the font files and what face each is), `template.json`, `table.csv`,
 is written, never on the designer's own. Reading it puts the pictures under
 the names the cells use. A picture of that name already in this browser is
 replaced, since the package is what the design was made with. Fonts go in only
-when the designer ticks that their licences allow it.
+when the designer ticks that their licences allow it, and the tick starts
+clear every time: a licence is a fact about those fonts, not a preference.
+
+**The table is CSV, read strictly.** Readable in any spreadsheet, and read
+back with commas named rather than sniffed: sniffing took a one-column table
+with tabs in its words for two columns. What CSV cannot carry is accepted
+rather than worked around: a row with every cell empty is not read back, and
+neither are the row numbers a sort keeps (`Dataset.order`), so a
+`%%lookup:N:…%%` in a sorted table counts from the new order.
+
+**A clash is asked about, each one.** A picture or a font family a package,
+or an InDesign folder, brings that this browser already holds, with different bytes, is listed
+before anything is written, ticked to take the package's (so the design
+prints as it was made) and unticked to keep this browser's. A kept family's
+font is pointed at this browser's file. The same bytes are no clash. Picture
+names are checked first, all of them: one that is a path would fail part way,
+into a connected folder.
+
+**The same package twice opens what is held.** As Import does for a template
+or a table: when the library holds this template and this table unchanged,
+and none of its files clash, those open instead of a second pair. A package
+whose pictures differ is a new version and imports as one. Fonts are left
+out of comparing templates, since opening a package points them at this
+browser's keys.
+
+**A face's files are loaded before anything is replaced.** A damaged file in
+a package fails before the family this browser had is cleared, and is named.
 
 **An InDesign folder is sorted, not trusted.** macOS's `__MACOSX/` and every
 dotfile are dropped. A picture the IDML links to is stored under the link's
@@ -296,6 +322,10 @@ is Minion Pro), never by file name. A matched family is installed whole:
 every face the folder has.
 
 ## Copy editing — `Template.copy`
+
+**Copy editing is always locked.** `normaliseTemplate` locks any design that
+says `copy`: with the controls hidden and the lock off, every area could
+still be dragged and there would be no padlock to say why.
 
 **A mode, not a permission.** Everything here runs in the writer's own
 browser, so nothing can stop them changing the design, and pretending
