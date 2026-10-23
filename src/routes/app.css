@@ -53,6 +53,14 @@
 	}
 }
 
+/* Native controls in the same accent: every checkbox is redrawn from masks
+   below, but only once +layout.svelte sets the class, and a radio, a slider
+   or a progress bar added later would otherwise come in the browser's own
+   colour — which in Chromium is its blue or its theme, not this one. */
+:root {
+	accent-color: var(--accent);
+}
+
 /* Relative colour syntax is Baseline Newly, not yet Widely: behind a query,
    so a browser without it keeps the inverse of the blue above. A browser with
    `AccentColor` but without this would pair the system accent with that
