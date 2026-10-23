@@ -1079,10 +1079,16 @@
 				query.matches ||
 				(browser.matches && Math.abs(window.innerWidth - screen.width) <= 1 && Math.abs(window.innerHeight - screen.height) <= 1));
 		read();
+		// Left by hand (Escape, the browser's own control): no longer the logo's to undo.
+		const left = () => {
+			if (!document.fullscreenElement) wentFullscreen = false;
+		};
+		document.addEventListener('fullscreenchange', left);
 		document.addEventListener('fullscreenchange', read);
 		query.addEventListener('change', read);
 		window.addEventListener('resize', read);
 		return () => {
+			document.removeEventListener('fullscreenchange', left);
 			document.removeEventListener('fullscreenchange', read);
 			query.removeEventListener('change', read);
 			window.removeEventListener('resize', read);
@@ -1120,8 +1126,38 @@
 		if (viewing) {
 			selectedIds = [];
 			editingId = null;
+			askFullscreen();
+		} else if (wentFullscreen) {
+			wentFullscreen = false;
+			if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
 		}
 		notify(viewing ? 'Read only — press the logo to edit again.' : 'Editing.');
+	}
+
+	/**
+	 * Whether the logo put the window in full screen, so pressing it again
+	 * takes it out — and only then: a window someone made full screen
+	 * themselves stays as they left it.
+	 */
+	let wentFullscreen = false;
+
+	/**
+	 * Read only goes full screen with it, as a display, if the browser lets
+	 * it: asked inside the press, which is the gesture the request needs. A
+	 * refusal — declined, an iframe without the permission, a browser that
+	 * says no — leaves read only on in the window, which is still the view
+	 * asked for, so it is swallowed rather than reported.
+	 */
+	function askFullscreen() {
+		if (document.fullscreenElement || !document.fullscreenEnabled) return;
+		document.documentElement
+			.requestFullscreen()
+			.then(() => {
+				// Ended while the request was pending: nothing left to show full screen.
+				if (!viewing) void document.exitFullscreen().catch(() => {});
+				else wentFullscreen = true;
+			})
+			.catch(() => {});
 	}
 
 	const bare = $derived((editor === 'readonly' || (editor === 'here' && viewing)) && fullscreen);

@@ -4612,7 +4612,11 @@ bare — without giving up the tab lock or stopping the autosave: nothing can
 be changed while it lasts (keys other than Export, drops and selection all
 stop), so there is nothing to save, and handing the lock over to look would
 let another tab take it. The logo, the eye or Escape ends it; Escape closes a
-dialog first. In a read-only tab the logo opens the Open Here / Read Only
+dialog first. Turning it on also asks for full screen, inside the press that
+is the gesture the request needs; a refusal is swallowed, since read only in
+the window is still what was asked for. Turning it off leaves full screen
+only if the logo entered it (`wentFullscreen`, cleared when full screen is
+left by hand), so a window someone made full screen themselves stays so. In a read-only tab the logo opens the Open Here / Read Only
 choice, as the eye does.
 
 **A glance at the other dark, never stored.** Hovering it (after

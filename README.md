@@ -45,7 +45,9 @@ double-click. A read-only tab always fits the card to its own window; it does
 not follow the editing tab's zoom. The logo brings the choice back too.
 
 In the editing tab, the logo hides everything but the card — the same view,
-without giving up the editing — and the logo, the eye or Escape brings the
+without giving up the editing — and asks the browser for full screen, to
+show the card alone; if the browser says no, it stays read only in the
+window. Pressing the logo again leaves full screen too, and the logo, the eye or Escape brings the
 editor back. Keys that would change anything do nothing meanwhile.
 
 ## Data
