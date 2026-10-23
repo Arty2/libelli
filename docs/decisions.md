@@ -345,6 +345,21 @@ as a field's words are, and the design's lock never froze those
 instead of opening the drawing: a writer swaps a photograph, they do not
 paint on it.
 
+**On a touchscreen the note says double-tap, and on a phone it is one line.**
+Which word is the primary pointer's (`hover: none` and `pointer: coarse`), so a
+laptop with a touchscreen keeps the mouse's word. Under 560px the note is its
+short form, its long one in the title for a press and hold, and Edit Design is
+a square icon. The area's right-click menu is off while copy editing: it holds
+design actions only, and on a phone a double-tap that selected a word opened it
+over the field instead of the browser's Copy and Paste.
+
+**A picture's file picker is asked for from a click.** Chromium refuses a file
+picker asked for during a touch's pointerup, user gesture or not, and grants
+it from the click that follows. So a double-tap on a picture field only marks
+it, and the click that ends the second tap opens the picker. The browser's own
+`dblclick` after two taps is ignored once a double tap has opened an area; it
+was opening it a second time, and asking for the picker twice.
+
 **Words that do not fit are always marked.** The cut line under a clipped
 area was drawn only with the bounds on, which are the designer's furniture.
 In copy editing it is drawn regardless, over a white halo, since a red dash

@@ -1315,6 +1315,33 @@
 	 */
 	const DOUBLE_TAP = 350;
 	let lastTap: { id: string; at: number } | null = null;
+	/**
+	 * When a double tap last opened an area. A touch browser follows two taps
+	 * with a `dblclick` of its own, which opened the area a second time: for
+	 * words that went unseen, but a picture's file picker was asked for twice.
+	 */
+	let tapOpenedAt = 0;
+
+	/**
+	 * A picture field double-tapped under copy editing, waiting for the click
+	 * that ends the second tap. Chromium refuses a file picker asked for from a
+	 * touch's pointerup, gesture or not, and grants it from the click, which
+	 * every touch browser sends after a tap.
+	 */
+	let pendingSwap: { id: string; at: number } | null = null;
+
+	/** Whether opening this area asks for a picture file rather than a drawing. */
+	const swapsPicture = (box: Box) =>
+		interactive && !!template.copy && !!onswappicture && contentOpen(box) && takesADrawing(box.mode);
+
+	/** The second of two taps: open the area, or wait for its click to ask for a picture. */
+	function openByTap(box: Box) {
+		lastTap = null;
+		tapOpenedAt = Date.now();
+		onselect?.(box.id, false);
+		if (swapsPicture(box)) pendingSwap = { id: box.id, at: tapOpenedAt };
+		else beginEdit(box);
+	}
 
 	/**
 	 * Every finger currently down, anywhere.
@@ -1397,9 +1424,7 @@
 		if (event.pointerType === 'touch' && mode === 'move') {
 			const now = event.timeStamp || Date.now();
 			if (lastTap && lastTap.id === box.id && now - lastTap.at < DOUBLE_TAP) {
-				lastTap = null;
-				onselect?.(box.id, false);
-				beginEdit(box);
+				openByTap(box);
 				return;
 			}
 			lastTap = { id: box.id, at: now };
@@ -1906,9 +1931,7 @@
 		if (tap.touch) {
 			const now = event.timeStamp || Date.now();
 			if (lastTap && lastTap.id === box.id && now - lastTap.at < DOUBLE_TAP) {
-				lastTap = null;
-				onselect?.(box.id, false);
-				beginEdit(box);
+				openByTap(box);
 				return;
 			}
 			lastTap = { id: box.id, at: now };
@@ -2369,7 +2392,7 @@
 		// nowhere to make one. The same double-click opens it full screen —
 		// on a locked page too, like typing: a drawing is content, not layout.
 		if (interactive && contentOpen(box) && takesADrawing(box.mode)) {
-			if (template.copy && onswappicture) onswappicture(box.id);
+			if (swapsPicture(box)) onswappicture?.(box.id);
 			else ondraw?.(box.id);
 			return;
 		}
@@ -2574,13 +2597,21 @@
 					startDrag(e, box, 'move');
 				}}
 				ontouchend={dropTapClick}
+				onclick={() => {
+					const swap = pendingSwap;
+					pendingSwap = null;
+					if (swap?.id === box.id && Date.now() - swap.at < 800) onswappicture?.(box.id);
+				}}
 				ondblclick={(e) => {
 					if (!interactive) return;
 					e.preventDefault();
+					if (Date.now() - tapOpenedAt < 800) return;
 					beginEdit(box);
 				}}
 				oncontextmenu={(e) => {
-					if (!interactive) return;
+					// Copy editing has none of the menu's actions to offer, and a
+					// writer selecting words wants the browser's own Copy and Paste.
+					if (!interactive || template.copy) return;
 					e.preventDefault();
 					// Right-clicking inside an existing selection acts on all of it;
 					// right-clicking outside one selects the box first.
