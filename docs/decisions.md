@@ -223,7 +223,58 @@ the handler. Measured both ways before the clamp existed — a `-8` bleed drew a
 no card in it and the whole design still inside, unreachable. Neither threw;
 that is what makes it worth writing down.
 
-## `src/lib/package.ts`
+## `src/lib/idml.ts`, `src/lib/xml.ts` and `src/lib/package.ts`
+
+**The Editable layer is the contract.** A designer already sorts a page into
+layers, so a layer called Editable says which frames a writer may change, in
+a place InDesign shows. A Script Label was the alternative: precise, but in a
+panel most designers never open. A frame's name in the Layers panel becomes
+its column, else its Script Label, else `Text 1`, `Picture 1`. A document
+with no such layer still imports, every frame a field, and says so first.
+
+**The artwork is a picture the designer exports, never rebuilt.** IDML holds
+no rendering, only paths, swatches and effects. Redrawing a logo from them
+would take a second renderer and still lose gradients, transparency and
+placed vector art. So the page's artwork comes in as a PNG or JPG made with
+the Editable layer hidden, and becomes the background, which covers the
+bleed. `bleedNote` checks the picture's proportions and warns when it looks
+like the trim alone: stretched over the bleed, it sits off every field by
+the bleed's width. A PDF is refused by name, since a browser cannot draw one
+as a background.
+
+**A frame takes one style, its commonest.** An area has one face, size and
+leading, so a frame is set in the style most of its characters use. Its
+paragraph settings come from its commonest paragraph. Bold, italic and a
+colour that differ from that become Markdown (`**`, `*`, `[…]{#hex}`); a frame
+with none of those stays plain, so a writer types no syntax. A run in a
+different face or size is set like the rest, and each frame that has one is
+named in the notes. Leading becomes a multiple of the size, tracking becomes
+mm, space before and after becomes the paragraph space in lines, and a first
+line indent becomes the indent in em.
+
+**Geometry goes through the matrices.** A frame's outline is its path's
+anchors in its own coordinates; its ItemTransform, through any groups, places
+it in the spread; the page's inverse brings it to the page's top-left. A turn
+is kept as `rotation` about the middle. A slant or a flip has no equivalent,
+so the frame is placed upright over the ground it covers, and noted. Page 1
+only: the first page of the first spread listed.
+
+**Colour is approximate, and says so.** CMYK goes to RGB by the plain formula
+with no profile; Lab through D50. Either way the screen shows a near colour,
+and the PDF the browser prints is RGB. A gradient or a mixed ink is left out
+and named.
+
+**`xml.ts` is a reader, not a DOM.** The tests run without a DOM, and the
+IDML reader walks plain objects. It parses elements, attributes, text and
+CDATA, skips comments, processing instructions (InDesign writes some special
+characters as `<?ACE 7?>`) and a DOCTYPE, and reads only the five named
+entities and numeric ones, which is all IDML uses.
+
+**Checked against real InDesign output.** Besides the hand-written fixture
+(`idml.fixture.ts`), the reader was run over the IDML regression files of an
+open-source IDML library: magazine pages, a four-page document, a rotated
+frame, grouped and threaded frames, linked pictures, and a Package folder
+with its `Document fonts/`. None of those files is in the repository.
 
 **A package carries what a template only names.** A template stays small by
 naming its pictures and fonts (AGENTS.md); a writer who was sent one has
@@ -234,6 +285,15 @@ is written, never on the designer's own. Reading it puts the pictures under
 the names the cells use. A picture of that name already in this browser is
 replaced, since the package is what the design was made with. Fonts go in only
 when the designer ticks that their licences allow it.
+
+**An InDesign folder is sorted, not trusted.** macOS's `__MACOSX/` and every
+dotfile are dropped. A picture the IDML links to is stored under the link's
+name; any other picture outside `Links/` may be the artwork: the only one,
+else the one named `background` or after the IDML, else the first, noted.
+Font files are matched to the families the layout uses by the family their
+own `name` table gives (typographic family over legacy, so `Minion Pro SmBd`
+is Minion Pro), never by file name. A matched family is installed whole:
+every face the folder has.
 
 ## Copy editing — `Template.copy`
 
@@ -3159,8 +3219,8 @@ first, because another template in the library may still be set in it.
 ## `src/lib/assets.ts` and `src/lib/fonts.ts`
 
 **A family can be several files.** An upload was one file for a whole family,
-drawn for every weight. A package brings Regular, Bold, Italic and Bold Italic
-as separate files, and loading each over the last
+drawn for every weight. A package or an InDesign folder brings Regular, Bold,
+Italic and Bold Italic as separate files, and loading each over the last
 would leave only the last. So a face stored with `weight` and `italic` is
 registered with those descriptors. The one nearest Regular is kept under the
 family's own key, which is the key a template's `FontRef.ref` names, so every

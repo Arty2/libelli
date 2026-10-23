@@ -50,7 +50,8 @@ src/lib/
   table.ts        column reorder, row sorting
   imposition.ts   tiling cards onto a sheet, in reading order or a zine's fold
   download.ts     hand the browser a file; zip.ts packs several into one, and unpacks
-  package.ts      a design, its table, pictures and fonts as one ZIP, for copy editing
+  idml.ts         an InDesign IDML's Editable layer -> areas, styles, one row; xml.ts parses
+  package.ts      a design, its table, pictures and fonts as one ZIP; an InDesign folder sorted
   dropfile.ts     what a file dropped on the app is: a template, a table, or neither
   template.ts     defaults (templates/default-card.json), validation, migration, import/export
   frame.ts        a file's x, y at the reference point; memory's top-left, through toFile

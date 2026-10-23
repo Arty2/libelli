@@ -187,6 +187,31 @@ A booklet is padded with blank pages to a multiple of four (eight for the mini
 zine). With **Recto / Verso** on, left-hand pages mirror the layout of the
 right-hand ones across the fold.
 
+## From InDesign
+
+A layout fixed in InDesign can be brought in and handed on for copy editing.
+In InDesign:
+
+1. Put the text and picture frames the writer may change on a layer called
+   **Editable**. Name each frame in the Layers panel; the name becomes its
+   column. Everything on other layers is fixed artwork.
+2. **File › Export… › InDesign Markup (IDML)**.
+3. Hide the Editable layer and export page 1 as **PNG or JPG**, with the
+   document's bleed included, as the artwork. A PDF will not do: a browser
+   cannot draw one as a background.
+4. Optionally use **File › Package…**, put the IDML and the artwork in the
+   folder it makes, and zip the folder. The pictures in `Links/` and the fonts
+   in `Document fonts/` then come in too.
+
+Drop the IDML or the zipped folder on libelli, or open it with the template
+menu's **Import…**. Each frame becomes an area at the same size and place,
+set in its paragraph style: font, size, leading, tracking, alignment, capitals,
+spacing and colour. Bold and italic words become Markdown. Bleed and crop
+marks are on. Only page 1 is read. Anything that could not be carried over is
+listed when the import finishes: text threaded across frames, tables,
+gradients, and CMYK colours, which are shown as their nearest screen colour.
+Then package it for copy editing, below.
+
 ## Copy editing
 
 A design can be handed to someone who should change its words and pictures

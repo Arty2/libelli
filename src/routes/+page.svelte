@@ -24,13 +24,18 @@
 		uploadBackgroundImage
 	} from '$lib/assets';
 	import { download, downloadBlob, fileStem } from '$lib/download';
+	import { IdmlError } from '$lib/idml';
 	import {
+		bleedNote,
 		MANIFEST,
+		matchFonts,
 		PackageError,
 		pictureType,
 		picturesNamed,
+		readInDesign,
 		readPackage,
 		writePackage,
+		type FontFileFacts,
 		type PackageFont,
 		type PackagePicture
 	} from '$lib/package';
@@ -42,6 +47,7 @@
 		ensureGoogleFont,
 		ensureTemplateFonts,
 		fontChoices,
+		fontFacts,
 		fontInventory,
 		fontRef,
 		installFontFaces,
@@ -3678,13 +3684,17 @@
 		return { text: `“${name}” imported as a new table, ${count} — the table you had is saved in your tables.`, tone: 'info' };
 	}
 
-	// ---- packages ---------------------------------------------------------------
+	// ---- archives: a package, or a layout from InDesign -----------------------
+
+	/** What an import could not carry over, listed in full rather than squeezed into the status line. */
+	let importReport = $state<{ title: string; notes: string[] } | null>(null);
 
 	/**
-	 * A package somebody made here (package.ts), opened as a new template and
-	 * a new table together, the pair it is; what was open is saved first, as
-	 * any import does. Like the other imports it reports rather than notifies,
-	 * so a drop of several files says what became of each.
+	 * A ZIP: a package somebody made here, or an InDesign layout — an IDML,
+	 * which is a ZIP itself, or a folder holding one. Opened as a new template
+	 * and a new table together, the pair it is; what was open is saved first,
+	 * as any import does. Like the other imports it reports rather than
+	 * notifies, so a drop of several files says what became of each.
 	 */
 	async function importArchiveFile(file: File): Promise<Said> {
 		if (editor !== 'here') return { text: 'Read only — press Open Here to import into your templates.', tone: 'warning' };
@@ -3694,17 +3704,30 @@
 		} catch (error) {
 			return { text: `“${file.name}” was not imported. ${error instanceof ZipError ? error.message : 'It could not be read.'}`, tone: 'warning' };
 		}
-		if (!files.has(MANIFEST)) return { text: `“${file.name}” was not imported. It is a ZIP, but not a libelli package.`, tone: 'warning' };
 		try {
-			return await openPackage(readPackage(files, tableNameFrom(file.name) || UNTITLED_TABLE));
+			if (files.has(MANIFEST)) return await openPackage(readPackage(files, tableNameFrom(file.name) || UNTITLED_TABLE));
+			return await openInDesign(await readInDesign(files, file.name));
 		} catch (error) {
-			return { text: `“${file.name}” was not imported. ${error instanceof PackageError ? error.message : 'It could not be read.'}`, tone: 'warning' };
+			const known = error instanceof PackageError || error instanceof IdmlError;
+			return { text: `“${file.name}” was not imported. ${known ? error.message : 'It could not be read.'}`, tone: 'warning' };
 		}
 	}
 
 	/** Pictures into this browser's store (or the folder), under the names the cells use. */
 	async function storePictures(pictures: PackagePicture[]) {
 		for (const p of pictures) await storeLocalImage(new File([p.bytes as BlobPart], p.name, { type: pictureType(p.name) }), p.name);
+	}
+
+	/** A picture's size in pixels, or null where the browser cannot say (an SVG, often). */
+	async function pictureSize(p: PackagePicture): Promise<{ w: number; h: number } | null> {
+		try {
+			const bitmap = await createImageBitmap(new Blob([p.bytes as BlobPart], { type: pictureType(p.name) }));
+			const size = { w: bitmap.width, h: bitmap.height };
+			bitmap.close();
+			return size;
+		} catch {
+			return null;
+		}
 	}
 
 	/**
@@ -3763,6 +3786,47 @@
 		return {
 			text: `“${next.name}” opened for copy editing: change the words and the pictures, then Export… to print.${missing}`,
 			tone: missing ? 'warning' : 'info'
+		};
+	}
+
+	async function openInDesign(contents: Awaited<ReturnType<typeof readInDesign>>): Promise<Said> {
+		const { layout } = contents;
+		const notes = [...layout.notes, ...contents.notes];
+		await storePictures(contents.pictures);
+		let next = layout.template;
+		if (contents.background) {
+			await storePictures([contents.background]);
+			next = { ...next, page: { ...next.page, image: { src: contents.background.name, source: 'local', fit: 'cover' } } };
+			const size = await pictureSize(contents.background);
+			const note = size && bleedNote(size, next.page, bleedFor(next.bleed));
+			if (note) notes.push(note);
+		}
+		const facts: FontFileFacts[] = [];
+		for (const file of contents.fontFiles) {
+			const read = await fontFacts(file.bytes.slice().buffer).catch(() => null);
+			if (read) facts.push({ name: file.name, ...read });
+			else notes.push(`“${file.name}” could not be read as a font${/\.woff2$/i.test(file.name) ? ' — a WOFF2 cannot be read here; use the OTF or TTF' : ''}.`);
+		}
+		const { families, missing } = matchFonts(layout.faces, facts);
+		const byFamily = new Map<string, FaceFile[]>();
+		for (const [family, files] of families) {
+			byFamily.set(
+				family,
+				files.map((f) => ({ name: f.name, bytes: contents.fontFiles.find((x) => x.name === f.name)!.bytes.slice().buffer, weight: f.weight, italic: f.italic }))
+			);
+		}
+		next = await installFamilies(next, byFamily);
+		if (missing.length) {
+			notes.push(
+				`No font file for ${missing.join(', ')} was in the archive; the fields are set in a fallback until one is added (Pictures › Fonts), or until InDesign's “Document fonts” folder is included.`
+			);
+		}
+		await adoptPair(next, layout.dataset, layout.mapping);
+		if (notes.length) importReport = { title: `“${next.name}” from InDesign`, notes };
+		const count = next.boxes.length;
+		return {
+			text: `“${next.name}” imported from InDesign: ${count} field${count === 1 ? '' : 's'}, one row to fill.${notes.length ? ` ${notes.length} thing${notes.length === 1 ? '' : 's'} to check.` : ''}`,
+			tone: notes.length ? 'warning' : 'info'
 		};
 	}
 
@@ -3886,7 +3950,7 @@
 						: `“${file.name}” is a picture — drop it on the page or on an area to place it.`,
 					tone: 'warning'
 				});
-			else said.push({ text: `“${file.name}” is not a file libelli can import — drop a CSV, TSV, template JSON or package ZIP.`, tone: 'warning' });
+			else said.push({ text: `“${file.name}” is not a file libelli can import — drop a CSV, TSV, template JSON, package ZIP or InDesign IDML.`, tone: 'warning' });
 		}
 		notify(said.map((s) => s.text).join(' '), said.some((s) => s.tone === 'warning') ? 'warning' : 'info');
 	}
@@ -4100,7 +4164,7 @@
      still be dropped on one. -->
 {#if dragHint}
 	<div class="drop-hint" aria-hidden="true">
-		<p>Drop a CSV, a template JSON or a package to open it as a new table or template — what is open now is saved first.</p>
+		<p>Drop a CSV, a template JSON, a package or an InDesign IDML to open it as a new table or template — what is open now is saved first.</p>
 	</div>
 {/if}
 
@@ -4203,7 +4267,7 @@
 		>
 			<Icon name="document-multiple" size={15} /> <span class="label">Export…</span>
 		</button>
-		<input bind:this={templateInput} type="file" accept="application/json,.json,.zip,application/zip" hidden onchange={importTemplate} />
+		<input bind:this={templateInput} type="file" accept="application/json,.json,.idml,.zip,application/zip" hidden onchange={importTemplate} />
 		<input bind:this={swapInput} type="file" accept="image/*" hidden onchange={onSwapChosen} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
 		<input bind:this={backgroundInput} type="file" accept="image/*" hidden onchange={onMissingBackgroundChosen} />
@@ -4900,6 +4964,26 @@
 			<span class="spacer"></span>
 			<button onclick={() => (leavingCopy = false)}>Cancel</button>
 			<button class="primary" data-default onclick={leaveCopyMode}>Edit Design</button>
+		</div>
+	</div>
+{/if}
+
+<!-- What an InDesign import could not carry over: a list, since a layout can
+     have several things to say and the status line holds one. Nothing to
+     decide, so one button. -->
+{#if importReport}
+	<div class="modal-backdrop" role="presentation" onclick={() => (importReport = null)}></div>
+	<div class="modal narrow import-report" role="dialog" aria-modal="true" aria-labelledby="import-report-title" use:armDefault>
+		<h2 id="import-report-title">{importReport.title}</h2>
+		<p>Imported, with {importReport.notes.length === 1 ? 'one thing' : `${importReport.notes.length} things`} to check:</p>
+		<ul>
+			{#each importReport.notes as note, i (i)}
+				<li>{note}</li>
+			{/each}
+		</ul>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button class="primary" data-default onclick={() => (importReport = null)}>OK</button>
 		</div>
 	</div>
 {/if}
@@ -5898,6 +5982,17 @@
 	.modal p {
 		margin: 0 0 8px;
 		color: #333;
+	}
+
+	/* An import's things to check: each its own item, since each is its own fix. */
+	.import-report ul {
+		margin: 0 0 12px;
+		padding-left: 1.2em;
+		color: #333;
+	}
+
+	.import-report li + li {
+		margin-top: 6px;
 	}
 
 	/* A tick with a sentence beside it, wrapping under itself rather than under the box. */
