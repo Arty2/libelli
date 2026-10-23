@@ -2400,11 +2400,33 @@
 		onedit?.(box.id);
 	}
 
+	/** How long after a double tap opens a field the browser's own word selection is undone. */
+	const TAP_SELECT_GUARD = 800;
+
 	const focusOnMount = (node: HTMLTextAreaElement) => {
 		node.focus();
 		// At the end, not selecting everything: this is a double-click into words
 		// that already exist, and replacing them wholesale is rarely the intent.
-		node.setSelectionRange(node.value.length, node.value.length);
+		const toEnd = () => node.setSelectionRange(node.value.length, node.value.length);
+		toEnd();
+		// A touch browser's double tap selects the word under the finger, and the
+		// field opened under that finger on the second tap — so the first key
+		// typed replaced "Concert" rather than following it. For a moment after
+		// a double tap, a selection the browser makes is put back to the caret.
+		if (Date.now() - tapOpenedAt > TAP_SELECT_GUARD) return;
+		const until = Date.now() + TAP_SELECT_GUARD;
+		const undoSelection = () => {
+			if (Date.now() > until) return stop();
+			if (document.activeElement === node && node.selectionStart !== node.selectionEnd) toEnd();
+		};
+		const stop = () => {
+			document.removeEventListener('selectionchange', undoSelection);
+			node.removeEventListener('select', undoSelection);
+		};
+		document.addEventListener('selectionchange', undoSelection);
+		node.addEventListener('select', undoSelection);
+		setTimeout(stop, TAP_SELECT_GUARD);
+		return { destroy: stop };
 	};
 
 	function onEditorKeydown(event: KeyboardEvent) {

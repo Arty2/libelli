@@ -300,6 +300,14 @@ it, and the click that ends the second tap opens the picker. The browser's own
 `dblclick` after two taps is ignored once a double tap has opened an area; it
 was opening it a second time, and asking for the picker twice.
 
+**A double tap leaves the caret at the end, as a double-click does.** The
+field opens under the finger on the second tap, and a touch browser's double
+tap selects the word there, so the first key typed replaced it. For 0.8 s
+after a double tap opens a field, a selection the browser makes is put back
+to a caret at the end (`focusOnMount`); after that, a selection is the
+person's and is left alone. It applies wherever an area is opened by touch,
+not only in copy editing.
+
 **Words that do not fit are always marked.** The cut line under a clipped
 area was drawn only with the bounds on, which are the designer's furniture.
 In copy editing it is drawn regardless, over a white halo, since a red dash
