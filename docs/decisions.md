@@ -4616,8 +4616,10 @@ dialog first. Turning it on also asks for full screen, inside the press that
 is the gesture the request needs; a refusal is swallowed, since read only in
 the window is still what was asked for. Turning it off leaves full screen
 only if the logo entered it (`wentFullscreen`, cleared when full screen is
-left by hand), so a window someone made full screen themselves stays so. In a read-only tab the logo opens the Open Here / Read Only
-choice, as the eye does.
+left by hand), so a window someone made full screen themselves stays so. In a read-only tab the logo asks for full screen in the same way,
+and opens the Open Here / Read Only choice, as the eye does, when the
+browser refuses or the tab is full screen already — so the dialog is still
+one press away, and bare full screen keeps Escape and a double-click.
 
 **A glance at the other dark, never stored.** Hovering it (after
 200ms, so crossing it does not flash the page) or holding it (the tooltip's

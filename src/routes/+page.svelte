@@ -1112,13 +1112,17 @@
 
 	/**
 	 * The logo: read only, there and back. In the editing tab it is `viewing`;
-	 * in a read-only tab it brings the dialog, whose Open Here is the way back
-	 * to editing — taking the editing from another tab is not a thing to do on
+	 * in a read-only tab it asks for full screen, and failing that brings the
+	 * dialog, whose Open Here is the way back to editing — taking the editing from another tab is not a thing to do on
 	 * one press of the mark. The theme is the button beside Help, not this.
 	 */
 	function toggleReadOnly() {
 		if (editor === 'readonly') {
-			readOnlyAsk = true;
+			// Already read only, so the press is for the display: full screen
+			// if the browser allows, the dialog if not or if it is already —
+			// bare full screen has its own way back (Escape, a double-click).
+			if (fullscreen || !document.fullscreenEnabled) readOnlyAsk = true;
+			else document.documentElement.requestFullscreen().catch(() => (readOnlyAsk = true));
 			return;
 		}
 		if (editor !== 'here') return;
