@@ -187,6 +187,20 @@ A booklet is padded with blank pages to a multiple of four (eight for the mini
 zine). With **Recto / Verso** on, left-hand pages mirror the layout of the
 right-hand ones across the fold.
 
+## Copy editing
+
+A design can be handed to someone who should change its words and pictures
+and nothing else. In the template menu, **Package for Copy Editing…** saves
+one ZIP with the design, its table and every picture they use. Tick
+**Include the fonts** only if their licences let you share the files.
+
+Whoever receives it drops the ZIP on libelli. It opens locked, with a note
+above the page instead of the design's controls. Double-click a field to
+change its words, or a picture to choose another; a picture can also be
+dropped on it. A red line under a field means its words do not fit and will
+be cut off. **Export…** prints, with the design's bleed and crop marks.
+**Edit Design…** leaves copy editing, after asking.
+
 ## Language
 
 **Language** in the Page bar says what language the cards are in. It sets the

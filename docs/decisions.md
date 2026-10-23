@@ -223,6 +223,44 @@ the handler. Measured both ways before the clamp existed — a `-8` bleed drew a
 no card in it and the whole design still inside, unreachable. Neither threw;
 that is what makes it worth writing down.
 
+## `src/lib/package.ts`
+
+**A package carries what a template only names.** A template stays small by
+naming its pictures and fonts (AGENTS.md); a writer who was sent one has
+neither. So a package is one stored ZIP: `libelli.json` (the mapping, the
+pictures, the font files and what face each is), `template.json`, `table.csv`,
+`pictures/` and `fonts/`. Writing it sets `copy` and `locked` on the copy that
+is written, never on the designer's own. Reading it puts the pictures under
+the names the cells use. A picture of that name already in this browser is
+replaced, since the package is what the design was made with. Fonts go in only
+when the designer ticks that their licences allow it.
+
+## Copy editing — `Template.copy`
+
+**A mode, not a permission.** Everything here runs in the writer's own
+browser, so nothing can stop them changing the design, and pretending
+otherwise would be theatre. The mode puts the design's controls away (the
+page bar, the area bar, the padlock, the unlock key) and says, above the
+page, what is left to do. **Edit Design…** asks, then clears `copy` and
+leaves `locked`, so unlocking is a second, deliberate step.
+
+**Only the row is the writer's.** On a locked design an area's own words
+still open for typing, as content; under copy editing they do not. A label or
+a heading written into the design is the designer's, and what a writer
+changes is the table: fields bound to a column, on the card or in the table.
+
+**A picture field takes a drop on a locked design.** Its picture is the row's,
+as a field's words are, and the design's lock never froze those
+(`contentOpen`). Under copy editing a double-click on one asks for a file
+instead of opening the drawing: a writer swaps a photograph, they do not
+paint on it.
+
+**Words that do not fit are always marked.** The cut line under a clipped
+area was drawn only with the bounds on, which are the designer's furniture.
+In copy editing it is drawn regardless, over a white halo, since a red dash
+on red artwork vanished, and its shears explain rather than offer to let the
+area grow.
+
 ## `src/lib/autolayout.ts`
 
 **A heading is lowercased, then read word by word from the end.** Every hint
@@ -3119,6 +3157,16 @@ one changes nothing — and an unused local file gets Delete instead, asking
 first, because another template in the library may still be set in it.
 
 ## `src/lib/assets.ts` and `src/lib/fonts.ts`
+
+**A family can be several files.** An upload was one file for a whole family,
+drawn for every weight. A package brings Regular, Bold, Italic and Bold Italic
+as separate files, and loading each over the last
+would leave only the last. So a face stored with `weight` and `italic` is
+registered with those descriptors. The one nearest Regular is kept under the
+family's own key, which is the key a template's `FontRef.ref` names, so every
+check that a font is missing is unchanged; the others go beside it under
+`faceKey` (`font:x@700i`). The tray lists a family once, weighing all its
+faces. Deleting it, or uploading a single file over it, takes them all.
 
 **The Pictures tray uploads, and carries by pointer.** Without the folder —
 Firefox, Safari, every phone — the only way in was dropping a file on an area,

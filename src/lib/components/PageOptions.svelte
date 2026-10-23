@@ -82,6 +82,7 @@
 		editorFonts: FontRef[];
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
+		onexportpackage?: () => void;
 		oneditcss: () => void;
 		/** open the drawing surface for the selected area */
 		ondraw?: (id: string) => void;
@@ -107,6 +108,7 @@
 		onnotice,
 		onimporttemplate,
 		onexporttemplate,
+		onexportpackage,
 		oneditcss
 	}: Props = $props();
 
@@ -491,7 +493,12 @@
 							<!-- Files in and out, apart from the templates to start. -->
 							<li role="separator"><hr /></li>
 							<li role="none">
-								<button role="menuitem" disabled={pageFrozen} onclick={fromMenu(onimporttemplate)}>
+								<button
+									role="menuitem"
+									disabled={pageFrozen}
+									title="A template JSON, or a package saved with Package for Copy Editing"
+									onclick={fromMenu(onimporttemplate)}
+								>
 									<span class="tick" aria-hidden="true"><Icon name="document-import" size={14} /></span>
 									Import…
 								</button>
@@ -502,6 +509,18 @@
 									Export
 								</button>
 							</li>
+							{#if onexportpackage}
+								<li role="none">
+									<button
+										role="menuitem"
+										title="This design, its table and its pictures in one file, which opens locked for someone to change the words and print"
+										onclick={fromMenu(onexportpackage)}
+									>
+										<span class="tick" aria-hidden="true"><Icon name="package" size={14} /></span>
+										Package for Copy Editing…
+									</button>
+								</li>
+							{/if}
 							<li role="separator"><hr /></li>
 							<!-- The two that lose something, together and in red: one puts the
 							     starter back, the other takes this template away. Reset only on

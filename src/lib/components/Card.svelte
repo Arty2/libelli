@@ -170,6 +170,12 @@
 		onedit?: (id: string | null) => void;
 		/** open the drawing surface for an area; a picture is never edited in place */
 		ondraw?: (id: string) => void;
+		/**
+		 * Copy editing (`Template.copy`): a double-click on a picture field asks
+		 * for a file to swap in, rather than opening the drawing — a writer
+		 * changes a photograph, they do not paint over it.
+		 */
+		onswappicture?: (id: string) => void;
 		/** open the cell a Data Field area prints, full size in the table */
 		oneditcell?: (id: string) => void;
 		/** drawn over the paper and under everything else — the stage's grid */
@@ -235,6 +241,7 @@
 		onaction,
 		onedit,
 		ondraw,
+		onswappicture,
 		oneditcell,
 		underlay,
 		ontext,
@@ -1231,8 +1238,17 @@
 			(item) => item.kind === 'file' && item.type.startsWith('image/')
 		);
 
+	/**
+	 * Whether a picture may be dropped here: an area the design lets change,
+	 * or a picture field bound to a column on a locked one — the picture is the
+	 * row's, as a field's words are, and a lock on the layout does not freeze it
+	 * (see `contentOpen`). The page still refuses it if the table is locked.
+	 */
+	const takesPicture = (box: Box) =>
+		editable(box) || (interactive && box.mode === 'image' && !!box.slot && !!mapping[box.slot]);
+
 	function dragOver(event: DragEvent, box: Box) {
-		if (!onimagedrop || !editable(box) || !draggingImage(event)) return;
+		if (!onimagedrop || !takesPicture(box) || !draggingImage(event)) return;
 		// Without this the browser takes the drop itself and navigates to the
 		// file, which leaves the design behind.
 		event.preventDefault();
@@ -1241,7 +1257,7 @@
 	}
 
 	function drop(event: DragEvent, box: Box) {
-		if (!onimagedrop || !editable(box)) return;
+		if (!onimagedrop || !takesPicture(box)) return;
 		const file = Array.from(event.dataTransfer?.files ?? []).find((f) => f.type.startsWith('image/'));
 		dropId = null;
 		if (!file) return;
@@ -2342,7 +2358,10 @@
 	 * locked data field still opens for typing or drawing, and the page refuses
 	 * the edit if the table is locked (`refuseLockedTable`).
 	 */
-	const contentOpen = (box: Box) => !box.locked || (!!box.slot && !!mapping[box.slot]);
+	const contentOpen = (box: Box) =>
+		// Copy editing hands over the row and nothing else: an area's own words
+		// are the design's — a label, a heading — and stay as the designer set them.
+		template.copy ? !!box.slot && !!mapping[box.slot] : !box.locked || (!!box.slot && !!mapping[box.slot]);
 
 	function beginEdit(box: Box) {
 		// A picture is the one thing not edited in place: an area on a card is
@@ -2350,7 +2369,8 @@
 		// nowhere to make one. The same double-click opens it full screen —
 		// on a locked page too, like typing: a drawing is content, not layout.
 		if (interactive && contentOpen(box) && takesADrawing(box.mode)) {
-			ondraw?.(box.id);
+			if (template.copy && onswappicture) onswappicture(box.id);
+			else ondraw?.(box.id);
 			return;
 		}
 		if (!canEdit(box)) return;
@@ -2444,7 +2464,9 @@
 		class:offered={!cutting}
 		style="--edge:{cutting ? '100%' : `${trimEdges(box)[0]}mm`};--stack:{badgeCount(box)}"
 		disabled={!editable(box)}
-		title={cutting
+		title={cutting && template.copy
+			? 'These words do not fit the field, and what does not fit will not print — shorten them.'
+			: cutting
 			? 'The content does not fit — this area is cutting off what will print. Press to let it grow instead.'
 			: 'This area has grown past the height it was given. Press to cut it at that height instead.'}
 		aria-label={cutting ? 'Let this area grow to fit' : 'Cut this area at its height'}
@@ -2727,13 +2749,17 @@
 
 				<!-- The cut is a clipped area's alone: a growing one is never cut —
 				     it has the trim line above instead. -->
-				{#if bounds && !empty && (box.overflow === 'clip' || box.overflow === 'shrink') && overflowing[box.id]}
+				<!-- Copy editing shows it with the bounds off too: words that do not
+				     fit are the one thing a writer has to see, and the bounds are
+				     the designer's furniture. -->
+				{#if (bounds || (interactive && !!template.copy)) && !empty && (box.overflow === 'clip' || box.overflow === 'shrink') && overflowing[box.id]}
 					<!-- Where the words are actually severed, drawn as the cut it is: a
 					     dashed red line along the bottom edge, with the shears straddling
 					     it at the end of the stroke. The other three edges keep the plain
 					     bound they always had — only this one is doing the cutting, and
 					     saying so on all four would say nothing. -->
 					<svg class="chrome cut-line" aria-hidden="true">
+						<line class="halo" x1="0" y1="100%" x2="100%" y2="100%" />
 						<line x1="0" y1="100%" x2="100%" y2="100%" />
 					</svg>
 					{@render shears(box, true)}
@@ -3809,6 +3835,19 @@
 			stroke: #b42318;
 			stroke-width: var(--line-thick);
 			stroke-dasharray: calc(var(--line) * 3) calc(var(--line) * 3);
+		}
+
+		/* Under the dashes, paper-white and unbroken, so the cut reads as red and
+		   white on any artwork — on a red band it was red on red. */
+		.cut-line line.halo {
+			stroke: #fff;
+			stroke-width: calc(var(--line-thick) * 2);
+			stroke-dasharray: none;
+		}
+
+		/* The shears get a ground of their own for the same reason. */
+		.overflow-mark:not(.offered) {
+			background: #fff;
 		}
 
 		/* The same badge as the others — same size and radius — sitting astride

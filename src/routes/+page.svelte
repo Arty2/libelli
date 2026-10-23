@@ -16,13 +16,25 @@
 	import {
 		localImageName,
 		localImageRef,
+		readLocalImage,
 		resolveBackground,
 		resolveLocalImages,
 		safeMediaUrl,
 		storeLocalImage,
 		uploadBackgroundImage
 	} from '$lib/assets';
-	import { download, fileStem } from '$lib/download';
+	import { download, downloadBlob, fileStem } from '$lib/download';
+	import {
+		MANIFEST,
+		PackageError,
+		pictureType,
+		picturesNamed,
+		readPackage,
+		writePackage,
+		type PackageFont,
+		type PackagePicture
+	} from '$lib/package';
+	import { unzip, ZipError } from '$lib/zip';
 	import { droppedKind, mightTakeDrag, sameTable, sameTemplate, tableNameFrom } from '$lib/dropfile';
 	import { parseTable } from '$lib/parse';
 	import {
@@ -32,6 +44,9 @@
 		fontChoices,
 		fontInventory,
 		fontRef,
+		installFontFaces,
+		storedFaces,
+		type FaceFile,
 		listStoredFonts,
 		mergeFonts,
 		previewFamilies,
@@ -2987,8 +3002,50 @@
 		notify(`Style pasted onto ${targets.length} area${targets.length === 1 ? '' : 's'}.`);
 	}
 
+	// ---- copy editing ------------------------------------------------------------
+
+	/**
+	 * A package opened for somebody to fill in (`Template.copy`): the design
+	 * locked and its controls put away — the page bar, the area bar, the
+	 * padlock — so what is left is the page, the words, the pictures and
+	 * Export. Not a permission: Edit Design leaves it, after asking, since a
+	 * writer who wanders into the layout is the thing the mode is for.
+	 */
+	const copyMode = $derived(!!template.copy);
+	let leavingCopy = $state(false);
+	let swapInput = $state<HTMLInputElement | null>(null);
+	let swapTarget: string | null = null;
+
+	function leaveCopyMode() {
+		leavingCopy = false;
+		describe('Edit the design');
+		// The lock stays: leaving copy editing shows the design's controls, and
+		// unlocking is the next, separate step — the padlock beside the page.
+		template = stripUndefined({ ...$state.snapshot(template), copy: undefined }) as Template;
+		notify('Copy editing off — the design is still locked; the padlock beside the page unlocks it. Ctrl/Cmd+Z goes back.');
+	}
+
+	/** A picture field asked to swap its picture: a file, from wherever the person keeps them. */
+	function swapPicture(id: string) {
+		swapTarget = id;
+		swapInput?.click();
+	}
+
+	async function onSwapChosen(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		const box = template.boxes.find((b) => b.id === swapTarget);
+		swapTarget = null;
+		if (file && box) await handleImageDrop(box, file);
+	}
+
 	/** The design's own lock, from the keyboard: the padlock above Area. */
 	function toggleDesignLock() {
+		if (copyMode) {
+			notify('This is open for copy editing — Edit Design, above the page, comes first.', 'warning');
+			return;
+		}
 		const locking = !template.locked;
 		describe(locking ? 'Lock the design' : 'Unlock the design');
 		template = stripUndefined({ ...$state.snapshot(template), locked: locking ? true : undefined }) as Template;
@@ -3495,7 +3552,7 @@
 		const file = input.files?.[0];
 		input.value = '';
 		if (!file) return;
-		const said = await importTemplateFile(file);
+		const said = droppedKind(file) === 'archive' ? await importArchiveFile(file) : await importTemplateFile(file);
 		notify(said.text, said.tone);
 	}
 
@@ -3621,6 +3678,127 @@
 		return { text: `“${name}” imported as a new table, ${count} — the table you had is saved in your tables.`, tone: 'info' };
 	}
 
+	// ---- packages ---------------------------------------------------------------
+
+	/**
+	 * A package somebody made here (package.ts), opened as a new template and
+	 * a new table together, the pair it is; what was open is saved first, as
+	 * any import does. Like the other imports it reports rather than notifies,
+	 * so a drop of several files says what became of each.
+	 */
+	async function importArchiveFile(file: File): Promise<Said> {
+		if (editor !== 'here') return { text: 'Read only — press Open Here to import into your templates.', tone: 'warning' };
+		let files: Map<string, Uint8Array>;
+		try {
+			files = await unzip(new Uint8Array(await file.arrayBuffer()));
+		} catch (error) {
+			return { text: `“${file.name}” was not imported. ${error instanceof ZipError ? error.message : 'It could not be read.'}`, tone: 'warning' };
+		}
+		if (!files.has(MANIFEST)) return { text: `“${file.name}” was not imported. It is a ZIP, but not a libelli package.`, tone: 'warning' };
+		try {
+			return await openPackage(readPackage(files, tableNameFrom(file.name) || UNTITLED_TABLE));
+		} catch (error) {
+			return { text: `“${file.name}” was not imported. ${error instanceof PackageError ? error.message : 'It could not be read.'}`, tone: 'warning' };
+		}
+	}
+
+	/** Pictures into this browser's store (or the folder), under the names the cells use. */
+	async function storePictures(pictures: PackagePicture[]) {
+		for (const p of pictures) await storeLocalImage(new File([p.bytes as BlobPart], p.name, { type: pictureType(p.name) }), p.name);
+	}
+
+	/**
+	 * Each family's faces installed, and the design's fonts pointed at them:
+	 * a package made in another browser names that browser's keys, and the
+	 * faces are stored here under this one's.
+	 */
+	async function installFamilies(next: Template, byFamily: Map<string, FaceFile[]>): Promise<Template> {
+		if (!byFamily.size) return next;
+		const refs: FontRef[] = [];
+		for (const [family, faces] of byFamily) refs.push(await installFontFaces(family, faces));
+		editorFonts = mergeFonts(editorFonts, refs);
+		saveEditorFonts($state.snapshot(editorFonts));
+		await refreshStoredFonts();
+		const fonts = next.fonts.filter((f) => !refs.some((r) => r.family.toLowerCase() === f.family.toLowerCase()));
+		const kept = refs.map((r) => ({ ...r, ...tuningOf(next.fonts.find((f) => f.family.toLowerCase() === r.family.toLowerCase())) }));
+		return { ...next, fonts: [...fonts, ...kept] };
+	}
+
+	/**
+	 * A template and its table, opened together as new entries in both
+	 * libraries — one step to undo, as a template import is.
+	 */
+	async function adoptPair(next: Template, data: Dataset, map: Mapping) {
+		settleProvisional();
+		await Promise.all([flushTemplate(), flushDataset()]);
+		describe(`Import “${next.name}”`);
+		template = next;
+		selectedIds = [];
+		editingId = null;
+		rememberTemplate(templateId);
+		templateId = nextTemplateId();
+		saveTemplateId(templateId);
+		rememberTable(datasetId);
+		datasetId = nextDatasetId();
+		saveDatasetId(datasetId);
+		dataset = { ...data, name: freeTableName(data.name?.trim() || UNTITLED_TABLE, true) };
+		activeRow = 0;
+		mapping = map;
+		missingFonts = await ensureTemplateFonts(template);
+		await Promise.all([saveTemplateDoc(templateId, $state.snapshot(template)), saveDatasetDoc(datasetId, $state.snapshot(dataset))]);
+		await Promise.all([refreshLibrary(), refreshTables()]);
+	}
+
+	async function openPackage(contents: ReturnType<typeof readPackage>): Promise<Said> {
+		await storePictures(contents.pictures);
+		const byFamily = new Map<string, FaceFile[]>();
+		for (const font of contents.fonts) {
+			const faces = byFamily.get(font.family) ?? [];
+			faces.push({ name: `${font.family}.${font.format}`, format: font.format, bytes: font.bytes.slice().buffer, weight: font.weight, italic: font.italic });
+			byFamily.set(font.family, faces);
+		}
+		const next = await installFamilies(contents.template, byFamily);
+		await adoptPair(next, contents.dataset, contents.mapping);
+		const missing = missingFonts.length ? ` ${missingFonts.length === 1 ? 'One font is' : `${missingFonts.length} fonts are`} not included — see above the page.` : '';
+		return {
+			text: `“${next.name}” opened for copy editing: change the words and the pictures, then Export… to print.${missing}`,
+			tone: missing ? 'warning' : 'info'
+		};
+	}
+
+	/** The package dialog, and whether the fonts go in it. */
+	let packaging = $state(false);
+	let packageFonts = $state(false);
+	/** The uploaded families this design is set in: what Include Fonts would put in. */
+	const packagedFamilies = $derived(template.fonts.filter((f) => f.source === 'local' && f.ref).map((f) => f.family));
+
+	/**
+	 * This design, its table and every picture they name, as one file for a
+	 * writer — see package.ts. The fonts only when ticked: a licence that lets
+	 * a designer use a face does not always let them hand the file on.
+	 */
+	async function exportPackage() {
+		packaging = false;
+		const t = $state.snapshot(template) as Template;
+		const d = $state.snapshot(dataset) as Dataset;
+		const pictures: PackagePicture[] = [];
+		const absent: string[] = [];
+		for (const name of picturesNamed(t, d)) {
+			const blob = await readLocalImage(name);
+			if (blob) pictures.push({ name, bytes: new Uint8Array(await blob.arrayBuffer()) });
+			else absent.push(name);
+		}
+		const fonts: PackageFont[] = [];
+		if (packageFonts) for (const f of t.fonts) if (f.source === 'local' && f.ref) fonts.push(...(await storedFaces(f.ref)));
+		const bytes = writePackage({ template: t, dataset: d, mapping: $state.snapshot(mapping), pictures, fonts });
+		downloadBlob(`${fileStem(t.name)}.zip`, new Blob([bytes], { type: 'application/zip' }));
+		const missing = absent.length ? ` ${absent.length} picture${absent.length === 1 ? ' is' : 's are'} missing from this browser and not in it: ${absent.join(', ')}.` : '';
+		notify(
+			`Package saved: the design, ${d.rows.length} row${d.rows.length === 1 ? '' : 's'}, ${pictures.length} picture${pictures.length === 1 ? '' : 's'}${fonts.length ? ` and ${fonts.length} font file${fonts.length === 1 ? '' : 's'}` : ''}. It opens for copy editing.${missing}`,
+			missing ? 'warning' : 'info'
+		);
+	}
+
 	/**
 	 * Something being dragged over the app that it might take, for the hint
 	 * that says where it will go. A count rather than a flag: `dragenter` and
@@ -3700,6 +3878,7 @@
 			const kind = droppedKind(file);
 			if (kind === 'template') said.push(await importTemplateFile(file));
 			else if (kind === 'table') said.push(await importTableFile(file));
+			else if (kind === 'archive') said.push(await importArchiveFile(file));
 			else if (kind === 'image')
 				said.push({
 					text: placed
@@ -3707,7 +3886,7 @@
 						: `“${file.name}” is a picture — drop it on the page or on an area to place it.`,
 					tone: 'warning'
 				});
-			else said.push({ text: `“${file.name}” is not a file libelli can import — drop a CSV, TSV or template JSON.`, tone: 'warning' });
+			else said.push({ text: `“${file.name}” is not a file libelli can import — drop a CSV, TSV, template JSON or package ZIP.`, tone: 'warning' });
 		}
 		notify(said.map((s) => s.text).join(' '), said.some((s) => s.tone === 'warning') ? 'warning' : 'info');
 	}
@@ -3921,7 +4100,7 @@
      still be dropped on one. -->
 {#if dragHint}
 	<div class="drop-hint" aria-hidden="true">
-		<p>Drop a CSV or a template JSON to open it as a new table or template — what is open now is saved first.</p>
+		<p>Drop a CSV, a template JSON or a package to open it as a new table or template — what is open now is saved first.</p>
 	</div>
 {/if}
 
@@ -3967,24 +4146,26 @@
 		<button class="help" onclick={() => (helpOpen = true)} title={withKey("How this works, and the keys", "help")}>
 			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
-		<button
-			class="page"
-			onclick={() => {
-				// Not a plain toggle any more: the two bars share one row, so this
-				// says "show me the page" — which, with an area selected, means
-				// letting go of the area rather than stacking a second bar on top.
-				const showing = pageSetupOpen && !barBox;
-				pageSetupOpen = !showing;
-				if (!showing && barBox) selectBox(null);
-			}}
-			aria-pressed={pageSetupOpen && !barBox}
-			aria-expanded={pageSetupOpen && !barBox}
-			title={barBox && pageSetupOpen
-				? 'Page — the area bar has the row; this takes it back'
-				: 'Show or hide the page settings'}
-		>
-			<Icon name="document-blank" size={15} /> <span class="label">Page</span>
-		</button>
+		{#if !copyMode}
+				<button
+				class="page"
+				onclick={() => {
+					// Not a plain toggle any more: the two bars share one row, so this
+					// says "show me the page" — which, with an area selected, means
+					// letting go of the area rather than stacking a second bar on top.
+					const showing = pageSetupOpen && !barBox;
+					pageSetupOpen = !showing;
+					if (!showing && barBox) selectBox(null);
+				}}
+				aria-pressed={pageSetupOpen && !barBox}
+				aria-expanded={pageSetupOpen && !barBox}
+				title={barBox && pageSetupOpen
+					? 'Page — the area bar has the row; this takes it back'
+					: 'Show or hide the page settings'}
+			>
+				<Icon name="document-blank" size={15} /> <span class="label">Page</span>
+			</button>
+		{/if}
 		<!-- Every stored picture, in a tray of its own in the table's place: the
 		     pictures are the browser's, not the page's — a row's own photograph
 		     is in there too. Pictures and Data share that room, one at a time, so
@@ -4022,7 +4203,8 @@
 		>
 			<Icon name="document-multiple" size={15} /> <span class="label">Export…</span>
 		</button>
-		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
+		<input bind:this={templateInput} type="file" accept="application/json,.json,.zip,application/zip" hidden onchange={importTemplate} />
+		<input bind:this={swapInput} type="file" accept="image/*" hidden onchange={onSwapChosen} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
 		<input bind:this={backgroundInput} type="file" accept="image/*" hidden onchange={onMissingBackgroundChosen} />
 		<input
@@ -4049,7 +4231,19 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden && !quiet}
+	<!-- Copy editing says so, and how, in place of the bars it puts away. -->
+	{#if copyMode && !quiet}
+		<div class="banner copy" role="note">
+			<span>
+				<strong>Copy editing.</strong> Double-click a field to change its words, or a picture to swap it — a red
+				line under a field means its words do not fit. Then Export… to print.
+			</span>
+			<span class="spacer"></span>
+			<button onclick={() => (leavingCopy = true)} title="Leave copy editing to change the design itself">Edit Design…</button>
+		</div>
+	{/if}
+
+	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden && !quiet && !copyMode}
 		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
@@ -4118,6 +4312,7 @@
 						onnotice={notify}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
+						onexportpackage={() => (packaging = true)}
 						oneditcss={openCss}
 						ondraw={drawArea}
 						onuploadimage={(id, file) => {
@@ -4155,6 +4350,7 @@
 						onnotice={notify}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
+						onexportpackage={() => (packaging = true)}
 						oneditcss={openCss}
 						ondraw={drawArea}
 						onuploadimage={(id, file) => {
@@ -4304,6 +4500,7 @@
 			onrelock={() => applyTemplate({ ...$state.snapshot(template), locked: true } as Template)}
 			onedit={beginEditing}
 			ondraw={drawArea}
+			onswappicture={swapPicture}
 			oneditcell={editCell}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
@@ -4685,6 +4882,49 @@
 			{#if !template.locked}
 				<button class="primary" onclick={saveCss} title="Put this on the card and close — Ctrl/Cmd + Enter">{cssDirty ? 'Save' : 'Done'}</button>
 			{/if}
+		</div>
+	</div>
+{/if}
+
+<!-- Leaving copy editing asks: the person who presses it is most often the
+     writer the mode is for, and the design is what they were sent not to move. -->
+{#if leavingCopy}
+	<div class="modal-backdrop" role="presentation" onclick={() => (leavingCopy = false)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="leave-copy-title" use:armDefault>
+		<h2 id="leave-copy-title">Edit the design?</h2>
+		<p>
+			“{template.name}” was sent to have its words and pictures changed. Changing the layout is for whoever designed
+			it; the design stays locked until you unlock it.
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (leavingCopy = false)}>Cancel</button>
+			<button class="primary" data-default onclick={leaveCopyMode}>Edit Design</button>
+		</div>
+	</div>
+{/if}
+
+<!-- A package is for someone else: what goes in is said before it is made,
+     and the fonts are asked about, since only the designer knows whether
+     their licences let the files travel. -->
+{#if packaging}
+	<div class="modal-backdrop" role="presentation" onclick={() => (packaging = false)}></div>
+	<div class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="package-title" use:armDefault>
+		<h2 id="package-title">Package for copy editing</h2>
+		<p>
+			One file with this design, its table and every picture they use. It opens locked: whoever you send it to
+			changes the words and the pictures, and prints.
+		</p>
+		{#if packagedFamilies.length}
+			<label class="check">
+				<input type="checkbox" bind:checked={packageFonts} />
+				<span>Include the fonts — {packagedFamilies.join(', ')}. Only if their licences let you share the files.</span>
+			</label>
+		{/if}
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (packaging = false)}>Cancel</button>
+			<button class="primary" data-default onclick={() => void exportPackage()}>Save Package</button>
 		</div>
 	</div>
 {/if}
@@ -5268,6 +5508,16 @@
 		font-size: 0.75rem;
 	}
 
+	/* Copy editing is a mode, not a fault: a quiet band rather than the warning yellow. */
+	.banner.copy {
+		background: #eef4fb;
+		border-bottom-color: #d3e1f1;
+	}
+
+	.banner .spacer {
+		flex: 1;
+	}
+
 	.status-bar {
 		display: flex;
 		align-items: center;
@@ -5648,6 +5898,18 @@
 	.modal p {
 		margin: 0 0 8px;
 		color: #333;
+	}
+
+	/* A tick with a sentence beside it, wrapping under itself rather than under the box. */
+	.modal label.check {
+		display: flex;
+		align-items: flex-start;
+		gap: 8px;
+		margin: 4px 0 12px;
+	}
+
+	.modal label.check input {
+		margin-top: 0.2em;
 	}
 
 	/* The CSS dialog is the one that holds an editor rather than a paragraph, and
