@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { crc32, zipStore } from './zip';
+import { crc32, unzip, zipStore, ZipError } from './zip';
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 
@@ -46,5 +46,38 @@ describe('zipStore', () => {
 		const day = view.getUint16(12, true);
 		expect([time >> 11, (time >> 5) & 63, (time & 31) * 2]).toEqual([14, 30, 10]);
 		expect([(day >> 9) + 1980, (day >> 5) & 15, day & 31]).toEqual([2026, 9, 25]);
+	});
+});
+
+describe('unzip', () => {
+	it('reads back what zipStore wrote', async () => {
+		const files = await unzip(zipStore([
+			{ name: 'a.txt', data: bytes('hello') },
+			{ name: 'dir/', data: new Uint8Array() },
+			{ name: 'dir/cartes_é.txt', data: bytes('world!') }
+		]));
+		expect([...files.keys()]).toEqual(['a.txt', 'dir/cartes_é.txt']);
+		expect(new TextDecoder().decode(files.get('dir/cartes_é.txt'))).toBe('world!');
+	});
+
+	it('inflates a deflated entry, as every zip tool writes them', async () => {
+		const text = 'Paragraph '.repeat(200);
+		const stream = new Blob([bytes(text)]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+		const packed = new Uint8Array(await new Response(stream).arrayBuffer());
+		const zip = zipStore([{ name: 'notes.txt', data: packed }]);
+		const view = new DataView(zip.buffer);
+		view.setUint16(8, 8, true); // local header: deflate
+		const directory = view.getUint32(zip.length - 22 + 16, true);
+		view.setUint16(directory + 10, 8, true);
+		const files = await unzip(zip);
+		expect(new TextDecoder().decode(files.get('notes.txt'))).toBe(text);
+	});
+
+	it('refuses what is not an archive, and one cut short', async () => {
+		await expect(unzip(bytes('name,price\nTea,2'))).rejects.toBeInstanceOf(ZipError);
+		const zip = zipStore([{ name: 'a.txt', data: bytes('hello there') }]);
+		const view = new DataView(zip.buffer);
+		view.setUint32(view.getUint32(zip.length - 22 + 16, true) + 20, 999, true);
+		await expect(unzip(zip)).rejects.toThrow(/cut short/);
 	});
 });

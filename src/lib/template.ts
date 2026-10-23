@@ -574,6 +574,7 @@ export function normaliseTemplate(raw: unknown): Template {
 			lang: safeLang(t.lang) === DEFAULT_LANG ? undefined : safeLang(t.lang),
 			css: typeof t.css === 'string' && t.css.trim() ? t.css : undefined,
 			locked: t.locked ? true : undefined,
+			copy: t.copy ? true : undefined,
 			starter: typeof t.starter === 'string' && t.starter.trim() ? t.starter.trim() : undefined
 		})
 	};

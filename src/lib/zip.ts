@@ -1,5 +1,6 @@
 /**
- * A ZIP of files, stored rather than compressed.
+ * A ZIP of files, stored rather than compressed — and, the other way, any
+ * ordinary ZIP read back.
  *
  * For the PNG export: fifty cards used to be fifty downloads, which a browser
  * either asks about fifty times or quietly stops after the first few. One
@@ -12,6 +13,12 @@
  *
  * No ZIP64: an archive over 4 GB of cards is not a thing this app makes, and
  * `zipStore` refuses one rather than writing a file that would not open.
+ *
+ * `unzip` reads what other tools write too — a package unzipped and zipped
+ * again by an operating system is deflated — so it takes deflated entries
+ * as well as stored ones, inflated by the browser's own
+ * `DecompressionStream`. It goes by the central directory, which is where
+ * the sizes are true even for an entry written as a stream.
  */
 
 export interface ZipEntry {
@@ -115,4 +122,67 @@ export function zipStore(entries: ZipEntry[]): Uint8Array<ArrayBuffer> {
 		at += part.length;
 	}
 	return out;
+}
+
+/** Why an archive could not be read, said in words a person can act on. */
+export class ZipError extends Error {}
+
+async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
+	const stream = new Blob([data as BlobPart]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+	return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+/**
+ * Every file in an archive, by its name inside it. Folders are left out —
+ * an entry whose name ends in `/` holds nothing. Throws `ZipError` for a
+ * file that is not a ZIP, or uses what this reader does not: ZIP64,
+ * encryption, or a compression other than none and deflate.
+ */
+export async function unzip(bytes: Uint8Array): Promise<Map<string, Uint8Array>> {
+	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+	// The end record is the last 22 bytes, unless the archive has a comment
+	// after it: up to 64 KB of one, searched backwards for the signature.
+	let end = -1;
+	for (let at = bytes.length - 22; at >= Math.max(0, bytes.length - 22 - 0xffff); at--) {
+		if (view.getUint32(at, true) === 0x06054b50) {
+			end = at;
+			break;
+		}
+	}
+	if (end < 0) throw new ZipError('This is not a ZIP archive.');
+	const count = view.getUint16(end + 10, true);
+	let at = view.getUint32(end + 16, true);
+	if (count === 0xffff || at === 0xffffffff) throw new ZipError('This archive is ZIP64, which libelli cannot read.');
+
+	const decoder = new TextDecoder();
+	const files = new Map<string, Uint8Array>();
+	for (let i = 0; i < count; i++) {
+		if (at + 46 > bytes.length || view.getUint32(at, true) !== 0x02014b50) throw new ZipError('This archive is damaged.');
+		const flags = view.getUint16(at + 8, true);
+		const method = view.getUint16(at + 10, true);
+		const packed = view.getUint32(at + 20, true);
+		const nameLength = view.getUint16(at + 28, true);
+		const extraLength = view.getUint16(at + 30, true);
+		const commentLength = view.getUint16(at + 32, true);
+		const local = view.getUint32(at + 42, true);
+		const name = decoder.decode(bytes.subarray(at + 46, at + 46 + nameLength));
+		at += 46 + nameLength + extraLength + commentLength;
+		if (name.endsWith('/')) continue;
+		if (flags & 1) throw new ZipError(`“${name}” in this archive is encrypted.`);
+		if (local + 30 > bytes.length || view.getUint32(local, true) !== 0x04034b50) throw new ZipError('This archive is damaged.');
+		// The local header's own name and extra field, which need not match the
+		// directory's lengths, are what the data follows.
+		const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+		const data = bytes.subarray(start, start + packed);
+		if (data.length !== packed) throw new ZipError('This archive is cut short.');
+		if (method === 0) files.set(name, data.slice());
+		else if (method === 8) {
+			try {
+				files.set(name, await inflateRaw(data));
+			} catch {
+				throw new ZipError(`“${name}” in this archive is damaged.`);
+			}
+		} else throw new ZipError(`“${name}” is compressed in a way libelli cannot read.`);
+	}
+	return files;
 }
