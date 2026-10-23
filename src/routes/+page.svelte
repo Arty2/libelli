@@ -4334,13 +4334,32 @@
 	     something up. -->
 	<!-- Copy editing says so, and how, in place of the bars it puts away. -->
 	{#if copyMode && !quiet}
+		<!-- Two wordings, picked by CSS rather than script: a finger double-taps
+		     where a mouse double-clicks, and a phone gets one line rather than
+		     three, since this sits above the page it is there to help with. The
+		     short one carries the long one as its title, for a press and hold. -->
 		<div class="banner copy" role="note">
-			<span>
-				<strong>Copy editing.</strong> Double-click a field to change its words, or a picture to swap it — a red
-				line under a field means its words do not fit. Then Export… to print.
+			<span class="copy-note">
+				<strong>Copy editing.</strong>
+				<span class="long"
+					><span class="by-mouse">Double-click</span><span class="by-touch">Double-tap</span> a field to change its words, or a
+					picture to swap it — a red line under a field means its words do not fit. Then Export… to print.</span
+				>
+				<span
+					class="short"
+					title="Double-tap a field to change its words, or a picture to swap it. A red line under a field means its words do not fit. Then Export… to print."
+					><span class="by-mouse">Double-click</span><span class="by-touch">Double-tap</span> a field to change it.</span
+				>
 			</span>
 			<span class="spacer"></span>
-			<button onclick={() => (leavingCopy = true)} title="Leave copy editing to change the design itself">Edit Design…</button>
+			<button
+				class="edit-design"
+				onclick={() => (leavingCopy = true)}
+				title="Edit Design: leave copy editing to change the design itself"
+				aria-label="Edit Design"
+			>
+				<Icon name="edit" size={15} /> <span class="label">Edit Design…</span>
+			</button>
 		</div>
 	{/if}
 
@@ -5645,6 +5664,60 @@
 
 	.banner .spacer {
 		flex: 1;
+	}
+
+	/* Which word: a mouse double-clicks, a finger double-taps. By the primary
+	   pointer, as a laptop with a touchscreen still reads a mouse's word. */
+	.banner.copy .by-touch,
+	.banner.copy .short {
+		display: none;
+	}
+
+	@media (hover: none) and (pointer: coarse) {
+		.banner.copy .by-mouse {
+			display: none;
+		}
+
+		.banner.copy .by-touch {
+			display: inline;
+		}
+	}
+
+	/* A phone: one line, not three over the page — the short wording, and
+	   Edit Design as a square icon with its name in its title. */
+	@media (max-width: 560px) {
+		.banner.copy {
+			flex-wrap: nowrap;
+			padding: 6px 16px;
+		}
+
+		.banner.copy .copy-note {
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.banner.copy .long {
+			display: none;
+		}
+
+		.banner.copy .short {
+			display: inline;
+		}
+
+		.banner.copy .edit-design {
+			flex: none;
+			width: calc(0.9375rem + 14px);
+			height: calc(0.9375rem + 14px);
+			padding: 0;
+			display: grid;
+			place-items: center;
+		}
+
+		.banner.copy .edit-design .label {
+			display: none;
+		}
 	}
 
 	.status-bar {
