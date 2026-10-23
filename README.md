@@ -42,7 +42,11 @@ read-only tab in full screen and it shows the card alone, fitted to the
 screen, on black and in the colours it prints in, whatever the theme — a
 display; leaving full screen brings the rest back, as do Escape and a
 double-click. A read-only tab always fits the card to its own window; it does
-not follow the editing tab's zoom.
+not follow the editing tab's zoom. The logo brings the choice back too.
+
+In the editing tab, the logo hides everything but the card — the same view,
+without giving up the editing — and the logo, the eye or Escape brings the
+editor back. Keys that would change anything do nothing meanwhile.
 
 ## Data
 

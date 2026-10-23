@@ -1,6 +1,6 @@
 /**
  * Light, dark, and dark with the page turned inside out — stepped through by
- * pressing the logo, and nowhere else.
+ * the theme button left of Help, and nowhere else.
  *
  * No setting and no reading of `prefers-color-scheme`: the app is a light
  * thing by default because the page on it is paper, and someone who wants it
@@ -27,7 +27,7 @@ export type Theme = (typeof THEMES)[number];
  */
 export const THEME_KEY = 'ui:theme';
 
-/** What each one is called in the logo's tooltip. */
+/** What each one is called in the theme button's tooltip. */
 export const THEME_NAMES: Record<Theme, string> = {
 	light: 'Light',
 	dark: 'Dark',
@@ -52,7 +52,7 @@ export function nextTheme(theme: Theme): Theme {
 }
 
 /**
- * The other dark, for a glance while the logo is hovered or held: dark and
+ * The other dark, for a glance while the theme button is hovered or held: dark and
  * dark with the page inverted are the pair worth comparing — whether the white
  * page is too bright tonight — and light is a press away anyway. `null` from
  * light, which has nothing to glance at.

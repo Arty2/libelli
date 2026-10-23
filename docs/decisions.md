@@ -4596,21 +4596,31 @@ match the stage.
 **The trade-off:** greys come out as exact inverses of the light theme's, not
 chosen for the dark — `#f7f7f7` bars are `#080808` — and the logo goes white
 with the rest, which is what it should do. Screen only; print and PNG never
-see it. No `prefers-color-scheme`: the logo is the switch, and the app is
-light until it is pressed.
+see it. No `prefers-color-scheme`: the theme button is the switch, and the
+app is light until it is pressed.
 
-**Two controls, one behaviour.** The theme button left of Help wears the
-theme it is on (Carbon's `light`; `contrast` for dark, half and half because
-the page stays white; `asleep`, the moon, for the page inverted too); the logo, where the
-theme started, keeps working. Both spread one `themeControl` object, so they
-cannot drift apart.
+**One control.** The theme button left of Help wears the theme it is on
+(Carbon's `light`; `contrast` for dark, half and half because the page stays
+white; `asleep`, the moon, for the page inverted too). The logo, where the
+theme started, stepped it too until 0.30.7; it now toggles reading only (see
+below), which wanted a control always on screen more than a second way to the
+theme did.
 
-**A glance at the other dark, never stored.** Hovering either (after
+**The logo reads only.** In the editing tab it sets `viewing`, a local view
+that is the read-only tab's chrome — `quiet`, the card fitted, full screen
+bare — without giving up the tab lock or stopping the autosave: nothing can
+be changed while it lasts (keys other than Export, drops and selection all
+stop), so there is nothing to save, and handing the lock over to look would
+let another tab take it. The logo, the eye or Escape ends it; Escape closes a
+dialog first. In a read-only tab the logo opens the Open Here / Read Only
+choice, as the eye does.
+
+**A glance at the other dark, never stored.** Hovering it (after
 200ms, so crossing it does not flash the page) or holding it (the tooltip's
 own `TIP_HOLD`, so the tip comes up with it) applies the other dark until the
 pointer leaves or lifts; the stored theme never changes. The Tooltip already
 swallows the click a held tip ends in, so a glance is never also a press. A
-click while the mouse is still over the logo spends the glance until the
+click while the mouse is still over the button spends the glance until the
 pointer leaves — otherwise the theme just chosen would be hidden under the
 preview of its pair; and a click clears a glance still waiting to start,
 which would otherwise land on the new theme a moment later.

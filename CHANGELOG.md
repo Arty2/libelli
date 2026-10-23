@@ -8,12 +8,12 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.30.6 — 2026-10-22
+## 0.30.7 — 2026-10-23
 
 - Drag a CSV, TSV or template JSON onto the app to open it as a new table or template; what was open is saved first. A file it cannot read is named in the status bar with the reason.
 - Import in the table menu opens a CSV as a new table too; Paste still fills the open one. A file already in your library opens that copy instead of a second one. Whitespace, beside the row height, shows spaces, tabs and line ends where you type.
 - A row whose card runs off the page — a Grow area grown past the margin or the edge — is marked under its number in the table.
-- Open in another tab: Read Only shows the card being edited there, live, following its row, and in full screen the card alone; or Open Here, or Close.
+- Open in another tab: Read Only shows the card being edited there, live, following its row, and in full screen the card alone; or Open Here, or Close. The logo shows the card alone in any tab; the theme is the button beside Help.
 - `%%today:countdown:2026-12-25%%` counts the days, hours or minutes to a moment, or from a column, and moves on by itself. Language in the Page bar sets the cards' `lang`, so the template's CSS can put its words in another language.
 - Template files from before 0.28 are now read like any other: an area aligned right or bottom may need moving back.
 
@@ -45,7 +45,7 @@ file under **What's new** — press the version number in the status bar.
 
 ## 0.26.3 — 2026-10-02
 
-- Dark theme: the button left of Help, or the logo, steps light, dark, and
+- Dark theme: the button left of Help steps light, dark, and
   dark with the page inverted. Hover or hold for a look at the other dark.
 - A full-screen sheet zooms: pinch, Ctrl/Cmd + scroll, + and −, double-click.
 - Folio, quarto and octavo in Pages per Sheet.

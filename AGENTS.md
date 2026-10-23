@@ -63,7 +63,7 @@ src/lib/
   onboarding.ts   the starter template and sample rows (sample-cards.csv) a first run lands on
   sw-policy.ts    the worker's answer to a request; pwa.ts registration, updates, install
   textsize.ts     no browser zoom: a pinch off the stage sizes the interface's text
-  theme.ts        the logo steps light, dark, dark with the page inverted
+  theme.ts        the theme button steps light, dark, dark with the page inverted
   turn.ts         Output's Portrait / Landscape: this browser's, never the template's
   version.ts      VERSION, and the bumping rule; changelog.ts reads CHANGELOG.md
   components/

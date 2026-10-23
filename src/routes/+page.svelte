@@ -239,7 +239,7 @@
 	}
 
 	/**
-	 * The other dark, shown while the logo is hovered or held — see peekTheme.
+	 * The other dark, shown while the theme button is hovered or held — see peekTheme.
 	 * Shown, never stored: letting go puts back the theme that was chosen.
 	 */
 	let peeking = false;
@@ -264,9 +264,9 @@
 	}
 
 	/**
-	 * What the logo and the theme button both do: a press steps the theme, a
-	 * hover or a hold glances at the other dark. Spread on each, so the two
-	 * cannot drift into answering differently.
+	 * What the theme button does: a press steps the theme, a hover or a hold
+	 * glances at the other dark. An object to spread, from when the logo
+	 * did the same; the logo now toggles reading only (`toggleReadOnly`).
 	 *
 	 * The hold is the tooltip's own (TIP_HOLD), so the tip still comes up with
 	 * it, and the Tooltip drops the click a held tip ends in — a glance is
@@ -1095,7 +1095,36 @@
 	 * size of the screen — Escape or a double-click brings the dialog back too,
 	 * so the way out never depends on the guess.
 	 */
-	const bare = $derived(editor === 'readonly' && fullscreen);
+	/**
+	 * The editing tab looking at its work as a read-only tab would: the card
+	 * alone, nothing to work it with, from a press on the logo and back with
+	 * another (or the eye, or Escape). Still the editor — saving, feeding any
+	 * read-only tabs — only nothing can be edited from it while it is on, so
+	 * a reader at the screen can page the cards without moving one.
+	 */
+	let viewing = $state(false);
+
+	/**
+	 * The logo: read only, there and back. In the editing tab it is `viewing`;
+	 * in a read-only tab it brings the dialog, whose Open Here is the way back
+	 * to editing — taking the editing from another tab is not a thing to do on
+	 * one press of the mark. The theme is the button beside Help, not this.
+	 */
+	function toggleReadOnly() {
+		if (editor === 'readonly') {
+			readOnlyAsk = true;
+			return;
+		}
+		if (editor !== 'here') return;
+		viewing = !viewing;
+		if (viewing) {
+			selectedIds = [];
+			editingId = null;
+		}
+		notify(viewing ? 'Read only — press the logo to edit again.' : 'Editing.');
+	}
+
+	const bare = $derived((editor === 'readonly' || (editor === 'here' && viewing)) && fullscreen);
 
 	/**
 	 * The pared-down view: read only, and also while the open-in-another-tab
@@ -1106,7 +1135,7 @@
 	 * still being asked (`checking`): the editing tab passes through that on
 	 * every start, and its bars would flash shut and open again.
 	 */
-	const quiet = $derived(editor === 'readonly' || editor === 'elsewhere' || editor === 'handed');
+	const quiet = $derived(editor === 'readonly' || editor === 'elsewhere' || editor === 'handed' || (editor === 'here' && viewing));
 
 	/**
 	 * Nothing of anybody's work read yet, so nothing drawn on the stage: what
@@ -3107,6 +3136,17 @@
 			} else if (!readOnlyAsk) readOnlyAsk = true;
 			return;
 		}
+		// The editing tab viewing read only: Escape closes what is open, or goes
+		// back to editing; printing still prints; nothing else edits from here.
+		if (editor === 'here' && viewing) {
+			if (event.key === 'Escape') {
+				if (helpOpen || whatsNewOpen || statusOpen) helpOpen = whatsNewOpen = statusOpen = false;
+				else if (stageModalOpen) lightboxOpen = previewOpen = false;
+				else toggleReadOnly();
+				return;
+			}
+			if (!wantsExport(event)) return;
+		}
 		// A tab that is not the editor holds a stale copy behind its dialog:
 		// a delete or an undo there edits what nobody will see saved, and an
 		// undo across a template switch would write its id over the editor's.
@@ -3598,6 +3638,10 @@
 			notify('Another tab is editing — press Open Here first, then drop the file again.', 'warning');
 			return;
 		}
+		if (viewing) {
+			notify('Read only — press the logo to edit, then drop the file again.', 'warning');
+			return;
+		}
 		const said: Said[] = placed ? [{ text: `“${placed.name}” placed.`, tone: 'info' }] : [];
 		for (const file of rest) {
 			const kind = droppedKind(file);
@@ -3828,17 +3872,20 @@
 	</div>
 {/if}
 
-<div class="app" class:view-only={quiet} class:unloaded class:bare ondblclick={() => bare && (readOnlyAsk = true)} role="presentation">
+<div class="app" class:view-only={quiet} class:unloaded class:bare ondblclick={() => bare && (viewing ? toggleReadOnly() : (readOnlyAsk = true))} role="presentation">
 	<header class="toolbar">
-		<!-- The mark, and the theme: each press steps light, dark, dark with the
-		     page inverted (theme.ts), and a hover or a hold glances at the other
-		     dark — the same as the theme button beside Help, see themeControl.
-		     Kept on the mark as well, where it was first. -->
+		<!-- The mark: read only, there and back — see toggleReadOnly. The theme
+		     is the button beside Help, which a read-only view keeps. -->
 		<button
 			class="brand"
-			{...themeControl}
-			title={themeTitle}
-			aria-label="libelli — theme: {THEME_NAMES[theme]}, press for {THEME_NAMES[nextTheme(theme)].toLowerCase()}"
+			onclick={toggleReadOnly}
+			aria-pressed={editor === 'here' ? viewing : undefined}
+			title={editor === 'readonly'
+				? 'Read only — press to edit here, or to close this tab'
+				: viewing
+					? 'Read only — press to edit again'
+					: 'Read only: the card alone, nothing to edit — press again to come back'}
+			aria-label={editor === 'readonly' || viewing ? 'libelli — read only; press to edit' : 'libelli — read only view'}
 		>
 			<img src="{base}/logo.svg" alt="" width="389" height="314" draggable="false" />
 		</button>
@@ -4147,7 +4194,7 @@
 			clock={clockTick}
 			viewOnly={quiet}
 			{bare}
-			onviewonly={() => (readOnlyAsk = true)}
+			onviewonly={() => (viewing ? toggleReadOnly() : (readOnlyAsk = true))}
 			{template}
 			{row}
 			{mapping}
