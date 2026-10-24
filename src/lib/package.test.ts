@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { MANIFEST, PackageError, packageFiles, pictureType, picturesNamed, readPackage, sameBytes, safePictureName, writePackage } from './package';
+import { enc, frame, idml } from './idml.fixture';
+import {
+	bleedNote,
+	matchFonts,
+	MANIFEST,
+	PackageError,
+	packageFiles,
+	pictureDimensions,
+	pictureType,
+	picturesNamed,
+	readInDesign,
+	readPackage,
+	sameBytes,
+	safePictureName,
+	writePackage
+} from './package';
 import { blankTemplate, newBox } from './template';
 import type { Dataset, Template } from './types';
 import { unzip, zipStore } from './zip';
-
-const enc = (text: string) => new TextEncoder().encode(text);
 
 const template = (): Template => ({
 	...blankTemplate(),
@@ -72,11 +85,119 @@ describe('a package', () => {
 	});
 });
 
-describe('pictureType', () => {
-	it('names an SVG as one, which a blob needs to be drawn', () => {
-		expect(pictureType('logo.SVG')).toBe('image/svg+xml');
-		expect(pictureType('photo.jpg')).toBe('image/jpeg');
-		expect(pictureType('notes.txt')).toBe('');
+/** InDesign's File › Package folder, zipped by macOS, with the artwork added. */
+function packageFolder(extra: Array<{ name: string; data: Uint8Array }> = [], options: { background?: boolean } = {}) {
+	const layout = zipStore([...idml()].map(([name, data]) => ({ name, data })));
+	return new Map<string, Uint8Array>([
+		['Concert/Concert.idml', layout],
+		['Concert/Concert.indd', enc('indd')],
+		['Concert/Links/hall view.jpg', enc('hall')],
+		['Concert/Document fonts/SourceSerif4-Regular.otf', enc('font')],
+		['__MACOSX/Concert/._Concert.idml', enc('junk')],
+		...(options.background === false ? [] : ([['Concert/Concert background.png', enc('art')]] as Array<[string, Uint8Array]>)),
+		...extra.map((e) => [e.name, e.data] as [string, Uint8Array])
+	]);
+}
+
+describe('readInDesign', () => {
+	it('reads an IDML on its own', async () => {
+		const read = await readInDesign(idml(), 'Concert.idml');
+		expect(read.layout.template.name).toBe('Concert');
+		expect(read.background).toBeNull();
+	});
+
+	it('finds the IDML in a package folder, its linked pictures, its fonts and the artwork', async () => {
+		const read = await readInDesign(packageFolder(), 'Concert.zip');
+		expect(read.layout.template.boxes.map((b) => b.slot)).toEqual(['title', 'Text-2', 'photo']);
+		expect(read.pictures).toEqual([{ name: 'hall view.jpg', bytes: enc('hall') }]);
+		expect(read.background).toEqual({ name: 'Concert background.png', bytes: enc('art') });
+		expect(read.fontFiles.map((f) => f.name)).toEqual(['SourceSerif4-Regular.otf']);
+		expect(read.notes).toEqual([]);
+	});
+
+	it('picks the artwork named so among several pictures, and says it chose', async () => {
+		const read = await readInDesign(packageFolder([{ name: 'Concert/proof.jpg', data: enc('proof') }]), 'Concert.zip');
+		expect(read.background?.name).toBe('Concert background.png');
+		expect(read.notes[0]).toMatch(/Several pictures/);
+	});
+
+	it('says how to export the artwork when there is none, and why a PDF will not do', async () => {
+		const none = await readInDesign(packageFolder([], { background: false }), 'Concert.zip');
+		expect(none.notes.join(' ')).toMatch(/No picture of the page artwork/);
+		const pdf = await readInDesign(packageFolder([{ name: 'Concert/Concert.pdf', data: enc('%PDF') }], { background: false }), 'Concert.zip');
+		expect(pdf.notes.join(' ')).toMatch(/is a PDF, which a browser cannot draw/);
+	});
+
+	it('asks for the IDML when only the InDesign document is there', async () => {
+		const files = packageFolder();
+		files.delete('Concert/Concert.idml');
+		await expect(readInDesign(files, 'Concert.zip')).rejects.toThrow(/InDesign Markup \(IDML\)/);
+	});
+});
+
+describe('readInDesign, from review', () => {
+	it('says what a bare IDML is missing, as a folder would', async () => {
+		const read = await readInDesign(idml(), 'Concert.idml');
+		expect(read.notes.join(' ')).toMatch(/An IDML holds no picture of the page artwork/);
+		expect(read.notes.join(' ')).toMatch(/holds none of the pictures it links to \(hall view\.jpg\)/);
+	});
+
+	it('takes the IDML named after the InDesign document when there are two', async () => {
+		const files = packageFolder([{ name: 'Concert/old export.idml', data: zipStore([{ name: 'x', data: enc('x') }]) }]);
+		const read = await readInDesign(files, 'Concert.zip');
+		expect(read.layout.template.boxes).toHaveLength(3);
+		expect(read.notes[0]).toMatch(/“Concert\.idml” was brought in, the one named after the InDesign document/);
+	});
+
+	it('shows a PNG or JPG in place of a TIFF link of the same name', async () => {
+		const layout = idml();
+		const spread = new TextDecoder().decode(layout.get('Spreads/Spread_u1.xml')).replace('hall%20view.jpg', 'hall%20view.tif');
+		layout.set('Spreads/Spread_u1.xml', enc(spread));
+		const files = new Map<string, Uint8Array>([
+			['Concert/Concert.idml', zipStore([...layout].map(([name, data]) => ({ name, data })))],
+			['Concert/Links/hall view.tif', enc('tiff')],
+			['Concert/Links/hall view.jpg', enc('jpeg')],
+			['Concert/Concert background.png', enc('art')]
+		]);
+		const read = await readInDesign(files, 'Concert.zip');
+		expect(read.layout.dataset.rows[0].photo).toBe('local:hall view.jpg');
+		expect(read.pictures).toEqual([{ name: 'hall view.jpg', bytes: enc('jpeg') }]);
+		expect(read.background?.name).toBe('Concert background.png');
+		expect(read.notes.join(' ')).toMatch(/“hall view\.jpg” from the archive is shown in its place/);
+	});
+});
+
+describe('matchFonts', () => {
+	const face = (name: string, family: string, weight = 400, italic = false, width = 5) => ({ name, family, weight, italic, width });
+
+	it('matches files to the families the layout uses, by the family the file names', () => {
+		const files = [face('MinionPro-Regular.otf', 'Minion Pro'), face('MinionPro-It.otf', 'Minion Pro', 400, true), face('Other.otf', 'Other Sans')];
+		const { families, missing } = matchFonts(['Minion Pro', 'Gill Sans'], files);
+		expect(families.get('Minion Pro')?.map((f) => f.name)).toEqual(['MinionPro-Regular.otf', 'MinionPro-It.otf']);
+		expect(missing).toEqual(['Gill Sans']);
+	});
+
+	it('leaves out a condensed width and a face described twice', () => {
+		const files = [face('MyriadPro-Regular.otf', 'Myriad Pro'), face('MyriadPro-Cond.otf', 'Myriad Pro', 400, false, 3), face('MyriadPro-Regular copy.otf', 'Myriad Pro')];
+		const { families, skipped } = matchFonts(['Myriad Pro'], files);
+		expect(families.get('Myriad Pro')?.map((f) => f.name)).toEqual(['MyriadPro-Regular.otf']);
+		expect(skipped.sort()).toEqual(['MyriadPro-Cond.otf', 'MyriadPro-Regular copy.otf']);
+	});
+
+	it('takes a family that only comes condensed, rather than none', () => {
+		const { families } = matchFonts(['Narrow'], [face('Narrow.otf', 'Narrow', 400, false, 3)]);
+		expect(families.get('Narrow')).toHaveLength(1);
+	});
+});
+
+describe('bleedNote', () => {
+	const page = { w: 148, h: 210 };
+	it('speaks up for artwork of the trim alone', () => {
+		expect(bleedNote({ w: 1748, h: 2480 }, page, 3)).toMatch(/without its bleed/);
+	});
+	it('stays quiet for artwork with its bleed, or no bleed to have', () => {
+		expect(bleedNote({ w: 1819, h: 2551 }, page, 3)).toBeNull();
+		expect(bleedNote({ w: 1748, h: 2480 }, page, 0)).toBeNull();
 	});
 });
 
@@ -115,6 +236,14 @@ describe('sameBytes', () => {
 		expect(sameBytes(enc('abc'), enc('abc'))).toBe(true);
 		expect(sameBytes(enc('abc'), enc('abd'))).toBe(false);
 		expect(sameBytes(enc('abc'), enc('ab'))).toBe(false);
+	});
+});
+
+describe('pictureType', () => {
+	it('names an SVG as one, which a blob needs to be drawn', () => {
+		expect(pictureType('logo.SVG')).toBe('image/svg+xml');
+		expect(pictureType('photo.jpg')).toBe('image/jpeg');
+		expect(pictureType('notes.txt')).toBe('');
 	});
 });
 
@@ -167,5 +296,42 @@ describe('what else a package carries, from the second review', () => {
 
 	it('refuses a picture named as a dotfile, which would be dropped as clutter', () => {
 		expect(safePictureName('.hidden.png')).toBe(false);
+	});
+});
+
+describe('pictureDimensions', () => {
+	it('reads a PNG and a JPEG from their headers', () => {
+		const png = new Uint8Array(24);
+		const pv = new DataView(png.buffer);
+		pv.setUint32(0, 0x89504e47);
+		pv.setUint32(12, 0x49484452);
+		pv.setUint32(16, 1819);
+		pv.setUint32(20, 2551);
+		expect(pictureDimensions(png)).toEqual({ w: 1819, h: 2551 });
+		// SOI, an APP0 of 16 bytes, then a baseline SOF0: precision, height, width.
+		const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, ...new Array(14).fill(0), 0xff, 0xc0, 0x00, 0x11, 0x08, 0x09, 0xf7, 0x07, 0x1b, 0x03]);
+		expect(pictureDimensions(jpg)).toEqual({ w: 0x071b, h: 0x09f7 });
+		expect(pictureDimensions(enc('GIF89a'))).toBeNull();
+	});
+});
+
+describe('readInDesign, second review', () => {
+	it('never lets a stand-in take a file another frame links to, nor the artwork a picture’s name', async () => {
+		const layout = idml();
+		// The photo frame links photo.jpg and a second frame photo.tif.
+		const spread = new TextDecoder().decode(layout.get('Spreads/Spread_u1.xml'))
+			.replace('hall%20view.jpg', 'photo.tif')
+			.replace('</Spread>', `${frame('Rectangle', 'Self="u41" ItemLayer="ub" Name="second" ContentType="GraphicType"', 28, 500, 100, 50, '<Image Self="u42"><Link Self="u43" LinkResourceURI="file:/x/Links/photo.jpg"/></Image>')}</Spread>`);
+		layout.set('Spreads/Spread_u1.xml', enc(spread));
+		const files = new Map<string, Uint8Array>([
+			['Concert/Concert.idml', zipStore([...layout].map(([name, data]) => ({ name, data })))],
+			['Concert/Links/photo.jpg', enc('jpeg')],
+			['Concert/photo.jpg', enc('artwork')]
+		]);
+		const read = await readInDesign(files, 'Concert.zip');
+		expect(read.pictures).toEqual([{ name: 'photo.jpg', bytes: enc('jpeg') }]);
+		// photo.tif shares the photo.jpg the second frame links to, rather than taking the artwork.
+		expect(read.layout.dataset.rows[0]).toMatchObject({ photo: 'local:photo.jpg', second: 'local:photo.jpg' });
+		expect(read.background).toEqual({ name: 'artwork photo.jpg', bytes: enc('artwork') });
 	});
 });

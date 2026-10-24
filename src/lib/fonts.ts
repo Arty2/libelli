@@ -620,6 +620,65 @@ export async function installFontFaces(family: string, files: FaceFile[]): Promi
 	return { family, source: 'local', ref, ...(kind ? { kind } : {}) };
 }
 
+/** What a font file says it is: its family, and which face of it. */
+export interface FontFacts {
+	family: string;
+	weight: number;
+	italic: boolean;
+	/** OS/2 width class, 1 (ultra-condensed) to 9 (ultra-expanded); 5 is normal, and what a file that says nothing is */
+	width: number;
+}
+
+/**
+ * A font file's family, weight and slant, from its own `name` and `OS/2`
+ * tables — how a package's files are matched to the faces a layout names,
+ * since a file name (`MinionPro-It.otf`) is a foundry's abbreviation. The
+ * typographic family (name 16) over the legacy one (name 1), which splits a
+ * family past its four styles into families of their own (`Minion Pro SmBd`).
+ * `null` for a file that is not a font this can read: WOFF2 included.
+ */
+export async function fontFacts(bytes: ArrayBuffer): Promise<FontFacts | null> {
+	const tables = await readTables(bytes, ['name', 'OS/2']);
+	const name = tables?.get('name');
+	if (!name || name.byteLength < 6) return null;
+	const count = name.getUint16(2);
+	const strings = name.getUint16(4);
+	const found = new Map<number, { text: string; score: number }>();
+	for (let i = 0; i < count; i++) {
+		const at = 6 + i * 12;
+		if (at + 12 > name.byteLength) break;
+		const platform = name.getUint16(at);
+		const language = name.getUint16(at + 4);
+		const id = name.getUint16(at + 6);
+		const length = name.getUint16(at + 8);
+		const offset = strings + name.getUint16(at + 10);
+		if (![1, 2, 16, 17].includes(id) || offset + length > name.byteLength) continue;
+		let text = '';
+		let score: number;
+		if (platform === 3 || platform === 0) {
+			for (let j = 0; j + 1 < length; j += 2) text += String.fromCharCode(name.getUint16(offset + j));
+			score = platform === 3 && language === 0x409 ? 3 : 2;
+		} else if (platform === 1 && language === 0) {
+			for (let j = 0; j < length; j++) text += String.fromCharCode(name.getUint8(offset + j));
+			score = 1;
+		} else continue;
+		if (text.trim() && (found.get(id)?.score ?? -1) < score) found.set(id, { text: text.trim(), score });
+	}
+	const family = found.get(16)?.text ?? found.get(1)?.text;
+	if (!family) return null;
+	const style = (found.get(17)?.text ?? found.get(2)?.text ?? '').toLowerCase();
+	const os2 = tables?.get('OS/2');
+	const weightClass = os2 && os2.byteLength >= 6 ? os2.getUint16(4) : 0;
+	const selection = os2 && os2.byteLength >= 64 ? os2.getUint16(62) : 0;
+	const widthClass = os2 && os2.byteLength >= 8 ? os2.getUint16(6) : 5;
+	return {
+		family,
+		weight: weightClass >= 100 && weightClass <= 900 ? Math.round(weightClass / 100) * 100 : /bold/.test(style) ? 700 : 400,
+		italic: !!(selection & 1) || /italic|oblique/.test(style),
+		width: widthClass >= 1 && widthClass <= 9 ? widthClass : 5
+	};
+}
+
 /** Every face this browser holds under a family's key (`FontRef.ref`), as a package carries them. */
 export async function storedFaces(ref: string): Promise<Array<{ family: string; weight: number; italic: boolean; format: string; bytes: Uint8Array }>> {
 	const out = [];

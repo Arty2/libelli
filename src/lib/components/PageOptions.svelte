@@ -496,7 +496,7 @@
 								<button
 									role="menuitem"
 									disabled={pageFrozen}
-									title="A template JSON, or a package saved with Package for Copy Editing"
+									title="A template JSON, a package, or a layout from InDesign (IDML, or its packaged folder zipped)"
 									onclick={fromMenu(onimporttemplate)}
 								>
 									<span class="tick" aria-hidden="true"><Icon name="document-import" size={14} /></span>
