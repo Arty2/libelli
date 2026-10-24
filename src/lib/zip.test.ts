@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { crc32, unzip, zipStore, ZipError } from './zip';
+import { crc32, entryName, unzip, zipStore, ZipError } from './zip';
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 
@@ -69,6 +69,7 @@ describe('unzip', () => {
 		view.setUint16(8, 8, true); // local header: deflate
 		const directory = view.getUint32(zip.length - 22 + 16, true);
 		view.setUint16(directory + 10, 8, true);
+		view.setUint32(directory + 24, bytes(text).length, true); // the size it inflates to, as a real tool declares
 		const files = await unzip(zip);
 		expect(new TextDecoder().decode(files.get('notes.txt'))).toBe(text);
 	});
@@ -79,5 +80,28 @@ describe('unzip', () => {
 		const view = new DataView(zip.buffer);
 		view.setUint32(view.getUint32(zip.length - 22 + 16, true) + 20, 999, true);
 		await expect(unzip(zip)).rejects.toThrow(/cut short/);
+	});
+});
+
+describe('unzip, defensively', () => {
+	it('refuses an entry that inflates past the size its directory declares', async () => {
+		const big = new Uint8Array(1024 * 1024); // a megabyte of zeros deflates to almost nothing
+		const stream = new Blob([big]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+		const packed = new Uint8Array(await new Response(stream).arrayBuffer());
+		const zip = zipStore([{ name: 'bomb.bin', data: packed }]);
+		const view = new DataView(zip.buffer);
+		view.setUint16(8, 8, true);
+		const directory = view.getUint32(zip.length - 22 + 16, true);
+		view.setUint16(directory + 10, 8, true);
+		// zipStore wrote the packed size as the unpacked one: a bomb's lie, in effect.
+		await expect(unzip(zip)).rejects.toThrow(/larger than it says/);
+	});
+});
+
+describe('entryName', () => {
+	it('reads UTF-8 when the archive says so, and code page 437 when it does not', () => {
+		expect(entryName(new TextEncoder().encode('café.jpg'), true)).toBe('café.jpg');
+		expect(entryName(new Uint8Array([0x63, 0x61, 0x66, 0x82, 0x2e, 0x6a, 0x70, 0x67]), false)).toBe('café.jpg');
+		expect(entryName(new TextEncoder().encode('plain.png'), false)).toBe('plain.png');
 	});
 });

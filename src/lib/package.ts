@@ -51,6 +51,8 @@ export interface PackageContents {
 	mapping: Mapping;
 	pictures: PackagePicture[];
 	fonts: PackageFont[];
+	/** pictures the manifest names that the archive does not hold */
+	absent: string[];
 }
 
 interface Manifest {
@@ -59,6 +61,12 @@ interface Manifest {
 	mapping: Mapping;
 	pictures: string[];
 	fonts: Array<{ file: string; family: string; weight: number; italic: boolean; format: string }>;
+	/**
+	 * How many rows the table has. CSV cannot say that a last row is blank —
+	 * a parser drops a trailing empty record — and a blank row is a card the
+	 * writer was sent to fill in, so the count travels beside it.
+	 */
+	rows?: number;
 }
 
 const EXTENSIONS: Record<string, string> = { woff2: 'woff2', woff: 'woff', opentype: 'otf', truetype: 'ttf' };
@@ -113,7 +121,8 @@ export function writePackage(input: {
 		version: 1,
 		mapping: input.mapping,
 		pictures: input.pictures.map((p) => p.name),
-		fonts
+		fonts,
+		rows: input.dataset.rows.length
 	};
 	return zipStore([
 		{ name: MANIFEST, data: enc(JSON.stringify(manifest, null, 2)) },
@@ -125,6 +134,20 @@ export function writePackage(input: {
 }
 
 export class PackageError extends Error {}
+
+/**
+ * An archive's files as a package lays them out. Zipping tools add what
+ * nobody put in the folder — macOS's `__MACOSX/` and `._` twins, dotfiles —
+ * and a package unzipped and zipped again as its folder has every file one
+ * folder down (`Menu/libelli.json`). Both are undone, so either opens.
+ */
+export function packageFiles(files: Map<string, Uint8Array>): Map<string, Uint8Array> {
+	const kept = [...files].filter(([path]) => !path.startsWith('__MACOSX/') && !path.split('/').some((part) => part.startsWith('.')));
+	if (kept.some(([path]) => path === MANIFEST)) return new Map(kept);
+	const top = kept[0]?.[0].split('/')[0];
+	const folder = top && kept.every(([path]) => path.startsWith(`${top}/`)) ? `${top}/` : '';
+	return new Map(kept.map(([path, bytes]) => [path.slice(folder.length), bytes]));
+}
 
 /** A picture's name a package may store: a file name, not a path. */
 export const safePictureName = (name: unknown): name is string =>
@@ -161,21 +184,27 @@ export function readPackage(files: Map<string, Uint8Array>, tableName: string): 
 	// Always commas: the package wrote it, so nothing is guessed. Sniffing
 	// took a one-column table with tabs in its words for two columns.
 	const dataset = { ...parseTable(text('table.csv'), { delimiter: ',' }), name: tableName };
+	// The blank rows at the end that CSV lost, put back.
+	const rows = Math.min(Number(manifest.rows) || 0, 100_000);
+	while (dataset.rows.length < rows) dataset.rows.push(Object.fromEntries(dataset.columns.map((c) => [c, ''])));
 	const mapping: Mapping = {};
 	// A mapping names columns; one this table has not got is left unmapped
 	// rather than pointing at nothing.
 	for (const [slot, column] of Object.entries(manifest.mapping ?? {})) {
 		if (typeof column === 'string' && dataset.columns.includes(column)) mapping[slot] = column;
 	}
-	const names = Array.isArray(manifest.pictures) ? manifest.pictures : [];
+	// Each once: a name listed twice would be stored twice and asked about twice.
+	const names = [...new Set(Array.isArray(manifest.pictures) ? manifest.pictures : [])];
 	// A name is stored as it is, into this browser or a connected folder, so
 	// one that is a path is refused before anything is written, not halfway.
 	const unsafe = names.filter((name) => !safePictureName(name));
 	if (unsafe.length) throw new PackageError(`The package names pictures that are not plain file names: ${unsafe.map(String).join(', ')}.`);
 	const pictures: PackagePicture[] = [];
+	const absent: string[] = [];
 	for (const name of names as string[]) {
 		const bytes = files.get(`pictures/${name}`);
 		if (bytes) pictures.push({ name, bytes });
+		else absent.push(name);
 	}
 	const fonts: PackageFont[] = [];
 	for (const font of Array.isArray(manifest.fonts) ? manifest.fonts : []) {
@@ -189,7 +218,7 @@ export function readPackage(files: Map<string, Uint8Array>, tableName: string): 
 			bytes
 		});
 	}
-	return { template, dataset, mapping, pictures, fonts };
+	return { template, dataset, mapping, pictures, fonts, absent };
 }
 
 // ---- InDesign ---------------------------------------------------------------------

@@ -289,10 +289,20 @@ clear every time: a licence is a fact about those fonts, not a preference.
 
 **The table is CSV, read strictly.** Readable in any spreadsheet, and read
 back with commas named rather than sniffed: sniffing took a one-column table
-with tabs in its words for two columns. What CSV cannot carry is accepted
-rather than worked around: a row with every cell empty is not read back, and
-neither are the row numbers a sort keeps (`Dataset.order`), so a
+with tabs in its words for two columns. A parser drops a blank record at the
+end, and a blank row is a card the writer was sent to fill in, so the
+manifest carries the row count and the blank rows are put back. What is still
+lost is the row numbers a sort keeps (`Dataset.order`), so a
 `%%lookup:N:…%%` in a sorted table counts from the new order.
+
+**An archive is untrusted, and its tools are many.** A package comes from
+somebody else, so `unzip` inflates no entry past the size its directory
+declares, nor past 256 MB: a few hundred kilobytes can otherwise stand for
+gigabytes. Names not flagged UTF-8 are read as code page 437, as older and
+Windows tools write them. `packageFiles` drops `__MACOSX/` and dotfiles and,
+when the manifest is one folder down, takes the folder off, so a package
+unzipped and zipped again as its folder still opens. A picture the manifest
+names twice is one picture; one it names but does not hold is said.
 
 **A clash is asked about, each one.** A picture or a font family a package,
 or an InDesign folder, brings that this browser already holds, with different bytes, is listed
@@ -302,10 +312,18 @@ font is pointed at this browser's file. The same bytes are no clash. Picture
 names are checked first, all of them: one that is a path would fail part way,
 into a connected folder.
 
+**Files already here with the same bytes are left alone.** Not rewritten, and
+a font family whose every face is already held is not reinstalled: installing
+clears the family first, which deleted the faces here that the package did
+not carry — a Bold that other designs were set in.
+
 **The same package twice opens what is held.** As Import does for a template
 or a table: when the library holds this template and this table unchanged,
 and none of its files clash, those open instead of a second pair. A package
-whose pictures differ is a new version and imports as one. Fonts are left
+whose pictures differ is a new version and imports as one. A picture or font
+it brings that this browser has lost since — deleted from the tray — is put
+back before the held pair opens: getting it back is a reason to open the
+package again. Fonts are left
 out of comparing templates, since opening a package points them at this
 browser's keys.
 
@@ -352,6 +370,17 @@ short form, its long one in the title for a press and hold, and Edit Design is
 a square icon. The area's right-click menu is off while copy editing: it holds
 design actions only, and on a phone a double-tap that selected a word opened it
 over the field instead of the browser's Copy and Paste.
+
+**A swapped-in picture never takes another's name.** A phone's picker names
+every camera photo `image.jpg`; stored under that, the second swap replaced
+the first on every row that showed it. A different picture under a name
+already held becomes `image-2.jpg`; the same picture keeps its name. Only the
+swap does this: a designer dropping an updated `logo.png` means to replace it.
+
+**Copy editing's dialogs are dialogs.** The package, Edit Design and clash
+dialogs are in `dialogOpen`, so Escape closes them — the clash dialog as
+Cancel — and the page's keys stand down behind them. While the clash dialog
+waited, Ctrl/Cmd+Z and Delete still reached the card under it.
 
 **A picture's file picker is asked for from a click.** Chromium refuses a file
 picker asked for during a touch's pointerup, user gesture or not, and grants

@@ -5,6 +5,7 @@ import {
 	matchFonts,
 	MANIFEST,
 	PackageError,
+	packageFiles,
 	pictureType,
 	picturesNamed,
 	readInDesign,
@@ -206,5 +207,31 @@ describe('pictureType', () => {
 		expect(pictureType('logo.SVG')).toBe('image/svg+xml');
 		expect(pictureType('photo.jpg')).toBe('image/jpeg');
 		expect(pictureType('notes.txt')).toBe('');
+	});
+});
+
+describe('what CSV and zipping tools lose', () => {
+	it('puts back the blank rows at the end of a table', async () => {
+		const blank: Dataset = { columns: ['dish', 'price'], rows: [{ dish: 'Soup', price: '4' }, { dish: '', price: '' }, { dish: '', price: '' }] };
+		const files = await unzip(writePackage({ template: template(), dataset: blank, mapping: {}, pictures: [], fonts: [] }));
+		expect(readPackage(files, 'x').dataset.rows).toEqual(blank.rows);
+	});
+
+	it('opens a package zipped again as its folder, macOS clutter and all', async () => {
+		const files = await unzip(writePackage({ template: template(), dataset: table, mapping: {}, pictures: [{ name: 'soup.jpg', bytes: enc('JPEG') }], fonts: [] }));
+		const rezipped = new Map([...files].map(([path, bytes]) => [`Menu/${path}`, bytes] as [string, Uint8Array]));
+		rezipped.set('__MACOSX/Menu/._libelli.json', enc('junk'));
+		rezipped.set('Menu/.DS_Store', enc('junk'));
+		const read = readPackage(packageFiles(rezipped), 'x');
+		expect(read.pictures.map((p) => p.name)).toEqual(['soup.jpg']);
+		expect(packageFiles(files).size).toBe(files.size);
+	});
+
+	it('lists a picture once however often it is named, and names one it does not hold', async () => {
+		const files = await unzip(bytesWith({ pictures: ['a.png', 'a.png', 'gone.png'] }));
+		files.set('pictures/a.png', enc('A'));
+		const read = readPackage(files, 'x');
+		expect(read.pictures.map((p) => p.name)).toEqual(['a.png']);
+		expect(read.absent).toEqual(['gone.png']);
 	});
 });
