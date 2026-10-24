@@ -232,6 +232,11 @@ panel most designers never open. A frame's name in the Layers panel becomes
 its column, else its Script Label, else `Text 1`, `Picture 1`. A document
 with no such layer still imports, every frame a field, and says so first.
 
+**The Editable layer is read even when hidden.** Hiding it is how the
+designer exports the artwork, and a file packaged straight after keeps it
+hidden: skipping hidden layers left that import with no fields at all. Other
+hidden layers are still left out.
+
 **The artwork is a picture the designer exports, never rebuilt.** IDML holds
 no rendering, only paths, swatches and effects. Redrawing a logo from them
 would take a second renderer and still lose gradients, transparency and
@@ -248,7 +253,13 @@ paragraph settings come from its commonest paragraph. Bold, italic and a
 colour that differ from that become Markdown (`**`, `*`, `[…]{#hex}`); a frame
 with none of those stays plain, so a writer types no syntax. A run in a
 different face or size is set like the rest, and each frame that has one is
-named in the notes. Leading becomes a multiple of the size, tracking becomes
+named in the notes. Markers go on line by line, since markdown.ts
+sets each line of a paragraph on its own and a bold run across a forced line
+break came out as literal asterisks. And Markdown has no escapes here, so a
+frame whose own words would read as formatting (`readsAsMarkdown`: a stray
+`*`, a line starting `- ` or `1. `) stays plain and drops its emphasis, with
+a note: the words are the content. A note names its field by the column it
+became, after duplicates are numbered. Leading becomes a multiple of the size, tracking becomes
 mm, space before and after becomes the paragraph space in lines, and a first
 line indent becomes the indent in em.
 
@@ -330,6 +341,14 @@ browser's keys.
 **A face's files are loaded before anything is replaced.** A damaged file in
 a package fails before the family this browser had is cleared, and is named.
 
+**A link the browser cannot draw takes a stand-in.** InDesign links TIFF,
+PSD, PDF and EPS; a browser draws none of them. A PNG or JPG in the archive
+with the same name before the ending is shown in its place, and the cell
+points at it; without one the note asks for exactly that name. Which files
+are drawable is the archive reader's call, not the layout reader's, since
+only it sees what else came. A bare IDML gets the same notes about missing
+artwork and pictures as a folder that left them out.
+
 **An InDesign folder is sorted, not trusted.** macOS's `__MACOSX/` and every
 dotfile are dropped. A picture the IDML links to is stored under the link's
 name; any other picture outside `Links/` may be the artwork: the only one,
@@ -337,7 +356,13 @@ else the one named `background` or after the IDML, else the first, noted.
 Font files are matched to the families the layout uses by the family their
 own `name` table gives (typographic family over legacy, so `Minion Pro SmBd`
 is Minion Pro), never by file name. A matched family is installed whole:
-every face the folder has.
+every face the folder has, at its normal width only — a condensed face has the
+same family, weight and slant as the regular, and two faces with one
+description draw whichever the browser found first. A face described twice
+is kept once, and both are listed as left out. The layout passes the
+families its fields are set in, uploaded ones only: a system face needs no
+file and is not missing. Of several IDMLs, the one named after the InDesign
+document in the folder is read.
 
 ## Copy editing — `Template.copy`
 

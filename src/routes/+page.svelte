@@ -3959,7 +3959,8 @@
 			if (read) facts.push({ name: file.name, ...read });
 			else notes.push(`“${file.name}” could not be read as a font${/\.woff2$/i.test(file.name) ? ' — a WOFF2 cannot be read here; use the OTF or TTF' : ''}.`);
 		}
-		const { families, missing } = matchFonts(layout.faces, facts);
+		const { families, missing, skipped } = matchFonts(layout.families, facts);
+		if (skipped.length) notes.push(`Left out, as faces the layout already has or another width of them: ${skipped.join(', ')}.`);
 		const byFamily = new Map<string, FaceFile[]>();
 		for (const [family, files] of families) {
 			byFamily.set(
