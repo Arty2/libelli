@@ -273,7 +273,7 @@ describe('replaceFamily', () => {
 });
 
 /** The smallest sfnt `fontFacts` reads: a `name` table and an `OS/2` one, nothing else. */
-function namedSfnt(names: Record<number, string>, weightClass: number, selection: number): ArrayBuffer {
+function namedSfnt(names: Record<number, string>, weightClass: number, selection: number, widthClass = 5): ArrayBuffer {
 	const ids = Object.keys(names).map(Number);
 	const strings = ids.map((id) => {
 		const s = names[id];
@@ -311,21 +311,27 @@ function namedSfnt(names: Record<number, string>, weightClass: number, selection
 		offset += strings[i].length;
 	});
 	v.setUint16(os2At + 4, weightClass);
+	v.setUint16(os2At + 6, widthClass);
 	v.setUint16(os2At + 62, selection);
 	return buffer;
 }
 
 describe('fontFacts', () => {
 	it('reads the family, the weight and the slant a file says it is', async () => {
-		expect(await fontFacts(namedSfnt({ 1: 'Studio Serif', 2: 'Bold Italic' }, 700, 1))).toEqual({ family: 'Studio Serif', weight: 700, italic: true });
+		expect(await fontFacts(namedSfnt({ 1: 'Studio Serif', 2: 'Bold Italic' }, 700, 1))).toEqual({ family: 'Studio Serif', weight: 700, italic: true, width: 5 });
 	});
 
 	it('takes the typographic family over the legacy one, which splits off a semibold', async () => {
 		expect(await fontFacts(namedSfnt({ 1: 'Studio Serif SmBd', 2: 'Regular', 16: 'Studio Serif', 17: 'Semibold' }, 600, 0))).toEqual({
 			family: 'Studio Serif',
 			weight: 600,
-			italic: false
+			italic: false,
+			width: 5
 		});
+	});
+
+	it('reads the width, so a condensed face is not taken for the regular one', async () => {
+		expect((await fontFacts(namedSfnt({ 1: 'Studio Sans', 2: 'Regular', 17: 'Condensed' }, 400, 0, 3)))?.width).toBe(3);
 	});
 
 	it('is null for what is not a font it can read', async () => {

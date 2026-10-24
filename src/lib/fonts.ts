@@ -625,6 +625,8 @@ export interface FontFacts {
 	family: string;
 	weight: number;
 	italic: boolean;
+	/** OS/2 width class, 1 (ultra-condensed) to 9 (ultra-expanded); 5 is normal, and what a file that says nothing is */
+	width: number;
 }
 
 /**
@@ -668,10 +670,12 @@ export async function fontFacts(bytes: ArrayBuffer): Promise<FontFacts | null> {
 	const os2 = tables?.get('OS/2');
 	const weightClass = os2 && os2.byteLength >= 6 ? os2.getUint16(4) : 0;
 	const selection = os2 && os2.byteLength >= 64 ? os2.getUint16(62) : 0;
+	const widthClass = os2 && os2.byteLength >= 8 ? os2.getUint16(6) : 5;
 	return {
 		family,
 		weight: weightClass >= 100 && weightClass <= 900 ? Math.round(weightClass / 100) * 100 : /bold/.test(style) ? 700 : 400,
-		italic: !!(selection & 1) || /italic|oblique/.test(style)
+		italic: !!(selection & 1) || /italic|oblique/.test(style),
+		width: widthClass >= 1 && widthClass <= 9 ? widthClass : 5
 	};
 }
 

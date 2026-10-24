@@ -21,7 +21,7 @@
  */
 
 import { localImageName } from './assets';
-import { readIdml, type IdmlFace, type IdmlImport } from './idml';
+import { readIdml, type IdmlImport } from './idml';
 import { parseTable, toCsv } from './parse';
 import { exportTemplate, importedTemplate } from './template';
 import type { Dataset, Mapping, Template } from './types';
@@ -265,72 +265,126 @@ function pickBackground(candidates: PackagePicture[], layoutName: string, notes:
 	return pick;
 }
 
+/** A browser can draw these; InDesign links to many it cannot. */
+const NOT_DRAWN = /\.(tiff?|psd|pdf|eps|ai|indd|bmp|heic)$/i;
+
+const stemOf = (name: string) => base(name).replace(/\.[^.]+$/, '');
+
 /**
  * An archive that is an IDML, or holds one, as a layout with its pictures
  * and font files. `archiveName` is the file it came in, for the template's
  * name. Throws `PackageError` when there is no IDML to be found.
  */
 export async function readInDesign(files: Map<string, Uint8Array>, archiveName: string): Promise<InDesignContents> {
-	const stemOf = (name: string) => base(name).replace(/\.[^.]+$/, '');
-	// The archive is the IDML itself.
-	if (files.has('designmap.xml')) {
-		const layout = readIdml(files, stemOf(archiveName));
-		return { layout, background: null, pictures: [], fontFiles: [], notes: [] };
-	}
-	const paths = [...files.keys()].filter((p) => !isClutter(p));
-	const idmls = paths.filter((p) => /\.idml$/i.test(p));
-	if (!idmls.length) {
-		const indd = paths.some((p) => /\.indd$/i.test(p));
-		throw new PackageError(
-			indd
-				? 'There is an InDesign document in this archive but no IDML — in InDesign, use File › Export… › InDesign Markup (IDML), and put it in the folder.'
-				: 'There is no IDML or libelli package in this archive.'
-		);
-	}
 	const notes: string[] = [];
-	if (idmls.length > 1) notes.push(`The archive holds ${idmls.length} IDML files; “${base(idmls[0])}” was brought in.`);
-	let inner: Map<string, Uint8Array>;
-	try {
-		inner = await unzip(files.get(idmls[0])!);
-	} catch (error) {
-		throw new PackageError(`“${base(idmls[0])}” is damaged: ${error instanceof ZipError ? error.message : 'it is not an IDML'}`);
+	let paths: string[] = [];
+	let layout: IdmlImport;
+	let layoutName: string;
+	// The archive is the IDML itself: nothing beside it, and the same notes
+	// about what is missing as a folder that left everything out.
+	if (files.has('designmap.xml')) {
+		layoutName = base(archiveName);
+		layout = readIdml(files, stemOf(archiveName));
+	} else {
+		paths = [...files.keys()].filter((p) => !isClutter(p));
+		const idmls = paths.filter((p) => /\.idml$/i.test(p));
+		if (!idmls.length) {
+			const indd = paths.some((p) => /\.indd$/i.test(p));
+			throw new PackageError(
+				indd
+					? 'There is an InDesign document in this archive but no IDML — in InDesign, use File › Export… › InDesign Markup (IDML), and put it in the folder.'
+					: 'There is no IDML or libelli package in this archive.'
+			);
+		}
+		// Several: the one InDesign's Package wrote beside its document, by name.
+		const beside = idmls.find((p) => paths.some((q) => /\.indd$/i.test(q) && stemOf(q).toLowerCase() === stemOf(p).toLowerCase()));
+		const chosen = beside ?? idmls[0];
+		if (idmls.length > 1) notes.push(`The archive holds ${idmls.length} IDML files; “${base(chosen)}” was brought in${beside ? ', the one named after the InDesign document' : ''}.`);
+		let inner: Map<string, Uint8Array>;
+		try {
+			inner = await unzip(files.get(chosen)!);
+		} catch (error) {
+			throw new PackageError(`“${base(chosen)}” is damaged: ${error instanceof ZipError ? error.message : 'it is not an IDML'}`);
+		}
+		layoutName = base(chosen);
+		layout = readIdml(inner, stemOf(chosen));
 	}
-	const layout = readIdml(inner, stemOf(idmls[0]));
+	const bare = !paths.length;
 
-	const linked = new Set(layout.links.map((l) => l.toLowerCase()));
+	const images = paths.filter((p) => IMAGE.test(p)).map((path) => ({ path, name: base(path), bytes: files.get(path)! }));
+	const used = new Set<string>();
 	const pictures: PackagePicture[] = [];
-	const candidates: PackagePicture[] = [];
-	for (const path of paths.filter((p) => IMAGE.test(p))) {
-		const picture = { name: base(path), bytes: files.get(path)! };
-		if (linked.has(picture.name.toLowerCase())) {
-			// Under the name the cells use, whatever case the file has here.
-			const name = layout.links.find((l) => l.toLowerCase() === picture.name.toLowerCase())!;
-			pictures.push({ ...picture, name });
-		} else if (!/(^|\/)links\//i.test(path)) candidates.push({ name: path, bytes: picture.bytes });
+	const absent: string[] = [];
+	// A link the browser cannot draw — a TIFF, a PSD — takes a picture of the
+	// same name with another ending, if the archive has one: Links/photo.jpg
+	// for photo.tif. The cell is pointed at what stands in.
+	const standIns = new Map<string, string>();
+	for (const link of layout.links) {
+		if (NOT_DRAWN.test(link)) {
+			const stand = images.find((im) => !used.has(im.path) && stemOf(im.name).toLowerCase() === stemOf(link).toLowerCase());
+			if (stand) {
+				used.add(stand.path);
+				pictures.push({ name: stand.name, bytes: stand.bytes });
+				standIns.set(link, stand.name);
+				notes.push(`“${link}” is a file a browser cannot draw; “${stand.name}” from the archive is shown in its place.`);
+			} else {
+				notes.push(
+					`“${link}” is a file a browser cannot draw — put a PNG or JPG of it named “${stemOf(link)}.jpg” in the archive and import it again, or swap in another picture.`
+				);
+			}
+			continue;
+		}
+		// Under the name the cells use, whatever case the file has here.
+		const found = images.find((im) => !used.has(im.path) && im.name.toLowerCase() === link.toLowerCase());
+		if (found) {
+			used.add(found.path);
+			pictures.push({ name: link, bytes: found.bytes });
+		} else if (IMAGE.test(link)) absent.push(link);
 	}
-	const chosen = pickBackground(candidates, base(idmls[0]), notes);
-	const background = chosen ? { name: base(chosen.name), bytes: chosen.bytes } : null;
+	if (standIns.size) {
+		const point = (value: string) => {
+			const name = value.startsWith('local:') ? value.slice(6) : null;
+			return name && standIns.has(name) ? `local:${standIns.get(name)}` : value;
+		};
+		layout = {
+			...layout,
+			links: layout.links.map((l) => standIns.get(l) ?? l),
+			dataset: { ...layout.dataset, rows: layout.dataset.rows.map((row) => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, point(v)]))) }
+		};
+	}
+
+	const candidates = images.filter((im) => !used.has(im.path) && !/(^|\/)links\//i.test(im.path)).map((im) => ({ name: im.path, bytes: im.bytes }));
+	const pick = pickBackground(candidates, layoutName, notes);
+	const background = pick ? { name: base(pick.name), bytes: pick.bytes } : null;
 	if (!background) {
 		const pdf = paths.some((p) => /\.pdf$/i.test(p) && !/(^|\/)links\//i.test(p));
 		notes.push(
 			pdf
-				? 'The page artwork is a PDF, which a browser cannot draw — export it from InDesign as PNG or JPG instead, with the Editable layer hidden and the bleed included, and add it to the archive.'
-				: 'No picture of the page artwork was in the archive. Export page 1 from InDesign as PNG or JPG with the Editable layer hidden and the bleed included, then set it as the background in Page.'
+				? 'The page artwork is a PDF, which a browser cannot draw — export it from InDesign as PNG or JPG instead, with the bleed included, and add it to the archive.'
+				: bare
+					? 'An IDML holds no picture of the page artwork. Export page 1 from InDesign as PNG or JPG with the Editable layer hidden and the bleed included, then set it as the background in Page — or zip it into the Package folder with the IDML and import that.'
+					: 'No picture of the page artwork was in the archive. Export page 1 from InDesign as PNG or JPG with the Editable layer hidden and the bleed included, then set it as the background in Page.'
 		);
 	}
-	for (const name of layout.links) {
-		if (!pictures.some((p) => p.name === name) && IMAGE.test(name)) notes.push(`The picture “${name}” is not in the archive; the field shows it once it is added in Pictures.`);
+	if (absent.length) {
+		notes.push(
+			bare
+				? `An IDML holds none of the pictures it links to (${absent.join(', ')}); the fields show them once they are added in Pictures, or import InDesign's zipped Package folder, which has them in Links.`
+				: `${absent.length === 1 ? 'The picture' : 'The pictures'} ${absent.map((a) => `“${a}”`).join(', ')} ${absent.length === 1 ? 'is' : 'are'} not in the archive; the field${absent.length === 1 ? ' shows it' : 's show them'} once added in Pictures.`
+		);
 	}
 	const fontFiles = paths.filter((p) => FONT.test(p)).map((p) => ({ name: base(p), bytes: files.get(p)! }));
 	return { layout, background, pictures, fontFiles, notes };
 }
 
-/** A font file and what it says it is, for matching against the faces a layout uses. */
+/** A font file and what it says it is, for matching against the families a layout uses. */
 export interface FontFileFacts {
 	name: string;
 	family: string;
 	weight: number;
 	italic: boolean;
+	/** OS/2 width class, 1 to 9; 5 is normal */
+	width: number;
 }
 
 const familyMatch = (name: string) => name.toLowerCase().replace(/[\s_-]+/g, '');
@@ -339,17 +393,35 @@ const familyMatch = (name: string) => name.toLowerCase().replace(/[\s_-]+/g, '')
  * Which font files are the families the layout is set in: each family that
  * has a file is installed whole, every face of it the archive has, since a
  * writer's Markdown may reach for a bold the designer's words did not use.
- * A family with no file is named, so the designer knows what to add.
+ * Only its normal width, though: a condensed face is the same family, weight
+ * and slant as the regular one, and two faces with one description draw
+ * whichever the browser found first. A face described twice is kept once.
+ * A family with no file is named, so the designer knows what to add; the
+ * caller passes uploaded families only, since a system face needs no file.
  */
-export function matchFonts(faces: IdmlFace[], files: FontFileFacts[]): { families: Map<string, FontFileFacts[]>; missing: string[] } {
-	const families = new Map<string, FontFileFacts[]>();
+export function matchFonts(
+	families: string[],
+	files: FontFileFacts[]
+): { families: Map<string, FontFileFacts[]>; missing: string[]; skipped: string[] } {
+	const matched = new Map<string, FontFileFacts[]>();
 	const missing: string[] = [];
-	for (const family of new Set(faces.map((f) => f.family))) {
+	const skipped: string[] = [];
+	for (const family of new Set(families)) {
 		const found = files.filter((f) => familyMatch(f.family) === familyMatch(family));
-		if (found.length) families.set(family, found);
-		else missing.push(family);
+		if (!found.length) {
+			missing.push(family);
+			continue;
+		}
+		const normal = found.some((f) => f.width === 5) ? found.filter((f) => f.width === 5) : found;
+		const faces: FontFileFacts[] = [];
+		for (const f of normal) {
+			if (faces.some((g) => g.weight === f.weight && g.italic === f.italic)) skipped.push(f.name);
+			else faces.push(f);
+		}
+		skipped.push(...found.filter((f) => !normal.includes(f)).map((f) => f.name));
+		matched.set(family, faces);
 	}
-	return { families, missing };
+	return { families: matched, missing, skipped };
 }
 
 /**

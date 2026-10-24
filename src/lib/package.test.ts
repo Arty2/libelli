@@ -134,22 +134,58 @@ describe('readInDesign', () => {
 	});
 });
 
+describe('readInDesign, from review', () => {
+	it('says what a bare IDML is missing, as a folder would', async () => {
+		const read = await readInDesign(idml(), 'Concert.idml');
+		expect(read.notes.join(' ')).toMatch(/An IDML holds no picture of the page artwork/);
+		expect(read.notes.join(' ')).toMatch(/holds none of the pictures it links to \(hall view\.jpg\)/);
+	});
+
+	it('takes the IDML named after the InDesign document when there are two', async () => {
+		const files = packageFolder([{ name: 'Concert/old export.idml', data: zipStore([{ name: 'x', data: enc('x') }]) }]);
+		const read = await readInDesign(files, 'Concert.zip');
+		expect(read.layout.template.boxes).toHaveLength(3);
+		expect(read.notes[0]).toMatch(/“Concert\.idml” was brought in, the one named after the InDesign document/);
+	});
+
+	it('shows a PNG or JPG in place of a TIFF link of the same name', async () => {
+		const layout = idml();
+		const spread = new TextDecoder().decode(layout.get('Spreads/Spread_u1.xml')).replace('hall%20view.jpg', 'hall%20view.tif');
+		layout.set('Spreads/Spread_u1.xml', enc(spread));
+		const files = new Map<string, Uint8Array>([
+			['Concert/Concert.idml', zipStore([...layout].map(([name, data]) => ({ name, data })))],
+			['Concert/Links/hall view.tif', enc('tiff')],
+			['Concert/Links/hall view.jpg', enc('jpeg')],
+			['Concert/Concert background.png', enc('art')]
+		]);
+		const read = await readInDesign(files, 'Concert.zip');
+		expect(read.layout.dataset.rows[0].photo).toBe('local:hall view.jpg');
+		expect(read.pictures).toEqual([{ name: 'hall view.jpg', bytes: enc('jpeg') }]);
+		expect(read.background?.name).toBe('Concert background.png');
+		expect(read.notes.join(' ')).toMatch(/“hall view\.jpg” from the archive is shown in its place/);
+	});
+});
+
 describe('matchFonts', () => {
+	const face = (name: string, family: string, weight = 400, italic = false, width = 5) => ({ name, family, weight, italic, width });
+
 	it('matches files to the families the layout uses, by the family the file names', () => {
-		const files = [
-			{ name: 'MinionPro-Regular.otf', family: 'Minion Pro', weight: 400, italic: false },
-			{ name: 'MinionPro-It.otf', family: 'Minion Pro', weight: 400, italic: true },
-			{ name: 'Other.otf', family: 'Other Sans', weight: 400, italic: false }
-		];
-		const { families, missing } = matchFonts(
-			[
-				{ family: 'Minion Pro', weight: 400, italic: false },
-				{ family: 'Gill Sans', weight: 400, italic: false }
-			],
-			files
-		);
+		const files = [face('MinionPro-Regular.otf', 'Minion Pro'), face('MinionPro-It.otf', 'Minion Pro', 400, true), face('Other.otf', 'Other Sans')];
+		const { families, missing } = matchFonts(['Minion Pro', 'Gill Sans'], files);
 		expect(families.get('Minion Pro')?.map((f) => f.name)).toEqual(['MinionPro-Regular.otf', 'MinionPro-It.otf']);
 		expect(missing).toEqual(['Gill Sans']);
+	});
+
+	it('leaves out a condensed width and a face described twice', () => {
+		const files = [face('MyriadPro-Regular.otf', 'Myriad Pro'), face('MyriadPro-Cond.otf', 'Myriad Pro', 400, false, 3), face('MyriadPro-Regular copy.otf', 'Myriad Pro')];
+		const { families, skipped } = matchFonts(['Myriad Pro'], files);
+		expect(families.get('Myriad Pro')?.map((f) => f.name)).toEqual(['MyriadPro-Regular.otf']);
+		expect(skipped.sort()).toEqual(['MyriadPro-Cond.otf', 'MyriadPro-Regular copy.otf']);
+	});
+
+	it('takes a family that only comes condensed, rather than none', () => {
+		const { families } = matchFonts(['Narrow'], [face('Narrow.otf', 'Narrow', 400, false, 3)]);
+		expect(families.get('Narrow')).toHaveLength(1);
 	});
 });
 
