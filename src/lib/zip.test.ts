@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { crc32, entryName, unzip, zipStore, ZipError } from './zip';
 
 const bytes = (text: string) => new TextEncoder().encode(text);
+const enc = bytes;
 
 describe('crc32', () => {
 	it('matches the standard check value', () => {
@@ -103,5 +104,29 @@ describe('entryName', () => {
 		expect(entryName(new TextEncoder().encode('café.jpg'), true)).toBe('café.jpg');
 		expect(entryName(new Uint8Array([0x63, 0x61, 0x66, 0x82, 0x2e, 0x6a, 0x70, 0x67]), false)).toBe('café.jpg');
 		expect(entryName(new TextEncoder().encode('plain.png'), false)).toBe('plain.png');
+	});
+
+	it('reads unflagged UTF-8 as UTF-8, and decomposed names composed, as macOS writes them', () => {
+		const decomposed = new TextEncoder().encode('cafe\u0301.jpg');
+		expect(entryName(decomposed, false)).toBe('café.jpg');
+		expect(entryName(decomposed, false)).toBe('caf\u00e9.jpg');
+	});
+});
+
+describe('unzip, the whole archive', () => {
+	it('refuses entries that together would inflate past the archive limit', async () => {
+		// Twenty directory entries pointing at one local header, each declaring 64 MB.
+		const stream = new Blob([enc('x')]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+		const packed = new Uint8Array(await new Response(stream).arrayBuffer());
+		const zip = zipStore(Array.from({ length: 20 }, (_, i) => ({ name: `part${i}.bin`, data: packed })));
+		const view = new DataView(zip.buffer);
+		const directory = view.getUint32(zip.length - 22 + 16, true);
+		let at = directory;
+		for (let i = 0; i < 20; i++) {
+			view.setUint16(at + 10, 8, true);
+			view.setUint32(at + 24, 64 * 1024 * 1024, true);
+			at += 46 + view.getUint16(at + 28, true);
+		}
+		await expect(unzip(zip)).rejects.toThrow(/too large to open/);
 	});
 });

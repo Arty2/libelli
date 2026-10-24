@@ -57,6 +57,12 @@ interface Manifest {
 	 * writer was sent to fill in, so the count travels beside it.
 	 */
 	rows?: number;
+	/**
+	 * The rest of the table that CSV cannot hold: the numbers a sort keeps
+	 * (`Dataset.order`, which `%%lookup:N:…%%` counts by) and its lock.
+	 */
+	order?: number[];
+	locked?: boolean;
 }
 
 const EXTENSIONS: Record<string, string> = { woff2: 'woff2', woff: 'woff', opentype: 'otf', truetype: 'ttf' };
@@ -112,7 +118,9 @@ export function writePackage(input: {
 		mapping: input.mapping,
 		pictures: input.pictures.map((p) => p.name),
 		fonts,
-		rows: input.dataset.rows.length
+		rows: input.dataset.rows.length,
+		...(input.dataset.order ? { order: input.dataset.order } : {}),
+		...(input.dataset.locked ? { locked: true } : {})
 	};
 	return zipStore([
 		{ name: MANIFEST, data: enc(JSON.stringify(manifest, null, 2)) },
@@ -132,16 +140,22 @@ export class PackageError extends Error {}
  * folder down (`Menu/libelli.json`). Both are undone, so either opens.
  */
 export function packageFiles(files: Map<string, Uint8Array>): Map<string, Uint8Array> {
-	const kept = [...files].filter(([path]) => !path.startsWith('__MACOSX/') && !path.split('/').some((part) => part.startsWith('.')));
+	const clutter = (path: string) =>
+		path.startsWith('__MACOSX/') || path.split('/').some((part) => part.startsWith('.')) || /(^|\/)(thumbs\.db|desktop\.ini)$/i.test(path);
+	const kept = [...files].filter(([path]) => !clutter(path));
 	if (kept.some(([path]) => path === MANIFEST)) return new Map(kept);
-	const top = kept[0]?.[0].split('/')[0];
-	const folder = top && kept.every(([path]) => path.startsWith(`${top}/`)) ? `${top}/` : '';
-	return new Map(kept.map(([path, bytes]) => [path.slice(folder.length), bytes]));
+	// The folder the manifest is in, one down, and what is under it: a stray
+	// file beside the folder is not part of the package.
+	const inner = kept.find(([path]) => path.split('/').length === 2 && path.endsWith(`/${MANIFEST}`));
+	if (!inner) return new Map(kept);
+	const folder = inner[0].slice(0, -MANIFEST.length);
+	return new Map(kept.filter(([path]) => path.startsWith(folder)).map(([path, bytes]) => [path.slice(folder.length), bytes]));
 }
 
 /** A picture's name a package may store: a file name, not a path. */
 export const safePictureName = (name: unknown): name is string =>
-	typeof name === 'string' && !!name.trim() && !/[/\\]/.test(name) && name !== '.' && name !== '..';
+	// Not a dotfile either: `packageFiles` drops those as clutter, so one would be listed and never found.
+	typeof name === 'string' && !!name.trim() && !/[/\\]/.test(name) && !name.startsWith('.');
 
 /** Whether two files are the same bytes: a picture or a face already here is no clash. */
 export function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
@@ -177,6 +191,10 @@ export function readPackage(files: Map<string, Uint8Array>, tableName: string): 
 	// The blank rows at the end that CSV lost, put back.
 	const rows = Math.min(Number(manifest.rows) || 0, 100_000);
 	while (dataset.rows.length < rows) dataset.rows.push(Object.fromEntries(dataset.columns.map((c) => [c, ''])));
+	// The order only when it still describes these rows: a number per row, each once.
+	const order = Array.isArray(manifest.order) ? manifest.order.map(Number) : null;
+	const fits = !!order && order.length === dataset.rows.length && new Set(order).size === order.length && order.every((n) => Number.isInteger(n) && n >= 0 && n < order.length);
+	const table = { ...dataset, ...(fits ? { order: order! } : {}), ...(manifest.locked ? { locked: true } : {}) };
 	const mapping: Mapping = {};
 	// A mapping names columns; one this table has not got is left unmapped
 	// rather than pointing at nothing.
@@ -208,7 +226,7 @@ export function readPackage(files: Map<string, Uint8Array>, tableName: string): 
 			bytes
 		});
 	}
-	return { template, dataset, mapping, pictures, fonts, absent };
+	return { template, dataset: table, mapping, pictures, fonts, absent };
 }
 
 const TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
