@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { faceOf, IdmlError, invert, linkName, multiply, place, readIdml, readsAsMarkdown, type Matrix } from './idml';
+import { faceOf, IdmlError, invert, linkName, multiply, place, readIdml, type Matrix } from './idml';
 import { enc, frame, idml, path, PX, PY } from './idml.fixture';
 
 const near = (value: number, expected: number, places = 1) => expect(value).toBeCloseTo(expected, places);
@@ -189,10 +189,37 @@ describe('readIdml, from review', () => {
 	});
 });
 
-describe('readsAsMarkdown', () => {
-	it('spots what markdown.ts would take for formatting, and nothing else', () => {
-		for (const yes of ['Offer*', 'a `code`', '== Menu ==', '~~gone~~', '[see]{red}', '[see](x.example)', '- 2 eggs', '1. first', '# 5 Main St', '---']) expect(readsAsMarkdown(yes)).toBe(true);
-		for (const no of ['Doors open at 7 pm.', 'Tea – 2.50', 'Q&A #5', '5 - 3 = 2', '[draft]']) expect(readsAsMarkdown(no)).toBe(false);
+describe('readIdml, second review', () => {
+	const one = (body: string, layers?: string) => {
+		const spread = frame('TextFrame', 'Self="u11" ParentStory="u10" ItemLayer="ub" Name="t"', 10, 10, 100, 50);
+		return readIdml(idml({ spread, stories: { u10: body }, ...(layers ? { layers } : {}) }), 'x');
+	};
+	const para = (style: string, text: string) => `<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/${style}"><CharacterStyleRange><Content>${text}</Content><Br/></CharacterStyleRange></ParagraphStyleRange>`;
+
+	it('sees a list in a later paragraph, not only the first', () => {
+		const body = `<ParagraphStyleRange><CharacterStyleRange FontStyle="Bold"><Content>Menu</Content><Br/></CharacterStyleRange><CharacterStyleRange><Content>1. Soup and more soup</Content></CharacterStyleRange></ParagraphStyleRange>`;
+		const { template, notes } = one(body);
+		expect(template.boxes[0].mode).toBe('plain');
+		expect(notes.join(' ')).toMatch(/keeps its words plain/);
+	});
+
+	it('keeps a forced line break a line, in a frame whose paragraphs are spaced', () => {
+		const { template, dataset } = one(para('Body', 'Example Street 1\u2028Example Town'));
+		expect(template.boxes[0]).toMatchObject({ mode: 'markdown', paragraph: { mode: 'space' } });
+		expect(dataset.rows[0].t).toBe('Example Street 1\nExample Town');
+	});
+
+	it('gives a document with no bleed none, and says so', () => {
+		const files = idml();
+		const prefs = new TextDecoder().decode(files.get('Resources/Preferences.xml')).replace(/DocumentBleed(\w+)Offset="8\.504"/g, 'DocumentBleed$1Offset="0"');
+		files.set('Resources/Preferences.xml', enc(prefs));
+		const { template, notes } = readIdml(files, 'x');
+		expect(template.bleed.enabled).toBe(false);
+		expect(notes.join(' ')).toMatch(/no bleed/);
+	});
+
+	it('says nothing about how a picture sat in its frame', () => {
+		expect(readIdml(idml(), 'x').notes.join(' ')).not.toMatch(/scaled or cropped/);
 	});
 });
 

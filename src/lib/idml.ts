@@ -21,6 +21,7 @@
  */
 
 import { fontRefKey, isSystemFamily } from './fonts';
+import { wouldFormat } from './markdown';
 import { normaliseHeaders } from './parse';
 import { DEFAULT_DEFAULTS, normaliseTemplate, blankTemplate, newBox } from './template';
 import { toFile } from './frame';
@@ -473,16 +474,6 @@ function emphasise(text: string, style: RunStyle, base: RunStyle): string {
 	return m[1] + core + m[3];
 }
 
-/**
- * Whether words would be read as Markdown of their own: emphasis, a code
- * span, a highlight, a coloured run or a link, or a line that starts a
- * heading, a list or a rule. markdown.ts has no escapes, so a frame whose
- * words do this stays plain text and loses its bold and italic instead —
- * the words are the content, and the emphasis is the lesser loss.
- */
-export function readsAsMarkdown(text: string): boolean {
-	return /[*`]|~~|==|\[[^\]\n]*\][({]/.test(text) || /^\s*(#{1,3}\s|[-*+]\s|\d+[.)]\s|-{3,}\s*$)/m.test(text);
-}
 
 interface FrameText {
 	value: string;
@@ -534,8 +525,16 @@ function frameText(story: XmlElement | undefined, styles: Styles, swatches: Swat
 	const emphasised = runs.some(
 		(r) => r.text.trim() && (r.style.weight >= base.weight + 200 || (r.style.italic && !base.italic) || (!!r.style.color && r.style.color !== base.color))
 	);
-	const unsafe = emphasised && readsAsMarkdown(runs.map((r) => r.text).join(''));
-	const markdown = emphasised && !unsafe;
+	// A forced line break inside a paragraph is a line, not a paragraph — but
+	// a plain area with a paragraph style sets every line as one, with its
+	// space or indent between. Markdown tells the two apart.
+	const forced = paragraphs.some((p) => p.some((r) => r.text.includes('\n')));
+	const spaced = base.spaceBefore + base.spaceAfter > 0 || base.indent > 0;
+	const wanted = emphasised || (forced && spaced);
+	// Paragraph by paragraph, as the renderer reads them: joined into one line,
+	// a second paragraph's `1. Soup` was never at a line's start to be seen.
+	const unsafe = wanted && wouldFormat(paragraphs.map((p) => p.map((r) => r.text).join('')).join('\n\n'));
+	const markdown = wanted && !unsafe;
 	const lost = runs.some((r) => r.text.trim() && (r.style.weight <= base.weight - 200 || (!r.style.italic && base.italic)));
 	const mixed = runs.some((r) => r.text.trim() && baseKey(r.style) !== baseKey(base));
 	const lines = paragraphs.map((p) => {
@@ -782,7 +781,7 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 			const own: Array<(name: string) => string> = [];
 			if (text.mixed) own.push((n) => `“${n}” sets some words in another face or size; they are in its main style, ${s.family} ${round(s.size, 1)} pt, now.`);
 			if (text.lost) own.push((n) => `“${n}” has words lighter or more upright than the rest; they are set like the rest now.`);
-			if (text.unsafe) own.push((n) => `“${n}” keeps its words plain: they hold characters that would read as formatting, so its bold and italic were left out.`);
+			if (text.unsafe) own.push((n) => `“${n}” keeps its words plain: they hold characters that would read as formatting, so its bold, italic and line breaks within a paragraph were left out.`);
 			if (text.tables) own.push((n) => `“${n}” holds a table, which was left out.`);
 			if (s.color === undefined) own.push((n) => `“${n}” is coloured with a gradient or a mixed ink, which was left out.`);
 			wanted.push({ base: fieldBase(item, 'Text', ++texts), box, value: text.value, notes: own });
@@ -794,13 +793,12 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 			const option = child(item, 'FrameFittingOption')?.attrs.FittingOnEmptyFrame;
 			const fit = option === 'Proportionally' ? 'contain' : option === 'ContentToFrame' ? 'fill' : 'cover';
 			const box = newBox({ ...frame, ...look, mode: 'image', overflow: 'clip', fit });
-			const own: Array<(name: string) => string> = [];
 			// Whether the browser can draw the file, and what stands in for it
 			// when not, is package.ts's to say: it is the one that sees the archive.
+			// How the picture sat in its frame by hand is not carried: nearly every
+			// placed picture is scaled, so saying so of each said nothing.
 			if (file) links.push(file);
-			if (graphic && child(graphic, 'Properties') && readMatrix(graphic.attrs.ItemTransform).some((v, i) => i < 4 && v !== IDENTITY[i])) {
-				own.push((n) => `“${n}”'s picture is scaled or cropped by hand in InDesign; here it fills its frame by the frame's fitting rule.`);
-			}
+			const own: Array<(name: string) => string> = [];
 			wanted.push({ base: fieldBase(item, 'Picture', ++pictures), box, value: file ? `local:${file}` : '', notes: own });
 		}
 	}
@@ -860,13 +858,18 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 		},
 		// Crop marks on: the reason to bring a layout here is to send it to
 		// print, and a print shop cuts by them.
-		bleed: { enabled: true, amount: round(bleedPt * PT, 2) || 3, cropMarks: true },
+		// A document with no bleed gets none: its artwork is trim-sized, and a
+		// bleed would stretch it past every field it was drawn under.
+		bleed: { enabled: bleedPt > 0, amount: bleedPt > 0 ? round(bleedPt * PT, 2) : 3, cropMarks: true },
 		fonts,
 		defaults: { ...DEFAULT_DEFAULTS, ...(mainFamily ? { font: mainFamily } : {}) },
 		slots: names,
 		boxes,
 		...(lang ? { lang } : {})
 	};
+	if (!(bleedPt > 0)) {
+		notes.push('The document has no bleed, so it prints without one and without crop marks. For print that runs to the edge, add a bleed in InDesign (File › Document Setup) and export the artwork with it.');
+	}
 	if (documentPrefs?.attrs.FacingPages === 'true') notes.push('The document has facing pages; page 1 is set up as a single page.');
 
 	const template = normaliseTemplate(toFile(built));

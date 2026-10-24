@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, flagUnknown, listCount, renderInline, renderMarkdown, tabSplit } from './markdown';
+import { wouldFormat, escapeHtml, flagUnknown, listCount, renderInline, renderMarkdown, tabSplit } from './markdown';
 import { UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders } from './placeholders';
 import type { ListMarker } from './types';
 const render = (src: string) => renderMarkdown(src, { size: 12.5 });
@@ -331,5 +331,14 @@ describe('tab marks in plain text', () => {
 	it('reads a backtick as a character, not the edge of a code span', () => {
 		expect(tabSplit('Chef`s special %%% 4.50', false, false)).toEqual(['Chef`s special', '4.50']);
 		expect(tabSplit('Chef`s special %%% 4.50')).toBeNull();
+	});
+});
+
+describe('wouldFormat', () => {
+	it('is true for what this renderer turns into markup, and only that', () => {
+		for (const yes of ['Offer *now*', 'a `code`', '==this==', '~~gone~~', '[see]{red}', '[see](https://x.example)', '- 2 eggs', '1. first', '# 5 Main St', '---', '__init__ ready', 'Menu\n\n1. Soup'])
+			expect(wouldFormat(yes)).toBe(true);
+		for (const no of ['Doors open at 7 pm.', 'Tea – 2.50', 'Q&A #5', '5 - 3 = 2', '[draft]', 'a == b == c', 'Stars*', 'line one\nline two'])
+			expect(wouldFormat(no)).toBe(false);
 	});
 });
