@@ -240,17 +240,21 @@ clear every time: a licence is a fact about those fonts, not a preference.
 back with commas named rather than sniffed: sniffing took a one-column table
 with tabs in its words for two columns. A parser drops a blank record at the
 end, and a blank row is a card the writer was sent to fill in, so the
-manifest carries the row count and the blank rows are put back. What is still
-lost is the row numbers a sort keeps (`Dataset.order`), so a
-`%%lookup:N:…%%` in a sorted table counts from the new order.
+manifest carries the row count and the blank rows are put back. It carries
+the rest of the table CSV cannot hold the same way: the numbers a sort keeps
+(`Dataset.order`, which `%%lookup:N:…%%` counts by), taken only while they
+still describe the rows, and the table's lock.
 
 **An archive is untrusted, and its tools are many.** A package comes from
 somebody else, so `unzip` inflates no entry past the size its directory
-declares, nor past 256 MB: a few hundred kilobytes can otherwise stand for
-gigabytes. Names not flagged UTF-8 are read as code page 437, as older and
-Windows tools write them. `packageFiles` drops `__MACOSX/` and dotfiles and,
-when the manifest is one folder down, takes the folder off, so a package
-unzipped and zipped again as its folder still opens. A picture the manifest
+declares, nor past 256 MB, nor the archive past 512 MB in all: a few hundred
+kilobytes can otherwise stand for gigabytes, and twenty entries can point at
+one. A name not flagged UTF-8 is still read as UTF-8 when it is valid UTF-8 —
+macOS's Archive Utility writes it so, unflagged and decomposed — and as code
+page 437 otherwise; every name is composed (NFC) to match the cells.
+`packageFiles` drops `__MACOSX/`, dotfiles, `Thumbs.db` and `desktop.ini`,
+and when the manifest is one folder down, takes that folder and what is in
+it, so a package unzipped and zipped again still opens. A picture the manifest
 names twice is one picture; one it names but does not hold is said.
 
 **A clash is asked about, each one.** A picture or a font family the package
@@ -314,8 +318,18 @@ over the field instead of the browser's Copy and Paste.
 **A swapped-in picture never takes another's name.** A phone's picker names
 every camera photo `image.jpg`; stored under that, the second swap replaced
 the first on every row that showed it. A different picture under a name
-already held becomes `image-2.jpg`; the same picture keeps its name. Only the
-swap does this: a designer dropping an updated `logo.png` means to replace it.
+already held becomes `image-2.jpg`; the same picture keeps its name. The swap does this, and so does a drop
+under copy editing; a designer dropping an updated `logo.png` means to
+replace it.
+
+**One import asks at a time.** While the clash dialog waits, another archive
+is refused with a word: taking the dialog over left the first import waiting
+for an answer that could never come. Saving a package says why if it fails,
+since its dialog is already gone.
+
+**The shears explain, under copy editing.** Not disabled (`aria-disabled`
+instead), so the tip that says to shorten the words can be reached and is
+announced; pressing them does nothing, as the layout is not the writer's.
 
 **Copy editing's dialogs are dialogs.** The package, Edit Design and clash
 dialogs are in `dialogOpen`, so Escape closes them — the clash dialog as
