@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MANIFEST, PackageError, pictureType, picturesNamed, readPackage, sameBytes, safePictureName, writePackage } from './package';
+import { MANIFEST, PackageError, packageFiles, pictureType, picturesNamed, readPackage, sameBytes, safePictureName, writePackage } from './package';
 import { blankTemplate, newBox } from './template';
 import type { Dataset, Template } from './types';
 import { unzip, zipStore } from './zip';
@@ -115,5 +115,31 @@ describe('sameBytes', () => {
 		expect(sameBytes(enc('abc'), enc('abc'))).toBe(true);
 		expect(sameBytes(enc('abc'), enc('abd'))).toBe(false);
 		expect(sameBytes(enc('abc'), enc('ab'))).toBe(false);
+	});
+});
+
+describe('what CSV and zipping tools lose', () => {
+	it('puts back the blank rows at the end of a table', async () => {
+		const blank: Dataset = { columns: ['dish', 'price'], rows: [{ dish: 'Soup', price: '4' }, { dish: '', price: '' }, { dish: '', price: '' }] };
+		const files = await unzip(writePackage({ template: template(), dataset: blank, mapping: {}, pictures: [], fonts: [] }));
+		expect(readPackage(files, 'x').dataset.rows).toEqual(blank.rows);
+	});
+
+	it('opens a package zipped again as its folder, macOS clutter and all', async () => {
+		const files = await unzip(writePackage({ template: template(), dataset: table, mapping: {}, pictures: [{ name: 'soup.jpg', bytes: enc('JPEG') }], fonts: [] }));
+		const rezipped = new Map([...files].map(([path, bytes]) => [`Menu/${path}`, bytes] as [string, Uint8Array]));
+		rezipped.set('__MACOSX/Menu/._libelli.json', enc('junk'));
+		rezipped.set('Menu/.DS_Store', enc('junk'));
+		const read = readPackage(packageFiles(rezipped), 'x');
+		expect(read.pictures.map((p) => p.name)).toEqual(['soup.jpg']);
+		expect(packageFiles(files).size).toBe(files.size);
+	});
+
+	it('lists a picture once however often it is named, and names one it does not hold', async () => {
+		const files = await unzip(bytesWith({ pictures: ['a.png', 'a.png', 'gone.png'] }));
+		files.set('pictures/a.png', enc('A'));
+		const read = readPackage(files, 'x');
+		expect(read.pictures.map((p) => p.name)).toEqual(['a.png']);
+		expect(read.absent).toEqual(['gone.png']);
 	});
 });

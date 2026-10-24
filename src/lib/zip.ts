@@ -127,9 +127,52 @@ export function zipStore(entries: ZipEntry[]): Uint8Array<ArrayBuffer> {
 /** Why an archive could not be read, said in words a person can act on. */
 export class ZipError extends Error {}
 
-async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
+/**
+ * The most one entry may inflate to. An archive comes from somebody else, and
+ * a few hundred kilobytes of deflate can stand for gigabytes of zeros, which
+ * would take the tab — and its unsaved work — down with it.
+ */
+export const MAX_ENTRY = 256 * 1024 * 1024;
+
+class TooLarge extends Error {}
+
+/** Inflated, but never past `limit`: the size the directory declares, or `MAX_ENTRY`. */
+async function inflateRaw(data: Uint8Array, limit: number): Promise<Uint8Array> {
 	const stream = new Blob([data as BlobPart]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-	return new Uint8Array(await new Response(stream).arrayBuffer());
+	const reader = stream.getReader();
+	const chunks: Uint8Array[] = [];
+	let total = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		total += value.length;
+		if (total > limit) {
+			await reader.cancel();
+			throw new TooLarge();
+		}
+		chunks.push(value);
+	}
+	const out = new Uint8Array(total);
+	let at = 0;
+	for (const chunk of chunks) {
+		out.set(chunk, at);
+		at += chunk.length;
+	}
+	return out;
+}
+
+/**
+ * IBM code page 437's upper half: what a name means in an archive that does
+ * not flag it UTF-8, as older and Windows tools write them. Read as UTF-8,
+ * `café.jpg` came out `caf\uFFFD.jpg` and matched nothing.
+ */
+const CP437 =
+	'ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■\u00a0';
+
+/** A name as its archive spells it: UTF-8 when flagged so (bit 11), CP437 otherwise. */
+export function entryName(bytes: Uint8Array, utf8: boolean): string {
+	if (utf8 || bytes.every((b) => b < 0x80)) return new TextDecoder().decode(bytes);
+	return Array.from(bytes, (b) => (b < 0x80 ? String.fromCharCode(b) : CP437[b - 0x80])).join('');
 }
 
 /**
@@ -154,18 +197,18 @@ export async function unzip(bytes: Uint8Array): Promise<Map<string, Uint8Array>>
 	let at = view.getUint32(end + 16, true);
 	if (count === 0xffff || at === 0xffffffff) throw new ZipError('This archive is ZIP64, which libelli cannot read.');
 
-	const decoder = new TextDecoder();
 	const files = new Map<string, Uint8Array>();
 	for (let i = 0; i < count; i++) {
 		if (at + 46 > bytes.length || view.getUint32(at, true) !== 0x02014b50) throw new ZipError('This archive is damaged.');
 		const flags = view.getUint16(at + 8, true);
 		const method = view.getUint16(at + 10, true);
 		const packed = view.getUint32(at + 20, true);
+		const unpacked = view.getUint32(at + 24, true);
 		const nameLength = view.getUint16(at + 28, true);
 		const extraLength = view.getUint16(at + 30, true);
 		const commentLength = view.getUint16(at + 32, true);
 		const local = view.getUint32(at + 42, true);
-		const name = decoder.decode(bytes.subarray(at + 46, at + 46 + nameLength));
+		const name = entryName(bytes.subarray(at + 46, at + 46 + nameLength), !!(flags & 0x0800));
 		at += 46 + nameLength + extraLength + commentLength;
 		if (name.endsWith('/')) continue;
 		if (flags & 1) throw new ZipError(`“${name}” in this archive is encrypted.`);
@@ -178,8 +221,10 @@ export async function unzip(bytes: Uint8Array): Promise<Map<string, Uint8Array>>
 		if (method === 0) files.set(name, data.slice());
 		else if (method === 8) {
 			try {
-				files.set(name, await inflateRaw(data));
-			} catch {
+				// No more than the directory says it holds: a bomb lies about that too.
+				files.set(name, await inflateRaw(data, Math.min(unpacked, MAX_ENTRY)));
+			} catch (error) {
+				if (error instanceof TooLarge) throw new ZipError(`“${name}” in this archive is larger than it says, or too large to open.`);
 				throw new ZipError(`“${name}” in this archive is damaged.`);
 			}
 		} else throw new ZipError(`“${name}” is compressed in a way libelli cannot read.`);
