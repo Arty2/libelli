@@ -1316,6 +1316,12 @@
 	const DOUBLE_TAP = 350;
 	let lastTap: { id: string; at: number } | null = null;
 	/**
+	 * How long after a double tap opens an area the events still trailing it
+	 * belong to it: the click that asks for a picture, the browser's own
+	 * `dblclick`, and the word selection a touch browser makes.
+	 */
+	const TAP_FOLLOW = 800;
+	/**
 	 * When a double tap last opened an area. A touch browser follows two taps
 	 * with a `dblclick` of its own, which opened the area a second time: for
 	 * words that went unseen, but a picture's file picker was asked for twice.
@@ -2400,9 +2406,6 @@
 		onedit?.(box.id);
 	}
 
-	/** How long after a double tap opens a field the browser's own word selection is undone. */
-	const TAP_SELECT_GUARD = 800;
-
 	const focusOnMount = (node: HTMLTextAreaElement) => {
 		node.focus();
 		// At the end, not selecting everything: this is a double-click into words
@@ -2413,8 +2416,8 @@
 		// field opened under that finger on the second tap — so the first key
 		// typed replaced "Concert" rather than following it. For a moment after
 		// a double tap, a selection the browser makes is put back to the caret.
-		if (Date.now() - tapOpenedAt > TAP_SELECT_GUARD) return;
-		const until = Date.now() + TAP_SELECT_GUARD;
+		if (Date.now() - tapOpenedAt > TAP_FOLLOW) return;
+		const until = Date.now() + TAP_FOLLOW;
 		const undoSelection = () => {
 			if (Date.now() > until) return stop();
 			if (document.activeElement === node && node.selectionStart !== node.selectionEnd) toEnd();
@@ -2425,7 +2428,7 @@
 		};
 		document.addEventListener('selectionchange', undoSelection);
 		node.addEventListener('select', undoSelection);
-		setTimeout(stop, TAP_SELECT_GUARD);
+		setTimeout(stop, TAP_FOLLOW);
 		return { destroy: stop };
 	};
 
@@ -2508,17 +2511,21 @@
 		class="overflow-mark"
 		class:offered={!cutting}
 		style="--edge:{cutting ? '100%' : `${trimEdges(box)[0]}mm`};--stack:{badgeCount(box)}"
-		disabled={!editable(box)}
+		disabled={!editable(box) && !(cutting && template.copy)}
+		aria-disabled={cutting && template.copy ? 'true' : undefined}
 		title={cutting && template.copy
 			? 'These words do not fit the field, and what does not fit will not print — shorten them.'
 			: cutting
 			? 'The content does not fit — this area is cutting off what will print. Press to let it grow instead.'
 			: 'This area has grown past the height it was given. Press to cut it at that height instead.'}
-		aria-label={cutting ? 'Let this area grow to fit' : 'Cut this area at its height'}
+		aria-label={cutting && template.copy ? 'These words do not fit — shorten them' : cutting ? 'Let this area grow to fit' : 'Cut this area at its height'}
 		onpointerdown={(e) => e.stopPropagation()}
 		onpointerenter={() => (hoveredBadge = `${box.id}:cut`)}
 		onpointerleave={() => (hoveredBadge = null)}
 		onclick={() => {
+			// Under copy editing it only explains: focusable and announced, so a
+			// writer can learn why the line is there, but the layout is not theirs.
+			if (template.copy) return;
 			flashBadge(`${box.id}:cut`);
 			onaction?.(cutting ? 'Let the area grow' : 'Cut the area at its height');
 			onchange?.({ ...box, overflow: cutting ? 'grow' : 'clip' });
@@ -2622,12 +2629,12 @@
 				onclick={() => {
 					const swap = pendingSwap;
 					pendingSwap = null;
-					if (swap?.id === box.id && Date.now() - swap.at < 800) onswappicture?.(box.id);
+					if (swap?.id === box.id && Date.now() - swap.at < TAP_FOLLOW) onswappicture?.(box.id);
 				}}
 				ondblclick={(e) => {
 					if (!interactive) return;
 					e.preventDefault();
-					if (Date.now() - tapOpenedAt < 800) return;
+					if (Date.now() - tapOpenedAt < TAP_FOLLOW) return;
 					beginEdit(box);
 				}}
 				oncontextmenu={(e) => {

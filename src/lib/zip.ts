@@ -134,6 +134,13 @@ export class ZipError extends Error {}
  */
 export const MAX_ENTRY = 256 * 1024 * 1024;
 
+/**
+ * The most a whole archive may inflate to. Per entry is not enough: a bomb
+ * can point twenty directory entries at one local header, each under the
+ * entry limit, and twenty of them are five gigabytes.
+ */
+export const MAX_ARCHIVE = 512 * 1024 * 1024;
+
 class TooLarge extends Error {}
 
 /** Inflated, but never past `limit`: the size the directory declares, or `MAX_ENTRY`. */
@@ -169,10 +176,22 @@ async function inflateRaw(data: Uint8Array, limit: number): Promise<Uint8Array> 
 const CP437 =
 	'ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■\u00a0';
 
-/** A name as its archive spells it: UTF-8 when flagged so (bit 11), CP437 otherwise. */
+/**
+ * A name as its archive spells it, in NFC. UTF-8 when flagged so (bit 11) —
+ * and when it reads as UTF-8 at all, since macOS's Archive Utility writes
+ * UTF-8 without the flag, and decomposed: `café` as `cafe` and an accent,
+ * which a cell's `local:café.jpg` would never match. CP437 only for bytes
+ * that are not UTF-8, as older and Windows tools write them.
+ */
 export function entryName(bytes: Uint8Array, utf8: boolean): string {
-	if (utf8 || bytes.every((b) => b < 0x80)) return new TextDecoder().decode(bytes);
-	return Array.from(bytes, (b) => (b < 0x80 ? String.fromCharCode(b) : CP437[b - 0x80])).join('');
+	if (!utf8 && bytes.some((b) => b >= 0x80)) {
+		try {
+			return new TextDecoder('utf-8', { fatal: true }).decode(bytes).normalize('NFC');
+		} catch {
+			return Array.from(bytes, (b) => (b < 0x80 ? String.fromCharCode(b) : CP437[b - 0x80])).join('');
+		}
+	}
+	return new TextDecoder().decode(bytes).normalize('NFC');
 }
 
 /**
@@ -198,6 +217,7 @@ export async function unzip(bytes: Uint8Array): Promise<Map<string, Uint8Array>>
 	if (count === 0xffff || at === 0xffffffff) throw new ZipError('This archive is ZIP64, which libelli cannot read.');
 
 	const files = new Map<string, Uint8Array>();
+	let total = 0;
 	for (let i = 0; i < count; i++) {
 		if (at + 46 > bytes.length || view.getUint32(at, true) !== 0x02014b50) throw new ZipError('This archive is damaged.');
 		const flags = view.getUint16(at + 8, true);
@@ -218,6 +238,8 @@ export async function unzip(bytes: Uint8Array): Promise<Map<string, Uint8Array>>
 		const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
 		const data = bytes.subarray(start, start + packed);
 		if (data.length !== packed) throw new ZipError('This archive is cut short.');
+		total += method === 0 ? packed : unpacked;
+		if (total > MAX_ARCHIVE) throw new ZipError('This archive is too large to open.');
 		if (method === 0) files.set(name, data.slice());
 		else if (method === 8) {
 			try {

@@ -271,3 +271,29 @@ describe('what CSV and zipping tools lose', () => {
 		expect(read.absent).toEqual(['gone.png']);
 	});
 });
+
+describe('what else a package carries, from the second review', () => {
+	it('keeps a sorted table’s row numbers and its lock', async () => {
+		const sorted: Dataset = { ...table, order: [1, 0], locked: true };
+		const read = readPackage(await unzip(writePackage({ template: template(), dataset: sorted, mapping: {}, pictures: [], fonts: [] })), 'x');
+		expect(read.dataset).toMatchObject({ order: [1, 0], locked: true });
+	});
+
+	it('drops an order that no longer describes the rows', async () => {
+		const files = await unzip(bytesWith({ order: [0, 0, 5] }));
+		expect(readPackage(files, 'x').dataset.order).toBeUndefined();
+	});
+
+	it('opens a re-zipped package with a stray file beside its folder', async () => {
+		const files = await unzip(writePackage({ template: template(), dataset: table, mapping: {}, pictures: [], fonts: [] }));
+		const rezipped = new Map([...files].map(([path, bytes]) => [`Menu/${path}`, bytes] as [string, Uint8Array]));
+		rezipped.set('Thumbs.db', enc('junk'));
+		rezipped.set('notes.txt', enc('mine'));
+		expect(packageFiles(rezipped).has(MANIFEST)).toBe(true);
+		expect(packageFiles(rezipped).has('notes.txt')).toBe(false);
+	});
+
+	it('refuses a picture named as a dotfile, which would be dropped as clutter', () => {
+		expect(safePictureName('.hidden.png')).toBe(false);
+	});
+});

@@ -1676,7 +1676,10 @@
 
 	async function handleImageDrop(box: Box, file: File) {
 		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
-		placeImage(box, await storeImage(file));
+		// Copy editing changes a row's picture, never another row's: a phone's
+		// photos are all `image.jpg` — see `underFreeName`. A designer dropping
+		// an updated `logo.png` means to replace it, so only here.
+		placeImage(box, await storeImage(copyMode ? await underFreeName(file) : file));
 	}
 
 	/**
@@ -3061,7 +3064,7 @@
 		input.value = '';
 		const box = template.boxes.find((b) => b.id === swapTarget);
 		swapTarget = null;
-		if (file && box) await handleImageDrop(box, await underFreeName(file));
+		if (file && box) await handleImageDrop(box, file);
 	}
 
 	/**
@@ -3639,11 +3642,7 @@
 		if (sameTemplate(next, toFile($state.snapshot(template)))) {
 			return { text: `“${template.name}” is the template already open — nothing to import.`, tone: 'info' };
 		}
-		// Read at once rather than one after another: a library of forty is
-		// forty IndexedDB round trips before the drop does anything.
-		const others = library.filter((entry) => entry.id !== templateId);
-		const docs = await Promise.all(others.map((entry) => loadTemplateDoc(entry.id)));
-		const held = others.find((_, i) => sameTemplate(next, docs[i]));
+		const held = await heldTemplate((doc) => sameTemplate(next, doc));
 		if (held) {
 			await switchTemplate(held.id);
 			return { text: `“${file.name}” is already in your templates as “${template.name}” — opened that one.`, tone: 'info' };
@@ -3704,12 +3703,7 @@
 		if (sameTable(parsed, dataset)) {
 			return { text: `“${tableName}” already holds exactly these rows — nothing to import.`, tone: 'info' };
 		}
-		const others = tables.filter((entry) => entry.id !== datasetId);
-		const docs = await Promise.all(others.map((entry) => loadDatasetDoc(entry.id)));
-		const held = others.find((_, i) => {
-			const doc = docs[i];
-			return !!doc && sameTable(parsed, doc);
-		});
+		const held = await heldTable((doc) => sameTable(parsed, doc));
 		if (held) {
 			await switchDataset(held.id);
 			return { text: `“${file.name}” is already in your tables as “${tableName}” — opened that one.`, tone: 'info' };
@@ -3744,6 +3738,9 @@
 	 */
 	async function importArchiveFile(file: File): Promise<Said> {
 		if (editor !== 'here') return { text: 'Read only — press Open Here to import into your templates.', tone: 'warning' };
+		// One import at a time while one is asking: a second would take the
+		// dialog over and leave the first waiting for an answer for ever.
+		if (clashAsk) return { text: `“${file.name}” was not imported — answer the question about files first, then import it again.`, tone: 'warning' };
 		let files: Map<string, Uint8Array>;
 		try {
 			files = await unzip(new Uint8Array(await file.arrayBuffer()));
@@ -3850,14 +3847,33 @@
 	 * comparison: opening a package points them at this browser's keys.
 	 */
 	async function heldPair(contents: ReturnType<typeof readPackage>): Promise<{ templateId: string; datasetId: string } | null> {
-		await Promise.all([flushTemplate(), flushDataset()]);
 		const bare = { ...contents.template, fonts: [] };
-		const templateDocs = await Promise.all(library.map((entry) => loadTemplateDoc(entry.id)));
-		const t = library.find((_, i) => !!templateDocs[i] && sameTemplate(bare, { ...(templateDocs[i] as object), fonts: [] }));
+		const sameDesign = (doc: unknown) => !!doc && sameTemplate(bare, { ...(doc as object), fonts: [] });
+		// The open pair counts, as it does for the other imports, read from
+		// memory since storage may be a debounce behind.
+		const t = sameDesign(toFile($state.snapshot(template))) ? templateId : (await heldTemplate(sameDesign))?.id;
 		if (!t) return null;
-		const tableDocs = await Promise.all(tables.map((entry) => loadDatasetDoc(entry.id)));
-		const d = tables.find((_, i) => !!tableDocs[i] && sameTable(contents.dataset, tableDocs[i]!));
-		return d ? { templateId: t.id, datasetId: d.id } : null;
+		const d = sameTable(contents.dataset, dataset) ? datasetId : (await heldTable((doc) => sameTable(contents.dataset, doc)))?.id;
+		return d ? { templateId: t, datasetId: d } : null;
+	}
+
+	/**
+	 * The library's template, other than the open one, whose stored copy
+	 * passes `test` — the one rule every import uses for "already have it".
+	 * Read at once rather than one after another: a library of forty is
+	 * forty IndexedDB round trips before the drop does anything.
+	 */
+	async function heldTemplate(test: (doc: unknown) => boolean) {
+		const others = library.filter((entry) => entry.id !== templateId);
+		const docs = await Promise.all(others.map((entry) => loadTemplateDoc(entry.id)));
+		return others.find((_, i) => !!docs[i] && test(docs[i]));
+	}
+
+	/** The same, for a table. */
+	async function heldTable(test: (doc: Dataset) => boolean) {
+		const others = tables.filter((entry) => entry.id !== datasetId);
+		const docs = await Promise.all(others.map((entry) => loadDatasetDoc(entry.id)));
+		return others.find((_, i) => !!docs[i] && test(docs[i]!));
 	}
 
 	/**
@@ -4003,6 +4019,15 @@
 	 */
 	async function exportPackage() {
 		packaging = false;
+		try {
+			await writeAndSavePackage();
+		} catch (error) {
+			// The dialog has gone: without this, nothing downloads and nothing says why.
+			notify(`The package was not saved — ${error instanceof Error ? error.message.replace(/\.$/, '') : 'something went wrong'}.`, 'warning');
+		}
+	}
+
+	async function writeAndSavePackage() {
 		const t = $state.snapshot(template) as Template;
 		const d = $state.snapshot(dataset) as Dataset;
 		const pictures: PackagePicture[] = [];
