@@ -21,6 +21,11 @@ describe('droppedKind', () => {
 		expect(droppedKind({ name: 'notes.pdf', type: 'application/pdf' })).toBe('unknown');
 	});
 
+	it('takes a ZIP as an archive, whatever type the system gives it', () => {
+		expect(droppedKind({ name: 'Poster package.zip', type: 'application/x-zip-compressed' })).toBe('archive');
+		expect(droppedKind({ name: 'Poster', type: 'application/zip' })).toBe('archive');
+	});
+
 	it('sets images apart, so they can be pointed at the page', () => {
 		expect(droppedKind({ name: 'photo.png', type: 'image/png' })).toBe('image');
 		expect(droppedKind({ name: 'photo', type: 'image/jpeg' })).toBe('image');

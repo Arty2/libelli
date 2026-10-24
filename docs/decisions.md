@@ -223,6 +223,140 @@ the handler. Measured both ways before the clamp existed — a `-8` bleed drew a
 no card in it and the whole design still inside, unreachable. Neither threw;
 that is what makes it worth writing down.
 
+## `src/lib/package.ts`
+
+**A package carries what a template only names.** A template stays small by
+naming its pictures and fonts (AGENTS.md); a writer who was sent one has
+neither. So a package is one stored ZIP: `libelli.json` (the mapping, the
+pictures, the font files and what face each is), `template.json`, `table.csv`,
+`pictures/` and `fonts/`. Writing it sets `copy` and `locked` on the copy that
+is written, never on the designer's own. Reading it puts the pictures under
+the names the cells use. A picture of that name already in this browser is
+replaced, since the package is what the design was made with. Fonts go in only
+when the designer ticks that their licences allow it, and the tick starts
+clear every time: a licence is a fact about those fonts, not a preference.
+
+**The table is CSV, read strictly.** Readable in any spreadsheet, and read
+back with commas named rather than sniffed: sniffing took a one-column table
+with tabs in its words for two columns. A parser drops a blank record at the
+end, and a blank row is a card the writer was sent to fill in, so the
+manifest carries the row count and the blank rows are put back. It carries
+the rest of the table CSV cannot hold the same way: the numbers a sort keeps
+(`Dataset.order`, which `%%lookup:N:…%%` counts by), taken only while they
+still describe the rows, and the table's lock.
+
+**An archive is untrusted, and its tools are many.** A package comes from
+somebody else, so `unzip` inflates no entry past the size its directory
+declares, nor past 256 MB, nor the archive past 512 MB in all: a few hundred
+kilobytes can otherwise stand for gigabytes, and twenty entries can point at
+one. A name not flagged UTF-8 is still read as UTF-8 when it is valid UTF-8 —
+macOS's Archive Utility writes it so, unflagged and decomposed — and as code
+page 437 otherwise; every name is composed (NFC) to match the cells.
+`packageFiles` drops `__MACOSX/`, dotfiles, `Thumbs.db` and `desktop.ini`,
+and when the manifest is one folder down, takes that folder and what is in
+it, so a package unzipped and zipped again still opens. A picture the manifest
+names twice is one picture; one it names but does not hold is said.
+
+**A clash is asked about, each one.** A picture or a font family the package
+brings that this browser already holds, with different bytes, is listed
+before anything is written, ticked to take the package's (so the design
+prints as it was made) and unticked to keep this browser's. A kept family's
+font is pointed at this browser's file. The same bytes are no clash. Picture
+names are checked first, all of them: one that is a path would fail part way,
+into a connected folder.
+
+**Files already here with the same bytes are left alone.** Not rewritten, and
+a font family whose every face is already held is not reinstalled: installing
+clears the family first, which deleted the faces here that the package did
+not carry — a Bold that other designs were set in.
+
+**The same package twice opens what is held.** As Import does for a template
+or a table: when the library holds this template and this table unchanged,
+and none of its files clash, those open instead of a second pair. A package
+whose pictures differ is a new version and imports as one. A picture or font
+it brings that this browser has lost since — deleted from the tray — is put
+back before the held pair opens: getting it back is a reason to open the
+package again. Fonts are left
+out of comparing templates, since opening a package points them at this
+browser's keys.
+
+**A face's files are loaded before anything is replaced.** A damaged file in
+a package fails before the family this browser had is cleared, and is named.
+
+## Copy editing — `Template.copy`
+
+**Copy editing is always locked.** `normaliseTemplate` locks any design that
+says `copy`: with the controls hidden and the lock off, every area could
+still be dragged and there would be no padlock to say why.
+
+**A mode, not a permission.** Everything here runs in the writer's own
+browser, so nothing can stop them changing the design, and pretending
+otherwise would be theatre. The mode puts the design's controls away (the
+page bar, the area bar, the padlock, the unlock key) and says, above the
+page, what is left to do. **Edit Design…** asks, then clears `copy` and
+leaves `locked`, so unlocking is a second, deliberate step.
+
+**Only the row is the writer's.** On a locked design an area's own words
+still open for typing, as content; under copy editing they do not. A label or
+a heading written into the design is the designer's, and what a writer
+changes is the table: fields bound to a column, on the card or in the table.
+
+**A picture field takes a drop on a locked design.** Its picture is the row's,
+as a field's words are, and the design's lock never froze those
+(`contentOpen`). Under copy editing a double-click on one asks for a file
+instead of opening the drawing: a writer swaps a photograph, they do not
+paint on it.
+
+**On a touchscreen the note says double-tap, and on a phone it is one line.**
+Which word is the primary pointer's (`hover: none` and `pointer: coarse`), so a
+laptop with a touchscreen keeps the mouse's word. Under 560px the note is its
+short form, its long one in the title for a press and hold, and Edit Design is
+a square icon. The area's right-click menu is off while copy editing: it holds
+design actions only, and on a phone a double-tap that selected a word opened it
+over the field instead of the browser's Copy and Paste.
+
+**A swapped-in picture never takes another's name.** A phone's picker names
+every camera photo `image.jpg`; stored under that, the second swap replaced
+the first on every row that showed it. A different picture under a name
+already held becomes `image-2.jpg`; the same picture keeps its name. The swap does this, and so does a drop
+under copy editing; a designer dropping an updated `logo.png` means to
+replace it.
+
+**One import asks at a time.** While the clash dialog waits, another archive
+is refused with a word: taking the dialog over left the first import waiting
+for an answer that could never come. Saving a package says why if it fails,
+since its dialog is already gone.
+
+**The shears explain, under copy editing.** Not disabled (`aria-disabled`
+instead), so the tip that says to shorten the words can be reached and is
+announced; pressing them does nothing, as the layout is not the writer's.
+
+**Copy editing's dialogs are dialogs.** The package, Edit Design and clash
+dialogs are in `dialogOpen`, so Escape closes them — the clash dialog as
+Cancel — and the page's keys stand down behind them. While the clash dialog
+waited, Ctrl/Cmd+Z and Delete still reached the card under it.
+
+**A picture's file picker is asked for from a click.** Chromium refuses a file
+picker asked for during a touch's pointerup, user gesture or not, and grants
+it from the click that follows. So a double-tap on a picture field only marks
+it, and the click that ends the second tap opens the picker. The browser's own
+`dblclick` after two taps is ignored once a double tap has opened an area; it
+was opening it a second time, and asking for the picker twice.
+
+**A double tap leaves the caret at the end, as a double-click does.** The
+field opens under the finger on the second tap, and a touch browser's double
+tap selects the word there, so the first key typed replaced it. For 0.8 s
+after a double tap opens a field, a selection the browser makes is put back
+to a caret at the end (`focusOnMount`); after that, a selection is the
+person's and is left alone. It applies wherever an area is opened by touch,
+not only in copy editing.
+
+**Words that do not fit are always marked.** The cut line under a clipped
+area was drawn only with the bounds on, which are the designer's furniture.
+In copy editing it is drawn regardless, over a white halo, since a red dash
+on red artwork vanished, and its shears explain rather than offer to let the
+area grow.
+
 ## `src/lib/autolayout.ts`
 
 **A heading is lowercased, then read word by word from the end.** Every hint
@@ -3119,6 +3253,16 @@ one changes nothing — and an unused local file gets Delete instead, asking
 first, because another template in the library may still be set in it.
 
 ## `src/lib/assets.ts` and `src/lib/fonts.ts`
+
+**A family can be several files.** An upload was one file for a whole family,
+drawn for every weight. A package brings Regular, Bold, Italic and Bold Italic
+as separate files, and loading each over the last
+would leave only the last. So a face stored with `weight` and `italic` is
+registered with those descriptors. The one nearest Regular is kept under the
+family's own key, which is the key a template's `FontRef.ref` names, so every
+check that a font is missing is unchanged; the others go beside it under
+`faceKey` (`font:x@700i`). The tray lists a family once, weighing all its
+faces. Deleting it, or uploading a single file over it, takes them all.
 
 **The Pictures tray uploads, and carries by pointer.** Without the folder —
 Firefox, Safari, every phone — the only way in was dropping a file on an area,

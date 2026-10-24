@@ -194,6 +194,12 @@ export function naturalXHeight(family: string | undefined): number | undefined {
  * a file that says nothing — gives null, and the fallback stays sans-serif.
  */
 export async function fontKindOf(bytes: ArrayBuffer): Promise<FontKind | null> {
+	const tables = await readTables(bytes, ['OS/2', 'post']);
+	return tables ? kindFromTables(tables.get('OS/2'), tables.get('post')) : null;
+}
+
+/** The named tables of an sfnt or WOFF file, inflated; `null` for anything else. */
+async function readTables(bytes: ArrayBuffer, wanted: string[]): Promise<Map<string, DataView> | null> {
 	const view = new DataView(bytes);
 	if (view.byteLength < 12) return null;
 	const tag = (at: number) => String.fromCharCode(view.getUint8(at), view.getUint8(at + 1), view.getUint8(at + 2), view.getUint8(at + 3));
@@ -202,8 +208,9 @@ export async function fontKindOf(bytes: ArrayBuffer): Promise<FontKind | null> {
 		const count = view.getUint16(12);
 		for (let i = 0; i < count; i++) {
 			const at = 44 + i * 20;
+			if (at + 20 > view.byteLength) break;
 			const name = tag(at);
-			if (name !== 'OS/2' && name !== 'post') continue;
+			if (!wanted.includes(name)) continue;
 			const offset = view.getUint32(at + 4);
 			const length = view.getUint32(at + 8);
 			const original = view.getUint32(at + 12);
@@ -216,12 +223,16 @@ export async function fontKindOf(bytes: ArrayBuffer): Promise<FontKind | null> {
 		const count = view.getUint16(4);
 		for (let i = 0; i < count; i++) {
 			const at = 12 + i * 16;
+			if (at + 16 > view.byteLength) break;
 			const name = tag(at);
-			if (name !== 'OS/2' && name !== 'post') continue;
-			tables.set(name, new DataView(bytes, view.getUint32(at + 8), view.getUint32(at + 12)));
+			if (!wanted.includes(name)) continue;
+			const offset = view.getUint32(at + 8);
+			const length = view.getUint32(at + 12);
+			if (offset + length > view.byteLength) continue;
+			tables.set(name, new DataView(bytes, offset, length));
 		}
 	}
-	return kindFromTables(tables.get('OS/2'), tables.get('post'));
+	return tables;
 }
 
 async function inflate(raw: ArrayBuffer): Promise<ArrayBuffer> {
@@ -252,7 +263,30 @@ export interface StoredFont {
 	family: string;
 	format: string;
 	bytes: ArrayBuffer;
+	/**
+	 * Which face of the family this file is, for a family that came as
+	 * several files — Regular, Bold, Italic — out of a package. Absent is the
+	 * one face a single upload is, drawn for every weight and slant as it
+	 * always was. Each further face is stored under `faceKey`, beside the
+	 * family's own key, which is the one a template's `FontRef.ref` names.
+	 */
+	weight?: number;
+	italic?: boolean;
 }
+
+/**
+ * Where a family's further faces are stored: its key, then the weight and an
+ * `i` for italic. The family's key alone is still what says it is held, so
+ * every check that a font is missing is unchanged.
+ */
+export const faceKey = (ref: string, weight: number, italic: boolean) => `${ref}@${weight}${italic ? 'i' : ''}`;
+
+/** The family's own key, for one of its face keys or for itself. */
+export const familyKey = (key: string) => key.replace(/@\d+i?$/, '');
+
+/** A stored face's descriptors for `FontFace` and `@font-face`; none for a single upload. */
+export const faceDescriptors = (stored: Pick<StoredFont, 'weight' | 'italic'>): FontFaceDescriptors =>
+	stored.weight === undefined ? {} : { weight: String(stored.weight), style: stored.italic ? 'italic' : 'normal' };
 
 const loadedGoogle = new Set<string>();
 const loadedLocal = new Set<string>();
@@ -495,16 +529,15 @@ function formatFor(name: string): string {
 	return 'truetype';
 }
 
-/** Register bytes with the document and remember them for next visit. */
-export async function installFontBytes(ref: string, family: string, bytes: ArrayBuffer, format: string): Promise<void> {
-	if (typeof document === 'undefined') return;
-	const face = new FontFace(family, bytes.slice(0));
-	await face.load();
-	// A file chosen for a family already drawn — a Google one, or an earlier
-	// upload — replaces it: the faces the page had for that name go, or the
-	// browser would go on matching whichever it found first. A Google family's
-	// faces belong to its stylesheet and cannot be deleted one by one, so the
-	// stylesheet goes, and the family is no longer counted as fetched.
+/**
+ * Every face this page has for a family, and every file stored for it, gone
+ * — before a family is installed afresh. A file chosen for a family already
+ * drawn, a Google one or an earlier upload, replaces it: otherwise the
+ * browser would go on matching whichever face it found first. A Google
+ * family's faces belong to its stylesheet and cannot be deleted one by one,
+ * so the stylesheet goes, and the family is no longer counted as fetched.
+ */
+async function clearFamily(ref: string, family: string): Promise<void> {
 	const name = family.toLowerCase();
 	document.querySelectorAll<HTMLLinkElement>('link[data-font-family]').forEach((link) => {
 		if (link.dataset.fontFamily?.toLowerCase() === name) link.remove();
@@ -515,20 +548,89 @@ export async function installFontBytes(ref: string, family: string, bytes: Array
 		if (old.family.replace(/^["']|["']$/g, '').toLowerCase() === name) stale.push(old);
 	});
 	for (const old of stale) document.fonts.delete(old);
-	document.fonts.add(face);
+	for (const key of await idbKeys(STORE_FONTS)) {
+		if (familyKey(key) !== ref) continue;
+		loadedLocal.delete(key);
+		if (key !== ref) await idbDelete(STORE_FONTS, key);
+	}
+}
+
+/** Register bytes with the document as the whole family, replacing what it had, and remember them for next visit. */
+export async function installFontBytes(ref: string, family: string, bytes: ArrayBuffer, format: string): Promise<void> {
+	if (typeof document === 'undefined') return;
+	const loaded = new FontFace(family, bytes.slice(0));
+	await loaded.load();
+	await clearFamily(ref, family);
+	document.fonts.add(loaded);
 	loadedLocal.add(ref);
 	await idbSet(STORE_FONTS, ref, { family, format, bytes } satisfies StoredFont);
 }
 
+/** The key a family's uploaded file is stored under, and its `FontRef.ref`. */
+export const fontRefKey = (family: string) => `font:${family.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
 export async function uploadLocalFont(file: File, familyOverride?: string): Promise<FontRef> {
 	const family = (familyOverride ?? file.name.replace(/\.[^.]+$/, '')).trim();
-	const ref = `font:${family.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+	const ref = fontRefKey(family);
 	const bytes = await file.arrayBuffer();
 	await installFontBytes(ref, family, bytes, formatFor(file.name));
 	// Read once, as it arrives, and kept with the font in the template: on a
 	// computer without the file, the fallback is of the same kind.
 	const kind = await fontKindOf(bytes).catch(() => null);
 	return { family, source: 'local', ref, ...(kind ? { kind } : {}) };
+}
+
+/** A face of a family, from a package: its file's bytes and what it is. */
+export interface FaceFile {
+	name: string;
+	/** `StoredFont.format`; absent, read off the name's extension */
+	format?: string;
+	bytes: ArrayBuffer;
+	weight: number;
+	italic: boolean;
+}
+
+/**
+ * Several files as the faces of one family. The one nearest Regular is the
+ * family's own key, so the family counts as held exactly as a single upload
+ * does; the rest are stored beside it (`faceKey`).
+ */
+export async function installFontFaces(family: string, files: FaceFile[]): Promise<FontRef> {
+	const ref = fontRefKey(family);
+	const ordered = [...files].sort((a, b) => Math.abs(a.weight - 400) + (a.italic ? 1000 : 0) - (Math.abs(b.weight - 400) + (b.italic ? 1000 : 0)));
+	if (typeof document !== 'undefined') {
+		// Every face loaded before anything is cleared: a damaged file throws
+		// here, and the family this browser had is still whole.
+		const loaded = await Promise.all(ordered.map((file) => new FontFace(family, file.bytes.slice(0), faceDescriptors(file)).load()));
+		await clearFamily(ref, family);
+		for (const [i, file] of ordered.entries()) {
+			const key = i === 0 ? ref : faceKey(ref, file.weight, file.italic);
+			document.fonts.add(loaded[i]);
+			loadedLocal.add(key);
+			await idbSet(STORE_FONTS, key, {
+				family,
+				format: file.format ?? formatFor(file.name),
+				bytes: file.bytes,
+				weight: file.weight,
+				italic: file.italic
+			} satisfies StoredFont);
+		}
+	}
+	const kind = ordered.length ? await fontKindOf(ordered[0].bytes).catch(() => null) : null;
+	return { family, source: 'local', ref, ...(kind ? { kind } : {}) };
+}
+
+/** Every face this browser holds under a family's key (`FontRef.ref`), as a package carries them. */
+export async function storedFaces(ref: string): Promise<Array<{ family: string; weight: number; italic: boolean; format: string; bytes: Uint8Array }>> {
+	const out = [];
+	for (const key of await idbKeys(STORE_FONTS)) {
+		if (familyKey(key) !== ref) continue;
+		const stored = await idbGet<StoredFont>(STORE_FONTS, key);
+		if (!stored?.bytes) continue;
+		// A single upload is no face in particular; it goes as the regular.
+		out.push({ family: stored.family, weight: stored.weight ?? 400, italic: !!stored.italic, format: stored.format, bytes: new Uint8Array(stored.bytes) });
+	}
+	return out;
 }
 
 export async function storedFontRefs(): Promise<Set<string>> {
@@ -543,7 +645,7 @@ export async function loadStoredFonts(): Promise<void> {
 		const stored = await idbGet<StoredFont>(STORE_FONTS, ref);
 		if (!stored?.bytes) continue;
 		try {
-			const face = new FontFace(stored.family, stored.bytes.slice(0));
+			const face = new FontFace(stored.family, stored.bytes.slice(0), faceDescriptors(stored));
 			await face.load();
 			document.fonts.add(face);
 			loadedLocal.add(ref);
@@ -628,12 +730,17 @@ export interface StoredFontEntry {
 
 /** Every font uploaded to this browser, by family. */
 export async function listStoredFonts(): Promise<StoredFontEntry[]> {
-	const out: StoredFontEntry[] = [];
-	for (const ref of await idbKeys(STORE_FONTS)) {
-		const stored = await idbGet<StoredFont>(STORE_FONTS, ref);
-		if (stored?.family) out.push({ ref, family: stored.family, bytes: stored.bytes?.byteLength ?? 0 });
+	// A family's faces are one line, under the family's own key, weighing all of them.
+	const byRef = new Map<string, StoredFontEntry>();
+	for (const key of await idbKeys(STORE_FONTS)) {
+		const stored = await idbGet<StoredFont>(STORE_FONTS, key);
+		if (!stored?.family) continue;
+		const ref = familyKey(key);
+		const entry = byRef.get(ref) ?? { ref, family: stored.family, bytes: 0 };
+		entry.bytes += stored.bytes?.byteLength ?? 0;
+		byRef.set(ref, entry);
 	}
-	return out.sort((a, b) => a.family.localeCompare(b.family));
+	return [...byRef.values()].sort((a, b) => a.family.localeCompare(b.family));
 }
 
 /**
@@ -642,8 +749,11 @@ export async function listStoredFonts(): Promise<StoredFontEntry[]> {
  * turn missing under the person deleting it.
  */
 export async function deleteStoredFont(ref: string, family: string): Promise<void> {
-	await idbDelete(STORE_FONTS, ref);
-	loadedLocal.delete(ref);
+	for (const key of await idbKeys(STORE_FONTS)) {
+		if (familyKey(key) !== ref) continue;
+		await idbDelete(STORE_FONTS, key);
+		loadedLocal.delete(key);
+	}
 	if (typeof document === 'undefined' || !document.fonts) return;
 	const name = family.toLowerCase();
 	const doomed: FontFace[] = [];

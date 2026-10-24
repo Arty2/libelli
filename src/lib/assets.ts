@@ -298,6 +298,20 @@ export async function resolveLocalImages(
 	return { urls, missing };
 }
 
+/**
+ * A stored picture's bytes, from the folder first and this browser second —
+ * the same order a name is resolved in — or null when neither has it. For
+ * putting a picture into a package.
+ */
+export async function readLocalImage(name: string): Promise<Blob | null> {
+	if (typeof window === 'undefined') return null;
+	const folder = await readyFolder();
+	const fromFolder = folder ? await fileIn(folder, name) : null;
+	if (fromFolder) return fromFolder;
+	const stored = await idbGet<StoredImage>(STORE_ASSETS, assetKey(name));
+	return stored?.bytes ? new Blob([stored.bytes], { type: stored.type }) : null;
+}
+
 // ---- a folder of one's own --------------------------------------------------
 
 /**
