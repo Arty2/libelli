@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { faceOf, IdmlError, invert, linkName, multiply, place, readIdml, type Matrix } from './idml';
+import { faceOf, IdmlError, invert, linkName, multiply, place, readIdml, readsAsMarkdown, type Matrix } from './idml';
 import { enc, frame, idml, path, PX, PY } from './idml.fixture';
 
 const near = (value: number, expected: number, places = 1) => expect(value).toBeCloseTo(expected, places);
@@ -70,15 +70,9 @@ describe('readIdml', () => {
 		near(template.page.margin as number, 12.7);
 	});
 
-	it('names the faces it sets words in, and asks for the files rather than guessing', () => {
-		const { faces, template } = readIdml(idml(), 'x');
-		expect(faces).toEqual(
-			expect.arrayContaining([
-				{ family: 'Source Serif 4', weight: 600, italic: true },
-				{ family: 'Source Serif 4', weight: 400, italic: false },
-				{ family: 'Source Serif 4', weight: 700, italic: false }
-			])
-		);
+	it('names the families it sets words in, and asks for the files rather than guessing', () => {
+		const { families, template } = readIdml(idml(), 'x');
+		expect(families).toEqual(['Source Serif 4']);
 		expect(template.fonts).toEqual([{ family: 'Source Serif 4', source: 'local', ref: 'font:source-serif-4' }]);
 		expect(template.defaults.font).toBe('Source Serif 4');
 	});
@@ -106,8 +100,8 @@ describe('readIdml', () => {
 		expect(notes[0]).toMatch(/no layer called “Editable”/);
 	});
 
-	it('skips a hidden layer', () => {
-		const files = idml({ layers: '<Layer Self="ua" Name="Artwork" Visible="true"/><Layer Self="ub" Name="Editable" Visible="false"/>' });
+	it('skips a hidden layer other than Editable', () => {
+		const files = idml({ layers: '<Layer Self="ua" Name="Artwork" Visible="true"/><Layer Self="ub" Name="Layer 1" Visible="false"/>' });
 		expect(readIdml(files, 'x').template.boxes).toHaveLength(0);
 	});
 
@@ -153,6 +147,52 @@ describe('readIdml', () => {
 		const spread = frame('TextFrame', 'Self="u11" ParentStory="u10" ItemLayer="ub" Name="t" FillColor="Tint/u97" StrokeWeight="1" StrokeColor="Color/Black"', 10, 10, 100, 50);
 		const { template } = readIdml(idml({ spread, stories: { u10: '<ParagraphStyleRange><CharacterStyleRange FillColor="Color/u99"><Content>Red</Content></CharacterStyleRange></ParagraphStyleRange>' } }), 'x');
 		expect(template.boxes[0]).toMatchObject({ background: '#e48f94', color: '#c81e28', borderColor: '#000000', borderStyle: 'solid' });
+	});
+});
+
+describe('readIdml, from review', () => {
+	const one = (body: string, attrs = 'Name="t"') => {
+		const spread = frame('TextFrame', `Self="u11" ParentStory="u10" ItemLayer="ub" ${attrs}`, 10, 10, 100, 50);
+		return readIdml(idml({ spread, stories: { u10: body } }), 'x');
+	};
+
+	it('reads the Editable layer even when it was left hidden for the artwork', () => {
+		const files = idml({ layers: '<Layer Self="ua" Name="Artwork" Visible="true"/><Layer Self="ub" Name="Editable" Visible="false"/>' });
+		expect(readIdml(files, 'x').template.boxes).toHaveLength(3);
+	});
+
+	it('marks bold line by line across a forced line break', () => {
+		const { dataset } = one(`<ParagraphStyleRange><CharacterStyleRange><Content>Plain words </Content></CharacterStyleRange><CharacterStyleRange FontStyle="Bold"><Content>Spring\u2028Sale</Content></CharacterStyleRange></ParagraphStyleRange>`);
+		expect(dataset.rows[0].t).toBe('Plain words **Spring**\n**Sale**');
+	});
+
+	it('keeps words plain when they would read as formatting, and says so', () => {
+		const { template, dataset, notes } = one(`<ParagraphStyleRange><CharacterStyleRange><Content>- 2 eggs, beaten*</Content></CharacterStyleRange><CharacterStyleRange FontStyle="Bold"><Content> now</Content></CharacterStyleRange></ParagraphStyleRange>`);
+		expect(template.boxes[0].mode).toBe('plain');
+		expect(dataset.rows[0].t).toBe('- 2 eggs, beaten* now');
+		expect(notes.join(' ')).toMatch(/“t” keeps its words plain/);
+	});
+
+	it('names a field in its notes as its column is named', () => {
+		const table = '<ParagraphStyleRange><CharacterStyleRange><Content>x</Content><Table Self="tb"/></CharacterStyleRange></ParagraphStyleRange>';
+		const spread = [
+			frame('TextFrame', 'Self="u11" ParentStory="u10" ItemLayer="ub" Name="Title"', 10, 10, 100, 30),
+			frame('TextFrame', 'Self="u12" ParentStory="u20" ItemLayer="ub" Name="Title"', 10, 60, 100, 30)
+		].join('');
+		const { notes } = readIdml(idml({ spread, stories: { u10: '<ParagraphStyleRange><CharacterStyleRange><Content>y</Content></CharacterStyleRange></ParagraphStyleRange>', u20: table } }), 'x');
+		expect(notes.join(' ')).toMatch(/“Title-2” holds a table/);
+	});
+
+	it('leaves system families out of the files it asks for', () => {
+		const { families } = one('<ParagraphStyleRange><Properties><AppliedFont type="string">Arial</AppliedFont></Properties><CharacterStyleRange><Content>Hi</Content></CharacterStyleRange></ParagraphStyleRange>');
+		expect(families).toEqual([]);
+	});
+});
+
+describe('readsAsMarkdown', () => {
+	it('spots what markdown.ts would take for formatting, and nothing else', () => {
+		for (const yes of ['Offer*', 'a `code`', '== Menu ==', '~~gone~~', '[see]{red}', '[see](x.example)', '- 2 eggs', '1. first', '# 5 Main St', '---']) expect(readsAsMarkdown(yes)).toBe(true);
+		for (const no of ['Doors open at 7 pm.', 'Tea – 2.50', 'Q&A #5', '5 - 3 = 2', '[draft]']) expect(readsAsMarkdown(no)).toBe(false);
 	});
 });
 

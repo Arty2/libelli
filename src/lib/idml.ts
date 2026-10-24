@@ -35,13 +35,6 @@ export const EDITABLE_LAYER = 'Editable';
 
 export class IdmlError extends Error {}
 
-/** A face the layout sets words in, for matching font files against. */
-export interface IdmlFace {
-	family: string;
-	weight: number;
-	italic: boolean;
-}
-
 export interface IdmlImport {
 	template: Template;
 	/** one row: each field's words, or `local:name` for a picture */
@@ -49,7 +42,8 @@ export interface IdmlImport {
 	mapping: Mapping;
 	/** the file names the picture frames link to, as `local:` names them */
 	links: string[];
-	faces: IdmlFace[];
+	/** the uploaded families the fields are set in — not the system ones — for matching font files */
+	families: string[];
 	/** what could not be carried over, or was carried over approximately */
 	notes: string[];
 }
@@ -467,6 +461,9 @@ function commonest<T>(items: Array<{ key: string; value: T; weight: number }>): 
  * inside the run's spaces, since `** word**` is not bold.
  */
 function emphasise(text: string, style: RunStyle, base: RunStyle): string {
+	// Line by line: markdown.ts sets each line of a paragraph on its own, so a
+	// bold run across a forced line break came out as `**Spring` and `Sale**`.
+	if (text.includes('\n')) return text.split('\n').map((line) => emphasise(line, style, base)).join('\n');
 	const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(text)!;
 	let core = m[2];
 	if (!core) return text;
@@ -474,6 +471,17 @@ function emphasise(text: string, style: RunStyle, base: RunStyle): string {
 	if (style.italic && !base.italic) core = `*${core}*`;
 	if (style.weight >= base.weight + 200) core = `**${core}**`;
 	return m[1] + core + m[3];
+}
+
+/**
+ * Whether words would be read as Markdown of their own: emphasis, a code
+ * span, a highlight, a coloured run or a link, or a line that starts a
+ * heading, a list or a rule. markdown.ts has no escapes, so a frame whose
+ * words do this stays plain text and loses its bold and italic instead —
+ * the words are the content, and the emphasis is the lesser loss.
+ */
+export function readsAsMarkdown(text: string): boolean {
+	return /[*`]|~~|==|\[[^\]\n]*\][({]/.test(text) || /^\s*(#{1,3}\s|[-*+]\s|\d+[.)]\s|-{3,}\s*$)/m.test(text);
 }
 
 interface FrameText {
@@ -484,14 +492,14 @@ interface FrameText {
 	mixed: boolean;
 	/** some words are lighter or more upright than the main face, which Markdown cannot say */
 	lost: boolean;
+	/** bold, italic or colour that could not be kept, because the words read as Markdown */
+	unsafe: boolean;
 	tables: number;
-	/** every face a word in it is set in, the main one included */
-	faces: IdmlFace[];
 }
 
 function frameText(story: XmlElement | undefined, styles: Styles, swatches: Swatches): FrameText {
 	const fallback = runStyle(INDESIGN_DEFAULTS, swatches);
-	if (!story) return { value: '', markdown: false, style: fallback, mixed: false, lost: false, tables: 0, faces: [] };
+	if (!story) return { value: '', markdown: false, style: fallback, mixed: false, lost: false, unsafe: false, tables: 0 };
 	const { paragraphs, tables } = readStory(story, styles, swatches);
 	const runs = paragraphs.flat();
 	const weighed = runs.map((r) => ({ key: baseKey(r.style), value: r.style, weight: r.text.length }));
@@ -523,9 +531,11 @@ function frameText(story: XmlElement | undefined, styles: Styles, swatches: Swat
 		indent: para.indent
 	};
 
-	const markdown = runs.some(
+	const emphasised = runs.some(
 		(r) => r.text.trim() && (r.style.weight >= base.weight + 200 || (r.style.italic && !base.italic) || (!!r.style.color && r.style.color !== base.color))
 	);
+	const unsafe = emphasised && readsAsMarkdown(runs.map((r) => r.text).join(''));
+	const markdown = emphasised && !unsafe;
 	const lost = runs.some((r) => r.text.trim() && (r.style.weight <= base.weight - 200 || (!r.style.italic && base.italic)));
 	const mixed = runs.some((r) => r.text.trim() && baseKey(r.style) !== baseKey(base));
 	const lines = paragraphs.map((p) => {
@@ -541,16 +551,7 @@ function frameText(story: XmlElement | undefined, styles: Styles, swatches: Swat
 		}
 		return joined.map((r) => emphasise(r.text, r.style, base)).join('');
 	});
-	const faces = new Map<string, IdmlFace>();
-	for (const r of [{ style: base, text: 'x' }, ...runs]) {
-		if (!r.text.trim()) continue;
-		// Set in the area's face unless Markdown can say otherwise.
-		const shown = baseKey(r.style) === baseKey(base) || markdown ? r.style : base;
-		const weight = shown.weight >= base.weight + 200 ? shown.weight : base.weight;
-		const italic = shown.italic || base.italic;
-		faces.set(`${base.family}|${weight}|${italic}`, { family: base.family, weight, italic });
-	}
-	return { value: lines.join(markdown ? '\n\n' : '\n'), markdown, style: base, mixed, lost, tables, faces: [...faces.values()] };
+	return { value: lines.join(markdown ? '\n\n' : '\n'), markdown, style: base, mixed, lost, unsafe, tables };
 }
 
 // ---- the document -------------------------------------------------------------
@@ -641,7 +642,9 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 	const editable = new Set(
 		layers.filter((l) => (l.attrs.Name ?? '').trim().toLowerCase() === EDITABLE_LAYER.toLowerCase()).map((l) => l.attrs.Self)
 	);
-	const hidden = new Set(layers.filter((l) => l.attrs.Visible === 'false').map((l) => l.attrs.Self));
+	// A hidden layer is left out — but never the Editable one: the designer
+	// hides it to export the artwork, and may package the file still hidden.
+	const hidden = new Set(layers.filter((l) => l.attrs.Visible === 'false' && !editable.has(l.attrs.Self)).map((l) => l.attrs.Self));
 	if (!editable.size) {
 		notes.push(
 			`There is no layer called “${EDITABLE_LAYER}”, so every text and picture frame on page 1 became a field. Put the frames the writer may change on a layer of that name to keep the rest fixed.`
@@ -690,15 +693,15 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 	const boxes: Box[] = [];
 	const row: Record<string, string> = {};
 	const links: string[] = [];
-	const faces = new Map<string, IdmlFace>();
 	const families = new Map<string, number>();
 	const langs = new Map<string, number>();
-	const wanted: Array<{ base: string; box: Box; value: string }> = [];
+	// Each field's notes wait for its name: two frames called Title become
+	// Title and Title-2, and a note has to say which.
+	const wanted: Array<{ base: string; box: Box; value: string; notes: Array<(name: string) => string> }> = [];
 	let offPage = 0;
 	let threaded = 0;
 	let skewed = 0;
 	let ignored = 0;
-	const storiesUsed = new Set<string>();
 	let texts = 0;
 	let pictures = 0;
 
@@ -740,7 +743,6 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 				continue;
 			}
 			if (item.attrs.NextTextFrame && item.attrs.NextTextFrame !== 'n') threaded++;
-			if (storyId) storiesUsed.add(storyId);
 			const text = frameText(storyId ? stories.get(storyId) : undefined, styles, swatches);
 			const s = text.style;
 			const prefs = child(item, 'TextFramePreference');
@@ -777,32 +779,29 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 					: {}),
 				...(columns > 1 ? { columns: { count: columns, gap: round(number(prefProps.TextColumnGutter, 12) * PT, 2) } } : {})
 			});
-			const label = fieldBase(item, 'Text', ++texts);
-			wanted.push({ base: label, box, value: text.value });
-			for (const f of text.faces) faces.set(`${f.family}|${f.weight}|${f.italic}`, f);
+			const own: Array<(name: string) => string> = [];
+			if (text.mixed) own.push((n) => `“${n}” sets some words in another face or size; they are in its main style, ${s.family} ${round(s.size, 1)} pt, now.`);
+			if (text.lost) own.push((n) => `“${n}” has words lighter or more upright than the rest; they are set like the rest now.`);
+			if (text.unsafe) own.push((n) => `“${n}” keeps its words plain: they hold characters that would read as formatting, so its bold and italic were left out.`);
+			if (text.tables) own.push((n) => `“${n}” holds a table, which was left out.`);
+			if (s.color === undefined) own.push((n) => `“${n}” is coloured with a gradient or a mixed ink, which was left out.`);
+			wanted.push({ base: fieldBase(item, 'Text', ++texts), box, value: text.value, notes: own });
 			families.set(s.family, (families.get(s.family) ?? 0) + text.value.length + 1);
 			if (s.lang) langs.set(s.lang, (langs.get(s.lang) ?? 0) + text.value.length + 1);
-			if (text.mixed) notes.push(`“${label}” sets some words in another face or size; they are in its main style, ${s.family} ${round(s.size, 1)} pt, now.`);
-			if (text.lost) notes.push(`“${label}” has words lighter or more upright than the rest; they are set like the rest now.`);
-			if (text.tables) notes.push(`“${label}” holds a table, which was left out.`);
-			if (s.color === undefined) notes.push(`“${label}” is coloured with a gradient or a mixed ink, which was left out.`);
 		} else {
 			const link = graphic ? descendants(graphic, 'Link')[0] ?? (graphic.name === 'Link' ? graphic : undefined) : undefined;
 			const file = linkName(link?.attrs.LinkResourceURI);
 			const option = child(item, 'FrameFittingOption')?.attrs.FittingOnEmptyFrame;
 			const fit = option === 'Proportionally' ? 'contain' : option === 'ContentToFrame' ? 'fill' : 'cover';
 			const box = newBox({ ...frame, ...look, mode: 'image', overflow: 'clip', fit });
-			const label = fieldBase(item, 'Picture', ++pictures);
-			wanted.push({ base: label, box, value: file ? `local:${file}` : '' });
-			if (file) {
-				links.push(file);
-				if (/\.(pdf|eps|ai|psd|tiff?|indd)$/i.test(file)) {
-					notes.push(`“${label}” shows ${file}, which a browser cannot draw — supply a PNG, JPG or SVG of it under the same name, or swap in another picture.`);
-				}
-			}
+			const own: Array<(name: string) => string> = [];
+			// Whether the browser can draw the file, and what stands in for it
+			// when not, is package.ts's to say: it is the one that sees the archive.
+			if (file) links.push(file);
 			if (graphic && child(graphic, 'Properties') && readMatrix(graphic.attrs.ItemTransform).some((v, i) => i < 4 && v !== IDENTITY[i])) {
-				notes.push(`“${label}”'s picture is scaled or cropped by hand in InDesign; here it fills its frame by the frame's fitting rule.`);
+				own.push((n) => `“${n}”'s picture is scaled or cropped by hand in InDesign; here it fills its frame by the frame's fitting rule.`);
 			}
+			wanted.push({ base: fieldBase(item, 'Picture', ++pictures), box, value: file ? `local:${file}` : '', notes: own });
 		}
 	}
 
@@ -811,6 +810,7 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 		const box = { ...w.box, id: `b_${i + 1}`, slot: names[i] };
 		boxes.push(box);
 		row[names[i]] = w.value;
+		for (const note of w.notes) notes.push(note(names[i]));
 	});
 
 	if (!boxes.length) {
@@ -875,7 +875,7 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 		dataset: { columns: names, rows: boxes.length ? [row] : [], name },
 		mapping: Object.fromEntries(names.map((n) => [n, n])),
 		links: [...new Set(links)],
-		faces: [...faces.values()],
+		families: [...families.keys()].filter((family) => !isSystemFamily(family)),
 		notes
 	};
 }
