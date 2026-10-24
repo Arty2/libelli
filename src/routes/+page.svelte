@@ -27,6 +27,7 @@
 	import { IdmlError } from '$lib/idml';
 	import {
 		bleedNote,
+		pictureDimensions,
 		MANIFEST,
 		matchFonts,
 		PackageError,
@@ -3026,6 +3027,9 @@
 	const copyMode = $derived(!!template.copy);
 	let leavingCopy = $state(false);
 
+	/** What an import could not carry over, listed in full rather than squeezed into the status line. */
+	let importReport = $state<{ title: string; notes: string[] } | null>(null);
+
 	/** The package dialog, and whether the fonts go in it. */
 	let packaging = $state(false);
 	let packageFonts = $state(false);
@@ -3263,7 +3267,8 @@
 			stepsOpen !== null ||
 			packaging ||
 			leavingCopy ||
-			clashAsk !== null
+			clashAsk !== null ||
+			importReport !== null
 	);
 	/** Something in front of the stage, which then leaves the keys alone. */
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
@@ -3356,6 +3361,7 @@
 			boxMenu = null;
 			packaging = false;
 			leavingCopy = false;
+			importReport = null;
 			// The import waiting on it goes ahead with nothing changed.
 			clashAsk?.resolve(null);
 			return;
@@ -3726,8 +3732,6 @@
 
 	// ---- archives: a package, or a layout from InDesign -----------------------
 
-	/** What an import could not carry over, listed in full rather than squeezed into the status line. */
-	let importReport = $state<{ title: string; notes: string[] } | null>(null);
 
 	/**
 	 * A ZIP: a package somebody made here, or an InDesign layout — an IDML,
@@ -3781,6 +3785,9 @@
 
 	/** A picture's size in pixels, or null where the browser cannot say (an SVG, often). */
 	async function pictureSize(p: PackagePicture): Promise<{ w: number; h: number } | null> {
+		// The header says it for a PNG or a JPEG; only anything else is decoded.
+		const header = pictureDimensions(p.bytes);
+		if (header) return header;
 		try {
 			const bitmap = await createImageBitmap(new Blob([p.bytes as BlobPart], { type: pictureType(p.name) }));
 			const size = { w: bitmap.width, h: bitmap.height };
@@ -3846,7 +3853,7 @@
 	 * as the other imports find theirs. The fonts are left out of the
 	 * comparison: opening a package points them at this browser's keys.
 	 */
-	async function heldPair(contents: ReturnType<typeof readPackage>): Promise<{ templateId: string; datasetId: string } | null> {
+	async function heldPair(contents: { template: Template; dataset: Dataset }): Promise<{ templateId: string; datasetId: string } | null> {
 		const bare = { ...contents.template, fonts: [] };
 		const sameDesign = (doc: unknown) => !!doc && sameTemplate(bare, { ...(doc as object), fonts: [] });
 		// The open pair counts, as it does for the other imports, read from
@@ -3970,8 +3977,10 @@
 			if (note) notes.push(note);
 		}
 		const facts: FontFileFacts[] = [];
+		// Each file's bytes copied out once, for reading it and installing it both.
+		const buffers = new Map(contents.fontFiles.map((file) => [file.name, file.bytes.slice().buffer]));
 		for (const file of contents.fontFiles) {
-			const read = await fontFacts(file.bytes.slice().buffer).catch(() => null);
+			const read = await fontFacts(buffers.get(file.name)!).catch(() => null);
 			if (read) facts.push({ name: file.name, ...read });
 			else notes.push(`“${file.name}” could not be read as a font${/\.woff2$/i.test(file.name) ? ' — a WOFF2 cannot be read here; use the OTF or TTF' : ''}.`);
 		}
@@ -3981,20 +3990,33 @@
 		for (const [family, files] of families) {
 			byFamily.set(
 				family,
-				files.map((f) => ({ name: f.name, bytes: contents.fontFiles.find((x) => x.name === f.name)!.bytes.slice().buffer, weight: f.weight, italic: f.italic }))
+				files.map((f) => ({ name: f.name, bytes: buffers.get(f.name)!, weight: f.weight, italic: f.italic }))
 			);
 		}
 		const pictures = contents.background ? [...contents.pictures, contents.background] : contents.pictures;
 		const { clashes, same } = await clashesWith(pictures, byFamily);
+		// The same layout again, nothing in it different, opens what is held —
+		// as every other import does — after putting back what was lost here.
+		const held = clashes.length ? null : await heldPair({ template: next, dataset: layout.dataset });
+		if (held) {
+			await storeAssets(next, pictures, byFamily, same, notes);
+			await switchTemplate(held.templateId);
+			await switchDataset(held.datasetId);
+			missingFonts = await ensureTemplateFonts(template);
+			return { text: `“${next.name}” is already in your templates, with its table, unchanged — opened those.`, tone: 'info' };
+		}
 		const kept = clashes.length ? await askClashes(clashes) : new Set<string>();
 		if (!kept) return { text: `“${next.name}” was not imported — nothing was changed.`, tone: 'info' };
 		next = await storeAssets(next, pictures, byFamily, new Set([...kept, ...same]), notes);
-		if (missing.length) {
+		await adoptPair(next, layout.dataset, layout.mapping);
+		// Only what is still missing once this browser's own fonts are counted:
+		// a family installed here before needs no file from the archive.
+		const unfound = missing.filter((family) => missingFonts.some((f) => f.family.toLowerCase() === family.toLowerCase()));
+		if (unfound.length) {
 			notes.push(
-				`No font file for ${missing.join(', ')} was in the archive; the fields are set in a fallback until one is added (Pictures › Fonts), or until InDesign's “Document fonts” folder is included.`
+				`No font file for ${unfound.join(', ')} was in the archive or this browser; the fields are set in a fallback until one is added (Pictures › Fonts), or until InDesign's “Document fonts” folder is included.`
 			);
 		}
-		await adoptPair(next, layout.dataset, layout.mapping);
 		if (notes.length) importReport = { title: `“${next.name}” from InDesign`, notes };
 		const count = next.boxes.length;
 		return {

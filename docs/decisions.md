@@ -232,6 +232,12 @@ panel most designers never open. A frame's name in the Layers panel becomes
 its column, else its Script Label, else `Text 1`, `Picture 1`. A document
 with no such layer still imports, every frame a field, and says so first.
 
+**No bleed is no bleed.** A document without one gets none, and a note: its
+artwork can only be trim-sized, and a bleed made up for it stretched the
+artwork past every field. How a picture sat in its frame by hand is not
+carried, nor noted — nearly every placed picture is scaled, and saying so of
+each said nothing.
+
 **The Editable layer is read even when hidden.** Hiding it is how the
 designer exports the artwork, and a file packaged straight after keeps it
 hidden: skipping hidden layers left that import with no fields at all. Other
@@ -256,9 +262,13 @@ different face or size is set like the rest, and each frame that has one is
 named in the notes. Markers go on line by line, since markdown.ts
 sets each line of a paragraph on its own and a bold run across a forced line
 break came out as literal asterisks. And Markdown has no escapes here, so a
-frame whose own words would read as formatting (`readsAsMarkdown`: a stray
-`*`, a line starting `- ` or `1. `) stays plain and drops its emphasis, with
-a note: the words are the content. A note names its field by the column it
+frame whose own words would read as formatting stays plain and drops its
+emphasis, with a note: the words are the content. Whether they would is
+markdown.ts's own answer (`wouldFormat`: its blocks and its inline rules),
+asked paragraph by paragraph — a copy of the syntax in idml.ts had already
+missed `__bold__`. A forced line break inside a paragraph makes a frame
+Markdown too when its paragraphs are spaced or indented, since a plain area
+with a paragraph style sets every line as a paragraph. A note names its field by the column it
 became, after duplicates are numbered. Leading becomes a multiple of the size, tracking becomes
 mm, space before and after becomes the paragraph space in lines, and a first
 line indent becomes the indent in em.
@@ -345,10 +355,18 @@ browser's keys.
 **A face's files are loaded before anything is replaced.** A damaged file in
 a package fails before the family this browser had is cleared, and is named.
 
+**The same layout twice opens what is held**, as every other import does,
+after putting back what this browser lost. Comparing it meant reading both
+sides the same way (`sameTemplate` normalises the incoming one too): a
+template built in memory has its keys in another order, and its export
+differed by nothing else. A missing-font note counts only families still
+missing once this browser's own are counted.
+
 **A link the browser cannot draw takes a stand-in.** InDesign links TIFF,
-PSD, PDF and EPS; a browser draws none of them. A PNG or JPG in the archive
-with the same name before the ending is shown in its place, and the cell
-points at it; without one the note asks for exactly that name. Which files
+PSD, PDF and EPS; a browser draws none of them. A PNG or JPG with the same
+name before the ending is shown in its place — one another frame already
+links to first, then one in `Links/`, never by preference the artwork — and
+the cell points at it; the artwork is renamed if a picture has its name; without one the note asks for exactly that name. Which files
 are drawable is the archive reader's call, not the layout reader's, since
 only it sees what else came. A bare IDML gets the same notes about missing
 artwork and pictures as a folder that left them out.
