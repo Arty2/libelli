@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { enc, idml } from './idml.fixture';
+import { enc, frame, idml } from './idml.fixture';
 import {
 	bleedNote,
 	matchFonts,
 	MANIFEST,
 	PackageError,
 	packageFiles,
+	pictureDimensions,
 	pictureType,
 	picturesNamed,
 	readInDesign,
@@ -295,5 +296,42 @@ describe('what else a package carries, from the second review', () => {
 
 	it('refuses a picture named as a dotfile, which would be dropped as clutter', () => {
 		expect(safePictureName('.hidden.png')).toBe(false);
+	});
+});
+
+describe('pictureDimensions', () => {
+	it('reads a PNG and a JPEG from their headers', () => {
+		const png = new Uint8Array(24);
+		const pv = new DataView(png.buffer);
+		pv.setUint32(0, 0x89504e47);
+		pv.setUint32(12, 0x49484452);
+		pv.setUint32(16, 1819);
+		pv.setUint32(20, 2551);
+		expect(pictureDimensions(png)).toEqual({ w: 1819, h: 2551 });
+		// SOI, an APP0 of 16 bytes, then a baseline SOF0: precision, height, width.
+		const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, ...new Array(14).fill(0), 0xff, 0xc0, 0x00, 0x11, 0x08, 0x09, 0xf7, 0x07, 0x1b, 0x03]);
+		expect(pictureDimensions(jpg)).toEqual({ w: 0x071b, h: 0x09f7 });
+		expect(pictureDimensions(enc('GIF89a'))).toBeNull();
+	});
+});
+
+describe('readInDesign, second review', () => {
+	it('never lets a stand-in take a file another frame links to, nor the artwork a picture’s name', async () => {
+		const layout = idml();
+		// The photo frame links photo.jpg and a second frame photo.tif.
+		const spread = new TextDecoder().decode(layout.get('Spreads/Spread_u1.xml'))
+			.replace('hall%20view.jpg', 'photo.tif')
+			.replace('</Spread>', `${frame('Rectangle', 'Self="u41" ItemLayer="ub" Name="second" ContentType="GraphicType"', 28, 500, 100, 50, '<Image Self="u42"><Link Self="u43" LinkResourceURI="file:/x/Links/photo.jpg"/></Image>')}</Spread>`);
+		layout.set('Spreads/Spread_u1.xml', enc(spread));
+		const files = new Map<string, Uint8Array>([
+			['Concert/Concert.idml', zipStore([...layout].map(([name, data]) => ({ name, data })))],
+			['Concert/Links/photo.jpg', enc('jpeg')],
+			['Concert/photo.jpg', enc('artwork')]
+		]);
+		const read = await readInDesign(files, 'Concert.zip');
+		expect(read.pictures).toEqual([{ name: 'photo.jpg', bytes: enc('jpeg') }]);
+		// photo.tif shares the photo.jpg the second frame links to, rather than taking the artwork.
+		expect(read.layout.dataset.rows[0]).toMatchObject({ photo: 'local:photo.jpg', second: 'local:photo.jpg' });
+		expect(read.background).toEqual({ name: 'artwork photo.jpg', bytes: enc('artwork') });
 	});
 });

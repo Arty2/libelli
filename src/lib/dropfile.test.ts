@@ -91,6 +91,15 @@ describe('sameTemplate', () => {
 		expect(sameTemplate(incoming, stored)).toBe(true);
 	});
 
+	it('knows one built in memory with its keys in another order', () => {
+		const stored = toFile(normaliseTemplate(file));
+		const built = importedTemplate(file);
+		const { image: _image, ...page } = { ...built.page, image: { src: 'art.png', source: 'local' as const, fit: 'cover' as const } };
+		const reordered = { ...built, page: { ...page, image: { src: 'art.png', source: 'local' as const, fit: 'cover' as const } } };
+		const withImage = toFile(normaliseTemplate({ ...stored, page: { ...stored.page, image: { src: 'art.png', source: 'local', fit: 'cover' } } }));
+		expect(sameTemplate(reordered, withImage)).toBe(true);
+	});
+
 	it('does not match one edited since', () => {
 		const incoming = importedTemplate(file);
 		expect(sameTemplate(incoming, { ...file, name: `${file.name} (edited)` })).toBe(false);

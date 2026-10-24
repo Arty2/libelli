@@ -12,6 +12,7 @@
  * reads them to report (see AGENTS.md, "A parser reports; the caller decides").
  */
 
+import { toFile } from './frame';
 import { exportTemplate, importedTemplate } from './template';
 import type { Dataset, Template } from './types';
 
@@ -89,7 +90,10 @@ export function sameTable(a: Pick<Dataset, 'columns' | 'rows'>, b: Pick<Dataset,
  */
 export function sameTemplate(incoming: Template, stored: unknown): boolean {
 	try {
-		return exportTemplate(incoming) === exportTemplate(importedTemplate(stored));
+		// Both sides through the same reading: a template built in memory (an
+		// InDesign import's) has the same keys in another order, and the file
+		// it would export differed by nothing but that.
+		return exportTemplate(importedTemplate(toFile(incoming))) === exportTemplate(importedTemplate(stored));
 	} catch {
 		return false;
 	}

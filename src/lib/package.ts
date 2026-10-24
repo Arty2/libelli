@@ -254,8 +254,6 @@ const FONT = /\.(otf|ttf|woff2?)$/i;
 
 const base = (path: string) => path.split('/').pop() ?? path;
 
-/** Files a zipping tool adds that nobody put in the folder: macOS's `__MACOSX/` and `._` twins, and dotfiles. */
-const isClutter = (path: string) => path.startsWith('__MACOSX/') || path.split('/').some((part) => part.startsWith('.'));
 
 export interface InDesignContents {
 	layout: IdmlImport;
@@ -304,7 +302,8 @@ export async function readInDesign(files: Map<string, Uint8Array>, archiveName: 
 		layoutName = base(archiveName);
 		layout = readIdml(files, stemOf(archiveName));
 	} else {
-		paths = [...files.keys()].filter((p) => !isClutter(p));
+		// The same clutter rule a package is read by, in one place.
+		paths = [...packageFiles(files).keys()];
 		const idmls = paths.filter((p) => /\.idml$/i.test(p));
 		if (!idmls.length) {
 			const indd = paths.some((p) => /\.indd$/i.test(p));
@@ -337,12 +336,24 @@ export async function readInDesign(files: Map<string, Uint8Array>, archiveName: 
 	// same name with another ending, if the archive has one: Links/photo.jpg
 	// for photo.tif. The cell is pointed at what stands in.
 	const standIns = new Map<string, string>();
-	for (const link of layout.links) {
+	// Drawable links first, so a stand-in for photo.tif can never take the
+	// photo.jpg another frame links to by name.
+	const ordered = [...layout.links].sort((a, b) => Number(NOT_DRAWN.test(a)) - Number(NOT_DRAWN.test(b)));
+	for (const link of ordered) {
 		if (NOT_DRAWN.test(link)) {
-			const stand = images.find((im) => !used.has(im.path) && stemOf(im.name).toLowerCase() === stemOf(link).toLowerCase());
+			const stem = stemOf(link).toLowerCase();
+			// A picture already taken for another frame is shared: photo.jpg can
+			// show for photo.tif and for itself. Then one from Links, and only
+			// then anything else — never by preference the artwork beside them.
+			const chosen = pictures.find((p) => stemOf(p.name).toLowerCase() === stem);
+			const free = (im: (typeof images)[number]) => !used.has(im.path) && stemOf(im.name).toLowerCase() === stem;
+			const stand = chosen ?? images.find((im) => free(im) && /(^|\/)links\//i.test(im.path)) ?? images.find(free);
 			if (stand) {
-				used.add(stand.path);
-				pictures.push({ name: stand.name, bytes: stand.bytes });
+				if (!chosen) {
+					const found = stand as (typeof images)[number];
+					used.add(found.path);
+					pictures.push({ name: found.name, bytes: found.bytes });
+				}
 				standIns.set(link, stand.name);
 				notes.push(`“${link}” is a file a browser cannot draw; “${stand.name}” from the archive is shown in its place.`);
 			} else {
@@ -373,7 +384,10 @@ export async function readInDesign(files: Map<string, Uint8Array>, archiveName: 
 
 	const candidates = images.filter((im) => !used.has(im.path) && !/(^|\/)links\//i.test(im.path)).map((im) => ({ name: im.path, bytes: im.bytes }));
 	const pick = pickBackground(candidates, layoutName, notes);
-	const background = pick ? { name: base(pick.name), bytes: pick.bytes } : null;
+	// Stored by name beside the pictures, so never under one of theirs.
+	const taken = new Set(pictures.map((p) => p.name.toLowerCase()));
+	const artworkName = (name: string) => (taken.has(name.toLowerCase()) ? `artwork ${name}` : name);
+	const background = pick ? { name: artworkName(base(pick.name)), bytes: pick.bytes } : null;
 	if (!background) {
 		const pdf = paths.some((p) => /\.pdf$/i.test(p) && !/(^|\/)links\//i.test(p));
 		notes.push(
@@ -440,6 +454,35 @@ export function matchFonts(
 		matched.set(family, faces);
 	}
 	return { families: matched, missing, skipped };
+}
+
+/**
+ * A PNG's or a JPEG's size in pixels, from its header — all the bleed check
+ * needs, without decoding a page of artwork to learn two numbers. Null for
+ * anything else, or a header it cannot read; the caller decodes then.
+ */
+export function pictureDimensions(bytes: Uint8Array): { w: number; h: number } | null {
+	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+	if (bytes.length >= 24 && view.getUint32(0) === 0x89504e47 && view.getUint32(12) === 0x49484452) {
+		return { w: view.getUint32(16), h: view.getUint32(20) };
+	}
+	if (bytes.length < 4 || view.getUint16(0) !== 0xffd8) return null;
+	let at = 2;
+	while (at + 9 < bytes.length) {
+		if (bytes[at] !== 0xff) return null;
+		const marker = bytes[at + 1];
+		if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+			at += 2;
+			continue;
+		}
+		const length = view.getUint16(at + 2);
+		// The start-of-frame markers, baseline to lossless, but not DHT, JPG or DAC.
+		if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+			return { w: view.getUint16(at + 7), h: view.getUint16(at + 5) };
+		}
+		at += 2 + length;
+	}
+	return null;
 }
 
 /**
