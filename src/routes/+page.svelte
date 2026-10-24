@@ -28,6 +28,7 @@
 		MANIFEST,
 		PackageError,
 		pictureType,
+		packageFiles,
 		picturesNamed,
 		readPackage,
 		sameBytes,
@@ -3015,6 +3016,21 @@
 	 */
 	const copyMode = $derived(!!template.copy);
 	let leavingCopy = $state(false);
+
+	/** The package dialog, and whether the fonts go in it. */
+	let packaging = $state(false);
+	let packageFonts = $state(false);
+
+	/** A picture or a font family a package brings that this browser already holds, different. */
+	interface Clash {
+		kind: 'picture' | 'font';
+		name: string;
+		/** use the package's; unticked keeps this browser's */
+		replace: boolean;
+	}
+
+	/** The clashes being asked about, and the import waiting on the answer. */
+	let clashAsk = $state<{ items: Clash[]; resolve: (items: Clash[] | null) => void } | null>(null);
 	let swapInput = $state<HTMLInputElement | null>(null);
 	let swapTarget: string | null = null;
 
@@ -3039,7 +3055,28 @@
 		input.value = '';
 		const box = template.boxes.find((b) => b.id === swapTarget);
 		swapTarget = null;
-		if (file && box) await handleImageDrop(box, file);
+		if (file && box) await handleImageDrop(box, await underFreeName(file));
+	}
+
+	/**
+	 * A swapped-in picture under a name no other picture here has. A phone's
+	 * picker names every camera photo `image.jpg`, and stored under that name
+	 * the second one replaced the first — on every row that showed it. The same
+	 * picture again keeps its name; a different one becomes `image-2.jpg`.
+	 */
+	async function underFreeName(file: File): Promise<File> {
+		const bytes = new Uint8Array(await file.arrayBuffer());
+		const dot = file.name.lastIndexOf('.');
+		const stem = dot > 0 ? file.name.slice(0, dot) : file.name;
+		const ext = dot > 0 ? file.name.slice(dot) : '';
+		for (let n = 1; n < 1000; n++) {
+			const name = n === 1 ? file.name : `${stem}-${n}${ext}`;
+			const have = await readLocalImage(name);
+			if (!have || sameBytes(new Uint8Array(await have.arrayBuffer()), bytes)) {
+				return name === file.name ? file : new File([bytes], name, { type: file.type });
+			}
+		}
+		return file;
 	}
 
 	/** The design's own lock, from the keyboard: the padlock above Area. */
@@ -3214,7 +3251,10 @@
 			deleting ||
 			deletingTable ||
 			magic !== null ||
-			stepsOpen !== null
+			stepsOpen !== null ||
+			packaging ||
+			leavingCopy ||
+			clashAsk !== null
 	);
 	/** Something in front of the stage, which then leaves the keys alone. */
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
@@ -3305,6 +3345,10 @@
 			deletingTable = false;
 			magic = null;
 			boxMenu = null;
+			packaging = false;
+			leavingCopy = false;
+			// The import waiting on it goes ahead with nothing changed.
+			clashAsk?.resolve(null);
 			return;
 		}
 		if (dialogOpen) return;
@@ -3696,6 +3740,7 @@
 		} catch (error) {
 			return { text: `“${file.name}” was not imported. ${error instanceof ZipError ? error.message : 'It could not be read.'}`, tone: 'warning' };
 		}
+		files = packageFiles(files);
 		if (!files.has(MANIFEST)) return { text: `“${file.name}” was not imported. It is a ZIP, but not a libelli package.`, tone: 'warning' };
 		try {
 			return await openPackage(readPackage(files, tableNameFrom(file.name) || UNTITLED_TABLE));
@@ -3710,25 +3755,15 @@
 		if (pictures.length) imagesVersion += 1;
 	}
 
-	/** A picture or a font family a package brings that this browser already holds, different. */
-	interface Clash {
-		kind: 'picture' | 'font';
-		name: string;
-		/** use the package's; unticked keeps this browser's */
-		replace: boolean;
-	}
 
-	/** The clashes being asked about, and the import waiting on the answer. */
-	let clashAsk = $state<{ items: Clash[]; resolve: (items: Clash[] | null) => void } | null>(null);
-
-	/** Ask which of the clashing files to replace; null is Cancel. */
-	function askClashes(items: Clash[]): Promise<Clash[] | null> {
+	/** Ask which of the clashing files to replace: what to keep as it is here (`kind:name`), or null for Cancel. */
+	function askClashes(items: Clash[]): Promise<Set<string> | null> {
 		return new Promise((resolve) => {
 			clashAsk = {
 				items,
 				resolve: (answer) => {
 					clashAsk = null;
-					resolve(answer);
+					resolve(answer && new Set(answer.filter((c) => !c.replace).map((c) => `${c.kind}:${c.name.toLowerCase()}`)));
 				}
 			};
 		});
@@ -3800,6 +3835,51 @@
 		return d ? { templateId: t.id, datasetId: d.id } : null;
 	}
 
+	/**
+	 * Each picture and font family an import brings, against what this browser
+	 * holds: the ones held with the same bytes (`same`, never written again),
+	 * and the ones held with different bytes (`clashes`, asked about). The rest
+	 * are new. Read together, not one after another — `resolveLocalImages`
+	 * learned that for forty pictures.
+	 */
+	async function clashesWith(pictures: PackagePicture[], byFamily: Map<string, FaceFile[]>): Promise<{ clashes: Clash[]; same: Set<string> }> {
+		const clashes: Clash[] = [];
+		const same = new Set<string>();
+		const held = await Promise.all(pictures.map(async (p) => (await readLocalImage(p.name))?.arrayBuffer()));
+		pictures.forEach((picture, i) => {
+			const have = held[i];
+			if (!have) return;
+			if (sameBytes(new Uint8Array(have), picture.bytes)) same.add(`picture:${picture.name.toLowerCase()}`);
+			else clashes.push({ kind: 'picture', name: picture.name, replace: true });
+		});
+		const families = [...byFamily];
+		const stored = await Promise.all(families.map(([family]) => storedFaces(fontRefKey(family))));
+		families.forEach(([family, faces], i) => {
+			const have = stored[i];
+			if (!have.length) return;
+			// Every face the import brings is already here: nothing to install, and
+			// installing would clear the faces here that the import does not carry.
+			if (faces.every((f) => have.some((h) => sameBytes(h.bytes, new Uint8Array(f.bytes))))) same.add(`font:${family.toLowerCase()}`);
+			else clashes.push({ kind: 'font', name: family, replace: true });
+		});
+		return { clashes, same };
+	}
+
+	/**
+	 * The pictures stored and the families installed, but for those `skip`
+	 * names — kept as this browser has them, or already the same. A skipped
+	 * family's font is pointed at this browser's file.
+	 */
+	async function storeAssets(next: Template, pictures: PackagePicture[], byFamily: Map<string, FaceFile[]>, skip: Set<string>, notes: string[]): Promise<Template> {
+		await storePictures(pictures.filter((p) => !skip.has(`picture:${p.name.toLowerCase()}`)));
+		const install = new Map([...byFamily].filter(([family]) => !skip.has(`font:${family.toLowerCase()}`)));
+		const installed = await installFamilies(next, install, notes);
+		return {
+			...installed,
+			fonts: installed.fonts.map((f) => (skip.has(`font:${f.family.toLowerCase()}`) ? { ...f, source: 'local' as const, ref: fontRefKey(f.family) } : f))
+		};
+	}
+
 	async function openPackage(contents: ReturnType<typeof readPackage>): Promise<Said> {
 		const byFamily = new Map<string, FaceFile[]>();
 		for (const font of contents.fonts) {
@@ -3807,53 +3887,37 @@
 			faces.push({ name: `${font.family}.${font.format}`, format: font.format, bytes: font.bytes.slice().buffer, weight: font.weight, italic: font.italic });
 			byFamily.set(font.family, faces);
 		}
+		const { clashes, same } = await clashesWith(contents.pictures, byFamily);
+		const absent = contents.absent.length ? ` The package lists ${contents.absent.join(', ')} but does not hold ${contents.absent.length === 1 ? 'it' : 'them'}.` : '';
 
-		// What would replace something this browser already holds, different:
-		// asked about before anything is written. The same bytes are no clash.
-		const clashes: Clash[] = [];
-		for (const picture of contents.pictures) {
-			const have = await readLocalImage(picture.name);
-			if (have && !sameBytes(new Uint8Array(await have.arrayBuffer()), picture.bytes)) clashes.push({ kind: 'picture', name: picture.name, replace: true });
-		}
-		for (const [family, faces] of byFamily) {
-			const have = await storedFaces(fontRefKey(family));
-			const same = faces.every((f) => have.some((h) => sameBytes(h.bytes, new Uint8Array(f.bytes))));
-			if (have.length && !same) clashes.push({ kind: 'font', name: family, replace: true });
-		}
-		// The same package again — its design, its table and its files all
-		// as held here — opens what is held rather than making a second pair.
-		// A picture that differs makes it a new version, imported as one.
+		// The same package again — its design and its table as held here, none
+		// of its files different — opens what is held rather than making a
+		// second pair. Whatever of it this browser has lost since (a picture
+		// deleted, a font) is put back first, which is a reason to open it again.
 		const held = clashes.length ? null : await heldPair(contents);
 		if (held) {
+			const notes: string[] = [];
+			const restored = contents.pictures.filter((p) => !same.has(`picture:${p.name.toLowerCase()}`)).length + [...byFamily.keys()].filter((f) => !same.has(`font:${f.toLowerCase()}`)).length;
+			await storeAssets(contents.template, contents.pictures, byFamily, same, notes);
 			await switchTemplate(held.templateId);
 			await switchDataset(held.datasetId);
-			return { text: `“${contents.template.name}” is already in your templates, with its table, unchanged — opened those.`, tone: 'info' };
+			missingFonts = await ensureTemplateFonts(template);
+			const back = restored ? ` ${restored === 1 ? 'One file it brings was' : `${restored} files it brings were`} missing here and ${restored === 1 ? 'is' : 'are'} back.` : '';
+			return { text: `“${contents.template.name}” is already in your templates, with its table, unchanged — opened those.${back}${absent}${notes.length ? ` ${notes.join(' ')}` : ''}`, tone: absent || notes.length ? 'warning' : 'info' };
 		}
-		const answer = clashes.length ? await askClashes(clashes) : [];
-		if (!answer) return { text: `“${contents.template.name}” was not imported — nothing was changed.`, tone: 'info' };
-		const kept = new Set(answer.filter((c) => !c.replace).map((c) => `${c.kind}:${c.name.toLowerCase()}`));
-
-		await storePictures(contents.pictures.filter((p) => !kept.has(`picture:${p.name.toLowerCase()}`)));
+		const kept = clashes.length ? await askClashes(clashes) : new Set<string>();
+		if (!kept) return { text: `“${contents.template.name}” was not imported — nothing was changed.`, tone: 'info' };
 		const notes: string[] = [];
-		const install = new Map([...byFamily].filter(([family]) => !kept.has(`font:${family.toLowerCase()}`)));
-		let next = await installFamilies(contents.template, install, notes);
-		// A family kept as this browser has it is pointed at this browser's file.
-		next = {
-			...next,
-			fonts: next.fonts.map((f) => (kept.has(`font:${f.family.toLowerCase()}`) ? { ...f, source: 'local' as const, ref: fontRefKey(f.family) } : f))
-		};
+		const next = await storeAssets(contents.template, contents.pictures, byFamily, new Set([...kept, ...same]), notes);
 		await adoptPair(next, contents.dataset, contents.mapping);
 		const keptCount = kept.size ? ` ${kept.size === 1 ? 'One of your own files was' : `${kept.size} of your own files were`} kept in place of the package's.` : '';
 		const missing = missingFonts.length ? ` ${missingFonts.length === 1 ? 'One font is' : `${missingFonts.length} fonts are`} not included — see above the page.` : '';
 		return {
-			text: `“${next.name}” opened for copy editing: change the words and the pictures, then Export… to print.${keptCount}${missing}${notes.length ? ` ${notes.join(' ')}` : ''}`,
-			tone: missing || notes.length ? 'warning' : 'info'
+			text: `“${next.name}” opened for copy editing: change the words and the pictures, then Export… to print.${keptCount}${missing}${absent}${notes.length ? ` ${notes.join(' ')}` : ''}`,
+			tone: missing || absent || notes.length ? 'warning' : 'info'
 		};
 	}
 
-	/** The package dialog, and whether the fonts go in it. */
-	let packaging = $state(false);
-	let packageFonts = $state(false);
 	/** Unticked every time: a licence is a fact about these fonts, not a preference to remember. */
 	function openPackaging() {
 		packageFonts = false;
@@ -3874,11 +3938,13 @@
 		const d = $state.snapshot(dataset) as Dataset;
 		const pictures: PackagePicture[] = [];
 		const absent: string[] = [];
-		for (const name of picturesNamed(t, d)) {
-			const blob = await readLocalImage(name);
-			if (blob) pictures.push({ name, bytes: new Uint8Array(await blob.arrayBuffer()) });
+		const names = picturesNamed(t, d);
+		const blobs = await Promise.all(names.map(async (name) => (await readLocalImage(name))?.arrayBuffer()));
+		names.forEach((name, i) => {
+			const bytes = blobs[i];
+			if (bytes) pictures.push({ name, bytes: new Uint8Array(bytes) });
 			else absent.push(name);
-		}
+		});
 		const fonts: PackageFont[] = [];
 		const fileless: string[] = [];
 		if (packageFonts) {

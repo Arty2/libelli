@@ -8,7 +8,7 @@ to a release, six at the very most. The dialog reads plain text and `code`
 spans and nothing else, so any other markup shows as typed. The app shows this
 file under **What's new** — press the version number in the status bar.
 
-## 0.31.3 — 2026-10-23
+## 0.31.4 — 2026-10-24
 
 - Package for Copy Editing saves the design, its table, its pictures and, if you choose, its fonts as one ZIP for someone else to fill in. It opens locked: double-click to change the words or swap a picture, then Export to print. A red line marks words that do not fit.
 
