@@ -322,6 +322,12 @@ already held becomes `image-2.jpg`; the same picture keeps its name. The swap do
 under copy editing; a designer dropping an updated `logo.png` means to
 replace it.
 
+**Import is open on a locked design.** Like New Template, it opens beside the
+design and changes nothing in it, so the lock has nothing to protect there.
+Frozen, it shut the one way in on a phone, which cannot drop a file, on the
+starter a first visit opens locked: a writer sent a package had no way to
+open it.
+
 **One import asks at a time.** While the clash dialog waits, another archive
 is refused with a word: taking the dialog over left the first import waiting
 for an answer that could never come. Saving a package says why if it fails,
