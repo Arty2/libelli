@@ -492,10 +492,13 @@
 							</li>
 							<!-- Files in and out, apart from the templates to start. -->
 							<li role="separator"><hr /></li>
+							<!-- Not frozen by the lock, as New Template is not: an import opens
+							     beside this template and leaves it as it is. Frozen, it was the
+							     one way in on a phone — which cannot drop a file — and shut on
+							     the starter a first visit opens locked. -->
 							<li role="none">
 								<button
 									role="menuitem"
-									disabled={pageFrozen}
 									title="A template JSON, a package, or a layout from InDesign (IDML, or its packaged folder zipped)"
 									onclick={fromMenu(onimporttemplate)}
 								>
