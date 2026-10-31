@@ -42,15 +42,20 @@ function topLevel(body: string): string[] {
 	return parts;
 }
 
-/** Calls with a literal key and an object literal of values that has no braces inside it. */
+/**
+ * Calls with their key or keys written literally — `t('a.b', …)`, or a choice
+ * between keys, `t(cond ? 'a.b' : 'a.c', …)` — and an object literal of values
+ * with no braces inside it. A key looked up in a map is read where the map is
+ * written, by "has every key the code asks for", but its values are not.
+ */
 function calls(source: string): Array<{ key: string; names: string[] | null }> {
 	const out: Array<{ key: string; names: string[] | null }> = [];
-	const pattern = /\b(?:t|rich)\(\s*'([\w.-]+)'\s*(?:,\s*\{([^{}]*)\}\s*)?\)|<Msg\s+id="([\w.-]+)"(?:\s+values=\{\{([^{}]*)\}\})?/g;
+	const pattern = /\b(?:t|rich)\(\s*((?:'[\w.-]+'|[^(){}'"`,])+?)\s*(?:,\s*\{([^{}]*)\}\s*)?\)|<Msg\s+id="([\w.-]+)"(?:\s+values=\{\{([^{}]*)\}\})?/g;
 	for (const m of source.matchAll(pattern)) {
-		const key = m[1] ?? m[3];
+		const keys = m[3] ? [m[3]] : [...(m[1] ?? '').matchAll(/'([\w.-]+)'/g)].map((k) => k[1]).filter((k) => k.includes('.'));
 		const body = m[2] ?? m[4];
 		const names = body === undefined ? [] : body.includes('...') ? null : topLevel(body).map((p) => p.split(':')[0].trim()).filter(Boolean);
-		out.push({ key, names });
+		for (const key of keys) out.push({ key, names });
 	}
 	return out;
 }

@@ -33,7 +33,7 @@
 		withoutOrder,
 		type SortDirection
 	} from '$lib/table';
-	import { UNTITLED_TABLE, type DatasetEntry } from '$lib/storage';
+	import { untitledTable, type DatasetEntry } from '$lib/storage';
 	import type { Dataset, Row, RowHeight } from '$lib/types';
 
 	/** Where a drawing was opened from, other than the table itself. */
@@ -1603,7 +1603,7 @@
 	/** The table as it stands, back out as a file. Nothing leaves the browser. */
 	function exportCsv() {
 		// Named as the picker names it, so the file is found under the table's name.
-		download(`${fileStem(tableName, UNTITLED_TABLE)}.csv`, toCsv(dataset), 'text/csv');
+		download(`${fileStem(tableName, untitledTable())}.csv`, toCsv(dataset), 'text/csv');
 		onnotice(t('table.rowsExported', { count: dataset.rows.length }));
 	}
 </script>
@@ -2192,7 +2192,7 @@
 				<span>{t('table.table')}</span>
 				<input
 					value={tableName}
-					placeholder={UNTITLED_TABLE}
+					placeholder={untitledTable()}
 					aria-label={t('table.tableNameLabel')}
 					readonly={locked}
 					onchange={(e) => onrenametable(e.currentTarget.value)}
@@ -2353,7 +2353,7 @@
 				class="icon"
 				disabled={!previousTable}
 				title={previousTable
-					? t('table.swapBackTitle', { name: tables.find((entry) => entry.id === previousTable)?.name ?? UNTITLED_TABLE })
+					? t('table.swapBackTitle', { name: tables.find((entry) => entry.id === previousTable)?.name ?? untitledTable() })
 					: t('table.swapNothingTitle')}
 				aria-label={t('table.swapPreviousTableLabel')}
 				onclick={onswaptable}

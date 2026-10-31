@@ -4750,16 +4750,35 @@ and a value nobody passed draws `{count}` — wrong, but visibly so. The
 catalogue's tests read every source file and assert that each key asked for
 exists, that each key in the file is asked for somewhere, that each message
 parses and uses only the four tags, and that a call passing its values as an
-object literal passes exactly the names the message reads. The key type is
+object literal passes exactly the names the message reads — whether it names
+one key or chooses between keys with `?:`. A key looked up in a map
+(`t(LEADER_LABELS[x])`) is checked where the map is written, but not for its
+values; those maps hold labels that take none. The key type is
 `keyof typeof catalogue`, so `svelte-check` refuses an unknown key where it is
 written literally.
 
 **Gate 13 keeps it that way.** `scripts/ui-text.mjs` lists markup text outside
-`{…}`, a literal `title`, `aria-label`, `placeholder`, `alt` or `label`, and a
-literal handed to `notify`, `onnotice`, `describe`, `onaction` or
-`window.prompt`. It does not see a string kept in a variable and shown later;
-the catalogue tests and review are what catch those. A name that is never
-translated can be marked `ui-text: allow` on its line; none needs it yet.
+`{…}`; a `title`, `aria-label`, `placeholder`, `alt` or `label` with words
+outside its `{…}`; in a component's script and its `{…}` expressions, any
+string literal that reads as a label — a capital, then letters — so both
+branches of `cond ? 'Open' : 'Close'` are seen; and, in any file, a literal
+among the arguments of `notify`, `onnotice`, `describe`, `onaction`,
+`window.prompt`, `notes.push` or a `new …Error`. A literal compared with `===`,
+named in `case` or passed to `includes(` is the keyboard's or the platform's
+(`'Escape'`, `'Files'`) and is let be. What it still cannot see is a sentence in
+a library module kept in a variable and shown later; review catches those. A
+line that is never shown — the service worker's own log, the message parser's
+error for whoever edits the catalogue — says `ui-text: allow`.
+
+**Numbers read as they were given.** A plain `{n}` or `#` is drawn in the
+locale's digits with no grouping and no rounding, so a 1189mm sheet reads 1189,
+as the field beside it does, and a 0.0125mm tracking is not cut to 0.013.
+`{n, number}` is there for the full style when a message wants it.
+
+**A malformed message shows as its key.** A translator's typo, or ICU this
+reader does not know (`selectordinal`, `{n, number, percent}`), is logged and
+drawn as the key, as a missing one is, rather than throwing inside a
+component's render.
 
 **One language, and no switcher yet.** `LOCALE` is `'en'`. When a second
 language arrives, its file sits beside `en.json` with the same keys, and

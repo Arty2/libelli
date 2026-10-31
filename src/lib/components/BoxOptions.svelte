@@ -661,7 +661,7 @@
 						<input
 							class="w-5"
 							value={selected.slot ?? ''}
-							title={t('area.nameTitle', { ident: cssIdent(selected.slot ?? '') || 'none' })}
+							title={t('area.nameTitle', { ident: cssIdent(selected.slot ?? ''), hasIdent: cssIdent(selected.slot ?? '') ? 'yes' : 'no' })}
 							disabled={boxFrozen}
 							onchange={(e) => setSlot(e.currentTarget.value, e.currentTarget)}
 						/>

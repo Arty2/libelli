@@ -217,7 +217,7 @@ export function readPackage(files: Map<string, Uint8Array>, tableName: string): 
 	// A name is stored as it is, into this browser or a connected folder, so
 	// one that is a path is refused before anything is written, not halfway.
 	const unsafe = names.filter((name) => !safePictureName(name));
-	if (unsafe.length) throw new PackageError(`Some picture names are not valid file names: ${unsafe.map(String).join(', ')}.`);
+	if (unsafe.length) throw new PackageError(t('package.unsafeNames', { names: unsafe.map(String).join(', ') }));
 	const pictures: PackagePicture[] = [];
 	const absent: string[] = [];
 	for (const name of names as string[]) {

@@ -11,7 +11,8 @@ describe('formatMessage', () => {
 		const m = '{count, plural, =0 {no rows} one {# row} other {# rows}}';
 		expect(formatMessage(m, { count: 0 })).toBe('no rows');
 		expect(formatMessage(m, { count: 1 })).toBe('1 row');
-		expect(formatMessage(m, { count: 1200 })).toBe('1,200 rows');
+		expect(formatMessage(m, { count: 1200 })).toBe('1200 rows');
+		expect(formatMessage('{w} × {h}mm, {s}mm', { w: 1189, h: 841, s: 0.0125 })).toBe('1189 × 841mm, 0.0125mm');
 	});
 
 	it('chooses a select by value, falling back on other', () => {

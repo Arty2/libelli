@@ -59,7 +59,7 @@ export class MessageError extends Error {}
 export function parseMessage(source: string): Node[] {
 	let at = 0;
 	const fail = (what: string): never => {
-		throw new MessageError(`${what} at ${at} in “${source}”`);
+		throw new MessageError(`${what} at ${at} in “${source}”`); // ui-text: allow — for whoever edits the catalogue, not the interface
 	};
 
 	const parseNodes = (inPlural: boolean, until: '}' | '</' | null): Node[] => {
@@ -214,6 +214,10 @@ export function tagsOf(nodes: Node[], out = new Set<string>()): Set<string> {
 // ---- formatting ------------------------------------------------------------
 
 const plurals = new Intl.PluralRules(LOCALE);
+// A value as given, in the locale's digits: no grouping and no rounding, so a
+// sheet of 1189mm reads 1189 like the field beside it and a tracking of
+// 0.0125mm is not cut to 0.013. `{n, number}` asks for the full style.
+const plain = new Intl.NumberFormat(LOCALE, { useGrouping: false, maximumFractionDigits: 20 });
 const numbers = new Intl.NumberFormat(LOCALE);
 const parsed = new Map<string, Node[]>();
 
@@ -222,7 +226,14 @@ function nodesFor(key: MessageKey): Node[] {
 	if (!nodes) {
 		const entry = catalogue[key] as { defaultMessage: string } | undefined;
 		// A key the catalogue has not got shows as itself: wrong, but visibly so.
-		nodes = entry ? parseMessage(entry.defaultMessage) : [{ kind: 'text', text: String(key) }];
+		try {
+			nodes = entry ? parseMessage(entry.defaultMessage) : [{ kind: 'text', text: String(key) }];
+		} catch (error) {
+			// A malformed message — a translator's slip — shows as its key, as a
+			// missing one does, rather than taking the component down with it.
+			console.error(error);
+			nodes = [{ kind: 'text', text: String(key) }];
+		}
 		parsed.set(key, nodes);
 	}
 	return nodes;
@@ -244,13 +255,14 @@ function render(nodes: Node[], values: Values, count: number | null): Part[] {
 				push(node.text);
 				break;
 			case 'pound':
-				push(count === null ? '#' : numbers.format(count));
+				push(count === null ? '#' : plain.format(count));
 				break;
 			case 'arg': {
 				const value = values[node.name];
 				// A value nobody passed shows as its placeholder, as the key does.
 				if (value === undefined) push(`{${node.name}}`);
-				else push(node.format === 'number' || typeof value === 'number' ? numbers.format(Number(value)) : value);
+				else if (node.format === 'number') push(numbers.format(Number(value)));
+				else push(typeof value === 'number' ? plain.format(value) : value);
 				break;
 			}
 			case 'plural': {
@@ -294,6 +306,3 @@ export const formatMessage = (source: string, values: Values = {}): string => fl
 
 /** Any ICU source as rich parts. */
 export const richMessage = (source: string, values: Values = {}): Part[] => render(parseMessage(source), values, null);
-
-/** Whether the catalogue has a message by this name — for a key made from data, checked rather than trusted. */
-export const hasMessage = (key: string): key is MessageKey => Object.hasOwn(catalogue, key);

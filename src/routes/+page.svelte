@@ -128,11 +128,12 @@
 		arrangeBoxes,
 		normaliseTemplate,
 		stripUndefined,
+		untitledCard,
 		usedSlots,
 		type Arrange
 	} from '$lib/template';
 	import {
-		UNTITLED_TABLE,
+		untitledTable,
 		deleteDatasetDoc,
 		deleteTemplateDoc,
 		listDatasets,
@@ -510,7 +511,7 @@
 	let previousTable = $state('');
 	/** Deleting a table asks, for the same reason deleting a template does. */
 	let deletingTable = $state(false);
-	const tableName = $derived(dataset.name?.trim() || UNTITLED_TABLE);
+	const tableName = $derived(dataset.name?.trim() || untitledTable());
 
 	async function refreshTables() {
 		tables = await listDatasets();
@@ -2271,7 +2272,7 @@
 	 * work to discover the letter you just pressed.
 	 */
 	$effect(() => {
-		const name = template.name.trim() || 'Untitled card';
+		const name = template.name.trim() || untitledCard();
 		const id = templateId;
 		if (!ready || !id) return;
 		if (library.some((entry) => entry.id === id && entry.name === name)) return;
@@ -2811,7 +2812,7 @@
 			await refreshTables();
 			return;
 		}
-		const name = doc.name?.trim() || UNTITLED_TABLE;
+		const name = doc.name?.trim() || untitledTable();
 		describe(t('history.openNamed', { name }));
 		// Not when there is nothing to come back to: deleting a table switches
 		// away from an id that no longer exists, and the pair it leaves behind is
@@ -3614,7 +3615,7 @@
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
 		saveDatasetId(datasetId);
-		dataset = { ...sample, name: freeTableName(sample.name ?? 'Getting Started', true) };
+		dataset = { ...sample, name: freeTableName(sample.name ?? t('name.gettingStarted'), true) };
 		activeRow = 0;
 		// Mapped the way a first run maps: this template's slots against the
 		// sample's columns, so the cards render rather than coming up blank.
@@ -3750,7 +3751,7 @@
 		}
 		settleProvisional();
 		await Promise.all([flushTemplate(), flushDataset()]);
-		const name = freeTableName(tableNameFrom(file.name) || UNTITLED_TABLE, true);
+		const name = freeTableName(tableNameFrom(file.name) || untitledTable(), true);
 		describe(t('history.importTable', { name }));
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
@@ -3786,7 +3787,7 @@
 		}
 		files = packageFiles(files);
 		try {
-			if (files.has(MANIFEST)) return await openPackage(readPackage(files, tableNameFrom(file.name) || UNTITLED_TABLE));
+			if (files.has(MANIFEST)) return await openPackage(readPackage(files, tableNameFrom(file.name) || untitledTable()));
 			return await openInDesign(await readInDesign(files, file.name));
 		} catch (error) {
 			const known = error instanceof PackageError || error instanceof IdmlError;
@@ -3873,7 +3874,7 @@
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
 		saveDatasetId(datasetId);
-		dataset = { ...data, name: freeTableName(data.name?.trim() || UNTITLED_TABLE, true) };
+		dataset = { ...data, name: freeTableName(data.name?.trim() || untitledTable(), true) };
 		activeRow = 0;
 		mapping = map;
 		missingFonts = await ensureTemplateFonts(template);
@@ -4796,7 +4797,7 @@
 				// it did — and it turns the grid on if it was off, because changing
 				// how something invisible is drawn is otherwise no answer at all.
 				ui = { ...ui, gridStyle, showGrid: true };
-				notify(gridStyle === 'dots' ? 'Dot grid.' : 'Ruled grid.');
+				notify(t(gridStyle === 'dots' ? 'stage.dotGrid' : 'stage.ruledGrid'));
 			}}
 			onzoom={(zoom) => (ui = { ...ui, zoom })}
 			onnudge={nudgeBox}
@@ -4917,7 +4918,7 @@
 				onplacecolumn={placeColumn}
 				oncellfocus={flashColumn}
 				onlock={(locked) => {
-					describe(locked ? 'Lock the table' : 'Unlock the table');
+					describe(t(locked ? 'history.lockTable' : 'history.unlockTable'));
 					dataset = stripUndefined({ ...$state.snapshot(dataset), locked: locked || undefined }) as Dataset;
 				}}
 				ondeletetable={() => (deletingTable = true)}
@@ -5024,8 +5025,8 @@
 			<button
 				class="ui-size as-typed"
 				onclick={() => setTextSize(1)}
-				title="Interface text at {Math.round(textSize * 100)}% — press for the default size"
-				aria-label="Interface text at {Math.round(textSize * 100)}%, back to the default size"
+				title={t('textSize.title', { percent: Math.round(textSize * 100) })}
+				aria-label={t('textSize.label', { percent: Math.round(textSize * 100) })}
 				>{Math.round(textSize * 100)}%</button
 			>
 		{/if}
@@ -5075,7 +5076,7 @@
 			<button disabled={takingOver} onclick={closeTab} title={t('app.closeTabOtherOneTitle')}>{t('app.closeTab')}</button>
 			<span class="spacer"></span>
 			<button disabled={takingOver} onclick={() => void useHere()} title={t('app.editHereOtherTabTitle')}>
-				{takingOver ? 'Moving it here…' : 'Open Here'}
+				{t(takingOver ? 'tab.moving' : 'tab.openHere')}
 			</button>
 			<button class="primary" data-default disabled={takingOver} onclick={readOnlyHere} title={t('app.showCardBeingEditedTitle')}>{t('app.readOnly')}</button>
 		</div>
@@ -5144,7 +5145,7 @@
 				class="icon"
 				onclick={() => (cssFull = !cssFull)}
 				aria-pressed={cssFull}
-				title={cssFull ? 'Back to a dialog' : 'Full screen — the whole window for the sheet'}
+				title={t(cssFull ? 'css.dialogTitle' : 'css.fullTitle')}
 				aria-label={t('app.fullScreenLabel')}
 			>
 				<Icon name={cssFull ? 'minimize' : 'maximize'} size={16} />
@@ -5192,15 +5193,15 @@
 				class="wrap-toggle"
 				aria-pressed={cssWrap}
 				onclick={() => (cssWrap = !cssWrap)}
-				title={cssWrap ? 'Text wrap is on — long lines fold to the editor\'s width' : 'Text wrap is off — long lines scroll sideways'}
+				title={t(cssWrap ? 'css.wrapOnTitle' : 'css.wrapOffTitle')}
 				aria-label={t('app.textWrapLabel')}
 			>
 				<Icon name="text-wrap" size={15} /><span class="label">{t('app.textWrap')}</span>
 			</button>
 			<span class="spacer"></span>
-			<button onclick={cancelCss}>{template.locked ? 'Close' : 'Cancel'}</button>
+			<button onclick={cancelCss}>{t(template.locked ? 'common.close' : 'common.cancel')}</button>
 			{#if !template.locked}
-				<button class="primary" onclick={saveCss} title={t('app.putCardCloseCtrlTitle')}>{cssDirty ? 'Save' : 'Done'}</button>
+				<button class="primary" onclick={saveCss} title={t('app.putCardCloseCtrlTitle')}>{t(cssDirty ? 'common.save' : 'common.done')}</button>
 			{/if}
 		</div>
 	</div>
@@ -5387,8 +5388,8 @@
 					     keeps whatever it was taken for. -->
 					<input
 						type="checkbox"
-						aria-label="Give {guess.column} an area"
-						title={guess.include === false ? 'Left out — tick to give it an area' : 'Untick to leave it off the card'}
+						aria-label={t('layout.includeLabel', { column: guess.column })}
+						title={t(guess.include === false ? 'layout.leftOutTitle' : 'layout.includedTitle')}
 						checked={guess.include !== false}
 						onchange={(e) => {
 							const include = e.currentTarget.checked;
@@ -5408,7 +5409,7 @@
 					     and choosing what a column is before letting it back in is
 					     harmless — it keeps whatever it was taken for. -->
 					<select
-						aria-label="What {guess.column} is"
+						aria-label={t('layout.kindLabel', { column: guess.column })}
 						value={guess.kind}
 						onchange={(e) => {
 							const kind = e.currentTarget.value as FieldGuess['kind'];
@@ -5472,7 +5473,7 @@
 	     otherwise take one back unasked (modal.ts). -->
 	<div class="modal steps" role="dialog" aria-modal="true" aria-labelledby="steps-title" use:dragByTitle use:armDefault>
 		<header class="modal-header drag-title" data-drag-handle>
-			<h2 id="steps-title">{stepsOpen === 'undo' ? 'Undo to…' : 'Redo to…'}</h2>
+			<h2 id="steps-title">{t(stepsOpen === 'undo' ? 'history.undoTo' : 'history.redoTo')}</h2>
 			<button class="icon" onclick={() => (stepsOpen = null)} title={t('common.close')} aria-label={t('common.close')}>
 				<Icon name="close" size={16} />
 			</button>

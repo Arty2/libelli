@@ -60,9 +60,9 @@ InDesign. The descriptions say where that applies.
 ## Checking a change
 
 `npm test` reads the whole file: every message must parse, use only the four
-tags, be given exactly the values it names, and be used somewhere — a key the
-code asks for that is missing would show on screen as the key itself. `npm run
-gates` fails if a component spells out a sentence instead of asking the file
+tags, be given exactly the values it names wherever the code names its key, and
+be used somewhere — a key the code asks for that is missing would show on
+screen as the key itself. `npm run gates` fails if a component spells out a sentence instead of asking the file
 for it. Run both after editing; `npm run verify` runs everything.
 
 ## Another language

@@ -403,7 +403,7 @@ export function builtinTemplate(): Template {
 export function blankTemplate(): Template {
 	return {
 		schema: SCHEMA_VERSION,
-		name: 'Untitled card',
+		name: untitledCard(),
 		page: { w: 148, h: 210, unit: 'mm', background: '#ffffff' },
 		bleed: { enabled: false, amount: 3, cropMarks: false },
 		print: { ...DEFAULT_PRINT_SETTINGS },
@@ -512,6 +512,9 @@ export function newBox(partial: Partial<Box> = {}): Box {
  * renderer can trust. Unknown future schemas are refused loudly rather than
  * half-read.
  */
+/** What a design with no name is called, in the interface's words. */
+export const untitledCard = () => t('name.untitledCard');
+
 export function normaliseTemplate(raw: unknown): Template {
 	if (!raw || typeof raw !== 'object') throw new Error(t('template.error.notTemplate'));
 	const doc = raw as Record<string, any>;
@@ -554,7 +557,7 @@ export function normaliseTemplate(raw: unknown): Template {
 
 	return {
 		schema: SCHEMA_VERSION,
-		name: typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : 'Untitled card',
+		name: typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : untitledCard(),
 		page: {
 			w: paper(doc.page?.w, 148),
 			h: paper(doc.page?.h, 210),

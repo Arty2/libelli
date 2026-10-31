@@ -316,9 +316,10 @@ fi
 # colleague editing the wording, has one file to open. A sentence written
 # straight into a component is one that file does not have, and nothing else
 # would notice: it reads fine in English. scripts/ui-text.mjs looks at markup
-# text, literal title / aria-label / placeholder / alt / label attributes, and
-# a literal handed to notify, describe and their kin; a line that names
-# something never translated says `ui-text: allow`. If the script cannot run,
+# text, title / aria-label / placeholder / alt / label attributes, string
+# literals that read as labels in a component's script and {…} expressions
+# (ternary branches included), and literals handed to notify, describe, a new
+# …Error and their kin; a line never shown says `ui-text: allow`. If the script cannot run,
 # the gate fails rather than passing on a scan that never happened.
 ui_text=$(node scripts/ui-text.mjs 2>&1)
 ui_status=$?

@@ -1,3 +1,5 @@
+import { untitledCard } from './template';
+import { t } from './i18n';
 import type { Dataset, FontRef, Mapping, Template, UiState } from './types';
 import { toFile } from './frame';
 
@@ -284,7 +286,7 @@ export async function listTemplates(): Promise<TemplateEntry[]> {
 	for (const id of ids) {
 		const doc = await loadTemplateDoc(id);
 		if (!doc) continue;
-		const name = typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : 'Untitled card';
+		const name = typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : untitledCard();
 		entries.push({ id, name });
 	}
 	return entries.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
@@ -312,7 +314,8 @@ export interface DatasetEntry {
 }
 
 /** What a table with no name of its own is called, everywhere it is listed. */
-export const UNTITLED_TABLE = 'Untitled table';
+/** What a table with no name is called, in the interface's words. */
+export const untitledTable = () => t('name.untitledTable');
 
 export const loadDatasetId = (): string => local.get<string>('dataset:id', '');
 export const saveDatasetId = (id: string) => local.set('dataset:id', id);
@@ -351,7 +354,7 @@ export async function listDatasets(): Promise<DatasetEntry[]> {
 	for (const id of ids) {
 		const doc = await loadDatasetDoc(id);
 		if (!doc) continue;
-		const name = typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : UNTITLED_TABLE;
+		const name = typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : untitledTable();
 		entries.push({ id, name });
 	}
 	return entries.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));

@@ -2,11 +2,16 @@
 // for from src/lib/i18n/en.json. Run by scripts/gates.sh; prints one line per
 // finding, `file:line: text`, and nothing when there is none.
 //
-// What counts as words: two letters together. What it looks at:
+// What it looks at:
 //   - text between tags in a .svelte file's markup, outside {…}
-//   - a literal title, aria-label, placeholder, alt or label attribute
-//   - the first argument of notify, onnotice, describe, onaction and
-//     window.prompt, where it is a string literal
+//   - a title, aria-label, placeholder, alt or label attribute with words in
+//     it outside {…}
+//   - in a .svelte file's script and its {…} expressions, a string literal
+//     that reads as words: a capital, then letters, as a label starts — the
+//     branches of `cond ? 'Open' : 'Close'` included. A key compared with
+//     `===` or named in `case` is the keyboard's, not ours, and is let be.
+//   - anywhere, a literal in the arguments of notify, onnotice, describe,
+//     onaction, window.prompt, notes.push or a new …Error, on that line
 // A line can opt out with `ui-text: allow` in a comment on it, for a name
 // that is not translated; there should be few.
 
@@ -14,8 +19,48 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const WORDS = /[A-Za-z]{2}/;
-const ATTRS = /\b(title|aria-label|placeholder|alt|label)="([^"{}]*)"/g;
-const CALLS = /\b(notify|onnotice|describe|onaction|window\.prompt)\(\s*(['"`])((?:\\.|(?!\2)[^\\])*)\2/g;
+const ATTRS = /\b(title|aria-label|placeholder|alt|label)="([^"]*)"/g;
+const CALLS = /\b(?:notify|onnotice|describe|onaction|window\.prompt|notes\.push|new \w*Error)\(([^\n]*)/g;
+/** A literal that reads as words: a capital, a lowercase letter, and nothing that looks like code. */
+const PHRASE = /^[A-Z][a-z’']+(?:[\s,—–…/-]+[\p{L}\d’'%.…!?()]+)*[.…!?]?$/u;
+/** Words the keyboard and the platform own: compared against, never shown. */
+const NOT_OURS = /(?:===|!==|case|includes\()\s*$/;
+
+/** The string literals in a span of JS: [offset, body, quote]. Template literals with ${} count by their text outside it. */
+function literals(code, from, to, out = []) {
+	for (let i = from; i < to; i++) {
+		const c = code[i];
+		if (c === "'" || c === '"' || c === '`') {
+			let j = i + 1;
+			let body = '';
+			let depth = 0;
+			while (j < to) {
+				const d = code[j];
+				if (d === '\\') {
+					body += code.slice(j, j + 2);
+					j += 2;
+					continue;
+				}
+				if (c === '`' && code.startsWith('${', j)) {
+					depth++;
+					j += 2;
+					continue;
+				}
+				if (depth) {
+					if (d === '}') depth--;
+					j++;
+					continue;
+				}
+				if (d === c || (c !== '`' && d === '\n')) break;
+				body += d;
+				j++;
+			}
+			out.push([i, body, c]);
+			i = j;
+		}
+	}
+	return out;
+}
 
 function files(dir) {
 	return readdirSync(dir).flatMap((name) => {
@@ -31,8 +76,9 @@ function blank(source, pattern) {
 }
 
 /** Markup text outside tags and outside {…}, as [offset, text] runs. */
-function textRuns(markup) {
+function textRuns(markup, expressions = []) {
 	const runs = [];
+	let exprStart = -1;
 	let depth = 0;
 	let inTag = false;
 	let quote = ''; // inside an expression
@@ -53,11 +99,15 @@ function textRuns(markup) {
 				else if (c === quote) quote = '';
 			} else if (c === "'" || c === '"' || c === '`') quote = c;
 			else if (c === '{') depth++;
-			else if (c === '}') depth--;
+			else if (c === '}') {
+				depth--;
+				if (!depth) expressions.push([exprStart, i]);
+			}
 			continue;
 		}
 		if (c === '{') {
 			depth = 1;
+			exprStart = i + 1;
 			continue;
 		}
 		if (inTag) {
@@ -87,24 +137,35 @@ const allowed = (source, offset) => {
 };
 
 const found = [];
+const report = (file, source, offset, text) => {
+	if (!allowed(source, offset)) found.push(`${file}:${lineOf(source, offset)}: ${text.replace(/\s+/g, ' ').slice(0, 80)}`);
+};
+const phrase = (code, offset, body) => PHRASE.test(body.replace(/\\(.)/g, '$1').trim()) && !NOT_OURS.test(code.slice(Math.max(0, offset - 12), offset));
 for (const file of files('src')) {
 	const source = readFileSync(file, 'utf8');
 	const svelte = file.endsWith('.svelte');
 	let code = blank(source, /<!--[\s\S]*?-->/g);
+	if (svelte) code = blank(code, /<style[\s\S]*?<\/style>/g);
+	code = blank(code, /\/\*[\s\S]*?\*\/|(?<![:'"])\/\/[^\n]*/g);
 	if (svelte) {
-		code = blank(code, /<style[\s\S]*?<\/style>/g);
 		const markup = blank(code, /<script[\s\S]*?<\/script>/g);
-		for (const [offset, text] of textRuns(markup)) {
-			if (!allowed(source, offset)) found.push(`${file}:${lineOf(source, offset)}: ${text.slice(0, 80)}`);
-		}
+		const expressions = [];
+		for (const [offset, text] of textRuns(markup, expressions)) report(file, source, offset, text);
 		for (const m of markup.matchAll(ATTRS)) {
-			if (WORDS.test(m[2]) && !allowed(source, m.index)) found.push(`${file}:${lineOf(source, m.index)}: ${m[1]}="${m[2].slice(0, 70)}"`);
+			const outside = m[2].replace(/\{[^{}]*\}/g, '');
+			if (WORDS.test(outside)) report(file, source, m.index, `${m[1]}="${m[2]}"`);
+		}
+		const scripts = [...code.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((m) => [m.index + m[0].indexOf('>') + 1, m.index + m[0].length - 9]);
+		for (const [from, to] of [...scripts, ...expressions]) {
+			for (const [offset, body] of literals(code, from, to)) if (phrase(code, offset, body)) report(file, source, offset, body);
 		}
 	}
-	const script = svelte ? code.replace(/^[\s\S]*?(?=<script)|<\/script>[\s\S]*?(?=<script|$)/g, (m) => m.replace(/[^\n]/g, ' ')) : code;
-	for (const m of blank(script, /\/\*[\s\S]*?\*\/|\/\/[^\n]*/g).matchAll(CALLS)) {
-		if (WORDS.test(m[3]) && !allowed(source, m.index)) found.push(`${file}:${lineOf(source, m.index)}: ${m[1]}(${m[2]}${m[3].slice(0, 70)}${m[2]})`);
+	for (const m of code.matchAll(CALLS)) {
+		const at = m.index + m[0].length - m[1].length;
+		for (const [offset, body] of literals(code, at, at + m[1].length)) {
+			if (WORDS.test(body.replace(/\$\{[^}]*\}/g, '')) && /\s/.test(body)) report(file, source, offset, body);
+		}
 	}
 }
 
-if (found.length) console.log(found.join('\n'));
+if (found.length) console.log([...new Set(found)].join('\n'));
