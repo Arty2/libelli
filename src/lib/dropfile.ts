@@ -12,10 +12,14 @@
  * reads them to report (see AGENTS.md, "A parser reports; the caller decides").
  */
 
+import { toFile } from './frame';
 import { exportTemplate, importedTemplate } from './template';
 import type { Dataset, Template } from './types';
 
-/** `archive` is a ZIP: a libelli package, which package.ts reads and checks. */
+/**
+ * `archive` is a ZIP: a libelli package, an InDesign IDML (itself a ZIP), or
+ * a folder holding one — package.ts tells them apart by what is inside.
+ */
 export type DroppedKind = 'template' | 'table' | 'archive' | 'image' | 'unknown';
 
 /** Anything with the two facts a `File` carries, so tests need no DOM. */
@@ -37,7 +41,7 @@ export function droppedKind(file: FileFacts): DroppedKind {
 	const ext = extension(file.name);
 	if (ext === 'json') return 'template';
 	if (TABLE_EXTENSIONS.includes(ext)) return 'table';
-	if (ext === 'zip') return 'archive';
+	if (ext === 'idml' || ext === 'zip') return 'archive';
 	// A known extension that is neither is taken at its word, whatever type
 	// the system attached: a `.xlsx` reported as `text/plain` is not a CSV.
 	const type = file.type.toLowerCase().split(';')[0].trim();
@@ -86,7 +90,10 @@ export function sameTable(a: Pick<Dataset, 'columns' | 'rows'>, b: Pick<Dataset,
  */
 export function sameTemplate(incoming: Template, stored: unknown): boolean {
 	try {
-		return exportTemplate(incoming) === exportTemplate(importedTemplate(stored));
+		// Both sides through the same reading: a template built in memory (an
+		// InDesign import's) has the same keys in another order, and the file
+		// it would export differed by nothing but that.
+		return exportTemplate(importedTemplate(toFile(incoming))) === exportTemplate(importedTemplate(stored));
 	} catch {
 		return false;
 	}

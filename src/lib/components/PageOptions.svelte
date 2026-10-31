@@ -499,7 +499,7 @@
 							<li role="none">
 								<button
 									role="menuitem"
-									title="Open a template file or a package"
+									title="Open a template file, a package, or an InDesign layout (an IDML file or a zipped Package folder)"
 									onclick={fromMenu(onimporttemplate)}
 								>
 									<span class="tick" aria-hidden="true"><Icon name="document-import" size={14} /></span>
