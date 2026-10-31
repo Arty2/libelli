@@ -1,4 +1,5 @@
 <script lang="ts" module>
+	import { t, type MessageKey } from '$lib/i18n';
 	/** One choice in the menu, a rule between runs of them, or a run's heading. */
 	export type MenuItem =
 		| {
@@ -22,7 +23,7 @@
 	 * the runs (`ruled`). A run with nothing in it has no heading either.
 	 */
 	export type FamilySource = 'local' | 'google' | 'system';
-	const SOURCE_HEADINGS: Record<FamilySource, string> = { local: 'Local', google: 'Google Fonts', system: 'System' };
+	const SOURCE_HEADINGS: Record<FamilySource, MessageKey> = { local: 'fontMenu.local', google: 'fontMenu.google', system: 'fontMenu.system' };
 	export function familyItems(
 		choices: Record<FamilySource, string[]>,
 		except?: string,
@@ -35,7 +36,7 @@
 			.filter((run) => run.kept.length);
 		return runs.flatMap(({ source, kept }, i): MenuItem[] => [
 			...(ruled && i > 0 ? [{ rule: true as const }] : []),
-			{ heading: SOURCE_HEADINGS[source] },
+			{ heading: t(SOURCE_HEADINGS[source]) },
 			...kept.map((family) => ({ value: family, label: family, family }))
 		]);
 	}
@@ -236,7 +237,7 @@
 		type="button"
 		aria-haspopup="menu"
 		aria-expanded={open}
-		aria-label="{label}: {current?.label ?? placeholder ?? value}"
+		aria-label={t('menuSelect.label', { label, value: current?.label ?? placeholder ?? value })}
 		title={title ?? current?.title}
 		{disabled}
 		onclick={press}

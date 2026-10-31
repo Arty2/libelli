@@ -1,0 +1,402 @@
+{
+	"align.bottom": {
+		"defaultMessage": "Align Bottom",
+		"description": "Button: align the chosen areas' bottom edges."
+	},
+	"align.centreX": {
+		"defaultMessage": "Centre Horizontally",
+		"description": "Button: centre the chosen areas on one vertical line."
+	},
+	"align.centreY": {
+		"defaultMessage": "Centre Vertically",
+		"description": "Button: centre the chosen areas on one horizontal line."
+	},
+	"align.group": {
+		"defaultMessage": "Align",
+		"description": "Screen-reader name of the row of alignment buttons in an area's menu."
+	},
+	"align.left": {
+		"defaultMessage": "Align Left",
+		"description": "Button: align the chosen areas' left edges."
+	},
+	"align.right": {
+		"defaultMessage": "Align Right",
+		"description": "Button: align the chosen areas' right edges."
+	},
+	"align.top": {
+		"defaultMessage": "Align Top",
+		"description": "Button: align the chosen areas' top edges."
+	},
+	"areaMenu.copyStyle": {
+		"defaultMessage": "Copy Style",
+		"description": "Menu item: copy the area's type, colours and borders, to paste onto others."
+	},
+	"areaMenu.delete": {
+		"defaultMessage": "{count, plural, one {Delete} other {Delete # Areas}}",
+		"description": "Menu item: remove the chosen areas; count is how many are chosen."
+	},
+	"areaMenu.duplicate": {
+		"defaultMessage": "{count, plural, one {Duplicate} other {Duplicate # Areas}}",
+		"description": "Menu item: copy the chosen areas; count is how many are chosen."
+	},
+	"areaMenu.label": {
+		"defaultMessage": "Area actions",
+		"description": "Screen-reader name of the menu an area opens on right-click or long-press."
+	},
+	"areaMenu.lock": {
+		"defaultMessage": "{count, plural, one {Lock} other {Lock # Areas}}",
+		"description": "Menu item: stop the chosen areas being moved or restyled; count is how many are chosen."
+	},
+	"areaMenu.pasteStyle": {
+		"defaultMessage": "{count, plural, one {Paste Style} other {Paste Style to # Areas}}",
+		"description": "Menu item: apply the copied style; count is how many areas are chosen."
+	},
+	"areaMenu.selectMultiple": {
+		"defaultMessage": "Select Multiple",
+		"description": "Menu item: turn on a mode where each area pressed joins or leaves the selection, for touchscreens."
+	},
+	"areaMenu.stopSelectingMultiple": {
+		"defaultMessage": "Stop Selecting Multiple",
+		"description": "Menu item: turn Select Multiple off again."
+	},
+	"areaMenu.unlock": {
+		"defaultMessage": "{count, plural, one {Unlock} other {Unlock # Areas}}",
+		"description": "Menu item: let the chosen areas be moved and restyled again; count is how many are chosen."
+	},
+	"background.contain": {
+		"defaultMessage": "Contain",
+		"description": "Option: fit the whole background image inside, leaving space at the sides if needed."
+	},
+	"background.cover": {
+		"defaultMessage": "Cover",
+		"description": "Option: let the background image fill everything, cropping what does not fit."
+	},
+	"background.tile": {
+		"defaultMessage": "Tile",
+		"description": "Option: repeat the background image at its own size."
+	},
+	"background.upload": {
+		"defaultMessage": "Upload…",
+		"description": "Button: choose an image file from this computer as a background."
+	},
+	"background.uploadTitle": {
+		"defaultMessage": "A file from this machine; the image stays in this browser, the template only names it",
+		"description": "Tooltip of the background Upload… button."
+	},
+	"background.url": {
+		"defaultMessage": "URL…",
+		"description": "Button: give a web address for a background image."
+	},
+	"background.urlTitle": {
+		"defaultMessage": "An http(s) address the template will carry as written",
+		"description": "Tooltip of the background URL… button."
+	},
+	"background.urlWrong": {
+		"defaultMessage": "A background image has to be an http or https address.",
+		"description": "Notice when the address typed for a background image is not a web address."
+	},
+	"bleed.cropMarks": {
+		"defaultMessage": "Crop Marks",
+		"description": "Checkbox: print marks at the corners showing where to cut."
+	},
+	"bleed.legend": {
+		"defaultMessage": "Bleed",
+		"description": "Heading of the bleed settings: extra printed area beyond the cut edge."
+	},
+	"bleed.pageAmount": {
+		"defaultMessage": "Page bleed amount",
+		"description": "Screen-reader name of the field for how much bleed each page has, in mm."
+	},
+	"bleed.pageBleed": {
+		"defaultMessage": "Page Bleed",
+		"description": "Checkbox: print each page with extra area beyond its cut edge."
+	},
+	"bleed.pageBleedTitle": {
+		"defaultMessage": "Also the gap between cards, and the crop marks between them, when several are printed to a sheet",
+		"description": "Tooltip of the Page Bleed checkbox."
+	},
+	"colorField.fromRow": {
+		"defaultMessage": "This row's {column} — the color comes from that column",
+		"description": "Tooltip of a color swatch whose color is taken from a table column; {column} is the column's name."
+	},
+	"colorField.opacityLabel": {
+		"defaultMessage": "{label} opacity, percent",
+		"description": "Screen-reader name of the opacity field beside a color; {label} is the color's own name, such as “Text color”."
+	},
+	"colorField.opacityTitle": {
+		"defaultMessage": "Opacity, in percent",
+		"description": "Tooltip of the opacity field beside a color swatch."
+	},
+	"colorField.rowHasNoColor": {
+		"defaultMessage": "This row's {column} holds no color, so this one is used",
+		"description": "Tooltip of a color swatch linked to a column whose cell in this row holds no color; {column} is the column's name."
+	},
+	"common.backTo": {
+		"defaultMessage": "Back to {to}",
+		"description": "Tooltip and name of a reset button; {to} is the value it puts back."
+	},
+	"common.close": {
+		"defaultMessage": "Close",
+		"description": "Button that closes a dialog, a panel or a full-screen view."
+	},
+	"common.mm": {
+		"defaultMessage": "mm",
+		"description": "Unit after a measurement field: millimetres."
+	},
+	"common.off": {
+		"defaultMessage": "Off",
+		"description": "Option that turns a setting off."
+	},
+	"css.editorLabel": {
+		"defaultMessage": "The template's CSS",
+		"description": "Screen-reader name of the stylesheet editor's text field."
+	},
+	"fontMenu.google": {
+		"defaultMessage": "Google Fonts",
+		"description": "Heading in a font menu over the fonts fetched from Google Fonts."
+	},
+	"fontMenu.local": {
+		"defaultMessage": "Local",
+		"description": "Heading in a font menu over the fonts uploaded to this browser."
+	},
+	"fontMenu.system": {
+		"defaultMessage": "System",
+		"description": "Heading in a font menu over the fonts this computer already has."
+	},
+	"lightbox.nextCard": {
+		"defaultMessage": "Next card",
+		"description": "Button in the full-screen card view."
+	},
+	"lightbox.previousCard": {
+		"defaultMessage": "Previous card",
+		"description": "Button in the full-screen card view."
+	},
+	"menuSelect.label": {
+		"defaultMessage": "{label}: {value}",
+		"description": "Screen-reader name of a drop-down: what it sets, then its current choice, e.g. “Font: Inter”."
+	},
+	"print.background.fitTitle": {
+		"defaultMessage": "How the image fills the sheet",
+		"description": "Tooltip of the drop-down for how a sheet background image is fitted."
+	},
+	"print.background.label": {
+		"defaultMessage": "Image",
+		"description": "Label before the sheet background image controls."
+	},
+	"print.background.prompt": {
+		"defaultMessage": "Address of the sheet background image",
+		"description": "Prompt asking for the web address of a sheet background image."
+	},
+	"print.background.remove": {
+		"defaultMessage": "Remove the sheet background image",
+		"description": "Button that removes the sheet background image."
+	},
+	"print.format.folio": {
+		"defaultMessage": "Folio",
+		"description": "Bookbinding name for a sheet with 2 pages on each side, folded once."
+	},
+	"print.format.octavo": {
+		"defaultMessage": "Octavo",
+		"description": "Bookbinding name for a sheet with 8 pages on each side, folded three times."
+	},
+	"print.format.quarto": {
+		"defaultMessage": "Quarto",
+		"description": "Bookbinding name for a sheet with 4 pages on each side, folded twice."
+	},
+	"print.legend": {
+		"defaultMessage": "Printing",
+		"description": "Heading of the settings for printing several cards to a sheet."
+	},
+	"print.order": {
+		"defaultMessage": "Order",
+		"description": "Label of the drop-down for the order pages are placed on a sheet."
+	},
+	"print.order.sequential": {
+		"defaultMessage": "Sequential",
+		"description": "Option: pages fill each sheet in reading order."
+	},
+	"print.order.title": {
+		"defaultMessage": "Sequential fills each sheet in reading order, to cut apart. Zine lays the pages out so that folding the sheet gives a booklet that reads 1, 2, 3",
+		"description": "Tooltip of the page order drop-down."
+	},
+	"print.order.zine": {
+		"defaultMessage": "Zine",
+		"description": "Option: pages are placed so that folding the sheet makes a booklet."
+	},
+	"print.orientation": {
+		"defaultMessage": "Orientation",
+		"description": "Label of the drop-down for which way round the paper goes."
+	},
+	"print.orientation.auto": {
+		"defaultMessage": "Auto",
+		"description": "Option: turn the paper whichever way fits the cards best."
+	},
+	"print.orientation.autoChose": {
+		"defaultMessage": "What Auto settled on for this count and this card: {width} × {height}mm",
+		"description": "Tooltip showing the paper size Auto chose; width and height in millimetres."
+	},
+	"print.orientation.landscape": {
+		"defaultMessage": "Landscape",
+		"description": "Option or label: the paper is wider than tall."
+	},
+	"print.orientation.portrait": {
+		"defaultMessage": "Portrait",
+		"description": "Option or label: the paper is taller than wide."
+	},
+	"print.orientation.title": {
+		"defaultMessage": "Which way round the paper goes. Auto turns it to whichever way fits these cards with the least shrinking.",
+		"description": "Tooltip of the orientation drop-down."
+	},
+	"print.perSheet": {
+		"defaultMessage": "Pages per Sheet",
+		"description": "Label of the drop-down for how many cards print on one sheet of paper."
+	},
+	"print.perSheet.option": {
+		"defaultMessage": "{count}-up",
+		"description": "Option in Pages per Sheet, e.g. “4-up”."
+	},
+	"print.perSheet.optionNamed": {
+		"defaultMessage": "{count}-up · {name}",
+		"description": "Option in Pages per Sheet with its bookbinding name, e.g. “2-up · Folio”."
+	},
+	"print.perSheet.title": {
+		"defaultMessage": "Print several cards to one physical sheet",
+		"description": "Tooltip of the Pages per Sheet drop-down."
+	},
+	"print.recto": {
+		"defaultMessage": "Recto / Verso",
+		"description": "Checkbox: alternate right-hand and left-hand pages, mirrored like a book."
+	},
+	"print.rectoTitle": {
+		"defaultMessage": "Odd rows are right-hand pages and even rows their facing left-hand pages — the same setting as Recto / Verso in the page bar",
+		"description": "Tooltip of the Recto / Verso checkbox on the print screen."
+	},
+	"print.scaled": {
+		"defaultMessage": "Scaled to {percent}%",
+		"description": "Label saying cards are printed smaller to fit the sheet; percent is a whole number."
+	},
+	"print.scaledTitle": {
+		"defaultMessage": "These cards do not fit this sheet at their own size in any orientation, so print shrinks every card on the sheet together to fit",
+		"description": "Tooltip of the Scaled to …% label."
+	},
+	"print.sheet": {
+		"defaultMessage": "Sheet",
+		"description": "Label of the drop-down for the paper size the cards print onto."
+	},
+	"print.sheet.custom": {
+		"defaultMessage": "Custom",
+		"description": "Option: a paper size typed in by hand."
+	},
+	"print.sheet.height": {
+		"defaultMessage": "Height",
+		"description": "Label of the paper height field."
+	},
+	"print.sheet.title": {
+		"defaultMessage": "The physical paper the cards print onto",
+		"description": "Tooltip of the Sheet drop-down."
+	},
+	"print.sheet.width": {
+		"defaultMessage": "Width",
+		"description": "Label of the paper width field."
+	},
+	"print.sheetBleed": {
+		"defaultMessage": "Sheet Bleed",
+		"description": "Checkbox: print the sheet with extra area beyond its own edge."
+	},
+	"print.sheetBleedAmount": {
+		"defaultMessage": "Sheet bleed amount",
+		"description": "Screen-reader name of the sheet bleed field, in mm."
+	},
+	"print.sheetBleedTitle": {
+		"defaultMessage": "An outset on the paper around the sheet, for printing a sheet that runs to its own edge",
+		"description": "Tooltip of the Sheet Bleed checkbox."
+	},
+	"print.sheetCropMarks": {
+		"defaultMessage": "Sheet Crop Marks",
+		"description": "Checkbox: marks at the corners of the block of cards, for cutting it off the sheet."
+	},
+	"print.sheetCropMarksTitle": {
+		"defaultMessage": "Marks at the corners of the tiled block, for the cut that takes it off the sheet",
+		"description": "Tooltip of the Sheet Crop Marks checkbox."
+	},
+	"print.zine.booklet": {
+		"defaultMessage": "Fold, nest, staple",
+		"description": "Short instruction shown for a 2-up zine."
+	},
+	"print.zine.bookletTitle": {
+		"defaultMessage": "Each sheet comes out as its front and then its back: print double-sided, flipped on the long edge. Fold the stack in half, one sheet inside another, and staple the spine.",
+		"description": "Tooltip with the full instructions for a 2-up zine."
+	},
+	"print.zine.miniZine": {
+		"defaultMessage": "Fold three times, cut the middle",
+		"description": "Short instruction shown for an 8-up zine."
+	},
+	"print.zine.miniZineTitle": {
+		"defaultMessage": "Eight pages on one side of one sheet. Fold it in half three times, unfold, cut along the middle fold between the two centre panels, then fold it back and collapse it into a zine.",
+		"description": "Tooltip with the full instructions for an 8-up zine."
+	},
+	"print.zine.wrongCount": {
+		"defaultMessage": "Folds at 2-up or 8-up",
+		"description": "Short warning that a zine needs 2 or 8 pages per sheet."
+	},
+	"print.zine.wrongCountTitle": {
+		"defaultMessage": "Only two up and eight up fold into a zine: two is a stapled booklet, eight the sheet that is folded and cut into a mini zine. Any other count prints in reading order.",
+		"description": "Tooltip explaining which counts fold into a zine."
+	},
+	"selection.delete": {
+		"defaultMessage": "Delete",
+		"description": "Button beside the page: remove the chosen areas."
+	},
+	"selection.duplicate": {
+		"defaultMessage": "Duplicate",
+		"description": "Button beside the page: copy the chosen areas."
+	},
+	"selection.group": {
+		"defaultMessage": "Group",
+		"description": "Button: join the chosen areas so they move, lock and delete as one."
+	},
+	"selection.groupTitle": {
+		"defaultMessage": "Group — move, lock and delete these as one",
+		"description": "Tooltip of the Group button."
+	},
+	"selection.label": {
+		"defaultMessage": "Selection",
+		"description": "Screen-reader name of the toolbar for several chosen areas."
+	},
+	"selection.lock": {
+		"defaultMessage": "Lock",
+		"description": "Button: stop the chosen areas being moved."
+	},
+	"selection.lockAll": {
+		"defaultMessage": "Lock all of them",
+		"description": "Tooltip of the Lock button when several areas are chosen."
+	},
+	"selection.ungroup": {
+		"defaultMessage": "Ungroup",
+		"description": "Button: undo a group, so its areas move on their own again."
+	},
+	"selection.unlock": {
+		"defaultMessage": "Unlock",
+		"description": "Button: let the chosen areas move again."
+	},
+	"selection.unlockAll": {
+		"defaultMessage": "Unlock all of them",
+		"description": "Tooltip of the Unlock button when several areas are chosen."
+	},
+	"sheetLightbox.counter": {
+		"defaultMessage": "Sheet {index} / {total}",
+		"description": "Counter under a printed sheet shown full screen, e.g. “Sheet 2 / 5”."
+	},
+	"sheetLightbox.lookCloser": {
+		"defaultMessage": "Double-click, pinch or Ctrl + scroll to look closer",
+		"description": "Tooltip on a printed sheet shown full screen."
+	},
+	"sheetLightbox.nextSheet": {
+		"defaultMessage": "Next sheet",
+		"description": "Button in the full-screen sheet view."
+	},
+	"sheetLightbox.previousSheet": {
+		"defaultMessage": "Previous sheet",
+		"description": "Button in the full-screen sheet view."
+	}
+}
