@@ -352,7 +352,9 @@ Versions are numbered `0.minor.patch`, and the leading zero never changes:
 
 [`AGENTS.md`](AGENTS.md) explains the codebase and its rules,
 [`docs/decisions.md`](docs/decisions.md) the reasoning behind each module, and
-[`CHANGELOG.md`](CHANGELOG.md) what each version added.
+[`CHANGELOG.md`](CHANGELOG.md) what each version added. Every word the
+interface shows is in [`src/lib/i18n/en.json`](src/lib/i18n/en.json), to edit
+or translate; [`docs/translating.md`](docs/translating.md) explains the format.
 
 ## Credit
 

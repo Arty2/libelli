@@ -66,6 +66,7 @@ src/lib/
   sw-policy.ts    the worker's answer to a request; pwa.ts registration, updates, install
   textsize.ts     no browser zoom: a pinch off the stage sizes the interface's text
   theme.ts        the theme button steps light, dark, dark with the page inverted
+  i18n.ts         every word the interface shows, from i18n/en.json (ICU); Msg.svelte its rich text
   turn.ts         Output's Portrait / Landscape: this browser's, never the template's
   version.ts      VERSION, and the bumping rule; changelog.ts reads CHANGELOG.md
   components/
@@ -150,6 +151,10 @@ src/routes/app.css        the :root tokens and app-wide rules
   enough to paste into a message. The one exception is a drawing, which is base64
   in the cell on purpose: it has no existence anywhere else, so it travels with
   the table.
+- **Words come from the catalogue.** A label, tooltip, notice or error is a key
+  in `src/lib/i18n/en.json`, asked for with `t()` or `<Msg>`, never spelled in a
+  component; counts are ICU plurals, not an `s` glued on. One sentence, one
+  message, so a translator can reorder it.
 - **`css.ts` also builds the `<style>` tag.** A literal `<style>…</style>` pair
   written in a `.svelte` file gets picked up by the Svelte toolchain as that
   component's own stylesheet.
@@ -167,7 +172,8 @@ re-read it. So every rule above that *can* be checked is, in `scripts/gates.sh`
 PrintRoot and Icon, `fetch` outside `png.ts` and the worker, runtime
 dependencies, `vercel.json`'s security headers, `colour` as a name, `VERSION`
 against `package.json` and `CHANGELOG.md`, this file's length and a changelog
-section's, type in `px`. ESLint (`npm run lint`, next in CI)
+section's, type in `px`, words written into a component rather than asked of
+`i18n/en.json` (docs/translating.md). ESLint (`npm run lint`, next in CI)
 covers what a linter can; where a rule is off, `eslint.config.js` says why.
 
 Add the next rule to the script, not as a paragraph here — `docs/decisions.md`

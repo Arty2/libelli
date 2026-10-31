@@ -4699,6 +4699,72 @@ produce a diff nobody reads, and bury every finding above inside it. If a
 formatter is ever wanted, that is a separate decision with its own one-time
 commit.
 
+## `src/lib/i18n.ts`, `src/lib/i18n/en.json` and `Msg.svelte`
+
+**Every word the interface shows is in one file.** A colleague who wants a
+tooltip worded differently, or a translator, opens `src/lib/i18n/en.json`
+and nothing else; the code asks for words by key and never spells them. The
+words on a card are not in it: those are the table's and the template's, in
+the card's language, which `lang.ts` sets and the template's CSS can speak to.
+`docs/translating.md` is the guide for whoever edits the file.
+
+**FormatJS's JSON layout, ICU's message syntax.** `{ key: { defaultMessage,
+description } }` is what FormatJS extracts and what Weblate, Crowdin,
+Lokalise, Phrase and Tolgee import as-is, so the description — where the
+words appear, what a value is — travels with each message into whatever tool
+does the translating. ICU MessageFormat is what those tools check and preview:
+`{count, plural, …}` and `{x, select, …}` keep a sentence whole, where the
+code used to glue an English `s` or a clause on in English order. A sentence
+is one message for the same reason: "Take the {which, select, …} from a
+column" can be reordered by a translator; "Take the " + what + " from a column"
+cannot.
+
+**The formatter is hand-written**, like the CSV parser — no runtime
+dependencies — and reads only as much ICU as the catalogue uses: values,
+`number`, `plural` with `=N` and `#`, `select`, rich-text tags and ICU's
+apostrophe quoting. Plural categories and digits come from `Intl.PluralRules`
+and `Intl.NumberFormat`, a list of names from `Intl.ListFormat`
+(`quotedList`), all Baseline Widely available. Parsed messages are cached by
+key; a message is parsed once per session.
+
+**Rich text without markup.** A message may wrap words in `<strong>`, `<em>`,
+`<kbd>` or `<code>`; `Msg.svelte` draws those four as elements, from a parsed
+tree, and draws any other tag as its words alone. The catalogue's text never
+reaches the page as HTML, so a translation cannot add an attribute, a link or a
+script, and `Msg` needs no `{@html}`. `t()` is the plain-text form, for
+attributes and the status line, and keeps the words of any tag. Where a
+message's words go into markup the app builds as a string — the barcode's and
+the QR code's screen-reader names — they are escaped on the way, for the same
+reason.
+
+**Maps hold keys, and are read at render.** `THEME_NAMES`, `KIND_LABELS`, the
+list-marker and leader labels, the blend modes and the page-number positions
+map a value to a `MessageKey`, and the component calls `t()` where it draws
+the label. A switcher, when there is one, then changes every label without a
+reload. Undo-step names are the exception: they are formatted when the step is
+recorded, in the language of that moment.
+
+**A missing word shows as its key, and the tests make sure it is never
+missing.** `t('table.rowsCopied')` with no such key draws `table.rowsCopied`,
+and a value nobody passed draws `{count}` — wrong, but visibly so. The
+catalogue's tests read every source file and assert that each key asked for
+exists, that each key in the file is asked for somewhere, that each message
+parses and uses only the four tags, and that a call passing its values as an
+object literal passes exactly the names the message reads. The key type is
+`keyof typeof catalogue`, so `svelte-check` refuses an unknown key where it is
+written literally.
+
+**Gate 13 keeps it that way.** `scripts/ui-text.mjs` lists markup text outside
+`{…}`, a literal `title`, `aria-label`, `placeholder`, `alt` or `label`, and a
+literal handed to `notify`, `onnotice`, `describe`, `onaction` or
+`window.prompt`. It does not see a string kept in a variable and shown later;
+the catalogue tests and review are what catch those. A name that is never
+translated can be marked `ui-text: allow` on its line; none needs it yet.
+
+**One language, and no switcher yet.** `LOCALE` is `'en'`. When a second
+language arrives, its file sits beside `en.json` with the same keys, and
+`LOCALE` comes from a setting; `t()`'s callers do not change.
+
 ## `scripts/gates.sh`
 
 **The rules a linter cannot see, made to execute.** `AGENTS.md` is a list of

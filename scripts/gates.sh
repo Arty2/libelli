@@ -311,6 +311,29 @@ else
 	pass "CHANGELOG.md entries are plain text and code spans" "changelog-plain-text"
 fi
 
+# ── 13. The interface's words come from the catalogue ───────────────────────
+# Every word a person reads is in src/lib/i18n/en.json, so a translator, or a
+# colleague editing the wording, has one file to open. A sentence written
+# straight into a component is one that file does not have, and nothing else
+# would notice: it reads fine in English. scripts/ui-text.mjs looks at markup
+# text, literal title / aria-label / placeholder / alt / label attributes, and
+# a literal handed to notify, describe and their kin; a line that names
+# something never translated says `ui-text: allow`. If the script cannot run,
+# the gate fails rather than passing on a scan that never happened.
+ui_text=$(node scripts/ui-text.mjs 2>&1)
+ui_status=$?
+
+if [ "$ui_status" -ne 0 ]; then
+	fail "the hard-coded text scan did not run" "$ui_text" "ui-text-in-catalogue"
+elif [ -n "$ui_text" ]; then
+	fail "interface text written outside the catalogue" \
+		"$ui_text
+move it to src/lib/i18n/en.json and ask for it with t() or <Msg> — see docs/translating.md" \
+		"ui-text-in-catalogue"
+else
+	pass "interface text comes from the catalogue" "ui-text-in-catalogue"
+fi
+
 # ── local, gitignored log — see the header comment ───────────────────────────
 mkdir -p .claude/logs
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
