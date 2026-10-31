@@ -11,7 +11,8 @@
 //     branches of `cond ? 'Open' : 'Close'` included. A key compared with
 //     `===` or named in `case` is the keyboard's, not ours, and is let be.
 //   - anywhere, a literal in the arguments of notify, onnotice, describe,
-//     onaction, window.prompt, notes.push or a new …Error, on that line
+//     onaction, window.prompt, notes.push or a new …Error, however the call
+//     wraps, and a label: or title: in an object literal
 // A line can opt out with `ui-text: allow` in a comment on it, for a name
 // that is not translated; there should be few.
 
@@ -19,12 +20,32 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const WORDS = /[A-Za-z]{2}/;
-const ATTRS = /\b(title|aria-label|placeholder|alt|label)="([^"]*)"/g;
-const CALLS = /\b(?:notify|onnotice|describe|onaction|window\.prompt|notes\.push|new \w*Error)\(([^\n]*)/g;
+const ATTRS = /\b(title|aria-label|placeholder|alt|label)=(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`{]+))/g;
+const CALLS = /\b(?:notify|onnotice|describe|onaction|window\.prompt|notes\.push|new \w*Error)\(/g;
+/** An object's label or title, written as a literal: `{ label: 'Bring to front' }`. */
+const LABELS = /\b(?:label|title):\s*(?=['"`])/g;
 /** A literal that reads as words: a capital, a lowercase letter, and nothing that looks like code. */
 const PHRASE = /^[A-Z][a-z’']+(?:[\s,—–…/-]+[\p{L}\d’'%.…!?()]+)*[.…!?]?$/u;
 /** Words the keyboard and the platform own: compared against, never shown. */
 const NOT_OURS = /(?:===|!==|case|includes\()\s*$/;
+/** …or listed in an array that is only asked whether it holds a key: `['Enter', 'Escape'].includes(k)`. */
+const LISTED = /^[^\]\n;]*\]\s*\.includes\(/;
+
+/** Where the call opened at `open` closes, strings and nesting allowed for. */
+function closing(code, open) {
+	let depth = 0;
+	let quote = '';
+	for (let i = open; i < code.length; i++) {
+		const c = code[i];
+		if (quote) {
+			if (c === '\\') i++;
+			else if (c === quote) quote = '';
+		} else if (c === "'" || c === '"' || c === '`') quote = c;
+		else if (c === '(') depth++;
+		else if (c === ')' && --depth === 0) return i;
+	}
+	return code.length;
+}
 
 /** The string literals in a span of JS: [offset, body, quote]. Template literals with ${} count by their text outside it. */
 function literals(code, from, to, out = []) {
@@ -140,30 +161,43 @@ const found = [];
 const report = (file, source, offset, text) => {
 	if (!allowed(source, offset)) found.push(`${file}:${lineOf(source, offset)}: ${text.replace(/\s+/g, ' ').slice(0, 80)}`);
 };
-const phrase = (code, offset, body) => PHRASE.test(body.replace(/\\(.)/g, '$1').trim()) && !NOT_OURS.test(code.slice(Math.max(0, offset - 12), offset));
+const phrase = (code, offset, body, quote) =>
+	PHRASE.test(body.replace(/\\(.)/g, '$1').trim()) &&
+	!NOT_OURS.test(code.slice(Math.max(0, offset - 12), offset)) &&
+	!LISTED.test(code.slice(offset + body.length + 2, offset + body.length + 200)) &&
+	quote !== undefined;
 for (const file of files('src')) {
 	const source = readFileSync(file, 'utf8');
 	const svelte = file.endsWith('.svelte');
 	let code = blank(source, /<!--[\s\S]*?-->/g);
 	if (svelte) code = blank(code, /<style[\s\S]*?<\/style>/g);
-	code = blank(code, /\/\*[\s\S]*?\*\/|(?<![:'"])\/\/[^\n]*/g);
+	// Comments are a script's: in markup, accept="image/*" is not one opening.
+	const COMMENTS = /\/\*[\s\S]*?\*\/|(?<![:'"])\/\/[^\n]*/g;
+	code = svelte ? code.replace(/(<script[^>]*>)([\s\S]*?)(<\/script>)/g, (_, a, b, c) => a + blank(b, COMMENTS) + c) : blank(code, COMMENTS);
 	if (svelte) {
 		const markup = blank(code, /<script[\s\S]*?<\/script>/g);
 		const expressions = [];
 		for (const [offset, text] of textRuns(markup, expressions)) report(file, source, offset, text);
 		for (const m of markup.matchAll(ATTRS)) {
-			const outside = m[2].replace(/\{[^{}]*\}/g, '');
-			if (WORDS.test(outside)) report(file, source, m.index, `${m[1]}="${m[2]}"`);
+			const value = m[2] ?? m[3] ?? m[4];
+			if (WORDS.test(value.replace(/\{[^{}]*\}/g, ''))) report(file, source, m.index, `${m[1]}="${value}"`);
 		}
 		const scripts = [...code.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((m) => [m.index + m[0].indexOf('>') + 1, m.index + m[0].length - 9]);
 		for (const [from, to] of [...scripts, ...expressions]) {
-			for (const [offset, body] of literals(code, from, to)) if (phrase(code, offset, body)) report(file, source, offset, body);
+			for (const [offset, body, quote] of literals(code, from, to)) if (phrase(code, offset, body, quote)) report(file, source, offset, body);
 		}
 	}
 	for (const m of code.matchAll(CALLS)) {
-		const at = m.index + m[0].length - m[1].length;
-		for (const [offset, body] of literals(code, at, at + m[1].length)) {
+		const open = m.index + m[0].length - 1;
+		for (const [offset, body] of literals(code, open, closing(code, open))) {
 			if (WORDS.test(body.replace(/\$\{[^}]*\}/g, '')) && /\s/.test(body)) report(file, source, offset, body);
+		}
+	}
+	if (!svelte) {
+		for (const m of code.matchAll(LABELS)) {
+			const at = m.index + m[0].length;
+			const [hit] = literals(code, at, closing(`(${code.slice(at, at + 400)}`, 0) + at);
+			if (hit && hit[0] === at && phrase(code, hit[0], hit[1], hit[2])) report(file, source, hit[0], hit[1]);
 		}
 	}
 }

@@ -4,7 +4,7 @@
 	import { safeImageUrl } from '$lib/assets';
 	import { IMPOSITION_COUNTS, foldsIntoAZine, resolveImposition } from '$lib/imposition';
 	import { bleedFor } from '$lib/layout';
-	import { MIN_PAPER, PAGE_PRESETS, presetFor, presetSize } from '$lib/template';
+	import { MIN_PAPER, PAGE_PRESETS, presetFor, presetLabel, presetSize } from '$lib/template';
 	import type {
 		BackgroundFit,
 		PageBackgroundImage,
@@ -354,7 +354,7 @@
 			>
 				<option value="">{t('print.sheet.custom')}</option>
 				{#each PAGE_PRESETS as option (option.name)}
-					<option value={option.name}>{option.name}</option>
+					<option value={option.name}>{presetLabel(option.name)}</option>
 				{/each}
 			</select>
 		</label>

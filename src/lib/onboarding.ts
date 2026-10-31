@@ -39,7 +39,7 @@ export interface Starter<T> {
 }
 
 export const STARTER_TEMPLATES: Starter<Template>[] = [
-	{ id: 'a5-starter-booklet', name: 'A5 Starter Booklet', make: starterTemplate }
+	{ id: 'a5-starter-booklet', name: t('page.a5StarterBooklet'), make: starterTemplate }
 ];
 
 export const STARTER_TABLES: Starter<Dataset>[] = [{ id: 'getting-started', name: t('name.gettingStarted'), make: sampleDataset }];

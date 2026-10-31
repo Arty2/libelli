@@ -226,6 +226,8 @@ export function barcodeSvg(text: string, kind: BarcodeKind, options: BarcodeSvgO
 	const color = parseColor(options.color ?? null) ?? '#000000';
 	const background = parseColor(options.background ?? null);
 	const label = escapeHtml(t(kind === 'ean13' ? 'code.ean13Label' : 'code.code128Label'));
+	// One message with the value in it, escaped as a whole: a translator may move the colon.
+	const named = (value: string) => escapeHtml(t(kind === 'ean13' ? 'code.ean13Named' : 'code.code128Named', { text: value }));
 	if (!options.digits) {
 		return barsSvg(barsPath(modules), modules.length, color, label).replace(
 			'><path',
@@ -250,7 +252,7 @@ export function barcodeSvg(text: string, kind: BarcodeKind, options: BarcodeSvgO
 		`position:absolute;top:0.1em;left:${((from / total) * 100).toFixed(3)}%;width:${((width / total) * 100).toFixed(3)}%`;
 	if (kind === 'code128') {
 		return (
-			`<span style="${box}" role="img" aria-label="${label}: ${escapeHtml(text)}">` +
+			`<span style="${box}" role="img" aria-label="${named(text)}">` +
 			barsSvg(barsPath(modules), modules.length, color, '', stretch) +
 			`<span style="position:relative;flex:none;height:1.3em;padding-top:0.15em;box-sizing:border-box;text-align:center;white-space:nowrap;overflow:hidden" aria-hidden="true">${escapeHtml(text)}</span></span>`
 		);
@@ -263,7 +265,7 @@ export function barcodeSvg(text: string, kind: BarcodeKind, options: BarcodeSvgO
 	const group = (chars: string) =>
 		[...chars].map((d) => `<span style="flex:1;text-align:center">${d}</span>`).join('');
 	return (
-		`<span style="${box}" role="img" aria-label="${label}: ${digits}">` +
+		`<span style="${box}" role="img" aria-label="${named(digits)}">` +
 		barsSvg(barsPath(modules, LEFT), total, color, '', stretch) +
 		`<span style="${row}" aria-hidden="true">` +
 		barsSvg(barsPath(modules, LEFT, guard), total, color, '', 'position:absolute;inset:0;height:100%') +

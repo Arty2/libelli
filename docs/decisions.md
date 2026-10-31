@@ -4763,12 +4763,20 @@ outside its `{…}`; in a component's script and its `{…}` expressions, any
 string literal that reads as a label — a capital, then letters — so both
 branches of `cond ? 'Open' : 'Close'` are seen; and, in any file, a literal
 among the arguments of `notify`, `onnotice`, `describe`, `onaction`,
-`window.prompt`, `notes.push` or a `new …Error`. A literal compared with `===`,
-named in `case` or passed to `includes(` is the keyboard's or the platform's
-(`'Escape'`, `'Files'`) and is let be. What it still cannot see is a sentence in
+`window.prompt`, `notes.push` or a `new …Error`, however the call wraps; and in
+a library module, an object's `label:` or `title:` written as a literal. A
+literal compared with `===`, named in `case`, passed to `includes(` or listed in
+an array that is only asked `.includes(…)` is the keyboard's or the platform's
+(`'Escape'`, `'Files'`) and is let be. Comments are blanked in scripts only: in
+markup, `accept="image/*"` is not one opening. What it still cannot see is a sentence in
 a library module kept in a variable and shown later; review catches those. A
 line that is never shown — the service worker's own log, the message parser's
 error for whoever edits the catalogue — says `ui-text: allow`.
+
+**The browser gets the words, not the notes.** A build-only Vite plugin
+(`vite.config.ts`) strips each `description` as `en.json` is bundled — a third
+of the file, written for translators, which no visitor reads. The tests and the
+dev server read the whole file.
 
 **Numbers read as they were given.** A plain `{n}` or `#` is drawn in the
 locale's digits with no grouping and no rounding, so a 1189mm sheet reads 1189,

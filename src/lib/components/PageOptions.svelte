@@ -32,6 +32,7 @@
 		PAGE_NUMBER_POSITIONS,
 		PAGE_PRESETS,
 		presetFor,
+		presetLabel,
 		presetSize,
 	} from '$lib/template';
 	import type { TemplateEntry } from '$lib/storage';
@@ -328,7 +329,7 @@
 		const size = presetSize(name, template.page.w > template.page.h);
 		if (!size) return;
 		patchTemplate({ page: { ...template.page, ...size } });
-		onnotice(t('page.presetSet', { name, w: size.w, h: size.h }));
+		onnotice(t('page.presetSet', { name: presetLabel(name), w: size.w, h: size.h }));
 	}
 
 	/**
@@ -595,7 +596,7 @@
 				>
 					<option value="">{t('page.custom')}</option>
 					{#each PAGE_PRESETS as option (option.name)}
-						<option value={option.name}>{option.name}</option>
+						<option value={option.name}>{presetLabel(option.name)}</option>
 					{/each}
 				</select>
 			</label>

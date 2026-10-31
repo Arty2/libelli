@@ -1490,10 +1490,9 @@
 		selectedRows = new Set();
 		const said = onchange(next, renumbering(dataset, next));
 		if (activeRow >= rows.length) onactivate(Math.max(0, rows.length - 1));
-		onnotice(
-			t('table.rowsDeleted', { count: gone.size, note: said ? ` ${said.note}` : '' }),
-			said?.warning ? 'warning' : 'info'
-		);
+		// Two sentences, each whole: what was deleted and how to get it back,
+		// then what moving the lookups along did.
+		onnotice([t('table.rowsDeleted', { count: gone.size }), said?.note].filter(Boolean).join(' '), said?.warning ? 'warning' : 'info');
 	}
 
 	/**

@@ -1655,6 +1655,10 @@
 		"defaultMessage": "Code 128 barcode",
 		"description": "Screen-reader name of a Code 128 barcode on a card."
 	},
+	"code.code128Named": {
+		"defaultMessage": "Code 128 barcode: {text}",
+		"description": "Screen-reader name of a Code 128 barcode on a card, with its text."
+	},
 	"code.ean13Digits": {
 		"defaultMessage": "EAN-13 takes 12 or 13 digits, with a right check digit, or an ISBN-10.",
 		"description": "Why an EAN-13 barcode cannot be drawn."
@@ -1662,6 +1666,10 @@
 	"code.ean13Label": {
 		"defaultMessage": "EAN-13 barcode",
 		"description": "Screen-reader name of an EAN-13 barcode on a card."
+	},
+	"code.ean13Named": {
+		"defaultMessage": "EAN-13 barcode: {text}",
+		"description": "Screen-reader name of an EAN-13 barcode on a card, with its digits."
 	},
 	"code.empty": {
 		"defaultMessage": "Nothing to encode.",
@@ -3241,7 +3249,7 @@
 	},
 	"page.a5StarterBooklet": {
 		"defaultMessage": "A5 Starter Booklet",
-		"description": "Label in the page settings."
+		"description": "Name of the bundled starter design, as menus, dialogs and the undo history say it."
 	},
 	"page.areasEdgeListsMarkersTitle": {
 		"defaultMessage": "From the area's edge to a list's markers, in em of the type size",
@@ -4062,6 +4070,10 @@
 	"png.nothing": {
 		"defaultMessage": "Nothing to export.",
 		"description": "Why a PNG could not be made."
+	},
+	"preset.postcard": {
+		"defaultMessage": "Postcard",
+		"description": "Paper size: the 4 × 6 inch postcard, in the page and sheet size menus."
 	},
 	"print.background.fitTitle": {
 		"defaultMessage": "How the image fills the sheet",
@@ -5188,8 +5200,8 @@
 		"description": "Notice after copying rows."
 	},
 	"table.rowsDeleted": {
-		"defaultMessage": "{count, plural, one {Deleted # row.} other {Deleted # rows.}}{note} {count, plural, one {Ctrl/Cmd+Z brings it back.} other {Ctrl/Cmd+Z brings them back.}}",
-		"description": "Notice after deleting rows; {note} is empty or a sentence starting with a space about lookups."
+		"defaultMessage": "{count, plural, one {Deleted # row. Ctrl/Cmd+Z brings it back.} other {Deleted # rows. Ctrl/Cmd+Z brings them back.}}",
+		"description": "Notice after deleting rows."
 	},
 	"table.rowsExported": {
 		"defaultMessage": "{count, plural, one {# row} other {# rows}} exported as CSV.",

@@ -255,14 +255,15 @@ function render(nodes: Node[], values: Values, count: number | null): Part[] {
 				push(node.text);
 				break;
 			case 'pound':
-				push(count === null ? '#' : plain.format(count));
+				push(count === null ? '#' : plain.format(count + 0));
 				break;
 			case 'arg': {
 				const value = values[node.name];
 				// A value nobody passed shows as its placeholder, as the key does.
 				if (value === undefined) push(`{${node.name}}`);
 				else if (node.format === 'number') push(numbers.format(Number(value)));
-				else push(typeof value === 'number' ? plain.format(value) : value);
+				// `+ 0` makes -0 a 0, as String(-0) always said it.
+				else push(typeof value === 'number' ? plain.format(value + 0) : value);
 				break;
 			}
 			case 'plural': {
