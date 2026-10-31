@@ -499,7 +499,7 @@
 							<li role="none">
 								<button
 									role="menuitem"
-									title="A template JSON, a package, or a layout from InDesign (IDML, or its packaged folder zipped)"
+									title="Open a template file, a package, or an InDesign layout (an IDML file or a zipped Package folder)"
 									onclick={fromMenu(onimporttemplate)}
 								>
 									<span class="tick" aria-hidden="true"><Icon name="document-import" size={14} /></span>
@@ -516,7 +516,7 @@
 								<li role="none">
 									<button
 										role="menuitem"
-										title="This design, its table and its pictures in one file, which opens locked for someone to change the words and print"
+										title="Save this design, its table and its pictures as one file for someone else to fill in and print"
 										onclick={fromMenu(onexportpackage)}
 									>
 										<span class="tick" aria-hidden="true"><Icon name="package" size={14} /></span>

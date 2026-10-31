@@ -3053,7 +3053,7 @@
 		// The lock stays: leaving copy editing shows the design's controls, and
 		// unlocking is the next, separate step — the padlock beside the page.
 		template = stripUndefined({ ...$state.snapshot(template), copy: undefined }) as Template;
-		notify('Copy editing off — the design is still locked; the padlock beside the page unlocks it. Ctrl/Cmd+Z goes back.');
+		notify('Copy editing is off. The design is still locked; the padlock beside the page unlocks it.');
 	}
 
 	/** A picture field asked to swap its picture: a file, from wherever the person keeps them. */
@@ -3095,7 +3095,7 @@
 	/** The design's own lock, from the keyboard: the padlock above Area. */
 	function toggleDesignLock() {
 		if (copyMode) {
-			notify('This is open for copy editing — Edit Design, above the page, comes first.', 'warning');
+			notify('To change the layout, choose Edit Design first.', 'warning');
 			return;
 		}
 		const locking = !template.locked;
@@ -3744,7 +3744,7 @@
 		if (editor !== 'here') return { text: 'Read only — press Open Here to import into your templates.', tone: 'warning' };
 		// One import at a time while one is asking: a second would take the
 		// dialog over and leave the first waiting for an answer for ever.
-		if (clashAsk) return { text: `“${file.name}” was not imported — answer the question about files first, then import it again.`, tone: 'warning' };
+		if (clashAsk) return { text: `“${file.name}” was not imported. Answer the open question first, then try again.`, tone: 'warning' };
 		let files: Map<string, Uint8Array>;
 		try {
 			files = await unzip(new Uint8Array(await file.arrayBuffer()));
@@ -3811,7 +3811,7 @@
 			try {
 				refs.push(await installFontFaces(family, faces));
 			} catch {
-				notes.push(`The ${family} files in the package are damaged and were not installed.`);
+				notes.push(`The ${family} font files are damaged and were not installed.`);
 			}
 		}
 		if (!refs.length) return next;
@@ -3936,7 +3936,7 @@
 			byFamily.set(font.family, faces);
 		}
 		const { clashes, same } = await clashesWith(contents.pictures, byFamily);
-		const absent = contents.absent.length ? ` The package lists ${contents.absent.join(', ')} but does not hold ${contents.absent.length === 1 ? 'it' : 'them'}.` : '';
+		const absent = contents.absent.length ? ` Missing from the package: ${contents.absent.join(', ')}.` : '';
 
 		// The same package again — its design and its table as held here, none
 		// of its files different — opens what is held rather than making a
@@ -3950,18 +3950,18 @@
 			await switchTemplate(held.templateId);
 			await switchDataset(held.datasetId);
 			missingFonts = await ensureTemplateFonts(template);
-			const back = restored ? ` ${restored === 1 ? 'One file it brings was' : `${restored} files it brings were`} missing here and ${restored === 1 ? 'is' : 'are'} back.` : '';
-			return { text: `“${contents.template.name}” is already in your templates, with its table, unchanged — opened those.${back}${absent}${notes.length ? ` ${notes.join(' ')}` : ''}`, tone: absent || notes.length ? 'warning' : 'info' };
+			const back = restored ? ` ${restored === 1 ? '1 missing file was' : `${restored} missing files were`} restored.` : '';
+			return { text: `“${contents.template.name}” is already in your library, unchanged, so that copy was opened.${back}${absent}${notes.length ? ` ${notes.join(' ')}` : ''}`, tone: absent || notes.length ? 'warning' : 'info' };
 		}
 		const kept = clashes.length ? await askClashes(clashes) : new Set<string>();
-		if (!kept) return { text: `“${contents.template.name}” was not imported — nothing was changed.`, tone: 'info' };
+		if (!kept) return { text: `“${contents.template.name}” was not imported. Nothing was changed.`, tone: 'info' };
 		const notes: string[] = [];
 		const next = await storeAssets(contents.template, contents.pictures, byFamily, new Set([...kept, ...same]), notes);
 		await adoptPair(next, contents.dataset, contents.mapping);
-		const keptCount = kept.size ? ` ${kept.size === 1 ? 'One of your own files was' : `${kept.size} of your own files were`} kept in place of the package's.` : '';
-		const missing = missingFonts.length ? ` ${missingFonts.length === 1 ? 'One font is' : `${missingFonts.length} fonts are`} not included — see above the page.` : '';
+		const keptCount = kept.size ? ` Your own version of ${kept.size === 1 ? '1 file was' : `${kept.size} files were`} kept.` : '';
+		const missing = missingFonts.length ? ` ${missingFonts.length === 1 ? '1 font is' : `${missingFonts.length} fonts are`} missing; see the notice above the page.` : '';
 		return {
-			text: `“${next.name}” opened for copy editing: change the words and the pictures, then Export… to print.${keptCount}${missing}${absent}${notes.length ? ` ${notes.join(' ')}` : ''}`,
+			text: `“${next.name}” opened for copy editing.${keptCount}${missing}${absent}${notes.length ? ` ${notes.join(' ')}` : ''}`,
 			tone: missing || absent || notes.length ? 'warning' : 'info'
 		};
 	}
@@ -4045,7 +4045,7 @@
 			await writeAndSavePackage();
 		} catch (error) {
 			// The dialog has gone: without this, nothing downloads and nothing says why.
-			notify(`The package was not saved — ${error instanceof Error ? error.message.replace(/\.$/, '') : 'something went wrong'}.`, 'warning');
+			notify(`The package could not be saved (${error instanceof Error ? error.message.replace(/\.$/, '') : 'unknown error'}).`, 'warning');
 		}
 	}
 
@@ -4074,10 +4074,10 @@
 		const bytes = writePackage({ template: t, dataset: d, mapping: $state.snapshot(mapping), pictures, fonts });
 		downloadBlob(`${fileStem(t.name)}.zip`, new Blob([bytes], { type: 'application/zip' }));
 		const missing =
-			(absent.length ? ` ${absent.length} picture${absent.length === 1 ? ' is' : 's are'} missing from this browser and not in it: ${absent.join(', ')}.` : '') +
-			(fileless.length ? ` No file for ${fileless.join(', ')} is in this browser, so ${fileless.length === 1 ? 'it is' : 'they are'} not in it.` : '');
+			(absent.length ? ` Left out because ${absent.length === 1 ? 'it is' : 'they are'} missing from this browser: ${absent.join(', ')}.` : '') +
+			(fileless.length ? ` No font files were found for ${fileless.join(', ')}.` : '');
 		notify(
-			`Package saved: the design, ${d.rows.length} row${d.rows.length === 1 ? '' : 's'}, ${pictures.length} picture${pictures.length === 1 ? '' : 's'}${fonts.length ? ` and ${fonts.length} font file${fonts.length === 1 ? '' : 's'}` : ''}. It opens for copy editing.${missing}`,
+			`Package saved with ${d.rows.length} row${d.rows.length === 1 ? '' : 's'}, ${pictures.length} picture${pictures.length === 1 ? '' : 's'}${fonts.length ? ` and ${fonts.length} font file${fonts.length === 1 ? '' : 's'}` : ''}.${missing}`,
 			missing ? 'warning' : 'info'
 		);
 	}
@@ -4169,7 +4169,7 @@
 						: `“${file.name}” is a picture — drop it on the page or on an area to place it.`,
 					tone: 'warning'
 				});
-			else said.push({ text: `“${file.name}” is not a file libelli can import — drop a CSV, TSV, template JSON, package ZIP or InDesign IDML.`, tone: 'warning' });
+			else said.push({ text: `“${file.name}” cannot be imported. Drop a CSV or TSV file, a template, a package or an InDesign file.`, tone: 'warning' });
 		}
 		notify(said.map((s) => s.text).join(' '), said.some((s) => s.tone === 'warning') ? 'warning' : 'info');
 	}
@@ -4383,7 +4383,7 @@
      still be dropped on one. -->
 {#if dragHint}
 	<div class="drop-hint" aria-hidden="true">
-		<p>Drop a CSV, a template JSON, a package or an InDesign IDML to open it as a new table or template — what is open now is saved first.</p>
+		<p>Drop a CSV file, a template, a package or an InDesign file to open it. What is open now is saved first.</p>
 	</div>
 {/if}
 
@@ -4524,20 +4524,20 @@
 			<span class="copy-note">
 				<strong>Copy editing.</strong>
 				<span class="long"
-					><span class="by-mouse">Double-click</span><span class="by-touch">Double-tap</span> a field to change its words, or a
-					picture to swap it — a red line under a field means its words do not fit. Then Export… to print.</span
+					><span class="by-mouse">Double-click</span><span class="by-touch">Double-tap</span> a field to edit it, or a picture to
+					replace it. A red line means the text is too long.</span
 				>
 				<span
 					class="short"
-					title="Double-tap a field to change its words, or a picture to swap it. A red line under a field means its words do not fit. Then Export… to print."
-					><span class="by-mouse">Double-click</span><span class="by-touch">Double-tap</span> a field to change it.</span
+					title="Double-tap a field to edit it, or a picture to replace it. A red line means the text is too long."
+					><span class="by-mouse">Double-click</span><span class="by-touch">Double-tap</span> a field to edit it.</span
 				>
 			</span>
 			<span class="spacer"></span>
 			<button
 				class="edit-design"
 				onclick={() => (leavingCopy = true)}
-				title="Edit Design: leave copy editing to change the design itself"
+				title="Leave copy editing to change the layout"
 				aria-label="Edit Design"
 			>
 				<Icon name="edit" size={15} /> <span class="label">Edit Design…</span>
@@ -5195,8 +5195,8 @@
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="leave-copy-title" use:armDefault>
 		<h2 id="leave-copy-title">Edit the design?</h2>
 		<p>
-			“{template.name}” was sent to have its words and pictures changed. Changing the layout is for whoever designed
-			it; the design stays locked until you unlock it.
+			“{template.name}” was sent to you for copy editing. The layout is normally changed only by its designer. The
+			design stays locked until you unlock it.
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
@@ -5234,14 +5234,14 @@
 	{@const ask = clashAsk}
 	<div class="modal-backdrop" role="presentation" onclick={() => ask.resolve(null)}></div>
 	<div class="modal narrow clashes" role="dialog" aria-modal="true" aria-labelledby="clash-title" use:armDefault>
-		<h2 id="clash-title">Replace your own files?</h2>
-		<p>This package brings files you already have under the same names, but different. Ticked ones are replaced by the package's; unticked ones keep yours.</p>
+		<h2 id="clash-title">Replace your files?</h2>
+		<p>Some files in this package have the same names as files you already have, but different contents. Ticked files will be replaced; unticked files are kept.</p>
 		<ul>
 			{#each ask.items as item (item.kind + item.name)}
 				<li>
 					<label class="check">
 						<input type="checkbox" bind:checked={item.replace} />
-						<span>{item.kind === 'font' ? `The font ${item.name}` : `The picture “${item.name}”`}</span>
+						<span>{item.kind === 'font' ? `Font: ${item.name}` : `Picture: ${item.name}`}</span>
 					</label>
 				</li>
 			{/each}
@@ -5262,13 +5262,13 @@
 	<div class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="package-title" use:armDefault>
 		<h2 id="package-title">Package for copy editing</h2>
 		<p>
-			One file with this design, its table and every picture they use. It opens locked: whoever you send it to
-			changes the words and the pictures, and prints.
+			Saves this design, its table and its pictures as one ZIP file. The person you send it to can change the words
+			and pictures, but not the layout.
 		</p>
 		{#if packagedFamilies.length}
 			<label class="check">
 				<input type="checkbox" bind:checked={packageFonts} />
-				<span>Include the fonts — {packagedFamilies.join(', ')}. Only if their licences let you share the files.</span>
+				<span>Include fonts ({packagedFamilies.join(', ')}). Tick only if their licences allow sharing.</span>
 			</label>
 		{/if}
 		<div class="modal-actions">

@@ -178,22 +178,22 @@ export function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
 export function readPackage(files: Map<string, Uint8Array>, tableName: string): PackageContents {
 	const text = (name: string) => {
 		const bytes = files.get(name);
-		if (!bytes) throw new PackageError(`The package has no ${name} in it.`);
+		if (!bytes) throw new PackageError(`The package is incomplete: ${name} is missing.`);
 		return new TextDecoder().decode(bytes);
 	};
 	let manifest: Manifest;
 	try {
 		manifest = JSON.parse(text(MANIFEST));
 	} catch (error) {
-		throw error instanceof PackageError ? error : new PackageError(`The package's ${MANIFEST} is damaged.`);
+		throw error instanceof PackageError ? error : new PackageError(`Its ${MANIFEST} file is damaged.`);
 	}
-	if (manifest?.format !== FORMAT) throw new PackageError('This is not a libelli package.');
-	if (Number(manifest.version) > 1) throw new PackageError('This package needs a newer version of libelli.');
+	if (manifest?.format !== FORMAT) throw new PackageError('It is not a libelli package.');
+	if (Number(manifest.version) > 1) throw new PackageError('It was made by a newer version of libelli.');
 	let template: Template;
 	try {
 		template = importedTemplate(JSON.parse(text('template.json')));
 	} catch (error) {
-		throw new PackageError(`The package's template could not be read: ${(error as Error).message.replace(/\.$/, '')}.`);
+		throw new PackageError(`Its template could not be read (${(error as Error).message.replace(/\.$/, '')}).`);
 	}
 	// Always commas: the package wrote it, so nothing is guessed. Sniffing
 	// took a one-column table with tabs in its words for two columns.
@@ -216,7 +216,7 @@ export function readPackage(files: Map<string, Uint8Array>, tableName: string): 
 	// A name is stored as it is, into this browser or a connected folder, so
 	// one that is a path is refused before anything is written, not halfway.
 	const unsafe = names.filter((name) => !safePictureName(name));
-	if (unsafe.length) throw new PackageError(`The package names pictures that are not plain file names: ${unsafe.map(String).join(', ')}.`);
+	if (unsafe.length) throw new PackageError(`Some picture names are not valid file names: ${unsafe.map(String).join(', ')}.`);
 	const pictures: PackagePicture[] = [];
 	const absent: string[] = [];
 	for (const name of names as string[]) {

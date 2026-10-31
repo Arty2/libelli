@@ -75,10 +75,10 @@ describe('a package', () => {
 		const files = await unzip(bytes);
 		const without = new Map(files);
 		without.delete('template.json');
-		expect(() => readPackage(without, 'x')).toThrow(/no template\.json/);
+		expect(() => readPackage(without, 'x')).toThrow(/template\.json is missing/);
 		const newer = new Map(files);
 		newer.set(MANIFEST, enc(JSON.stringify({ format: 'libelli-package', version: 2 })));
-		expect(() => readPackage(newer, 'x')).toThrow(/newer version/);
+		expect(() => readPackage(newer, 'x')).toThrow(/newer version of libelli/);
 		const other = new Map(files);
 		other.set(MANIFEST, enc('{}'));
 		expect(() => readPackage(other, 'x')).toThrow(PackageError);
@@ -210,7 +210,7 @@ describe('reading a package strictly', () => {
 
 	it('refuses a picture whose name is a path, before anything is read', async () => {
 		const files = await unzip(bytesWith({ pictures: ['../escape.png'] }));
-		expect(() => readPackage(files, 'x')).toThrow(/not plain file names: \.\.\/escape\.png/);
+		expect(() => readPackage(files, 'x')).toThrow(/not valid file names: \.\.\/escape\.png/);
 	});
 });
 

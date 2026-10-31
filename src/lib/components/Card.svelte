@@ -2514,11 +2514,11 @@
 		disabled={!editable(box) && !(cutting && template.copy)}
 		aria-disabled={cutting && template.copy ? 'true' : undefined}
 		title={cutting && template.copy
-			? 'These words do not fit the field, and what does not fit will not print — shorten them.'
+			? 'The text is too long for this field. Anything that does not fit will not print.'
 			: cutting
 			? 'The content does not fit — this area is cutting off what will print. Press to let it grow instead.'
 			: 'This area has grown past the height it was given. Press to cut it at that height instead.'}
-		aria-label={cutting && template.copy ? 'These words do not fit — shorten them' : cutting ? 'Let this area grow to fit' : 'Cut this area at its height'}
+		aria-label={cutting && template.copy ? 'Text too long for this field' : cutting ? 'Let this area grow to fit' : 'Cut this area at its height'}
 		onpointerdown={(e) => e.stopPropagation()}
 		onpointerenter={() => (hoveredBadge = `${box.id}:cut`)}
 		onpointerleave={() => (hoveredBadge = null)}
