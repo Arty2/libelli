@@ -1,4 +1,4 @@
-import type { MessageKey } from './i18n';
+import { t, type MessageKey } from './i18n';
 import { safeImageUrl } from './assets';
 import { clampSide, fitBoard } from './bitmap';
 import { fromRgba, parseColor, toRgba } from './color';
@@ -513,33 +513,33 @@ export function newBox(partial: Partial<Box> = {}): Box {
  * half-read.
  */
 export function normaliseTemplate(raw: unknown): Template {
-	if (!raw || typeof raw !== 'object') throw new Error('Not a template file.');
-	const t = raw as Record<string, any>;
-	const schema = Number(t.schema ?? SCHEMA_VERSION);
-	if (!Number.isFinite(schema)) throw new Error('Template is missing a schema version.');
+	if (!raw || typeof raw !== 'object') throw new Error(t('template.error.notTemplate'));
+	const doc = raw as Record<string, any>;
+	const schema = Number(doc.schema ?? SCHEMA_VERSION);
+	if (!Number.isFinite(schema)) throw new Error(t('template.error.noSchema'));
 	if (schema > SCHEMA_VERSION) {
-		throw new Error(`This template needs a newer version of the app (schema ${schema}).`);
+		throw new Error(t('template.error.newer', { schema: String(schema) }));
 	}
-	if (!Array.isArray(t.boxes)) throw new Error('Template has no boxes.');
+	if (!Array.isArray(doc.boxes)) throw new Error(t('template.error.noBoxes'));
 
 	// The defaults first: an area inheriting the page's alignment is placed
 	// by it, so its corner cannot be found from the file until they are read.
 	const defaults = stripUndefined({
 		...DEFAULT_DEFAULTS,
-		...stripUndefined(t.defaults ?? {}),
-		color: color(t.defaults?.color) ?? DEFAULT_DEFAULTS.color,
-		size: atLeast(t.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
-		lineHeight: atLeast(t.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
-		paragraph: normaliseParagraph(t.defaults?.paragraph),
+		...stripUndefined(doc.defaults ?? {}),
+		color: color(doc.defaults?.color) ?? DEFAULT_DEFAULTS.color,
+		size: atLeast(doc.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
+		lineHeight: atLeast(doc.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
+		paragraph: normaliseParagraph(doc.defaults?.paragraph),
 		// The page's `none` is the same as none at all, so it is not kept.
-		leader: normaliseLeader(t.defaults?.leader) === 'none' ? undefined : normaliseLeader(t.defaults?.leader),
-		list: normaliseList(t.defaults?.list),
-		baseline: normaliseBaseline(t.defaults?.baseline)
+		leader: normaliseLeader(doc.defaults?.leader) === 'none' ? undefined : normaliseLeader(doc.defaults?.leader),
+		list: normaliseList(doc.defaults?.list),
+		baseline: normaliseBaseline(doc.defaults?.baseline)
 	}) as Defaults;
 	// Top-left corners in memory, from the reference points a file gives —
 	// frame.ts. Unmarked files too: the top-left reading is gone.
 	const boxes: Box[] = fromFile(
-		t.boxes.map((b: any) => newBox(b)),
+		doc.boxes.map((b: any) => newBox(b)),
 		defaults
 	);
 	const ids = new Set(boxes.map((b) => b.id));
@@ -548,38 +548,38 @@ export function normaliseTemplate(raw: unknown): Template {
 		if (box.anchor && (!ids.has(box.anchor.to) || box.anchor.to === box.id)) box.anchor = null;
 	}
 
-	const slots = Array.isArray(t.slots) && t.slots.length
-		? t.slots.map(String)
+	const slots = Array.isArray(doc.slots) && doc.slots.length
+		? doc.slots.map(String)
 		: Array.from(new Set(boxes.map((b) => b.slot).filter((s): s is string => !!s)));
 
 	return {
 		schema: SCHEMA_VERSION,
-		name: typeof t.name === 'string' && t.name.trim() ? t.name.trim() : 'Untitled card',
+		name: typeof doc.name === 'string' && doc.name.trim() ? doc.name.trim() : 'Untitled card',
 		page: {
-			w: paper(t.page?.w, 148),
-			h: paper(t.page?.h, 210),
+			w: paper(doc.page?.w, 148),
+			h: paper(doc.page?.h, 210),
 			unit: 'mm',
-			background: parseColor(t.page?.background) ?? '#ffffff',
-			...stripUndefined({ image: normaliseBackgroundImage(t.page?.image), margin: normaliseMargin(t.page?.margin) })
+			background: parseColor(doc.page?.background) ?? '#ffffff',
+			...stripUndefined({ image: normaliseBackgroundImage(doc.page?.image), margin: normaliseMargin(doc.page?.margin) })
 		},
-		bleed: normaliseBleed(t.bleed),
-		print: normalisePrintSettings(t.print),
-		pageNumber: normalisePageNumber(t.pageNumber),
-		fonts: normaliseFonts(t.fonts),
+		bleed: normaliseBleed(doc.bleed),
+		print: normalisePrintSettings(doc.print),
+		pageNumber: normalisePageNumber(doc.pageNumber),
+		fonts: normaliseFonts(doc.fonts),
 		defaults,
 		slots,
 		boxes,
 		...stripUndefined({
-			facing: t.facing ? true : undefined,
+			facing: doc.facing ? true : undefined,
 			// English is the absence of the field, as it was before there was one.
-			lang: safeLang(t.lang) === DEFAULT_LANG ? undefined : safeLang(t.lang),
-			css: typeof t.css === 'string' && t.css.trim() ? t.css : undefined,
+			lang: safeLang(doc.lang) === DEFAULT_LANG ? undefined : safeLang(doc.lang),
+			css: typeof doc.css === 'string' && doc.css.trim() ? doc.css : undefined,
 			// Copy editing is a locked design with its controls put away; a file
 			// that says copy without locked would hide the controls and still let
 			// every area be dragged.
-			locked: t.locked || t.copy ? true : undefined,
-			copy: t.copy ? true : undefined,
-			starter: typeof t.starter === 'string' && t.starter.trim() ? t.starter.trim() : undefined
+			locked: doc.locked || doc.copy ? true : undefined,
+			copy: doc.copy ? true : undefined,
+			starter: typeof doc.starter === 'string' && doc.starter.trim() ? doc.starter.trim() : undefined
 		})
 	};
 }

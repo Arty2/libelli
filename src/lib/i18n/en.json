@@ -1747,6 +1747,10 @@
 		"defaultMessage": "Leave copy editing to change the layout",
 		"description": "Tooltip of Edit Design… in the copy-editing banner."
 	},
+	"copy.leave.body": {
+		"defaultMessage": "“{name}” was sent to you for copy editing. The layout is normally changed only by its designer. The design stays locked until you unlock it.",
+		"description": "Dialog before leaving copy editing."
+	},
 	"copy.leave.confirm": {
 		"defaultMessage": "Edit Design",
 		"description": "Button in the main screen."
@@ -1755,9 +1759,21 @@
 		"defaultMessage": "Edit the design?",
 		"description": "Heading in the main screen."
 	},
+	"css.bytes": {
+		"defaultMessage": "{count, plural, one {# byte} other {# bytes}}",
+		"description": "A size in bytes."
+	},
 	"css.editorLabel": {
 		"defaultMessage": "The template's CSS",
 		"description": "Screen-reader name of the stylesheet editor's text field."
+	},
+	"css.kilobytes": {
+		"defaultMessage": "{count} KB",
+		"description": "A size in kilobytes."
+	},
+	"css.stats": {
+		"defaultMessage": "{lines, plural, one {# line} other {# lines}} · {size}",
+		"description": "Size of the template's stylesheet, in the CSS dialog's header."
 	},
 	"design.lock": {
 		"defaultMessage": "Lock",
@@ -2166,6 +2182,14 @@
 	"fontMenu.system": {
 		"defaultMessage": "System",
 		"description": "Heading in a font menu over the fonts this computer already has."
+	},
+	"fonts.chooseFile": {
+		"defaultMessage": "Choose {family} File…",
+		"description": "Button in the missing-fonts banner: pick the font file from this computer."
+	},
+	"fonts.missingBanner": {
+		"defaultMessage": "This template needs {count, plural, one {# font that is not in this browser. Nothing is substituted until you supply it.} other {# fonts that are not in this browser. Nothing is substituted until you supply them.}}",
+		"description": "Banner when the design names fonts this browser does not have."
 	},
 	"help.chord.altShiftArrows": {
 		"defaultMessage": "Alt + Shift + Arrows",
@@ -2663,6 +2687,14 @@
 		"defaultMessage": "“{name}” is already in your templates, with its table, unchanged — opened those.",
 		"description": "Text in the main screen."
 	},
+	"indesign.cmyk": {
+		"defaultMessage": "CMYK colours are shown as their nearest screen colour; the printed page will be RGB.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.damaged": {
+		"defaultMessage": "{path} in this IDML is damaged: {why}.",
+		"description": "Reason an IDML could not be imported: one of the files inside it is not well-formed XML."
+	},
 	"indesign.declined": {
 		"defaultMessage": "“{name}” was not imported — nothing was changed.",
 		"description": "Text in the main screen."
@@ -2670,6 +2702,10 @@
 	"indesign.facesSkipped": {
 		"defaultMessage": "Left out, as faces the layout already has or another width of them: {names}.",
 		"description": "Note after an InDesign import: font files not used."
+	},
+	"indesign.facing": {
+		"defaultMessage": "The document has facing pages; page 1 is set up as a single page.",
+		"description": "Note after an InDesign import, listed in its report. "
 	},
 	"indesign.fontUnreadable": {
 		"defaultMessage": "“{name}” could not be read as a font{woff2, select, yes { — a WOFF2 cannot be read here; use the OTF or TTF} other {}}.",
@@ -2679,13 +2715,81 @@
 		"defaultMessage": "No font file for {families} was in the archive or this browser; the fields are set in a fallback until one is added (Pictures › Fonts), or until InDesign's “Document fonts” folder is included.",
 		"description": "Note after an InDesign import: fonts with no file."
 	},
+	"indesign.gradient": {
+		"defaultMessage": "“{field}” is coloured with a gradient or a mixed ink, which was left out.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
 	"indesign.imported": {
 		"defaultMessage": "“{name}” imported from InDesign: {count, plural, one {# field} other {# fields}}, one row to fill.{notes, plural, =0 {} one { # thing to check.} other { # things to check.}}",
 		"description": "Notice after an InDesign import."
 	},
+	"indesign.lostWeights": {
+		"defaultMessage": "“{field}” has words lighter or more upright than the rest; they are set like the rest now.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.mixedType": {
+		"defaultMessage": "“{field}” sets some words in another face or size; they are in its main style, {family} {size} pt, now.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.noBleed": {
+		"defaultMessage": "The document has no bleed, so it prints without one and without crop marks. For print that runs to the edge, add a bleed in InDesign (File › Document Setup) and export the artwork with it.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.noEditableLayer": {
+		"defaultMessage": "There is no layer called “{layer}”, so every text and picture frame on page 1 became a field. Put the frames the writer may change on a layer of that name to keep the rest fixed.",
+		"description": "Note after an InDesign import, listed in its report. {layer} is the layer's name, Editable, which stays in English."
+	},
+	"indesign.noFields": {
+		"defaultMessage": "Page 1 has no text or picture frames, so there are no fields.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.noFieldsOnLayer": {
+		"defaultMessage": "Nothing on the “{layer}” layer of page 1 is a text or picture frame, so there are no fields.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.noPage": {
+		"defaultMessage": "This IDML has no page in it.",
+		"description": "Reason an IDML could not be imported."
+	},
+	"indesign.notIdml": {
+		"defaultMessage": "This is not an InDesign IDML file — in InDesign, use File › Export… › InDesign Markup (IDML).",
+		"description": "Reason a file could not be imported. Use InDesign's own menu names in this language."
+	},
+	"indesign.offPage": {
+		"defaultMessage": "{count, plural, one {# frame is off page 1 and was left out.} other {# frames are off page 1 and were left out.}}",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.onlyPage1": {
+		"defaultMessage": "Only page 1 was brought in; the document has {count, plural, one {# page} other {# pages}}.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.plainWords": {
+		"defaultMessage": "“{field}” keeps its words plain: they hold characters that would read as formatting, so its bold, italic and line breaks within a paragraph were left out.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.reportIntro": {
+		"defaultMessage": "Imported, with {count, plural, one {one thing} other {# things}} to check:",
+		"description": "First line of the InDesign import report."
+	},
 	"indesign.reportTitle": {
 		"defaultMessage": "“{name}” from InDesign",
 		"description": "Title or prompt in the main screen."
+	},
+	"indesign.shapes": {
+		"defaultMessage": "{count, plural, one {# shape} other {# shapes}} {where, select, layer {on the {layer} layer} other {on page 1}} {count, plural, one {is neither a text nor a picture frame, and was left out} other {are neither text nor picture frames, and were left out}} — artwork belongs in the exported background.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.skewed": {
+		"defaultMessage": "{count, plural, one {# frame is slanted or flipped; placed upright over the same ground.} other {# frames are slanted or flipped; placed upright over the same ground.}}",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.table": {
+		"defaultMessage": "“{field}” holds a table, which was left out.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"indesign.threaded": {
+		"defaultMessage": "Some text runs on from one frame to the next; it is all in the first frame now, and the later frames were left out.",
+		"description": "Note after an InDesign import, listed in its report. "
 	},
 	"layout.done": {
 		"defaultMessage": "{count, plural, one {# area} other {# areas}} laid out from {columns, plural, one {# column} other {# columns}}.",
@@ -2698,6 +2802,10 @@
 	"layout.noRoom": {
 		"defaultMessage": "No room on the card for {columns} — {count, plural, one {add an area by hand if you need it.} other {add areas by hand if you need them.}}",
 		"description": "Note after the automatic layout: columns that did not fit."
+	},
+	"layout.replaces": {
+		"defaultMessage": "{count, plural, one {Replaces the # area already on this template. Ctrl/Cmd+Z puts it back.} other {Replaces the # areas already on this template. Ctrl/Cmd+Z puts them back.}}",
+		"description": "Warning in the Automatic Layout dialog when the template already has areas."
 	},
 	"leader.dashed": {
 		"defaultMessage": "Dashed",
@@ -2827,6 +2935,14 @@
 		"defaultMessage": "“{name}” is already in your library, unchanged, so that copy was opened.",
 		"description": "Notice when a package that is already here is opened again."
 	},
+	"package.artworkPdf": {
+		"defaultMessage": "The page artwork is a PDF, which a browser cannot draw — export it from InDesign as PNG or JPG instead, with the bleed included, and add it to the archive.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"package.cannotDraw": {
+		"defaultMessage": "“{link}” is a file a browser cannot draw — put a PNG or JPG of it named “{name}” in the archive and import it again, or swap in another picture.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
 	"package.clash.body": {
 		"defaultMessage": "Some files in this package have the same names as files you already have, but different contents. Ticked files will be replaced; unticked files are kept.",
 		"description": "Label in the main screen."
@@ -2851,6 +2967,18 @@
 		"defaultMessage": "{count, plural, one {1 font is missing; see the notice above the page.} other {# fonts are missing; see the notice above the page.}}",
 		"description": "Note: fonts the design needs that are not here."
 	},
+	"package.includeFonts": {
+		"defaultMessage": "Include fonts ({families}). Tick only if their licences allow sharing.",
+		"description": "Checkbox in the Package dialog: put the design's font files in the package."
+	},
+	"package.incomplete": {
+		"defaultMessage": "The package is incomplete: {name} is missing.",
+		"description": "Reason a package could not be opened."
+	},
+	"package.inddNoIdml": {
+		"defaultMessage": "There is an InDesign document in this archive but no IDML — in InDesign, use File › Export… › InDesign Markup (IDML), and put it in the folder.",
+		"description": "Reason an archive could not be imported."
+	},
 	"package.kept": {
 		"defaultMessage": "{count, plural, one {Your own version of 1 file was kept.} other {Your own version of # files was kept.}}",
 		"description": "Note: files the user chose to keep rather than replace."
@@ -2859,9 +2987,37 @@
 		"defaultMessage": "Left out because {count, plural, one {it is} other {they are}} missing from this browser: {names}.",
 		"description": "Note after saving a package: pictures it could not include."
 	},
+	"package.manifestDamaged": {
+		"defaultMessage": "Its {name} file is damaged.",
+		"description": "Reason a package could not be opened."
+	},
+	"package.newer": {
+		"defaultMessage": "It was made by a newer version of libelli.",
+		"description": "Reason a package could not be opened."
+	},
+	"package.noArtwork": {
+		"defaultMessage": "No picture of the page artwork was in the archive. Export page 1 from InDesign as PNG or JPG with the Editable layer hidden and the bleed included, then set it as the background in Page.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"package.noArtworkIdml": {
+		"defaultMessage": "An IDML holds no picture of the page artwork. Export page 1 from InDesign as PNG or JPG with the Editable layer hidden and the bleed included, then set it as the background in Page — or zip it into the Package folder with the IDML and import that.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"package.noBleedArtwork": {
+		"defaultMessage": "The artwork looks exported without its bleed, so it is stretched over the bleed and sits slightly off the fields. Export it again with the bleed included (Use Document Bleed Settings).",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
 	"package.noFontFiles": {
 		"defaultMessage": "No font files were found for {families}.",
 		"description": "Note after saving a package: fonts with no file to include."
+	},
+	"package.notPackage": {
+		"defaultMessage": "It is not a libelli package.",
+		"description": "Reason a ZIP file could not be opened as a package."
+	},
+	"package.nothingToOpen": {
+		"defaultMessage": "There is no IDML or libelli package in this archive.",
+		"description": "Reason an archive could not be imported."
 	},
 	"package.opened": {
 		"defaultMessage": "“{name}” opened for copy editing.",
@@ -2890,6 +3046,18 @@
 	"package.saved": {
 		"defaultMessage": "Package saved with {rows, plural, one {# row} other {# rows}}, {pictures, plural, one {# picture} other {# pictures}}{fonts, plural, =0 {} one { and # font file} other { and # font files}}.",
 		"description": "Notice after saving a package."
+	},
+	"package.severalArtworks": {
+		"defaultMessage": "Several pictures could be the page's artwork; “{name}” was made the background. Name the one you mean “background”.",
+		"description": "Note after an InDesign import, listed in its report. Keep “background” in English: it is matched in file names."
+	},
+	"package.standIn": {
+		"defaultMessage": "“{link}” is a file a browser cannot draw; “{name}” from the archive is shown in its place.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
+	"package.templateUnreadable": {
+		"defaultMessage": "Its template could not be read ({why}).",
+		"description": "Reason a package could not be opened."
 	},
 	"package.unknownError": {
 		"defaultMessage": "unknown error",
@@ -3927,6 +4095,14 @@
 		"defaultMessage": "the page's {value}",
 		"description": "Completes “Back to …” on a reset button; {value} is the page's setting, such as a font or a weight."
 	},
+	"reset.tableBody": {
+		"defaultMessage": "{count, plural, one {# row goes} other {# rows go}} back to {starter}. Your design is not touched.",
+		"description": "Dialog before resetting the table; {starter} is the starter table's name."
+	},
+	"reset.templateBody": {
+		"defaultMessage": "{count, plural, one {# area goes} other {# areas go}} back to the {starter}. Your rows are not touched.",
+		"description": "Dialog before resetting the template; {starter} is the starter design's name."
+	},
 	"selection.delete": {
 		"defaultMessage": "Delete",
 		"description": "Button beside the page: remove the chosen areas."
@@ -4207,6 +4383,22 @@
 		"defaultMessage": "This browser only lets a tab close itself when a script opened it — close it from the tab bar.",
 		"description": "Label in the main screen."
 	},
+	"tab.choice": {
+		"defaultMessage": "Open it here to edit, or read it here without saving anything.",
+		"description": "Last line of the dialog about another tab."
+	},
+	"tab.elsewhereBody": {
+		"defaultMessage": "libelli is already open in another tab. One tab edits at a time, so that the two never save over each other's work.",
+		"description": "Dialog when the app is opened in a second tab."
+	},
+	"tab.handedBody": {
+		"defaultMessage": "Your work moved to another tab, saved as you left it. This tab has stopped saving, so nothing here can overwrite it.",
+		"description": "Dialog in a tab whose editing moved to another tab."
+	},
+	"tab.readonlyBody": {
+		"defaultMessage": "This tab is read only: it shows the card being edited in another tab, and saves nothing.",
+		"description": "Dialog in a second tab, when this one is the read-only view."
+	},
 	"table.addColumnTitle": {
 		"defaultMessage": "Add a column",
 		"description": "Tooltip in the table panel."
@@ -4287,6 +4479,10 @@
 		"defaultMessage": "{characters, plural, one {# character} other {# characters}} · {words, plural, one {# word} other {# words}}",
 		"description": "Count shown while a cell is open full size."
 	},
+	"table.deleteBody": {
+		"defaultMessage": "{count, plural, one {# row} other {# rows}} in this browser. Your design is not touched.",
+		"description": "Dialog before deleting a table."
+	},
 	"table.deleteChosenRowsTitle": {
 		"defaultMessage": "Delete the chosen rows",
 		"description": "Tooltip in the table panel."
@@ -4310,6 +4506,10 @@
 	"table.deleteColumnTitle": {
 		"defaultMessage": "Delete column",
 		"description": "Tooltip in the table panel."
+	},
+	"table.deleteDialog": {
+		"defaultMessage": "Delete “{name}”?",
+		"description": "Title of the dialog before deleting a table."
 	},
 	"table.deleteDrawingTitle": {
 		"defaultMessage": "Delete this drawing",
@@ -4747,6 +4947,14 @@
 		"defaultMessage": "“{name}” added to your templates, as it came. Your other templates and your rows are untouched.",
 		"description": "Notice in the status line, in the main screen."
 	},
+	"template.deleteBody": {
+		"defaultMessage": "{count, plural, one {# area} other {# areas}}, and this template's own settings. {last, select, yes {A new empty template opens, since this is the last one.} other {The next template in the list opens.}} Your rows are not touched.",
+		"description": "Dialog before deleting a template."
+	},
+	"template.deleteDialog": {
+		"defaultMessage": "Delete “{name}”?",
+		"description": "Title of the dialog before deleting a template."
+	},
 	"template.deleted": {
 		"defaultMessage": "“{name}” deleted. Ctrl/Cmd+Z brings the design back.",
 		"description": "Text in the main screen."
@@ -4754,6 +4962,22 @@
 	"template.deletedLast": {
 		"defaultMessage": "“{name}” deleted — that was the last one, so this is a new empty template. Ctrl/Cmd+Z brings the design back.",
 		"description": "Text in the main screen."
+	},
+	"template.error.newer": {
+		"defaultMessage": "This template needs a newer version of the app (schema {schema}).",
+		"description": "Reason a file could not be imported as a template; {schema} is the format's version number."
+	},
+	"template.error.noBoxes": {
+		"defaultMessage": "Template has no boxes.",
+		"description": "Reason a file could not be imported as a template."
+	},
+	"template.error.noSchema": {
+		"defaultMessage": "Template is missing a schema version.",
+		"description": "Reason a file could not be imported as a template."
+	},
+	"template.error.notTemplate": {
+		"defaultMessage": "Not a template file.",
+		"description": "Reason a file could not be imported as a template."
 	},
 	"template.loaded": {
 		"defaultMessage": "“{name}” loaded. Your rows are untouched.",
@@ -4834,5 +5058,109 @@
 	"theme.title": {
 		"defaultMessage": "{theme} — press for {next}{peek, select, none {} other {; hover or hold for a look at {peek}}}{readonly, select, yes { — this read-only tab only, until it is closed} other {}}",
 		"description": "Tooltip of the theme button; {theme}, {next} and {peek} are theme names such as Dark."
+	},
+	"xml.atLine": {
+		"defaultMessage": "{what} (line {line})",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.cdataNeverCloses": {
+		"defaultMessage": "a CDATA section never closes",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.closesWrong": {
+		"defaultMessage": "'</'{name}> closes {open}",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.comment": {
+		"defaultMessage": "a comment",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.declaration": {
+		"defaultMessage": "a declaration",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.instruction": {
+		"defaultMessage": "a processing instruction",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.nameExpected": {
+		"defaultMessage": "a name was expected",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.neverClosed": {
+		"defaultMessage": "<{name}> is never closed",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.neverCloses": {
+		"defaultMessage": "{what} never closes",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.noElement": {
+		"defaultMessage": "there is no element",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.noQuotedValue": {
+		"defaultMessage": "attribute {name} has no quoted value",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.noValue": {
+		"defaultMessage": "attribute {name} has no value",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.notClosed": {
+		"defaultMessage": "'</'{name} is not closed",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.nothing": {
+		"defaultMessage": "nothing",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms. Used in “</x> closes nothing”."
+	},
+	"xml.secondRoot": {
+		"defaultMessage": "a second root element",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"xml.textOutside": {
+		"defaultMessage": "text outside the root element",
+		"description": "What is wrong in a damaged XML file inside an IDML; shown after “… in this IDML is damaged:”. Technical; keep the XML terms."
+	},
+	"zip.damaged": {
+		"defaultMessage": "The ZIP file is damaged.",
+		"description": "Reason a ZIP file could not be opened, after “… was not imported.”"
+	},
+	"zip.encrypted": {
+		"defaultMessage": "“{name}” inside it is encrypted.",
+		"description": "Reason a ZIP file could not be opened, after “… was not imported.”"
+	},
+	"zip.entryDamaged": {
+		"defaultMessage": "“{name}” inside it is damaged.",
+		"description": "Reason a ZIP file could not be opened, after “… was not imported.”"
+	},
+	"zip.entryTooLarge": {
+		"defaultMessage": "“{name}” inside it is larger than stated, or too large to open.",
+		"description": "Reason a ZIP file could not be opened, after “… was not imported.”"
+	},
+	"zip.incomplete": {
+		"defaultMessage": "The ZIP file is incomplete.",
+		"description": "Reason a ZIP file could not be opened, after “… was not imported.”"
+	},
+	"zip.method": {
+		"defaultMessage": "“{name}” inside it is compressed in a way libelli cannot read.",
+		"description": "Reason a ZIP file could not be opened, after “… was not imported.”"
+	},
+	"zip.notZip": {
+		"defaultMessage": "It is not a ZIP file.",
+		"description": "Reason a ZIP file could not be opened, after “… was not imported.”"
+	},
+	"zip.tooLarge": {
+		"defaultMessage": "It is too large to open.",
+		"description": "Reason a ZIP file could not be opened, after “… was not imported.”"
+	},
+	"zip.tooMuch": {
+		"defaultMessage": "Too much for one archive — export fewer cards at a time.",
+		"description": "Notice when an export would be too large for a ZIP file."
+	},
+	"zip.zip64": {
+		"defaultMessage": "It uses ZIP64, which libelli cannot read.",
+		"description": "Reason a ZIP file could not be opened, after “… was not imported.”"
 	}
 }

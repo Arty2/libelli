@@ -4692,12 +4692,10 @@
 	{#if missingFonts.length}
 		<div class="banner" role="alert">
 			<span>
-				This template needs {missingFonts.length} font{missingFonts.length === 1 ? '' : 's'} that
-				{missingFonts.length === 1 ? 'is' : 'are'} not in this browser. Nothing is substituted until you supply
-				{missingFonts.length === 1 ? 'it' : 'them'}.
+				{t('fonts.missingBanner', { count: missingFonts.length })}
 			</span>
 			{#each missingFonts as font (font.ref ?? font.family)}
-				<button onclick={() => pickMissingFont(font)}>Choose {font.family} File…</button>
+				<button onclick={() => pickMissingFont(font)}>{t('fonts.chooseFile', { family: font.family })}</button>
 			{/each}
 			<!-- No file to hand: the Pictures tray's Fonts swaps the face for another. -->
 			<button
@@ -5058,15 +5056,13 @@
 		<h2 id="elsewhere-title">{t('app.openAnotherTab')}</h2>
 		<p id="elsewhere-text">
 			{#if editor === 'readonly'}
-				This tab is read only: it shows the card being edited in another tab, and saves nothing.
+				{t('tab.readonlyBody')}
 			{:else if editor === 'handed'}
-				Your work moved to another tab, saved as you left it. This tab has stopped saving, so nothing here can
-				overwrite it.
+				{t('tab.handedBody')}
 			{:else}
-				libelli is already open in another tab. One tab edits at a time, so that the two never save over each
-				other's work.
+				{t('tab.elsewhereBody')}
 			{/if}
-			Open it here to edit, or read it here without saving anything.
+			{t('tab.choice')}
 		</p>
 		{#if closeRefused}
 			<p class="close-refused">{t('tab.cannotClose')}</p>
@@ -5134,9 +5130,13 @@
 		>
 			<h2 id="css-title">{t('app.css')}</h2>
 			<span class="css-stats">
-				{cssCount.lines} line{cssCount.lines === 1 ? '' : 's'} · {cssCount.bytes < 1024
-					? `${cssCount.bytes} bytes`
-					: `${Math.round((cssCount.bytes / 1024) * 10) / 10} KB`}
+				{t('css.stats', {
+					lines: cssCount.lines,
+					size:
+						cssCount.bytes < 1024
+							? t('css.bytes', { count: cssCount.bytes })
+							: t('css.kilobytes', { count: Math.round((cssCount.bytes / 1024) * 10) / 10 })
+				})}
 			</span>
 			<!-- Beside the ×, as a window's own controls sit: the room to work in,
 			     then the way out. -->
@@ -5213,8 +5213,7 @@
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="leave-copy-title" use:armDefault>
 		<h2 id="leave-copy-title">{t('copy.leave.title')}</h2>
 		<p>
-			“{template.name}” was sent to you for copy editing. The layout is normally changed only by its designer. The
-			design stays locked until you unlock it.
+			{t('copy.leave.body', { name: template.name })}
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
@@ -5231,7 +5230,7 @@
 	<div class="modal-backdrop" role="presentation" onclick={() => (importReport = null)}></div>
 	<div class="modal narrow import-report" role="dialog" aria-modal="true" aria-labelledby="import-report-title" use:armDefault>
 		<h2 id="import-report-title">{importReport.title}</h2>
-		<p>Imported, with {importReport.notes.length === 1 ? 'one thing' : `${importReport.notes.length} things`} to check:</p>
+		<p>{t('indesign.reportIntro', { count: importReport.notes.length })}</p>
 		<ul>
 			{#each importReport.notes as note, i (i)}
 				<li>{note}</li>
@@ -5285,7 +5284,7 @@
 		{#if packagedFamilies.length}
 			<label class="check">
 				<input type="checkbox" bind:checked={packageFonts} />
-				<span>Include fonts ({packagedFamilies.join(', ')}). Tick only if their licences allow sharing.</span>
+				<span>{t('package.includeFonts', { families: packagedFamilies.join(', ') })}</span>
 			</label>
 		{/if}
 		<div class="modal-actions">
@@ -5305,8 +5304,7 @@
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label={t('app.resetTemplateLabel')} use:armDefault>
 		<h2>{t('app.resetTemplateLabel')}</h2>
 		<p>
-			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} go back to the {templateStarter?.name}. Your rows are
-			not touched.
+			{t('reset.templateBody', { count: template.boxes.length, starter: templateStarter?.name ?? '' })}
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
@@ -5322,8 +5320,7 @@
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label={t('app.resetTableLabel')} use:armDefault>
 		<h2>{t('app.resetTableLabel')}</h2>
 		<p>
-			{dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'} go back to {tableStarter?.name}. Your design is
-			not touched.
+			{t('reset.tableBody', { count: dataset.rows.length, starter: tableStarter?.name ?? '' })}
 		</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
@@ -5341,12 +5338,8 @@
 {#if deleting}
 	<div class="modal-backdrop" role="presentation" onclick={() => (deleting = false)}></div>
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label={t('app.deleteTemplateLabel')} use:armDefault>
-		<h2>Delete “{template.name}”?</h2>
-		<p>
-			{template.boxes.length} area{template.boxes.length === 1 ? '' : 's'}, and this template's own settings.
-			{library.length > 1 ? 'The next template in the list opens.' : 'A new empty template opens, since this is the last one.'}
-			Your rows are not touched.
-		</p>
+		<h2>{t('template.deleteDialog', { name: template.name })}</h2>
+		<p>{t('template.deleteBody', { count: template.boxes.length, last: library.length > 1 ? 'no' : 'yes' })}</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button onclick={() => (deleting = false)}>{t('common.cancel')}</button>
@@ -5362,11 +5355,8 @@
 {#if deletingTable}
 	<div class="modal-backdrop" role="presentation" onclick={() => (deletingTable = false)}></div>
 	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="delete-table-title" use:armDefault>
-		<h2 id="delete-table-title">Delete “{tableName}”?</h2>
-		<p>
-			{dataset.rows.length} row{dataset.rows.length === 1 ? '' : 's'} in this browser. Your design is not
-			touched.
-		</p>
+		<h2 id="delete-table-title">{t('table.deleteDialog', { name: tableName })}</h2>
+		<p>{t('table.deleteBody', { count: dataset.rows.length })}</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
 			<button onclick={() => (deletingTable = false)}>{t('common.cancel')}</button>
@@ -5440,10 +5430,7 @@
 		{#if template.boxes.length}
 			<p class="magic-warning" role="status">
 				<Icon name="warning" size={13} />
-				<span>
-					Replaces the {template.boxes.length} area{template.boxes.length === 1 ? '' : 's'} already on this template.
-					Ctrl/Cmd+Z puts {template.boxes.length === 1 ? 'it' : 'them'} back.
-				</span>
+				<span>{t('layout.replaces', { count: template.boxes.length })}</span>
 			</p>
 		{/if}
 		<div class="modal-actions">

@@ -20,6 +20,7 @@
  * face is the page's work, since both reach the browser's storage.
  */
 
+import { t } from './i18n';
 import { localImageName } from './assets';
 import { readIdml, type IdmlImport } from './idml';
 import { parseTable, toCsv } from './parse';
@@ -178,22 +179,22 @@ export function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
 export function readPackage(files: Map<string, Uint8Array>, tableName: string): PackageContents {
 	const text = (name: string) => {
 		const bytes = files.get(name);
-		if (!bytes) throw new PackageError(`The package is incomplete: ${name} is missing.`);
+		if (!bytes) throw new PackageError(t('package.incomplete', { name }));
 		return new TextDecoder().decode(bytes);
 	};
 	let manifest: Manifest;
 	try {
 		manifest = JSON.parse(text(MANIFEST));
 	} catch (error) {
-		throw error instanceof PackageError ? error : new PackageError(`Its ${MANIFEST} file is damaged.`);
+		throw error instanceof PackageError ? error : new PackageError(t('package.manifestDamaged', { name: MANIFEST }));
 	}
-	if (manifest?.format !== FORMAT) throw new PackageError('It is not a libelli package.');
-	if (Number(manifest.version) > 1) throw new PackageError('It was made by a newer version of libelli.');
+	if (manifest?.format !== FORMAT) throw new PackageError(t('package.notPackage'));
+	if (Number(manifest.version) > 1) throw new PackageError(t('package.newer'));
 	let template: Template;
 	try {
 		template = importedTemplate(JSON.parse(text('template.json')));
 	} catch (error) {
-		throw new PackageError(`Its template could not be read (${(error as Error).message.replace(/\.$/, '')}).`);
+		throw new PackageError(t('package.templateUnreadable', { why: (error as Error).message.replace(/\.$/, '') }));
 	}
 	// Always commas: the package wrote it, so nothing is guessed. Sniffing
 	// took a one-column table with tabs in its words for two columns.
@@ -277,7 +278,7 @@ function pickBackground(candidates: PackagePicture[], layoutName: string, notes:
 		candidates.find((c) => /background|artwork|\bbg\b/i.test(base(c.name))) ??
 		candidates.find((c) => base(c.name).toLowerCase().startsWith(stem)) ??
 		candidates[0];
-	notes.push(`Several pictures could be the page's artwork; “${base(pick.name)}” was made the background. Name the one you mean “background”.`);
+	notes.push(t('package.severalArtworks', { name: base(pick.name) }));
 	return pick;
 }
 
@@ -308,9 +309,7 @@ export async function readInDesign(files: Map<string, Uint8Array>, archiveName: 
 		if (!idmls.length) {
 			const indd = paths.some((p) => /\.indd$/i.test(p));
 			throw new PackageError(
-				indd
-					? 'There is an InDesign document in this archive but no IDML — in InDesign, use File › Export… › InDesign Markup (IDML), and put it in the folder.'
-					: 'There is no IDML or libelli package in this archive.'
+				t(indd ? 'package.inddNoIdml' : 'package.nothingToOpen')
 			);
 		}
 		// Several: the one InDesign's Package wrote beside its document, by name.
@@ -355,11 +354,9 @@ export async function readInDesign(files: Map<string, Uint8Array>, archiveName: 
 					pictures.push({ name: found.name, bytes: found.bytes });
 				}
 				standIns.set(link, stand.name);
-				notes.push(`“${link}” is a file a browser cannot draw; “${stand.name}” from the archive is shown in its place.`);
+				notes.push(t('package.standIn', { link, name: stand.name }));
 			} else {
-				notes.push(
-					`“${link}” is a file a browser cannot draw — put a PNG or JPG of it named “${stemOf(link)}.jpg” in the archive and import it again, or swap in another picture.`
-				);
+				notes.push(t('package.cannotDraw', { link, name: `${stemOf(link)}.jpg` }));
 			}
 			continue;
 		}
@@ -391,11 +388,7 @@ export async function readInDesign(files: Map<string, Uint8Array>, archiveName: 
 	if (!background) {
 		const pdf = paths.some((p) => /\.pdf$/i.test(p) && !/(^|\/)links\//i.test(p));
 		notes.push(
-			pdf
-				? 'The page artwork is a PDF, which a browser cannot draw — export it from InDesign as PNG or JPG instead, with the bleed included, and add it to the archive.'
-				: bare
-					? 'An IDML holds no picture of the page artwork. Export page 1 from InDesign as PNG or JPG with the Editable layer hidden and the bleed included, then set it as the background in Page — or zip it into the Package folder with the IDML and import that.'
-					: 'No picture of the page artwork was in the archive. Export page 1 from InDesign as PNG or JPG with the Editable layer hidden and the bleed included, then set it as the background in Page.'
+			t(pdf ? 'package.artworkPdf' : bare ? 'package.noArtworkIdml' : 'package.noArtwork')
 		);
 	}
 	if (absent.length) {
@@ -498,7 +491,7 @@ export function bleedNote(picture: { w: number; h: number }, page: { w: number; 
 	const withBleed = (page.w + bleed * 2) / (page.h + bleed * 2);
 	const trim = page.w / page.h;
 	if (Math.abs(ratio - trim) < Math.abs(ratio - withBleed) && Math.abs(ratio - trim) < 0.01) {
-		return 'The artwork looks exported without its bleed, so it is stretched over the bleed and sits slightly off the fields. Export it again with the bleed included (Use Document Bleed Settings).';
+		return t('package.noBleedArtwork');
 	}
 	return null;
 }
