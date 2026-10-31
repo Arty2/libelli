@@ -64,8 +64,10 @@ async function storedFaces(): Promise<{ css: string; families: Set<string> }> {
 		if (!stored?.bytes) continue;
 		families.add(stored.family.toLowerCase());
 		const mime = stored.format === 'woff2' ? 'font/woff2' : stored.format === 'woff' ? 'font/woff' : 'font/ttf';
+		// A face of several says which; a single upload is every weight, as before.
+		const face = stored.weight === undefined ? '' : `font-weight:${Math.round(stored.weight)};font-style:${stored.italic ? 'italic' : 'normal'};`;
 		faces.push(
-			`@font-face{font-family:"${stored.family.replace(/"/g, '')}";src:url(data:${mime};base64,${bytesToBase64(stored.bytes)})}`
+			`@font-face{font-family:"${stored.family.replace(/"/g, '')}";${face}src:url(data:${mime};base64,${bytesToBase64(stored.bytes)})}`
 		);
 	}
 	return { css: faces.join('\n'), families };

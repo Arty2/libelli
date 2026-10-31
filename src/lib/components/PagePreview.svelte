@@ -99,6 +99,7 @@
 		onedit?: (id: string | null) => void;
 		/** open the drawing surface for an area */
 		ondraw?: (id: string) => void;
+		onswappicture?: (id: string) => void;
 		oneditcell?: (id: string) => void;
 		/** words typed into the card, forwarded to whoever owns them */
 		ontext?: (box: Box, value: string) => void;
@@ -184,6 +185,7 @@
 		ondelete,
 		onedit,
 		ondraw,
+		onswappicture,
 		oneditcell,
 		ontext,
 		onrescue,
@@ -1779,6 +1781,7 @@
 				{onmenuclose}
 				{onedit}
 				{ondraw}
+				{onswappicture}
 				{oneditcell}
 				{ontext}
 				underlay={gridArt && !viewOnly ? gridLayer : undefined}
@@ -1962,7 +1965,8 @@
 		     whatever Boxes says: it is the one way to unlock from beside the page,
 		     and with the outlines off it vanished and Area stood greyed out with
 		     nothing above it to say why. -->
-		{#if template.locked || unlocking}
+		<!-- Not while copy editing: Edit Design is the way out of that, and it asks. -->
+		{#if (template.locked || unlocking) && !template.copy}
 			<button
 				class="square page-lock"
 				aria-pressed={!unlocking}

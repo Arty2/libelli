@@ -51,6 +51,8 @@
 		onnotice: (message: string, tone?: 'info' | 'warning') => void;
 		onimporttemplate: () => void;
 		onexporttemplate: () => void;
+		/** the design, its table and its pictures as one file for a writer — package.ts */
+		onexportpackage?: () => void;
 		oneditcss: () => void;
 		/** open the drawing surface for the selected area */
 		ondraw?: (id: string) => void;

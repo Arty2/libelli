@@ -16,13 +16,27 @@
 	import {
 		localImageName,
 		localImageRef,
+		readLocalImage,
 		resolveBackground,
 		resolveLocalImages,
 		safeMediaUrl,
 		storeLocalImage,
 		uploadBackgroundImage
 	} from '$lib/assets';
-	import { download, fileStem } from '$lib/download';
+	import { download, downloadBlob, fileStem } from '$lib/download';
+	import {
+		MANIFEST,
+		PackageError,
+		pictureType,
+		packageFiles,
+		picturesNamed,
+		readPackage,
+		sameBytes,
+		writePackage,
+		type PackageFont,
+		type PackagePicture
+	} from '$lib/package';
+	import { unzip, ZipError } from '$lib/zip';
 	import { droppedKind, mightTakeDrag, sameTable, sameTemplate, tableNameFrom } from '$lib/dropfile';
 	import { parseTable } from '$lib/parse';
 	import {
@@ -32,6 +46,10 @@
 		fontChoices,
 		fontInventory,
 		fontRef,
+		fontRefKey,
+		installFontFaces,
+		storedFaces,
+		type FaceFile,
 		listStoredFonts,
 		mergeFonts,
 		previewFamilies,
@@ -1652,7 +1670,10 @@
 
 	async function handleImageDrop(box: Box, file: File) {
 		if (box.slot && mapping[box.slot] && refuseLockedTable()) return;
-		placeImage(box, await storeImage(file));
+		// Copy editing changes a row's picture, never another row's: a phone's
+		// photos are all `image.jpg` — see `underFreeName`. A designer dropping
+		// an updated `logo.png` means to replace it, so only here.
+		placeImage(box, await storeImage(copyMode ? await underFreeName(file) : file));
 	}
 
 	/**
@@ -2987,8 +3008,86 @@
 		notify(`Style pasted onto ${targets.length} area${targets.length === 1 ? '' : 's'}.`);
 	}
 
+	// ---- copy editing ------------------------------------------------------------
+
+	/**
+	 * A package opened for somebody to fill in (`Template.copy`): the design
+	 * locked and its controls put away — the page bar, the area bar, the
+	 * padlock — so what is left is the page, the words, the pictures and
+	 * Export. Not a permission: Edit Design leaves it, after asking, since a
+	 * writer who wanders into the layout is the thing the mode is for.
+	 */
+	const copyMode = $derived(!!template.copy);
+	let leavingCopy = $state(false);
+
+	/** The package dialog, and whether the fonts go in it. */
+	let packaging = $state(false);
+	let packageFonts = $state(false);
+
+	/** A picture or a font family a package brings that this browser already holds, different. */
+	interface Clash {
+		kind: 'picture' | 'font';
+		name: string;
+		/** use the package's; unticked keeps this browser's */
+		replace: boolean;
+	}
+
+	/** The clashes being asked about, and the import waiting on the answer. */
+	let clashAsk = $state<{ items: Clash[]; resolve: (items: Clash[] | null) => void } | null>(null);
+	let swapInput = $state<HTMLInputElement | null>(null);
+	let swapTarget: string | null = null;
+
+	function leaveCopyMode() {
+		leavingCopy = false;
+		describe('Edit the design');
+		// The lock stays: leaving copy editing shows the design's controls, and
+		// unlocking is the next, separate step — the padlock beside the page.
+		template = stripUndefined({ ...$state.snapshot(template), copy: undefined }) as Template;
+		notify('Copy editing is off. The design is still locked; the padlock beside the page unlocks it.');
+	}
+
+	/** A picture field asked to swap its picture: a file, from wherever the person keeps them. */
+	function swapPicture(id: string) {
+		swapTarget = id;
+		swapInput?.click();
+	}
+
+	async function onSwapChosen(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		const box = template.boxes.find((b) => b.id === swapTarget);
+		swapTarget = null;
+		if (file && box) await handleImageDrop(box, file);
+	}
+
+	/**
+	 * A swapped-in picture under a name no other picture here has. A phone's
+	 * picker names every camera photo `image.jpg`, and stored under that name
+	 * the second one replaced the first — on every row that showed it. The same
+	 * picture again keeps its name; a different one becomes `image-2.jpg`.
+	 */
+	async function underFreeName(file: File): Promise<File> {
+		const bytes = new Uint8Array(await file.arrayBuffer());
+		const dot = file.name.lastIndexOf('.');
+		const stem = dot > 0 ? file.name.slice(0, dot) : file.name;
+		const ext = dot > 0 ? file.name.slice(dot) : '';
+		for (let n = 1; n < 1000; n++) {
+			const name = n === 1 ? file.name : `${stem}-${n}${ext}`;
+			const have = await readLocalImage(name);
+			if (!have || sameBytes(new Uint8Array(await have.arrayBuffer()), bytes)) {
+				return name === file.name ? file : new File([bytes], name, { type: file.type });
+			}
+		}
+		return file;
+	}
+
 	/** The design's own lock, from the keyboard: the padlock above Area. */
 	function toggleDesignLock() {
+		if (copyMode) {
+			notify('To change the layout, choose Edit Design first.', 'warning');
+			return;
+		}
 		const locking = !template.locked;
 		describe(locking ? 'Lock the design' : 'Unlock the design');
 		template = stripUndefined({ ...$state.snapshot(template), locked: locking ? true : undefined }) as Template;
@@ -3155,7 +3254,10 @@
 			deleting ||
 			deletingTable ||
 			magic !== null ||
-			stepsOpen !== null
+			stepsOpen !== null ||
+			packaging ||
+			leavingCopy ||
+			clashAsk !== null
 	);
 	/** Something in front of the stage, which then leaves the keys alone. */
 	const stageModalOpen = $derived(dialogOpen || previewOpen || lightboxOpen || boxMenu !== null || editingId !== null);
@@ -3246,6 +3348,10 @@
 			deletingTable = false;
 			magic = null;
 			boxMenu = null;
+			packaging = false;
+			leavingCopy = false;
+			// The import waiting on it goes ahead with nothing changed.
+			clashAsk?.resolve(null);
 			return;
 		}
 		if (dialogOpen) return;
@@ -3495,7 +3601,7 @@
 		const file = input.files?.[0];
 		input.value = '';
 		if (!file) return;
-		const said = await importTemplateFile(file);
+		const said = droppedKind(file) === 'archive' ? await importArchiveFile(file) : await importTemplateFile(file);
 		notify(said.text, said.tone);
 	}
 
@@ -3530,11 +3636,7 @@
 		if (sameTemplate(next, toFile($state.snapshot(template)))) {
 			return { text: `“${template.name}” is the template already open — nothing to import.`, tone: 'info' };
 		}
-		// Read at once rather than one after another: a library of forty is
-		// forty IndexedDB round trips before the drop does anything.
-		const others = library.filter((entry) => entry.id !== templateId);
-		const docs = await Promise.all(others.map((entry) => loadTemplateDoc(entry.id)));
-		const held = others.find((_, i) => sameTemplate(next, docs[i]));
+		const held = await heldTemplate((doc) => sameTemplate(next, doc));
 		if (held) {
 			await switchTemplate(held.id);
 			return { text: `“${file.name}” is already in your templates as “${template.name}” — opened that one.`, tone: 'info' };
@@ -3595,12 +3697,7 @@
 		if (sameTable(parsed, dataset)) {
 			return { text: `“${tableName}” already holds exactly these rows — nothing to import.`, tone: 'info' };
 		}
-		const others = tables.filter((entry) => entry.id !== datasetId);
-		const docs = await Promise.all(others.map((entry) => loadDatasetDoc(entry.id)));
-		const held = others.find((_, i) => {
-			const doc = docs[i];
-			return !!doc && sameTable(parsed, doc);
-		});
+		const held = await heldTable((doc) => sameTable(parsed, doc));
 		if (held) {
 			await switchDataset(held.id);
 			return { text: `“${file.name}” is already in your tables as “${tableName}” — opened that one.`, tone: 'info' };
@@ -3619,6 +3716,279 @@
 		await refreshTables();
 		const count = `${parsed.rows.length} row${parsed.rows.length === 1 ? '' : 's'}`;
 		return { text: `“${name}” imported as a new table, ${count} — the table you had is saved in your tables.`, tone: 'info' };
+	}
+
+	// ---- packages ---------------------------------------------------------------
+
+	/**
+	 * A package somebody made here (package.ts), opened as a new template and
+	 * a new table together, the pair it is; what was open is saved first, as
+	 * any import does. Like the other imports it reports rather than notifies,
+	 * so a drop of several files says what became of each.
+	 */
+	async function importArchiveFile(file: File): Promise<Said> {
+		if (editor !== 'here') return { text: 'Read only — press Open Here to import into your templates.', tone: 'warning' };
+		// One import at a time while one is asking: a second would take the
+		// dialog over and leave the first waiting for an answer for ever.
+		if (clashAsk) return { text: `“${file.name}” was not imported. Answer the open question first, then try again.`, tone: 'warning' };
+		let files: Map<string, Uint8Array>;
+		try {
+			files = await unzip(new Uint8Array(await file.arrayBuffer()));
+		} catch (error) {
+			return { text: `“${file.name}” was not imported. ${error instanceof ZipError ? error.message : 'It could not be read.'}`, tone: 'warning' };
+		}
+		files = packageFiles(files);
+		if (!files.has(MANIFEST)) return { text: `“${file.name}” was not imported. It is a ZIP file but not a libelli package.`, tone: 'warning' };
+		try {
+			return await openPackage(readPackage(files, tableNameFrom(file.name) || UNTITLED_TABLE));
+		} catch (error) {
+			return { text: `“${file.name}” was not imported. ${error instanceof PackageError ? error.message : 'It could not be read.'}`, tone: 'warning' };
+		}
+	}
+
+	/** Pictures into this browser's store (or the folder), under the names the cells use. */
+	async function storePictures(pictures: PackagePicture[]) {
+		for (const p of pictures) await storeLocalImage(new File([p.bytes as BlobPart], p.name, { type: pictureType(p.name) }), p.name);
+		if (pictures.length) imagesVersion += 1;
+	}
+
+
+	/** Ask which of the clashing files to replace: what to keep as it is here (`kind:name`), or null for Cancel. */
+	function askClashes(items: Clash[]): Promise<Set<string> | null> {
+		return new Promise((resolve) => {
+			clashAsk = {
+				items,
+				resolve: (answer) => {
+					clashAsk = null;
+					resolve(answer && new Set(answer.filter((c) => !c.replace).map((c) => `${c.kind}:${c.name.toLowerCase()}`)));
+				}
+			};
+		});
+	}
+
+	/**
+	 * Each family's faces installed, and the design's fonts pointed at them:
+	 * a package made in another browser names that browser's keys, and the
+	 * faces are stored here under this one's. A family whose files will not
+	 * load is named, and left as this browser had it.
+	 */
+	async function installFamilies(next: Template, byFamily: Map<string, FaceFile[]>, notes: string[]): Promise<Template> {
+		if (!byFamily.size) return next;
+		const refs: FontRef[] = [];
+		for (const [family, faces] of byFamily) {
+			try {
+				refs.push(await installFontFaces(family, faces));
+			} catch {
+				notes.push(`The ${family} font files are damaged and were not installed.`);
+			}
+		}
+		if (!refs.length) return next;
+		editorFonts = mergeFonts(editorFonts, refs);
+		saveEditorFonts($state.snapshot(editorFonts));
+		await refreshStoredFonts();
+		const fonts = next.fonts.filter((f) => !refs.some((r) => r.family.toLowerCase() === f.family.toLowerCase()));
+		const kept = refs.map((r) => ({ ...r, ...tuningOf(next.fonts.find((f) => f.family.toLowerCase() === r.family.toLowerCase())) }));
+		return { ...next, fonts: [...fonts, ...kept] };
+	}
+
+	/**
+	 * A template and its table, opened together as new entries in both
+	 * libraries — one step to undo, as a template import is.
+	 */
+	async function adoptPair(next: Template, data: Dataset, map: Mapping) {
+		settleProvisional();
+		await Promise.all([flushTemplate(), flushDataset()]);
+		describe(`Import “${next.name}”`);
+		template = next;
+		selectedIds = [];
+		editingId = null;
+		rememberTemplate(templateId);
+		templateId = nextTemplateId();
+		saveTemplateId(templateId);
+		rememberTable(datasetId);
+		datasetId = nextDatasetId();
+		saveDatasetId(datasetId);
+		dataset = { ...data, name: freeTableName(data.name?.trim() || UNTITLED_TABLE, true) };
+		activeRow = 0;
+		mapping = map;
+		missingFonts = await ensureTemplateFonts(template);
+		await Promise.all([saveTemplateDoc(templateId, $state.snapshot(template)), saveDatasetDoc(datasetId, $state.snapshot(dataset))]);
+		await Promise.all([refreshLibrary(), refreshTables()]);
+	}
+
+	/**
+	 * The template and table of a package already in the library, unchanged,
+	 * as the other imports find theirs. The fonts are left out of the
+	 * comparison: opening a package points them at this browser's keys.
+	 */
+	async function heldPair(contents: ReturnType<typeof readPackage>): Promise<{ templateId: string; datasetId: string } | null> {
+		const bare = { ...contents.template, fonts: [] };
+		const sameDesign = (doc: unknown) => !!doc && sameTemplate(bare, { ...(doc as object), fonts: [] });
+		// The open pair counts, as it does for the other imports, read from
+		// memory since storage may be a debounce behind.
+		const t = sameDesign(toFile($state.snapshot(template))) ? templateId : (await heldTemplate(sameDesign))?.id;
+		if (!t) return null;
+		const d = sameTable(contents.dataset, dataset) ? datasetId : (await heldTable((doc) => sameTable(contents.dataset, doc)))?.id;
+		return d ? { templateId: t, datasetId: d } : null;
+	}
+
+	/**
+	 * The library's template, other than the open one, whose stored copy
+	 * passes `test` — the one rule every import uses for "already have it".
+	 * Read at once rather than one after another: a library of forty is
+	 * forty IndexedDB round trips before the drop does anything.
+	 */
+	async function heldTemplate(test: (doc: unknown) => boolean) {
+		const others = library.filter((entry) => entry.id !== templateId);
+		const docs = await Promise.all(others.map((entry) => loadTemplateDoc(entry.id)));
+		return others.find((_, i) => !!docs[i] && test(docs[i]));
+	}
+
+	/** The same, for a table. */
+	async function heldTable(test: (doc: Dataset) => boolean) {
+		const others = tables.filter((entry) => entry.id !== datasetId);
+		const docs = await Promise.all(others.map((entry) => loadDatasetDoc(entry.id)));
+		return others.find((_, i) => !!docs[i] && test(docs[i]!));
+	}
+
+	/**
+	 * Each picture and font family an import brings, against what this browser
+	 * holds: the ones held with the same bytes (`same`, never written again),
+	 * and the ones held with different bytes (`clashes`, asked about). The rest
+	 * are new. Read together, not one after another — `resolveLocalImages`
+	 * learned that for forty pictures.
+	 */
+	async function clashesWith(pictures: PackagePicture[], byFamily: Map<string, FaceFile[]>): Promise<{ clashes: Clash[]; same: Set<string> }> {
+		const clashes: Clash[] = [];
+		const same = new Set<string>();
+		const held = await Promise.all(pictures.map(async (p) => (await readLocalImage(p.name))?.arrayBuffer()));
+		pictures.forEach((picture, i) => {
+			const have = held[i];
+			if (!have) return;
+			if (sameBytes(new Uint8Array(have), picture.bytes)) same.add(`picture:${picture.name.toLowerCase()}`);
+			else clashes.push({ kind: 'picture', name: picture.name, replace: true });
+		});
+		const families = [...byFamily];
+		const stored = await Promise.all(families.map(([family]) => storedFaces(fontRefKey(family))));
+		families.forEach(([family, faces], i) => {
+			const have = stored[i];
+			if (!have.length) return;
+			// Every face the import brings is already here: nothing to install, and
+			// installing would clear the faces here that the import does not carry.
+			if (faces.every((f) => have.some((h) => sameBytes(h.bytes, new Uint8Array(f.bytes))))) same.add(`font:${family.toLowerCase()}`);
+			else clashes.push({ kind: 'font', name: family, replace: true });
+		});
+		return { clashes, same };
+	}
+
+	/**
+	 * The pictures stored and the families installed, but for those `skip`
+	 * names — kept as this browser has them, or already the same. A skipped
+	 * family's font is pointed at this browser's file.
+	 */
+	async function storeAssets(next: Template, pictures: PackagePicture[], byFamily: Map<string, FaceFile[]>, skip: Set<string>, notes: string[]): Promise<Template> {
+		await storePictures(pictures.filter((p) => !skip.has(`picture:${p.name.toLowerCase()}`)));
+		const install = new Map([...byFamily].filter(([family]) => !skip.has(`font:${family.toLowerCase()}`)));
+		const installed = await installFamilies(next, install, notes);
+		return {
+			...installed,
+			fonts: installed.fonts.map((f) => (skip.has(`font:${f.family.toLowerCase()}`) ? { ...f, source: 'local' as const, ref: fontRefKey(f.family) } : f))
+		};
+	}
+
+	async function openPackage(contents: ReturnType<typeof readPackage>): Promise<Said> {
+		const byFamily = new Map<string, FaceFile[]>();
+		for (const font of contents.fonts) {
+			const faces = byFamily.get(font.family) ?? [];
+			faces.push({ name: `${font.family}.${font.format}`, format: font.format, bytes: font.bytes.slice().buffer, weight: font.weight, italic: font.italic });
+			byFamily.set(font.family, faces);
+		}
+		const { clashes, same } = await clashesWith(contents.pictures, byFamily);
+		const absent = contents.absent.length ? ` Missing from the package: ${contents.absent.join(', ')}.` : '';
+
+		// The same package again — its design and its table as held here, none
+		// of its files different — opens what is held rather than making a
+		// second pair. Whatever of it this browser has lost since (a picture
+		// deleted, a font) is put back first, which is a reason to open it again.
+		const held = clashes.length ? null : await heldPair(contents);
+		if (held) {
+			const notes: string[] = [];
+			const restored = contents.pictures.filter((p) => !same.has(`picture:${p.name.toLowerCase()}`)).length + [...byFamily.keys()].filter((f) => !same.has(`font:${f.toLowerCase()}`)).length;
+			await storeAssets(contents.template, contents.pictures, byFamily, same, notes);
+			await switchTemplate(held.templateId);
+			await switchDataset(held.datasetId);
+			missingFonts = await ensureTemplateFonts(template);
+			const back = restored ? ` ${restored === 1 ? '1 missing file was' : `${restored} missing files were`} restored.` : '';
+			return { text: `“${contents.template.name}” is already in your library, unchanged, so that copy was opened.${back}${absent}${notes.length ? ` ${notes.join(' ')}` : ''}`, tone: absent || notes.length ? 'warning' : 'info' };
+		}
+		const kept = clashes.length ? await askClashes(clashes) : new Set<string>();
+		if (!kept) return { text: `“${contents.template.name}” was not imported. Nothing was changed.`, tone: 'info' };
+		const notes: string[] = [];
+		const next = await storeAssets(contents.template, contents.pictures, byFamily, new Set([...kept, ...same]), notes);
+		await adoptPair(next, contents.dataset, contents.mapping);
+		const keptCount = kept.size ? ` Your own version of ${kept.size === 1 ? '1 file was' : `${kept.size} files were`} kept.` : '';
+		const missing = missingFonts.length ? ` ${missingFonts.length === 1 ? '1 font is' : `${missingFonts.length} fonts are`} missing; see the notice above the page.` : '';
+		return {
+			text: `“${next.name}” opened for copy editing.${keptCount}${missing}${absent}${notes.length ? ` ${notes.join(' ')}` : ''}`,
+			tone: missing || absent || notes.length ? 'warning' : 'info'
+		};
+	}
+
+	/** Unticked every time: a licence is a fact about these fonts, not a preference to remember. */
+	function openPackaging() {
+		packageFonts = false;
+		packaging = true;
+	}
+
+	/** The uploaded families this design is set in: what Include Fonts would put in. */
+	const packagedFamilies = $derived(template.fonts.filter((f) => f.source === 'local' && f.ref).map((f) => f.family));
+
+	/**
+	 * This design, its table and every picture they name, as one file for a
+	 * writer — see package.ts. The fonts only when ticked: a licence that lets
+	 * a designer use a face does not always let them hand the file on.
+	 */
+	async function exportPackage() {
+		packaging = false;
+		try {
+			await writeAndSavePackage();
+		} catch (error) {
+			// The dialog has gone: without this, nothing downloads and nothing says why.
+			notify(`The package could not be saved (${error instanceof Error ? error.message.replace(/\.$/, '') : 'unknown error'}).`, 'warning');
+		}
+	}
+
+	async function writeAndSavePackage() {
+		const t = $state.snapshot(template) as Template;
+		const d = $state.snapshot(dataset) as Dataset;
+		const pictures: PackagePicture[] = [];
+		const absent: string[] = [];
+		const names = picturesNamed(t, d);
+		const blobs = await Promise.all(names.map(async (name) => (await readLocalImage(name))?.arrayBuffer()));
+		names.forEach((name, i) => {
+			const bytes = blobs[i];
+			if (bytes) pictures.push({ name, bytes: new Uint8Array(bytes) });
+			else absent.push(name);
+		});
+		const fonts: PackageFont[] = [];
+		const fileless: string[] = [];
+		if (packageFonts) {
+			for (const f of t.fonts) {
+				if (f.source !== 'local' || !f.ref) continue;
+				const faces = await storedFaces(f.ref);
+				if (faces.length) fonts.push(...faces);
+				else fileless.push(f.family);
+			}
+		}
+		const bytes = writePackage({ template: t, dataset: d, mapping: $state.snapshot(mapping), pictures, fonts });
+		downloadBlob(`${fileStem(t.name)}.zip`, new Blob([bytes], { type: 'application/zip' }));
+		const missing =
+			(absent.length ? ` Left out because ${absent.length === 1 ? 'it is' : 'they are'} missing from this browser: ${absent.join(', ')}.` : '') +
+			(fileless.length ? ` No font files were found for ${fileless.join(', ')}.` : '');
+		notify(
+			`Package saved with ${d.rows.length} row${d.rows.length === 1 ? '' : 's'}, ${pictures.length} picture${pictures.length === 1 ? '' : 's'}${fonts.length ? ` and ${fonts.length} font file${fonts.length === 1 ? '' : 's'}` : ''}.${missing}`,
+			missing ? 'warning' : 'info'
+		);
 	}
 
 	/**
@@ -3700,6 +4070,7 @@
 			const kind = droppedKind(file);
 			if (kind === 'template') said.push(await importTemplateFile(file));
 			else if (kind === 'table') said.push(await importTableFile(file));
+			else if (kind === 'archive') said.push(await importArchiveFile(file));
 			else if (kind === 'image')
 				said.push({
 					text: placed
@@ -3707,7 +4078,7 @@
 						: `“${file.name}” is a picture — drop it on the page or on an area to place it.`,
 					tone: 'warning'
 				});
-			else said.push({ text: `“${file.name}” is not a file libelli can import — drop a CSV, TSV or template JSON.`, tone: 'warning' });
+			else said.push({ text: `“${file.name}” cannot be imported. Drop a CSV or TSV file, a template or a package.`, tone: 'warning' });
 		}
 		notify(said.map((s) => s.text).join(' '), said.some((s) => s.tone === 'warning') ? 'warning' : 'info');
 	}
@@ -3921,7 +4292,7 @@
      still be dropped on one. -->
 {#if dragHint}
 	<div class="drop-hint" aria-hidden="true">
-		<p>Drop a CSV or a template JSON to open it as a new table or template — what is open now is saved first.</p>
+		<p>Drop a CSV file, a template or a package to open it. What is open now is saved first.</p>
 	</div>
 {/if}
 
@@ -3967,24 +4338,26 @@
 		<button class="help" onclick={() => (helpOpen = true)} title={withKey("How this works, and the keys", "help")}>
 			<Icon name="help" size={15} /> <span class="label">Help</span>
 		</button>
-		<button
-			class="page"
-			onclick={() => {
-				// Not a plain toggle any more: the two bars share one row, so this
-				// says "show me the page" — which, with an area selected, means
-				// letting go of the area rather than stacking a second bar on top.
-				const showing = pageSetupOpen && !barBox;
-				pageSetupOpen = !showing;
-				if (!showing && barBox) selectBox(null);
-			}}
-			aria-pressed={pageSetupOpen && !barBox}
-			aria-expanded={pageSetupOpen && !barBox}
-			title={barBox && pageSetupOpen
-				? 'Page — the area bar has the row; this takes it back'
-				: 'Show or hide the page settings'}
-		>
-			<Icon name="document-blank" size={15} /> <span class="label">Page</span>
-		</button>
+		{#if !copyMode}
+				<button
+				class="page"
+				onclick={() => {
+					// Not a plain toggle any more: the two bars share one row, so this
+					// says "show me the page" — which, with an area selected, means
+					// letting go of the area rather than stacking a second bar on top.
+					const showing = pageSetupOpen && !barBox;
+					pageSetupOpen = !showing;
+					if (!showing && barBox) selectBox(null);
+				}}
+				aria-pressed={pageSetupOpen && !barBox}
+				aria-expanded={pageSetupOpen && !barBox}
+				title={barBox && pageSetupOpen
+					? 'Page — the area bar has the row; this takes it back'
+					: 'Show or hide the page settings'}
+			>
+				<Icon name="document-blank" size={15} /> <span class="label">Page</span>
+			</button>
+		{/if}
 		<!-- Every stored picture, in a tray of its own in the table's place: the
 		     pictures are the browser's, not the page's — a row's own photograph
 		     is in there too. Pictures and Data share that room, one at a time, so
@@ -4022,7 +4395,8 @@
 		>
 			<Icon name="document-multiple" size={15} /> <span class="label">Export…</span>
 		</button>
-		<input bind:this={templateInput} type="file" accept="application/json,.json" hidden onchange={importTemplate} />
+		<input bind:this={templateInput} type="file" accept="application/json,.json,.zip,application/zip" hidden onchange={importTemplate} />
+		<input bind:this={swapInput} type="file" accept="image/*" hidden onchange={onSwapChosen} />
 		<input bind:this={missingFontInput} type="file" accept=".woff2,.woff,.otf,.ttf" hidden onchange={onMissingFontChosen} />
 		<input bind:this={backgroundInput} type="file" accept="image/*" hidden onchange={onMissingBackgroundChosen} />
 		<input
@@ -4049,7 +4423,38 @@
 	     because both bars wrap and neither height survives a change of width. The
 	     trade-off is that band; it buys a page that does not move when you pick
 	     something up. -->
-	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden && !quiet}
+	<!-- Copy editing says so, and how, in place of the bars it puts away. -->
+	{#if copyMode && !quiet}
+		<!-- Two wordings, picked by CSS rather than script: a finger double-taps
+		     where a mouse double-clicks, and a phone gets one line rather than
+		     three, since this sits above the page it is there to help with. The
+		     short one carries the long one as its title, for a press and hold. -->
+		<div class="banner copy" role="note">
+			<span class="copy-note">
+				<strong>Copy editing.</strong>
+				<span class="long"
+					><span class="by-mouse">Double-click</span><span class="by-touch">Double-tap</span> a field to edit it, or a picture to
+					replace it. A red line means the text is too long.</span
+				>
+				<span
+					class="short"
+					title="Double-tap a field to edit it, or a picture to replace it. A red line means the text is too long."
+					><span class="by-mouse">Double-click</span><span class="by-touch">Double-tap</span> a field to edit it.</span
+				>
+			</span>
+			<span class="spacer"></span>
+			<button
+				class="edit-design"
+				onclick={() => (leavingCopy = true)}
+				title="Leave copy editing to change the layout"
+				aria-label="Edit Design"
+			>
+				<Icon name="edit" size={15} /> <span class="label">Edit Design…</span>
+			</button>
+		</div>
+	{/if}
+
+	{#if (barBox || pageSetupOpen) && !panelTakesRow && !barHidden && !quiet && !copyMode}
 		<div class="bar-row" class:box={!!barBox} style="min-height:{Math.max(barFloor, probeHeight)}px">
 			<!-- Never seen and never reached — `inert` takes it out of the focus
 			     order and the accessibility tree — only measured. -->
@@ -4118,6 +4523,7 @@
 						onnotice={notify}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
+						onexportpackage={openPackaging}
 						oneditcss={openCss}
 						ondraw={drawArea}
 						onuploadimage={(id, file) => {
@@ -4155,6 +4561,7 @@
 						onnotice={notify}
 						onimporttemplate={() => templateInput?.click()}
 						onexporttemplate={doExportTemplate}
+						onexportpackage={openPackaging}
 						oneditcss={openCss}
 						ondraw={drawArea}
 						onuploadimage={(id, file) => {
@@ -4304,6 +4711,7 @@
 			onrelock={() => applyTemplate({ ...$state.snapshot(template), locked: true } as Template)}
 			onedit={beginEditing}
 			ondraw={drawArea}
+			onswappicture={swapPicture}
 			oneditcell={editCell}
 			ontext={setBoxText}
 			onrescue={rescueStrays}
@@ -4685,6 +5093,77 @@
 			{#if !template.locked}
 				<button class="primary" onclick={saveCss} title="Put this on the card and close — Ctrl/Cmd + Enter">{cssDirty ? 'Save' : 'Done'}</button>
 			{/if}
+		</div>
+	</div>
+{/if}
+
+<!-- Leaving copy editing asks: the person who presses it is most often the
+     writer the mode is for, and the design is what they were sent not to move. -->
+{#if leavingCopy}
+	<div class="modal-backdrop" role="presentation" onclick={() => (leavingCopy = false)}></div>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="leave-copy-title" use:armDefault>
+		<h2 id="leave-copy-title">Edit the design?</h2>
+		<p>
+			“{template.name}” was sent to you for copy editing. The layout is normally changed only by its designer. The
+			design stays locked until you unlock it.
+		</p>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (leavingCopy = false)}>Cancel</button>
+			<button class="primary" data-default onclick={leaveCopyMode}>Edit Design</button>
+		</div>
+	</div>
+{/if}
+
+<!-- A package brings files this browser already has under the same names,
+     different: asked about before anything is written, each one, since only
+     the person importing knows whether theirs or the designer's is the one
+     to keep. Ticked uses the package's, so the design prints as it was made. -->
+{#if clashAsk}
+	{@const ask = clashAsk}
+	<div class="modal-backdrop" role="presentation" onclick={() => ask.resolve(null)}></div>
+	<div class="modal narrow clashes" role="dialog" aria-modal="true" aria-labelledby="clash-title" use:armDefault>
+		<h2 id="clash-title">Replace your files?</h2>
+		<p>Some files in this package have the same names as files you already have, but different contents. Ticked files will be replaced; unticked files are kept.</p>
+		<ul>
+			{#each ask.items as item (item.kind + item.name)}
+				<li>
+					<label class="check">
+						<input type="checkbox" bind:checked={item.replace} />
+						<span>{item.kind === 'font' ? `Font: ${item.name}` : `Picture: ${item.name}`}</span>
+					</label>
+				</li>
+			{/each}
+		</ul>
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => ask.resolve(null)}>Cancel Import</button>
+			<button class="primary" data-default onclick={() => ask.resolve($state.snapshot(ask.items))}>Import</button>
+		</div>
+	</div>
+{/if}
+
+<!-- A package is for someone else: what goes in is said before it is made,
+     and the fonts are asked about, since only the designer knows whether
+     their licences let the files travel. -->
+{#if packaging}
+	<div class="modal-backdrop" role="presentation" onclick={() => (packaging = false)}></div>
+	<div class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="package-title" use:armDefault>
+		<h2 id="package-title">Package for copy editing</h2>
+		<p>
+			Saves this design, its table and its pictures as one ZIP file. The person you send it to can change the words
+			and pictures, but not the layout.
+		</p>
+		{#if packagedFamilies.length}
+			<label class="check">
+				<input type="checkbox" bind:checked={packageFonts} />
+				<span>Include fonts ({packagedFamilies.join(', ')}). Tick only if their licences allow sharing.</span>
+			</label>
+		{/if}
+		<div class="modal-actions">
+			<span class="spacer"></span>
+			<button onclick={() => (packaging = false)}>Cancel</button>
+			<button class="primary" data-default onclick={() => void exportPackage()}>Save Package</button>
 		</div>
 	</div>
 {/if}
@@ -5268,6 +5747,70 @@
 		font-size: 0.75rem;
 	}
 
+	/* Copy editing is a mode, not a fault: a quiet band rather than the warning yellow. */
+	.banner.copy {
+		background: #eef4fb;
+		border-bottom-color: #d3e1f1;
+	}
+
+	.banner .spacer {
+		flex: 1;
+	}
+
+	/* Which word: a mouse double-clicks, a finger double-taps. By the primary
+	   pointer, as a laptop with a touchscreen still reads a mouse's word. */
+	.banner.copy .by-touch,
+	.banner.copy .short {
+		display: none;
+	}
+
+	@media (hover: none) and (pointer: coarse) {
+		.banner.copy .by-mouse {
+			display: none;
+		}
+
+		.banner.copy .by-touch {
+			display: inline;
+		}
+	}
+
+	/* A phone: one line, not three over the page — the short wording, and
+	   Edit Design as a square icon with its name in its title. */
+	@media (max-width: 560px) {
+		.banner.copy {
+			flex-wrap: nowrap;
+			padding: 6px 16px;
+		}
+
+		.banner.copy .copy-note {
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.banner.copy .long {
+			display: none;
+		}
+
+		.banner.copy .short {
+			display: inline;
+		}
+
+		.banner.copy .edit-design {
+			flex: none;
+			width: calc(0.9375rem + 14px);
+			height: calc(0.9375rem + 14px);
+			padding: 0;
+			display: grid;
+			place-items: center;
+		}
+
+		.banner.copy .edit-design .label {
+			display: none;
+		}
+	}
+
 	.status-bar {
 		display: flex;
 		align-items: center;
@@ -5648,6 +6191,28 @@
 	.modal p {
 		margin: 0 0 8px;
 		color: #333;
+	}
+
+	.clashes ul {
+		margin: 0 0 12px;
+		padding: 0;
+		list-style: none;
+	}
+
+	.clashes label.check {
+		margin: 2px 0;
+	}
+
+	/* A tick with a sentence beside it, wrapping under itself rather than under the box. */
+	.modal label.check {
+		display: flex;
+		align-items: flex-start;
+		gap: 8px;
+		margin: 4px 0 12px;
+	}
+
+	.modal label.check input {
+		margin-top: 0.2em;
 	}
 
 	/* The CSS dialog is the one that holds an editor rather than a paragraph, and

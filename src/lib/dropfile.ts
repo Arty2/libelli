@@ -15,7 +15,8 @@
 import { exportTemplate, importedTemplate } from './template';
 import type { Dataset, Template } from './types';
 
-export type DroppedKind = 'template' | 'table' | 'image' | 'unknown';
+/** `archive` is a ZIP: a libelli package, which package.ts reads and checks. */
+export type DroppedKind = 'template' | 'table' | 'archive' | 'image' | 'unknown';
 
 /** Anything with the two facts a `File` carries, so tests need no DOM. */
 export interface FileFacts {
@@ -36,12 +37,14 @@ export function droppedKind(file: FileFacts): DroppedKind {
 	const ext = extension(file.name);
 	if (ext === 'json') return 'template';
 	if (TABLE_EXTENSIONS.includes(ext)) return 'table';
+	if (ext === 'zip') return 'archive';
 	// A known extension that is neither is taken at its word, whatever type
 	// the system attached: a `.xlsx` reported as `text/plain` is not a CSV.
 	const type = file.type.toLowerCase().split(';')[0].trim();
 	if (type.startsWith('image/')) return 'image';
 	if (ext) return 'unknown';
 	if (type === 'application/json') return 'template';
+	if (type === 'application/zip' || type === 'application/x-zip-compressed') return 'archive';
 	if (TABLE_TYPES.includes(type)) return 'table';
 	return 'unknown';
 }
