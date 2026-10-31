@@ -27,6 +27,606 @@
 		"defaultMessage": "Align Top",
 		"description": "Button: align the chosen areas' top edges."
 	},
+	"app.a5StarterBookletCame": {
+		"defaultMessage": "This is the A5 Starter Booklet, as it came.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.aligned": {
+		"defaultMessage": "Aligned.",
+		"description": "Text in the main screen."
+	},
+	"app.alignedSkipped": {
+		"defaultMessage": "Aligned. {count, plural, one {# anchored area takes its top from another, so vertical alignment left it alone.} other {# anchored areas take their tops from another, so vertical alignment left them alone.}}",
+		"description": "Notice after aligning, when anchored areas were not moved up or down."
+	},
+	"app.alignedTo": {
+		"defaultMessage": "Aligned {where, select, left {left} center {centred} right {right} justify {justified} top {top} middle {middle} other {bottom}}.",
+		"description": "Notice after stepping the text alignment."
+	},
+	"app.alignmentStepped": {
+		"defaultMessage": "Alignment stepped.",
+		"description": "Notice after stepping the text alignment on areas that landed in different places."
+	},
+	"app.anotherTabEditingPress": {
+		"defaultMessage": "Another tab is editing — press Open Here first, then drop the file again.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.areaHasNoWords": {
+		"defaultMessage": "That area has no words to copy.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.areaLockedUnlockPut": {
+		"defaultMessage": "That area is locked — unlock it to put an image in it.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.areaSameEveryCard": {
+		"defaultMessage": "{name} is on this area, the same on every card, and stays in this browser.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.areasDeleted": {
+		"defaultMessage": "{count, plural, one {# area deleted. Ctrl/Cmd+Z brings it back.} other {# areas deleted. Ctrl/Cmd+Z brings them back.}}",
+		"description": "Notice after deleting areas."
+	},
+	"app.areasGroupedClickingAny": {
+		"defaultMessage": "{count, plural, one {# area grouped} other {# areas grouped}} — clicking any one now takes all of them.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.areasWereHangingOff": {
+		"defaultMessage": "{count, plural, one {One area was hanging off the sheet and is wholly on it now. Ctrl/Cmd+Z puts it back.} other {# areas were hanging off the sheet and are wholly on it now. Ctrl/Cmd+Z puts them back.}}",
+		"description": "Text in the main screen."
+	},
+	"app.automaticLayout": {
+		"defaultMessage": "Automatic Layout",
+		"description": "Heading in the main screen."
+	},
+	"app.bringForward": {
+		"defaultMessage": "Bring forward",
+		"description": "Text in the main screen."
+	},
+	"app.bringFront": {
+		"defaultMessage": "Bring to front",
+		"description": "Text in the main screen."
+	},
+	"app.browserWillNotLet": {
+		"defaultMessage": "This browser will not let libelli store anything — private mode, or storage turned off for this site. Everything here works, but none of it will be here next time. Export your template before you close the tab.",
+		"description": "Text in the main screen."
+	},
+	"app.browserWouldNotLet": {
+		"defaultMessage": "This browser would not let libelli reach the clipboard.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.browserWouldNotLet2": {
+		"defaultMessage": "This browser would not let libelli read the clipboard.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.cardAreaOwnSame": {
+		"defaultMessage": "{name} is on the card in an area of its own, the same on every card.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.cardDragNewArea": {
+		"defaultMessage": "{column} is on the card — drag the new area where it belongs.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.changeLayoutChooseEdit": {
+		"defaultMessage": "To change the layout, choose Edit Design first.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.chosenAreasAreLocked": {
+		"defaultMessage": "The chosen areas are locked — unlock them to change the type, or press Escape and Ctrl/Cmd +/− zooms the page.",
+		"description": "Text in the main screen."
+	},
+	"app.closeTab": {
+		"defaultMessage": "Close Tab",
+		"description": "Button in the main screen."
+	},
+	"app.closeTabOtherOneTitle": {
+		"defaultMessage": "Close this tab; the other one keeps editing",
+		"description": "Tooltip in the main screen."
+	},
+	"app.closeWithoutKeepingChangesTitle": {
+		"defaultMessage": "Close without keeping changes",
+		"description": "Tooltip in the main screen."
+	},
+	"app.closeWithoutLayingAnythingTitle": {
+		"defaultMessage": "Close without laying anything out",
+		"description": "Tooltip in the main screen."
+	},
+	"app.copiedAreaSText": {
+		"defaultMessage": "Copied the area’s text.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.copyEditingOffDesign": {
+		"defaultMessage": "Copy editing is off. The design is still locked; the padlock beside the page unlocks it.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.css": {
+		"defaultMessage": "CSS",
+		"description": "Heading in the main screen."
+	},
+	"app.ctrlCmdZPuts": {
+		"defaultMessage": "Ctrl/Cmd+Z puts the old design back.",
+		"description": "Text in the main screen."
+	},
+	"app.data": {
+		"defaultMessage": "Data",
+		"description": "Label in the main screen."
+	},
+	"app.deleteDrawing": {
+		"defaultMessage": "Delete the drawing",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.deleteTable": {
+		"defaultMessage": "Delete Table",
+		"description": "Button in the main screen."
+	},
+	"app.deleteTemplate": {
+		"defaultMessage": "Delete Template",
+		"description": "Button in the main screen."
+	},
+	"app.deleteTemplateLabel": {
+		"defaultMessage": "Delete this template?",
+		"description": "Screen-reader name of a control in the main screen."
+	},
+	"app.deletedBrowser": {
+		"defaultMessage": "{family} deleted from this browser.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.designLockedNothingMoves": {
+		"defaultMessage": "Design locked — nothing moves until it is unlocked.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.designLockedUnlockAdd": {
+		"defaultMessage": "The design is locked — unlock it to add an area.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.designLockedUnlockChange": {
+		"defaultMessage": "The design is locked — unlock it to change its fonts.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.designLockedUnlockCtrl": {
+		"defaultMessage": "The design is locked — unlock it (Ctrl/Cmd+Shift+L) to lock or unlock its areas.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.designUnlocked": {
+		"defaultMessage": "Design unlocked.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.dragShareWidthBetweenTitle": {
+		"defaultMessage": "Drag to share the width between the page and the table — double-click to reset",
+		"description": "Tooltip in the main screen."
+	},
+	"app.dropHint": {
+		"defaultMessage": "Drop a CSV file, a template, a package or an InDesign file to open it. What is open now is saved first.",
+		"description": "Label in the main screen."
+	},
+	"app.dropImage": {
+		"defaultMessage": "Drop image",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.duplicateArea": {
+		"defaultMessage": "Duplicate area",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.duplicateAreas": {
+		"defaultMessage": "Duplicate {count, plural, one {# area} other {# areas}}",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.editDesign": {
+		"defaultMessage": "Edit the design",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.editHereOtherTabTitle": {
+		"defaultMessage": "Edit here; the other tab stops editing",
+		"description": "Tooltip in the main screen."
+	},
+	"app.editText": {
+		"defaultMessage": "Edit the text",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.editing": {
+		"defaultMessage": "Editing.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.everyAreaHangingOff": {
+		"defaultMessage": "Every area hanging off the sheet is locked, so none of them moved.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.everythingSetNowCtrl": {
+		"defaultMessage": "Everything set in {from} is now in {to}. Ctrl/Cmd+Z puts it back.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.export": {
+		"defaultMessage": "Export…",
+		"description": "Label in the main screen."
+	},
+	"app.exportTitle": {
+		"defaultMessage": "Open every card as a page to print or save",
+		"description": "Tooltip of Export…"
+	},
+	"app.fontFileCouldNot": {
+		"defaultMessage": "That font file could not be read.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.fontFilesAreDamaged": {
+		"defaultMessage": "The {family} font files are damaged and were not installed.",
+		"description": "Text in the main screen."
+	},
+	"app.fourCardsExplainThemselves": {
+		"defaultMessage": "Four cards that explain themselves — page through them with the arrows under the sheet. Type over them whenever you like; press ? for the rest.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.fullScreenLabel": {
+		"defaultMessage": "Full screen",
+		"description": "Screen-reader name of a control in the main screen."
+	},
+	"app.gettingStartedTableCame": {
+		"defaultMessage": "This is the Getting Started table, as it came.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.guess": {
+		"defaultMessage": "Guess",
+		"description": "Label in the main screen."
+	},
+	"app.help": {
+		"defaultMessage": "Help",
+		"description": "Label in the main screen."
+	},
+	"app.helpTitle": {
+		"defaultMessage": "How this works, and the keys",
+		"description": "Tooltip of Help."
+	},
+	"app.imageCouldNotBe": {
+		"defaultMessage": "That image could not be read.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.install": {
+		"defaultMessage": "Install",
+		"description": "Label in the main screen."
+	},
+	"app.installLibelliDeviceTitle": {
+		"defaultMessage": "Install libelli on this device",
+		"description": "Tooltip in the main screen."
+	},
+	"app.installLibelliLabel": {
+		"defaultMessage": "Install libelli",
+		"description": "Screen-reader name of a control in the main screen."
+	},
+	"app.installedBrowser": {
+		"defaultMessage": "{family} installed in this browser.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.installedLibelliOpensOwn": {
+		"defaultMessage": "Installed. libelli opens in its own window from now on.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.largerText": {
+		"defaultMessage": "Larger text",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.leftBrowserOfferComes": {
+		"defaultMessage": "Left in the browser — the offer comes back on a later visit.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.lockDesign": {
+		"defaultMessage": "Lock the design",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.moveMm": {
+		"defaultMessage": "Move {mm}mm",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.name": {
+		"defaultMessage": "libelli",
+		"description": "The app's name. Not translated."
+	},
+	"app.new": {
+		"defaultMessage": "· new",
+		"description": "Label in the main screen."
+	},
+	"app.newArea": {
+		"defaultMessage": "New area",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.newTable": {
+		"defaultMessage": "New table",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.newTemplate": {
+		"defaultMessage": "New template",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.newVersionKeepUndo": {
+		"defaultMessage": "New version — keep undo history or update now to restart this session.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.notTemplate": {
+		"defaultMessage": "it is not a template",
+		"description": "Text in the main screen."
+	},
+	"app.notValidJson": {
+		"defaultMessage": "it is not valid JSON",
+		"description": "Text in the main screen."
+	},
+	"app.nothingButLengthCellsTitle": {
+		"defaultMessage": "Nothing but the length of the cells pointed at this",
+		"description": "Tooltip in the main screen."
+	},
+	"app.nothingPrintYet": {
+		"defaultMessage": "Nothing to print yet.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.nothingRedoChangeJust": {
+		"defaultMessage": "Nothing to redo — the change just made took the place of what was undone.",
+		"description": "Text in the main screen."
+	},
+	"app.nothingUndo": {
+		"defaultMessage": "Nothing to undo.",
+		"description": "Text in the main screen."
+	},
+	"app.noticeLabel": {
+		"defaultMessage": "Notice",
+		"description": "Screen-reader name of a control in the main screen."
+	},
+	"app.now": {
+		"defaultMessage": "Now",
+		"description": "Label in the main screen."
+	},
+	"app.ok": {
+		"defaultMessage": "OK",
+		"description": "Button in the main screen."
+	},
+	"app.openAnotherTab": {
+		"defaultMessage": "Open in another tab",
+		"description": "Heading in the main screen."
+	},
+	"app.page": {
+		"defaultMessage": "Page",
+		"description": "Label in the main screen."
+	},
+	"app.pageTakeBackTitle": {
+		"defaultMessage": "Page — the area bar has the row; this takes it back",
+		"description": "Tooltip of Page while the area settings fill the bar."
+	},
+	"app.pageTitle": {
+		"defaultMessage": "Show or hide the page settings",
+		"description": "Tooltip of Page."
+	},
+	"app.pasteArea": {
+		"defaultMessage": "Paste an area",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.pasteStyle": {
+		"defaultMessage": "Paste the style",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.pasteStyleOntoAreas": {
+		"defaultMessage": "Paste the style onto {count, plural, one {# area} other {# areas}}",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.pastedNewAreaHolding": {
+		"defaultMessage": "Pasted as a new area, holding its own words. Ctrl/Cmd+Z takes it away.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.pictures": {
+		"defaultMessage": "Pictures",
+		"description": "Label in the main screen."
+	},
+	"app.picturesImagesDrawingsFontsTitle": {
+		"defaultMessage": "Pictures: the images, drawings and fonts of this design and this browser — what each weighs, whether anything uses it, and a way to replace it",
+		"description": "Tooltip in the main screen."
+	},
+	"app.placeColumn": {
+		"defaultMessage": "Place a column",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.placeImage": {
+		"defaultMessage": "Place an image",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.positionAreas": {
+		"defaultMessage": "Position the areas",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.positionAreasAgain": {
+		"defaultMessage": "Position the areas again",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.putCardCloseCtrlTitle": {
+		"defaultMessage": "Put this on the card and close — Ctrl/Cmd + Enter",
+		"description": "Tooltip in the main screen."
+	},
+	"app.readOnly": {
+		"defaultMessage": "Read Only",
+		"description": "Button in the main screen."
+	},
+	"app.readOnlyPressLogo": {
+		"defaultMessage": "Read only — press the logo to edit again.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.readOnlyPressLogo2": {
+		"defaultMessage": "Read only — press the logo to edit, then drop the file again.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.readOnlyPressOpen": {
+		"defaultMessage": "Read only — press Open Here to import into your templates.",
+		"description": "Text in the main screen."
+	},
+	"app.readOnlyPressOpen2": {
+		"defaultMessage": "Read only — press Open Here to import into your tables.",
+		"description": "Text in the main screen."
+	},
+	"app.readOnlyShowingCard": {
+		"defaultMessage": "Read only — showing the card being edited in another tab, as it changes. Nothing here is saved. Press the eye for Open Here.",
+		"description": "Text in the main screen."
+	},
+	"app.renameTable": {
+		"defaultMessage": "Rename the table",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.replace": {
+		"defaultMessage": "Replace…",
+		"description": "Button in the main screen."
+	},
+	"app.replace2": {
+		"defaultMessage": "Replace {from} with {to}",
+		"description": "Text in the main screen."
+	},
+	"app.replaceSheetStarterKitTitle": {
+		"defaultMessage": "Replace the sheet with the starter kit: this template's facts and the selectors it can reach. Ctrl/Cmd + Z or Cancel brings the old sheet back.",
+		"description": "Tooltip in the main screen."
+	},
+	"app.resetTable": {
+		"defaultMessage": "Reset Table",
+		"description": "Button in the main screen."
+	},
+	"app.resetTable2": {
+		"defaultMessage": "Reset the table",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.resetTableLabel": {
+		"defaultMessage": "Reset the table?",
+		"description": "Screen-reader name of a control in the main screen."
+	},
+	"app.resetTemplate": {
+		"defaultMessage": "Reset Template",
+		"description": "Button in the main screen."
+	},
+	"app.resetTemplate2": {
+		"defaultMessage": "Reset the template",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.resetTemplateLabel": {
+		"defaultMessage": "Reset the template?",
+		"description": "Screen-reader name of a control in the main screen."
+	},
+	"app.rowStaysBrowser": {
+		"defaultMessage": "{name} is in {column} for this row, and stays in this browser.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.savedTemplateCouldNot": {
+		"defaultMessage": "The saved template could not be read — perhaps a newer version of libelli wrote it — so this is the starter card. The saved one is kept in your templates, untouched, and your data too.",
+		"description": "Text in the main screen."
+	},
+	"app.sendBack": {
+		"defaultMessage": "Send to back",
+		"description": "Text in the main screen."
+	},
+	"app.sendBackward": {
+		"defaultMessage": "Send backward",
+		"description": "Text in the main screen."
+	},
+	"app.setPageBackgroundImage": {
+		"defaultMessage": "{src} set as the page background — the image stays in this browser, the template only names it.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.setSheetBackgroundImage": {
+		"defaultMessage": "{src} set as the sheet background — the image stays in this browser, the template only names it.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.showCardBeingEditedTitle": {
+		"defaultMessage": "Show the card being edited in the other tab, as it changes; nothing here is saved",
+		"description": "Tooltip in the main screen."
+	},
+	"app.showHideTableTitle": {
+		"defaultMessage": "Show or hide the table",
+		"description": "Tooltip in the main screen."
+	},
+	"app.smallerText": {
+		"defaultMessage": "Smaller text",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.starter": {
+		"defaultMessage": "Starter",
+		"description": "Label in the main screen."
+	},
+	"app.starterSheetLabel": {
+		"defaultMessage": "Starter sheet",
+		"description": "Screen-reader name of a control in the main screen."
+	},
+	"app.stepAlignment": {
+		"defaultMessage": "Step the alignment",
+		"description": "Step in the undo history: the text alignment stepped on several areas."
+	},
+	"app.styleCopiedCtrlCmd": {
+		"defaultMessage": "Style copied — Ctrl/Cmd+Shift+V puts it on another area.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.stylePasted": {
+		"defaultMessage": "Style pasted onto {count, plural, one {# area} other {# areas}}.",
+		"description": "Notice after pasting a style."
+	},
+	"app.tableLockedUnlockUnder": {
+		"defaultMessage": "The table is locked — unlock it under the table to change its cells.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.tableNoLongerBrowser": {
+		"defaultMessage": "That table is no longer in this browser.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.tableWidthLabel": {
+		"defaultMessage": "Table width",
+		"description": "Screen-reader name of a control in the main screen."
+	},
+	"app.templateCouldNotBe": {
+		"defaultMessage": "That template could not be read.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.templateExportedFontsReferenced": {
+		"defaultMessage": "Template exported — fonts referenced by name.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.templateLockedUnlockChange": {
+		"defaultMessage": "The template is locked — unlock it to change the type.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.templateNoLongerBrowser": {
+		"defaultMessage": "That template is no longer in this browser.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.textWrap": {
+		"defaultMessage": "Text Wrap",
+		"description": "Label in the main screen."
+	},
+	"app.textWrapLabel": {
+		"defaultMessage": "Text wrap",
+		"description": "Screen-reader name of a control in the main screen."
+	},
+	"app.thereAreNoColumns": {
+		"defaultMessage": "There are no columns to lay out yet — import a CSV or paste a table under the page first.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.type": {
+		"defaultMessage": "Type of {family}",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"app.typeAlreadySmallestPt": {
+		"defaultMessage": "The type is already at the smallest, {size} pt.",
+		"description": "Text in the main screen."
+	},
+	"app.ungrouped": {
+		"defaultMessage": "Ungrouped.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"app.unnamedArea": {
+		"defaultMessage": "an unnamed area",
+		"description": "Text in the main screen."
+	},
+	"app.update": {
+		"defaultMessage": "Update",
+		"description": "Button in the main screen."
+	},
+	"app.wasSavedBeforeLibelli": {
+		"defaultMessage": "It was saved before libelli 0.28, so areas aligned right, centre or bottom may have moved by their width or height — check them before printing.",
+		"description": "Text in the main screen."
+	},
+	"app.whatsNewTitle": {
+		"defaultMessage": "What's new",
+		"description": "Tooltip in the main screen."
+	},
+	"app.yourWorkNoLonger": {
+		"defaultMessage": "Your work is no longer being saved — this browser is out of room, or has stopped allowing it. Export what you have.",
+		"description": "Notice in the status line, in the main screen."
+	},
 	"area.align": {
 		"defaultMessage": "Align",
 		"description": "Heading of a group of fields in the area settings."
@@ -927,6 +1527,26 @@
 		"defaultMessage": "Stamp",
 		"description": "Border style: a postage stamp's perforated edge."
 	},
+	"brand.editingTitle": {
+		"defaultMessage": "Read only: the card alone, nothing to edit — press again to come back",
+		"description": "Tooltip of the logo: it switches to a view of the card alone."
+	},
+	"brand.label": {
+		"defaultMessage": "libelli — read only view",
+		"description": "Screen-reader name of the logo."
+	},
+	"brand.readonlyLabel": {
+		"defaultMessage": "libelli — read only; press to edit",
+		"description": "Screen-reader name of the logo while read only."
+	},
+	"brand.readonlyTabTitle": {
+		"defaultMessage": "Read only — press to edit here, or to close this tab",
+		"description": "Tooltip of the logo in a read-only tab."
+	},
+	"brand.viewingTitle": {
+		"defaultMessage": "Read only — press to edit again",
+		"description": "Tooltip of the logo while the view-only mode is on."
+	},
 	"card.anchoredTitle": {
 		"defaultMessage": "Tied to another area — its top follows that area's bottom. Press to break the tie and leave this area where it is.",
 		"description": "Tooltip in the card on the stage."
@@ -1094,6 +1714,46 @@
 	"common.undo": {
 		"defaultMessage": "Undo",
 		"description": "Button: undo the last change."
+	},
+	"copy.banner.mouse": {
+		"defaultMessage": "Double-click a field to edit it, or a picture to replace it. A red line means the text is too long.",
+		"description": "Copy-editing banner, on a computer with a mouse."
+	},
+	"copy.banner.mouseShort": {
+		"defaultMessage": "Double-click a field to edit it.",
+		"description": "Copy-editing banner, short form for a narrow window with a mouse."
+	},
+	"copy.banner.title": {
+		"defaultMessage": "Copy editing.",
+		"description": "Start of the banner shown while filling in a package: the app is in copy-editing mode."
+	},
+	"copy.banner.touch": {
+		"defaultMessage": "Double-tap a field to edit it, or a picture to replace it. A red line means the text is too long.",
+		"description": "Copy-editing banner, on a touchscreen; also its tooltip on a phone."
+	},
+	"copy.banner.touchShort": {
+		"defaultMessage": "Double-tap a field to edit it.",
+		"description": "Copy-editing banner, short form for a phone."
+	},
+	"copy.editDesign": {
+		"defaultMessage": "Edit Design",
+		"description": "Screen-reader name of the button that leaves copy editing."
+	},
+	"copy.editDesignEllipsis": {
+		"defaultMessage": "Edit Design…",
+		"description": "Button in the copy-editing banner: leave copy editing (asks first)."
+	},
+	"copy.editDesignTitle": {
+		"defaultMessage": "Leave copy editing to change the layout",
+		"description": "Tooltip of Edit Design… in the copy-editing banner."
+	},
+	"copy.leave.confirm": {
+		"defaultMessage": "Edit Design",
+		"description": "Button in the main screen."
+	},
+	"copy.leave.title": {
+		"defaultMessage": "Edit the design?",
+		"description": "Heading in the main screen."
 	},
 	"css.editorLabel": {
 		"defaultMessage": "The template's CSS",
@@ -1315,6 +1975,30 @@
 		"defaultMessage": "What this drawing adds to the cell it is written into",
 		"description": "Tooltip of the drawing's size in KB."
 	},
+	"drawing.whereArea": {
+		"defaultMessage": "on the area",
+		"description": "Where a drawing is, in the list of drawings: on the area itself."
+	},
+	"drawing.whereRow": {
+		"defaultMessage": "row {row}",
+		"description": "Where a drawing is, in the list of drawings: in this row of the table."
+	},
+	"drop.cannotImport": {
+		"defaultMessage": "“{name}” cannot be imported. Drop a CSV or TSV file, a template, a package or an InDesign file.",
+		"description": "Text in the main screen."
+	},
+	"drop.onePicture": {
+		"defaultMessage": "“{name}” was not placed — one picture goes in at a time.",
+		"description": "Text in the main screen."
+	},
+	"drop.pictureHint": {
+		"defaultMessage": "“{name}” is a picture — drop it on the page or on an area to place it.",
+		"description": "Text in the main screen."
+	},
+	"drop.placed": {
+		"defaultMessage": "“{name}” placed.",
+		"description": "Text in the main screen."
+	},
 	"edge.short": {
 		"defaultMessage": "{edge, select, top {T} right {R} bottom {B} other {L}}",
 		"description": "One-letter label of a box edge, beside its own field: Top, Right, Bottom, Left."
@@ -1483,9 +2167,361 @@
 		"defaultMessage": "System",
 		"description": "Heading in a font menu over the fonts this computer already has."
 	},
+	"help.chord.altShiftArrows": {
+		"defaultMessage": "Alt + Shift + Arrows",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.arrows": {
+		"defaultMessage": "Arrows",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.backspace": {
+		"defaultMessage": "Backspace",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.bar": {
+		"defaultMessage": "|",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrl0": {
+		"defaultMessage": "Ctrl/Cmd + 0",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlA": {
+		"defaultMessage": "Ctrl/Cmd + A",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlC": {
+		"defaultMessage": "Ctrl/Cmd + C",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlClick": {
+		"defaultMessage": "Ctrl / ⌘ + click",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlD": {
+		"defaultMessage": "Ctrl/Cmd + D",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlH": {
+		"defaultMessage": "Ctrl/Cmd + H",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlHash": {
+		"defaultMessage": "Ctrl/Cmd + #",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlL": {
+		"defaultMessage": "Ctrl/Cmd + L",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlMinus": {
+		"defaultMessage": "Ctrl/Cmd + −",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlP": {
+		"defaultMessage": "Ctrl/Cmd + P",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlPlus": {
+		"defaultMessage": "Ctrl/Cmd + +",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlQuote": {
+		"defaultMessage": "Ctrl/Cmd + '",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlS": {
+		"defaultMessage": "Ctrl/Cmd + S",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlScrollPinch": {
+		"defaultMessage": "Ctrl/Cmd + scroll, pinch",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlSemicolon": {
+		"defaultMessage": "Ctrl/Cmd + ;",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlShiftArrows": {
+		"defaultMessage": "Ctrl/Cmd + Shift + Arrows",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlShiftC": {
+		"defaultMessage": "Ctrl/Cmd + Shift + C",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlShiftL": {
+		"defaultMessage": "Ctrl/Cmd + Shift + L",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlShiftS": {
+		"defaultMessage": "Ctrl/Cmd + Shift + S",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlShiftScroll": {
+		"defaultMessage": "Ctrl/Cmd + Shift + scroll",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlShiftV": {
+		"defaultMessage": "Ctrl/Cmd + Shift + V",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlShiftZ": {
+		"defaultMessage": "Ctrl/Cmd + Shift + Z",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlV": {
+		"defaultMessage": "Ctrl/Cmd + V",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlY": {
+		"defaultMessage": "Ctrl/Cmd + Y",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.ctrlZ": {
+		"defaultMessage": "Ctrl/Cmd + Z",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.delete": {
+		"defaultMessage": "Delete",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.enter": {
+		"defaultMessage": "Enter",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.esc": {
+		"defaultMessage": "Esc",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.leftRight": {
+		"defaultMessage": "← / →",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.pageUpPageDown": {
+		"defaultMessage": "PageUp / PageDown",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.pinchCtrlScroll": {
+		"defaultMessage": "Pinch, Ctrl/Cmd + scroll",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.question": {
+		"defaultMessage": "?",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.shiftArrows": {
+		"defaultMessage": "Shift + Arrows",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.shiftClick": {
+		"defaultMessage": "Shift + click",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.chord.slash": {
+		"defaultMessage": "/",
+		"description": "A key, chord or gesture in the list of keys. Translate the names of keys and gestures as this language's keyboards and help pages print them; keep the symbols."
+	},
+	"help.creditBy": {
+		"defaultMessage": "of Heracles Papatheodorou and Claude",
+		"description": "Credit after the work's title in the Help panel; the names are not translated."
+	},
+	"help.creditWork": {
+		"defaultMessage": "Dialectic Acheiropoieton",
+		"description": "Title of the work the app belongs to: a proper name, not translated."
+	},
+	"help.does.addAreaSelectionDrop": {
+		"defaultMessage": "Add an area to the selection, or drop it",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.boundsOff": {
+		"defaultMessage": "Bounds on or off",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.copyAreasStyle": {
+		"defaultMessage": "Copy the area's style",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.copySelectedAreasWords": {
+		"defaultMessage": "Copy the selected area's words",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.duplicateSelectedAreas": {
+		"defaultMessage": "Duplicate the selected areas",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.exportFingersReachInstead": {
+		"defaultMessage": "Export, for the fingers that reach for that instead",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.exportPressAgainFrom": {
+		"defaultMessage": "Export — press again from that screen to print",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.fitPageShift100": {
+		"defaultMessage": "Fit the page (Shift for 100%)",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.gridOff": {
+		"defaultMessage": "Grid on or off",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.guidesAllWithoutSpacing": {
+		"defaultMessage": "Guides: all, without the spacing, off",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.lastChangeOffAgain": {
+		"defaultMessage": "The last change off, and on again — press it twice to compare",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.lockUnlockDesign": {
+		"defaultMessage": "Lock or unlock the design",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.lockUnlockSelectedAreas": {
+		"defaultMessage": "Lock or unlock the selected areas",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.nudge10mm": {
+		"defaultMessage": "Nudge by 10mm",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.nudge5mm": {
+		"defaultMessage": "Nudge by 5mm",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.nudgeSelection1mm": {
+		"defaultMessage": "Nudge the selection by 1mm",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.panel": {
+		"defaultMessage": "This panel",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.pastePlainTextAs": {
+		"defaultMessage": "Paste plain text as a new area",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.pasteStyleOntoSelection": {
+		"defaultMessage": "Paste that style onto the selection",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.redo": {
+		"defaultMessage": "Redo",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.removeSelectedAreas": {
+		"defaultMessage": "Remove the selected areas",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.saveDrawingWhileDrawing": {
+		"defaultMessage": "Save the drawing, while drawing",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.selectEveryArea": {
+		"defaultMessage": "Select every area",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.sizeTypeAreaUnder": {
+		"defaultMessage": "Size the type in the area under the pointer",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.stepAlignmentLeftRight": {
+		"defaultMessage": "Step the alignment — left, right, top, bottom",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.stepThroughCardsNothing": {
+		"defaultMessage": "Step through the cards, with nothing selected",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.stepThroughCardsOne": {
+		"defaultMessage": "Step through the cards, with one open full screen",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.stopTypingLeaveSelect": {
+		"defaultMessage": "Stop typing, leave Select Multiple, deselect, or close what is open",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.textSizeInterfaceItself": {
+		"defaultMessage": "Text size — the interface itself never zooms",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.textSizeStepsCtrl": {
+		"defaultMessage": "Text size, in steps; Ctrl/Cmd + 0, or the percentage beside the version, puts it back",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.typeIntoSelectedArea": {
+		"defaultMessage": "Type into the selected area",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.undo": {
+		"defaultMessage": "Undo",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.zoomPageAboutSelected": {
+		"defaultMessage": "Zoom the page — about the selected area, if there is one",
+		"description": "What a key in the list of keys does."
+	},
+	"help.does.zoomPageOut": {
+		"defaultMessage": "Zoom the page in or out",
+		"description": "What a key in the list of keys does."
+	},
+	"help.intro": {
+		"defaultMessage": "Paste or import a table, put areas on the page and bind them to its columns, and print one card per row. It all stays in this browser — nothing is uploaded, and it works offline.",
+		"description": "Help panel: the app in a few sentences."
+	},
+	"help.keys": {
+		"defaultMessage": "Keys",
+		"description": "Heading of the list of keyboard shortcuts in the Help panel."
+	},
+	"help.learn": {
+		"defaultMessage": "To learn what something does, <strong>rest the pointer on it</strong>, or <strong>press and hold</strong> it on a touchscreen. Double-click an area to type in it or draw in it; right-click it, or long-press it, for its menu.",
+		"description": "Help panel: how to find out what a control does. Keep the <strong> tags round the two gestures."
+	},
+	"help.liveInstance": {
+		"defaultMessage": "Live instance",
+		"description": "Link in the Help panel to the app online."
+	},
+	"help.projectPage": {
+		"defaultMessage": "Project page",
+		"description": "Link in the Help panel to the project's web page."
+	},
+	"help.source": {
+		"defaultMessage": "Source",
+		"description": "Link in the Help panel to the source code."
+	},
+	"help.tagline": {
+		"defaultMessage": "Rows of a spreadsheet in, print-ready cards out.",
+		"description": "First line of the Help panel: what the app does, in one line."
+	},
+	"help.where.fieldHere": {
+		"defaultMessage": "in a field or here",
+		"description": "Where a key or gesture works, in the list of keys."
+	},
+	"help.where.offPage": {
+		"defaultMessage": "off the page",
+		"description": "Where a key or gesture works, in the list of keys."
+	},
+	"help.where.page": {
+		"defaultMessage": "on the page",
+		"description": "Where a key or gesture works, in the list of keys."
+	},
+	"history.aChange": {
+		"defaultMessage": "a change",
+		"description": "Stands in for a step with no name, in “Undone 3 steps, back to before: a change”."
+	},
+	"history.alignTo": {
+		"defaultMessage": "Align {where, select, left {Left} center {Centre} right {Right} justify {Justified} top {Top} middle {Middle} other {Bottom}}",
+		"description": "Step in the undo history: the text alignment stepped to one place."
+	},
 	"history.breakAnchor": {
 		"defaultMessage": "Break the anchor",
 		"description": "Step in the undo history, shown as “Undo …”: an area's tie to the one above it broken."
+	},
+	"history.bringBack": {
+		"defaultMessage": "Bring {count, plural, one {# area} other {# areas}} back on",
+		"description": "Step in the undo history: areas moved back onto the sheet."
 	},
 	"history.castOff": {
 		"defaultMessage": "Cast off",
@@ -1499,9 +2535,29 @@
 		"defaultMessage": "Cut the area at its height",
 		"description": "Step in the undo history, shown as “Undo …”: an area set to clip its content."
 	},
+	"history.deleteAreas": {
+		"defaultMessage": "Delete {count, plural, one {# area} other {# areas}}",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"history.deleteNamed": {
+		"defaultMessage": "Delete “{name}”",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"history.importNamed": {
+		"defaultMessage": "Import “{name}”",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"history.importTable": {
+		"defaultMessage": "Import “{name}”",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
 	"history.letGrow": {
 		"defaultMessage": "Let the area grow",
 		"description": "Step in the undo history, shown as “Undo …”: an area set to grow with its content."
+	},
+	"history.load": {
+		"defaultMessage": "Load “{name}”",
+		"description": "Step in the undo history, shown as “Undo …”."
 	},
 	"history.move": {
 		"defaultMessage": "Move",
@@ -1510,6 +2566,22 @@
 	"history.movePivot": {
 		"defaultMessage": "Move the pivot",
 		"description": "Step in the undo history, shown as “Undo …”: the point an area turns about moved."
+	},
+	"history.openNamed": {
+		"defaultMessage": "Open “{name}”",
+		"description": "Step in the undo history, shown as “Undo …”."
+	},
+	"history.redoneBare": {
+		"defaultMessage": "Redone.",
+		"description": "Notice after one redo of a step with no name."
+	},
+	"history.redoneMany": {
+		"defaultMessage": "Redone {count} steps, up to: {what}",
+		"description": "Notice after redoing several steps at once."
+	},
+	"history.redoneOne": {
+		"defaultMessage": "Redone: {what}",
+		"description": "Notice after one redo; {what} is the step's name."
 	},
 	"history.resize": {
 		"defaultMessage": "Resize",
@@ -1523,9 +2595,109 @@
 		"defaultMessage": "Turn",
 		"description": "Step in the undo history, shown as “Undo …”: an area rotated."
 	},
+	"history.undoneBare": {
+		"defaultMessage": "Undone.",
+		"description": "Notice after one undo of a step with no name."
+	},
+	"history.undoneMany": {
+		"defaultMessage": "Undone {count} steps, back to before: {what}",
+		"description": "Notice after undoing several steps at once."
+	},
+	"history.undoneOne": {
+		"defaultMessage": "Undone: {what}",
+		"description": "Notice after one undo; {what} is the step's name."
+	},
 	"history.unlockArea": {
 		"defaultMessage": "Unlock the area",
 		"description": "Step in the undo history, shown as “Undo …”: an area's lock taken off."
+	},
+	"import.busy": {
+		"defaultMessage": "“{name}” was not imported. Answer the open question first, then try again.",
+		"description": "Text in the main screen."
+	},
+	"import.couldNotRead": {
+		"defaultMessage": "It could not be read.",
+		"description": "Reason a file was not imported, when nothing more is known."
+	},
+	"import.couldNotReadFile": {
+		"defaultMessage": "“{name}” could not be read.",
+		"description": "Text in the main screen."
+	},
+	"import.noTable": {
+		"defaultMessage": "“{name}” was not imported — nothing in it reads as a table.",
+		"description": "Text in the main screen."
+	},
+	"import.notImported": {
+		"defaultMessage": "“{name}” was not imported. {why}",
+		"description": "Notice when a file could not be imported; {why} says why."
+	},
+	"import.notImportedWhy": {
+		"defaultMessage": "“{name}” was not imported — {why}.",
+		"description": "Text in the main screen."
+	},
+	"import.tableAlreadyHeld": {
+		"defaultMessage": "“{name}” is already in your tables as “{existing}” — opened that one.",
+		"description": "Text in the main screen."
+	},
+	"import.tableAlreadyHolds": {
+		"defaultMessage": "“{tableName}” already holds exactly these rows — nothing to import.",
+		"description": "Text in the main screen."
+	},
+	"import.tableImported": {
+		"defaultMessage": "“{name}” imported as a new table, {count, plural, one {# row} other {# rows}} — the table you had is saved in your tables.",
+		"description": "Text in the main screen."
+	},
+	"import.templateAlreadyHeld": {
+		"defaultMessage": "“{name}” is already in your templates as “{existing}” — opened that one.",
+		"description": "Text in the main screen."
+	},
+	"import.templateAlreadyOpen": {
+		"defaultMessage": "“{name}” is the template already open — nothing to import.",
+		"description": "Text in the main screen."
+	},
+	"import.templateLoaded": {
+		"defaultMessage": "Loaded “{name}” as a new template — the one you had is saved in your templates.",
+		"description": "Text in the main screen."
+	},
+	"indesign.alreadyHeld": {
+		"defaultMessage": "“{name}” is already in your templates, with its table, unchanged — opened those.",
+		"description": "Text in the main screen."
+	},
+	"indesign.declined": {
+		"defaultMessage": "“{name}” was not imported — nothing was changed.",
+		"description": "Text in the main screen."
+	},
+	"indesign.facesSkipped": {
+		"defaultMessage": "Left out, as faces the layout already has or another width of them: {names}.",
+		"description": "Note after an InDesign import: font files not used."
+	},
+	"indesign.fontUnreadable": {
+		"defaultMessage": "“{name}” could not be read as a font{woff2, select, yes { — a WOFF2 cannot be read here; use the OTF or TTF} other {}}.",
+		"description": "Note after an InDesign import: a font file that could not be read."
+	},
+	"indesign.fontsUnfound": {
+		"defaultMessage": "No font file for {families} was in the archive or this browser; the fields are set in a fallback until one is added (Pictures › Fonts), or until InDesign's “Document fonts” folder is included.",
+		"description": "Note after an InDesign import: fonts with no file."
+	},
+	"indesign.imported": {
+		"defaultMessage": "“{name}” imported from InDesign: {count, plural, one {# field} other {# fields}}, one row to fill.{notes, plural, =0 {} one { # thing to check.} other { # things to check.}}",
+		"description": "Notice after an InDesign import."
+	},
+	"indesign.reportTitle": {
+		"defaultMessage": "“{name}” from InDesign",
+		"description": "Title or prompt in the main screen."
+	},
+	"layout.done": {
+		"defaultMessage": "{count, plural, one {# area} other {# areas}} laid out from {columns, plural, one {# column} other {# columns}}.",
+		"description": "Notice after laying the page out from the table's columns."
+	},
+	"layout.leftOut": {
+		"defaultMessage": "Left out: {columns}.",
+		"description": "Note after the automatic layout: columns it was told to leave out."
+	},
+	"layout.noRoom": {
+		"defaultMessage": "No room on the card for {columns} — {count, plural, one {add an area by hand if you need it.} other {add areas by hand if you need them.}}",
+		"description": "Note after the automatic layout: columns that did not fit."
 	},
 	"leader.dashed": {
 		"defaultMessage": "Dashed",
@@ -1607,9 +2779,121 @@
 		"defaultMessage": "I, II, III Roman Capitals",
 		"description": "Option in the list numbers menu: how a numbered list counts, shown with its first three."
 	},
+	"lookup.orphaned": {
+		"defaultMessage": "{count, plural, one {# lookup named a deleted row and now reads %%lookup:{gone}:…%%.} other {# lookups named a deleted row and now read %%lookup:{gone}:…%%.}}",
+		"description": "Note after rows are deleted: lookups that pointed at them. Keep %%…%% as written."
+	},
+	"lookup.renumbered": {
+		"defaultMessage": "{count, plural, one {# lookup renumbered to follow its row.} other {# lookups renumbered to follow their rows.}}",
+		"description": "Note after rows move: lookups (%%lookup:N:…%% placeholders) that were carried along."
+	},
+	"mapping.confirm": {
+		"defaultMessage": "Confirm",
+		"description": "Button in the main screen."
+	},
+	"mapping.none": {
+		"defaultMessage": "— None —",
+		"description": "Option in a drop-down in the main screen."
+	},
+	"mapping.prompt": {
+		"defaultMessage": "Check the column mapping for this template:",
+		"description": "Label in the main screen."
+	},
 	"menuSelect.label": {
 		"defaultMessage": "{label}: {value}",
 		"description": "Screen-reader name of a drop-down: what it sets, then its current choice, e.g. “Font: Inter”."
+	},
+	"missing.background": {
+		"defaultMessage": "This template's background image, <strong>{name}</strong>, is not in this browser. The template carries its name, never the file.",
+		"description": "Banner when the page's background image file is missing."
+	},
+	"missing.choose": {
+		"defaultMessage": "Choose {name}…",
+		"description": "Button: pick the missing image file from this computer."
+	},
+	"missing.remove": {
+		"defaultMessage": "Remove It",
+		"description": "Button in the main screen."
+	},
+	"missing.sheetBackground": {
+		"defaultMessage": "This template's sheet background image, <strong>{name}</strong>, is not in this browser. The template carries its name, never the file.",
+		"description": "Banner when the printed sheet's background image file is missing."
+	},
+	"package.absent": {
+		"defaultMessage": "Missing from the package: {names}.",
+		"description": "Note: files the package names but does not hold."
+	},
+	"package.alreadyHeld": {
+		"defaultMessage": "“{name}” is already in your library, unchanged, so that copy was opened.",
+		"description": "Notice when a package that is already here is opened again."
+	},
+	"package.clash.body": {
+		"defaultMessage": "Some files in this package have the same names as files you already have, but different contents. Ticked files will be replaced; unticked files are kept.",
+		"description": "Label in the main screen."
+	},
+	"package.clash.cancel": {
+		"defaultMessage": "Cancel Import",
+		"description": "Button in the main screen."
+	},
+	"package.clash.import": {
+		"defaultMessage": "Import",
+		"description": "Button in the main screen."
+	},
+	"package.clash.title": {
+		"defaultMessage": "Replace your files?",
+		"description": "Heading in the main screen."
+	},
+	"package.declined": {
+		"defaultMessage": "“{name}” was not imported. Nothing was changed.",
+		"description": "Text in the main screen."
+	},
+	"package.fontsMissing": {
+		"defaultMessage": "{count, plural, one {1 font is missing; see the notice above the page.} other {# fonts are missing; see the notice above the page.}}",
+		"description": "Note: fonts the design needs that are not here."
+	},
+	"package.kept": {
+		"defaultMessage": "{count, plural, one {Your own version of 1 file was kept.} other {Your own version of # files was kept.}}",
+		"description": "Note: files the user chose to keep rather than replace."
+	},
+	"package.leftOut": {
+		"defaultMessage": "Left out because {count, plural, one {it is} other {they are}} missing from this browser: {names}.",
+		"description": "Note after saving a package: pictures it could not include."
+	},
+	"package.noFontFiles": {
+		"defaultMessage": "No font files were found for {families}.",
+		"description": "Note after saving a package: fonts with no file to include."
+	},
+	"package.opened": {
+		"defaultMessage": "“{name}” opened for copy editing.",
+		"description": "Notice after opening a package."
+	},
+	"package.restored": {
+		"defaultMessage": "{count, plural, one {1 missing file was restored.} other {# missing files were restored.}}",
+		"description": "Note: files of the package that were missing here were put back."
+	},
+	"package.save.body": {
+		"defaultMessage": "Saves this design, its table and its pictures as one ZIP file. The person you send it to can change the words and pictures, but not the layout.",
+		"description": "Label in the main screen."
+	},
+	"package.save.button": {
+		"defaultMessage": "Save Package",
+		"description": "Button in the main screen."
+	},
+	"package.save.title": {
+		"defaultMessage": "Package for copy editing",
+		"description": "Heading in the main screen."
+	},
+	"package.saveFailed": {
+		"defaultMessage": "The package could not be saved ({why}).",
+		"description": "Notice when writing the package file failed."
+	},
+	"package.saved": {
+		"defaultMessage": "Package saved with {rows, plural, one {# row} other {# rows}}, {pictures, plural, one {# picture} other {# pictures}}{fonts, plural, =0 {} one { and # font file} other { and # font files}}.",
+		"description": "Notice after saving a package."
+	},
+	"package.unknownError": {
+		"defaultMessage": "unknown error",
+		"description": "Reason the package could not be saved, when nothing more is known."
 	},
 	"page.a5StarterBooklet": {
 		"defaultMessage": "A5 Starter Booklet",
@@ -2919,6 +4203,10 @@
 		"defaultMessage": "This screen is not one the app knows, so this is the browser’s own millimetre, which may not match a ruler",
 		"description": "Tooltip of Actual on an unknown screen."
 	},
+	"tab.cannotClose": {
+		"defaultMessage": "This browser only lets a tab close itself when a script opened it — close it from the tab bar.",
+		"description": "Label in the main screen."
+	},
 	"table.addColumnTitle": {
 		"defaultMessage": "Add a column",
 		"description": "Tooltip in the table panel."
@@ -3039,6 +4327,14 @@
 		"defaultMessage": "Delete this table from this browser. Your design is not touched.",
 		"description": "Tooltip in the table panel."
 	},
+	"table.deleted": {
+		"defaultMessage": "“{name}” deleted. Ctrl/Cmd+Z brings the rows back.",
+		"description": "Text in the main screen."
+	},
+	"table.deletedLast": {
+		"defaultMessage": "“{name}” deleted — that was the last one, so this is a new empty table. Ctrl/Cmd+Z brings the rows back.",
+		"description": "Text in the main screen."
+	},
 	"table.dragRowTitle": {
 		"defaultMessage": "Drag to move this row{others, select, yes { and the other chosen rows} other {}}. {expanded, select, yes {Double-click to put this row back} other {Double-click to show this whole row}}",
 		"description": "Tooltip of a row's number."
@@ -3082,6 +4378,10 @@
 	"table.gettingStarted": {
 		"defaultMessage": "Getting Started",
 		"description": "Label in the table panel."
+	},
+	"table.gettingStartedOpened": {
+		"defaultMessage": "“{name}” started, with the cards that walk through the app. Your other tables are untouched.",
+		"description": "Notice in the status line, in the main screen."
 	},
 	"table.import": {
 		"defaultMessage": "Import…",
@@ -3195,6 +4495,10 @@
 		"defaultMessage": "Open this picture in Pictures",
 		"description": "Tooltip of Open for a cell naming a stored picture."
 	},
+	"table.opened": {
+		"defaultMessage": "“{name}” opened — {count, plural, one {# row} other {# rows}}. Your design is untouched.",
+		"description": "Notice after opening a saved table."
+	},
 	"table.paste": {
 		"defaultMessage": "Paste…",
 		"description": "Label in the table panel."
@@ -3274,6 +4578,10 @@
 	"table.replaceRows": {
 		"defaultMessage": "Replace Rows",
 		"description": "Button in the table panel."
+	},
+	"table.resetDone": {
+		"defaultMessage": "Table reset to {starter}. Your design is untouched, and Ctrl/Cmd+Z brings the old rows back.",
+		"description": "Notice in the status line, in the main screen."
 	},
 	"table.resetTable": {
 		"defaultMessage": "Reset…",
@@ -3379,6 +4687,10 @@
 		"defaultMessage": "Sorted — press to put the rows back in the order they arrived in",
 		"description": "Tooltip of the button that clears the sorting, after a reload."
 	},
+	"table.started": {
+		"defaultMessage": "“{name}” started. Your design is untouched — press Paste or Import under the table to fill it.",
+		"description": "Notice in the status line, in the main screen."
+	},
 	"table.storedPictureTitle": {
 		"defaultMessage": "{name} — double-click to open it in Pictures",
 		"description": "Tooltip of a cell that names a stored picture."
@@ -3431,6 +4743,38 @@
 		"defaultMessage": "Why this column is red",
 		"description": "Tooltip in the table panel."
 	},
+	"template.addedAsCame": {
+		"defaultMessage": "“{name}” added to your templates, as it came. Your other templates and your rows are untouched.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"template.deleted": {
+		"defaultMessage": "“{name}” deleted. Ctrl/Cmd+Z brings the design back.",
+		"description": "Text in the main screen."
+	},
+	"template.deletedLast": {
+		"defaultMessage": "“{name}” deleted — that was the last one, so this is a new empty template. Ctrl/Cmd+Z brings the design back.",
+		"description": "Text in the main screen."
+	},
+	"template.loaded": {
+		"defaultMessage": "“{name}” loaded. Your rows are untouched.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"template.loadedMoved": {
+		"defaultMessage": "“{name}” loaded. {note}",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"template.openMoved": {
+		"defaultMessage": "“{name}” is open. {note}",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"template.resetDone": {
+		"defaultMessage": "Template reset to the {starter}. Your data is untouched, and Ctrl/Cmd+Z brings the old design back.",
+		"description": "Notice in the status line, in the main screen."
+	},
+	"template.started": {
+		"defaultMessage": "“{name}” started. Your rows are untouched — press {hasColumns, select, yes {the shapes button beside the page to lay them out} other {Import under the table to bring some in}}.",
+		"description": "Notice after starting a new template."
+	},
 	"textAlign.bottom": {
 		"defaultMessage": "Align Bottom",
 		"description": "Button: set the area's text at the bottom of the box."
@@ -3458,5 +4802,37 @@
 	"textAlign.top": {
 		"defaultMessage": "Align Top",
 		"description": "Button: set the area's text at the top of the box."
+	},
+	"theme.dark": {
+		"defaultMessage": "Dark",
+		"description": "Theme: dark interface."
+	},
+	"theme.darkPage": {
+		"defaultMessage": "Dark, with the page inverted",
+		"description": "Theme: dark interface, with the card's page shown inverted too."
+	},
+	"theme.label": {
+		"defaultMessage": "Theme: {theme}, press for {next}",
+		"description": "Screen-reader name of the theme button."
+	},
+	"theme.light": {
+		"defaultMessage": "Light",
+		"description": "Theme: light interface."
+	},
+	"theme.lowerDark": {
+		"defaultMessage": "dark",
+		"description": "Theme name inside a sentence, such as “press for dark”."
+	},
+	"theme.lowerDarkPage": {
+		"defaultMessage": "dark, with the page inverted",
+		"description": "Theme name inside a sentence."
+	},
+	"theme.lowerLight": {
+		"defaultMessage": "light",
+		"description": "Theme name inside a sentence, such as “press for light”."
+	},
+	"theme.title": {
+		"defaultMessage": "{theme} — press for {next}{peek, select, none {} other {; hover or hold for a look at {peek}}}{readonly, select, yes { — this read-only tab only, until it is closed} other {}}",
+		"description": "Tooltip of the theme button; {theme}, {next} and {peek} are theme names such as Dark."
 	}
 }
