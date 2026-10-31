@@ -1,3 +1,4 @@
+import type { MessageKey } from './i18n';
 import { safeImageUrl } from './assets';
 import { clampSide, fitBoard } from './bitmap';
 import { fromRgba, parseColor, toRgba } from './color';
@@ -155,17 +156,17 @@ export const LIST_MARKERS: ListMarker[] = [
 	'none'
 ];
 
-/** Said with the glyph, since the glyph is the choice. */
-export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
-	bullet: '• Bullet',
-	disc: '● Disc',
-	circle: '○ Circle',
-	square: '■ Square',
-	openSquare: '□ Open Square',
-	dash: '– Dash',
-	emdash: '— Em Dash',
-	arrow: '➤ Arrow',
-	none: 'None'
+/** Said with the glyph, since the glyph is the choice; keys into the catalogue, read with `t`. */
+export const LIST_MARKER_LABELS: Record<ListMarker, MessageKey> = {
+	bullet: 'list.marker.bullet',
+	disc: 'list.marker.disc',
+	circle: 'list.marker.circle',
+	square: 'list.marker.square',
+	openSquare: 'list.marker.openSquare',
+	dash: 'list.marker.dash',
+	emdash: 'list.marker.emdash',
+	arrow: 'list.marker.arrow',
+	none: 'list.marker.none'
 };
 
 /**
@@ -175,22 +176,22 @@ export const LIST_MARKER_LABELS: Record<ListMarker, string> = {
 export const LIST_NUMBERINGS: ListNumbering[] = ['decimal', 'lowerAlpha', 'upperAlpha', 'lowerRoman', 'upperRoman'];
 
 /** Said with the first three, since the count is the choice. */
-export const LIST_NUMBERING_LABELS: Record<ListNumbering, string> = {
-	decimal: '1, 2, 3 Numbers',
-	lowerAlpha: 'a, b, c Letters',
-	upperAlpha: 'A, B, C Capitals',
-	lowerRoman: 'i, ii, iii Roman',
-	upperRoman: 'I, II, III Roman Capitals'
+export const LIST_NUMBERING_LABELS: Record<ListNumbering, MessageKey> = {
+	decimal: 'list.numbering.decimal',
+	lowerAlpha: 'list.numbering.lowerAlpha',
+	upperAlpha: 'list.numbering.upperAlpha',
+	lowerRoman: 'list.numbering.lowerRoman',
+	upperRoman: 'list.numbering.upperRoman'
 };
 
 /** The tab leaders, in the order the menu offers them. */
 export const LEADERS: Leader[] = ['none', 'dotted', 'dashed', 'solid'];
 
-export const LEADER_LABELS: Record<Leader, string> = {
-	none: 'None',
-	dotted: 'Dotted',
-	dashed: 'Dashed',
-	solid: 'Solid'
+export const LEADER_LABELS: Record<Leader, MessageKey> = {
+	none: 'leader.none',
+	dotted: 'leader.dotted',
+	dashed: 'leader.dashed',
+	solid: 'leader.solid'
 };
 
 /** A leader the format names, or nothing. */

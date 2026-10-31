@@ -27,6 +27,726 @@
 		"defaultMessage": "Align Top",
 		"description": "Button: align the chosen areas' top edges."
 	},
+	"area.align": {
+		"defaultMessage": "Align",
+		"description": "Heading of a group of fields in the area settings."
+	},
+	"area.anchor": {
+		"defaultMessage": "Anchor",
+		"description": "Label in the area settings."
+	},
+	"area.areaSettingsLabel": {
+		"defaultMessage": "Area settings",
+		"description": "Screen-reader name of a control in the area settings."
+	},
+	"area.areasEdgeListsMarkersTitle": {
+		"defaultMessage": "From the area's edge to a list's markers, in em of the type size; blank takes the page's",
+		"description": "Tooltip in the area settings."
+	},
+	"area.asTyped": {
+		"defaultMessage": "As Typed",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.background": {
+		"defaultMessage": "Background",
+		"description": "Label in the area settings."
+	},
+	"area.barcode": {
+		"defaultMessage": "Barcode",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.barcodeBackgroundColor": {
+		"defaultMessage": "Barcode Background Color",
+		"description": "Label in the area settings."
+	},
+	"area.barcodeBackgroundLabel": {
+		"defaultMessage": "Barcode background color",
+		"description": "Screen-reader name of the barcode's background swatch."
+	},
+	"area.baseline": {
+		"defaultMessage": "Baseline",
+		"description": "Label in the area settings."
+	},
+	"area.baselineOtherFontTitle": {
+		"defaultMessage": "Raise the text by this much of its size, or lower it below 0. The page's is for its own font, so an area in another starts at 0",
+		"description": "Tooltip of the Baseline field when the area's font is not the page's."
+	},
+	"area.baselineTitle": {
+		"defaultMessage": "Raise the text by this much of its size, or lower it below 0. Blank takes the page's",
+		"description": "Tooltip of the Baseline field."
+	},
+	"area.betweenAreasBottomOnesTitle": {
+		"defaultMessage": "Between that area's bottom and this one's top; below 0 overlaps it",
+		"description": "Tooltip in the area settings."
+	},
+	"area.betweenOneColumnNextTitle": {
+		"defaultMessage": "Between one column and the next",
+		"description": "Tooltip in the area settings."
+	},
+	"area.blend": {
+		"defaultMessage": "Blend",
+		"description": "Label in the area settings."
+	},
+	"area.border": {
+		"defaultMessage": "Border",
+		"description": "Label in the area settings."
+	},
+	"area.borderColor": {
+		"defaultMessage": "Border Color",
+		"description": "Label in the area settings."
+	},
+	"area.borderColorFollowsTextTitle": {
+		"defaultMessage": "Border color; follows the text color until you set one",
+		"description": "Tooltip in the area settings."
+	},
+	"area.borderColorLabel": {
+		"defaultMessage": "Border color",
+		"description": "Screen-reader name of the border color swatch."
+	},
+	"area.borderSitsInsideBoxsTitle": {
+		"defaultMessage": "The border sits inside the box's millimetres, not outside them",
+		"description": "Tooltip in the area settings."
+	},
+	"area.borderStyle": {
+		"defaultMessage": "Border Style",
+		"description": "Label in the area settings."
+	},
+	"area.borderStyleWholeBoxTitle": {
+		"defaultMessage": "Border style, for the whole box",
+		"description": "Tooltip in the area settings."
+	},
+	"area.borderWidthLabel": {
+		"defaultMessage": "Border width",
+		"description": "Screen-reader name of a control in the area settings."
+	},
+	"area.bordersApart": {
+		"defaultMessage": "A thickness per edge",
+		"description": "Tooltip of the button that shows a border width field per edge."
+	},
+	"area.bordersTogether": {
+		"defaultMessage": "One thickness all round",
+		"description": "Tooltip of the button that goes back to one border width."
+	},
+	"area.box": {
+		"defaultMessage": "Box",
+		"description": "Heading of a group of fields in the area settings."
+	},
+	"area.case": {
+		"defaultMessage": "Case",
+		"description": "Label in the area settings."
+	},
+	"area.centreXLabel": {
+		"defaultMessage": "Centre X",
+		"description": "Screen-reader name of a control in the area settings."
+	},
+	"area.centreYLabel": {
+		"defaultMessage": "Centre Y",
+		"description": "Screen-reader name of a control in the area settings."
+	},
+	"area.clip": {
+		"defaultMessage": "Clip",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.clipCutsOffWhatTitle": {
+		"defaultMessage": "Clip cuts off what does not fit in the box's millimetres; Grow lets the box get taller to hold it; Shrink keeps the height and sets the words smaller until they fit, down to half their size",
+		"description": "Tooltip in the area settings."
+	},
+	"area.code128": {
+		"defaultMessage": "Code 128",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.color": {
+		"defaultMessage": "Color",
+		"description": "Label in the area settings."
+	},
+	"area.colorFrom.columnLabel": {
+		"defaultMessage": "Column for the {which, select, text {text color} fill {fill} other {border color}}",
+		"description": "Screen-reader name of the column menu beside a color swatch."
+	},
+	"area.colorFrom.columnTitle": {
+		"defaultMessage": "The column whose cell is this area's {which, select, text {text color} fill {fill} other {border color}}; a cell that is not a color leaves the swatch's",
+		"description": "Tooltip of the column menu beside a color swatch."
+	},
+	"area.colorFrom.label": {
+		"defaultMessage": "{which, select, text {Text color} fill {Fill} other {Border color}} from a column",
+		"description": "Screen-reader name of the link button beside a color swatch."
+	},
+	"area.colorFrom.missing": {
+		"defaultMessage": "{column} (not in this table)",
+		"description": "Menu option: a column the template names that this table does not have."
+	},
+	"area.colorFrom.start": {
+		"defaultMessage": "Take the {which, select, text {text color} fill {fill} other {border color}} from a column of the row, where its cell is a color — #c0392b, teal, rgb(…)",
+		"description": "Tooltip of the link button beside a color swatch: read the color from a column instead."
+	},
+	"area.colorFrom.stop": {
+		"defaultMessage": "Stop taking the {which, select, text {text color} fill {fill} other {border color}} from a column",
+		"description": "Tooltip of the link button beside a color swatch while it reads the color from a column."
+	},
+	"area.colorLabel": {
+		"defaultMessage": "Area color",
+		"description": "Screen-reader name of the swatch that fills an area with one color."
+	},
+	"area.column": {
+		"defaultMessage": "Column",
+		"description": "Label in the area settings."
+	},
+	"area.columnPrompt": {
+		"defaultMessage": "— Column —",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.columns": {
+		"defaultMessage": "Columns",
+		"description": "Label in the area settings."
+	},
+	"area.columnsTitle": {
+		"defaultMessage": "Set the words in 2 to {max} columns side by side; blank or 1 for one",
+		"description": "Tooltip of the Columns field."
+	},
+	"area.content": {
+		"defaultMessage": "Content",
+		"description": "Heading of a group of fields in the area settings."
+	},
+	"area.cornerRadiusWholeBoxTitle": {
+		"defaultMessage": "Corner radius, for the whole box",
+		"description": "Tooltip in the area settings."
+	},
+	"area.correction": {
+		"defaultMessage": "Correction",
+		"description": "Label in the area settings."
+	},
+	"area.cover": {
+		"defaultMessage": "Cover",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.dataField": {
+		"defaultMessage": "Data Field",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.degreesClockwiseBoxTurnsTitle": {
+		"defaultMessage": "Degrees clockwise; the box turns about the centre marked on it",
+		"description": "Tooltip in the area settings."
+	},
+	"area.deleteAreaLabel": {
+		"defaultMessage": "Delete this area",
+		"description": "Screen-reader name of a control in the area settings."
+	},
+	"area.deleteTitle": {
+		"defaultMessage": "Delete this area",
+		"description": "Tooltip of the Delete button in the area settings."
+	},
+	"area.digitsUnderBarsAreasTitle": {
+		"defaultMessage": "The digits under the bars, in this area's type — EAN-13 in its three groups, Code 128 centred",
+		"description": "Tooltip in the area settings."
+	},
+	"area.draft": {
+		"defaultMessage": "Draft",
+		"description": "Label in the area settings."
+	},
+	"area.draw": {
+		"defaultMessage": "Draw…",
+		"description": "Label in the area settings."
+	},
+	"area.drawBorderHandSameTitle": {
+		"defaultMessage": "Draw the border by hand: the same width, style and radius, wobbling. The line is the same on every card — it is drawn from this area's own name, not from chance",
+		"description": "Tooltip in the area settings."
+	},
+	"area.drawCellTitle": {
+		"defaultMessage": "Draw a small image for this area. It is written into this row's cell, so every row can have its own",
+		"description": "Tooltip in the area settings."
+	},
+	"area.drawStaticTitle": {
+		"defaultMessage": "Draw a small image for this area, saved in the template — over the one it shows, where the browser allows",
+		"description": "Tooltip in the area settings."
+	},
+	"area.ean13": {
+		"defaultMessage": "EAN-13",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.edgeBorderLabel": {
+		"defaultMessage": "{edge, select, top {Top} right {Right} bottom {Bottom} other {Left}} border width",
+		"description": "Screen-reader name of one edge's border width field."
+	},
+	"area.edgePaddingLabel": {
+		"defaultMessage": "{edge, select, top {Top} right {Right} bottom {Bottom} other {Left}} padding",
+		"description": "Screen-reader name of one edge's padding field."
+	},
+	"area.edit": {
+		"defaultMessage": "Edit…",
+		"description": "Button: open the drawing editor on the drawing the area already has."
+	},
+	"area.effects": {
+		"defaultMessage": "Effects",
+		"description": "Heading of a group of fields in the area settings."
+	},
+	"area.em": {
+		"defaultMessage": "em",
+		"description": "Label in the area settings."
+	},
+	"area.fewestLinesParagraphCarriedTitle": {
+		"defaultMessage": "The fewest lines of a paragraph carried to the head of the next column",
+		"description": "Tooltip in the area settings."
+	},
+	"area.fewestLinesParagraphLeftTitle": {
+		"defaultMessage": "The fewest lines of a paragraph left at the foot of a column — fewer, and the paragraph starts in the next one",
+		"description": "Tooltip in the area settings."
+	},
+	"area.fill": {
+		"defaultMessage": "Fill",
+		"description": "Label in the area settings."
+	},
+	"area.fillAreaColorInsteadTitle": {
+		"defaultMessage": "Fill the area with a color instead of an image",
+		"description": "Tooltip in the area settings."
+	},
+	"area.fillBehindBoxTransparentTitle": {
+		"defaultMessage": "A fill behind this box; transparent lets the paper through",
+		"description": "Tooltip in the area settings."
+	},
+	"area.fillColor": {
+		"defaultMessage": "Fill Color",
+		"description": "Label in the area settings."
+	},
+	"area.fillColorLabel": {
+		"defaultMessage": "Fill color",
+		"description": "Screen-reader name of the fill color swatch."
+	},
+	"area.fit": {
+		"defaultMessage": "Fit",
+		"description": "Label in the area settings."
+	},
+	"area.fixedY": {
+		"defaultMessage": "— Fixed Y —",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.foldFollow": {
+		"defaultMessage": "Fold Follow",
+		"description": "Label in the area settings."
+	},
+	"area.font": {
+		"defaultMessage": "Font",
+		"description": "Label in the area settings."
+	},
+	"area.font.other": {
+		"defaultMessage": "Other Family…",
+		"description": "Font menu item: type the name of a Google Fonts family that is not listed."
+	},
+	"area.font.prompt": {
+		"defaultMessage": "Font family name (as Google Fonts spells it)",
+		"description": "Prompt asking for a font family name."
+	},
+	"area.font.upload": {
+		"defaultMessage": "Upload a Font File…",
+		"description": "Font menu item: choose a font file from this computer."
+	},
+	"area.gap": {
+		"defaultMessage": "Gap",
+		"description": "Label in the area settings."
+	},
+	"area.grow": {
+		"defaultMessage": "Grow",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.h": {
+		"defaultMessage": "H",
+		"description": "Label of the area's height field (one letter, for Height)."
+	},
+	"area.hideAreaSettingsLabel": {
+		"defaultMessage": "Hide the area settings",
+		"description": "Screen-reader name of a control in the area settings."
+	},
+	"area.hideEmptyNotApplicable": {
+		"defaultMessage": "Does not apply to an area holding its own words and none of them — it stays in view so it can be selected",
+		"description": "Tooltip of Hide When Empty when the area has its own, empty, text."
+	},
+	"area.hideTheseSettingsUntilTitle": {
+		"defaultMessage": "Hide these settings until the next area is chosen",
+		"description": "Tooltip in the area settings."
+	},
+	"area.hideWhenEmpty": {
+		"defaultMessage": "Hide When Empty",
+		"description": "Label in the area settings."
+	},
+	"area.horizontalAlignmentLabel": {
+		"defaultMessage": "Horizontal alignment",
+		"description": "Screen-reader name of a control in the area settings."
+	},
+	"area.howAreaMeetsWhatTitle": {
+		"defaultMessage": "How this area meets what is under it — the paper, its own background image, and any area it overlaps. Multiply is ink on paper. Prints only with background graphics on, like the paper colour",
+		"description": "Tooltip in the area settings."
+	},
+	"area.howMuchCodeCanTitle": {
+		"defaultMessage": "How much of the code can be damaged and still scan",
+		"description": "Tooltip in the area settings."
+	},
+	"area.howMuchWhatUnderTitle": {
+		"defaultMessage": "How much of what is under this area shows through it. Fades the fill, the border and the content together",
+		"description": "Tooltip in the area settings."
+	},
+	"area.howNumberedListCountsTitle": {
+		"defaultMessage": "How a numbered list counts: numbers, letters or Roman numerals",
+		"description": "Tooltip in the area settings."
+	},
+	"area.image": {
+		"defaultMessage": "Image",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.imageDeviceKeptBrowserTitle": {
+		"defaultMessage": "An image from this device — kept in this browser (or your images folder), the template only names it",
+		"description": "Tooltip in the area settings."
+	},
+	"area.indent": {
+		"defaultMessage": "Indent",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.leader": {
+		"defaultMessage": "Leader",
+		"description": "Label in the area settings."
+	},
+	"area.leading": {
+		"defaultMessage": "Leading",
+		"description": "Label in the area settings."
+	},
+	"area.leadingTitle": {
+		"defaultMessage": "Blank inherits the page's {leading}",
+		"description": "Tooltip of the Leading field."
+	},
+	"area.lineSetsWhatFollowsTitle": {
+		"defaultMessage": "A line with %%% in it sets what follows against the right edge, joined by this line — Coffee %%% 3.50 for a price list; with a leader set, a tab does too",
+		"description": "Tooltip in the area settings."
+	},
+	"area.lines": {
+		"defaultMessage": "Lines",
+		"description": "Heading of a group of fields in the area settings."
+	},
+	"area.listLeadingTitle": {
+		"defaultMessage": "The list's own leading. Blank takes {from, select, page {the page's for lists} other {this area's}}",
+		"description": "Tooltip of a list's Leading field."
+	},
+	"area.lists": {
+		"defaultMessage": "Lists",
+		"description": "Heading of a group of fields in the area settings."
+	},
+	"area.lockTitle": {
+		"defaultMessage": "Lock this area — no dragging, no resizing, no option changes",
+		"description": "Tooltip of the Lock button in the area settings."
+	},
+	"area.markdown": {
+		"defaultMessage": "Markdown",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.marker": {
+		"defaultMessage": "Marker",
+		"description": "Label in the area settings."
+	},
+	"area.mirrorAreaAcrossFoldTitle": {
+		"defaultMessage": "Mirror this area across the fold onto left-hand pages, so it keeps its distance from the outer edge and its inner side stays on the fold. Off pins it to the same millimetres on every page",
+		"description": "Tooltip in the area settings."
+	},
+	"area.mode": {
+		"defaultMessage": "Mode",
+		"description": "Label in the area settings."
+	},
+	"area.name": {
+		"defaultMessage": "Name",
+		"description": "Label in the area settings."
+	},
+	"area.nameIsPageId": {
+		"defaultMessage": "“{value}” would be #{ident}, which is a page's CSS id — choose another name for the area.",
+		"description": "Notice when the name typed for an area would clash with a page's own CSS id."
+	},
+	"area.nameTaken": {
+		"defaultMessage": "Another area is already called “{name}”. A name is that area's CSS id, so no two can share one.",
+		"description": "Notice when the name typed for an area is already another area's."
+	},
+	"area.nameTitle": {
+		"defaultMessage": "The template's own name for what this area holds; the column beside it says which spreadsheet column fills it. It is also this area's CSS id{ident, select, none {} other { — #{ident}}}, so no two areas may share a name.",
+		"description": "Tooltip of the area's Name field; {ident} is its CSS id, or none."
+	},
+	"area.noColumn": {
+		"defaultMessage": "— None —",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.none": {
+		"defaultMessage": "None",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.normal": {
+		"defaultMessage": "Normal",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.numbers": {
+		"defaultMessage": "Numbers",
+		"description": "Label in the area settings."
+	},
+	"area.opacity": {
+		"defaultMessage": "Opacity",
+		"description": "Label in the area settings."
+	},
+	"area.orphans": {
+		"defaultMessage": "Orphans",
+		"description": "Label in the area settings."
+	},
+	"area.overflow": {
+		"defaultMessage": "Overflow",
+		"description": "Label in the area settings."
+	},
+	"area.paddingApart": {
+		"defaultMessage": "A padding per edge",
+		"description": "Tooltip of the button that shows a padding field per edge."
+	},
+	"area.paddingLabel": {
+		"defaultMessage": "Padding",
+		"description": "Screen-reader name of a control in the area settings."
+	},
+	"area.paddingTogether": {
+		"defaultMessage": "One padding all round",
+		"description": "Tooltip of the button that goes back to one padding."
+	},
+	"area.paragraph": {
+		"defaultMessage": "Paragraph",
+		"description": "Label in the area settings."
+	},
+	"area.paragraph.continuous": {
+		"defaultMessage": "Continuous",
+		"description": "Paragraph style: no space and no indent between paragraphs."
+	},
+	"area.paragraphAmount": {
+		"defaultMessage": "Paragraph amount",
+		"description": "Label in the area settings."
+	},
+	"area.paragraphIndentTitle": {
+		"defaultMessage": "In em of the type size",
+		"description": "Tooltip of the paragraph amount field when paragraphs are indented."
+	},
+	"area.paragraphSpaceTitle": {
+		"defaultMessage": "In lines of this area's leading",
+		"description": "Tooltip of the paragraph amount field when paragraphs have space after."
+	},
+	"area.perEdgeBorderWidthsLabel": {
+		"defaultMessage": "Per-edge border widths",
+		"description": "Screen-reader name of a control in the area settings."
+	},
+	"area.perEdgePaddingLabel": {
+		"defaultMessage": "Per-edge padding",
+		"description": "Screen-reader name of a control in the area settings."
+	},
+	"area.picture.now": {
+		"defaultMessage": "Now: {url}",
+		"description": "Tooltip of the URL… button when the area already shows an image from that address."
+	},
+	"area.picture.prompt": {
+		"defaultMessage": "Address of the image",
+		"description": "Prompt asking for the web address of an area's image."
+	},
+	"area.picture.wrong": {
+		"defaultMessage": "An image address has to be an http or https address.",
+		"description": "Notice when the address typed for an area's image is not a web address."
+	},
+	"area.pivotAcrossBoxPercentageTitle": {
+		"defaultMessage": "The pivot across the box, as a percentage of its width",
+		"description": "Tooltip in the area settings."
+	},
+	"area.pivotDownBoxPercentageTitle": {
+		"defaultMessage": "The pivot down the box, as a percentage of its height",
+		"description": "Tooltip in the area settings."
+	},
+	"area.plainText": {
+		"defaultMessage": "Plain Text",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.position": {
+		"defaultMessage": "Position",
+		"description": "Heading of a group of fields in the area settings."
+	},
+	"area.pt": {
+		"defaultMessage": "pt",
+		"description": "Label in the area settings."
+	},
+	"area.qrCode": {
+		"defaultMessage": "QR Code",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.qrHoldsAnythingReadsTitle": {
+		"defaultMessage": "QR holds anything and reads from any angle; Code 128 is a line of bars for any plain text; EAN-13 is a 13-digit retail number or ISBN",
+		"description": "Tooltip in the area settings."
+	},
+	"area.radius": {
+		"defaultMessage": "Radius",
+		"description": "Label in the area settings."
+	},
+	"area.refXTitle": {
+		"defaultMessage": "The {edge, select, left {left edge} centre {middle, across} other {right edge}} — where the words are set from{ring, select, yes {, and the handle with the ring} other {}}",
+		"description": "Tooltip of the X field: which point of the area X measures."
+	},
+	"area.refYAnchoredTitle": {
+		"defaultMessage": "Anchored: the gap sets the top edge — this is the {edge, select, top {top edge} middle {middle, down} other {bottom edge}}",
+		"description": "Tooltip of the Y field when the area is anchored below another."
+	},
+	"area.refYTitle": {
+		"defaultMessage": "The {edge, select, top {top edge} middle {middle, down} other {bottom edge}} — where the words are set from{ring, select, yes {, and the handle with the ring} other {}}",
+		"description": "Tooltip of the Y field: which point of the area Y measures."
+	},
+	"area.rotation": {
+		"defaultMessage": "Rotation",
+		"description": "Label in the area settings."
+	},
+	"area.showDigits": {
+		"defaultMessage": "Show Digits",
+		"description": "Label in the area settings."
+	},
+	"area.shrink": {
+		"defaultMessage": "Shrink",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.size": {
+		"defaultMessage": "Size",
+		"description": "Label in the area settings."
+	},
+	"area.sizeTitle": {
+		"defaultMessage": "Blank inherits the page's {size}pt",
+		"description": "Tooltip of the Size field."
+	},
+	"area.smallCaps": {
+		"defaultMessage": "Small Caps",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.solid": {
+		"defaultMessage": "Solid",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.spaceAfter": {
+		"defaultMessage": "Space After",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.spaceAfterEachParagraphTitle": {
+		"defaultMessage": "Space after each paragraph, or the first line of the next indented. Every line of plain text is a paragraph",
+		"description": "Tooltip in the area settings."
+	},
+	"area.spaceBetweenBorderContentTitle": {
+		"defaultMessage": "Space between the border and the content, inside the box's millimetres",
+		"description": "Tooltip in the area settings."
+	},
+	"area.staticText": {
+		"defaultMessage": "Static Text",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.stretch": {
+		"defaultMessage": "Stretch",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.text": {
+		"defaultMessage": "Text",
+		"description": "Label in the area settings."
+	},
+	"area.textColorLabel": {
+		"defaultMessage": "Text color",
+		"description": "Screen-reader name of the text color swatch."
+	},
+	"area.textColorTitle": {
+		"defaultMessage": "The page's text color",
+		"description": "Tooltip of the text color swatch while it shows the page's color."
+	},
+	"area.textSameEveryCardPlaceholder": {
+		"defaultMessage": "Text — the same on every card",
+		"description": "Greyed hint in an empty field in the area settings."
+	},
+	"area.textSavedTemplateNotTitle": {
+		"defaultMessage": "Text saved in the template, not in the data — the same on every card",
+		"description": "Tooltip in the area settings."
+	},
+	"area.tile": {
+		"defaultMessage": "Tile",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.tracking": {
+		"defaultMessage": "Tracking",
+		"description": "Label in the area settings."
+	},
+	"area.trackingSpaceAddedBetweenTitle": {
+		"defaultMessage": "Tracking: space added between letters, in mm; blank inherits the page's",
+		"description": "Tooltip in the area settings."
+	},
+	"area.transparent": {
+		"defaultMessage": "Transparent",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.transparentLetsPaperShowTitle": {
+		"defaultMessage": "Transparent lets the paper show through; a scanner needs contrast either way",
+		"description": "Tooltip in the area settings."
+	},
+	"area.type": {
+		"defaultMessage": "Type",
+		"description": "Label in the area settings."
+	},
+	"area.unitLines": {
+		"defaultMessage": "lines",
+		"description": "Unit after a number field: lines of the leading."
+	},
+	"area.unlockTitle": {
+		"defaultMessage": "Unlock this area",
+		"description": "Tooltip of the Unlock button in the area settings."
+	},
+	"area.upload": {
+		"defaultMessage": "Upload…",
+		"description": "Label in the area settings."
+	},
+	"area.uppercase": {
+		"defaultMessage": "Uppercase",
+		"description": "Option in a drop-down in the area settings."
+	},
+	"area.url": {
+		"defaultMessage": "URL…",
+		"description": "Label in the area settings."
+	},
+	"area.verticalAlignmentLabel": {
+		"defaultMessage": "Vertical alignment",
+		"description": "Screen-reader name of a control in the area settings."
+	},
+	"area.w": {
+		"defaultMessage": "W",
+		"description": "Label of the area's width field (one letter, for Width)."
+	},
+	"area.weight": {
+		"defaultMessage": "Weight",
+		"description": "Label in the area settings."
+	},
+	"area.whatEachItemBulletTitle": {
+		"defaultMessage": "What each item of a bullet list is marked with — a numbered list counts by Numbers",
+		"description": "Tooltip in the area settings."
+	},
+	"area.whereAreaGetsWhatTitle": {
+		"defaultMessage": "Where this area gets what it shows",
+		"description": "Tooltip in the area settings."
+	},
+	"area.whichSpreadsheetColumnFillsTitle": {
+		"defaultMessage": "Which spreadsheet column fills this field",
+		"description": "Tooltip in the area settings."
+	},
+	"area.widows": {
+		"defaultMessage": "Widows",
+		"description": "Label in the area settings."
+	},
+	"area.x": {
+		"defaultMessage": "X",
+		"description": "Label of the field for the area's position across, from the left trim edge."
+	},
+	"area.xHeight": {
+		"defaultMessage": "X-Height",
+		"description": "Label in the area settings."
+	},
+	"area.xHeightOff": {
+		"defaultMessage": "Only with the page's size — clear Size to set it",
+		"description": "Tooltip of the X-Height field when the area has a size of its own."
+	},
+	"area.xHeightTitle": {
+		"defaultMessage": "The lowercase's height as a percentage of the size; blank is the face's own",
+		"description": "Tooltip of the X-Height field."
+	},
+	"area.y": {
+		"defaultMessage": "Y",
+		"description": "Label of the field for the area's position down, from the top trim edge."
+	},
 	"areaMenu.copyStyle": {
 		"defaultMessage": "Copy Style",
 		"description": "Menu item: copy the area's type, colours and borders, to paste onto others."
@@ -135,6 +855,78 @@
 		"defaultMessage": "Also the gap between cards, and the crop marks between them, when several are printed to a sheet",
 		"description": "Tooltip of the Page Bleed checkbox."
 	},
+	"blend.color": {
+		"defaultMessage": "Color",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.darken": {
+		"defaultMessage": "Darken",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.difference": {
+		"defaultMessage": "Difference",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.exclusion": {
+		"defaultMessage": "Exclusion",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.hardLight": {
+		"defaultMessage": "Hard Light",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.hue": {
+		"defaultMessage": "Hue",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.lighten": {
+		"defaultMessage": "Lighten",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.luminosity": {
+		"defaultMessage": "Luminosity",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.multiply": {
+		"defaultMessage": "Multiply",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.overlay": {
+		"defaultMessage": "Overlay",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.saturation": {
+		"defaultMessage": "Saturation",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.screen": {
+		"defaultMessage": "Screen",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"blend.softLight": {
+		"defaultMessage": "Soft Light",
+		"description": "Blend mode (as in Photoshop/Illustrator)."
+	},
+	"border.style.dashed": {
+		"defaultMessage": "Dashed",
+		"description": "Border style."
+	},
+	"border.style.dotted": {
+		"defaultMessage": "Dotted",
+		"description": "Border style."
+	},
+	"border.style.double": {
+		"defaultMessage": "Double",
+		"description": "Border style: two thin lines."
+	},
+	"border.style.solid": {
+		"defaultMessage": "Solid",
+		"description": "Border style: one continuous line."
+	},
+	"border.style.stamp": {
+		"defaultMessage": "Stamp",
+		"description": "Border style: a postage stamp's perforated edge."
+	},
 	"colorField.fromRow": {
 		"defaultMessage": "This row's {column} — the color comes from that column",
 		"description": "Tooltip of a color swatch whose color is taken from a table column; {column} is the column's name."
@@ -151,6 +943,10 @@
 		"defaultMessage": "This row's {column} holds no color, so this one is used",
 		"description": "Tooltip of a color swatch linked to a column whose cell in this row holds no color; {column} is the column's name."
 	},
+	"common.auto": {
+		"defaultMessage": "auto",
+		"description": "Greyed hint in a number field left blank: worked out automatically."
+	},
 	"common.backTo": {
 		"defaultMessage": "Back to {to}",
 		"description": "Tooltip and name of a reset button; {to} is the value it puts back."
@@ -166,6 +962,10 @@
 	"common.counter": {
 		"defaultMessage": "{index} / {total}",
 		"description": "A position in a run, e.g. “3 / 12”."
+	},
+	"common.defaultValue": {
+		"defaultMessage": "Default: {value}",
+		"description": "First option of a menu whose blank takes the page's setting; {value} is that setting."
 	},
 	"common.delete": {
 		"defaultMessage": "Delete",
@@ -411,6 +1211,10 @@
 		"defaultMessage": "What this drawing adds to the cell it is written into",
 		"description": "Tooltip of the drawing's size in KB."
 	},
+	"edge.short": {
+		"defaultMessage": "{edge, select, top {T} right {R} bottom {B} other {L}}",
+		"description": "One-letter label of a box edge, beside its own field: Top, Right, Bottom, Left."
+	},
 	"export.checklist.background": {
 		"defaultMessage": "<strong>Background graphics</strong> — on, or the browser drops the paper color.",
 		"description": "Print checklist item: the print dialog's background graphics setting."
@@ -575,6 +1379,22 @@
 		"defaultMessage": "System",
 		"description": "Heading in a font menu over the fonts this computer already has."
 	},
+	"leader.dashed": {
+		"defaultMessage": "Dashed",
+		"description": "Option in the Leader menu: the line that joins words to a price or page number set against the right edge."
+	},
+	"leader.dotted": {
+		"defaultMessage": "Dotted",
+		"description": "Option in the Leader menu: the line that joins words to a price or page number set against the right edge."
+	},
+	"leader.none": {
+		"defaultMessage": "None",
+		"description": "Option in the Leader menu: the line that joins words to a price or page number set against the right edge."
+	},
+	"leader.solid": {
+		"defaultMessage": "Solid",
+		"description": "Option in the Leader menu: the line that joins words to a price or page number set against the right edge."
+	},
 	"lightbox.nextCard": {
 		"defaultMessage": "Next card",
 		"description": "Button in the full-screen card view."
@@ -583,9 +1403,505 @@
 		"defaultMessage": "Previous card",
 		"description": "Button in the full-screen card view."
 	},
+	"list.marker.arrow": {
+		"defaultMessage": "➤ Arrow",
+		"description": "Option in the list marker menu: the mark before each item of a bullet list, shown with its glyph."
+	},
+	"list.marker.bullet": {
+		"defaultMessage": "• Bullet",
+		"description": "Option in the list marker menu: the mark before each item of a bullet list, shown with its glyph."
+	},
+	"list.marker.circle": {
+		"defaultMessage": "○ Circle",
+		"description": "Option in the list marker menu: the mark before each item of a bullet list, shown with its glyph."
+	},
+	"list.marker.dash": {
+		"defaultMessage": "– Dash",
+		"description": "Option in the list marker menu: the mark before each item of a bullet list, shown with its glyph."
+	},
+	"list.marker.disc": {
+		"defaultMessage": "● Disc",
+		"description": "Option in the list marker menu: the mark before each item of a bullet list, shown with its glyph."
+	},
+	"list.marker.emdash": {
+		"defaultMessage": "— Em Dash",
+		"description": "Option in the list marker menu: the mark before each item of a bullet list, shown with its glyph."
+	},
+	"list.marker.none": {
+		"defaultMessage": "None",
+		"description": "Option in the list marker menu: the mark before each item of a bullet list, shown with its glyph."
+	},
+	"list.marker.openSquare": {
+		"defaultMessage": "□ Open Square",
+		"description": "Option in the list marker menu: the mark before each item of a bullet list, shown with its glyph."
+	},
+	"list.marker.square": {
+		"defaultMessage": "■ Square",
+		"description": "Option in the list marker menu: the mark before each item of a bullet list, shown with its glyph."
+	},
+	"list.numbering.decimal": {
+		"defaultMessage": "1, 2, 3 Numbers",
+		"description": "Option in the list numbers menu: how a numbered list counts, shown with its first three."
+	},
+	"list.numbering.lowerAlpha": {
+		"defaultMessage": "a, b, c Letters",
+		"description": "Option in the list numbers menu: how a numbered list counts, shown with its first three."
+	},
+	"list.numbering.lowerRoman": {
+		"defaultMessage": "i, ii, iii Roman",
+		"description": "Option in the list numbers menu: how a numbered list counts, shown with its first three."
+	},
+	"list.numbering.upperAlpha": {
+		"defaultMessage": "A, B, C Capitals",
+		"description": "Option in the list numbers menu: how a numbered list counts, shown with its first three."
+	},
+	"list.numbering.upperRoman": {
+		"defaultMessage": "I, II, III Roman Capitals",
+		"description": "Option in the list numbers menu: how a numbered list counts, shown with its first three."
+	},
 	"menuSelect.label": {
 		"defaultMessage": "{label}: {value}",
 		"description": "Screen-reader name of a drop-down: what it sets, then its current choice, e.g. “Font: Inter”."
+	},
+	"page.a5StarterBooklet": {
+		"defaultMessage": "A5 Starter Booklet",
+		"description": "Label in the page settings."
+	},
+	"page.areasEdgeListsMarkersTitle": {
+		"defaultMessage": "From the area's edge to a list's markers, in em of the type size",
+		"description": "Tooltip in the page settings."
+	},
+	"page.background.prompt": {
+		"defaultMessage": "Address of the background image",
+		"description": "Prompt asking for the web address of the page's background image."
+	},
+	"page.baseline": {
+		"defaultMessage": "Baseline",
+		"description": "Label in the page settings."
+	},
+	"page.color": {
+		"defaultMessage": "Color",
+		"description": "Label in the page settings."
+	},
+	"page.contain": {
+		"defaultMessage": "Contain",
+		"description": "Option in a drop-down in the page settings."
+	},
+	"page.continuous": {
+		"defaultMessage": "Continuous",
+		"description": "Option in a drop-down in the page settings."
+	},
+	"page.cover": {
+		"defaultMessage": "Cover",
+		"description": "Option in a drop-down in the page settings."
+	},
+	"page.css": {
+		"defaultMessage": "CSS",
+		"description": "Label in the page settings."
+	},
+	"page.css.lockedNoneTitle": {
+		"defaultMessage": "Styles for this card — none yet, and locked",
+		"description": "Tooltip of CSS when the design is locked and has no styles."
+	},
+	"page.css.lockedSomeTitle": {
+		"defaultMessage": "Styles for this card — locked, so this opens to read",
+		"description": "Tooltip of CSS when the design is locked and has styles."
+	},
+	"page.css.noneTitle": {
+		"defaultMessage": "Styles for this card, saved inside the template",
+		"description": "Tooltip of CSS when the template has no styles yet."
+	},
+	"page.css.someTitle": {
+		"defaultMessage": "Styles for this card, saved inside the template — this one has some",
+		"description": "Tooltip of CSS when the template has styles of its own."
+	},
+	"page.custom": {
+		"defaultMessage": "Custom",
+		"description": "Option in a drop-down in the page settings."
+	},
+	"page.defaultTextColorEveryTitle": {
+		"defaultMessage": "Default text color for every box that does not set its own",
+		"description": "Tooltip in the page settings."
+	},
+	"page.deleteTemplate": {
+		"defaultMessage": "Delete…",
+		"description": "Label in the page settings."
+	},
+	"page.deleteTemplateBrowserYourTitle": {
+		"defaultMessage": "Delete this template from this browser. Your rows are not touched.",
+		"description": "Tooltip in the page settings."
+	},
+	"page.designTourSetCameTitle": {
+		"defaultMessage": "The design the tour is set in, as it came — your templates are untouched",
+		"description": "Tooltip in the page settings."
+	},
+	"page.edge.facing": {
+		"defaultMessage": "{edge, select, top {Top} right {Outer} bottom {Bottom} other {Inner}}",
+		"description": "Name of a page edge on facing pages, where right and left are Outer and Inner."
+	},
+	"page.edge.facingShort": {
+		"defaultMessage": "{edge, select, top {T} right {O} bottom {B} other {I}}",
+		"description": "One-letter label of a margin field on facing pages: Top, Outer, Bottom, Inner."
+	},
+	"page.edge.flat": {
+		"defaultMessage": "{edge, select, top {Top} right {Right} bottom {Bottom} other {Left}}",
+		"description": "Name of a page edge."
+	},
+	"page.edgeMarginFacingLabel": {
+		"defaultMessage": "{edge, select, top {Top} right {Outer} bottom {Bottom} other {Inner}} margin",
+		"description": "Screen-reader name of one edge's margin field on facing pages."
+	},
+	"page.edgeMarginLabel": {
+		"defaultMessage": "{edge, select, top {Top} right {Right} bottom {Bottom} other {Left}} margin",
+		"description": "Screen-reader name of one edge's margin field."
+	},
+	"page.em": {
+		"defaultMessage": "em",
+		"description": "Label in the page settings."
+	},
+	"page.export": {
+		"defaultMessage": "Export",
+		"description": "Label in the page settings."
+	},
+	"page.fileMachineImageStaysTitle": {
+		"defaultMessage": "A file from this machine; the image stays in this browser, the template only names it",
+		"description": "Tooltip in the page settings."
+	},
+	"page.font": {
+		"defaultMessage": "Font",
+		"description": "Label in the page settings."
+	},
+	"page.height": {
+		"defaultMessage": "Height",
+		"description": "Label in the page settings."
+	},
+	"page.howImageFillsSheetTitle": {
+		"defaultMessage": "How the image fills the sheet, bleed included",
+		"description": "Tooltip in the page settings."
+	},
+	"page.howNumberedMarkdownListTitle": {
+		"defaultMessage": "How a numbered Markdown list counts: numbers, letters or Roman numerals",
+		"description": "Tooltip in the page settings."
+	},
+	"page.httpSAddressTemplateTitle": {
+		"defaultMessage": "An http(s) address the template will carry as written",
+		"description": "Tooltip in the page settings."
+	},
+	"page.image": {
+		"defaultMessage": "Image",
+		"description": "Label in the page settings."
+	},
+	"page.import": {
+		"defaultMessage": "Import…",
+		"description": "Label in the page settings."
+	},
+	"page.indent": {
+		"defaultMessage": "Indent",
+		"description": "Option in a drop-down in the page settings."
+	},
+	"page.language": {
+		"defaultMessage": "Language",
+		"description": "Label in the page settings."
+	},
+	"page.languageCardsAreWrittenTitle": {
+		"defaultMessage": "The language the cards are written in. Sets the page's lang, so the template's CSS can say :lang(el) — a countdown's words, the page number's separator — and justified text hyphenates with the right dictionary",
+		"description": "Tooltip in the page settings."
+	},
+	"page.layout": {
+		"defaultMessage": "Layout",
+		"description": "Label in the page settings."
+	},
+	"page.layoutLockedTitle": {
+		"defaultMessage": "Lay the page out from your columns — unlock the design first",
+		"description": "Tooltip of Layout while the design is locked."
+	},
+	"page.layoutNothingTitle": {
+		"defaultMessage": "Nothing to lay out yet — import a CSV or paste a table under the page",
+		"description": "Tooltip of Layout while there is no table."
+	},
+	"page.layoutTitle": {
+		"defaultMessage": "Lay the page out from your columns — a card worked out from your headings and your data",
+		"description": "Tooltip of Layout."
+	},
+	"page.leader": {
+		"defaultMessage": "Leader",
+		"description": "Label in the page settings."
+	},
+	"page.leading": {
+		"defaultMessage": "Leading",
+		"description": "Label in the page settings."
+	},
+	"page.leadingEveryListSetTitle": {
+		"defaultMessage": "The leading every list is set in, where an area names none of its own. Blank takes the text's",
+		"description": "Tooltip in the page settings."
+	},
+	"page.libraryTitle": {
+		"defaultMessage": "{count, plural, one {# saved template} other {# saved templates}} in this browser, and what you can do to this one",
+		"description": "Tooltip of the button that opens the template menu."
+	},
+	"page.lineSetsWhatFollowsTitle": {
+		"defaultMessage": "A line with %%% in it sets what follows against the right edge, joined by this line — Coffee %%% 3.50 for a price list; with a leader set, a tab does too. For every area that sets none of its own",
+		"description": "Tooltip in the page settings."
+	},
+	"page.lists": {
+		"defaultMessage": "Lists",
+		"description": "Heading of a group of fields in the page settings."
+	},
+	"page.marginLabel": {
+		"defaultMessage": "Margin",
+		"description": "Screen-reader name of a control in the page settings."
+	},
+	"page.marginsApart": {
+		"defaultMessage": "A margin per edge",
+		"description": "Tooltip of the button that shows a margin field per edge."
+	},
+	"page.marginsTogether": {
+		"defaultMessage": "One margin all round",
+		"description": "Tooltip of the button that goes back to one margin."
+	},
+	"page.marker": {
+		"defaultMessage": "Marker",
+		"description": "Label in the page settings."
+	},
+	"page.newTemplate": {
+		"defaultMessage": "New Template",
+		"description": "Label in the page settings."
+	},
+	"page.numbers": {
+		"defaultMessage": "Numbers",
+		"description": "Label in the page settings."
+	},
+	"page.oddRowsAreRightTitle": {
+		"defaultMessage": "Odd rows are right-hand pages and even rows their facing left-hand pages. Areas mirror across the fold unless an area says otherwise, and Outer and Inner page numbers know which edge they are on",
+		"description": "Tooltip in the page settings."
+	},
+	"page.ofTotal": {
+		"defaultMessage": "of Total",
+		"description": "Label in the page settings."
+	},
+	"page.openTemplateFilePackageTitle": {
+		"defaultMessage": "Open a template file, a package, or an InDesign layout (an IDML file or a zipped Package folder)",
+		"description": "Tooltip in the page settings."
+	},
+	"page.packageCopyEditing": {
+		"defaultMessage": "Package for Copy Editing…",
+		"description": "Label in the page settings."
+	},
+	"page.page": {
+		"defaultMessage": "Page",
+		"description": "Heading of a group of fields in the page settings."
+	},
+	"page.pageColorPrintsOnlyTitle": {
+		"defaultMessage": "Page color — prints only with background graphics enabled",
+		"description": "Tooltip in the page settings."
+	},
+	"page.pageMarginEveryEdgeTitle": {
+		"defaultMessage": "The page margin, every edge — drawn with the grid, snapped to, and where Position Automagically lays out",
+		"description": "Tooltip in the page settings."
+	},
+	"page.pageNumber": {
+		"defaultMessage": "Page Number",
+		"description": "Heading of a group of fields in the page settings."
+	},
+	"page.pageSettingsLabel": {
+		"defaultMessage": "Page settings",
+		"description": "Screen-reader name of a control in the page settings."
+	},
+	"page.paper": {
+		"defaultMessage": "Paper",
+		"description": "Heading of a group of fields in the page settings."
+	},
+	"page.paperColorLabel": {
+		"defaultMessage": "Paper color",
+		"description": "Screen-reader name of the page's color swatch."
+	},
+	"page.paragraphAmount": {
+		"defaultMessage": "Paragraph amount",
+		"description": "Label in the page settings."
+	},
+	"page.paragraphSpaceTitle": {
+		"defaultMessage": "In lines of the leading",
+		"description": "Tooltip of the page's paragraph amount field when paragraphs have space after."
+	},
+	"page.paragraphStyle": {
+		"defaultMessage": "Paragraph style",
+		"description": "Label in the page settings."
+	},
+	"page.paragraphs": {
+		"defaultMessage": "Paragraphs",
+		"description": "Heading of a group of fields in the page settings."
+	},
+	"page.perEdgeMarginsLabel": {
+		"defaultMessage": "Per-edge margins",
+		"description": "Screen-reader name of a control in the page settings."
+	},
+	"page.position": {
+		"defaultMessage": "Position",
+		"description": "Label in the page settings."
+	},
+	"page.preset": {
+		"defaultMessage": "Preset",
+		"description": "Label in the page settings."
+	},
+	"page.presetSet": {
+		"defaultMessage": "{name} — {w} × {h}mm. Every box keeps the millimetres it had.",
+		"description": "Notice after choosing a paper size preset."
+	},
+	"page.print312RatherTitle": {
+		"defaultMessage": "Print it as 3 / 12 rather than as 3. The slash is an element of its own — .page-number .of — so this template's CSS can set its content to anything, or take it away",
+		"description": "Tooltip in the page settings."
+	},
+	"page.pt": {
+		"defaultMessage": "pt",
+		"description": "Label in the page settings."
+	},
+	"page.putStarterTemplateBeganTitle": {
+		"defaultMessage": "Put the starter this template began as back over it. Your rows are not touched.",
+		"description": "Tooltip in the page settings."
+	},
+	"page.raiseTextMuchSizeTitle": {
+		"defaultMessage": "Raise the text by this much of its size, or lower it below 0 — for a face that sits high or low on its line. Applies to areas in the page's font only",
+		"description": "Tooltip in the page settings."
+	},
+	"page.rectoVerso": {
+		"defaultMessage": "Recto / Verso",
+		"description": "Label in the page settings."
+	},
+	"page.removeBackgroundImageTitle": {
+		"defaultMessage": "Remove the background image",
+		"description": "Tooltip in the page settings."
+	},
+	"page.resetTemplate": {
+		"defaultMessage": "Reset…",
+		"description": "Label in the page settings."
+	},
+	"page.saveDesignTablePicturesTitle": {
+		"defaultMessage": "Save this design, its table and its pictures as one file for someone else to fill in and print",
+		"description": "Tooltip in the page settings."
+	},
+	"page.savedTemplatesLabel": {
+		"defaultMessage": "Saved templates",
+		"description": "Screen-reader name of a control in the page settings."
+	},
+	"page.size": {
+		"defaultMessage": "Size",
+		"description": "Label in the page settings."
+	},
+	"page.sizeWorthHavingHandTitle": {
+		"defaultMessage": "A size worth having to hand, or set the two numbers yourself",
+		"description": "Tooltip in the page settings."
+	},
+	"page.spaceAfter": {
+		"defaultMessage": "Space After",
+		"description": "Option in a drop-down in the page settings."
+	},
+	"page.spaceAfterEachParagraphTitle": {
+		"defaultMessage": "Space after each paragraph, or the first line of the next indented — for every area that sets none of its own. Every line of plain text is a paragraph",
+		"description": "Tooltip in the page settings."
+	},
+	"page.swapBackTitle": {
+		"defaultMessage": "Back to “{name}”",
+		"description": "Tooltip of the swap button: open the template you had open before."
+	},
+	"page.swapNothingTitle": {
+		"defaultMessage": "Nothing to swap back to yet — this is the only template you have opened",
+		"description": "Tooltip of the swap button when no other template has been opened."
+	},
+	"page.swapPreviousTemplateLabel": {
+		"defaultMessage": "Swap to the previous template",
+		"description": "Screen-reader name of a control in the page settings."
+	},
+	"page.swapWidthHeightLabel": {
+		"defaultMessage": "Swap width and height",
+		"description": "Screen-reader name of a control in the page settings."
+	},
+	"page.swapWidthHeightTurnTitle": {
+		"defaultMessage": "Swap width and height — turn the page over",
+		"description": "Tooltip in the page settings."
+	},
+	"page.templateNameLabel": {
+		"defaultMessage": "Template name",
+		"description": "Screen-reader name of a control in the page settings."
+	},
+	"page.text": {
+		"defaultMessage": "Text",
+		"description": "Heading of a group of fields in the page settings."
+	},
+	"page.tile": {
+		"defaultMessage": "Tile",
+		"description": "Option in a drop-down in the page settings."
+	},
+	"page.tracking": {
+		"defaultMessage": "Tracking",
+		"description": "Label in the page settings."
+	},
+	"page.trackingSpaceAddedBetweenTitle": {
+		"defaultMessage": "Tracking: space added between letters, in mm, for every area that does not set its own",
+		"description": "Tooltip in the page settings."
+	},
+	"page.turned": {
+		"defaultMessage": "Page turned — {w} × {h}mm. Every box keeps the millimetres it had.",
+		"description": "Notice after swapping the page's width and height."
+	},
+	"page.untitledCardPlaceholder": {
+		"defaultMessage": "Untitled card",
+		"description": "Greyed hint in an empty field in the page settings."
+	},
+	"page.upload": {
+		"defaultMessage": "Upload…",
+		"description": "Label in the page settings."
+	},
+	"page.url": {
+		"defaultMessage": "URL…",
+		"description": "Label in the page settings."
+	},
+	"page.whatEachItemMarkdownTitle": {
+		"defaultMessage": "What each item of a Markdown bullet list is marked with — a numbered list counts by Numbers",
+		"description": "Tooltip in the page settings."
+	},
+	"page.width": {
+		"defaultMessage": "Width",
+		"description": "Label in the page settings."
+	},
+	"pageNumber.bottomCentre": {
+		"defaultMessage": "Bottom Centre",
+		"description": "Where the page number goes. Outer and Inner follow the fold: the edge away from it and the edge beside it."
+	},
+	"pageNumber.bottomInner": {
+		"defaultMessage": "Bottom Inner",
+		"description": "Where the page number goes. Outer and Inner follow the fold: the edge away from it and the edge beside it."
+	},
+	"pageNumber.bottomLeft": {
+		"defaultMessage": "Bottom Left",
+		"description": "Where the page number goes. Outer and Inner follow the fold: the edge away from it and the edge beside it."
+	},
+	"pageNumber.bottomOuter": {
+		"defaultMessage": "Bottom Outer",
+		"description": "Where the page number goes. Outer and Inner follow the fold: the edge away from it and the edge beside it."
+	},
+	"pageNumber.bottomRight": {
+		"defaultMessage": "Bottom Right",
+		"description": "Where the page number goes. Outer and Inner follow the fold: the edge away from it and the edge beside it."
+	},
+	"pageNumber.topCentre": {
+		"defaultMessage": "Top Centre",
+		"description": "Where the page number goes. Outer and Inner follow the fold: the edge away from it and the edge beside it."
+	},
+	"pageNumber.topInner": {
+		"defaultMessage": "Top Inner",
+		"description": "Where the page number goes. Outer and Inner follow the fold: the edge away from it and the edge beside it."
+	},
+	"pageNumber.topLeft": {
+		"defaultMessage": "Top Left",
+		"description": "Where the page number goes. Outer and Inner follow the fold: the edge away from it and the edge beside it."
+	},
+	"pageNumber.topOuter": {
+		"defaultMessage": "Top Outer",
+		"description": "Where the page number goes. Outer and Inner follow the fold: the edge away from it and the edge beside it."
+	},
+	"pageNumber.topRight": {
+		"defaultMessage": "Top Right",
+		"description": "Where the page number goes. Outer and Inner follow the fold: the edge away from it and the edge beside it."
 	},
 	"pictures.added": {
 		"defaultMessage": "{count, plural, one {{name} added. Drag it onto an area to put it there, or onto the page for an area of its own.} other {# images added. Drag one onto an area to put it there, or onto the page for an area of its own.}}",
@@ -1123,6 +2439,62 @@
 		"defaultMessage": "Only two up and eight up fold into a zine: two is a stapled booklet, eight the sheet that is folded and cut into a mini zine. Any other count prints in reading order.",
 		"description": "Tooltip explaining which counts fold into a zine."
 	},
+	"reset.areaLeading": {
+		"defaultMessage": "this area's leading",
+		"description": "Completes “Back to …” on the list leading's reset button when the page sets none for lists."
+	},
+	"reset.faceOwn": {
+		"defaultMessage": "the face's own",
+		"description": "Completes “Back to …” on the X-Height's reset button: the font's own proportions."
+	},
+	"reset.pageAlignment": {
+		"defaultMessage": "the page's alignment",
+		"description": "Completes “Back to …” on a reset button."
+	},
+	"reset.pageBaseline": {
+		"defaultMessage": "the page's baseline",
+		"description": "Completes “Back to …” on the baseline's reset button."
+	},
+	"reset.pageLeader": {
+		"defaultMessage": "the page's leader",
+		"description": "Completes “Back to …” on the leader's reset button."
+	},
+	"reset.pageListIndent": {
+		"defaultMessage": "the page's list indent",
+		"description": "Completes “Back to …” on the list indent's reset button."
+	},
+	"reset.pageListLeading": {
+		"defaultMessage": "the page's list leading",
+		"description": "Completes “Back to …” on the list leading's reset button."
+	},
+	"reset.pageListMarker": {
+		"defaultMessage": "the page's list marker",
+		"description": "Completes “Back to …” on the list marker's reset button."
+	},
+	"reset.pageListNumbering": {
+		"defaultMessage": "the page's list numbering",
+		"description": "Completes “Back to …” on the list numbering's reset button."
+	},
+	"reset.pageParagraphs": {
+		"defaultMessage": "the page's paragraphs",
+		"description": "Completes “Back to …” on the paragraph style's reset button."
+	},
+	"reset.pageSize": {
+		"defaultMessage": "the page's {size}pt",
+		"description": "Completes “Back to …” on the type size's reset button."
+	},
+	"reset.pageTextColor": {
+		"defaultMessage": "the page's text color",
+		"description": "Completes “Back to …” on the text color's reset button."
+	},
+	"reset.pageTracking": {
+		"defaultMessage": "the page's {tracking}mm",
+		"description": "Completes “Back to …” on the tracking's reset button."
+	},
+	"reset.pageValue": {
+		"defaultMessage": "the page's {value}",
+		"description": "Completes “Back to …” on a reset button; {value} is the page's setting, such as a font or a weight."
+	},
 	"selection.delete": {
 		"defaultMessage": "Delete",
 		"description": "Button beside the page: remove the chosen areas."
@@ -1398,5 +2770,33 @@
 	"stage.zoomUnknownScreen": {
 		"defaultMessage": "This screen is not one the app knows, so this is the browser’s own millimetre, which may not match a ruler",
 		"description": "Tooltip of Actual on an unknown screen."
+	},
+	"textAlign.bottom": {
+		"defaultMessage": "Align Bottom",
+		"description": "Button: set the area's text at the bottom of the box."
+	},
+	"textAlign.centre": {
+		"defaultMessage": "Centre",
+		"description": "Button: centre the area's text."
+	},
+	"textAlign.justify": {
+		"defaultMessage": "Justify",
+		"description": "Button: justify the area's text."
+	},
+	"textAlign.left": {
+		"defaultMessage": "Align Left",
+		"description": "Button: set the area's text flush left."
+	},
+	"textAlign.middle": {
+		"defaultMessage": "Align Middle",
+		"description": "Button: set the area's text in the middle of the box, top to bottom."
+	},
+	"textAlign.right": {
+		"defaultMessage": "Align Right",
+		"description": "Button: set the area's text flush right."
+	},
+	"textAlign.top": {
+		"defaultMessage": "Align Top",
+		"description": "Button: set the area's text at the top of the box."
 	}
 }
