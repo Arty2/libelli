@@ -211,15 +211,15 @@ export async function unzip(bytes: Uint8Array): Promise<Map<string, Uint8Array>>
 			break;
 		}
 	}
-	if (end < 0) throw new ZipError('This is not a ZIP archive.');
+	if (end < 0) throw new ZipError('It is not a ZIP file.');
 	const count = view.getUint16(end + 10, true);
 	let at = view.getUint32(end + 16, true);
-	if (count === 0xffff || at === 0xffffffff) throw new ZipError('This archive is ZIP64, which libelli cannot read.');
+	if (count === 0xffff || at === 0xffffffff) throw new ZipError('It uses ZIP64, which libelli cannot read.');
 
 	const files = new Map<string, Uint8Array>();
 	let total = 0;
 	for (let i = 0; i < count; i++) {
-		if (at + 46 > bytes.length || view.getUint32(at, true) !== 0x02014b50) throw new ZipError('This archive is damaged.');
+		if (at + 46 > bytes.length || view.getUint32(at, true) !== 0x02014b50) throw new ZipError('The ZIP file is damaged.');
 		const flags = view.getUint16(at + 8, true);
 		const method = view.getUint16(at + 10, true);
 		const packed = view.getUint32(at + 20, true);
@@ -231,25 +231,25 @@ export async function unzip(bytes: Uint8Array): Promise<Map<string, Uint8Array>>
 		const name = entryName(bytes.subarray(at + 46, at + 46 + nameLength), !!(flags & 0x0800));
 		at += 46 + nameLength + extraLength + commentLength;
 		if (name.endsWith('/')) continue;
-		if (flags & 1) throw new ZipError(`“${name}” in this archive is encrypted.`);
-		if (local + 30 > bytes.length || view.getUint32(local, true) !== 0x04034b50) throw new ZipError('This archive is damaged.');
+		if (flags & 1) throw new ZipError(`“${name}” inside it is encrypted.`);
+		if (local + 30 > bytes.length || view.getUint32(local, true) !== 0x04034b50) throw new ZipError('The ZIP file is damaged.');
 		// The local header's own name and extra field, which need not match the
 		// directory's lengths, are what the data follows.
 		const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
 		const data = bytes.subarray(start, start + packed);
-		if (data.length !== packed) throw new ZipError('This archive is cut short.');
+		if (data.length !== packed) throw new ZipError('The ZIP file is incomplete.');
 		total += method === 0 ? packed : unpacked;
-		if (total > MAX_ARCHIVE) throw new ZipError('This archive is too large to open.');
+		if (total > MAX_ARCHIVE) throw new ZipError('It is too large to open.');
 		if (method === 0) files.set(name, data.slice());
 		else if (method === 8) {
 			try {
 				// No more than the directory says it holds: a bomb lies about that too.
 				files.set(name, await inflateRaw(data, Math.min(unpacked, MAX_ENTRY)));
 			} catch (error) {
-				if (error instanceof TooLarge) throw new ZipError(`“${name}” in this archive is larger than it says, or too large to open.`);
-				throw new ZipError(`“${name}” in this archive is damaged.`);
+				if (error instanceof TooLarge) throw new ZipError(`“${name}” inside it is larger than stated, or too large to open.`);
+				throw new ZipError(`“${name}” inside it is damaged.`);
 			}
-		} else throw new ZipError(`“${name}” is compressed in a way libelli cannot read.`);
+		} else throw new ZipError(`“${name}” inside it is compressed in a way libelli cannot read.`);
 	}
 	return files;
 }

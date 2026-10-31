@@ -80,7 +80,7 @@ describe('unzip', () => {
 		const zip = zipStore([{ name: 'a.txt', data: bytes('hello there') }]);
 		const view = new DataView(zip.buffer);
 		view.setUint32(view.getUint32(zip.length - 22 + 16, true) + 20, 999, true);
-		await expect(unzip(zip)).rejects.toThrow(/cut short/);
+		await expect(unzip(zip)).rejects.toThrow(/incomplete/);
 	});
 });
 
@@ -95,7 +95,7 @@ describe('unzip, defensively', () => {
 		const directory = view.getUint32(zip.length - 22 + 16, true);
 		view.setUint16(directory + 10, 8, true);
 		// zipStore wrote the packed size as the unpacked one: a bomb's lie, in effect.
-		await expect(unzip(zip)).rejects.toThrow(/larger than it says/);
+		await expect(unzip(zip)).rejects.toThrow(/larger than stated/);
 	});
 });
 
