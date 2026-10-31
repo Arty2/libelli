@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t, type MessageKey } from '$lib/i18n';
 	import { flushSync, tick, untrack } from 'svelte';
 	import Card from './Card.svelte';
 	import type { Theme } from '$lib/theme';
@@ -259,11 +260,11 @@
 	);
 
 	/** Paint order is array order, so "front" is last in the list, not a z-index. */
-	const ARRANGEMENTS: Array<{ value: Arrange; icon: string; label: string }> = [
-		{ value: 'front', icon: 'bring-to-front', label: 'Bring to Front' },
-		{ value: 'forward', icon: 'bring-forward', label: 'Bring Forward' },
-		{ value: 'backward', icon: 'send-backward', label: 'Send Backward' },
-		{ value: 'back', icon: 'send-to-back', label: 'Send to Back' }
+	const ARRANGEMENTS: Array<{ value: Arrange; icon: string; label: MessageKey }> = [
+		{ value: 'front', icon: 'bring-to-front', label: 'arrange.front' },
+		{ value: 'forward', icon: 'bring-forward', label: 'arrange.forward' },
+		{ value: 'backward', icon: 'send-backward', label: 'arrange.backward' },
+		{ value: 'back', icon: 'send-to-back', label: 'arrange.back' }
 	];
 
 	// A single box knows where it sits in the stack, so the ends can be disabled.
@@ -397,19 +398,19 @@
 	 * which it was.
 	 */
 	const zoomItems = $derived.by((): MenuItem[] => [
-		{ value: 'fit', label: `${Math.round(fitScale * 100)}% — Fit` },
+		{ value: 'fit', label: t('stage.zoomFit', { percent: Math.round(fitScale * 100) }) },
 		{
 			value: 'actual',
-			label: `${Math.round(actual.scale * 100)}% — Actual`,
+			label: t('stage.zoomActual', { percent: Math.round(actual.scale * 100) }),
 			title: actual.panel
-				? `The paper at its real size, measured for a ${actual.panel}${actual.estimate ? ' — the commonest screen of this resolution, so it may be off' : ''}`
-				: 'This screen is not one the app knows, so this is the browser’s own millimetre, which may not match a ruler'
+				? t(actual.estimate ? 'stage.zoomActualEstimate' : 'stage.zoomActualKnown', { panel: actual.panel })
+				: t('stage.zoomUnknownScreen')
 		},
 		{ rule: true },
 		...(typeof zoom === 'number' && !ZOOM_STEPS.includes(zoom)
-			? [{ value: String(zoom), label: `${Math.round(zoom * 100)}%` }]
+			? [{ value: String(zoom), label: t('stage.zoomPercent', { percent: Math.round(zoom * 100) }) }]
 			: []),
-		...ZOOM_STEPS.map((step) => ({ value: String(step), label: `${step * 100}%` }))
+		...ZOOM_STEPS.map((step) => ({ value: String(step), label: t('stage.zoomPercent', { percent: step * 100 }) }))
 	]);
 
 	/**
@@ -1715,7 +1716,7 @@
 		if (e.target === e.currentTarget || /\b(sheet|card|trim|scaler|page|grid-overlay)\b/.test(el.className)) onselect(null);
 	}}
 	role="region"
-	aria-label="Card preview"
+	aria-label={t('stage.label')}
 	tabindex="-1"
 >
 	<div
@@ -1826,7 +1827,7 @@
 	     band it occupies is bottom padding on the viewport, which is what keeps
 	     the page clear of it. -->
 	{#if rowCount > 0}
-		<div class="pager" role="group" aria-label="Card" bind:clientHeight={pagerHeight}>
+		<div class="pager" role="group" aria-label={t('stage.card')} bind:clientHeight={pagerHeight}>
 			<!-- The swipe lives on this inner chip rather than on the row, because
 			     the row spans the whole stage: hit-testing it would swallow every
 			     press on the ground either side of the controls, and hit-testing
@@ -1842,22 +1843,22 @@
 					<button
 						class="step"
 						disabled={activeRow <= 0}
-						title={withKey('Previous card', 'cards')}
-						aria-label="Previous card"
+						title={withKey(t('stage.previousCard'), 'cards')}
+						aria-label={t('stage.previousCard')}
 						onclick={() => onactivate(Math.max(0, activeRow - 1))}
 					><Icon name="chevron-left" size={18} /></button>
 				{/if}
 				<button
 					class="count"
-					title="Look at this card full screen"
+					title={t('stage.fullScreen')}
 					onclick={onlightbox}
-				>{activeRow + 1} / {rowCount}</button>
+				>{t('common.counter', { index: activeRow + 1, total: rowCount })}</button>
 				{#if rowCount > 1}
 					<button
 						class="step"
 						disabled={activeRow >= rowCount - 1}
-						title={withKey('Next card', 'cards')}
-						aria-label="Next card"
+						title={withKey(t('stage.nextCard'), 'cards')}
+						aria-label={t('stage.nextCard')}
 						onclick={() => onactivate(Math.min(rowCount - 1, activeRow + 1))}
 					><Icon name="chevron-right" size={18} /></button>
 				{/if}
@@ -1879,8 +1880,8 @@
 				onpointerup={dropStepsHold}
 				onpointercancel={dropStepsHold}
 				disabled={!undoable}
-				title="{withKey('Undo', 'undo')} — hold, or right-click, for every step, to go back several at once"
-				aria-label="Undo"
+				title={t('stage.undoTitle', { action: withKey(t('common.undo'), 'undo') })}
+				aria-label={t('common.undo')}
 			>
 				<Icon name="undo" size={16} />
 			</button>
@@ -1893,8 +1894,8 @@
 				onpointerup={dropStepsHold}
 				onpointercancel={dropStepsHold}
 				disabled={!redoable}
-				title="{withKey('Redo', 'redo')} — hold, or right-click, for every step, to go forward several at once"
-				aria-label="Redo"
+				title={t('stage.redoTitle', { action: withKey(t('common.redo'), 'redo') })}
+				aria-label={t('common.redo')}
 			>
 				<Icon name="redo" size={16} />
 			</button>
@@ -1906,12 +1907,12 @@
 		<!-- Not on a locked page, where nothing can be restacked: a column of
 		     dead buttons says only what the padlock already does. -->
 		{#if selectedIds.length && !template.locked}
-			<div class="corner stack" role="toolbar" aria-label="Stacking order" aria-orientation="vertical">
+			<div class="corner stack" role="toolbar" aria-label={t('arrange.label')} aria-orientation="vertical">
 				{#each ARRANGEMENTS as option (option.value)}
 					<button
 						class="square"
-						title={option.label}
-						aria-label={option.label}
+						title={t(option.label)}
+						aria-label={t(option.label)}
 						disabled={cannotArrange(option.value)}
 						onclick={() => onarrange(option.value)}
 					>
@@ -1948,7 +1949,7 @@
 	{#if viewOnly}
 		<!-- Where the padlock is on a locked design, and the one control here. -->
 		<div class="corner top right view-eye">
-			<button class="square" title="Read only — the card being edited in another tab. Press for Open Here, Read Only or Close." aria-label="Read only" onclick={() => onviewonly?.()}>
+			<button class="square" title={t('stage.readOnlyTitle')} aria-label={t('stage.readOnly')} onclick={() => onviewonly?.()}>
 				<Icon name="view" size={16} />
 			</button>
 		</div>
@@ -1970,8 +1971,8 @@
 			<button
 				class="square page-lock"
 				aria-pressed={!unlocking}
-				title={unlocking ? 'Unlocked — press again to lock it' : withKey('The design is locked — press to unlock it', 'lockPage')}
-				aria-label={unlocking ? 'Lock the design again' : 'Unlock the design'}
+				title={unlocking ? t('stage.unlocked') : withKey(t('stage.locked'), 'lockPage')}
+				aria-label={unlocking ? t('stage.lockAgain') : t('stage.unlockDesign')}
 				onclick={unlock}
 			>
 				<Icon name={unlocking ? 'unlocked' : 'locked'} size={16} />
@@ -1984,9 +1985,9 @@
 			<button
 				class="square"
 				onclick={onaddbox}
-				title="Add an area to the page"
+				title={t('stage.addAreaTitle')}
 			>
-				<Icon name="shapes" size={16} /><span class="sr-only">Area</span>
+				<Icon name="shapes" size={16} /><span class="sr-only">{t('stage.addArea')}</span>
 			</button>
 			{#if drawTarget}
 				<!-- Under Area, because it is the same kind of thing: Area makes one,
@@ -1994,9 +1995,9 @@
 				<button
 					class="square"
 					onclick={() => ondraw?.(drawTarget)}
-					title="Draw this area's image"
+					title={t('stage.drawTitle')}
 				>
-					<Icon name="edit" size={16} /><span class="sr-only">Draw this area</span>
+					<Icon name="edit" size={16} /><span class="sr-only">{t('stage.draw')}</span>
 				</button>
 			{/if}
 			<!-- Zoom and pan, on and off, under the two that make areas: those
@@ -2013,11 +2014,9 @@
 					padChoice ??= padOpen;
 					panning = !panning;
 				}}
-				title={panning
-					? 'Zoom and pan — a finger scrolls, areas stay put; tap one and nudge it with the pad. Press to drag areas again.'
-					: 'Move — areas drag where you press them. Press for zoom and pan: scroll and pinch without dragging; the cross brings out a nudge pad.'}
+				title={panning ? t('stage.pan') : t('stage.move')}
 			>
-				<Icon name={panning ? 'zoom-pan' : 'move'} size={16} /><span class="sr-only">Zoom and pan</span>
+				<Icon name={panning ? 'zoom-pan' : 'move'} size={16} /><span class="sr-only">{t('stage.panLabel')}</span>
 			</button>
 			{#if !padOpen && (panning || coarse)}
 				<!-- The pad, put away by holding its middle: this is where it is,
@@ -2035,9 +2034,9 @@
 						// would be swallowed.
 						padHeld = false;
 					}}
-					title="Show the nudge pad"
+					title={t('stage.showPad')}
 				>
-					<Icon name="health-cross" size={16} /><span class="sr-only">Show the nudge pad</span>
+					<Icon name="health-cross" size={16} /><span class="sr-only">{t('stage.showPad')}</span>
 				</button>
 			{/if}
 		{/if}
@@ -2050,9 +2049,9 @@
 				class="square"
 				aria-pressed="true"
 				onclick={onstoppicking}
-				title="Selecting several — every press adds an area or drops it. Press to stop, or Esc."
+				title={t('stage.selectingMultiple')}
 			>
-				<Icon name="checkbox-checked" size={16} /><span class="sr-only">Stop selecting multiple</span>
+				<Icon name="checkbox-checked" size={16} /><span class="sr-only">{t('stage.stopSelecting')}</span>
 			</button>
 		{:else if coarse && selectedIds.length && onstartpicking}
 			<!-- The way in on a touch screen, which has no Shift to add an area
@@ -2063,9 +2062,9 @@
 				class="square"
 				aria-pressed="false"
 				onclick={onstartpicking}
-				title="Select multiple — then every tap adds an area or drops it"
+				title={t('stage.selectMultipleTitle')}
 			>
-				<Icon name="checkbox" size={16} /><span class="sr-only">Select multiple</span>
+				<Icon name="checkbox" size={16} /><span class="sr-only">{t('stage.selectMultiple')}</span>
 			</button>
 		{/if}
 		{#if strayIds.length}
@@ -2079,11 +2078,9 @@
 				class="square"
 				onclick={onrescue}
 				disabled={!!template.locked}
-				title={template.locked
-					? `${strayIds.length} area${strayIds.length === 1 ? ' is' : 's are'} not wholly on the page — unlock the design to bring ${strayIds.length === 1 ? 'it' : 'them'} back`
-					: `${strayIds.length} area${strayIds.length === 1 ? ' is' : 's are'} not wholly on the page — bring ${strayIds.length === 1 ? 'it' : 'them'} back on, and nothing else`}
+				title={t(template.locked ? 'stage.strayLockedTitle' : 'stage.strayTitle', { count: strayIds.length })}
 			>
-				<Icon name="data-collection" size={16} /><span class="sr-only">Bring stray areas back onto the page</span>
+				<Icon name="data-collection" size={16} /><span class="sr-only">{t('stage.stray')}</span>
 			</button>
 		{/if}
 	</div>
@@ -2118,16 +2115,16 @@
 		     two words in it already, and the label says which it is drawing. It
 		     was a press and hold, until a hold came to mean "what is this?". -->
 		<label
-			title="{GRID_MAJOR}mm grid with a {GRID_MINOR}mm subgrid; dragging snaps to it ({SHORTCUTS.grid}). Press again for {grid &&
-			gridStyle === 'lines'
-				? 'a dot grid'
-				: grid
-					? 'no grid'
-					: 'ruled lines'}."
+			title={t('stage.gridTitle', {
+				major: GRID_MAJOR,
+				minor: GRID_MINOR,
+				key: SHORTCUTS.grid,
+				next: grid && gridStyle === 'lines' ? 'dots' : grid ? 'none' : 'lines'
+			})}
 		>
 			<input
 				type="checkbox"
-				aria-label={grid && gridStyle === 'dots' ? 'Dots' : 'Grid'}
+				aria-label={grid && gridStyle === 'dots' ? t('stage.dots') : t('stage.grid')}
 				checked={grid}
 				use:mixed={grid && gridStyle === 'dots'}
 				onchange={(e) => {
@@ -2139,22 +2136,18 @@
 					} else ongrid(false);
 				}}
 			/>
-			<span class="wide">{grid && gridStyle === 'dots' ? 'Dots' : 'Grid'}</span>
+			<span class="wide">{grid && gridStyle === 'dots' ? t('stage.dots') : t('stage.grid')}</span>
 			<span class="narrow" aria-hidden="true">{grid && gridStyle === 'dots' ? '\u2237' : '\u22d5'}</span>
 		</label>
 		<label
 			title={withKey(
-				guidesFull
-					? 'Page margins, alignment guides and spacing: a drag shows its millimetres to its neighbours — press to hide the spacing'
-					: !guidesOff
-						? 'Page margins and alignment guides, without the spacing — press to turn guides off'
-						: 'No guides — press for the page margins, alignment guides and spacing',
+				guidesFull ? t('stage.guidesFullTitle') : !guidesOff ? t('stage.guidesPartTitle') : t('stage.guidesOffTitle'),
 				'guides'
 			)}
 		>
 			<input
 				type="checkbox"
-				aria-label="Guides"
+				aria-label={t('stage.guides')}
 				checked={!guidesOff}
 				use:mixed={!guidesFull && !guidesOff}
 				onchange={(e) => {
@@ -2164,22 +2157,18 @@
 					cycleGuides();
 				}}
 			/>
-			<span class="wide">Guides</span>
+			<span class="wide">{t('stage.guides')}</span>
 			<span class="narrow" aria-hidden="true">{guidesFull ? '\u2223' : '\u2224'}</span>
 		</label>
 		<label
 			title={withKey(
-				!bounds
-					? "No boxes — press for each area's dashed bounds, its badges and the trim edge (screen only, never printed)"
-					: ties
-						? 'Boxes, and every tie between areas drawn as its thread — press to turn boxes off'
-						: "Each area's dashed bounds, its badges and the trim edge, screen only — press to draw every tie as well",
+				!bounds ? t('stage.boxesOffTitle') : ties ? t('stage.boxesTiesTitle') : t('stage.boxesOnTitle'),
 				'boxes'
 			)}
 		>
 			<input
 				type="checkbox"
-				aria-label="Boxes"
+				aria-label={t('stage.boxes')}
 				checked={bounds}
 				use:mixed={bounds && ties}
 				onchange={(e) => {
@@ -2188,7 +2177,7 @@
 					cycleBounds();
 				}}
 			/>
-			<span class="wide">Boxes</span>
+			<span class="wide">{t('stage.boxes')}</span>
 			<span class="narrow" aria-hidden="true">{bounds && ties ? '\u229e' : '\u22a1'}</span>
 		</label>
 	</div>
@@ -2199,8 +2188,8 @@
 	     control always says where the page is. -->
 	<div class="corner right">
 		<MenuSelect
-			label="Zoom"
-			title={withKey('Zoom — double-click to go between Fit and the zoom before it', 'zoom')}
+			label={t('stage.zoom')}
+			title={withKey(t('stage.zoomTitle'), 'zoom')}
 			bare
 			value={typeof zoom === 'number' ? String(zoom) : zoom}
 			items={zoomItems}
@@ -2225,7 +2214,7 @@
 			class:push-right={pushed === 'right'}
 			class:push-centre={pushed === 'centre'}
 			role="group"
-			aria-label="Nudge the selected box"
+			aria-label={t('stage.nudge.label')}
 			style="right:{padAt.right}px;bottom:{padAt.bottom}px"
 			onpointerup={stopNudge}
 			onpointercancel={stopNudge}
@@ -2242,17 +2231,17 @@
 				<button
 					class="up"
 					class:tied={verticalTied}
-					title={verticalTied ? `Gap ${padStep}mm smaller — closer to the area this one follows` : `Up ${padStep}mm`}
+					title={verticalTied ? t('stage.nudge.gapSmaller', { step: padStep }) : t('stage.nudge.up', { step: padStep })}
 					onpointerdown={(e) => startNudge(e, 0, -padStep)}
 				>
 					<Icon name={verticalTied ? 'skip-back-filled' : 'caret-up'} size={verticalTied ? 16 : 30} />
 				</button>
-				<button class="left" title="Left {padStep}mm" onpointerdown={(e) => startNudge(e, -padStep, 0)}><Icon name="caret-left" size={30} /></button>
+				<button class="left" title={t('stage.nudge.left', { step: padStep })} onpointerdown={(e) => startNudge(e, -padStep, 0)}><Icon name="caret-left" size={30} /></button>
 				<!-- The middle button carries the second gesture: drag it and the pad
 				     comes with your finger. A tap still cycles the step. -->
 				<button
 					class="step"
-					title="Step size — 1, 5 or 10mm. Drag it to move the pad; hold it to put the pad away."
+					title={t('stage.nudge.step')}
 					onpointerdown={(e) => {
 						pushed = 'centre';
 						padPickup(e);
@@ -2265,11 +2254,11 @@
 						padStep = PAD_STEPS[(PAD_STEPS.indexOf(padStep) + 1) % PAD_STEPS.length];
 					}}>{padStep}</button
 				>
-				<button class="right" title="Right {padStep}mm" onpointerdown={(e) => startNudge(e, padStep, 0)}><Icon name="caret-right" size={30} /></button>
+				<button class="right" title={t('stage.nudge.right', { step: padStep })} onpointerdown={(e) => startNudge(e, padStep, 0)}><Icon name="caret-right" size={30} /></button>
 				<button
 					class="down"
 					class:tied={verticalTied}
-					title={verticalTied ? `Gap ${padStep}mm larger — further from the area this one follows` : `Down ${padStep}mm`}
+					title={verticalTied ? t('stage.nudge.gapLarger', { step: padStep }) : t('stage.nudge.down', { step: padStep })}
 					onpointerdown={(e) => startNudge(e, 0, padStep)}
 				>
 					<Icon name={verticalTied ? 'skip-back-filled' : 'caret-down'} size={verticalTied ? 16 : 30} />

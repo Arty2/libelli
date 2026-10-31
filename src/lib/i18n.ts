@@ -234,6 +234,10 @@ function render(nodes: Node[], values: Values, count: number | null): Part[] {
 		if (typeof out[out.length - 1] === 'string') out[out.length - 1] += text;
 		else out.push(text);
 	};
+	const add = (part: Part) => {
+		if (typeof part === 'string') push(part);
+		else out.push(part);
+	};
 	for (const node of nodes) {
 		switch (node.kind) {
 			case 'text':
@@ -252,12 +256,12 @@ function render(nodes: Node[], values: Values, count: number | null): Part[] {
 			case 'plural': {
 				const n = Number(values[node.name]);
 				const option = node.options.get(`=${n}`) ?? node.options.get(plurals.select(n)) ?? node.options.get('other')!;
-				for (const part of render(option, values, n)) typeof part === 'string' ? push(part) : out.push(part);
+				for (const part of render(option, values, n)) add(part);
 				break;
 			}
 			case 'select': {
 				const option = node.options.get(String(values[node.name])) ?? node.options.get('other')!;
-				for (const part of render(option, values, count)) typeof part === 'string' ? push(part) : out.push(part);
+				for (const part of render(option, values, count)) add(part);
 				break;
 			}
 			case 'tag':

@@ -2,7 +2,7 @@
 	A message with rich text in it — `<strong>`, `<kbd>` — drawn as elements.
 	The tags a message may use are this list and no other, each an element
 	written here: the catalogue's text never reaches the page as markup, so a
-	translation cannot add an attribute, a link or a script (no `{@html}`).
+	translation cannot add an attribute, a link or a script, and this file needs no raw-HTML block.
 	A tag not on the list keeps its words and loses its element.
 -->
 <script lang="ts">

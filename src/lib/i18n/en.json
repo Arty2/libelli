@@ -63,6 +63,26 @@
 		"defaultMessage": "{count, plural, one {Unlock} other {Unlock # Areas}}",
 		"description": "Menu item: let the chosen areas be moved and restyled again; count is how many are chosen."
 	},
+	"arrange.back": {
+		"defaultMessage": "Send to Back",
+		"description": "Button: move the chosen areas behind all others."
+	},
+	"arrange.backward": {
+		"defaultMessage": "Send Backward",
+		"description": "Button: move the chosen areas one step back."
+	},
+	"arrange.forward": {
+		"defaultMessage": "Bring Forward",
+		"description": "Button: move the chosen areas one step forward."
+	},
+	"arrange.front": {
+		"defaultMessage": "Bring to Front",
+		"description": "Button: move the chosen areas in front of all others."
+	},
+	"arrange.label": {
+		"defaultMessage": "Stacking order",
+		"description": "Screen-reader name of the column of stacking buttons."
+	},
 	"background.contain": {
 		"defaultMessage": "Contain",
 		"description": "Option: fit the whole background image inside, leaving space at the sides if needed."
@@ -1158,5 +1178,225 @@
 	"sheetLightbox.previousSheet": {
 		"defaultMessage": "Previous sheet",
 		"description": "Button in the full-screen sheet view."
+	},
+	"stage.addArea": {
+		"defaultMessage": "Area",
+		"description": "Hidden name of the button that adds an area."
+	},
+	"stage.addAreaTitle": {
+		"defaultMessage": "Add an area to the page",
+		"description": "Tooltip of the add-area button."
+	},
+	"stage.boxes": {
+		"defaultMessage": "Boxes",
+		"description": "Checkbox: draw each area's dashed outline on screen."
+	},
+	"stage.boxesOffTitle": {
+		"defaultMessage": "No boxes — press for each area's dashed bounds, its badges and the trim edge (screen only, never printed)",
+		"description": "Tooltip of Boxes when off."
+	},
+	"stage.boxesOnTitle": {
+		"defaultMessage": "Each area's dashed bounds, its badges and the trim edge, screen only — press to draw every tie as well",
+		"description": "Tooltip of Boxes when on."
+	},
+	"stage.boxesTiesTitle": {
+		"defaultMessage": "Boxes, and every tie between areas drawn as its thread — press to turn boxes off",
+		"description": "Tooltip of Boxes when showing ties too."
+	},
+	"stage.card": {
+		"defaultMessage": "Card",
+		"description": "Screen-reader name of the card pager."
+	},
+	"stage.dots": {
+		"defaultMessage": "Dots",
+		"description": "Checkbox label when the grid is drawn as dots."
+	},
+	"stage.draw": {
+		"defaultMessage": "Draw this area",
+		"description": "Hidden name of the button that opens drawing for the chosen area."
+	},
+	"stage.drawTitle": {
+		"defaultMessage": "Draw this area's image",
+		"description": "Tooltip of the draw button beside the page."
+	},
+	"stage.fullScreen": {
+		"defaultMessage": "Look at this card full screen",
+		"description": "Tooltip of the card counter."
+	},
+	"stage.grid": {
+		"defaultMessage": "Grid",
+		"description": "Checkbox: show the grid."
+	},
+	"stage.gridTitle": {
+		"defaultMessage": "{major}mm grid with a {minor}mm subgrid; dragging snaps to it ({key}). Press again for {next, select, dots {a dot grid} none {no grid} other {ruled lines}}.",
+		"description": "Tooltip of the Grid checkbox; key is its keyboard shortcut; next is what pressing switches to."
+	},
+	"stage.guides": {
+		"defaultMessage": "Guides",
+		"description": "Checkbox: show margins and alignment guides."
+	},
+	"stage.guidesFullTitle": {
+		"defaultMessage": "Page margins, alignment guides and spacing: a drag shows its millimetres to its neighbours — press to hide the spacing",
+		"description": "Tooltip of Guides when fully on."
+	},
+	"stage.guidesOffTitle": {
+		"defaultMessage": "No guides — press for the page margins, alignment guides and spacing",
+		"description": "Tooltip of Guides when off."
+	},
+	"stage.guidesPartTitle": {
+		"defaultMessage": "Page margins and alignment guides, without the spacing — press to turn guides off",
+		"description": "Tooltip of Guides when on without spacing."
+	},
+	"stage.label": {
+		"defaultMessage": "Card preview",
+		"description": "Screen-reader name of the area showing the card."
+	},
+	"stage.lockAgain": {
+		"defaultMessage": "Lock the design again",
+		"description": "Screen-reader name of the padlock just after unlocking."
+	},
+	"stage.locked": {
+		"defaultMessage": "The design is locked — press to unlock it",
+		"description": "Tooltip of the padlock beside the page."
+	},
+	"stage.move": {
+		"defaultMessage": "Move — areas drag where you press them. Press for zoom and pan: scroll and pinch without dragging; the cross brings out a nudge pad.",
+		"description": "Tooltip of the mode button when areas can be dragged."
+	},
+	"stage.nextCard": {
+		"defaultMessage": "Next card",
+		"description": "Button beside the page."
+	},
+	"stage.nudge.down": {
+		"defaultMessage": "Down {step}mm",
+		"description": "Tooltip of the nudge pad's down arrow."
+	},
+	"stage.nudge.gapLarger": {
+		"defaultMessage": "Gap {step}mm larger — further from the area this one follows",
+		"description": "Tooltip of the nudge pad's down arrow for an area tied under another."
+	},
+	"stage.nudge.gapSmaller": {
+		"defaultMessage": "Gap {step}mm smaller — closer to the area this one follows",
+		"description": "Tooltip of the nudge pad's up arrow for an area tied under another."
+	},
+	"stage.nudge.label": {
+		"defaultMessage": "Nudge the selected box",
+		"description": "Screen-reader name of the on-screen nudge pad."
+	},
+	"stage.nudge.left": {
+		"defaultMessage": "Left {step}mm",
+		"description": "Tooltip of the nudge pad's left arrow."
+	},
+	"stage.nudge.right": {
+		"defaultMessage": "Right {step}mm",
+		"description": "Tooltip of the nudge pad's right arrow."
+	},
+	"stage.nudge.step": {
+		"defaultMessage": "Step size — 1, 5 or 10mm. Drag it to move the pad; hold it to put the pad away.",
+		"description": "Tooltip of the nudge pad's centre."
+	},
+	"stage.nudge.up": {
+		"defaultMessage": "Up {step}mm",
+		"description": "Tooltip of the nudge pad's up arrow."
+	},
+	"stage.pan": {
+		"defaultMessage": "Zoom and pan — a finger scrolls, areas stay put; tap one and nudge it with the pad. Press to drag areas again.",
+		"description": "Tooltip of the mode button in zoom and pan mode."
+	},
+	"stage.panLabel": {
+		"defaultMessage": "Zoom and pan",
+		"description": "Hidden name of the mode button."
+	},
+	"stage.previousCard": {
+		"defaultMessage": "Previous card",
+		"description": "Button beside the page."
+	},
+	"stage.readOnly": {
+		"defaultMessage": "Read only",
+		"description": "Screen-reader name of the eye button in a read-only tab."
+	},
+	"stage.readOnlyTitle": {
+		"defaultMessage": "Read only — the card being edited in another tab. Press for Open Here, Read Only or Close.",
+		"description": "Tooltip of the eye button in a read-only tab."
+	},
+	"stage.redoTitle": {
+		"defaultMessage": "{action} — hold, or right-click, for every step, to go forward several at once",
+		"description": "Tooltip of Redo; action is “Redo” with its shortcut."
+	},
+	"stage.selectMultiple": {
+		"defaultMessage": "Select multiple",
+		"description": "Hidden name of the select-multiple button on a phone."
+	},
+	"stage.selectMultipleTitle": {
+		"defaultMessage": "Select multiple — then every tap adds an area or drops it",
+		"description": "Tooltip of the select-multiple button."
+	},
+	"stage.selectingMultiple": {
+		"defaultMessage": "Selecting several — every press adds an area or drops it. Press to stop, or Esc.",
+		"description": "Tooltip of the select-multiple button while it is on."
+	},
+	"stage.showPad": {
+		"defaultMessage": "Show the nudge pad",
+		"description": "Button: bring back the on-screen nudge pad."
+	},
+	"stage.stopSelecting": {
+		"defaultMessage": "Stop selecting multiple",
+		"description": "Hidden name of the select-multiple button while it is on."
+	},
+	"stage.stray": {
+		"defaultMessage": "Bring stray areas back onto the page",
+		"description": "Hidden name of the button that moves off-page areas back."
+	},
+	"stage.strayLockedTitle": {
+		"defaultMessage": "{count, plural, one {# area is not wholly on the page — unlock the design to bring it back} other {# areas are not wholly on the page — unlock the design to bring them back}}",
+		"description": "Tooltip of the stray-areas button on a locked design."
+	},
+	"stage.strayTitle": {
+		"defaultMessage": "{count, plural, one {# area is not wholly on the page — bring it back on, and nothing else} other {# areas are not wholly on the page — bring them back on, and nothing else}}",
+		"description": "Tooltip of the stray-areas button."
+	},
+	"stage.undoTitle": {
+		"defaultMessage": "{action} — hold, or right-click, for every step, to go back several at once",
+		"description": "Tooltip of Undo; action is “Undo” with its shortcut."
+	},
+	"stage.unlockDesign": {
+		"defaultMessage": "Unlock the design",
+		"description": "Screen-reader name of the padlock."
+	},
+	"stage.unlocked": {
+		"defaultMessage": "Unlocked — press again to lock it",
+		"description": "Tooltip of the padlock just after unlocking."
+	},
+	"stage.zoom": {
+		"defaultMessage": "Zoom",
+		"description": "Label of the zoom menu."
+	},
+	"stage.zoomActual": {
+		"defaultMessage": "{percent}% — Actual",
+		"description": "Zoom option: the paper at its real size."
+	},
+	"stage.zoomActualEstimate": {
+		"defaultMessage": "The paper at its real size, measured for a {panel} — the commonest screen of this resolution, so it may be off",
+		"description": "Tooltip of Actual when the screen is guessed; panel is a screen model."
+	},
+	"stage.zoomActualKnown": {
+		"defaultMessage": "The paper at its real size, measured for a {panel}",
+		"description": "Tooltip of Actual; panel is a screen model."
+	},
+	"stage.zoomFit": {
+		"defaultMessage": "{percent}% — Fit",
+		"description": "Zoom option: fit the page in the window."
+	},
+	"stage.zoomPercent": {
+		"defaultMessage": "{percent}%",
+		"description": "A zoom level."
+	},
+	"stage.zoomTitle": {
+		"defaultMessage": "Zoom — double-click to go between Fit and the zoom before it",
+		"description": "Tooltip of the zoom menu."
+	},
+	"stage.zoomUnknownScreen": {
+		"defaultMessage": "This screen is not one the app knows, so this is the browser’s own millimetre, which may not match a ruler",
+		"description": "Tooltip of Actual on an unknown screen."
 	}
 }
