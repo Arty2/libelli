@@ -20,7 +20,7 @@
  * face is the page's work, since both reach the browser's storage.
  */
 
-import { t } from './i18n';
+import { quotedList, t } from './i18n';
 import { localImageName } from './assets';
 import { readIdml, type IdmlImport } from './idml';
 import { parseTable, toCsv } from './parse';
@@ -315,12 +315,12 @@ export async function readInDesign(files: Map<string, Uint8Array>, archiveName: 
 		// Several: the one InDesign's Package wrote beside its document, by name.
 		const beside = idmls.find((p) => paths.some((q) => /\.indd$/i.test(q) && stemOf(q).toLowerCase() === stemOf(p).toLowerCase()));
 		const chosen = beside ?? idmls[0];
-		if (idmls.length > 1) notes.push(`The archive holds ${idmls.length} IDML files; “${base(chosen)}” was brought in${beside ? ', the one named after the InDesign document' : ''}.`);
+		if (idmls.length > 1) notes.push(t('package.severalIdml', { count: idmls.length, name: base(chosen), beside: beside ? 'yes' : 'no' }));
 		let inner: Map<string, Uint8Array>;
 		try {
 			inner = await unzip(files.get(chosen)!);
 		} catch (error) {
-			throw new PackageError(`“${base(chosen)}” is damaged: ${error instanceof ZipError ? error.message : 'it is not an IDML'}`);
+			throw new PackageError(t('package.idmlDamaged', { name: base(chosen), why: error instanceof ZipError ? error.message : t('package.notIdml') }));
 		}
 		layoutName = base(chosen);
 		layout = readIdml(inner, stemOf(chosen));
@@ -394,8 +394,8 @@ export async function readInDesign(files: Map<string, Uint8Array>, archiveName: 
 	if (absent.length) {
 		notes.push(
 			bare
-				? `An IDML holds none of the pictures it links to (${absent.join(', ')}); the fields show them once they are added in Pictures, or import InDesign's zipped Package folder, which has them in Links.`
-				: `${absent.length === 1 ? 'The picture' : 'The pictures'} ${absent.map((a) => `“${a}”`).join(', ')} ${absent.length === 1 ? 'is' : 'are'} not in the archive; the field${absent.length === 1 ? ' shows it' : 's show them'} once added in Pictures.`
+				? t('package.idmlNoPictures', { names: absent.join(', ') })
+				: t('package.picturesAbsent', { count: absent.length, names: quotedList(absent) })
 		);
 	}
 	const fontFiles = paths.filter((p) => FONT.test(p)).map((p) => ({ name: base(p), bytes: files.get(p)! }));

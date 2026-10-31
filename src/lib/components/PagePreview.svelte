@@ -5,7 +5,7 @@
 	import type { Theme } from '$lib/theme';
 	import Icon from './Icon.svelte';
 	import { isDark } from '$lib/color';
-	import { SHORTCUTS, withKey } from '$lib/keys';
+	import { shortcut, withKey } from '$lib/keys';
 	import MenuSelect, { type MenuItem } from './MenuSelect.svelte';
 	import SelectionTools from './SelectionTools.svelte';
 	import type { AlignEdge } from '$lib/layout';
@@ -2118,7 +2118,7 @@
 			title={t('stage.gridTitle', {
 				major: GRID_MAJOR,
 				minor: GRID_MINOR,
-				key: SHORTCUTS.grid,
+				key: shortcut('grid'),
 				next: grid && gridStyle === 'lines' ? 'dots' : grid ? 'none' : 'lines'
 			})}
 		>

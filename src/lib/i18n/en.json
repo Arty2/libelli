@@ -1647,6 +1647,34 @@
 		"defaultMessage": "Unlock this area",
 		"description": "Screen-reader name of a control in the card on the stage."
 	},
+	"code.code128Char": {
+		"defaultMessage": "Code 128 cannot encode {char}.",
+		"description": "Why a Code 128 barcode cannot be drawn: a character it has no bars for."
+	},
+	"code.code128Label": {
+		"defaultMessage": "Code 128 barcode",
+		"description": "Screen-reader name of a Code 128 barcode on a card."
+	},
+	"code.ean13Digits": {
+		"defaultMessage": "EAN-13 takes 12 or 13 digits, with a right check digit, or an ISBN-10.",
+		"description": "Why an EAN-13 barcode cannot be drawn."
+	},
+	"code.ean13Label": {
+		"defaultMessage": "EAN-13 barcode",
+		"description": "Screen-reader name of an EAN-13 barcode on a card."
+	},
+	"code.empty": {
+		"defaultMessage": "Nothing to encode.",
+		"description": "Why a QR code or barcode cannot be drawn: the cell is empty."
+	},
+	"code.qrLabel": {
+		"defaultMessage": "QR code",
+		"description": "Screen-reader name of a QR code on a card."
+	},
+	"code.qrTooMuch": {
+		"defaultMessage": "Too much text for a QR code of this size.",
+		"description": "Why a QR code cannot be drawn."
+	},
 	"colorField.fromRow": {
 		"defaultMessage": "This row's {column} — the color comes from that column",
 		"description": "Tooltip of a color swatch whose color is taken from a table column; {column} is the column's name."
@@ -1714,6 +1742,10 @@
 	"common.undo": {
 		"defaultMessage": "Undo",
 		"description": "Button: undo the last change."
+	},
+	"common.withKey": {
+		"defaultMessage": "{title} ({key})",
+		"description": "A tooltip with its keyboard shortcut after it, in brackets."
 	},
 	"copy.banner.mouse": {
 		"defaultMessage": "Double-click a field to edit it, or a picture to replace it. A red line means the text is too long.",
@@ -2154,6 +2186,62 @@
 	"export.versoLetter": {
 		"defaultMessage": "V",
 		"description": "One-letter mark for a left-hand (verso) page."
+	},
+	"fieldKind.barcode": {
+		"defaultMessage": "Barcode",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.body": {
+		"defaultMessage": "Body",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.code": {
+		"defaultMessage": "Code",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.credit": {
+		"defaultMessage": "Credit",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.date": {
+		"defaultMessage": "Date",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.detail": {
+		"defaultMessage": "Detail",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.image": {
+		"defaultMessage": "Image",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.label": {
+		"defaultMessage": "Byline",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.link": {
+		"defaultMessage": "QR code",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.notes": {
+		"defaultMessage": "Notes",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.number": {
+		"defaultMessage": "Number",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.subtitle": {
+		"defaultMessage": "Subtitle",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"fieldKind.title": {
+		"defaultMessage": "Title",
+		"description": "What a column holds, in the Automatic Layout dialog: the role its area takes on the card."
+	},
+	"folder.unnamed": {
+		"defaultMessage": "the folder you chose",
+		"description": "Stands in for a folder with no name of its own (a drive's root), inside a sentence."
 	},
 	"fontKind.handwriting": {
 		"defaultMessage": "Cursive",
@@ -2967,6 +3055,14 @@
 		"defaultMessage": "{count, plural, one {1 font is missing; see the notice above the page.} other {# fonts are missing; see the notice above the page.}}",
 		"description": "Note: fonts the design needs that are not here."
 	},
+	"package.idmlDamaged": {
+		"defaultMessage": "“{name}” is damaged: {why}",
+		"description": "Reason an archive could not be imported."
+	},
+	"package.idmlNoPictures": {
+		"defaultMessage": "An IDML holds none of the pictures it links to ({names}); the fields show them once they are added in Pictures, or import InDesign's zipped Package folder, which has them in Links.",
+		"description": "Note after an InDesign import, listed in its report. "
+	},
 	"package.includeFonts": {
 		"defaultMessage": "Include fonts ({families}). Tick only if their licences allow sharing.",
 		"description": "Checkbox in the Package dialog: put the design's font files in the package."
@@ -3011,6 +3107,10 @@
 		"defaultMessage": "No font files were found for {families}.",
 		"description": "Note after saving a package: fonts with no file to include."
 	},
+	"package.notIdml": {
+		"defaultMessage": "it is not an IDML",
+		"description": "Reason an archive could not be imported, after “… is damaged:”."
+	},
 	"package.notPackage": {
 		"defaultMessage": "It is not a libelli package.",
 		"description": "Reason a ZIP file could not be opened as a package."
@@ -3022,6 +3122,10 @@
 	"package.opened": {
 		"defaultMessage": "“{name}” opened for copy editing.",
 		"description": "Notice after opening a package."
+	},
+	"package.picturesAbsent": {
+		"defaultMessage": "{count, plural, one {The picture {names} is not in the archive; the field shows it once added in Pictures.} other {The pictures {names} are not in the archive; the fields show them once added in Pictures.}}",
+		"description": "Note after an InDesign import, listed in its report. "
 	},
 	"package.restored": {
 		"defaultMessage": "{count, plural, one {1 missing file was restored.} other {# missing files were restored.}}",
@@ -3050,6 +3154,10 @@
 	"package.severalArtworks": {
 		"defaultMessage": "Several pictures could be the page's artwork; “{name}” was made the background. Name the one you mean “background”.",
 		"description": "Note after an InDesign import, listed in its report. Keep “background” in English: it is matched in file names."
+	},
+	"package.severalIdml": {
+		"defaultMessage": "The archive holds {count} IDML files; “{name}” was brought in{beside, select, yes {, the one named after the InDesign document} other {}}.",
+		"description": "Note after an InDesign import, listed in its report. "
 	},
 	"package.standIn": {
 		"defaultMessage": "“{link}” is a file a browser cannot draw; “{name}” from the archive is shown in its place.",
@@ -3871,6 +3979,22 @@
 		"defaultMessage": "Upload images from this device",
 		"description": "Tooltip of the upload button."
 	},
+	"png.noCanvas": {
+		"defaultMessage": "This browser will not give a canvas to draw on.",
+		"description": "Why a PNG could not be made."
+	},
+	"png.notEncoded": {
+		"defaultMessage": "The image could not be encoded.",
+		"description": "Why a PNG could not be made."
+	},
+	"png.notRasterised": {
+		"defaultMessage": "The card could not be rasterised.",
+		"description": "Why a PNG could not be made."
+	},
+	"png.nothing": {
+		"defaultMessage": "Nothing to export.",
+		"description": "Why a PNG could not be made."
+	},
 	"print.background.fitTitle": {
 		"defaultMessage": "How the image fills the sheet",
 		"description": "Tooltip of the drop-down for how a sheet background image is fitted."
@@ -4103,6 +4227,90 @@
 		"defaultMessage": "{count, plural, one {# area goes} other {# areas go}} back to the {starter}. Your rows are not touched.",
 		"description": "Dialog before resetting the template; {starter} is the starter design's name."
 	},
+	"screen.109InchIpad": {
+		"defaultMessage": "10.9-inch iPad",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.11InchIpadPro": {
+		"defaultMessage": "11-inch iPad Pro",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.129InchIpadPro": {
+		"defaultMessage": "12.9-inch iPad Pro",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.13InchMacbook": {
+		"defaultMessage": "13-inch MacBook",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.13InchMacbookAir": {
+		"defaultMessage": "13-inch MacBook Air",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.14InchMacbookPro": {
+		"defaultMessage": "14-inch MacBook Pro",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.156InchLaptop": {
+		"defaultMessage": "15.6-inch laptop",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.15InchMacbookAir": {
+		"defaultMessage": "15-inch MacBook Air",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.15InchMacbookPro": {
+		"defaultMessage": "15-inch MacBook Pro",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.16InchMacbookPro": {
+		"defaultMessage": "16-inch MacBook Pro",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.24InchImac": {
+		"defaultMessage": "24-inch iMac",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.24InchMonitor": {
+		"defaultMessage": "24-inch monitor",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.27Inch4kMonitor": {
+		"defaultMessage": "27-inch 4K monitor",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.27InchImacOrStudioDisplay": {
+		"defaultMessage": "27-inch iMac or Studio Display",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.27InchMonitor": {
+		"defaultMessage": "27-inch monitor",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.34InchUltrawide": {
+		"defaultMessage": "34-inch ultrawide",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.47InchIphone": {
+		"defaultMessage": "4.7-inch iPhone",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.58InchIphone": {
+		"defaultMessage": "5.8-inch iPhone",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.61InchIphone": {
+		"defaultMessage": "6.1-inch iPhone",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.67InchIphone": {
+		"defaultMessage": "6.7-inch iPhone",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
+	"screen.ipadMini": {
+		"defaultMessage": "iPad mini",
+		"description": "A screen, named in the zoom menu's Actual size tooltip as the one the page is sized for. Model names stay as the maker writes them."
+	},
 	"selection.delete": {
 		"defaultMessage": "Delete",
 		"description": "Button beside the page: remove the chosen areas."
@@ -4158,6 +4366,78 @@
 	"sheetLightbox.previousSheet": {
 		"defaultMessage": "Previous sheet",
 		"description": "Button in the full-screen sheet view."
+	},
+	"shortcut.boxes": {
+		"defaultMessage": "Ctrl/Cmd+H",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.cards": {
+		"defaultMessage": "arrows or PageUp/PageDown, with nothing selected",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.copyStyle": {
+		"defaultMessage": "Ctrl/Cmd+Shift+C",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.delete": {
+		"defaultMessage": "Delete",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.duplicate": {
+		"defaultMessage": "Ctrl/Cmd+D",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.export": {
+		"defaultMessage": "Ctrl/Cmd+P",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.grid": {
+		"defaultMessage": "Ctrl/Cmd+' or Ctrl/Cmd+#",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.guides": {
+		"defaultMessage": "Ctrl/Cmd+; or |",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.help": {
+		"defaultMessage": "?",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.lockArea": {
+		"defaultMessage": "Ctrl/Cmd+L",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.lockPage": {
+		"defaultMessage": "Ctrl/Cmd+Shift+L",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.pasteStyle": {
+		"defaultMessage": "Ctrl/Cmd+Shift+V",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.redo": {
+		"defaultMessage": "Ctrl/Cmd+Y",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.type": {
+		"defaultMessage": "Enter",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.undo": {
+		"defaultMessage": "Ctrl/Cmd+Z",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"shortcut.zoom": {
+		"defaultMessage": "Ctrl/Cmd + and −, Ctrl/Cmd+0 to fit; with an area chosen, + and − size its type",
+		"description": "A keyboard shortcut, shown in brackets after a tooltip. Translate key names as this language's keyboards print them; keep the symbols."
+	},
+	"size.kilobytes": {
+		"defaultMessage": "{count} KB",
+		"description": "A file size in kilobytes."
+	},
+	"size.megabytes": {
+		"defaultMessage": "{count} MB",
+		"description": "A file size in megabytes."
 	},
 	"stage.addArea": {
 		"defaultMessage": "Area",
@@ -4394,6 +4674,10 @@
 	"tab.handedBody": {
 		"defaultMessage": "Your work moved to another tab, saved as you left it. This tab has stopped saving, so nothing here can overwrite it.",
 		"description": "Dialog in a tab whose editing moved to another tab."
+	},
+	"tab.readOnly": {
+		"defaultMessage": "This tab is read only.",
+		"description": "Error when a read-only tab tries to save a picture."
 	},
 	"tab.readonlyBody": {
 		"defaultMessage": "This tab is read only: it shows the card being edited in another tab, and saves nothing.",
@@ -5058,6 +5342,10 @@
 	"theme.title": {
 		"defaultMessage": "{theme} — press for {next}{peek, select, none {} other {; hover or hold for a look at {peek}}}{readonly, select, yes { — this read-only tab only, until it is closed} other {}}",
 		"description": "Tooltip of the theme button; {theme}, {next} and {peek} are theme names such as Dark."
+	},
+	"tile.notLoaded": {
+		"defaultMessage": "That image did not load.",
+		"description": "Why a picture could not be tiled."
 	},
 	"xml.atLine": {
 		"defaultMessage": "{what} (line {line})",

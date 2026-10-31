@@ -5417,7 +5417,7 @@
 						}}
 					>
 						{#each FIELD_KINDS as kind (kind)}
-							<option value={kind}>{KIND_LABELS[kind]}</option>
+							<option value={kind}>{t(KIND_LABELS[kind])}</option>
 						{/each}
 					</select>
 				</li>

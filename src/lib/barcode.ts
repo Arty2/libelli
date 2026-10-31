@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { parseColor } from './color';
 import { escapeHtml } from './markdown';
 
@@ -63,10 +64,10 @@ function digitsFrom(text: string, at: number): number {
  * long number is half as wide again as it needs to be.
  */
 export function code128Values(text: string): number[] {
-	if (!text) throw new Error('Nothing to encode.');
+	if (!text) throw new Error(t('code.empty'));
 	for (const ch of text) {
 		const code = ch.charCodeAt(0);
-		if (code < 32 || code > 126) throw new Error(`Code 128 cannot encode ${JSON.stringify(ch)}.`);
+		if (code < 32 || code > 126) throw new Error(t('code.code128Char', { char: JSON.stringify(ch) }));
 	}
 	const values: number[] = [];
 	let set: 'B' | 'C';
@@ -154,7 +155,7 @@ export function eanDigits(text: string): string | null {
 /** EAN-13 as modules, for whatever `eanDigits` accepts. */
 export function ean13(text: string): boolean[] {
 	const all = eanDigits(text);
-	if (!all) throw new Error('EAN-13 takes 12 or 13 digits, with a right check digit, or an ISBN-10.');
+	if (!all) throw new Error(t('code.ean13Digits'));
 	const out: boolean[] = [];
 	widths('111', out);
 	const parity = EAN_PARITY[Number(all[0])];
@@ -224,7 +225,7 @@ export function barcodeSvg(text: string, kind: BarcodeKind, options: BarcodeSvgO
 	const modules = kind === 'ean13' ? ean13(text) : code128(text);
 	const color = parseColor(options.color ?? null) ?? '#000000';
 	const background = parseColor(options.background ?? null);
-	const label = kind === 'ean13' ? 'EAN-13 barcode' : 'Code 128 barcode';
+	const label = escapeHtml(t(kind === 'ean13' ? 'code.ean13Label' : 'code.code128Label'));
 	if (!options.digits) {
 		return barsSvg(barsPath(modules), modules.length, color, label).replace(
 			'><path',
