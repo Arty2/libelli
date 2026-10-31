@@ -284,6 +284,11 @@ export function rich(key: MessageKey, values: Values = {}): Part[] {
 	return render(nodesFor(key), values, null);
 }
 
+const lists = new Intl.ListFormat(LOCALE, { style: 'long', type: 'conjunction' });
+
+/** Names in quotation marks, as a list in the locale's words: “a”, “b” and “c”. */
+export const quotedList = (names: string[]): string => lists.format(names.map((name) => t('common.quoted', { name })));
+
 /** Any ICU source as plain text, outside the catalogue — for tests, and for checking a translation. */
 export const formatMessage = (source: string, values: Values = {}): string => flatten(render(parseMessage(source), values, null));
 

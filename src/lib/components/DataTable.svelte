@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { quotedList, t, type MessageKey } from '$lib/i18n';
 	import { untrack } from 'svelte';
 	import { showWhitespace } from '$lib/whitespace';
 	import Icon from './Icon.svelte';
@@ -268,7 +269,11 @@
 	 * setting you look up.
 	 */
 	const ROW_HEIGHTS: RowHeight[] = ['short', 'medium', 'full'];
-	const ROW_HEIGHT_LABELS: Record<RowHeight, string> = { short: 'Short', medium: 'Long', full: 'Full' };
+	const ROW_HEIGHT_LABELS: Record<RowHeight, MessageKey> = {
+		short: 'table.rowHeight.short',
+		medium: 'table.rowHeight.medium',
+		full: 'table.rowHeight.full'
+	};
 	/** Carbon's: the ruled table for one line a row, fit to screen, fit to height. */
 	const ROW_HEIGHT_ICONS: Record<RowHeight, string> = { short: 'table', medium: 'fit-to-screen', full: 'fit-to-height' };
 	const nextRowHeight = $derived(ROW_HEIGHTS[(ROW_HEIGHTS.indexOf(rowHeight) + 1) % ROW_HEIGHTS.length]);
@@ -435,7 +440,7 @@
 
 	/** What a column a keyword has taken is told, here and in the status line. */
 	const keywordWarning = (column: string) =>
-		`“${column}” is a reserved keyword. Rename the column to enable the %%${column.trim().toLowerCase()}%% placeholder.`;
+		t('table.keywordWarning', { column, placeholder: column.trim().toLowerCase() });
 
 	const countLabel = (value: string) => {
 		// A picture's words are base64 nobody counts; what it weighs is the
@@ -445,7 +450,7 @@
 		const stored = localImageName(value);
 		if (stored) return stored;
 		const { characters, words } = countText(value);
-		return `${characters} character${characters === 1 ? '' : 's'} · ${words} word${words === 1 ? '' : 's'}`;
+		return t('table.count', { characters, words });
 	};
 
 	/**
@@ -669,7 +674,7 @@
 	const stepBack = () => closeBigCell(leaveTo !== 'images');
 
 	const leaveTitle = (dirty: boolean) =>
-		(dirty ? 'Close — the drawing not saved is dropped' : leaveTo === 'images' ? 'Back to Pictures' : leaveTo === 'card' ? 'Close' : 'Back to the table') + ' (Esc)';
+		t(dirty ? 'table.leave.dirty' : leaveTo === 'images' ? 'table.leave.pictures' : leaveTo === 'card' ? 'table.leave.close' : 'table.leave.table');
 
 	/**
 	 * Where the caret goes as the cell opens full size: where the finger
@@ -1040,7 +1045,7 @@
 	let sortedBy = $state<{ column: string; direction: SortDirection } | null>(null);
 	let pasteText = $state('');
 	/** Two rows of two tab-separated cells: what comes off a spreadsheet. */
-	const PASTE_EXAMPLE = 'Bellwether\tA quiet start\nCatalogue\tThe second card';
+	const PASTE_EXAMPLE = t('table.pasteExample');
 	let fileInput = $state<HTMLInputElement | null>(null);
 
 	/**
@@ -1174,7 +1179,7 @@
 		if (field) field.value = to;
 		if (to === from) return;
 		if (dataset.columns.includes(to)) {
-			onnotice(`There is already a column called “${to}”.`, 'warning');
+			onnotice(t('table.columnExists', { name: to }), 'warning');
 			return;
 		}
 		const columns = dataset.columns.map((c, i) => (i === index ? to : c));
@@ -1236,7 +1241,7 @@
 		expanded = new Set();
 		onchange(restored);
 		onactivate(previewed);
-		onnotice('Back to the order the rows came in.');
+		onnotice(t('table.unsorted'));
 	}
 
 	/**
@@ -1252,7 +1257,7 @@
 		const next = withoutOrder(dataset);
 		sortedBy = null;
 		const said = onchange(next, renumbering(dataset, next));
-		onnotice(said ? `Reindexed in this order. ${said.note}` : 'Reindexed in this order — undo puts the old numbers back.', said?.warning ? 'warning' : 'info');
+		onnotice(said ? t('table.reindexedNote', { note: said.note }) : t('table.reindexed'), said?.warning ? 'warning' : 'info');
 	}
 
 	/**
@@ -1264,7 +1269,7 @@
 		if (locked) return;
 		const wanted = name === undefined ? undefined : columnName(name) || undefined;
 		if (wanted && dataset.columns.includes(wanted)) {
-			onnotice(`There is already a column called \u201c${wanted}\u201d.`, 'warning');
+			onnotice(t('table.columnExists', { name: wanted }), 'warning');
 			return;
 		}
 		let column = wanted ?? '';
@@ -1313,7 +1318,7 @@
 			})
 		});
 		resetWidth(column);
-		onnotice(`Deleted the column \u201c${column}\u201d. Ctrl/Cmd+Z brings it back.`);
+		onnotice(t('table.columnDeleted', { column }));
 	}
 
 	/** How many cells go with a column, which is what the question is about. */
@@ -1486,7 +1491,7 @@
 		const said = onchange(next, renumbering(dataset, next));
 		if (activeRow >= rows.length) onactivate(Math.max(0, rows.length - 1));
 		onnotice(
-			`Deleted ${gone.size} row${gone.size === 1 ? '' : 's'}.${said ? ` ${said.note}` : ''} Ctrl/Cmd+Z brings ${gone.size === 1 ? 'it' : 'them'} back.`,
+			t('table.rowsDeleted', { count: gone.size, note: said ? ` ${said.note}` : '' }),
 			said?.warning ? 'warning' : 'info'
 		);
 	}
@@ -1505,7 +1510,7 @@
 		const bare = dataset.columns.length === 0;
 		const parsed = parseTable(pasteText, bare ? {} : { header: false });
 		if (!parsed.rows.length && !parsed.columns.length) {
-			onnotice('Nothing recognisable in there.', 'warning');
+			onnotice(t('table.pasteNothing'), 'warning');
 			return;
 		}
 		commitImport(parsed, mode);
@@ -1515,7 +1520,7 @@
 
 	function commitImport(parsed: Dataset, mode: 'replace' | 'append') {
 		if (locked) {
-			onnotice('The table is locked — unlock it to paste or import into it.', 'warning');
+			onnotice(t('table.lockedImport'), 'warning');
 			return;
 		}
 		// The one place the emptiness policy is decided for the open table — see
@@ -1523,7 +1528,7 @@
 		// import opens a table of its own, so it has nothing to lose; the page
 		// decides its own policy.)
 		if (wouldEmptyTable(dataset, parsed, mode)) {
-			onnotice('Nothing readable as rows in there — the table is unchanged.', 'warning');
+			onnotice(t('table.pasteUnreadable'), 'warning');
 			return;
 		}
 		const rows = dataset.columns.length ? realign(parsed) : parsed.rows;
@@ -1536,7 +1541,7 @@
 		}
 		sortedBy = null;
 		selectedRows = new Set();
-		onnotice(`${rows.length} row${rows.length === 1 ? '' : 's'} ${mode === 'append' ? 'added' : 'loaded'}.`);
+		onnotice(t(mode === 'append' ? 'table.rowsAdded' : 'table.rowsLoaded', { count: rows.length }));
 	}
 
 	/** Incoming rows, laid into the columns this table already has. */
@@ -1589,17 +1594,17 @@
 			// No clipboard at all (an insecure origin) or permission refused. There
 			// is no silent fallback worth having — the old execCommand path needs a
 			// visible selection — so it says so and points at the one that works.
-			onnotice('This browser would not hand over the clipboard. Export CSV instead.', 'warning');
+			onnotice(t('table.clipboardRefused'), 'warning');
 			return;
 		}
-		onnotice(`${rows.length} row${rows.length === 1 ? '' : 's'} copied, ready to paste into a spreadsheet.`);
+		onnotice(t('table.rowsCopied', { count: rows.length }));
 	}
 
 	/** The table as it stands, back out as a file. Nothing leaves the browser. */
 	function exportCsv() {
 		// Named as the picker names it, so the file is found under the table's name.
 		download(`${fileStem(tableName, UNTITLED_TABLE)}.csv`, toCsv(dataset), 'text/csv');
-		onnotice(`${dataset.rows.length} row${dataset.rows.length === 1 ? '' : 's'} exported as CSV.`);
+		onnotice(t('table.rowsExported', { count: dataset.rows.length }));
 	}
 </script>
 
@@ -1610,7 +1615,7 @@
 	class:rows-short={rowHeight === 'short'}
 	class:rows-full={rowHeight === 'full'}
 	class:locked
-	aria-label="Card data"
+	aria-label={t('table.cardDataLabel')}
 	style="--head-h:{headHeight}px; --gutter-w:{gutterWidth}; --bar-h:{barHeight}px"
 	use:scrollEdges={(section) => section.querySelector<HTMLElement>(':scope > .scroll')}
 >
@@ -1659,8 +1664,8 @@
 								class="tick"
 								role="checkbox"
 								aria-checked={allChosen ? 'true' : someChosen ? 'mixed' : 'false'}
-								title={allChosen ? 'Drop every row' : 'Choose every row'}
-								aria-label={allChosen ? 'Drop every row' : 'Choose every row'}
+								title={t(allChosen ? 'table.dropAll' : 'table.chooseAll')}
+								aria-label={t(allChosen ? 'table.dropAll' : 'table.chooseAll')}
 								onclick={toggleAll}
 							><Icon name={allChosen ? 'checkbox-checked' : someChosen ? 'checkbox-indeterminate' : 'checkbox'} size={14} /></button>
 						{/if}
@@ -1669,13 +1674,13 @@
 							     which column did it is only remembered for the session. -->
 							<button
 								class="icon unsort"
-								title="{sortedBy ? `Sorted by “${sortedBy.column}”` : 'Sorted'} — press to put the rows back in the order they arrived in"
-								aria-label="Clear the sorting"
+								title={sortedBy ? t('table.sortedByTitle', { column: sortedBy.column }) : t('table.sortedTitle')}
+								aria-label={t('table.clearSortingLabel')}
 								disabled={locked}
 								onclick={clearSort}
 							><Icon name="activity" size={14} /></button>
 						{:else if !dataset.rows.length}
-							<span class="sr-only">Row</span>
+							<span class="sr-only">{t('table.rowLabel')}</span>
 						{/if}
 						</span>
 					</th>
@@ -1694,7 +1699,7 @@
 							<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 							<span
 								class="column-head"
-								title={locked ? column : 'Rename this column — drag it sideways to move it'}
+								title={locked ? column : t('table.renameColumnTitle')}
 								onclick={takeName}
 							>
 							<!-- Data nothing on the card prints: no area is bound to it and
@@ -1705,8 +1710,8 @@
 								     to the column, where a new area goes. -->
 								<button
 									class="icon unused"
-									title="No area uses “{column}” — press to place it on the card{isKeyword(column) ? '' : `, or write %%${column}%% in an area`}"
-									aria-label="Place {column} on the card"
+									title={t('table.unusedTitle', { column, keyword: isKeyword(column) ? 'yes' : 'no' })}
+									aria-label={t('table.placeLabel', { column })}
 									onclick={() => onplacecolumn(column)}
 								><Icon name="unlink" size={12} /></button>
 							{/if}
@@ -1718,8 +1723,8 @@
 							{#if isKeyword(column)}
 								<button
 									class="icon reserved"
-									title="Why this column is red"
-									aria-label="“{column}” is a reserved keyword — why"
+									title={t('table.whyColumnRedTitle')}
+									aria-label={t('table.keywordWhyLabel', { column })}
 									onclick={(e) => {
 										e.stopPropagation();
 										const message = keywordWarning(column);
@@ -1734,7 +1739,7 @@
 								title={isKeyword(column) ? keywordWarning(column) : undefined}
 								value={column}
 								readonly={locked}
-								aria-label="Rename column {column}"
+								aria-label={t('table.renameColumnLabel', { column })}
 								onchange={(e) => renameColumn(i, e.currentTarget.value, e.currentTarget)}
 							/>
 							<span class="column-tools">
@@ -1743,9 +1748,9 @@
 								     keyboard still reaches them, since a focused name shows them. -->
 								{#if !locked}
 									<span class="column-move">
-										<button class="icon" title="Move column left" aria-label="Move {column} left" disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
-										<button class="icon" title="Move column right" aria-label="Move {column} right" disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
-										<button class="icon" title="Delete column" aria-label="Delete {column}" onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
+										<button class="icon" title={t('table.moveColumnLeftTitle')} aria-label={t('table.moveLeftLabel', { column })} disabled={i === 0} onclick={() => shiftColumn(i, -1)}><Icon name="chevron-left" size={14} /></button>
+										<button class="icon" title={t('table.moveColumnRightTitle')} aria-label={t('table.moveRightLabel', { column })} disabled={i === dataset.columns.length - 1} onclick={() => shiftColumn(i, 1)}><Icon name="chevron-right" size={14} /></button>
+										<button class="icon" title={t('table.deleteColumnTitle')} aria-label={t('table.deleteLabel', { column })} onclick={() => (confirmColumn = i)}><Icon name="trash" size={14} /></button>
 									</span>
 								{/if}
 								<!-- Sort last, at the header's far edge: the move and delete
@@ -1758,10 +1763,10 @@
 									class:on={sortedBy?.column === column}
 									title={sortedBy?.column === column
 										? sortedBy.direction === 'asc'
-											? `Sort ${column} Z to A`
-											: 'Back to the order the rows came in'
-										: `Sort rows by ${column}, A to Z`}
-									aria-label="Sort rows by {column}"
+											? t('table.sortDescTitle', { column })
+											: t('table.backToOrder')
+										: t('table.sortAscTitle', { column })}
+									aria-label={t('table.sortLabel', { column })}
 									disabled={locked}
 									onclick={() => sortBy(column)}
 								>
@@ -1785,7 +1790,7 @@
 								class="resize"
 								class:on={resizing?.column === column}
 								role="presentation"
-								title="Drag to set this column's width — double-click for the default"
+								title={t('table.dragSetColumnsWidthTitle')}
 								onpointerdown={(e) => startResize(e, column)}
 								onpointermove={moveResize}
 								onpointerup={endResize}
@@ -1804,8 +1809,8 @@
 							     change the colour of the words and nothing else. -->
 							<button
 								class="icon add"
-								title="Add a column"
-								aria-label="Add a column"
+								title={t('table.addColumnTitle')}
+								aria-label={t('table.addColumnTitle')}
 								disabled={locked}
 								tabindex={locked ? -1 : undefined}
 								style:visibility={locked ? 'hidden' : undefined}
@@ -1838,8 +1843,8 @@
 								class="tick"
 								role="checkbox"
 								aria-checked={selectedRows.has(i)}
-								title="Choose this row as well"
-								aria-label="Choose row {rowLabel(i)}"
+								title={t('table.chooseRowWellTitle')}
+								aria-label={t('table.chooseRowLabel', { row: rowLabel(i) })}
 								onclick={(e) => {
 									// Not the row's own click: the tick builds a set without
 									// moving the preview off the card you are looking at.
@@ -1862,7 +1867,10 @@
 								role="presentation"
 								title={locked
 									? undefined
-									: `Drag to move this row${selectedRows.has(i) && selectedRows.size > 1 ? ' and the other chosen rows' : ''}. ${expanded.has(i) ? 'Double-click to put this row back' : 'Double-click to show this whole row'}`}
+									: t('table.dragRowTitle', {
+											others: selectedRows.has(i) && selectedRows.size > 1 ? 'yes' : 'no',
+											expanded: expanded.has(i) ? 'yes' : 'no'
+										})}
 								onpointerdown={(e) => startRowDrag(e, i)}
 								onpointermove={moveRowDrag}
 								onpointerup={endRowDrag}
@@ -1881,8 +1889,8 @@
 								<span
 									class="runs-off"
 									role="img"
-									aria-label="Runs off the page"
-									title="Card {rowLabel(i)} runs off the page: {areas.map((a) => `“${a}”`).join(', ')} {areas.length === 1 ? 'grows' : 'grow'} past the margin or the edge. Shorten the words, or give the area more room."
+									aria-label={t('table.runsOffPageLabel')}
+									title={t('table.runsOffTitle', { row: rowLabel(i), areas: quotedList(areas), count: areas.length })}
 								><Icon name="warning" size={12} /></span>
 							{/if}
 						</td>
@@ -1918,7 +1926,7 @@
 									     the bar then offers Draw and says what it weighs. -->
 									<button
 										class="cell-picture-pick"
-										aria-label="{column}, row {rowLabel(i)}: a picture"
+										aria-label={t('table.pictureCellLabel', { column, row: rowLabel(i) })}
 										onfocus={() => {
 											editing = { row: i, column };
 											onactivate(i);
@@ -1950,8 +1958,8 @@
 											title={locked
 												? undefined
 												: localImageName(row[column])
-													? `${localImageName(row[column])} — double-click to open it in Pictures`
-													: 'A drawing — double-click to draw on it'}
+													? t('table.storedPictureTitle', { name: localImageName(row[column])! })
+													: t('table.drawingTitle')}
 											draggable="false"
 										/>
 										{#if drawing}
@@ -1965,7 +1973,7 @@
 								     table, which finds the cell by `data-opens`). -->
 								<textarea
 									rows="1"
-									aria-label="{column}, row {rowLabel(i)}"
+									aria-label={t('table.cellLabel', { column, row: rowLabel(i) })}
 									value={row[column] ?? ''}
 									readonly={locked || byFinger}
 									class:by-finger={byFinger && !locked}
@@ -2002,8 +2010,8 @@
 									class="more"
 									tabindex="-1"
 									disabled={locked}
-									title="Show all of this cell"
-									aria-label="Show all of {column}, row {rowLabel(i)}"
+									title={t('table.showAllCellTitle')}
+									aria-label={t('table.showAllLabel', { column, row: rowLabel(i) })}
 									onclick={(e) => {
 										e.stopPropagation();
 										openBigCell(i, column);
@@ -2024,10 +2032,9 @@
 						     nothing was below it was the whole of the trouble. -->
 						<td class="empty" colspan={dataset.columns.length + 2}>
 							{#if dataset.columns.length}
-								No rows yet. Paste from a spreadsheet, import a CSV, or add a row with the + below.
+								{t('table.noRows')}
 							{:else}
-								Nothing here yet. Paste from a spreadsheet, import a CSV, or add a column with
-								the + above — it arrives with a row in it.
+								{t('table.nothingYet')}
 							{/if}
 						</td>
 					</tr>
@@ -2036,7 +2043,7 @@
 					<!-- One button under the last row, centred on the gutter it sits in. -->
 					<tr class="ghost-row">
 						<td class="gutter">
-							<button class="icon add" title="Add a row" aria-label="Add a row" onclick={() => addRow()}>
+							<button class="icon add" title={t('table.addRowTitle')} aria-label={t('table.addRowTitle')} onclick={() => addRow()}>
 								<Icon name="add" size={16} />
 							</button>
 						</td>
@@ -2087,20 +2094,20 @@
 				<!-- The board's undo and redo, first in the bar, moved in by it. -->
 				<span class="board-bar" bind:this={boardBar}></span>
 			{/if}
-			<span class="big-pager" role="group" aria-label="Row">
+			<span class="big-pager" role="group" aria-label={t('table.rowLabel')}>
 				<button
 					class="icon step"
 					disabled={at <= 0 || boardShown(bigCell) && boardDirty}
-					title={boardShown(bigCell) && boardDirty ? 'Save the drawing first' : 'Previous row'}
-					aria-label="Previous row"
+					title={t(boardShown(bigCell) && boardDirty ? 'table.saveDrawingFirst' : 'table.previousRowTitle')}
+					aria-label={t('table.previousRowLabel')}
 					onclick={() => stepBigCell(-1)}
 				><Icon name="chevron-left" size={16} /></button>
-				<span class="big-row">{at + 1} / {dataset.rows.length}</span>
+				<span class="big-row">{t('common.counter', { index: at + 1, total: dataset.rows.length })}</span>
 				<button
 					class="icon step"
 					disabled={at >= dataset.rows.length - 1 || boardShown(bigCell) && boardDirty}
-					title={boardShown(bigCell) && boardDirty ? 'Save the drawing first' : 'Next row'}
-					aria-label="Next row"
+					title={t(boardShown(bigCell) && boardDirty ? 'table.saveDrawingFirst' : 'table.nextRowTitle')}
+					aria-label={t('table.nextRowLabel')}
 					onclick={() => stepBigCell(1)}
 				><Icon name="chevron-right" size={16} /></button>
 			</span>
@@ -2123,27 +2130,27 @@
 				<!-- A picture is chosen rather than typed in, and the way into it is
 				     the drawing surface — or, for a stored one, the Pictures tray. -->
 				<button
-					title={localImageName(value) ? 'Open this picture in Pictures' : 'Draw on this picture'}
+					title={t(localImageName(value) ? 'table.openPictureTitle' : 'table.drawPictureTitle')}
 					disabled={locked}
 					onmousedown={(e) => e.preventDefault()}
 					onclick={() => editing && openBigCell(editing.row, editing.column)}
-				><Icon name="edit" size={15} /> {localImageName(value) ? 'Open' : 'Draw'}</button>
+				><Icon name="edit" size={15} /> {t(localImageName(value) ? 'table.open' : 'table.draw')}</button>
 			{:else}
 				<button
-					title="Open this cell in the table's full room"
+					title={t('table.openCellTablesFullTitle')}
 					disabled={locked}
 					onmousedown={(e) => e.preventDefault()}
 					onclick={editChosen}
-				><Icon name="task-edit" size={15} /> Edit</button>
+				><Icon name="task-edit" size={15} /> {t('table.edit')}</button>
 				<!-- An empty cell can be written in or drawn in; there is nothing to
 				     count yet, so the count makes room for the other way in. -->
 				{#if !value}
 					<button
-						title="Draw in this cell — a picture made here, kept in the table"
+						title={t('table.drawCellPictureMadeTitle')}
 						disabled={locked}
 						onmousedown={(e) => e.preventDefault()}
 						onclick={() => editing && openBigCell(editing.row, editing.column, true)}
-					><Icon name="edit" size={15} /> Draw</button>
+					><Icon name="edit" size={15} /> {t('table.draw')}</button>
 				{/if}
 			{/if}
 		{/if}
@@ -2158,39 +2165,35 @@
 			<button
 				class="lock-toggle"
 				aria-pressed={locked}
-				title={locked ? 'Unlock the table' : 'Lock the table — no typing, no new rows or columns, no paste or import'}
+				title={t(locked ? 'table.unlockTitle' : 'table.lockTitle')}
 				onclick={() => onlock(!locked)}
 			>
 				<Icon name={locked ? 'unlocked' : 'locked'} size={15} />
-				{locked ? 'Unlock' : 'Lock'}
+				{t(locked ? 'design.unlock' : 'design.lock')}
 			</button>
 			<!-- Beside the lock, because like it this is about the table as a
 			     whole and how it prints, not an errand on some rows. Only does
 			     anything once a sort has moved rows off their numbers. -->
 			<button
 				class="reindex"
-				title={locked
-					? 'The table is locked — unlock it to reindex'
-					: order
-						? 'Reindex — make this order the rows\' own: the numbers follow it, and lookups with them'
-						: 'Reindex — the rows are already in the order of their numbers; sort the table first'}
-				aria-label="Reindex"
+				title={t(locked ? 'table.reindexLockedTitle' : order ? 'table.reindexTitle' : 'table.reindexInOrderTitle')}
+				aria-label={t('table.reindexLabel')}
 				disabled={locked || !order}
 				onclick={reindex}
 			>
 				<Icon name="array-numbers" size={15} />
-				<span class="label">Reindex</span>
+				<span class="label">{t('table.reindexLabel')}</span>
 			</button>
 			<!-- What table this is, beside its lock: the buttons act on it, and it
 			     is the one control here that is a name rather than an act. One
 			     design prints any number of tables, so this is not the template
 			     picker's second half: the two are switched independently. -->
 			<label class="picker" bind:this={pickerEl}>
-				<span>Table</span>
+				<span>{t('table.table')}</span>
 				<input
 					value={tableName}
 					placeholder={UNTITLED_TABLE}
-					aria-label="Table name"
+					aria-label={t('table.tableNameLabel')}
 					readonly={locked}
 					onchange={(e) => onrenametable(e.currentTarget.value)}
 				/>
@@ -2198,8 +2201,8 @@
 					class="caret"
 					aria-haspopup="menu"
 					aria-expanded={pickerOpen}
-					title="{tables.length} table{tables.length === 1 ? '' : 's'} in this browser"
-					aria-label="Saved tables"
+					title={t('table.libraryTitle', { count: tables.length })}
+					aria-label={t('table.savedTablesLabel')}
 					onclick={togglePicker}
 				>
 					<span class="picker-icon"><Icon name="table-split" size={15} /></span>
@@ -2240,7 +2243,7 @@
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="add" size={14} /></span>
-								New Table
+								{t('table.newTable')}
 							</button>
 						</li>
 						<!-- Never over the open table's rows: it opens a table that already
@@ -2249,14 +2252,14 @@
 						<li role="none">
 							<button
 								role="menuitem"
-								title="The cards that walk through the app, in a table of their own — your tables are untouched"
+								title={t('table.cardsWalkThroughAppTitle')}
 								onclick={() => {
 									pickerOpen = false;
 									ongettingstarted();
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="information-square" size={14} /></span>
-								Getting Started
+								{t('table.gettingStarted')}
 							</button>
 						</li>
 						<!-- And below the next, what can be done to the open table: rows in,
@@ -2266,41 +2269,41 @@
 							<button
 								role="menuitem"
 								disabled={locked}
-								title="Paste a block of cells straight off a spreadsheet"
+								title={t('table.pasteBlockCellsStraightTitle')}
 								onclick={() => {
 									pickerOpen = false;
 									pasteOpen = true;
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="task-add" size={14} /></span>
-								Paste…
+								{t('table.paste')}
 							</button>
 						</li>
 						<li role="none">
 							<button
 								role="menuitem"
-								title="Open a CSV or TSV file as a new table — this one is kept as it is"
+								title={t('table.openCsvTsvFileTitle')}
 								onclick={() => {
 									pickerOpen = false;
 									fileInput?.click();
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="table-shortcut" size={14} /></span>
-								Import…
+								{t('table.import')}
 							</button>
 						</li>
 						<li role="none">
 							<button
 								role="menuitem"
 								disabled={!dataset.columns.length}
-								title="Save the rows as a CSV file"
+								title={t('table.saveRowsCsvFileTitle')}
 								onclick={() => {
 									pickerOpen = false;
 									exportCsv();
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="table-built" size={14} /></span>
-								Export
+								{t('table.export')}
 							</button>
 						</li>
 						<!-- The two that lose something, together and in red, as under the
@@ -2312,14 +2315,14 @@
 									class="danger"
 									role="menuitem"
 									disabled={locked}
-									title="Put the starter this table began as back over it. Your design is not touched."
+									title={t('table.putStarterTableBeganTitle')}
 									onclick={() => {
 										pickerOpen = false;
 										onresettable();
 									}}
 								>
 									<span class="mark" aria-hidden="true"><Icon name="reset" size={14} /></span>
-									Reset…
+									{t('table.resetTable')}
 								</button>
 							</li>
 						{/if}
@@ -2328,14 +2331,14 @@
 								class="danger"
 								role="menuitem"
 								disabled={locked}
-								title="Delete this table from this browser. Your design is not touched."
+								title={t('table.deleteTableBrowserYourTitle')}
 								onclick={() => {
 									pickerOpen = false;
 									ondeletetable();
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="trash" size={14} /></span>
-								Delete…
+								{t('table.deleteTable')}
 							</button>
 						</li>
 					</ul>
@@ -2350,9 +2353,9 @@
 				class="icon"
 				disabled={!previousTable}
 				title={previousTable
-					? `Back to “${tables.find((t) => t.id === previousTable)?.name ?? UNTITLED_TABLE}”`
-					: 'Nothing to swap back to yet — this is the only table you have opened'}
-				aria-label="Swap to the previous table"
+					? t('table.swapBackTitle', { name: tables.find((entry) => entry.id === previousTable)?.name ?? UNTITLED_TABLE })
+					: t('table.swapNothingTitle')}
+				aria-label={t('table.swapPreviousTableLabel')}
 				onclick={onswaptable}
 			><Icon name="compare" size={15} /></button>
 		{/if}
@@ -2381,33 +2384,33 @@
 			     should read as a button that does — on a phone its word goes, the
 			     bar being short, and the red bin is a square of its own. -->
 			<button
-				title="Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet"
+				title={t('table.copyChosenRowsTabTitle')}
 				onclick={copyTsv}
-			><Icon name="copy-to-clipboard" size={15} /> Copy</button>
+			><Icon name="copy-to-clipboard" size={15} /> {t('table.copy')}</button>
 			<button
 				class="danger delete-rows"
-				title="Delete the chosen rows"
-				aria-label="Delete the chosen rows"
+				title={t('table.deleteChosenRowsTitle')}
+				aria-label={t('table.deleteChosenRowsTitle')}
 				disabled={locked}
 				onclick={deleteChosen}
-			><Icon name="trash" size={15} /> <span class="label">Delete</span></button>
+			><Icon name="trash" size={15} /> <span class="label">{t('common.delete')}</span></button>
 			<!-- After what is done with them, how many and where they go: the count
 			     names what the arrows move. No rule before any of it — the row
 			     actions follow on from the table's as one run. "3 rows"; one row
 			     says nothing, the tick beside it already does. -->
-			{#if chosenRows.length > 1}<span class="chosen-count">{chosenRows.length} rows</span>{/if}
+			{#if chosenRows.length > 1}<span class="chosen-count">{t('table.chosenCount', { count: chosenRows.length })}</span>{/if}
 			<!-- Icon-only, the pair reads as one control. -->
 			<button
 				class="icon"
-				title="Move the chosen rows up — earlier in print order"
-				aria-label="Move the chosen rows up"
+				title={t('table.moveChosenRowsUpTitle')}
+				aria-label={t('table.moveChosenRowsUpLabel')}
 				disabled={locked || chosenRows[0] === 0}
 				onclick={() => moveChosen(-1)}
 			><span class="nudge-up"><Icon name="chevron-sort-up" size={20} /></span></button>
 			<button
 				class="icon"
-				title="Move the chosen rows down — later in print order"
-				aria-label="Move the chosen rows down"
+				title={t('table.moveChosenRowsDownTitle')}
+				aria-label={t('table.moveChosenRowsDownLabel')}
 				disabled={locked || chosenRows[chosenRows.length - 1] === dataset.rows.length - 1}
 				onclick={() => moveChosen(1)}
 			><span class="nudge-down"><Icon name="chevron-sort-down" size={20} /></span></button>
@@ -2420,12 +2423,12 @@
 		{@render whitespaceButton()}
 		<button
 			class="row-height"
-			title="Row height: {ROW_HEIGHT_LABELS[rowHeight]} — press for {ROW_HEIGHT_LABELS[nextRowHeight]}"
-			aria-label="Row height, {ROW_HEIGHT_LABELS[rowHeight]}"
+			title={t('table.rowHeightTitle', { now: t(ROW_HEIGHT_LABELS[rowHeight]), next: t(ROW_HEIGHT_LABELS[nextRowHeight]) })}
+			aria-label={t('table.rowHeightLabel', { now: t(ROW_HEIGHT_LABELS[rowHeight]) })}
 			onclick={() => onrowheight(nextRowHeight)}
 		>
 			<Icon name={ROW_HEIGHT_ICONS[rowHeight]} size={15} />
-			<span class="label">{ROW_HEIGHT_LABELS[rowHeight]}</span>
+			<span class="label">{t(ROW_HEIGHT_LABELS[rowHeight])}</span>
 		</button>
 		{/if}
 		<input
@@ -2447,8 +2450,8 @@
 	{#snippet back()}
 		<button
 			class="icon back"
-			title={leaveTo === 'images' ? 'Back to Pictures' : 'Back to the table'}
-			aria-label={leaveTo === 'images' ? 'Back to Pictures' : 'Back to the table'}
+			title={t(leaveTo === 'images' ? 'table.backToPictures' : 'table.backToTable')}
+			aria-label={t(leaveTo === 'images' ? 'table.backToPictures' : 'table.backToTable')}
 			onclick={stepBack}
 		>
 			<Icon name="chevron-left" size={16} />
@@ -2473,7 +2476,7 @@
 				{@render back()}
 				<h2 id="cell-editor-title" class="sr-only">{area.name}</h2>
 				<span class="board-head" bind:this={boardHead}></span>
-				<button class="icon close" title={leaveTitle(boardDirty)} aria-label="Close" onclick={() => closeBigCell()}>
+				<button class="icon close" title={leaveTitle(boardDirty)} aria-label={t('common.close')} onclick={() => closeBigCell()}>
 					<Icon name="close" size={18} />
 				</button>
 			</div>
@@ -2514,7 +2517,7 @@
 					<h2 id="cell-editor-title">{open.column}</h2>
 					<span class="spacer"></span>
 				{/if}
-				<button class="icon close" title={leaveTitle(boardShown(open) && boardDirty)} aria-label="Close" onclick={() => closeBigCell()}>
+				<button class="icon close" title={leaveTitle(boardShown(open) && boardDirty)} aria-label={t('common.close')} onclick={() => closeBigCell()}>
 					<Icon name="close" size={18} />
 				</button>
 			</div>
@@ -2550,7 +2553,7 @@
 				<button
 					class="big-picture"
 					disabled={!stored}
-					title={stored ? `Open ${stored} in Pictures` : undefined}
+					title={stored ? t('table.openInPicturesTitle', { name: stored }) : undefined}
 					onclick={() => stored && onopenimage(stored)}
 				><img src={drawingSource(text)} alt={open.column} /></button>
 			{:else}
@@ -2576,38 +2579,35 @@
 {#if confirmColumn !== null && dataset.columns[confirmColumn]}
 	{@const column = dataset.columns[confirmColumn]}
 	<div class="modal-backdrop" role="presentation" onclick={() => (confirmColumn = null)}></div>
-	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label="Delete this column?" use:armDefault>
-		<h2>Delete “{column}”?</h2>
-		<p>
-			{filledCells(column)} filled cell{filledCells(column) === 1 ? '' : 's'}, across {dataset.rows.length}
-			row{dataset.rows.length === 1 ? '' : 's'}.
-		</p>
+	<div class="modal narrow" role="alertdialog" aria-modal="true" aria-label={t('table.deleteColumnConfirm')} use:armDefault>
+		<h2>{t('table.deleteColumnDialog', { column })}</h2>
+		<p>{t('table.deleteColumnBody', { cells: filledCells(column), rows: dataset.rows.length })}</p>
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button onclick={() => (confirmColumn = null)}>Cancel</button>
-			<button class="danger-solid" data-default onclick={() => deleteColumn(confirmColumn!)}>Delete Column</button>
+			<button onclick={() => (confirmColumn = null)}>{t('common.cancel')}</button>
+			<button class="danger-solid" data-default onclick={() => deleteColumn(confirmColumn!)}>{t('table.deleteColumn')}</button>
 		</div>
 	</div>
 {/if}
 
 {#if pasteOpen}
 	<div class="modal-backdrop" role="presentation" onclick={() => (pasteOpen = false)}></div>
-	<div class="modal" role="dialog" aria-modal="true" aria-label="Paste from Sheet" use:armDefault>
-		<h2>Paste from Sheet</h2>
+	<div class="modal" role="dialog" aria-modal="true" aria-label={t('table.pasteSheetLabel')} use:armDefault>
+		<h2>{t('table.pasteSheetLabel')}</h2>
 		<!-- Only where the answer is not already on screen. With columns in the
 		     table the paste lands in them left to right, which is what the table
 		     behind this dialog shows; saying it as well was a line everybody read
 		     once and then read past. With no columns yet there is nothing behind
 		     the dialog to read, so the first row's fate still has to be said. -->
 		{#if !dataset.columns.length}
-			<p>The first line names the columns — there is nothing else here to name them with yet.</p>
+			<p>{t('table.firstLineNamesColumns')}</p>
 		{/if}
 		<textarea bind:value={pasteText} rows="10" placeholder={PASTE_EXAMPLE}></textarea>
 		<div class="modal-actions">
 			<span class="spacer"></span>
-			<button onclick={() => (pasteOpen = false)}>Cancel</button>
-			<button disabled={!dataset.rows.length} onclick={() => applyPaste('append')}>Add Rows</button>
-			<button class="primary" data-default onclick={() => applyPaste('replace')}>Replace Rows</button>
+			<button onclick={() => (pasteOpen = false)}>{t('common.cancel')}</button>
+			<button disabled={!dataset.rows.length} onclick={() => applyPaste('append')}>{t('table.addRows')}</button>
+			<button class="primary" data-default onclick={() => applyPaste('replace')}>{t('table.replaceRows')}</button>
 		</div>
 	</div>
 {/if}
@@ -2624,24 +2624,22 @@
 	<button
 		class="whitespace"
 		aria-pressed={whitespace}
-		title={whitespace
-			? 'Whitespace shown in the cell being typed in and the full-size editor: a dot for a space (a ring where a line wraps at it), → for a tab, a square for a no-break space, ¶ for a line end. Press to hide it'
-			: 'Show whitespace — spaces, tabs and line ends — in the cell being typed in and the full-size editor'}
-		aria-label="Show whitespace"
+		title={t(whitespace ? 'table.whitespaceShownTitle' : 'table.whitespaceHiddenTitle')}
+		aria-label={t('table.showWhitespaceLabel')}
 		onmousedown={(e) => e.preventDefault()}
 		onclick={() => onwhitespace?.(!whitespace)}
 	>
 		<Icon name="paragraph" size={15} />
-		<span class="label">Whitespace</span>
+		<span class="label">{t('table.whitespace')}</span>
 	</button>
 {/snippet}
 
 {#snippet drawingButtons(present: boolean, remove: () => void)}
-	<button class="danger" disabled={!present && !boardDirty} title="Delete this drawing" onclick={remove}>
-		<Icon name="trash" size={15} /> Delete
+	<button class="danger" disabled={!present && !boardDirty} title={t('table.deleteDrawingTitle')} onclick={remove}>
+		<Icon name="trash" size={15} /> {t('common.delete')}
 	</button>
-	<button class="primary" disabled={!boardDirty} title="Save this drawing (Ctrl/Cmd+S)" onclick={() => board?.save()}>
-		Save
+	<button class="primary" disabled={!boardDirty} title={t('table.saveDrawingCtrlCmdTitle')} onclick={() => board?.save()}>
+		{t('common.save')}
 	</button>
 {/snippet}
 

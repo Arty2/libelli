@@ -12,6 +12,7 @@
 </script>
 
 <script lang="ts">
+	import { t, type MessageKey } from '$lib/i18n';
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
 	import { backgroundStyle, cssUrl, localImageName, safeMediaUrl } from '$lib/assets';
@@ -575,7 +576,7 @@
 				// on this row: `%%link%%` says what will be here, which "Area" did
 				// not — and shows the template to someone who has to fix it.
 				(!box.slot && box.static?.text?.includes('%%') ? box.static.text.trim() : '') ||
-				(pictureKind(box) ? 'Image' : 'Area')
+				t(pictureKind(box) ? 'card.name.image' : 'card.name.area')
 			: '';
 
 	/** Any of an area's colors taken from a column; see `Box.colorFrom`. */
@@ -1611,7 +1612,7 @@
 		// that sticks, a click followed by an arrow key was recorded as a drag.
 		if (!drag.named) {
 			drag.named = true;
-			onaction?.(DRAG_LABELS[drag.mode]);
+			onaction?.(t(DRAG_LABELS[drag.mode]));
 			// Moving or sizing reads out the gaps; a turn reads out its angle, and
 			// placing the pivot its distances in from the area's own edges.
 			if (drag.mode === 'rotate' || drag.mode === 'centre') turning = { id: drag.id, mode: drag.mode };
@@ -2006,18 +2007,18 @@
 		return (y + x || null) as DragMode | null;
 	}
 
-	const DRAG_LABELS: Record<DragMode, string> = {
-		move: 'Move',
-		rotate: 'Turn',
-		centre: 'Move the pivot',
-		n: 'Resize',
-		s: 'Resize',
-		e: 'Resize',
-		w: 'Resize',
-		ne: 'Resize',
-		nw: 'Resize',
-		se: 'Resize',
-		sw: 'Resize'
+	const DRAG_LABELS: Record<DragMode, MessageKey> = {
+		move: 'history.move',
+		rotate: 'history.turn',
+		centre: 'history.movePivot',
+		n: 'history.resize',
+		s: 'history.resize',
+		e: 'history.resize',
+		w: 'history.resize',
+		ne: 'history.resize',
+		nw: 'history.resize',
+		se: 'history.resize',
+		sw: 'history.resize'
 	};
 
 	/**
@@ -2299,7 +2300,7 @@
 	function releaseDependents(box: Box) {
 		const moored = dependentsOf(box.id).filter((b) => b.anchor?.to === box.id && !b.locked);
 		if (!moored.length) return;
-		onaction?.('Cast off');
+		onaction?.(t('history.castOff'));
 		// The resolved top is where the box is actually sitting, so writing it back
 		// as its own y is what "keeps its place" means — an anchor released to the
 		// box's stale y would jump it up the card.
@@ -2320,7 +2321,7 @@
 	 */
 	function unlockBox(box: Box) {
 		if (!box.locked || template.locked) return;
-		onaction?.('Unlock the area');
+		onaction?.(t('history.unlockArea'));
 		onchange?.({ ...box, locked: undefined });
 	}
 
@@ -2341,21 +2342,21 @@
 	function resetPivot(box: Box) {
 		if (!editable(box) || !box.centre) return;
 		drag = null;
-		onaction?.('Centre the pivot');
+		onaction?.(t('history.centrePivot'));
 		onchange?.({ ...box, centre: undefined });
 	}
 
 	function resetRotation(box: Box) {
 		if (!editable(box) || !box.rotation) return;
 		drag = null;
-		onaction?.('Straighten the area');
+		onaction?.(t('history.straighten'));
 		onchange?.({ ...box, rotation: undefined });
 	}
 
 	/** Break this box's own tie, again without moving it. */
 	function breakAnchor(box: Box) {
 		if (!box.anchor || box.locked) return;
-		onaction?.('Break the anchor');
+		onaction?.(t('history.breakAnchor'));
 		onchange?.({ ...box, anchor: null, y: freedTop(box, layout.tops[box.id] ?? box.y, layout.heights[box.id] ?? box.h) });
 	}
 
@@ -2491,7 +2492,7 @@
 	{/if}
 {/snippet}
 
-{#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.countdown}<span class="countdown {part.countdown.past ? 'past' : 'future'}"><span class="countdown-number">{part.countdown.n}</span><span class="countdown-unit {part.countdown.word}"></span></span>{:else if part.unknown}<span class="unknown-placeholder" title="No column called this in the table — or the cell naming its own column">{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
+{#snippet marked(text: string)}{#each segments(text) as part, i (i)}{#if part.countdown}<span class="countdown {part.countdown.past ? 'past' : 'future'}"><span class="countdown-number">{part.countdown.n}</span><span class="countdown-unit {part.countdown.word}"></span></span>{:else if part.unknown}<span class="unknown-placeholder" title={t('card.unknownPlaceholderTitle')}>{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
 
 <!-- The shears, which are also the switch between cutting and growing. Red and
      astride the cut on an area that is cutting its words off, where pressing
@@ -2513,12 +2514,8 @@
 		style="--edge:{cutting ? '100%' : `${trimEdges(box)[0]}mm`};--stack:{badgeCount(box)}"
 		disabled={!editable(box) && !(cutting && template.copy)}
 		aria-disabled={cutting && template.copy ? 'true' : undefined}
-		title={cutting && template.copy
-			? 'The text is too long for this field. Anything that does not fit will not print.'
-			: cutting
-			? 'The content does not fit — this area is cutting off what will print. Press to let it grow instead.'
-			: 'This area has grown past the height it was given. Press to cut it at that height instead.'}
-		aria-label={cutting && template.copy ? 'Text too long for this field' : cutting ? 'Let this area grow to fit' : 'Cut this area at its height'}
+		title={t(cutting && template.copy ? 'card.overflow.copyTitle' : cutting ? 'card.overflow.cuttingTitle' : 'card.overflow.grownTitle')}
+		aria-label={t(cutting && template.copy ? 'card.overflow.copyLabel' : cutting ? 'card.overflow.growLabel' : 'card.overflow.cutLabel')}
 		onpointerdown={(e) => e.stopPropagation()}
 		onpointerenter={() => (hoveredBadge = `${box.id}:cut`)}
 		onpointerleave={() => (hoveredBadge = null)}
@@ -2527,7 +2524,7 @@
 			// writer can learn why the line is there, but the layout is not theirs.
 			if (template.copy) return;
 			flashBadge(`${box.id}:cut`);
-			onaction?.(cutting ? 'Let the area grow' : 'Cut the area at its height');
+			onaction?.(t(cutting ? 'history.letGrow' : 'history.cutAtHeight'));
 			onchange?.({ ...box, overflow: cutting ? 'grow' : 'clip' });
 		}}
 	>
@@ -2846,8 +2843,8 @@
 							class:lit={litFollowers.has(box.id)}
 							class:lit-edge={litKin.has(box.id)}
 							disabled={!editable(box)}
-							title="Tied to another area — its top follows that area's bottom. Press to break the tie and leave this area where it is."
-							aria-label="Break this area's anchor"
+							title={t('card.anchoredTitle')}
+							aria-label={t('card.breakAnchorLabel')}
 							onpointerdown={(e) => e.stopPropagation()}
 							data-tie={box.id}
 							onpointerenter={() => {
@@ -2872,8 +2869,8 @@
 								class="badge action moored"
 								class:lit={litTargets.has(box.id)}
 								disabled={!!template.locked}
-								title="Other areas are moored to this one — moving it moves them too. Press to cast them off and leave them where they are."
-								aria-label="Cast off the areas anchored to this one"
+								title={t('card.mooredTitle')}
+								aria-label={t('card.castOffLabel')}
 								onpointerdown={(e) => e.stopPropagation()}
 								data-moor={box.id}
 								onpointerenter={() => {
@@ -2908,8 +2905,8 @@
 						{#if editsCell(box)}
 							<button
 								class="badge action"
-								title={`Edit “${mapping[box.slot!]}” for this row, full size in the table`}
-								aria-label="Edit this area's cell"
+								title={t('card.editCellTitle', { column: mapping[box.slot!] })}
+								aria-label={t('card.editCellLabel')}
 								onpointerdown={(e) => e.stopPropagation()}
 								onclick={() => oneditcell?.(box.id)}
 							>
@@ -2917,7 +2914,7 @@
 							</button>
 						{/if}
 						{#if isStatic(box)}
-							<span class="badge" title="Static text — this says the same on every card, because it is not plugged into a column">
+							<span class="badge" title={t('card.staticTitle')}>
 								<Icon name="text-creation" size={11} fixed />
 							</span>
 						{/if}
@@ -2928,23 +2925,23 @@
 							<button
 								class="badge action"
 								disabled={!editable(box)}
-								title={box.slot ? 'An image drawn here, from this row\'s cell — press to draw on it' : 'An image drawn here, the same on every card — press to draw on it'}
-								aria-label="Draw in this area"
+								title={t(box.slot ? 'card.drawn.cellTitle' : 'card.drawn.staticTitle')}
+								aria-label={t('card.drawLabel')}
 								onpointerdown={(e) => e.stopPropagation()}
 								onclick={() => ondraw?.(box.id)}
 							>
 								<Icon name="edit" size={11} fixed />
 							</button>
 						{:else if pictureKind(box) === 'picture'}
-							<span class="badge" title={box.slot ? 'An image, from this row\'s cell — double-click to draw instead' : 'An image, the same on every card — double-click to draw instead'}>
+							<span class="badge" title={t(box.slot ? 'card.picture.cellTitle' : 'card.picture.staticTitle')}>
 								<Icon name="image" size={11} fixed />
 							</span>
 						{/if}
 						{#if box.locked}
 							<button
 								class="badge action"
-								title="Locked — no dragging, no resizing, no option changes. Press to unlock this area."
-								aria-label="Unlock this area"
+								title={t('card.lockedTitle')}
+								aria-label={t('card.unlockAreaLabel')}
 								onpointerdown={(e) => e.stopPropagation()}
 								onpointerenter={() => (hoveredBadge = `${box.id}:locked`)}
 								onpointerleave={() => (hoveredBadge = null)}
@@ -2979,7 +2976,7 @@
 								resetPivot(box);
 							}}
 							style="left:{(placed(box).centre ?? { x: 50, y: 50 }).x}%;top:{(placed(box).centre ?? { x: 50, y: 50 }).y}%"
-							title="The point this area turns about — drag it, or type it in the bar. Double-click to put it back in the middle."
+							title={t('card.pivotTitle')}
 							onpointerdown={(e) => startDrag(e, box, 'centre')}
 							onpointermove={moveDrag}
 							onpointerup={endDrag}
@@ -2995,7 +2992,7 @@
 								resetRotation(box);
 							}}
 							style="left:{(placed(box).centre ?? { x: 50, y: 50 }).x}%;top:{(placed(box).centre ?? { x: 50, y: 50 }).y}%"
-							title="Drag to turn this area — hold Shift for 15° steps. Double-click to set it upright."
+							title={t('card.rotateTitle')}
 							onpointerdown={(e) => startDrag(e, box, 'rotate')}
 							onpointermove={moveDrag}
 							onpointerup={endDrag}

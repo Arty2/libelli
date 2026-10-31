@@ -927,6 +927,106 @@
 		"defaultMessage": "Stamp",
 		"description": "Border style: a postage stamp's perforated edge."
 	},
+	"card.anchoredTitle": {
+		"defaultMessage": "Tied to another area — its top follows that area's bottom. Press to break the tie and leave this area where it is.",
+		"description": "Tooltip in the card on the stage."
+	},
+	"card.breakAnchorLabel": {
+		"defaultMessage": "Break this area's anchor",
+		"description": "Screen-reader name of a control in the card on the stage."
+	},
+	"card.castOffLabel": {
+		"defaultMessage": "Cast off the areas anchored to this one",
+		"description": "Screen-reader name of a control in the card on the stage."
+	},
+	"card.drawLabel": {
+		"defaultMessage": "Draw in this area",
+		"description": "Screen-reader name of a control in the card on the stage."
+	},
+	"card.drawn.cellTitle": {
+		"defaultMessage": "An image drawn here, from this row's cell — press to draw on it",
+		"description": "Tooltip of the drawing badge on an area whose drawing comes from the row."
+	},
+	"card.drawn.staticTitle": {
+		"defaultMessage": "An image drawn here, the same on every card — press to draw on it",
+		"description": "Tooltip of the drawing badge on an area with its own drawing."
+	},
+	"card.editCellLabel": {
+		"defaultMessage": "Edit this area's cell",
+		"description": "Screen-reader name of a control in the card on the stage."
+	},
+	"card.editCellTitle": {
+		"defaultMessage": "Edit “{column}” for this row, full size in the table",
+		"description": "Tooltip of the pencil badge on an area filled from a column."
+	},
+	"card.lockedTitle": {
+		"defaultMessage": "Locked — no dragging, no resizing, no option changes. Press to unlock this area.",
+		"description": "Tooltip in the card on the stage."
+	},
+	"card.mooredTitle": {
+		"defaultMessage": "Other areas are moored to this one — moving it moves them too. Press to cast them off and leave them where they are.",
+		"description": "Tooltip in the card on the stage."
+	},
+	"card.name.area": {
+		"defaultMessage": "Area",
+		"description": "Name shown on an empty area that has no name of its own."
+	},
+	"card.name.image": {
+		"defaultMessage": "Image",
+		"description": "Name shown on an area holding an image that has no name of its own."
+	},
+	"card.overflow.copyLabel": {
+		"defaultMessage": "Text too long for this field",
+		"description": "Screen-reader name of the scissors mark for a writer."
+	},
+	"card.overflow.copyTitle": {
+		"defaultMessage": "The text is too long for this field. Anything that does not fit will not print.",
+		"description": "Tooltip of the scissors mark for a writer filling in a package: the text overflows its field."
+	},
+	"card.overflow.cutLabel": {
+		"defaultMessage": "Cut this area at its height",
+		"description": "Screen-reader name of the scissors mark on a grown area."
+	},
+	"card.overflow.cuttingTitle": {
+		"defaultMessage": "The content does not fit — this area is cutting off what will print. Press to let it grow instead.",
+		"description": "Tooltip of the scissors mark on an area that clips its content."
+	},
+	"card.overflow.growLabel": {
+		"defaultMessage": "Let this area grow to fit",
+		"description": "Screen-reader name of the scissors mark on a clipping area."
+	},
+	"card.overflow.grownTitle": {
+		"defaultMessage": "This area has grown past the height it was given. Press to cut it at that height instead.",
+		"description": "Tooltip of the scissors mark on an area that grew with its content."
+	},
+	"card.picture.cellTitle": {
+		"defaultMessage": "An image, from this row's cell — double-click to draw instead",
+		"description": "Tooltip of the image badge on an area whose image comes from the row."
+	},
+	"card.picture.staticTitle": {
+		"defaultMessage": "An image, the same on every card — double-click to draw instead",
+		"description": "Tooltip of the image badge on an area with its own image."
+	},
+	"card.pivotTitle": {
+		"defaultMessage": "The point this area turns about — drag it, or type it in the bar. Double-click to put it back in the middle.",
+		"description": "Tooltip in the card on the stage."
+	},
+	"card.rotateTitle": {
+		"defaultMessage": "Drag to turn this area — hold Shift for 15° steps. Double-click to set it upright.",
+		"description": "Tooltip in the card on the stage."
+	},
+	"card.staticTitle": {
+		"defaultMessage": "Static text — this says the same on every card, because it is not plugged into a column",
+		"description": "Tooltip in the card on the stage."
+	},
+	"card.unknownPlaceholderTitle": {
+		"defaultMessage": "No column called this in the table — or the cell naming its own column",
+		"description": "Tooltip in the card on the stage."
+	},
+	"card.unlockAreaLabel": {
+		"defaultMessage": "Unlock this area",
+		"description": "Screen-reader name of a control in the card on the stage."
+	},
 	"colorField.fromRow": {
 		"defaultMessage": "This row's {column} — the color comes from that column",
 		"description": "Tooltip of a color swatch whose color is taken from a table column; {column} is the column's name."
@@ -978,6 +1078,10 @@
 	"common.off": {
 		"defaultMessage": "Off",
 		"description": "Option that turns a setting off."
+	},
+	"common.quoted": {
+		"defaultMessage": "“{name}”",
+		"description": "A name in quotation marks, in a list of names."
 	},
 	"common.redo": {
 		"defaultMessage": "Redo",
@@ -1378,6 +1482,50 @@
 	"fontMenu.system": {
 		"defaultMessage": "System",
 		"description": "Heading in a font menu over the fonts this computer already has."
+	},
+	"history.breakAnchor": {
+		"defaultMessage": "Break the anchor",
+		"description": "Step in the undo history, shown as “Undo …”: an area's tie to the one above it broken."
+	},
+	"history.castOff": {
+		"defaultMessage": "Cast off",
+		"description": "Step in the undo history, shown as “Undo …”: areas anchored to this one let go, keeping their places."
+	},
+	"history.centrePivot": {
+		"defaultMessage": "Centre the pivot",
+		"description": "Step in the undo history, shown as “Undo …”: the pivot put back in the middle."
+	},
+	"history.cutAtHeight": {
+		"defaultMessage": "Cut the area at its height",
+		"description": "Step in the undo history, shown as “Undo …”: an area set to clip its content."
+	},
+	"history.letGrow": {
+		"defaultMessage": "Let the area grow",
+		"description": "Step in the undo history, shown as “Undo …”: an area set to grow with its content."
+	},
+	"history.move": {
+		"defaultMessage": "Move",
+		"description": "Step in the undo history, shown as “Undo …”: areas moved."
+	},
+	"history.movePivot": {
+		"defaultMessage": "Move the pivot",
+		"description": "Step in the undo history, shown as “Undo …”: the point an area turns about moved."
+	},
+	"history.resize": {
+		"defaultMessage": "Resize",
+		"description": "Step in the undo history, shown as “Undo …”: an area resized."
+	},
+	"history.straighten": {
+		"defaultMessage": "Straighten the area",
+		"description": "Step in the undo history, shown as “Undo …”: an area's rotation taken off."
+	},
+	"history.turn": {
+		"defaultMessage": "Turn",
+		"description": "Step in the undo history, shown as “Undo …”: an area rotated."
+	},
+	"history.unlockArea": {
+		"defaultMessage": "Unlock the area",
+		"description": "Step in the undo history, shown as “Undo …”: an area's lock taken off."
 	},
 	"leader.dashed": {
 		"defaultMessage": "Dashed",
@@ -2770,6 +2918,518 @@
 	"stage.zoomUnknownScreen": {
 		"defaultMessage": "This screen is not one the app knows, so this is the browser’s own millimetre, which may not match a ruler",
 		"description": "Tooltip of Actual on an unknown screen."
+	},
+	"table.addColumnTitle": {
+		"defaultMessage": "Add a column",
+		"description": "Tooltip in the table panel."
+	},
+	"table.addRowTitle": {
+		"defaultMessage": "Add a row",
+		"description": "Tooltip in the table panel."
+	},
+	"table.addRows": {
+		"defaultMessage": "Add Rows",
+		"description": "Button in the table panel."
+	},
+	"table.backToOrder": {
+		"defaultMessage": "Back to the order the rows came in",
+		"description": "Tooltip of a column's sort button after sorting Z to A: the next press unsorts."
+	},
+	"table.backToPictures": {
+		"defaultMessage": "Back to Pictures",
+		"description": "Back button of a cell opened from the Pictures tray."
+	},
+	"table.backToTable": {
+		"defaultMessage": "Back to the table",
+		"description": "Back button of a cell opened full size."
+	},
+	"table.cardDataLabel": {
+		"defaultMessage": "Card data",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.cardsWalkThroughAppTitle": {
+		"defaultMessage": "The cards that walk through the app, in a table of their own — your tables are untouched",
+		"description": "Tooltip in the table panel."
+	},
+	"table.cellLabel": {
+		"defaultMessage": "{column}, row {row}",
+		"description": "Screen-reader name of a cell."
+	},
+	"table.chooseAll": {
+		"defaultMessage": "Choose every row",
+		"description": "Tooltip of the tick box in the header: tick every row."
+	},
+	"table.chooseRowLabel": {
+		"defaultMessage": "Choose row {row}",
+		"description": "Screen-reader name of a row's tick box."
+	},
+	"table.chooseRowWellTitle": {
+		"defaultMessage": "Choose this row as well",
+		"description": "Tooltip in the table panel."
+	},
+	"table.chosenCount": {
+		"defaultMessage": "{count, plural, one {# row} other {# rows}}",
+		"description": "How many rows are chosen, before the buttons that move them."
+	},
+	"table.clearSortingLabel": {
+		"defaultMessage": "Clear the sorting",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.clipboardRefused": {
+		"defaultMessage": "This browser would not hand over the clipboard. Export CSV instead.",
+		"description": "Notice when copying rows fails."
+	},
+	"table.columnDeleted": {
+		"defaultMessage": "Deleted the column “{column}”. Ctrl/Cmd+Z brings it back.",
+		"description": "Notice after deleting a column."
+	},
+	"table.columnExists": {
+		"defaultMessage": "There is already a column called “{name}”.",
+		"description": "Notice when a column is renamed or added with a name the table already has."
+	},
+	"table.copy": {
+		"defaultMessage": "Copy",
+		"description": "Label in the table panel."
+	},
+	"table.copyChosenRowsTabTitle": {
+		"defaultMessage": "Copy the chosen rows as tab-separated text, ready to paste into a spreadsheet",
+		"description": "Tooltip in the table panel."
+	},
+	"table.count": {
+		"defaultMessage": "{characters, plural, one {# character} other {# characters}} · {words, plural, one {# word} other {# words}}",
+		"description": "Count shown while a cell is open full size."
+	},
+	"table.deleteChosenRowsTitle": {
+		"defaultMessage": "Delete the chosen rows",
+		"description": "Tooltip in the table panel."
+	},
+	"table.deleteColumn": {
+		"defaultMessage": "Delete Column",
+		"description": "Button in the table panel."
+	},
+	"table.deleteColumnBody": {
+		"defaultMessage": "{cells, plural, one {# filled cell} other {# filled cells}}, across {rows, plural, one {# row} other {# rows}}.",
+		"description": "Body of the dialog before deleting a column."
+	},
+	"table.deleteColumnConfirm": {
+		"defaultMessage": "Delete this column?",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.deleteColumnDialog": {
+		"defaultMessage": "Delete “{column}”?",
+		"description": "Title of the dialog before deleting a column."
+	},
+	"table.deleteColumnTitle": {
+		"defaultMessage": "Delete column",
+		"description": "Tooltip in the table panel."
+	},
+	"table.deleteDrawingTitle": {
+		"defaultMessage": "Delete this drawing",
+		"description": "Tooltip in the table panel."
+	},
+	"table.deleteLabel": {
+		"defaultMessage": "Delete {column}",
+		"description": "Screen-reader name of the delete button in a column's header."
+	},
+	"table.deleteTable": {
+		"defaultMessage": "Delete…",
+		"description": "Label in the table panel."
+	},
+	"table.deleteTableBrowserYourTitle": {
+		"defaultMessage": "Delete this table from this browser. Your design is not touched.",
+		"description": "Tooltip in the table panel."
+	},
+	"table.dragRowTitle": {
+		"defaultMessage": "Drag to move this row{others, select, yes { and the other chosen rows} other {}}. {expanded, select, yes {Double-click to put this row back} other {Double-click to show this whole row}}",
+		"description": "Tooltip of a row's number."
+	},
+	"table.dragSetColumnsWidthTitle": {
+		"defaultMessage": "Drag to set this column's width — double-click for the default",
+		"description": "Tooltip in the table panel."
+	},
+	"table.draw": {
+		"defaultMessage": "Draw",
+		"description": "Label in the table panel."
+	},
+	"table.drawCellPictureMadeTitle": {
+		"defaultMessage": "Draw in this cell — a picture made here, kept in the table",
+		"description": "Tooltip in the table panel."
+	},
+	"table.drawPictureTitle": {
+		"defaultMessage": "Draw on this picture",
+		"description": "Tooltip of Draw for a cell holding a drawing."
+	},
+	"table.drawingTitle": {
+		"defaultMessage": "A drawing — double-click to draw on it",
+		"description": "Tooltip of a cell holding a drawing."
+	},
+	"table.dropAll": {
+		"defaultMessage": "Drop every row",
+		"description": "Tooltip of the tick box in the header: untick every row."
+	},
+	"table.edit": {
+		"defaultMessage": "Edit",
+		"description": "Label in the table panel."
+	},
+	"table.export": {
+		"defaultMessage": "Export",
+		"description": "Label in the table panel."
+	},
+	"table.firstLineNamesColumns": {
+		"defaultMessage": "The first line names the columns — there is nothing else here to name them with yet.",
+		"description": "Label in the table panel."
+	},
+	"table.gettingStarted": {
+		"defaultMessage": "Getting Started",
+		"description": "Label in the table panel."
+	},
+	"table.import": {
+		"defaultMessage": "Import…",
+		"description": "Label in the table panel."
+	},
+	"table.keywordWarning": {
+		"defaultMessage": "“{column}” is a reserved keyword. Rename the column to enable the %%{placeholder}%% placeholder.",
+		"description": "Warning about a column whose name is one of the app's own placeholders, such as page. Keep %%…%% as written."
+	},
+	"table.keywordWhyLabel": {
+		"defaultMessage": "“{column}” is a reserved keyword — why",
+		"description": "Screen-reader name of the warning sign on a column whose name is reserved."
+	},
+	"table.leave.close": {
+		"defaultMessage": "Close (Esc)",
+		"description": "Tooltip of the close button when the cell was opened from the card."
+	},
+	"table.leave.dirty": {
+		"defaultMessage": "Close — the drawing not saved is dropped (Esc)",
+		"description": "Tooltip of the close button while a drawing has unsaved changes."
+	},
+	"table.leave.pictures": {
+		"defaultMessage": "Back to Pictures (Esc)",
+		"description": "Tooltip of the close button when the cell was opened from the Pictures tray."
+	},
+	"table.leave.table": {
+		"defaultMessage": "Back to the table (Esc)",
+		"description": "Tooltip of the close button of a cell opened full size."
+	},
+	"table.libraryTitle": {
+		"defaultMessage": "{count, plural, one {# table} other {# tables}} in this browser",
+		"description": "Tooltip of the button that opens the table menu."
+	},
+	"table.lockTitle": {
+		"defaultMessage": "Lock the table — no typing, no new rows or columns, no paste or import",
+		"description": "Tooltip of Lock under the table."
+	},
+	"table.lockedImport": {
+		"defaultMessage": "The table is locked — unlock it to paste or import into it.",
+		"description": "Notice when pasting or importing into a locked table."
+	},
+	"table.moveChosenRowsDownLabel": {
+		"defaultMessage": "Move the chosen rows down",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.moveChosenRowsDownTitle": {
+		"defaultMessage": "Move the chosen rows down — later in print order",
+		"description": "Tooltip in the table panel."
+	},
+	"table.moveChosenRowsUpLabel": {
+		"defaultMessage": "Move the chosen rows up",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.moveChosenRowsUpTitle": {
+		"defaultMessage": "Move the chosen rows up — earlier in print order",
+		"description": "Tooltip in the table panel."
+	},
+	"table.moveColumnLeftTitle": {
+		"defaultMessage": "Move column left",
+		"description": "Tooltip in the table panel."
+	},
+	"table.moveColumnRightTitle": {
+		"defaultMessage": "Move column right",
+		"description": "Tooltip in the table panel."
+	},
+	"table.moveLeftLabel": {
+		"defaultMessage": "Move {column} left",
+		"description": "Screen-reader name of the move-left button in a column's header."
+	},
+	"table.moveRightLabel": {
+		"defaultMessage": "Move {column} right",
+		"description": "Screen-reader name of the move-right button in a column's header."
+	},
+	"table.newTable": {
+		"defaultMessage": "New Table",
+		"description": "Label in the table panel."
+	},
+	"table.nextRowLabel": {
+		"defaultMessage": "Next row",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.nextRowTitle": {
+		"defaultMessage": "Next row",
+		"description": "Tooltip of the right arrow of a cell opened full size."
+	},
+	"table.noRows": {
+		"defaultMessage": "No rows yet. Paste from a spreadsheet, import a CSV, or add a row with the + below.",
+		"description": "Shown in a table with columns and no rows."
+	},
+	"table.nothingYet": {
+		"defaultMessage": "Nothing here yet. Paste from a spreadsheet, import a CSV, or add a column with the + above — it arrives with a row in it.",
+		"description": "Shown in an empty table."
+	},
+	"table.open": {
+		"defaultMessage": "Open",
+		"description": "Button: open the cell's stored picture in the Pictures tray."
+	},
+	"table.openCellTablesFullTitle": {
+		"defaultMessage": "Open this cell in the table's full room",
+		"description": "Tooltip in the table panel."
+	},
+	"table.openCsvTsvFileTitle": {
+		"defaultMessage": "Open a CSV or TSV file as a new table — this one is kept as it is",
+		"description": "Tooltip in the table panel."
+	},
+	"table.openInPicturesTitle": {
+		"defaultMessage": "Open {name} in Pictures",
+		"description": "Tooltip of a stored picture opened full size."
+	},
+	"table.openPictureTitle": {
+		"defaultMessage": "Open this picture in Pictures",
+		"description": "Tooltip of Open for a cell naming a stored picture."
+	},
+	"table.paste": {
+		"defaultMessage": "Paste…",
+		"description": "Label in the table panel."
+	},
+	"table.pasteBlockCellsStraightTitle": {
+		"defaultMessage": "Paste a block of cells straight off a spreadsheet",
+		"description": "Tooltip in the table panel."
+	},
+	"table.pasteExample": {
+		"defaultMessage": "Bellwether\tA quiet start\nCatalogue\tThe second card",
+		"description": "Greyed example in the empty paste box: two rows of two cells, separated by a tab. Translate the words, keep the tab and the line break."
+	},
+	"table.pasteNothing": {
+		"defaultMessage": "Nothing recognisable in there.",
+		"description": "Notice when pasted text has no cells in it."
+	},
+	"table.pasteSheetLabel": {
+		"defaultMessage": "Paste from Sheet",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.pasteUnreadable": {
+		"defaultMessage": "Nothing readable as rows in there — the table is unchanged.",
+		"description": "Notice when a paste would empty the table."
+	},
+	"table.pictureCellLabel": {
+		"defaultMessage": "{column}, row {row}: a picture",
+		"description": "Screen-reader name of a cell holding a picture."
+	},
+	"table.placeLabel": {
+		"defaultMessage": "Place {column} on the card",
+		"description": "Screen-reader name of the mark on an unused column."
+	},
+	"table.previousRowLabel": {
+		"defaultMessage": "Previous row",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.previousRowTitle": {
+		"defaultMessage": "Previous row",
+		"description": "Tooltip of the left arrow of a cell opened full size."
+	},
+	"table.putStarterTableBeganTitle": {
+		"defaultMessage": "Put the starter this table began as back over it. Your design is not touched.",
+		"description": "Tooltip in the table panel."
+	},
+	"table.reindexInOrderTitle": {
+		"defaultMessage": "Reindex — the rows are already in the order of their numbers; sort the table first",
+		"description": "Tooltip of Reindex when there is nothing to reindex."
+	},
+	"table.reindexLabel": {
+		"defaultMessage": "Reindex",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.reindexLockedTitle": {
+		"defaultMessage": "The table is locked — unlock it to reindex",
+		"description": "Tooltip of Reindex while the table is locked."
+	},
+	"table.reindexTitle": {
+		"defaultMessage": "Reindex — make this order the rows' own: the numbers follow it, and lookups with them",
+		"description": "Tooltip of Reindex after a sort."
+	},
+	"table.reindexed": {
+		"defaultMessage": "Reindexed in this order — undo puts the old numbers back.",
+		"description": "Notice after Reindex."
+	},
+	"table.reindexedNote": {
+		"defaultMessage": "Reindexed in this order. {note}",
+		"description": "Notice after Reindex when lookups were carried along; {note} says what changed."
+	},
+	"table.renameColumnLabel": {
+		"defaultMessage": "Rename column {column}",
+		"description": "Screen-reader name of a column's name field."
+	},
+	"table.renameColumnTitle": {
+		"defaultMessage": "Rename this column — drag it sideways to move it",
+		"description": "Tooltip of a column's name in the header."
+	},
+	"table.replaceRows": {
+		"defaultMessage": "Replace Rows",
+		"description": "Button in the table panel."
+	},
+	"table.resetTable": {
+		"defaultMessage": "Reset…",
+		"description": "Label in the table panel."
+	},
+	"table.rowHeight.full": {
+		"defaultMessage": "Full",
+		"description": "Row height in the table: every row as tall as its longest cell."
+	},
+	"table.rowHeight.medium": {
+		"defaultMessage": "Long",
+		"description": "Row height in the table: a few lines a row."
+	},
+	"table.rowHeight.short": {
+		"defaultMessage": "Short",
+		"description": "Row height in the table: one line a row."
+	},
+	"table.rowHeightLabel": {
+		"defaultMessage": "Row height, {now}",
+		"description": "Screen-reader name of the row height button."
+	},
+	"table.rowHeightTitle": {
+		"defaultMessage": "Row height: {now} — press for {next}",
+		"description": "Tooltip of the row height button; {now} and {next} are row heights such as Short."
+	},
+	"table.rowLabel": {
+		"defaultMessage": "Row",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.rowsAdded": {
+		"defaultMessage": "{count, plural, one {# row} other {# rows}} added.",
+		"description": "Notice after rows are added at the end of the table."
+	},
+	"table.rowsCopied": {
+		"defaultMessage": "{count, plural, one {# row} other {# rows}} copied, ready to paste into a spreadsheet.",
+		"description": "Notice after copying rows."
+	},
+	"table.rowsDeleted": {
+		"defaultMessage": "{count, plural, one {Deleted # row.} other {Deleted # rows.}}{note} {count, plural, one {Ctrl/Cmd+Z brings it back.} other {Ctrl/Cmd+Z brings them back.}}",
+		"description": "Notice after deleting rows; {note} is empty or a sentence starting with a space about lookups."
+	},
+	"table.rowsExported": {
+		"defaultMessage": "{count, plural, one {# row} other {# rows}} exported as CSV.",
+		"description": "Notice after exporting the table as a CSV file."
+	},
+	"table.rowsLoaded": {
+		"defaultMessage": "{count, plural, one {# row} other {# rows}} loaded.",
+		"description": "Notice after rows replace the table's."
+	},
+	"table.runsOffPageLabel": {
+		"defaultMessage": "Runs off the page",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.runsOffTitle": {
+		"defaultMessage": "Card {row} runs off the page: {areas} {count, plural, one {grows} other {grow}} past the margin or the edge. Shorten the words, or give the area more room.",
+		"description": "Tooltip of the warning on a row whose card overflows; {areas} is a list of area names."
+	},
+	"table.saveDrawingCtrlCmdTitle": {
+		"defaultMessage": "Save this drawing (Ctrl/Cmd+S)",
+		"description": "Tooltip in the table panel."
+	},
+	"table.saveDrawingFirst": {
+		"defaultMessage": "Save the drawing first",
+		"description": "Tooltip of the row arrows while a drawing has unsaved changes."
+	},
+	"table.saveRowsCsvFileTitle": {
+		"defaultMessage": "Save the rows as a CSV file",
+		"description": "Tooltip in the table panel."
+	},
+	"table.savedTablesLabel": {
+		"defaultMessage": "Saved tables",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.showAllCellTitle": {
+		"defaultMessage": "Show all of this cell",
+		"description": "Tooltip in the table panel."
+	},
+	"table.showAllLabel": {
+		"defaultMessage": "Show all of {column}, row {row}",
+		"description": "Screen-reader name of the button that opens a cell full size."
+	},
+	"table.showWhitespaceLabel": {
+		"defaultMessage": "Show whitespace",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.sortAscTitle": {
+		"defaultMessage": "Sort rows by {column}, A to Z",
+		"description": "Tooltip of a column's sort button."
+	},
+	"table.sortDescTitle": {
+		"defaultMessage": "Sort {column} Z to A",
+		"description": "Tooltip of a column's sort button after sorting A to Z."
+	},
+	"table.sortLabel": {
+		"defaultMessage": "Sort rows by {column}",
+		"description": "Screen-reader name of a column's sort button."
+	},
+	"table.sortedByTitle": {
+		"defaultMessage": "Sorted by “{column}” — press to put the rows back in the order they arrived in",
+		"description": "Tooltip of the button that clears the sorting."
+	},
+	"table.sortedTitle": {
+		"defaultMessage": "Sorted — press to put the rows back in the order they arrived in",
+		"description": "Tooltip of the button that clears the sorting, after a reload."
+	},
+	"table.storedPictureTitle": {
+		"defaultMessage": "{name} — double-click to open it in Pictures",
+		"description": "Tooltip of a cell that names a stored picture."
+	},
+	"table.swapBackTitle": {
+		"defaultMessage": "Back to “{name}”",
+		"description": "Tooltip of the swap button: open the table you had open before."
+	},
+	"table.swapNothingTitle": {
+		"defaultMessage": "Nothing to swap back to yet — this is the only table you have opened",
+		"description": "Tooltip of the swap button when no other table has been opened."
+	},
+	"table.swapPreviousTableLabel": {
+		"defaultMessage": "Swap to the previous table",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.table": {
+		"defaultMessage": "Table",
+		"description": "Label in the table panel."
+	},
+	"table.tableNameLabel": {
+		"defaultMessage": "Table name",
+		"description": "Screen-reader name of a control in the table panel."
+	},
+	"table.unlockTitle": {
+		"defaultMessage": "Unlock the table",
+		"description": "Tooltip of Unlock under the table."
+	},
+	"table.unsorted": {
+		"defaultMessage": "Back to the order the rows came in.",
+		"description": "Notice after the sorting is cleared."
+	},
+	"table.unusedTitle": {
+		"defaultMessage": "No area uses “{column}” — press to place it on the card{keyword, select, yes {} other {, or write %%{column}%% in an area}}",
+		"description": "Tooltip of the mark on a column nothing on the card shows. Keep %%…%% as written."
+	},
+	"table.whitespace": {
+		"defaultMessage": "Whitespace",
+		"description": "Label in the table panel."
+	},
+	"table.whitespaceHiddenTitle": {
+		"defaultMessage": "Show whitespace — spaces, tabs and line ends — in the cell being typed in and the full-size editor",
+		"description": "Tooltip of Whitespace while it is off."
+	},
+	"table.whitespaceShownTitle": {
+		"defaultMessage": "Whitespace shown in the cell being typed in and the full-size editor: a dot for a space (a ring where a line wraps at it), → for a tab, a square for a no-break space, ¶ for a line end. Press to hide it",
+		"description": "Tooltip of Whitespace while it is on."
+	},
+	"table.whyColumnRedTitle": {
+		"defaultMessage": "Why this column is red",
+		"description": "Tooltip in the table panel."
 	},
 	"textAlign.bottom": {
 		"defaultMessage": "Align Bottom",
