@@ -20,7 +20,7 @@
  * face is the page's work, since both reach the browser's storage.
  */
 
-import { quotedList, t } from './i18n';
+import { listOf, quotedList, t } from './i18n';
 import { localImageName } from './assets';
 import { readIdml, type IdmlImport } from './idml';
 import { parseTable, toCsv } from './parse';
@@ -217,7 +217,7 @@ export function readPackage(files: Map<string, Uint8Array>, tableName: string): 
 	// A name is stored as it is, into this browser or a connected folder, so
 	// one that is a path is refused before anything is written, not halfway.
 	const unsafe = names.filter((name) => !safePictureName(name));
-	if (unsafe.length) throw new PackageError(t('package.unsafeNames', { names: unsafe.map(String).join(', ') }));
+	if (unsafe.length) throw new PackageError(t('package.unsafeNames', { names: listOf(unsafe.map(String)) }));
 	const pictures: PackagePicture[] = [];
 	const absent: string[] = [];
 	for (const name of names as string[]) {
@@ -394,7 +394,7 @@ export async function readInDesign(files: Map<string, Uint8Array>, archiveName: 
 	if (absent.length) {
 		notes.push(
 			bare
-				? t('package.idmlNoPictures', { names: absent.join(', ') })
+				? t('package.idmlNoPictures', { names: listOf(absent) })
 				: t('package.picturesAbsent', { count: absent.length, names: quotedList(absent) })
 		);
 	}

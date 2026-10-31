@@ -26,10 +26,40 @@ const CALLS = /\b(?:notify|onnotice|describe|onaction|window\.prompt|notes\.push
 const LABELS = /\b(?:label|title):\s*(?=['"`])/g;
 /** A literal that reads as words: a capital, a lowercase letter, and nothing that looks like code. */
 const PHRASE = /^[A-Z][a-z’']+(?:[\s,—–…/-]+[\p{L}\d’'%.…!?()]+)*[.…!?]?$/u;
+/** …or a lowercase fragment of three words or more, as spliced into a sentence: 'it is not valid JSON'. */
+const FRAGMENT = /^[a-z’']+(?:\s+[\p{L}\d’'%.…!?()]+){2,}[.…!?]?$/u;
 /** Words the keyboard and the platform own: compared against, never shown. */
 const NOT_OURS = /(?:===|!==|case|includes\()\s*$/;
 /** …or listed in an array that is only asked whether it holds a key: `['Enter', 'Escape'].includes(k)`. */
 const LISTED = /^[^\]\n;]*\]\s*\.includes\(/;
+
+/**
+ * JS with its comments blanked, reading strings as strings: a regular
+ * expression over the text would take the slash-star in 'image/' + '*' for a
+ * comment opening, and blank everything up to the next one that closes.
+ */
+function uncomment(code) {
+	const out = code.split('');
+	let quote = '';
+	for (let i = 0; i < code.length; i++) {
+		const c = code[i];
+		if (quote) {
+			if (c === '\\') i++;
+			else if (c === quote || (quote !== '`' && c === '\n')) quote = '';
+			continue;
+		}
+		if (c === "'" || c === '"' || c === '`') quote = c;
+		else if (c === '/' && code[i + 1] === '/') {
+			while (i < code.length && code[i] !== '\n') out[i++] = ' ';
+		} else if (c === '/' && code[i + 1] === '*') {
+			const end = code.indexOf('*/', i + 2);
+			const stop = end < 0 ? code.length : end + 2;
+			for (; i < stop; i++) if (code[i] !== '\n') out[i] = ' ';
+			i--;
+		}
+	}
+	return out.join('');
+}
 
 /** Where the call opened at `open` closes, strings and nesting allowed for. */
 function closing(code, open) {
@@ -51,6 +81,18 @@ function closing(code, open) {
 function literals(code, from, to, out = []) {
 	for (let i = from; i < to; i++) {
 		const c = code[i];
+		// A comment inside a {…} handler is a comment, not words.
+		if (c === '/' && code[i + 1] === '/') {
+			i = code.indexOf('\n', i);
+			if (i < 0) break;
+			continue;
+		}
+		if (c === '/' && code[i + 1] === '*') {
+			const end = code.indexOf('*' + '/', i + 2);
+			if (end < 0) break;
+			i = end + 1;
+			continue;
+		}
 		if (c === "'" || c === '"' || c === '`') {
 			let j = i + 1;
 			let body = '';
@@ -161,19 +203,17 @@ const found = [];
 const report = (file, source, offset, text) => {
 	if (!allowed(source, offset)) found.push(`${file}:${lineOf(source, offset)}: ${text.replace(/\s+/g, ' ').slice(0, 80)}`);
 };
-const phrase = (code, offset, body, quote) =>
-	PHRASE.test(body.replace(/\\(.)/g, '$1').trim()) &&
+const phrase = (code, offset, body) =>
+	(PHRASE.test(body.replace(/\\(.)/g, '$1').trim()) || FRAGMENT.test(body.replace(/\\(.)/g, '$1').trim())) &&
 	!NOT_OURS.test(code.slice(Math.max(0, offset - 12), offset)) &&
-	!LISTED.test(code.slice(offset + body.length + 2, offset + body.length + 200)) &&
-	quote !== undefined;
+	!LISTED.test(code.slice(offset + body.length + 2, offset + body.length + 200));
 for (const file of files('src')) {
 	const source = readFileSync(file, 'utf8');
 	const svelte = file.endsWith('.svelte');
 	let code = blank(source, /<!--[\s\S]*?-->/g);
 	if (svelte) code = blank(code, /<style[\s\S]*?<\/style>/g);
 	// Comments are a script's: in markup, accept="image/*" is not one opening.
-	const COMMENTS = /\/\*[\s\S]*?\*\/|(?<![:'"])\/\/[^\n]*/g;
-	code = svelte ? code.replace(/(<script[^>]*>)([\s\S]*?)(<\/script>)/g, (_, a, b, c) => a + blank(b, COMMENTS) + c) : blank(code, COMMENTS);
+	code = svelte ? code.replace(/(<script[^>]*>)([\s\S]*?)(<\/script>)/g, (_, a, b, c) => a + uncomment(b) + c) : uncomment(code);
 	if (svelte) {
 		const markup = blank(code, /<script[\s\S]*?<\/script>/g);
 		const expressions = [];
@@ -184,7 +224,7 @@ for (const file of files('src')) {
 		}
 		const scripts = [...code.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((m) => [m.index + m[0].indexOf('>') + 1, m.index + m[0].length - 9]);
 		for (const [from, to] of [...scripts, ...expressions]) {
-			for (const [offset, body, quote] of literals(code, from, to)) if (phrase(code, offset, body, quote)) report(file, source, offset, body);
+			for (const [offset, body] of literals(code, from, to)) if (phrase(code, offset, body)) report(file, source, offset, body);
 		}
 	}
 	for (const m of code.matchAll(CALLS)) {
@@ -196,8 +236,8 @@ for (const file of files('src')) {
 	if (!svelte) {
 		for (const m of code.matchAll(LABELS)) {
 			const at = m.index + m[0].length;
-			const [hit] = literals(code, at, closing(`(${code.slice(at, at + 400)}`, 0) + at);
-			if (hit && hit[0] === at && phrase(code, hit[0], hit[1], hit[2])) report(file, source, hit[0], hit[1]);
+			const [hit] = literals(code, at, at + 400);
+			if (hit && hit[0] === at && phrase(code, hit[0], hit[1])) report(file, source, hit[0], hit[1]);
 		}
 	}
 }

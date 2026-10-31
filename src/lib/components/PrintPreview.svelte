@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Msg from './Msg.svelte';
-	import { t } from '$lib/i18n';
+	import { listOf, t } from '$lib/i18n';
 	import { tick } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import Card from './Card.svelte';
@@ -199,7 +199,7 @@
 			const unit = imposed ? 'sheet' : 'page';
 			onnotice(
 				(files.length ? t('export.doneZip', { count: written, unit, file: `${stem}.zip` }) : t('export.done', { count: written, unit })) +
-					(missing.size ? ` ${t('export.fontsNotEmbedded', { fonts: [...missing].join(', ') })}` : '')
+					(missing.size ? ` ${t('export.fontsNotEmbedded', { fonts: listOf([...missing]) })}` : '')
 			);
 		} catch (error) {
 			const reason = error instanceof Error ? error.message : t('export.failed');

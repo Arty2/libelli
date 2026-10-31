@@ -1843,8 +1843,8 @@
 					<button
 						class="step"
 						disabled={activeRow <= 0}
-						title={withKey(t('stage.previousCard'), 'cards')}
-						aria-label={t('stage.previousCard')}
+						title={withKey(t('lightbox.previousCard'), 'cards')}
+						aria-label={t('lightbox.previousCard')}
 						onclick={() => onactivate(Math.max(0, activeRow - 1))}
 					><Icon name="chevron-left" size={18} /></button>
 				{/if}
@@ -1857,8 +1857,8 @@
 					<button
 						class="step"
 						disabled={activeRow >= rowCount - 1}
-						title={withKey(t('stage.nextCard'), 'cards')}
-						aria-label={t('stage.nextCard')}
+						title={withKey(t('lightbox.nextCard'), 'cards')}
+						aria-label={t('lightbox.nextCard')}
 						onclick={() => onactivate(Math.min(rowCount - 1, activeRow + 1))}
 					><Icon name="chevron-right" size={18} /></button>
 				{/if}
@@ -1972,7 +1972,7 @@
 				class="square page-lock"
 				aria-pressed={!unlocking}
 				title={unlocking ? t('stage.unlocked') : withKey(t('stage.locked'), 'lockPage')}
-				aria-label={unlocking ? t('stage.lockAgain') : t('stage.unlockDesign')}
+				aria-label={unlocking ? t('stage.lockAgain') : t('design.unlockTitle')}
 				onclick={unlock}
 			>
 				<Icon name={unlocking ? 'unlocked' : 'locked'} size={16} />

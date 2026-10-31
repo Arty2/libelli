@@ -352,7 +352,7 @@
 				disabled={pageFrozen}
 				onchange={(e) => setPreset(e.currentTarget.value)}
 			>
-				<option value="">{t('print.sheet.custom')}</option>
+				<option value="">{t('page.custom')}</option>
 				{#each PAGE_PRESETS as option (option.name)}
 					<option value={option.name}>{presetLabel(option.name)}</option>
 				{/each}

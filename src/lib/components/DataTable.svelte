@@ -2098,7 +2098,7 @@
 					class="icon step"
 					disabled={at <= 0 || boardShown(bigCell) && boardDirty}
 					title={t(boardShown(bigCell) && boardDirty ? 'table.saveDrawingFirst' : 'table.previousRowTitle')}
-					aria-label={t('table.previousRowLabel')}
+					aria-label={t('table.previousRowTitle')}
 					onclick={() => stepBigCell(-1)}
 				><Icon name="chevron-left" size={16} /></button>
 				<span class="big-row">{t('common.counter', { index: at + 1, total: dataset.rows.length })}</span>
@@ -2106,7 +2106,7 @@
 					class="icon step"
 					disabled={at >= dataset.rows.length - 1 || boardShown(bigCell) && boardDirty}
 					title={t(boardShown(bigCell) && boardDirty ? 'table.saveDrawingFirst' : 'table.nextRowTitle')}
-					aria-label={t('table.nextRowLabel')}
+					aria-label={t('table.nextRowTitle')}
 					onclick={() => stepBigCell(1)}
 				><Icon name="chevron-right" size={16} /></button>
 			</span>
@@ -2258,7 +2258,7 @@
 								}}
 							>
 								<span class="mark" aria-hidden="true"><Icon name="information-square" size={14} /></span>
-								{t('table.gettingStarted')}
+								{t('name.gettingStarted')}
 							</button>
 						</li>
 						<!-- And below the next, what can be done to the open table: rows in,

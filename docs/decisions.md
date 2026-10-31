@@ -4760,15 +4760,17 @@ written literally.
 **Gate 13 keeps it that way.** `scripts/ui-text.mjs` lists markup text outside
 `{…}`; a `title`, `aria-label`, `placeholder`, `alt` or `label` with words
 outside its `{…}`; in a component's script and its `{…}` expressions, any
-string literal that reads as a label — a capital, then letters — so both
-branches of `cond ? 'Open' : 'Close'` are seen; and, in any file, a literal
+string literal that reads as a label — a capital, then letters — or as a
+fragment of three words or more spliced into a sentence (`'it is not valid
+JSON'`), so both branches of `cond ? 'Open' : 'Close'` are seen; and, in any file, a literal
 among the arguments of `notify`, `onnotice`, `describe`, `onaction`,
 `window.prompt`, `notes.push` or a `new …Error`, however the call wraps; and in
 a library module, an object's `label:` or `title:` written as a literal. A
 literal compared with `===`, named in `case`, passed to `includes(` or listed in
 an array that is only asked `.includes(…)` is the keyboard's or the platform's
-(`'Escape'`, `'Files'`) and is let be. Comments are blanked in scripts only: in
-markup, `accept="image/*"` is not one opening. What it still cannot see is a sentence in
+(`'Escape'`, `'Files'`) and is let be. Comments are read as comments by walking the
+code, strings included, so neither `accept="image/*"` in markup nor `'/*'` in a
+script opens one. What it still cannot see is a sentence in
 a library module kept in a variable and shown later; review catches those. A
 line that is never shown — the service worker's own log, the message parser's
 error for whoever edits the catalogue — says `ui-text: allow`.
@@ -4787,6 +4789,21 @@ as the field beside it does, and a 0.0125mm tracking is not cut to 0.013.
 reader does not know (`selectordinal`, `{n, number, percent}`), is logged and
 drawn as the key, as a missing one is, rather than throwing inside a
 component's render.
+
+**A name the app gives is the user's from then on.** "Untitled card", "New
+table" and "Getting Started" are written into the design or table in the
+interface's language when it is made, and stay so: a name is data a person
+renames, exports and sends, and a file that changed its own name when opened
+under another language would be stranger than one that keeps the name it was
+given. Names that are only shown — the starters in the Reset menus, a fallback
+for a nameless entry in a list — are read when shown, never cached at load.
+
+**One key per meaning, not per spelling.** Two places that say the same thing
+about the same thing share a key (the page's and the sheet's background buttons,
+Next card on the stage and in the lightbox). The same English for different
+things keeps two: "Color" as a blend mode and as a field label, "Solid" as a
+border and as a leader, Align Left for text and for areas — another language
+may need two words where English has one.
 
 **One language, and no switcher yet.** `LOCALE` is `'en'`. When a second
 language arrives, its file sits beside `en.json` with the same keys, and

@@ -2941,7 +2941,7 @@
 							<button
 								class="badge action"
 								title={t('card.lockedTitle')}
-								aria-label={t('card.unlockAreaLabel')}
+								aria-label={t('area.unlockTitle')}
 								onpointerdown={(e) => e.stopPropagation()}
 								onpointerenter={() => (hoveredBadge = `${box.id}:locked`)}
 								onpointerleave={() => (hoveredBadge = null)}

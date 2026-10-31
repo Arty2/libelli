@@ -101,7 +101,7 @@ export function parseMessage(source: string): Node[] {
 			}
 			if (ch === '{') {
 				flush();
-				nodes.push(parseArgument());
+				nodes.push(parseArgument(inPlural));
 				continue;
 			}
 			if (ch === '}') {
@@ -147,7 +147,8 @@ export function parseMessage(source: string): Node[] {
 		return m[1];
 	};
 
-	const parseArgument = (): Node => {
+	// `#` is the nearest plural's number, so a select inside a plural still reads it.
+	const parseArgument = (inPlural: boolean): Node => {
 		at++; // {
 		const name = word();
 		if (source[at] === '}') {
@@ -176,7 +177,7 @@ export function parseMessage(source: string): Node[] {
 			const key = word();
 			if (source[at] !== '{') fail(`a { after ${key}`);
 			at++;
-			options.set(key, parseNodes(type === 'plural', '}'));
+			options.set(key, parseNodes(type === 'plural' || inPlural, '}'));
 			at++; // }
 		}
 		if (!options.has('other')) fail(`${type} without an other`);
@@ -298,6 +299,9 @@ export function rich(key: MessageKey, values: Values = {}): Part[] {
 }
 
 const lists = new Intl.ListFormat(LOCALE, { style: 'long', type: 'conjunction' });
+
+/** Names as a list in the locale's words: a, b and c. */
+export const listOf = (names: string[]): string => lists.format(names);
 
 /** Names in quotation marks, as a list in the locale's words: “a”, “b” and “c”. */
 export const quotedList = (names: string[]): string => lists.format(names.map((name) => t('common.quoted', { name })));

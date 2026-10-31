@@ -14,7 +14,7 @@
 	import PagePreview from '$lib/components/PagePreview.svelte';
 	import PrintRoot from '$lib/components/PrintRoot.svelte';
 	import Msg from '$lib/components/Msg.svelte';
-	import { quotedList, t, type MessageKey } from '$lib/i18n';
+	import { listOf, quotedList, t, type MessageKey } from '$lib/i18n';
 	import {
 		localImageName,
 		localImageRef,
@@ -372,7 +372,8 @@
 			t('theme.title', {
 				theme: t(THEME_NAMES[theme]),
 				next: t(THEME_LOWER[nextTheme(theme)]),
-				peek: peekTheme(theme) ? t(THEME_LOWER[peekTheme(theme) ?? theme]) : 'none',
+				peek: t(THEME_LOWER[peekTheme(theme) ?? theme]),
+				hasPeek: peekTheme(theme) ? 'yes' : 'no',
 				readonly: editor === 'readonly' ? 'yes' : 'no'
 			})
 	);
@@ -3611,7 +3612,7 @@
 		}
 		settleProvisional();
 		await flushDataset();
-		describe(t('table.gettingStarted'));
+		describe(t('name.gettingStarted'));
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
 		saveDatasetId(datasetId);
@@ -3752,7 +3753,7 @@
 		settleProvisional();
 		await Promise.all([flushTemplate(), flushDataset()]);
 		const name = freeTableName(tableNameFrom(file.name) || untitledTable(), true);
-		describe(t('history.importTable', { name }));
+		describe(t('history.importNamed', { name }));
 		rememberTable(datasetId);
 		datasetId = nextDatasetId();
 		saveDatasetId(datasetId);
@@ -5136,7 +5137,7 @@
 					size:
 						cssCount.bytes < 1024
 							? t('css.bytes', { count: cssCount.bytes })
-							: t('css.kilobytes', { count: Math.round((cssCount.bytes / 1024) * 10) / 10 })
+							: t('size.kilobytes', { count: Math.round((cssCount.bytes / 1024) * 10) / 10 })
 				})}
 			</span>
 			<!-- Beside the ×, as a window's own controls sit: the room to work in,
@@ -5285,7 +5286,7 @@
 		{#if packagedFamilies.length}
 			<label class="check">
 				<input type="checkbox" bind:checked={packageFonts} />
-				<span>{t('package.includeFonts', { families: packagedFamilies.join(', ') })}</span>
+				<span>{t('package.includeFonts', { families: listOf(packagedFamilies) })}</span>
 			</label>
 		{/if}
 		<div class="modal-actions">

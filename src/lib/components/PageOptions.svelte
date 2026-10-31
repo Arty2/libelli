@@ -420,7 +420,7 @@
 						class="w-8"
 						aria-label={t('page.templateNameLabel')}
 						value={template.name}
-						placeholder={t('page.untitledCardPlaceholder')}
+						placeholder={t('name.untitledCard')}
 						disabled={pageFrozen}
 						onchange={(e) => ontemplatechange(renamed(template, e.currentTarget.value))}
 					/>
@@ -941,9 +941,9 @@
 					disabled={pageFrozen}
 					onchange={(e) => setBackground({ ...template.page.image!, fit: e.currentTarget.value as BackgroundFit })}
 				>
-					<option value="cover">{t('page.cover')}</option>
-					<option value="contain">{t('page.contain')}</option>
-					<option value="repeat">{t('page.tile')}</option>
+					<option value="cover">{t('background.cover')}</option>
+					<option value="contain">{t('background.contain')}</option>
+					<option value="repeat">{t('background.tile')}</option>
 				</select>
 				<button
 					class="square"
@@ -957,10 +957,10 @@
 			{:else}
 				<button
 					disabled={pageFrozen}
-					title={t('page.fileMachineImageStaysTitle')}
-					onclick={() => imageInput?.click()}><Icon name="image-reference" size={14} /> {t('page.upload')}</button
+					title={t('background.uploadTitle')}
+					onclick={() => imageInput?.click()}><Icon name="image-reference" size={14} /> {t('background.upload')}</button
 				>
-				<button disabled={pageFrozen} title={t('page.httpSAddressTemplateTitle')} onclick={linkBackground}><Icon name="copy-link" size={14} /> {t('page.url')}</button>
+				<button disabled={pageFrozen} title={t('background.urlTitle')} onclick={linkBackground}><Icon name="copy-link" size={14} /> {t('background.url')}</button>
 			{/if}
 		</fieldset>
 		<fieldset class="group">

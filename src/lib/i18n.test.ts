@@ -12,6 +12,9 @@ describe('formatMessage', () => {
 		expect(formatMessage(m, { count: 0 })).toBe('no rows');
 		expect(formatMessage(m, { count: 1 })).toBe('1 row');
 		expect(formatMessage(m, { count: 1200 })).toBe('1200 rows');
+		// A select inside a plural reads the plural's #.
+		expect(formatMessage('{n, plural, other {{kind, select, font {# fonts} other {# pictures}}}}', { n: 3, kind: 'font' })).toBe('3 fonts');
+		expect(formatMessage('{n, plural, =0 {none} one {one} other {#}}', { n: 0 })).toBe('none');
 		expect(formatMessage('{w} × {h}mm, {s}mm', { w: 1189, h: 841, s: 0.0125 })).toBe('1189 × 841mm, 0.0125mm');
 	});
 

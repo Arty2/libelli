@@ -672,7 +672,7 @@
 					onclick={ondelete}
 					disabled={boxFrozen}
 					title={withKey(t('area.deleteTitle'), 'delete')}
-					aria-label={t('area.deleteAreaLabel')}
+					aria-label={t('area.deleteTitle')}
 				>
 					<Icon name="trash" size={14} /> <span class="label">{t('common.delete')}</span>
 				</button>
