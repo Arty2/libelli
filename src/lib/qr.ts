@@ -11,6 +11,8 @@
  * 300dpi is the classic way to end up with a code no phone will read.
  */
 
+import { t } from './i18n';
+import { escapeHtml } from './markdown';
 import { parseColor } from './color';
 
 export type EccLevel = 'L' | 'M' | 'Q' | 'H';
@@ -161,7 +163,7 @@ function chooseVersion(byteLength: number, level: EccLevel): number {
 		const needed = Math.ceil((4 + lengthBits(version) + byteLength * 8) / 8);
 		if (needed <= capacity) return version;
 	}
-	throw new Error('Too much text for a QR code of this size.');
+	throw new Error(t('code.qrTooMuch'));
 }
 
 function codewords(bytes: number[], version: number, level: EccLevel): number[] {
@@ -420,7 +422,7 @@ export interface QrOptions {
 export function qrMatrix(text: string, options: QrOptions = {}): boolean[][] {
 	const level = options.level ?? 'M';
 	const bytes = Array.from(new TextEncoder().encode(text));
-	if (!bytes.length) throw new Error('Nothing to encode.');
+	if (!bytes.length) throw new Error(t('code.empty'));
 	const version = chooseVersion(bytes.length, level);
 	const data = codewords(bytes, version, level);
 
@@ -469,7 +471,7 @@ export function qrSvg(text: string, options: QrSvgOptions = {}): string {
 
 	return [
 		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="100%" height="100%"`,
-		` shape-rendering="crispEdges" role="img" aria-label="QR code">`,
+		` shape-rendering="crispEdges" role="img" aria-label="${escapeHtml(t('code.qrLabel'))}">`,
 		background ? `<rect width="${size}" height="${size}" fill="${background}"/>` : '',
 		`<path d="${path}" fill="${color}"/>`,
 		`</svg>`

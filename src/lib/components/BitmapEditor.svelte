@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	import { tick, untrack } from 'svelte';
 	import Icon from './Icon.svelte';
 	import {
@@ -461,13 +462,13 @@
 		if (!data) return;
 		try {
 			await navigator.clipboard.write([new ClipboardItem({ 'image/png': data })]);
-			say('Copied');
+			say(t('draw.copied'));
 		} catch {
 			// Firefox writes images only from a user gesture it recognises, and a
 			// page without the permission gets nothing. Said out loud rather than
 			// failing quietly, because a copy that did not happen looks exactly
 			// like one that did until you paste.
-			say('This browser would not let go of the clipboard', 'warning');
+			say(t('draw.clipboardRefused'), 'warning');
 		}
 	}
 
@@ -481,11 +482,11 @@
 				break;
 			}
 		} catch {
-			say('This browser would not let go of the clipboard', 'warning');
+			say(t('draw.clipboardRefused'), 'warning');
 			return;
 		}
 		if (!source) {
-			say('No image on the clipboard', 'warning');
+			say(t('draw.noImage'), 'warning');
 			return;
 		}
 		try {
@@ -511,7 +512,7 @@
 				ctx.drawImage(image, 0, 0, grid.w, grid.h);
 			}
 			measure();
-			say('Pasted');
+			say(t('draw.pasted'));
 		} finally {
 			URL.revokeObjectURL(source);
 		}
@@ -710,15 +711,15 @@
 <!-- An application in the ARIA sense: a surface that takes its own keys,
      which the compiler's list of interactive roles does not count. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<div class="drawer" role="application" aria-label="Drawing" tabindex="-1" onkeydown={onKeydown} use:takeFocus>
+<div class="drawer" role="application" aria-label={t('draw.label')} tabindex="-1" onkeydown={onKeydown} use:takeFocus>
 	<!-- One row over the board: the paper to see it on, its size, and what it
 	     weighs — which grows with the size, and is why it is in view. -->
 	<div class="board" use:portal={head}>
 		<button
 			class="square"
 			aria-pressed={checks === 'dark'}
-			title="Show the transparent squares dark or light — a pale drawing needs the dark ones"
-			aria-label="Dark checkerboard"
+			title={t('draw.darkChecksTitle')}
+			aria-label={t('draw.darkChecks')}
 			onclick={() => (checks = checks === 'dark' ? 'light' : 'dark')}
 		>
 			<Icon name="opacity" size={16} />
@@ -728,8 +729,8 @@
 			min={MIN_SIDE}
 			max={MAX_SIDE}
 			value={grid.w}
-			title="Board width, in pixels"
-			aria-label="Board width in pixels"
+			title={t('draw.boardWidthTitle')}
+			aria-label={t('draw.boardWidth')}
 			onchange={(e) => setSide('w', e.currentTarget.value)}
 		/>
 		<span class="by" aria-hidden="true">×</span>
@@ -738,15 +739,15 @@
 			min={MIN_SIDE}
 			max={MAX_SIDE}
 			value={grid.h}
-			title="Board height, in pixels"
-			aria-label="Board height in pixels"
+			title={t('draw.boardHeightTitle')}
+			aria-label={t('draw.boardHeight')}
 			onchange={(e) => setSide('h', e.currentTarget.value)}
 		/>
-		<span class="by">px</span>
+		<span class="by">{t('draw.pixels')}</span>
 		<!-- Said out loud, because this is going into a cell of the table and a
 		     long cell is the cost of it travelling with the words. -->
 		{#if weight !== null}
-			<span class="weight" title="What this drawing adds to the cell it is written into">/ {weight} KB</span>
+			<span class="weight" title={t('draw.weightTitle')}>{t('draw.weight', { weight })}</span>
 		{/if}
 	</div>
 
@@ -781,12 +782,12 @@
 	<!-- Two rows. What you draw with — the tool, the nib, undo, and the paper
 	     to see it on — and under it what you do to the whole board, with the
 	     three ways out at the far end: Delete, then Cancel and Done. -->
-	<div class="tools" role="toolbar" aria-label="Drawing tools">
+	<div class="tools" role="toolbar" aria-label={t('draw.tools')}>
 		<span class="segmented">
 			<button
 				aria-pressed={tool === 'pen'}
-				title="Draw"
-				aria-label="Draw"
+				title={t('draw.draw')}
+				aria-label={t('draw.draw')}
 				onclick={() => pick('pen')}
 			>
 				<!-- The pencil the Draw buttons wear, drawn in the ink it puts down:
@@ -795,8 +796,8 @@
 			</button>
 			<button
 				aria-pressed={tool === 'line'}
-				title="Straight line — press where it starts and let go where it ends"
-				aria-label="Line"
+				title={t('draw.lineTitle')}
+				aria-label={t('draw.line')}
 				onclick={() => pick('line')}
 			>
 				<Icon name="line" size={16} />
@@ -805,28 +806,24 @@
 			     so the button says whether the next one is free or even. -->
 			<button
 				aria-pressed={tool === 'rect'}
-				title={square
-					? 'Square — drag from corner to corner. Press twice for any rectangle; Shift for one'
-					: 'Rectangle — drag from corner to corner. Press twice for squares; Shift for one'}
-				aria-label={square ? 'Square' : 'Rectangle'}
+				title={square ? t('draw.squareTitle') : t('draw.rectangleTitle')}
+				aria-label={square ? t('draw.square') : t('draw.rectangle')}
 				onclick={() => pick('rect')}
 			>
 				<span class="outline" class:even={square}></span>
 			</button>
 			<button
 				aria-pressed={tool === 'ellipse'}
-				title={circle
-					? 'Circle — drag across it. Press twice for any ellipse; Shift for one'
-					: 'Ellipse — drag across it. Press twice for circles; Shift for one'}
-				aria-label={circle ? 'Circle' : 'Ellipse'}
+				title={circle ? t('draw.circleTitle') : t('draw.ellipseTitle')}
+				aria-label={circle ? t('draw.circle') : t('draw.ellipse')}
 				onclick={() => pick('ellipse')}
 			>
 				<span class="outline round" class:even={circle}></span>
 			</button>
 			<button
 				aria-pressed={tool === 'eraser'}
-				title="Rub out — back to the paper, not to white"
-				aria-label="Erase"
+				title={t('draw.eraseTitle')}
+				aria-label={t('draw.erase')}
 				onclick={() => pick('eraser')}
 			>
 				<Icon name="erase" size={16} />
@@ -839,8 +836,8 @@
 		     the same size, which starts as the area's own. -->
 		<span class="segmented">
 			<button
-				title="{nib} pixel{nib === 1 ? '' : 's'} wide — press for {nib === NIBS.at(-1) ? 'the thinnest' : 'wider'}"
-				aria-label="Nib, {nib} pixel{nib === 1 ? '' : 's'}"
+				title={t('draw.nibTitle', { nib, next: nib === NIBS.at(-1) ? 'thinnest' : 'wider' })}
+				aria-label={t('draw.nib', { nib })}
 				onclick={nextNib}
 			>
 				<span
@@ -857,8 +854,8 @@
 					color = e.currentTarget.value;
 					if (tool === 'eraser') tool = 'pen';
 				}}
-				title="The colour to draw in — it starts as this area's own"
-				aria-label="Color to draw in"
+				title={t('draw.colorTitle')}
+				aria-label={t('draw.color')}
 			/>
 		</span>
 
@@ -867,50 +864,50 @@
 
 	<!-- Undo and redo, at the far left of the panel's bottom bar. -->
 		<span class="segmented undo" use:portal={bar}>
-			<button onclick={undo} disabled={!history.length} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">
+			<button onclick={undo} disabled={!history.length} title={t('draw.undoTitle')} aria-label={t('common.undo')}>
 				<Icon name="undo" size={16} />
 			</button>
-			<button onclick={redo} disabled={!future.length} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">
+			<button onclick={redo} disabled={!future.length} title={t('draw.redoTitle')} aria-label={t('common.redo')}>
 				<Icon name="redo" size={16} />
 			</button>
 		</span>
 
-	<div class="tools second" role="toolbar" aria-label="Board">
+	<div class="tools second" role="toolbar" aria-label={t('draw.board')}>
 		<!-- The ones that redraw the whole board rather than a pixel of it. All
 		     are one undo away, board and all. -->
 		<span class="segmented">
-			<button onclick={rotate} title="Turn the drawing a quarter turn clockwise" aria-label="Rotate">
+			<button onclick={rotate} title={t('draw.rotateTitle')} aria-label={t('draw.rotate')}>
 				<Icon name="rotate" size={16} />
 			</button>
-			<button onclick={() => flip('x')} title="Flip the drawing left to right" aria-label="Flip horizontally">
+			<button onclick={() => flip('x')} title={t('draw.flipXTitle')} aria-label={t('draw.flipX')}>
 				<Icon name="reflect-horizontal" size={16} />
 			</button>
-			<button onclick={() => flip('y')} title="Flip the drawing upside down" aria-label="Flip vertically">
+			<button onclick={() => flip('y')} title={t('draw.flipYTitle')} aria-label={t('draw.flipY')}>
 				<Icon name="reflect-vertical" size={16} />
 			</button>
 			<button
 				aria-pressed={cropping}
 				onclick={toggleCrop}
-				title={cropping ? 'Stop cropping' : 'Crop — drag a frame over the board'}
-				aria-label="Crop"
+				title={cropping ? t('draw.stopCropping') : t('draw.cropTitle')}
+				aria-label={t('draw.crop')}
 			>
 				<Icon name="crop" size={16} />
 			</button>
 		</span>
 		{#if cropping}
-			<button class="apply" disabled={!cropPixels} onclick={applyCrop} title="Keep only what is inside the frame">
-				Apply Crop
+			<button class="apply" disabled={!cropPixels} onclick={applyCrop} title={t('draw.applyCropTitle')}>
+				{t('draw.applyCrop')}
 			</button>
 		{/if}
 
 		<span class="segmented">
-			<button onclick={copy} title="Copy the drawing as an image (Ctrl/Cmd+C)" aria-label="Copy">
+			<button onclick={copy} title={t('draw.copyTitle')} aria-label={t('draw.copy')}>
 				<Icon name="copy" size={16} />
 			</button>
 			<button
 				onclick={paste}
-				title="Paste an image from the clipboard — it replaces the board and brings its own size (Ctrl/Cmd+V)"
-				aria-label="Paste"
+				title={t('draw.pasteTitle')}
+				aria-label={t('draw.paste')}
 			>
 				<Icon name="paste" size={16} />
 			</button>

@@ -560,7 +560,7 @@ export interface Dataset {
 	/**
 	 * What this table is called in the picker. Optional, because every table
 	 * stored before there was more than one has no name and is not going to
-	 * grow one by being read — see `UNTITLED_TABLE` for what it is called until
+	 * grow one by being read — see `untitledTable` in storage.ts for what it is called until
 	 * somebody types one.
 	 */
 	name?: string;

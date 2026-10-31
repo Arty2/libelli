@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t, type MessageKey } from '$lib/i18n';
 	import Icon from './Icon.svelte';
 	import type { AlignEdge } from '$lib/layout';
 	import type { Box, Template } from '$lib/types';
@@ -47,19 +48,19 @@
 	}: Props = $props();
 
 	const many = $derived(selectedBoxes.length > 1);
-	const plural = $derived(many ? ` ${selectedBoxes.length} Areas` : '');
+	const count = $derived(selectedBoxes.length);
 	const grouped = $derived(
 		many && selectedBoxes.every((b) => b.group) && new Set(selectedBoxes.map((b) => b.group)).size === 1
 	);
 
 	/** The same six the selection bar offers, as one row rather than six lines. */
-	const ALIGN_EDGES: Array<{ value: AlignEdge; icon: string; label: string }> = [
-		{ value: 'left', icon: 'obj-left', label: 'Align Left' },
-		{ value: 'centre-x', icon: 'obj-centre-x', label: 'Centre Horizontally' },
-		{ value: 'right', icon: 'obj-right', label: 'Align Right' },
-		{ value: 'top', icon: 'obj-top', label: 'Align Top' },
-		{ value: 'centre-y', icon: 'obj-centre-y', label: 'Centre Vertically' },
-		{ value: 'bottom', icon: 'obj-bottom', label: 'Align Bottom' }
+	const ALIGN_EDGES: Array<{ value: AlignEdge; icon: string; label: MessageKey }> = [
+		{ value: 'left', icon: 'obj-left', label: 'align.left' },
+		{ value: 'centre-x', icon: 'obj-centre-x', label: 'align.centreX' },
+		{ value: 'right', icon: 'obj-right', label: 'align.right' },
+		{ value: 'top', icon: 'obj-top', label: 'align.top' },
+		{ value: 'centre-y', icon: 'obj-centre-y', label: 'align.centreY' },
+		{ value: 'bottom', icon: 'obj-bottom', label: 'align.bottom' }
 	];
 
 	const frozen = $derived(!!template.locked);
@@ -95,7 +96,7 @@
 	class="menu"
 	bind:this={menu}
 	role="menu"
-	aria-label="Area actions"
+	aria-label={t('areaMenu.label')}
 	tabindex="-1"
 	style="left:{position.left}px;top:{position.top}px"
 >
@@ -103,11 +104,11 @@
 	     alignments as an icon row, because six of them as six lines would bury
 	     everything else. -->
 	{#if many}
-		<div class="align-row" role="group" aria-label="Align">
+		<div class="align-row" role="group" aria-label={t('align.group')}>
 			{#each ALIGN_EDGES as option (option.value)}
 				<button
-					title={option.label}
-					aria-label={option.label}
+					title={t(option.label)}
+					aria-label={t(option.label)}
 					disabled={frozen}
 					onclick={() => run(() => onalign(option.value))}
 				>
@@ -129,14 +130,14 @@
 		onclick={() => run(() => onpicking(!picking))}
 	>
 		<Icon name={picking ? 'checkbox-checked' : 'checkbox'} size={15} />
-		{picking ? 'Stop Selecting Multiple' : 'Select Multiple'}
+		{picking ? t('areaMenu.stopSelectingMultiple') : t('areaMenu.selectMultiple')}
 	</button>
 
 	<hr />
 
 	<button role="menuitem" disabled={frozen} onclick={() => run(() => onlock(!box.locked))}>
 		<Icon name={box.locked ? 'unlocked' : 'locked'} size={15} />
-		{box.locked ? 'Unlock' : 'Lock'}{plural}
+		{box.locked ? t('areaMenu.unlock', { count }) : t('areaMenu.lock', { count })}
 	</button>
 
 	<hr />
@@ -146,10 +147,10 @@
 	     and it wants to be pressed four times in a row rather than reopened from
 	     a menu between each press. -->
 	<button role="menuitem" onclick={() => run(oncopystyle)}>
-		<Icon name="copy" size={15} /> Copy Style
+		<Icon name="copy" size={15} /> {t('areaMenu.copyStyle')}
 	</button>
 	<button role="menuitem" disabled={frozen || !hasStyle} onclick={() => run(onpastestyle)}>
-		<Icon name="paste" size={15} /> Paste Style{plural}
+		<Icon name="paste" size={15} /> {t('areaMenu.pasteStyle', { count })}
 	</button>
 
 	<hr />
@@ -157,14 +158,14 @@
 	{#if many}
 		<button role="menuitem" disabled={frozen} onclick={() => run(ongroup)}>
 			<Icon name={grouped ? 'ungroup-objects' : 'group-objects'} size={15} />
-			{grouped ? 'Ungroup' : 'Group'}
+			{grouped ? t('selection.ungroup') : t('selection.group')}
 		</button>
 	{/if}
 	<button role="menuitem" disabled={frozen} onclick={() => run(onduplicate)}>
-		<Icon name="replicate" size={15} /> Duplicate{plural}
+		<Icon name="replicate" size={15} /> {t('areaMenu.duplicate', { count })}
 	</button>
 	<button class="danger" role="menuitem" disabled={frozen || (!many && !!box.locked)} onclick={() => run(ondelete)}>
-		<Icon name="trash" size={15} /> Delete{plural}
+		<Icon name="trash" size={15} /> {t('areaMenu.delete', { count })}
 	</button>
 </div>
 

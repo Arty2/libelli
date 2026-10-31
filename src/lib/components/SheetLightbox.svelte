@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	import Icon from './Icon.svelte';
 	import PrintSheet from './PrintSheet.svelte';
 	import { swipe } from '$lib/gestures';
@@ -313,7 +314,7 @@
 		if (zoom === 1 && !pinched) step(index + by);
 	}}
 >
-	<button class="plain close" onclick={onclose} title="Close" aria-label="Close">
+	<button class="plain close" onclick={onclose} title={t('common.close')} aria-label={t('common.close')}>
 		<Icon name="close" size={22} />
 	</button>
 
@@ -327,7 +328,7 @@
 		}}
 		ondblclick={onDblClick}
 		style="width:{stageW}px;height:{stageH}px;translate:{pan.x}px {pan.y}px;scale:{zoom}"
-		title="Double-click, pinch or Ctrl + scroll to look closer"
+		title={t('sheetLightbox.lookCloser')}
 	>
 		<span class="scaler" style="transform:scale({scale})">
 			<PrintSheet
@@ -347,15 +348,15 @@
 	<!-- Under the sheet with the count between them, the same one control the
 	     card lightbox puts there. -->
 	<div class="nav-bar" role="presentation" onclick={(e) => e.stopPropagation()}>
-		<button class="plain" disabled={index === 0} onclick={() => step(index - 1)} aria-label="Previous sheet">
+		<button class="plain" disabled={index === 0} onclick={() => step(index - 1)} aria-label={t('sheetLightbox.previousSheet')}>
 			<Icon name="chevron-left" size={26} />
 		</button>
-		<span class="counter">Sheet {index + 1} / {sheets.length}</span>
+		<span class="counter">{t('sheetLightbox.counter', { index: index + 1, total: sheets.length })}</span>
 		<button
 			class="plain"
 			disabled={index === sheets.length - 1}
 			onclick={() => step(index + 1)}
-			aria-label="Next sheet"
+			aria-label={t('sheetLightbox.nextSheet')}
 		>
 			<Icon name="chevron-right" size={26} />
 		</button>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	import Icon from './Icon.svelte';
 
 	/**
@@ -17,6 +18,6 @@
 	let { to, onclick, disabled = false }: Props = $props();
 </script>
 
-<button class="reset" title="Back to {to}" aria-label="Back to {to}" {disabled} {onclick}>
+<button class="reset" title={t('common.backTo', { to })} aria-label={t('common.backTo', { to })} {disabled} {onclick}>
 	<Icon name="close" size={12} />
 </button>
