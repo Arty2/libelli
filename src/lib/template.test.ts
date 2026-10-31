@@ -70,6 +70,12 @@ describe('the built-in template', () => {
 });
 
 describe('normaliseTemplate', () => {
+	it('locks a design that opens for copy editing, whatever the file says', () => {
+		const t = normaliseTemplate({ ...blankTemplate(), copy: true, locked: false });
+		expect(t).toMatchObject({ copy: true, locked: true });
+		expect(normaliseTemplate(blankTemplate()).locked).toBeUndefined();
+	});
+
 	it('refuses a schema from the future rather than half-reading it', () => {
 		expect(() => normaliseTemplate({ schema: 99, boxes: [] })).toThrow(/newer version/);
 	});

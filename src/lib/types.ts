@@ -536,6 +536,13 @@ export interface Template {
 	/** freezes the whole design: no dragging, no resizing, no option changes */
 	locked?: boolean;
 	/**
+	 * Opens for copy editing: the design is locked and the app shows only
+	 * what a writer needs — the words, the pictures that may be swapped, and
+	 * printing. Set on a package made for someone else to fill in (package.ts),
+	 * never by an edit; Edit Design clears it, and leaves `locked` as it was.
+	 */
+	copy?: boolean;
+	/**
 	 * Which of the bundled starters this template began as, by id — see
 	 * `STARTER_TEMPLATES` in onboarding.ts. What offers Reset, and what it
 	 * resets to. Kept through every edit, since a starter somebody has worked
